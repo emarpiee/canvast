@@ -548,6 +548,32 @@ test("the workspace menu exports the whole workspace as a backup or as plain fil
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("the library's filters are kept over a reload, and one button resets them all", async ({ app }) => {
+  const p = app.page;
+  await libraryWithTwo(p);
+  const reset = p.getByTestId("assets-reset-filters");
+  await expect(reset).toBeHidden(); // (nothing to reset)
+  await p.getByTestId("assets-usage").selectOption("unused");
+  await p.getByTestId("assets-sort").selectOption("name");
+  await p.getByTestId("assets-sort-dir").click();
+  await side(p, /^Favourites/).click();
+  await expect(reset).toBeVisible();
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await expect(p.getByTestId("assets-usage")).toHaveValue("unused");
+  await expect(p.getByTestId("assets-sort")).toHaveValue("name");
+  await expect(p.getByTestId("assets-sort-dir")).toHaveAttribute("aria-pressed", "true");
+  await expect(side(p, /^Favourites/)).toHaveAttribute("aria-current", "true");
+  await reset.click();
+  await expect(p.getByTestId("assets-usage")).toHaveValue("all");
+  await expect(p.getByTestId("assets-sort")).toHaveValue("newest");
+  await expect(p.getByTestId("assets-sort-dir")).toHaveAttribute("aria-pressed", "false");
+  await expect(side(p, /^All items/)).toHaveAttribute("aria-current", "true");
+  await expect(reset).toBeHidden();
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("sidebar: one More menu per row (Escape closes only it, one click elsewhere still works), sections fold and are remembered, and on a phone the list is a strip that opens on demand", async ({ app }) => {
   const p = app.page;
   await libraryWithTwo(p);

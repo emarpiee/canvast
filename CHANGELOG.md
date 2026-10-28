@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.18 — The library keeps its filters (2026-10-29)
+
+- **Added:** the library's filters (Show, Sort by, its direction, and the list chosen in the sidebar: a folder, tag, file type…) are kept over a reload and a restart, with the layout. A reset button (a funnel with a cross) beside them, shown only when a filter is not its default, puts them all back at once. The search is not kept: it has its own clear button.
+
 ## 0.50.17 — Files put back show at once (2026-10-29)
 
 - **Fixed:** in the desktop app, a library file put back in its own place from outside the app (from a trash, by hand) still showed as missing until the app was restarted: any change made in `library/` outside the app now lists the library again.

@@ -84,6 +84,7 @@ import house from "lucide-static/icons/house.svg";
 import plus from "lucide-static/icons/plus.svg";
 import refreshCw from "lucide-static/icons/refresh-cw.svg";
 import rotateCcw from "lucide-static/icons/rotate-ccw.svg";
+import funnelXSvg from "lucide-static/icons/funnel-x.svg";
 import rotateCwSquare from "lucide-static/icons/rotate-cw-square.svg";
 import ratioIcon from "lucide-static/icons/ratio.svg";
 import focusIcon from "lucide-static/icons/focus.svg";
@@ -323,6 +324,7 @@ export const ICONS = {
   plus: clean(plus),
   refresh: clean(refreshCw),
   rotateCcw: clean(rotateCcw),
+  funnelX: clean(funnelXSvg),
   rotateCwSquare: clean(rotateCwSquare),
   ratio: clean(ratioIcon),
   focus: clean(focusIcon),

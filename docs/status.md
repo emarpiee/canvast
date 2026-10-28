@@ -36,6 +36,14 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.18: the library keeps its filters (2026-10-29)
+
+**Implemented:** `ui.filters` (usage, sort, reversed, scope) saved by `keepFilters` on each render; `NO_FILTERS`; reset button (`funnelX`, registry row added); `.assets-btn[hidden]`.
+**Tested:** new organize test (kept over a reload, reset), icon audit, chromium and firefox 4/4.
+**Known failures:** none.
+**Committed:** on `main`, not pushed.
+**Next bounded task:** media player bar over the video in the viewer.
+
 ## v0.50.17: files put back show at once (2026-10-29)
 
 **Implemented:** an outside change under `library/` (or a readable file in `.hidden/`) rescans and then always lists the library again. Audit: the folder is followed by events only (no polling); followed live: library files, `library.json`, `hidden.json`, `workspace.json`, canvas files, `.hidden/`.

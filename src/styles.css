@@ -1085,6 +1085,7 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
    and the details on the right. Cards carry the picture only; the rest appears on hover, focus and selection. */
 #assets-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: var(--edge) var(--edge) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
 #assets-view[hidden] { display: none; }
+.assets-btn[hidden] { display: none; }
 /* A list of boards and canvases (the switcher, Place on…): its search field, and a folded board shows only its name (a click unfolds it). */
 .board-filter { padding: var(--sp-2) var(--sp-3) var(--sp-4); }
 .board-filter-input { box-sizing: border-box; width: 100%; }

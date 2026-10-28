@@ -170,6 +170,9 @@ const DRAG_STACK = 5;
 /** The library sidebar's sections, in their default order (the order can be changed by dragging them). */
 const SIDE_SECTIONS = ["folders", "types", "tags", "ctags"] as const;
 
+/** The library's filters as they are before any is chosen (the reset button goes back to these). */
+const NO_FILTERS = { usage: "all", sort: "newest", reversed: false, scope: "all" } as const;
+
 export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore): AssetsView {
   root.innerHTML = `
     <div class="assets-place-zone drop-zone" data-testid="assets-place-zone" hidden>${ICONS.mapPin}<span></span></div>
@@ -197,6 +200,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <option value="pixels">Most pixels</option><option value="type">Type A–Z</option><option value="tags">Tags A–Z</option><option value="folder">Folder A–Z</option><option value="favourite">Favourites first</option><option value="width">Widest first</option><option value="height">Tallest first</option><option value="canvases">On most canvases</option>
       </select>
       <button type="button" class="assets-btn is-icon" data-action="sort-dir" data-testid="assets-sort-dir" aria-pressed="false">${ICONS.arrowUpDown}</button>
+      <button type="button" class="assets-btn is-icon" data-action="reset-filters" data-testid="assets-reset-filters" aria-label="Reset all filters" title="Reset all filters: All items, Newest first, the whole library" hidden>${ICONS.funnelX}</button>
       <span class="assets-sep" role="separator"></span>
       <span class="split assets-import"><button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.arrowDownToLine}<span>Import</span></button><button type="button" class="assets-btn is-icon" data-action="import-menu" data-testid="assets-import-menu" aria-haspopup="menu" aria-label="Files or a folder" title="Bring in files, or a folder">${ICONS.chevronDown}</button></span>
       <span class="assets-sep" role="separator"></span>
@@ -293,6 +297,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const usageSel = root.querySelector<HTMLSelectElement>('[data-testid="assets-usage"]')!;
   const sortSel = root.querySelector<HTMLSelectElement>('[data-testid="assets-sort"]')!;
   const sortDirBtn = root.querySelector<HTMLButtonElement>('[data-testid="assets-sort-dir"]')!;
+  const resetFiltersBtn = root.querySelector<HTMLButtonElement>('[data-testid="assets-reset-filters"]')!;
   /** Sort order reversed from its usual one (newest, A to Z, largest and most used first). */
   let reversed = false;
   const SORT_LABEL: Record<SortKey, [usual: string, reversed: string]> = {
@@ -335,7 +340,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; expanded: string[]; sections: string[]; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], expanded: [], sections: [...SIDE_SECTIONS], sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; expanded: string[]; sections: string[]; filters: { usage: string; sort: string; reversed: boolean; scope: string }; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], expanded: [], sections: [...SIDE_SECTIONS], filters: { ...NO_FILTERS }, sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -360,6 +365,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (typeof saved.sheetH === "number" && saved.sheetH >= 120 && saved.sheetH <= 2000) ui.sheetH = saved.sheetH;
     if (Array.isArray(saved.closed)) ui.closed = saved.closed.filter((c) => typeof c === "string").slice(0, 8);
     if (Array.isArray(saved.expanded)) ui.expanded = saved.expanded.filter((c) => typeof c === "string").slice(0, 8);
+    if (saved.filters && typeof saved.filters === "object") {
+      const f = saved.filters as Partial<typeof ui.filters>;
+      ui.filters = { usage: typeof f.usage === "string" ? f.usage : "all", sort: typeof f.sort === "string" ? f.sort : "newest", reversed: f.reversed === true, scope: typeof f.scope === "string" ? f.scope : "all" };
+    }
     if (Array.isArray(saved.sections)) {
       const order = saved.sections.filter((c, i, a): c is string => (SIDE_SECTIONS as readonly string[]).includes(c as string) && a.indexOf(c) === i);
       ui.sections = [...order, ...SIDE_SECTIONS.filter((c) => !order.includes(c))];
@@ -373,6 +382,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   } catch {
     // unreadable: shown
   }
+  // (the kept filters: an option the menus do not have any more is not taken)
+  if ([...usageSel.options].some((o) => o.value === ui.filters.usage)) usageSel.value = ui.filters.usage;
+  if ([...sortSel.options].some((o) => o.value === ui.filters.sort)) sortSel.value = ui.filters.sort;
+  reversed = ui.filters.reversed;
+  showSort();
   const saveUi = (): void => {
     try {
       localStorage.setItem(UI_KEY, JSON.stringify(ui));
@@ -425,7 +439,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let places: AssetPlace[] = [];
   let generation = 0;
   /** Sidebar scope: "all", "favorites", "unfiled", "folder:<id>" or "tag:<lowercased tag>". */
-  let scope = "all";
+  let scope = ui.filters.scope; // (the filters are kept with the library's layout: a restart opens the library as it was left)
   /** Inline name input in the sidebar: a new folder (under `parent`) or a rename. */
   /** In-canvas tags across the workspace (ADR 0062), and those carried by instances of the open asset. */
   let canvasTags = new Map<string, { label: string; objects: number; canvases: Set<string>; assets: Set<string> }>();
@@ -1604,7 +1618,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return i === undefined ? null : revealIndex(i, block);
   };
   let filmOf: CatalogListing["entries"] | null = null;
+  /** Keep the filters (not the search) with the layout, and show the reset button only when one is not its default. */
+  const keepFilters = (): void => {
+    const f = { usage: usageSel.value, sort: sortSel.value, reversed, scope };
+    resetFiltersBtn.hidden = f.usage === NO_FILTERS.usage && f.sort === NO_FILTERS.sort && !f.reversed && f.scope === NO_FILTERS.scope;
+    if (JSON.stringify(f) === JSON.stringify(ui.filters)) return;
+    ui.filters = f;
+    saveUi();
+  };
   const render = (): void => {
+    keepFilters();
     root.querySelector<HTMLElement>(".assets-searchbox .cs-clear")!.hidden = !search.value;
     if (!listing) return;
     const rows = filtered();
@@ -3443,6 +3466,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const group = picked.size > 1 ? list.filter((e) => picked.has(e.hash)) : list;
     const first = group.find((e) => e.hash === selected) ?? group[0]!;
     startShow(first.hash, picked.size > 1 ? new Set(group.map((e) => e.hash)) : undefined);
+  });
+  resetFiltersBtn.addEventListener("click", () => {
+    usageSel.value = NO_FILTERS.usage;
+    sortSel.value = NO_FILTERS.sort;
+    reversed = false;
+    scope = NO_FILTERS.scope;
+    showSort();
+    renderSide();
+    render();
   });
   sortSel.addEventListener("change", () => {
     reversed = false; // a new order starts from its usual direction
