@@ -9,6 +9,8 @@ export interface ResetOptions {
   db: IDBDatabase | null;
   /** Another tab still holds the database open: it is asked to close; this says it is waiting. */
   onBlocked?: () => void;
+  /** Keep the device settings (the desktop build's rebuild from the workspace folder clears only its working copy). */
+  keepSettings?: boolean;
 }
 
 export async function resetAllData(o: ResetOptions): Promise<void> {
@@ -27,7 +29,7 @@ export async function resetAllData(o: ResetOptions): Promise<void> {
       r.onblocked = () => o.onBlocked?.(); // waits: the other tabs close their connection when they are told
     });
   }
-  try {
+  if (!o.keepSettings) try {
     for (const k of Object.keys(localStorage)) if (k.startsWith("canvast")) localStorage.removeItem(k);
     for (const k of Object.keys(sessionStorage)) if (k.startsWith("canvast")) sessionStorage.removeItem(k);
   } catch {

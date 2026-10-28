@@ -174,8 +174,6 @@ export interface DebugHook {
   originalBytes(hash: string): Promise<number[] | null>;
   /** Whether the canvas draws this original as locked (with a padlock). */
   pictureLocked(hash: string): boolean;
-  /** A full backup of the workspace, as base64 (the desktop build has no download a test can catch). */
-  fullBackup(): Promise<string>;
   /** Replace the document with a generated benchmark scene (no history, no save). */
   benchLoad(scene: BenchScene): Promise<{ objects: number; generateMs: number; loadMs: number; heapMB: number | null }>;
   /**
@@ -513,12 +511,6 @@ export function installDebugHook(
       else if (op === "check") ok = await session.checkPassword("hidden", password ?? "");
       else session.storage?.hidden?.lock();
       return { ok, state: (await session.storage?.hidden?.state()) ?? "browser" };
-    },
-    fullBackup: async () => {
-      const bytes = new Uint8Array(await (await session.exportArchive({ kind: "workspace" })).blob.arrayBuffer());
-      let bin = "";
-      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-      return btoa(bin);
     },
     flushStorage: async () => {
       await session.persistence.flush();

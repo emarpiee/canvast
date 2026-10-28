@@ -16,7 +16,7 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session, dele
     if (workspace) {
       const now = deleteTo?.get() ?? "trash";
       const option = (v: DeleteMode, label: string): string => `<option value="${v}"${v === now ? " selected" : ""}>${label}</option>`;
-      host.innerHTML = `<p data-testid="storage-folder">Your library's files are kept as ordinary files in <strong>${esc(workspace)}</strong>, under <code>library/</code>, named after their names in the library.</p>
+      host.innerHTML = `<p data-testid="storage-folder"><strong>${esc(workspace)}</strong> (File &gt; Open workspace folder… opens another)</p>
         <label class="storage-check">When canvast deletes a file (an item deleted from the library once undo no longer needs it, a deleted canvas or board)
           <select data-delete-to data-testid="storage-delete-to">${option("trash", "Move it to .trash in the workspace folder")}${option("system", "Move it to the system trash")}${option("erase", "Delete it permanently")}</select></label>
         <p class="storage-note">Files in <code>.trash</code> travel with the workspace folder to your other devices, and can be put back by hand.</p>`;

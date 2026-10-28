@@ -1734,7 +1734,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   });
   document.documentElement.dataset["version"] = __CANVAST_VERSION__; // before Settings is built: its Develop tab shows it
   // The library index in the library folder follows the workspace by itself (ADR 0159): a change pokes it, it writes a little later.
-  session.autoIndex = installAutoIndex({
+  // (not in the desktop build: its workspace folder has library.json, so this browser-format index would be a stale copy)
+  if (!storage?.workspaceFolder) session.autoIndex = installAutoIndex({
     enabled: () => settings.get("storage.autoIndex"),
     readOnly: () => session.readOnly,
     build: (scope, progress) => session.exportArchive(scope, progress),
@@ -1787,6 +1788,15 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       return (await session.setPassword(kind, first)) ? state("The password was set.", true) : state();
     },
     reset: async () => {
+      if (session.storage?.workspaceFolder) {
+        // The desktop build: the folder is the workspace; this only clears the working copy of this device and reads it again.
+        const sure = await confirmDialog({ title: "Rebuild from the workspace folder?", lines: ["This device's working copy is cleared and the workspace is read again from its folder. Edits not in the folder yet are written to it first.", "Nothing in the folder is deleted, and your settings stay."], confirmLabel: "Rebuild", danger: false });
+        if (!sure) return;
+        const p = beginProgress(editor, "reset", "Rebuilding from the workspace folder");
+        p.update(null, "the app reloads when it is done");
+        await session.storage.resetAll().catch((e) => p.fail(`Could not rebuild: ${(e as Error).message}`));
+        return;
+      }
       const folderStore = session.storage?.libraryFolder ?? null;
       const tree = session.tree;
       const boards = tree?.boards.length ?? 0;

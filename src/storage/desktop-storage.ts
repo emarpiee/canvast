@@ -14,6 +14,7 @@ import { LIBRARY_JSON } from "./library-mirror";
 import { WORKSPACE_FILE, WorkspaceMirror, watched } from "./workspace-mirror";
 import { BOARDS_DIR, WORKSPACE_NAMING } from "./workspace-names";
 import { HIDDEN_JSON, HiddenVault } from "./hidden-store";
+import { resetAllData } from "./reset";
 import type { AssetCatalog } from "../assets/asset-catalog";
 
 
@@ -151,7 +152,12 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     reconcile: (n) => void (n && mirror.library()),
   });
   const originals = watched(storage.originals, { put: library });
-  return { ...storage, workspace, backups, catalog, originals, libraryFolder: null, workspaceFolder: ws.path, hidden, folderSync, flush: () => mirror.flush() };
+  // Rebuild from the folder: what is not in the folder yet is written first, then only the working copy goes (the settings stay).
+  const resetAll = async (onBlocked?: () => void): Promise<void> => {
+    await mirror.flush();
+    await resetAllData({ db: storage.db, keepSettings: true, ...(onBlocked ? { onBlocked } : {}) });
+  };
+  return { ...storage, resetAll, workspace, backups, catalog, originals, libraryFolder: null, workspaceFolder: ws.path, hidden, folderSync, flush: () => mirror.flush() };
 }
 
 /** This device's id in the workspace folder (`.canvast/devices/<id>.json`), made once and kept. */

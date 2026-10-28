@@ -273,7 +273,7 @@ test("library folders are real folders: filing or renaming an item moves its fil
   }
 });
 
-test("a backup imported into a workspace folder: its boards, canvases and library are written as folders and files", async () => {
+test("a backup exported from Settings and imported into a workspace folder: written as folders and files; Rebuild from the folder reads it all again", async () => {
   const src = mkdtempSync(join(tmpdir(), "canvast-ws-"));
   const green = makePng(3, 2, () => [30, 200, 30, 255]);
   let { app, page } = await launch(src);
@@ -286,7 +286,19 @@ test("a backup imported into a workspace folder: its boards, canvases and librar
     await expect.poll(() => page.evaluate((id) => window.__canvastDebug.storedObjectIds(id).then((ids) => ids.length), t[0]!.canvases[0]!.id)).toBe(1);
     const hash = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries[0]!.hash));
     await page.evaluate((h) => window.__canvastDebug.libraryOp("createFolder", "f1", "Plants").then(() => window.__canvastDebug.libraryOp("file", h, "f1")), hash);
-    backup = await page.evaluate(() => window.__canvastDebug.fullBackup());
+    // Settings > Storage > Export backup, as a person would: Electron hands the download over (to a save dialog; here, to a set path).
+    const saved = `${src}-backup.canvast`;
+    await app.evaluate(({ BrowserWindow }, to) => {
+      const g = globalThis as { saved?: Promise<string> };
+      g.saved = new Promise((done) => BrowserWindow.getAllWindows()[0]!.webContents.session.once("will-download", (_e, item) => {
+        item.setSavePath(to);
+        item.once("done", (_d, state) => done(state));
+      }));
+    }, saved);
+    await page.getByTestId("save-status").click();
+    await page.getByTestId("set-export-full").click();
+    expect(await app.evaluate(() => (globalThis as { saved?: Promise<string> }).saved)).toBe("completed");
+    backup = readFileSync(saved).toString("base64");
   } finally {
     await app.close();
   }
@@ -311,6 +323,15 @@ test("a backup imported into a workspace folder: its boards, canvases and librar
   ({ app, page } = await launch(ws));
   try {
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, e.present]))), { timeout: 10_000 }).toEqual([["Green Leaf.png", true]]);
+    // Settings > Storage > Rebuild from the folder: the working copy goes, the app reloads, and reads it all again from the folder (settings kept).
+    await page.evaluate(() => window.__canvastDebug.setSetting("ui.density", "dense"));
+    await page.getByTestId("save-status").click();
+    await page.getByTestId("reset-all").click();
+    await Promise.all([page.waitForEvent("load"), page.getByTestId("confirm-ok").click()]);
+    await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000, polling: 100 });
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, e.present]))), { timeout: 10_000 }).toEqual([["Green Leaf.png", true]]);
+    expect(await page.evaluate(() => window.__canvastDebug.session().tree!.map((b) => b.name).sort())).toEqual(["Board 1", "Studies"]);
+    expect(await page.evaluate(() => localStorage.getItem("canvast.settings")?.includes("dense") ?? null)).toBe(true);
   } finally {
     await app.close();
   }

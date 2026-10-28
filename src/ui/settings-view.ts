@@ -15,6 +15,13 @@ import NOTICES from "../../THIRD_PARTY_NOTICES.md";
 import { capabilities, clearErrorLog, diagnosticReport, errorLog, onErrorLog } from "../app/diagnostics";
 import { ICONS } from "./icons";
 import { logoSvg } from "./brand";
+import { desktopBridge } from "../storage/desktop-bridge";
+
+/** The desktop build (ADR 0177): the workspace is a folder, so what Settings says about storage, privacy and the page differs. */
+const DESKTOP = !!desktopBridge();
+/** A setting's words as the desktop build needs them (it has an app window, not a tab or an address). */
+const forDesktop = (text: string): string =>
+  DESKTOP ? text.replace(/until the tab closes/g, "until the app closes").replace(/until this tab is closed or reloaded/g, "until the app is closed or reloaded").replace(/ An address ending in #debug turns it on for one session\./g, "") : text;
 
 /**
  * The Settings view (ADR 0048, engineering plan §14.40): a tabbed page, one of the three top-level views. Every row is one declared
@@ -295,7 +302,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     const rowHtml = (r: Row): string => {
       const id = `set-${r.key.replace(/\./g, "-")}`;
       const scope = SCOPE_LABEL[SETTINGS[r.key].scope];
-      return `<div class="set-row" data-row="${r.key}"><label for="${id}"><span class="set-label" id="${id}-l">${esc(r.label)}</span>${r.help ? `<span class="set-help" id="${id}-h">${esc(r.help)}</span>` : ""}</label>
+      return `<div class="set-row" data-row="${r.key}"><label for="${id}"><span class="set-label" id="${id}-l">${esc(forDesktop(r.label))}</span>${r.help ? `<span class="set-help" id="${id}-h">${esc(forDesktop(r.help))}</span>` : ""}</label>
               <div class="set-control">${controlHtml(r, id)}</div><span class="set-scope" title="Where this setting is kept">${scope}</span>
               <button type="button" class="set-reset" data-reset="${r.key}" aria-label="Reset ${esc(r.label)} to its default" title="Reset to the default">${ICONS.settingReset}</button></div>`;
     };
@@ -304,10 +311,13 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
           .map((c) => `<div class="set-card">${c.title ? `<h3>${esc(c.title)}</h3>` : ""}${c.rows.map(rowHtml).join("")}</div>`)
           .join("") +
         (t.id === "privacy"
-          ? pwCard("workspace", "Password for the workspace", "Asked when the app opens: nothing of the workspace is read or shown until it is given. It keeps people at your screen out; it does not encrypt your data, so someone with access to this browser's storage or to an exported file is not stopped. It cannot be recovered: to change or remove it you enter the old one.") +
-            pwCard("hidden", "Password for the Hidden items", "A password asked before the Hidden items open and before an export that includes them. The same limits apply: it does not encrypt the files. It cannot be recovered either.")
+          ? (DESKTOP
+              ? pwCard("workspace", "Password for the workspace", "Asked when the app opens: nothing of the workspace is shown until it is given. It keeps people at your screen out; it does not encrypt your data, so someone who can open the workspace folder, or an exported file, is not stopped. It cannot be recovered: to change or remove it you enter the old one.") +
+                pwCard("hidden", "Password for the Hidden items", "Hidden items are encrypted with it in the workspace folder: their files, names, tags and notes cannot be read without it. It is asked before the Hidden items open and before an export that includes them (an exported file is not encrypted). It cannot be recovered: if it is lost, so are the hidden items. It cannot be removed while items are hidden.")
+              : pwCard("workspace", "Password for the workspace", "Asked when the app opens: nothing of the workspace is read or shown until it is given. It keeps people at your screen out; it does not encrypt your data, so someone with access to this browser's storage or to an exported file is not stopped. It cannot be recovered: to change or remove it you enter the old one.") +
+                pwCard("hidden", "Password for the Hidden items", "A password asked before the Hidden items open and before an export that includes them. The same limits apply: it does not encrypt the files. It cannot be recovered either."))
           : t.id === "develop"
-          ? `<div class="set-info set-card" data-develop><dl><dt>Version</dt><dd>${esc(document.documentElement.dataset["version"] ?? "")}</dd><dt>Build</dt><dd>One file: this page. There is no separate debug build.</dd></dl>
+          ? `<div class="set-info set-card" data-develop><dl><dt>Version</dt><dd>${esc(document.documentElement.dataset["version"] ?? "")}</dd><dt>Build</dt><dd>${DESKTOP ? "The desktop app runs the same single file as the browser build." : "One file: this page. There is no separate debug build."}</dd></dl>
              <p class="set-note" data-dev-note role="status" hidden>Reload to apply the change. <button type="button" class="set-done" data-reload>Reload now</button></p></div>`
           : "")
       : t.id === "shortcuts"
@@ -315,13 +325,18 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
            <p><button type="button" class="set-reset" data-keys-reset-all>Reset every shortcut</button></p>
            <div data-tool-keys></div><div class="set-note" data-key-note role="status" aria-live="polite"></div><h3 class="set-sub">Fixed shortcuts</h3>${FIXED_SHORTCUTS.map((g) => `<div class="set-card"><h4>${esc(g.group)}</h4><dl>${g.items.map((i) => `<dt><kbd>${esc(i.keys)}</kbd></dt><dd>${esc(i.does)}</dd>`).join("")}</dl></div>`).join("")}</div>`
       : t.id === "storage"
-        ? `<div class="set-info set-card" data-storage><h3>Space</h3><p>Your canvases are kept in this browser's storage, on this device, unless you keep the files in a library folder (next card).</p>
+        ? (DESKTOP
+            ? `<div class="set-info set-card" data-folder-card><h3>Workspace folder</h3><div data-folder-host></div>
+             <p class="set-help">This folder is your workspace: the library's files under <code>library/</code>, the boards and canvases in <code>.canvast/boards/</code>. Back it up, sync it or copy it like any folder.</p></div>
+           <div class="set-info set-card" data-storage><h3>Working copy</h3><p>The app also keeps a working copy of the workspace on this device, so every change is safe at once; the folder follows a moment after editing pauses.</p>
+             <dl><dt>Used</dt><dd data-used>…</dd></dl></div>`
+            : `<div class="set-info set-card" data-storage><h3>Space</h3><p>Your canvases are kept in this browser's storage, on this device, unless you keep the files in a library folder (next card).</p>
              <dl><dt>Used</dt><dd data-used>…</dd><dt>Available</dt><dd data-quota>…</dd><dt>Protected from clearing</dt><dd><span data-persisted>…</span> <button type="button" data-persist hidden>Ask the browser to keep it</button></dd></dl>
              <p><strong>Browser storage is not a backup.</strong> Clearing site data, or the browser's own clean-up, removes it. Keep a copy (Backup, below).</p></div>
-           <div class="set-info set-card" data-folder-card><h3>Library folder</h3><div data-folder-host></div></div>
-           <div class="set-info set-card" data-saving><h3>Saving</h3>
-             <dl><dt>Status</dt><dd data-testid="storage-save-state" data-save-state>…</dd><dt>Last verified save</dt><dd data-save-verified>…</dd><dt>This tab</dt><dd data-testid="storage-role" data-save-role>…</dd></dl>
-             <p class="set-help">Every change is saved within a fraction of a second and read back to check. The indicator at the bottom shows the state; pressing it brings you here.</p></div>
+           <div class="set-info set-card" data-folder-card><h3>Library folder</h3><div data-folder-host></div></div>`) +
+          `<div class="set-info set-card" data-saving><h3>Saving</h3>
+             <dl><dt>Status</dt><dd data-testid="storage-save-state" data-save-state>…</dd><dt>Last verified save</dt><dd data-save-verified>…</dd><dt>${DESKTOP ? "This window" : "This tab"}</dt><dd data-testid="storage-role" data-save-role>…</dd></dl>
+             <p class="set-help">Every change is saved within a fraction of a second and read back to check${DESKTOP ? "; the workspace folder is written about 2 seconds after editing pauses, and when the app closes" : ""}. The indicator at the bottom shows the state; pressing it brings you here.</p></div>
            <div class="set-info set-card" data-backup><h3>Backup</h3>
              <p data-testid="set-last-backup" data-last-backup>…</p>
              <div class="action-rows">
@@ -331,13 +346,17 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
                <div class="action-row"><button type="button" data-backup-action="import" data-testid="set-import">Import backup…</button><span>Add a backup (or a full one with its incremental ones, picked together) to this workspace; nothing existing is replaced.</span></div>
                <input type="file" multiple accept=".canvast,.zip,application/zip" hidden data-testid="set-import-input">
              </div>
-             <p class="set-help">The browser does not report whether a download finished, so keep the file somewhere safe.</p></div>
-           <div class="set-info set-card set-danger" data-reset-card><h3>Start from scratch</h3>
+             <p class="set-help">${DESKTOP ? "Each export asks where to save the file." : "The browser does not report whether a download finished, so keep the file somewhere safe."}</p></div>` +
+          (DESKTOP
+            ? `<div class="set-info set-card" data-reset-card><h3>Rebuild from the folder</h3>
+             <p>Clears this device's working copy and reads the workspace again from its folder, for when something looks wrong. The files in the folder are not touched, and settings stay. (To delete a workspace, delete its folder.)</p>
+             <div class="storage-actions"><button type="button" data-reset-all data-testid="reset-all">Rebuild from the folder…</button></div></div>`
+            : `<div class="set-info set-card set-danger" data-reset-card><h3>Start from scratch</h3>
              <p>Deletes everything canvast keeps in this browser: all boards and canvases, the library, saved styles and settings. You are asked first, and offered a backup.</p>
-             <div class="storage-actions"><button type="button" class="is-danger" data-reset-all data-testid="reset-all">Delete all data…</button></div></div>`
+             <div class="storage-actions"><button type="button" class="is-danger" data-reset-all data-testid="reset-all">Delete all data…</button></div></div>`)
         : t.id === "about"
-          ? `<div class="set-info set-card"><h3 class="about-title"><span class="about-logo">${logoSvg()}</span>canvast <span data-testid="about-version">${esc(typeof __CANVAST_VERSION__ === "string" ? __CANVAST_VERSION__ : "dev")}</span></h3><p>An endless canvas that works offline, in one file. Drawing uses the browser's Canvas 2D (the browser decides whether the graphics card helps).</p></div>
-             <div class="set-info set-card"><h3>This browser</h3><dl data-testid="about-capabilities">${capabilities().map((c) => `<dt>${c.ok ? "✓" : "✗"} ${esc(c.name)}</dt><dd>${esc(c.note)}</dd>`).join("")}</dl></div>
+          ? `<div class="set-info set-card"><h3 class="about-title"><span class="about-logo">${logoSvg()}</span>canvast <span data-testid="about-version">${esc(typeof __CANVAST_VERSION__ === "string" ? __CANVAST_VERSION__ : "dev")}</span></h3><p>${DESKTOP ? "An endless canvas that works offline: the desktop app, on a workspace folder. Drawing uses Canvas 2D." : "An endless canvas that works offline, in one file. Drawing uses the browser's Canvas 2D (the browser decides whether the graphics card helps)."}</p></div>
+             <div class="set-info set-card"><h3>${DESKTOP ? "What this app can use" : "This browser"}</h3><dl data-testid="about-capabilities">${capabilities().map((c) => `<dt>${c.ok ? "✓" : "✗"} ${esc(c.name)}</dt><dd>${esc(c.note)}</dd>`).join("")}</dl></div>
              <div class="set-info set-card"><h3>Errors this session</h3><ul class="set-errors" data-testid="about-errors"></ul>
                <div class="storage-actions"><button type="button" data-about="report" data-testid="about-report">Save a diagnostic report</button><button type="button" data-about="clear" data-testid="about-clear">Clear the list</button></div>
                <p class="set-help">The report is a text file with the version, this browser, the numbers above and the errors. It holds no canvas content. canvast sends nothing: you send the file if you choose to.</p></div>
