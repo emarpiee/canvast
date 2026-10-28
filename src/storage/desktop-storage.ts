@@ -41,6 +41,7 @@ export function bridgeDir(bridge: DesktopBridge, name: string, deleteTo: () => D
       };
     },
     removeEntry: (path) => bridge.remove(path, deleteTo()),
+    sizes: (paths) => bridge.sizes(paths),
   };
 }
 

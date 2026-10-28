@@ -20,6 +20,8 @@ export interface Dir {
   removeEntry(name: string): Promise<void>;
   /** The names in the folder (a real directory handle has it; the tests' stand-in too). */
   keys?(): AsyncIterable<string>;
+  /** The size of each file, or null when it is not there, in one look (the desktop build's workspace folder): no bytes are read. */
+  sizes?(names: string[]): Promise<Array<number | null>>;
   queryPermission?(o: { mode: "readwrite" }): Promise<PermissionState>;
   requestPermission?(o: { mode: "readwrite" }): Promise<PermissionState>;
 }
@@ -255,6 +257,21 @@ class ExternalFolder {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * Whether each file is there with its size, as `has`, for many at once: where the folder can say sizes (the desktop build), one look
+   * for all of them and no bytes read (reading every file to check it was there read the whole library from the disk).
+   */
+  async hasMany(items: ReadonlyArray<{ hash: string; size: number; file?: string | undefined }>): Promise<boolean[]> {
+    if (this.dir?.sizes && this.status === "ready") {
+      const files = items.map((i) => i.file ?? i.hash);
+      const sizes = await this.dir.sizes(files);
+      return items.map((it, k) => this.naming.valid(it.hash, files[k]!) && sizes[k] === (isHiddenFile(files[k]!) ? it.size + SEAL_OVERHEAD : it.size));
+    }
+    const out: boolean[] = [];
+    for (let i = 0; i < items.length; i += 50) out.push(...(await Promise.all(items.slice(i, i + 50).map((s) => this.has(s.hash, s.size, s.file)))));
+    return out;
   }
 
   /** Every file of the folder that is an original (named by hash, with or without an extension), with its size. */

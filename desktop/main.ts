@@ -10,7 +10,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shel
 import { execFile } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, watch, writeFileSync } from "node:fs";
-import { mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises";
+import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { BOARDS_DIR, isSafeRelativePath } from "../src/storage/workspace-names";
 import { pathToFileURL } from "node:url";
@@ -283,6 +283,25 @@ function installFileCalls(win: BrowserWindow, root: string): void {
     own(e);
     if (!(bytes instanceof Uint8Array)) throw new Error("bytes expected");
     await writeAtomic(await inside(root, rel), bytes, durable !== false);
+  });
+  // Many files' sizes at once (whether the library's files are still there), without reading them. A link is not followed (lstat), so a
+  // path can only ever say something about the workspace folder itself.
+  ipcMain.handle("canvast:sizes", async (e, rels: unknown) => {
+    own(e);
+    if (!Array.isArray(rels)) throw new Error("paths expected");
+    return Promise.all(
+      rels.map(async (r) => {
+        if (typeof r !== "string" || !isSafeRelativePath(r)) return null;
+        const full = resolve(root, ...r.split("/"));
+        if (!full.startsWith(root + sep)) return null;
+        try {
+          const s = await lstat(full);
+          return s.isFile() ? s.size : null;
+        } catch {
+          return null;
+        }
+      }),
+    );
   });
   // A file of the workspace opened in the system's default app for its kind (one canvast cannot show, or to edit it elsewhere).
   ipcMain.handle("canvast:openFile", async (e, rel: string) => {

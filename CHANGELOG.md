@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.8 — The library lists at once (2026-10-28)
+
+- **Fixed:** in the desktop app, listing the library read every file in it from the disk to check it was still there: with a library of 2,500 files on a spinning disk the library stayed empty for about 11 seconds after opening, and again on each refresh. Each file's size is now asked for, all of them in one call, and nothing is read.
+- **Changed:** the library's view controls (layout, columns, thumbnail size) are inside its status bar, at the right, instead of floating above it.
+
 ## 0.50.7 — A start screen, one word for each thing (2026-10-28)
 
 - **Added:** a start screen while a workspace opens: the logo, *Opening the workspace* and what is being done (reading the workspace and its folder, loading the canvas, checking the library), in front of the whole app until everything is ready, so nothing shows empty or half-loaded. It steps aside for the lock screen. Each step is also said in the developer tools' console with its time (*canvast start: …*), to find what makes a start slow.

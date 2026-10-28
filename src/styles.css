@@ -1087,11 +1087,12 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 .assets-bar input[type="search"], .assets-bar select { height: var(--ctl); padding: 0 var(--sp-6); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
 .assets-bar select { padding-right: var(--sp-4); }
 /* The status bar: the canvas's own readout and controls (the same classes, so one look), in a row under the library instead of floating. */
-/* The library's status bar is the canvas's (.hud-bottom): the full-width strip at the bottom, the view controls just above it at the right.
-   Here it sits in the page's column instead of over the canvas, from edge to edge. */
-#assets-view > .assets-statusbar, #assets-view .assets-statusbar { position: static; flex: none; margin: 0 calc(-1 * var(--edge)); }
+/* The library's status bar is the canvas's (.hud-bottom): the full-width strip at the bottom. Here it sits in the page's column, from edge
+   to edge, and the view controls are inside the strip at its right (nothing floats over the grid). */
+#assets-view .assets-statusbar { position: static; flex: none; flex-direction: row; align-items: center; margin: var(--near) calc(-1 * var(--edge)) 0; background: var(--hud-bg); border-top: 1px solid var(--hud-border); pointer-events: auto; }
 #assets-view .assets-statusbar > :is(.hud-readout, .hud-controls) { opacity: 1; }
-.assets-statusbar > .hud-controls { align-items: center; }
+#assets-view .assets-statusbar > .hud-readout { order: 1; flex: 1; background: none; border: 0; backdrop-filter: none; }
+#assets-view .assets-statusbar > .hud-controls { order: 2; align-self: center; align-items: center; margin: 0 var(--edge) 0 0; padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; }
 .assets-count { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .assets-picked, .assets-total { color: var(--hud-muted); }
 #assets-view.is-viewing .assets-statusbar { display: none; }

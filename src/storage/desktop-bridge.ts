@@ -27,6 +27,8 @@ export interface DesktopBridge {
    * `durable: false` does not wait for the disk to confirm it (many files at once): `syncFiles` does that later, for all of them.
    */
   write(path: string, bytes: Uint8Array, opts?: { durable?: boolean }): Promise<void>;
+  /** The size of each file of the workspace folder, or null when it is not there (or not a plain file), in one call; nothing is read. */
+  sizes(paths: string[]): Promise<Array<number | null>>;
   /** Open a file of the workspace folder in the system's default app for its kind. An error in plain words, or "" when it opened. */
   openFile(path: string): Promise<string>;
   /** Wait until the files written with `durable: false` are really on the disk (one request for the whole disk where it can). */
