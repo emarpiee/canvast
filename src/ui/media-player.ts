@@ -483,11 +483,11 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
   const sync = (): void => {
     const id = editor.selection.size === 1 ? [...editor.selection][0]! : null;
     const o = id ? doc.get(id) : undefined;
-    const want = o && o.kind === "image" && o.media && !o.hidden ? o : null;
-    // Players follow their objects; one whose object is gone or hidden stops without writing.
+    const want = o && o.kind === "image" && o.media && !o.hidden && !assets.isHidden(o.assetId) ? o : null;
+    // Players follow their objects; one whose object is gone or hidden (or its library item hidden) stops without writing.
     for (const p of [...players.values()]) {
       const cur = doc.get(p.o.id);
-      if (!cur || cur.kind !== "image" || !cur.media || cur.hidden) {
+      if (!cur || cur.kind !== "image" || !cur.media || cur.hidden || assets.isHidden(cur.assetId)) {
         p.eng.unload();
         p.eng.el.remove();
         players.delete(p.o.id);

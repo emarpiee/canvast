@@ -706,6 +706,15 @@ async function start(): Promise<void> {
   doc.subscribe((source, changed) => {
     if (source === "load" && changed === null) followStyles();
   });
+  // Hidden library items are drawn as a padlock on every canvas, whatever the password state, until they are shown again.
+  const syncHidden = async (): Promise<void> => {
+    const hidden = await session.catalog?.hiddenHashes().catch(() => null);
+    if (hidden && assets.setHidden(hidden)) {
+      tiles.clear();
+      invalidate();
+    }
+  };
+  session.subscribeAssets((_meta, usageOnly) => void (usageOnly || syncHidden()));
   const assetNames = new AssetNames(async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "");
   assetNames.subscribe(() => invalidate());
   if (storage) {
@@ -713,6 +722,7 @@ async function start(): Promise<void> {
       // A workspace password: nothing of the workspace is read or drawn until it is given.
       const lock = await session.catalog?.lock("workspace").catch(() => null);
       if (lock) await openLockScreen((typed) => session.checkPassword("workspace", typed));
+      await syncHidden(); // (before the first canvas is drawn)
       await session.start();
       if (session.startup?.kind === "migrated") {
         const m = session.startup.migration;

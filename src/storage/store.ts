@@ -105,6 +105,8 @@ export interface CatalogStore {
   /** The listing again only when something changed since `prev` (null when nothing did). */
   relist(prev: CatalogListing): Promise<CatalogListing | null>;
   entry(hash: string): Promise<CatalogEntry | undefined>;
+  /** The hashes of the active items that are hidden (their pictures are drawn as a padlock on every canvas). */
+  hiddenHashes(): Promise<Set<string>>;
   locations(hash: string): Promise<AssetLocation[]>;
   thumb(hash: string): Promise<ThumbRecord | undefined>;
   putThumb(rec: ThumbRecord): Promise<void>;

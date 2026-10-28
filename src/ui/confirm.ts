@@ -1,4 +1,28 @@
 import { esc } from "./format";
+import { ICONS } from "./icons";
+
+/** A password input with a button that shows what was typed and hides it again (`attrs`: the input's own attributes). */
+export function secretFieldHtml(attrs: string): string {
+  return `<span class="secret-field"><input type="password" class="prompt-input" ${attrs}><button type="button" class="secret-reveal" data-testid="secret-reveal" aria-pressed="false" aria-label="Show the password" title="Show the password">${ICONS.passwordShow}</button></span>`;
+}
+
+/** Make the reveal button of every secret field in `root` work (the input keeps the focus and the caret). */
+export function wireSecretFields(root: HTMLElement): void {
+  for (const field of root.querySelectorAll<HTMLElement>(".secret-field")) {
+    const input = field.querySelector<HTMLInputElement>("input")!;
+    const btn = field.querySelector<HTMLButtonElement>(".secret-reveal")!;
+    btn.addEventListener("pointerdown", (e) => e.preventDefault()); // (the input keeps the focus)
+    btn.addEventListener("click", () => {
+      const show = input.type === "password";
+      input.type = show ? "text" : "password";
+      btn.setAttribute("aria-pressed", String(show));
+      const label = show ? "Hide the password" : "Show the password";
+      btn.setAttribute("aria-label", label);
+      btn.title = label;
+      btn.innerHTML = show ? ICONS.passwordHide : ICONS.passwordShow;
+    });
+  }
+}
 
 export interface ConfirmOptions {
   title: string;
@@ -104,18 +128,21 @@ export function promptDialog(opts: PromptOptions): Promise<string | null> {
   dlg.innerHTML = `
     <h2 id="prompt-title">${esc(opts.title)}</h2>
     ${opts.lines.map((l) => `<p>${esc(l)}</p>`).join("")}
-    <input type="${opts.secret ? "password" : "text"}" class="prompt-input" data-testid="prompt-input" aria-labelledby="prompt-title" autocomplete="${opts.secret ? "new-password" : "off"}" spellcheck="false" value="${esc(opts.value)}">
+    ${opts.secret
+      ? secretFieldHtml(`data-testid="prompt-input" aria-labelledby="prompt-title" autocomplete="new-password" spellcheck="false" value="${esc(opts.value)}"`)
+      : `<input type="text" class="prompt-input" data-testid="prompt-input" aria-labelledby="prompt-title" autocomplete="off" spellcheck="false" value="${esc(opts.value)}">`}
     <div class="confirm-actions">
       <button type="button" data-testid="prompt-cancel" value="cancel">Cancel</button>
       <button type="button" class="is-primary" data-testid="prompt-ok" value="ok">${esc(opts.confirmLabel)}</button>
     </div>`;
   document.body.appendChild(dlg);
   const input = dlg.querySelector<HTMLInputElement>(".prompt-input")!;
+  wireSecretFields(dlg);
   return new Promise((resolve) => {
     let answer: string | null = null;
     dlg.addEventListener("click", (e) => {
       const b = (e.target as HTMLElement).closest("button");
-      if (!b) return;
+      if (!b || b.classList.contains("secret-reveal")) return;
       if (b.value === "ok") answer = input.value;
       dlg.close();
     });

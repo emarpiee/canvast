@@ -247,6 +247,7 @@ import distH from "lucide-static/icons/align-horizontal-distribute-center.svg";
 import distV from "lucide-static/icons/align-vertical-distribute-center.svg";
 import grid3x3 from "lucide-static/icons/grid-3x3.svg";
 import gripIcon from "lucide-static/icons/grip.svg";
+import gripVerticalSvg from "lucide-static/icons/grip-vertical.svg";
 import captionsSvg from "lucide-static/icons/captions.svg";
 import captionsOffSvg from "lucide-static/icons/captions-off.svg";
 import scanTextSvg from "lucide-static/icons/scan-text.svg";
@@ -264,6 +265,8 @@ import x from "lucide-static/icons/x.svg";
 import eye from "lucide-static/icons/eye.svg";
 import eyeClosedIcon from "lucide-static/icons/eye-closed.svg";
 import eyeOff from "lucide-static/icons/eye-off.svg";
+import passwordShowSvg from "lucide-static/icons/view.svg";
+import passwordHideSvg from "lucide-static/icons/eye-dashed.svg";
 import group from "lucide-static/icons/group.svg";
 import image from "lucide-static/icons/image.svg";
 import layers from "lucide-static/icons/layers.svg";
@@ -483,6 +486,8 @@ export const ICONS = {
   eye: clean(eye),
   eyeOff: clean(eyeOff),
   eyeClosed: clean(eyeClosedIcon),
+  passwordShow: clean(passwordShowSvg),
+  passwordHide: clean(passwordHideSvg),
   lockKeyhole: clean(lockKeyhole),
   lockKeyholeOpen: clean(lockKeyholeOpen),
   ungroup: clean(ungroup),
@@ -516,6 +521,7 @@ export const ICONS = {
   distV: clean(distV),
   grid3x3: clean(grid3x3),
   gripIcon: clean(gripIcon),
+  gripVertical: clean(gripVerticalSvg),
   captions: clean(captionsSvg),
   captionsOff: clean(captionsOffSvg),
   scanText: clean(scanTextSvg),

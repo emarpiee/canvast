@@ -118,6 +118,9 @@ One icon per function: two buttons that do different things never share an icon,
 | `eye` | Show all hidden |
 | `eye-closed` | Hide from the library; the Hidden list of the library |
 | `eye-off` | Hide the selection; Hide selection |
+| `view` | Show the password (a password field) |
+| `eye-dashed` | Hide the password again (a password field) |
+| `grip-vertical` | Move a field of a library item's note (drag, or the Up and Down arrows) |
 | `file-archive` | Export all files as ZIP; Export the files of canvas Canvas 1 as a ZIP |
 | `file-output` | Export canvas Canvas 1; Export as archive |
 | `file-type` | By type |

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.0 — Hidden means hidden, an eye on passwords, fields in your order (2026-10-28)
+
+- **Added:** every password field (the lock screen, setting or giving a password) has an eye button at its end that shows what was typed and hides it again; the field keeps the focus.
+- **Added:** the fields of a library item's note can be put in any order: drag a row by its grip, or press the Up and Down arrows on the grip. The order is stored with the item.
+- **Changed:** a hidden library item's pictures on every canvas show a padlock at once, in the browser and in the desktop app, whether or not the Hidden password was given, until the item is shown again. A hidden video or sound on a canvas does not play.
+- **Fixed:** in the desktop app, a hidden item's card and details picture could stay blank (until the app was restarted) after the app was reopened, even once the Hidden list was opened or the item shown again: Similar images read the hidden item's picture while it was still locked, and the library kept that failure. Hidden items are no longer read for Similar images, and a picture that could not be read is tried again when the library is read again or the hidden items are opened.
+
 ## 0.49.0 — The desktop app: your workspace as a folder of files (2026-10-28)
 
 - **Added:** a **desktop app for Linux** (`canvast-0.49.0-x86_64.AppImage`, attached to the release): the same app, whose workspace is a folder of ordinary files you choose (File > Open workspace folder…), so a sync tool, a backup tool or a file manager can see it. The library's files are under `library/`, named after their names in the library, in folders that are its library folders; the boards and canvases (one `.cvst` file each) and the names, order, tags and folders are in the app's own `.canvast/` folder, out of the way (ADR 0177).

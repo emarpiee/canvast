@@ -165,6 +165,8 @@ export class AssetLibrary {
   private readonly missing = new Set<string>();
   /** Of the missing: hidden items' encrypted files while the Hidden items are locked (drawn with a padlock). */
   private readonly locked = new Set<string>();
+  /** Library items that are hidden: their pictures are never read or drawn on a canvas, whatever the password state (a padlock instead). */
+  private hidden = new Set<string>();
   /** Originals the browser could not decode at a reduced size. */
   private readonly noReduced = new Set<string>();
   private readonly memoryOnly = new Map<string, AssetRecord>();
@@ -372,7 +374,24 @@ export class AssetLibrary {
   }
 
   isLocked(hash: string): boolean {
-    return this.locked.has(hash);
+    return this.locked.has(hash) || this.hidden.has(hash.split("#")[0]!.replace(SMALL_KEY, ""));
+  }
+
+  /** Whether this original is a hidden item's (its picture is not shown outside the library). */
+  isHidden(hash: string): boolean {
+    return this.hidden.has(hash);
+  }
+
+  /** The hidden items now: the newly hidden leave memory, the shown again are read. True when anything changed (tiles must be drawn again). */
+  setHidden(hashes: ReadonlySet<string>): boolean {
+    const changed = hashes.size !== this.hidden.size || [...hashes].some((h) => !this.hidden.has(h));
+    if (!changed) return false;
+    const was = this.hidden;
+    this.hidden = new Set(hashes);
+    for (const h of hashes) if (!was.has(h)) this.forget(h);
+    for (const h of was) if (!hashes.has(h)) this.retry(h);
+    this.onReady();
+    return true;
   }
 
   /** Forget that a hash was missing so the next draw retries (after a restore). */
@@ -397,6 +416,7 @@ export class AssetLibrary {
    */
   get(hash: string, shownPx = Infinity, edge = 0): RasterSource | null {
     const now = performance.now();
+    if (this.hidden.has(hash.split("#")[0]!)) return null;
     const small = edge > SMALL_EDGE && shownPx <= SMALL_EDGE / 2 && !this.noReduced.has(hash);
     const full = this.decoded.get(hash);
     const reduced = this.decoded.get(hash + SMALL_KEY);

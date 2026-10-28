@@ -635,6 +635,13 @@ dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
 /* the field of a prompt (and of the lock screen): the same as a field in Settings */
 dialog.confirm .prompt-input { box-sizing: border-box; display: block; width: 100%; height: var(--ctl); padding: 0 var(--sp-6); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
 dialog.confirm .prompt-input:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+/* A password field: the eye button inside its right end shows what was typed. */
+.secret-field { position: relative; display: block; }
+dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) + var(--sp-6)); }
+.secret-reveal { position: absolute; top: 0; bottom: 0; right: var(--sp-3); display: inline-flex; align-items: center; justify-content: center; width: var(--icon-xl); height: var(--icon-xl); margin: auto 0; padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-pill); cursor: pointer; }
+.secret-reveal:hover, .secret-reveal[aria-pressed="true"] { color: var(--hud-fg); background: var(--hud-hover); }
+.secret-reveal:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+.secret-reveal svg { width: var(--icon-md); height: var(--icon-md); }
 .confirm-actions { display: flex; justify-content: flex-end; gap: var(--sp-4); margin-top: var(--sp-6); }
 .confirm-actions button {
   font: var(--weight-medium) var(--text-md) var(--font-ui);
@@ -1169,7 +1176,15 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 /* the note (plain text) and the fields the user names: a name and a value per row, × to remove one, "Add a field" below */
 .asset-note-box { display: block; width: 100%; min-height: calc(var(--sp-15) + var(--sp-8)); resize: vertical; box-sizing: border-box; }
 .asset-fields { list-style: none; margin: var(--sp-4) 0 0; padding: 0; display: grid; gap: var(--sp-3); }
-.asset-field { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto; gap: var(--sp-3); align-items: center; }
+.asset-field { display: grid; grid-template-columns: auto minmax(0, 2fr) minmax(0, 3fr) auto; gap: var(--sp-3); align-items: center; }
+/* the grip moves a field (drag it, or the Up and Down arrows on it); the row being dragged is lifted */
+.field-grip { display: inline-flex; align-items: center; justify-content: center; width: var(--icon-lg); height: var(--ctl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-sm); cursor: grab; touch-action: none; }
+.field-grip:hover { color: var(--hud-fg); background: var(--hud-hover); }
+.field-grip:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+.field-grip:disabled { cursor: default; opacity: 0.4; }
+.field-grip svg { width: var(--icon-md); height: var(--icon-md); }
+.asset-field.is-moving { background: var(--hud-hover); border-radius: var(--r-sm); }
+.asset-field.is-moving .field-grip { cursor: grabbing; }
 .asset-field input { min-width: 0; }
 .asset-field .field-key { color: var(--hud-muted); }
 .asset-notes > .assets-btn[data-action="field-add"] { margin-top: var(--sp-4); }

@@ -399,7 +399,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let naming: { kind: "new"; parent: string | null } | { kind: "rename-tag"; key: string; label: string } | { kind: "rename-ctag"; key: string; label: string } | { kind: "rename"; id: string } | null = null;
   const scroller = root.querySelector<HTMLElement>(".assets-scroll")!;
   /** A thumbnail being read or made: who still wants it (a card that scrolled away does not), and whether it is for the screen or the background. */
-  type ThumbJob = { p: Promise<string>; wants: Array<() => boolean>; urgent: boolean };
+  type ThumbJob = { p: Promise<string>; wants: Array<() => boolean>; urgent: boolean; failed?: boolean };
   const thumbs = new Map<string, ThumbJob>();
   const thumbUrls = new Map<string, string>(); // the ones already loaded, oldest first: a redrawn grid shows them at once instead of blank cards
   /** A file the browser cannot show gets no picture at all (ADR 0089): a fixed tile with the file icon, the extension and one general message. */
@@ -461,6 +461,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       () => (job.wants = []),
       (e) => {
         if (e instanceof ThumbSkipped && thumbs.get(hash) === job) thumbs.delete(hash); // asked again later, it is made then
+        else job.failed = true; // tried again when the library is read again (the file may have been mid-move, or the hidden items locked)
       },
     );
     thumbs.set(hash, job);
@@ -553,10 +554,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const dropStaleThumbs = (): void => {
     const live = new Set(listing?.entries.map((e) => e.hash));
     for (const [hash, job] of thumbs) {
-      if (live.has(hash)) continue;
+      if (live.has(hash) && !job.failed) continue;
       thumbs.delete(hash);
       thumbUrls.delete(hash);
       void job.p.then((url) => URL.revokeObjectURL(url), () => undefined);
+      // A card kept on the screen with no picture asks again.
+      const img = job.failed ? mounted.get(hash)?.el.querySelector<HTMLImageElement>("img.is-broken") : null;
+      if (img) {
+        img.classList.remove("is-broken");
+        loadThumb(img);
+      }
     }
   };
 
@@ -1335,7 +1342,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return true;
     };
     const rows = listing.entries.filter((e) => inScope(e) && matchesQuery(e, words, usage));
-    if (wantsLooks) ensureLooks(listing.entries.filter((e) => !isCard(e)).map((e) => e.hash));
+    // (hidden items only while their list is open: they are in no Similar group, and their files may be locked)
+    if (wantsLooks) ensureLooks(listing.entries.filter((e) => !isCard(e) && (scope === "hidden" || !meta(e).hidden)).map((e) => e.hash));
     // Look-alikes are listed together, the biggest group first, whatever the sort (the point is to see them side by side).
     if (scope === "similar") return rows.sort((a, b) => group.get(a.hash)! - group.get(b.hash)! || collator.compare(a.name, b.name));
     const key = sortSel.value as SortKey;
@@ -1929,6 +1937,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       back.setSelectionRange(kept.start, kept.end);
       back.scrollTop = kept.top;
     }
+    if (focusGrip !== null) inspector.querySelector<HTMLElement>(`.field-grip[data-index="${focusGrip}"]`)?.focus();
+    focusGrip = null;
     // The viewer's favourite button follows the stored state.
     if (e && slideHash === e.hash) viewer.querySelector<HTMLElement>('[data-act="favorite"]')!.setAttribute("aria-pressed", String(fav));
   };
@@ -2023,6 +2033,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <h3><label for="asset-note-box">Note</label></h3>
         <textarea id="asset-note-box" class="asset-note-box" data-prop="note" data-testid="asset-note" rows="4" maxlength="${MAX_NOTE}" placeholder="Anything about it, in plain text"${dis}>${esc(m.note)}</textarea>
         ${rows.length ? `<ul class="asset-fields" data-testid="asset-fields">${rows.map((f, i) => `<li class="asset-field">
+            <button type="button" class="field-grip" data-index="${i}" aria-label="Move the field ${esc(f.key || String(i + 1))}" title="Drag to move this field (or the Up and Down arrows)"${dis}>${ICONS.gripVertical}</button>
             <input class="field-key" data-prop="key-${i}" list="field-key-suggest" value="${esc(f.key)}" placeholder="Name" aria-label="Name of field ${i + 1}" maxlength="${MAX_FIELD_KEY}"${dis}>
             <input class="field-value" data-prop="value-${i}" value="${esc(f.value)}" placeholder="Value" aria-label="${f.key ? `Value of ${esc(f.key)}` : `Value of field ${i + 1}`}" maxlength="${MAX_FIELD_VALUE}"${dis}>
             <button type="button" class="assets-btn is-icon" data-action="field-remove" data-index="${i}" aria-label="Remove the field ${esc(f.key || String(i + 1))}" title="Remove this field"${dis}>${ICONS.x}</button>
@@ -2031,6 +2042,60 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <button type="button" class="assets-btn" data-action="field-add" data-testid="asset-field-add" title="Add a field with a name you choose (a link, a source, an author...)"${dis}>${ICONS.fieldAdd}<span>Add a field</span></button>
       </section>`;
   };
+
+  /** The grip to focus once the details are drawn again (a field moved with the keyboard). */
+  let focusGrip: number | null = null;
+  /** After the rows were moved on the screen: each row's parts take its new place's number (a field being typed in stays its own when redrawn), then the order is stored. */
+  const fieldsMoved = (hash: string, ul: HTMLElement): void => {
+    [...ul.children].forEach((li, i) => {
+      li.querySelector<HTMLElement>(".field-key")!.dataset["prop"] = `key-${i}`;
+      li.querySelector<HTMLElement>(".field-value")!.dataset["prop"] = `value-${i}`;
+      li.querySelector<HTMLElement>(".field-grip")!.dataset["index"] = String(i);
+      li.querySelector<HTMLElement>("[data-action=field-remove]")!.dataset["index"] = String(i);
+    });
+    saveNotes(hash, notesNow(), "Moved a field");
+  };
+  // A field is moved by dragging its grip (the order is stored), or with the Up and Down arrows on it.
+  inspector.addEventListener("pointerdown", (e) => {
+    const grip = (e.target as HTMLElement).closest<HTMLButtonElement>(".field-grip");
+    const hash = inspector.dataset["hash"];
+    if (!grip || grip.disabled || e.button !== 0 || !hash) return;
+    e.preventDefault(); // (a field being typed in keeps the focus)
+    const li = grip.closest<HTMLElement>(".asset-field")!;
+    const ul = li.parentElement!;
+    const was = [...ul.children].indexOf(li);
+    grip.setPointerCapture(e.pointerId);
+    li.classList.add("is-moving");
+    const move = (ev: PointerEvent): void => {
+      const other = [...ul.children].find((x) => x !== li && ev.clientY < x.getBoundingClientRect().top + x.getBoundingClientRect().height / 2);
+      if (other ? li.nextElementSibling !== other : ul.lastElementChild !== li) ul.insertBefore(li, other ?? null);
+    };
+    const end = (): void => {
+      grip.removeEventListener("pointermove", move);
+      grip.removeEventListener("pointerup", end);
+      grip.removeEventListener("pointercancel", end);
+      li.classList.remove("is-moving");
+      if ([...ul.children].indexOf(li) !== was) fieldsMoved(hash, ul);
+    };
+    grip.addEventListener("pointermove", move);
+    grip.addEventListener("pointerup", end);
+    grip.addEventListener("pointercancel", end);
+  });
+  inspector.addEventListener("keydown", (e) => {
+    const grip = (e.target as HTMLElement).closest<HTMLButtonElement>(".field-grip");
+    const hash = inspector.dataset["hash"];
+    if (!grip || grip.disabled || !hash || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const li = grip.closest<HTMLElement>(".asset-field")!;
+    const to = e.key === "ArrowUp" ? li.previousElementSibling : li.nextElementSibling?.nextElementSibling ?? null;
+    if (e.key === "ArrowUp" ? !to : !li.nextElementSibling) return;
+    const ul = li.parentElement!;
+    ul.insertBefore(li, to);
+    grip.focus();
+    focusGrip = [...ul.children].indexOf(li);
+    fieldsMoved(hash, ul);
+  });
 
   /** The note and the fields as they are in the details now (typed but maybe not stored yet). */
   const notesNow = (): { note: string; fields: AssetField[] } => ({
@@ -3325,6 +3390,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   session.subscribeAssets(refreshSoon);
   session.subscribe(() => refreshSoon()); // tree renamed, role changed
+  session.storage?.hidden?.subscribe(() => refreshSoon(true)); // hidden items opened or locked: pictures that could not be read are tried again
 
   const view: AssetsView = {
     show() {

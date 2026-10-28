@@ -191,6 +191,22 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await searchFor("life class", 1);
   await searchFor("example.com", 1);
   await searchFor("", 3);
+  // A field is moved by dragging its grip, or with the arrows on it; the order is stored.
+  const stored = () => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => (l.entries.find((e) => e.hash === h)?.fields ?? []).map((f) => f.key)), HASH);
+  const names = () => rows.locator(".field-key").evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value));
+  const authorGrip = p.getByRole("button", { name: "Move the field author", exact: true });
+  const g = (await authorGrip.boundingBox())!;
+  const top = (await rows.first().boundingBox())!;
+  await p.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(g.x + g.width / 2, top.y + 2, { steps: 4 });
+  await p.mouse.up();
+  await expect.poll(stored).toEqual(["author", "link"]);
+  await expect.poll(names).toEqual(["author", "link"]);
+  await authorGrip.focus();
+  await p.keyboard.press("ArrowDown");
+  await expect.poll(stored).toEqual(["link", "author"]);
+  await expect(p.getByRole("button", { name: "Move the field author", exact: true })).toBeFocused(); // (the grip keeps the keyboard)
   await p.getByRole("button", { name: "Remove the field author" }).click();
   await expect(rows).toHaveCount(1);
 
@@ -213,6 +229,8 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   await pick(p, HASH);
   await p.getByTestId("asset-hide").click();
   await expect(cards(p)).toHaveCount(1); // gone from All; nothing stays picked
+  const locked = () => p.evaluate((h) => window.__canvastDebug.pictureLocked(h), HASH);
+  await expect.poll(locked).toBe(true); // its pictures on canvases are a padlock at once, with no password set
   await expect(side(p, /^All items/)).toContainText("1");
   await expect(side(p, /Hidden/)).toHaveCount(0); // (no Hidden row: the list is not shown anywhere)
   const search = p.getByTestId("assets-search");
@@ -222,6 +240,15 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   await p.getByRole("tab", { name: /Privacy/ }).click();
   await p.getByTestId("hidden-pw-set").click();
   await p.getByTestId("prompt-input").fill("secret");
+  // The eye button shows what was typed and hides it again; the field keeps the focus.
+  const reveal = p.getByTestId("secret-reveal");
+  await reveal.click();
+  await expect(p.getByTestId("prompt-input")).toHaveAttribute("type", "text");
+  await expect(reveal).toHaveAttribute("aria-label", "Hide the password");
+  await expect(p.getByTestId("prompt-input")).toBeFocused();
+  await reveal.click();
+  await expect(p.getByTestId("prompt-input")).toHaveAttribute("type", "password");
+  await expect(p.getByTestId("prompt-dialog")).toBeVisible(); // (not an answer: the dialog stays)
   await p.getByTestId("prompt-ok").click();
   await p.getByTestId("prompt-input").fill("secret");
   await p.getByTestId("prompt-ok").click();
@@ -291,6 +318,13 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   const withIt = await backup(true);
   expect(withIt.hiddenLock).toMatch(/^pbkdf2\$/);
   expect(withIt.settings?.["library.hiddenRemember"]).toBe(true);
+  expect(await locked()).toBe(true); // (the list open and the password given: still a padlock)
+
+  // Shown again: its pictures are drawn again.
+  await p.getByTestId("view-assets").click();
+  await pick(p, HASH);
+  await p.getByTestId("asset-hide").click();
+  await expect.poll(locked).toBe(false);
   expect(app.consoleErrors).toEqual([]);
 });
 

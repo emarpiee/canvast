@@ -525,6 +525,13 @@ export class AssetCatalog implements CatalogStore {
     }
   }
 
+  /** The hashes of the active items that are hidden. */
+  async hiddenHashes(): Promise<Set<string>> {
+    const tx = this.db.transaction("assetCatalog", "readonly");
+    const all = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
+    return new Set(all.flatMap((e) => (e.hidden && e.state === "active" ? [e.hash] : [])));
+  }
+
   async entry(hash: string): Promise<CatalogEntry | undefined> {
     const tx = this.db.transaction("assetCatalog", "readonly");
     return req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);

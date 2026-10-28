@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.0: hidden items always a padlock, an eye on passwords, fields in any order (2026-10-28)
+
+**Implemented:** every password field (prompt and lock screen) has an eye button that shows and hides what was typed (`secretFieldHtml`, `wireSecretFields` in `ui/confirm.ts`). A hidden library item's pictures are a padlock on every canvas, in both builds and whatever the password state (`AssetLibrary.setHidden`, `CatalogStore.hiddenHashes`, synced in `main.ts` on library changes but not on canvas commits); hidden media do not play. Note fields move by a grip (drag, or Up and Down on it), the order stored. Fixed: after a restart, Similar images read a locked hidden item's thumbnail and the library kept the failure, so its card and details stayed blank until a reload; hidden items are no longer read for looks, failed thumbnails are tried again on the next library read, and the library is read again when the hidden items open or lock.
+**Tested:** unit 587/587; every group in `chromium` and most in `chromium-cpu`/`chromium-dpr2` (746 tests, 0 failed; the run was stopped there as too long for the change); desktop, organize and settings in `desktop` and `firefox` 40/40 (snapshot 6d2eeb5f). New desktop test for the thumbnail fix fails on the old code. `chromium-dpr2` and `firefox` not run for the drawing, rendering and pictures groups (code they test changed only by a lookup in `AssetLibrary.get`).
+**Known failures:** none.
+**Unverified:** the eye button and the grip on a touch screen.
+**Committed:** on `main`, not pushed.
+**Next bounded task:** choose specs by what they run (per-spec coverage of the source), so a small change in a shared file does not run every group.
+
 ## v0.49.0: the desktop app, merged into main (2026-10-28)
 
 **Implemented:** ADR 0177 steps 1 to 6 (see the step sections below), plus, before the release: the boards and canvases moved into `.canvast/boards/` (owner: canvas files are not edited by hand; a workspace with them at the top is moved in when opened); the app may reload itself in Electron (Delete all data hung); in the desktop app Settings describes the workspace folder (Storage, Privacy, About, Develop), *Start from scratch* is *Rebuild from the folder* (clears only this device's working copy, keeps the settings, writes pending edits first), and the browser-format library index is no longer written; a package that fails its start check is deleted; stopped test runs no longer keep their snapshots. Testing moved to **groups** (`test:affected`, `test:group`, `check:groups`; docs/testing/README.md).

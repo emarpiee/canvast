@@ -75,7 +75,7 @@ export class Session {
   /** The last garbage-collection result (diagnostics and tests). */
   lastGc: GcReport | null = null;
   private readonly listeners = new Set<() => void>();
-  private readonly assetListeners = new Set<(metaOnly: boolean) => void>();
+  private readonly assetListeners = new Set<(metaOnly: boolean, usageOnly: boolean) => void>();
   private switching: Promise<void> | null = null;
   private channel: BroadcastChannel | null = null;
   /** Deleted assets are still retained by roots: collect again when the roots may have shrunk. */
@@ -105,7 +105,7 @@ export class Session {
     this.lease.subscribe(() => void this.onLease());
     this.persistence.onCommitted = (canvasId, revision) => {
       this.post({ kind: "commit", canvasId, revision });
-      this.emitAssets(); // usage counts changed
+      this.emitAssets(false, true); // usage counts changed
       // An undo may have re-created an instance of an asset deleted from the library.
       if (this.gcPending) void this.collectGarbage();
     };
@@ -153,8 +153,11 @@ export class Session {
     this.emit();
   }
 
-  /** Listen for changes to the asset library or its usage (`metaOnly`: only its organization changed, nothing was added, removed or placed). */
-  subscribeAssets(fn: (metaOnly: boolean) => void): () => void {
+  /**
+   * Listen for changes to the asset library or its usage (`metaOnly`: only its organization changed, nothing was added, removed or placed;
+   * `usageOnly`: only where items are placed changed, a canvas edit).
+   */
+  subscribeAssets(fn: (metaOnly: boolean, usageOnly: boolean) => void): () => void {
     this.assetListeners.add(fn);
     return () => this.assetListeners.delete(fn);
   }
@@ -182,8 +185,8 @@ export class Session {
     this.emitAssets();
   }
 
-  private emitAssets(metaOnly = false): void {
-    for (const fn of this.assetListeners) fn(metaOnly);
+  private emitAssets(metaOnly = false, usageOnly = false): void {
+    for (const fn of this.assetListeners) fn(metaOnly, usageOnly);
   }
 
   subscribe(fn: () => void): () => void {

@@ -371,8 +371,8 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.pictureLocked(h), hash)).toBe(true);
     expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toBeNull();
     expect((await hid("check", "pw2")).ok).toBe(true);
-    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.pictureLocked(h), hash)).toBe(false);
     expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toEqual(Array.from(secret));
+    expect(await page.evaluate((h) => window.__canvastDebug.pictureLocked(h), hash)).toBe(true); // (opened, but still hidden: a padlock)
   } finally {
     await app.close();
   }
@@ -385,9 +385,10 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     expect(await hid("check", "pw2")).toEqual({ ok: true, state: "open" });
     await expect.poll(listing).toEqual([["Secret Plan.png", true, true]]);
     expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toEqual(Array.from(secret));
-    // Shown again: opened back into its place in library/, the sealed file erased.
+    // Shown again: opened back into its place in library/, the sealed file erased, its picture drawn again.
     await lib("hide", hash, "");
     await flush();
+    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.pictureLocked(h), hash)).toBe(false);
     expect(files(ws).filter((f) => f.startsWith("library/") || f.startsWith(".hidden/"))).toEqual(["library/images/secret_plan.png"]);
     expect(readFileSync(join(ws, "library/images/secret_plan.png")).equals(secret)).toBe(true);
     // Locked again: hiding waits for the key (the readable file stays until the password is given).
@@ -399,6 +400,38 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     await flush();
     expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual([]);
     expect(traces()).toEqual([]);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a hidden item's picture is not read while locked, so after a restart its card shows once its list is opened", async () => {
+  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const pic = (k: number) => makePng(600, 400, (x, y) => [(x * k) % 256, y % 256, 120, 255]); // (bigger than a thumbnail: one is made)
+  let { app, page } = await launch(ws);
+  const listing = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length));
+  let hash = "";
+  try {
+    for (const k of [1, 2]) await page.getByTestId("import-input").setInputFiles({ name: `p${k}.png`, mimeType: "image/png", buffer: pic(k) });
+    await expect.poll(listing).toBe(2);
+    hash = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === "p1.png")!.hash));
+    await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"));
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), hash);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+  } finally {
+    await app.close();
+  }
+  ({ app, page } = await launch(ws));
+  try {
+    // Locked: Similar images reads how every picture looks, but not the hidden one's.
+    await page.getByTestId("view-assets").click();
+    await page.getByTestId("assets-side").getByRole("button", { name: /^Similar images/ }).click();
+    await page.waitForTimeout(500);
+    await page.getByTestId("assets-search").fill("hidden:");
+    await page.getByTestId("prompt-input").fill("pw");
+    await page.getByTestId("prompt-ok").click();
+    const img = page.locator(`[data-testid="asset-card"][data-hash="${hash}"] img`);
+    await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth)).toBeGreaterThan(0);
   } finally {
     await app.close();
   }
