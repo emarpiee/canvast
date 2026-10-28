@@ -20,7 +20,7 @@ const record = (p: Page, hash: string): Promise<Rec> =>
         const r = indexedDB.open("canvast");
         r.onsuccess = () => {
           const g = r.result.transaction("assets").objectStore("assets").get(h);
-          g.onsuccess = () => res(g.result ? { ext: g.result.ext ?? 0, blob: g.result.blob.size } : null);
+          g.onsuccess = () => res(g.result ? { ext: g.result.ext ?? 0, blob: g.result.blob?.size ?? 0 } : null); // (a stub keeps no bytes: no blob at all)
         };
       }),
     hash,
