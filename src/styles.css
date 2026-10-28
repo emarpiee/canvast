@@ -1092,11 +1092,14 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 .is-folded > :first-child { cursor: pointer; }
 .is-folded > :first-child::after { content: "›"; margin-left: auto; padding-left: var(--sp-4); color: var(--hud-muted); }
 /* Dragging items in the library: the strip at the top places them on the open canvas when they are dropped on it. */
-.assets-place-zone { position: absolute; z-index: var(--z-edge); top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: var(--sp-4); height: var(--sp-14); color: var(--hud-accent); font: var(--weight-semibold) var(--text-md) var(--font-ui); background: color-mix(in oklch, var(--theme-bg) 85%, var(--hud-accent)); border-bottom: 2px dashed var(--hud-accent); }
+.assets-place-zone { position: absolute; z-index: var(--z-edge); top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: var(--sp-4); height: var(--sp-14); font: var(--weight-semibold) var(--text-md) var(--font-ui); }
 .assets-place-zone[hidden] { display: none; }
 .assets-place-zone svg { width: var(--icon-md); height: var(--icon-md); pointer-events: none; }
 .assets-place-zone span { pointer-events: none; }
-.assets-place-zone.is-drop-target { color: var(--hud-accent-fg); background: var(--hud-accent); border-bottom-style: solid; }
+/* Where dragged items can be dropped (the strip at the top, a folder, a tag, Unfiled, Favourites): one look for all of them, dashed while
+   items are dragged, filled while they are over it. */
+.drop-zone { color: var(--hud-accent); background: color-mix(in oklch, var(--theme-bg) 85%, var(--hud-accent)); outline: 2px dashed var(--hud-accent); outline-offset: -2px; }
+.drop-zone.is-drop-target { color: var(--hud-accent-fg); background: var(--hud-accent); outline-style: solid; }
 /* What a drag from the library shows: up to five thumbnails stacked and fanned a little, and how many there are. */
 .drag-stack { position: fixed; top: calc(-1 * var(--drag-stack) * 3); left: 0; width: var(--drag-stack); height: var(--drag-stack); }
 .drag-stack img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 2px solid var(--hud-bg); border-radius: var(--r-md); box-shadow: var(--hud-lift); transform: translate(calc(var(--i) * var(--sp-2)), calc(var(--i) * var(--sp-2))) rotate(calc(var(--i) * 3deg)); }
@@ -1237,7 +1240,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 /* several picked: a tag only some have (dashed, with how many), a folder only some are in (how many) */
 .tag-chip.is-partial { background: transparent; border: 1px dashed var(--hud-border); }
 .tag-count, .folder-count { font-size: var(--text-xs); color: var(--hud-muted); }
-.side-item.is-drop-target { outline: 2px dashed var(--hud-accent); outline-offset: -2px; background: var(--hud-hover); }
+
 .folder-count { margin-left: auto; }
 .asset-sec > .assets-btn[data-action="new-folder-into"] { margin-top: var(--sp-3); }
 /* the note (plain text) and the fields the user names: a name and a value per row, × to remove one, "Add a field" below */
@@ -1643,42 +1646,32 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .split { display: inline-flex; flex: 1; min-width: 0; }
 .split > .assets-btn:first-child { flex: 1; border-top-right-radius: 0; border-bottom-right-radius: 0; }
 .split > .assets-btn.is-icon { border-top-left-radius: 0; border-bottom-left-radius: 0; margin-left: 1px; width: 32px; }
-.place-menu { position: fixed; z-index: 40; width: 260px; max-height: min(70vh, 460px); overflow: auto; display: grid; gap: var(--sp-1); padding: var(--sp-3); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
+.place-menu { position: fixed; z-index: 40; width: 320px; max-height: min(70vh, 460px); overflow: auto; display: grid; gap: var(--sp-1); padding: var(--sp-3); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
 .place-menu[hidden] { display: none; }
 .pm-title { margin: var(--sp-1) var(--sp-4) var(--sp-2); font-size: var(--text-sm); color: var(--hud-muted); }
-.pm-board { display: grid; gap: 1px; padding: var(--sp-2) 0; border-top: 1px solid var(--hud-border); }
-.pm-board h3 { display: flex; align-items: center; gap: var(--sp-3); margin: var(--sp-1) var(--sp-4) var(--sp-1); font-size: var(--text-sm); font-weight: 600; color: var(--hud-muted); }
-.pm-board h3 svg { width: 14px; height: 14px; }
-.place-menu button { display: flex; align-items: center; gap: var(--sp-4); min-height: var(--list-h); padding: 0 var(--sp-4); font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
-.place-menu button:hover, .place-menu button:focus-visible { background: var(--hud-hover); }
-.pm-mark { width: 16px; flex: none; display: inline-flex; }
-.pm-mark svg { width: 14px; height: 14px; }
-.pm-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.place-menu small { color: var(--hud-muted); }
-.place-menu .pm-new { color: var(--hud-accent); }
-.place-menu .pm-new svg { width: 14px; height: 14px; flex: none; }
-.place-menu .pm-new-board { border-top: 1px solid var(--hud-border); border-radius: 0 0 var(--r-sm) var(--r-sm); }
+.place-menu > button:not(.nav-add) { display: flex; align-items: center; gap: var(--sp-4); min-height: var(--list-h); padding: 0 var(--sp-4); font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
+.place-menu > button:not(.nav-add):hover, .place-menu > button:not(.nav-add):focus-visible { background: var(--hud-hover); }
 
 /* ---- Workspace menu (ADR 0059): boards are cards, canvases hang under a guide line, "new board" is not "new canvas" ---- */
 .nav-menu { width: 340px; display: grid; gap: var(--sp-4); padding: var(--sp-4); max-height: min(80vh, 640px); overflow: auto; }
-.nav-menu > .nav-board { padding: var(--sp-2) var(--sp-2) var(--sp-3); background: color-mix(in oklch, var(--hud-fg) 5%, transparent); border: 1px solid var(--hud-border); border-radius: var(--r-lg); }
-.nav-menu > .nav-board + .nav-board { margin-top: 0; border-top: 1px solid var(--hud-border); padding-top: var(--sp-2); }
-.nav-menu .nav-board-head { min-height: calc(var(--ctl) - 2px); padding: 0 var(--sp-1) 0 var(--sp-4); }
-.nav-menu .nav-board-name { font-weight: 650; }
-.nav-menu .nav-board-n { flex: none; font-size: var(--text-xs); color: var(--hud-muted); }
-.nav-menu .nav-canvases { margin: 0 0 0 var(--sp-8); padding: 0 0 0 var(--sp-4); border-left: 2px solid color-mix(in oklch, var(--hud-fg) 18%, transparent); gap: 1px; }
-.nav-menu .nav-canvas-row { border-radius: var(--r-sm); }
-.nav-menu .nav-canvas.is-active { color: var(--hud-accent); }
-.nav-menu .nav-canvas-row:has(.is-active) { background: color-mix(in oklch, var(--hud-accent) 12%, transparent); }
-.nav-menu .nav-count { font-size: var(--text-xs); }
+.nav-menu > .nav-board, .place-menu > .nav-board { padding: var(--sp-2) var(--sp-2) var(--sp-3); background: color-mix(in oklch, var(--hud-fg) 5%, transparent); border: 1px solid var(--hud-border); border-radius: var(--r-lg); }
+.nav-menu > .nav-board + .nav-board, .place-menu > .nav-board + .nav-board { margin-top: 0; border-top: 1px solid var(--hud-border); padding-top: var(--sp-2); }
+.nav-menu .nav-board-head, .place-menu .nav-board-head { min-height: calc(var(--ctl) - 2px); padding: 0 var(--sp-1) 0 var(--sp-4); }
+.nav-menu .nav-board-name, .place-menu .nav-board-name { font-weight: 650; }
+.nav-menu .nav-board-n, .place-menu .nav-board-n { flex: none; font-size: var(--text-xs); color: var(--hud-muted); }
+.nav-menu .nav-canvases, .place-menu .nav-canvases { margin: 0 0 0 var(--sp-8); padding: 0 0 0 var(--sp-4); border-left: 2px solid color-mix(in oklch, var(--hud-fg) 18%, transparent); gap: 1px; }
+.nav-menu .nav-canvas-row, .place-menu .nav-canvas-row { border-radius: var(--r-sm); }
+.nav-menu .nav-canvas.is-active, .place-menu .nav-canvas.is-active { color: var(--hud-accent); }
+.nav-menu .nav-canvas-row:has(.is-active), .place-menu .nav-canvas-row:has(.is-active) { background: color-mix(in oklch, var(--hud-accent) 12%, transparent); }
+.nav-menu .nav-count, .place-menu .nav-count { font-size: var(--text-xs); }
 /* "+ New canvas": a quiet line under the board's canvases */
-.nav-menu .nav-board > .nav-add { width: auto; margin: var(--sp-1) 0 0 var(--sp-10); min-height: 28px; padding: 0 var(--sp-4); border: 0; border-radius: var(--r-sm); background: transparent; color: var(--hud-muted); font-size: var(--text-sm); display: inline-flex; }
-.nav-menu .nav-board > .nav-add:hover { color: var(--hud-fg); background: var(--hud-hover); }
+.nav-menu .nav-board > .nav-add, .place-menu .nav-board > .nav-add { width: auto; margin: var(--sp-1) 0 0 var(--sp-10); min-height: 28px; padding: 0 var(--sp-4); border: 0; border-radius: var(--r-sm); background: transparent; color: var(--hud-muted); font-size: var(--text-sm); display: inline-flex; }
+.nav-menu .nav-board > .nav-add:hover, .place-menu .nav-board > .nav-add:hover { color: var(--hud-fg); background: var(--hud-hover); }
 /* "+ New board": a button of its own, apart from the boards */
-.nav-menu .nav-add-board { width: 100%; margin: 0; min-height: var(--ctl); justify-content: center; font-weight: 600; color: var(--hud-accent); border: 1px solid color-mix(in oklch, var(--hud-accent) 55%, transparent); background: transparent; border-radius: var(--r-lg); }
-.nav-menu .nav-add-board:hover { background: color-mix(in oklch, var(--hud-accent) 12%, transparent); border-color: var(--hud-accent); color: var(--hud-accent); }
-.nav-menu .nav-ws { margin-top: 0; padding: var(--sp-4) var(--sp-2) 0; }
-.nav-menu .nav-ws h3 { padding: 0 var(--sp-2); }
+.nav-menu .nav-add-board, .place-menu .nav-add-board { width: 100%; margin: 0; min-height: var(--ctl); justify-content: center; font-weight: 600; color: var(--hud-accent); border: 1px solid color-mix(in oklch, var(--hud-accent) 55%, transparent); background: transparent; border-radius: var(--r-lg); }
+.nav-menu .nav-add-board:hover, .place-menu .nav-add-board:hover { background: color-mix(in oklch, var(--hud-accent) 12%, transparent); border-color: var(--hud-accent); color: var(--hud-accent); }
+.nav-menu .nav-ws, .place-menu .nav-ws { margin-top: 0; padding: var(--sp-4) var(--sp-2) 0; }
+.nav-menu .nav-ws h3, .place-menu .nav-ws h3 { padding: 0 var(--sp-2); }
 
 /* ---- Tags as chips: on cards, in the list and in the sidebar ---- */
 .asset-tags { display: flex; gap: var(--sp-2); overflow: hidden; }
@@ -2152,8 +2145,8 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 
 /* The board menu never pushes past its own edge: a long canvas name (with "42 objects" beside it) is cut with an ellipsis, not clipped (ADR 0079). */
 .nav-menu > *, .nav-menu .nav-board, .nav-menu .nav-canvases, .nav-menu .nav-canvas-row, .nav-menu .nav-canvas, .nav-menu .nav-board-head { min-width: 0; }
-.nav-menu .nav-canvas .nav-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
-.nav-menu .nav-canvas .nav-count { flex: none; }
+.nav-menu .nav-canvas .nav-name, .place-menu .nav-canvas .nav-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.nav-menu .nav-canvas .nav-count, .place-menu .nav-canvas .nav-count { flex: none; }
 
 /* Suggestions under a search box (ADR 0083). */
 .search-suggest { display: flex; flex-wrap: wrap; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--hud-border); }

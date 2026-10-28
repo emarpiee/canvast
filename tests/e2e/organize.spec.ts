@@ -763,6 +763,10 @@ test("the library's own undo and redo; items dragged onto a folder or a tag; a p
   const zone = p.getByTestId("assets-place-zone");
   await expect(zone).toBeVisible();
   await expect(zone).toContainText("Drop here to place it on");
+  // every place that takes them shows it the same way: the strip, and the sidebar's folders, tags, Unfiled and Favourites
+  await expect(p.locator('[data-scope="favorites"]')).toHaveClass(/drop-zone/);
+  await expect(p.locator('[data-scope^="folder:"]').first()).toHaveClass(/drop-zone/);
+  await expect(p.locator('[data-scope="all"]')).not.toHaveClass(/drop-zone/);
   await zone.hover();
   await p.mouse.up();
   await p.getByTestId("choose-ok").click(); // (it has a tag: asked whether the tag goes with it)

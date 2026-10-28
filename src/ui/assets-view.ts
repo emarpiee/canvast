@@ -169,7 +169,7 @@ const DRAG_STACK = 5;
 
 export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore): AssetsView {
   root.innerHTML = `
-    <div class="assets-place-zone" data-testid="assets-place-zone" hidden>${ICONS.mapPin}<span></span></div>
+    <div class="assets-place-zone drop-zone" data-testid="assets-place-zone" hidden>${ICONS.mapPin}<span></span></div>
     <div class="assets-bar" role="toolbar" aria-label="Library">
       <div class="assets-searchbox">
               <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search" title="Search by name, type or tag; #tag is a tag, .png a file type; width>1000, ratio:16x9, orientation:portrait, colour:red filter by what the picture is" aria-label="Search the library">
@@ -2768,19 +2768,23 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     placeMenu.innerHTML =
       `<p class="pm-title">Place ${n === 1 ? "it" : `these ${n}`} on</p>` +
       boardFilterHtml(placeFilter, "place-find") +
+      // (the board and canvas switcher's own rows and styles: one look for both lists)
       tree.boards
         .map(
-          ({ board, canvases }) => `<section class="pm-board" aria-label="Board ${esc(board.name)}">
-            <h3>${ICONS.squareStack}<span>${esc(board.name)}</span></h3>
-            ${canvases
-              .map((c) => `<button type="button" role="menuitem" data-pm="canvas" data-id="${c.id}"><span class="pm-mark">${cur?.canvasId === c.id ? ICONS.check : ""}</span><span class="pm-name">${esc(c.name)}</span><small>${cur?.canvasId === c.id ? "active" : c.objectCount ? plural(c.objectCount, "object") : "empty"}</small></button>`)
-              .join("")}
-            <button type="button" role="menuitem" class="pm-new" data-pm="new-canvas" data-id="${board.id}">${ICONS.plus}<span>New canvas in ${esc(board.name)}</span></button>
+          ({ board, canvases }) => `<section class="nav-board" aria-label="Board ${esc(board.name)}">
+            <div class="nav-board-head"><span class="nav-board-icon">${ICONS.squareStack}</span><span class="nav-board-name">${esc(board.name)}</span><span class="nav-board-n">${canvases.length} ${canvases.length === 1 ? "canvas" : "canvases"}</span></div>
+            <ul class="nav-canvases">${canvases
+              .map((c) => {
+                const active = cur?.canvasId === c.id;
+                return `<li class="nav-canvas-row"><button type="button" role="menuitem" class="nav-canvas${active ? " is-active" : ""}" data-pm="canvas" data-id="${c.id}"><span class="nav-name">${esc(c.name)}</span><span class="nav-count">${c.objectCount === 0 ? "empty" : `${c.objectCount} object${c.objectCount === 1 ? "" : "s"}`}</span></button></li>`;
+              })
+              .join("")}</ul>
+            <button type="button" role="menuitem" class="nav-add" data-pm="new-canvas" data-id="${board.id}" aria-label="New canvas in ${esc(board.name)}">+ New canvas</button>
           </section>`,
         )
         .join("") +
-      `<button type="button" role="menuitem" class="pm-new pm-new-board" data-pm="new-board">${ICONS.plus}<span>New board with a canvas</span></button>`;
-    wireBoardFilter(placeMenu, { board: ".pm-board", head: "h3", row: '[data-pm="canvas"]', current: (s) => !!s.querySelector(".pm-mark svg") }, placeFilter);
+      `<button type="button" role="menuitem" class="nav-add nav-add-board" data-pm="new-board">+ New board with a canvas</button>`;
+    wireBoardFilter(placeMenu, { board: ".nav-board", head: ".nav-board-head", row: ".nav-canvas-row", current: (s) => !!s.querySelector(".nav-canvas.is-active") }, placeFilter);
     placeMenu.hidden = false;
     const r = anchor.getBoundingClientRect();
     const w = placeMenu.offsetWidth;
@@ -2838,10 +2842,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       placeZone.querySelector("span")!.textContent = `Drop here to place ${hashes.length === 1 ? "it" : `these ${hashes.length}`} on ${session.current && session.tree ? crumbOf(session.current.canvasId) : "the open canvas"}`;
       placeZone.hidden = false;
     }
+    // Every place they can be dropped shows it, as the strip does.
+    for (const t of side.querySelectorAll<HTMLElement>("[data-scope]")) if (takesDrop(t)) t.classList.add("drop-zone");
   });
   grid.addEventListener("dragend", () => {
     placeZone.hidden = true;
-    placeZone.classList.remove("is-drop-target");
+    for (const t of root.querySelectorAll<HTMLElement>(".drop-zone")) t.classList.remove("is-drop-target");
+    for (const t of side.querySelectorAll<HTMLElement>(".drop-zone")) t.classList.remove("drop-zone");
   });
   const placeZone = root.querySelector<HTMLElement>(".assets-place-zone")!;
   placeZone.addEventListener("dragover", (e) => {
@@ -2865,10 +2872,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       session.editor.changed();
     });
   });
+  /** Whether a row of the sidebar takes dropped items (a folder, a tag, Unfiled, Favourites). */
+  const takesDrop = (t: HTMLElement): boolean => {
+    const k = t.dataset["scope"] ?? "";
+    return !session.readOnly && (k.startsWith("folder:") || k.startsWith("tag:") || k === "unfiled" || k === "favorites");
+  };
   const dropTarget = (e: DragEvent): HTMLElement | null => {
     const t = (e.target as HTMLElement).closest<HTMLElement>("[data-scope]");
-    const k = t?.dataset["scope"] ?? "";
-    return t && e.dataTransfer?.types.includes(DRAG_TYPE) && !session.readOnly && (k.startsWith("folder:") || k.startsWith("tag:") || k === "unfiled" || k === "favorites") ? t : null;
+    return t && e.dataTransfer?.types.includes(DRAG_TYPE) && takesDrop(t) ? t : null;
   };
   let over: HTMLElement | null = null;
   const lightDrop = (t: HTMLElement | null): void => {

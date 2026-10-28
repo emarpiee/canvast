@@ -36,6 +36,14 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.14: one look for lists of boards and drop places (2026-10-28)
+
+**Implemented:** the Place on… menu renders the navigator's `.nav-board` markup, its menu rules scoped to `.place-menu` too; `.drop-zone` / `.is-drop-target` for the strip and every sidebar row `takesDrop` accepts.
+**Tested:** Place on…, switcher and drag tests (the drag test checks the sidebar targets are marked), chromium and firefox 6/6.
+**Known failures:** none.
+**Committed:** on `main`, not pushed.
+**Next bounded task:** owner's feedback; push and release when asked.
+
 ## v0.50.13: the filmstrip finds the open item (2026-10-28)
 
 **Implemented:** `centreFilm` sizes the strip (`windowFilm`) before it scrolls.

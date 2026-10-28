@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.14 — One look for lists of boards and drop places (2026-10-28)
+
+- **Changed:** **Place on…** is the board and canvas switcher's list: the same board cards, rows and counts, the open canvas highlighted the same way.
+- **Changed:** while items are dragged in the library, every place that takes them shows it with one look: the strip at the top and the sidebar's folders, tags, Unfiled and Favourites, dashed while dragging and filled while the items are over one.
+
 ## 0.50.13 — The filmstrip finds the open item (2026-10-28)
 
 - **Fixed:** opening an item far down a big library in the viewer left the filmstrip near its start, so the item was not in it: the strip was centred before it had its whole length. It now takes its length first, then centres the open item.
