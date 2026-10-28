@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.2: faster import into a workspace folder (2026-10-28)
+
+**Implemented:** an import's files are written without a flush each (`write(path, bytes, { durable: false })`), then `canvast:syncFiles` (`sync -f` on Linux, else a flush per file) once per 100, and only then the app's copies let go, in one transaction (`writeNew`, `keepWritten` in `library-mirror.ts`).
+**Tested:** desktop spec 12/12. Spinning disk: 1,168 imported files written in 10.4 s (about 112 a second).
+**Known failures:** none.
+**Unverified:** a side-by-side run of the old and new build on one backup (stopped for time); the owner's 2,510-file backup.
+**Committed:** on `main`, not pushed.
+**Next bounded task:** the owner's blank window after a big import.
+
 ## v0.50.1: a new folder is a new workspace, the folder watched per folder, a calmer library wait (2026-10-28)
 
 **Implemented:** in the desktop app, each workspace folder has its own id (`.canvast/folder.json`); the storage partition is per path and id (`partitionOf` in `desktop/main.ts`, recorded in the app's `partitions.json`), so a new folder where a deleted one was never opens the deleted one's cache, which is cleared; folders from before keep theirs. On Linux the folder is watched per folder (`watchTree`) instead of Node's recursive watch, which watched every file and read a folder again synchronously on each change. Loading thumbnails share one soft wave (fixed to the window, `--thumb-glint`). Settings > Storage's workspace card: the path as a Folder line, one short line, Switch workspace as the other buttons, where deleted files go as a standard settings row.

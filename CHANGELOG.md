@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.2 — Faster import into a workspace folder (2026-10-28)
+
+- **Fixed:** in the desktop app, writing an import's files into the workspace folder waited for the disk to confirm every file, which on a spinning disk took minutes for a big backup. The files are now written in batches of 100 and the disk is asked once per batch; the app keeps its own copy of each file until its batch is confirmed, so stopping half-way still loses nothing. Measured on a spinning disk: about 112 files a second (1,168 files in 10 s).
+
 ## 0.50.1 — A new folder is a new workspace, a calmer library wait (2026-10-28)
 
 - **Fixed:** in the desktop app on Linux, watching the workspace folder for outside changes put a watch on every file and read a whole folder again, holding the app's main process, on every file written into it, so a big import slowed the app more the more files it wrote. Each folder is now watched once, and nothing waits on it.

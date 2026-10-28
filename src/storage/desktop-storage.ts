@@ -53,7 +53,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   };
   const bridge: DesktopBridge = {
     ...raw,
-    write: (p, b) => (note(p), raw.write(p, b)),
+    write: (p, b, o) => (note(p), raw.write(p, b, o)),
     rename: (a, b) => (note(a, b), raw.rename(a, b)),
     remove: (p, how) => (note(p), raw.remove(p, how)),
     erase: (p) => (note(p), raw.erase(p)),

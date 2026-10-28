@@ -7,6 +7,7 @@
  * one opened, else the one chosen in the start dialog (recent ones, open a folder, a new workspace).
  */
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } from "electron";
+import { execFile } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, watch, writeFileSync } from "node:fs";
 import { mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises";
@@ -161,14 +162,17 @@ async function inside(root: string, rel: string): Promise<string> {
   return full;
 }
 
-/** Write a file safely: a temporary file beside it, flushed to the disk, then renamed over it (never half a file). */
-async function writeAtomic(full: string, bytes: Uint8Array): Promise<void> {
+/**
+ * Write a file safely: a temporary file beside it, flushed to the disk, then renamed over it (never half a file). Not `durable`:
+ * not waited for on the disk (`canvast:syncFiles` does it for many at once; the app keeps its own copy until then).
+ */
+async function writeAtomic(full: string, bytes: Uint8Array, durable = true): Promise<void> {
   await mkdir(dirname(full), { recursive: true });
   const tmp = `${full}.tmp-${process.pid}-${Date.now().toString(36)}`;
   const fh = await open(tmp, "w");
   try {
     await fh.writeFile(bytes);
-    await fh.sync();
+    if (durable) await fh.sync();
   } finally {
     await fh.close();
   }
@@ -220,10 +224,30 @@ function installFileCalls(win: BrowserWindow, root: string): void {
       return false;
     }
   });
-  ipcMain.handle("canvast:write", async (e, rel: string, bytes: Uint8Array) => {
+  ipcMain.handle("canvast:write", async (e, rel: string, bytes: Uint8Array, durable: unknown = true) => {
     own(e);
     if (!(bytes instanceof Uint8Array)) throw new Error("bytes expected");
-    await writeAtomic(await inside(root, rel), bytes);
+    await writeAtomic(await inside(root, rel), bytes, durable !== false);
+  });
+  // Files written without waiting for the disk, now on it: on Linux one request for the whole file system (one wait for the
+  // disk instead of one per file), else each file in turn.
+  ipcMain.handle("canvast:syncFiles", async (e, rels: unknown) => {
+    own(e);
+    if (!Array.isArray(rels)) throw new Error("paths expected");
+    const fulls = await Promise.all(rels.map((r) => inside(root, String(r))));
+    if (process.platform === "linux") {
+      const ok = await new Promise<boolean>((done) => execFile("sync", ["-f", root], (err) => done(!err)));
+      if (ok) return;
+    }
+    for (const full of fulls) {
+      const fh = await open(full, "r+").catch(() => null);
+      if (!fh) continue;
+      try {
+        await fh.sync();
+      } finally {
+        await fh.close();
+      }
+    }
   });
   ipcMain.handle("canvast:remove", async (e, rel: string, how: unknown = "trash") => {
     own(e);

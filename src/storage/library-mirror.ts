@@ -174,6 +174,14 @@ export function libraryJsonText(folders: readonly AssetFolder[], items: readonly
 
 /** How many files only the app's storage holds are written into the folder at once. */
 const PARALLEL_WRITES = 6;
+/** How many of those files are written before the disk is asked, once, to store them (and the app's copies are let go). */
+const SYNC_BATCH = 100;
+/** A file written for an item only the app's storage held, before the app lets go of its copy. */
+interface Written {
+  hash: string;
+  file: string;
+  size: number;
+}
 
 export class LibraryMirror {
   private state: LibraryState = { folders: "", items: {} };
@@ -343,14 +351,26 @@ export class LibraryMirror {
         await this.place(m, taken, emptied, failed);
         step();
       }
-      let next = 0;
-      const worker = async (): Promise<void> => {
-        while (next < writes.length) {
-          await this.place(writes[next++]!, taken, emptied, failed);
-          step();
-        }
-      };
-      await Promise.all(Array.from({ length: Math.min(PARALLEL_WRITES, writes.length) }, worker));
+      // In batches: the files are written without waiting for the disk each time, then the disk is asked once to store them all,
+      // and only then does the app's storage let go of its copies (one transaction), so stopping half-way loses nothing.
+      for (let at = 0; at < writes.length; at += SYNC_BATCH) {
+        const batch = writes.slice(at, at + SYNC_BATCH);
+        const written: Written[] = [];
+        let next = 0;
+        const worker = async (): Promise<void> => {
+          while (next < batch.length) {
+            const m = batch[next++]!;
+            if (await this.adoptWritten(m, taken)) step();
+            else {
+              const w = await this.writeNew(m, taken, failed);
+              if (w) written.push(w);
+              step();
+            }
+          }
+        };
+        await Promise.all(Array.from({ length: Math.min(PARALLEL_WRITES, batch.length) }, worker));
+        await this.keepWritten(written);
+      }
       pending = wait;
     }
     for (const hash of toSeal) {
@@ -472,9 +492,8 @@ export class LibraryMirror {
     await idbPut(this.db, "meta", MOVING_KEY, null);
   }
 
-  /** Move an item's file to the first free place for its name (or write it, when only the app's storage holds the original). */
+  /** Move an item's file to the first free place for its name (a sealed one is opened back into it). */
   private async place(m: { hash: string; from: string | null; dir: string; base: string; ext: string }, taken: Set<string>, emptied: Set<string>, failed: string[]): Promise<void> {
-    if (!m.from && (await this.adoptWritten(m, taken))) return;
     const target = await this.freeTarget(m.dir, m.base, m.ext, taken);
     try {
       if (isHiddenFile(m.from)) {
@@ -496,11 +515,6 @@ export class LibraryMirror {
         await idbPut(this.db, "meta", MOVING_KEY, null);
         taken.delete(m.from.toLowerCase());
         emptied.add(parentOf(m.from));
-      } else {
-        const rec = await idbGet<AssetRecord>(this.db, "assets", m.hash);
-        if (!rec || rec.ext) return;
-        await externalFolder.write(m.hash, rec.blob, target); // (read back and compared with the hash)
-        await this.setFile(m.hash, (r) => !r.ext && r.blob.size === rec.blob.size, target, "relaxed");
       }
     } catch (e) {
       taken.delete(target.toLowerCase());
@@ -508,6 +522,48 @@ export class LibraryMirror {
       failed.push((e as Error).message);
     } finally {
       externalFolder.release(target);
+    }
+  }
+
+  /**
+   * Write a file only the app's storage holds (a backup's import) to its place without waiting for the disk, and check it there by
+   * its content. What `keepWritten` needs once the disk has it, or null (nothing to write, or it failed: tried again later).
+   */
+  private async writeNew(m: { hash: string; dir: string; base: string; ext: string }, taken: Set<string>, failed: string[]): Promise<Written | null> {
+    const target = await this.freeTarget(m.dir, m.base, m.ext, taken);
+    try {
+      const rec = await idbGet<AssetRecord>(this.db, "assets", m.hash);
+      if (!rec || rec.ext) {
+        externalFolder.release(target);
+        taken.delete(target.toLowerCase());
+        return null;
+      }
+      await this.bridge.write(target, new Uint8Array(await rec.blob.arrayBuffer()), { durable: false });
+      if ((await this.bridge.hash(target)) !== m.hash) throw new Error(`${target} was not written whole`);
+      return { hash: m.hash, file: target, size: rec.blob.size };
+    } catch (e) {
+      externalFolder.release(target);
+      taken.delete(target.toLowerCase());
+      failed.push((e as Error).message);
+      return null;
+    }
+  }
+
+  /** The files `writeNew` wrote are made sure on the disk, then the app's storage keeps only where each one is (one transaction). */
+  private async keepWritten(written: Written[]): Promise<void> {
+    if (!written.length) return;
+    try {
+      await this.bridge.syncFiles(written.map((w) => w.file));
+      const tx = this.db.transaction("assets", "readwrite", { durability: "strict" });
+      const committed = done(tx);
+      const store = tx.objectStore("assets");
+      for (const w of written) {
+        const cur = await req(store.get(w.hash) as IDBRequest<AssetRecord | undefined>);
+        if (cur && !cur.ext && cur.blob.size === w.size) store.put({ ...cur, size: cur.blob.size, blob: new Blob([]), ext: 1, file: w.file } satisfies AssetRecord, w.hash);
+      }
+      await committed;
+    } finally {
+      for (const w of written) externalFolder.release(w.file);
     }
   }
 
