@@ -253,3 +253,4 @@ One icon per function: two buttons that do different things never share an icon,
 | `undo-dot` | Reset a setting to its default (every row of Settings) |
 | (own inline icon in `src/colour-picker/picker.ts`, not lucide) | Pick a colour from the screen (the colour picker's eyedropper) |
 | `funnel-x` | Reset every filter of the library (Show, Sort, direction, the sidebar's list) |
+| `arrow-up-to-line` | Back to the top of the library (status bar, grid and list) |

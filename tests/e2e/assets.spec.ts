@@ -2620,10 +2620,12 @@ test("a library of thousands keeps only the cards near the view in the page; End
   await last.dblclick();
   await expect(p.locator(".film-item.is-current")).toBeInViewport();
   await p.keyboard.press("Escape");
-  // Scrolled back to the top by hand, the first card is drawn again with its picture.
-  await p.locator(".assets-scroll").evaluate((s) => (s.scrollTop = 0));
+  // Back to top (status bar), shown once scrolled down: the first card is drawn again with its picture, and the button goes.
+  await expect(p.getByTestId("assets-to-top")).toBeVisible();
+  await p.getByTestId("assets-to-top").click();
   const first = p.locator('[data-testid="asset-card"][aria-label^="item-0.png"]');
   await expect(first).toBeInViewport();
+  await expect(p.getByTestId("assets-to-top")).toBeHidden();
   await expect.poll(() => first.locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   // A picture shows only once it has loaded (its place shimmers until then), never as the browser's broken-picture mark.
   await expect(first.locator("img")).toHaveClass(/is-loaded/);

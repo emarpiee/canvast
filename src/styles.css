@@ -1120,6 +1120,7 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 #assets-view .assets-statusbar { position: static; flex: none; flex-direction: row; align-items: center; margin: var(--near) calc(-1 * var(--edge)) 0; background: var(--hud-bg); border-top: 1px solid var(--hud-border); pointer-events: auto; }
 #assets-view .assets-statusbar > :is(.hud-readout, .hud-controls) { opacity: 1; }
 #assets-view .assets-statusbar > .hud-readout { order: 1; flex: 1; background: none; border: 0; backdrop-filter: none; }
+#assets-view .assets-statusbar > .hud-controls > [hidden] { display: none; }
 #assets-view .assets-statusbar > .hud-controls { order: 2; align-self: center; align-items: center; margin: 0 var(--edge) 0 0; padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; }
 .assets-count { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .assets-picked, .assets-total { color: var(--hud-muted); }

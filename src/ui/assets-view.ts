@@ -262,6 +262,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <span class="assets-total" data-testid="assets-total"></span>
       </div>
       <div class="hud-controls assets-controls" role="toolbar" aria-label="View of the library">
+        <button type="button" data-action="to-top" data-testid="assets-to-top" aria-label="Back to top" title="Back to top (Home)" hidden>${ICONS.arrowUpToLine}</button>
+        <span class="hud-sep assets-top-sep" role="separator" hidden></span>
         <button type="button" data-layout="grid" aria-pressed="true" aria-label="Thumbnails" title="Thumbnails">${ICONS.layoutGrid}</button>
         <button type="button" data-layout="list" aria-pressed="false" aria-label="List" title="List">${ICONS.layoutList}</button>
         <button type="button" data-action="columns" data-testid="assets-columns" aria-haspopup="dialog" aria-expanded="false" aria-label="List columns" title="Choose and arrange the columns of the list">${ICONS.columns3}</button>
@@ -3676,10 +3678,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         scrollFrame = 0;
         remember(); // (first: it only reads, so the page is not laid out twice)
         windowGrid();
+        showToTop();
       })),
     { passive: true },
   );
   grid.addEventListener("click", () => requestAnimationFrame(remember));
+  // Back to top: shown once the list has been scrolled a screen down, in grid and list alike.
+  const toTop = root.querySelector<HTMLButtonElement>('[data-testid="assets-to-top"]')!;
+  const toTopSep = root.querySelector<HTMLElement>(".assets-top-sep")!;
+  function showToTop(): void {
+    toTop.hidden = toTopSep.hidden = scroller.scrollTop < scroller.clientHeight;
+  }
+  toTop.addEventListener("click", () => {
+    scroller.scrollTop = 0;
+    showToTop();
+  });
   if (typeof ResizeObserver !== "undefined") {
     // A new width lays the cards out again; a new height only draws the ones now in view.
     let lastH = 0;

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.23 — Back to top (2026-10-29)
+
+- **Added:** a **Back to top** button (an arrow up to a line) in the library's status bar, in the grid and the list alike; it shows once the library is scrolled a screen down. Home does the same from the keyboard.
+
 ## 0.50.22 — Resizable list columns, a remembered thumbnail size (2026-10-29)
 
 - **Added:** in the library's list, a column is resized by dragging its header's right edge (a double-click gives back its usual width); the widths are kept with the layout, as the columns' choice and order are.
