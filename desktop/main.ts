@@ -6,10 +6,10 @@
  * two workspaces never share boards or a library. The folder is the one passed with `--workspace=<path>`, else the last
  * one opened, else the one picked in a folder dialog.
  */
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } from "electron";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { mkdir, open, readFile, readdir, realpath, rename, rmdir, stat, unlink } from "node:fs/promises";
+import { mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { isSafeRelativePath } from "../src/storage/workspace-names";
 import { pathToFileURL } from "node:url";
@@ -163,10 +163,12 @@ function installFileCalls(win: BrowserWindow, root: string): void {
     if (!(bytes instanceof Uint8Array)) throw new Error("bytes expected");
     await writeAtomic(await inside(root, rel), bytes);
   });
-  ipcMain.handle("canvast:remove", async (e, rel: string) => {
+  ipcMain.handle("canvast:remove", async (e, rel: string, how: unknown = "trash") => {
     own(e);
     const full = await inside(root, rel);
     if (!existsSync(full)) return;
+    if (how === "erase") return rm(full, { recursive: true, force: true });
+    if (how === "system") return shell.trashItem(full);
     if (rel === ".trash" || rel.startsWith(".trash/")) throw new Error("already in the trash");
     await toTrash(root, rel, full);
   });

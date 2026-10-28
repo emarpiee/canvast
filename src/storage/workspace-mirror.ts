@@ -8,7 +8,7 @@
  */
 import { canvasJson, putCanvasContent } from "./archive";
 import { canvasFileHead, readCanvasFile } from "./canvas-file";
-import type { DesktopBridge } from "./desktop-bridge";
+import type { DeleteMode, DesktopBridge } from "./desktop-bridge";
 import { done, idbGet, idbPut, req } from "./idb";
 import { LibraryMirror } from "./library-mirror";
 import type { HiddenVault } from "./hidden-store";
@@ -79,6 +79,7 @@ export class WorkspaceMirror {
     private readonly bridge: DesktopBridge,
     readonly deviceId: string,
     vault: HiddenVault,
+    private readonly deleteTo: () => DeleteMode = () => "trash",
   ) {
     this.lib = new LibraryMirror(db, bridge, vault);
     this.lib.onNotice = (text) => this.onError?.(text);
@@ -353,8 +354,8 @@ export class WorkspaceMirror {
     const fileMoves = [...newFile].filter(([id, f]) => oldFile.has(id) && nowAt(id, oldFile.get(id)!) !== f);
     for (const [id] of fileMoves) await this.moveIfThere(nowAt(id, oldFile.get(id)!), park(id));
     for (const [id, f] of fileMoves) await this.moveIfThere(park(id), f);
-    for (const [id, f] of oldFile) if (!newFile.has(id)) await this.bridge.remove(nowAt(id, f));
-    for (const [id, f] of oldFolder) if (!newFolder.has(id)) await this.bridge.remove(f);
+    for (const [id, f] of oldFile) if (!newFile.has(id)) await this.bridge.remove(nowAt(id, f), this.deleteTo());
+    for (const [id, f] of oldFolder) if (!newFolder.has(id)) await this.bridge.remove(f, this.deleteTo());
     for (const [id] of newFile) if (!oldFile.has(id)) this.dirty.add(id); // a new canvas: its file is written below
     const styles = await this.repo.styles().catch(() => undefined);
     const hidden = await idbGet<string>(this.db, "meta", "hiddenLock").catch(() => undefined);

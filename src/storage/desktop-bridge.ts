@@ -9,6 +9,9 @@ export interface DesktopWorkspace {
   name: string;
 }
 
+/** Where a deleted file of the workspace folder goes. */
+export type DeleteMode = "trash" | "system" | "erase";
+
 /** Paths are relative to the workspace folder and `/`-separated; the main process refuses any that would leave it. */
 export interface DesktopBridge {
   /** The workspace folder this window is open on. */
@@ -21,8 +24,11 @@ export interface DesktopBridge {
   exists(path: string): Promise<boolean>;
   /** Write a file whole: a temporary file is written, flushed and renamed over it, so it is never half written. Folders are made. */
   write(path: string, bytes: Uint8Array): Promise<void>;
-  /** Move a file or a folder into the workspace's `.trash/` (nothing when it is not there). */
-  remove(path: string): Promise<void>;
+  /**
+   * Delete a file or a folder the way the person chose (ADR 0177, "Deleting"): into the workspace's `.trash/` (the default),
+   * into the system's trash, or for good. Nothing when it is not there.
+   */
+  remove(path: string, how?: DeleteMode): Promise<void>;
   /** Rename or move a file or a folder inside the workspace (folders are made; refused when the target is taken). */
   rename(from: string, to: string): Promise<void>;
   /** Delete a file for good, not into `.trash/` (a readable copy of a hidden item must not be kept); nothing when it is not there. */

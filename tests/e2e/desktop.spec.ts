@@ -117,6 +117,16 @@ test("boards are folders and canvases .cvst files: safe names, -2 on a clash, re
   ({ app, page } = await launch(ws));
   try {
     await expect.poll(async () => (await tree()).map((b) => [b.name, b.canvases.map((c) => [c.name, c.objectCount])])).toEqual([["Drawings", [["Characters", 1]]]]);
+    // Settings > Storage, "Delete it permanently": the next deleted canvas leaves nothing, in .trash or anywhere.
+    await page.evaluate(() => window.__canvastDebug.setSetting("storage.deleteTo", "erase"));
+    const b = (await tree())[0]!.id;
+    await op("newCanvas", b);
+    await op("renameCanvas", (await tree())[0]!.canvases[1]!.id, "Scrap");
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    expect(existsSync(join(ws, "drawings/scrap.cvst"))).toBe(true);
+    await op("deleteCanvas", (await tree())[0]!.canvases[1]!.id);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    expect(files(ws).filter((f) => !f.startsWith(".canvast/"))).toEqual([".trash/drawings/characters-2.cvst", "drawings/characters.cvst", "library/images/dot.png"]);
   } finally {
     await app.close();
   }

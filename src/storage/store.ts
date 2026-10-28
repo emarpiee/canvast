@@ -13,6 +13,7 @@ import type { FilesLayout, FilesZipResult } from "./files-zip";
 import type { MoveReport } from "./folder-move";
 import type { AssetFolder, AssetLocation, CatalogEntry, CatalogListing, GcReport, MetaChange, MetaSnapshot, PasswordKind, ThumbRecord } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
+import type { DeleteMode } from "./desktop-bridge";
 
 export interface WorkspaceTreeRecords {
   workspace: WorkspaceRecord;
@@ -152,6 +153,8 @@ export interface OpenHooks {
   onVersionChange?: () => void;
   /** Something the person should know about storage (a failed write to the workspace folder), in plain words. */
   onNotice?: (text: string) => void;
+  /** The desktop build: where a deleted file of the workspace folder goes (Settings > Storage); `.trash/` when not given. */
+  deleteTo?: () => DeleteMode;
 }
 
 /** Whether the hidden items' key exists and is in memory: "none" (no Hidden password in this workspace folder yet), "locked", "open". */

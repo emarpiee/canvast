@@ -60,6 +60,8 @@ export const SETTINGS = {
   "dev.tools": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "restart" } as Def<boolean>,
   "library.hiddenWord": { scope: "device", default: "hidden:", validate: text(40), effect: "immediate" } as Def<string>,
   "library.hiddenRemember": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  /** The desktop build (ADR 0177): where a file the app deletes from the workspace folder goes. */
+  "storage.deleteTo": { scope: "device", default: "trash", validate: oneOf("trash", "system", "erase"), effect: "immediate" } as Def<"trash" | "system" | "erase">,
   "storage.autoIndex": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "ui.view": { scope: "device", default: "canvas", validate: oneOf("canvas", "assets"), effect: "restart" } as Def<"canvas" | "assets">,
   "pen.color": { scope: "device", default: "#1f2329", validate: colour, effect: "immediate" } as Def<string>,

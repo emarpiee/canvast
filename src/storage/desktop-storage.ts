@@ -4,7 +4,7 @@
  * canvases as `.cvst` files, `.canvast/workspace.json` and `library.json`. Every original is a readable file under
  * `library/`, written through the library-folder code (ADR 0159) with readable names and moved when it is filed or renamed.
  */
-import type { DesktopBridge } from "./desktop-bridge";
+import type { DeleteMode, DesktopBridge } from "./desktop-bridge";
 import type { Dir } from "./external-folder";
 import { externalFolder } from "./external-folder";
 import { openBrowserStorage } from "./idb-storage";
@@ -17,7 +17,7 @@ import type { AssetCatalog } from "../assets/asset-catalog";
 
 
 /** The workspace folder as a directory of the library-folder code; paths are relative to the workspace. */
-export function bridgeDir(bridge: DesktopBridge, name: string): Dir {
+export function bridgeDir(bridge: DesktopBridge, name: string, deleteTo: () => DeleteMode = () => "trash"): Dir {
   const notFound = (path: string): DOMException => new DOMException(`${path} is not there`, "NotFoundError");
   return {
     name,
@@ -38,7 +38,7 @@ export function bridgeDir(bridge: DesktopBridge, name: string): Dir {
         },
       };
     },
-    removeEntry: (path) => bridge.remove(path),
+    removeEntry: (path) => bridge.remove(path, deleteTo()),
   };
 }
 
@@ -48,9 +48,10 @@ export async function openDesktopStorage(bridge: DesktopBridge, opts: OpenHooks)
   const storage = await openBrowserStorage(opts);
   externalFolder.naming = WORKSPACE_NAMING;
   externalFolder.saveHandle = false; // (the folder is the workspace itself, never a handle kept in the database)
-  await externalFolder.use(bridgeDir(bridge, ws.name));
+  const deleteTo = (): DeleteMode => opts.deleteTo?.() ?? "trash";
+  await externalFolder.use(bridgeDir(bridge, ws.name, deleteTo));
   const hidden = new HiddenVault(bridge, async () => [...(await storage.catalog.snapshotMeta()).entries.values()].filter((e) => e.hidden).length);
-  const mirror = new WorkspaceMirror(storage.db, storage.workspace, bridge, deviceId(), hidden);
+  const mirror = new WorkspaceMirror(storage.db, storage.workspace, bridge, deviceId(), hidden, deleteTo);
   // Hidden originals are sealed files: read through the key, in memory (none while locked); their thumbnails are never stored.
   externalFolder.unseal = {
     open: async (blob) => {
