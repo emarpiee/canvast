@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.25 — Told each time a file is put in .hidden/ (2026-10-29)
+
+- **Fixed:** in the desktop app, a readable file put in `.hidden/` while the Hidden items were locked was mentioned only once, at start-up, so moving one in later seemed to do nothing. The app now says so each time a file is put there (it can only be encrypted with the password), and encrypts it as soon as the Hidden items are opened.
+
 ## 0.50.24 — One search panel (2026-10-29)
 
 - **Changed:** the library's search panel is built from the same parts as the canvas search: the ways to search as tabs (All selected at first), a line saying what to type, and the keys at the bottom; the library's own look-alike styles are gone. Esc now closes it, as it closes the canvas search. The canvas search's All tab is also shown selected when it opens.

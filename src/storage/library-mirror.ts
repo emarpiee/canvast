@@ -439,10 +439,11 @@ export class LibraryMirror {
    * once: its bytes are in that item, which is hidden too). While they are locked, the person is told once, to open them. Whether anything
    * was taken.
    */
-  async scanHidden(): Promise<boolean> {
+  async scanHidden(tellAgain = false): Promise<boolean> {
     const plain = (await this.bridge.list(".hidden")).map((n) => `.hidden/${n}`).filter((p) => !isHiddenFile(p) && !p.includes(".tmp-"));
     if (!plain.length) return false;
     if (!this.vault.dataKey) {
+      if (tellAgain) this.toldPlain.clear(); // (a file was just put there: said again, even about one said before)
       const fresh = plain.filter((p) => !this.toldPlain.has(p));
       for (const p of fresh) this.toldPlain.add(p);
       if (fresh.length) this.onNotice?.(`${fresh.length === 1 ? `A readable file (${fresh[0]!.slice(8)}) is` : `${fresh.length} readable files are`} in .hidden/ of the workspace folder. Open the Hidden items to encrypt ${fresh.length === 1 ? "it" : "them"}.`);

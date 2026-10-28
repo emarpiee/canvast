@@ -377,10 +377,11 @@ export class WorkspaceMirror {
     this.later();
   }
   /** Look through `library/` for files changed outside the app (on the write queue); the library is written after, when it changed. */
-  rescan(onChange: () => void): Promise<void> {
+  rescan(onChange: () => void, hiddenTouched = false): Promise<void> {
     this.running = Promise.all([this.running, this.ready])
       .then(async () => {
-        if ((await this.lib.scan()) || (await this.lib.scanHidden())) {
+        const scanned = await this.lib.scan();
+        if ((await this.lib.scanHidden(hiddenTouched)) || scanned) {
           onChange();
           this.library();
         }
