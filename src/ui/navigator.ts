@@ -1,4 +1,5 @@
 import type { Session } from "../app/session";
+import { boardFilterHtml, boardFilterState, wireBoardFilter } from "./board-filter";
 import { plural } from "../doc/plural";
 import { confirmDialog } from "./confirm";
 import { esc } from "./format";
@@ -16,6 +17,7 @@ import { canSwitchWorkspace, openWorkspaceSwitcher } from "./workspace-switch";
  * Returns a function that tells it which view is open.
  */
 export function mountNavigator(root: HTMLElement, session: Session, openCanvasView: () => void): (v: AppView) => void {
+  const filter = boardFilterState(); // (what is typed in the menu's search field, kept while it is drawn again)
   root.innerHTML = `
     <div class="nav">
       <div class="nav-pill" data-cmd-group="Navigate" data-testid="workspace-nav" data-active="true">
@@ -72,6 +74,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
         }`;
     };
     menu.innerHTML =
+      boardFilterHtml(filter, "nav-find") +
       tree.boards
         .map(({ board, canvases }) => {
           const head = label(
@@ -113,6 +116,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
          <input type="file" multiple accept="${ARCHIVE_ACCEPT}" hidden data-testid="nav-import-input">
          ${canSwitchWorkspace() ? `<button type="button" data-action="switch-workspace" data-testid="nav-switch-workspace" aria-haspopup="menu">${ICONS.arrowLeftRight}<span>Switch workspace…</span></button>` : ""}
        </section>`;
+    wireBoardFilter(menu, { board: ".nav-board", head: ".nav-board-head", row: ".nav-canvas-row", current: (s) => !!s.querySelector(".nav-canvas.is-active") }, filter);
     // The row's actions float over the page like every other menu, kept inside the window.
     const pop = menu.querySelector<HTMLElement>(".nav-actions");
     const opener = menu.querySelector<HTMLElement>('.nav-more[aria-expanded="true"]');

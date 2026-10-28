@@ -1,4 +1,5 @@
 import { beginProgress } from "../app/progress";
+import { boardFilterHtml, boardFilterState, wireBoardFilter } from "./board-filter";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { startStep } from "../app/startup-log";
 import { fileByFolders, filesOfPicker } from "../app/directory";
@@ -106,7 +107,7 @@ function syncChildren(parent: HTMLElement, els: readonly HTMLElement[]): void {
   if (focused?.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
 }
 /** How many thumbnails are made from their originals at once. */
-const THUMB_MAKERS = 3;
+const THUMB_MAKERS = 6;
 /** "Where it is used" lists this many canvases, then a button for the rest. */
 const PLACES_SHOWN = 5;
 /** A list of the sidebar (folders, file types, tags) shows this many rows before a "Show more" button. */
@@ -1289,6 +1290,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (scope.startsWith("ctag:") && !canvasTags.has(scope.slice(5))) scope = "all";
     render();
     startStep("library shown");
+    void fillThumbs();
+  };
+  // Every item's thumbnail is made once, in the background, after the library is first listed (the cards on the screen still go first):
+  // made only when a card scrolled into view, a big library imported at once stayed blank for seconds wherever one scrolled.
+  let filling = false;
+  const fillThumbs = async (): Promise<void> => {
+    if (filling || !listing || !session.catalog) return;
+    filling = true;
+    const have = new Set(await session.catalog.thumbHashes().catch(() => []));
+    for (const e of listing.entries) {
+      if (have.has(e.hash) || !e.present || isCard(e) || meta(e).hidden || thumbUrls.has(e.hash)) continue;
+      thumbFor(e.hash, always, false).then((url) => keepThumbUrl(e.hash, url), () => undefined);
+    }
   };
 
   const usesText = (instances: number, canvases: number): string =>
@@ -2743,6 +2757,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     placeMenu.hidden = true;
     placing = [];
   };
+  const placeFilter = boardFilterState();
   const openPlaceMenu = (anchor: HTMLElement, hashes: string[]): void => {
     const tree = session.tree;
     if (!tree || !hashes.length) return;
@@ -2751,6 +2766,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const n = hashes.length;
     placeMenu.innerHTML =
       `<p class="pm-title">Place ${n === 1 ? "it" : `these ${n}`} on</p>` +
+      boardFilterHtml(placeFilter, "place-find") +
       tree.boards
         .map(
           ({ board, canvases }) => `<section class="pm-board" aria-label="Board ${esc(board.name)}">
@@ -2763,6 +2779,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         )
         .join("") +
       `<button type="button" role="menuitem" class="pm-new pm-new-board" data-pm="new-board">${ICONS.plus}<span>New board with a canvas</span></button>`;
+    wireBoardFilter(placeMenu, { board: ".pm-board", head: "h3", row: '[data-pm="canvas"]', current: (s) => !!s.querySelector(".pm-mark svg") }, placeFilter);
     placeMenu.hidden = false;
     const r = anchor.getBoundingClientRect();
     const w = placeMenu.offsetWidth;

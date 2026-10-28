@@ -109,6 +109,8 @@ export interface CatalogStore {
   hiddenHashes(): Promise<Set<string>>;
   locations(hash: string): Promise<AssetLocation[]>;
   thumb(hash: string): Promise<ThumbRecord | undefined>;
+  /** The items that have a stored thumbnail. */
+  thumbHashes(): Promise<string[]>;
   putThumb(rec: ThumbRecord): Promise<void>;
   healThumbs(): Promise<void>;
   healTags(): Promise<void>;

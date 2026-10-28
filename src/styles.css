@@ -1085,6 +1085,12 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
    and the details on the right. Cards carry the picture only; the rest appears on hover, focus and selection. */
 #assets-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: var(--edge) var(--edge) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
 #assets-view[hidden] { display: none; }
+/* A list of boards and canvases (the switcher, Place on…): its search field, and a folded board shows only its name (a click unfolds it). */
+.board-filter { padding: var(--sp-2) var(--sp-3) var(--sp-4); }
+.board-filter-input { box-sizing: border-box; width: 100%; }
+.is-folded > :not(:first-child) { display: none; }
+.is-folded > :first-child { cursor: pointer; }
+.is-folded > :first-child::after { content: "›"; margin-left: auto; padding-left: var(--sp-4); color: var(--hud-muted); }
 /* Dragging items in the library: the strip at the top places them on the open canvas when they are dropped on it. */
 .assets-place-zone { position: absolute; z-index: var(--z-edge); top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: var(--sp-4); height: var(--sp-14); color: var(--hud-accent); font: var(--weight-semibold) var(--text-md) var(--font-ui); background: color-mix(in oklch, var(--theme-bg) 85%, var(--hud-accent)); border-bottom: 2px dashed var(--hud-accent); }
 .assets-place-zone[hidden] { display: none; }

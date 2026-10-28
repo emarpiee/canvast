@@ -73,6 +73,24 @@ test("a fresh start creates a workspace, and saves write only the changed object
   expect(s.revision).toBe(r0 + 2);
 });
 
+test("many boards in the switcher: folded but the open one, and a search keeps only the matching boards and canvases", async ({ app }) => {
+  const p = app.page;
+  const sess = () => p.evaluate(() => window.__canvastDebug.session().tree!);
+  for (let i = 0; i < 5; i++) await p.evaluate(() => window.__canvastDebug.workspaceOp("newBoard"));
+  const tree = await sess();
+  await p.evaluate(([id]) => window.__canvastDebug.workspaceOp("renameBoard", id!, "Ocean studies"), [tree[2]!.id]);
+  await openMenu(p);
+  const menu = p.getByTestId("workspace-menu");
+  await expect(menu.locator(".nav-board")).toHaveCount(6);
+  await expect(menu.locator(".nav-board:not(.is-folded)")).toHaveCount(1); // (the one holding the open canvas)
+  await p.getByTestId("nav-find").fill("ocean");
+  await expect(menu.locator(".nav-board:visible")).toHaveCount(1);
+  await expect(menu.locator(".nav-board:visible")).toContainText("Ocean studies");
+  await p.getByTestId("nav-find").fill("");
+  await menu.locator(".nav-board.is-folded .nav-board-head").first().click(); // a click unfolds a folded board
+  await expect(menu.locator(".nav-board:not(.is-folded)")).toHaveCount(2);
+});
+
 test("boards and canvases: create, rename, switch; each canvas keeps its own objects and camera across reloads", async ({ app }) => {
   const p = app.page;
   await draw(p, [[300, 300], [400, 350]]);

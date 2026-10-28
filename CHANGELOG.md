@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.12 — Many boards, thumbnails ready (2026-10-28)
+
+- **Added:** the board and canvas switcher and **Place on…** have a search field (*Find a board or canvas*) that keeps only the boards and canvases whose names hold what is typed; with more than four boards, each is folded to its name but the one holding the open canvas (a click unfolds it). One behaviour for both lists.
+- **Fixed:** in a big library imported at once, cards scrolled into view stayed blank for seconds while their thumbnails were made one by one. Every missing thumbnail is now made in the background after the library is first listed (the cards on screen first), six at a time, and kept: the next scroll, and the next start, show them at once.
+
 ## 0.50.11 — Narrow panels never cut (2026-10-28)
 
 - **Fixed:** the library's details panel, made narrow, was wider than itself and cut on both sides (the *Show* buttons of *Used on*, the text). The sidebar's rule that nothing in a panel is wider than the panel, and text shortens with an ellipsis, is now one rule for both panels.

@@ -232,6 +232,11 @@ export type PasswordKind = "hidden" | "workspace";
 export class AssetCatalog implements CatalogStore {
   constructor(readonly db: IDBDatabase) {}
 
+  async thumbHashes(): Promise<string[]> {
+    const tx = this.db.transaction("thumbs", "readonly");
+    return (await req(tx.objectStore("thumbs").getAllKeys())) as string[];
+  }
+
   async thumb(hash: string): Promise<ThumbRecord | undefined> {
     const tx = this.db.transaction("thumbs", "readonly");
     return req(tx.objectStore("thumbs").get(hash) as IDBRequest<ThumbRecord | undefined>);
