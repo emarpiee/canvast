@@ -124,6 +124,61 @@ async function chooseWorkspace(): Promise<string | null> {
   return startDialog(last?.path ?? null);
 }
 
+/** Where the process that has a workspace open notes its pid (the workspace's storage can be open in one process only). */
+const holderFile = (workspace: string): string => join(app.getPath("userData"), "open", `${createHash("sha256").update(workspace).digest("hex").slice(0, 24)}.pid`);
+
+/** Whether `pid` is a canvast process that is still running (a pid the system gave to another program after a restart is not). */
+function runningCanvast(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0 || pid === process.pid) return false;
+  try {
+    process.kill(pid, 0);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "EPERM") return false;
+  }
+  if (process.platform !== "linux") return true;
+  try {
+    return readFileSync(`/proc/${pid}/cmdline`, "utf8").includes(basename(process.execPath));
+  } catch {
+    return false;
+  }
+}
+
+const pause = (ms: number): Promise<void> => new Promise((done) => setTimeout(done, ms));
+
+/**
+ * Take the workspace for this process. Another canvast that has it open (or is still closing: the window is gone while it
+ * finishes writing to the storage) is waited for, quietly for up to 20 s, then with a question, never opened beside it: the
+ * second would find the storage taken and open with nothing. False when the person chose to quit.
+ */
+async function holdWorkspace(workspace: string): Promise<boolean> {
+  const file = holderFile(workspace);
+  const other = (): boolean => {
+    try {
+      return runningCanvast(Number(readFileSync(file, "utf8")));
+    } catch {
+      return false;
+    }
+  };
+  for (let i = 0; i < 40 && other(); i++) await pause(500);
+  while (other()) {
+    const { response } = await dialog.showMessageBox({
+      type: "info",
+      title: "canvast",
+      message: `“${basename(workspace)}” is open in another canvast window`,
+      detail: "A workspace can be open in one window at a time. If you have just closed it, it is still finishing its writes: wait a moment.",
+      buttons: ["Wait", "Quit"],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    });
+    if (response === 1) return false;
+    for (let i = 0; i < 20 && other(); i++) await pause(500);
+  }
+  mkdirSync(dirname(file), { recursive: true });
+  writeFileSync(file, String(process.pid));
+  return true;
+}
+
 /** The workspace the window switches to once it has closed (saved first, and asked when files are still being written). */
 let switchTo: string | null = null;
 
@@ -596,6 +651,7 @@ void app.whenReady().then(async () => {
   installMenu();
   const workspace = await chooseWorkspace();
   if (!workspace) return app.quit();
+  if (!(await holdWorkspace(workspace))) return app.quit();
   remember(workspace);
   await openWindow(workspace);
 });

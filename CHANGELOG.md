@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.50.4 — The lock screen answers at once, one window per workspace (2026-10-28)
+
+- **Fixed:** the workspace lock screen could seem to do nothing on Enter right after a big import: the password was read again from the app's storage, which was still busy with the import's clean-up. It is checked against the password already read, so it answers at once, and **Open** says *Checking…* while it works.
+- **Fixed:** in the desktop app, closing the window at the lock screen waited (up to 15 s) for a save that cannot be needed while locked; it now closes at once.
+- **Fixed:** in the desktop app, starting the app again while it was still closing (its window gone, the process still finishing its writes) opened a window with *Storage unavailable* and an empty library. A workspace is now open in one process only: a new start waits for the closing one, and asks when it is still open in another window.
+
 ## 0.50.3 — Import and export questions you can read at a glance (2026-10-28)
 
 - **Changed:** the dialog before an import reads at a glance: a summary in two columns (From, Exported, Contains, Checked, Goes to), an *Also in this file* list (the workspace and Hidden items passwords, your settings, a library index) with one line each on what happens, and warnings (an incremental backup on its own, missing originals, problems) in a box of their own. Counts are written with thousands separators.

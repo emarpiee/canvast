@@ -58,6 +58,7 @@ import type { OpenHooks, Storage } from "../storage/store";
 import type { SaveState } from "../storage/canvas-persistence";
 import { Session } from "./session";
 import { mountNavigator } from "../ui/navigator";
+import { checkLock } from "../assets/hidden-lock";
 import { mountLibraryFolderCard } from "../ui/library-folder-card";
 import { confirmReset } from "../ui/reset-dialog";
 import { beginProgress } from "./progress";
@@ -696,7 +697,9 @@ async function start(): Promise<void> {
   const session = new Session(storage, doc, view, editor, assets);
   // The desktop build: before its window closes, the last edits reach the workspace folder (ADR 0177).
   // While files are still being written into the folder (an import's), closing asks first: the rest are written at the next start.
+  let opened = false; // (the workspace is open: past the lock screen, its session started)
   desktopBridge()?.onClosing(async () => {
+    if (!opened) return; // (still locked or starting: nothing was changed, so nothing waits to be written)
     const writing = storage?.folderWriting?.now();
     if (writing && writing.total >= BUSY_FILES) {
       await desktopBridge()!.holdClose();
@@ -760,9 +763,11 @@ async function start(): Promise<void> {
     try {
       // A workspace password: nothing of the workspace is read or drawn until it is given.
       const lock = await session.catalog?.lock("workspace").catch(() => null);
-      if (lock) await openLockScreen((typed) => session.checkPassword("workspace", typed));
+      // (checked against the password read here, so the check never waits for the storage, busy right after an import)
+      if (lock) await openLockScreen((typed) => checkLock(lock, typed));
       await syncHidden(); // (before the first canvas is drawn)
       await session.start();
+      opened = true;
       if (session.startup?.kind === "migrated") {
         const m = session.startup.migration;
         editor.message = m.verified

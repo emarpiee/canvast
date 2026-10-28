@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.4: the lock screen answers at once, one window per workspace (2026-10-28)
+
+**Implemented:** the lock screen checks against the lock read before it opened (`checkLock`), with a *Checking…* state; the close handler returns at once until the session has started; `holdWorkspace` in `desktop/main.ts` (a pid file per workspace in the app's data folder; a running canvast holding it is waited for 20 s, then asked about).
+**Tested:** desktop spec and the workspace password test (see the commit).
+**Known failures:** none.
+**Unverified:** the second start while the first is closing (native dialog, no E2E); why the owner's workspace takes about 15 s to open (2,510 items) and longer right after an import.
+**Committed:** on `main`, not pushed.
+**Next bounded task:** time the start-up of a 2,500-item workspace and remove what blocks it.
+
 ## v0.50.3: import and export questions you can read at a glance (2026-10-28)
 
 **Implemented:** `DialogSummary` (facts, a titled list, warnings) for `confirmDialog` and `chooseDialog` (`ui/confirm.ts`); the import dialog (`ui/archive-ui.ts`) and the passwords and privacy question (`ui/hidden-access.ts`) use it.

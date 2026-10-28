@@ -20,14 +20,20 @@ export function openLockScreen(check: (typed: string) => Promise<boolean>): Prom
   document.body.appendChild(dlg);
   const input = dlg.querySelector<HTMLInputElement>(".prompt-input")!;
   const error = dlg.querySelector<HTMLElement>("[data-lock-error]")!;
+  const openButton = dlg.querySelector<HTMLButtonElement>("[data-testid=lock-ok]")!;
   wireSecretFields(dlg);
   return new Promise((resolve) => {
     let busy = false;
     const submit = async (): Promise<void> => {
       if (busy) return;
       busy = true;
+      openButton.disabled = true;
+      openButton.textContent = "Checking…";
+      error.hidden = true;
       const ok = await check(input.value).catch(() => false);
       busy = false;
+      openButton.disabled = false;
+      openButton.textContent = "Open";
       if (ok) {
         dlg.close();
         dlg.remove();
@@ -39,7 +45,7 @@ export function openLockScreen(check: (typed: string) => Promise<boolean>): Prom
       input.focus();
     };
     dlg.addEventListener("cancel", (e) => e.preventDefault()); // (Escape does not close it)
-    dlg.querySelector("[data-testid=lock-ok]")!.addEventListener("click", () => void submit());
+    openButton.addEventListener("click", () => void submit());
     input.addEventListener("keydown", (e) => {
       if (e.key !== "Enter") return;
       e.preventDefault();
