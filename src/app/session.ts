@@ -652,18 +652,34 @@ export class Session {
 
   /** The password gates (assets/hidden-lock.ts): of the Hidden items and of the whole workspace. Whether there is one, set or remove it, check a try. */
   async hasPassword(kind: PasswordKind): Promise<boolean> {
-    return !!(await this.catalog?.lock(kind).catch(() => null));
+    if (await this.catalog?.lock(kind).catch(() => null)) return true;
+    return kind === "hidden" && !!this.storage?.hidden && (await this.storage.hidden.state()) !== "none";
   }
 
+  /**
+   * In the desktop build the Hidden password also wraps the key the hidden items are encrypted with (ADR 0177): a new one wraps
+   * the same key again, and it cannot be removed while items are hidden.
+   */
   async setPassword(kind: PasswordKind, password: string | null): Promise<boolean> {
     if (!this.guardWrite() || !this.catalog) return false;
+    const hidden = kind === "hidden" ? this.storage?.hidden : null;
+    if (hidden && password === null && !(await hidden.remove())) {
+      this.tell("Show the hidden items first: in this app hidden items are encrypted with this password, so it stays while there are any.");
+      return false;
+    }
+    if (hidden && password !== null) await hidden.setPassword(password);
     await this.catalog.setLock(kind, password === null ? null : await makeLock(password));
     return true;
   }
 
+  /** Whether `password` is the right one. In the desktop build a right Hidden password also opens the hidden items' key. */
   async checkPassword(kind: PasswordKind, password: string): Promise<boolean> {
+    const hidden = kind === "hidden" ? this.storage?.hidden : null;
+    if (hidden && (await hidden.state()) !== "none") return hidden.unlock(password);
     const lock = await this.catalog?.lock(kind).catch(() => null);
-    return !lock || checkLock(lock, password);
+    const ok = !lock || (await checkLock(lock, password));
+    if (ok && lock && hidden) await hidden.setPassword(password); // (a password set before the key, or brought by a backup: its key is made now)
+    return ok;
   }
 
   /** The device settings, which travel in a workspace backup and come back on import (set by the app). */

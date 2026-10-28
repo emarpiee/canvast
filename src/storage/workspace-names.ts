@@ -5,6 +5,7 @@
  */
 import { extOf } from "../assets/file-kind";
 import type { FolderNaming } from "./external-folder";
+import { isHiddenFile } from "./hidden-vault";
 
 /** Longest file base kept (well under every system's 255-byte limit, with room for `-99` and an extension). */
 export const MAX_BASE = 100;
@@ -100,7 +101,7 @@ export function isSafeRelativePath(path: string): boolean {
 /** Originals as `library/<kind>/<name>.<ext>`; the library index in the app's own `.canvast/` folder. */
 export const WORKSPACE_NAMING: FolderNaming = {
   fileFor: (_hash, name, type, taken) => libraryPath(name, type, taken),
-  valid: (_hash, file) => isSafeRelativePath(file) && file.startsWith("library/"),
+  valid: (_hash, file) => (isSafeRelativePath(file) && file.startsWith("library/")) || isHiddenFile(file),
   indexFile: ".canvast/library-index.canvast",
 };
 

@@ -12,6 +12,8 @@ import type { IdbStorage } from "./idb-storage";
 import type { OpenHooks } from "./store";
 import { WorkspaceMirror, watched } from "./workspace-mirror";
 import { WORKSPACE_NAMING } from "./workspace-names";
+import { HiddenVault } from "./hidden-store";
+import type { AssetCatalog } from "../assets/asset-catalog";
 
 
 /** The workspace folder as a directory of the library-folder code; paths are relative to the workspace. */
@@ -47,7 +49,14 @@ export async function openDesktopStorage(bridge: DesktopBridge, opts: OpenHooks)
   externalFolder.naming = WORKSPACE_NAMING;
   externalFolder.saveHandle = false; // (the folder is the workspace itself, never a handle kept in the database)
   await externalFolder.use(bridgeDir(bridge, ws.name));
-  const mirror = new WorkspaceMirror(storage.db, storage.workspace, bridge, deviceId());
+  const hidden = new HiddenVault(bridge, async () => [...(await storage.catalog.snapshotMeta()).entries.values()].filter((e) => e.hidden).length);
+  const mirror = new WorkspaceMirror(storage.db, storage.workspace, bridge, deviceId(), hidden);
+  // Hidden originals are sealed files: read through the key, in memory (none while locked); their thumbnails are never stored.
+  externalFolder.unseal = async (blob) => {
+    const bytes = await hidden.open(new Uint8Array(await blob.arrayBuffer()));
+    return bytes && new Blob([bytes]);
+  };
+  (storage.catalog as AssetCatalog).keepHiddenThumbs = false;
   mirror.onError = (text) => opts.onNotice?.(text);
   const tree = (): void => mirror.tree();
   const canvases = (r: { canvases: string[] }): void => r.canvases.forEach((id) => mirror.canvas(id));
@@ -99,7 +108,7 @@ export async function openDesktopStorage(bridge: DesktopBridge, opts: OpenHooks)
     reconcile: (n) => void (n && mirror.library()),
   });
   const originals = watched(storage.originals, { put: library });
-  return { ...storage, workspace, backups, catalog, originals, libraryFolder: null, workspaceFolder: ws.path, flush: () => mirror.flush() };
+  return { ...storage, workspace, backups, catalog, originals, libraryFolder: null, workspaceFolder: ws.path, hidden, flush: () => mirror.flush() };
 }
 
 /** This device's id in the workspace folder (`.canvast/devices/<id>.json`), made once and kept. */

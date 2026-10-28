@@ -152,6 +152,27 @@ export interface OpenHooks {
   onNotice?: (text: string) => void;
 }
 
+/** Whether the hidden items' key exists and is in memory: "none" (no Hidden password in this workspace folder yet), "locked", "open". */
+export type HiddenState = "none" | "locked" | "open";
+
+/**
+ * The desktop build's encrypted hidden items (ADR 0177): the key wrapped by the Hidden password. Absent in the browser build,
+ * where the Hidden password is a gate only.
+ */
+export interface HiddenStore {
+  state(): Promise<HiddenState>;
+  /** Open with the password (false when it is not the password); the key stays in memory until `lock` or the app closes. */
+  unlock(password: string): Promise<boolean>;
+  /** Make the key for a first password, or wrap it with a new one (it must be open). */
+  setPassword(password: string): Promise<void>;
+  /** Remove the key; refused (false) while any item is hidden, since hidden means encrypted. */
+  remove(): Promise<boolean>;
+  /** Forget the key: hidden items are locked until the password is given again. */
+  lock(): void;
+  /** Told when it opens or locks. */
+  subscribe(fn: () => void): () => void;
+}
+
 /** One opened storage: what a session works on. */
 export interface Storage {
   readonly workspace: WorkspaceStore;
@@ -160,6 +181,8 @@ export interface Storage {
   readonly originals: OriginalStore;
   /** The library folder (ADR 0159): only the browser build has one (in the desktop build the workspace is a folder). */
   readonly libraryFolder: LibraryFolderStore | null;
+  /** The desktop build's encrypted hidden items; null in the browser build. */
+  readonly hidden: HiddenStore | null;
   /** The desktop build's workspace folder (its full path); null in the browser build. */
   readonly workspaceFolder: string | null;
   /** Start from scratch: delete everything canvast keeps here, then reload. `onBlocked`: another window still has it open. */

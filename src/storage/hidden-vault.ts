@@ -45,7 +45,7 @@ async function wrap(dataKey: CryptoKey, password: string, iterations: number): P
   return { format: VAULT_FORMAT, version: 1, kdf: { name: "PBKDF2", hash: "SHA-256", iterations, salt: b64(salt) }, key: b64(key) };
 }
 
-/** The data key, or null when the password is wrong or the record damaged. `extractable` only to wrap it again. */
+/** The data key, or null when the password is wrong or the record damaged. */
 async function unwrap(record: VaultRecord, password: string, extractable: boolean): Promise<CryptoKey | null> {
   try {
     const kek = await passwordKey(password, unb64(record.kdf.salt), record.kdf.iterations);
@@ -55,20 +55,20 @@ async function unwrap(record: VaultRecord, password: string, extractable: boolea
   }
 }
 
-/** A new vault for a password: its record (to keep in the folder) and the data key (kept in memory only, not extractable). */
+/**
+ * A new vault for a password: its record (to keep in the folder) and the data key, kept in memory only (extractable only so a
+ * new password can wrap it again without asking for the old one twice: on disk it is only ever wrapped).
+ */
 export async function createVault(password: string, iterations = VAULT_ITERATIONS): Promise<{ record: VaultRecord; key: CryptoKey }> {
-  const fresh = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
-  const record = await wrap(fresh, password, iterations);
-  return { record, key: (await unwrap(record, password, false))! };
+  const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+  return { record: await wrap(key, password, iterations), key };
 }
 
 /** The data key for a password, or null when it is not the password. */
-export const openVault = (record: VaultRecord, password: string): Promise<CryptoKey | null> => unwrap(record, password, false);
+export const openVault = (record: VaultRecord, password: string): Promise<CryptoKey | null> => unwrap(record, password, true);
 
-/** The same data key under a new password (null when `oldPassword` is wrong). The sealed index and files stay as they are. */
-export async function rewrapVault(record: VaultRecord, oldPassword: string, newPassword: string, iterations = record.kdf.iterations): Promise<VaultRecord | null> {
-  const key = await unwrap(record, oldPassword, true);
-  if (!key) return null;
+/** The same data key under a new password. The sealed index and files stay as they are. */
+export async function rewrapVault(record: VaultRecord, key: CryptoKey, newPassword: string, iterations = record.kdf.iterations): Promise<VaultRecord> {
   return { ...(await wrap(key, newPassword, iterations)), ...(record.index ? { index: record.index } : {}) };
 }
 
@@ -130,6 +130,10 @@ export function readVault(text: string): VaultRecord | null {
     return null;
   }
 }
+
+/** A hidden item's file: `.hidden/<32 random hex>.bin`. */
+export const HIDDEN_FILE_RE = /^\.hidden\/[0-9a-f]{32}\.bin$/;
+export const isHiddenFile = (file: string | null | undefined): boolean => !!file && HIDDEN_FILE_RE.test(file);
 
 /** A new name for a hidden file: random, so it says nothing about the item. */
 export function hiddenFileName(): string {

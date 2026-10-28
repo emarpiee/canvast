@@ -11,6 +11,7 @@ import { canvasFileHead, readCanvasFile } from "./canvas-file";
 import type { DesktopBridge } from "./desktop-bridge";
 import { done, idbGet, idbPut, req } from "./idb";
 import { LibraryMirror } from "./library-mirror";
+import type { HiddenVault } from "./hidden-store";
 import type { BackupRecord, WorkspaceStore } from "./store";
 import type { BoardRecord, CanvasRecord, CurrentMeta, StoredView, WorkspaceRecord } from "./workspace-repo";
 import type { PlacedBoard } from "./workspace-names";
@@ -77,9 +78,16 @@ export class WorkspaceMirror {
     private readonly repo: WorkspaceStore,
     private readonly bridge: DesktopBridge,
     readonly deviceId: string,
+    vault: HiddenVault,
   ) {
-    this.lib = new LibraryMirror(db, bridge);
+    this.lib = new LibraryMirror(db, bridge, vault);
     this.lib.onNotice = (text) => this.onError?.(text);
+    // Opened: what another device hid is read from the sealed index, and what waited for the key (hiding, showing) is done.
+    vault.subscribe(() => {
+      if (!vault.dataKey) return;
+      this.running = this.running.then(() => this.lib.reread()).catch(() => undefined);
+      this.library();
+    });
   }
 
   /**

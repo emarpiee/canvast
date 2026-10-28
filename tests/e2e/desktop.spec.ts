@@ -287,3 +287,60 @@ test("a backup imported into a workspace folder: its boards, canvases and librar
     await app.close();
   }
 });
+
+test("hidden items are encrypted: sealed into .hidden/ with nothing readable left, opened only with the password, shown back into library/, the same key under a new password", async () => {
+  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const secret = makePng(3, 2, () => [200, 40, 160, 255]);
+  // Every file of the workspace, as text: no trace of the hidden item's name or its picture may be in any of them.
+  const traces = () => files(ws).filter((f) => { const b = readFileSync(join(ws, f)); return /secret/i.test(b.toString("latin1")) || b.includes(secret.subarray(0, 24)); });
+  let { app, page } = await launch(ws);
+  const lib = (...a: Parameters<typeof window.__canvastDebug.libraryOp>) => page.evaluate((a) => window.__canvastDebug.libraryOp(...a), a);
+  const hid = (op: "set" | "check" | "lock", pw?: string) => page.evaluate(([op, pw]) => window.__canvastDebug.hiddenOp(op as "set", pw), [op, pw] as const);
+  const flush = () => page.evaluate(() => window.__canvastDebug.flushStorage());
+  const listing = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, !!e.hidden, e.present])));
+  let hash = "";
+  try {
+    await page.getByTestId("import-input").setInputFiles({ name: "Secret Plan.png", mimeType: "image/png", buffer: secret });
+    await expect.poll(listing).toEqual([["Secret Plan.png", false, true]]);
+    hash = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries[0]!.hash));
+    expect(await hid("set", "pw1")).toEqual({ ok: true, state: "open" });
+    await lib("hide", hash, "1");
+    await flush();
+    const sealed = files(ws).filter((f) => f.startsWith(".hidden/"));
+    expect(sealed).toHaveLength(1);
+    expect(sealed[0]).toMatch(/^\.hidden\/[0-9a-f]{32}\.bin$/);
+    expect(files(ws).filter((f) => f.startsWith("library/") || f.startsWith(".trash/"))).toEqual([]);
+    expect(traces()).toEqual([]);
+    expect(await listing()).toEqual([["Secret Plan.png", true, true]]);
+    expect(await hid("set", null as unknown as string)).toEqual({ ok: false, state: "open" }); // (not removed while an item is hidden)
+    expect(await hid("set", "pw2")).toEqual({ ok: true, state: "open" }); // the same key under a new password
+  } finally {
+    await app.close();
+  }
+  // Another device: it knows nothing of the hidden item until the password is given there.
+  ({ app, page } = await launch(ws, "device-b"));
+  try {
+    await expect.poll(() => hid("check", "x").then((r) => r.state)).toBe("locked");
+    expect(await listing()).toEqual([]);
+    expect((await hid("check", "pw1")).ok).toBe(false);
+    expect(await hid("check", "pw2")).toEqual({ ok: true, state: "open" });
+    await expect.poll(listing).toEqual([["Secret Plan.png", true, true]]);
+    expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toEqual(Array.from(secret));
+    // Shown again: opened back into its place in library/, the sealed file erased.
+    await lib("hide", hash, "");
+    await flush();
+    expect(files(ws).filter((f) => f.startsWith("library/") || f.startsWith(".hidden/"))).toEqual(["library/images/secret_plan.png"]);
+    expect(readFileSync(join(ws, "library/images/secret_plan.png")).equals(secret)).toBe(true);
+    // Locked again: hiding waits for the key (the readable file stays until the password is given).
+    await hid("lock");
+    await lib("hide", hash, "1");
+    await flush();
+    expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual(["library/images/secret_plan.png"]);
+    expect((await hid("check", "pw2")).ok).toBe(true);
+    await flush();
+    expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual([]);
+    expect(traces()).toEqual([]);
+  } finally {
+    await app.close();
+  }
+});

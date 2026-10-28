@@ -12,6 +12,9 @@ import { FOLDERS_KEY, folderPath, meta, normalizeFields, normalizeNote, normaliz
 import type { AssetRecord } from "../assets/asset-library";
 import type { DesktopBridge } from "./desktop-bridge";
 import { externalFolder } from "./external-folder";
+import type { HiddenVault } from "./hidden-store";
+import { hiddenFileName, isHiddenFile } from "./hidden-vault";
+import { sha256Hex } from "../assets/sha256";
 import { done, idbGet, idbPut, req } from "./idb";
 import { fileExt, fitsPlace, freePath, isSafeRelativePath, libraryDir, nameBase } from "./workspace-names";
 
@@ -100,7 +103,7 @@ export function readItem(a: unknown): LibraryItem | null {
   if (!a || typeof a !== "object") return null;
   const r = a as Record<string, unknown>;
   if (typeof r.hash !== "string" || !HASH_RE.test(r.hash) || typeof r.name !== "string" || !r.name || typeof r.type !== "string" || !num(r.size) || !num(r.pixelW) || !num(r.pixelH)) return null;
-  const file = typeof r.file === "string" && isSafeRelativePath(r.file) && r.file.startsWith("library/") ? r.file : null;
+  const file = typeof r.file === "string" && ((isSafeRelativePath(r.file) && r.file.startsWith("library/")) || isHiddenFile(r.file)) ? r.file : null;
   const fields = Array.isArray(r.fields) ? (r.fields as unknown[]).filter((f): f is AssetField => !!f && typeof (f as AssetField).key === "string" && typeof (f as AssetField).value === "string").map((f) => ({ key: f.key, value: f.value })) : [];
   try {
     return {
@@ -168,6 +171,7 @@ export class LibraryMirror {
   /** The library folders' places on disk as last written (to remove the ones a rename or delete emptied). */
   private dirs = new Set<string>();
   private lastText = "";
+  private lastIndex = "";
   private failing = false;
   /** Told when an item could not be moved or written, in plain words. */
   onNotice: ((text: string) => void) | null = null;
@@ -175,12 +179,21 @@ export class LibraryMirror {
   constructor(
     private readonly db: IDBDatabase,
     private readonly bridge: DesktopBridge,
+    private readonly vault: HiddenVault,
   ) {}
 
   /** At start-up: what another device changed in `library.json` is taken (new items, names, tags, folders, where each file is). */
   async start(): Promise<void> {
     this.state = (await idbGet<LibraryState>(this.db, "meta", STATE_KEY).catch(() => undefined)) ?? { folders: "", items: {} };
     await this.finishMove();
+    await this.reread();
+  }
+
+  /**
+   * Read `library.json`, and the hidden items' index when the hidden items are open, and take what changed. Also when the
+   * hidden items are opened: what another device hid or changed among them is known only then.
+   */
+  async reread(): Promise<void> {
     const bytes = await this.bridge.read(LIBRARY_JSON);
     if (!bytes) return;
     let raw: Partial<LibraryJson>;
@@ -191,7 +204,17 @@ export class LibraryMirror {
     }
     if (raw.format !== LIBRARY_JSON_FORMAT || !Array.isArray(raw.items)) return;
     const items = raw.items.map(readItem).filter((i): i is LibraryItem => i !== null);
-    await this.adopt(readFolders(raw.folders), items);
+    const vault = await this.vault.state();
+    if (vault === "open") {
+      try {
+        const hidden = JSON.parse((await this.vault.readIndex()) ?? "[]") as unknown[];
+        if (Array.isArray(hidden)) items.push(...hidden.map(readItem).filter((i): i is LibraryItem => i !== null));
+      } catch {
+        // a damaged index: the hidden items here stay as they are
+      }
+    }
+    // (While the hidden items are locked, an item missing from library.json may have been hidden elsewhere, not erased.)
+    await this.adopt(readFolders(raw.folders), items, vault !== "locked");
   }
 
   /**
@@ -199,7 +222,7 @@ export class LibraryMirror {
    * since (then its own version stays and is written back). An item the file no longer has was erased on another device: it is
    * deleted here too (the app's garbage collection erases it once nothing needs it, or brings it back if a canvas uses it).
    */
-  private async adopt(folders: AssetFolder[], items: LibraryItem[]): Promise<void> {
+  private async adopt(folders: AssetFolder[], items: LibraryItem[], complete: boolean): Promise<void> {
     const tx = this.db.transaction(["assetCatalog", "assets", "meta"], "readwrite", { durability: "strict" });
     const committed = done(tx);
     const catalog = tx.objectStore("assetCatalog");
@@ -232,7 +255,7 @@ export class LibraryMirror {
       }
       known[it.hash] = text;
     }
-    for (const hash of Object.keys(known)) {
+    for (const hash of complete ? Object.keys(known) : []) {
       if (inFile.has(hash)) continue;
       const e = await req(catalog.get(hash) as IDBRequest<CatalogEntry | undefined>);
       const rec = await req(assets.get(hash) as IDBRequest<AssetRecord | undefined>);
@@ -258,12 +281,20 @@ export class LibraryMirror {
     const active = entries.filter((e) => e.state === "active").sort((a, b) => a.importedAt - b.importedAt || (a.hash < b.hash ? -1 : 1));
     const activeHashes = new Set(active.map((e) => e.hash));
     for (const r of recs.values()) if (r.ext && r.file && !activeHashes.has(r.hash)) taken.add(r.file.toLowerCase());
+    const toSeal: string[] = [];
     for (const e of active) {
       const rec = recs.get(e.hash);
       if (!rec || (rec.ext && !rec.file)) continue; // no original stored (or a file named by its hash, from the browser's library folder)
+      // Hidden: sealed into `.hidden/` (when the key is open); shown again: opened back into its place (the same).
+      const sealed = rec.ext === 1 && isHiddenFile(rec.file);
+      if (meta(e).hidden) {
+        if (!sealed) toSeal.push(e.hash);
+        continue;
+      }
+      if (sealed && !this.vault.dataKey) continue;
       const id = meta(e).folderIds[0];
       const dir = libraryDir(id && folderOk.has(id) ? folderPath(folders, id) : [], e.type, e.name);
-      const ext = (rec.file && extOfPath(rec.file)) || fileExt(rec.name, e.type);
+      const ext = (rec.file && !sealed && extOfPath(rec.file)) || fileExt(rec.name, e.type); // (a sealed file's own is .bin)
       const base = nameBase(e.name);
       if (rec.file && fitsPlace(rec.file, dir, base, ext) && !taken.has(rec.file.toLowerCase())) taken.add(rec.file.toLowerCase());
       else moves.push({ hash: e.hash, from: rec.ext ? rec.file! : null, dir, base, ext });
@@ -285,6 +316,7 @@ export class LibraryMirror {
       for (const m of ready) await this.place(m, taken, emptied, failed);
       pending = wait;
     }
+    for (const hash of toSeal) if (this.vault.dataKey) await this.seal(hash, failed);
     // Library folders are real folders, even empty; the places a move or a rename emptied are removed.
     const wanted = new Set<string>();
     for (const f of folders) for (let d = libraryDir(folderPath(folders, f.id), "", ""); d.includes("/"); d = parentOf(d)) wanted.add(d);
@@ -303,7 +335,11 @@ export class LibraryMirror {
   private async finishMove(): Promise<void> {
     const m = await idbGet<Moving | null>(this.db, "meta", MOVING_KEY).catch(() => null);
     if (!m) return;
-    if (await this.bridge.exists(m.to)) await this.setFile(m.hash, (r) => r.ext === 1 && r.file === m.from, m.to);
+    if (await this.bridge.exists(m.to)) {
+      await this.setFile(m.hash, (r) => r.ext === 1 && r.file === m.from, m.to);
+      // Sealed or opened: the file it came from (readable, or sealed) is erased once the new one is there.
+      if ((isHiddenFile(m.from) || isHiddenFile(m.to)) && (await idbGet<AssetRecord>(this.db, "assets", m.hash))?.file === m.to) await this.bridge.erase(m.from);
+    }
     await idbPut(this.db, "meta", MOVING_KEY, null);
   }
 
@@ -311,7 +347,18 @@ export class LibraryMirror {
   private async place(m: { hash: string; from: string | null; dir: string; base: string; ext: string }, taken: Set<string>, emptied: Set<string>, failed: string[]): Promise<void> {
     const target = await this.freeTarget(m.dir, m.base, m.ext, taken);
     try {
-      if (m.from) {
+      if (isHiddenFile(m.from)) {
+        // Shown again: opened, proven, written to its place, and only then the sealed file erased.
+        const from = m.from!;
+        await idbPut(this.db, "meta", MOVING_KEY, { hash: m.hash, from, to: target } satisfies Moving);
+        const sealed = await this.bridge.read(from);
+        const bytes = sealed && (await this.vault.open(sealed as Uint8Array<ArrayBuffer>));
+        if (!bytes || (await sha256Hex(bytes.buffer)) !== m.hash) throw new Error("a hidden file did not open with the key");
+        await externalFolder.write(m.hash, new Blob([bytes]), target);
+        await this.setFile(m.hash, (r) => r.ext === 1 && r.file === from, target);
+        await this.bridge.erase(from);
+        await idbPut(this.db, "meta", MOVING_KEY, null);
+      } else if (m.from) {
         // The move is noted first: if the app stops between the rename and the stored original's new place, start-up finishes it.
         await idbPut(this.db, "meta", MOVING_KEY, { hash: m.hash, from: m.from, to: target } satisfies Moving);
         await this.bridge.rename(m.from, target);
@@ -331,6 +378,36 @@ export class LibraryMirror {
       failed.push((e as Error).message);
     } finally {
       externalFolder.release(target);
+    }
+  }
+
+  /**
+   * Hide an original: sealed with the key into `.hidden/<random>.bin`, read back and opened to prove it, then the readable copy
+   * erased (never put in `.trash/`) and its thumbnail dropped. A failure leaves it as it was.
+   */
+  private async seal(hash: string, failed: string[]): Promise<void> {
+    const rec = await idbGet<AssetRecord>(this.db, "assets", hash);
+    if (!rec || isHiddenFile(rec.file)) return;
+    const name = hiddenFileName();
+    try {
+      const bytes = rec.ext ? await this.bridge.read(rec.file ?? "") : new Uint8Array(await rec.blob.arrayBuffer());
+      if (!bytes || (await sha256Hex((bytes as Uint8Array<ArrayBuffer>).slice().buffer)) !== hash) throw new Error("the file is not what the library says");
+      await idbPut(this.db, "meta", MOVING_KEY, { hash, from: rec.ext ? rec.file! : "", to: name } satisfies Moving);
+      await this.bridge.write(name, await this.vault.seal(bytes as Uint8Array<ArrayBuffer>));
+      const back = await this.bridge.read(name);
+      const opened = back && (await this.vault.open(back as Uint8Array<ArrayBuffer>));
+      if (!opened || (await sha256Hex(opened.buffer)) !== hash) {
+        await this.bridge.erase(name);
+        throw new Error("the sealed file did not open back the same");
+      }
+      await this.setFile(hash, (r) => (rec.ext ? r.ext === 1 && r.file === rec.file : !r.ext), name);
+      if (rec.ext && rec.file) await this.bridge.erase(rec.file);
+      const tx = this.db.transaction("thumbs", "readwrite");
+      tx.objectStore("thumbs").delete(hash);
+      await done(tx);
+      await idbPut(this.db, "meta", MOVING_KEY, null);
+    } catch (e) {
+      failed.push((e as Error).message);
     }
   }
 
@@ -371,9 +448,14 @@ export class LibraryMirror {
   private async writeJson(): Promise<void> {
     const { entries, recs, folders } = await this.read();
     const items = entries.map((e) => itemOf(e, recs.get(e.hash)));
-    const text = libraryJsonText(folders, items);
+    // Sealed items are only in the sealed index (written while the key is open: sealing and opening need it). One hidden while
+    // the key is locked stays in library.json, as its file stays readable, until it is sealed.
+    const text = libraryJsonText(folders, items.filter((i) => !isHiddenFile(i.file)));
     if (text !== this.lastText) await this.bridge.write(LIBRARY_JSON, encode(text));
     this.lastText = text;
+    const index = JSON.stringify(items.filter((i) => isHiddenFile(i.file)));
+    if (this.vault.dataKey && index !== this.lastIndex && (index !== "[]" || (await this.vault.state()) !== "none")) await this.vault.writeIndex(index);
+    if (this.vault.dataKey) this.lastIndex = index;
     this.state = { folders: JSON.stringify(folders), items: Object.fromEntries(items.map((i) => [i.hash, JSON.stringify(i)])) };
     await idbPut(this.db, "meta", STATE_KEY, this.state);
   }

@@ -5,7 +5,7 @@ import type { MetaRow } from "../assets/metadata";
 import type { Session, AssetPlace } from "../app/session";
 import { plural } from "../doc/plural";
 import { openBatchRename } from "./batch-rename";
-import { askHiddenPassword } from "./hidden-access";
+import { askHiddenPassword, readyForHidden } from "./hidden-access";
 import { tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { mountSuggest } from "./search-suggest";
 import type { SuggestSources } from "../search/suggest";
@@ -2282,16 +2282,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       case "hide-all": {
         const on = b.getAttribute("aria-pressed") !== "true";
-        void session.organize((c) => c.updateMetaEach(group.map((h) => ({ hash: h, change: { hidden: on } }))), on ? "Hidden" : "Not hidden").then((ok) => {
+        void readyForHidden(session, on).then((ready) => void (ready && session.organize((c) => c.updateMetaEach(group.map((h) => ({ hash: h, change: { hidden: on } }))), on ? "Hidden" : "Not hidden").then((ok) => {
           if (ok && on) void select(null); // (they leave the list: nothing stays picked)
-        });
+        })));
         break;
       }
       case "hide": {
         const on = b.getAttribute("aria-pressed") !== "true";
-        void session.organize((c) => c.updateMeta(hash, { hidden: on }), on ? "Hidden" : "Not hidden").then((ok) => {
+        void readyForHidden(session, on).then((ready) => void (ready && session.organize((c) => c.updateMeta(hash, { hidden: on }), on ? "Hidden" : "Not hidden").then((ok) => {
           if (ok && on) void select(null);
-        });
+        })));
         break;
       }
       case "favorite": {

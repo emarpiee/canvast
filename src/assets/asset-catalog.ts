@@ -311,12 +311,16 @@ export class AssetCatalog implements CatalogStore {
     await committed;
   }
 
+  /** False in the desktop build, where a hidden item is encrypted: its thumbnail is made in memory only, never stored (ADR 0177). */
+  keepHiddenThumbs = true;
+
   /** Store a thumbnail. Derived data, so any tab may write it, and a failure only means it is made again next time. */
   async putThumb(rec: ThumbRecord): Promise<void> {
     const tx = this.db.transaction(["thumbs", "assetCatalog"], "readwrite");
     const committed = done(tx);
     // Not for an asset erased in the meantime: nothing would ever remove it.
-    if (await req(tx.objectStore("assetCatalog").count(rec.hash))) tx.objectStore("thumbs").put(rec);
+    const e = await req(tx.objectStore("assetCatalog").get(rec.hash) as IDBRequest<CatalogEntry | undefined>);
+    if (e && (this.keepHiddenThumbs || !e.hidden)) tx.objectStore("thumbs").put(rec);
     await committed;
   }
 

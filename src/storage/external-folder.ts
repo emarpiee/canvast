@@ -9,6 +9,7 @@
 import { sha256Hex } from "../assets/sha256";
 import { extOf } from "../assets/file-kind";
 import { done, idbGet, idbPut, req } from "./idb";
+import { SEAL_OVERHEAD, isHiddenFile } from "./hidden-vault";
 
 export type FolderState = "none" | "ready" | "needs-permission" | "unavailable";
 
@@ -159,6 +160,12 @@ class ExternalFolder {
     }
   }
 
+  /**
+   * The desktop build's hidden items (ADR 0177): a file under `.hidden/` is sealed, and is read through this (null while the
+   * key is locked). Unset elsewhere.
+   */
+  unseal: ((blob: Blob) => Promise<Blob | null>) | null = null;
+
   /** Tests only: a stand-in directory cannot be saved in the database (it has functions), so it is used for the session. */
   saveHandle = true;
 
@@ -227,16 +234,27 @@ class ExternalFolder {
   async read(hash: string, size: number, type = "", file = hash): Promise<Blob | null> {
     if (!this.dir || this.status !== "ready" || !this.naming.valid(hash, file)) return null;
     try {
-      const f = await (await this.dir.getFileHandle(file)).getFile();
+      let f: Blob = await (await this.dir.getFileHandle(file)).getFile();
+      if (isHiddenFile(file)) {
+        const opened = this.unseal && f.size === size + SEAL_OVERHEAD ? await this.unseal(f) : null;
+        if (!opened) return null;
+        f = opened;
+      }
       return f.size === size ? (type ? new Blob([f], { type }) : f) : null;
     } catch {
       return null;
     }
   }
 
-  /** Does the file exist with this size (no bytes read). */
+  /** Does the file exist with this size (no bytes read; a sealed hidden file is checked by its sealed size, not opened). */
   async has(hash: string, size: number, file = hash): Promise<boolean> {
-    return (await this.read(hash, size, "", file)) !== null;
+    if (!isHiddenFile(file)) return (await this.read(hash, size, "", file)) !== null;
+    if (!this.dir || this.status !== "ready" || !this.naming.valid(hash, file)) return false;
+    try {
+      return (await (await this.dir.getFileHandle(file)).getFile()).size === size + SEAL_OVERHEAD;
+    } catch {
+      return false;
+    }
   }
 
   /** Every file of the folder that is an original (named by hash, with or without an extension), with its size. */

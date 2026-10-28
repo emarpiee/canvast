@@ -42,6 +42,36 @@ export async function askPassword(session: Session, kind: PasswordKind, why: str
 export const askHiddenPassword = (session: Session, why: string, remember = false): Promise<boolean> => askPassword(session, "hidden", why, remember);
 
 /**
+ * Before hiding items, or showing hidden ones, in the desktop build, where hidden items are encrypted (ADR 0177): the key must be
+ * open. With no Hidden password yet, one is set first (hiding only); with a locked key, the password is asked. True when ready.
+ */
+export async function readyForHidden(session: Session, hiding: boolean): Promise<boolean> {
+  const hidden = session.storage?.hidden;
+  if (!hidden) return true;
+  const state = await hidden.state();
+  if (state === "open") return true;
+  if (state === "locked" || (await session.hasPassword("hidden"))) return askPassword(session, "hidden", "Enter the password of the Hidden items: they are encrypted with it.");
+  if (!hiding) return true; // (hidden before they were encrypted: nothing to open)
+  const first = await promptDialog({
+    title: "Password for the Hidden items",
+    lines: [
+      "Hidden items are encrypted in the workspace folder with this password, so nobody can open them without it.",
+      "If it is lost, so are they: it cannot be recovered. A full backup (Settings > Storage) keeps a copy you can open without it.",
+    ],
+    value: "",
+    confirmLabel: "Next",
+    secret: true,
+  });
+  if (!first) return false;
+  const again = await promptDialog({ title: "Password for the Hidden items", lines: ["Type it again."], value: "", confirmLabel: "Set the password and hide", secret: true });
+  if (again !== first) {
+    session.tell("The two did not match, so nothing was hidden.");
+    return false;
+  }
+  return session.setPassword("hidden", first);
+}
+
+/**
  * Before an export that would carry hidden items: ask whether to include them and their data (then the password first, when there is one) or leave
  * them out. Resolves with the scope to export, or null when cancelled or the password was not given.
  */

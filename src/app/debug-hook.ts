@@ -167,7 +167,11 @@ export interface DebugHook {
   /** Write what the desktop build's workspace folder does not have yet (its storage's flush). */
   flushStorage(): Promise<void>;
   /** Organize the library as its panel does, with the library's undo: a new folder (`id`, `name`, parent id or ""), file an item (`hash`, folder id or "" for none), rename an item or a folder, undo, redo. */
-  libraryOp(op: "createFolder" | "file" | "rename" | "renameFolder" | "undo" | "redo", ...args: string[]): Promise<void>;
+  libraryOp(op: "createFolder" | "file" | "rename" | "renameFolder" | "hide" | "undo" | "redo", ...args: string[]): Promise<void>;
+  /** The Hidden password as Settings and the Hidden list use it: set (or remove, with no password), check (which opens the desktop build's key), lock; the result, and the key's state after. */
+  hiddenOp(op: "set" | "check" | "lock", password?: string): Promise<{ ok: boolean; state: string }>;
+  /** The bytes of a stored original as the app reads it (a hidden one opened with the key), or null when it cannot be read. */
+  originalBytes(hash: string): Promise<number[] | null>;
   /** A full backup of the workspace, as base64 (the desktop build has no download a test can catch). */
   fullBackup(): Promise<string>;
   /** Replace the document with a generated benchmark scene (no history, no save). */
@@ -491,7 +495,19 @@ export function installDebugHook(
       else if (op === "file") await session.organize((cat) => cat.updateMeta(a, b ? { addFolders: [b] } : { clearFolder: true }));
       else if (op === "rename") await session.renameAssets([{ hash: a, name: b }]);
       else if (op === "renameFolder") await session.organize((cat) => cat.renameFolder(a, b));
+      else if (op === "hide") await session.organize((cat) => cat.updateMeta(a, { hidden: b === "1" }));
       else await session.undoLibrary(op === "redo");
+    },
+    originalBytes: async (hash) => {
+      const rec = await session.storage?.originals.get(hash);
+      return rec ? Array.from(new Uint8Array(await rec.blob.arrayBuffer())) : null;
+    },
+    hiddenOp: async (op, password) => {
+      let ok = true;
+      if (op === "set") ok = await session.setPassword("hidden", password ?? null);
+      else if (op === "check") ok = await session.checkPassword("hidden", password ?? "");
+      else session.storage?.hidden?.lock();
+      return { ok, state: (await session.storage?.hidden?.state()) ?? "browser" };
     },
     fullBackup: async () => {
       const bytes = new Uint8Array(await (await session.exportArchive({ kind: "workspace" })).blob.arrayBuffer());

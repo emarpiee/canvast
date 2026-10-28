@@ -34,8 +34,7 @@ describe("hidden vault", () => {
   it("a new password wraps the same key: files sealed before still open, the old password no longer does", async () => {
     const { record, key } = await createVault("old", FAST);
     const sealed = await sealBytes(key, new Uint8Array([42]));
-    expect(await rewrapVault(record, "nope", "new")).toBeNull();
-    const next = (await rewrapVault(record, "old", "new"))!;
+    const next = await rewrapVault(record, (await openVault(record, "old"))!, "new");
     expect(next.kdf.salt).not.toBe(record.kdf.salt);
     expect(await openVault(next, "old")).toBeNull();
     expect(Array.from((await openBytes((await openVault(next, "new"))!, sealed))!)).toEqual([42]);
