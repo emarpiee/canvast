@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.28 — A new logo (2026-10-29)
+
+- **Changed:** a new logo: a frame, a window cut from its middle and a dot in the window, each half the size of the one around it (the way canvast zooms, by powers of two), in the default theme's colours (a Viridian tile, an orange dot). It is the favicon, the app icon of the desktop build, and the mark on the lock screen, the opening screen and Settings > About. The brand guidelines, the logo files (now with a line version for use beside the app's icons) and the README cover are made again; the cover is drawn as a canvas in the default theme, with the dot on the origin.
+
 ## 0.50.27 — A faster big library (2026-10-29)
 
 - **Fixed:** a big library was slow to open, to search and to save. Records of files kept in a folder no longer carry an empty stored file (reading thousands of them was most of the cost; existing ones are converted once, in the background); each save reads the library once, not twice, and keeps a short fingerprint of each item instead of its whole line; a search filters the library sorted once, instead of sorting again on every keystroke. Measured with 20,000 items: opening 6.0 s → 3.0 s, listing 1.8–2.6 s → 0.9 s, a save after one change 6.5 s → 2.1 s.

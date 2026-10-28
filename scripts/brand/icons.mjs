@@ -1,9 +1,9 @@
 // Writes the logo files from the same geometry as the brand board (pages.mjs): the SVG masters, PNGs from 16 to 512 px (the small-size
-// master at 32 px and under) and a favicon.ico with 16, 32 and 48 px. Usage: node scripts/brand/icons.mjs <dir>
+// master at 32 px and under), the line mark for icon sizes, and a favicon.ico with 16, 32 and 48 px. Usage: node scripts/brand/icons.mjs <dir>
 import { chromium } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { markSvg, C } from "./pages.mjs";
+import { markSvg, lineSvg, C } from "./pages.mjs";
 
 const dir = process.argv[2];
 if (!dir) { console.log("usage: node scripts/brand/icons.mjs <dir>"); process.exit(1); }
@@ -15,6 +15,7 @@ const svgs = {
   "canvast-mark-on-dark.svg": markSvg({ tile: null, c: C.paper }, 512),
   "canvast-mark-one-colour-ink.svg": markSvg({ tile: null, c: C.ink, dot: C.ink }, 512),
   "canvast-mark-one-colour-white.svg": markSvg({ tile: null, c: C.white, dot: C.white }, 512),
+  "canvast-mark-line.svg": lineSvg(C.ink, 512), // beside line icons
 };
 for (const [n, s] of Object.entries(svgs)) writeFileSync(join(dir, n), s);
 
