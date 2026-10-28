@@ -8,9 +8,10 @@ This file is for coding agents working in the repo; it applies to this code only
 
 ## Testing
 
-Which suite when (see `docs/testing/README.md` for commands and durations):
-- While working, run only the specs a change touches (`npm run test:snap -- <files or -g>`, below); `npm test` (the quick suite) before committing a slice/milestone. When you start a run, say its estimated finish time.
-- `npm run test:full` **only** when a whole phase is complete; record results (suite and per-test times) in `docs/testing/` and in the commit message.
+Which tests when (see `docs/testing/README.md` for commands, groups and durations). The E2E specs are in **groups** (`scripts/lib/test-groups.mjs`); run only the groups a change needs:
+- While working, run the specs a change touches (`npm run test:snap -- <files or -g>`) or its groups (`npm run test:group -- <group…>`). Before committing a slice, pushing or releasing: `npm run test:affected` (or `npm test`, which runs it with typecheck, unit tests and checks); it picks the groups from what changed since `origin/main`. Start with `-- --dry` to see the groups and the estimate, and say the estimated finish time.
+- The whole quick suite (`npm run test:all`) only when `test:affected` picks every group or every few releases. `npm run test:full` **only** when a phase changed zoom, coordinates, projection, rendering, tiles or performance; record its results (suite and per-test times) in `docs/testing/` and in the commit message.
+- A new spec goes into a group (`npm run check:groups` fails otherwise); a new source folder gets a rule in the change map.
 - **Every test runs from a snapshot, never `dist/` (the owner's build, in development).** `npm test`, `test:e2e`, `test:full`, `bench` and `qualify` all go through `scripts/test-snap.mjs`; `tests/e2e/build-dir.ts` throws if `CANVAST_BUILD_DIR` is not set, so a bare `playwright test` fails instead of reading `dist/`. The snapshot step also runs `check:offline` and `check:names` on its own build. **`npm run test:snap -- <playwright args>`** for a few specs. It builds a copy into `test-builds/<time>-<source hash>/` (with `build.json`: what it was made from, and `run.json`: the run and its result) and points the tests at it (`CANVAST_BUILD_DIR`, read by `tests/e2e/harness.ts`), so `dist/` can be rebuilt and work can go on while the tests run. Run it in the background. `npm run test:status` lists the snapshots with their result and how far each is behind the source and `dist/` (by source hash and changed files); a result belongs to the source it was built from, so re-run what changed after later edits. `dist/` also has a `build.json`. No test reads `dist/`, so it can be rebuilt at any time.
 
 ## Test rules

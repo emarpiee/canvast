@@ -35,6 +35,25 @@ for (const script of ["check-offline", "check-names"]) {
   if (checked.status !== 0) process.exit(checked.status ?? 1);
 }
 
+/**
+ * Each test's last time, kept across snapshots in test-builds/times.json ("spec|project|title" → ms): what `test:affected` estimates
+ * a run from. Only passed tests count (a failure's time says little about the next run).
+ */
+async function recordTimes(report) {
+  const file = resolve(root, "test-builds", "times.json");
+  const times = await readFile(file, "utf8").then((t) => JSON.parse(t), () => ({}));
+  const walk = (suite, at) => {
+    const f = suite.file ?? at;
+    for (const s of suite.specs ?? []) for (const t of s.tests ?? []) {
+      const r = (t.results ?? []).at(-1);
+      if (r?.status === "passed") times[`${f.replace(/^.*\//, "").replace(/\.spec\.ts$/, "")}|${t.projectName}|${s.title}`] = r.duration;
+    }
+    for (const c of suite.suites ?? []) walk(c, f);
+  };
+  for (const s of report.suites ?? []) walk(s, s.file);
+  await writeFile(file, JSON.stringify(times));
+}
+
 const args = process.argv.slice(2);
 const run = { args, startedAt: new Date().toISOString(), status: "running" };
 const save = () => writeFile(resolve(dir, "run.json"), JSON.stringify(run, null, 1));
@@ -49,12 +68,14 @@ child.on("exit", async (code) => {
   run.finishedAt = new Date().toISOString();
   run.status = code === 0 ? "passed" : "failed";
   try {
-    const st = JSON.parse(await readFile(resolve(dir, "report.json"), "utf8")).stats;
+    const report = JSON.parse(await readFile(resolve(dir, "report.json"), "utf8"));
+    const st = report.stats;
     run.counts = { passed: st.expected, failed: st.unexpected, flaky: st.flaky, skipped: st.skipped };
+    await recordTimes(report);
   } catch { /* no report: the run was cut short */ }
   await save();
   // keep the newest few snapshots
-  const all = (await readdir(resolve(root, "test-builds"))).sort();
+  const all = (await readdir(resolve(root, "test-builds"))).filter((n) => /^\d{8}-/.test(n)).sort(); // (snapshots only, not times.json)
   for (const old of all.slice(0, Math.max(0, all.length - KEEP))) {
     // (never one that is still running: its tests are reading that build)
     const state = await readFile(resolve(root, "test-builds", old, "run.json"), "utf8").then((t) => JSON.parse(t).status, () => "none");

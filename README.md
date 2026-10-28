@@ -528,7 +528,8 @@ Open `dist/canvast.html` directly. Developer tools (frame times, camera internal
 | --- | --- |
 | `npm run typecheck` | TypeScript check |
 | `npm run test:unit` | Unit tests (seconds) |
-| `npm test` | Typecheck, unit, quick end-to-end suite, token, storage, picker and pattern-generator checks (about an hour) |
+| `npm test` | Typecheck, unit tests, the end-to-end **groups the changes need** (`test:affected`), token, storage, picker and pattern-generator checks |
+| `npm run test:affected` | Only the end-to-end groups needed by what changed since `origin/main` (`-- --dry` shows which, and how long); `npm run test:group -- <group…>` runs named groups; `npm run test:all` every group (about an hour). Groups and the change map: [docs/testing/README.md](docs/testing/README.md) |
 | `npm run build:patterns` | Build the pattern generators alone into `dist-patterns/` (script, module, types, demo page); `npm run check:patterns` fails if they import from, or touch, anything outside their folder |
 | `npm run desktop` | Build the app and run it in the desktop shell (Electron, see [The desktop app](#the-desktop-app-linux)) on a workspace folder: `--workspace=<path>` after `electron dist-desktop`, else the last one opened, else a folder dialog |
 | `npm run package:desktop` | Package the desktop app as a Linux AppImage in `dist-package/` (with its SHA-256), from `dist-desktop/` and the pinned Electron, then start that AppImage on a fresh workspace folder and fail unless it writes it. Making it needs the network once (electron-builder's AppImage tools); the app it makes does not |

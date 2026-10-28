@@ -1,27 +1,60 @@
 # Testing guide — which suite to run, and when
 
-canvast has one set of end-to-end (E2E) tests that runs in two lengths. Every
-test runs in both; only the length of the stress loops differs (for example
-240 instead of 1,200 wheel notches).
+canvast has one set of end-to-end (E2E) tests, in **groups** (below), that runs in two lengths. Only the length of the stress loops
+differs (for example 240 instead of 1,200 wheel notches). Run the groups a change needs, not everything.
 
 | Command | What it runs | Time (reference machine) | When to run it |
 | --- | --- | --- | --- |
-| `npm test` | Typecheck, unit tests, **quick** E2E suite (4 browser configs: 3 Chromium, 1 Firefox) from a snapshot build, offline and naming checks (run on that snapshot), tokens, picker and pattern-generator checks | ~60 min (1259 tests, v0.28.0) | **After every ordinary change, and before committing a finished slice or milestone** (for example v0.2.0, v0.3.0) |
-| `npm run test:full` | The same, with the **full** E2E stress loops | ~1.5 h (1318 tests, v0.35.1; see `full-run-0.35.1.md`) | **Only when a whole phase is complete** (for example the end of Phase 1); record the result in that phase's test log |
+| `npm run test:affected` | The E2E groups the changes since `origin/main` need (commits not on it and uncommitted edits; `-- --since <ref>` for another base, `-- --dry` to see what and how long first) | from ~1 min (smoke only) to the whole quick suite | **The default.** After a change, before committing a slice, before a push and a release |
+| `npm test` | Typecheck, unit tests, `test:affected`, tokens, storage, picker and pattern-generator checks | as `test:affected` + ~2 min | Before committing a finished slice |
+| `npm run test:group -- <group…>` | Named groups (`all` for every one), quick lengths | as the groups | To re-run a group after a fix, or to check an area on purpose |
+| `npm run test:all` | Every group at quick lengths (the former `npm test`) | ~60 min (1259 tests, v0.28.0) | When the shared heart of the app or the test machinery changed (`test:affected` then picks it by itself), or every few releases to catch drift |
+| `npm run test:full` | Every group with the **full** stress loops | ~1.5 h (1318 tests, v0.35.1; see `full-run-0.35.1.md`) | **Only when a phase changed zoom, coordinates, projection, rendering, tiles or performance**, before its release; record the result in that phase's test log |
+| `npm run check:groups` | Every spec is in exactly one group | instant | Runs inside `test:affected`; after adding a spec |
 | `npm run test:snap -- <args>` | Playwright against a snapshot build of its own in `test-builds/` (the same tests; every suite goes through it, so no test reads `dist/`). `npm run test:status` shows each snapshot against the source and `dist/` | as the tests chosen | **Whenever work goes on while tests run** (the default way to run E2E during a session) |
 | `npm run test:unit` | Unit tests only (Vitest) | ~15 s | While developing |
 | `npm run test:snap -- -g "<name>"` | Selected quick E2E tests (a bare `npx playwright test` fails on purpose: it has no snapshot) | seconds + build | While developing a specific feature |
 | `npm run bench` | Scale benchmarks, 1K–1M objects, plus tile-cache benchmarks (tiles on/off; pan, still, pan+zoom) in Chromium, Chromium CPU-only and Firefox. Not a pass/fail gate | ~15–25 min (not yet timed with Firefox; tile benchmarks alone 2.2 min) | After rendering or performance changes; compare with `metrics/bench-*.json`, `metrics/tiles-*.json`, docs/testing/phase-0c.md and phase-1d.md |
 
+## Groups
+
+`scripts/lib/test-groups.mjs` puts every spec in one group and says which changed files need which groups. `smoke` always runs.
+
+| Group | Specs |
+| --- | --- |
+| navigation | navigation, zoom-controls, deep-zoom-rendering, depth-suite, extreme-depth, bookmarks, frames |
+| drawing | editing, vectors, text, sheets, styles, pattern |
+| rendering | tiles, density, lowmem |
+| pictures | pictures, files, screenshot |
+| library | assets, organize, library-folder |
+| storage | storage, archive, upgrade |
+| desktop | desktop |
+| interface | settings, dock, a11y, icon-audit, scrub-audit |
+| packages | colour-picker, colour-picker-package, patterns-package |
+| smoke | scenarios, release |
+
+| Changed | Groups |
+| --- | --- |
+| A spec | its group |
+| `src/storage/`, `src/assets/` (catalog, library) | storage, library, desktop (the desktop-only storage files: desktop) |
+| `desktop/`, the desktop build and package scripts | desktop |
+| `src/core/`, `src/scene/`, `src/render/` | navigation, rendering, drawing, pictures |
+| `src/doc/`, `src/interaction/`, `src/text/`, `src/gen/` | drawing (and pictures, packages where they reach) |
+| `src/ui/` | interface and drawing; the library's views: library; backups: storage |
+| `package.json` | smoke; a change to Playwright, esbuild, TypeScript or the scripts: everything; Electron: desktop |
+| `src/app/main.ts`, `session.ts`, `debug-hook.ts`, `editor-state.ts`, `src/doc/model.ts`, `document-store.ts`, `src/styles.css`, the harness, `playwright.config.ts`, the build | **everything** |
+| Docs, README, CHANGELOG, unit tests, `.gitignore` | none (unit tests and checks still run) |
+| **Any file no rule names** | **everything** (a gap costs time, never coverage) |
+
+A new spec goes into a group in `GROUPS` (`check:groups` fails until it does); a new source folder gets a rule. Every run keeps each
+test's time in `test-builds/times.json`, which `test:affected` estimates from.
+
 ## Rules
 
-1. **Run the full suite only when a whole phase is complete, and never skip
-   it then.** A slice or milestone within a phase that can be tested on its
-   own (unit tests, its own E2E spec, and the quick suite) does not need it.
-   The quick suite runs every test with shorter stress loops. The full one
-   is the record that the spec's "hundreds of successive gestures"
-   requirements hold. (Decided with the project owner, 2026-10-13. Slices 1a
-   and 1b ran it as well; from 1c on they do not.)
+1. **Run what the change needs.** `npm run test:affected` (or `npm test`) after a change and before a commit, push or release; the
+   whole quick suite only when it picks every group or every few releases; the full suite only when a phase changed zoom,
+   coordinates, projection, rendering, tiles or performance. (Decided with the project owner, 2026-10-28: the quick and full suites at
+   every phase end cost hours for code they do not test. Before: full suite at every phase end, decided 2026-10-13.)
 2. **Tests never use `dist/`.** Every suite builds a snapshot of its own in
    `test-builds/` (`scripts/test-snap.mjs`) and opens that, so `dist/` (the
    owner's build, in development) can be rebuilt at any time and a rebuild
