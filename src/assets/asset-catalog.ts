@@ -6,6 +6,7 @@ import { isCard } from "./file-kind";
 import { formatTag, formatTags, renamedTag, tagIsOrUnder } from "../doc/tags";
 import { done, req } from "../storage/idb";
 import type { AssetRecord } from "./asset-library";
+import { storedStub } from "./asset-library";
 import type { CatalogStore } from "../storage/store";
 
 /**
@@ -231,6 +232,29 @@ export type PasswordKind = "hidden" | "workspace";
 
 export class AssetCatalog implements CatalogStore {
   constructor(readonly db: IDBDatabase) {}
+
+  /**
+   * Once: records of files kept in a folder lose the empty `blob` they were stored with (reading thousands of stored empty files made
+   * every listing and every write of the library slow). Run in the background at start.
+   */
+  async healStubs(): Promise<void> {
+    const tx = this.db.transaction(["assets", "meta"], "readwrite");
+    const committed = done(tx);
+    if (((await req(tx.objectStore("meta").get("stubVersion") as IDBRequest<number | undefined>)) ?? 0) >= 1) return void (await committed);
+    await new Promise<void>((resolve, reject) => {
+      const cur = tx.objectStore("assets").index("ext").openCursor();
+      cur.onerror = () => reject(cur.error);
+      cur.onsuccess = () => {
+        const c = cur.result;
+        if (!c) return resolve();
+        const v = c.value as AssetRecord;
+        if ("blob" in v) c.update(storedStub(v));
+        c.continue();
+      };
+    });
+    tx.objectStore("meta").put(1, "stubVersion");
+    await committed;
+  }
 
   async thumbHashes(): Promise<string[]> {
     const tx = this.db.transaction("thumbs", "readonly");

@@ -1352,10 +1352,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
    * The search (ADR 0069, 0071): a word matches the name, type, start of the hash or a tag (All), only the name (Name) or only the tags (Tag);
    * `#tag` is an exact tag and `.png` an exact file type, in every way. AND, OR, XOR, NOT and brackets combine words. Then the usage filter.
    */
+  /** An item's name and tags in lower case, made once per listed item (not on every keystroke for every item). */
+  const lowered = new WeakMap<object, { m: ReturnType<typeof meta>; tags: string[]; name: string }>();
+  const lowerOf = (e: CatalogListing["entries"][number]): { m: ReturnType<typeof meta>; tags: string[]; name: string } => {
+    let l = lowered.get(e);
+    if (!l) {
+      const m = meta(e);
+      l = { m, tags: m.tags.map((t) => t.toLowerCase()), name: e.name.toLowerCase() };
+      lowered.set(e, l);
+    }
+    return l;
+  };
   const matchesQuery = (e: CatalogListing["entries"][number], query: Query | null, usage: UsageFilter, how: Way = way): boolean => {
-    const m = meta(e);
-    const tags = m.tags.map((t) => t.toLowerCase());
-    const name = e.name.toLowerCase();
+    const { m, tags, name } = lowerOf(e);
     let notes: string | null = null; // the note and the fields, lowercased only when a word gets that far
     const words_ok = evalQuery(query, ({ text: w }) => {
       if (w.startsWith("#")) return tags.some((t) => tagIsOrUnder(t, w.slice(1))); // a tag and the tags nested under it
@@ -1406,34 +1415,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     filterMemo = { key: memoKey, of: listing, tags: canvasTags, wantsLooks, looksGen, rows };
     return rows;
   };
-  const filterNow = (): CatalogListing["entries"] => {
-    if (!listing) return [];
-    // shortcut: a linear filter over the in-memory listing; add a tag/name index if libraries reach tens of thousands.
-    const words = searchWords(search.value);
-    wantsLooks = scope === "similar";
-    const usage = usageSel.value as UsageFilter;
-    const group = new Map<string, number>();
-    if (scope === "similar") similar().forEach((g, i) => g.forEach((h) => group.set(h, i)));
-    const inFolders = scope.startsWith("folder:") ? folderSubtree(listing.folders, scope.slice(7)) : null;
-    const inScope = (e: CatalogListing["entries"][number]): boolean => {
-      const m = meta(e);
-      if (scope === "hidden") return m.hidden;
-      if (m.hidden) return false; // hidden items show in the Hidden scope only, whatever is searched
-      if (scope === "similar") return group.has(e.hash);
-      if (scope === "favorites") return m.favorite;
-      if (scope === "unfiled") return m.folderIds.length === 0;
-      if (inFolders) return m.folderIds.some((id) => inFolders.has(id));
-      if (scope.startsWith("ext:")) return chipOf(e.name, e.type).toLowerCase() === scope.slice(4);
-      if (scope.startsWith("tag:")) return m.tags.some((t) => tagIsOrUnder(t, scope.slice(4)));
-      if (scope.startsWith("ctag:")) return canvasTags.get(scope.slice(5))?.assets.has(e.hash) ?? false;
-      return true;
-    };
-    const rows = listing.entries.filter((e) => inScope(e) && matchesQuery(e, words, usage));
-    // (hidden items only while their list is open: they are in no Similar group, and their files may be locked)
-    if (wantsLooks) ensureLooks(listing.entries.filter((e) => !isCard(e) && (scope === "hidden" || !meta(e).hidden)).map((e) => e.hash));
-    // Look-alikes are listed together, the biggest group first, whatever the sort (the point is to see them side by side).
-    if (scope === "similar") return rows.sort((a, b) => group.get(a.hash)! - group.get(b.hash)! || collator.compare(a.name, b.name));
+  let sortMemo: { of: CatalogListing; key: SortKey; reversed: boolean; rows: CatalogListing["entries"] } | null = null;
+  /** Every item of the library in the order chosen, made once per library and sort. */
+  const sortedAll = (): CatalogListing["entries"] => {
     const key = sortSel.value as SortKey;
+    if (sortMemo && sortMemo.of === listing && sortMemo.key === key && sortMemo.reversed === reversed) return sortMemo.rows;
+    const rows = [...listing!.entries];
     // Text sorts compare a key made once per item (a folder path or the joined tags, made in every comparison, made sorting slow).
     const textKey: Partial<Record<SortKey, (e: (typeof rows)[number]) => string>> = {
       type: (e) => chipOf(e.name, e.type),
@@ -1459,7 +1446,41 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       canvases: (a, b) => b.canvases - a.canvases,
     };
     const flip = reversed ? -1 : 1;
-    return rows.sort((a, b) => flip * cmp[key](a, b) || (a.hash < b.hash ? -1 : 1));
+    const sorted = rows.sort((a, b) => flip * cmp[key](a, b) || (a.hash < b.hash ? -1 : 1));
+    sortMemo = { of: listing!, key, reversed, rows: sorted };
+    return sorted;
+  };
+  const filterNow = (): CatalogListing["entries"] => {
+    if (!listing) return [];
+    // shortcut: a linear filter over the in-memory listing; add a tag/name index if libraries reach tens of thousands.
+    const words = searchWords(search.value);
+    wantsLooks = scope === "similar";
+    const usage = usageSel.value as UsageFilter;
+    const group = new Map<string, number>();
+    if (scope === "similar") similar().forEach((g, i) => g.forEach((h) => group.set(h, i)));
+    const inFolders = scope.startsWith("folder:") ? folderSubtree(listing.folders, scope.slice(7)) : null;
+    const inScope = (e: CatalogListing["entries"][number]): boolean => {
+      const m = meta(e);
+      if (scope === "hidden") return m.hidden;
+      if (m.hidden) return false; // hidden items show in the Hidden scope only, whatever is searched
+      if (scope === "similar") return group.has(e.hash);
+      if (scope === "favorites") return m.favorite;
+      if (scope === "unfiled") return m.folderIds.length === 0;
+      if (inFolders) return m.folderIds.some((id) => inFolders.has(id));
+      if (scope.startsWith("ext:")) return chipOf(e.name, e.type).toLowerCase() === scope.slice(4);
+      if (scope.startsWith("tag:")) return m.tags.some((t) => tagIsOrUnder(t, scope.slice(4)));
+      if (scope.startsWith("ctag:")) return canvasTags.get(scope.slice(5))?.assets.has(e.hash) ?? false;
+      return true;
+    };
+    // The library sorted once for this sort (kept until the library or the sort changes); a search or a filter only keeps rows of it, in
+    // that order: sorting again on every keystroke cost most of the time with tens of thousands of items.
+    const base = scope === "similar" ? listing.entries : sortedAll();
+    const rows = base.filter((e) => inScope(e) && matchesQuery(e, words, usage));
+    // (hidden items only while their list is open: they are in no Similar group, and their files may be locked)
+    if (wantsLooks) ensureLooks(listing.entries.filter((e) => !isCard(e) && (scope === "hidden" || !meta(e).hidden)).map((e) => e.hash));
+    // Look-alikes are listed together, the biggest group first, whatever the sort (the point is to see them side by side).
+    if (scope === "similar") return rows.sort((a, b) => group.get(a.hash)! - group.get(b.hash)! || collator.compare(a.name, b.name));
+    return rows;
   };
 
   // ---- rendering

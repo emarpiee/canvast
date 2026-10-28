@@ -10,7 +10,7 @@ import { WorkspaceRepo } from "./workspace-repo";
 import type { CatalogEntry, ThumbRecord } from "../assets/asset-catalog";
 import { AssetCatalog, entryFromRecord } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
-import { ImportError } from "../assets/asset-library";
+import { ImportError, storedStub } from "../assets/asset-library";
 import { FULL_MESSAGE, isQuotaError, nearFullNotice, requestPersistence } from "./quota";
 import { externalFolder, externalHashes, libraryCounts } from "./external-folder";
 import { isHiddenFile } from "./hidden-vault";
@@ -157,7 +157,7 @@ export class IdbOriginals implements OriginalStore {
     try {
       const tx = this.db.transaction(["assets", "assetCatalog"], "readwrite", { durability: "strict" });
       const committed = done(tx);
-      if (writeBytes) tx.objectStore("assets").put(toFolder ? ({ ...record, blob: new Blob([]), ext: 1, file } satisfies AssetRecord) : record, record.hash);
+      if (writeBytes) tx.objectStore("assets").put(toFolder ? storedStub({ ...record, blob: new Blob([]), ext: 1, file }) : record, record.hash);
       const e = await req(tx.objectStore("assetCatalog").get(record.hash) as IDBRequest<CatalogEntry | undefined>);
       if (!e) tx.objectStore("assetCatalog").put(entryFromRecord(record));
       else if (e.state !== "active") tx.objectStore("assetCatalog").put({ ...e, state: "active", deletedAt: null } satisfies CatalogEntry);

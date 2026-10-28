@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.27 — A faster big library (2026-10-29)
+
+- **Fixed:** a big library was slow to open, to search and to save. Records of files kept in a folder no longer carry an empty stored file (reading thousands of them was most of the cost; existing ones are converted once, in the background); each save reads the library once, not twice, and keeps a short fingerprint of each item instead of its whole line; a search filters the library sorted once, instead of sorting again on every keystroke. Measured with 20,000 items: opening 6.0 s → 3.0 s, listing 1.8–2.6 s → 0.9 s, a save after one change 6.5 s → 2.1 s.
+
 ## 0.50.26 — A file put in .hidden/ asks for the password (2026-10-29)
 
 - **Changed:** in the desktop app, a readable file put in `.hidden/` while the Hidden items are locked makes the app ask for their password at once (it names the file); once given, the file is encrypted within a moment, so the folder shows its `.bin` in its place. A file that could not be taken in is now written in the developer tools' console instead of being skipped silently.

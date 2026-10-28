@@ -15,6 +15,15 @@ import { describeFile, isCard, isMediaType } from "./file-kind";
  * referencing an asset by SHA-256; the original bytes are stored once no
  * matter how many instances exist, and are never modified.
  */
+/**
+ * A record whose bytes are a file of a folder (`ext: 1`), as stored: without its empty `blob` (thousands of stored empty files made every
+ * read of the records slow; the bytes are always read from the folder). Read back, a stub's `blob` is filled in where it is used.
+ */
+export function storedStub(rec: AssetRecord): AssetRecord {
+  const { blob: _empty, ...rest } = rec;
+  return rest as AssetRecord;
+}
+
 export interface AssetRecord {
   hash: string;
   type: string;

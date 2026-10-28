@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.27: a faster big library (2026-10-29)
+
+**Implemented:** `storedStub` (folder-file records without `blob`), `AssetCatalog.healStubs` (once, at start); `LibraryMirror.writeJson` reuses the write's read; `seen()` fingerprints in the mirror state; the library search filters `sortedAll()` (sorted once per listing and sort) and caches each item's lower-case name and tags.
+**Tested:** see the commit. Benchmark (desktop, fake items, files absent): 20k: open 3.0 s, list 0.9 s, save after one rename 2.1 s, search 0.7 s; 100k (before the search change): open 8.0 s, list 4.5 s, save 9.8 s, `library.json` 29 MB, heap 342 MB.
+**Known failures:** none.
+**Unverified:** 500k. A change still reads and rewrites the whole library: incremental writes and a split `library.json` are the next step.
+**Committed:** on `main`, not pushed.
+**Next bounded task:** incremental library writes (only changed items), split `library.json`.
+
 ## v0.50.26: a file put in .hidden/ asks for the password (2026-10-29)
 
 **Implemented:** `FolderHandlers.hiddenNeedsKey` → `askHiddenPassword` (LibraryMirror.askKey, WorkspaceMirror.askHiddenKey); main's folder import logs a file it could not take.

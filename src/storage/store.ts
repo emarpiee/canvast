@@ -109,6 +109,8 @@ export interface CatalogStore {
   hiddenHashes(): Promise<Set<string>>;
   locations(hash: string): Promise<AssetLocation[]>;
   thumb(hash: string): Promise<ThumbRecord | undefined>;
+  /** Once, in the background: stored records of folder files drop their empty `blob`. */
+  healStubs(): Promise<void>;
   /** The items that have a stored thumbnail. */
   thumbHashes(): Promise<string[]>;
   putThumb(rec: ThumbRecord): Promise<void>;

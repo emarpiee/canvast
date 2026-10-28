@@ -1,4 +1,5 @@
 import { externalFolder } from "./external-folder";
+import { storedStub } from "../assets/asset-library";
 import type { SerializedCamera } from "../core/camera";
 import { plural, were } from "../doc/plural";
 import { deserializeCamera } from "../core/camera";
@@ -807,7 +808,7 @@ async function stageOriginals(db: IDBDatabase, assets: readonly AssetRecord[], p
       const committed = done(tx);
       const staged = ((await req(tx.objectStore("meta").get(STAGED_KEY) as IDBRequest<string[] | undefined>)) ?? []);
       for (const a of loaded) if ((await req(tx.objectStore("assets").count(a.hash))) === 0) {
-        tx.objectStore("assets").put(a, a.hash);
+        tx.objectStore("assets").put(a.ext ? storedStub(a) : a, a.hash);
         staged.push(a.hash);
         written.add(a.hash);
       }
@@ -878,7 +879,7 @@ async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: st
     for (const a of plan.assets) {
       if (staged.has(a.hash)) result.assetsAdded++; // written ahead (stageOriginals)
       else if ((await req(tx.objectStore("assets").count(a.hash))) === 0) {
-        tx.objectStore("assets").put(a, a.hash);
+        tx.objectStore("assets").put(a.ext ? storedStub(a) : a, a.hash);
         result.assetsAdded++;
       }
       const e = await req(tx.objectStore("assetCatalog").get(a.hash) as IDBRequest<CatalogEntry | undefined>);

@@ -213,6 +213,7 @@ export class Session {
     startStep("writer lease");
     this.persistence.setWritable(!this.readOnly);
     void this.catalog?.healThumbs().catch(() => undefined);
+    void this.catalog?.healStubs().catch(() => undefined);
     // Tags stored in an older form are formatted first (ADR 0084), before any canvas is read.
     await this.catalog?.healTags().catch(() => undefined);
     await this.repo.formatStoredTags().catch(() => undefined);

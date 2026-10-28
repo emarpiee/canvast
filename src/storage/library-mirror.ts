@@ -10,6 +10,7 @@
 import type { AssetField, AssetFolder, CatalogEntry } from "../assets/asset-catalog";
 import { FOLDERS_KEY, folderPath, meta, normalizeFields, normalizeNote, normalizeTags } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
+import { storedStub } from "../assets/asset-library";
 import type { DesktopBridge } from "./desktop-bridge";
 import { externalFolder } from "./external-folder";
 import type { HiddenVault } from "./hidden-store";
@@ -172,6 +173,21 @@ export function libraryJsonText(folders: readonly AssetFolder[], items: readonly
   return `{"format":"${LIBRARY_JSON_FORMAT}","version":1,\n"folders":${JSON.stringify(folders)},\n"items":[${items.length ? "\n" : ""}${items.map((i) => JSON.stringify(i)).join(",\n")}${items.length ? "\n" : ""}]}\n`;
 }
 
+/**
+ * What this device last knew of an item of `library.json`: a short fingerprint of its line (FNV-1a), not the line itself, so the record
+ * kept of a big library stays small (it is written with each change).
+ */
+function seen(text: string): string {
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  for (let i = 0; i < text.length; i++) {
+    const c = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193);
+    h2 = Math.imul(h2 ^ c, 0x5bd1e995);
+  }
+  return `${(h1 >>> 0).toString(36)}${(h2 >>> 0).toString(36)}`;
+}
+
 /** How many files only the app's storage holds are written into the folder at once. */
 const PARALLEL_WRITES = 6;
 /** How many of those files are written before the disk is asked, once, to store them (and the app's copies are let go). */
@@ -268,23 +284,23 @@ export class LibraryMirror {
     for (const it of items) {
       inFile.add(it.hash);
       const text = JSON.stringify(it);
-      if (text === known[it.hash]) continue; // nothing new from the folder
+      if (seen(text) === known[it.hash]) continue; // nothing new from the folder
       const e = await req(catalog.get(it.hash) as IDBRequest<CatalogEntry | undefined>);
       const rec = await req(assets.get(it.hash) as IDBRequest<AssetRecord | undefined>);
-      if (e && JSON.stringify(itemOf(e, rec)) !== (known[it.hash] ?? "")) continue; // changed here too: this device's stays
+      if (e && seen(JSON.stringify(itemOf(e, rec))) !== (known[it.hash] ?? "")) continue; // changed here too: this device's stays
       catalog.put(entryOf(it, e));
       if (it.file && (!rec || rec.ext)) {
         const stub: AssetRecord = { hash: it.hash, type: it.type, size: it.size, name: rec?.name ?? it.name, pixelW: it.pixelW, pixelH: it.pixelH, blob: new Blob([]), importedAt: it.importedAt, ...(it.card ? { card: true } : {}), ...(it.duration !== undefined ? { duration: it.duration } : {}), ...(it.frames !== undefined ? { frames: it.frames } : {}), ext: 1, file: it.file };
-        assets.put(stub, it.hash);
+        assets.put(storedStub(stub), it.hash);
       }
-      known[it.hash] = text;
+      known[it.hash] = seen(text);
       took = true;
     }
     for (const hash of complete ? Object.keys(known) : []) {
       if (inFile.has(hash)) continue;
       const e = await req(catalog.get(hash) as IDBRequest<CatalogEntry | undefined>);
       const rec = await req(assets.get(hash) as IDBRequest<AssetRecord | undefined>);
-      if (e && JSON.stringify(itemOf(e, rec)) !== known[hash]) continue; // changed here: kept
+      if (e && seen(JSON.stringify(itemOf(e, rec))) !== known[hash]) continue; // changed here: kept
       if (e?.state === "active") catalog.put({ ...e, state: "deleted", deletedAt: Date.now() } satisfies CatalogEntry);
       delete known[hash];
       took = true;
@@ -300,7 +316,8 @@ export class LibraryMirror {
    */
   async write(): Promise<boolean> {
     await this.finishMove();
-    const { entries, recs, folders } = await this.read();
+    const read = await this.read();
+    const { entries, recs, folders } = read;
     const folderOk = new Set(folders.map((f) => f.id));
     // Places kept: every file of an item that is not moved (deleted items stay where they are until they are erased).
     const taken = new Set<string>();
@@ -386,7 +403,8 @@ export class LibraryMirror {
       for (let p = d; p.startsWith("library/") && !wanted.has(p); p = parentOf(p)) if (!(await this.bridge.removeEmptyFolder(p))) break;
     }
     this.dirs = wanted;
-    await this.writeJson();
+    const placedAll = total === 0; // (no file moved, sealed or written: the records are as they were read)
+    await this.writeJson(placedAll ? read : undefined);
     if (failed.length && !this.failing) this.onNotice?.(`${failed.length === 1 ? "A library file" : `${failed.length} library files`} could not be moved to ${failed.length === 1 ? "its" : "their"} place in the workspace folder (${failed[0]}). ${failed.length === 1 ? "It is" : "They are"} tried again with the next change.`);
     this.failing = failed.length > 0;
     return !this.failing;
@@ -621,7 +639,7 @@ export class LibraryMirror {
       const store = tx.objectStore("assets");
       for (const w of written) {
         const cur = await req(store.get(w.hash) as IDBRequest<AssetRecord | undefined>);
-        if (cur && !cur.ext && cur.blob.size === w.size) store.put({ ...cur, size: cur.blob.size, blob: new Blob([]), ext: 1, file: w.file } satisfies AssetRecord, w.hash);
+        if (cur && !cur.ext && cur.blob.size === w.size) store.put(storedStub({ ...cur, size: cur.blob.size, blob: new Blob([]), ext: 1, file: w.file }), w.hash);
       }
       await committed;
     } finally {
@@ -700,7 +718,7 @@ export class LibraryMirror {
     const tx = this.db.transaction("assets", "readwrite", { durability });
     const committed = done(tx);
     const cur = await req(tx.objectStore("assets").get(hash) as IDBRequest<AssetRecord | undefined>);
-    if (cur && still(cur)) tx.objectStore("assets").put({ ...cur, size: cur.ext ? cur.size : cur.blob.size, blob: new Blob([]), ext: 1, file } satisfies AssetRecord, hash);
+    if (cur && still(cur)) tx.objectStore("assets").put(storedStub({ ...cur, size: cur.ext ? cur.size : cur.blob.size, blob: new Blob([]), ext: 1, file }), hash);
     await committed;
   }
 
@@ -719,8 +737,9 @@ export class LibraryMirror {
     return { entries, recs, folders };
   }
 
-  private async writeJson(): Promise<void> {
-    const { entries, recs, folders } = await this.read();
+  /** Write `library.json` (and the sealed index), from `known` when nothing was moved since it was read (no second read of the library). */
+  private async writeJson(known?: Awaited<ReturnType<LibraryMirror["read"]>>): Promise<void> {
+    const { entries, recs, folders } = known ?? (await this.read());
     const items = entries.map((e) => itemOf(e, recs.get(e.hash)));
     // Sealed items are only in the sealed index (written while the key is open: sealing and opening need it). One hidden while
     // the key is locked stays in library.json, as its file stays readable, until it is sealed.
@@ -730,7 +749,7 @@ export class LibraryMirror {
     const index = JSON.stringify(items.filter((i) => isHiddenFile(i.file)));
     if (this.vault.dataKey && index !== this.lastIndex && (index !== "[]" || (await this.vault.state()) !== "none")) await this.vault.writeIndex(index);
     if (this.vault.dataKey) this.lastIndex = index;
-    this.state = { folders: JSON.stringify(folders), items: Object.fromEntries(items.map((i) => [i.hash, JSON.stringify(i)])) };
+    this.state = { folders: JSON.stringify(folders), items: Object.fromEntries(items.map((i) => [i.hash, seen(JSON.stringify(i))])) };
     await idbPut(this.db, "meta", STATE_KEY, this.state);
   }
 }

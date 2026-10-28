@@ -1,4 +1,5 @@
 /** Move originals between the browser's storage and the library folder (ADR 0159), one at a time, each proven before the other copy goes. */
+import { storedStub } from "../assets/asset-library";
 import type { AssetRecord } from "../assets/asset-library";
 import { done, idbGet, req } from "./idb";
 import { externalFolder, externalHashes, folderFileName } from "./external-folder";
@@ -48,7 +49,7 @@ export async function moveToFolder(db: IDBDatabase, progress: (done: number, tot
     const committed = done(tx);
     const cur = await req(tx.objectStore("assets").get(hash) as IDBRequest<AssetRecord | undefined>);
     // Changed in the meantime (another tab): leave it, the file is only an extra copy.
-    if (cur && !cur.ext && cur.blob.size === rec.blob.size) tx.objectStore("assets").put({ ...cur, size: cur.blob.size, blob: EMPTY(), ext: 1, file }, hash);
+    if (cur && !cur.ext && cur.blob.size === rec.blob.size) tx.objectStore("assets").put(storedStub({ ...cur, size: cur.blob.size, blob: EMPTY(), ext: 1, file }), hash);
     await committed;
     return true;
   }, progress);
