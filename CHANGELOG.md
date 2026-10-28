@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.1 — A new folder is a new workspace, a calmer library wait (2026-10-28)
+
+- **Fixed:** in the desktop app on Linux, watching the workspace folder for outside changes put a watch on every file and read a whole folder again, holding the app's main process, on every file written into it, so a big import slowed the app more the more files it wrote. Each folder is now watched once, and nothing waits on it.
+- **Fixed:** in the desktop app, a new workspace folder made where a deleted one was (the same name and place) opened the deleted one's copy kept on this device: its boards, library and passwords. Each folder now has its own id (`.canvast/folder.json`); a new folder is a new, empty workspace, and the deleted one's copy is cleared.
+- **Changed:** the thumbnail of a library item still loading shows one soft light passing across the whole view (every waiting thumbnail in the same wave) instead of a stripe on each; still with reduced motion.
+- **Changed:** Settings > Storage in the desktop app is tidier: the workspace folder's path as in the Library folder card, one short line on what the folder is, **Switch workspace…** as the app's other buttons, and where deleted files go as an ordinary setting row (with its reset).
+
 ## 0.50.0 — Hidden means hidden, an eye on passwords, fields in your order (2026-10-28)
 
 - **Added:** every password field (the lock screen, setting or giving a password) has an eye button at its end that shows what was typed and hides it again; the field keeps the focus.
@@ -16,10 +23,6 @@
 - **Changed:** a hidden library item's pictures on every canvas show a padlock at once, in the browser and in the desktop app, whether or not the Hidden password was given, until the item is shown again. A hidden video or sound on a canvas does not play.
 - **Fixed:** scrolling fast through a big library showed the browser's broken-picture mark on cards whose thumbnails were still loading. A thumbnail's place (cards, list rows, the details picture, the viewer's filmstrip) now shimmers until its picture has loaded, and one that cannot be shown leaves the place plain.
 - **Fixed:** in the desktop app, a hidden item's card and details picture could stay blank (until the app was restarted) after the app was reopened, even once the Hidden list was opened or the item shown again: Similar images read the hidden item's picture while it was still locked, and the library kept that failure. Hidden items are no longer read for Similar images, and a picture that could not be read is tried again when the library is read again or the hidden items are opened.
-- **Fixed:** in the desktop app on Linux, watching the workspace folder for outside changes put a watch on every file and read a whole folder again, holding the app's main process, on every file written into it, so a big import slowed the app more the more files it wrote. Each folder is now watched once, and nothing waits on it.
-- **Fixed:** in the desktop app, a new workspace folder made where a deleted one was (the same name and place) opened the deleted one's copy kept on this device: its boards, library and passwords. Each folder now has its own id (`.canvast/folder.json`); a new folder is a new, empty workspace, and the deleted one's copy is cleared.
-- **Changed:** the thumbnail of a library item still loading shows one soft light passing across the whole view (every waiting thumbnail in the same wave) instead of a stripe on each; still with reduced motion.
-- **Changed:** Settings > Storage in the desktop app is tidier: the workspace folder's path as in the Library folder card, one short line on what the folder is, **Switch workspace…** as the app's other buttons, and where deleted files go as an ordinary setting row (with its reset).
 
 ## 0.49.0 — The desktop app: your workspace as a folder of files (2026-10-28)
 

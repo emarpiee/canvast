@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.1: a new folder is a new workspace, the folder watched per folder, a calmer library wait (2026-10-28)
+
+**Implemented:** in the desktop app, each workspace folder has its own id (`.canvast/folder.json`); the storage partition is per path and id (`partitionOf` in `desktop/main.ts`, recorded in the app's `partitions.json`), so a new folder where a deleted one was never opens the deleted one's cache, which is cleared; folders from before keep theirs. On Linux the folder is watched per folder (`watchTree`) instead of Node's recursive watch, which watched every file and read a folder again synchronously on each change. Loading thumbnails share one soft wave (fixed to the window, `--thumb-glint`). Settings > Storage's workspace card: the path as a Folder line, one short line, Switch workspace as the other buttons, where deleted files go as a standard settings row.
+**Tested:** desktop spec 12/12 (the same-path case added); library-folder, storage Settings and the virtual-library assets spec in chromium and firefox 16/16; unit 587/587.
+**Known failures:** none.
+**Unverified:** a folder opened by this build after an older build had cached a deleted workspace at the same path (logic only). The blank window for about 2 minutes after importing a backup of 2,510 files: not reproduced with 1,500 generated pictures; the watcher cost fixed here grows with the folder but did not reach minutes.
+**Committed:** on `main`, not pushed.
+**Next bounded task:** reproduce the blank window after a big import (the owner's backup has hidden items and both passwords).
+
 ## v0.50.0: hidden items always a padlock, an eye on passwords, fields in any order (2026-10-28)
 
 **Implemented:** every password field (prompt and lock screen) has an eye button that shows and hides what was typed (`secretFieldHtml`, `wireSecretFields` in `ui/confirm.ts`). A hidden library item's pictures are a padlock on every canvas, in both builds and whatever the password state (`AssetLibrary.setHidden`, `CatalogStore.hiddenHashes`, synced in `main.ts` on library changes but not on canvas commits); hidden media do not play. Note fields move by a grip (drag, or Up and Down on it), the order stored. Fixed: after a restart, Similar images read a locked hidden item's thumbnail and the library kept the failure, so its card and details stayed blank until a reload; hidden items are no longer read for looks, failed thumbnails are tried again on the next library read, and the library is read again when the hidden items open or lock.
