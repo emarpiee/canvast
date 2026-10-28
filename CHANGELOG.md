@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.49.0 — The desktop app: your workspace as a folder of files (2026-10-28)
+
+- **Added:** a **desktop app for Linux** (`canvast-0.49.0-x86_64.AppImage`, attached to the release): the same app, whose workspace is a folder of ordinary files you choose (File > Open workspace folder…), so a sync tool, a backup tool or a file manager can see it. Each board is a folder, each canvas a `.cvst` file, the library's files are under `library/` named after their names in the library, and `.canvast/` holds the names, order, tags and folders (ADR 0177).
+- **Added:** library folders are real folders in the desktop app: filing or renaming an item moves its file, and the library's undo moves it back.
+- **Added:** several devices on one folder (through any sync tool): each device keeps its own cameras and open canvas; a canvas another device changed is read in, the open one loaded again; when both changed the same canvas, both versions are kept (`<name> (conflict <date>)`), and a file is never written over another device's newer version.
+- **Added:** changes made in a file manager are followed: a library file renamed or moved is found again by its content, a new file dropped into `library/` is imported where it lies, a renamed canvas file or board folder renames the canvas or board, and a deleted file shows as missing.
+- **Added:** in the desktop app, **hidden items are encrypted** (AES-GCM, a key wrapped by the Hidden password): hiding asks for a password first, the readable file is deleted, nothing about the item is readable in the folder, a hidden picture on a canvas shows a padlock while locked, and **Lock hidden items** locks them again.
+- **Added:** Settings > Storage in the desktop app chooses where deleted files go: `.trash/` in the workspace folder (the default), the system trash, or for good.
+- **Added:** moving in from the browser: export a full backup there and import it in the desktop app; its boards, canvases and files are written into the folder.
+- **Changed:** the app reaches storage only through one set of interfaces, so the browser build (unchanged, IndexedDB) and the desktop app share all their code; `npm run check:storage` keeps it so.
+- **Changed:** releases carry the AppImage and its SHA-256 beside `canvast.html`; the release checks that the AppImage starts before publishing it.
+
 ## 0.48.2 — Old painting data removed (2026-10-28)
 
 - **Removed:** the browser storage kept three stores of the removed Painting view (paintings, their layers and tiles) that nothing read. The storage upgrade (schema 12) deletes them and what they hold. Backups made by older versions still import, and say the paintings in them are left out (ADR 0170).
