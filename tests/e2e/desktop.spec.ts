@@ -107,7 +107,8 @@ test("boards are folders and canvases .cvst files: safe names, -2 on a clash, re
     await op("deleteCanvas", t[0]!.canvases[1]!.id);
     // the last change, not flushed: closing the window writes it
     await page.getByTestId("import-input").setInputFiles({ name: "dot.png", mimeType: "image/png", buffer: makePng(2, 2, () => [0, 0, 0, 255]) });
-    await expect.poll(() => page.evaluate(() => window.__canvastDebug.saveStatus())).toBe("verified");
+    // (stored, not only "verified": right after an import the save status can still be the one from before)
+    await expect.poll(() => page.evaluate((id) => window.__canvastDebug.storedObjectIds(id).then((ids) => ids.length), t[0]!.canvases[0]!.id)).toBe(1);
   } finally {
     await app.close();
   }
@@ -406,5 +407,54 @@ test("library files changed outside the app: a renamed or moved file is found by
     ]);
   } finally {
     await app.close();
+  }
+});
+
+test("while the app runs it follows the folder: a canvas file renamed by hand, a file dropped into library/, another device's edits (loaded again) and both sides' edits (a conflict copy)", async () => {
+  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const a = await launch(ws, "device-a");
+  let b: Awaited<ReturnType<typeof launch>> | null = null;
+  let shade = 0;
+  const add = async (p: Page, n: number): Promise<void> => {
+    const before = (await p.evaluate(() => window.__canvastDebug.objects().length));
+    for (let i = 0; i < n; i++) {
+      const v = 10 + 20 * shade++;
+      await p.getByTestId("import-input").setInputFiles({ name: `p${v}.png`, mimeType: "image/png", buffer: makePng(2, 2, () => [v, v, v, 255]) });
+    }
+    await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(before + n);
+  };
+  const tree = (p: Page) => p.evaluate(() => window.__canvastDebug.session().tree?.map((x) => [x.name, x.canvases.map((c) => c.name)]) ?? []);
+  try {
+    await expect.poll(async () => (await tree(a.page)).length).toBe(1);
+    const t = await a.page.evaluate(() => window.__canvastDebug.session().tree!);
+    await a.page.evaluate(([bid, cid]) => window.__canvastDebug.workspaceOp("renameBoard", bid, "Sketches").then(() => window.__canvastDebug.workspaceOp("renameCanvas", cid, "Characters")), [t[0]!.id, t[0]!.canvases[0]!.id] as [string, string]);
+    await add(a.page, 1);
+    await a.page.evaluate(() => window.__canvastDebug.flushStorage());
+
+    // By hand, in the file manager: the canvas file renamed, a picture dropped into a new folder of library/.
+    renameSync(join(ws, "sketches/characters.cvst"), join(ws, "sketches/Heroes.cvst"));
+    mkdirSync(join(ws, "library/drops"));
+    writeFileSync(join(ws, "library/drops/New One.png"), makePng(2, 2, () => [5, 200, 5, 255]));
+    await expect.poll(() => tree(a.page), { timeout: 10_000 }).toEqual([["Sketches", ["Heroes"]]]);
+    await expect.poll(() => a.page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.name === "New One.png").map((e) => l.folders.find((f) => f.id === e.folderIds?.[0])?.name))), { timeout: 10_000 }).toEqual(["drops"]);
+    await a.page.evaluate(() => window.__canvastDebug.flushStorage());
+    expect(files(ws).filter((f) => f.endsWith(".cvst"))).toEqual(["sketches/heroes.cvst"]);
+
+    // Another device on the same folder at the same time: its saved edits are loaded again on this one (no edits here).
+    b = await launch(ws, "device-b");
+    await expect.poll(() => b!.page.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
+    await add(b.page, 2);
+    await b.page.evaluate(() => window.__canvastDebug.flushStorage());
+    await expect.poll(() => a.page.evaluate(() => window.__canvastDebug.objects().length), { timeout: 10_000 }).toBe(3);
+
+    // Both edit before either file is written: this device keeps the folder's version, and its own as a conflict copy.
+    await add(a.page, 1);
+    await add(b.page, 1);
+    await b.page.evaluate(() => window.__canvastDebug.flushStorage());
+    await expect.poll(async () => (await tree(a.page)).map(([n, cs]) => [n, (cs as string[]).map((c) => c.replace(/\(conflict [^)]*\)/, "(conflict)"))]), { timeout: 10_000 }).toEqual([["Sketches", ["Heroes", "Heroes (conflict)"]]]);
+    await expect.poll(() => a.page.evaluate(() => window.__canvastDebug.objects().length)).toBe(4); // (the folder's version: 3 + device B's one)
+  } finally {
+    await b?.app.close();
+    await a.app.close();
   }
 });

@@ -190,13 +190,22 @@ export interface FolderFile {
   read(): Promise<Blob | null>;
 }
 
-/** The desktop build: files that appear in `library/` outside the app. */
-export interface FolderImports {
-  /**
-   * Who imports new files (the app, which can decode them) and who is told when items were relinked or added; the folder is
-   * looked through once this is set, and again on each change.
-   */
-  start(importFiles: (files: FolderFile[]) => Promise<void>, changed: () => void): void;
+/** What the app does when the desktop build's workspace folder changes outside it (ADR 0177, "Changes from outside the app"). */
+export interface FolderHandlers {
+  /** Import files found in `library/` that no item has (the app can decode them). */
+  importFiles(files: FolderFile[]): Promise<void>;
+  /** Library items were relinked, added or changed: lists are drawn again. */
+  libraryChanged(): void;
+  /** Before canvas files are compared: edits still on their way are saved (so they count as this device's). */
+  beforeCheck(): Promise<void>;
+  /** Boards or canvases changed; `canvases` were read in from their files (the open one is loaded again). */
+  canvasesChanged(canvases: string[]): Promise<void>;
+}
+
+/** The desktop build: the workspace folder's changes from outside the app. */
+export interface FolderSync {
+  /** Start following the folder: it is looked through at once, then on each change. */
+  start(handlers: FolderHandlers): void;
 }
 
 /** One opened storage: what a session works on. */
@@ -207,8 +216,8 @@ export interface Storage {
   readonly originals: OriginalStore;
   /** The library folder (ADR 0159): only the browser build has one (in the desktop build the workspace is a folder). */
   readonly libraryFolder: LibraryFolderStore | null;
-  /** The desktop build's files found in `library/`; null in the browser build. */
-  readonly folderImports: FolderImports | null;
+  /** The desktop build's changes from outside the app; null in the browser build. */
+  readonly folderSync: FolderSync | null;
   /** The desktop build's encrypted hidden items; null in the browser build. */
   readonly hidden: HiddenStore | null;
   /** The desktop build's workspace folder (its full path); null in the browser build. */

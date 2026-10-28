@@ -201,16 +201,16 @@ export class LibraryMirror {
    * Read `library.json`, and the hidden items' index when the hidden items are open, and take what changed. Also when the
    * hidden items are opened: what another device hid or changed among them is known only then.
    */
-  async reread(): Promise<void> {
+  async reread(): Promise<boolean> {
     const bytes = await this.bridge.read(LIBRARY_JSON);
-    if (!bytes) return;
+    if (!bytes) return false;
     let raw: Partial<LibraryJson>;
     try {
       raw = JSON.parse(new TextDecoder().decode(bytes)) as Partial<LibraryJson>;
     } catch {
-      return; // damaged: written again from the app's storage
+      return false; // damaged: written again from the app's storage
     }
-    if (raw.format !== LIBRARY_JSON_FORMAT || !Array.isArray(raw.items)) return;
+    if (raw.format !== LIBRARY_JSON_FORMAT || !Array.isArray(raw.items)) return false;
     const items = raw.items.map(readItem).filter((i): i is LibraryItem => i !== null);
     const vault = await this.vault.state();
     if (vault === "open") {
@@ -222,7 +222,7 @@ export class LibraryMirror {
       }
     }
     // (While the hidden items are locked, an item missing from library.json may have been hidden elsewhere, not erased.)
-    await this.adopt(readFolders(raw.folders), items, vault !== "locked");
+    return this.adopt(readFolders(raw.folders), items, vault !== "locked");
   }
 
   /**
@@ -230,7 +230,9 @@ export class LibraryMirror {
    * since (then its own version stays and is written back). An item the file no longer has was erased on another device: it is
    * deleted here too (the app's garbage collection erases it once nothing needs it, or brings it back if a canvas uses it).
    */
-  private async adopt(folders: AssetFolder[], items: LibraryItem[], complete: boolean): Promise<void> {
+  /** Whether anything was taken. */
+  private async adopt(folders: AssetFolder[], items: LibraryItem[], complete: boolean): Promise<boolean> {
+    let took = false;
     const tx = this.db.transaction(["assetCatalog", "assets", "meta"], "readwrite", { durability: "strict" });
     const committed = done(tx);
     const catalog = tx.objectStore("assetCatalog");
@@ -246,6 +248,7 @@ export class LibraryMirror {
       const localIds = new Set(localFolders.map((f) => f.id));
       tx.objectStore("meta").put(localChanged ? [...localFolders, ...folders.filter((f) => !localIds.has(f.id) && !knownIds.has(f.id))] : folders, FOLDERS_KEY);
       this.state.folders = fileFolders;
+      took = true;
     }
 
     const inFile = new Set<string>();
@@ -262,6 +265,7 @@ export class LibraryMirror {
         assets.put(stub, it.hash);
       }
       known[it.hash] = text;
+      took = true;
     }
     for (const hash of complete ? Object.keys(known) : []) {
       if (inFile.has(hash)) continue;
@@ -270,9 +274,11 @@ export class LibraryMirror {
       if (e && JSON.stringify(itemOf(e, rec)) !== known[hash]) continue; // changed here: kept
       if (e?.state === "active") catalog.put({ ...e, state: "deleted", deletedAt: Date.now() } satisfies CatalogEntry);
       delete known[hash];
+      took = true;
     }
     tx.objectStore("meta").put(this.state, STATE_KEY);
     await committed;
+    return took;
   }
 
   /**

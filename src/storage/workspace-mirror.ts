@@ -15,7 +15,7 @@ import type { HiddenVault } from "./hidden-store";
 import type { BackupRecord, WorkspaceStore } from "./store";
 import type { BoardRecord, CanvasRecord, CurrentMeta, StoredView, WorkspaceRecord } from "./workspace-repo";
 import type { PlacedBoard } from "./workspace-names";
-import { placeTree } from "./workspace-names";
+import { placeTree, safeBase } from "./workspace-names";
 
 export const MIRROR_DELAY_MS = 2000;
 export const WORKSPACE_FILE = ".canvast/workspace.json";
@@ -68,6 +68,8 @@ export class WorkspaceMirror {
   private placed: PlacedBoard[] = [];
   private timer: ReturnType<typeof setTimeout> | null = null;
   private running: Promise<void> = Promise.resolve();
+  /** Told when a canvas was not written because another device changed its file meanwhile (it is then compared, as an outside change). */
+  onContested: (() => void) | null = null;
   /** Told when a write failed (once per streak), in plain words. */
   onError: ((text: string) => void) | null = null;
   private failing = false;
@@ -86,7 +88,7 @@ export class WorkspaceMirror {
     // Opened: what another device hid is read from the sealed index, and what waited for the key (hiding, showing) is done.
     vault.subscribe(() => {
       if (!vault.dataKey) return;
-      this.running = this.running.then(() => this.lib.reread()).catch(() => undefined);
+      this.running = this.running.then(async () => void (await this.lib.reread())).catch(() => undefined);
       this.library();
     });
   }
@@ -118,10 +120,24 @@ export class WorkspaceMirror {
     if (tree !== this.state.tree) await this.adoptTree(fileWs);
     this.placed = fileWs.boards;
     this.state.tree = tree;
+    await this.reconcile(fileWs.boards);
+    await idbPut(this.db, "meta", STATE_KEY, this.state);
+    this.treeDirty = true;
+    this.deviceDirty = true;
+    this.later();
+  }
+
+  /**
+   * Each canvas against its file: a file another device wrote replaces the app's copy, unless the app has edits the file does
+   * not have, when both are kept (the app's as a conflict copy); what the folder lacks is marked to be written. The canvases
+   * whose content was read in.
+   */
+  private async reconcile(boards: readonly PlacedBoard[]): Promise<string[]> {
+    const adopted: string[] = [];
     const cur = await this.repo.current();
-    if (!cur) return;
+    if (!cur) return adopted;
     const records = (await this.repo.tree(cur.workspaceId)).boards.flatMap((b) => b.canvases);
-    const files = new Map(fileWs.boards.flatMap((b) => b.canvases.map((c) => [c.id, c.file] as const)));
+    const files = new Map(boards.flatMap((b) => b.canvases.map((c) => [c.id, c.file] as const)));
     for (const c of records) {
       const file = files.get(c.id);
       const head = file ? canvasHead(await this.bridge.head(file)) : null;
@@ -143,11 +159,82 @@ export class WorkspaceMirror {
         this.onError?.(`“${c.name}” was changed in the workspace folder and here: the folder's version is kept, and this device's as “${c.name} (conflict …)”.`);
       }
       await this.adoptCanvas(c, file);
+      adopted.push(c.id);
     }
-    await idbPut(this.db, "meta", STATE_KEY, this.state);
-    this.treeDirty = true;
-    this.deviceDirty = true;
-    this.later();
+    return adopted;
+  }
+
+  /**
+   * While the app runs, the folder changed outside it (another device through a sync tool, or a file manager): boards and
+   * canvases another device changed are taken, canvas files and board folders renamed or moved by hand are followed, and each
+   * changed canvas file is read in as at start-up. Which canvases were read in (the open one is loaded again), and whether the
+   * boards or canvases changed.
+   */
+  recheck(): Promise<{ canvases: string[]; tree: boolean }> {
+    const job = Promise.all([this.running, this.ready]).then(async () => {
+      const fileWs = await this.readWorkspaceFile();
+      if (!fileWs) return { canvases: [], tree: false };
+      let tree = false;
+      const text = JSON.stringify(fileWs.boards);
+      if (text !== this.state.tree) {
+        await this.adoptTree(fileWs);
+        this.placed = fileWs.boards;
+        this.state.tree = text;
+        tree = true;
+      }
+      if (await this.followMoved()) tree = true;
+      const canvases = await this.reconcile(this.placed);
+      await idbPut(this.db, "meta", STATE_KEY, this.state);
+      if (this.treeDirty || this.dirty.size) this.later();
+      return { canvases, tree: tree || canvases.length > 0 };
+    });
+    this.running = job.then(
+      () => undefined,
+      (e: unknown) => this.onError?.(`The workspace folder could not be read: ${(e as Error).message}.`),
+    );
+    return job.catch(() => ({ canvases: [], tree: false }));
+  }
+
+  /**
+   * Canvas files and board folders renamed or moved in a file manager (the file is found by the id in its header): a renamed
+   * file renames the canvas, a renamed folder the board (the names as on disk), a file moved into another board's folder moves
+   * the canvas there. Their files then take the safe names as any do. A copy, or a canvas this workspace does not have, is left alone.
+   */
+  private async followMoved(): Promise<boolean> {
+    const where = new Map(this.placed.flatMap((b) => b.canvases.map((c) => [c.id, { board: b, canvas: c }] as const)));
+    const placedPaths = new Set([...where.values()].map((v) => v.canvas.file.toLowerCase()));
+    let changed = false;
+    for (const path of await this.bridge.canvasFiles()) {
+      if (placedPaths.has(path.toLowerCase())) continue;
+      const head = canvasHead(await this.bridge.head(path));
+      const was = head && where.get(head.id);
+      if (!was || (await this.bridge.exists(was.canvas.file))) continue;
+      const folder = path.slice(0, path.indexOf("/"));
+      const stem = path.slice(folder.length + 1, -".cvst".length);
+      const board = was.board;
+      const toBoard = this.placed.find((b) => b.folder.toLowerCase() === folder.toLowerCase());
+      if (!toBoard) {
+        // The board's folder was renamed (none of its other canvases is where it was): the board takes the folder's name.
+        if (!(await Promise.all(board.canvases.filter((c) => c.id !== head.id).map((c) => this.bridge.exists(c.file)))).every((x) => !x)) continue;
+        const old = board.folder;
+        board.folder = folder;
+        for (const c of board.canvases) c.file = `${folder}${c.file.slice(old.length)}`;
+        await this.repo.renameBoard(board.id, folder);
+        board.name = folder;
+      } else if (toBoard.id !== board.id) {
+        board.canvases.splice(board.canvases.indexOf(was.canvas), 1);
+        toBoard.canvases.push(was.canvas);
+        await this.repo.moveCanvas(head.id, toBoard.id, toBoard.canvases.length - 1);
+      }
+      was.canvas.file = path;
+      if (safeBase(stem) !== safeBase(was.canvas.name)) {
+        await this.repo.renameCanvas(head.id, stem);
+        was.canvas.name = stem;
+      }
+      changed = true;
+    }
+    if (changed) this.treeDirty = true; // (their files take their safe names)
+    return changed;
   }
 
   private async readWorkspaceFile(): Promise<WorkspaceFile | null> {
@@ -271,6 +358,17 @@ export class WorkspaceMirror {
       .catch((e: unknown) => this.onError?.(`The workspace folder could not be looked through: ${(e as Error).message}.`));
     return this.running;
   }
+  /** `library.json` or the hidden index changed (another device, through a sync tool): read again (on the write queue). */
+  rereadLibrary(onChange: () => void): Promise<void> {
+    this.running = Promise.all([this.running, this.ready])
+      .then(async () => {
+        if (!(await this.lib.reread())) return;
+        onChange();
+        this.library();
+      })
+      .catch((e: unknown) => this.onError?.(`The library of the workspace folder could not be read: ${(e as Error).message}.`));
+    return this.running;
+  }
   /** Who imports files found in `library/`. */
   set importFiles(fn: LibraryMirror["importFiles"]) {
     this.lib.importFiles = fn;
@@ -323,12 +421,19 @@ export class WorkspaceMirror {
     const ids = all ? tree.boards.flatMap((b) => b.canvases.map((c) => c.id)) : [...this.dirty];
     this.dirty.clear();
     const files = new Map(this.placed.flatMap((b) => b.canvases.map((c) => [c.id, c.file] as const)));
+    let contested = false;
     for (const id of ids) {
       const file = files.get(id);
       const record = tree.boards.flatMap((b) => b.canvases).find((c) => c.id === id);
       if (!file || !record) continue; // deleted since
       const known = this.state.canvases[id];
       if (all && known && known.local === record.revision && known.file.savedBy === this.deviceId && known.file.revision === record.revision) continue; // the file has it
+      // Never over another device's version: a file changed since this device last wrote or read it is compared first (a conflict copy).
+      const head = known ? canvasHead(await this.bridge.head(file)) : null;
+      if (head && head.id === id && (head.revision !== known!.file.revision || head.savedBy !== known!.file.savedBy)) {
+        contested = true;
+        continue;
+      }
       try {
         await this.writeCanvas(id, record.revision, file);
         this.state.canvases[id] = { file: { revision: record.revision, savedBy: this.deviceId }, local: record.revision };
@@ -352,6 +457,7 @@ export class WorkspaceMirror {
     }
     await idbPut(this.db, "meta", STATE_KEY, this.state);
     this.failing = false;
+    if (contested) this.onContested?.();
   }
 
   private async writeCanvas(id: string, revision: number, file: string): Promise<void> {

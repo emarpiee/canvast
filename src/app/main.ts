@@ -482,25 +482,30 @@ async function start(): Promise<void> {
   }
   assets.onNotice = (text) => { editor.message = text; editor.changed(); };
   // The desktop build: files that appear in library/ outside the app are imported where they lie (ADR 0177).
-  storage?.folderImports?.start(async (files) => {
-    let n = 0;
-    for (const f of files) {
-      const blob = await f.read();
-      if (!blob) continue;
-      try {
-        const { record } = await assets.importFileDetailed(new File([blob], f.name, { type: typeOfName(f.name) }), false, f.path);
-        if (f.folderId) await storage.catalog.updateMeta(record.hash, { addFolders: [f.folderId] });
-        n++;
-      } catch {
-        // (not a file canvast can keep: left where it is)
+  storage?.folderSync?.start({
+    importFiles: async (files) => {
+      let n = 0;
+      for (const f of files) {
+        const blob = await f.read();
+        if (!blob) continue;
+        try {
+          const { record } = await assets.importFileDetailed(new File([blob], f.name, { type: typeOfName(f.name) }), false, f.path);
+          if (f.folderId) await storage.catalog.updateMeta(record.hash, { addFolders: [f.folderId] });
+          n++;
+        } catch {
+          // (not a file canvast can keep: left where it is)
+        }
       }
-    }
-    if (!n) return;
-    editor.message = `${n === 1 ? "A new file" : `${n} new files`} in the workspace folder ${n === 1 ? "was" : "were"} added to the library.`;
-    editor.changed();
-  }, () => {
-    assets.retryAll(); // (a relinked file: its pictures are read again)
-    session.libraryChanged();
+      if (!n) return;
+      editor.message = `${n === 1 ? "A new file" : `${n} new files`} in the workspace folder ${n === 1 ? "was" : "were"} added to the library.`;
+      editor.changed();
+    },
+    libraryChanged: () => {
+      assets.retryAll(); // (a relinked file: its pictures are read again)
+      session.libraryChanged();
+    },
+    beforeCheck: () => session.persistence.flush(),
+    canvasesChanged: (ids) => session.outsideChanged(ids),
   });
   assets.setBudget(Number(settings.get("cache.decodedMb")) * 2 ** 20);
   const textureHost = createTextureHost({ doc, index, assets, theme: () => theme, editor });

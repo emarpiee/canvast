@@ -159,6 +159,23 @@ export class Session {
     return () => this.assetListeners.delete(fn);
   }
 
+  /**
+   * Boards or canvases changed in the desktop build's workspace folder outside the app: the tree again, and the open canvas
+   * loaded again (its camera kept) when its file was read in.
+   */
+  async outsideChanged(canvases: readonly string[]): Promise<void> {
+    await this.refreshTree();
+    await this.leaveDeletedCanvas();
+    if (this.current && canvases.includes(this.current.canvasId)) {
+      await this.persistence.saveCamera();
+      await this.load(this.current.canvasId);
+      this.tell("This canvas was changed in the workspace folder and has been loaded again.");
+    }
+    this.post({ kind: "tree" });
+    this.emitAssets();
+    this.emit();
+  }
+
   /** The library changed outside the app (files found in the desktop build's workspace folder): every list is drawn again. */
   libraryChanged(): void {
     this.post({ kind: "assets" });

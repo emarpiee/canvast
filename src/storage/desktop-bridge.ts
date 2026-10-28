@@ -43,6 +43,10 @@ export interface DesktopBridge {
   tree(path: string): Promise<Array<{ path: string; size: number }>>;
   /** A file's SHA-256 (hex), read in the main process; null when there is no such file. */
   hash(path: string): Promise<string | null>;
+  /** The canvas files of the boards: `<board folder>/<name>.cvst` (not under `library/` or a dot folder). */
+  canvasFiles(): Promise<string[]>;
+  /** Told, a moment after the folder changed (by anyone, the app too), which paths changed. */
+  onChanged(fn: (paths: string[]) => void): void;
   /** The names of the files (not folders) in a folder; empty when there is none. */
   list(path: string): Promise<string[]>;
 }

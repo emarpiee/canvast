@@ -8,7 +8,7 @@
  */
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } from "electron";
 import { createHash } from "node:crypto";
-import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, watch, writeFileSync } from "node:fs";
 import { mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { isSafeRelativePath } from "../src/storage/workspace-names";
@@ -221,6 +221,15 @@ function installFileCalls(win: BrowserWindow, root: string): void {
     await walk(await inside(root, rel), rel);
     return out;
   });
+  ipcMain.handle("canvast:canvasFiles", async (e) => {
+    own(e);
+    const out: string[] = [];
+    for (const d of await readdir(root, { withFileTypes: true }).catch(() => [])) {
+      if (!d.isDirectory() || d.name.startsWith(".") || d.name === "library") continue;
+      for (const f of await readdir(join(root, d.name), { withFileTypes: true }).catch(() => [])) if (f.isFile() && f.name.endsWith(".cvst")) out.push(`${d.name}/${f.name}`);
+    }
+    return out;
+  });
   ipcMain.handle("canvast:hash", async (e, rel: string) => {
     own(e);
     try {
@@ -239,6 +248,32 @@ function installFileCalls(win: BrowserWindow, root: string): void {
       return [];
     }
   });
+}
+
+/**
+ * Tell the page which paths of the workspace folder changed (ADR 0177, "Changes from outside the app"), a second after the
+ * last change, in one message. The app's own temporary files and the trash are left out.
+ */
+function watchFolder(win: BrowserWindow, root: string): void {
+  const pending = new Set<string>();
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let watcher: ReturnType<typeof watch>;
+  try {
+    watcher = watch(root, { recursive: true }, (_event, name) => {
+      if (!name) return;
+      const rel = name.toString().split(sep).join("/");
+      if (/^\.trash(\/|$)|^\.canvast\/moving(\/|$)|\.tmp-/.test(rel)) return;
+      pending.add(rel);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (!win.isDestroyed()) win.webContents.send("canvast:changed", [...pending]);
+        pending.clear();
+      }, 1000);
+    });
+  } catch {
+    return; // (no watching on this system: changes are still read at the next start)
+  }
+  win.on("closed", () => watcher.close());
 }
 
 function partitionOf(workspace: string): string {
@@ -283,6 +318,7 @@ async function openWindow(workspace: string): Promise<void> {
   // The page asks which workspace it is in; only this window's own page is answered.
   ipcMain.handle("canvast:workspace", (e) => (e.sender === win.webContents ? { path: workspace, name: basename(workspace) } : null));
   installFileCalls(win, await realpath(workspace));
+  watchFolder(win, await realpath(workspace));
   // Closing waits (up to 15 s) for the page to write what is not in the folder yet (ADR 0177: files follow edits by a moment).
   let closing = false;
   win.on("close", (e) => {

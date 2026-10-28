@@ -14,6 +14,8 @@ const bridge: DesktopBridge = {
   remove: (path, how) => ipcRenderer.invoke("canvast:remove", path, how ?? "trash"),
   list: (path) => ipcRenderer.invoke("canvast:list", path),
   tree: (path) => ipcRenderer.invoke("canvast:tree", path),
+  canvasFiles: () => ipcRenderer.invoke("canvast:canvasFiles"),
+  onChanged: (fn) => void ipcRenderer.on("canvast:changed", (_e, paths: string[]) => fn(paths)),
   hash: (path) => ipcRenderer.invoke("canvast:hash", path),
   rename: (from, to) => ipcRenderer.invoke("canvast:rename", from, to),
   erase: (path) => ipcRenderer.invoke("canvast:erase", path),

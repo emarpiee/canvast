@@ -9,10 +9,11 @@ import type { Dir } from "./external-folder";
 import { externalFolder } from "./external-folder";
 import { openBrowserStorage } from "./idb-storage";
 import type { IdbStorage } from "./idb-storage";
-import type { FolderFile, OpenHooks } from "./store";
-import { WorkspaceMirror, watched } from "./workspace-mirror";
+import type { FolderSync, OpenHooks } from "./store";
+import { LIBRARY_JSON } from "./library-mirror";
+import { WORKSPACE_FILE, WorkspaceMirror, watched } from "./workspace-mirror";
 import { WORKSPACE_NAMING } from "./workspace-names";
-import { HiddenVault } from "./hidden-store";
+import { HIDDEN_JSON, HiddenVault } from "./hidden-store";
 import type { AssetCatalog } from "../assets/asset-catalog";
 
 
@@ -42,7 +43,22 @@ export function bridgeDir(bridge: DesktopBridge, name: string, deleteTo: () => D
   };
 }
 
-export async function openDesktopStorage(bridge: DesktopBridge, opts: OpenHooks): Promise<IdbStorage> {
+export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): Promise<IdbStorage> {
+  // What the app itself writes, moves or deletes is noted for a few seconds, so its own changes are not taken for outside ones.
+  const recent = new Map<string, number>();
+  const note = (...paths: string[]): void => {
+    const now = Date.now();
+    for (const p of paths) recent.set(p, now);
+  };
+  const bridge: DesktopBridge = {
+    ...raw,
+    write: (p, b) => (note(p), raw.write(p, b)),
+    rename: (a, b) => (note(a, b), raw.rename(a, b)),
+    remove: (p, how) => (note(p), raw.remove(p, how)),
+    erase: (p) => (note(p), raw.erase(p)),
+    makeFolder: (p) => (note(p), raw.makeFolder(p)),
+    removeEmptyFolder: (p) => (note(p), raw.removeEmptyFolder(p)),
+  };
   const ws = await bridge.workspace();
   if (!ws) throw new Error("the desktop app did not say which workspace folder is open");
   const storage = await openBrowserStorage(opts);
@@ -95,12 +111,27 @@ export async function openDesktopStorage(bridge: DesktopBridge, opts: OpenHooks)
   });
   const backups = watched(storage.backups, { applyImport: () => mirror.everything(), recordBackup: () => mirror.device() });
   const library = (): void => mirror.library();
-  let rescan = (): void => undefined;
-  const folderImports = {
-    start(importFiles: (files: FolderFile[]) => Promise<void>, changed: () => void) {
-      mirror.importFiles = importFiles;
-      rescan = () => void mirror.rescan(changed);
-      rescan();
+  const folderSync: FolderSync = {
+    start(on) {
+      mirror.importFiles = (files) => on.importFiles(files);
+      void mirror.rescan(() => on.libraryChanged());
+      const check = (): void =>
+        void on.beforeCheck().then(async () => {
+          const r = await mirror.recheck();
+          if (r.tree) await on.canvasesChanged(r.canvases);
+        });
+      mirror.onContested = check;
+      raw.onChanged((paths) => {
+        const now = Date.now();
+        for (const [p, t] of recent) if (now - t > 5000) recent.delete(p);
+        // Library paths the app itself just wrote (or a folder holding one) are not looked through again: that costs a listing of
+        // the whole library. Canvas and index files are always compared, by their headers and contents, which is cheap: another
+        // device may write the same file a moment after this one did.
+        const ownWrite = (p: string): boolean => [...recent.keys()].some((r) => r === p || r.startsWith(`${p}/`));
+        if (paths.some((p) => (p === "library" || p.startsWith("library/")) && !ownWrite(p))) void mirror.rescan(() => on.libraryChanged());
+        if (paths.some((p) => p === LIBRARY_JSON || p === HIDDEN_JSON)) void mirror.rereadLibrary(() => on.libraryChanged());
+        if (paths.some((p) => p === WORKSPACE_FILE || (!p.startsWith(".") && !p.startsWith("library")))) check();
+      });
     },
   };
   const catalog = watched(storage.catalog, {
@@ -120,7 +151,7 @@ export async function openDesktopStorage(bridge: DesktopBridge, opts: OpenHooks)
     reconcile: (n) => void (n && mirror.library()),
   });
   const originals = watched(storage.originals, { put: library });
-  return { ...storage, workspace, backups, catalog, originals, libraryFolder: null, workspaceFolder: ws.path, hidden, folderImports, flush: () => mirror.flush() };
+  return { ...storage, workspace, backups, catalog, originals, libraryFolder: null, workspaceFolder: ws.path, hidden, folderSync, flush: () => mirror.flush() };
 }
 
 /** This device's id in the workspace folder (`.canvast/devices/<id>.json`), made once and kept. */
