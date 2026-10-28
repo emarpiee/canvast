@@ -14,6 +14,8 @@ const bridge: DesktopBridge = {
   remove: (path) => ipcRenderer.invoke("canvast:remove", path),
   list: (path) => ipcRenderer.invoke("canvast:list", path),
   rename: (from, to) => ipcRenderer.invoke("canvast:rename", from, to),
+  makeFolder: (path) => ipcRenderer.invoke("canvast:makeFolder", path),
+  removeEmptyFolder: (path) => ipcRenderer.invoke("canvast:removeEmptyFolder", path),
   onClosing: (write) => {
     ipcRenderer.on("canvast:closing", () => {
       void write()

@@ -181,3 +181,109 @@ test("the folder is the truth: a new device opens the whole workspace, another d
   await a.app.close();
   expect(files(ws).filter((f) => f.endsWith(".cvst")).map((f) => f.replace(/conflict_[0-9_-]+/, "conflict"))).toEqual(["sketches/characters-conflict.cvst", "sketches/characters.cvst"]);
 });
+
+test("library folders are real folders: filing or renaming an item moves its file, undo moves it back, library.json brings the library to a new device", async () => {
+  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const red = makePng(3, 2, () => [220, 30, 30, 255]);
+  const blue = makePng(3, 2, () => [30, 30, 220, 255]);
+  let { app, page } = await launch(ws);
+  const lib = (...a: Parameters<typeof window.__canvastDebug.libraryOp>) => page.evaluate((a) => window.__canvastDebug.libraryOp(...a), a);
+  const flush = () => page.evaluate(() => window.__canvastDebug.flushStorage());
+  const libraryFiles = () => files(ws).filter((f) => f.startsWith("library/"));
+  try {
+    for (const [name, buffer] of [["Hand Study.png", red], ["Pose.png", blue]] as const) {
+      await page.getByTestId("import-input").setInputFiles({ name, mimeType: "image/png", buffer });
+      await expect.poll(() => page.evaluate((n) => window.__canvastDebug.assetListing().then((l) => l.entries.some((e) => e.name === n)), name)).toBe(true);
+    }
+    const hashOf = (name: string) => page.evaluate((n) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === n)!.hash), name);
+    const [r, b] = [await hashOf("Hand Study.png"), await hashOf("Pose.png")];
+    await lib("createFolder", "f1", "Refs: Hands?");
+    await lib("createFolder", "f2", "Sub", "f1");
+    await flush();
+    expect(libraryFiles()).toEqual(["library/images/hand_study.png", "library/images/pose.png"]);
+    expect(existsSync(join(ws, "library/refs-hands/sub"))).toBe(true); // (an empty library folder is a folder too)
+
+    // Filed: the file moves into the folder's path; renamed onto the name it left: the other file takes that name.
+    await lib("file", r, "f2");
+    await lib("rename", b, "Hand Study.png");
+    await flush();
+    expect(libraryFiles()).toEqual(["library/images/hand_study.png", "library/refs-hands/sub/hand_study.png"]);
+    expect(readFileSync(join(ws, "library/refs-hands/sub/hand_study.png")).equals(red)).toBe(true);
+    expect(readFileSync(join(ws, "library/images/hand_study.png")).equals(blue)).toBe(true);
+
+    // The library's undo puts both back, and so the files.
+    await lib("undo");
+    await lib("undo");
+    await flush();
+    expect(libraryFiles()).toEqual(["library/images/hand_study.png", "library/images/pose.png"]);
+    expect(readFileSync(join(ws, "library/images/hand_study.png")).equals(red)).toBe(true);
+
+    // A renamed folder is renamed on disk; the old one, emptied, goes.
+    await lib("redo");
+    await lib("renameFolder", "f1", "Anatomy");
+    await flush();
+    expect(libraryFiles()).toEqual(["library/anatomy/sub/hand_study.png", "library/images/pose.png"]);
+    expect(existsSync(join(ws, "library/refs-hands"))).toBe(false);
+    expect(await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.every((e) => e.present)))).toBe(true);
+    const json = readFileSync(join(ws, ".canvast/library.json"), "utf8");
+    expect(JSON.parse(json).items.map((i: { name: string; file: string; folderId: string | null }) => [i.name, i.file, i.folderId]).sort()).toEqual([
+      ["Hand Study.png", "library/anatomy/sub/hand_study.png", "f2"],
+      ["Pose.png", "library/images/pose.png", null],
+    ]);
+  } finally {
+    await app.close();
+  }
+  // Another device (its own empty cache): the library as the folder has it, names, folders and files.
+  ({ app, page } = await launch(ws, "device-b"));
+  try {
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => [l.folders.map((f) => f.name).sort(), l.entries.map((e) => [e.name, e.folderIds?.[0] ?? null, e.present]).sort()])), { timeout: 10_000 }).toEqual([
+      ["Anatomy", "Sub"],
+      [["Hand Study.png", "f2", true], ["Pose.png", null, true]],
+    ]);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a backup imported into a workspace folder: its boards, canvases and library are written as folders and files", async () => {
+  const src = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const green = makePng(3, 2, () => [30, 200, 30, 255]);
+  let { app, page } = await launch(src);
+  let backup: string;
+  try {
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.session().tree?.length ?? 0)).toBe(1);
+    const t = await page.evaluate(() => window.__canvastDebug.session().tree!);
+    await page.evaluate(([bid, cid]) => window.__canvastDebug.workspaceOp("renameBoard", bid, "Studies").then(() => window.__canvastDebug.workspaceOp("renameCanvas", cid, "Hands")), [t[0]!.id, t[0]!.canvases[0]!.id] as [string, string]);
+    await page.getByTestId("import-input").setInputFiles({ name: "Green Leaf.png", mimeType: "image/png", buffer: green });
+    await expect.poll(() => page.evaluate((id) => window.__canvastDebug.storedObjectIds(id).then((ids) => ids.length), t[0]!.canvases[0]!.id)).toBe(1);
+    const hash = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries[0]!.hash));
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("createFolder", "f1", "Plants").then(() => window.__canvastDebug.libraryOp("file", h, "f1")), hash);
+    backup = await page.evaluate(() => window.__canvastDebug.fullBackup());
+  } finally {
+    await app.close();
+  }
+
+  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  ({ app, page } = await launch(ws));
+  try {
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.session().tree?.length ?? 0)).toBe(1);
+    await page.getByTestId("save-status").click();
+    await page.getByTestId("set-import-input").setInputFiles({ name: "backup.canvast", mimeType: "application/zip", buffer: Buffer.from(backup, "base64") });
+    await page.getByTestId("confirm-ok").click();
+    await expect(page.getByTestId("toast")).toContainText(/Imported/);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    expect(files(ws).filter((f) => !f.startsWith(".canvast/"))).toEqual(["board_1/canvas_1.cvst", "library/plants/green_leaf.png", "studies/hands.cvst"]);
+    expect(readFileSync(join(ws, "library/plants/green_leaf.png")).equals(green)).toBe(true);
+    const canvas = JSON.parse(readFileSync(join(ws, "studies/hands.cvst"), "utf8"));
+    expect(canvas.objects.map((o: { kind: string }) => o.kind)).toEqual(["image"]);
+  } finally {
+    await app.close();
+  }
+  // The original is the file now, not a copy in the app's storage: it is read from there after a restart.
+  ({ app, page } = await launch(ws));
+  try {
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, e.present]))), { timeout: 10_000 }).toEqual([["Green Leaf.png", true]]);
+  } finally {
+    await app.close();
+  }
+});

@@ -1,7 +1,8 @@
 /**
- * The desktop build's storage (ADR 0177, step 2): boards, canvases and the library's entries are still in this
- * workspace's own IndexedDB (a storage partition per workspace folder), and every new original is a readable file
- * under `library/` in the workspace folder, through the library-folder code (ADR 0159) with readable names.
+ * The desktop build's storage (ADR 0177): the same storage as the browser build, in this workspace's own IndexedDB (a
+ * storage partition per workspace folder), which the workspace folder follows (`WorkspaceMirror`): boards as folders,
+ * canvases as `.cvst` files, `.canvast/workspace.json` and `library.json`. Every original is a readable file under
+ * `library/`, written through the library-folder code (ADR 0159) with readable names and moved when it is filed or renamed.
  */
 import type { DesktopBridge } from "./desktop-bridge";
 import type { Dir } from "./external-folder";
@@ -80,8 +81,25 @@ export async function openDesktopStorage(bridge: DesktopBridge, opts: OpenHooks)
     saveStyles: tree,
   });
   const backups = watched(storage.backups, { applyImport: () => mirror.everything(), recordBackup: () => mirror.device() });
-  const catalog = watched(storage.catalog, { setLock: tree });
-  return { ...storage, workspace, backups, catalog, libraryFolder: null, workspaceFolder: ws.path, flush: () => mirror.flush() };
+  const library = (): void => mirror.library();
+  const catalog = watched(storage.catalog, {
+    setLock: tree,
+    renameAssets: library,
+    updateMeta: library,
+    updateMetaEach: library,
+    renameTag: library,
+    deleteTag: library,
+    createFolder: library,
+    renameFolder: library,
+    deleteFolder: library,
+    restoreMeta: library,
+    markDeleted: library,
+    markDeletedEach: library,
+    collect: library,
+    reconcile: (n) => void (n && mirror.library()),
+  });
+  const originals = watched(storage.originals, { put: library });
+  return { ...storage, workspace, backups, catalog, originals, libraryFolder: null, workspaceFolder: ws.path, flush: () => mirror.flush() };
 }
 
 /** This device's id in the workspace folder (`.canvast/devices/<id>.json`), made once and kept. */

@@ -56,14 +56,39 @@ export function fileExt(name: string, type: string): string {
  * Every part is lower case, so two of these never differ only in case (which clashes on some systems).
  */
 export async function libraryPath(name: string, type: string, taken: (path: string) => Promise<boolean>): Promise<string> {
-  const dir = `library/${kindFolder(type, name)}`;
-  const base = safeBase(name.replace(/\.[A-Za-z0-9]{1,8}$/, ""));
-  const ext = fileExt(name, type);
+  return freePath(`library/${kindFolder(type, name)}`, nameBase(name), fileExt(name, type), taken);
+}
+
+/** A library name's safe base, without its extension. */
+export const nameBase = (name: string): string => safeBase(name.replace(/\.[A-Za-z0-9]{1,8}$/, ""));
+
+/** The first of `<dir>/<base>.<ext>`, `<dir>/<base>-2.<ext>`… that is not taken. */
+export async function freePath(dir: string, base: string, ext: string, taken: (path: string) => Promise<boolean>): Promise<string> {
   for (let n = 1; n < 10_000; n++) {
     const path = `${dir}/${n === 1 ? base : `${base}-${n}`}.${ext}`;
     if (!(await taken(path))) return path;
   }
   throw new Error("no free file name");
+}
+
+/** Whether `path` is `<dir>/<base>.<ext>` or one of its numbered forms (`-2`…): the place is still right for that name. */
+export function fitsPlace(path: string, dir: string, base: string, ext: string): boolean {
+  if (!path.startsWith(`${dir}/`) || !path.endsWith(`.${ext}`)) return false;
+  const stem = path.slice(dir.length + 1, path.length - ext.length - 1);
+  return stem === base || (stem.startsWith(`${base}-`) && /^(?:[2-9]|[1-9]\d+)$/.test(stem.slice(base.length + 1)));
+}
+
+/** Longest library folder path kept on disk; a deeper one files its items under their kind folder (paths stay well inside every system's limit). */
+const MAX_LIBRARY_DIR = 800;
+
+/**
+ * The folder of `library/` an item belongs in (ADR 0177, "library.json"): the path of its library folder, each part a safe
+ * name (`["Refs", "Hands?"]` → `library/refs/hands`), or its kind folder when it is in none. A library folder named like a
+ * kind folder shares it on disk.
+ */
+export function libraryDir(folderNames: readonly string[], type: string, name: string): string {
+  const dir = ["library", ...folderNames.map(safeBase)].join("/");
+  return folderNames.length && dir.length <= MAX_LIBRARY_DIR ? dir : `library/${kindFolder(type, name)}`;
 }
 
 /** A relative path inside a workspace: `/`-separated, no empty, `.` or `..` part, no backslash or NUL, not absolute. */

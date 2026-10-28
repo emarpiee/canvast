@@ -166,6 +166,10 @@ export interface DebugHook {
   workspaceOp(op: "newBoard" | "newCanvas" | "renameBoard" | "renameCanvas" | "deleteCanvas" | "moveCanvas", ...args: Array<string | number>): Promise<void>;
   /** Write what the desktop build's workspace folder does not have yet (its storage's flush). */
   flushStorage(): Promise<void>;
+  /** Organize the library as its panel does, with the library's undo: a new folder (`id`, `name`, parent id or ""), file an item (`hash`, folder id or "" for none), rename an item or a folder, undo, redo. */
+  libraryOp(op: "createFolder" | "file" | "rename" | "renameFolder" | "undo" | "redo", ...args: string[]): Promise<void>;
+  /** A full backup of the workspace, as base64 (the desktop build has no download a test can catch). */
+  fullBackup(): Promise<string>;
   /** Replace the document with a generated benchmark scene (no history, no save). */
   benchLoad(scene: BenchScene): Promise<{ objects: number; generateMs: number; loadMs: number; heapMB: number | null }>;
   /**
@@ -481,6 +485,19 @@ export function installDebugHook(
       else if (op === "renameCanvas") await session.renameCanvas(a, b);
       else if (op === "deleteCanvas") await session.deleteCanvas(a);
       else await session.moveCanvas(a, b, c);
+    },
+    libraryOp: async (op, a = "", b = "", c = "") => {
+      if (op === "createFolder") await session.organize((cat) => cat.createFolder(b, c || null, a));
+      else if (op === "file") await session.organize((cat) => cat.updateMeta(a, b ? { addFolders: [b] } : { clearFolder: true }));
+      else if (op === "rename") await session.renameAssets([{ hash: a, name: b }]);
+      else if (op === "renameFolder") await session.organize((cat) => cat.renameFolder(a, b));
+      else await session.undoLibrary(op === "redo");
+    },
+    fullBackup: async () => {
+      const bytes = new Uint8Array(await (await session.exportArchive({ kind: "workspace" })).blob.arrayBuffer());
+      let bin = "";
+      for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      return btoa(bin);
     },
     flushStorage: async () => {
       await session.persistence.flush();

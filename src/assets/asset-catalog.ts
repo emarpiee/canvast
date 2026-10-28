@@ -130,7 +130,8 @@ export function folderPath(folders: readonly AssetFolder[], id: string): string[
   return path;
 }
 
-const FOLDERS_KEY = "assetFolders";
+/** The `meta` key of the library folders. */
+export const FOLDERS_KEY = "assetFolders";
 
 export interface Usage {
   /** Stored image instances that reference the asset, across all canvases. */

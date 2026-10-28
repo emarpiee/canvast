@@ -130,6 +130,7 @@ export class IdbOriginals implements OriginalStore {
       try {
         await externalFolder.write(record.hash, record.blob, file);
       } catch (err) {
+        externalFolder.release(file);
         throw new ImportError((err as Error).message);
       }
     }
@@ -144,6 +145,8 @@ export class IdbOriginals implements OriginalStore {
     } catch (err) {
       if (isQuotaError(err)) throw new ImportError(FULL_MESSAGE);
       throw err;
+    } finally {
+      if (file) externalFolder.release(file);
     }
     if (writeBytes) {
       void requestPersistence();

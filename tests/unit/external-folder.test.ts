@@ -3,7 +3,9 @@ import { sha256Hex } from "../../src/assets/sha256";
 import { externalFolder, folderFileName } from "../../src/storage/external-folder";
 import type { Dir } from "../../src/storage/external-folder";
 import { HASH_NAMING } from "../../src/storage/external-folder";
-import { WORKSPACE_NAMING, isSafeRelativePath, libraryPath, placeTree, safeBase } from "../../src/storage/workspace-names";
+import { WORKSPACE_NAMING, fitsPlace, isSafeRelativePath, libraryDir, libraryPath, placeTree, safeBase } from "../../src/storage/workspace-names";
+import { itemOf, libraryJsonText, readItem } from "../../src/storage/library-mirror";
+import type { CatalogEntry } from "../../src/assets/asset-catalog";
 
 /** An in-memory directory; `tamper` changes what a file reads back as, `perm` is what the browser answers about permission. */
 function fakeDir(): Dir & { files: Map<string, Blob>; tamper: boolean; perm: PermissionState } {
@@ -137,5 +139,31 @@ describe("library folder", () => {
     expect(placed[0]!.canvases.map((x) => x.file)).toEqual(["sketches/characters.cvst", "sketches/characters-2.cvst", "sketches/file.cvst"]);
     expect(placed[1]!.canvases[0]!.file).toBe("sketches-2/characters.cvst");
     expect(placeTree([{ id: "b", name: ".canvast", canvases: [] }])[0]!.folder).toBe("canvast"); // (no leading dot: safeBase drops it)
+  });
+
+  it("a library item's place: its folder path by safe names (else its kind folder), and a numbered file still fits its name", () => {
+    expect(libraryDir(["Refs", "Hands?"], "image/png", "x.png")).toBe("library/refs/hands");
+    expect(libraryDir([], "image/png", "x.png")).toBe("library/images");
+    expect(libraryDir(["Images"], "video/mp4", "x.mp4")).toBe("library/images"); // (a folder named like a kind folder shares it)
+    expect(libraryDir(Array(40).fill("a long folder name here"), "image/png", "x.png")).toBe("library/images"); // too deep: by kind
+    expect(fitsPlace("library/images/hand.png", "library/images", "hand", "png")).toBe(true);
+    expect(fitsPlace("library/images/hand-2.png", "library/images", "hand", "png")).toBe(true);
+    expect(fitsPlace("library/images/hand-1.png", "library/images", "hand", "png")).toBe(false);
+    expect(fitsPlace("library/images/hand-loomis.png", "library/images", "hand", "png")).toBe(false);
+    expect(fitsPlace("library/refs/hand.png", "library/images", "hand", "png")).toBe(false);
+    expect(fitsPlace("library/images/hand.jpg", "library/images", "hand", "png")).toBe(false);
+  });
+
+  it("library.json items: read back the same as written, damaged ones and bad paths refused", () => {
+    const e: CatalogEntry = { hash: "a".repeat(64), name: "Hand (Loomis).png", type: "image/png", size: 10, pixelW: 3, pixelH: 2, importedAt: 5, state: "active", deletedAt: null, tags: ["hands"], favorite: true, folderIds: ["f1"], note: "n", fields: [{ key: "by", value: "L" }] };
+    const item = itemOf(e, { hash: e.hash, type: e.type, size: 10, name: e.name, pixelW: 3, pixelH: 2, blob: new Blob([]), importedAt: 5, ext: 1, file: "library/refs/hand-loomis.png", duration: 2 });
+    const text = libraryJsonText([{ id: "f1", name: "Refs", parentId: null }], [item]);
+    const back = JSON.parse(text) as { format: string; items: unknown[] };
+    expect(back.format).toBe("canvast-library");
+    expect(JSON.stringify(readItem(back.items[0]))).toBe(JSON.stringify(item));
+    expect(readItem({ ...item, hash: "x" })).toBeNull();
+    expect(readItem({ ...item, file: "../outside.png" })!.file).toBeNull();
+    expect(readItem({ ...item, file: ".canvast/workspace.json" })!.file).toBeNull();
+    expect(readItem({ ...item, tags: Array(200).fill("t").map((t, i) => t + i) })).toBeNull();
   });
 });

@@ -72,16 +72,40 @@ class ExternalFolder {
   /** How files are named (set once at start-up: the desktop build names them readably). */
   naming: FolderNaming = HASH_NAMING;
 
-  /** The file for a new original, free in the folder. */
+  /**
+   * The file for a new original, free in the folder, and claimed until `release` (after its stub is stored): a new original
+   * and a file the workspace folder moves (ADR 0177) never take the same free name at once.
+   */
   async fileFor(hash: string, name: string, type: string): Promise<string> {
-    return this.naming.fileFor(hash, name, type, async (file) => {
-      try {
-        await this.dir?.getFileHandle(file);
-        return !!this.dir;
-      } catch {
-        return false;
-      }
-    });
+    for (;;) {
+      const file = await this.naming.fileFor(hash, name, type, async (file) => this.claimed(file) || (await this.exists(file)));
+      // (Readable names: claimed by another while this one was looking. Hash names are the same file for the same bytes.)
+      if (this.naming !== HASH_NAMING && this.claimed(file)) continue;
+      this.claims.add(file.toLowerCase());
+      return file;
+    }
+  }
+  private readonly claims = new Set<string>();
+  claimed(file: string): boolean {
+    return this.claims.has(file.toLowerCase());
+  }
+  /** Claim a free file name for a move; false when it is claimed already. */
+  claim(file: string): boolean {
+    if (this.claimed(file)) return false;
+    this.claims.add(file.toLowerCase());
+    return true;
+  }
+  release(file: string): void {
+    this.claims.delete(file.toLowerCase());
+  }
+  /** Whether the folder has a file of that name. */
+  async exists(file: string): Promise<boolean> {
+    try {
+      await this.dir?.getFileHandle(file);
+      return !!this.dir;
+    } catch {
+      return false;
+    }
   }
   private readonly listeners = new Set<() => void>();
 

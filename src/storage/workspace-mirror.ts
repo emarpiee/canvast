@@ -2,13 +2,15 @@
  * The workspace folder follows the app's storage (ADR 0177, "Saving and the cache"): every edit is committed to IndexedDB
  * as in the browser build, which is the journal and the cache; a moment after changes stop (`MIRROR_DELAY_MS`), and when
  * the window closes, what changed is written to the folder: each canvas as `<board>/<canvas>.cvst`, the boards and
- * canvases with their names and order in `.canvast/workspace.json`, and this device's state in `.canvast/devices/<id>.json`.
+ * canvases with their names and order in `.canvast/workspace.json`, the library in `.canvast/library.json` with each original
+ * in its place under `library/` (library-mirror.ts), and this device's state in `.canvast/devices/<id>.json`.
  * Boards and canvases renamed, moved or deleted in the app are renamed, moved or put in `.trash/` on disk.
  */
 import { canvasJson, putCanvasContent } from "./archive";
 import { canvasFileHead, readCanvasFile } from "./canvas-file";
 import type { DesktopBridge } from "./desktop-bridge";
 import { done, idbGet, idbPut, req } from "./idb";
+import { LibraryMirror } from "./library-mirror";
 import type { BackupRecord, WorkspaceStore } from "./store";
 import type { BoardRecord, CanvasRecord, CurrentMeta, StoredView, WorkspaceRecord } from "./workspace-repo";
 import type { PlacedBoard } from "./workspace-names";
@@ -59,6 +61,8 @@ export class WorkspaceMirror {
   private readonly dirty = new Set<string>();
   private treeDirty = false;
   private deviceDirty = false;
+  private libraryDirty = false;
+  private readonly lib: LibraryMirror;
   /** The boards and canvases as last written to `workspace.json` (where each one is on disk now). */
   private placed: PlacedBoard[] = [];
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -73,7 +77,10 @@ export class WorkspaceMirror {
     private readonly repo: WorkspaceStore,
     private readonly bridge: DesktopBridge,
     readonly deviceId: string,
-  ) {}
+  ) {
+    this.lib = new LibraryMirror(db, bridge);
+    this.lib.onNotice = (text) => this.onError?.(text);
+  }
 
   /**
    * At start-up, before anything is shown: the folder and the app's storage are brought together (ADR 0177, "Saving and
@@ -83,6 +90,8 @@ export class WorkspaceMirror {
    */
   async start(): Promise<void> {
     this.state = (await idbGet<MirrorState>(this.db, "meta", STATE_KEY).catch(() => undefined)) ?? { tree: "", canvases: {} };
+    await this.lib.start(); // (first: the canvases read below may show items another device added)
+    this.libraryDirty = true;
     const fileWs = await this.readWorkspaceFile();
     if (!fileWs) return this.everything(); // a new workspace folder: all of it is written
     const tree = JSON.stringify(fileWs.boards);
@@ -230,6 +239,11 @@ export class WorkspaceMirror {
     this.treeDirty = true;
     this.later();
   }
+  /** The library changed: its items, their names, tags or folders, the library folders, or the originals stored. */
+  library(): void {
+    this.libraryDirty = true;
+    this.later();
+  }
   /** This device's state changed (open canvas, a camera, the last backup). */
   device(): void {
     this.deviceDirty = true;
@@ -239,6 +253,7 @@ export class WorkspaceMirror {
   everything(): void {
     this.treeDirty = true;
     this.deviceDirty = true;
+    this.libraryDirty = true;
     this.dirty.add("*");
     this.later();
   }
@@ -282,6 +297,15 @@ export class WorkspaceMirror {
         this.state.canvases[id] = { file: { revision: record.revision, savedBy: this.deviceId }, local: record.revision };
       } catch (e) {
         this.dirty.add(id); // tried again with the next write
+        throw e;
+      }
+    }
+    if (this.libraryDirty) {
+      this.libraryDirty = false;
+      try {
+        if (!(await this.lib.write())) this.libraryDirty = true; // (not timed again: tried with the next change)
+      } catch (e) {
+        this.libraryDirty = true;
         throw e;
       }
     }

@@ -25,6 +25,10 @@ export interface DesktopBridge {
   remove(path: string): Promise<void>;
   /** Rename or move a file or a folder inside the workspace (folders are made; refused when the target is taken). */
   rename(from: string, to: string): Promise<void>;
+  /** Make a folder (and its parents) when it is not there. */
+  makeFolder(path: string): Promise<void>;
+  /** Remove a folder only when it is empty; whether it was removed. */
+  removeEmptyFolder(path: string): Promise<boolean>;
   /** When the window closes, `write` runs first (to write what is not in the folder yet); the window waits for it, up to 15 s. */
   onClosing(write: () => Promise<void>): void;
   /** The names of the files (not folders) in a folder; empty when there is none. */

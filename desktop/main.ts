@@ -9,7 +9,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session } from "electron";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { mkdir, open, readFile, readdir, realpath, rename, stat } from "node:fs/promises";
+import { mkdir, open, readFile, readdir, realpath, rename, rmdir, stat } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { isSafeRelativePath } from "../src/storage/workspace-names";
 import { pathToFileURL } from "node:url";
@@ -177,6 +177,19 @@ function installFileCalls(win: BrowserWindow, root: string): void {
     if (existsSync(b) && a.toLowerCase() !== b.toLowerCase()) throw new Error(`${to} is already there`);
     await mkdir(dirname(b), { recursive: true });
     await rename(a, b);
+  });
+  ipcMain.handle("canvast:makeFolder", async (e, rel: string) => {
+    own(e);
+    await mkdir(await inside(root, rel), { recursive: true });
+  });
+  ipcMain.handle("canvast:removeEmptyFolder", async (e, rel: string) => {
+    own(e);
+    try {
+      await rmdir(await inside(root, rel)); // (refused by the system unless the folder is empty)
+      return true;
+    } catch {
+      return false;
+    }
   });
   ipcMain.handle("canvast:list", async (e, rel: string) => {
     own(e);
