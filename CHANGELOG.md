@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.17 — Files put back show at once (2026-10-29)
+
+- **Fixed:** in the desktop app, a library file put back in its own place from outside the app (from a trash, by hand) still showed as missing until the app was restarted: any change made in `library/` outside the app now lists the library again.
+
 ## 0.50.16 — A moved workspace keeps its password (2026-10-29)
 
 - **Fixed:** in the desktop app, a workspace with a password opened from a new place (moved or renamed, or on a device that had no copy of it yet) opened without asking for the password: it was read from the app's own copy before the folder was. The passwords in the folder's `workspace.json` are now taken first, before the app asks.

@@ -617,12 +617,19 @@ test("library files changed outside the app: a renamed or moved file is found by
   } finally {
     await app.close();
   }
+  const poseBytes = readFileSync(join(ws, "library/poses/pose_one.png"));
   rmSync(join(ws, "library/poses/pose_one.png"));
   ({ app, page } = await launch(ws));
   try {
     await expect.poll(listing, { timeout: 10_000 }).toEqual([
       ["Loomis Hands.png", "anatomy", true, 1],
       ["Pose One.png", "poses", false, 0],
+    ]);
+    // Put back in its place while the app runs (from a trash, by hand): there again at once, no restart.
+    writeFileSync(join(ws, "library/poses/pose_one.png"), poseBytes);
+    await expect.poll(listing, { timeout: 10_000 }).toEqual([
+      ["Loomis Hands.png", "anatomy", true, 1],
+      ["Pose One.png", "poses", true, 0],
     ]);
   } finally {
     await app.close();

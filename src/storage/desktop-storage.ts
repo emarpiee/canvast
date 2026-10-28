@@ -144,7 +144,8 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
         // the whole library. Canvas and index files are always compared, by their headers and contents, which is cheap: another
         // device may write the same file a moment after this one did.
         const ownWrite = (p: string): boolean => [...recent.keys()].some((r) => r === p || r.startsWith(`${p}/`));
-        if (paths.some((p) => (p === "library" || p.startsWith("library/") || (p.startsWith(".hidden/") && !isHiddenFile(p))) && !ownWrite(p))) void mirror.rescan(() => on.libraryChanged());
+        // (the library is listed again after any outside change in it: a file put back in its own place changes no item, but it is there again)
+        if (paths.some((p) => (p === "library" || p.startsWith("library/") || (p.startsWith(".hidden/") && !isHiddenFile(p))) && !ownWrite(p))) void mirror.rescan(() => undefined).then(() => on.libraryChanged());
         if (paths.some((p) => p === LIBRARY_JSON || p === HIDDEN_JSON)) void mirror.rereadLibrary(() => on.libraryChanged());
         if (paths.some((p) => p === WORKSPACE_FILE || p.startsWith(`${BOARDS_DIR}/`))) check();
       });

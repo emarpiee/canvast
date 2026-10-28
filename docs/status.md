@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.17: files put back show at once (2026-10-29)
+
+**Implemented:** an outside change under `library/` (or a readable file in `.hidden/`) rescans and then always lists the library again. Audit: the folder is followed by events only (no polling); followed live: library files, `library.json`, `hidden.json`, `workspace.json`, canvas files, `.hidden/`.
+**Tested:** the outside-changes desktop test now puts a deleted file back while the app runs (present again); follow test passes.
+**Known failures:** none.
+**Unverified:** a deleted item whose picture the canvas's undo can still bring back keeps its file until restart (by design: undo needs it).
+**Committed:** on `main`, not pushed.
+**Next bounded task:** library filters remembered + reset button.
+
 ## v0.50.16: a moved workspace keeps its password (2026-10-29)
 
 **Implemented:** `WorkspaceMirror.adoptLocks` (folder passwords into the app's storage before the lock check, never removing one); `LibraryMirror.scanHidden` (readable files in `.hidden/` imported in place as hidden items, then sealed; a copy of a known item erased; a notice while locked); `frame.place` default off; Enter opens the selected item in the viewer.
