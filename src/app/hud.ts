@@ -56,7 +56,7 @@ const PATTERN_ICON: Record<CanvasPattern, string> = { grid: ICONS.grid3x3, dots:
 
 export type ItemNames = "all" | "picked" | "off";
 const NAMES: readonly ItemNames[] = ["all", "picked", "off"];
-const NAMES_LABEL: Record<ItemNames, string> = { all: "shown on every item", picked: "shown on the picked items", off: "hidden" };
+const NAMES_LABEL: Record<ItemNames, string> = { all: "shown on every item", picked: "shown on the selected items", off: "hidden" };
 const NAMES_ICON: Record<ItemNames, string> = { all: ICONS.captions, picked: ICONS.scanText, off: ICONS.captionsOff };
 
 export interface HudStatus {

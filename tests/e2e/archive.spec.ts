@@ -184,7 +184,7 @@ test("a workspace backup round-trips to another browser profile exactly", async 
   await q.reload();
   await q.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   const text = await importArchive(q, file.name, file.bytes);
-  expect(text).toContain("3 canvases · 5 objects · 2 originals");
+  expect(text).toContain("3 canvases · 5 objects · 2 files");
   expect(text).toContain("Your settings");
   expect(await q.evaluate(() => JSON.parse(localStorage.getItem("canvast.settings")!))).toMatchObject({ "nav.mode": "layer", "nav.arrive": "keep" });
   expect(text).toContain("2 new boards");
@@ -331,8 +331,8 @@ test("damaged and hostile archives are refused or reported, and nothing partial 
   })();
   const text = await importArchive(p, "tampered.canvast", fresh);
   expect(text).toContain("does not match its content hash (damaged) and was skipped.");
-  expect(text).toContain("1 image refers to originals that are not in the archive");
-  await expect(p.getByTestId("toast")).toContainText("1 original is still missing.");
+  expect(text).toContain("1 image refers to files that are not in the archive");
+  await expect(p.getByTestId("toast")).toContainText("1 file is still missing.");
   expect(await stored(p)).toEqual([]);
   expect((await sess(p)).tree!.length).toBe(2);
 
@@ -373,7 +373,7 @@ test("damaged and hostile archives are refused or reported, and nothing partial 
   // The import itself, a batch per original: both stored, the canvas in, nothing left listed.
   await q.evaluate(() => window.__canvastDebug.importTesting({ stageBytes: 1 }));
   await importArchive(q, "two.canvast", two);
-  await expect(q.getByTestId("toast")).toContainText("2 new originals stored");
+  await expect(q.getByTestId("toast")).toContainText("2 new files stored");
   expect([(await stored(q)).sort(), await staged(q), (await sess(q)).tree!.length]).toEqual([both, [], boards + 1]);
   await context.close();
 });

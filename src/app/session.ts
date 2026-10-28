@@ -1,4 +1,5 @@
 import { HOME, deserializeCamera, fitRect, zoomLevel } from "../core/camera";
+import { startStep } from "./startup-log";
 import { plural } from "../doc/plural";
 import { deserializeFrameCamera, fromLocal, levelsBetween } from "../core/frames";
 import type { AssetLibrary } from "../assets/asset-library";
@@ -209,23 +210,29 @@ export class Session {
       return;
     }
     await this.lease.acquire();
+    startStep("writer lease");
     this.persistence.setWritable(!this.readOnly);
     void this.catalog?.healThumbs().catch(() => undefined);
     // Tags stored in an older form are formatted first (ADR 0084), before any canvas is read.
     await this.catalog?.healTags().catch(() => undefined);
     await this.repo.formatStoredTags().catch(() => undefined);
+    startStep("tags checked");
     this.editor.readOnly = this.readOnly;
     this.startup = await this.repo.startup();
+    startStep("workspace read (and its folder)");
     this.current = this.startup.current;
     this.styles.load(await this.repo.styles().catch(() => undefined));
     await this.refreshTree();
     await this.load(this.current.canvasId);
+    startStep("canvas loaded");
     if (!this.readOnly && this.catalog) {
       try {
         // Originals of an import that did not finish are erased before reconcile, which would give them library entries (ADR 0176).
         await this.backups!.sweepImportStaging();
         await this.catalog.reconcile();
+        startStep("library checked");
         await this.collectGarbage();
+        startStep("unused files collected");
       } catch (e) {
         console.warn("canvast: asset catalog maintenance failed", e);
       }
@@ -330,7 +337,7 @@ export class Session {
     this.gcPending = true;
     const report = await this.collectGarbage();
     const erased = !!report?.swept.includes(hash);
-    this.tell(erased ? "Deleted from the library. The original was erased." : "Deleted from the library. The original is kept until undo history no longer needs it.");
+    this.tell(erased ? "Deleted from the library. The file was erased." : "Deleted from the library. The file is kept until undo history no longer needs it.");
     this.post({ kind: "assets" });
     this.emitAssets();
     return { erased };
@@ -479,7 +486,7 @@ export class Session {
     if (this.editor.blockEdit() || !this.assets) return null;
     const rec = await this.assets.record(hash);
     if (!rec) {
-      this.tell("The original of this item is missing, so it cannot be placed.");
+      this.tell("The file of this item is missing, so it cannot be placed.");
       return null;
     }
     const tags = withTags ? ((await this.catalog?.entry(hash).catch(() => undefined))?.tags ?? []) : [];
@@ -517,7 +524,7 @@ export class Session {
       if (rec) recs.push(rec);
     }
     progress?.done();
-    if (recs.length < hashes.length) this.tell(`${hashes.length - recs.length} of the originals are missing and were not placed.`);
+    if (recs.length < hashes.length) this.tell(`${hashes.length - recs.length} of the files are missing and were not placed.`);
     if (recs.length === 1) placeImage(recs[0]!, this.doc, this.view, 0, "Place item", tagsOf.get(recs[0]!.hash) ?? []);
     else if (recs.length > 1) placeImages(recs, this.doc, this.view, `Place ${recs.length} items`, tagsOf);
     return recs.length;

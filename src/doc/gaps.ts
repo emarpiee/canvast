@@ -154,7 +154,7 @@ export function bridgesOf(loops: readonly SubPath[], r: number): SubPath[] {
  * openings up to that wide count as closed.
  */
 export function gapsOf(shapes: readonly PathObject[], space: FrameSpace, close = 0): { back: PathObject; gaps: Gap[] } | string {
-  if (!shapes.length) return "Pick the shapes around the gaps.";
+  if (!shapes.length) return "Select the shapes around the gaps.";
   if (shapes.length > MAX_GAP_SHAPES) return `Gaps are found among up to ${MAX_GAP_SHAPES} shapes at a time.`;
   const back = [...shapes].sort((a, b) => a.z - b.z)[0]!;
   const regions: Region[] = [];

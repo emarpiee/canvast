@@ -66,7 +66,7 @@ export function makePatternEach(doc: DocumentStore, editor: EditorState, view: V
     if (makePattern(doc, editor, view, newPatternSession(), g, values, seed)) made++;
   }
   editor.selection = new Set([...picked].filter((id) => !!doc.get(id)));
-  editor.message = `Made the pattern on ${made} of ${ids.length} picked.`;
+  editor.message = `Made the pattern on ${made} of ${ids.length} selected.`;
   editor.changed();
   return made;
 }
@@ -96,11 +96,11 @@ export function foundPattern(doc: DocumentStore, editor: EditorState): { info: G
 /** The words for what a result goes on, for the panel. */
 export function patternTargetLabel(doc: DocumentStore, editor: EditorState): string {
   const many = patternTargets(doc, editor).length;
-  if (many > 1) return `${many} picked shapes: one pattern on each`;
+  if (many > 1) return `${many} selected shapes: one pattern on each`;
   const f = foundPattern(doc, editor);
   if (f) return `This pattern (${f.info.id}): changes replace it`;
   const t = patternTarget(doc, editor);
-  return !t ? "A new sheet" : t.kind === "sheet" ? (t.obj.name ?? "The picked sheet") : `The picked shape (cuts the pattern to its outline)`;
+  return !t ? "A new sheet" : t.kind === "sheet" ? (t.obj.name ?? "The selected sheet") : `The selected shape (cuts the pattern to its outline)`;
 }
 
 const sizeOf = (o: PathObject) => {

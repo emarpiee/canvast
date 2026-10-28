@@ -134,7 +134,7 @@ test("bookmark keys, reorder, a bookmark of the picked things, and a tour that m
   await app.drag({ x: 450, y: 300 }, { x: 520, y: 340 }, 6);
   await p.keyboard.press("v");
   const before = await p.evaluate(() => window.__canvastDebug.camera());
-  await p.getByRole("button", { name: "Bookmark the picked things" }).click();
+  await p.getByRole("button", { name: "Bookmark the selected things" }).click();
   await expect(p.locator("li.bookmark")).toHaveCount(4);
   await expect(p.getByTestId("thumb-veil")).toHaveCount(0, { timeout: 10000 }); // (its picture is taken by visiting it, then the view comes back)
   expect(await p.evaluate(() => window.__canvastDebug.camera())).toEqual(before);

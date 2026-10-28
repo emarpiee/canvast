@@ -1062,6 +1062,9 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 /* The busy screen (an import's files being written into the workspace folder): the notices' bar, in the accent colour. */
 dialog.busy-screen { width: min(var(--lock-w), calc(100vw - var(--sp-12))); }
 dialog.busy-screen .busy-bar { --tone: var(--hud-accent); height: var(--sp-3); margin: var(--sp-8) 0 var(--sp-4); }
+/* The start screen: the busy screen over the whole window (as the lock screen), with the logo. */
+dialog.start-screen::backdrop { background: var(--canvas-bg); }
+dialog.start-screen { padding: var(--sp-13) var(--sp-12) var(--sp-12); text-align: center; }
 dialog.busy-screen .busy-detail { margin: 0; color: var(--hud-muted); font-variant-numeric: tabular-nums; }
 .notice-spin { display: inline-flex; animation: notice-spin 0.9s linear infinite; }
 @keyframes notice-in { from { opacity: 0; translate: 0 calc(var(--sp-4) * var(--anim-move)); } }
@@ -1084,11 +1087,11 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 .assets-bar input[type="search"], .assets-bar select { height: var(--ctl); padding: 0 var(--sp-6); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
 .assets-bar select { padding-right: var(--sp-4); }
 /* The status bar: the canvas's own readout and controls (the same classes, so one look), in a row under the library instead of floating. */
-.assets-statusbar { flex: none; display: flex; align-items: stretch; justify-content: space-between; gap: var(--near); padding: var(--near) 0 var(--edge); }
-#assets-view .assets-statusbar > :is(.hud-readout, .hud-controls) { position: static; opacity: 1; }
-.assets-statusbar > .hud-readout { flex-direction: row; align-items: center; gap: var(--sp-6); min-width: 0; }
-.assets-statusbar > .hud-controls { flex: none; align-items: center; }
-.assets-readout > span:not([hidden]) ~ span:not([hidden])::before { content: "·"; margin-right: var(--sp-6); color: var(--hud-muted); }
+/* The library's status bar is the canvas's (.hud-bottom): the full-width strip at the bottom, the view controls just above it at the right.
+   Here it sits in the page's column instead of over the canvas, from edge to edge. */
+#assets-view > .assets-statusbar, #assets-view .assets-statusbar { position: static; flex: none; margin: 0 calc(-1 * var(--edge)); }
+#assets-view .assets-statusbar > :is(.hud-readout, .hud-controls) { opacity: 1; }
+.assets-statusbar > .hud-controls { align-items: center; }
 .assets-count { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .assets-picked, .assets-total { color: var(--hud-muted); }
 #assets-view.is-viewing .assets-statusbar { display: none; }

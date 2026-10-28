@@ -54,11 +54,13 @@ import { AssetLibrary } from "../assets/asset-library";
 import { openBrowserStorage } from "../storage/idb-storage";
 import { openDesktopStorage } from "../storage/desktop-storage";
 import { desktopBridge } from "../storage/desktop-bridge";
+import { meta } from "../assets/asset-catalog";
 import type { OpenHooks, Storage } from "../storage/store";
 import type { SaveState } from "../storage/canvas-persistence";
 import { Session } from "./session";
 import { mountNavigator } from "../ui/navigator";
 import { checkLock } from "../assets/hidden-lock";
+import { onStartStep, startStep } from "./startup-log";
 import { mountLibraryFolderCard } from "../ui/library-folder-card";
 import { confirmReset } from "../ui/reset-dialog";
 import { beginProgress } from "./progress";
@@ -87,7 +89,7 @@ import { ICONS } from "../ui/icons";
 import { mountContextBar } from "../ui/context-bar";
 import { installMenuKeys } from "../ui/more-menu";
 import { chooseDialog, confirmDialog, promptDialog } from "../ui/confirm";
-import { currentBusy, openBusyScreen } from "../ui/busy-screen";
+import { currentBusy, openBusyScreen, openStartScreen } from "../ui/busy-screen";
 import { canSwitchWorkspace, openWorkspaceSwitcher } from "../ui/workspace-switch";
 import type { BusyScreen } from "../ui/busy-screen";
 import { extractPalette } from "../assets/extract-palette";
@@ -430,6 +432,17 @@ async function start(): Promise<void> {
 
   let storage: Storage | null = null;
   let storageError = "";
+  // Until the workspace is open, a start screen stands in front of the app (nothing can be used half-loaded); it says each step.
+  let opening: BusyScreen | null = openStartScreen("");
+  const NEXT: Record<string, string> = {
+    "storage opened": "Reading the workspace",
+    "writer lease": "Reading the workspace",
+    "tags checked": "Reading the workspace folder",
+    "workspace read (and its folder)": "Loading the canvas",
+    "canvas loaded": "Checking the library",
+    "library checked": "Tidying up unused files",
+  };
+  const stopSteps = onStartStep((step) => NEXT[step] && opening?.update(null, NEXT[step]));
   try {
     const desktop = desktopBridge();
     const opts: OpenHooks = {
@@ -449,6 +462,7 @@ async function start(): Promise<void> {
       deleteTo: () => settings.get("storage.deleteTo"),
     };
     storage = desktop ? await openDesktopStorage(desktop, opts) : await openBrowserStorage(opts);
+    startStep("storage opened");
     // (the library folder's link is loaded too, before anything is drawn: an await later in this function lets a frame run early)
   } catch (e) {
     storageError = (e as Error).message;
@@ -764,7 +778,12 @@ async function start(): Promise<void> {
       // A workspace password: nothing of the workspace is read or drawn until it is given.
       const lock = await session.catalog?.lock("workspace").catch(() => null);
       // (checked against the password read here, so the check never waits for the storage, busy right after an import)
-      if (lock) await openLockScreen((typed) => checkLock(lock, typed));
+      startStep("lock read");
+      if (lock) {
+        opening?.close(); // (the lock screen in its place)
+        await openLockScreen((typed) => checkLock(lock, typed));
+        opening = openStartScreen("");
+      }
       await syncHidden(); // (before the first canvas is drawn)
       await session.start();
       opened = true;
@@ -782,6 +801,9 @@ async function start(): Promise<void> {
   } else {
     editor.message = `Storage unavailable (${storageError}); work will not be saved.`;
   }
+  stopSteps();
+  opening?.close();
+  opening = null;
   const persistence = session.persistence;
   // Startup marks (docs/testing/phase-8.md): the canvas is loaded, the index is complete (the first frame is marked where it is drawn).
   mark("loaded");
@@ -898,7 +920,7 @@ async function start(): Promise<void> {
       document.body.appendChild(anchor);
       let add = false;
       const items = (): MenuItem[] => [
-        { id: "reveal-add", label: "Add to the pick", hint: "Tap to add or take out; tap outside when done", icon: ICONS.listChecks, checked: add, run: () => { add = !add; } },
+        { id: "reveal-add", label: "Add to the selection", hint: "Tap to add or take out; tap outside when done", icon: ICONS.listChecks, checked: add, run: () => { add = !add; } },
         ...things.map((o): MenuItem => {
           const l = labelOf(o, assetNames.map);
           // ticked while picked; in "Add to the pick" a tap on a picked one takes it out again
@@ -991,7 +1013,7 @@ async function start(): Promise<void> {
             ];
             const choice = await chooseDialog({
               title: `Apply “${label}” to ${n} shapes`,
-              lines: ["Which part of the picked shapes should take it?"],
+              lines: ["Which part of the selected shapes should take it?"],
               choices: [...all.filter((c) => c.value === target), ...all.filter((c) => c.value !== target)],
               confirmLabel: "Apply",
             });
@@ -1208,7 +1230,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   const openExport = (): void => {
     const targets = exportTargets(doc, editor);
     if (!targets.length || appView !== "canvas") {
-      editor.message = "Pick a sheet, a picture or some shapes to export.";
+      editor.message = "Select a sheet, a picture or some shapes to export.";
       editor.changed();
       return;
     }
@@ -1559,7 +1581,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
           fileKinds.set(o.assetId, { card: false, open: false, svg: false });
           void session.catalog?.entry(o.assetId).then((e) => {
             if (!e) return;
-            fileKinds.set(o.assetId, { card: isCard(e), open: fileActionsOf(e.name, e.type).canOpen, svg: e.type === "image/svg+xml" });
+            fileKinds.set(o.assetId, { card: isCard(e), open: desktopBridge() ? !meta(e).hidden : fileActionsOf(e.name, e.type).canOpen, svg: e.type === "image/svg+xml" });
             contextBar.update();
           });
         }
@@ -1604,7 +1626,18 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       downloadFile: () => void downloadSelection(doc, editor, assets, session, settings),
       openFile: () => {
         const o = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "image");
-        if (o?.kind === "image") void openOriginalInTab(assets, o.assetId);
+        if (o?.kind !== "image") return;
+        const desktop = desktopBridge();
+        if (!desktop) return void openOriginalInTab(assets, o.assetId);
+        // The desktop app: the file in the workspace folder, in the system's app for its kind.
+        void (async () => {
+          const file = await session.storage?.originals.fileOf(o.assetId).catch(() => null);
+          const problem = file ? await desktop.openFile(file) : "its file is not in the workspace folder yet; try again in a moment";
+          if (problem) {
+            editor.message = `Could not open it: ${problem}.`;
+            editor.changed();
+          }
+        })();
       },
       hasLibraryItems: () => [...editor.selection].some((id) => doc.get(id)?.kind === "image"),
       showInLibrary: () => {
@@ -1991,7 +2024,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Mask", title: "Paint the mask in white", words: "show reveal", enabled: () => onCanvas && editor.maskEdit !== null, run: () => paintMask(editor, "show") },
       { group: "Mask", title: "Paint the mask in black", words: "hide", enabled: () => onCanvas && editor.maskEdit !== null, run: () => paintMask(editor, "hide") },
       { group: "Mask", title: "Done painting the mask", words: "finish stop", enabled: () => onCanvas && editor.maskEdit !== null, run: () => paintMask(editor, "done") },
-      { group: "Mask", title: "Pick the mask", words: "select edit move", enabled: () => onCanvas && canReleaseMask(doc, editor), run: () => selectTheMask(doc, editor) },
+      { group: "Mask", title: "Select the mask", words: "select edit move", enabled: () => onCanvas && canReleaseMask(doc, editor), run: () => selectTheMask(doc, editor) },
       { group: "Mask", title: "Invert the mask", words: "swap show hide", enabled: () => onCanvas && canReleaseMask(doc, editor), run: () => changeMask(doc, editor, { invert: !(selectedMask(doc, editor)?.invert ?? false) }) },
       { group: "Mask", title: "Release the mask", words: "remove unmask", enabled: () => onCanvas && canReleaseMask(doc, editor), run: () => changeMask(doc, editor, { release: true }) },
       { group: "Path", title: "Outline stroke", words: "stroke to shape expand", enabled: () => onCanvas && canOutlineStroke(doc, editor), run: () => outlineStroke(doc, editor) },
@@ -2013,7 +2046,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "View", title: "Play the bookmarks as a tour", words: "present", enabled: () => onCanvas && bookmarkList.items.length > 0, run: () => bookmarkTour.start() },
       { group: "Panel", title: "Adjust", words: "toggle show hide adjustments picture exposure contrast", enabled: () => onCanvas, run: () => { editor.adjustOpen = !editor.adjustOpen; editor.changed(); } },
       { group: "Panel", title: "Layers", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.layersOpen = !editor.layersOpen; editor.changed(); } },
-      { group: "View", title: "Bookmark the picked things", words: "save view selection", enabled: () => onCanvas && editor.selection.size > 0, run: bookmarkPicked },
+      { group: "View", title: "Bookmark the selected things", words: "save view selection", enabled: () => onCanvas && editor.selection.size > 0, run: bookmarkPicked },
       { group: "Panel", title: "Bookmarks", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.bookmarksOpen = !editor.bookmarksOpen; editor.changed(); } },
       { group: "Panel", title: "Pattern", words: "toggle show hide generator wave blob background random tiles", enabled: () => onCanvas, run: () => { editor.patternOpen = !editor.patternOpen; editor.changed(); } },
       { group: "Panel", title: "Styles", words: "toggle show hide adjustments saved", enabled: () => onCanvas, run: () => { editor.stylesOpen = !editor.stylesOpen; editor.changed(); } },

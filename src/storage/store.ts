@@ -140,6 +140,8 @@ export interface OriginalStore {
   locked(hash: string): Promise<boolean>;
   /** The state of its library entry, if it has one. */
   entryState(hash: string): Promise<CatalogEntry["state"] | undefined>;
+  /** Where the original is a readable file of the workspace folder or library folder: its path there (never a hidden item's sealed file), else null. */
+  fileOf(hash: string): Promise<string | null>;
   /** Write the original (when `writeBytes`) and make its library entry active, as one step. Throws ImportError when there is no room. */
   put(record: AssetRecord, writeBytes: boolean): Promise<void>;
   putThumb(rec: ThumbRecord): Promise<void>;

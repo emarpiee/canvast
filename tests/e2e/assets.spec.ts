@@ -243,7 +243,7 @@ test("deleting from the library erases only unused originals, and undo history k
   await p.getByTestId("asset-delete").click();
   await p.getByTestId("confirm-ok").click();
   await expect(card(p, GREEN_HASH)).toHaveCount(0);
-  await expect(p.getByTestId("assets-status")).toHaveText("Deleted from the library. The original was erased.");
+  await expect(p.getByTestId("assets-status")).toHaveText("Deleted from the library. The file was erased.");
   expect(await stored(p)).toEqual([]);
 
   // An original whose last instance was deleted is still needed by undo.
@@ -259,7 +259,7 @@ test("deleting from the library erases only unused originals, and undo history k
   await card(p, HASH).click();
   await p.getByTestId("asset-delete").click();
   await p.getByTestId("confirm-ok").click();
-  await expect(p.getByTestId("assets-status")).toHaveText("Deleted from the library. The original is kept until undo history no longer needs it.");
+  await expect(p.getByTestId("assets-status")).toHaveText("Deleted from the library. The file is kept until undo history no longer needs it.");
   await expect(card(p, HASH)).toHaveCount(0);
   expect(await stored(p)).toEqual([HASH]);
   expect(await p.evaluate(() => window.__canvastDebug.gcRoots())).toEqual([HASH]);
@@ -426,14 +426,14 @@ test("a lost original is shown as missing and is restored everywhere by importin
   await expect(card(p, HASH)).toHaveClass(/is-missing/);
   // The card still shows what the asset looked like, marked as missing.
   await expect.poll(() => card(p, HASH).locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
-  await expect(card(p, HASH)).toContainText("Original missing");
+  await expect(card(p, HASH)).toContainText("File missing");
   // Its slide view shows the thumbnail and says why.
   await card(p, HASH).dblclick();
-  await expect(p.getByTestId("slide-view").locator("figcaption")).toContainText("The original is missing or damaged");
+  await expect(p.getByTestId("slide-view").locator("figcaption")).toContainText("The file is missing or damaged");
   await expect.poll(() => p.getByTestId("slide-view").locator("figure img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   await p.keyboard.press("Escape");
   await card(p, HASH).click();
-  await expect(p.getByTestId("asset-inspector")).toContainText("The original file is missing from storage.");
+  await expect(p.getByTestId("asset-inspector")).toContainText("The file is missing from storage.");
   await expect(p.getByTestId("asset-place")).toHaveCount(0);
   // Re-import the same bytes: the original is back, for every instance.
   await p.getByTestId("assets-import-input").setInputFiles({ name: "blocks.png", mimeType: "image/png", buffer: BLOCKS });
@@ -929,7 +929,7 @@ test("a video this browser cannot decode is still imported as a card of its own 
   await expect(bar.locator(".media-time")).toHaveText("Can't play in this browser");
   await expect(bar.getByRole("button", { name: "Play", exact: true })).toBeDisabled();
   const download = p.waitForEvent("download");
-  await bar.getByRole("button", { name: /Download the original file/ }).click();
+  await bar.getByRole("button", { name: /Download the file/ }).click();
   expect((await download).suggestedFilename()).toBe("hevc.mp4");
   // A selected, unplayable instance has no black layer over its card.
   await expect(p.locator("video.media-video")).toBeHidden();
@@ -2592,7 +2592,7 @@ test("a library of thousands keeps only the cards near the view in the page; End
   await p.keyboard.press("Control+a");
   await expect(p.getByTestId("asset-inspector").locator("h2")).toHaveText("111 selected");
   // The status bar: how many are listed, how many picked and their size, the size of the whole library.
-  await expect(p.getByTestId("assets-picked")).toHaveText(/^111 picked, \S+ (B|KiB)$/);
+  await expect(p.getByTestId("assets-picked")).toHaveText(/^111 selected, \S+ (B|KiB)$/);
   await expect(p.getByTestId("assets-total")).toHaveText(/^\S+ KiB in all$/);
   expect(app.consoleErrors).toEqual([]);
 });

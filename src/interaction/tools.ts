@@ -1845,7 +1845,7 @@ export function attachTools(
           const at = cellAt(baked(net.o).sub, l.x, l.y);
           if (at !== null) {
             editor.region = { id: net.o.id, at };
-            editor.message = "Region picked: change the fill to colour it alone.";
+            editor.message = "Region selected: change the fill to colour it alone.";
             editor.changed();
             break;
           }

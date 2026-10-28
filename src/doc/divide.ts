@@ -25,7 +25,7 @@ export function pathLookOf(top: PathObject): Omit<PathObject, "sub" | "id" | "an
 
 /** The regions of `shapes` (two to MAX_DIVIDE closed shapes), or a sentence saying why not. */
 export function divideShapes(shapes: readonly PathObject[], space: FrameSpace): RegionShape[] | string {
-  if (shapes.length < 2) return "Pick two or more shapes to divide.";
+  if (shapes.length < 2) return "Select two or more shapes to divide.";
   if (shapes.length > MAX_DIVIDE) return `Divide takes up to ${MAX_DIVIDE} shapes at a time.`;
   const back = [...shapes].sort((a, b) => a.z - b.z)[0]!;
   const regions: Region[] = [];

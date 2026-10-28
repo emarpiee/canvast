@@ -1,4 +1,5 @@
 import type { EditorState } from "../app/editor-state";
+import { desktopBridge } from "../storage/desktop-bridge";
 import type { DocumentStore } from "../doc/document-store";
 import type { LayoutCommand } from "../app/actions";
 import type { AlignKey, SortKey } from "../doc/arrange";
@@ -156,19 +157,19 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   bar.innerHTML =
     group("Items", btn("library", ICONS.library, "View in the library"), btn("duplicate", ICONS.copy, "Duplicate"), btn("group", ICONS.group, "Group"), btn("ungroup", ICONS.ungroup, "Ungroup"), btn("tag", ICONS.tag, "Tag the selection")) +
     group("Files",
-      btn("exportmenu", ICONS.exportMenu, "Export and copy out: save as a picture or SVG, download the original file, copy the Markdown of a text", 'aria-haspopup="menu" aria-expanded="false"'),
-      btn("open", ICONS.externalLink, "Open in a new tab"),
+      btn("exportmenu", ICONS.exportMenu, "Export and copy out: save as a picture or SVG, download the file, copy the Markdown of a text", 'aria-haspopup="menu" aria-expanded="false"'),
+      btn("open", ICONS.externalLink, desktopBridge() ? "Open in default app" : "Open in a new tab"),
       btn("copyadj", ICONS.clipboardList, "Copy the adjustments of the picture"),
-      btn("pasteadj", ICONS.clipboardPaste, "Paste the copied adjustments on the picked pictures"),
+      btn("pasteadj", ICONS.clipboardPaste, "Paste the copied adjustments on the selected pictures"),
       btn("copypng", ICONS.clipboardPlain, "Copy the picture to the clipboard as it looks now (crop and adjustments included)"),
       btn("bake", ICONS.copyPlus, "Make a new picture of it as it looks now, beside it"),
       btn("vectorise", ICONS.vectorPolygon, "Turn this SVG picture into editable vector shapes, in its place (the file stays in the library)")) +
     group("Regions", btn("builderdone", ICONS.check, "Done: keep the regions as they are now (Enter)"), btn("buildercancel", ICONS.x, "Cancel the Shape builder (Esc)")) +
-    group("Edit shapes", btn("pathmenu", ICONS.pathMenu, "Path tools: simplify, outline stroke, taper, vector network, divide, shape builder, text to path", 'aria-haspopup="menu" aria-expanded="false"'), btn("maskmenu", ICONS.maskMenu, "Masks: make one from the top shape, or change the one picked", 'aria-haspopup="menu" aria-expanded="false"'), btn("boolmenu", ICONS.boolMenu, "Shapes: join, intersect, subtract or exclude the picked shapes, and manage the group they make", 'aria-haspopup="menu" aria-expanded="false"'), btn("sheetmenu", ICONS.sheetMenu, "Sheets: put the picked things on a sheet, release the sheet, fit it to what is on it", 'aria-haspopup="menu" aria-expanded="false"')) +
-    group("Arrange", btn("alignmenu", ICONS.alignMenu, "Align and distribute: a list of the ways to line the picked things up", 'aria-haspopup="menu" aria-expanded="false"'), btn("arrangemenu", ICONS.arrangeMenu, "Arrange in a grid: the ways to order the items, and the space between them", 'aria-haspopup="menu" aria-expanded="false"'), btn("statemenu", ICONS.stateMenu, "Initial state: save the shape as it is now, replace the saved one, or go back to it", 'aria-haspopup="menu" aria-expanded="false"'), btn("front", ICONS.bringToFront, "Bring to front"), btn("back", ICONS.sendToBack, "Send to back"), btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("baserot", ICONS.rotateCwSquare, "Apply rotation: make the current turn the shape's own, the new zero (it looks the same; its box fits it)"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
+    group("Edit shapes", btn("pathmenu", ICONS.pathMenu, "Path tools: simplify, outline stroke, taper, vector network, divide, shape builder, text to path", 'aria-haspopup="menu" aria-expanded="false"'), btn("maskmenu", ICONS.maskMenu, "Masks: make one from the top shape, or change the one selected", 'aria-haspopup="menu" aria-expanded="false"'), btn("boolmenu", ICONS.boolMenu, "Shapes: join, intersect, subtract or exclude the selected shapes, and manage the group they make", 'aria-haspopup="menu" aria-expanded="false"'), btn("sheetmenu", ICONS.sheetMenu, "Sheets: put the selected things on a sheet, release the sheet, fit it to what is on it", 'aria-haspopup="menu" aria-expanded="false"')) +
+    group("Arrange", btn("alignmenu", ICONS.alignMenu, "Align and distribute: a list of the ways to line the selected things up", 'aria-haspopup="menu" aria-expanded="false"'), btn("arrangemenu", ICONS.arrangeMenu, "Arrange in a grid: the ways to order the items, and the space between them", 'aria-haspopup="menu" aria-expanded="false"'), btn("statemenu", ICONS.stateMenu, "Initial state: save the shape as it is now, replace the saved one, or go back to it", 'aria-haspopup="menu" aria-expanded="false"'), btn("front", ICONS.bringToFront, "Bring to front"), btn("back", ICONS.sendToBack, "Send to back"), btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("baserot", ICONS.rotateCwSquare, "Apply rotation: make the current turn the shape's own, the new zero (it looks the same; its box fits it)"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
     group("Attach",
-      btn("attach", ICONS.link, "Attach the picked objects to another object: they follow the object you click next when it moves", 'aria-pressed="false"'),
-      btn("detach", ICONS.unlink, "Detach the picked objects: they stop following another object")) +
+      btn("attach", ICONS.link, "Attach the selected objects to another object: they follow the object you click next when it moves", 'aria-pressed="false"'),
+      btn("detach", ICONS.unlink, "Detach the selected objects: they stop following another object")) +
     group("Selection", btn("lock", ICONS.lockKeyhole, "Lock selection"), btn("hide", ICONS.eyeOff, "Hide selection"), btn("delete", ICONS.trash, "Delete selection"));
   // The bar is placed inside a wrapper, which the selection options bar (ui/toolbar.ts) joins: one parent for both, so they line up.
   const wrap = document.createElement("div");
@@ -209,7 +210,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "sheetmenu": {
         // Put on a sheet, release it, fit it to what is on it: one menu that stays open; only what applies to the pick is listed
         const items = (): MenuItem[] => [
-          { id: "puton", label: "Put on a sheet", hint: "The picked objects go on a new sheet (Ctrl+Alt+G)", icon: ICONS.sheetSelection, run: () => actions.putOnSheet() },
+          { id: "puton", label: "Put on a sheet", hint: "The selected objects go on a new sheet (Ctrl+Alt+G)", icon: ICONS.sheetSelection, run: () => actions.putOnSheet() },
           ...(actions.canReleaseSheet() ? [{ id: "unsheet", label: "Release the sheet", hint: "Keep what is on it, take the sheet away (a clipping mask goes back to being its shape)", icon: ICONS.releaseSheet, run: () => actions.releaseSheet() }] : []),
           ...(actions.canFitSheet() ? [{ id: "fitsheet", label: "Fit the sheet to its contents", hint: "The sheet shrinks or grows to what is on it", icon: ICONS.shrink, run: () => actions.fitSheet() }] : []),
         ];
@@ -220,9 +221,9 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
         // What takes the picked things out of the canvas, in one menu that stays open: only what applies to the pick is listed
         const items = (): MenuItem[] => [
           ...(actions.canExport() ? [{ id: "exportpic", label: "Export…", hint: "Choose a size and save it as a picture (PNG, WebP, JPEG, SVG or PDF)", icon: ICONS.imageUp, run: () => { closeMoreMenu(); actions.exportPicture(); } }] : []),
-          ...(actions.canDownload() ? [{ id: "download", label: "Download the original", hint: "The original file (several files: one ZIP; an edited picture comes with its original)", icon: ICONS.download, run: () => actions.downloadFile() }] : []),
+          ...(actions.canDownload() ? [{ id: "download", label: "Download the file", hint: "The file (several files: one ZIP; an edited picture comes with its file)", icon: ICONS.download, run: () => actions.downloadFile() }] : []),
           ...(actions.canExportSvg() ? [{ id: "svglibrary", label: "Save to library", hint: "The shapes as an SVG picture in the library, to place again", icon: ICONS.save, run: () => actions.saveSvgToLibrary() }] : []),
-          ...([...editor.selection].some((id) => doc.get(id)?.kind === "text") ? [{ id: "copymd", label: "Copy Markdown", hint: "The Markdown of the picked text", icon: ICONS.markdown, run: () => actions.copyMarkdown() }] : []),
+          ...([...editor.selection].some((id) => doc.get(id)?.kind === "text") ? [{ id: "copymd", label: "Copy Markdown", hint: "The Markdown of the selected text", icon: ICONS.markdown, run: () => actions.copyMarkdown() }] : []),
         ];
         openMoreMenu(b, items(), "Export", { keepOpen: true, refresh: items });
         break;
@@ -263,12 +264,12 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           const has = actions.canReleaseMask();
           return [
             ...(make ? [
-              row("clipmask", "Clipping mask", "The top shape cuts what else is picked to its outline", ICONS.venetianMask, () => actions.makeClippingMask()),
+              row("clipmask", "Clipping mask", "The top shape cuts what else is selected to its outline", ICONS.venetianMask, () => actions.makeClippingMask()),
               row("maskalpha", "Mask by opacity", "The top thing shows the others only where it is solid", ICONS.circleDashed, () => actions.makeMask("alpha")),
               row("maskluma", "Mask by brightness", "The top thing shows the others where it is light", ICONS.contrast, () => actions.makeMask("luminance")),
             ] : []),
             ...(has ? [
-              row("selectmask", "Pick the mask", "Pick the mask of the picked things, to move or edit it", ICONS.scanEye, () => actions.selectMask()),
+              row("selectmask", "Select the mask", "Select the mask of the selected things, to move or edit it", ICONS.scanEye, () => actions.selectMask()),
               row("invertmask", "Invert the mask", "Show what it hides and hide what it shows", ICONS.circleSlash, () => actions.changeMask({ invert: !(actions.selectedMask()?.invert ?? false) }), { checked: actions.selectedMask()?.invert ?? false }),
               row("releasemask", "Release the mask", "What it cut is whole again", ICONS.circleMinus, () => actions.changeMask({ release: true })),
             ] : []),
@@ -289,18 +290,18 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
               row("outlinestroke", "Outline stroke", "Make the line a shape of its own", ICONS.stamp, () => actions.outlineStroke()),
               row("taper", "Taper", "Thin at both ends; stays editable (again: take it away)", ICONS.feather, () => actions.setWidthProfile("taper")),
             ] : []),
-            ...(actions.canMakeNetwork() ? [row("makenet", "Vector network", "Join the picked paths where they meet and fill the regions they enclose", ICONS.network, () => actions.makeNetwork())] : []),
+            ...(actions.canMakeNetwork() ? [row("makenet", "Vector network", "Join the selected paths where they meet and fill the regions they enclose", ICONS.network, () => actions.makeNetwork())] : []),
             ...(actions.canReleaseNetwork() ? [row("releasenet", "Release the network", "Its edges are an ordinary path again", ICONS.unplug, () => actions.releaseNetwork())] : []),
             ...(actions.canDivide() && free ? [
-              row("divide", "Divide", "Cut the picked shapes into the regions they overlap in", ICONS.slice, () => actions.divide()),
+              row("divide", "Divide", "Cut the selected shapes into the regions they overlap in", ICONS.slice, () => actions.divide()),
               row("shapebuilder", "Shape builder", "Drag across regions to merge them, Alt-drag to delete them", ICONS.puzzle, () => { closeMoreMenu(); actions.shapeBuilder(); }),
             ] : []),
             ...(actions.canFillGaps() && free ? [
-              row("fillgaps", "Fill gaps", "Fill every empty place the picked shapes close in, under them", ICONS.paintRoller, () => actions.fillGaps()),
+              row("fillgaps", "Fill gaps", "Fill every empty place the selected shapes close in, under them", ICONS.paintRoller, () => actions.fillGaps()),
               row("fillgap", "Fill a gap…", "Click the gaps to fill, one by one; Enter or Esc when done", ICONS.mousePointerClick, () => { closeMoreMenu(); actions.fillGap(); }),
             ] : []),
             ...(actions.canOutline() ? [row("outline", "Text to path", "Convert the text to a path (Ctrl+E)", ICONS.replace, () => actions.outline())] : []),
-            ...(actions.canSetOnPath() ? [row("onpath", "Text along a path", "Set the text along the picked path (pick the text and the path)", ICONS.route, () => actions.setOnPath())] : []),
+            ...(actions.canSetOnPath() ? [row("onpath", "Text along a path", "Set the text along the selected path (select the text and the path)", ICONS.route, () => actions.setOnPath())] : []),
             ...(actions.canTakeOffPath() ? [row("offpath", "Text off its path", "The text is set straight again", ICONS.routeOff, () => actions.takeOffPath())] : []),
           ];
         };

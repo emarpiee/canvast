@@ -142,8 +142,8 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     gradient: "A gradient is a blend of colours. Save one from the fill or outline picker, make a new one here, or import a GIMP .ggr file.",
     colour: "Keep the colours you use. Add one here, or save one from any colour picker.",
     palette: "A palette is a set of colours you reuse together, like a brand's.",
-    pattern: "A pattern style is a generator with its settings and seed. Save one from the Pattern panel, then press it to make the same pattern on the picked sheet or shape.",
-    text: "A text style is a size, spacing, alignment and colour. Pick a text, save its style here, then press it to give other texts the same look.",
+    pattern: "A pattern style is a generator with its settings and seed. Save one from the Pattern panel, then press it to make the same pattern on the selected sheet or shape.",
+    text: "A text style is a size, spacing, alignment and colour. Select a text, save its style here, then press it to give other texts the same look.",
   };
 
   const render = (): void => {
@@ -186,7 +186,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const empty =
       all.length === 0
         ? k.id === "palette"
-          ? `<div class="styles-empty" data-testid="palette-empty"><p>${esc(GUIDE["palette"]!)}</p><div class="styles-empty-actions"><button type="button" data-new-from="selection">From the selected shapes' colours</button><button type="button" data-new-from="picture">From a picked picture</button><button type="button" data-new-from="colour">From one colour you like</button><button type="button" data-new-from="empty">Start empty</button><button type="button" data-import>Import a palette file (.gpl, .ase, .aco)</button></div></div>`
+          ? `<div class="styles-empty" data-testid="palette-empty"><p>${esc(GUIDE["palette"]!)}</p><div class="styles-empty-actions"><button type="button" data-new-from="selection">From the selected shapes' colours</button><button type="button" data-new-from="picture">From a selected picture</button><button type="button" data-new-from="colour">From one colour you like</button><button type="button" data-new-from="empty">Start empty</button><button type="button" data-import>Import a palette file (.gpl, .ase, .aco)</button></div></div>`
           : `<p class="styles-guide">${esc(GUIDE[k.id] ?? k.empty)}</p>`
         : "";
     panel.innerHTML = panelHtml({
@@ -196,7 +196,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       sub: `<div class="styles-tabs" role="tablist" aria-label="Kinds of style">${tabs}</div><div class="layers-filter"><input type="search" data-styles-filter placeholder="Search ${esc(k.plural.toLowerCase())}" aria-label="Search the ${esc(k.plural.toLowerCase())} by name" autocomplete="off" value="${esc(filter)}"></div>`,
       body: `<div class="styles-body" role="tabpanel" aria-label="${esc(k.plural)}">
         <div class="styles-tab-head"><h3>${esc(k.plural)}</h3>${k.id === "gradient" || k.id === "palette" ? moreButton(`More actions for ${k.plural}`, `data-kind-more="${k.id}"`) : ""}</div>
-        ${paints ? `<div class="styles-target" role="radiogroup" aria-label="Apply to"><span>Apply to</span>${seg("fill", "Fill", "Colours go on the fill of the picked shapes")}${seg("stroke", "Outline", "Colours go on the outline of the picked shapes")}${seg("both", "Both", "Fill and outline")}</div>` : ""}
+        ${paints ? `<div class="styles-target" role="radiogroup" aria-label="Apply to"><span>Apply to</span>${seg("fill", "Fill", "Colours go on the fill of the selected shapes")}${seg("stroke", "Outline", "Colours go on the outline of the selected shapes")}${seg("both", "Both", "Fill and outline")}</div>` : ""}
         ${!can ? `<p class="styles-hint">${ICONS.pointer}<span>${paints ? (k.id === "gradient" ? "Select shapes or pictures on the canvas, then press one to apply it (on a picture it becomes a gradient map)." : "Select shapes on the canvas, then press one to apply it.") : k.id === "text" ? "Select texts on the canvas, then press one to apply it." : "Select pictures on the canvas, then press one to apply it."}</span></p>` : ""}
         ${actions ? `<div class="styles-actions">${actions}</div>` : ""}
         ${empty}
@@ -355,7 +355,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     }
     if (item.kind === "adjustment")
       return [
-        { label: "Update from the picked picture", icon: ICONS.refresh, disabled: !deps.adjustment.can(), aria: `Replace ${item.name} with the adjustments of the picked picture: the pictures that follow it change too`, run: () => { const a = deps.adjustment.current(); if (a) void styles.update(item.id, a); } },
+        { label: "Update from the selected picture", icon: ICONS.refresh, disabled: !deps.adjustment.can(), aria: `Replace ${item.name} with the adjustments of the selected picture: the pictures that follow it change too`, run: () => { const a = deps.adjustment.current(); if (a) void styles.update(item.id, a); } },
         ...common(item),
         del,
       ];
@@ -371,7 +371,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   const harmonyPalette = async (anchor: HTMLElement): Promise<void> => {
     const kind = await chooseDialog({
       title: "Palette from a colour",
-      lines: ["Pick how the other colours follow the one you choose next."],
+      lines: ["Choose how the other colours follow the one you choose next."],
       choices: [
         { value: "analogous", label: "Analogous", help: "Neighbours on the colour wheel: calm and close" },
         { value: "complementary", label: "Complementary", help: "The opposite colour: strong contrast" },
@@ -478,7 +478,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       const how = from.dataset["newFrom"]!;
       const sel = deps.selectionColours();
       if (how === "selection") void (sel.length ? addPalette(styles.nextName("palette"), sel) : Promise.resolve(deps.notify("Select shapes with colours first.")));
-      else if (how === "picture") void deps.picturePalette().then((c) => (c ? addPalette(styles.nextName("palette"), c) : deps.notify("Pick one picture first.")));
+      else if (how === "picture") void deps.picturePalette().then((c) => (c ? addPalette(styles.nextName("palette"), c) : deps.notify("Select one picture first.")));
       else if (how === "colour") void harmonyPalette(from);
       else void addPalette(styles.nextName("palette"), ["#808080"], (m) => { editing = m.id; render(); });
       return;
@@ -491,7 +491,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
         [
           { label: "Empty palette", icon: ICONS.palette, aria: "New empty palette", run: () => void addPalette(styles.nextName("palette"), ["#808080"], (m) => { editing = m.id; render(); }) },
           { label: "From the selection's colours", icon: ICONS.pointer, disabled: sel.length === 0, aria: "New palette from the selection", run: () => void addPalette(styles.nextName("palette"), sel) },
-          { label: "From the picked picture", icon: ICONS.imagePlus, aria: "New palette from the picked picture", run: () => void deps.picturePalette().then((c) => (c ? addPalette(styles.nextName("palette"), c) : deps.notify("Pick one picture first."))) },
+          { label: "From the selected picture", icon: ICONS.imagePlus, aria: "New palette from the selected picture", run: () => void deps.picturePalette().then((c) => (c ? addPalette(styles.nextName("palette"), c) : deps.notify("Select one picture first."))) },
           { label: "From a colour (harmony)", icon: ICONS.rainbow, aria: "New palette from a colour", run: () => void harmonyPalette(add) },
         ],
         "New style",

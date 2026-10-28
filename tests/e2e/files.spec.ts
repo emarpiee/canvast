@@ -24,7 +24,7 @@ test("any file imports: a 3D model becomes a card on the canvas and in the libra
   const names = p.getByRole("button", { name: /^Item names/ });
   await expect(names).toHaveAttribute("aria-label", /shown on every item/);
   await names.click();
-  await expect(names).toHaveAttribute("aria-label", /shown on the picked items/);
+  await expect(names).toHaveAttribute("aria-label", /shown on the selected items/);
   await expect.poll(labels).toEqual([]);
   await p.locator("#canvas").focus();
   await p.keyboard.press("Control+a");

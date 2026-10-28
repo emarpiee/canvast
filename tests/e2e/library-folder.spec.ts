@@ -148,7 +148,7 @@ test("the library index: saved into the folder, and opened from it, it adds the 
   await p.evaluate((h) => window.__canvastDebug.removeAssetBytes(h), hash);
   expect(await present(p, hash)).toBe(false);
   await p.getByRole("button", { name: "Open index", exact: true }).click();
-  await expect(p.getByTestId("confirm-dialog")).toContainText("Its originals are the files in the library folder");
+  await expect(p.getByTestId("confirm-dialog")).toContainText("Its files are the ones in the library folder");
   await p.getByTestId("confirm-ok").click();
   await expect.poll(() => present(p, hash)).toBe(true);
   expect(await record(p, hash)).toEqual({ ext: 1, blob: 0 });
@@ -186,7 +186,7 @@ test("choosing a folder that already holds a library offers to open it at once",
   await expect(p.getByTestId("storage-folder")).toContainText("Not set");
   await p.evaluate(() => window.__canvastDebug.stubPicker("lib-g"));
   await p.getByRole("button", { name: "Choose library folder…" }).click();
-  await expect(p.getByTestId("confirm-dialog")).toContainText("Its originals are the files in the library folder"); // (no second button to find)
+  await expect(p.getByTestId("confirm-dialog")).toContainText("Its files are the ones in the library folder"); // (no second button to find)
   await p.getByTestId("confirm-ok").click();
   await expect.poll(() => present(p, hash)).toBe(true);
 });

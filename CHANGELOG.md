@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.50.7 — A start screen, one word for each thing (2026-10-28)
+
+- **Added:** a start screen while a workspace opens: the logo, *Opening the workspace* and what is being done (reading the workspace and its folder, loading the canvas, checking the library), in front of the whole app until everything is ready, so nothing shows empty or half-loaded. It steps aside for the lock screen. Each step is also said in the developer tools' console with its time (*canvast start: …*), to find what makes a start slow.
+- **Fixed:** dragging a library panel's edge no longer lays the cards out while dragging (that moved and reloaded the thumbnails, so it still lagged): only the panel follows the pointer, and the cards are laid out once when the edge is let go.
+- **Fixed:** in a big library, scrolling a little and back showed blank, shimmering cards for a moment while their thumbnails loaded again: cards are kept three screens beyond the view (one before), and a thumbnail already loaded is shown at once.
+- **Added:** in the desktop app, **Open in default app** (the library's details and right-click menu, and the canvas's Actions bar for a file card) opens the item's file from the workspace folder in the app your system uses for that kind of file: a video or file canvast cannot play or show, or a picture to edit elsewhere. Not offered for hidden items.
+- **Changed:** the library's status bar is the canvas's: the same full-width strip along the bottom, the view controls just above it at the right (one set of styles for both).
+- **Changed:** the app says the same common word for the same thing everywhere: **selected** (not "picked": the details said "36 selected" while the status bar said "36 picked"), **files** for the library's files (not "originals"), and **info bar** for the line at the bottom left (not "readout"). The colour picker keeps "pick a colour". The README follows.
+
 ## 0.50.6 — Smooth panel resizing in the library (2026-10-28)
 
 - **Fixed:** dragging the edge of the library's side panel or details panel crawled in a big library: every pixel laid out every card again. The panel now follows the pointer every frame, and the cards are laid out again a few times a second while dragging and once when the edge is let go.

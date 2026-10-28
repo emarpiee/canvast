@@ -107,7 +107,7 @@ test("adjustments: kept on the picture, drawn live, one undo step, copied to ano
   await p.mouse.click(...edge);
   await p.getByTestId("context-bar").getByRole("button", { name: "Copy the adjustments of the picture" }).click(); // (on the bar under the picture)
   await p.mouse.click(Math.round((bb.minX + bb.maxX) / 2), Math.round((bb.minY + bb.maxY) / 2));
-  await p.getByTestId("context-bar").getByRole("button", { name: "Paste the copied adjustments on the picked pictures" }).click();
+  await p.getByTestId("context-bar").getByRole("button", { name: "Paste the copied adjustments on the selected pictures" }).click();
   expect((await objs(app)).find((o) => o.id === b.id)!.adjust).toEqual({ exposure: 70 });
   await p.keyboard.press("Control+z");
   expect((await objs(app)).find((o) => o.id === b.id)!.adjust, "one undo step").toBeUndefined();

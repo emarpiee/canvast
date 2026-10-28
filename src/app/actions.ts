@@ -1946,7 +1946,7 @@ function gapShapes(doc: DocumentStore, editor: EditorState, view: ViewState, clo
   const found = gapsOf(shapes, doc.space, ppu > 0 && ppu < Infinity ? closePx / ppu : 0);
   if (typeof found === "string") return found;
   const { back } = found;
-  if (!found.gaps.length) return "The picked shapes close in no gap: an empty place must be closed in on every side to be filled.";
+  if (!found.gaps.length) return "The selected shapes close in no gap: an empty place must be closed in on every side to be filled.";
   const gaps = found.gaps.map((g): PathObject => homeObject(normalizeUnit({
     id: newObjectId(), kind: "path", ...(back.frame ? { frame: back.frame } : {}), anchor: back.anchor, unit: back.unit, z: back.z, opacity: 1,
     attachmentTargetId: null, ...(back.parent ? { parent: back.parent } : {}), sub: g.subs, evenodd: true,
@@ -2081,7 +2081,7 @@ export function canMakeMask(doc: DocumentStore, editor: EditorState): boolean {
 export function makeMask(doc: DocumentStore, editor: EditorState, mode: "alpha" | "luminance"): void {
   if (editor.blockEdit()) return;
   if (!canMakeMask(doc, editor)) {
-    editor.message = "Pick two or more things that are not masks already: the top one becomes the mask of the others.";
+    editor.message = "Select two or more things that are not masks already: the top one becomes the mask of the others.";
     editor.changed();
     return;
   }
@@ -2179,7 +2179,7 @@ export function startBrushMask(doc: DocumentStore, editor: EditorState, revealed
   const roots = rootsOf(selected(doc, editor).filter((o) => !o.locked));
   const level = editor.entered.length;
   if (!roots.length || roots.some((o) => o.isMask || o.mask)) {
-    editor.message = "Pick the things to paint a mask for (not masks already).";
+    editor.message = "Select the things to paint a mask for (not masks already).";
     editor.changed();
     return;
   }
@@ -2246,7 +2246,7 @@ export function makeClippingMask(doc: DocumentStore, editor: EditorState): void 
   const shapes = roots.filter((o): o is PathObject => o.kind === "path" && !o.container && !o.result && !o.groups?.length && o.sub.some((s) => s.closed));
   const maskShape = shapes.sort((a, b) => b.z - a.z)[0];
   if (!maskShape || roots.length < 2) {
-    editor.message = "Pick a closed shape and what it should cut: the top shape becomes the clipping mask.";
+    editor.message = "Select a closed shape and what it should cut: the top shape becomes the clipping mask.";
     editor.changed();
     return;
   }
@@ -2409,7 +2409,7 @@ export function attachSelection(doc: DocumentStore, editor: EditorState, targetI
     .filter((o) => o.id !== targetId && !following.has(o.id) && !o.locked && o.attachmentTargetId !== targetId)
     .map((o) => ({ ...o, attachmentTargetId: targetId }) as CanvasObject);
   if (!next.length) {
-    editor.message = "Nothing to attach: the picked objects already follow it, or it follows them.";
+    editor.message = "Nothing to attach: the selected objects already follow it, or it follows them.";
     editor.changed();
     return false;
   }

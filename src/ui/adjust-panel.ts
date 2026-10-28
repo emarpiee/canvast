@@ -27,7 +27,7 @@ export function mountAdjustPanel(host: HTMLElement, editor: EditorState, actions
   panel.hidden = true;
   panel.innerHTML = panelHtml({
     title: "Adjust",
-    tools: `<button type="button" class="layer-btn" data-reset aria-label="Reset the adjustments" title="Reset the adjustments of the picked pictures">${ICONS.listRestart}</button>`,
+    tools: `<button type="button" class="layer-btn" data-reset aria-label="Reset the adjustments" title="Reset the adjustments of the selected pictures">${ICONS.listRestart}</button>`,
     sub: `<div data-adj-sub></div>`,
     body: `<div class="adjust-body"></div>`,
     foot: `<div data-adj-foot></div>`,
@@ -69,7 +69,7 @@ export function mountAdjustPanel(host: HTMLElement, editor: EditorState, actions
       if (shown?.ids !== "none") {
         closeAdjustChild();
         settle();
-        body.innerHTML = `<p class="adj-empty">Select a picture, video, GIF, shape or text to adjust it. The original is never changed.</p>`;
+        body.innerHTML = `<p class="adj-empty">Select a picture, video, GIF, shape or text to adjust it. The file is never changed.</p>`;
         shown = { ids: "none", handle: null };
       }
       return;

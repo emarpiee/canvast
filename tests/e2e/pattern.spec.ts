@@ -294,7 +294,7 @@ test("Pattern: with several shapes picked, Generate makes one pattern on each of
   await p.keyboard.up("Shift");
   await p.click("[data-pattern-panel]");
   await choose(app, "tides");
-  await expect(p.locator("[data-pg-target]")).toContainText("2 picked shapes");
+  await expect(p.locator("[data-pg-target]")).toContainText("2 selected shapes");
   await make(app);
   await expect.poll(async () => (await objs(app)).filter((o) => o.container?.mask).length).toBe(2);
   expect(await p.evaluate(() => window.__canvastDebug.selection().length), "both shapes are still picked").toBe(2);

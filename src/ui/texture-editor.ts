@@ -125,7 +125,7 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
   el.innerHTML = `
     <div class="tex-source">
       ${o.kind === "image" ? `<button type="button" class="colour-save is-first" data-tex-lib>Choose from the library…</button>` : ""}
-      <button type="button" class="colour-save" data-tex-pick>${o.kind === "image" ? "Pick a picture on the canvas" : "Pick the objects on the canvas"}</button>
+      <button type="button" class="colour-save" data-tex-pick>${o.kind === "image" ? "Select a picture on the canvas" : "Select the objects on the canvas"}</button>
       ${o.kind === "image" ? `<button type="button" class="colour-save" data-tex-file>Choose a file…</button><input type="file" accept="image/*" hidden data-tex-input>` : ""}
       <p class="op-note" data-tex-note role="status"></p>
     </div>

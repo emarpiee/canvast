@@ -54,8 +54,8 @@ export async function runExport(session: Session, asked: ExportScope): Promise<b
     const inc = r.manifest.incremental;
     const kept = r.manifest.assets.filter((a) => a.file).length;
     p.done(
-      `Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${inc ? `only what changed since ${new Date(inc.since).toLocaleString()}: ` : ""}${plural(r.canvases, "canvas", "canvases")}, ${plural(r.objects, "object")}, ${plural(inc ? kept : r.manifest.assets.length, "original")}; checked before saving).` + (inc ? " Keep it with the full backup and the incremental ones before it: restoring takes them all together." : "") +
-        (missing ? ` ${plural(missing, "original")} ${were(missing)} already missing and ${missing === 1 ? "is" : "are"} not included.` : ""),
+      `Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${inc ? `only what changed since ${new Date(inc.since).toLocaleString()}: ` : ""}${plural(r.canvases, "canvas", "canvases")}, ${plural(r.objects, "object")}, ${plural(inc ? kept : r.manifest.assets.length, "file")}; checked before saving).` + (inc ? " Keep it with the full backup and the incremental ones before it: restoring takes them all together." : "") +
+        (missing ? ` ${plural(missing, "file")} ${were(missing)} already missing and ${missing === 1 ? "is" : "are"} not included.` : ""),
     );
     return true;
   } catch (e) {
@@ -87,7 +87,7 @@ export async function runExportFiles(session: Session, asked: ExportScope): Prom
     }
     p.update(null, "handing the file over");
     download(r.blob, r.fileName);
-    p.done(`Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${plural(r.files, "file")}).` + (r.missing ? ` ${plural(r.missing, "original")} ${were(r.missing)} missing and ${be(r.missing)} not included.` : ""));
+    p.done(`Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${plural(r.files, "file")}).` + (r.missing ? ` ${plural(r.missing, "file")} ${were(r.missing)} missing and ${be(r.missing)} not included.` : ""));
     return true;
   } catch (e) {
     p.fail(`Export failed: ${(e as Error).message}`);
@@ -132,10 +132,10 @@ export async function runImport(session: Session, picked: File | readonly File[]
   const facts: Array<[string, string]> = [
     ["From", `“${plan.workspaceName}”${plan.files > 1 ? `, ${plan.files} files of a backup chain` : ""}`],
     ["Exported", plan.exportedAt ? new Date(plan.exportedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "at an unknown time"],
-    ["Contains", [count(canvases, "canvas", "canvases"), count(plan.objects, "object"), count(plan.assets.length, "original")].join(" · ")],
+    ["Contains", [count(canvases, "canvas", "canvases"), count(plan.objects, "object"), count(plan.assets.length, "file")].join(" · ")],
     ["Checked", "All checksums and content hashes verified"],
-    ["Goes to", plan.scope === "canvas" ? "A new canvas on the open board" : plan.scope === "assets" ? "The library: its originals are added to the library" : `${count(plan.boards.length, "new board")}; nothing existing is replaced`],
-    ...(folder ? [["Originals", "Its originals are the files in the library folder"] as [string, string]] : []),
+    ["Goes to", plan.scope === "canvas" ? "A new canvas on the open board" : plan.scope === "assets" ? "The library: its files are added to the library" : `${count(plan.boards.length, "new board")}; nothing existing is replaced`],
+    ...(folder ? [["Originals", "Its files are the ones in the library folder"] as [string, string]] : []),
   ];
   const settings = session.settingsHook?.restorable(plan.settings) ?? 0;
   const carried = [
@@ -146,7 +146,7 @@ export async function runImport(session: Session, picked: File | readonly File[]
   ];
   const warnings = [
     ...(plan.incrementalOnly ? ["This is an incremental backup on its own: only the canvases that changed are in it. Add the full backup and the earlier incremental ones to restore everything."] : []),
-    ...(plan.unresolved.length ? [`${count(plan.unresolved.length, "image")} ${plan.unresolved.length === 1 ? "refers" : "refer"} to originals that are not in the archive; ${plan.unresolved.length === 1 ? "it shows" : "they show"} as missing unless already in your library.`] : []),
+    ...(plan.unresolved.length ? [`${count(plan.unresolved.length, "image")} ${plan.unresolved.length === 1 ? "refers" : "refer"} to files that are not in the archive; ${plan.unresolved.length === 1 ? "it shows" : "they show"} as missing unless already in your library.`] : []),
     ...(plan.problems.length ? [`Problems (${plan.problems.length}): ${plan.problems.slice(0, 5).join(" ")}${plan.problems.length > 5 ? ` …and ${plan.problems.length - 5} more.` : ""}`] : []),
   ];
   const ok = await confirmDialog({ title: folder ? "Open the library of this folder?" : `Import ${file.name}?`, lines: [], facts, list: { title: "Also in this file", items: carried }, warnings, confirmLabel: folder ? "Open library" : "Import", danger: false });
@@ -161,9 +161,9 @@ export async function runImport(session: Session, picked: File | readonly File[]
     }
     const restored = session.settingsHook?.restore(plan.settings) ?? 0;
     const result =
-      (restored ? `${plural(restored, "setting")} restored. ` : "") + `Imported ${plural(r.canvases, "canvas", "canvases")} and ${plural(r.objects, "object")}; ${plural(r.assetsAdded, "new original")} stored.` +
+      (restored ? `${plural(restored, "setting")} restored. ` : "") + `Imported ${plural(r.canvases, "canvas", "canvases")} and ${plural(r.objects, "object")}; ${plural(r.assetsAdded, "new file")} stored.` +
       (r.stylesAdded ? ` ${plural(r.stylesAdded, "saved style")} added.` : "") +
-      (r.stillMissing ? ` ${plural(r.stillMissing, "original")} ${be(r.stillMissing)} still missing.` : "");
+      (r.stillMissing ? ` ${plural(r.stillMissing, "file")} ${be(r.stillMissing)} still missing.` : "");
     // The desktop build: the import's files are written into the workspace folder first (the busy screen shows how far), then the
     // app starts again on what it now holds, and says the result.
     if (session.storage?.folderWriting) {

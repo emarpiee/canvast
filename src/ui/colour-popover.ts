@@ -154,7 +154,7 @@ function gradientStyles(now: () => Gradient, use: (g: Gradient) => void, stop: (
   let saved = styleHooks?.gradients() ?? [];
   const render = (): void => {
     saved = styleHooks?.gradients() ?? [];
-    box.innerHTML = `${saved.length ? `<div class="cp-group"><div class="cp-group-h">Saved gradients<button type="button" class="gradient-show" data-show-gradients title="Open the Gradients of the Styles panel">Show all</button></div><div class="gradient-chips" role="group" aria-label="Saved gradients">${saved.map((s, i) => `<button type="button" class="gradient-chip" data-saved="${i}" title="${esc(s.name)}" aria-label="Use the gradient ${esc(s.name)}" style="background-image:${gradientCss(s.gradient)}"></button>`).join("")}</div></div>` : ""}<button type="button" class="colour-save" data-save-gradient title="Keep this gradient in the Styles">Save gradient</button><button type="button" class="colour-save" data-save-stop title="Keep the colour of the picked stop in the Styles, as a colour of its own">Save colour of this stop</button>`;
+    box.innerHTML = `${saved.length ? `<div class="cp-group"><div class="cp-group-h">Saved gradients<button type="button" class="gradient-show" data-show-gradients title="Open the Gradients of the Styles panel">Show all</button></div><div class="gradient-chips" role="group" aria-label="Saved gradients">${saved.map((s, i) => `<button type="button" class="gradient-chip" data-saved="${i}" title="${esc(s.name)}" aria-label="Use the gradient ${esc(s.name)}" style="background-image:${gradientCss(s.gradient)}"></button>`).join("")}</div></div>` : ""}<button type="button" class="colour-save" data-save-gradient title="Keep this gradient in the Styles">Save gradient</button><button type="button" class="colour-save" data-save-stop title="Keep the colour of the selected stop in the Styles, as a colour of its own">Save colour of this stop</button>`;
   };
   render();
   // A saved gradient is copied as CSS by a long press, a right click or Ctrl/Cmd+C, and is not used.
@@ -915,7 +915,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   const curvesSection = `<section class="adj-group" aria-label="Curves">${head("Curves")}<div class="adj-row">${chSelect("cv-ch")}<button type="button" data-cv-reset>Reset curve</button></div><canvas class="adj-curve" data-curve width="192" height="192" tabindex="0" role="application" aria-label="Curve: drag a point, click to add one, double-click a point to remove it. With the keyboard: [ and ] choose a point, arrows move it, Delete removes it"></canvas></section>`;
   pop.innerHTML =
     layerTabs +
-    `<header class="adj-head"><span class="adj-note">${o.count > 1 ? `Shows the first of ${o.count} pictures; applies to all.` : "The original is not changed."}</span></header>` +
+    `<header class="adj-head"><span class="adj-note">${o.count > 1 ? `Shows the first of ${o.count} pictures; applies to all.` : "The file is not changed."}</span></header>` +
     GROUPS.map(([name, keys]) => `<section class="adj-group" aria-label="${name}">${head(name)}${keys.map((k) => row(rows.find((r) => r.key === k)!)).join("")}${colourRow(name)}</section>`).join("") +
     mapSection() +
     levelsSection +

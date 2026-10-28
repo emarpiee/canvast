@@ -222,7 +222,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     </div>
     <div class="dock" data-cmd-group="Dock" role="toolbar" aria-label="Panels">
       <div class="tb-group">
-        <button type="button" class="layers-toggle" data-adjust-panel aria-pressed="false" aria-label="Adjust panel" title="Adjust: show or hide the panel for the exposure, contrast, colour and more of the picked pictures">${ICONS.slidersVertical}</button>
+        <button type="button" class="layers-toggle" data-adjust-panel aria-pressed="false" aria-label="Adjust panel" title="Adjust: show or hide the panel for the exposure, contrast, colour and more of the selected pictures">${ICONS.slidersVertical}</button>
         <button type="button" class="layers-toggle" data-layers aria-pressed="false" aria-label="Layers panel" title="Layers: show or hide the floating Layers panel">${ICONS.layers}</button>
         <button type="button" class="layers-toggle" data-tags aria-pressed="false" aria-label="Tags panel" title="Tags: tag items on this canvas, and rename or delete a tag">${ICONS.tag}</button>
         <button type="button" class="layers-toggle" data-styles aria-pressed="false" aria-label="Styles panel" title="Styles: saved adjustments (and more soon) to apply to the selected items">${ICONS.swatchBook}</button>
@@ -256,7 +256,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-kind="picture" data-crop hidden aria-pressed="false" aria-label="Crop the picture" title="Crop: drag a side or a corner of the picture; drag outward to bring back what was cut. Enter or Escape finishes.">${ICONS.crop}</button>
         <button type="button" data-kind="picture" data-uncrop hidden aria-label="Show the whole picture" title="Show the whole picture again (the crop is removed)">${ICONS.fullscreen}</button>
         <button type="button" data-kind="picture shape stroke text" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture, shape or text: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
-        <button type="button" data-kind="picture shape stroke text" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the picked pictures">${ICONS.listRestart}</button>
+        <button type="button" data-kind="picture shape stroke text" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the selected pictures">${ICONS.listRestart}</button>
         <span class="tb-count" data-kind="any" data-on-sheet hidden title="Where it is on its sheet, in per cent of the sheet: X and Y from its top-left corner, W and H of its width and height">On sheet
           <label>X <input type="number" data-on-x step="any" inputmode="decimal" aria-label="Position from the left of the sheet (per cent of its width)"></label> <label>Y <input type="number" data-on-y step="any" inputmode="decimal" aria-label="Position from the top of the sheet (per cent of its height)"></label>
           <span data-on-size><label>W <input type="number" data-on-w min="0" step="any" inputmode="decimal" aria-label="Width (per cent of the sheet's width)"></label> <label>H <input type="number" data-on-h min="0" step="any" inputmode="decimal" aria-label="Height (per cent of the sheet's height)"></label></span> %</span>
@@ -316,8 +316,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" class="snap" data-kind="any" data-snap aria-pressed="true" aria-label="Snap to other objects" title="Snap to other objects: while moving, edges and centres line up with other objects (exactly, at any zoom), with a guide line">${ICONS.magnet}</button>
         <button type="button" class="snap" data-kind="any" data-box-axis aria-pressed="false" aria-label="Axis-aligned selection box" title="Axis-aligned selection box: by default the box turns with the selected objects when they share a rotation">${ICONS.boxSelect}</button>
       </div>
-      <div class="tb-group tb-options" data-for="select node" role="group" aria-label="Pick options">
-        <button type="button" class="snap" data-kind="tool" data-ignore-fill aria-pressed="false" aria-label="Ignore the object that fills the view" title="Ignore the object that fills the view: zoomed far into an object it cannot be picked or deleted by accident">${ICONS.pointerBan}</button>
+      <div class="tb-group tb-options" data-for="select node" role="group" aria-label="Select options">
+        <button type="button" class="snap" data-kind="tool" data-ignore-fill aria-pressed="false" aria-label="Ignore the object that fills the view" title="Ignore the object that fills the view: zoomed far into an object it cannot be selected or deleted by accident">${ICONS.pointerBan}</button>
       </div>
       <div class="tb-group tb-options" data-for="eraser" role="group" aria-label="Size">
         <input type="range" class="size" data-eraser-size min="4" max="128" step="1" aria-label="Eraser size" title="Eraser diameter (screen px)">
@@ -1065,7 +1065,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     // (`all`, chosen by its chip, shows only what is for any kind in this row; the Actions bar below follows the same choice)
     const chosen = editor.subject === "all" && kinds.length > 1 ? "all" : kinds.includes(editor.subject ?? "") ? editor.subject! : (kinds[0] ?? null);
     const chips = root.querySelector<HTMLElement>(".tb-subject")!;
-    const chipHtml = kinds.length > 1 ? ["all", ...kinds].map((k) => `<button type="button" role="radio" class="tb-chip" data-subject="${k}" aria-checked="${k === chosen}" title="${k === "all" ? "Everything picked: the tools for all of it" : `Edit the ${KIND_LABEL[k]!.toLowerCase()} properties of the selection`}">${KIND_LABEL[k]}</button>`).join("") : "";
+    const chipHtml = kinds.length > 1 ? ["all", ...kinds].map((k) => `<button type="button" role="radio" class="tb-chip" data-subject="${k}" aria-checked="${k === chosen}" title="${k === "all" ? "Everything selected: the tools for all of it" : `Edit the ${KIND_LABEL[k]!.toLowerCase()} properties of the selection`}">${KIND_LABEL[k]}</button>`).join("") : "";
     if (chips.dataset["html"] !== chipHtml) {
       chips.dataset["html"] = chipHtml;
       chips.innerHTML = chipHtml;

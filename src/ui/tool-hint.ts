@@ -27,7 +27,7 @@ export function toolHint(editor: EditorState, doc: DocumentStore): string | null
     case "shape":
       return editor.shapeDraft ? null : SHAPE_HINT[editor.shapeKind];
     case "sheet":
-      return "Drag to draw a sheet · what you draw or move into it is held and cut by it · Ctrl+Alt+G puts the picked objects on a sheet";
+      return "Drag to draw a sheet · what you draw or move into it is held and cut by it · Ctrl+Alt+G puts the selected objects on a sheet";
     case "path":
       return editor.pathDraft
         ? "Click the first node to close the shape · Enter or double-click to finish · Backspace takes back a node · Esc ends it open"
@@ -36,7 +36,7 @@ export function toolHint(editor: EditorState, doc: DocumentStore): string | null
       return paths.length === 1 ? "Drag a node or a handle · click a line to add a node · Alt-click a node: smooth or corner · Delete removes it · Enter or Esc to finish" : "Click a shape to edit its nodes";
     case "select": {
       if (editor.cropId) return "Crop: drag a side or a corner of the picture; drag outward to bring back what was cut · Enter or Esc finishes";
-      if (editor.attachMode) return "Click the object to attach the picked ones to · they will follow it when it moves · Esc cancels";
+      if (editor.attachMode) return "Click the object to attach the selected ones to · they will follow it when it moves · Esc cancels";
       const inside = editor.entered.length ? editor.entered[editor.entered.length - 1]! : null;
       // (a group entered with nothing picked is found among all the objects: a rare moment, so the scan is fine)
       const boolEntered = inside !== null && (sel.length ? sel.some((o) => o!.boolOps?.[inside]) : [...doc.all()].some((o) => o.boolOps?.[inside]));
@@ -47,7 +47,7 @@ export function toolHint(editor: EditorState, doc: DocumentStore): string | null
       const sides = paths.length === 1 && sel.length === 1 ? gradientSides(paths[0] as PathObject, editor.gradientFocus) : null;
       const handles = sides
         ? ` · Drag the round handles on the shape to move its ${paintName(sides.active).toLowerCase()}'s ${gradientName(sides.g)} gradient${sides.other ? ` · Press ${paintName(sides.other.which)} in the bar above to edit its ${gradientName(sides.other.g)} gradient instead` : ""}`
-        : gradient ? " · Drag the round handles on the shape to move its gradient (Fill or Outline picks which one)" : "";
+        : gradient ? " · Drag the round handles on the shape to move its gradient (Fill or Outline selects which one)" : "";
       if (sel.length && sel.every((o) => boolGroupsOf(o!).length > 0 && boolGroupsOf(o!).some((g) => !editor.entered.includes(g.gid)))) return "Boolean group · double-click to edit the shapes inside · Combine in the bar above changes the operation, flattens or releases · The pin saves its initial state" + handles;
       if (paths.length === 1 && sel.length === 1) {
         const shape = (paths[0] as PathObject).shape;

@@ -12,6 +12,7 @@ const bridge: DesktopBridge = {
   head: (path) => ipcRenderer.invoke("canvast:head", path),
   write: (path, bytes, opts) => ipcRenderer.invoke("canvast:write", path, bytes, opts?.durable !== false),
   syncFiles: (paths) => ipcRenderer.invoke("canvast:syncFiles", paths),
+  openFile: (path) => ipcRenderer.invoke("canvast:openFile", path),
   remove: (path, how) => ipcRenderer.invoke("canvast:remove", path, how ?? "trash"),
   list: (path) => ipcRenderer.invoke("canvast:list", path),
   tree: (path) => ipcRenderer.invoke("canvast:tree", path),

@@ -1,4 +1,6 @@
 import { beginProgress } from "../app/progress";
+import { desktopBridge } from "../storage/desktop-bridge";
+import { startStep } from "../app/startup-log";
 import { fileByFolders, filesOfPicker } from "../app/directory";
 import { readMetadata } from "../assets/metadata";
 import type { MetaRow } from "../assets/metadata";
@@ -79,8 +81,11 @@ export interface AssetsView {
 const REVEAL_NAMES_MAX = 20;
 /** How long typing in the search box pauses before the results are drawn again. */
 const SEARCH_PAUSE_MS = 250;
-/** Cards drawn beyond the view on each side, in screens (the grid) and in items (the filmstrip). */
-const GRID_OVERSCAN = 1;
+/**
+ * Cards kept beyond the view on each side, in screens (the grid) and in items (the filmstrip): scrolling back a little finds them still
+ * there, their pictures shown, instead of new cards waiting for their pictures to be decoded again.
+ */
+const GRID_OVERSCAN = 3;
 const FILM_OVERSCAN = 12;
 /**
  * Make `parent`'s children exactly `els`, in order, moving as few as possible (a kept element stays in the page, so its picture is not
@@ -158,9 +163,6 @@ const SORT_OF: Record<ColumnId, { key: SortKey; desc: boolean }> = {
 /** Fields that take typed text: shortcuts keep out of them (a checkbox or a slider is not one). */
 const TYPING = 'input:not([type="checkbox"]):not([type="range"]), textarea, select';
 
-/** While a panel edge is dragged, the cards are laid out again at most this often. */
-const RESIZE_LAYOUT_MS = 120;
-
 export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore): AssetsView {
   root.innerHTML = `
     <div class="assets-bar" role="toolbar" aria-label="Library">
@@ -190,7 +192,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <span class="assets-sep" role="separator"></span>
       <span class="split assets-import"><button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.arrowDownToLine}<span>Import</span></button><button type="button" class="assets-btn is-icon" data-action="import-menu" data-testid="assets-import-menu" aria-haspopup="menu" aria-label="Files or a folder" title="Bring in files, or a folder">${ICONS.chevronDown}</button></span>
       <span class="assets-sep" role="separator"></span>
-      <button type="button" class="assets-btn is-icon" data-action="slideshow" data-testid="assets-slideshow" aria-label="Slideshow" title="Play the library, or the items you picked, as a slideshow">${ICONS.play}</button>
+      <button type="button" class="assets-btn is-icon" data-action="slideshow" data-testid="assets-slideshow" aria-label="Slideshow" title="Play the library, or the items you selected, as a slideshow">${ICONS.play}</button>
       <span class="assets-sep" role="separator"></span>
       <button type="button" class="assets-btn is-icon" data-action="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
       <input type="file" multiple hidden data-testid="assets-import-input">
@@ -238,7 +240,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="sheet-grip" data-testid="sheet-grip" role="separator" aria-orientation="horizontal" aria-label="Resize the details panel" title="Drag to resize the details (double-click to reset)" tabindex="0"><span></span></div>
       <aside class="asset-inspector" data-testid="asset-inspector" aria-label="Details" hidden></aside>
     </div>
-    <footer class="assets-statusbar" data-testid="assets-statusbar">
+    <footer class="hud-bottom assets-statusbar" data-testid="assets-statusbar">
       <div class="hud-readout assets-readout" aria-live="off">
         <span class="assets-count" data-testid="assets-count"></span>
         <span class="assets-picked" data-testid="assets-picked" hidden></span>
@@ -276,7 +278,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     pickedOut.hidden = picked.size === 0;
     if (!picked.size) return;
     const bytes = [...picked].reduce((n, h) => n + (entryOf(h)?.size ?? 0), 0);
-    pickedOut.textContent = `${picked.size} picked, ${fmtBytes(bytes)}`;
+    pickedOut.textContent = `${picked.size} selected, ${fmtBytes(bytes)}`;
   };
   const search = root.querySelector<HTMLInputElement>(".assets-search")!;
   wireSearchHelp(root.querySelector<HTMLElement>(".search-help-btn")!, search, "Type the operators in capitals.", LIBRARY_ROWS);
@@ -563,7 +565,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const hash = img.dataset["hash"]!;
     const known = thumbUrls.get(hash);
     if (known) {
+      // Loaded before: decoded before the card is painted, so it shows at once (no blank card, no shimmer, while it decodes).
+      img.decoding = "sync";
       img.src = known;
+      if (img.parentElement?.classList.contains("thumb-slot")) img.classList.add("is-loaded");
       return;
     }
     thumbFor(hash, () => img.isConnected).then(
@@ -1038,7 +1043,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       vector = false;
       slideVec.hidden = true;
       slideImg.classList.remove("is-vector");
-      slideCaption.textContent = `${label}. The original is missing or damaged; showing its thumbnail.`;
+      slideCaption.textContent = `${label}. The file is missing or damaged; showing its thumbnail.`;
       slideCaption.classList.add("is-note");
       slideImg.src = await thumbFor(hash).catch(() => "");
     };
@@ -1263,6 +1268,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (gen !== generation) return;
     if (!light) await session.persistence.flush(); // usage reflects every edit made so far
     const l = light ?? (await session.catalog.list());
+    startStep("library listed");
     if (gen !== generation) return;
     listing = l;
     dropStaleThumbs();
@@ -1278,6 +1284,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (gen !== generation) return;
     if (scope.startsWith("ctag:") && !canvasTags.has(scope.slice(5))) scope = "all";
     render();
+    startStep("library shown");
   };
 
   const usesText = (instances: number, canvases: number): string =>
@@ -1431,7 +1438,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <button type="button" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}" draggable="${session.readOnly ? "false" : "true"}"
           aria-pressed="false" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}">
         <span class="asset-thumb thumb-slot">${isCard(e) ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}" data-hash="${e.hash}"><span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>`}</span>
-        ${e.present ? "" : `<span class="asset-missing-label">Original missing</span>`}
+        ${e.present ? "" : `<span class="asset-missing-label">File missing</span>`}
         <span class="asset-info">
           <span class="asset-name">${esc(name)}</span>
           <span class="asset-meta">${e.pixelW} × ${e.pixelH} px</span>
@@ -1455,7 +1462,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const missingHtml = (m: CatalogListing["missing"][number]): string => `<div class="asset-cell" role="listitem">
             <button type="button" class="asset-card is-missing" data-testid="asset-missing" data-hash="${m.hash}" aria-pressed="false" aria-label="Missing original">
               <span class="asset-thumb"></span>
-              <span class="asset-missing-label">Original missing</span>
+              <span class="asset-missing-label">File missing</span>
               <span class="asset-info">
                 <span class="asset-name">Missing original</span>
                 <span class="asset-meta">${m.hash.slice(0, 12)}…</span>
@@ -1856,7 +1863,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           // picked items a search or filter now hides still count (and what is done here is done to them): say so, and offer to drop them
           const shown = new Set(filtered().map((x) => x.hash));
           const hidden = hashes.filter((h) => !shown.has(h)).length;
-          return hidden ? `<button type="button" class="assets-btn" data-action="drop-hidden" data-testid="bulk-hidden" title="${hidden} of the picked items are not shown by the search or filter, and what is done here is done to them too. Keep only the ${n - hidden} shown.">${hidden} not shown · keep the shown</button>` : "";
+          return hidden ? `<button type="button" class="assets-btn" data-action="drop-hidden" data-testid="bulk-hidden" title="${hidden} of the selected items are not shown by the search or filter, and what is done here is done to them too. Keep only the ${n - hidden} shown.">${hidden} not shown · keep the shown</button>` : "";
         })()}
         <button type="button" class="assets-btn is-icon" data-action="clear" aria-label="Clear the selection" title="Clear the selection (Esc)">${ICONS.x}</button>
       </div>
@@ -1891,7 +1898,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       inspector.hidden = narrow.matches;
       inspector.dataset["hash"] = "";
       keepDetails();
-      inspector.innerHTML = `<p class="asset-note asset-insp-empty" data-testid="inspector-empty">Pick an item to see its details. Several picked: their tags and folder together.</p>`;
+      inspector.innerHTML = `<p class="asset-note asset-insp-empty" data-testid="inspector-empty">Select an item to see its details. Several selected: their tags and folder together.</p>`;
       return;
     }
     inspector.hidden = false;
@@ -1942,8 +1949,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         ${e ? `<span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>${!isCard(e) ? `<span>${e.pixelW} × ${e.pixelH} px</span>` : ""}<span>${fmtBytes(e.size)}</span>` : ""}
       </div>
       ${e && isCard(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>No preview for this file</h3><p class="asset-note">${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as a card. ${esc(d.todo)}</p></section>`; })() : ""}
-      ${e && !e.present ? `<p class="asset-warn">The original file is missing from storage. Import the same file again to restore it everywhere.</p>` : ""}
-      ${m ? `<p class="asset-warn" data-testid="asset-missing-help">Instances use an original that is not stored. Import the same file again to restore all ${instances} of them.</p>` : ""}
+      ${e && !e.present ? `<p class="asset-warn">The file is missing from storage. Import the same file again to restore it everywhere.</p>` : ""}
+      ${m ? `<p class="asset-warn" data-testid="asset-missing-help">Instances use a file that is not stored. Import the same file again to restore all ${instances} of them.</p>` : ""}
       ${e ? organizeHtml(e) : ""}
       ${e ? notesHtml(e) : ""}
       <section class="asset-sec asset-where">
@@ -1953,8 +1960,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       </section>
       <div class="asset-actions">
         ${e ? `<button type="button" class="assets-btn" data-action="rename" data-testid="asset-rename" title="Rename it, or change its extension (F2)"${ro}>${ICONS.textCursorInput}<span>Rename</span></button>` : ""}
-        ${e?.present ? `<button type="button" class="assets-btn" data-action="download" data-testid="asset-download" title="Save a copy of the original file">${ICONS.download}<span>Download</span></button>` : ""}
-        ${e?.present && fileActionsOf(e.name, e.type).canOpen ? `<button type="button" class="assets-btn" data-action="open-tab" data-testid="asset-open-tab" title="Show it in a new browser tab">${ICONS.externalLink}<span>Open in tab</span></button>` : ""}
+        ${e?.present ? `<button type="button" class="assets-btn" data-action="download" data-testid="asset-download" title="Save a copy of the file">${ICONS.download}<span>Download</span></button>` : ""}
+        ${
+          !e?.present ? ""
+          : desktopBridge() ? (meta(e).hidden ? "" : `<button type="button" class="assets-btn" data-action="open-app" data-testid="asset-open-app" title="Open it in the app your system uses for this kind of file">${ICONS.externalLink}<span>Open in default app</span></button>`)
+          : fileActionsOf(e.name, e.type).canOpen ? `<button type="button" class="assets-btn" data-action="open-tab" data-testid="asset-open-tab" title="Show it in a new browser tab">${ICONS.externalLink}<span>Open in tab</span></button>`
+          : ""
+        }
         ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export">${ICONS.fileOutput}<span>Export</span></button>` : ""}
         ${e ? `<button type="button" class="assets-btn is-danger" data-action="${instances > 0 ? "delete-everywhere" : "delete"}" data-testid="asset-delete" title="${instances > 0 ? "Delete it from the library and from every canvas it is on" : "Delete it from the library"}"${ro}>${ICONS.trash2}<span>Delete…</span></button>` : ""}
       </div>
@@ -2360,7 +2372,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const gone = group.filter((h) => entryOf(h)?.instances === 0);
         void confirmDialog({
           title: `Delete ${gone.length} item${gone.length === 1 ? "" : "s"} from the library?`,
-          lines: ["Their originals are erased from this browser's storage once nothing can use them any more. Items in use are kept."],
+          lines: ["Their files are erased from this browser's storage once nothing can use them any more. Items in use are kept."],
           confirmLabel: `Delete ${gone.length}`,
         }).then(async (ok) => {
           if (ok) await session.deleteAssets(gone);
@@ -2469,6 +2481,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "open-tab":
         void openOriginalInTab(assets, hash);
         break;
+      case "open-app":
+        // The desktop app: the item's file in the workspace folder, in the system's app for it (a file canvast cannot play or show, too).
+        void (async () => {
+          const file = await session.storage?.originals.fileOf(hash).catch(() => null);
+          const problem = file ? await desktopBridge()!.openFile(file) : "its file is not in the workspace folder yet; try again in a moment";
+          if (problem && visible) status.textContent = `Could not open it: ${problem}.`;
+        })();
+        break;
       case "export":
         void runExport(session, { kind: "assets", hashes: [hash] });
         break;
@@ -2489,7 +2509,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           title: `Delete ${name} everywhere?`,
           lines: [
             `${hashes.length === 1 ? "It is" : "They are"} used ${plural(uses, "time")}${where ? ` on ${where}` : canvases ? ` on ${plural(canvases, "canvas", "canvases")} or more` : ""}. Those instances are removed too; a text that uses one as its font keeps its words in the default font.`,
-            "On the open canvas Undo brings them back; on the other canvases they cannot be brought back. The originals are erased from this browser's storage once nothing can use them any more.",
+            "On the open canvas Undo brings them back; on the other canvases they cannot be brought back. The files are erased from this browser's storage once nothing can use them any more.",
           ],
           confirmLabel: "Delete everywhere",
         }).then(async (ok) => {
@@ -2503,7 +2523,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const e = entryOf(hash);
         void confirmDialog({
           title: `Delete “${e?.name || "Untitled"}” from the library?`,
-          lines: [`Its original (${fmtBytes(e?.size ?? 0)}) is erased from this browser's storage once nothing can use it any more.`],
+          lines: [`Its file (${fmtBytes(e?.size ?? 0)}) is erased from this browser's storage once nothing can use it any more.`],
           confirmLabel: "Delete item",
         }).then(async (ok) => {
           if (ok) await session.deleteAsset(hash);
@@ -2648,8 +2668,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
 
   // ---- the library and details panels' widths on a wide screen: drag the edge (or use the arrow keys); double-click goes back to the default.
-  // While an edge is dragged, the panel follows the pointer once a frame and the cards are laid out again at most every RESIZE_LAYOUT_MS
-  // (laying out thousands of cards on every pixel made the drag crawl), then once more when the edge is let go.
+  // While an edge is dragged only the panel follows the pointer (once a frame): the cards stay as they are and are laid out once, when the
+  // edge is let go (laying them out while dragging moved and reloaded the thumbnails, and the drag crawled).
   let resizing = false;
   for (const g of root.querySelectorAll<HTMLElement>(".col-grip")) {
     const isSide = g.dataset["grip"] === "side";
@@ -2674,7 +2694,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       resizing = true;
       let want = startW;
       let frame = 0;
-      let laidOut = 0;
       const prop = isSide ? "--side-w" : "--insp-w";
       body.classList.add(isSide ? "has-side-w" : "has-insp-w");
       const move = (ev: PointerEvent): void => {
@@ -2682,9 +2701,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         frame ||= requestAnimationFrame(() => {
           frame = 0;
           body.style.setProperty(prop, `${want}px`);
-          if (performance.now() - laidOut < RESIZE_LAYOUT_MS) return;
-          laidOut = performance.now();
-          relayout();
         });
       };
       const up = (): void => {
@@ -3056,7 +3072,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // The item rows are read from the panel's buttons (their words, icon and state) and press them, so the menu and the panel can never disagree.
   const PANEL_GROUPS: ReadonlyArray<ReadonlyArray<readonly [string, string?]>> = [
     [["slide", "Open in the viewer"], ["place"], ["place-all"], ["slideshow-all"], ["favorite"], ["favorite-all"], ["hide"], ["hide-all"]],
-    [["rename", "Rename…"], ["rename-all"], ["download", "Download original"], ["open-tab"], ["export", "Export as archive"], ["export-all"], ["export-files-all"]],
+    [["rename", "Rename…"], ["rename-all"], ["download", "Download"], ["open-tab"], ["open-app"], ["export", "Export as archive"], ["export-all"], ["export-files-all"]],
     [["delete"], ["delete-all"], ["delete-everywhere"]],
   ];
   const panelGroups = (): MenuItem[][] =>

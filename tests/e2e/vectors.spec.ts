@@ -1455,8 +1455,8 @@ test("the interface around the vector tools: the hint floats at the bottom (and 
   await key(app, "Escape");
   await click(app, 300, 650); // (nothing picked)
   await expect(p.getByRole("button", { name: "Show all hidden" }), "Show all and Unlock all are in the context menu, not the bar").toHaveCount(0);
-  await expect(p.getByRole("toolbar", { name: "Selection options" }), "with nothing picked there is no bar of selection options").toBeHidden();
-  await expect(p.getByRole("button", { name: /^Ignore the object that fills the view/ }), "the fill-pick guard stays in the options bar: it is for when nothing is picked").toBeVisible();
+  await expect(p.getByRole("toolbar", { name: "Selection options" }), "with nothing selected there is no bar of selection options").toBeHidden();
+  await expect(p.getByRole("button", { name: /^Ignore the object that fills the view/ }), "the fill-select guard stays in the options bar: it is for when nothing is selected").toBeVisible();
   // the rest are a bar of their own beside the Actions bar (with something picked), not in the options bar at the top
   for (const name of [/^Axis-aligned selection box/, /^Snap to other objects/, /^Lock corner radius/]) expect(await p.getByRole("toolbar", { name: "Tool options" }).getByRole("button", { name }).count(), `${name} is not in the options bar`).toBe(0);
   await expect(p.locator("[data-select-more]")).toHaveCount(0);
@@ -2733,7 +2733,7 @@ test("a long press with a finger lists everything under it; tapping a row picks 
   await rows.nth(1).click();
   await rows.nth(2).click();
   expect([...(await p.evaluate(() => window.__canvastDebug.selection()))].sort()).toEqual([back, front].sort());
-  await expect(rows.nth(1), "what is picked is ticked").toHaveAttribute("aria-checked", "true");
+  await expect(rows.nth(1), "what is selected is ticked").toHaveAttribute("aria-checked", "true");
   await rows.nth(1).click(); // a tap on a picked one takes it out
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([back]);
   await rows.nth(1).click();

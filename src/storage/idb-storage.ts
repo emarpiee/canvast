@@ -126,6 +126,11 @@ export class IdbOriginals implements OriginalStore {
     return !!rec?.ext && isHiddenFile(rec.file);
   }
 
+  async fileOf(hash: string): Promise<string | null> {
+    const rec = await idbGet<AssetRecord>(this.db, "assets", hash);
+    return rec?.ext && rec.file && !isHiddenFile(rec.file) ? rec.file : null;
+  }
+
   async entryState(hash: string): Promise<CatalogEntry["state"] | undefined> {
     return (await idbGet<CatalogEntry>(this.db, "assetCatalog", hash))?.state;
   }

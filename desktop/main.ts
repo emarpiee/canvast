@@ -284,6 +284,11 @@ function installFileCalls(win: BrowserWindow, root: string): void {
     if (!(bytes instanceof Uint8Array)) throw new Error("bytes expected");
     await writeAtomic(await inside(root, rel), bytes, durable !== false);
   });
+  // A file of the workspace opened in the system's default app for its kind (one canvast cannot show, or to edit it elsewhere).
+  ipcMain.handle("canvast:openFile", async (e, rel: string) => {
+    own(e);
+    return shell.openPath(await inside(root, rel));
+  });
   // Files written without waiting for the disk, now on it: on Linux one request for the whole file system (one wait for the
   // disk instead of one per file), else each file in turn.
   ipcMain.handle("canvast:syncFiles", async (e, rels: unknown) => {

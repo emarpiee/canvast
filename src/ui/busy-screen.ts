@@ -1,6 +1,7 @@
 import type { EditorState } from "../app/editor-state";
 import type { Progress } from "../app/progress";
 import { esc } from "./format";
+import { logoSvg } from "./brand";
 
 /** The screen in front of the app while work that must not be interrupted runs, with how far it is. */
 export interface BusyScreen {
@@ -17,12 +18,13 @@ export const currentBusy = (): BusyScreen | null => current;
  * A screen in front of the whole app while work runs that nothing should change half-way (an import, its files being written into
  * the workspace folder): nothing can be clicked or typed until it ends, and Escape does nothing. Its bar is the notices' bar.
  */
-export function openBusyScreen(title: string, lines: string[]): BusyScreen {
+export function openBusyScreen(title: string, lines: string[], start = false): BusyScreen {
   const dlg = document.createElement("dialog");
-  dlg.className = "confirm busy-screen";
-  dlg.dataset["testid"] = "busy-screen";
+  dlg.className = start ? "confirm busy-screen start-screen" : "confirm busy-screen";
+  dlg.dataset["testid"] = start ? "start-screen" : "busy-screen";
   dlg.setAttribute("aria-labelledby", "busy-title");
   dlg.innerHTML = `
+    ${start ? `<div class="lock-brand"><span class="lock-logo">${logoSvg()}</span><span class="lock-name">canvast</span></div>` : ""}
     <h2 id="busy-title">${esc(title)}</h2>
     ${lines.map((l) => `<p>${esc(l)}</p>`).join("")}
     <span class="notice-bar busy-bar is-unknown" role="progressbar" aria-labelledby="busy-title" aria-valuemin="0" aria-valuemax="100"><span></span></span>
@@ -62,4 +64,14 @@ export function busyProgress(editor: EditorState, title: string, lines: string[]
     }
   };
   return { update: (fraction, detail) => screen.update(fraction, detail ?? ""), done: (result) => end(result), fail: (text) => end(text) };
+}
+
+/**
+ * The screen in front of the app while a workspace opens (the logo, the workspace's name and what is being done), so nothing can be
+ * used half-loaded. It steps aside for the lock screen and is closed once everything is ready.
+ */
+export function openStartScreen(name: string): BusyScreen {
+  const screen = openBusyScreen(name ? `Opening “${name}”` : "Opening the workspace", [], true);
+  screen.update(null, "Reading the workspace");
+  return screen;
 }

@@ -186,7 +186,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     const actionsRow = `<div class="layers-do" role="group" aria-label="Selected layers">
       <button type="button" data-do="rename"${sel.length === 1 ? "" : " disabled"} title="Rename the selected layer (double-click its name too)">${ICONS.textCursorInput}<span>Rename</span></button>
       <button type="button" data-do="hide" title="Hide the selection">${allHidden ? ICONS.eye : ICONS.eyeOff}<span>${allHidden ? "Show" : "Hide"}</span></button>
-      <button type="button" data-do="lock" title="Lock the selection: it is drawn, but cannot be picked">${allLocked ? ICONS.lockKeyholeOpen : ICONS.lockKeyhole}<span>${allLocked ? "Unlock" : "Lock"}</span></button></div>`;
+      <button type="button" data-do="lock" title="Lock the selection: it is drawn, but cannot be selected">${allLocked ? ICONS.lockKeyholeOpen : ICONS.lockKeyhole}<span>${allLocked ? "Unlock" : "Lock"}</span></button></div>`;
     return `${actionsRow}<label class="layers-blend">Blend <select data-blend ${sel.length ? "" : "disabled"} aria-label="Blend mode of the selection">${modes}</select></label><label class="layers-opacity">Opacity <input type="range" data-opacity min="${MIN_OPACITY * 100}" max="100" step="1" value="${pct}" ${sel.length ? "" : "disabled"} aria-label="Opacity of the selection"> <output>${pct}%</output></label>`;
   };
 

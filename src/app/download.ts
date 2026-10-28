@@ -68,7 +68,7 @@ export async function downloadSelection(doc: DocumentStore, editor: EditorState,
     edited++;
   }
   if (!entries.length) {
-    editor.message = "Nothing to download: the originals are not stored.";
+    editor.message = "Nothing to download: the files are not stored.";
     return editor.changed();
   }
   let how: string;
@@ -84,8 +84,8 @@ export async function downloadSelection(doc: DocumentStore, editor: EditorState,
   }
   editor.message =
     `Downloaded ${how}.` +
-    (edited ? ` ${edited} edited ${edited === 1 ? "picture" : "pictures"} (as it looks now) came with the original${edited === 1 ? "" : "s"}.` : "") +
-    (unbaked ? ` The adjustments of ${unbaked} video, GIF or other ${unbaked === 1 ? "file" : "files"} stay on the canvas: the original was downloaded.` : "") +
+    (edited ? ` ${edited} edited ${edited === 1 ? "picture" : "pictures"} (as it looks now) came with the file${edited === 1 ? "" : "s"}.` : "") +
+    (unbaked ? ` The adjustments of ${unbaked} video, GIF or other ${unbaked === 1 ? "file" : "files"} stay on the canvas: the file was downloaded.` : "") +
     (missing ? ` ${missing} original${missing === 1 ? " is" : "s are"} missing.` : "");
   editor.changed();
 }
