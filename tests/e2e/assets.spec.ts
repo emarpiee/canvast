@@ -2275,6 +2275,11 @@ test("Extract frame follows Settings > Media and playback: name template and sty
   await p.getByTestId("asset-preview").click();
   const viewer = p.getByTestId("slide-view");
   await expect(viewer).toBeVisible();
+  // The player does not cover the GIF: the picture fits above it, and the button that hides the controls sits above the player.
+  const playerBox = (await viewer.getByTestId("viewer-media-bar").boundingBox())!;
+  await expect.poll(async () => (await viewer.locator("canvas.viewer-gif").boundingBox())!.y + (await viewer.locator("canvas.viewer-gif").boundingBox())!.height).toBeLessThanOrEqual(playerBox.y + 1);
+  const hideBox = (await viewer.locator(".viewer-hide").boundingBox())!;
+  expect(hideBox.y + hideBox.height).toBeLessThanOrEqual(playerBox.y + 1);
   await viewer.getByRole("button", { name: /^Extract frame/ }).click();
   await expect(p.getByTestId("toast")).toContainText("added to the library");
   await expect.poll(async () => (await p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.length))).toBe(2);

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.19 — The player no longer covers the video (2026-10-29)
+
+- **Fixed:** in the library's viewer, the player of a video or GIF covered the bottom of the picture, and the button that hides the controls sat on the player. The picture now fits above the player, and the button sits above both; the viewer itself keeps its size.
+
 ## 0.50.18 — The library keeps its filters (2026-10-29)
 
 - **Added:** the library's filters (Show, Sort by, its direction, and the list chosen in the sidebar: a folder, tag, file type…) are kept over a reload and a restart, with the layout. A reset button (a funnel with a cross) beside them, shown only when a filter is not its default, puts them all back at once. The search is not kept: it has its own clear button.

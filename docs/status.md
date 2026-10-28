@@ -36,6 +36,14 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.19: the player no longer covers the video (2026-10-29)
+
+**Implemented:** `--viewer-media-h` (the player's height, observed); with the player shown, `--viewer-bottom` makes room for it and `.viewer-hide` sits above it.
+**Tested:** the GIF viewer test checks the picture ends above the player and the hide button is above it; viewer and media tests chromium and firefox 34/34.
+**Known failures:** none.
+**Committed:** on `main`, not pushed.
+**Next bounded task:** folders by file kind (proposal), font preview.
+
 ## v0.50.18: the library keeps its filters (2026-10-29)
 
 **Implemented:** `ui.filters` (usage, sort, reversed, scope) saved by `keepFilters` on each render; `NO_FILTERS`; reset button (`funnelX`, registry row added); `.assets-btn[hidden]`.

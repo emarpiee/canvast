@@ -754,6 +754,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const controls = mountPlayerControls(stage, settings, {
     extract: () => void extractFrame(),
   });
+  // The player's height too: a video or GIF fits above it (never under it), and the button that hides the controls sits above it.
+  const mediaBarEl = viewer.querySelector<HTMLElement>('[data-testid="viewer-media-bar"]');
+  if (mediaBarEl) new ResizeObserver(() => mediaBarEl.offsetHeight && viewer.style.setProperty("--viewer-media-h", `${mediaBarEl.offsetHeight}px`)).observe(mediaBarEl);
   let eng: Engine | null = null;
   const unloadMedia = (): void => {
     eng?.pause();
