@@ -3,7 +3,7 @@
 // Path tool, every label with the Text tool, and the cover's dot holds the mark again, 20 times over. Run from the repo root after `npm run build`:
 // node scripts/brand/build.mjs <out.canvast> [shotsDir]   (shotsDir: a PNG of every page, the whole board and the deepest view)
 import { open, VW, VH } from "./lib.mjs";
-import { pages, markSvg, C, HERO, GRID, MARKERS, MISUSE, FRAME, WINDOW, DOT } from "./pages.mjs";
+import { pages, markSvg, C, HERO, GRID, MARKERS, MISUSE, CANVAS, DOT } from "./pages.mjs";
 import { favPixels } from "./preview.mjs";
 import { copyFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -54,29 +54,16 @@ const nameLayer = async (from, to) => {
   await A.frame();
 };
 
-// 03: the glyph on the grid, built with the Shape tool: the frame minus the window (Subtract), flattened, then the dot
+// 03: the glyph on the grid, drawn with the Shape tool: the canvas, then the dot
 async function buildGlyph() {
   const g = (gx, gy) => [GRID.x + gx * GRID.u, GRID.y + gy * GRID.u];
   const px = (units) => +(units * GRID.u * K).toFixed(3);
+  const box = (b) => [g(b.x, b.x), g(b.x + b.w, b.x + b.w)];
   await p.keyboard.press("u");
   await p.click('[data-shape-kind="rect"]').catch(() => {});
   await paint("fill", C.ultra);
-  const box = (b) => [g(b.x, b.x), g(b.x + b.w, b.x + b.w)];
-  await drag(...box(FRAME));
-  await radius(px(FRAME.r));
-  await p.keyboard.press("u");
-  await drag(...box(WINDOW)); // (stays picked; Shift adds the frame)
-  await radius(px(WINDOW.r));
-  await p.keyboard.press("v");
-  await click(...g(16, 32), ["Shift"]);
-  log("glyph parts picked", (await A.H(() => window.__canvastDebug.selection())).length);
-  await p.locator('[data-ctx="boolmenu"]').click();
-  await p.locator('.pop-menu [data-id="op:subtract"]').click();
-  await p.keyboard.press("Escape");
-  await A.frame();
-  await click(...g(16, 32));
-  await p.keyboard.press("Control+e");
-  await A.frame();
+  await drag(...box(CANVAS));
+  await radius(px(CANVAS.r));
   await A.esc();
   // the dot
   await p.keyboard.press("u");

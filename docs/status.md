@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.29: the logo, filled (2026-10-29)
+
+**Implemented:** the mark is a solid canvas (32 units, radius 8) with the dot at its centre (8 units, radius 2) on the 64 grid, in `scripts/brand/pages.mjs`, `src/ui/brand.ts` (one colour, dot cut out) and `src/index.html`; no small master, no line version; the board's construction draws the canvas and the dot with the Shape tool; misuse examples redone; the kit, cover and social preview made again.
+**Tested:** the About and workspace-password specs in `settings.spec` (Chromium, from a snapshot). The board was built in the app and its pages and the icons at 16 to 512 px checked by eye.
+**Known failures:** none.
+**Unverified:** Firefox; the desktop AppImage was not packaged again.
+**Committed:** on `main`, not pushed.
+**Next bounded task:** owner review; push and release when they say so.
+
 ## v0.50.28: a new logo (2026-10-29)
 
 **Implemented:** the Tunnel mark (frame 40, window 20, dot 10 on the 64 grid; radii 12, 6, 3) in `scripts/brand/pages.mjs` and `src/ui/brand.ts`, the 16 px master in `src/index.html`, a line version in the logo files; guideline pages redrawn (ideas, construction built with *Subtract*, misuse, cards as the app's panels); the README cover redrawn as a default-theme canvas (`cover.mjs`, with a 2:1 height for the social preview); the kit in `docs/brand/` made again.

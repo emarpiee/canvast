@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.29 — The logo, filled (2026-10-29)
+
+- **Changed:** the logo is the filled mark: a solid canvas half the size of the tile, with the orange dot at its centre (a quarter of the canvas); the frame and window of 0.50.28 are gone. One drawing serves every size, the favicon too, so there is no separate small master any more, and the line version is removed. In one colour (the app's own mark, in the theme's text colour) the dot is cut out. The guidelines, the logo files, the README cover and the social preview are made again.
+
 ## 0.50.28 — A new logo (2026-10-29)
 
 - **Changed:** a new logo: a frame, a window cut from its middle and a dot in the window, each half the size of the one around it (the way canvast zooms, by powers of two), in the default theme's colours (a Viridian tile, an orange dot). It is the favicon, the app icon of the desktop build, and the mark on the lock screen, the opening screen and Settings > About. The brand guidelines, the logo files (now with a line version for use beside the app's icons) and the README cover are made again; the cover is drawn as a canvas in the default theme, with the dot on the origin.

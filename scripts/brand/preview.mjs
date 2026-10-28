@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 import { pages, markSvg } from "./pages.mjs";
 import { FONT_DIR } from "./lib.mjs";
 
-/** The 16 px favicon (the small-size master) as 256 RGBA pixels, for page 05. */
+/** The 16 px favicon as 256 RGBA pixels, for page 05. */
 export async function favPixels(page) {
   return page.evaluate(async (s) => {
     const img = new Image(); img.src = "data:image/svg+xml;base64," + btoa(s); await img.decode();
@@ -15,7 +15,7 @@ export async function favPixels(page) {
     const d = g.getImageData(0, 0, 16, 16).data, out = [];
     for (let i = 0; i < 256; i++) out.push([d[4 * i], d[4 * i + 1], d[4 * i + 2], d[4 * i + 3]]);
     return out;
-  }, markSvg({ small: true }, 16));
+  }, markSvg({}, 16));
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
