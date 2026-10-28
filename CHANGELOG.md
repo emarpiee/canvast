@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.11 — Narrow panels never cut (2026-10-28)
+
+- **Fixed:** the library's details panel, made narrow, was wider than itself and cut on both sides (the *Show* buttons of *Used on*, the text). The sidebar's rule that nothing in a panel is wider than the panel, and text shortens with an ellipsis, is now one rule for both panels.
+
 ## 0.50.10 — Drag from the library to place (2026-10-28)
 
 - **Added:** dragging items in the library shows them: up to five of their thumbnails stacked and fanned a little, with how many there are.

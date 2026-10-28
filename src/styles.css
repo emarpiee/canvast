@@ -2425,8 +2425,11 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
   :root .assets-body:is(.is-resizing-side, .is-resizing-insp) .assets-scroll { will-change: transform; contain: strict; }
 }
 
-/* A narrow library panel never cuts anything at its edge: rows and chips shorten their text with an ellipsis and keep their count. */
-.assets-side { overflow-x: hidden; }
+/* A narrow library panel (the sidebar or the details) never cuts anything at its edge: nothing in it is wider than the panel, rows and chips
+   shorten their text with an ellipsis and keep their count, and a row's button keeps its size. One rule for both panels. */
+:is(.assets-side, .asset-inspector) { overflow-x: hidden; }
+:is(.assets-side, .asset-inspector) :where(*) { min-width: 0; max-width: 100%; }
+:is(.assets-side, .asset-inspector) :where(button, .assets-btn) > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .side-body, .side-body > *, .side-list, .side-row, .tag-cloud { min-width: 0; max-width: 100%; }
 .side-item { min-width: 0; }
 .side-label { min-width: 0; }

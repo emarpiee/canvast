@@ -2317,6 +2317,15 @@ test("wide screen: the library and details panels are resized by their edges (dr
   await p.mouse.dblclick(sg2.x, sg2.y + 200);
   expect(await w(side)).toBe(side0);
   expect(app.consoleErrors).toEqual([]);
+  // at their narrowest, nothing in either panel is wider than the panel (no sideways scroll, nothing cut at the edges)
+  for (const [grip, dir] of [["side-grip", -1], ["insp-grip", 1]] as const) {
+    const gb = (await p.getByTestId(grip).boundingBox())!;
+    await p.mouse.move(gb.x, gb.y + 200);
+    await p.mouse.down();
+    await p.mouse.move(gb.x + dir * 600, gb.y + 200, { steps: 4 });
+    await p.mouse.up();
+  }
+  for (const panel of [side, insp]) expect(await panel.evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(0);
 });
 
 test("a picture with a player: the selection bar and the player bar never sit on each other, and the player's picture is under the floating bars on the edges (ADR 0096)", async ({ app }) => {
