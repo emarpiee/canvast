@@ -4,7 +4,7 @@
 // The app it makes needs no network; making it does (electron-builder fetches its AppImage tools once, into its cache).
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { _electron as electron } from "@playwright/test";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -55,21 +55,30 @@ chmodSync(file, 0o755);
 // The package starts: the AppImage itself (unpacked to run, so no FUSE is needed) opens a fresh workspace folder, with the
 // bridge, from inside its archive, and writes the folder. A package that does not start is never handed out.
 const ws = mkdtempSync(join(tmpdir(), "canvast-package-check-"));
-const app = await electron.launch({ executablePath: file, args: [`--workspace=${ws}`, `--user-data-dir=${ws}-data`], env: { ...process.env, APPIMAGE_EXTRACT_AND_RUN: "1", CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug" } });
-try {
-  const page = await app.firstWindow();
-  await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined" && typeof window.canvastDesktop === "object", null, { timeout: 60_000 });
-  await page.evaluate(() => window.__canvastDebug.flushStorage());
-} finally {
-  await app.close();
-}
-if (!existsSync(join(ws, ".canvast/workspace.json")) || !existsSync(join(ws, "board_1/canvas_1.cvst"))) {
-  console.error("package-desktop: the AppImage started but did not write its workspace folder");
+/** A package that fails the check is deleted, so a broken AppImage is never left where it could be run or handed out. */
+const refuse = (why) => {
+  rmSync(out, { recursive: true, force: true });
+  console.error(`package-desktop: ${why}; the package was deleted`);
   process.exit(1);
+};
+try {
+  const app = await electron.launch({ executablePath: file, args: [`--workspace=${ws}`, `--user-data-dir=${ws}-data`], env: { ...process.env, APPIMAGE_EXTRACT_AND_RUN: "1", CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug" } });
+  try {
+    const page = await app.firstWindow();
+    await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined" && typeof window.canvastDesktop === "object", null, { timeout: 60_000 });
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+  } finally {
+    await app.close();
+  }
+} catch (e) {
+  refuse(`the AppImage did not start (${(e).message.split("\n")[0]})`);
 }
+if (!existsSync(join(ws, ".canvast/workspace.json")) || !existsSync(join(ws, "board_1/canvas_1.cvst"))) refuse("the AppImage started but did not write its workspace folder");
 rmSync(ws, { recursive: true, force: true });
 rmSync(`${ws}-data`, { recursive: true, force: true });
 
+// Only the AppImage and its checksum are kept: electron-builder's unpacked copy and debug files are not needed by anyone.
+for (const name of readdirSync(out)) if (!name.endsWith(".AppImage")) rmSync(join(out, name), { recursive: true, force: true });
 const sum = createHash("sha256").update(readFileSync(file)).digest("hex");
 writeFileSync(`${file}.sha256`, `${sum}  ${name}\n`);
 console.log(`dist-package/${name}  ${(readFileSync(file).length / 1048576).toFixed(1)} MB  sha256 ${sum}  (started and wrote a workspace folder)`);

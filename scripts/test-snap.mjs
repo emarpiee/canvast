@@ -54,8 +54,20 @@ async function recordTimes(report) {
   await writeFile(file, JSON.stringify(times));
 }
 
+/** A run marked "running" whose process is gone (stopped, killed, power lost) is not running; one from before `pid` was kept counts for 12 h. */
+function stillRunning(r) {
+  if (r.status !== "running") return false;
+  if (!r.pid) return Date.now() - Date.parse(r.startedAt ?? 0) < 12 * 3600_000;
+  try {
+    process.kill(r.pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const args = process.argv.slice(2);
-const run = { args, startedAt: new Date().toISOString(), status: "running" };
+const run = { args, startedAt: new Date().toISOString(), status: "running", pid: process.pid };
 const save = () => writeFile(resolve(dir, "run.json"), JSON.stringify(run, null, 1));
 await save();
 console.log(`snapshot ${dir.slice(root.length + 1)}  (dist/ is free to rebuild)`);
@@ -77,9 +89,9 @@ child.on("exit", async (code) => {
   // keep the newest few snapshots
   const all = (await readdir(resolve(root, "test-builds"))).filter((n) => /^\d{8}-/.test(n)).sort(); // (snapshots only, not times.json)
   for (const old of all.slice(0, Math.max(0, all.length - KEEP))) {
-    // (never one that is still running: its tests are reading that build)
-    const state = await readFile(resolve(root, "test-builds", old, "run.json"), "utf8").then((t) => JSON.parse(t).status, () => "none");
-    if (state !== "running") await rm(resolve(root, "test-builds", old), { recursive: true, force: true });
+    // (never one that is still running: its tests are reading that build; a run that was stopped or killed is not running)
+    const r = await readFile(resolve(root, "test-builds", old, "run.json"), "utf8").then((t) => JSON.parse(t), () => ({}));
+    if (!stillRunning(r)) await rm(resolve(root, "test-builds", old), { recursive: true, force: true });
   }
   console.log(`${run.status}  ${JSON.stringify(run.counts ?? {})}  ${dir.slice(root.length + 1)}`);
   process.exit(code ?? 1);
