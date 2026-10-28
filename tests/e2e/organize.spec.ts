@@ -755,16 +755,30 @@ test("the library's own undo and redo; items dragged onto a folder or a tag; a p
   await newFolder(p, "Box");
   await card(p, hashes[2]!).dragTo(side(p, /^Box/));
   await expect.poll(() => p.evaluate((x) => window.__canvastDebug.catalogEntries().then((es) => (es.find((e) => e.hash === x)?.folderIds ?? []).length), hashes[2]!)).toBe(1);
+  // dragged onto the strip that shows at the top while dragging: placed on the open canvas, and the library stays open
+  const before = await p.evaluate(() => window.__canvastDebug.objects().length);
+  await card(p, hashes[0]!).hover();
+  await p.mouse.down();
+  await p.mouse.move(400, 300, { steps: 4 });
+  const zone = p.getByTestId("assets-place-zone");
+  await expect(zone).toBeVisible();
+  await expect(zone).toContainText("Drop here to place it on");
+  await zone.hover();
+  await p.mouse.up();
+  await p.getByTestId("choose-ok").click(); // (it has a tag: asked whether the tag goes with it)
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(before + 1);
+  await expect(zone).toBeHidden();
+  await expect(p.getByTestId("assets-grid")).toBeVisible();
   // Ctrl+A, then a plain click: that one alone
   await keyOutside("Escape");
   await keyOutside("Control+a");
-  await expect(p.getByText("3 selected")).toBeVisible();
+  await expect(p.getByRole("heading", { name: "3 selected" })).toBeVisible();
   await card(p, hashes[1]!).click();
   await expect(card(p, hashes[1]!)).toHaveAttribute("aria-pressed", "true");
   await expect(card(p, hashes[0]!)).toHaveAttribute("aria-pressed", "false");
   // two picked, a search hides one: said, and it can be dropped
   await card(p, hashes[0]!).click({ modifiers: ["Control"] });
-  await expect(p.getByText("2 selected")).toBeVisible();
+  await expect(p.getByRole("heading", { name: "2 selected" })).toBeVisible();
   const name0 = await p.evaluate((x) => window.__canvastDebug.catalogEntries().then((es) => es.find((e) => e.hash === x)!.name), hashes[0]!);
   await p.getByTestId("assets-search").fill(name0);
   await expect(p.getByTestId("bulk-hidden")).toContainText("1 not shown");

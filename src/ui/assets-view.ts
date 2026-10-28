@@ -163,8 +163,12 @@ const SORT_OF: Record<ColumnId, { key: SortKey; desc: boolean }> = {
 /** Fields that take typed text: shortcuts keep out of them (a checkbox or a slider is not one). */
 const TYPING = 'input:not([type="checkbox"]):not([type="range"]), textarea, select';
 
+/** How many thumbnails a drag from the library shows, stacked. */
+const DRAG_STACK = 5;
+
 export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore): AssetsView {
   root.innerHTML = `
+    <div class="assets-place-zone" data-testid="assets-place-zone" hidden>${ICONS.mapPin}<span></span></div>
     <div class="assets-bar" role="toolbar" aria-label="Library">
       <div class="assets-searchbox">
               <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search" title="Search by name, type or tag; #tag is a tag, .png a file type; width>1000, ratio:16x9, orientation:portrait, colour:red filter by what the picture is" aria-label="Search the library">
@@ -2801,6 +2805,47 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(hashes));
     e.dataTransfer.setData("text/plain", hashes.length > 1 ? `${hashes.length} items` : (entryOf(hash)?.name ?? ""));
     e.dataTransfer.effectAllowed = "copyMove";
+    // What is dragged: up to DRAG_STACK of their thumbnails stacked, with how many there are.
+    const stack = document.createElement("div");
+    stack.className = "drag-stack";
+    const urls = hashes.map((h) => thumbUrls.get(h)).filter((u): u is string => !!u).slice(0, DRAG_STACK);
+    // (the first on top: drawn last)
+    stack.innerHTML = `${urls.map((u, i) => `<img src="${u}" alt="" style="--i:${i}">`).reverse().join("")}${hashes.length > 1 ? `<span class="drag-count">${hashes.length}</span>` : ""}`;
+    document.body.appendChild(stack);
+    const box = stack.getBoundingClientRect();
+    e.dataTransfer.setDragImage(stack, box.width / 2, box.height / 2);
+    setTimeout(() => stack.remove());
+    // The strip at the top: drop them there to place them on the open canvas (the library stays open).
+    if (!session.readOnly && hashes.some((h) => entryOf(h)?.present === true)) {
+      placeZone.querySelector("span")!.textContent = `Drop here to place ${hashes.length === 1 ? "it" : `these ${hashes.length}`} on ${session.current && session.tree ? crumbOf(session.current.canvasId) : "the open canvas"}`;
+      placeZone.hidden = false;
+    }
+  });
+  grid.addEventListener("dragend", () => {
+    placeZone.hidden = true;
+    placeZone.classList.remove("is-drop-target");
+  });
+  const placeZone = root.querySelector<HTMLElement>(".assets-place-zone")!;
+  placeZone.addEventListener("dragover", (e) => {
+    if (!e.dataTransfer?.types.includes(DRAG_TYPE)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    placeZone.classList.add("is-drop-target");
+  });
+  placeZone.addEventListener("dragleave", () => placeZone.classList.remove("is-drop-target"));
+  placeZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    placeZone.hidden = true;
+    placeZone.classList.remove("is-drop-target");
+    const hashes = (JSON.parse(e.dataTransfer?.getData(DRAG_TYPE) || "[]") as string[]).filter((h) => entryOf(h)?.present === true);
+    if (!hashes.length) return;
+    void askPlaceTags(hashes).then(async (withTags) => {
+      if (withTags === null) return;
+      const n = await session.placeAssets(hashes, withTags);
+      if (!n) return;
+      session.editor.message = `Placed ${plural(n, "item")} on ${session.current && session.tree ? crumbOf(session.current.canvasId) : "the open canvas"}.`;
+      session.editor.changed();
+    });
   });
   const dropTarget = (e: DragEvent): HTMLElement | null => {
     const t = (e.target as HTMLElement).closest<HTMLElement>("[data-scope]");

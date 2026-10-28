@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.50.10 — Drag from the library to place (2026-10-28)
+
+- **Added:** dragging items in the library shows them: up to five of their thumbnails stacked and fanned a little, with how many there are.
+- **Added:** while items are dragged, a strip across the top of the library says *Drop here to place … on* the open canvas; dropping them there places them on it, and the library stays open.
+- **Fixed:** in the library's viewer, the left edge of the details panel was hidden under the picture (since 0.50.9).
+
 ## 0.50.9 — Smooth panel edges, one scrollbar style (2026-10-28)
 
 - **Fixed:** dragging a library panel's edge still lagged in a big library: every pixel moved the grid and repainted every thumbnail. While dragging, the panel now grows over the grid (or away from it) and the grid keeps its place, as its own layer; it takes its new place once, when the edge is let go.

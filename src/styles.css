@@ -104,6 +104,7 @@
   --sp-15: 60px;
   /* Icon sizes */
   --icon-sm: 14px;
+  --drag-stack: 96px; /* the stack of thumbnails a drag from the library shows */
   --icon-md: 16px;
   --icon-lg: 18px;
   --icon-xl: 20px;
@@ -1084,6 +1085,16 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
    and the details on the right. Cards carry the picture only; the rest appears on hover, focus and selection. */
 #assets-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: var(--edge) var(--edge) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
 #assets-view[hidden] { display: none; }
+/* Dragging items in the library: the strip at the top places them on the open canvas when they are dropped on it. */
+.assets-place-zone { position: absolute; z-index: var(--z-edge); top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: var(--sp-4); height: var(--sp-14); color: var(--hud-accent); font: var(--weight-semibold) var(--text-md) var(--font-ui); background: color-mix(in oklch, var(--theme-bg) 85%, var(--hud-accent)); border-bottom: 2px dashed var(--hud-accent); }
+.assets-place-zone[hidden] { display: none; }
+.assets-place-zone svg { width: var(--icon-md); height: var(--icon-md); pointer-events: none; }
+.assets-place-zone span { pointer-events: none; }
+.assets-place-zone.is-drop-target { color: var(--hud-accent-fg); background: var(--hud-accent); border-bottom-style: solid; }
+/* What a drag from the library shows: up to five thumbnails stacked and fanned a little, and how many there are. */
+.drag-stack { position: fixed; top: calc(-1 * var(--drag-stack) * 3); left: 0; width: var(--drag-stack); height: var(--drag-stack); }
+.drag-stack img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 2px solid var(--hud-bg); border-radius: var(--r-md); box-shadow: var(--hud-lift); transform: translate(calc(var(--i) * var(--sp-2)), calc(var(--i) * var(--sp-2))) rotate(calc(var(--i) * 3deg)); }
+.drag-count { position: absolute; top: calc(-1 * var(--sp-4)); right: calc(-1 * var(--sp-4)); min-width: var(--sp-10); padding: var(--sp-1) var(--sp-3); font: var(--weight-semibold) var(--text-sm) var(--font-ui); text-align: center; color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: var(--r-pill); }
 .assets-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--near); min-height: calc(var(--ctl) + 2 * var(--pad) + 2px); padding-left: calc(var(--nav-w, 0px) + var(--near)); padding-right: calc(var(--bar-h) + var(--near) + var(--edge)); }
 .assets-search { flex: 1 1 220px; min-width: 0; max-width: 380px; }
 .assets-bar input[type="search"], .assets-bar select { height: var(--ctl); padding: 0 var(--sp-6); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
@@ -1117,6 +1128,7 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 .assets-scroll { position: absolute; inset: 0; overflow: auto; padding-bottom: var(--sp-10); }
 .assets-body.is-viewing .assets-scroll, .assets-body.is-viewing .assets-side { display: none; }
 .assets-body.is-viewing { gap: 0; padding-top: 0; } /* the viewer and its details panel share the whole page: no gap between them */
+.assets-body.is-viewing .col-grip { margin-inline: 0; } /* (no gap to sit in: it takes no space back) */
 .assets-empty { margin: var(--sp-10) 0; color: var(--hud-muted); }
 
 /* The library: a justified gallery, every picture at its own proportions, no frames or bands around them. */
