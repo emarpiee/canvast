@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.9: smooth panel edges, one scrollbar style (2026-10-28)
+
+**Implemented:** `.is-resizing-side/-insp` (panel at `--drag-w` over a slot of `--slot-w`, grid `will-change: transform; contain: strict`); grip in a single gap; `:where(*) { scrollbar-width: thin }`. Profile (600 items, Chromium): frame p90 50 ms → 33 ms while dragging.
+**Tested:** see the commit.
+**Known failures:** none.
+**Unverified:** the drag in the owner's 2,466-item library.
+**Committed:** on `main`, not pushed.
+**Next bounded task:** the owner's start-up timings with 0.50.8+.
+
 ## v0.50.8: the library lists at once (2026-10-28)
 
 **Implemented:** `externalFolder.hasMany` (sizes from `Dir.sizes`, the bridge's `canvast:sizes` with `lstat`, one call) replaces a read of every file in `AssetCatalog.list`; the library's view controls inside its status bar.

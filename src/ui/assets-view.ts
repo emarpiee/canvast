@@ -2668,8 +2668,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
 
   // ---- the library and details panels' widths on a wide screen: drag the edge (or use the arrow keys); double-click goes back to the default.
-  // While an edge is dragged only the panel follows the pointer (once a frame): the cards stay as they are and are laid out once, when the
-  // edge is let go (laying them out while dragging moved and reloaded the thumbnails, and the drag crawled).
+  // While an edge is dragged only the panel follows the pointer (once a frame), over the grid or away from it: the grid keeps its place and
+  // size, so nothing but the panel is laid out or painted again; it takes its new place once, when the edge is let go (moving it with every
+  // pixel repainted every thumbnail, and the drag crawled).
   let resizing = false;
   for (const g of root.querySelectorAll<HTMLElement>(".col-grip")) {
     const isSide = g.dataset["grip"] === "side";
@@ -2694,13 +2695,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       resizing = true;
       let want = startW;
       let frame = 0;
-      const prop = isSide ? "--side-w" : "--insp-w";
-      body.classList.add(isSide ? "has-side-w" : "has-insp-w");
+      const drag = isSide ? "is-resizing-side" : "is-resizing-insp";
+      body.style.setProperty("--slot-w", `${startW}px`);
+      body.style.setProperty("--drag-w", `${startW}px`);
+      body.classList.add(drag);
       const move = (ev: PointerEvent): void => {
         want = Math.max(range.min, Math.min(range.max, Math.round(startW + (isSide ? ev.clientX - startX : startX - ev.clientX))));
         frame ||= requestAnimationFrame(() => {
           frame = 0;
-          body.style.setProperty(prop, `${want}px`);
+          body.style.setProperty("--drag-w", `${want}px`);
+          g.style.transform = `translateX(${(want - startW) * (isSide ? 1 : -1)}px)`;
         });
       };
       const up = (): void => {
@@ -2710,6 +2714,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         g.removeEventListener("pointercancel", up);
         cancelAnimationFrame(frame);
         resizing = false;
+        body.classList.remove(drag);
+        g.style.transform = "";
         set(want, true);
         relayout();
       };

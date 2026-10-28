@@ -247,6 +247,8 @@ input, textarea, [contenteditable="true"] { caret-color: var(--hud-accent); }
 body { -webkit-user-select: none; user-select: none; }
 input, textarea, [contenteditable="true"], pre, code, .asset-more dd, [data-selectable] { -webkit-user-select: text; user-select: text; }
 :where(select) { height: var(--field-h); padding-block: 0; max-width: 100%; text-overflow: ellipsis; }
+/* Every scroll area has the same thin scrollbar in the theme's colours (the library grid had the system's own, with arrows). */
+:where(*) { scrollbar-width: thin; scrollbar-color: var(--hud-muted) transparent; }
 :where(option) { color: var(--hud-fg); background: var(--hud-bg); }
 :where(select, textarea, input):where(:focus-visible) { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub-input] { touch-action: none; } /* (a number field takes a finger that drags it; its name does not, so a bar that scrolls sideways scrolls from the name) */
@@ -2393,7 +2395,8 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 /* The library and details panels can be made wider or narrower by their edges (ADR 0095); on a small screen the details are a sheet with its own grip. */
 .col-grip { display: none; }
 @media (min-width: 901px) {
-  .col-grip { display: block; flex: none; position: relative; z-index: 2; width: 0; }
+  /* (no space of its own: it sits in the one gap between the panels, which the row would otherwise give twice, once on each side of it) */
+  .col-grip { display: block; flex: none; position: relative; z-index: 2; width: 0; margin-inline: calc(var(--sp-8) / -2); }
   /* The hit area is the gap between the panels and no more, so it never covers what is beside it. */
   .col-grip::before { content: ""; position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--sp-4)); width: calc(2 * var(--sp-4)); cursor: col-resize; touch-action: none; }
   .col-grip::after { content: ""; position: absolute; top: 50%; left: calc(-1 * var(--sp-1)); width: var(--sp-2); height: var(--sp-10); transform: translateY(-50%); border-radius: var(--r-xs); background: var(--hud-muted); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); pointer-events: none; }
@@ -2402,6 +2405,12 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
   .assets-body.is-viewing .col-grip[data-grip="side"], .assets-body.no-details .col-grip[data-grip="insp"], .assets-body:has(.asset-inspector[hidden]) .col-grip[data-grip="insp"] { display: none; }
   :root .assets-body.has-side-w > .assets-side { flex: 0 0 var(--side-w); }
   :root .assets-body.has-insp-w > .asset-inspector { flex: 0 0 var(--insp-w); }
+  /* A panel edge being dragged: the panel takes the new width over the grid (or away from it) while its place in the row keeps the old one,
+     so the grid does not move until the edge is let go. */
+  :root .assets-body.is-resizing-side > .assets-side { flex: 0 0 var(--drag-w); margin-right: calc(var(--slot-w) - var(--drag-w)); position: relative; z-index: var(--z-item-bar); }
+  :root .assets-body.is-resizing-insp > .asset-inspector { flex: 0 0 var(--drag-w); margin-left: calc(var(--slot-w) - var(--drag-w)); position: relative; z-index: var(--z-item-bar); }
+  /* (the grid is its own layer while the edge moves: painted once, then only put together with the panel over it) */
+  :root .assets-body:is(.is-resizing-side, .is-resizing-insp) .assets-scroll { will-change: transform; contain: strict; }
 }
 
 /* A narrow library panel never cuts anything at its edge: rows and chips shorten their text with an ellipsis and keep their count. */

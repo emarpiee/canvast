@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.50.9 — Smooth panel edges, one scrollbar style (2026-10-28)
+
+- **Fixed:** dragging a library panel's edge still lagged in a big library: every pixel moved the grid and repainted every thumbnail. While dragging, the panel now grows over the grid (or away from it) and the grid keeps its place, as its own layer; it takes its new place once, when the edge is let go.
+- **Fixed:** the library's panels had a double gap around each edge handle; the handle now sits in a single gap.
+- **Changed:** every scroll area has the same thin scrollbar in the theme's colours (the library grid had the system's own, with arrows).
+
 ## 0.50.8 — The library lists at once (2026-10-28)
 
 - **Fixed:** in the desktop app, listing the library read every file in it from the disk to check it was still there: with a library of 2,500 files on a spinning disk the library stayed empty for about 11 seconds after opening, and again on each refresh. Each file's size is now asked for, all of them in one call, and nothing is read.
