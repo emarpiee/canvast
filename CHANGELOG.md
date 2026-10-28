@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.15 — Put the library's sections in your order (2026-10-28)
+
+- **Added:** the library sidebar's sections (Folders, File types, Tags, Canvas tags) can be put in any order: drag a section by its head onto another (the places it can go are marked like every drop place), or press Alt+Up or Alt+Down on its name. The order is kept (in the desktop app, for each workspace).
+
 ## 0.50.14 — One look for lists of boards and drop places (2026-10-28)
 
 - **Changed:** **Place on…** is the board and canvas switcher's list: the same board cards, rows and counts, the open canvas highlighted the same way.

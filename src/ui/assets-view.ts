@@ -167,6 +167,9 @@ const TYPING = 'input:not([type="checkbox"]):not([type="range"]), textarea, sele
 /** How many thumbnails a drag from the library shows, stacked. */
 const DRAG_STACK = 5;
 
+/** The library sidebar's sections, in their default order (the order can be changed by dragging them). */
+const SIDE_SECTIONS = ["folders", "types", "tags", "ctags"] as const;
+
 export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore): AssetsView {
   root.innerHTML = `
     <div class="assets-place-zone drop-zone" data-testid="assets-place-zone" hidden>${ICONS.mapPin}<span></span></div>
@@ -332,7 +335,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; expanded: string[]; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], expanded: [], sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; expanded: string[]; sections: string[]; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], expanded: [], sections: [...SIDE_SECTIONS], sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -357,6 +360,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (typeof saved.sheetH === "number" && saved.sheetH >= 120 && saved.sheetH <= 2000) ui.sheetH = saved.sheetH;
     if (Array.isArray(saved.closed)) ui.closed = saved.closed.filter((c) => typeof c === "string").slice(0, 8);
     if (Array.isArray(saved.expanded)) ui.expanded = saved.expanded.filter((c) => typeof c === "string").slice(0, 8);
+    if (Array.isArray(saved.sections)) {
+      const order = saved.sections.filter((c, i, a): c is string => (SIDE_SECTIONS as readonly string[]).includes(c as string) && a.indexOf(c) === i);
+      ui.sections = [...order, ...SIDE_SECTIONS.filter((c) => !order.includes(c))];
+    }
     if (Array.isArray(saved.hidden)) {
       ui.hidden = saved.hidden.filter((c) => known.has(c) && c !== "name");
       // Columns added after these choices were saved start hidden.
@@ -1744,7 +1751,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const section = (id: string, title: string, add: string, body: string): string => {
       const closed = ui.closed.includes(id);
       return `<section class="side-sec${closed ? " is-closed" : ""}" data-sec="${id}">
-        <div class="side-head"><button type="button" class="side-sec-toggle" data-sec-toggle="${id}" aria-expanded="${!closed}" aria-label="${title}">${closed ? ICONS.chevronRight : ICONS.chevronDown}<h2>${title}</h2></button>${add}</div>
+        <div class="side-head" draggable="true" title="Drag to move this section (or Alt+Up and Alt+Down on its name)"><button type="button" class="side-sec-toggle" data-sec-toggle="${id}" aria-expanded="${!closed}" aria-label="${title}">${closed ? ICONS.chevronRight : ICONS.chevronDown}<h2>${title}</h2></button>${add}</div>
         ${closed ? "" : body}</section>`;
     };
     /** A long list shows its first rows and a full-width button for the rest (remembered on this device); the row in use always shows. */
@@ -1844,9 +1851,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         )}
       </div>`;
     // Drawn again only when something in it changed (a redraw for a pick or a look read leaves it, its scroll and its input alone).
-    if (html === lastSideHtml && side.firstElementChild) return;
-    lastSideHtml = html;
+    if (html + ui.sections.join() === lastSideHtml && side.firstElementChild) return;
+    lastSideHtml = html + ui.sections.join();
     side.innerHTML = html;
+    // The sections in the order chosen (dragged by their heads), kept with the library's layout.
+    const secs = new Map([...side.querySelectorAll<HTMLElement>("[data-sec]")].map((s) => [s.dataset["sec"]!, s]));
+    const last = [...secs.values()].at(-1);
+    const after = last?.nextSibling ?? null;
+    for (const id of ui.sections) {
+      const s = secs.get(id);
+      if (s && last?.parentNode) last.parentNode.insertBefore(s, after);
+    }
     // The menu floats over the page (the sidebar scrolls and would clip it), kept inside the window.
     const pop = side.querySelector<HTMLElement>(".side-menu");
     const anchor = side.querySelector<HTMLElement>('[data-side-more][aria-expanded="true"]');
@@ -2888,7 +2903,46 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     over = t;
     over?.classList.add("is-drop-target");
   };
+  // ---- the sidebar's sections are put in another order by dragging their heads (or Alt+Up and Alt+Down on one): kept with the layout
+  const SEC_TYPE = "application/x-canvast-section";
+  let movingSec: string | null = null;
+  const moveSection = (id: string, to: number): void => {
+    const order = ui.sections.filter((s) => s !== id);
+    order.splice(Math.max(0, Math.min(order.length, to)), 0, id);
+    ui.sections = order;
+    saveUi();
+    renderSide();
+    side.querySelector<HTMLElement>(`[data-sec-toggle="${id}"]`)?.focus();
+  };
+  side.addEventListener("dragstart", (e) => {
+    const head = (e.target as HTMLElement).closest<HTMLElement>(".side-head");
+    if (!head || !e.dataTransfer) return;
+    movingSec = head.closest<HTMLElement>("[data-sec]")!.dataset["sec"]!;
+    e.dataTransfer.setData(SEC_TYPE, movingSec);
+    e.dataTransfer.effectAllowed = "move";
+    for (const s of side.querySelectorAll<HTMLElement>("[data-sec]")) if (s.dataset["sec"] !== movingSec) s.classList.add("drop-zone");
+  });
+  side.addEventListener("dragend", () => {
+    movingSec = null;
+    for (const s of side.querySelectorAll<HTMLElement>("[data-sec]")) s.classList.remove("drop-zone", "is-drop-target");
+  });
+  side.addEventListener("keydown", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-sec-toggle]");
+    if (!b || !e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    e.preventDefault();
+    const id = b.dataset["secToggle"]!;
+    moveSection(id, ui.sections.indexOf(id) + (e.key === "ArrowUp" ? -1 : 1));
+  });
   side.addEventListener("dragover", (e) => {
+    if (movingSec && e.dataTransfer?.types.includes(SEC_TYPE)) {
+      const s = (e.target as HTMLElement).closest<HTMLElement>("[data-sec]");
+      for (const x of side.querySelectorAll<HTMLElement>("[data-sec]")) x.classList.toggle("is-drop-target", x === s && x.dataset["sec"] !== movingSec);
+      if (s && s.dataset["sec"] !== movingSec) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      }
+      return;
+    }
     const t = dropTarget(e);
     lightDrop(t);
     if (!t) return;
@@ -2899,6 +2953,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!side.contains(e.relatedTarget as Node | null)) lightDrop(null);
   });
   side.addEventListener("drop", (e) => {
+    if (movingSec && e.dataTransfer?.types.includes(SEC_TYPE)) {
+      const s = (e.target as HTMLElement).closest<HTMLElement>("[data-sec]");
+      const id = movingSec;
+      if (!s || s.dataset["sec"] === id) return;
+      e.preventDefault();
+      // Dropped on a section's upper half: before it; on its lower half: after it.
+      const r = s.getBoundingClientRect();
+      const at = ui.sections.filter((x) => x !== id).indexOf(s.dataset["sec"]!) + (e.clientY > r.top + r.height / 2 ? 1 : 0);
+      moveSection(id, at);
+      return;
+    }
     const t = dropTarget(e);
     lightDrop(null);
     if (!t) return;

@@ -573,6 +573,18 @@ test("sidebar: one More menu per row (Escape closes only it, one click elsewhere
   await expect(p.getByTestId("folder-tree")).toHaveCount(0);
   await p.getByRole("button", { name: "Folders", exact: true }).click();
   await expect(p.getByTestId("folder-tree")).toBeVisible();
+  // The sections move: Alt+Up on a section's name, or its head dragged onto another; the order stays over a reload.
+  const order = () => p.locator("[data-sec]").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset["sec"]));
+  await expect.poll(order).toEqual(["folders", "types", "tags", "ctags"]);
+  await p.getByRole("button", { name: "Tags", exact: true }).focus();
+  await p.keyboard.press("Alt+ArrowUp");
+  await expect.poll(order).toEqual(["folders", "tags", "types", "ctags"]);
+  await p.locator('[data-sec="ctags"] .side-head').dragTo(p.locator('[data-sec="folders"]'), { targetPosition: { x: 20, y: 4 } });
+  await expect.poll(order).toEqual(["ctags", "folders", "tags", "types"]);
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await expect.poll(order).toEqual(["ctags", "folders", "tags", "types"]);
   // Small screen: a strip naming the current choice; opening it shows the lists; choosing folds it again.
   await p.setViewportSize({ width: 390, height: 800 });
   const strip = p.locator(".side-collapse");
