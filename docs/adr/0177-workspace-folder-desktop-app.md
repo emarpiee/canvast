@@ -236,6 +236,39 @@ The move uses the existing backup format: in the browser build, **Export a full 
 | E | Moving in from the browser = export a full backup there, import it in the desktop app | Through a backup |
 | F | A library folder named like a kind folder (`Images`) shares `library/images/` | Share |
 
+## Hidden items: the design (step 4; owner's answers 2026-10-28)
+
+The browser build keeps the Hidden password as a gate, as today. In the desktop build hidden means encrypted.
+
+### Owner's answers
+
+| # | Question | Answer |
+|---|---|---|
+| G | Hiding when no Hidden password is set | **A password is asked for first** (with the "lost password = lost files" warning and the offer of a backup); hidden always means encrypted |
+| H | A hidden picture on a canvas while the Hidden items are locked | **A locked placeholder** until the password is given; once given, the key stays in memory until the app closes, or until **Lock hidden items** |
+| I | How far encryption reaches | **No readable picture anywhere:** in the workspace folder the bytes, names, tags, notes and fields are encrypted; in the app's own cache on the device the originals and thumbnails of hidden items are never kept readable (they are read from `.hidden/` and decrypted in memory), while their names and tags stay there so search and the Hidden list work as today |
+
+### Keys
+
+- A random 256-bit **data key** (AES-GCM) encrypts the files and the index.
+- The password, stretched with **PBKDF2-SHA-256, 600,000 iterations**, 16-byte random salt, gives a **key-encryption key** that wraps the data key (**AES-KW**). A wrong password fails to unwrap, so the unwrap is also the check.
+- Changing the password unwraps with the old one and wraps the same data key with the new one: no file is encrypted again.
+- Removing the Hidden password is refused while there are hidden items ("show them first"), since hidden means encrypted.
+- `locks.hidden` in `workspace.json` stays (the gate's PBKDF2 form, for the browser build and backups).
+
+### Files
+
+| File | Holds |
+|---|---|
+| `.canvast/hidden.json` | `{"format":"canvast-hidden","version":1,"kdf":{"name":"PBKDF2","hash":"SHA-256","iterations":600000,"salt":"…"},"key":"<wrapped data key>","index":{"iv":"…","data":"…"}}`. The index is the hidden items' `library.json` entries (hash, name, tags, note, fields, folder, which `.hidden/` file), encrypted with the data key |
+| `.hidden/<32 random hex>.bin` | One hidden original: a 12-byte IV, then the AES-GCM ciphertext of its bytes (16-byte tag at the end). The name says nothing about the item |
+
+- `library.json` leaves hidden items out entirely; they are only in the encrypted index.
+- **Hiding** encrypts the file into `.hidden/`, reads it back and decrypts it to prove it, then **erases** the readable file (never into `.trash/`, which would keep a readable copy). **Showing** decrypts it back to its place in `library/` and erases the `.hidden/` file.
+- Thumbnails of hidden items are made in memory only, never stored.
+- Another device reads the encrypted index when the password is given there (until then, it does not know the hidden items, and pictures that use them show as missing).
+- Erasing deletes the file; it does not overwrite the disk blocks. Limitations say so.
+
 ## Order of work
 
 Each step ends in a working app and is committed and released on its own.
