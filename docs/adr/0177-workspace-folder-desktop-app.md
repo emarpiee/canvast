@@ -1,6 +1,6 @@
 # ADR 0177 — The workspace as a folder on disk, in a desktop app
 
-- Status: **proposed** (2026-10-28), waiting for the owner's decision; nothing is built yet
+- Status: **accepted** (2026-10-28): the owner approved the proposal and the on-disk format; steps 1 to 6 are built on branch `workspace-folder`
 - Would supersede: [ADR 0159](0159-library-folder.md) (library folder) in the desktop app; amends [ADR 0006](0006-workspace-storage.md)–[0008](0008-portable-archives.md) (storage, assets, archives) and [ADR 0175](0175-releases.md) (releases)
 
 ## Context
@@ -280,7 +280,7 @@ Each step ends in a working app and is committed and released on its own.
 | 3 | **Workspace format:** boards as folders, `.cvst` canvases, `.canvast/workspace.json` and `library.json`, IndexedDB as journal and cache, safe-write saving, the move from browser storage | A whole workspace lives in a folder and survives restart, move and copy. **Done:** `canvas-file.ts` (one canvas codec with backups), `workspace-mirror.ts` (boards, canvases, device files, start-up reconcile and conflict copies), `library-mirror.ts` (library folders as real folders, `library.json`, originals from an imported backup written as files); `desktop.spec.ts` |
 | 4 | **Encrypted hidden items** | `.hidden/` files unreadable without the password; password change re-wraps the key. **Done:** `hidden-vault.ts` (keys, sealing), `hidden-store.ts` (`Storage.hidden`), sealing and opening in `library-mirror.ts`, padlock and *Lock hidden items*; `desktop.spec.ts` |
 | 5 | **Delete options and outside changes:** trash setting, file watching, relinking, conflict copies | The table above works with real file-manager actions. **Done:** `storage.deleteTo` and `bridge.remove(path, how)`; `LibraryMirror.scan` (relink by hash, import in place); `fs.watch` in the main process, `WorkspaceMirror.recheck` and `followMoved`, a canvas never written over another device's version; `desktop.spec.ts`. Not done: a `.cvst` dropped in from elsewhere (an id the workspace does not have) is left alone |
-| 6 | **Releases:** the AppImage in the release pipeline; README, Limitations and this ADR accepted | A release carries the HTML and the desktop package |
+| 6 | **Releases:** the AppImage in the release pipeline; README, Limitations and this ADR accepted | A release carries the HTML and the desktop package. **Done:** `scripts/package-desktop.mjs` (electron-builder 26.17.0, pinned; the tested Electron; the AppImage must start and write a workspace folder), `release.mjs` uploads it with its SHA-256 and names it in the notes; README "The desktop app (Linux)" |
 
 ## Owner's answers (2026-10-28)
 

@@ -8,6 +8,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "build:desktop": "node scripts/build-desktop.mjs",
+    "package:desktop": "node scripts/package-desktop.mjs",
     "desktop": "node scripts/build.mjs && node scripts/build-desktop.mjs && electron dist-desktop",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.desktop.json",
     "test:unit": "vitest run",
@@ -36,6 +37,7 @@
     "@playwright/test": "1.64.0",
     "@types/node": "26.6.5",
     "electron": "44.7.1",
+    "electron-builder": "26.17.0",
     "esbuild": "0.28.2",
     "lucide-static": "1.48.0",
     "typescript": "7.0.2",

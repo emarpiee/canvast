@@ -1,5 +1,5 @@
 // Publishes the built single file as the latest GitHub release (ADR 0175). Run after the version is bumped, CHANGELOG.md has its section and everything is pushed:
-//   npm run release              build, check, tag vX.Y.Z, upload dist/canvast.html, mark it Latest, verify
+//   npm run release              build, check, package the desktop AppImage, tag vX.Y.Z, upload both, mark it Latest, verify
 //   npm run release -- --dry-run do everything but publish, and print the notes
 //   npm run release -- --force   publish even if a newer version is already the latest (the new one then becomes Latest)
 // It never pushes, and never marks an older version Latest on its own.
@@ -46,7 +46,13 @@ const releases = JSON.parse(run("gh", ["release", "list", "--repo", repo, "--lim
 const latest = releases.find((r) => r.isLatest)?.tagName;
 if (latest && olderThan(version, latest.slice(1)) && !force) stop(`${latest} is already the latest and is newer than ${tag}: use --force only if this is meant.`);
 const previous = releases.map((r) => r.tagName).filter((t) => t !== tag && olderThan(t.slice(1), version)).sort((a, b) => (olderThan(a.slice(1), b.slice(1)) ? 1 : -1))[0] ?? null;
-const notes = releaseNotes({ version, section, sha256: sum, size: statSync(file).size, previousTag: previous, repo });
+// The desktop app (ADR 0177): the Linux AppImage of the same build, checked to start before it is handed out.
+say("Packaging the desktop app…");
+run("node", ["scripts/package-desktop.mjs"], { stdio: ["ignore", "ignore", "inherit"] });
+const appImage = join(root, `dist-package/canvast-${version}-x86_64.AppImage`);
+const appImageSum = sha256(appImage);
+say(`dist-package/canvast-${version}-x86_64.AppImage  ${(statSync(appImage).size / 1048576).toFixed(1)} MB  sha256 ${appImageSum}`);
+const notes = releaseNotes({ version, section, sha256: sum, size: statSync(file).size, previousTag: previous, repo, appImage: { sha256: appImageSum, size: statSync(appImage).size } });
 const dir = mkdtempSync(join(tmpdir(), "canvast-release-"));
 const notesFile = join(dir, "notes.md");
 writeFileSync(notesFile, notes);
@@ -54,7 +60,7 @@ const title = `canvast ${version} — ${section.title}`;
 if (dry) { say(`\n--dry-run: would publish ${tag} “${title}” as the latest release of ${repo}.\n\n${notes}`); rmSync(dir, { recursive: true }); process.exit(0); }
 
 // 4. Create it (or, if the tag already has a release, replace its file and notes), always as the latest
-const assets = [file, join(root, "dist/canvast.html.sha256")];
+const assets = [file, join(root, "dist/canvast.html.sha256"), appImage, `${appImage}.sha256`];
 const exists = releases.some((r) => r.tagName === tag);
 if (exists) {
   const at = run("git", ["rev-list", "-n", "1", tag]);
@@ -69,7 +75,7 @@ if (exists) {
 const shown = JSON.parse(run("gh", ["release", "view", tag, "--repo", repo, "--json", "url,assets,isDraft,isPrerelease"]));
 const isLatest = JSON.parse(run("gh", ["release", "list", "--repo", repo, "--limit", "100", "--json", "tagName,isLatest"])).some((r) => r.tagName === tag && r.isLatest);
 if (!isLatest || shown.isDraft || shown.isPrerelease) stop(`${tag} was published but is not the latest release (${shown.url}).`);
-if (!["canvast.html", "canvast.html.sha256"].every((n) => shown.assets.some((a) => a.name === n))) stop(`${tag} is missing its files (${shown.url}).`);
+if (!["canvast.html", "canvast.html.sha256", `canvast-${version}-x86_64.AppImage`, `canvast-${version}-x86_64.AppImage.sha256`].every((n) => shown.assets.some((a) => a.name === n))) stop(`${tag} is missing its files (${shown.url}).`);
 run("gh", ["release", "download", tag, "--repo", repo, "--pattern", "canvast.html", "--dir", dir, "--clobber"]);
 const served = sha256(join(dir, "canvast.html"));
 rmSync(dir, { recursive: true });

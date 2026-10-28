@@ -25,5 +25,5 @@ const common = { bundle: true, platform: "node", format: "cjs", target: "node22"
 await build({ ...common, entryPoints: [resolve(root, "desktop/main.ts")], outfile: resolve(out, "main.cjs") });
 await build({ ...common, entryPoints: [resolve(root, "desktop/preload.ts")], outfile: resolve(out, "preload.cjs") });
 await copyFile(html, resolve(out, "canvast.html"));
-await writeFile(resolve(out, "package.json"), JSON.stringify({ name: "canvast", productName: "canvast", version: pkg.version, main: "main.cjs", private: true }, null, 2));
+await writeFile(resolve(out, "package.json"), JSON.stringify({ name: "canvast", productName: "canvast", desktopName: "canvast.desktop", version: pkg.version, main: "main.cjs", private: true }, null, 2));
 console.log(`${out.replace(root + "/", "")}/ (main.cjs, preload.cjs, canvast.html from ${html.replace(root + "/", "")})`);

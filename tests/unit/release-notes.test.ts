@@ -40,6 +40,10 @@ describe("release notes", () => {
     expect(both.indexOf("### Features")).toBeLessThan(both.indexOf("### Fixes"));
     expect(both).toContain("compare/v0.1.0...v0.2.0");
     expect(both).toContain("SHA-256: `cd`");
+    expect(both).not.toContain("AppImage");
+    const desktop = releaseNotes({ version: "0.2.0", section: changelogSection(CHANGELOG, "0.2.0"), sha256: "cd", size: 2097152, previousTag: null, repo: "o/r", appImage: { sha256: "ef", size: 125829120 } });
+    expect(desktop).toContain("**`canvast-0.2.0-x86_64.AppImage`** (120.0 MB)");
+    expect(desktop).toContain("SHA-256: `ef`");
   });
 
   it("orders versions", () => {

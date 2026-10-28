@@ -26,7 +26,7 @@ export function splitBullets(bullets) {
 const list = (items, none) => (items.length ? items.map((b) => `- ${b}`).join("\n") : `- ${none}`);
 
 /** The release notes: the title line, Features, Fixes (both always there), and what to download. */
-export function releaseNotes({ version, section, sha256, size, previousTag, repo }) {
+export function releaseNotes({ version, section, sha256, size, previousTag, repo, appImage = null }) {
   const { features, fixes } = splitBullets(section.bullets);
   const mb = (size / 1024 / 1024).toFixed(2);
   return [
@@ -40,6 +40,9 @@ export function releaseNotes({ version, section, sha256, size, previousTag, repo
     "",
     "### Download",
     `**\`canvast.html\`** (${mb} MB) is the whole app in one file: save it anywhere and open it in a browser, no install and no server. SHA-256: \`${sha256}\``,
+    ...(appImage
+      ? ["", `**\`canvast-${version}-x86_64.AppImage\`** (${(appImage.size / 1024 / 1024).toFixed(1)} MB) is the desktop app for Linux: your workspace is a folder of ordinary files on your disk. Make it executable and run it. SHA-256: \`${appImage.sha256}\``]
+      : []),
     ...(previousTag ? ["", `**Full changelog:** https://github.com/${repo}/compare/${previousTag}...v${version}`] : []),
     "",
   ].join("\n");
