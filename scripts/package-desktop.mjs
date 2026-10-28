@@ -73,7 +73,7 @@ try {
 } catch (e) {
   refuse(`the AppImage did not start (${(e).message.split("\n")[0]})`);
 }
-if (!existsSync(join(ws, ".canvast/workspace.json")) || !existsSync(join(ws, "board_1/canvas_1.cvst"))) refuse("the AppImage started but did not write its workspace folder");
+if (!existsSync(join(ws, ".canvast/workspace.json")) || !existsSync(join(ws, ".canvast/boards/board_1/canvas_1.cvst"))) refuse("the AppImage started but did not write its workspace folder");
 rmSync(ws, { recursive: true, force: true });
 rmSync(`${ws}-data`, { recursive: true, force: true });
 
