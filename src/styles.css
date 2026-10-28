@@ -1065,8 +1065,17 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 .assets-search { flex: 1 1 220px; min-width: 0; max-width: 380px; }
 .assets-bar input[type="search"], .assets-bar select { height: var(--ctl); padding: 0 var(--sp-6); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
 .assets-bar select { padding-right: var(--sp-4); }
-.assets-count { color: var(--hud-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.assets-size { display: inline-flex; align-items: center; gap: var(--sp-3); color: var(--hud-muted); }
+/* The status bar: the canvas's own readout and controls (the same classes, so one look), in a row under the library instead of floating. */
+.assets-statusbar { flex: none; display: flex; align-items: stretch; justify-content: space-between; gap: var(--near); padding: var(--near) 0 var(--edge); }
+#assets-view .assets-statusbar > :is(.hud-readout, .hud-controls) { position: static; opacity: 1; }
+.assets-statusbar > .hud-readout { flex-direction: row; align-items: center; gap: var(--sp-6); min-width: 0; }
+.assets-statusbar > .hud-controls { flex: none; align-items: center; }
+.assets-readout > span:not([hidden]) ~ span:not([hidden])::before { content: "·"; margin-right: var(--sp-6); color: var(--hud-muted); }
+.assets-count { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.assets-picked, .assets-total { color: var(--hud-muted); }
+#assets-view.is-viewing .assets-statusbar { display: none; }
+@media (max-width: 900px) { .assets-total { display: none; } }
+.assets-size { display: inline-flex; align-items: center; gap: var(--sp-3); padding: 0 var(--sp-3); color: var(--hud-muted); }
 .assets-size svg { width: 16px; height: 16px; }
 .assets-size input { width: 96px; }
 .assets-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-3); min-height: var(--ctl); padding: 0 var(--sp-6); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); cursor: pointer; }
@@ -1347,9 +1356,6 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 /* A touch screen, or any device that does not report a hover: the checkbox is always there. */
 @media (pointer: coarse), (hover: none), (hover: on-demand), (max-width: 640px) { .asset-check { opacity: 1 !important; } }
 .asset-thumb img, .film-item img, .asset-preview img, .viewer img { -webkit-user-drag: none; user-select: none; }
-.assets-layout { display: inline-flex; gap: var(--sp-1); }
-.assets-layout .assets-btn { border-color: transparent; background: transparent; }
-.assets-layout .assets-btn[aria-pressed="true"] { background: var(--hud-hover); box-shadow: inset 0 0 0 2px var(--hud-accent); }
 .assets-list-head { display: none; }
 
 /* List mode: a row per asset (picture, name, pixels, type and size, usage, tags), the same cards with a different layout. */
@@ -1367,10 +1373,10 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .assets-body.is-list .asset-name { color: inherit; }
 .assets-body.is-list .asset-meta, .assets-body.is-list .asset-uses, .assets-body.is-list .asset-tags { color: var(--hud-muted); font-variant-numeric: tabular-nums; }
 .assets-body.is-list .asset-check { top: 50%; left: 6px; transform: translateY(-50%); }
-#assets-view.is-list .assets-size { display: none; }
+#assets-view.is-list .assets-size, #assets-view.is-list .assets-size-sep { display: none; }
 
 /* The viewer takes the page: what does not apply to it leaves the library bar, and with the controls hidden so does the bar. */
-#assets-view.is-viewing .assets-size, #assets-view.is-viewing .assets-layout, #assets-view.is-viewing .assets-import, #assets-view.is-viewing .assets-bar [data-action="slideshow"], #assets-view.is-viewing .assets-bar [data-action="details"] { display: none; }
+#assets-view.is-viewing .assets-import, #assets-view.is-viewing .assets-bar [data-action="slideshow"], #assets-view.is-viewing .assets-bar [data-action="details"] { display: none; }
 #assets-view.is-viewing.no-controls .assets-bar { display: none; }
 .viewer-quick { display: none; }
 .assets-body.no-details .viewer-quick { display: contents; }
@@ -1395,7 +1401,6 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .assets-bar .assets-search { flex-shrink: 1; min-width: 80px; }
 .assets-bar select { min-width: 0; text-overflow: ellipsis; }
 .assets-bar > select { flex-shrink: 1; }
-@media (max-width: 1500px) { .assets-count { display: none; } }
 @media (max-width: 1380px) { .assets-bar [data-action="import"] span { display: none; } .assets-bar [data-action="import"] { width: var(--ctl); padding: 0; } .assets-size input { width: 64px; } }
 @media (max-width: 1180px) { .assets-size input { width: 56px; } }
 /* Nothing in the bar is hidden on a narrow window: what does not fit in one row wraps to a second (the thumbnail size included). Down to 960 px the bar shares the row of the view tabs (the search gives way first). */

@@ -2587,5 +2587,8 @@ test("a library of thousands keeps only the cards near the view in the page; End
   await p.getByTestId("asset-card").first().click();
   await p.keyboard.press("Control+a");
   await expect(p.getByTestId("asset-inspector").locator("h2")).toHaveText("111 selected");
+  // The status bar: how many are listed, how many picked and their size, the size of the whole library.
+  await expect(p.getByTestId("assets-picked")).toHaveText(/^111 picked, \S+ (B|KiB)$/);
+  await expect(p.getByTestId("assets-total")).toHaveText(/^\S+ KiB in all$/);
   expect(app.consoleErrors).toEqual([]);
 });

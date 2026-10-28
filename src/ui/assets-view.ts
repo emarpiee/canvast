@@ -175,7 +175,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <div class="cs-recent" data-testid="search-recent" hidden></div>
         </div>
       </div>
-      <span class="assets-count" data-testid="assets-count"></span>
       <span class="assets-sep" role="separator"></span>
       <select data-testid="assets-usage" aria-label="Show">
         <option value="all">All items</option><option value="used">In use</option><option value="unused">Unused</option>
@@ -185,13 +184,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <option value="pixels">Most pixels</option><option value="type">Type A–Z</option><option value="tags">Tags A–Z</option><option value="folder">Folder A–Z</option><option value="favourite">Favourites first</option><option value="width">Widest first</option><option value="height">Tallest first</option><option value="canvases">On most canvases</option>
       </select>
       <button type="button" class="assets-btn is-icon" data-action="sort-dir" data-testid="assets-sort-dir" aria-pressed="false">${ICONS.arrowUpDown}</button>
-      <span class="assets-sep" role="separator"></span>
-      <div class="assets-layout" role="group" aria-label="Layout">
-        <button type="button" class="assets-btn is-icon" data-layout="grid" aria-pressed="true" aria-label="Thumbnails" title="Thumbnails">${ICONS.layoutGrid}</button>
-        <button type="button" class="assets-btn is-icon" data-layout="list" aria-pressed="false" aria-label="List" title="List">${ICONS.layoutList}</button>
-      </div>
-      <button type="button" class="assets-btn is-icon" data-action="columns" data-testid="assets-columns" aria-haspopup="dialog" aria-expanded="false" aria-label="List columns" title="Choose and arrange the columns of the list">${ICONS.columns3}</button>
-      <label class="assets-size" title="Thumbnail size">${ICONS.moveDiagonal}<input type="range" min="96" max="240" step="24" value="144" aria-label="Thumbnail size"></label>
       <span class="assets-sep" role="separator"></span>
       <span class="split assets-import"><button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.arrowDownToLine}<span>Import</span></button><button type="button" class="assets-btn is-icon" data-action="import-menu" data-testid="assets-import-menu" aria-haspopup="menu" aria-label="Files or a folder" title="Bring in files, or a folder">${ICONS.chevronDown}</button></span>
       <span class="assets-sep" role="separator"></span>
@@ -243,6 +235,20 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="sheet-grip" data-testid="sheet-grip" role="separator" aria-orientation="horizontal" aria-label="Resize the details panel" title="Drag to resize the details (double-click to reset)" tabindex="0"><span></span></div>
       <aside class="asset-inspector" data-testid="asset-inspector" aria-label="Details" hidden></aside>
     </div>
+    <footer class="assets-statusbar" data-testid="assets-statusbar">
+      <div class="hud-readout assets-readout" aria-live="off">
+        <span class="assets-count" data-testid="assets-count"></span>
+        <span class="assets-picked" data-testid="assets-picked" hidden></span>
+        <span class="assets-total" data-testid="assets-total"></span>
+      </div>
+      <div class="hud-controls assets-controls" role="toolbar" aria-label="View of the library">
+        <button type="button" data-layout="grid" aria-pressed="true" aria-label="Thumbnails" title="Thumbnails">${ICONS.layoutGrid}</button>
+        <button type="button" data-layout="list" aria-pressed="false" aria-label="List" title="List">${ICONS.layoutList}</button>
+        <button type="button" data-action="columns" data-testid="assets-columns" aria-haspopup="dialog" aria-expanded="false" aria-label="List columns" title="Choose and arrange the columns of the list">${ICONS.columns3}</button>
+        <span class="hud-sep assets-size-sep" role="separator"></span>
+        <label class="assets-size" title="Thumbnail size">${ICONS.moveDiagonal}<input type="range" min="96" max="240" step="24" value="144" aria-label="Thumbnail size"></label>
+      </div>
+    </footer>
     <div class="place-menu" role="menu" aria-label="Place on" data-testid="place-menu" hidden></div>`;
   const body = root.querySelector<HTMLElement>(".assets-body")!;
   const viewer = root.querySelector<HTMLElement>(".viewer")!;
@@ -258,6 +264,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   const status = root.querySelector<HTMLElement>(".assets-status")!;
   const count = root.querySelector<HTMLElement>(".assets-count")!;
+  const total = root.querySelector<HTMLElement>(".assets-total")!;
+  const pickedOut = root.querySelector<HTMLElement>(".assets-picked")!;
+  /** The listing whose total size the status bar shows (worked out again only for a new one). */
+  let totalOf: CatalogListing | null = null;
+  /** The status bar: how many are picked and their size. */
+  const showPicked = (): void => {
+    pickedOut.hidden = picked.size === 0;
+    if (!picked.size) return;
+    const bytes = [...picked].reduce((n, h) => n + (entryOf(h)?.size ?? 0), 0);
+    pickedOut.textContent = `${picked.size} picked, ${fmtBytes(bytes)}`;
+  };
   const search = root.querySelector<HTMLInputElement>(".assets-search")!;
   wireSearchHelp(root.querySelector<HTMLElement>(".search-help-btn")!, search, "Type the operators in capitals.", LIBRARY_ROWS);
   const usageSel = root.querySelector<HTMLSelectElement>('[data-testid="assets-usage"]')!;
@@ -1557,6 +1574,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const rows = filtered();
     const usageAll = usageSel.value === "all" && !search.value.trim() && scope === "all";
     count.textContent = `${rows.length === listing.entries.length ? "" : `${rows.length} of `}${listing.entries.length} item${listing.entries.length === 1 ? "" : "s"}`;
+    if (totalOf !== listing) {
+      totalOf = listing;
+      total.textContent = `${fmtBytes(listing.entries.reduce((n, e) => n + e.size, 0))} in all`;
+    }
+    showPicked();
     if (cardsOf !== listing || cardsReadOnly !== session.readOnly) {
       cardHtml = new WeakMap();
       cardsOf = listing;
@@ -2155,6 +2177,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** Show which cards are picked without redrawing the library. */
   const markPicked = (): void => {
     for (const { el } of mounted.values()) markCell(el);
+    showPicked();
     // Every card shows its checkbox only once several are being picked; one plain click just opens that item's details.
     grid.classList.toggle("has-picks", picked.size > 1 || (selecting && picked.size > 0));
   };
@@ -3160,7 +3183,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const openColumns = (): void => {
     renderColumns();
     const r = colBtn.getBoundingClientRect();
-    colPop.style.top = `${Math.round(clearRect(colBtn).bottom + MENU_GAP)}px`;
+    // (the button is in the status bar: the panel opens above it)
+    const below = r.top < window.innerHeight / 2;
+    colPop.style.top = below ? `${Math.round(clearRect(colBtn).bottom + MENU_GAP)}px` : "";
+    colPop.style.bottom = below ? "" : `${Math.round(window.innerHeight - r.top + MENU_GAP)}px`;
     colPop.style.right = `${Math.max(8, Math.round(window.innerWidth - r.right))}px`;
     colPop.hidden = false;
     colBtn.setAttribute("aria-expanded", "true");
@@ -3203,7 +3229,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       e.stopPropagation();
     }
   });
-  for (const b of root.querySelectorAll<HTMLElement>(".assets-layout [data-layout]")) {
+  for (const b of root.querySelectorAll<HTMLElement>(".assets-controls [data-layout]")) {
     b.addEventListener("click", () => {
       ui.layout = b.dataset["layout"] === "list" ? "list" : "grid";
       saveUi();
