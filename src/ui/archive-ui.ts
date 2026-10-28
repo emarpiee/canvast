@@ -9,6 +9,7 @@ import { scopeWithHiddenChoice, scopeWithPrivacyChoice } from "./hidden-access";
 import { ARCHIVE_EXTENSION, ArchiveError } from "../storage/archive";
 import { chooseDialog, confirmDialog } from "./confirm";
 import { fmtBytes } from "./format";
+import { busyProgress } from "./busy-screen";
 
 /** Export, download and import of `.canvast` archives (ADR 0008). Results are reported through the editor message. */
 
@@ -108,7 +109,8 @@ export async function runImport(session: Session, picked: File | readonly File[]
   if (!files.length) return;
   const file = files.length === 1 ? files[0]! : { name: `${files.length} backup files` };
   let plan;
-  const reading = beginProgress(session.editor, "import-archive", `Reading ${file.name}`);
+  // An import keeps the app waiting behind one screen, stage by stage, so nothing is changed half-way.
+  const reading = busyProgress(session.editor, `Reading ${file.name}`, ["Checking the file before anything is imported."]);
   try {
     plan = await session.readArchive(files.length === 1 ? files[0]! : files, folder, stages(reading));
     reading.done();
@@ -148,7 +150,7 @@ export async function runImport(session: Session, picked: File | readonly File[]
   }
   const ok = await confirmDialog({ title: folder ? "Open the library of this folder?" : `Import ${file.name}?`, lines, confirmLabel: folder ? "Open library" : "Import", danger: false });
   if (!ok) return;
-  const saving = beginProgress(session.editor, "import-archive", folder ? "Opening the library" : `Importing ${file.name}`);
+  const saving = busyProgress(session.editor, folder ? "Opening the library" : `Importing ${file.name}`, ["Keep the app open until it ends."]);
   saving.update(null, "saving into the workspace");
   try {
     const r = await session.applyImport(plan, stages(saving));
@@ -164,11 +166,10 @@ export async function runImport(session: Session, picked: File | readonly File[]
     // The desktop build: the import's files are written into the workspace folder first (the busy screen shows how far), then the
     // app starts again on what it now holds, and says the result.
     if (session.storage?.folderWriting) {
-      saving.update(null, "writing it into the workspace folder");
-      await session.storage.flush();
-      saving.done();
+      saving.update(null, "Writing the files into the workspace folder");
+      await session.storage.flush(); // (its progress shows on this screen)
       sayAfterReload(result);
-      location.reload();
+      location.reload(); // (the screen stays until the app starts again)
       return;
     }
     saving.done(result);

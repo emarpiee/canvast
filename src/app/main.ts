@@ -86,7 +86,7 @@ import { ICONS } from "../ui/icons";
 import { mountContextBar } from "../ui/context-bar";
 import { installMenuKeys } from "../ui/more-menu";
 import { chooseDialog, confirmDialog, promptDialog } from "../ui/confirm";
-import { openBusyScreen } from "../ui/busy-screen";
+import { currentBusy, openBusyScreen } from "../ui/busy-screen";
 import { canSwitchWorkspace, openWorkspaceSwitcher } from "../ui/workspace-switch";
 import type { BusyScreen } from "../ui/busy-screen";
 import { extractPalette } from "../assets/extract-palette";
@@ -725,6 +725,8 @@ async function start(): Promise<void> {
       busy = null;
       return;
     }
+    const shown = currentBusy();
+    if (shown && shown !== busy) return shown.update(done / total, `Writing the files into the workspace folder: ${done} of ${total}`); // (a task's own screen, as an import's: one bar)
     if (!busy && total < BUSY_FILES) return;
     busy ??= openBusyScreen("Writing the workspace to its folder", [
       "The files are copied into the workspace folder, so other programs and devices see them. Keep the app open until it ends.",

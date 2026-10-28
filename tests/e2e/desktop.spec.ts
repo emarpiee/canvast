@@ -389,8 +389,9 @@ test("a backup of many files: the busy screen shows how far its files are writte
     await page.getByTestId("confirm-ok").click();
     await loaded;
     expect(said.length).toBeGreaterThan(0);
-    expect(said.every((t) => /^\d+ of 25 files$/.test(t))).toBe(true);
-    expect(said.at(-1)).toBe("25 of 25 files");
+    const files = said.filter((t) => t.startsWith("Writing the files into the workspace folder: "));
+    expect(files.length).toBeGreaterThan(0);
+    expect(files.at(-1)).toBe("Writing the files into the workspace folder: 25 of 25");
     await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
     await expect(page.getByTestId("toast")).toContainText(/Imported/);
     expect(visible(ws).filter((f) => f.startsWith("library/"))).toHaveLength(25);
@@ -399,7 +400,7 @@ test("a backup of many files: the busy screen shows how far its files are writte
   }
 });
 
-test("switching workspace from the app: the recent ones, a gone one taken off the list, and the open one written before the switch", async () => {
+test("switching workspace from the app: the recent ones (a gone one left out), the open one written before the switch, and clearing the list", async () => {
   const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
   const other = mkdtempSync(join(tmpdir(), "canvast-ws-"));
   const gone = join(tmpdir(), "canvast-ws-gone-never-made");
@@ -407,18 +408,16 @@ test("switching workspace from the app: the recent ones, a gone one taken off th
   const recent = join(`${ws}-userdata`, "workspaces.json");
   writeFileSync(recent, JSON.stringify({ workspaces: [{ path: other, openedAt: 2 }, { path: gone, openedAt: 1 }] }));
   process.env["CANVAST_NO_RELAUNCH"] = "1"; // (the switch is checked; no second app is left running)
-  const { app, page } = await launch(ws);
+  let { app, page } = await launch(ws);
   try {
     const items = () => page.locator(".pop-menu [data-i]").evaluateAll((els) => els.map((el) => `${el.getAttribute("data-id")}:${el.getAttribute("aria-label")}`));
     const openSwitcher = async () => {
-      await page.getByTestId("workspace-chevron").click();
+      if (await page.getByTestId("workspace-menu").isHidden()) await page.getByTestId("workspace-chevron").click();
       await page.getByTestId("nav-switch-workspace").click();
       await expect(page.locator(".pop-menu")).toBeVisible();
     };
     await openSwitcher();
-    expect(await items()).toEqual([`current:${ws.split("/").pop()}`, `recent:Switch to the workspace ${other.split("/").pop()}`, "open:Open a folder…", "new:New workspace…", `forget:Take “${gone.split("/").pop()}” off the list`]);
-    await page.locator('.pop-menu [data-id="forget"]').click();
-    await expect.poll(() => JSON.parse(readFileSync(recent, "utf8")).workspaces.map((w: { path: string }) => w.path)).toEqual([ws, other]);
+    expect(await items()).toEqual([`current:${ws.split("/").pop()}`, `recent:Switch to the workspace ${other.split("/").pop()}`, "open:Open a folder…", "new:New workspace…", "clear:Clear the recent list"]);
     // An edit made a moment ago is in the folder before the app leaves for the other workspace.
     await page.keyboard.press("Escape");
     const t = await page.evaluate(() => window.__canvastDebug.session().tree!);
@@ -427,6 +426,13 @@ test("switching workspace from the app: the recent ones, a gone one taken off th
     await Promise.all([app.waitForEvent("close", { timeout: 30_000 }), page.locator('.pop-menu [data-id="recent"]').click()]);
     expect(JSON.parse(readFileSync(recent, "utf8")).workspaces[0].path).toBe(other);
     expect(visible(ws)).toContain(`${B}last_edit/canvas_1.cvst`);
+    // Back on the first one: clearing leaves only the open workspace on the list (no folder is touched).
+    ({ app, page } = await launch(ws));
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.session().tree?.length ?? 0)).toBe(1);
+    await openSwitcher();
+    await page.locator('.pop-menu [data-id="clear"]').click();
+    await expect.poll(() => JSON.parse(readFileSync(recent, "utf8")).workspaces.map((w: { path: string }) => w.path)).toEqual([ws]);
+    expect(existsSync(other)).toBe(true);
   } finally {
     delete process.env["CANVAST_NO_RELAUNCH"];
     await app.close().catch(() => undefined);
