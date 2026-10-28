@@ -272,6 +272,10 @@ test("a font file is imported from the options bar, a text is set in it, and it 
   await p.keyboard.press("v");
   await p.mouse.click(310, 308);
   await expect(p.getByRole("combobox", { name: "Font" }).locator("option:checked")).toHaveText("Inter-Black");
+  // In the library the font shows its letters: an "Aa" thumbnail in that font, not the file tile.
+  await p.getByTestId("view-assets").click();
+  await expect(p.locator('[data-testid="asset-card"] img.is-font-thumb')).toHaveClass(/is-loaded/);
+  expect(await p.locator('[data-testid="asset-card"] img.is-font-thumb').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
 });
 
 test("a read-only tab cannot create or edit text", async ({ app, context }) => {

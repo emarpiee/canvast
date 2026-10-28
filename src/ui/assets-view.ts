@@ -14,7 +14,7 @@ import { mountSuggest } from "./search-suggest";
 import type { SuggestSources } from "../search/suggest";
 import { itemsIn, justifiedLayout, listLayout, nearestInRow, rowOf, squaresLayout, type GridLayout } from "./library-layout";
 import { storeFrame } from "../app/frames";
-import { chipOf, describeFile, extOf, isCard } from "../assets/file-kind";
+import { chipOf, describeFile, extOf, hasThumb, isCard, isFontFile } from "../assets/file-kind";
 import { FILE_CARD_NOTE } from "../assets/card";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actions";
 import { LIBRARY_ROWS, searchHelpButton, wireSearchHelp } from "./search-help";
@@ -665,7 +665,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let filmItemW = 0;
   const filmItem = (e: CatalogListing["entries"][number]): HTMLElement => {
     const t = document.createElement("template");
-    t.innerHTML = `<button type="button" class="film-item thumb-slot" role="option" data-hash="${e.hash}" aria-label="${esc(e.name || "Untitled")}" title="${esc(e.name || "Untitled")}">${isCard(e) ? fileTile(e, false) : `<img alt="" draggable="false" data-hash="${e.hash}">`}</button>`;
+    t.innerHTML = `<button type="button" class="film-item thumb-slot" role="option" data-hash="${e.hash}" aria-label="${esc(e.name || "Untitled")}" title="${esc(e.name || "Untitled")}">${!hasThumb(e) ? fileTile(e, false) : `<img alt="" draggable="false" data-hash="${e.hash}"${isFontFile(e) ? ' class="is-font-thumb"' : ""}>`}</button>`;
     const b = t.content.firstElementChild as HTMLElement;
     const img = b.querySelector<HTMLImageElement>("img");
     if (img) loadThumb(img);
@@ -1325,7 +1325,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     filling = true;
     const have = new Set(await session.catalog.thumbHashes().catch(() => []));
     for (const e of listing.entries) {
-      if (have.has(e.hash) || !e.present || isCard(e) || meta(e).hidden || thumbUrls.has(e.hash)) continue;
+      if (have.has(e.hash) || !e.present || !hasThumb(e) || meta(e).hidden || thumbUrls.has(e.hash)) continue;
       thumbFor(e.hash, always, false).then((url) => keepThumbUrl(e.hash, url), () => undefined);
     }
   };
@@ -1480,7 +1480,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const html = `<div class="asset-cell" role="listitem">
         <button type="button" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}" draggable="${session.readOnly ? "false" : "true"}"
           aria-pressed="false" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}">
-        <span class="asset-thumb thumb-slot">${isCard(e) ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}" data-hash="${e.hash}"><span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>`}</span>
+        <span class="asset-thumb thumb-slot">${!hasThumb(e) ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}${isFontFile(e) ? " is-font-thumb" : ""}" data-hash="${e.hash}"><span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>`}</span>
         ${e.present ? "" : `<span class="asset-missing-label">File missing</span>`}
         <span class="asset-info">
           <span class="asset-name">${esc(name)}</span>
@@ -2665,7 +2665,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         if (alphaOf.size > 4000) alphaOf.clear();
         alphaOf.set(key, a);
       }
-      host.classList.toggle("has-alpha", a);
+      host.classList.toggle("has-alpha", a && !img.classList.contains("is-font-thumb")); // (a font's letters stand on the card itself, no chequered ground)
     },
     true,
   );

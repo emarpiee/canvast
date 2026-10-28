@@ -1,6 +1,6 @@
 {
   "name": "canvast",
-  "version": "0.50.20",
+  "version": "0.50.21",
   "private": true,
   "description": "canvast — an offline-first endless canvas that ships as a single HTML file",
   "type": "module",

@@ -31,6 +31,7 @@
   --hud-border: oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.14);
   --hud-hover: oklch(0.5 calc(0.03 * var(--vivid)) var(--hue) / 0.14);
   --thumb-glint: oklch(1 0 0 / 0.55); /* the light passing over a thumbnail that is still loading */
+  --font-thumb-filter: invert(0.85); /* a font's "Aa" thumbnail is light letters: dark on a light theme */
   --hud-accent: oklch(0.52 calc(0.1 * var(--vivid)) var(--hue));
   --hud-accent-fg: oklch(1 0 0);
   --hud-danger: oklch(0.47 0.15 20);
@@ -160,6 +161,7 @@
     --hud-border: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue) / 0.14);
     --hud-hover: oklch(0.75 calc(0.025 * var(--vivid)) var(--hue) / 0.16);
   --thumb-glint: oklch(1 0 0 / 0.06);
+  --font-thumb-filter: none;
     --hud-accent: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
     --hud-accent-fg: oklch(0.25 calc(0.04 * var(--vivid)) var(--hue));
     --hud-danger: oklch(0.7 0.14 20);
@@ -196,6 +198,7 @@
   --hud-border: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue) / 0.14);
   --hud-hover: oklch(0.75 calc(0.025 * var(--vivid)) var(--hue) / 0.16);
   --thumb-glint: oklch(1 0 0 / 0.06);
+  --font-thumb-filter: none;
   --hud-accent: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
   --hud-accent-fg: oklch(0.25 calc(0.04 * var(--vivid)) var(--hue));
   --hud-danger: oklch(0.7 0.14 20);
@@ -1085,6 +1088,8 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
    and the details on the right. Cards carry the picture only; the rest appears on hover, focus and selection. */
 #assets-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: var(--edge) var(--edge) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
 #assets-view[hidden] { display: none; }
+/* A font's thumbnail: its letters in the theme's text colour, the whole picture shown (never cropped). */
+.is-font-thumb { filter: var(--font-thumb-filter); object-fit: contain !important; }
 .assets-btn[hidden] { display: none; }
 /* A list of boards and canvases (the switcher, Place on…): its search field, and a folded board shows only its name (a click unfolds it). */
 .board-filter { padding: var(--sp-2) var(--sp-3) var(--sp-4); }

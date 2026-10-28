@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.21 — Fonts show their letters (2026-10-29)
+
+- **Added:** a font in the library (TTF, OTF, WOFF, WOFF2) shows "Aa" written in that font as its thumbnail, in the theme's text colour, instead of the file tile; read and drawn by the app itself, with no extra package.
+
 ## 0.50.20 — A folder for each kind of file (2026-10-29)
 
 - **Changed:** in the desktop app, library files that are in no library folder are sorted into more kind folders of `library/`: `vectors` (svg, eps), `icons` (ico, icns), `art_sources` (psd, kra, xcf, clip, procreate, sai, ai, afphoto, …), `presets` (brushes and swatches), `3d`, `archives`, besides `images`, `video`, `audio`, `fonts`, `documents` and `other`. The extension decides first, so an art file is never filed with the pictures. Files already in the folder move to their new place on the next save.

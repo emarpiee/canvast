@@ -10,6 +10,12 @@ export const isMediaType = (type: string): boolean => /^(image|video|audio)\//.t
 /** Shown as a card: not something the browser can show (any other file), or a picture, video or sound it could not read. */
 export const isCard = (x: { type: string; card?: boolean }): boolean => !isMediaType(x.type) || x.card === true;
 
+/** A font file (shown by its letters: a thumbnail of "Aa" in that font). */
+export const isFontFile = (x: { type: string; name: string }): boolean => /^font\//.test(x.type) || /^(TTF|OTF|WOFF2?|TTC)$/.test(extOf(x.name));
+
+/** A file card with a thumbnail of its own (a font's letters), else a card shows the file tile. */
+export const hasThumb = (x: { type: string; name: string; card?: boolean }): boolean => !isCard(x) || isFontFile(x);
+
 /** The extension of a file name, upper case and at most eight letters or digits; "" when there is none. */
 export function extOf(name: string): string {
   const m = /\.([A-Za-z0-9]{1,8})$/.exec(name.trim());

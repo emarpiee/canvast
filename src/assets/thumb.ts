@@ -3,7 +3,7 @@ import type { ThumbRecord } from "./asset-catalog";
 import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { probeMp4 } from "./mp4-probe";
 import { makeCard } from "./card";
-import { isCard } from "./file-kind";
+import { isCard, isFontFile } from "./file-kind";
 
 /** Longest edge of a stored thumbnail (CSS px: cards show them at up to 240). */
 export const THUMB_PX = 256;
@@ -17,6 +17,7 @@ const THUMB_QUALITY = 0.6;
  */
 export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
   // A file shown as a card has no stored picture: the library draws a fixed tile for it (ADR 0089), so there is nothing to make.
+  if (isFontFile(rec)) return makeFontThumb(rec);
   if (isCard(rec)) return null;
   try {
     const k = Math.min(1, THUMB_PX / Math.max(rec.pixelW, rec.pixelH));
@@ -49,5 +50,36 @@ export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
   } catch {
     // A picture the browser cannot decode at a size (an SVG, say) has no thumbnail: the library shows the original itself, as it always did.
     return null;
+  }
+}
+
+/**
+ * A font's thumbnail: "Aa" in that font, light on a clear ground (the library shows it in the theme's colour). Null when the browser cannot
+ * read the font.
+ */
+async function makeFontThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
+  let face: FontFace | null = null;
+  try {
+    face = new FontFace(`canvast-thumb-${rec.hash.slice(0, 12)}`, await rec.blob.arrayBuffer());
+    await face.load();
+    document.fonts.add(face);
+    const c = document.createElement("canvas");
+    c.width = c.height = THUMB_PX;
+    const g = c.getContext("2d")!;
+    g.fillStyle = "#fff";
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    // As large as fits: measured once at a reference size, then scaled to fill most of the width.
+    g.font = `100px "${face.family}"`;
+    const w = g.measureText("Aa").width || 100;
+    const size = Math.min(THUMB_PX * 0.62, (100 * THUMB_PX * 0.78) / w);
+    g.font = `${size}px "${face.family}"`;
+    g.fillText("Aa", THUMB_PX / 2, THUMB_PX / 2);
+    const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
+    return blob ? { hash: rec.hash, blob, w: c.width, h: c.height } : null;
+  } catch {
+    return null;
+  } finally {
+    if (face) document.fonts.delete(face);
   }
 }

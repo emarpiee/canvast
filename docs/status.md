@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.21: fonts show their letters (2026-10-29)
+
+**Implemented:** `isFontFile`, `hasThumb` (file-kind.ts); `makeFontThumb` (FontFace, "Aa" in light letters, PNG); library cards and filmstrip show it (`.is-font-thumb`, `--font-thumb-filter` per theme, no chequered ground).
+**Tested:** the font import test checks the library card's "Aa" thumbnail loads; card tests; chromium and firefox 4/4.
+**Known failures:** none.
+**Unverified:** a font card placed on a canvas still shows the file card (the canvas draws cards itself): next step.
+**Committed:** on `main`, not pushed.
+**Next bounded task:** "Aa" on a font's card on the canvas.
+
 ## v0.50.20: a folder for each kind of file (2026-10-29)
 
 **Implemented:** `kindFolder` by extension first (`KIND_EXTS`), then by type; `KIND_FOLDERS` holds the twelve kinds (owner chose the full set).
