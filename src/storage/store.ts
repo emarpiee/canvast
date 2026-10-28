@@ -180,6 +180,25 @@ export interface HiddenStore {
   subscribe(fn: () => void): () => void;
 }
 
+/** A file found in the desktop build's `library/` that no library item has: imported where it lies (ADR 0177, "Changes from outside the app"). */
+export interface FolderFile {
+  /** Its path in the workspace folder. */
+  path: string;
+  name: string;
+  /** The library folder of the folder it was found in (made when there was none), or null for a kind folder. */
+  folderId: string | null;
+  read(): Promise<Blob | null>;
+}
+
+/** The desktop build: files that appear in `library/` outside the app. */
+export interface FolderImports {
+  /**
+   * Who imports new files (the app, which can decode them) and who is told when items were relinked or added; the folder is
+   * looked through once this is set, and again on each change.
+   */
+  start(importFiles: (files: FolderFile[]) => Promise<void>, changed: () => void): void;
+}
+
 /** One opened storage: what a session works on. */
 export interface Storage {
   readonly workspace: WorkspaceStore;
@@ -188,6 +207,8 @@ export interface Storage {
   readonly originals: OriginalStore;
   /** The library folder (ADR 0159): only the browser build has one (in the desktop build the workspace is a folder). */
   readonly libraryFolder: LibraryFolderStore | null;
+  /** The desktop build's files found in `library/`; null in the browser build. */
+  readonly folderImports: FolderImports | null;
   /** The desktop build's encrypted hidden items; null in the browser build. */
   readonly hidden: HiddenStore | null;
   /** The desktop build's workspace folder (its full path); null in the browser build. */

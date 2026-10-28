@@ -159,6 +159,12 @@ export class Session {
     return () => this.assetListeners.delete(fn);
   }
 
+  /** The library changed outside the app (files found in the desktop build's workspace folder): every list is drawn again. */
+  libraryChanged(): void {
+    this.post({ kind: "assets" });
+    this.emitAssets();
+  }
+
   private emitAssets(metaOnly = false): void {
     for (const fn of this.assetListeners) fn(metaOnly);
   }

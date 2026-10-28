@@ -41,6 +41,7 @@ import { parseHex, rgbToOklch } from "../colour-picker/colour";
 import { canvasItems, mountContextMenu } from "../ui/context-menu";
 import { openBatchRename } from "../ui/batch-rename";
 import { askPassword, forgetHiddenPassword } from "../ui/hidden-access";
+import { typeOfName } from "../storage/workspace-names";
 import { openLockScreen } from "../ui/lock-screen";
 import { writeSystemClipboard } from "./system-clipboard";
 import { LANDMARKS } from "../scene/landmarks";
@@ -480,6 +481,27 @@ async function start(): Promise<void> {
     });
   }
   assets.onNotice = (text) => { editor.message = text; editor.changed(); };
+  // The desktop build: files that appear in library/ outside the app are imported where they lie (ADR 0177).
+  storage?.folderImports?.start(async (files) => {
+    let n = 0;
+    for (const f of files) {
+      const blob = await f.read();
+      if (!blob) continue;
+      try {
+        const { record } = await assets.importFileDetailed(new File([blob], f.name, { type: typeOfName(f.name) }), false, f.path);
+        if (f.folderId) await storage.catalog.updateMeta(record.hash, { addFolders: [f.folderId] });
+        n++;
+      } catch {
+        // (not a file canvast can keep: left where it is)
+      }
+    }
+    if (!n) return;
+    editor.message = `${n === 1 ? "A new file" : `${n} new files`} in the workspace folder ${n === 1 ? "was" : "were"} added to the library.`;
+    editor.changed();
+  }, () => {
+    assets.retryAll(); // (a relinked file: its pictures are read again)
+    session.libraryChanged();
+  });
   assets.setBudget(Number(settings.get("cache.decodedMb")) * 2 ** 20);
   const textureHost = createTextureHost({ doc, index, assets, theme: () => theme, editor });
   setTextureHost(textureHost); // (texture fills, ADR 0154)

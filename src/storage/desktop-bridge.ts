@@ -39,6 +39,10 @@ export interface DesktopBridge {
   removeEmptyFolder(path: string): Promise<boolean>;
   /** When the window closes, `write` runs first (to write what is not in the folder yet); the window waits for it, up to 15 s. */
   onClosing(write: () => Promise<void>): void;
+  /** Every file under a folder, at any depth, with its size (names starting with a dot, and what is in such folders, left out). */
+  tree(path: string): Promise<Array<{ path: string; size: number }>>;
+  /** A file's SHA-256 (hex), read in the main process; null when there is no such file. */
+  hash(path: string): Promise<string | null>;
   /** The names of the files (not folders) in a folder; empty when there is none. */
   list(path: string): Promise<string[]>;
 }

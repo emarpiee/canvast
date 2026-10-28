@@ -98,6 +98,17 @@ export class WorkspaceMirror {
    * does not have, when both are kept (the app's as a conflict copy). What the folder lacks is written to it.
    */
   async start(): Promise<void> {
+    try {
+      await this.startUp();
+    } finally {
+      this.started();
+    }
+  }
+  /** Start-up is over (a look through `library/` waits for it: the folder's index explains most files). */
+  private started: () => void = () => undefined;
+  private readonly ready = new Promise<void>((resolve) => (this.started = resolve));
+
+  private async startUp(): Promise<void> {
     this.state = (await idbGet<MirrorState>(this.db, "meta", STATE_KEY).catch(() => undefined)) ?? { tree: "", canvases: {} };
     await this.lib.start(); // (first: the canvases read below may show items another device added)
     this.libraryDirty = true;
@@ -248,6 +259,23 @@ export class WorkspaceMirror {
     this.treeDirty = true;
     this.later();
   }
+  /** Look through `library/` for files changed outside the app (on the write queue); the library is written after, when it changed. */
+  rescan(onChange: () => void): Promise<void> {
+    this.running = Promise.all([this.running, this.ready])
+      .then(async () => {
+        if (await this.lib.scan()) {
+          onChange();
+          this.library();
+        }
+      })
+      .catch((e: unknown) => this.onError?.(`The workspace folder could not be looked through: ${(e as Error).message}.`));
+    return this.running;
+  }
+  /** Who imports files found in `library/`. */
+  set importFiles(fn: LibraryMirror["importFiles"]) {
+    this.lib.importFiles = fn;
+  }
+
   /** The library changed: its items, their names, tags or folders, the library folders, or the originals stored. */
   library(): void {
     this.libraryDirty = true;

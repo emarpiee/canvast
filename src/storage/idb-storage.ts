@@ -40,6 +40,7 @@ export function idbStorage(db: IDBDatabase): IdbStorage {
     libraryFolder: idbLibraryFolder(db),
     workspaceFolder: null,
     hidden: null,
+    folderImports: null,
     resetAll: (onBlocked) => resetAllData({ db, ...(onBlocked ? { onBlocked } : {}) }),
     flush: async () => undefined,
   };
@@ -131,10 +132,12 @@ export class IdbOriginals implements OriginalStore {
    * deleted or absent catalog entry to the library.
    */
   async put(record: AssetRecord, writeBytes: boolean): Promise<void> {
-    // With a library folder the file is written and proven first; only then does the browser keep a stub of it.
+    // With a library folder the file is written and proven first; only then does the browser keep a stub of it. A file found in the
+    // workspace folder (`record.file` on a record that is not a stub) is kept where it is.
     const toFolder = writeBytes && externalFolder.ready;
-    const file = toFolder ? await externalFolder.fileFor(record.hash, record.name, record.type) : "";
-    if (toFolder) {
+    const kept = toFolder && !record.ext && record.file ? record.file : "";
+    const file = kept || (toFolder ? await externalFolder.fileFor(record.hash, record.name, record.type) : "");
+    if (toFolder && !kept) {
       try {
         await externalFolder.write(record.hash, record.blob, file);
       } catch (err) {
@@ -154,7 +157,7 @@ export class IdbOriginals implements OriginalStore {
       if (isQuotaError(err)) throw new ImportError(FULL_MESSAGE);
       throw err;
     } finally {
-      if (file) externalFolder.release(file);
+      if (file && !kept) externalFolder.release(file);
     }
     if (writeBytes) {
       void requestPersistence();

@@ -9,7 +9,7 @@ import type { Dir } from "./external-folder";
 import { externalFolder } from "./external-folder";
 import { openBrowserStorage } from "./idb-storage";
 import type { IdbStorage } from "./idb-storage";
-import type { OpenHooks } from "./store";
+import type { FolderFile, OpenHooks } from "./store";
 import { WorkspaceMirror, watched } from "./workspace-mirror";
 import { WORKSPACE_NAMING } from "./workspace-names";
 import { HiddenVault } from "./hidden-store";
@@ -95,6 +95,14 @@ export async function openDesktopStorage(bridge: DesktopBridge, opts: OpenHooks)
   });
   const backups = watched(storage.backups, { applyImport: () => mirror.everything(), recordBackup: () => mirror.device() });
   const library = (): void => mirror.library();
+  let rescan = (): void => undefined;
+  const folderImports = {
+    start(importFiles: (files: FolderFile[]) => Promise<void>, changed: () => void) {
+      mirror.importFiles = importFiles;
+      rescan = () => void mirror.rescan(changed);
+      rescan();
+    },
+  };
   const catalog = watched(storage.catalog, {
     setLock: tree,
     renameAssets: library,
@@ -112,7 +120,7 @@ export async function openDesktopStorage(bridge: DesktopBridge, opts: OpenHooks)
     reconcile: (n) => void (n && mirror.library()),
   });
   const originals = watched(storage.originals, { put: library });
-  return { ...storage, workspace, backups, catalog, originals, libraryFolder: null, workspaceFolder: ws.path, hidden, flush: () => mirror.flush() };
+  return { ...storage, workspace, backups, catalog, originals, libraryFolder: null, workspaceFolder: ws.path, hidden, folderImports, flush: () => mirror.flush() };
 }
 
 /** This device's id in the workspace folder (`.canvast/devices/<id>.json`), made once and kept. */

@@ -8,7 +8,7 @@
  */
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } from "electron";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { isSafeRelativePath } from "../src/storage/workspace-names";
@@ -199,6 +199,36 @@ function installFileCalls(win: BrowserWindow, root: string): void {
       return true;
     } catch {
       return false;
+    }
+  });
+  ipcMain.handle("canvast:tree", async (e, rel: string) => {
+    own(e);
+    const out: Array<{ path: string; size: number }> = [];
+    const walk = async (dir: string, at: string): Promise<void> => {
+      let entries;
+      try {
+        entries = await readdir(dir, { withFileTypes: true });
+      } catch {
+        return;
+      }
+      for (const d of entries) {
+        if (d.name.startsWith(".") || out.length >= 200_000) continue;
+        const full = join(dir, d.name);
+        if (d.isDirectory()) await walk(full, `${at}/${d.name}`);
+        else if (d.isFile()) out.push({ path: `${at}/${d.name}`, size: (await stat(full)).size });
+      }
+    };
+    await walk(await inside(root, rel), rel);
+    return out;
+  });
+  ipcMain.handle("canvast:hash", async (e, rel: string) => {
+    own(e);
+    try {
+      const h = createHash("sha256");
+      for await (const chunk of createReadStream(await inside(root, rel))) h.update(chunk as Buffer);
+      return h.digest("hex");
+    } catch {
+      return null;
     }
   });
   ipcMain.handle("canvast:list", async (e, rel: string) => {

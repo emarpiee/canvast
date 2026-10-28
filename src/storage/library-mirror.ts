@@ -16,7 +16,8 @@ import type { HiddenVault } from "./hidden-store";
 import { hiddenFileName, isHiddenFile } from "./hidden-vault";
 import { sha256Hex } from "../assets/sha256";
 import { done, idbGet, idbPut, req } from "./idb";
-import { fileExt, fitsPlace, freePath, isSafeRelativePath, libraryDir, nameBase } from "./workspace-names";
+import { KIND_FOLDERS, fileExt, fitsPlace, freePath, isSafeRelativePath, libraryDir, nameBase, safeBase } from "./workspace-names";
+import type { FolderFile } from "./store";
 
 export const LIBRARY_JSON = ".canvast/library.json";
 export const LIBRARY_JSON_FORMAT = "canvast-library";
@@ -67,6 +68,11 @@ const MOVING_KEY = "libraryMoving";
 const HASH_RE = /^[0-9a-f]{64}$/;
 
 const encode = (text: string): Uint8Array => new TextEncoder().encode(text);
+/** A file worth looking at: not hidden, not a file being written (the app's own temporary files, a sync tool's or a browser's partial ones). */
+const usable = (path: string): boolean => {
+  const name = path.slice(path.lastIndexOf("/") + 1);
+  return !name.startsWith(".") && !/\.tmp-|\.(tmp|part|partial|crdownload|download|!sync|sync-conflict)$/i.test(name) && !/^(thumbs\.db|desktop\.ini)$/i.test(name);
+};
 const parentOf = (path: string): string => path.slice(0, path.lastIndexOf("/"));
 /** A file's own extension (`library/images/x.png` → `png`), or "" when it has none. */
 const extOfPath = (path: string): string => /\.([a-z0-9]{1,8})$/.exec(path.slice(path.lastIndexOf("/") + 1))?.[1] ?? "";
@@ -173,6 +179,8 @@ export class LibraryMirror {
   private lastText = "";
   private lastIndex = "";
   private failing = false;
+  /** Imports files found in `library/` that no item has (set by the app through `Storage.folderImports`). */
+  importFiles: ((files: FolderFile[]) => Promise<void>) | null = null;
   /** Told when an item could not be moved or written, in plain words. */
   onNotice: ((text: string) => void) | null = null;
 
@@ -329,6 +337,94 @@ export class LibraryMirror {
     if (failed.length && !this.failing) this.onNotice?.(`${failed.length === 1 ? "A library file" : `${failed.length} library files`} could not be moved to ${failed.length === 1 ? "its" : "their"} place in the workspace folder (${failed[0]}). ${failed.length === 1 ? "It is" : "They are"} tried again with the next change.`);
     this.failing = failed.length > 0;
     return !this.failing;
+  }
+
+  /**
+   * Look through `library/` for files the app did not put there (ADR 0177, "Changes from outside the app"). A file with the
+   * content of an item whose file is gone is that file, renamed or moved: the item follows it (its library folder is the one of
+   * the folder it is in, and a new file name becomes its name). Any other new file is imported where it lies, into the library
+   * folder of its folder. A copy of a file the library has is left alone. Whether anything changed.
+   */
+  async scan(): Promise<boolean> {
+    const found = (await this.bridge.tree("library")).filter((f) => usable(f.path));
+    const { entries, recs } = await this.read();
+    const known = new Set([...recs.values()].flatMap((r) => (r.ext && r.file ? [r.file.toLowerCase()] : [])));
+    const fresh = found.filter((f) => !known.has(f.path.toLowerCase()) && !externalFolder.claimed(f.path));
+    if (!fresh.length) return false;
+    const onDisk = new Set(found.map((f) => f.path.toLowerCase()));
+    const byHash = new Map(entries.map((e) => [e.hash, e]));
+    const found2: FolderFile[] = [];
+    let changed = false;
+    for (const f of fresh) {
+      const hash = await this.bridge.hash(f.path);
+      if (!hash) continue;
+      const rec = recs.get(hash);
+      if (rec) {
+        if (rec.ext && rec.file && !isHiddenFile(rec.file) && !onDisk.has(rec.file.toLowerCase())) {
+          await this.relink(hash, byHash.get(hash), rec.file, f.path);
+          onDisk.add(rec.file.toLowerCase()); // (a second copy of it is not relinked too)
+          changed = true;
+        }
+        continue; // a copy of a file the library has, or bytes it keeps otherwise: left alone
+      }
+      const name = f.path.slice(f.path.lastIndexOf("/") + 1);
+      found2.push({ path: f.path, name, folderId: await this.folderFor(parentOf(f.path)), read: async () => {
+        const bytes = await this.bridge.read(f.path);
+        return bytes && new Blob([bytes as Uint8Array<ArrayBuffer>]);
+      } });
+    }
+    if (found2.length && this.importFiles) {
+      await this.importFiles(found2);
+      changed = true;
+    }
+    return changed;
+  }
+
+  /** An item's file was renamed or moved outside the app: the item points at it, and takes its folder and (when renamed) its name. */
+  private async relink(hash: string, e: CatalogEntry | undefined, from: string, to: string): Promise<void> {
+    const folderId = await this.folderFor(parentOf(to));
+    const tx = this.db.transaction(["assets", "assetCatalog"], "readwrite", { durability: "strict" });
+    const committed = done(tx);
+    const cur = await req(tx.objectStore("assets").get(hash) as IDBRequest<AssetRecord | undefined>);
+    if (cur?.ext && cur.file === from) tx.objectStore("assets").put({ ...cur, file: to } satisfies AssetRecord, hash);
+    const entry = e && (await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>));
+    if (entry) {
+      const base = to.slice(to.lastIndexOf("/") + 1);
+      const renamed = nameBase(base) !== nameBase(entry.name);
+      tx.objectStore("assetCatalog").put({ ...entry, ...(renamed ? { name: base } : {}), folderIds: folderId ? [folderId] : [] } satisfies CatalogEntry);
+    }
+    await committed;
+  }
+
+  /**
+   * The library folder a folder of `library/` stands for: the one whose path of safe names it is, made (with its parents) when
+   * there is none, named as the folder on disk. A kind folder (`library/images`) or `library/` itself stands for none.
+   */
+  private async folderFor(dir: string): Promise<string | null> {
+    const parts = dir.split("/").slice(1);
+    const tx = this.db.transaction("meta", "readwrite", { durability: "strict" });
+    const committed = done(tx);
+    const folders = (await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? [];
+    const match = (parent: string | null, part: string): AssetFolder | undefined => folders.find((f) => f.parentId === parent && safeBase(f.name) === part);
+    if (!parts.length || (parts.length === 1 && KIND_FOLDERS.has(parts[0]!) && !match(null, parts[0]!))) {
+      tx.abort();
+      await committed.catch(() => undefined);
+      return null;
+    }
+    let parent: string | null = null;
+    let made = false;
+    for (const part of parts) {
+      let f = match(parent, part);
+      if (!f) {
+        f = { id: Array.from(crypto.getRandomValues(new Uint8Array(16)), (x) => x.toString(16).padStart(2, "0")).join(""), name: part, parentId: parent };
+        folders.push(f);
+        made = true;
+      }
+      parent = f.id;
+    }
+    if (made) tx.objectStore("meta").put(folders, FOLDERS_KEY);
+    await committed;
+    return parent;
   }
 
   /** A move the app stopped in the middle of: the stored original follows the file to wherever it is now. */

@@ -193,7 +193,7 @@ export class AssetLibrary {
    * Like `importFile`, and says whether these bytes were already in the library: "present" (nothing stored again) or
    * "restored" (it had been deleted from the library and is back).
    */
-  async importFileDetailed(file: Blob & { name?: string }, keepDecoded = true): Promise<ImportOutcome> {
+  async importFileDetailed(file: Blob & { name?: string }, keepDecoded = true, /** A file of the workspace folder, kept where it is (desktop build). */ at?: string): Promise<ImportOutcome> {
     if (file.size > MAX_IMPORT_BYTES) throw new ImportError(`file is larger than ${MAX_IMPORT_BYTES / 2 ** 20} MiB`);
     const type = file.type || "application/octet-stream";
     const bytes = await file.arrayBuffer();
@@ -274,6 +274,7 @@ export class AssetLibrary {
       ...(duration !== undefined ? { duration } : {}),
       ...(frames !== undefined ? { frames } : {}),
       ...(carded ? { card: true } : {}),
+      ...(at ? { file: at } : {}),
     };
     if (record.pixelW < 1 || record.pixelH < 1) throw new ImportError("image has no pixels");
     if (this.store) await this.save(record, true);

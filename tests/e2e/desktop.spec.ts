@@ -1,6 +1,6 @@
 import { _electron as electron, expect, test } from "@playwright/test";
 import type { ElectronApplication, Page } from "@playwright/test";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, symlinkSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { buildDir } from "./build-dir";
@@ -360,6 +360,50 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     await flush();
     expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual([]);
     expect(traces()).toEqual([]);
+  } finally {
+    await app.close();
+  }
+});
+
+test("library files changed outside the app: a renamed or moved file is found by its content, a new one is imported where it lies, a deleted one shows as missing", async () => {
+  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const red = makePng(3, 2, () => [220, 30, 30, 255]);
+  const blue = makePng(3, 2, () => [30, 30, 220, 255]);
+  let { app, page } = await launch(ws);
+  const listing = () =>
+    page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, l.folders.find((f) => f.id === e.folderIds?.[0])?.name ?? null, e.present, e.instances]).sort()));
+  try {
+    await page.getByTestId("import-input").setInputFiles({ name: "Hand Study.png", mimeType: "image/png", buffer: red });
+    await expect.poll(listing).toEqual([["Hand Study.png", null, true, 1]]);
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.saveStatus())).toBe("verified");
+  } finally {
+    await app.close();
+  }
+  // In the file manager: the file renamed into a new folder, a new file dropped into another, a download not finished yet.
+  mkdirSync(join(ws, "library/anatomy"));
+  renameSync(join(ws, "library/images/hand_study.png"), join(ws, "library/anatomy/Loomis Hands.png"));
+  mkdirSync(join(ws, "library/poses"));
+  writeFileSync(join(ws, "library/poses/Pose One.png"), blue);
+  writeFileSync(join(ws, "library/poses/half.png.part"), blue.subarray(0, 10));
+  ({ app, page } = await launch(ws));
+  try {
+    await expect.poll(listing, { timeout: 10_000 }).toEqual([
+      ["Loomis Hands.png", "anatomy", true, 1], // (the placed picture still shows it)
+      ["Pose One.png", "poses", true, 0],
+    ]);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    // Their files then take their place in the naming convention, as any item's does.
+    expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual(["library/anatomy/loomis_hands.png", "library/poses/half.png.part", "library/poses/pose_one.png"]);
+  } finally {
+    await app.close();
+  }
+  rmSync(join(ws, "library/poses/pose_one.png"));
+  ({ app, page } = await launch(ws));
+  try {
+    await expect.poll(listing, { timeout: 10_000 }).toEqual([
+      ["Loomis Hands.png", "anatomy", true, 1],
+      ["Pose One.png", "poses", false, 0],
+    ]);
   } finally {
     await app.close();
   }
