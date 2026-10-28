@@ -1504,6 +1504,25 @@ test("list columns: each can be hidden or moved, the header follows, and the cho
   await expect(head("width")).toHaveAttribute("aria-sort", "descending");
   await expect(head("name")).toHaveAttribute("aria-sort", "none");
   await p.keyboard.press("Escape");
+  // A column is resized by its header's right edge (not a sort), and the width stays over a reload, as does the grid's thumbnail size.
+  const sortBefore = await head("width").getAttribute("aria-sort");
+  const w0 = (await head("width").boundingBox())!.width;
+  const edge = (await head("width").locator(".col-resize").boundingBox())!;
+  await p.mouse.move(edge.x + edge.width / 2, edge.y + edge.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(edge.x + edge.width / 2 + 80, edge.y + edge.height / 2, { steps: 4 });
+  await p.mouse.up();
+  const w1 = (await head("width").boundingBox())!.width;
+  expect(w1).toBeGreaterThan(w0 + 60);
+  await expect(head("width")).toHaveAttribute("aria-sort", sortBefore!);
+  await p.locator('[data-layout="grid"]').click();
+  await p.locator(".assets-size input").fill("216");
+  await p.locator('[data-layout="list"]').click();
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  expect(Math.abs((await head("width").boundingBox())!.width - w1)).toBeLessThan(2);
+  await expect(p.locator(".assets-size input")).toHaveValue("216");
   // The list never squeezes a column: it scrolls sideways instead of clipping (the header and the rows are as wide as the columns need).
   await p.setViewportSize({ width: 700, height: 700 });
   const wide = await p.locator(".assets-body.is-list .assets-list-head").evaluate((e) => e.scrollWidth <= e.clientWidth + 1 || e.parentElement!.scrollWidth > e.parentElement!.clientWidth);

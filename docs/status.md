@@ -36,6 +36,14 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.22: resizable list columns, a remembered thumbnail size (2026-10-29)
+
+**Implemented:** `.col-resize` in each list header (pointer drag, double-click resets), `ui.colW` (into `--cols`), `ui.thumb`; `COL_W_MAX`.
+**Tested:** the list-columns test resizes a column (not a sort), sets the thumbnail size, reloads, both kept (chromium, firefox 2/2).
+**Known failures:** none.
+**Committed:** on `main`, not pushed.
+**Next bounded task:** "Aa" on a font's card on the canvas.
+
 ## v0.50.21: fonts show their letters (2026-10-29)
 
 **Implemented:** `isFontFile`, `hasThumb` (file-kind.ts); `makeFontThumb` (FontFace, "Aa" in light letters, PNG); library cards and filmstrip show it (`.is-font-thumb`, `--font-thumb-filter` per theme, no chequered ground).

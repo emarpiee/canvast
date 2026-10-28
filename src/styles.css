@@ -1882,7 +1882,10 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .assets-body.hide-size.is-list .asset-size, .assets-body.hide-size .assets-list-head [data-col="size"],
 .assets-body.hide-folder.is-list .asset-folder, .assets-body.hide-folder .assets-list-head [data-col="folder"],
 .assets-body.hide-favourite.is-list .asset-fav, .assets-body.hide-favourite .assets-list-head [data-col="favourite"] { display: none; }
-.assets-body.is-list .assets-list-head [data-col] { cursor: grab; user-select: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.assets-body.is-list .assets-list-head [data-col] { position: relative; cursor: grab; user-select: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A column's resize handle: its header's right edge (the gap to the next column). */
+.assets-body.is-list .assets-list-head .col-resize { position: absolute; top: 0; bottom: 0; right: 0; width: var(--sp-4); cursor: col-resize; touch-action: none; }
+.assets-body.is-list .assets-list-head .col-resize:hover { background: color-mix(in oklch, var(--hud-accent) 40%, transparent); }
 .assets-body.is-list .assets-list-head [data-col].is-dragging { opacity: 0.4; }
 .assets-body.is-list .assets-list-head [data-col].is-drop { box-shadow: inset 2px 0 0 var(--hud-accent); }
 .assets-body.is-list .assets-scroll { overflow-x: auto; }

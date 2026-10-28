@@ -173,6 +173,9 @@ const SIDE_SECTIONS = ["folders", "types", "tags", "ctags"] as const;
 /** The library's filters as they are before any is chosen (the reset button goes back to these). */
 const NO_FILTERS = { usage: "all", sort: "newest", reversed: false, scope: "all" } as const;
 
+/** The widest a list column can be made by dragging its header's edge. */
+const COL_W_MAX = 900;
+
 export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore): AssetsView {
   root.innerHTML = `
     <div class="assets-place-zone drop-zone" data-testid="assets-place-zone" hidden>${ICONS.mapPin}<span></span></div>
@@ -216,7 +219,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <nav class="assets-side" data-testid="assets-side" aria-label="Library"></nav>
       <div class="col-grip" data-grip="side" data-testid="side-grip" role="separator" aria-orientation="vertical" aria-label="Resize the library panel" title="Drag to resize the library panel (double-click to reset)" tabindex="0"></div>
       <div class="assets-main">
-        <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map((c) => `<span data-col="${c.id}" draggable="true" role="columnheader" aria-sort="none" title="Click to sort by ${c.label.toLowerCase()}; drag to move this column">${c.label}<i class="col-sort" aria-hidden="true"></i></span>`).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
+        <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map((c) => `<span data-col="${c.id}" draggable="true" role="columnheader" aria-sort="none" title="Click to sort by ${c.label.toLowerCase()}; drag to move this column">${c.label}<i class="col-sort" aria-hidden="true"></i><i class="col-resize" data-resize="${c.id}" title="Drag to resize this column (double-click: its usual width)" aria-hidden="true"></i></span>`).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
           <button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.arrowLeft}</button>
           <button type="button" class="vbtn viewer-hide" data-act="bar" aria-label="Hide the controls" title="Hide the controls (F)">${ICONS.chevronsDown}</button>
@@ -340,7 +343,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; expanded: string[]; sections: string[]; filters: { usage: string; sort: string; reversed: boolean; scope: string }; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], expanded: [], sections: [...SIDE_SECTIONS], filters: { ...NO_FILTERS }, sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; expanded: string[]; sections: string[]; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], expanded: [], sections: [...SIDE_SECTIONS], filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -365,6 +368,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (typeof saved.sheetH === "number" && saved.sheetH >= 120 && saved.sheetH <= 2000) ui.sheetH = saved.sheetH;
     if (Array.isArray(saved.closed)) ui.closed = saved.closed.filter((c) => typeof c === "string").slice(0, 8);
     if (Array.isArray(saved.expanded)) ui.expanded = saved.expanded.filter((c) => typeof c === "string").slice(0, 8);
+    if (saved.colW && typeof saved.colW === "object") {
+      for (const c of COLUMNS) {
+        const w = (saved.colW as Record<string, unknown>)[c.id];
+        if (typeof w === "number" && w >= c.min && w <= COL_W_MAX) ui.colW[c.id] = Math.round(w);
+      }
+    }
+    if (typeof saved.thumb === "number" && saved.thumb >= 96 && saved.thumb <= 240) ui.thumb = saved.thumb;
     if (saved.filters && typeof saved.filters === "object") {
       const f = saved.filters as Partial<typeof ui.filters>;
       ui.filters = { usage: typeof f.usage === "string" ? f.usage : "all", sort: typeof f.sort === "string" ? f.sort : "newest", reversed: f.reversed === true, scope: typeof f.scope === "string" ? f.scope : "all" };
@@ -413,7 +423,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const shown = ui.order.filter((c) => !ui.hidden.includes(c));
     ui.order.forEach((c, i) => body.style.setProperty(`--o-${c}`, String(i + 1)));
     for (const c of DEFAULT_COLUMN_ORDER) body.classList.toggle(`hide-${c}`, ui.hidden.includes(c));
-    body.style.setProperty("--cols", ["56px", ...shown.map((c) => trackOf(COLUMNS.find((x) => x.id === c)!))].join(" "));
+    // (a column resized by its header's edge keeps that width; the others share the room as usual)
+    body.style.setProperty("--cols", ["56px", ...shown.map((c) => (ui.colW[c] ? `${ui.colW[c]}px` : trackOf(COLUMNS.find((x) => x.id === c)!)))].join(" "));
     // The list never squeezes a column below its minimum: when the window is narrower it scrolls sideways instead.
     body.style.setProperty("--list-min", `${56 + shown.reduce((n, c) => n + COLUMNS.find((x) => x.id === c)!.min, 0) + 12 * shown.length + 48}px`);
     if (ui.sheetH) body.style.setProperty("--sheet-h", `${ui.sheetH}px`);
@@ -3341,7 +3352,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // A click on a header sorts by it; another click reverses it, as in a table.
   listHead.addEventListener("click", (e) => {
     const h = (e.target as HTMLElement).closest<HTMLElement>("[data-col]");
-    if (!h) return;
+    if (!h || (e.target as HTMLElement).closest("[data-resize]") || performance.now() - resizedAt < 300) return; // (a resize is not a sort)
     const key = SORT_OF[h.dataset["col"] as ColumnId].key;
     if (sortSel.value === key) reversed = !reversed;
     else {
@@ -3353,6 +3364,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
   listHead.addEventListener("dragstart", (e) => {
     const h = (e.target as HTMLElement).closest<HTMLElement>("[data-col]");
+    if ((e.target as HTMLElement).closest?.("[data-resize]")) return void e.preventDefault();
     if (!h) return;
     dragCol = h.dataset["col"] as ColumnId;
     h.classList.add("is-dragging");
@@ -3594,7 +3606,50 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
   sizeInput.addEventListener("input", () => {
     grid.style.setProperty("--thumb", `${sizeInput.value}px`);
+    ui.thumb = Number(sizeInput.value);
+    saveUi();
     relayout();
+  });
+  // The thumbnail size, as it was left.
+  if (ui.thumb) {
+    sizeInput.value = String(ui.thumb);
+    grid.style.setProperty("--thumb", `${ui.thumb}px`);
+  }
+  // A column of the list is resized by dragging its header's right edge (double-click: back to its usual width); kept with the layout.
+  let resizedAt = 0;
+  listHead.addEventListener("pointerdown", (e) => {
+    const grip = (e.target as HTMLElement).closest<HTMLElement>("[data-resize]");
+    if (!grip || e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const id = grip.dataset["resize"] as ColumnId;
+    const col = COLUMNS.find((c) => c.id === id)!;
+    const startX = e.clientX;
+    const startW = grip.parentElement!.getBoundingClientRect().width;
+    let frame = 0;
+    grip.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent): void => {
+      ui.colW[id] = Math.round(Math.max(col.min, Math.min(COL_W_MAX, startW + ev.clientX - startX)));
+      frame ||= requestAnimationFrame(() => ((frame = 0), applyUi()));
+    };
+    const up = (): void => {
+      grip.removeEventListener("pointermove", move);
+      grip.removeEventListener("pointerup", up);
+      grip.removeEventListener("pointercancel", up);
+      resizedAt = performance.now();
+      applyUi();
+      saveUi();
+    };
+    grip.addEventListener("pointermove", move);
+    grip.addEventListener("pointerup", up);
+    grip.addEventListener("pointercancel", up);
+  });
+  listHead.addEventListener("dblclick", (e) => {
+    const grip = (e.target as HTMLElement).closest<HTMLElement>("[data-resize]");
+    if (!grip) return;
+    delete ui.colW[grip.dataset["resize"] as ColumnId];
+    applyUi();
+    saveUi();
   });
   // The picture you are looking at stays where it is on the screen when the grid is laid out again (the details panel opened or closed, the
   // window or the thumbnails resized, items added above): the picked one if it is in view, else the one a third of the way down.

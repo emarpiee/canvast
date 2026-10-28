@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.22 — Resizable list columns, a remembered thumbnail size (2026-10-29)
+
+- **Added:** in the library's list, a column is resized by dragging its header's right edge (a double-click gives back its usual width); the widths are kept with the layout, as the columns' choice and order are.
+- **Fixed:** the grid's thumbnail size was forgotten on a reload: it is now kept with the layout.
+
 ## 0.50.21 — Fonts show their letters (2026-10-29)
 
 - **Added:** a font in the library (TTF, OTF, WOFF, WOFF2) shows "Aa" written in that font as its thumbnail, in the theme's text colour, instead of the file tile; read and drawn by the app itself, with no extra package.
