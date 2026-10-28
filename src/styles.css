@@ -30,6 +30,7 @@
   --hud-muted: oklch(0.46 calc(0.02 * var(--vivid)) var(--hue));
   --hud-border: oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.14);
   --hud-hover: oklch(0.5 calc(0.03 * var(--vivid)) var(--hue) / 0.14);
+  --thumb-glint: oklch(1 0 0 / 0.55); /* the light passing over a thumbnail that is still loading */
   --hud-accent: oklch(0.52 calc(0.1 * var(--vivid)) var(--hue));
   --hud-accent-fg: oklch(1 0 0);
   --hud-danger: oklch(0.47 0.15 20);
@@ -157,6 +158,7 @@
     --hud-muted: oklch(0.72 calc(0.014 * var(--vivid)) var(--hue));
     --hud-border: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue) / 0.14);
     --hud-hover: oklch(0.75 calc(0.025 * var(--vivid)) var(--hue) / 0.16);
+  --thumb-glint: oklch(1 0 0 / 0.06);
     --hud-accent: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
     --hud-accent-fg: oklch(0.25 calc(0.04 * var(--vivid)) var(--hue));
     --hud-danger: oklch(0.7 0.14 20);
@@ -192,6 +194,7 @@
   --hud-muted: oklch(0.72 calc(0.014 * var(--vivid)) var(--hue));
   --hud-border: oklch(0.93 calc(0.014 * var(--vivid)) var(--hue) / 0.14);
   --hud-hover: oklch(0.75 calc(0.025 * var(--vivid)) var(--hue) / 0.16);
+  --thumb-glint: oklch(1 0 0 / 0.06);
   --hud-accent: oklch(0.78 calc(0.075 * var(--vivid)) var(--hue));
   --hud-accent-fg: oklch(0.25 calc(0.04 * var(--vivid)) var(--hue));
   --hud-danger: oklch(0.7 0.14 20);
@@ -1116,8 +1119,11 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 /* A thumbnail's place, the same everywhere (cards, list rows, the details picture, the filmstrip): until its picture has loaded the
    picture is out of sight (never the browser's broken-picture mark) and the place shimmers; one that cannot be shown leaves it plain. */
 .thumb-slot > img:not(.is-loaded) { visibility: hidden; }
-.thumb-slot:has(> img:not(.is-loaded):not(.is-broken)) { background-image: linear-gradient(100deg, transparent 30%, var(--hud-hover) 50%, transparent 70%); background-size: 250% 100%; animation: thumb-wait var(--dur-wait) linear infinite; }
-@keyframes thumb-wait { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+/* One soft light sweeps across the whole view (fixed to the window), so every waiting place takes part in the same wave instead of each
+   flickering on its own; with reduced motion the places stay still. */
+.thumb-slot:has(> img:not(.is-loaded):not(.is-broken)) { background-image: linear-gradient(105deg, transparent 40%, var(--thumb-glint) 50%, transparent 60%); background-size: 300% 100%; background-repeat: no-repeat; background-attachment: fixed; animation: thumb-wait var(--dur-wait) var(--ease-out) infinite; }
+@keyframes thumb-wait { from { background-position: 100% 0; } to { background-position: 0% 0; } }
+@media (prefers-reduced-motion: reduce) { .thumb-slot:has(> img:not(.is-loaded):not(.is-broken)) { animation: none; background-image: none; } }
 .asset-card:hover { box-shadow: 0 0 0 2px var(--hud-muted); }
 .asset-card[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--hud-accent); }
 .asset-info { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 1px; padding: var(--sp-11) var(--sp-5) var(--sp-4); color: var(--media-fg); background: linear-gradient(to top, var(--media-fade), transparent); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); pointer-events: none; }
@@ -2748,6 +2754,8 @@ dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height
 .adj-row[data-lv-row] { grid-template-columns: minmax(0, 1fr) 3.75rem; row-gap: var(--sp-3); }
 .adj-group > .adj-row:has(> select) { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-4); }
 .adj-group > .adj-row:has(> select) button { flex: none; white-space: nowrap; }
+#settings-view .storage-actions button { gap: var(--sp-3); }
+#settings-view .storage-actions button svg { flex: none; width: var(--icon-md); height: var(--icon-md); }
 #settings-view button.is-danger { color: var(--hud-danger-fg); background: var(--hud-danger); border-color: var(--hud-danger); }
 .set-danger { border-color: var(--hud-danger); }
 dialog.reset-dialog { max-width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; }

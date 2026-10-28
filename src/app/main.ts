@@ -1818,7 +1818,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     onSaving: (fn) => void session.persistence.subscribe(fn),
     folder: (() => {
       let draw: (() => Promise<void>) | null = null;
-      return (host: HTMLElement) => (draw ??= mountLibraryFolderCard(host, session, { get: () => settings.get("storage.deleteTo"), set: (v) => void settings.set("storage.deleteTo", v) }))();
+      return (host: HTMLElement) => (draw ??= mountLibraryFolderCard(host, session))();
     })(),
     persist: async () => void (await navigator.storage?.persist?.().catch(() => false)),
     password: async (kind, action) => {

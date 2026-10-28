@@ -252,6 +252,14 @@ export const SETTINGS_TABS: readonly Tab[] = [
   },
 ];
 
+/** The desktop app's one setting of the Storage tab, shown as a row of the Workspace folder card. */
+const DELETE_TO_ROW: Row = {
+  key: "storage.deleteTo",
+  label: "Deleted files go",
+  help: "A library item once undo no longer needs it, a deleted canvas or board. Files in .trash travel with the folder and can be put back by hand.",
+  control: { kind: "select", options: [["trash", "To .trash in the folder"], ["system", "To the system trash"], ["erase", "Deleted for good"]] },
+};
+
 const fmt = (n: number): string => String(Math.round(n * 100) / 100);
 
 function controlHtml(row: Row, id: string): string {
@@ -328,8 +336,9 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
       : t.id === "storage"
         ? (DESKTOP
             ? `<div class="set-info set-card" data-folder-card><h3>Workspace folder</h3><div data-folder-host></div>
-             <p class="set-help">This folder is your workspace: the library's files under <code>library/</code>, the boards and canvases in <code>.canvast/boards/</code>. Back it up, sync it or copy it like any folder.</p>
-             <p><button type="button" data-switch-workspace data-testid="set-switch-workspace" aria-haspopup="menu">${ICONS.arrowLeftRight}<span>Switch workspace…</span></button></p></div>
+             <p class="set-help">Your boards, canvases and library are files in this folder: back it up, sync it or copy it like any folder.</p>
+             <div class="storage-actions"><button type="button" data-switch-workspace data-testid="set-switch-workspace" aria-haspopup="menu">${ICONS.arrowLeftRight}<span>Switch workspace…</span></button></div>
+             ${rowHtml(DELETE_TO_ROW)}</div>
            <div class="set-info set-card" data-storage><h3>Working copy</h3><p>The app also keeps a working copy of the workspace on this device, so every change is safe at once; the folder follows a moment after editing pauses.</p>
              <dl><dt>Used</dt><dd data-used>…</dd></dl></div>`
             : `<div class="set-info set-card" data-storage><h3>Space</h3><p>Your canvases are kept in this browser's storage, on this device, unless you keep the files in a library folder (next card).</p>
@@ -589,7 +598,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     if (!n) return;
     n.innerHTML = `<span>${esc(text)}</span> <button type="button" class="set-reset" data-key-yes>${esc(yes)}</button> <button type="button" class="set-reset" data-key-no>Cancel</button>`;
   };
-  const all = SETTINGS_TABS.flatMap((t) => t.rows ?? []);
+  const all = [...SETTINGS_TABS.flatMap((t) => t.rows ?? []), ...(DESKTOP ? [DELETE_TO_ROW] : [])];
   /** Show the stored values in the controls (never while one is being typed into: only called on a change). */
   const refresh = (): void => {
     renderKeys();

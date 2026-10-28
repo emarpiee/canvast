@@ -4,22 +4,16 @@ import { esc } from "./format";
 import { LIBRARY_FILE, externalFolder, folderSupported } from "../storage/external-folder";
 import { runOpenLibraryFile, runSaveLibraryFile } from "./archive-ui";
 import { beginProgress } from "../app/progress";
-import type { DeleteMode } from "../storage/desktop-bridge";
 
 /**
  * The library folder card of Settings > Storage (ADR 0159): where the originals are kept, and the moves between the
  * browser's storage and a folder on the disk. Returns the function that draws it again; the card draws itself after each action.
  */
-export function mountLibraryFolderCard(host: HTMLElement, session: Session, deleteTo?: { get(): DeleteMode; set(v: DeleteMode): void }): () => Promise<void> {
+export function mountLibraryFolderCard(host: HTMLElement, session: Session): () => Promise<void> {
   const draw = async (): Promise<void> => {
     const workspace = session.storage?.workspaceFolder;
     if (workspace) {
-      const now = deleteTo?.get() ?? "trash";
-      const option = (v: DeleteMode, label: string): string => `<option value="${v}"${v === now ? " selected" : ""}>${label}</option>`;
-      host.innerHTML = `<p data-testid="storage-folder"><strong>${esc(workspace)}</strong> (File &gt; Open workspace folder… opens another)</p>
-        <label class="storage-check">When canvast deletes a file (an item deleted from the library once undo no longer needs it, a deleted canvas or board)
-          <select data-delete-to data-testid="storage-delete-to">${option("trash", "Move it to .trash in the workspace folder")}${option("system", "Move it to the system trash")}${option("erase", "Delete it permanently")}</select></label>
-        <p class="storage-note">Files in <code>.trash</code> travel with the workspace folder to your other devices, and can be put back by hand.</p>`;
+      host.innerHTML = `<dl data-testid="storage-folder"><dt>Folder</dt><dd><strong>${esc(workspace)}</strong></dd></dl>`;
       return;
     }
     const folder = session.storage?.libraryFolder;
@@ -75,8 +69,6 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session, dele
   };
 
   host.addEventListener("change", (e) => {
-    const to = (e.target as HTMLElement).closest<HTMLSelectElement>("[data-delete-to]");
-    if (to) return deleteTo?.set(to.value as DeleteMode);
     const box = (e.target as HTMLElement).closest<HTMLInputElement>("[data-auto-index]");
     if (!box) return;
     session.settingsHook?.setAuto(box.checked);
