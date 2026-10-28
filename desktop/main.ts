@@ -7,7 +7,7 @@
  * one opened, else the one chosen in the start dialog (recent ones, open a folder, a new workspace).
  */
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } from "electron";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, watch, writeFileSync } from "node:fs";
 import { mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
@@ -320,12 +320,11 @@ function installFileCalls(win: BrowserWindow, root: string): void {
 function watchFolder(win: BrowserWindow, root: string): void {
   const pending = new Set<string>();
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let watcher: ReturnType<typeof watch>;
+  const skipped = (rel: string): boolean => /^\.trash(\/|$)|^\.canvast\/moving(\/|$)|\.tmp-/.test(rel);
+  let close: () => void;
   try {
-    watcher = watch(root, { recursive: true }, (_event, name) => {
-      if (!name) return;
-      const rel = name.toString().split(sep).join("/");
-      if (/^\.trash(\/|$)|^\.canvast\/moving(\/|$)|\.tmp-/.test(rel)) return;
+    close = watchTree(root, skipped, (rel) => {
+      if (skipped(rel)) return;
       pending.add(rel);
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
@@ -336,15 +335,117 @@ function watchFolder(win: BrowserWindow, root: string): void {
   } catch {
     return; // (no watching on this system: changes are still read at the next start)
   }
-  win.on("closed", () => watcher.close());
+  win.on("closed", () => close());
 }
 
-function partitionOf(workspace: string): string {
-  return `persist:ws-${createHash("sha256").update(workspace).digest("hex").slice(0, 24)}`;
+/**
+ * Watch a folder and every folder in it; `onChange` gets each changed path, relative, with `/`. Linux has no recursive watch
+ * of its own, and Node's stand-in watches every file and reads a folder again, synchronously, on each change in it: an
+ * import writing thousands of files into one folder then held this process for minutes (the window stayed blank). Here each
+ * folder is watched once (a folder's watch reports its files) and a new folder is added when it appears, never blocking.
+ */
+function watchTree(root: string, skip: (rel: string) => boolean, onChange: (rel: string) => void): () => void {
+  if (process.platform !== "linux") {
+    const w = watch(root, { recursive: true }, (_event, name) => name && onChange(name.toString().split(sep).join("/")));
+    return () => w.close();
+  }
+  const watchers = new Map<string, ReturnType<typeof watch>>(); // (by folder, relative; "" is the root)
+  let closed = false;
+  const drop = (rel: string): void => {
+    for (const [d, w] of watchers) {
+      if (d !== rel && !d.startsWith(`${rel}/`)) continue;
+      w.close();
+      watchers.delete(d);
+    }
+  };
+  const add = async (rel: string): Promise<void> => {
+    if (closed || watchers.has(rel) || (rel && skip(rel))) return;
+    const full = rel ? join(root, ...rel.split("/")) : root;
+    let w: ReturnType<typeof watch>;
+    try {
+      w = watch(full, (event, name) => {
+        if (!name) return;
+        const child = rel ? `${rel}/${name.toString()}` : name.toString();
+        if (skip(child)) return;
+        onChange(child);
+        // A name that came or went: a folder made (or moved in) is watched too, one removed is let go.
+        if (event === "rename") void stat(join(full, name.toString())).then((s) => (s.isDirectory() ? add(child) : undefined), () => drop(child));
+      });
+    } catch {
+      return; // (gone already, or not readable)
+    }
+    w.on("error", () => drop(rel));
+    watchers.set(rel, w);
+    for (const d of await readdir(full, { withFileTypes: true }).catch(() => [])) if (d.isDirectory()) await add(rel ? `${rel}/${d.name}` : d.name);
+  };
+  void add("");
+  return () => {
+    closed = true;
+    for (const w of watchers.values()) w.close();
+    watchers.clear();
+  };
+}
+
+/** The folder's own id, in the folder (`.canvast/folder.json`): a new folder at the path of a deleted one is another workspace. */
+const FOLDER_FILE = join(".canvast", "folder.json");
+const FOLDER_ID_RE = /^[0-9a-f]{32}$/;
+const partitionsFile = (): string => join(app.getPath("userData"), "partitions.json");
+/** Which storage partition each workspace folder uses on this device: by path, with the folder's id. */
+type Partitions = Record<string, { id: string; partition: string }>;
+
+function readPartitions(): Partitions {
+  try {
+    const p = JSON.parse(readFileSync(partitionsFile(), "utf8")) as Partitions;
+    return p && typeof p === "object" ? p : {};
+  } catch {
+    return {};
+  }
+}
+
+function readFolderId(workspace: string): string | null {
+  try {
+    const id = (JSON.parse(readFileSync(join(workspace, FOLDER_FILE), "utf8")) as { id?: unknown }).id;
+    return typeof id === "string" && FOLDER_ID_RE.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+const hashed = (text: string): string => `persist:ws-${createHash("sha256").update(text).digest("hex").slice(0, 24)}`;
+
+/**
+ * The storage partition of a workspace folder (its cache on this device): one per folder, not per path, so a folder made
+ * where a deleted one was never opens the deleted one's boards, library or passwords. A folder that has no id yet gets one;
+ * one made before folders had ids keeps the partition it had (named by its path). A partition left behind by a folder that
+ * is gone from that path is cleared: what it held was a cache of that folder.
+ */
+async function partitionOf(workspace: string): Promise<string> {
+  const known = readPartitions();
+  const legacy = hashed(workspace);
+  let id = readFolderId(workspace);
+  let partition: string;
+  if (id && known[workspace]?.id === id) partition = known[workspace].partition;
+  else if (id) partition = hashed(`${workspace}\n${id}`);
+  else {
+    id = randomBytes(16).toString("hex");
+    const before = existsSync(join(workspace, ".canvast", "workspace.json")) && !known[workspace];
+    partition = before ? legacy : hashed(`${workspace}\n${id}`);
+    mkdirSync(join(workspace, ".canvast"), { recursive: true });
+    writeFileSync(join(workspace, FOLDER_FILE), JSON.stringify({ format: "canvast-folder", version: 1, id }, null, 1));
+  }
+  const onDisk = (p: string): boolean => existsSync(join(app.getPath("userData"), "Partitions", p.slice("persist:".length)));
+  const inUse = (p: string): boolean => Object.entries(known).some(([path, k]) => path !== workspace && k.partition === p);
+  for (const p of new Set([known[workspace]?.partition, legacy])) {
+    if (p && p !== partition && onDisk(p) && !inUse(p)) await session.fromPartition(p).clearStorageData().catch(() => undefined);
+  }
+  known[workspace] = { id, partition };
+  mkdirSync(app.getPath("userData"), { recursive: true });
+  writeFileSync(partitionsFile(), JSON.stringify(known, null, 2));
+  return partition;
 }
 
 async function openWindow(workspace: string): Promise<void> {
-  const partition = partitionOf(workspace);
+  const partition = await partitionOf(workspace);
   const ses = session.fromPartition(partition);
   // Only the app itself is served; any other path of the scheme is not found.
   ses.protocol.handle(SCHEME, (req) => {

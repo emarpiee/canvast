@@ -88,7 +88,7 @@ test("library files are readable files under library/: the same bytes once, -2 o
       await page.getByTestId("import-input").setInputFiles({ name: "Hand Study (Loomis).PNG", mimeType: "image/png", buffer });
       await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.reduce((n, e) => n + e.instances, 0)))).toBe(before + 1);
     }
-    expect(files(ws)).toEqual(["library/images/hand_study-loomis-2.png", "library/images/hand_study-loomis.png"]);
+    expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual(["library/images/hand_study-loomis-2.png", "library/images/hand_study-loomis.png"]);
     expect(readFileSync(join(ws, "library/images/hand_study-loomis.png")).equals(red)).toBe(true);
     expect(readFileSync(join(ws, "library/images/hand_study-loomis-2.png")).equals(blue)).toBe(true);
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.saveStatus()), { timeout: 5000 }).toBe("verified"); // (the placed pictures are saved before closing)
@@ -223,6 +223,14 @@ test("the folder is the truth: a new device opens the whole workspace, another d
   await a.page.evaluate(() => window.__canvastDebug.flushStorage());
   await a.app.close();
   expect(files(ws).filter((f) => f.endsWith(".cvst")).map((f) => f.replace(/conflict_[0-9_-]+/, "conflict"))).toEqual([`${B}sketches/characters-conflict.cvst`, `${B}sketches/characters.cvst`]);
+
+  // The folder deleted and a new, empty one made at the same path: a new workspace, nothing of the old one's cache.
+  rmSync(ws, { recursive: true, force: true });
+  mkdirSync(ws);
+  a = await launch(ws, "device-a");
+  await ready(a.page);
+  expect(await counts(a.page)).toEqual([[expect.any(String), expect.any(String), 0]]);
+  await a.app.close();
 });
 
 test("library folders are real folders: filing or renaming an item moves its file, undo moves it back, library.json brings the library to a new device", async () => {
