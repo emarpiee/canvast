@@ -3,7 +3,7 @@
 // Path tool, every label with the Text tool, and the cover's dot holds the mark again, 20 times over. Run from the repo root after `npm run build`:
 // node scripts/brand/build.mjs <out.canvast> [shotsDir]   (shotsDir: a PNG of every page, the whole board and the deepest view)
 import { open, VW, VH } from "./lib.mjs";
-import { pages, markSvg, C, HERO, GRID, MARKERS, MISUSE, CANVAS, DOT } from "./pages.mjs";
+import { pages, markSvg, C, HERO, GRID, MARKERS, MISUSE, FRAME, WINDOW, DOT, DOT_C } from "./pages.mjs";
 import { favPixels } from "./preview.mjs";
 import { copyFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -54,16 +54,29 @@ const nameLayer = async (from, to) => {
   await A.frame();
 };
 
-// 03: the glyph on the grid, drawn with the Shape tool: the canvas, then the dot
+// 03: the glyph on the grid, built with the Shape tool: the frame minus the window (Subtract), flattened, then the dot
 async function buildGlyph() {
   const g = (gx, gy) => [GRID.x + gx * GRID.u, GRID.y + gy * GRID.u];
   const px = (units) => +(units * GRID.u * K).toFixed(3);
-  const box = (b) => [g(b.x, b.x), g(b.x + b.w, b.x + b.w)];
   await p.keyboard.press("u");
   await p.click('[data-shape-kind="rect"]').catch(() => {});
   await paint("fill", C.ultra);
-  await drag(...box(CANVAS));
-  await radius(px(CANVAS.r));
+  const box = (b) => [g(b.x, b.x), g(b.x + b.w, b.x + b.w)];
+  await drag(...box(FRAME));
+  await radius(px(FRAME.r));
+  await p.keyboard.press("u");
+  await drag(...box(WINDOW)); // (stays picked; Shift adds the frame)
+  await radius(px(WINDOW.r));
+  await p.keyboard.press("v");
+  await click(...g(FRAME.x + 2, 32), ["Shift"]);
+  log("glyph parts picked", (await A.H(() => window.__canvastDebug.selection())).length);
+  await p.locator('[data-ctx="boolmenu"]').click();
+  await p.locator('.pop-menu [data-id="op:subtract"]').click();
+  await p.keyboard.press("Escape");
+  await A.frame();
+  await click(...g(FRAME.x + 2, 32));
+  await p.keyboard.press("Control+e");
+  await A.frame();
   await A.esc();
   // the dot
   await p.keyboard.press("u");
@@ -113,8 +126,8 @@ let deep = null;
 async function recurse(c) {
   await A.cam(c, 0);
   const tile = markSvg({}, 64);
-  // the hero's dot centre (the tile's centre), in page units → world
-  const dotU = HERO.x + HERO.size / 2, dotV = HERO.y + HERO.size / 2;
+  // the hero's dot centre, in page units → world
+  const dotU = HERO.x + (DOT_C / 64) * HERO.size, dotV = HERO.y + (DOT_C / 64) * HERO.size;
   let w = await A.world(...sc(dotU, dotV));
   let L = 7; // the inner tile (6.25 units = 4.6875 px at level 0) fills 600 px at level 7
   for (let k = 0; k < DEPTH; k++) {
@@ -122,7 +135,7 @@ async function recurse(c) {
     await p.mouse.move(VW / 2, VH / 2);
     await A.paste(tile);
     await A.esc();
-    if (k < DEPTH - 1) L += 6; // (the next dot is at the same centre, 1/64 the size)
+    if (k < DEPTH - 1) { const d = ((DOT_C - 32) / 64) * 600; w = await A.world(VW / 2 + d, VH / 2 + d); L += 6; } // (the next dot: off the tile's centre as this one)
   }
   deep = { w, L };
   await A.cam(w, L);

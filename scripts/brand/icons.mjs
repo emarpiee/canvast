@@ -1,5 +1,5 @@
-// Writes the logo files from the same geometry as the brand board (pages.mjs): the SVG masters, PNGs from 16 to 512 px (one drawing at
-// every size) and a favicon.ico with 16, 32 and 48 px. Usage: node scripts/brand/icons.mjs <dir>
+// Writes the logo files from the same geometry as the brand board (pages.mjs): the SVG masters, PNGs from 16 to 512 px (the
+// same drawing at every size) and a favicon.ico with 16, 32 and 48 px. Usage: node scripts/brand/icons.mjs <dir>
 import { chromium } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -13,8 +13,8 @@ const svgs = {
   "canvast-favicon.svg": markSvg({}, 32),
   "canvast-mark-on-light.svg": markSvg({ tile: null, c: C.ultra }, 512),
   "canvast-mark-on-dark.svg": markSvg({ tile: null, c: C.paper }, 512),
-  "canvast-mark-one-colour-ink.svg": markSvg({ tile: null, c: C.ink, dot: null }, 512),
-  "canvast-mark-one-colour-white.svg": markSvg({ tile: null, c: C.white, dot: null }, 512),
+  "canvast-mark-one-colour-ink.svg": markSvg({ tile: null, c: C.ink, dot: C.ink }, 512),
+  "canvast-mark-one-colour-white.svg": markSvg({ tile: null, c: C.white, dot: C.white }, 512),
 };
 for (const [n, s] of Object.entries(svgs)) writeFileSync(join(dir, n), s);
 

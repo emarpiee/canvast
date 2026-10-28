@@ -4,16 +4,21 @@ export const PW = 1600, PH = 1000;
 // The palette is the app's default theme (src/styles.css, hue 178, Viridian) in light mode: ultra = --hud-accent, ink = --hud-fg, paper = --theme-bg, muted = --hud-muted; spark is the orange of --canvas-axis, lifted so the dot reads on the tile.
 export const C = { ultra: "#007B69", ink: "#172522", paper: "#E8F3F0", spark: "#FFA460", haze: "#C3E7DE", white: "#F8FDFC", muted: "#4D5C58", mutedD: "#9CA8A4", line: "#CCD7D4", red: "#C92F33", dkLine: "#273A35", dkGrid: "#1C2A26", dkGridMajor: "#20322E" };
 
-// The mark on a 64-unit grid: a canvas half the size of the tile, and the point at its centre, a quarter of the canvas (zoom steps, by powers
-// of two). Every corner is a quarter of its side. Every edge falls on the 16 px grid, so the same drawing serves every size, the favicon too.
-const rr = (x, y, w, r) => `M${x + r} ${y}H${x + w - r}A${r} ${r} 0 0 1 ${x + w} ${y + r}V${y + w - r}A${r} ${r} 0 0 1 ${x + w - r} ${y + w}H${x + r}A${r} ${r} 0 0 1 ${x} ${y + w - r}V${y + r}A${r} ${r} 0 0 1 ${x + r} ${y}Z`;
-export const CANVAS = { x: 16, w: 32, r: 8 }, DOT = { x: 28, w: 8, r: 2 };
-export const GLYPH = rr(CANVAS.x, CANVAS.x, CANVAS.w, CANVAS.r);
-const DOT_PATH = rr(DOT.x, DOT.x, DOT.w, DOT.r);
-/** The mark in a box of `size` at x, y. tile: the tile colour or null; dot: the dot's colour, or null for one colour (the dot is cut out). */
+// The mark on a 64-unit grid: a canvas (the frame), a window cut from it, a little low and to the right (you lean in to look), and the point in
+// the window's middle (the dot). The owner's chosen drawing, made on a 24-unit grid, scaled to 64 exactly: keep these numbers as they are.
+const K = 64 / 24, f = (n) => +(n * K).toFixed(3);
+const rr = (x, y, w, r) => {
+  const n = (v) => +v.toFixed(3), a = n(x + r), b = n(x + w - r), c = n(y + r), d = n(y + w - r), X = n(x + w), Y = n(y + w);
+  return `M${a} ${y}H${b}A${r} ${r} 0 0 1 ${X} ${c}V${d}A${r} ${r} 0 0 1 ${b} ${Y}H${a}A${r} ${r} 0 0 1 ${x} ${d}V${c}A${r} ${r} 0 0 1 ${a} ${y}Z`;
+};
+export const FRAME = { x: f(5.5), w: f(13), r: f(3.575) }, WINDOW = { x: f(9.075), w: f(7.475), r: f(2.21) }, DOT = { x: f(11.5125), w: f(2.6), r: f(0.715) };
+export const DOT_C = DOT.x + DOT.w / 2; // the dot's centre (x and y), 34.17 units: the window's centre
+export const GLYPH = rr(FRAME.x, FRAME.x, FRAME.w, FRAME.r) + rr(WINDOW.x, WINDOW.x, WINDOW.w, WINDOW.r); // (even-odd: the window is a hole)
+const dotRect = (fill) => `<rect x="${DOT.x}" y="${DOT.x}" width="${DOT.w}" height="${DOT.w}" rx="${DOT.r}" fill="${fill}"/>`;
+/** The mark in a box of `size` at x, y. tile: the tile colour or null. One drawing serves every size, the favicon too. */
 export function mark(x, y, size, { tile = C.ultra, c = C.paper, dot = C.spark, extra = "", tileAttrs = "" } = {}) {
   const s = size / 64;
-  const glyph = dot ? `<path d="${GLYPH}" fill="${c}"/><path d="${DOT_PATH}" fill="${dot}"/>` : `<path d="${GLYPH}${DOT_PATH}" fill="${c}" fill-rule="evenodd"/>`;
+  const glyph = `<path d="${GLYPH}" fill="${c}" fill-rule="evenodd"/>${dot ? dotRect(dot) : ""}`;
   return `<g transform="translate(${x} ${y}) scale(${s})">${tile ? `<rect width="64" height="64" rx="14" fill="${tile}" ${tileAttrs}/>` : ""}${glyph}${extra}</g>`;
 }
 /** Standalone SVG files of the mark (for the icon files, not the board). */
@@ -64,25 +69,25 @@ function cover() {
 
 // 02 · The idea -----------------------------------------------------------------------------------------------------------
 function idea() {
-  const P = page(2, "One mark, three ideas", ["A canvas and the point at its centre. The canvas is half the tile and the point a quarter of the canvas:", "zoom steps, by powers of two. Zoom into the point and it is a canvas again."]);
+  const P = page(2, "One mark, three ideas", ["A canvas, a window into it, and the point in the window. The window sits a little low and to the right, the way", "you lean in to look. Zoom into the point and it is a canvas again."]);
   const xs = [100, 580, 1060], y = 370, w = 440, h = 320;
   let b = P.body + xs.map((x) => card(x, y, w, h)).join("");
   // Canvas: a frame with its handles
   { const x = xs[0] + 140, yy = y + 80, s = 160;
     b += `<rect x="${x}" y="${yy}" width="${s}" height="${s}" rx="22" fill="none" stroke="${C.ultra}" stroke-width="16"/>`;
     for (const [hx, hy] of [[x, yy], [x + s, yy], [x, yy + s], [x + s, yy + s]]) b += r(hx - 9, hy - 9, 18, 18, C.white, 3, `stroke="${C.spark}" stroke-width="4"`); }
-  // Half: the canvas, and the tile it is half of, dashed (one zoom step out)
-  { const x = xs[1] + 100, yy = y + 40, s = 240, k = s / 64;
-    b += `<rect x="${x}" y="${yy}" width="${s}" height="${s}" rx="${14 * k}" fill="none" stroke="${C.spark}" stroke-width="3" stroke-dasharray="10 8"/>`;
-    b += mark(x, yy, s, { tile: null, c: C.ultra, dot: null }); }
+  // Window: cut from the frame; the dashed squares are the window at the next zoom steps (×2, ×4)
+  { const x = xs[1] + 100, yy = y + 40, s = 240, k = s / 64, cx = x + DOT_C * k, cy = yy + DOT_C * k;
+    b += mark(x, yy, s, { tile: null, c: C.ultra, dot: null });
+    for (const [d, o] of [[WINDOW.w / 2, 0.9], [WINDOW.w, 0.45]]) b += `<rect x="${cx - d * k}" y="${cy - d * k}" width="${2 * d * k}" height="${2 * d * k}" rx="${d * k * 0.3}" fill="none" stroke="${C.spark}" stroke-width="3" stroke-dasharray="10 8" opacity="${o}"/>`; }
   // Point: the dot, with the views you pass on the way in
-  { const x = xs[2] + 100, yy = y + 40, s = 240, k = s / 64, cx = x + 32 * k, cy = yy + 32 * k;
+  { const x = xs[2] + 100, yy = y + 40, s = 240, k = s / 64, cx = x + DOT_C * k, cy = yy + DOT_C * k;
     for (const [d, o] of [[22, 0.9], [34, 0.6], [48, 0.35], [64, 0.18]]) b += `<rect x="${cx - d}" y="${cy - d}" width="${2 * d}" height="${2 * d}" rx="${d * 0.25}" fill="none" stroke="${C.spark}" stroke-width="3" opacity="${o}"/>`;
     b += mark(x, yy, s, { tile: null, c: C.ultra, dot: C.spark }); }
   const cols = [
     ["Canvas", "Everything starts as a frame:", "the rectangle you draw on."],
-    ["Half", "The canvas is half the tile: one", "zoom step in, and it fills the screen."],
-    ["Point", "A quarter of the canvas, at its centre.", "In canvast every point holds a canvas."],
+    ["Window", "Cut from the frame, low and right:", "you look into it, and zoom in."],
+    ["Point", "The dot, in the middle of the window.", "In canvast every point holds a canvas."],
   ];
   const labels = [...P.labels];
   cols.forEach(([t, a, c2], i) => labels.push([xs[i], 752, t, 30, C.ink, true], [xs[i], 806, a, 20, C.muted, false], [xs[i], 838, c2, 20, C.muted, false]));
@@ -91,9 +96,9 @@ function idea() {
 
 // 03 · Construction -------------------------------------------------------------------------------------------------------
 export const GRID = { x: 110, y: 340, u: 8.5 }; // 64 units → 544
-export const MARKERS = [[3, 3], [8, 32], [20, 32], [32, 42], [58, 32]]; // drawn in the app, over the glyph
+export const MARKERS = [[3, 3], [7.3, 32], [19.4, 32], [34.17, 26.9], [34.17, 41.3], [57, 32]]; // drawn in the app, over the glyph
 function construction() {
-  const P = page(3, "Construction", ["A 64-unit grid. The canvas is half the tile, the dot a quarter of the canvas, every corner a quarter of its side.", "Both were drawn in canvast with the Shape tool, on the grid below."]);
+  const P = page(3, "Construction", ["A 64-unit grid. The window and the dot share one centre, a little low and right of the tile's. The glyph was built", "in canvast with the Shape tool: a rounded rectangle minus another (Subtract), flattened to one path, and the dot."]);
   const { x, y, u } = GRID, S = 64 * u;
   let b = P.body + r(x, y, S, S, C.white);
   for (let i = 0; i <= 64; i++) {
@@ -102,22 +107,23 @@ function construction() {
   }
   b += `<rect x="${x}" y="${y}" width="${S}" height="${S}" rx="${14 * u}" fill="${C.ultra}" opacity="0.07"/>`;
   b += `<rect x="${x}" y="${y}" width="${S}" height="${S}" rx="${14 * u}" fill="none" stroke="${C.ultra}" stroke-width="2" stroke-dasharray="8 6"/>`;
-  // keylines: the glyph's box and its two axes, which cross at the dot
-  b += `<rect x="${x + 16 * u}" y="${y + 16 * u}" width="${32 * u}" height="${32 * u}" fill="none" stroke="${C.spark}" stroke-width="1.5" stroke-dasharray="4 4"/>`;
-  b += line(x, y + 32 * u, x + S, y + 32 * u, C.spark, 1.5, `stroke-dasharray="4 4"`) + line(x + 32 * u, y, x + 32 * u, y + S, C.spark, 1.5, `stroke-dasharray="4 4"`);
+  // keylines: the frame's box, and the window's two axes, which cross at the dot
+  b += `<rect x="${x + FRAME.x * u}" y="${y + FRAME.x * u}" width="${FRAME.w * u}" height="${FRAME.w * u}" fill="none" stroke="${C.spark}" stroke-width="1.5" stroke-dasharray="4 4"/>`;
+  b += line(x, y + DOT_C * u, x + S, y + DOT_C * u, C.spark, 1.5, `stroke-dasharray="4 4"`) + line(x + DOT_C * u, y, x + DOT_C * u, y + S, C.spark, 1.5, `stroke-dasharray="4 4"`);
   // numbered markers (the glyph itself is drawn in the app, over the grid)
   const marks = MARKERS;
   const items = [
     ["Tile", "64 × 64 units, corner radius 14"],
-    ["Margin", "16 units round the canvas, on every side"],
-    ["Canvas", "32 units, corner radius 8: half the tile"],
-    ["Dot", "8 units, radius 2: a quarter of the canvas, centred"],
+    ["Margin", "14.7 units round the frame, on every side"],
+    ["Frame", "34.7 units, corner radius 9.5"],
+    ["Window", "19.9 units, radius 5.9; 9.5 from the top and left, 5.3 from the right and bottom"],
+    ["Dot", "6.9 units, radius 1.9, in the middle of the window"],
     ["Inside the dot", "the mark again at 1/64 (six zoom levels), without end"],
   ];
   const labels = [...P.labels];
   marks.forEach(([mx, my], i) => labels.push([x + mx * u - 5, y + my * u, String(i + 1), 16, C.white, true]));
   items.forEach(([t, d], i) => {
-    const yy = 390 + i * 100;
+    const yy = 380 + i * 88;
     b += `<circle cx="${790}" cy="${yy}" r="15" fill="${C.ink}"/>`;
     labels.push([785, yy, String(i + 1), 16, C.white, true], [826, yy - 12, t, 22, C.ink, true], [826, yy + 18, d, 18, C.muted, false]);
   });
@@ -126,15 +132,15 @@ function construction() {
 
 // 04 · Logo set -----------------------------------------------------------------------------------------------------------
 function logos() {
-  const P = page(4, "The logo set", ["Use the app icon wherever the mark stands alone. On a light or dark ground, the mark may drop its tile.", "Pick the version with the most contrast; in one colour the dot is cut out, for single-ink printing and embossing."]);
+  const P = page(4, "The logo set", ["Use the app icon wherever the mark stands alone. On a light or dark ground, the mark may drop its tile.", "Pick the version with the most contrast; the one-colour versions are for single-ink printing and embossing."]);
   const xs = [100, 590, 1080], ys = [370, 640], w = 420, h = 240;
   const cells = [
     [C.white, (x, y) => mark(x + 150, y + 50, 120), "App icon · primary", C.muted],
     [C.white, (x, y) => mark(x + 150, y + 50, 120, { tile: null, c: C.ultra }), "Mark on light", C.muted],
     [C.ink, (x, y) => mark(x + 150, y + 50, 120, { tile: null, c: C.paper }), "Mark on dark", C.mutedD],
     [C.white, (x, y) => mark(x + 40, y + 60, 100), "Horizontal lockup", C.muted],
-    [C.white, (x, y) => mark(x + 150, y + 50, 120, { tile: null, c: C.ink, dot: null }), "One colour, dark", C.muted],
-    [C.ultra, (x, y) => mark(x + 150, y + 50, 120, { tile: null, c: C.white, dot: null }), "One colour, light", C.haze],
+    [C.white, (x, y) => mark(x + 150, y + 50, 120, { tile: null, c: C.ink, dot: C.ink }), "One colour, dark", C.muted],
+    [C.ultra, (x, y) => mark(x + 150, y + 50, 120, { tile: null, c: C.white, dot: C.white }), "One colour, light", C.haze],
   ];
   let b = P.body;
   const labels = [...P.labels];
@@ -150,7 +156,7 @@ function logos() {
 // 05 · Clear space and size -----------------------------------------------------------------------------------------------
 export const PIXELS = { x: 760, y: 640, cell: 13 }; // the 16 px favicon, pixel by pixel (filled in from a render)
 function space(pixels) {
-  const P = page(5, "Space and size", ["Keep at least one dot of clear space round the tile: x is the width of the dot, 8/64 of the tile.", "One drawing serves every size: every edge falls on the 16 px grid, so even the favicon is the same mark."]);
+  const P = page(5, "Space and size", ["Keep at least one dot of clear space round the tile: x is the width of the dot, 6.9/64 of the tile.", "One drawing serves every size, the favicon too: no separate small version."]);
   let b = P.body + card(100, 370, 560, 500);
   const T = 260, tx = 250, ty = 470, xu = (T * DOT.w) / 64;
   b += r(tx - xu, ty - xu, T + 2 * xu, T + 2 * xu, "none", 0, `stroke="${C.spark}" stroke-width="2" stroke-dasharray="6 5"`);
@@ -175,8 +181,8 @@ function space(pixels) {
     b += `<rect x="${px0 + 30 + i * cell}" y="${py0 + 14 + j * cell}" width="${cell - 1}" height="${cell - 1}" fill="rgb(${R},${G},${B})" opacity="${(A / 255).toFixed(3)}"/>`;
   }
   labels.push([1030, 690, "The 16 px favicon, pixel by pixel", 22, C.ink, true],
-    [1030, 730, "Every edge falls on a pixel: an 8 px canvas and", 18, C.muted, false],
-    [1030, 760, "a 2 × 2 px dot, three pixels clear all round.", 18, C.muted, false],
+    [1030, 730, "At 16 px the frame, the window and the dot still", 18, C.muted, false],
+    [1030, 760, "read apart: the dot is about 2 px, the frame 3.", 18, C.muted, false],
     [1030, 806, "Smallest sizes: 16 px on screen, 6 mm in print.", 18, C.ink, false]);
   return { name: "05 Space and size", body: svg(b), labels, bg: C.paper };
 }
@@ -241,10 +247,10 @@ function misuse() {
   const labels = [...P.labels];
   const w = 320, h = 250, s = 120;
   const items = [
-    ["Make it round", (x, y) => `<g transform="translate(${x} ${y}) scale(${s / 64})"><rect width="64" height="64" rx="14" fill="${C.ultra}"/><circle cx="32" cy="32" r="16" fill="${C.paper}"/><circle cx="32" cy="32" r="4" fill="${C.spark}"/></g>`],
+    ["Make it round", (x, y) => `<g transform="translate(${x} ${y}) scale(${s / 64})"><rect width="64" height="64" rx="14" fill="${C.ultra}"/><path d="M14.7 32a17.3 17.3 0 1 0 34.6 0a17.3 17.3 0 1 0-34.6 0ZM24.2 34.2a10 10 0 1 0 20 0a10 10 0 1 0-20 0Z" fill="${C.paper}" fill-rule="evenodd"/><circle cx="34.2" cy="34.2" r="3.5" fill="${C.spark}"/></g>`],
     ["Stretch it", (x, y) => `<g transform="translate(${x - 40} ${y + 18}) scale(1.6 0.7)">${mark(0, 0, s)}</g>`],
-    ["Outline the canvas", (x, y) => `<g transform="translate(${x} ${y}) scale(${s / 64})"><rect width="64" height="64" rx="14" fill="${C.ultra}"/><rect x="18" y="18" width="28" height="28" rx="7" fill="none" stroke="${C.paper}" stroke-width="4"/><path d="${DOT_PATH}" fill="${C.spark}"/></g>`],
-    ["Move the dot", (x, y) => `<g transform="translate(${x} ${y}) scale(${s / 64})"><rect width="64" height="64" rx="14" fill="${C.ultra}"/><path d="${GLYPH}" fill="${C.paper}"/><rect x="38" y="19" width="8" height="8" rx="2" fill="${C.spark}"/></g>`],
+    ["Fill the window", (x, y) => `<g transform="translate(${x} ${y}) scale(${s / 64})"><rect width="64" height="64" rx="14" fill="${C.ultra}"/><rect x="${FRAME.x}" y="${FRAME.x}" width="${FRAME.w}" height="${FRAME.w}" rx="${FRAME.r}" fill="${C.paper}"/>${dotRect(C.spark)}</g>`],
+    ["Move the dot", (x, y) => `<g transform="translate(${x} ${y}) scale(${s / 64})"><rect width="64" height="64" rx="14" fill="${C.ultra}"/><path d="${GLYPH}" fill="${C.paper}" fill-rule="evenodd"/><rect x="38" y="10" width="${DOT.w}" height="${DOT.w}" rx="${DOT.r}" fill="${C.spark}"/></g>`],
     ["Change its colours", (x, y) => mark(x, y, s, { tile: "#2A33D6", c: "#FFF4C2", dot: "#E83E8C" })],
     ["Add a gradient", (x, y) => mark(x, y, s, { tile: "url(#bad)" })],
     ["Add outlines or shadows", (x, y) => mark(x + 10, y + 10, s, { tile: "#000000", c: "none", dot: null, tileAttrs: `opacity="0.35"` }) + mark(x, y, s, { tileAttrs: `stroke="${C.spark}" stroke-width="3"` })],
@@ -268,7 +274,7 @@ function misuse() {
 
 // 09 · In use -------------------------------------------------------------------------------------------------------------
 function inUse() {
-  const P = page(9, "In use", ["The tile is the favicon, the app icon and the face of every .canvast file. Let it sit on Viridian or Ink,", "and let the mark run off an edge when there is room: the canvas goes on beyond it."]);
+  const P = page(9, "In use", ["The tile is the favicon, the app icon and the face of every .canvast file. Let it sit on Viridian or Ink,", "and let the frame run off an edge when there is room: the canvas goes on beyond it."]);
   let b = P.body;
   const labels = [...P.labels];
   // a browser tab

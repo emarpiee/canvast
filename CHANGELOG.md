@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.30 — The logo as chosen (2026-10-29)
+
+- **Fixed:** the logo is the one the owner chose: on the Viridian tile, a Paper frame with a window cut from it a little low and to the right, and the orange dot in the window's middle. 0.50.29 had drawn a solid square instead, and 0.50.28 a frame with different proportions. One drawing serves every size, the favicon too; there is no line version. The favicon, the app's own mark, the logo files, the guidelines, the README cover and the social preview are made again from it.
+
 ## 0.50.29 — The logo, filled (2026-10-29)
 
 - **Changed:** the logo is the filled mark: a solid canvas half the size of the tile, with the orange dot at its centre (a quarter of the canvas); the frame and window of 0.50.28 are gone. One drawing serves every size, the favicon too, so there is no separate small master any more, and the line version is removed. In one colour (the app's own mark, in the theme's text colour) the dot is cut out. The guidelines, the logo files, the README cover and the social preview are made again.
