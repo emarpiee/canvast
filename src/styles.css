@@ -49,6 +49,7 @@
   --dur-fast: calc(120ms * var(--anim-speed));
   --dur-base: calc(200ms * var(--anim-speed));
   --dur-slow: calc(320ms * var(--anim-speed));
+  --dur-wait: calc(1400ms * var(--anim-speed)); /* one sweep of a "still loading" shimmer */
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --font-ui: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -1108,6 +1109,11 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 .asset-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .asset-thumb img.is-pixelated, .viewer img.is-pixelated { image-rendering: pixelated; }
 .asset-thumb img.is-broken { display: none; }
+/* A thumbnail's place, the same everywhere (cards, list rows, the details picture, the filmstrip): until its picture has loaded the
+   picture is out of sight (never the browser's broken-picture mark) and the place shimmers; one that cannot be shown leaves it plain. */
+.thumb-slot > img:not(.is-loaded) { visibility: hidden; }
+.thumb-slot:has(> img:not(.is-loaded):not(.is-broken)) { background-image: linear-gradient(100deg, transparent 30%, var(--hud-hover) 50%, transparent 70%); background-size: 250% 100%; animation: thumb-wait var(--dur-wait) linear infinite; }
+@keyframes thumb-wait { from { background-position: 100% 0; } to { background-position: -150% 0; } }
 .asset-card:hover { box-shadow: 0 0 0 2px var(--hud-muted); }
 .asset-card[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--hud-accent); }
 .asset-info { position: absolute; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; gap: 1px; padding: var(--sp-11) var(--sp-5) var(--sp-4); color: var(--media-fg); background: linear-gradient(to top, var(--media-fade), transparent); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); pointer-events: none; }

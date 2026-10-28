@@ -631,7 +631,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let filmItemW = 0;
   const filmItem = (e: CatalogListing["entries"][number]): HTMLElement => {
     const t = document.createElement("template");
-    t.innerHTML = `<button type="button" class="film-item" role="option" data-hash="${e.hash}" aria-label="${esc(e.name || "Untitled")}" title="${esc(e.name || "Untitled")}">${isCard(e) ? fileTile(e, false) : `<img alt="" draggable="false" data-hash="${e.hash}">`}</button>`;
+    t.innerHTML = `<button type="button" class="film-item thumb-slot" role="option" data-hash="${e.hash}" aria-label="${esc(e.name || "Untitled")}" title="${esc(e.name || "Untitled")}">${isCard(e) ? fileTile(e, false) : `<img alt="" draggable="false" data-hash="${e.hash}">`}</button>`;
     const b = t.content.firstElementChild as HTMLElement;
     const img = b.querySelector<HTMLImageElement>("img");
     if (img) loadThumb(img);
@@ -1427,7 +1427,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const html = `<div class="asset-cell" role="listitem">
         <button type="button" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}" draggable="${session.readOnly ? "false" : "true"}"
           aria-pressed="false" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}">
-        <span class="asset-thumb">${isCard(e) ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}" data-hash="${e.hash}"><span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>`}</span>
+        <span class="asset-thumb thumb-slot">${isCard(e) ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}" data-hash="${e.hash}"><span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>`}</span>
         ${e.present ? "" : `<span class="asset-missing-label">Original missing</span>`}
         <span class="asset-info">
           <span class="asset-name">${esc(name)}</span>
@@ -1925,7 +1925,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="asset-insp-head">
         <h2 title="${esc(e ? e.name || "Untitled" : "Missing original")}">${esc(e ? e.name || "Untitled" : "Missing original")}</h2>
       </div>
-      ${e ? `<button type="button" class="asset-preview" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open in the viewer (double-click a card, or Enter)">${isCard(e) ? fileTile(e) : `<img alt="Preview of ${esc(e.name)}" draggable="false" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}">`}</button>` : ""}
+      ${e ? `<button type="button" class="asset-preview thumb-slot" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open in the viewer (double-click a card, or Enter)">${isCard(e) ? fileTile(e) : `<img alt="Preview of ${esc(e.name)}" draggable="false" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}">`}</button>` : ""}
       ${
         e
           ? `<div class="asset-quick">
@@ -2557,6 +2557,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     void session.organize((c) => c.updateMeta(hash, into(id)), "Moved to a folder");
   });
 
+  // A thumbnail shows once it has loaded (its place shimmers until then), and one that cannot be shown leaves its place plain: never the browser's broken-picture mark.
+  root.addEventListener(
+    "error",
+    (e) => {
+      if (e.target instanceof HTMLImageElement && e.target.parentElement?.classList.contains("thumb-slot")) e.target.classList.add("is-broken");
+    },
+    true,
+  );
   // A thumbnail with see-through pixels gets a chequered ground (cards, filmstrip and the details picture) so it reads as transparent.
   const alphaOf = new Map<string, boolean>();
   root.addEventListener(
@@ -2564,6 +2572,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     (e) => {
       const img = e.target;
       if (!(img instanceof HTMLImageElement) || img === slideImg) return;
+      if (img.parentElement?.classList.contains("thumb-slot")) img.classList.add("is-loaded");
       const host = img.closest<HTMLElement>(".asset-card, .film-item, .asset-preview");
       if (!host) return;
       const key = img.dataset["hash"] ?? img.src;

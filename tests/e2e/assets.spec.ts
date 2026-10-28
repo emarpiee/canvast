@@ -2581,6 +2581,10 @@ test("a library of thousands keeps only the cards near the view in the page; End
   const first = p.locator('[data-testid="asset-card"][aria-label^="item-0.png"]');
   await expect(first).toBeInViewport();
   await expect.poll(() => first.locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+  // A picture shows only once it has loaded (its place shimmers until then), never as the browser's broken-picture mark.
+  await expect(first.locator("img")).toHaveClass(/is-loaded/);
+  await expect(first.locator("img")).toBeVisible();
+  expect(await p.locator(".thumb-slot > img:not(.is-loaded)").evaluateAll((els) => els.filter((el) => getComputedStyle(el).visibility !== "hidden").length)).toBe(0);
   // A search lists every match, and Ctrl+A picks all of them, not only the cards in the page.
   await p.locator(".assets-search").fill("item-29");
   await expect(p.getByTestId("assets-count")).toHaveText(`111 of ${N} items`);
