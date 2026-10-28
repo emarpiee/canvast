@@ -158,6 +158,9 @@ const SORT_OF: Record<ColumnId, { key: SortKey; desc: boolean }> = {
 /** Fields that take typed text: shortcuts keep out of them (a checkbox or a slider is not one). */
 const TYPING = 'input:not([type="checkbox"]):not([type="range"]), textarea, select';
 
+/** While a panel edge is dragged, the cards are laid out again at most this often. */
+const RESIZE_LAYOUT_MS = 120;
+
 export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore): AssetsView {
   root.innerHTML = `
     <div class="assets-bar" role="toolbar" aria-label="Library">
@@ -2644,7 +2647,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     e.stopPropagation();
   });
 
-  // ---- the library and details panels' widths on a wide screen: drag the edge (or use the arrow keys); double-click goes back to the default
+  // ---- the library and details panels' widths on a wide screen: drag the edge (or use the arrow keys); double-click goes back to the default.
+  // While an edge is dragged, the panel follows the pointer once a frame and the cards are laid out again at most every RESIZE_LAYOUT_MS
+  // (laying out thousands of cards on every pixel made the drag crawl), then once more when the edge is let go.
+  let resizing = false;
   for (const g of root.querySelectorAll<HTMLElement>(".col-grip")) {
     const isSide = g.dataset["grip"] === "side";
     const range = isSide ? SIDE_W : INSP_W;
@@ -2665,13 +2671,31 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const startW = panel.offsetWidth;
       g.setPointerCapture(e.pointerId);
       g.classList.add("is-dragging");
-      const move = (ev: PointerEvent): void => set(startW + (isSide ? ev.clientX - startX : startX - ev.clientX), false);
+      resizing = true;
+      let want = startW;
+      let frame = 0;
+      let laidOut = 0;
+      const prop = isSide ? "--side-w" : "--insp-w";
+      body.classList.add(isSide ? "has-side-w" : "has-insp-w");
+      const move = (ev: PointerEvent): void => {
+        want = Math.max(range.min, Math.min(range.max, Math.round(startW + (isSide ? ev.clientX - startX : startX - ev.clientX))));
+        frame ||= requestAnimationFrame(() => {
+          frame = 0;
+          body.style.setProperty(prop, `${want}px`);
+          if (performance.now() - laidOut < RESIZE_LAYOUT_MS) return;
+          laidOut = performance.now();
+          relayout();
+        });
+      };
       const up = (): void => {
         g.classList.remove("is-dragging");
         g.removeEventListener("pointermove", move);
         g.removeEventListener("pointerup", up);
         g.removeEventListener("pointercancel", up);
-        saveUi();
+        cancelAnimationFrame(frame);
+        resizing = false;
+        set(want, true);
+        relayout();
       };
       g.addEventListener("pointermove", move);
       g.addEventListener("pointerup", up);
@@ -3404,7 +3428,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // A new width lays the cards out again; a new height only draws the ones now in view.
     let lastH = 0;
     new ResizeObserver(() => {
-      if (!visible) return;
+      if (!visible || resizing) return; // (a panel edge being dragged lays the cards out itself, less often)
       if (grid.clientWidth !== layoutW || layoutDirty) relayout();
       else if (scroller.clientHeight !== lastH) windowGrid();
       lastH = scroller.clientHeight;

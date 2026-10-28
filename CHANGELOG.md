@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.6 — Smooth panel resizing in the library (2026-10-28)
+
+- **Fixed:** dragging the edge of the library's side panel or details panel crawled in a big library: every pixel laid out every card again. The panel now follows the pointer every frame, and the cards are laid out again a few times a second while dragging and once when the edge is let go.
+
 ## 0.50.5 — An import writes its files straight into the workspace folder (2026-10-28)
 
 - **Fixed:** in the desktop app, an import first stored every file of the backup (pictures, fonts, videos and the rest) in the app's own storage and then copied it into the workspace folder; after the app started again, the storage spent minutes clearing those copies on a spinning disk, which slowed the start, the lock screen and closing. The files now go straight into the folder (the app keeps only where each one is), so nothing is left to clear and the disk does about half the work. Hidden items are never written as readable files: they stay in the app until the Hidden items are opened, then are encrypted into `.hidden/` as before.

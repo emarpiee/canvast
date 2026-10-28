@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.6: smooth panel resizing in the library (2026-10-28)
+
+**Implemented:** a dragged panel edge (`.col-grip`, `assets-view.ts`) sets the width once a frame and lays the cards out at most every `RESIZE_LAYOUT_MS` (120 ms), then once on release; the grid's ResizeObserver waits while an edge is dragged.
+**Tested:** the panel-width and big-library assets tests in chromium and firefox (4/4).
+**Known failures:** none.
+**Unverified:** how smooth it feels in the owner's 2,465-item library.
+**Committed:** on `main`, not pushed.
+**Next bounded task:** common terms (selected, files, info bar) across the app.
+
 ## v0.50.5: an import writes its files straight into the workspace folder (2026-10-28)
 
 **Implemented:** `OriginalWriter` (archive.ts): `stageOriginals` hands each batch's originals that are not hidden to it and stores only their file (`ext: 1`); the desktop build sets `IdbBackups.writeOriginals` to `LibraryMirror.writeOriginals` (written by kind and name without a flush each, checked by hash, one `syncFiles` per batch; the next library write moves each to its library folder).
