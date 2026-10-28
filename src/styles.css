@@ -2096,9 +2096,9 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .assets-searchbox .cs-clear { right: calc(var(--icon-xl) + var(--sp-2)); }
 .assets-search-pop { display: none; position: absolute; z-index: 30; top: calc(100% + var(--sp-2)); left: 0; width: max(100%, 300px); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
 .assets-searchbox:focus-within .assets-search-pop { display: block; }
-.assets-search-pop .cs-modes { padding-top: var(--sp-4); border-bottom: 0; }
+.assets-search-pop .cs-modes { padding-top: var(--sp-4); }
 .assets-search-pop .cs-recent { border-top: 1px solid var(--hud-border); border-bottom: 0; }
-.assets-search-pop kbd { font: inherit; font-size: var(--text-sm); opacity: 0.75; }
+
 
 /* Arrange menu: the space between items, a row of choices (ADR 0074). */
 

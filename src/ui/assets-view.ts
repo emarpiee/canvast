@@ -1,4 +1,5 @@
 import { beginProgress } from "../app/progress";
+import { searchHelpLineHtml, searchKeysHtml, searchWaysHtml } from "./search-parts";
 import { boardFilterHtml, boardFilterState, wireBoardFilter } from "./board-filter";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { startStep } from "../app/startup-log";
@@ -185,13 +186,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <button type="button" class="cs-clear" aria-label="Clear the search" title="Clear the search" hidden>${ICONS.x}</button>
         ${searchHelpButton()}
         <div class="assets-search-pop" data-testid="assets-search-pop">
-          <div class="cs-modes" role="tablist" aria-label="Search by">
-            <button type="button" role="tab" data-m="all">All</button>
-            <button type="button" role="tab" data-m="name"><kbd>/</kbd>Name</button>
-            <button type="button" role="tab" data-m="tag"><kbd>#</kbd>Tag</button>
-          </div>
+          ${searchWaysHtml(["all", "name", "tag"])}
+          ${searchHelpLineHtml("Type a name, tag or file type to search the library. / # narrow it to one.")}
           <div class="search-suggest" data-testid="search-suggest" hidden></div>
           <div class="cs-recent" data-testid="search-recent" hidden></div>
+          ${searchKeysHtml([["↓", "go to the items"], ["Esc", "close"]])}
         </div>
       </div>
       <span class="assets-sep" role="separator"></span>
@@ -3513,8 +3512,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     search.placeholder = PLACE[w];
     for (const t of pop.querySelectorAll<HTMLElement>("[data-m]")) t.setAttribute("aria-selected", String(t.dataset["m"] === w));
   };
+  const searchHelpLine = pop.querySelector<HTMLElement>("[data-search-help]")!;
+  // Esc leaves the search box (its panel closes; what was typed stays), as Esc closes the canvas search.
+  search.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    e.preventDefault();
+    e.stopPropagation();
+    search.blur();
+  });
   const paintSearchUi = (): void => {
     clearBtn.hidden = !search.value;
+    searchHelpLine.hidden = !!search.value; // (what to type: only while nothing is typed)
     paintRecent(recentBox, ASSETS_RECENT, !search.value.trim());
   };
   /** A search that found something and was used (Enter, or a card chosen) goes to the recent list. */

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.24 — One search panel (2026-10-29)
+
+- **Changed:** the library's search panel is built from the same parts as the canvas search: the ways to search as tabs (All selected at first), a line saying what to type, and the keys at the bottom; the library's own look-alike styles are gone. Esc now closes it, as it closes the canvas search. The canvas search's All tab is also shown selected when it opens.
+
 ## 0.50.23 — Back to top (2026-10-29)
 
 - **Added:** a **Back to top** button (an arrow up to a line) in the library's status bar, in the grid and the list alike; it shows once the library is scrolled a screen down. Home does the same from the keyboard.

@@ -1,4 +1,5 @@
 import type { EditorState } from "../app/editor-state";
+import { searchKeysHtml, searchWaysHtml } from "./search-parts";
 import { tagIsOrUnder } from "../doc/tags";
 import { mountSuggest } from "./search-suggest";
 import { extOf } from "../assets/file-kind";
@@ -52,17 +53,12 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   root.hidden = true;
   root.innerHTML = `
     <div class="cs-box">${ICONS.search}<input type="text" role="combobox" aria-expanded="true" aria-controls="cs-list" aria-label="Search the canvas" autocomplete="off" spellcheck="false"><button type="button" class="cs-clear" aria-label="Clear the search" title="Clear the search" hidden>${ICONS.x}</button>${searchHelpButton()}</div>
-    <div class="cs-modes" role="tablist" aria-label="Search by">
-      <button type="button" role="tab" data-m="all">All</button>
-      <button type="button" role="tab" data-m="name"><kbd>/</kbd>Name</button>
-      <button type="button" role="tab" data-m="tag"><kbd>#</kbd>Tag</button>
-      <button type="button" role="tab" data-m="bookmark"><kbd>@</kbd>Bookmark</button>
-    </div>
+    ${searchWaysHtml(["all", "name", "tag", "bookmark"])}
     <div class="search-suggest" data-testid="search-suggest" hidden></div>
     <div class="cs-recent" data-testid="search-recent" hidden></div>
     <div class="cs-bar" hidden><label><input type="checkbox" class="cs-check" data-all> <span>Select all shown</span></label><span class="cs-count" aria-live="polite"></span></div>
     <ul id="cs-list" role="listbox" aria-label="Results" aria-multiselectable="true"></ul>
-    <p class="cs-hint"><kbd>Enter</kbd> go to it · <kbd>Ctrl+Enter</kbd> check · <kbd>Shift+Enter</kbd> check all · <kbd>Esc</kbd> close</p>`;
+    ${searchKeysHtml([["Enter", "go to it"], ["Ctrl+Enter", "check"], ["Shift+Enter", "check all"], ["Esc", "close"]])}`;
   host.appendChild(root);
   const input = root.querySelector<HTMLInputElement>("input")!;
   wireSearchHelp(root.querySelector<HTMLElement>(".search-help-btn")!, input, "Type the operators in capitals. Works after / # or @.");

@@ -119,6 +119,13 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   const box = p.getByTestId("assets-search");
   const pop = p.getByTestId("assets-search-pop");
   await box.focus();
+  // The canvas search's parts: All selected at first, a line saying what to type, the keys at the bottom; Esc closes it.
+  await expect(pop.getByRole("tab", { name: "All" })).toHaveAttribute("aria-selected", "true");
+  await expect(pop.locator("[data-search-help]")).toContainText("search the library");
+  await expect(pop.locator(".cs-hint")).toContainText("Esc");
+  await p.keyboard.press("Escape");
+  await expect(pop).toBeHidden();
+  await box.focus();
   await pop.getByRole("tab", { name: /Tag/ }).click();
   await searchFor("png", 0); // tags only
   await searchFor("hand", 1);
