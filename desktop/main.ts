@@ -9,7 +9,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session } from "electron";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { mkdir, open, readFile, readdir, realpath, rename, rmdir, stat } from "node:fs/promises";
+import { mkdir, open, readFile, readdir, realpath, rename, rmdir, stat, unlink } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { isSafeRelativePath } from "../src/storage/workspace-names";
 import { pathToFileURL } from "node:url";
@@ -177,6 +177,14 @@ function installFileCalls(win: BrowserWindow, root: string): void {
     if (existsSync(b) && a.toLowerCase() !== b.toLowerCase()) throw new Error(`${to} is already there`);
     await mkdir(dirname(b), { recursive: true });
     await rename(a, b);
+  });
+  ipcMain.handle("canvast:erase", async (e, rel: string) => {
+    own(e);
+    try {
+      if ((await stat(await inside(root, rel))).isFile()) await unlink(await inside(root, rel));
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+    }
   });
   ipcMain.handle("canvast:makeFolder", async (e, rel: string) => {
     own(e);

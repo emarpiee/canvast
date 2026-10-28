@@ -25,6 +25,8 @@ export interface DesktopBridge {
   remove(path: string): Promise<void>;
   /** Rename or move a file or a folder inside the workspace (folders are made; refused when the target is taken). */
   rename(from: string, to: string): Promise<void>;
+  /** Delete a file for good, not into `.trash/` (a readable copy of a hidden item must not be kept); nothing when it is not there. */
+  erase(path: string): Promise<void>;
   /** Make a folder (and its parents) when it is not there. */
   makeFolder(path: string): Promise<void>;
   /** Remove a folder only when it is empty; whether it was removed. */
