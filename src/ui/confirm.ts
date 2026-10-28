@@ -24,7 +24,27 @@ export function wireSecretFields(root: HTMLElement): void {
   }
 }
 
-export interface ConfirmOptions {
+/** The parts of a dialog that are read at a glance, under its lines: facts as label and value, a titled list, warnings. */
+export interface DialogSummary {
+  /** Label and value pairs, in two columns. */
+  facts?: Array<[label: string, value: string]>;
+  /** A short list under a heading: each item a name in bold and what it means. */
+  list?: { title: string; items: Array<{ name: string; text?: string }> };
+  /** What needs attention, in a box of its own. */
+  warnings?: string[];
+}
+
+/** The summary's markup (empty when it has nothing). */
+export function summaryHtml(s: DialogSummary): string {
+  const facts = s.facts?.length ? `<dl class="confirm-facts">${s.facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>` : "";
+  const list = s.list?.items.length
+    ? `<h3 class="confirm-sub">${esc(s.list.title)}</h3><ul class="confirm-list">${s.list.items.map((i) => `<li><strong>${esc(i.name)}</strong>${i.text ? `<span>${esc(i.text)}</span>` : ""}</li>`).join("")}</ul>`
+    : "";
+  const warn = s.warnings?.length ? `<div class="confirm-warn" role="note">${s.warnings.map((w) => `<p>${esc(w)}</p>`).join("")}</div>` : "";
+  return facts + list + warn;
+}
+
+export interface ConfirmOptions extends DialogSummary {
   title: string;
   /** Plain-text lines shown as paragraphs. */
   lines: string[];
@@ -46,6 +66,7 @@ export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
   dlg.innerHTML = `
     <h2 id="confirm-title">${esc(opts.title)}</h2>
     ${opts.lines.map((l) => `<p>${esc(l)}</p>`).join("")}
+    ${summaryHtml(opts)}
     <div class="confirm-actions">
       <button type="button" data-testid="confirm-cancel" value="cancel">Cancel</button>
       <button type="button" class="${opts.danger === false ? "is-primary" : "is-danger"}" data-testid="confirm-ok" value="ok">${esc(opts.confirmLabel)}</button>
@@ -68,7 +89,7 @@ export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
   });
 }
 
-export interface ChooseOptions {
+export interface ChooseOptions extends DialogSummary {
   title: string;
   lines: string[];
   /** The ways to go on: one is picked (the first is selected). */
@@ -85,6 +106,7 @@ export function chooseDialog(opts: ChooseOptions): Promise<string | null> {
   dlg.innerHTML = `
     <h2 id="choose-title">${esc(opts.title)}</h2>
     ${opts.lines.map((l) => `<p>${esc(l)}</p>`).join("")}
+    ${summaryHtml(opts)}
     <div class="choose-list" role="radiogroup" aria-labelledby="choose-title">
       ${opts.choices.map((c, i) => `<label class="choose-item"><input type="radio" name="choose" value="${esc(c.value)}"${i === 0 ? " checked" : ""}><span><strong>${esc(c.label)}</strong><small>${esc(c.help)}</small></span></label>`).join("")}
     </div>

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.3 — Import and export questions you can read at a glance (2026-10-28)
+
+- **Changed:** the dialog before an import reads at a glance: a summary in two columns (From, Exported, Contains, Checked, Goes to), an *Also in this file* list (the workspace and Hidden items passwords, your settings, a library index) with one line each on what happens, and warnings (an incremental backup on its own, missing originals, problems) in a box of their own. Counts are written with thousands separators.
+- **Changed:** before a workspace backup, the passwords and privacy question lists what this device has (the workspace password, the Hidden items password, your privacy settings) instead of one long sentence.
+
 ## 0.50.2 — Faster import into a workspace folder (2026-10-28)
 
 - **Fixed:** in the desktop app, writing an import's files into the workspace folder waited for the disk to confirm every file, which on a spinning disk took minutes for a big backup. The files are now written in batches of 100 and the disk is asked once per batch; the app keeps its own copy of each file until its batch is confirmed, so stopping half-way still loses nothing. Measured on a spinning disk: about 112 files a second (1,168 files in 10 s).

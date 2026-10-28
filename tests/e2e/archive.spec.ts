@@ -184,8 +184,8 @@ test("a workspace backup round-trips to another browser profile exactly", async 
   await q.reload();
   await q.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   const text = await importArchive(q, file.name, file.bytes);
-  expect(text).toContain("Contains 3 canvases, 5 objects and 2 originals.");
-  expect(text).toContain("It also carries your settings");
+  expect(text).toContain("3 canvases · 5 objects · 2 originals");
+  expect(text).toContain("Your settings");
   expect(await q.evaluate(() => JSON.parse(localStorage.getItem("canvast.settings")!))).toMatchObject({ "nav.mode": "layer", "nav.arrive": "keep" });
   expect(text).toContain("2 new boards");
   await expect(q.getByTestId("workspace-nav")).toHaveText("Board 1 › Canvas 1");
@@ -246,7 +246,7 @@ test("canvas, board and asset exports contain only what their scope needs", asyn
   const q = other.page;
   // A canvas archive becomes a new canvas on the open board.
   const text = await importArchive(q, canvasFile.name, canvasFile.bytes);
-  expect(text).toContain("added as a new canvas on the open board");
+  expect(text).toContain("A new canvas on the open board");
   await expect(q.getByTestId("workspace-nav")).toHaveText("Board 1 › Canvas 2");
   expect((await sess(q)).tree!.map((b) => [b.name, b.canvases.map((c) => c.name)])).toEqual([["Board 1", ["Canvas 1", "Canvas 2"]]]);
   expect((await dump(q, (await sess(q)).current!.canvasId)).objects).toEqual((await dump(p, c2.id)).objects);
@@ -482,7 +482,7 @@ test("an incremental backup holds only what changed, a chain of backups restores
   ]);
   const dlg = q.getByTestId("confirm-dialog");
   await expect(dlg).toBeVisible();
-  expect((await dlg.textContent()) ?? "").toContain("put together from 2 files");
+  expect((await dlg.textContent()) ?? "").toContain("2 files of a backup chain");
   await q.getByTestId("confirm-ok").click();
   await expect(dlg).toHaveCount(0);
   await expect(q.getByTestId("toast")).toContainText(/Imported 3 canvases/);
@@ -547,7 +547,7 @@ test("a workspace password travels in a backup only when included, and an import
   // Left out (asked, and the first choice is to leave it out): no trace in the file.
   const left = await download(p, async () => {
     await p.getByTestId("set-export-full").click();
-    await expect(p.getByTestId("choose-dialog")).toContainText("the password of the workspace");
+    await expect(p.getByTestId("choose-dialog")).toContainText("The workspace password");
     await p.getByTestId("choose-ok").click();
   });
   expect((await manifestOf(left.bytes))["workspaceLock"]).toBeUndefined();
@@ -566,7 +566,7 @@ test("a workspace password travels in a backup only when included, and an import
   // A fresh profile has no password: the import sets it, and the next start asks for it.
   const { context, page } = await freshProfile(browser);
   try {
-    expect(await importArchive(page, kept.name, kept.bytes)).toContain("password for the whole workspace");
+    expect(await importArchive(page, kept.name, kept.bytes)).toContain("The workspace password");
     await page.reload();
     await expect(page.getByTestId("lock-screen")).toBeVisible();
     await page.getByTestId("lock-input").fill("open sesame");

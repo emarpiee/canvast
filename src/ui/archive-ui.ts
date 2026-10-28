@@ -128,27 +128,28 @@ export async function runImport(session: Session, picked: File | readonly File[]
     return;
   }
   const canvases = plan.boards.reduce((n, b) => n + b.canvases.length, 0);
-  const where =
-    plan.scope === "canvas" ? "It will be added as a new canvas on the open board."
-    : plan.scope === "assets" ? "The originals will be added to the library."
-    : `It will be added as ${plural(plan.boards.length, "new board")}; nothing existing is replaced.`;
-  const lines = [
-    ...(plan.libraryFile ? ["This is a library index: your canvases and the library's names, tags and folders, without the files."] : []),
-    `Exported ${plan.exportedAt ? new Date(plan.exportedAt).toLocaleString() : "at an unknown time"} from “${plan.workspaceName}”${plan.files > 1 ? `, put together from ${plan.files} files of a backup chain` : ""}.`,
-    ...(plan.incrementalOnly ? ["This is an incremental backup on its own: only the canvases that changed are in it. Add the full backup and the earlier incremental ones to restore everything."] : []),
-    `Contains ${plural(canvases, "canvas", "canvases")}, ${plural(plan.objects, "object")} and ${plural(plan.assets.length, "original")}. All checksums and content hashes were verified.`,
-    where,
-    ...(folder ? ["Its originals are the files in the library folder."] : []),
-    ...(plan.workspaceLock ? ["It also carries a password for the whole workspace: it is used only if this device has none, and the app then asks for it when it opens."] : []),
-    ...(plan.hiddenLock ? ["It also carries the password of the Hidden items: it is used only if this device has none."] : []),
-    ...((n) => (n ? [`It also carries your settings (theme, shortcuts, panel layout): ${n} you have not changed on this device ${n === 1 ? "is" : "are"} restored; the others stay as they are here.`] : []))(session.settingsHook?.restorable(plan.settings) ?? 0),
+  const count = (n: number, one: string, many = `${one}s`): string => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+  const facts: Array<[string, string]> = [
+    ["From", `“${plan.workspaceName}”${plan.files > 1 ? `, ${plan.files} files of a backup chain` : ""}`],
+    ["Exported", plan.exportedAt ? new Date(plan.exportedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "at an unknown time"],
+    ["Contains", [count(canvases, "canvas", "canvases"), count(plan.objects, "object"), count(plan.assets.length, "original")].join(" · ")],
+    ["Checked", "All checksums and content hashes verified"],
+    ["Goes to", plan.scope === "canvas" ? "A new canvas on the open board" : plan.scope === "assets" ? "The library: its originals are added to the library" : `${count(plan.boards.length, "new board")}; nothing existing is replaced`],
+    ...(folder ? [["Originals", "Its originals are the files in the library folder"] as [string, string]] : []),
   ];
-  if (plan.unresolved.length) lines.push(`${plural(plan.unresolved.length, "image")} ${plan.unresolved.length === 1 ? "refers" : "refer"} to originals that are not in the archive; ${plan.unresolved.length === 1 ? "it shows" : "they show"} as missing unless already in your library.`);
-  if (plan.problems.length) {
-    lines.push(`Problems (${plan.problems.length}):`, ...plan.problems.slice(0, 5));
-    if (plan.problems.length > 5) lines.push(`…and ${plan.problems.length - 5} more.`);
-  }
-  const ok = await confirmDialog({ title: folder ? "Open the library of this folder?" : `Import ${file.name}?`, lines, confirmLabel: folder ? "Open library" : "Import", danger: false });
+  const settings = session.settingsHook?.restorable(plan.settings) ?? 0;
+  const carried = [
+    ...(plan.libraryFile ? [{ name: "A library index", text: "Your canvases and the library's names, tags and folders, without the files." }] : []),
+    ...(plan.workspaceLock ? [{ name: "The workspace password", text: "Used only if this device has none; the app then asks for it when it opens." }] : []),
+    ...(plan.hiddenLock ? [{ name: "The Hidden items password", text: "Used only if this device has none." }] : []),
+    ...(settings ? [{ name: "Your settings", text: `${count(settings, "setting")} you have not changed on this device (theme, shortcuts, panel layout) ${settings === 1 ? "is" : "are"} restored; the others stay as they are here.` }] : []),
+  ];
+  const warnings = [
+    ...(plan.incrementalOnly ? ["This is an incremental backup on its own: only the canvases that changed are in it. Add the full backup and the earlier incremental ones to restore everything."] : []),
+    ...(plan.unresolved.length ? [`${count(plan.unresolved.length, "image")} ${plan.unresolved.length === 1 ? "refers" : "refer"} to originals that are not in the archive; ${plan.unresolved.length === 1 ? "it shows" : "they show"} as missing unless already in your library.`] : []),
+    ...(plan.problems.length ? [`Problems (${plan.problems.length}): ${plan.problems.slice(0, 5).join(" ")}${plan.problems.length > 5 ? ` …and ${plan.problems.length - 5} more.` : ""}`] : []),
+  ];
+  const ok = await confirmDialog({ title: folder ? "Open the library of this folder?" : `Import ${file.name}?`, lines: [], facts, list: { title: "Also in this file", items: carried }, warnings, confirmLabel: folder ? "Open library" : "Import", danger: false });
   if (!ok) return;
   const saving = busyProgress(session.editor, folder ? "Opening the library" : `Importing ${file.name}`, ["Keep the app open until it ends."]);
   saving.update(null, "saving into the workspace");

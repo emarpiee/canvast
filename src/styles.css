@@ -636,6 +636,16 @@ dialog.lock-screen .confirm-actions button { flex: 1; height: var(--ctl); }
 .about-logo { flex: none; width: var(--logo-sm); height: var(--logo-sm); color: var(--hud-fg); }
 dialog.confirm h2 { margin: 0 0 var(--sp-4); font-size: var(--text-xl); }
 dialog.confirm p { margin: 0 0 var(--sp-4); overflow-wrap: anywhere; }
+/* A dialog's summary, read at a glance: facts in two columns, a titled list, warnings in a box. */
+dialog.confirm .confirm-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--sp-3) var(--sp-7); margin: var(--sp-2) 0 var(--sp-6); }
+dialog.confirm .confirm-facts dt { color: var(--hud-muted); }
+dialog.confirm .confirm-facts dd { margin: 0; font-weight: var(--weight-medium); overflow-wrap: anywhere; }
+dialog.confirm .confirm-sub { margin: 0 0 var(--sp-3); font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--hud-muted); }
+dialog.confirm .confirm-list { display: grid; gap: var(--sp-3); margin: 0 0 var(--sp-6); padding: 0; list-style: none; }
+dialog.confirm .confirm-list li { display: grid; gap: var(--sp-1); padding: var(--sp-4) var(--sp-5); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
+dialog.confirm .confirm-list span { font-size: var(--text-sm); color: var(--hud-muted); }
+dialog.confirm .confirm-warn { margin: 0 0 var(--sp-6); padding: var(--sp-4) var(--sp-5); border: 1px solid var(--hud-danger); border-radius: var(--r-md); background: color-mix(in oklch, var(--hud-danger) 10%, transparent); }
+dialog.confirm .confirm-warn p:last-child { margin-bottom: 0; }
 /* the field of a prompt (and of the lock screen): the same as a field in Settings */
 dialog.confirm .prompt-input { box-sizing: border-box; display: block; width: 100%; height: var(--ctl); padding: 0 var(--sp-6); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
 dialog.confirm .prompt-input:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }

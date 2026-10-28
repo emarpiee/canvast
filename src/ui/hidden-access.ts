@@ -80,7 +80,7 @@ export async function scopeWithHiddenChoice(session: Session, scope: ExportScope
   if (!n) return scope;
   const choice = await chooseDialog({
     title: "Hidden items",
-    lines: [`${plural(n, "hidden item")} would be in this export. Include ${n === 1 ? "it" : "them"}, and ${n === 1 ? "its" : "their"} files and names?`],
+    lines: [`${plural(n, "hidden item")} would be in this export. Include ${n === 1 ? "it" : "them"}, with ${n === 1 ? "its" : "their"} files and names?`],
     choices: [
       { value: "leave", label: "Leave them out", help: "The export has no trace of them. Pictures on a canvas that use them show as missing when it is imported." },
       { value: "include", label: "Include them", help: "They stay hidden when imported. The file is not encrypted: anyone who has it can open it." },
@@ -101,10 +101,15 @@ export async function scopeWithPrivacyChoice(session: Session, scope: ExportScop
   const kinds = ["workspace", "hidden"] as const;
   const have = (await Promise.all(kinds.map((k) => session.hasPassword(k)))).map((h, i) => (h ? kinds[i]! : null)).filter((k): k is PasswordKind => k !== null);
   if (!have.length && !session.settingsHook?.privacySet()) return scope;
-  const names = [have.includes("workspace") ? "the password of the workspace" : "", have.includes("hidden") ? "the password of the Hidden items" : "", session.settingsHook?.privacySet() ? "your privacy settings" : ""].filter(Boolean);
+  const items = [
+    ...(have.includes("workspace") ? [{ name: "The workspace password" }] : []),
+    ...(have.includes("hidden") ? [{ name: "The Hidden items password" }] : []),
+    ...(session.settingsHook?.privacySet() ? [{ name: "Your privacy settings" }] : []),
+  ];
   const choice = await chooseDialog({
     title: "Passwords and privacy settings",
-    lines: [`Include ${names.join(", ").replace(/, ([^,]*)$/, " and $1")} in this backup?`],
+    lines: ["Include these in this backup?"],
+    list: { title: "This device has", items },
     choices: [
       { value: "leave", label: "Leave them out", help: "A copy restored from it starts with no password and the default privacy settings." },
       { value: "include", label: "Include them", help: "Importing it sets a password only on a device that has none. The file then holds the password's hash: anyone who has it could try to guess it." },
