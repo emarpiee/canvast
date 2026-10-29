@@ -21,6 +21,21 @@ export const LIBRARY_ROWS: readonly { keys: string; does: string; example: strin
   { keys: "width> height< pixels> size<", does: "by size (px, mp, kb, mb)", example: "width>1000 size<5mb" },
   { keys: "ratio:  orientation:", does: "shape of the picture", example: "ratio:16x9" },
   { keys: "colour:", does: "the colour that fills most of it", example: "colour:blue" },
+  { keys: "kind:", does: "picture, video, audio, gif, font, file", example: "kind:video" },
+  { keys: "is:", does: "favourite, used, unused, missing, filed, unfiled, tagged, untagged", example: "is:unused" },
+  { keys: "uses>  canvases>", does: "how often it is placed", example: "uses>2" },
+  { keys: "date:  date>  date<", does: "the day it was added (2026-10, today, week, month)", example: "date:week" },
+  { keys: "on:  folder:", does: "a canvas it is on, a folder it is in", example: "on:moodboard" },
+  { keys: "note:  field:", does: "its note, a field (field:source=web)", example: "field:source" },
+  { keys: "duration>", does: "the length of a video or sound (30s, 2m, 1:30)", example: "duration>30s" },
+];
+
+/** The words that only the canvas search understands. */
+export const CANVAS_ROWS: readonly { keys: string; does: string; example: string }[] = [
+  { keys: "kind:", does: "picture, video, gif, audio, text, stroke, shape, sheet", example: "kind:text" },
+  { keys: "group:  in:", does: "in a group, on a sheet (by name)", example: "in:page" },
+  { keys: "fill:  stroke:", does: "the colour of its fill or outline (a name or #hex)", example: "fill:red" },
+  { keys: "is:", does: "locked, masked, offscreen, tagged, named", example: "is:locked" },
 ];
 
 export function searchHelpButton(): string {

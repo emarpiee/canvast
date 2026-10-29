@@ -1694,6 +1694,11 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await box.fill("/.png");
   await p.keyboard.press("Shift+Enter");
   expect((await selection()).length).toBe(2);
+  // Keywords: what kind an item is, beside the words of the way chosen.
+  await box.fill("kind:picture blocks");
+  await expect(results.getByRole("option")).toHaveCount(1);
+  await box.fill("kind:text");
+  await expect(results.getByRole("option")).toHaveCount(0);
   // AND, OR, XOR, NOT work here too (ADR 0069): by name, and over a picture's whole tag list.
   await box.fill("/blocks OR green");
   await expect(results.getByRole("option")).toHaveCount(2);
@@ -2444,6 +2449,11 @@ test("the library filters by size, shape and colour, and lists look-alikes toget
   await expect.poll(names, { timeout: 8000 }).toEqual(["blue.png"]); // read from the thumbnails: arrives a moment later
   await search.fill("colour:red OR orientation:portrait");
   await expect.poll(names).toEqual(["blue.png", "red.png"]);
+  // keywords about the item: what it is, when it was added, how it is used
+  await search.fill("kind:picture is:unused date:today ratio:2x1");
+  await expect.poll(names).toEqual(["red.png"]);
+  await search.fill("uses>0 OR kind:video OR date<2000");
+  await expect.poll(names).toEqual([]);
   await search.fill("");
 
   // look-alikes: the two photos, side by side; the red and blue ones are not among them

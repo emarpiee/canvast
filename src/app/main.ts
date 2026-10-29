@@ -910,6 +910,11 @@ async function start(): Promise<void> {
       return e ? { name: e.name, tags: e.tags ?? [] } : undefined;
     },
     focus: (ids) => focusObjects(doc, view, ids, settings.get("nav.arrive") === "focus"),
+    onScreen: (o) => {
+      const fc = view.frameCamera;
+      const oc = cameraIn(fc, o.frame ?? doc.space.world);
+      return isCoarse(fc, o.frame ?? doc.space.world) || !!(oc && projectObject(o, oc, view.viewport, { keepTiny: true }));
+    },
   });
   attachTools(canvas, view, doc, index, editor, { editText: (t, at, box) => textEditor.open(t, at, box), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
     navigate: (dir) =>

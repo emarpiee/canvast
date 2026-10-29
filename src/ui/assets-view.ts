@@ -23,7 +23,7 @@ import { LIBRARY_ROWS, searchHelpButton, wireSearchHelp } from "./search-help";
 import { ASSETS_RECENT, rememberSearch } from "../search/history";
 import { paintRecent, wireRecent } from "./search-recent";
 import { evalQuery, parseQuery, type Query } from "../search/query";
-import { parseFilter, type Filter } from "../assets/filters";
+import { parseFilter, type Extra, type Filter } from "../assets/filters";
 import { LOOK_SIZE, lookOf, similarGroups, type Look } from "../assets/look";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
@@ -595,6 +595,44 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return filterCache.get(w)!;
   };
   let wantsLooks = false;
+  // ---- what the library keywords read besides the entry: canvas names (on:) and lengths of media files (duration>), the latter read on demand
+  let namesMemo: { of: unknown; names: Map<string, string[]> } | null = null;
+  const canvasNamesOf = (ids: readonly string[]): string[] => {
+    if (namesMemo?.of !== session.tree) {
+      const names = new Map<string, string[]>();
+      for (const { board, canvases } of session.tree?.boards ?? []) for (const c of canvases) names.set(c.id, [c.name.toLowerCase(), board.name.toLowerCase()]);
+      namesMemo = { of: session.tree, names };
+    }
+    return ids.flatMap((id) => namesMemo!.names.get(id) ?? []);
+  };
+  const durations = new Map<string, number | null>();
+  let durationsGen = 0;
+  let wantsDurations = false;
+  let readingDurations = false;
+  const readDurations = async (): Promise<void> => {
+    if (readingDurations || !listing) return;
+    readingDurations = true;
+    const todo: string[] = [];
+    for (const e of listing.entries) {
+      if (durations.has(e.hash)) continue;
+      if (/^(video|audio)\/|^image\/gif$/.test(e.type)) todo.push(e.hash);
+      else durations.set(e.hash, null); // a still picture or a file has no length
+    }
+    for (const h of todo) durations.set(h, (await assets.record(h).catch(() => undefined))?.duration ?? null);
+    readingDurations = false;
+    durationsGen++;
+    render();
+  };
+  const extraOf = (e: CatalogListing["entries"][number], m: ReturnType<typeof meta>): Extra => ({
+    hidden: m.hidden,
+    favorite: m.favorite,
+    tags: m.tags.length,
+    folders: m.folderIds.length && listing ? folderPath(listing.folders, m.folderIds[0]!).map((n) => n.toLowerCase()) : [],
+    note: m.note.toLowerCase(),
+    fields: m.fields.map((f) => ({ key: f.key.toLowerCase(), value: f.value.toLowerCase() })),
+    on: () => canvasNamesOf(e.canvasIds),
+    duration: () => durations.get(e.hash),
+  });
   /** The groups of look-alikes among the pictures read so far. */
   let similarMemo: { of: CatalogListing | null; gen: number; groups: string[][] } | null = null;
   const similar = (): string[][] => {
@@ -1378,9 +1416,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (w.startsWith(".")) return w.length > 1 ? chipOf(e.name, e.type).toLowerCase() === w.slice(1) : extOf(e.name) !== "";
       const f = filterOf(w);
       if (f) {
-        const verdict = f.test(e, looks.get(e.hash));
+        const verdict = f.test(e, looks.get(e.hash), extraOf(e, m));
         if (verdict === "unknown") {
           if (f.needsLook) wantsLooks = true;
+          if (f.needsDuration) wantsDurations = true;
           return false;
         }
         return verdict;
@@ -1408,17 +1447,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** One formatter for every card's date (making one per card was most of the time it took to draw a card). */
   const addedDate = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric" });
   /** What is listed, worked out again only when the listing, the search, the scope, the sort or (for the look filters) the looks changed. */
-  let filterMemo: { key: string; of: CatalogListing; tags: typeof canvasTags; wantsLooks: boolean; looksGen: number; rows: CatalogListing["entries"] } | null = null;
+  let filterMemo: { key: string; of: CatalogListing; tags: typeof canvasTags; wantsLooks: boolean; looksGen: number; durationsGen: number; tree: unknown; rows: CatalogListing["entries"] } | null = null;
   const filtered = (): CatalogListing["entries"] => {
     if (!listing) return [];
     const memoKey = [search.value, way, usageSel.value, sortSel.value, reversed, scope].join("\u0001");
     const m = filterMemo;
-    if (m && m.key === memoKey && m.of === listing && m.tags === canvasTags && (!m.wantsLooks || m.looksGen === looksGen)) {
+    if (m && m.key === memoKey && m.of === listing && m.tags === canvasTags && m.tree === session.tree && m.durationsGen === durationsGen && (!m.wantsLooks || m.looksGen === looksGen)) {
       wantsLooks = m.wantsLooks;
       return m.rows;
     }
     const rows = filterNow();
-    filterMemo = { key: memoKey, of: listing, tags: canvasTags, wantsLooks, looksGen, rows };
+    filterMemo = { key: memoKey, of: listing, tags: canvasTags, wantsLooks, looksGen, durationsGen, tree: session.tree, rows };
     return rows;
   };
   let sortMemo: { of: CatalogListing; key: SortKey; reversed: boolean; rows: CatalogListing["entries"] } | null = null;
@@ -1461,6 +1500,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // shortcut: a linear filter over the in-memory listing; add a tag/name index if libraries reach tens of thousands.
     const words = searchWords(search.value);
     wantsLooks = scope === "similar";
+    wantsDurations = false;
     const usage = usageSel.value as UsageFilter;
     const group = new Map<string, number>();
     if (scope === "similar") similar().forEach((g, i) => g.forEach((h) => group.set(h, i)));
@@ -1483,6 +1523,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const base = scope === "similar" ? listing.entries : sortedAll();
     const rows = base.filter((e) => inScope(e) && matchesQuery(e, words, usage));
     // (hidden items only while their list is open: they are in no Similar group, and their files may be locked)
+    if (wantsDurations) void readDurations();
     if (wantsLooks) ensureLooks(listing.entries.filter((e) => !isCard(e) && (scope === "hidden" || !meta(e).hidden)).map((e) => e.hash));
     // Look-alikes are listed together, the biggest group first, whatever the sort (the point is to see them side by side).
     if (scope === "similar") return rows.sort((a, b) => group.get(a.hash)! - group.get(b.hash)! || collator.compare(a.name, b.name));

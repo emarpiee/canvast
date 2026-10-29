@@ -5,8 +5,9 @@ import { mountSuggest } from "./search-suggest";
 import { extOf } from "../assets/file-kind";
 import { CANVAS_RECENT, rememberSearch } from "../search/history";
 import { paintRecent, wireRecent } from "./search-recent";
-import { searchHelpButton, wireSearchHelp } from "./search-help";
+import { CANVAS_ROWS, searchHelpButton, wireSearchHelp } from "./search-help";
 import { evalQuery, parseQuery } from "../search/query";
+import { parseCanvasFilter, type CanvasContext, type CanvasFilter } from "../search/canvas-filters";
 import type { BookmarkList } from "../app/bookmarks";
 import type { DocumentStore } from "../doc/document-store";
 import type { CanvasObject } from "../doc/model";
@@ -27,6 +28,8 @@ export interface SearchDeps {
   entry(hash: string): Promise<{ name: string; tags: readonly string[] } | undefined>;
   /** Bring these objects into view. */
   focus(ids: readonly string[]): void;
+  /** Whether an object is in the view now (`is:offscreen`). */
+  onScreen(o: CanvasObject): boolean;
 }
 
 interface Result {
@@ -61,7 +64,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
     ${searchKeysHtml([["Enter", "go to it"], ["Ctrl+Enter", "check"], ["Shift+Enter", "check all"], ["Esc", "close"]])}`;
   host.appendChild(root);
   const input = root.querySelector<HTMLInputElement>("input")!;
-  wireSearchHelp(root.querySelector<HTMLElement>(".search-help-btn")!, input, "Type the operators in capitals. Works after / # or @.");
+  wireSearchHelp(root.querySelector<HTMLElement>(".search-help-btn")!, input, "Type the operators in capitals. Works after / # or @.", CANVAS_ROWS);
   const list = root.querySelector<HTMLElement>("ul")!;
   const PLACEHOLDER: Record<Mode, string> = { all: "Search", name: "Name", tag: "Tag", bookmark: "Bookmark" };
   const EMPTY: Record<Mode, string> = { all: "Type a name, tag, group or bookmark to search this canvas. / # @ narrow it to one.", name: "Type a name to search this canvas.", tag: "Type a tag to find items with it (their own tags, and the tags of a picture's original).", bookmark: "Type a bookmark name, or leave it empty to list them." };
@@ -76,6 +79,24 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   let names = new Map<string, string>();
   let tags = new Map<string, readonly string[]>();
   let token = 0;
+
+  const filters = new Map<string, CanvasFilter | null>();
+  const filterOf = (w: string): CanvasFilter | null => {
+    if (!filters.has(w)) filters.set(w, parseCanvasFilter(w));
+    return filters.get(w)!;
+  };
+  const ctx: CanvasContext = {
+    sheetName: (id) => {
+      const s = deps.doc.get(id);
+      return s ? labelOf(s).text.toLowerCase() : undefined;
+    },
+    onScreen: (o) => deps.onScreen(o),
+  };
+  /** A keyword (`kind:text`, `fill:red`...) decides alone; any other word goes to `word`. */
+  const term = (o: CanvasObject, text: string, word: (w: string) => boolean): boolean => {
+    const f = filterOf(text);
+    return f ? f(o, ctx) : word(text);
+  };
 
   const compute = (): void => {
     const q = parseQuery(input.value).query;
@@ -101,7 +122,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
           const hay = `${lab.text} ${groupName} ${noteOf(o)}`.toLowerCase();
           const tagHit = (w: string): boolean => own.some((x) => x.toLowerCase().includes(w));
           const exact = (w: string): boolean => own.some((x) => tagIsOrUnder(x, w));
-          if (!evalQuery(q, (term) => (term.text.startsWith("#") ? exact(term.text.slice(1)) : term.text.length > 1 && term.text.startsWith(".") ? lab.text.toLowerCase().endsWith(term.text) : hay.includes(term.text) || tagHit(term.text)))) continue;
+          if (!evalQuery(q, (t) => term(o, t.text, (w) => (w.startsWith("#") ? exact(w.slice(1)) : w.length > 1 && w.startsWith(".") ? lab.text.toLowerCase().endsWith(w) : hay.includes(w) || tagHit(w))))) continue;
           out.push({ key: o.id, icon: lab.icon, label: lab.text, note: own.length ? own.map((x) => `#${x}`).join(" ") : noteOf(o), ids: [o.id], entered: [...(o.groups ?? [])] });
         } else if (mode === "tag") {
           // The item's own in-canvas tags, and (for a picture) the tags of its original in the library.
@@ -109,13 +130,13 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
           const all = [...new Map(t.map((x) => [x.toLowerCase(), x] as const)).values()];
           // A term matches when some tag contains it; NOT and XOR then apply to the item's whole tag list.
           // A `#word` is an exact tag; a plain word is part of a tag (the same as in the library).
-          if (!all.length || !evalQuery(q, (term) => all.some((x) => (term.text.startsWith("#") ? tagIsOrUnder(x, term.text.slice(1)) : x.toLowerCase().includes(term.text))))) continue;
+          if (!all.length || !evalQuery(q, (t) => term(o, t.text, (w) => all.some((x) => (w.startsWith("#") ? tagIsOrUnder(x, w.slice(1)) : x.toLowerCase().includes(w)))))) continue;
           const hit = all;
           out.push({ key: o.id, icon: lab.icon, label: lab.text, note: hit.map((x) => `#${x}`).join(" "), ids: [o.id], entered: [...(o.groups ?? [])] });
         } else {
           const groupName = (o.groups ?? []).map((g) => o.groupNames?.[g] ?? "").join(" ");
           const hay = `${lab.text} ${groupName}`.toLowerCase();
-          if (!evalQuery(q, (t) => (t.text.length > 1 && t.text.startsWith(".") ? lab.text.toLowerCase().endsWith(t.text) : hay.includes(t.text)))) continue;
+          if (!evalQuery(q, (t) => term(o, t.text, (w) => (w.length > 1 && w.startsWith(".") ? lab.text.toLowerCase().endsWith(w) : hay.includes(w))))) continue;
           out.push({ key: o.id, icon: lab.icon, label: lab.text, note: noteOf(o), ids: [o.id], entered: [...(o.groups ?? [])] });
         }
         if (out.length >= MAX_RESULTS) break;
@@ -126,7 +147,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
       // Bookmarks whose name matches follow the items (a `#tag` word is about tags, so it never matches a bookmark).
       for (const b of deps.bookmarks.items) {
         const bn = b.name.toLowerCase();
-        if (evalQuery(q, (t) => !t.text.startsWith("#") && bn.includes(t.text))) results.push({ key: `b:${b.id}`, icon: ICONS.bookmark, label: b.name, note: "Bookmark", bookmark: b.id });
+        if (evalQuery(q, (t) => !t.text.startsWith("#") && !filterOf(t.text) && bn.includes(t.text))) results.push({ key: `b:${b.id}`, icon: ICONS.bookmark, label: b.name, note: "Bookmark", bookmark: b.id });
       }
     }
     active = Math.min(active, Math.max(0, results.length - 1));

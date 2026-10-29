@@ -139,6 +139,8 @@ export interface Usage {
   instances: number;
   /** Distinct canvases holding those instances. */
   canvases: number;
+  /** Those canvases (ids). */
+  canvasIds: readonly string[];
 }
 
 export interface CatalogListing {
@@ -195,7 +197,7 @@ export function entryFromRecord(r: AssetRecord): CatalogEntry {
 
 const usageOf = (m: Map<string, { instances: number; canvases: Set<string> }>, hash: string): Usage => {
   const u = m.get(hash);
-  return { instances: u?.instances ?? 0, canvases: u?.canvases.size ?? 0 };
+  return { instances: u?.instances ?? 0, canvases: u?.canvases.size ?? 0, canvasIds: u ? [...u.canvases] : [] };
 };
 
 /** A persisted lower-quality thumbnail of an asset (derived data: never hashed, regenerated from the original when missing). */
@@ -368,7 +370,7 @@ export class AssetCatalog implements CatalogStore {
     for (const e of active) {
       const p = was.get(e.hash);
       if (!p) return null;
-      out.push({ ...e, instances: p.instances, canvases: p.canvases, present: p.present });
+      out.push({ ...e, instances: p.instances, canvases: p.canvases, canvasIds: p.canvasIds, present: p.present });
     }
     return { entries: out, missing: prev.missing, pendingDeletion: entries.filter((e) => e.state === "deleted").length, folders };
   }

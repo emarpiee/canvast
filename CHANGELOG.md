@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.50.41 — Search keywords (2026-10-29)
+
+- **Added:** library search keywords: `kind:` (picture, video, audio, gif, font, file), `is:` (favourite, used, unused, missing, filed, unfiled, tagged, untagged), `uses>` and `canvases>`, `date:` (a day, month or year, `today`, `yesterday`, `week`, `month`, `year`, and `date>` / `date<`), `on:` (a canvas or board it is placed on), `folder:`, `note:`, `field:key` and `field:key=value`, and `duration>` for videos, sounds and GIFs (`30s`, `2m`, `1:30`).
+- **Added:** canvas search keywords: `kind:` (picture, video, gif, audio, text, stroke, shape, sheet), `group:` and `in:` (a group or a sheet by name), `fill:` and `stroke:` (a colour name or a hex colour; a gradient by any of its stops; `colour:` either), and `is:` (locked, masked, offscreen, tagged, named, rotated, grouped).
+- **Changed:** the search help card lists the new keywords with an example each, in the library and on the canvas.
+
 ## 0.50.40 — Undo brings deleted items back selected; fonts show their letters on the canvas (2026-10-29)
 
 - **Changed:** undoing a delete brings the items back selected, whatever their kind (strokes, shapes, text, pictures, videos, sheets), so they can be moved or deleted again at once.

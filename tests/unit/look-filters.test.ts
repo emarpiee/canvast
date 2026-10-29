@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFilter } from "../../src/assets/filters";
+import { dateSpan, parseFilter, parseSeconds, type Extra } from "../../src/assets/filters";
 import { colourName, hamming, lookOf, similarGroups } from "../../src/assets/look";
 
 const grid = (f: (x: number, y: number) => [number, number, number, number], n = 32): Uint8ClampedArray => {
@@ -83,5 +83,58 @@ describe("groups of look-alikes (ADR 0114)", () => {
       { id: "y", dhash: flip("0123456789abcdef", [63]) },
     ]);
     expect(groups.map((g) => [...g].sort())).toEqual([["a", "b", "c"], ["x", "y"]]);
+  });
+});
+
+describe("library keywords", () => {
+  const now = new Date(2026, 9, 29, 15, 0).getTime();
+  const item = { pixelW: 10, pixelH: 10, size: 1, name: "clip.mp4", type: "video/mp4", importedAt: new Date(2026, 9, 28, 9).getTime(), instances: 3, canvases: 2, present: true };
+  const extra: Extra = { hidden: false, favorite: true, tags: 0, folders: ["refs", "faces"], note: "from the museum", fields: [{ key: "source", value: "web" }], on: () => ["moodboard", "work"], duration: () => 95 };
+  const t = (w: string, s: object = item, x: Extra | undefined = extra) => parseFilter(w, now)!.test({ ...item, ...s }, undefined, x);
+  it("is:, kind:, uses> and canvases>", () => {
+    expect(t("is:favourite")).toBe(true);
+    expect(t("is:used")).toBe(true);
+    expect(t("is:unused")).toBe(false);
+    expect(t("is:untagged")).toBe(true);
+    expect(t("is:filed")).toBe(true);
+    expect(t("is:missing", { present: false })).toBe(true);
+    expect(parseFilter("is:nonsense")).toBeNull();
+    expect(t("kind:video")).toBe(true);
+    expect(t("kind:font", { name: "a.ttf", type: "font/ttf", card: true })).toBe(true);
+    expect(t("kind:file", { name: "a.zip", type: "application/zip", card: true })).toBe(true);
+    expect(t("uses>2")).toBe(true);
+    expect(t("uses:0")).toBe(false);
+    expect(t("canvases<2")).toBe(false);
+  });
+  it("date: names a day, month, year or a recent span; > and < are after and before it", () => {
+    expect(t("date:2026-10")).toBe(true);
+    expect(t("date:2026-10-28")).toBe(true);
+    expect(t("date:yesterday")).toBe(true);
+    expect(t("date:today")).toBe(false);
+    expect(t("date:week")).toBe(true);
+    expect(t("date>2026-10-27")).toBe(true);
+    expect(t("date>2026-10-28")).toBe(false);
+    expect(t("date>=2026-10-28")).toBe(true);
+    expect(t("date<2026")).toBe(false);
+    expect(dateSpan("2026-13", now)).toBeNull();
+  });
+  it("on:, folder:, note: and field: read the item's places and words", () => {
+    expect(t("on:mood")).toBe(true);
+    expect(t("on:sketch")).toBe(false);
+    expect(t("folder:face")).toBe(true);
+    expect(t("note:museum")).toBe(true);
+    expect(t("field:source")).toBe(true);
+    expect(t("field:source=web")).toBe(true);
+    expect(t("field:source=book")).toBe(false);
+  });
+  it("duration> compares seconds and waits while the length is unknown", () => {
+    expect(parseSeconds("1:30")).toBe(90);
+    expect(parseSeconds("2m")).toBe(120);
+    expect(parseSeconds("500ms")).toBe(0.5);
+    expect(t("duration>1m")).toBe(true);
+    expect(t("duration<1:30")).toBe(false);
+    expect(t("duration>1m", {}, { ...extra, duration: () => undefined })).toBe("unknown");
+    expect(t("duration>1m", {}, { ...extra, duration: () => null })).toBe(false);
+    expect(parseFilter("duration>1m")!.needsDuration).toBe(true);
   });
 });

@@ -223,6 +223,7 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
   - A **tour** plays them in list order: the bars fade, `→` and `←` step, `Esc` ends it. With *Tour: wait at each stop* (Settings) it moves on by itself.
   - Getting to a bookmark is a glide; a far one zooms out from here and in to there (see *Camera travel* below).
 - **Search** (`Ctrl+F`) finds objects by name, tag or bookmark. Combine words with space or `AND`, `OR`, `XOR`, `NOT`, parentheses and `"phrases"`. `/` searches names only, `#` tags only, `@` bookmarks only. Searches that found something are remembered, and a help card lists the syntax.
+  - **Keywords:** `kind:` (picture, video, gif, audio, text, stroke, shape, sheet), `group:name` (in a group of that name), `in:name` (on a sheet of that name), `fill:red` and `stroke:#2563eb` (the colour of the fill or the outline; `colour:` either), and `is:locked`, `is:masked`, `is:offscreen`, `is:tagged`, `is:named`, `is:rotated`, `is:grouped`.
 - **Step through items** with `W` `A` `S` `D`: the nearest in view (when you are zoomed in on an item and nothing is near enough on the screen, the nearest of its size that way, however far), the nearest anywhere, by layer or by name A to Z (each either among the items in the window or among all of them; `W` and `A` go back, `S` and `D` on). On arriving, focus on the item or keep the zoom. `F` brings the selection into view; press it again to fit everything.
 - **Jump anywhere:** click the zoom in the info bar and type a level. One jump can travel up to 2^50 levels.
 - **Camera travel** (Settings → Navigation) is how the view gets to a bookmark or a previous view.
@@ -395,7 +396,8 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
   - **Grid or list.** In the list, drag a column header's edge to resize it (double-click for its usual width). Columns, widths and the thumbnail size are kept.
   - **The sidebar's sections** (Folders, File types, Tags, Canvas tags) can be reordered by dragging their heads, or with `Alt+↑` / `Alt+↓` on a section's name.
   - **Filters** (Show, Sort by and its direction, the sidebar's list) are kept over a restart; the funnel-with-a-cross button resets them.
-  - **Thumbnails** are made in the background after an import, so the grid fills in on its own. A font shows "Aa" in its letters; selected, its details show a sample sentence, and the viewer shows it at four sizes with the alphabet and digits.
+  - **Thumbnails** are made in the background after an import, so the grid fills in on its own. A font shows "Aa" in its letters (on the canvas too); selected, its details show a sample sentence, and the viewer shows it at four sizes with the alphabet and digits.
+  - **Search keywords** (the help card beside the box lists them, each with an example): `width>1000`, `height<`, `pixels>2mp`, `size<5mb`, `ratio:16x9`, `orientation:portrait`, `colour:blue`; `kind:` (picture, video, audio, gif, font, file); `is:` favourite, used, unused, missing, filed, unfiled, tagged, untagged; `uses>2` and `canvases>1`; `date:2026-10` (also a day or a year, `today`, `yesterday`, `week`, `month`, `year`, and `date>` / `date<` for after and before); `on:name` (placed on a canvas or board of that name); `folder:`, `note:`, `field:source` or `field:source=web`; `duration>30s` (`2m`, `1:30`). They combine with words and operators: `kind:video duration>1m -is:used`.
   - **Back to top:** the arrow in the status bar, once you have scrolled down.
 - **Dragging items** shows up to five of them stacked, with their count. Drop them on a folder, a tag or Favourites in the sidebar to file them, or on the strip across the top to place them on the open canvas (the library stays open).
 - **The status bar** along the bottom (the same as the canvas's) shows how many items are listed (*3 of 5 items*), how many are selected and their size, and the size of the whole library. At its right end: grid or list, the list's columns, and the thumbnail size.
@@ -903,7 +905,7 @@ src/
   interaction/   navigation, tools, snapping, pens, item stepping
   assets/        content addressing, decoding, catalog, garbage collection
   storage/       IndexedDB, workspace repository, persistence, writer lease, ZIP, archives
-  search/        boolean query parser and evaluator
+  search/        boolean query parser and evaluator, canvas search keywords, recent searches
   settings/      declared settings, scopes, rebindable shortcuts
   commands/      command registry, palette providers, macros
   gen/           the pattern generators, a standalone module that imports nothing from the app: seeded random, geometry helpers, one pure function per pattern, an SVG writer
