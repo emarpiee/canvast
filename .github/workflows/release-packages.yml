@@ -1,0 +1,55 @@
+name: Release packages
+
+# The desktop app's Linux packages (AppImage with its .zsync, .deb, .rpm, .tar.gz, each with its .sha256), for x86_64 and aarch64:
+# built and checked on GitHub's machines with scripts/package-desktop.mjs (which packages for the machine it runs on: it starts the
+# AppImage and the unpacked tarball, and checks the .deb and .rpm), then added to the release they belong to. `npm run release`
+# publishes the release with the single file only, so no package is uploaded from a home connection. Run it by hand for a tag with
+# "Run workflow" to redo one.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The release tag to build and add the packages to (vX.Y.Z)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  packages:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Tools for the packages and the start check
+        run: sudo apt-get update && sudo apt-get install -y zsync rpm xvfb
+      - run: npm ci
+      # (the brand icons are drawn with Playwright's Chromium; the start check runs Electron under a virtual display)
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: The single file is the one released (the build is reproducible)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$TAG" --pattern canvast.html.sha256 --dir released --repo "$GITHUB_REPOSITORY"
+          test "$(cut -c1-64 released/canvast.html.sha256)" = "$(sha256sum dist/canvast.html | cut -c1-64)"
+      - run: xvfb-run -a node scripts/package-desktop.mjs
+      - name: Add them to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" dist-package/canvast-* --clobber --repo "$GITHUB_REPOSITORY"

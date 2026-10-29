@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.34 — Packages built on GitHub, tests on GitHub (2026-10-29)
+
+- **Changed:** the desktop packages of a release are built, checked and added on GitHub's machines (x86_64 and aarch64) a few minutes after it is published; a release no longer uploads them from the developer's machine. The release notes list them by format.
+- **Added:** the whole end-to-end suite runs on GitHub on every push and pull request, split by test group and browser, and the full suite every Sunday.
+- **Added:** the README has notes from the developer.
+- **Fixed:** three tests that the first run on GitHub showed to be wrong: two looked for the canvas's view controls by a class the library's bar now shares, and one read a pixel before the next frame was drawn.
+
 ## 0.50.33 — Linux packages, a new README, GPL v3 (2026-10-29)
 
 - **Added:** the desktop app is packaged as `.deb`, `.rpm` and `.tar.gz` besides the AppImage, for x86_64 and aarch64 (ARM64, built and start-checked on an ARM machine by a release workflow). Each package is checked before it is released and has its SHA-256 beside it.

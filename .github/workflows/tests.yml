@@ -58,7 +58,8 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps ${{ matrix.project == 'firefox' && 'firefox' || 'chromium' }}
+      # (the smoke group's portability test opens both browsers)
+      - run: npx playwright install --with-deps ${{ matrix.group == 'smoke' && 'chromium firefox' || matrix.project == 'firefox' && 'firefox' || 'chromium' }}
       - name: Run the group
         run: |
           specs=$(node -e 'import("./scripts/lib/test-groups.mjs").then((m) => console.log(m.GROUPS[process.argv[1]].map((s) => `tests/e2e/${s}.spec.ts`).join(" ")))' "${{ matrix.group }}")

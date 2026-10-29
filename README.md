@@ -37,7 +37,8 @@
 **Project**
 
 16. [Platform support](#platform-support)
-17. [Licence](#licence)
+17. [Notes from the developer](#notes-from-the-developer)
+18. [Licence](#licence)
 
 ---
 
@@ -746,7 +747,7 @@ Every end-to-end run builds its own copy of the app into `test-builds/` and test
 
 ### Releasing
 
-`npm run release` publishes `dist/canvast.html` and the desktop app's x86_64 packages (`npm run package:desktop`, which checks each before it is handed out), each with its SHA-256 (and the AppImage's `.zsync`, which updaters read), as the latest GitHub release (tag `vX.Y.Z`, the version in `package.json`). Run it after the version is bumped, `CHANGELOG.md` has its `## X.Y.Z — Title (date)` section and everything is pushed: it builds and checks the file, packages the AppImage, creates or updates the release, marks it **Latest** and reads it back to confirm that it is the latest and serves the same file. `npm run release -- --dry-run` does everything but publish and prints the notes. The notes are split into **Features** and **Fixes** from the CHANGELOG: a bullet that starts with `**Fixed:**` is a fix, any other (`**Added:**`, `**Changed:**`, `**Removed:**`) is a feature. Publishing the release starts the `Release (aarch64)` workflow (`.github/workflows/release-arm64.yml`), which builds the `aarch64` packages with the same script on an ARM machine, starts them, and adds them to the release; it can also be run by hand for a tag.
+`npm run release` publishes `dist/canvast.html` with its SHA-256 as the latest GitHub release (tag `vX.Y.Z`, the version in `package.json`). Run it after the version is bumped, `CHANGELOG.md` has its `## X.Y.Z — Title (date)` section and everything is pushed: it builds and checks the file, creates or updates the release, marks it **Latest** and reads it back to confirm that it is the latest and serves the same file. `npm run release -- --dry-run` does everything but publish and prints the notes. The notes are split into **Features** and **Fixes** from the CHANGELOG: a bullet that starts with `**Fixed:**` is a fix, any other (`**Added:**`, `**Changed:**`, `**Removed:**`) is a feature. Publishing the release starts the `Release packages` workflow (`.github/workflows/release-packages.yml`): on an x86_64 and an ARM machine it builds the app from the tag, checks that its single file is the one released (the build is reproducible), makes the packages with `npm run package:desktop` (which checks each), and adds them to the release with their SHA-256 and the AppImage's `.zsync`. No package is uploaded from the developer's machine. It can also be run by hand for a tag.
 
 ### The showcase and the screenshots
 
@@ -788,6 +789,16 @@ The logo (a frame, a window cut from it a little low and to the right, and the d
 - Requires `BigInt`, Pointer Events, `ResizeObserver`, Canvas 2D and IndexedDB. Roughly Chromium 67+, Firefox 68+, Safari 14+.
 - **Tested** in Chromium 156 (default, CPU-only, and devicePixelRatio 2 with touch) and Firefox 157 on Linux. **Not tested** in Safari.
 - Firefox on `file://` supports everything canvast uses (IndexedDB, Web Locks, BroadcastChannel) with frame times close to Chromium's.
+
+---
+
+## Notes from the developer
+
+canvast was planned and built with [Claude Code](https://claude.com/claude-code).
+
+I do not believe that images made by generative AI are art, and by the same measure this project, its branding included, is not art either. I treat AI as a tool. It can make an artist's workflow better, and it can build the tools artists use to make their art. It should not be the one making the art for them.
+
+The idea grew out of [Kambas](https://github.com/emarpiee/obsidian-kambas), my Obsidian plugin that extends Canvas with image controls. Shipping the app as a single HTML file was inspired by the one-file tools of [iamsingle.app](https://iamsingle.app/) and [Anton Burmistrov](https://antonburmistrov.com/).
 
 ---
 

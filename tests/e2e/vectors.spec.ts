@@ -1462,7 +1462,7 @@ test("the interface around the vector tools: the hint floats at the bottom (and 
   await expect(p.locator("[data-select-more]")).toHaveCount(0);
   // the hint line never runs under the controls at the bottom right: it takes the room they leave
   const hintBox = await p.locator(".hint-float").boundingBox();
-  const controlsBox = (await p.locator(".hud-controls").boundingBox())!;
+  const controlsBox = (await p.locator(".hud-controls:not(.assets-controls)").boundingBox())!;
   if (hintBox && hintBox.y + hintBox.height > controlsBox.y) expect(hintBox.x + hintBox.width, "the hint ends before the controls").toBeLessThanOrEqual(controlsBox.x);
   // Settings > Hints and tooltips: none
   await p.getByTestId("view-settings").click();
@@ -2436,6 +2436,7 @@ test("Fill gaps fills the place four shapes close in, under them; Fill a gap fil
   expect(await px()).toEqual([37, 99, 235]);
   await key(app, "Control+z");
   expect(await objs(app)).toHaveLength(4);
+  await app.frame(); // (the undone fill is gone from the next frame)
   expect(await px()).toEqual(empty);
   // one at a time: a click outside every gap does nothing, a click in one fills it (the last gap ends the mode)
   await key(app, "Control+a");
@@ -3368,7 +3369,7 @@ test("on a phone the Actions bar stands above the bottom controls, and the colou
   await p.mouse.click(190, 350);
   const ctx = p.locator(".ctx-wrap");
   await expect(ctx).toBeVisible();
-  const [a, c] = [(await ctx.boundingBox())!, (await p.locator(".hud-controls").boundingBox())!];
+  const [a, c] = [(await ctx.boundingBox())!, (await p.locator(".hud-controls:not(.assets-controls)").boundingBox())!];
   expect(a.y + a.height, "the Actions bar ends above the controls").toBeLessThanOrEqual(c.y + 1);
   // (the colours' own bar is a .toolbar too: the Properties bar is the other one)
   const row = p.locator('#toolbar > .toolbar:not([aria-label="Colours of the selection"]) .tb-options-row');

@@ -26,8 +26,8 @@ export function splitBullets(bullets) {
 const list = (items, none) => (items.length ? items.map((b) => `- ${b}`).join("\n") : `- ${none}`);
 
 /** The release notes: the title line, Features, Fixes (both always there), and what to download. */
-/** `desktop`: the Linux packages of this machine's architecture ({ name, size, sha256 }, the AppImage first), or empty. */
-export function releaseNotes({ version, section, sha256, size, previousTag, repo, desktop = [] }) {
+/** `desktop`: whether the release also gets the desktop app's packages (the Release packages workflow adds them). */
+export function releaseNotes({ version, section, sha256, size, previousTag, repo, desktop = false }) {
   const { features, fixes } = splitBullets(section.bullets);
   const mb = (size / 1024 / 1024).toFixed(2);
   return [
@@ -41,16 +41,19 @@ export function releaseNotes({ version, section, sha256, size, previousTag, repo
     "",
     "### Download",
     `**\`canvast.html\`** (${mb} MB) is the whole app in one file: save it anywhere and open it in a browser, no install and no server. SHA-256: \`${sha256}\``,
-    ...(desktop.length
+    ...(desktop
       ? [
           "",
-          "The desktop app for Linux, whose workspace is a folder of ordinary files on your disk (see the README's Installation section):",
+          "The desktop app for Linux, whose workspace is a folder of ordinary files on your disk (see the README's Installation section), for x86_64 and aarch64 (ARM64):",
           "",
-          "| File | Size | SHA-256 |",
-          "| --- | --- | --- |",
-          ...desktop.map((p) => `| \`${p.name}\` | ${(p.size / 1024 / 1024).toFixed(1)} MB | \`${p.sha256}\` |`),
+          "| Format | File |",
+          "| --- | --- |",
+          `| AppImage (any distribution; updates itself with an AppImage updater) | \`canvast-${version}-<arch>.AppImage\` |`,
+          `| Debian, Ubuntu | \`canvast-${version}-<arch>.deb\` |`,
+          `| Fedora, RHEL, openSUSE | \`canvast-${version}-<arch>.rpm\` |`,
+          `| Any, without installing | \`canvast-${version}-<arch>.tar.gz\` |`,
           "",
-          "The AppImage updates itself with an AppImage updater (its `.zsync` is beside it). The aarch64 (ARM64) packages are added to this release by the ARM build once it has passed its start check.",
+          "Each has its SHA-256 beside it (`.sha256`). The packages are built and checked on GitHub's machines and added to this release a few minutes after it is published.",
         ]
       : []),
     ...(previousTag ? ["", `**Full changelog:** https://github.com/${repo}/compare/${previousTag}...v${version}`] : []),

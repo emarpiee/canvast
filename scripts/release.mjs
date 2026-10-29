@@ -1,5 +1,6 @@
 // Publishes the built single file as the latest GitHub release (ADR 0175). Run after the version is bumped, CHANGELOG.md has its section and everything is pushed:
-//   npm run release              build, check, package the desktop AppImage, tag vX.Y.Z, upload both, mark it Latest, verify
+//   npm run release              build, check, tag vX.Y.Z, upload the single file, mark it Latest, verify; publishing it starts the
+//                                Release packages workflow, which builds, checks and adds the desktop packages on GitHub's machines
 //   npm run release -- --dry-run do everything but publish, and print the notes
 //   npm run release -- --force   publish even if a newer version is already the latest (the new one then becomes Latest)
 // It never pushes, and never marks an older version Latest on its own.
@@ -46,13 +47,9 @@ const releases = JSON.parse(run("gh", ["release", "list", "--repo", repo, "--lim
 const latest = releases.find((r) => r.isLatest)?.tagName;
 if (latest && olderThan(version, latest.slice(1)) && !force) stop(`${latest} is already the latest and is newer than ${tag}: use --force only if this is meant.`);
 const previous = releases.map((r) => r.tagName).filter((t) => t !== tag && olderThan(t.slice(1), version)).sort((a, b) => (olderThan(a.slice(1), b.slice(1)) ? 1 : -1))[0] ?? null;
-// The desktop app (ADR 0177): the Linux packages of the same build (x86_64 here; the ARM build adds aarch64), checked before they are handed out.
-say("Packaging the desktop app…");
-run("node", ["scripts/package-desktop.mjs"], { stdio: ["ignore", "ignore", "inherit"] });
-const packages = ["AppImage", "deb", "rpm", "tar.gz"].map((ext) => join(root, `dist-package/canvast-${version}-x86_64.${ext}`));
-const desktop = packages.map((p) => ({ name: basename(p), size: statSync(p).size, sha256: sha256(p) }));
-for (const p of desktop) say(`dist-package/${p.name}  ${(p.size / 1048576).toFixed(1)} MB  sha256 ${p.sha256}`);
-const notes = releaseNotes({ version, section, sha256: sum, size: statSync(file).size, previousTag: previous, repo, desktop });
+// The desktop app (ADR 0177): its packages are not made or uploaded here. Publishing the release starts the Release packages workflow
+// (.github/workflows/release-packages.yml), which builds them on GitHub's machines from this tag, checks them and adds them.
+const notes = releaseNotes({ version, section, sha256: sum, size: statSync(file).size, previousTag: previous, repo, desktop: true });
 const dir = mkdtempSync(join(tmpdir(), "canvast-release-"));
 const notesFile = join(dir, "notes.md");
 writeFileSync(notesFile, notes);
@@ -60,7 +57,7 @@ const title = `canvast ${version}`; // (the page title is the version; the notes
 if (dry) { say(`\n--dry-run: would publish ${tag} “${title}” as the latest release of ${repo}.\n\n${notes}`); rmSync(dir, { recursive: true }); process.exit(0); }
 
 // 4. Create it (or, if the tag already has a release, replace its file and notes), always as the latest
-const assets = [file, join(root, "dist/canvast.html.sha256"), ...packages.flatMap((p) => [p, `${p}.sha256`]), `${packages[0]}.zsync`];
+const assets = [file, join(root, "dist/canvast.html.sha256")];
 const exists = releases.some((r) => r.tagName === tag);
 if (exists) {
   const at = run("git", ["rev-list", "-n", "1", tag]);
