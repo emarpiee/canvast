@@ -105,6 +105,11 @@ export class Library {
     const rows = this.db.prepare<[], { json: string }>(`SELECT json FROM entries WHERE ${where}`).raw().all() as unknown as string[][];
     return `[${rows.map((r) => r[0]).join(",")}]`;
   }
+  /** The items changed here since their line was last written or read (or never written): what the folder does not have yet. */
+  pending(): string[] {
+    const rows = this.db.prepare("SELECT e.hash AS hash, e.json AS entry, r.json AS rec, s.v AS v FROM entries e LEFT JOIN recs r ON r.hash = e.hash LEFT JOIN seen s ON s.hash = e.hash").raw().all() as Array<[string, string, string | null, string | null]>;
+    return rows.filter(([, e, r, v]) => seen(JSON.stringify(itemOf(JSON.parse(e) as CatalogEntry, r ? (JSON.parse(r) as AssetRecord) : undefined))) !== v).map(([h]) => h);
+  }
   /** Each part's fingerprint as last read or written. */
   parts(): Record<string, string> {
     return Object.fromEntries((this.db.prepare("SELECT key, fp FROM parts").all() as Array<{ key: string; fp: string }>).map((r) => [r.key, r.fp]));
@@ -164,7 +169,8 @@ export class Library {
       const open = items.filter((i) => !isHiddenFile(i.file));
       for (const i of items) {
         if (isHiddenFile(i.file)) sealedOut.push(i);
-        seenOps.push({ t: "seen", hash: i.hash, v: seen(JSON.stringify(i)) });
+        const v = seen(JSON.stringify(i));
+        if (this.seenOf(i.hash) !== v) seenOps.push({ t: "seen", hash: i.hash, v });
       }
       if (key.length === 1) {
         if (fps[key]) (drop.push(key), partOps.push({ t: "part", k: key, v: null })); // (a part of the 16 of version 2: written again as parts of 256)

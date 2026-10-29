@@ -541,6 +541,8 @@ function installFileCalls(win: BrowserWindow, root: string): void {
           remove: (rel) => unlink(at(rel)).catch(() => undefined),
         });
       }
+      case "pending":
+        return l.pending();
       case "parts": {
         return l.parts();
       }

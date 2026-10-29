@@ -174,7 +174,7 @@ export class WorkspaceMirror {
   private async startUp(): Promise<void> {
     this.state = (await idbGet<MirrorState>(this.db, "meta", STATE_KEY).catch(() => undefined)) ?? { tree: "", canvases: {} };
     await this.lib.start(); // (first: the canvases read below may show items another device added)
-    this.libraryDirty = true;
+    this.libraryDirty = await this.lib.pendingWrite();
     const fileWs = await this.readWorkspaceFile();
     if (!fileWs) return this.everything(); // a new workspace folder: all of it is written
     await this.mergeTreeCopies(fileWs); // (written back below, with the tree)

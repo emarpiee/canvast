@@ -21,10 +21,12 @@ describe("library database (desktop)", () => {
     let f = folder([item(1), item(2), item(3)]);
     expect(lib.sync(f.keys, f.read, [], true)).toEqual({ took: true, whole: true, read: 3 });
     expect(lib.rec(item(2).hash)!.file).toBe("library/images/p2.png");
+    expect(lib.pending()).toEqual([]); // (what was read from the folder is what the folder has)
     // Unchanged parts are not read again.
     expect(lib.sync(f.keys, f.read, [], true)).toEqual({ took: false, whole: true, read: 0 });
     // Here: item 1 renamed. There: item 1 and item 2 renamed, item 3 erased.
     lib.apply([{ t: "entry", hash: item(1).hash, v: { ...lib.entry(item(1).hash)!, name: "mine.png" } }]);
+    expect(lib.pending()).toEqual([item(1).hash]);
     f = folder([item(1, { name: "theirs.png" }), item(2, { name: "two.png" })]);
     const r = lib.sync(f.keys, f.read, [], true);
     expect(r.took).toBe(true);

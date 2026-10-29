@@ -386,6 +386,7 @@ export class LibraryMirror {
     // `library.json`: read when it is the only form (a workspace of an earlier version), or when an older app changed it since.
     const bytes = await this.bridge.read(LIBRARY_JSON);
     const text = bytes ? new TextDecoder().decode(bytes) : null;
+    if (text === null && hasParts) this.lastText = "-"; // (a library too big for it: written in parts only)
     if (text === null || text === this.lastText) return took;
     let raw: Partial<LibraryJson>;
     try {
@@ -468,6 +469,16 @@ export class LibraryMirror {
       ops.push({ t: "meta", k: BLANK_KEY, v: [] });
       await this.lib.apply(ops);
     });
+  }
+
+  /**
+   * What start-up has to write: a small library (with `library.json`) or one whose folders changed here, all of it; a big one, only the
+   * items changed here since they were last written (a stop before the write), or nothing.
+   */
+  async pendingWrite(): Promise<true | Set<string> | false> {
+    if (this.lastText !== "-" || canonFolders(await this.lib.folders()) !== (this.state.folders || "[]")) return true;
+    const p = await this.lib.calls.pending();
+    return p.length > 50_000 ? true : p.length ? new Set(p) : false;
   }
 
   /** Whether any hidden item or folder is blank here (its names only in the sealed index). */
