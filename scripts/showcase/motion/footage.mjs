@@ -17,11 +17,7 @@ await p.addStyleTag({ content: ".hud-dev,.hud-debug{display:none!important}" });
 const H = (fn, arg) => p.evaluate(fn, arg);
 const frame = () => H(() => window.__canvastDebug.nextFrame());
 
-// The app's look for the stills with chrome: dark, Ultramarine
-await p.getByTestId("view-settings").click();
-await p.getByRole("tab", { name: "Appearance" }).click();
-await p.locator('.set-preset[aria-label="Ultramarine"]').click();
-await p.getByRole("button", { name: "Back to canvas" }).click();
+// The app's default theme colour (Viridian, the logo's colour): nothing is set in Settings > Appearance
 await p.getByTestId("save-status").click();
 await p.getByTestId("import-archive-input").setInputFiles(resolve(archive));
 await p.getByTestId("confirm-ok").click();

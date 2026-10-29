@@ -23,11 +23,7 @@ const shot = async (name) => {
 const off = () => p.mouse.move(700, 893); // (the pointer on the status bar: no hover outlines on the canvas)
 const blur = () => p.evaluate(() => document.activeElement?.blur());
 
-// A theme colour for the cosmos: the Ultramarine preset (265°) of Settings > Appearance
-await p.getByTestId("view-settings").click();
-await p.getByRole("tab", { name: "Appearance" }).click();
-await p.locator('.set-preset[aria-label="Ultramarine"]').click();
-await p.getByRole("button", { name: "Back to canvas" }).click();
+// The app's default theme colour (Viridian, the logo's colour): nothing is set in Settings > Appearance
 
 // Import the showcase and open its canvas
 await p.getByTestId("save-status").click();

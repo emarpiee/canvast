@@ -26,10 +26,7 @@ const shot = async (name) => {
 const off = () => p.mouse.move(700, 893);
 const blur = () => p.evaluate(() => document.activeElement?.blur());
 
-await p.getByTestId("view-settings").click();
-await p.getByRole("tab", { name: "Appearance" }).click();
-await p.locator('.set-preset[aria-label="Ultramarine"]').click();
-await p.getByRole("button", { name: "Back to canvas" }).click();
+// The app's default theme colour (Viridian, the logo's colour): nothing is set in Settings > Appearance
 await p.getByTestId("save-status").click();
 await p.getByTestId("set-import-input").setInputFiles(resolve(archive));
 await p.getByTestId("confirm-ok").click();
