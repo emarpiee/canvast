@@ -612,6 +612,7 @@ My art/
       cosmos/powers_of_two.cvst
     devices/<device id>.json
     folder.json
+    library/index.json, items-0.json … items-f.json
     library.json
     workspace.json
   library/
@@ -636,7 +637,8 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 | `.canvast/boards/<board>/` | A board, named after it (lowercase, `_` between words, `-` between parts; `-2` on a clash). Inside the app's own folder, so canvases are not edited by accident |
 | `.canvast/boards/<board>/<canvas>.cvst` | A canvas: one JSON file with its objects, frames and bookmarks |
 | `library/<folder path>/`, `library/images/`… | The library's files, named after their names in the library: in the folders of their library folders, or by kind when in none: `images`, `vectors` (svg, eps), `icons` (ico, icns), `art_sources` (psd, kra, xcf, clip, procreate, sai, ai, afphoto, …), `presets` (brushes and swatches: abr, kpp, ase, aco, gpl, …), `3d` (obj, fbx, glb, gltf, stl, blend, …), `video`, `audio`, `fonts`, `documents` (pdf, txt, md, office files, epub, html, …), `archives` (zip, rar, 7z, tar, gz, …), `other` |
-| `.canvast/workspace.json`, `library.json` | Names, order, styles and passwords' kept forms; the library's names, tags, folders, notes and fields |
+| `.canvast/workspace.json`, `.canvast/library/` | Names, order, styles and passwords' kept forms; the library's names, tags, folders, notes and fields, in parts so a change rewrites one small file |
+| `.canvast/library.json` | A copy of the library in one file, for an older version of the app (kept up to 10,000 items) |
 | `.canvast/devices/` | One file per device: its open canvas and cameras |
 | `.canvast/folder.json` | This folder's own id, so a new folder at the same place is a new workspace |
 | `.hidden/`, `.canvast/hidden.json` | Hidden items, encrypted (see [Hidden items and passwords](#hidden-items-and-passwords)) |
@@ -665,7 +667,8 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 | A new file in `library/` | Imports it where it lies, into the library folder of its folder (made if needed) |
 | A file deleted from `library/` | Shows the item as missing |
 | A file still being written (temporary, partial download) | Leaves it alone |
-| `library.json` on a device with no copy yet | Takes the library from it; a device with no copy at all opens the whole workspace from the folder |
+| The library's files (`.canvast/library/`) on a device with no copy yet | Takes the library from them; a device with no copy at all opens the whole workspace from the folder |
+| `library.json` changed by an older version of the app | Takes what it changed; a workspace that has only `library.json` (made by an older version) is read from it and gets the parts |
 
 **Bringing a browser workspace in:** export a full backup in the browser and import it in the desktop app. One screen shows the import and how many files are written into the folder; then the app starts again on them and says what was imported, without asking for the workspace password again (it was given before the import).
 
@@ -934,7 +937,9 @@ canvast has no network API, by design: it never opens a connection. Other progra
 | `.canvast` backup | `canvast-archive`, version 6 | An uncompressed ZIP (ZIP64 when large): `manifest.json` (format, version, scope, the boards and canvases, the list of files), `canvases/<id>.json` (`objects`, `frames`, `view`) and each library file once as `assets/<sha256>`, with a CRC on every entry. Any unzip tool opens it; do not re-compress it |
 | `.canvast/boards/<board>/<canvas>.cvst` | `canvast-canvas`, version 1 | One canvas as JSON: a header (`format`, `version`, `id`, `revision`, `savedAt`, `savedBy`) and the same canvas data a backup holds |
 | `.canvast/workspace.json` | `canvast-workspace` | The boards and canvases (names, order, ids), styles, and the passwords' kept forms (salted PBKDF2 hashes) |
-| `.canvast/library.json` | `canvast-library`, version 1 | The library: `folders`, and `items`, one per line: `hash` (SHA-256), `file` (its path under `library/`), `name`, `type`, `size`, `pixelW`, `pixelH`, `importedAt`, `tags`, `favorite`, `folderId`, `note`, `fields`, `state` |
+| `.canvast/library/index.json` | `canvast-library`, version 2 | The library folders (`folders`) and the parts there are (`parts`: `0` to `f`) |
+| `.canvast/library/items-<x>.json` | `canvast-library-items`, version 2 | The items whose hash starts with `x`, one per line: `hash` (SHA-256), `file` (its path under `library/`), `name`, `type`, `size`, `pixelW`, `pixelH`, `importedAt`, `tags`, `favorite`, `folderId`, `note`, `fields`, `state` |
+| `.canvast/library.json` | `canvast-library`, version 1 | The same library in one file (`folders`, `items`), kept for older versions of the app while the library has up to 10,000 items. The app's own copy says `"copyOf": ".canvast/library"`; one without it was written by an older version and what it changed is taken |
 | `.canvast/devices/<id>.json` | `canvast-device`, version 1 | One device's open canvas and camera per canvas |
 | `.canvast/hidden.json`, `.hidden/*.bin` | `canvast-hidden`, version 1 | The encrypted hidden items: see [Hidden items: the file format](#hidden-items-the-file-format) |
 | `library/…` | The files themselves | Each library file under its own name, as you would expect to find it |

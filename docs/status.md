@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.44: the library index in parts (2026-10-29)
+
+**Implemented:** the desktop app's library index in `.canvast/library/` (an index and sixteen parts by hash; only changed parts are written and read), `library.json` kept as a marked copy for older versions up to 10,000 items, changes by an older version taken, workspaces of earlier versions read and converted ([ADR 0179](adr/0179-library-in-parts.md)).
+**Tested:** the whole desktop spec (13 passed), unit suite.
+**Known failures:** none.
+**Unverified:** a library over 10,000 items on disk (not measured after this change); an older app version and this one on the same workspace through a real sync tool (simulated in the test by writing `library.json` by hand).
+**Committed:** on `main`, not pushed.
+**Next bounded task:** coverage-based test selection; for very large libraries, an in-memory list of changed items so a save does not read the whole catalog.
+
 ## v0.50.40 to v0.50.43: undo re-selects, font cards, search keywords, saved searches, delete at once (2026-10-29)
 
 **Implemented:** undoing a delete brings the items back selected (every kind); a font's card on the canvas shows "Aa" in the font; library and canvas search keywords (`kind:`, `is:`, `uses>`, `date:`, `on:`, `folder:`, `note:`, `field:`, `duration>`; `group:`, `in:`, `fill:`, `stroke:`); saved searches in both search boxes ([ADR 0178](adr/0178-saved-searches.md)); *Delete library files at once* (desktop); CI reports failed tests as annotations.
@@ -44,7 +53,7 @@ Unverified / Committed / Next bounded task**.
 **Known failures:** none new. A `library · chromium` job failed once on GitHub (a96696d) and passed on the re-run; its log could not be read here.
 **Unverified:** the saved-search chips and the save button on a narrow screen; `duration>` on a large library (lengths are read from each media file once).
 **Committed:** on `main`, not pushed.
-**Next bounded task:** big library step 2 (incremental library writes, `library.json` in parts), after the owner confirms the format.
+**Next bounded task:** the library index in parts (v0.50.44).
 
 ## v0.50.34 to v0.50.39: packages and tests on GitHub, the viewer's player, a tidier repository (2026-10-29)
 

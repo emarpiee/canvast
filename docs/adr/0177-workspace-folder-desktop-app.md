@@ -194,6 +194,8 @@ The same JSON a `.canvast` backup already writes for a canvas (`canvases/<id>.js
 
 ### `library.json`
 
+(Kept in parts in `.canvast/library/` since v0.50.44, with `library.json` as a copy for older versions: see [ADR 0179](0179-library-in-parts.md).)
+
 ```json
 {
   "format": "canvast-library",

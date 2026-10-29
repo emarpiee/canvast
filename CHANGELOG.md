@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.44 — The library index in parts (2026-10-29)
+
+- **Changed:** the desktop app keeps the library's names, tags, folders, notes and fields in `.canvast/library/`: an index and sixteen parts, so a change rewrites one small file instead of the whole library, and a sync tool copies only that part. A workspace of an earlier version (with `library.json` only) is read as before and gets the parts with the next save.
+- **Changed:** `library.json` is still written as a copy while the library has up to 10,000 items, so an older version of the app keeps working on the workspace; what an older version changes in it is taken.
+
 ## 0.50.43 — Delete library files at once (2026-10-29)
 
 - **Added:** *Delete library files at once* in Settings > Storage (desktop app, off by default): a file deleted from the library leaves the folder at once, to where *Deleted files go* sends it, instead of when undo on the open canvas no longer needs it. Undoing then shows the picture as missing until its file is back in `library/`.

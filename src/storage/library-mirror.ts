@@ -22,6 +22,17 @@ import type { FolderFile } from "./store";
 
 export const LIBRARY_JSON = ".canvast/library.json";
 export const LIBRARY_JSON_FORMAT = "canvast-library";
+/**
+ * The library in parts (ADR 0179): `index.json` holds the library folders and names the parts; each part `items-<x>.json` holds the
+ * items whose hash starts with `x` (16 parts), so a change rewrites one part, not the whole library, and a sync tool copies only it.
+ */
+export const LIBRARY_DIR = ".canvast/library";
+export const LIBRARY_INDEX = `${LIBRARY_DIR}/index.json`;
+export const LIBRARY_PART_FORMAT = "canvast-library-items";
+const partPath = (key: string): string => `${LIBRARY_DIR}/items-${key}.json`;
+const PART_KEYS = "0123456789abcdef".split("");
+/** Up to this many items, `library.json` (the single file of earlier versions) is still written, so an older app keeps working on the workspace. */
+export const COMPAT_MAX_ITEMS = 10_000;
 
 /** One library item as `library.json` keeps it. */
 export interface LibraryItem {
@@ -51,6 +62,15 @@ export interface LibraryJson {
   version: 1;
   folders: AssetFolder[];
   items: LibraryItem[];
+}
+
+/** `.canvast/library/index.json`. */
+export interface LibraryIndex {
+  format: typeof LIBRARY_JSON_FORMAT;
+  version: 2;
+  folders: AssetFolder[];
+  /** The parts there are (`0` … `f`): a part not named has no items. */
+  parts: string[];
 }
 
 /** What this device last wrote or read of `library.json`: the folders and each item, as JSON (meta "libraryMirror"). */
@@ -168,9 +188,14 @@ function entryOf(it: LibraryItem, prev: CatalogEntry | undefined): CatalogEntry 
   };
 }
 
+/** A part's text: one item per line, as in `library.json`. */
+export function libraryPartText(items: readonly LibraryItem[]): string {
+  return `{"format":"${LIBRARY_PART_FORMAT}","version":2,\n"items":[${items.length ? "\n" : ""}${items.map((i) => JSON.stringify(i)).join(",\n")}${items.length ? "\n" : ""}]}\n`;
+}
+
 /** `library.json`'s text: one item per line, so a sync tool or a diff shows what changed. */
-export function libraryJsonText(folders: readonly AssetFolder[], items: readonly LibraryItem[]): string {
-  return `{"format":"${LIBRARY_JSON_FORMAT}","version":1,\n"folders":${JSON.stringify(folders)},\n"items":[${items.length ? "\n" : ""}${items.map((i) => JSON.stringify(i)).join(",\n")}${items.length ? "\n" : ""}]}\n`;
+export function libraryJsonText(folders: readonly AssetFolder[], items: readonly LibraryItem[], copy = false): string {
+  return `{"format":"${LIBRARY_JSON_FORMAT}","version":1,${copy ? `"copyOf":"${LIBRARY_DIR}",` : ""}\n"folders":${JSON.stringify(folders)},\n"items":[${items.length ? "\n" : ""}${items.map((i) => JSON.stringify(i)).join(",\n")}${items.length ? "\n" : ""}]}\n`;
 }
 
 /**
@@ -203,7 +228,11 @@ export class LibraryMirror {
   private state: LibraryState = { folders: "", items: {} };
   /** The library folders' places on disk as last written (to remove the ones a rename or delete emptied). */
   private dirs = new Set<string>();
+  /** `library.json` as last written or read (another text there was written by an older app). */
   private lastText = "";
+  /** The parts as last written or read: their text, and the hashes each holds (an unchanged part is not read again). */
+  private parts = new Map<string, { text: string; hashes: string[] }>();
+  private lastPartsIndex = "";
   private lastIndex = "";
   private failing = false;
   /** Imports files found in `library/` that no item has (set by the app through `Storage.folderImports`). */
@@ -231,27 +260,81 @@ export class LibraryMirror {
    * hidden items are opened: what another device hid or changed among them is known only then.
    */
   async reread(): Promise<boolean> {
-    const bytes = await this.bridge.read(LIBRARY_JSON);
-    if (!bytes) return false;
-    let raw: Partial<LibraryJson>;
-    try {
-      raw = JSON.parse(new TextDecoder().decode(bytes)) as Partial<LibraryJson>;
-    } catch {
-      return false; // damaged: written again from the app's storage
-    }
-    if (raw.format !== LIBRARY_JSON_FORMAT || !Array.isArray(raw.items)) return false;
-    const items = raw.items.map(readItem).filter((i): i is LibraryItem => i !== null);
     const vault = await this.vault.state();
-    if (vault === "open") {
+    const hiddenItems = async (): Promise<LibraryItem[]> => {
+      if (vault !== "open") return [];
       try {
         const hidden = JSON.parse((await this.vault.readIndex()) ?? "[]") as unknown[];
-        if (Array.isArray(hidden)) items.push(...hidden.map(readItem).filter((i): i is LibraryItem => i !== null));
+        return Array.isArray(hidden) ? hidden.map(readItem).filter((i): i is LibraryItem => i !== null) : [];
       } catch {
-        // a damaged index: the hidden items here stay as they are
+        return []; // a damaged index: the hidden items here stay as they are
       }
+    };
+    let took = false;
+    // The library in parts: only the parts whose text changed are read; the others' items are known to be there still.
+    const indexBytes = await this.bridge.read(LIBRARY_INDEX);
+    let index: Partial<LibraryIndex> | null = null;
+    try {
+      index = indexBytes ? (JSON.parse(new TextDecoder().decode(indexBytes)) as Partial<LibraryIndex>) : null;
+    } catch {
+      index = null; // damaged: written again from the app's storage
     }
-    // (While the hidden items are locked, an item missing from library.json may have been hidden elsewhere, not erased.)
-    return this.adopt(readFolders(raw.folders), items, vault !== "locked");
+    const hasParts = !!index && index.format === LIBRARY_JSON_FORMAT && index.version === 2 && Array.isArray(index.parts);
+    if (index && hasParts) {
+      const keys = index.parts!.filter((k): k is string => typeof k === "string" && PART_KEYS.includes(k));
+      const items: LibraryItem[] = [];
+      const present = new Set<string>();
+      let whole = true;
+      const parts = new Map<string, { text: string; hashes: string[] }>();
+      for (const key of keys) {
+        const bytes = await this.bridge.read(partPath(key));
+        const text = bytes ? new TextDecoder().decode(bytes) : null;
+        const was = this.parts.get(key);
+        if (text !== null && was?.text === text) {
+          parts.set(key, was);
+          for (const h of was.hashes) present.add(h);
+          continue;
+        }
+        let raw: { format?: unknown; items?: unknown } | null = null;
+        try {
+          raw = text === null ? null : (JSON.parse(text) as { format?: unknown; items?: unknown });
+        } catch {
+          raw = null;
+        }
+        if (!raw || raw.format !== LIBRARY_PART_FORMAT || !Array.isArray(raw.items)) {
+          whole = false; // missing (a sync tool still bringing it) or damaged: nothing in it counts as erased
+          continue;
+        }
+        const read = raw.items.map(readItem).filter((i): i is LibraryItem => i !== null);
+        items.push(...read);
+        for (const i of read) present.add(i.hash);
+        parts.set(key, { text: text!, hashes: read.map((i) => i.hash) });
+      }
+      const hidden = await hiddenItems();
+      items.push(...hidden);
+      for (const i of hidden) present.add(i.hash);
+      // (While the hidden items are locked, an item missing from the library may have been hidden elsewhere, not erased.)
+      took = await this.adopt(readFolders(index.folders), items, whole && vault !== "locked" ? present : null);
+      this.parts = parts;
+    }
+    // `library.json`: read when it is the only form (a workspace of an earlier version), or when an older app changed it since.
+    const bytes = await this.bridge.read(LIBRARY_JSON);
+    const text = bytes ? new TextDecoder().decode(bytes) : null;
+    if (text === null || text === this.lastText) return took;
+    let raw: Partial<LibraryJson>;
+    try {
+      raw = JSON.parse(text) as Partial<LibraryJson>;
+    } catch {
+      return took; // damaged: written again from the app's storage
+    }
+    this.lastText = text;
+    if (raw.format !== LIBRARY_JSON_FORMAT || !Array.isArray(raw.items)) return took;
+    // The copy this version keeps for older apps says so: with the parts there it is never read (a copy a sync tool brings after the
+    // parts would be older than them). One without the mark was written by an older app: what it changed is taken.
+    if (hasParts && (raw as { copyOf?: unknown }).copyOf === LIBRARY_DIR) return took;
+    const items = raw.items.map(readItem).filter((i): i is LibraryItem => i !== null);
+    items.push(...(await hiddenItems()));
+    return (await this.adopt(readFolders(raw.folders), items, vault !== "locked" ? new Set(items.map((i) => i.hash)) : null)) || took;
   }
 
   /**
@@ -260,7 +343,8 @@ export class LibraryMirror {
    * deleted here too (the app's garbage collection erases it once nothing needs it, or brings it back if a canvas uses it).
    */
   /** Whether anything was taken. */
-  private async adopt(folders: AssetFolder[], items: LibraryItem[], complete: boolean): Promise<boolean> {
+  /** `present`: every hash the library has (the items given and those of the parts not read again); null when it is not whole. */
+  private async adopt(folders: AssetFolder[], items: LibraryItem[], present: ReadonlySet<string> | null): Promise<boolean> {
     let took = false;
     const tx = this.db.transaction(["assetCatalog", "assets", "meta"], "readwrite", { durability: "strict" });
     const committed = done(tx);
@@ -280,9 +364,7 @@ export class LibraryMirror {
       took = true;
     }
 
-    const inFile = new Set<string>();
     for (const it of items) {
-      inFile.add(it.hash);
       const text = JSON.stringify(it);
       if (seen(text) === known[it.hash]) continue; // nothing new from the folder
       const e = await req(catalog.get(it.hash) as IDBRequest<CatalogEntry | undefined>);
@@ -296,8 +378,8 @@ export class LibraryMirror {
       known[it.hash] = seen(text);
       took = true;
     }
-    for (const hash of complete ? Object.keys(known) : []) {
-      if (inFile.has(hash)) continue;
+    for (const hash of present ? Object.keys(known) : []) {
+      if (present!.has(hash)) continue;
       const e = await req(catalog.get(hash) as IDBRequest<CatalogEntry | undefined>);
       const rec = await req(assets.get(hash) as IDBRequest<AssetRecord | undefined>);
       if (e && seen(JSON.stringify(itemOf(e, rec))) !== known[hash]) continue; // changed here: kept
@@ -743,9 +825,30 @@ export class LibraryMirror {
     const items = entries.map((e) => itemOf(e, recs.get(e.hash)));
     // Sealed items are only in the sealed index (written while the key is open: sealing and opening need it). One hidden while
     // the key is locked stays in library.json, as its file stays readable, until it is sealed.
-    const text = libraryJsonText(folders, items.filter((i) => !isHiddenFile(i.file)));
-    if (text !== this.lastText) await this.bridge.write(LIBRARY_JSON, encode(text));
-    this.lastText = text;
+    const open = items.filter((i) => !isHiddenFile(i.file));
+    // The parts first, then the index that names them, so a reader never finds the index naming a part not written yet.
+    const byKey = new Map<string, LibraryItem[]>();
+    for (const i of open) (byKey.get(i.hash[0]!) ?? byKey.set(i.hash[0]!, []).get(i.hash[0]!)!).push(i);
+    const parts = new Map<string, { text: string; hashes: string[] }>();
+    for (const [key, list] of [...byKey].sort()) {
+      const text = libraryPartText(list);
+      if (this.parts.get(key)?.text !== text) await this.bridge.write(partPath(key), encode(text));
+      parts.set(key, { text, hashes: list.map((i) => i.hash) });
+    }
+    const indexText = `${JSON.stringify({ format: LIBRARY_JSON_FORMAT, version: 2, folders, parts: [...parts.keys()] } satisfies LibraryIndex)}\n`;
+    if (indexText !== this.lastPartsIndex) await this.bridge.write(LIBRARY_INDEX, encode(indexText));
+    for (const key of this.parts.keys()) if (!parts.has(key)) await this.bridge.remove(partPath(key), "erase"); // (after the index stopped naming it)
+    this.parts = parts;
+    this.lastPartsIndex = indexText;
+    // The single file of earlier versions, for an older app on another device; past COMPAT_MAX_ITEMS it is no longer kept.
+    if (open.length <= COMPAT_MAX_ITEMS) {
+      const text = libraryJsonText(folders, open, true);
+      if (text !== this.lastText) await this.bridge.write(LIBRARY_JSON, encode(text));
+      this.lastText = text;
+    } else if (this.lastText !== "-") {
+      await this.bridge.remove(LIBRARY_JSON, "erase");
+      this.lastText = "-";
+    }
     const index = JSON.stringify(items.filter((i) => isHiddenFile(i.file)));
     if (this.vault.dataKey && index !== this.lastIndex && (index !== "[]" || (await this.vault.state()) !== "none")) await this.vault.writeIndex(index);
     if (this.vault.dataKey) this.lastIndex = index;

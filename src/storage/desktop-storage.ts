@@ -11,7 +11,7 @@ import { externalFolder } from "./external-folder";
 import { openBrowserStorage } from "./idb-storage";
 import type { IdbBackups, IdbStorage } from "./idb-storage";
 import type { FolderSync, FolderWriting, OpenHooks } from "./store";
-import { LIBRARY_JSON } from "./library-mirror";
+import { LIBRARY_DIR, LIBRARY_JSON } from "./library-mirror";
 import { WORKSPACE_FILE, WorkspaceMirror, watched } from "./workspace-mirror";
 import { BOARDS_DIR, WORKSPACE_NAMING } from "./workspace-names";
 import { HIDDEN_JSON, HiddenVault } from "./hidden-store";
@@ -148,7 +148,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
         // (the library is listed again after any outside change in it: a file put back in its own place changes no item, but it is there again)
         const hiddenTouched = paths.some((p) => p.startsWith(".hidden/") && !isHiddenFile(p) && !ownWrite(p));
         if (hiddenTouched || paths.some((p) => (p === "library" || p.startsWith("library/")) && !ownWrite(p))) void mirror.rescan(() => undefined, hiddenTouched).then(() => on.libraryChanged());
-        if (paths.some((p) => p === LIBRARY_JSON || p === HIDDEN_JSON)) void mirror.rereadLibrary(() => on.libraryChanged());
+        if (paths.some((p) => p === LIBRARY_JSON || p === HIDDEN_JSON || p === LIBRARY_DIR || p.startsWith(`${LIBRARY_DIR}/`))) void mirror.rereadLibrary(() => on.libraryChanged());
         if (paths.some((p) => p === WORKSPACE_FILE || p.startsWith(`${BOARDS_DIR}/`))) check();
       });
     },

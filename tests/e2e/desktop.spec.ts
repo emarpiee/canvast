@@ -287,7 +287,13 @@ test("library folders are real folders: filing or renaming an item moves its fil
     expect(libraryFiles()).toEqual(["library/anatomy/sub/hand_study.png", "library/images/pose.png"]);
     expect(existsSync(join(ws, "library/refs-hands"))).toBe(false);
     expect(await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.every((e) => e.present)))).toBe(true);
+    // The library is kept in parts (by the first letter of each hash), with an index naming them; library.json stays as a copy for older apps.
+    const index = JSON.parse(readFileSync(join(ws, ".canvast/library/index.json"), "utf8")) as { parts: string[]; folders: unknown[] };
+    expect(index.folders.length).toBe(2);
+    const inParts = index.parts.flatMap((k) => (JSON.parse(readFileSync(join(ws, `.canvast/library/items-${k}.json`), "utf8")) as { items: { name: string }[] }).items.map((i) => i.name));
+    expect(inParts.sort()).toEqual(["Hand Study.png", "Pose.png"]);
     const json = readFileSync(join(ws, ".canvast/library.json"), "utf8");
+    expect(JSON.parse(json).copyOf).toBe(".canvast/library");
     expect(JSON.parse(json).items.map((i: { name: string; file: string; folderId: string | null }) => [i.name, i.file, i.folderId]).sort()).toEqual([
       ["Hand Study.png", "library/anatomy/sub/hand_study.png", "f2"],
       ["Pose.png", "library/images/pose.png", null],
@@ -309,12 +315,28 @@ test("library folders are real folders: filing or renaming an item moves its fil
   } finally {
     await app.close();
   }
-  // Another device (its own empty cache): the library as the folder has it, names, folders and files.
+  // Another device (its own empty cache), on a workspace of an earlier version (library.json only): the library as the folder has it,
+  // names, folders and files; then the parts are written.
+  rmSync(join(ws, ".canvast/library"), { recursive: true });
+  const unmarked = JSON.parse(readFileSync(join(ws, ".canvast/library.json"), "utf8")) as { copyOf?: string; items: { name: string }[] };
+  delete unmarked.copyOf;
+  writeFileSync(join(ws, ".canvast/library.json"), JSON.stringify(unmarked));
   ({ app, page } = await launch(ws, "device-b"));
   try {
-    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => [l.folders.map((f) => f.name).sort(), l.entries.map((e) => [e.name, e.folderIds?.[0] ?? null, e.present]).sort()])), { timeout: 10_000 }).toEqual([
+    const listing = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => [l.folders.map((f) => f.name).sort(), l.entries.map((e) => [e.name, e.folderIds?.[0] ?? null, e.present]).sort()]));
+    await expect.poll(listing, { timeout: 10_000 }).toEqual([
       ["Anatomy", "Sub"],
       [["Hand Study.png", "f2", true], ["Pose.png", null, true]],
+    ]);
+    await expect.poll(async () => (await page.evaluate(() => window.__canvastDebug.flushStorage()), existsSync(join(ws, ".canvast/library/index.json"))), { timeout: 10_000 }).toBe(true);
+    // An older app on a third device renames an item in library.json (it knows no parts): taken here, while the app runs.
+    const old = JSON.parse(readFileSync(join(ws, ".canvast/library.json"), "utf8")) as { copyOf?: string; items: { name: string }[] };
+    delete old.copyOf;
+    old.items.find((i) => i.name === "Pose.png")!.name = "Pose (renamed).png";
+    writeFileSync(join(ws, ".canvast/library.json"), JSON.stringify(old));
+    await expect.poll(listing, { timeout: 10_000 }).toEqual([
+      ["Anatomy", "Sub"],
+      [["Hand Study.png", "f2", true], ["Pose (renamed).png", null, true]],
     ]);
   } finally {
     await app.close();
