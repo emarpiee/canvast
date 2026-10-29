@@ -57,12 +57,46 @@ export class DesktopLibrary {
   async folders(): Promise<AssetFolder[]> {
     return ((await this.calls.meta(FOLDERS_KEY)) as AssetFolder[] | null) ?? [];
   }
-  apply(ops: readonly LibraryOp[]): Promise<void> {
-    return ops.length ? this.calls.apply(ops) : Promise.resolve();
+  async apply(ops: readonly LibraryOp[]): Promise<void> {
+    if (!ops.length) return;
+    // Undo snapshots taken since record what each entry was before its first change (see `DesktopCatalog.snapshotMeta`).
+    const open = this.journals();
+    const changed = open.length ? [...new Set(ops.flatMap((o) => (o.t === "entry" ? [o.hash] : [])))] : [];
+    if (changed.length) {
+      const { entries } = await this.rows(changed.filter((h) => open.some((j) => !j.has(h))));
+      for (const h of changed) {
+        const e = entries.get(h);
+        for (const j of open) if (!j.has(h)) j.set(h, e && e.state === "active" ? { name: e.name, ...meta(e) } : null);
+      }
+    }
+    await this.calls.apply(ops);
+  }
+
+  /** Undo snapshots still held (a snapshot dropped from the undo list is let go): each entry's state before its first change since. */
+  private readonly snaps = new Set<WeakRef<Map<string, SnapEntry | null>>>();
+  journal(): Map<string, SnapEntry | null> {
+    const m = new Map<string, SnapEntry | null>();
+    this.snaps.add(new WeakRef(m));
+    return m;
+  }
+  private journals(): Array<Map<string, SnapEntry | null>> {
+    const out: Array<Map<string, SnapEntry | null>> = [];
+    for (const r of this.snaps) {
+      const m = r.deref();
+      if (m) out.push(m);
+      else this.snaps.delete(r);
+    }
+    return out;
   }
 }
 
 const putEntry = (e: CatalogEntry): LibraryOp => ({ t: "entry", hash: e.hash, v: e });
+/** What an undo snapshot keeps of an entry. */
+type SnapEntry = { name: string } & ReturnType<typeof meta>;
+/** A snapshot of the desktop library (copy on write): the entries changed since, as they were then (null: not an active item then). */
+interface JournalSnapshot extends MetaSnapshot {
+  readonly journal: Map<string, SnapEntry | null>;
+}
 const putFolders = (folders: AssetFolder[]): LibraryOp => ({ t: "meta", k: FOLDERS_KEY, v: folders });
 
 export class DesktopCatalog implements CatalogStore {
@@ -341,7 +375,7 @@ export class DesktopCatalog implements CatalogStore {
   }
 
   async hiddenHashes(): Promise<Set<string>> {
-    return new Set((await this.lib.entries("active")).flatMap((e) => (e.hidden ? [e.hash] : [])));
+    return new Set((await this.lib.entries("hidden")).flatMap((e) => (e.state === "active" ? [e.hash] : [])));
   }
 
   entry(hash: string): Promise<CatalogEntry | undefined> {
@@ -360,11 +394,13 @@ export class DesktopCatalog implements CatalogStore {
   /** Every original without an entry gets one (a record here, or bytes still in the page's storage). */
   reconcile(): Promise<number> {
     return this.lib.serial(async () => {
-      const known = new Set((await this.lib.entries()).map((e) => e.hash));
       const ops: LibraryOp[] = [];
-      for (const r of await this.lib.recs()) if (!known.has(r.hash)) (known.add(r.hash), ops.push(putEntry(entryFromRecord(r))));
+      const known = new Set<string>();
+      for (const r of JSON.parse(await this.lib.calls.orphans()) as AssetRecord[]) (known.add(r.hash), ops.push(putEntry(entryFromRecord(r))));
       const tx = this.db.transaction("assets", "readonly");
-      for (const k of (await req(tx.objectStore("assets").getAllKeys())) as string[]) {
+      const held = (await req(tx.objectStore("assets").getAllKeys())) as string[];
+      for (const k of (await this.lib.rows(held)).entries.keys()) known.add(k);
+      for (const k of held) {
         if (known.has(k)) continue;
         const r = await idbGet<AssetRecord>(this.db, "assets", k);
         if (r) (known.add(k), ops.push(putEntry(entryFromRecord({ ...r, hash: k }))));
@@ -374,15 +410,27 @@ export class DesktopCatalog implements CatalogStore {
     });
   }
 
+  /**
+   * An undo snapshot that copies nothing now: from here on, the first change to each entry records what it was (`DesktopLibrary.apply`).
+   * A library of a million items is not read for each edit. (`entries` holds only those changed since.)
+   */
   async snapshotMeta(): Promise<MetaSnapshot> {
-    const [all, folders] = await Promise.all([this.lib.entries("active"), this.lib.folders()]);
-    return { entries: new Map(all.map((e) => [e.hash, { name: e.name, ...meta(e) }])), folders };
+    const journal = this.lib.journal();
+    const entries = new Map<string, SnapEntry>();
+    const snap: JournalSnapshot = { journal, folders: await this.lib.folders(), get entries() {
+      entries.clear();
+      for (const [h, v] of journal) if (v) entries.set(h, v);
+      return entries;
+    } };
+    return snap;
   }
 
   restoreMeta(s: MetaSnapshot): Promise<number> {
     return this.lib.serial(async () => {
       const ops: LibraryOp[] = [];
-      for (const e of await this.lib.entries("active")) {
+      const { entries } = await this.lib.rows([...s.entries.keys()]);
+      for (const e of entries.values()) {
+        if (e.state !== "active") continue;
         const was = s.entries.get(e.hash);
         if (!was) continue;
         if (JSON.stringify({ name: e.name, ...meta(e) }) === JSON.stringify(was)) continue;
@@ -575,6 +623,8 @@ export async function moveIdbLibrary(db: IDBDatabase, lib: DesktopLibrary): Prom
   await lib.apply([
     ...MOVED_META.flatMap((k, i): LibraryOp[] => (metas[i] === undefined ? [] : [{ t: "meta", k, v: metas[i] }])),
     { t: "meta", k: "libraryMirror", v: { folders: state.folders ?? "" } },
+    // (a library made from the folder's files has its tags formatted already: read through `readItem`)
+    ...(metas[MOVED_META.indexOf("tagFormat")] === undefined && !entries.length ? [{ t: "meta", k: "tagFormat", v: 1 } as LibraryOp] : []),
     { t: "meta", k: "fromIdb", v: 1 }, // (last: a stop before it moves it all again, the same)
   ]);
   // The page's copies go (the library's own storage has them now); bytes waiting to be written out stay.

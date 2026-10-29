@@ -43,6 +43,8 @@ export interface LibraryCalls {
    * items among them whose files are sealed (for the sealed index), and `library.json`'s text ("-": none, the library is too big).
    */
   write(only: readonly string[] | null, compatMax: number): Promise<{ sealed: unknown[]; compat: string }>;
+  /** The records with no entry, as JSON array text. */
+  orphans(): Promise<string>;
   /** The items changed here since they were last written to (or read from) the folder. */
   pending(): Promise<string[]>;
   /** Each part's fingerprint (SHA-256 of its text) as last read or written here. */

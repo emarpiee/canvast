@@ -308,6 +308,17 @@ async function emptyOldTrash(root: string, days: number): Promise<number> {
   return n;
 }
 
+/**
+ * Sizes of `library/`'s files as the start-up walk found them (path → size), until the folder says one changed: a library of a million
+ * files is not looked at twice to show which are there. One window, one workspace, per process.
+ */
+const walkedSizes = new Map<string, number>();
+function forgetWalked(rel: string): void {
+  if (!walkedSizes.size) return;
+  walkedSizes.delete(rel);
+  if (!/\.[^/]+$/.test(rel)) for (const p of walkedSizes.keys()) if (p.startsWith(`${rel}/`)) walkedSizes.delete(p); // (a folder)
+}
+
 /** The file calls of the bridge, each answering only this window's page and only inside its workspace folder. */
 function installFileCalls(win: BrowserWindow, root: string): void {
   const own = (e: Electron.IpcMainInvokeEvent): void => {
@@ -347,6 +358,7 @@ function installFileCalls(win: BrowserWindow, root: string): void {
   });
   ipcMain.handle("canvast:write", async (e, rel: string, bytes: Uint8Array, durable: unknown = true) => {
     own(e);
+    forgetWalked(String(rel));
     if (!(bytes instanceof Uint8Array)) throw new Error("bytes expected");
     await writeAtomic(await inside(root, rel), bytes, durable !== false);
   });
@@ -358,6 +370,8 @@ function installFileCalls(win: BrowserWindow, root: string): void {
     return Promise.all(
       rels.map(async (r) => {
         if (typeof r !== "string" || !isSafeRelativePath(r)) return null;
+        const walked = walkedSizes.get(r);
+        if (walked !== undefined) return walked;
         const full = resolve(root, ...r.split("/"));
         if (!full.startsWith(root + sep)) return null;
         try {
@@ -401,6 +415,7 @@ function installFileCalls(win: BrowserWindow, root: string): void {
   });
   ipcMain.handle("canvast:remove", async (e, rel: string, how: unknown = "trash") => {
     own(e);
+    forgetWalked(String(rel));
     const full = await inside(root, rel);
     if (!existsSync(full)) return;
     if (how === "erase") return rm(full, { recursive: true, force: true });
@@ -415,6 +430,8 @@ function installFileCalls(win: BrowserWindow, root: string): void {
   });
   ipcMain.handle("canvast:rename", async (e, from: string, to: string) => {
     own(e);
+    forgetWalked(String(from));
+    forgetWalked(String(to));
     const a = await inside(root, from);
     const b = await inside(root, to);
     if (existsSync(b) && a.toLowerCase() !== b.toLowerCase()) throw new Error(`${to} is already there`);
@@ -423,6 +440,7 @@ function installFileCalls(win: BrowserWindow, root: string): void {
   });
   ipcMain.handle("canvast:erase", async (e, rel: string) => {
     own(e);
+    forgetWalked(String(rel));
     try {
       if ((await stat(await inside(root, rel))).isFile()) await unlink(await inside(root, rel));
     } catch (err) {
@@ -453,7 +471,10 @@ function installFileCalls(win: BrowserWindow, root: string): void {
   const lookFile = join(app.getPath("userData"), "library-looks", `${createHash("sha256").update(root).digest("hex").slice(0, 24)}.json`);
   ipcMain.handle("canvast:libraryChanges", async (e) => {
     own(e);
-    look = new Map((await walkFiles(join(root, "library"), "library")).map((f) => [f.path, `${f.size}:${Math.round(f.mtimeMs)}`]));
+    const walked = await walkFiles(join(root, "library"), "library");
+    walkedSizes.clear();
+    for (const f of walked) walkedSizes.set(f.path, f.size);
+    look = new Map(walked.map((f) => [f.path, `${f.size}:${Math.round(f.mtimeMs)}`]));
     let before: Record<string, string> | null = null;
     try {
       before = JSON.parse(await readFile(lookFile, "utf8")) as Record<string, string>;
@@ -541,6 +562,8 @@ function installFileCalls(win: BrowserWindow, root: string): void {
           remove: (rel) => unlink(at(rel)).catch(() => undefined),
         });
       }
+      case "orphans":
+        return l.orphansText();
       case "pending":
         return l.pending();
       case "parts": {
@@ -603,6 +626,7 @@ function watchFolder(win: BrowserWindow, root: string): void {
   try {
     close = watchTree(root, skipped, (rel) => {
       if (skipped(rel)) return;
+      forgetWalked(rel);
       pending.add(rel);
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {

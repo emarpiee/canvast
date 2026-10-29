@@ -28,6 +28,7 @@ const bridge: DesktopBridge = {
     sync: (keys, extra, deletions, all) => ipcRenderer.invoke("canvast:lib", "sync", keys, extra, deletions, all === true),
     parts: () => ipcRenderer.invoke("canvast:lib", "parts"),
     pending: () => ipcRenderer.invoke("canvast:lib", "pending"),
+    orphans: () => ipcRenderer.invoke("canvast:lib", "orphans"),
     reset: () => ipcRenderer.invoke("canvast:lib", "reset"),
     onProgress: (fn) => void ipcRenderer.on("canvast:libProgress", (_e, done: number, total: number) => fn(done, total)),
   },

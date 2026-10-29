@@ -116,6 +116,11 @@ export class Library {
   parts(): Record<string, string> {
     return Object.fromEntries((this.db.prepare("SELECT key, fp FROM parts").all() as Array<{ key: string; fp: string }>).map((r) => [r.key, r.fp]));
   }
+  /** The records with no entry (an interrupted write), as JSON array text. */
+  orphansText(): string {
+    const rows = this.db.prepare("SELECT r.json FROM recs r LEFT JOIN entries e ON e.hash = r.hash WHERE e.hash IS NULL").raw().all() as string[][];
+    return `[${rows.map((r) => r[0]).join(",")}]`;
+  }
   /** Every record, as one JSON array text. */
   recsText(sealedOnly = false): string {
     const rows = this.db.prepare(`SELECT json FROM recs${sealedOnly ? " WHERE file LIKE '.hidden/%'" : ""}`).raw().all() as unknown as string[][];
