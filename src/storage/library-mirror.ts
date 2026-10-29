@@ -10,7 +10,7 @@
 import type { AssetField, AssetFolder, CatalogEntry } from "../assets/asset-catalog";
 import { FOLDERS_KEY, folderPath, meta, normalizeFields, normalizeNote, normalizeTags, visibleFolders } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
-import { storedStub } from "../assets/asset-library";
+import { MAX_IMPORT_BYTES, storedStub } from "../assets/asset-library";
 import type { DeleteMode, DesktopBridge } from "./desktop-bridge";
 import { externalFolder } from "./external-folder";
 import type { HiddenVault } from "./hidden-store";
@@ -656,6 +656,21 @@ export class LibraryMirror {
     return !this.failing;
   }
 
+  /** See FolderSync.checkFiles. */
+  async checkFiles(onStep: (done: number, total: number) => void): Promise<{ checked: number; missing: string[]; damaged: string[] }> {
+    const { entries, recs } = await this.read();
+    const items = entries.filter((e) => e.state === "active" && recs.get(e.hash)?.ext && recs.get(e.hash)?.file && !isHiddenFile(recs.get(e.hash)!.file));
+    const missing: string[] = [];
+    const damaged: string[] = [];
+    for (const [i, e] of items.entries()) {
+      const got = await this.bridge.hash(recs.get(e.hash)!.file!);
+      if (got === null) missing.push(e.name);
+      else if (got !== e.hash) damaged.push(e.name);
+      onStep(i + 1, items.length);
+    }
+    return { checked: items.length, missing, damaged };
+  }
+
   /**
    * The files the folder says changed (the watcher's paths), looked at alone instead of all of `library/` (ADR 0177): a file no item
    * names is found by its content (an item's file renamed or moved: the item follows it) or imported where it lies; one that is gone
@@ -685,7 +700,7 @@ export class LibraryMirror {
         }
         continue; // (a copy of a file the library has: left alone)
       }
-      found.push({ path, name: path.slice(path.lastIndexOf("/") + 1), folderId: await this.folderFor(parentOf(path)), read: async () => {
+      found.push({ path, name: path.slice(path.lastIndexOf("/") + 1), folderId: await this.folderFor(parentOf(path)), size: sizes[k]!, hash: async () => hash, read: async () => {
         const bytes = await this.bridge.read(path);
         return bytes && new Blob([bytes as Uint8Array<ArrayBuffer>]);
       } });
@@ -723,7 +738,7 @@ export class LibraryMirror {
         continue; // a copy of a file the library has, or bytes it keeps otherwise: left alone
       }
       const name = f.path.slice(f.path.lastIndexOf("/") + 1);
-      found2.push({ path: f.path, name, folderId: await this.folderFor(parentOf(f.path)), read: async () => {
+      found2.push({ path: f.path, name, folderId: await this.folderFor(parentOf(f.path)), size: f.size, hash: async () => hash, read: async () => {
         const bytes = await this.bridge.read(f.path);
         return bytes && new Blob([bytes as Uint8Array<ArrayBuffer>]);
       } });
@@ -1097,6 +1112,11 @@ export class LibraryMirror {
   private async seal(hash: string, failed: string[]): Promise<void> {
     const rec = await idbGet<AssetRecord>(this.db, "assets", hash);
     if (!rec || isHiddenFile(rec.file)) return;
+    // shortcut: a file too big to read into the page is not encrypted (it stays readable, and is said); seal it in a stream to lift this.
+    if (rec.size > MAX_IMPORT_BYTES) {
+      failed.push(`“${rec.name}” is larger than ${MAX_IMPORT_BYTES / 2 ** 20} MiB, too big to encrypt`);
+      return;
+    }
     const name = hiddenFileName();
     try {
       const bytes = rec.ext ? await this.bridge.read(rec.file ?? "") : new Uint8Array(await rec.blob.arrayBuffer());

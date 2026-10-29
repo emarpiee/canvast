@@ -51,7 +51,7 @@ import { syncIndex } from "../scene/spatial-index";
 import { FrameIndex, cameraIn, isCoarse, worldBackdrop } from "../scene/frame-index";
 import type { Frame } from "../core/frames";
 import { depthOf, localCamera, normalize } from "../core/frames";
-import { AssetLibrary } from "../assets/asset-library";
+import { AssetLibrary, MAX_IMPORT_BYTES } from "../assets/asset-library";
 import { openBrowserStorage } from "../storage/idb-storage";
 import { openDesktopStorage } from "../storage/desktop-storage";
 import { desktopBridge } from "../storage/desktop-bridge";
@@ -90,7 +90,7 @@ import { ICONS } from "../ui/icons";
 import { mountContextBar } from "../ui/context-bar";
 import { installMenuKeys } from "../ui/more-menu";
 import { chooseDialog, confirmDialog, promptDialog } from "../ui/confirm";
-import { currentBusy, openBusyScreen, openStartScreen } from "../ui/busy-screen";
+import { busyProgress, currentBusy, openBusyScreen, openStartScreen } from "../ui/busy-screen";
 import { canSwitchWorkspace, openWorkspaceSwitcher } from "../ui/workspace-switch";
 import type { BusyScreen } from "../ui/busy-screen";
 import { extractPalette } from "../assets/extract-palette";
@@ -512,10 +512,12 @@ async function start(): Promise<void> {
     importFiles: async (files) => {
       let n = 0;
       for (const f of files) {
-        const blob = await f.read();
-        if (!blob) continue;
         try {
-          const { record } = await assets.importFileDetailed(new File([blob], f.name, { type: typeOfName(f.name) }), false, f.path);
+          // Too big to read into the page: taken in from its hash alone, as a card.
+          const hash = f.size !== undefined && f.size > MAX_IMPORT_BYTES && f.hash ? await f.hash() : null;
+          const blob = hash ? null : await f.read();
+          if (!hash && !blob) continue;
+          const { record } = hash ? await assets.importLargeFound(f.name, typeOfName(f.name), f.size!, hash, f.path) : await assets.importFileDetailed(new File([blob!], f.name, { type: typeOfName(f.name) }), false, f.path);
           if (f.folderId) await storage.catalog.updateMeta(record.hash, { addFolders: [f.folderId] });
           if (f.hidden) await storage.catalog.updateMeta(record.hash, { hidden: true });
           if (f.meta) await storage.catalog.updateMeta(record.hash, { addTags: f.meta.tags, favorite: f.meta.favorite, note: f.meta.note, fields: f.meta.fields });
@@ -2083,6 +2085,19 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Workspace", title: "New board", words: "add", run: () => void session.newBoard() },
       { group: "Workspace", title: "Export a backup (.canvast)", words: "save archive", run: () => void runExport(session, { kind: "workspace" }) },
       ...(canSwitchWorkspace() ? [{ group: "Workspace", title: "Switch workspace…", words: "open folder new recent workspace change", run: () => void openWorkspaceSwitcher(document.querySelector<HTMLElement>('[data-testid="workspace-chevron"]') ?? document.body) }] : []),
+      ...(storage?.folderSync
+        ? [{ group: "Workspace", title: "Check library files", words: "verify damaged corrupt missing integrity hash folder", run: () => {
+            const p = busyProgress(editor, "Checking the library files", ["Each file is read and compared with what the library knows of it. Hidden items are left out."]);
+            void storage.folderSync!.checkFiles((done, total) => p.update(done / total, `${done} of ${total} files`)).then(
+              (r) => {
+                const list = (names: string[]) => names.slice(0, 5).map((n) => `“${n}”`).join(", ") + (names.length > 5 ? ` and ${names.length - 5} more` : "");
+                const found = [r.damaged.length ? `${r.damaged.length} changed or damaged (${list(r.damaged)})` : "", r.missing.length ? `${r.missing.length} missing (${list(r.missing)})` : ""].filter(Boolean).join("; ");
+                p.done(found ? `Checked ${r.checked} library files: ${found}. Put good copies back from a backup.` : `All ${r.checked} library files are as the library knows them.`);
+              },
+              (e: unknown) => p.fail(`The check stopped: ${(e as Error).message}`),
+            );
+          } }]
+        : []),
       ...(storage?.hidden ? [{ group: "Workspace", title: "Lock hidden items", words: "encrypt password hide close", enabled: () => !!storage.hidden?.isOpen(), run: () => { storage.hidden!.lock(); editor.message = "Hidden items are locked: the password opens them again."; editor.changed(); } }] : []),
     ];
     // the keys shown are the ones in use now (Settings > Shortcuts)

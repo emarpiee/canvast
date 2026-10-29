@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.59: big files and Check library files (2026-10-30)
+
+**Implemented:** #3 (smallest version) and #16: `importLargeFound` (a card from the main process's hash, never read into the page); originals over the cap come back without bytes (presence by size only), and are left out of backups and ZIP exports and refused for hiding; `FolderSync.checkFiles` + palette command *Check library files*.
+**Tested:** desktop "library files changed outside" extended (a 300 MiB sparse file listed as a present card); "a big library…" extended (one damaged and one deleted file named by the check); desktop group 15 passed.
+**Known failures:** none.
+**Unverified:** playing or showing a big file inside the app (not done: needs the folder's files served to the page, with a CSP change); the 1M bench on GitHub (running).
+**Committed:** on `main`.
+**Next bounded task:** read the 1M bench, then ask the owner about #13, H and the release.
+
 ## v0.50.58: newer versions, old trash, sync tools (2026-10-30)
 
 **Implemented:** step 5's small items (#17, #18, #14): `workspace.json` `app` and a once-only notice on an older device; `storage.trashDays` (toTrash stamps the date, `canvast:emptyOldTrash` at start-up); README note on `*.tmp-*` for sync tools.

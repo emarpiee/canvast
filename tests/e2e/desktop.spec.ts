@@ -1,6 +1,6 @@
 import { _electron as electron, expect, test } from "@playwright/test";
 import type { ElectronApplication, Page } from "@playwright/test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
 import { createHash, scryptSync } from "node:crypto";
@@ -429,13 +429,21 @@ test("a big library (past the size library.json is kept for) writes only what ch
     expect(changed).toEqual([`.canvast/library/items-${hash.slice(0, 2)}.json`]);
     expect(after.get(changed[0]!)).toContain("Renamed One.png");
     expect(existsSync(join(ws, "library/images/renamed_one.png"))).toBe(true);
+    // Check library files (command palette): every file read and compared with its item; one damaged, one gone, both named.
+    writeFileSync(join(ws, "library/images/pic_0.png"), Buffer.from("not the picture any more"));
+    rmSync(join(ws, "library/images/pic_1.png"));
+    await page.keyboard.press("Control+k");
+    await page.locator(".palette-input").fill("check library files");
+    await expect(page.locator(".palette-title").first()).toHaveText("Check library files");
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("toast")).toContainText("Checked 6 library files: 1 changed or damaged (“Pic 0.png”); 1 missing (“Pic 1.png”)", { timeout: 15_000 });
   } finally {
     await app.close();
   }
-  // Another device reads the whole library from the parts.
+  // Another device reads the whole library from the parts (the two files changed above: missing, as their sizes are not the items').
   ({ app, page } = await launch(ws, "device-b"));
   try {
-    await expect.poll(listing, { timeout: 15_000 }).toEqual(["Pic 0.png", "Pic 1.png", "Renamed One.png", "Pic 3.png", "Pic 4.png", "Pic 5.png"].map((n) => [n, true]).sort());
+    await expect.poll(listing, { timeout: 15_000 }).toEqual([["Pic 0.png", false], ["Pic 1.png", false], ...["Renamed One.png", "Pic 3.png", "Pic 4.png", "Pic 5.png"].map((n) => [n, true])].sort());
   } finally {
     await app.close();
   }
@@ -987,6 +995,15 @@ test("library files changed outside the app: a renamed or moved file is found by
   } finally {
     await app.close();
   }
+  // A file far past what can be read into the page (300 MiB, sparse: no disk used): taken in where it lies from its hash, as a card.
+  ({ app, page } = await launch(ws));
+  try {
+    truncateSync((writeFileSync(join(ws, "library/poses/huge_scan.tif"), ""), join(ws, "library/poses/huge_scan.tif")), 300 * 2 ** 20);
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.name === "huge_scan.tif").map((e) => [e.present, e.size, !!e.card]))), { timeout: 30_000 }).toEqual([[true, 300 * 2 ** 20, true]]);
+  } finally {
+    await app.close();
+  }
+  rmSync(join(ws, "library/poses/huge_scan.tif"));
   // A file put in while the app is closed: at the next start only what changed since the last look is looked at (kept in the app's own
   // folder), and the new file is found that way too.
   writeFileSync(join(ws, "library/poses/while_closed.png"), makePng(3, 3, () => [240, 120, 0, 255]));
@@ -995,6 +1012,7 @@ test("library files changed outside the app: a renamed or moved file is found by
     await expect.poll(listing, { timeout: 15_000 }).toEqual([
       ["Loomis Hands.png", "anatomy", true, 1],
       ["Pose One.png", "poses", true, 0],
+      ["huge_scan.tif", "poses", false, 0], // (its file removed above: missing)
       ["while_closed.png", "poses", true, 0],
     ]);
     expect(readdirSync(join(`${ws}-userdata`, "library-looks"))).toHaveLength(1);

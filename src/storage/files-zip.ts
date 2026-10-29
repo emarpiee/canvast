@@ -1,4 +1,5 @@
 import type { AssetRecord } from "../assets/asset-library";
+import { MAX_IMPORT_BYTES } from "../assets/asset-library";
 import { extOf } from "../assets/file-kind";
 import type { AssetFolder, CatalogEntry } from "../assets/asset-catalog";
 import { folderPath, meta } from "../assets/asset-catalog";
@@ -106,6 +107,11 @@ export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope:
   for (const [i, r] of [...rows.entries()].reverse()) {
     if (!r.rec.ext) continue;
     progress?.("Reading the files of the library folder", rows.length - i, rows.length);
+    if (r.rec.size > MAX_IMPORT_BYTES) {
+      rows.splice(i, 1); // (too big to read into the page: left out, and counted as not included)
+      missing++;
+      continue;
+    }
     const blob = await externalFolder.read(r.hash, r.rec.size, r.rec.type, r.rec.file);
     if (blob) r.rec = { ...r.rec, blob };
     else {

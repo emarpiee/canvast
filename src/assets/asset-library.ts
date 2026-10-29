@@ -204,6 +204,21 @@ export class AssetLibrary {
    * Like `importFile`, and says whether these bytes were already in the library: "present" (nothing stored again) or
    * "restored" (it had been deleted from the library and is back).
    */
+  /**
+   * A file of the workspace folder too big to read into the page (desktop build): taken in where it lies as a card (its name, kind and
+   * size), from its SHA-256 read in the main process. It opens in the system's app for its kind.
+   * shortcut: a card only, no picture or playback; serve the file to the page from disk to show or play it.
+   */
+  async importLargeFound(name: string, type: string, size: number, hash: string, at: string): Promise<ImportOutcome> {
+    const existing = await this.record(hash);
+    if (existing) return { record: existing, duplicate: "present" };
+    const record: AssetRecord = { hash, type, size, name, pixelW: FILE_CARD_W, pixelH: FILE_CARD_H, blob: new Blob([]), importedAt: Date.now(), card: true, file: at };
+    if (this.store) await this.save(record, true);
+    else this.memoryOnly.set(hash, record);
+    this.onReady();
+    return { record, duplicate: null };
+  }
+
   async importFileDetailed(file: Blob & { name?: string }, keepDecoded = true, /** A file of the workspace folder, kept where it is (desktop build). */ at?: string): Promise<ImportOutcome> {
     if (file.size > MAX_IMPORT_BYTES) throw new ImportError(`file is larger than ${MAX_IMPORT_BYTES / 2 ** 20} MiB`);
     const type = file.type || "application/octet-stream";

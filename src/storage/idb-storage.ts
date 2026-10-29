@@ -10,7 +10,7 @@ import { WorkspaceRepo } from "./workspace-repo";
 import type { CatalogEntry, ThumbRecord } from "../assets/asset-catalog";
 import { AssetCatalog, entryFromRecord } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
-import { ImportError, storedStub } from "../assets/asset-library";
+import { ImportError, MAX_IMPORT_BYTES, storedStub } from "../assets/asset-library";
 import { FULL_MESSAGE, isQuotaError, nearFullNotice, requestPersistence } from "./quota";
 import { externalFolder, externalHashes, libraryCounts } from "./external-folder";
 import { isHiddenFile } from "./hidden-vault";
@@ -109,7 +109,11 @@ export class IdbOriginals implements OriginalStore {
   async get(hash: string): Promise<AssetRecord | undefined> {
     let rec = await idbGet<AssetRecord>(this.db, "assets", hash);
     if (!rec) return rec;
-    if (rec.ext) {
+    if (rec.ext && rec.size > MAX_IMPORT_BYTES) {
+      // Too big to read into the page (a card, opened in the system's app): only whether its file is there.
+      if (!(await externalFolder.hasMany([{ hash, size: rec.size, file: rec.file }]))[0]) return undefined;
+      rec = { ...rec, blob: new Blob([]) };
+    } else if (rec.ext) {
       // Kept in the library folder: missing (as for a cleared store) when the file or the permission is gone.
       const blob = await externalFolder.read(hash, rec.size, rec.type, rec.file);
       if (!blob) return undefined;

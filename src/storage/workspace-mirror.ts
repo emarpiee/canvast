@@ -571,6 +571,10 @@ export class WorkspaceMirror {
       .catch((e: unknown) => this.onError?.(`The library of the workspace folder could not be read: ${(e as Error).message}.`));
     return this.running;
   }
+  /** Check the library files' contents (see FolderSync.checkFiles). */
+  checkFiles(onStep: (done: number, total: number) => void): ReturnType<LibraryMirror["checkFiles"]> {
+    return this.lib.checkFiles(onStep);
+  }
   /** Blank hidden items' names in this device's cache (on the write queue; see LibraryMirror.blankHidden). */
   blankHidden(): Promise<void> {
     this.running = Promise.all([this.running, this.ready]).then(() => this.lib.blankHidden()).catch((e: unknown) => this.onError?.(`Hidden items' names could not be cleared from this device's cache: ${(e as Error).message}.`));

@@ -314,6 +314,11 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       sealedReads.push({ input, file: r.file! });
       continue;
     }
+    // Too big to read into the page (a card of the desktop build): not in the backup, counted with the missing.
+    if (r.ext && r.size > MAX_IMPORT_BYTES && !noBytes) {
+      missingAssets.push(hash);
+      continue;
+    }
     const file = `assets/${hash}`;
     const known = noBytes || (since !== undefined && r.importedAt <= since); // already in an earlier file of the chain: its list entry, not its bytes
     const entry = await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);

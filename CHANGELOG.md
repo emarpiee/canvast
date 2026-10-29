@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.59 — Big files and Check library files (2026-10-30)
+
+- **Added:** in the desktop app, a file larger than 256 MiB put into `library/` is taken in where it lies as a card (name, kind, size), from its SHA-256 read in the background; it opens in the system's app. It is never read into the app, so it is left out of backups and ZIP exports, and cannot be hidden.
+- **Added:** *Check library files* (command palette, desktop app): reads every library file and names those changed, damaged or gone.
+
 ## 0.50.58 — Newer versions, old trash, sync tools (2026-10-30)
 
 - **Added:** in the desktop app, a device whose canvast is older than the one that last wrote the workspace folder says so once, and asks to be updated (`workspace.json` now names the version that wrote it).

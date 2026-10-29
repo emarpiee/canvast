@@ -203,6 +203,9 @@ export interface FolderFile {
   folderId: string | null;
   /** Found in `.hidden/`: it becomes a hidden item (and is sealed). */
   hidden?: boolean;
+  /** Its size, and its SHA-256 read in the main process (desktop): one too big to read into the page is taken in from these alone. */
+  size?: number;
+  hash?: () => Promise<string | null>;
   /** What a sealed file said of its item (its tags, note…), given back to it. */
   meta?: { tags: string[]; favorite: boolean; note: string; fields: Array<{ key: string; value: string }> };
   read(): Promise<Blob | null>;
@@ -226,6 +229,11 @@ export interface FolderHandlers {
 export interface FolderSync {
   /** Start following the folder: it is looked through at once, then on each change. */
   start(handlers: FolderHandlers): void;
+  /**
+   * Read every library file of the folder and check its content against its item (SHA-256, in the main process); hidden ones are left
+   * out (that needs their key). The names of those gone and those changed (damaged, or replaced by another file).
+   */
+  checkFiles(onStep: (done: number, total: number) => void): Promise<{ checked: number; missing: string[]; damaged: string[] }>;
 }
 
 /** One opened storage: what a session works on. */
