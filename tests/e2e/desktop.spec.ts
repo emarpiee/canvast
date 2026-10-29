@@ -754,7 +754,7 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
   const kek = await crypto.subtle.importKey("raw", new Uint8Array(scryptSync("pw", Buffer.from(vault.kdf.salt, "base64"), 32, { N: vault.kdf.N, r: vault.kdf.r, p: vault.kdf.p, maxmem: 2 ** 28 })), "AES-KW", false, ["unwrapKey"]);
   const dataKey = await crypto.subtle.unwrapKey("raw", new Uint8Array(Buffer.from(vault.key, "base64")), kek, "AES-KW", { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  writeFileSync(join(ws, alphaFile), Buffer.concat([iv, new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, dataKey, alpha))]));
+  writeFileSync(join(ws, alphaFile), Buffer.concat([iv, new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, dataKey, new Uint8Array(alpha)))]));
   expect(readFileSync(join(ws, alphaFile)).subarray(0, 8).toString("latin1")).not.toBe("CVSTHID2");
   // The spare of the key: with hidden.json lost, the password still opens every file (each says its own name; one of version 1 is
   // named by its content), and the app
