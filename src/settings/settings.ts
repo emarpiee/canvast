@@ -65,6 +65,7 @@ export const SETTINGS = {
   "storage.deleteTo": { scope: "device", default: "trash", validate: oneOf("trash", "system", "erase"), effect: "immediate" } as Def<"trash" | "system" | "erase">,
   // The desktop app: a file deleted from the library leaves the folder at once, even while undo on the open canvas could still bring an instance back.
   "storage.deleteAtOnce": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  "library.hiddenNamesOff": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "storage.autoIndex": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "ui.view": { scope: "device", default: "canvas", validate: oneOf("canvas", "assets"), effect: "restart" } as Def<"canvas" | "assets">,
   "pen.color": { scope: "device", default: "#1f2329", validate: colour, effect: "immediate" } as Def<string>,

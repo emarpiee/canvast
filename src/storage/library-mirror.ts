@@ -8,7 +8,7 @@
  * As with the canvases, IndexedDB stays the one place the app's logic works on; this only follows it, a moment later.
  */
 import type { AssetField, AssetFolder, CatalogEntry } from "../assets/asset-catalog";
-import { FOLDERS_KEY, folderPath, meta, normalizeFields, normalizeNote, normalizeTags } from "../assets/asset-catalog";
+import { FOLDERS_KEY, folderPath, meta, normalizeFields, normalizeNote, normalizeTags, visibleFolders } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
 import { storedStub } from "../assets/asset-library";
 import type { DeleteMode, DesktopBridge } from "./desktop-bridge";
@@ -36,6 +36,8 @@ const PART_KEYS = "0123456789abcdef".split("");
 export const COMPAT_MAX_ITEMS = 10_000;
 /** How long a sealed file with no entry waits before it is taken back as a hidden item (its entry may still be on its way); tests shorten it. */
 export const HIDDEN_ORPHAN_WAIT = { ms: 30_000 };
+/** Hidden items (hashes) and folders (`folder:<id>`) blanked in this device's cache while locked (app storage `meta`). */
+const BLANK_KEY = "hiddenBlanked";
 /** Sealed files a backup put into `.hidden/`, taken in without that wait (app storage `meta`). */
 const NO_WAIT_KEY = "hiddenNoWait";
 
@@ -168,7 +170,12 @@ function readFolders(a: unknown): AssetFolder[] {
   if (!Array.isArray(a)) return [];
   const out = (a as unknown[]).filter((f): f is AssetFolder => !!f && typeof (f as AssetFolder).id === "string" && typeof (f as AssetFolder).name === "string" && !!(f as AssetFolder).name.trim());
   const ids = new Set(out.map((f) => f.id));
-  return out.map((f) => ({ id: f.id, name: f.name, parentId: typeof f.parentId === "string" && ids.has(f.parentId) && f.parentId !== f.id ? f.parentId : null }));
+  return out.map((f) => ({ id: f.id, name: f.name, parentId: typeof f.parentId === "string" && ids.has(f.parentId) && f.parentId !== f.id ? f.parentId : null, ...(f.hidden === true ? { hidden: true as const } : {}) }));
+}
+
+/** Folders in one order (by id), so two lists compare as text whatever order each was written in. */
+function canonFolders(folders: readonly AssetFolder[]): string {
+  return JSON.stringify([...folders].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)));
 }
 
 /** The entry an item from the file makes (what this device had of it, `prev`, gives only its deletion time). */
@@ -239,6 +246,7 @@ export class LibraryMirror {
   private parts = new Map<string, { text: string; hashes: string[] }>();
   private lastPartsIndex = "";
   private lastIndex = "";
+  private lastFolders = "[]";
   private failing = false;
   /** Imports files found in `library/` that no item has (set by the app through `Storage.folderImports`). */
   importFiles: ((files: FolderFile[]) => Promise<void>) | null = null;
@@ -320,12 +328,18 @@ export class LibraryMirror {
     const vault = await this.vault.state();
     // (An index this key does not open, damaged or of another key, is not whole: the hidden items here stay as they are.)
     let hiddenWhole = true;
+    // The hidden folders: from the sealed list while the key is open; while locked, this device's own (as they were).
+    let hiddenFolders: unknown[] = vault === "open" ? [] : ((await idbGet<AssetFolder[]>(this.db, "meta", FOLDERS_KEY).catch(() => undefined)) ?? []).filter((f) => f.hidden);
     const hiddenItems = async (): Promise<LibraryItem[]> => {
       if (vault !== "open") return [];
       const read = await this.vault.readIndex().catch(() => null);
       if (!read?.whole) hiddenWhole = false;
-      return (read?.items ?? []).map(readItem).filter((i): i is LibraryItem => i !== null);
+      hiddenFolders = read?.whole ? read.folders : ((await idbGet<AssetFolder[]>(this.db, "meta", FOLDERS_KEY).catch(() => undefined)) ?? []).filter((f) => f.hidden);
+      const items = (read?.items ?? []).map(readItem).filter((i): i is LibraryItem => i !== null);
+      if (read?.whole) await this.refill(items, readFolders(hiddenFolders));
+      return items;
     };
+    const withHidden = (raw: unknown): AssetFolder[] => readFolders([...(Array.isArray(raw) ? raw : []), ...hiddenFolders]);
     let took = false;
     // The library in parts: only the parts whose text changed are read; the others' items are known to be there still.
     const indexBytes = await this.bridge.read(LIBRARY_INDEX);
@@ -370,7 +384,7 @@ export class LibraryMirror {
       items.push(...hidden);
       for (const i of hidden) present.add(i.hash);
       // (While the hidden items are locked, an item missing from the library may have been hidden elsewhere, not erased.)
-      took = await this.adopt(readFolders(index.folders), items, whole && hiddenWhole && vault !== "locked" ? present : null);
+      took = await this.adopt(withHidden(index.folders), items, whole && hiddenWhole && vault !== "locked" ? present : null);
       this.parts = parts;
     }
     // `library.json`: read when it is the only form (a workspace of an earlier version), or when an older app changed it since.
@@ -390,7 +404,57 @@ export class LibraryMirror {
     if (hasParts && (raw as { copyOf?: unknown }).copyOf === LIBRARY_DIR) return took;
     const items = raw.items.map(readItem).filter((i): i is LibraryItem => i !== null);
     items.push(...(await hiddenItems()));
-    return (await this.adopt(readFolders(raw.folders), items, hiddenWhole && vault !== "locked" ? new Set(items.map((i) => i.hash)) : null)) || took;
+    return (await this.adopt(withHidden(raw.folders), items, hiddenWhole && vault !== "locked" ? new Set(items.map((i) => i.hash)) : null)) || took;
+  }
+
+  /**
+   * Hidden items' names, tags, notes and fields (and hidden folders' names) out of this device's cache while the key is locked
+   * (Settings > Privacy, ADR 0177): those of sealed items are blanked, as the sealed index holds them, and listed; opening the key fills
+   * them in again from it (`refill`) before anything else. While any is blank the index is never written, so a blank never reaches it.
+   */
+  async blankHidden(): Promise<void> {
+    const tx = this.db.transaction(["assetCatalog", "assets", "meta"], "readwrite", { durability: "strict" });
+    const committed = done(tx);
+    const blanked = new Set((await req(tx.objectStore("meta").get(BLANK_KEY) as IDBRequest<string[] | undefined>)) ?? []);
+    for (const e of await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>)) {
+      if (!e.hidden || blanked.has(e.hash)) continue;
+      const rec = await req(tx.objectStore("assets").get(e.hash) as IDBRequest<AssetRecord | undefined>);
+      if (!rec?.ext || !isHiddenFile(rec.file)) continue; // (not sealed yet: not in the sealed index either)
+      const { note: _n, fields: _f, ...rest } = e;
+      tx.objectStore("assetCatalog").put({ ...rest, name: `Hidden item${fileExt(e.name, e.type) ? `.${fileExt(e.name, e.type)}` : ""}`, tags: [] } satisfies CatalogEntry);
+      blanked.add(e.hash);
+    }
+    const folders = (await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? [];
+    const blankFolders = folders.map((f) => (f.hidden && !blanked.has(`folder:${f.id}`) ? (blanked.add(`folder:${f.id}`), { ...f, name: "Hidden folder" }) : f));
+    tx.objectStore("meta").put(blankFolders, FOLDERS_KEY);
+    tx.objectStore("meta").put([...blanked], BLANK_KEY);
+    await committed;
+  }
+
+  /** Fill blanked hidden items and folders in again from the sealed index (`items`, `folders`): theirs, whatever this device holds. */
+  private async refill(items: readonly LibraryItem[], folders: readonly AssetFolder[]): Promise<void> {
+    const blanked = (await idbGet<string[]>(this.db, "meta", BLANK_KEY).catch(() => undefined)) ?? [];
+    if (!blanked.length) return;
+    const left = new Set(blanked);
+    const tx = this.db.transaction(["assetCatalog", "meta"], "readwrite", { durability: "strict" });
+    const committed = done(tx);
+    for (const it of items) {
+      if (!left.has(it.hash)) continue;
+      const e = await req(tx.objectStore("assetCatalog").get(it.hash) as IDBRequest<CatalogEntry | undefined>);
+      if (e) tx.objectStore("assetCatalog").put({ ...entryOf(it, e), state: e.state, deletedAt: e.deletedAt });
+      left.delete(it.hash);
+    }
+    const byId = new Map(folders.map((f) => [f.id, f]));
+    const mine = (await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? [];
+    tx.objectStore("meta").put(mine.map((f) => (left.has(`folder:${f.id}`) && byId.has(f.id) ? (left.delete(`folder:${f.id}`), { ...f, name: byId.get(f.id)!.name }) : f)), FOLDERS_KEY);
+    // (one no longer in the index was shown or erased elsewhere meanwhile: it is not blank any more, it is taken from the files as any)
+    tx.objectStore("meta").put([], BLANK_KEY);
+    await committed;
+  }
+
+  /** Whether any hidden item or folder is blank here (its names only in the sealed index). */
+  private async anyBlank(): Promise<boolean> {
+    return ((await idbGet<string[]>(this.db, "meta", BLANK_KEY).catch(() => undefined)) ?? []).length > 0;
   }
 
   /**
@@ -409,9 +473,9 @@ export class LibraryMirror {
     const known = this.state.items;
 
     const localFolders = (await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? [];
-    const fileFolders = JSON.stringify(folders);
+    const fileFolders = canonFolders(folders);
     if (fileFolders !== (this.state.folders || "[]")) {
-      const localChanged = JSON.stringify(localFolders) !== (this.state.folders || "[]");
+      const localChanged = canonFolders(localFolders) !== (this.state.folders || "[]");
       // Both changed: this device's folders, and the ones the other device added.
       const knownIds = new Set((JSON.parse(this.state.folders || "[]") as AssetFolder[]).map((f) => f.id));
       const localIds = new Set(localFolders.map((f) => f.id));
@@ -533,7 +597,8 @@ export class LibraryMirror {
       step(true);
     }
     // A sealed item this device changed since the library was last written (its name, folder, tags…): its file is sealed again with it.
-    for (const e of active) {
+    // (Not while any is blank: a blank is not a change.)
+    for (const e of (await this.anyBlank()) ? [] : active) {
       const rec = recs.get(e.hash);
       const was = this.state.items[e.hash];
       if (meta(e).hidden && rec?.ext && isHiddenFile(rec.file) && was !== undefined && seen(JSON.stringify(itemOf(e, rec))) !== was) this.resealed.add(e.hash);
@@ -542,7 +607,7 @@ export class LibraryMirror {
     if (total) this.onProgress?.(total, 0);
     // Library folders are real folders, even empty; the places a move or a rename emptied are removed.
     const wanted = new Set<string>();
-    for (const f of folders) for (let d = libraryDir(folderPath(folders, f.id), "", ""); d.includes("/"); d = parentOf(d)) wanted.add(d);
+    for (const f of visibleFolders(folders)) for (let d = libraryDir(folderPath(folders, f.id), "", ""); d.includes("/"); d = parentOf(d)) wanted.add(d);
     for (const d of wanted) await this.bridge.makeFolder(d);
     for (const d of [...emptied, ...this.dirs]) {
       for (let p = d; p.startsWith("library/") && !wanted.has(p); p = parentOf(p)) if (!(await this.bridge.removeEmptyFolder(p))) break;
@@ -1091,14 +1156,16 @@ export class LibraryMirror {
       if (this.parts.get(key)?.text !== text) await this.bridge.write(partPath(key), encode(text));
       parts.set(key, { text, hashes: list.map((i) => i.hash) });
     }
-    const indexText = `${JSON.stringify({ format: LIBRARY_JSON_FORMAT, version: 2, folders, parts: [...parts.keys()] } satisfies LibraryIndex)}\n`;
+    // Hidden folders are only in the sealed index: their names are written nowhere readable.
+    const shown = visibleFolders(folders);
+    const indexText = `${JSON.stringify({ format: LIBRARY_JSON_FORMAT, version: 2, folders: shown, parts: [...parts.keys()] } satisfies LibraryIndex)}\n`;
     if (indexText !== this.lastPartsIndex) await this.bridge.write(LIBRARY_INDEX, encode(indexText));
     for (const key of this.parts.keys()) if (!parts.has(key)) await this.bridge.remove(partPath(key), "erase"); // (after the index stopped naming it)
     this.parts = parts;
     this.lastPartsIndex = indexText;
     // The single file of earlier versions, for an older app on another device; past COMPAT_MAX_ITEMS it is no longer kept.
     if (open.length <= COMPAT_MAX_ITEMS) {
-      const text = libraryJsonText(folders, open, true);
+      const text = libraryJsonText(shown, open, true);
       if (text !== this.lastText) await this.bridge.write(LIBRARY_JSON, encode(text));
       this.lastText = text;
     } else if (this.lastText !== "-") {
@@ -1106,9 +1173,10 @@ export class LibraryMirror {
       this.lastText = "-";
     }
     const index = JSON.stringify(items.filter((i) => isHiddenFile(i.file)));
-    if (this.vault.dataKey && (index !== this.lastIndex || this.vault.indexWaiting) && (index !== "[]" || (await this.vault.state()) !== "none")) await this.vault.writeIndex(index);
-    if (this.vault.dataKey) this.lastIndex = index;
-    this.state = { folders: JSON.stringify(folders), items: Object.fromEntries(items.map((i) => [i.hash, seen(JSON.stringify(i))])) };
+    const sealedFolders = JSON.stringify(folders.filter((f) => !shown.includes(f)));
+    if (this.vault.dataKey && !(await this.anyBlank()) && (index !== this.lastIndex || sealedFolders !== this.lastFolders || this.vault.indexWaiting) && (index !== "[]" || sealedFolders !== "[]" || (await this.vault.state()) !== "none")) await this.vault.writeIndex(index, sealedFolders);
+    if (this.vault.dataKey) (this.lastIndex = index), (this.lastFolders = sealedFolders);
+    this.state = { folders: canonFolders(folders), items: Object.fromEntries(items.map((i) => [i.hash, seen(JSON.stringify(i))])) };
     await idbPut(this.db, "meta", STATE_KEY, this.state);
   }
 }

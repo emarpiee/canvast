@@ -65,6 +65,15 @@ export interface AssetFolder {
   id: string;
   name: string;
   parentId: string | null;
+  /** Hidden with its items (Hide folder): left out of every list until an item in it is shown again. In the desktop build its name is then only encrypted. */
+  hidden?: true;
+}
+
+/** The folders a list shows: none that is hidden, or inside a hidden one. */
+export function visibleFolders(folders: readonly AssetFolder[]): AssetFolder[] {
+  const out = new Set<string>();
+  for (const f of folders) if (f.hidden) for (const id of folderSubtree(folders, f.id)) out.add(id);
+  return folders.filter((f) => !out.has(f.id));
 }
 
 /** Organization fields of an entry, with defaults for entries that predate them. */
@@ -361,7 +370,7 @@ export class AssetCatalog implements CatalogStore {
    */
   async relist(prev: CatalogListing): Promise<CatalogListing | null> {
     const tx = this.db.transaction(["assetCatalog", "meta"], "readonly");
-    const folders = ((await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? []).sort((a, b) => a.name.localeCompare(b.name));
+    const folders = visibleFolders((await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? []).sort((a, b) => a.name.localeCompare(b.name));
     const entries = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
     const was = new Map(prev.entries.map((e) => [e.hash, e]));
     const active = entries.filter((e) => e.state === "active");
@@ -378,7 +387,7 @@ export class AssetCatalog implements CatalogStore {
   /** The whole library with usage, in one read-only transaction (keys only for usage; no bytes are read). */
   async list(): Promise<CatalogListing> {
     const tx = this.db.transaction(["assetCatalog", "assets", "objects", "meta"], "readonly");
-    const folders = ((await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? []).sort((a, b) => a.name.localeCompare(b.name));
+    const folders = visibleFolders((await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? []).sort((a, b) => a.name.localeCompare(b.name));
     const entries = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
     const blobKeys = new Set((await req(tx.objectStore("assets").getAllKeys())) as string[]);
     const stubs = (await req(tx.objectStore("assets").index("ext").getAll())) as Array<{ hash: string; size: number; file?: string }>; // (stubs hold no bytes)
@@ -428,6 +437,8 @@ export class AssetCatalog implements CatalogStore {
     return this.write(["assetCatalog", "meta"], async (tx) => {
       const known = changes.some(({ change: c }) => c.addFolders || c.removeFolders || c.clearFolder) ? new Set((await this.readFolders(tx)).map((f) => f.id)) : null;
       const out: CatalogEntry[] = [];
+      let folders: AssetFolder[] | null = null;
+      let unhid = false;
       for (const { hash, change } of changes) {
         const e = await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);
         if (!e || e.state !== "active") throw new CatalogInputError("the item is not in the library");
@@ -435,6 +446,12 @@ export class AssetCatalog implements CatalogStore {
         const next: CatalogEntry = { ...e, ...m };
         if (change.favorite !== undefined) next.favorite = change.favorite;
         if (change.hidden !== undefined) next.hidden = change.hidden;
+        // Shown again from a hidden folder: that folder and the ones above it are shown again too (their other items stay hidden).
+        if (change.hidden === false && m.folderIds.length) {
+          folders ??= await this.readFolders(tx);
+          const byId = new Map(folders.map((f) => [f.id, f]));
+          for (let f = byId.get(m.folderIds[0]!); f; f = f.parentId ? byId.get(f.parentId) : undefined) if (f.hidden) (delete f.hidden, (unhid = true));
+        }
         if (change.note !== undefined) next.note = normalizeNote(change.note);
         if (change.fields !== undefined) next.fields = normalizeFields(change.fields);
         if (!next.note) delete next.note;
@@ -453,7 +470,25 @@ export class AssetCatalog implements CatalogStore {
         tx.objectStore("assetCatalog").put(next);
         out.push(next);
       }
+      if (unhid) tx.objectStore("meta").put(folders, FOLDERS_KEY);
       return out;
+    });
+  }
+
+  /** Hide a folder with what is in it: its subfolders, and every item filed in any of them. How many items were hidden. */
+  async hideFolder(id: string): Promise<number> {
+    return this.write(["meta", "assetCatalog"], async (tx) => {
+      const folders = await this.readFolders(tx);
+      if (!folders.some((f) => f.id === id)) throw new CatalogInputError("that folder no longer exists");
+      const inside = folderSubtree(folders, id);
+      tx.objectStore("meta").put(folders.map((f) => (inside.has(f.id) ? { ...f, hidden: true as const } : f)), FOLDERS_KEY);
+      let n = 0;
+      for (const e of await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>)) {
+        if (e.state !== "active" || e.hidden || !(e.folderIds ?? []).some((x) => inside.has(x))) continue;
+        tx.objectStore("assetCatalog").put({ ...e, hidden: true });
+        n++;
+      }
+      return n;
     });
   }
 

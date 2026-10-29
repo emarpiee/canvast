@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.55 — Hide folder; hidden names off the device (2026-10-29)
+
+- **Added:** *Hide folder* in a library folder's menu: the folder, its subfolders and every item in them are hidden, and the folders leave every list. Showing an item again shows its folder again. In the desktop app the folder's name is kept only encrypted, and its real folder leaves `library/`.
+- **Added:** *Keep hidden items' names off this device while locked* (Settings > Privacy, desktop app): when the Hidden items are locked, and when the app starts, this device's own copy of their names, tags and notes is cleared; opening them brings it back from the encrypted files.
+
 ## 0.50.54 — Hidden items stay encrypted in backups (2026-10-29)
 
 - **Changed:** in the desktop app, a backup that includes hidden items carries them still encrypted, with their key file, instead of readable: nothing of them can be read from the backup. Importing it in the desktop app brings them back once the Hidden items are opened with their password; the browser leaves them out and says so. Backups are now version 7 (older versions of the app ask to be updated to import one).

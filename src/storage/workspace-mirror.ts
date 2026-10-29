@@ -527,6 +527,11 @@ export class WorkspaceMirror {
       .catch((e: unknown) => this.onError?.(`The library of the workspace folder could not be read: ${(e as Error).message}.`));
     return this.running;
   }
+  /** Blank hidden items' names in this device's cache (on the write queue; see LibraryMirror.blankHidden). */
+  blankHidden(): Promise<void> {
+    this.running = Promise.all([this.running, this.ready]).then(() => this.lib.blankHidden()).catch((e: unknown) => this.onError?.(`Hidden items' names could not be cleared from this device's cache: ${(e as Error).message}.`));
+    return this.running;
+  }
   /** Sealed hidden files a backup brought, and their key (see LibraryMirror.importSealed). */
   importSealed(files: ReadonlyArray<{ hash: string; data: Blob }>, key: string | null): Promise<number> {
     return this.lib.importSealed(files, key);

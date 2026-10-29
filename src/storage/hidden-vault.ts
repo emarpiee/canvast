@@ -39,6 +39,8 @@ export interface VaultRecord {
   index?: Sealed;
   /** A known text sealed with the data key: whether a key is this record's, without the password (records of 0.50.46 and before have none). */
   check?: Sealed;
+  /** The hidden library folders (Hide folder), sealed: their names are nowhere else in the workspace folder. */
+  folders?: Sealed;
 }
 
 export interface Sealed {
@@ -115,7 +117,7 @@ export const openVault = (record: VaultRecord, password: string): Promise<Crypto
 export async function rewrapVault(record: VaultRecord, password: string, newPassword: string, choice: KdfChoice = SCRYPT): Promise<VaultRecord | null> {
   const key = await unwrap(record, password, true);
   if (!key) return null;
-  return { ...(await wrap(key, newPassword, choice)), ...(record.index ? { index: record.index } : {}), check: await keyCheck(key) };
+  return { ...(await wrap(key, newPassword, choice)), ...(record.index ? { index: record.index } : {}), ...(record.folders ? { folders: record.folders } : {}), check: await keyCheck(key) };
 }
 
 /** Whether two data keys are the same key, without reading either out: what one seals, the other opens. */
@@ -192,7 +194,7 @@ export function readVault(text: string): VaultRecord | null {
       kdfOk &&
       typeof k!.salt === "string" && B64_RE.test(k!.salt) &&
       typeof r.key === "string" && B64_RE.test(r.key) && r.key.length <= 64 &&
-      [r.index, r.check].every((x) => x === undefined || (typeof x.iv === "string" && B64_RE.test(x.iv) && typeof x.data === "string" && B64_RE.test(x.data)));
+      [r.index, r.check, r.folders].every((x) => x === undefined || (typeof x.iv === "string" && B64_RE.test(x.iv) && typeof x.data === "string" && B64_RE.test(x.data)));
     return ok ? (r as VaultRecord) : null;
   } catch {
     return null;

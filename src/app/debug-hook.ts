@@ -167,7 +167,7 @@ export interface DebugHook {
   /** Write what the desktop build's workspace folder does not have yet (its storage's flush). */
   flushStorage(): Promise<void>;
   /** Organize the library as its panel does, with the library's undo: a new folder (`id`, `name`, parent id or ""), file an item (`hash`, folder id or "" for none), rename an item or a folder, undo, redo. */
-  libraryOp(op: "createFolder" | "file" | "rename" | "renameFolder" | "hide" | "undo" | "redo", ...args: string[]): Promise<void>;
+  libraryOp(op: "createFolder" | "file" | "rename" | "renameFolder" | "hide" | "hideFolder" | "undo" | "redo", ...args: string[]): Promise<void>;
   /** The Hidden password as Settings and the Hidden list use it: set (or remove, with no password), check (which opens the desktop build's key), lock; the result, and the key's state after. */
   hiddenOp(op: "set" | "check" | "lock", password?: string, current?: string): Promise<{ ok: boolean; state: string }>;
   /** The bytes of a stored original as the app reads it (a hidden one opened with the key), or null when it cannot be read. */
@@ -500,6 +500,7 @@ export function installDebugHook(
       else if (op === "rename") await session.renameAssets([{ hash: a, name: b }]);
       else if (op === "renameFolder") await session.organize((cat) => cat.renameFolder(a, b));
       else if (op === "hide") await session.organize((cat) => cat.updateMeta(a, { hidden: b === "1" }));
+      else if (op === "hideFolder") await session.organize((cat) => cat.hideFolder(a));
       else await session.undoLibrary(op === "redo");
     },
     pictureLocked: (hash) => deps.pictureLocked(hash),
@@ -511,7 +512,11 @@ export function installDebugHook(
       let ok = true;
       if (op === "set") ok = await session.setPassword("hidden", password ?? null, current);
       else if (op === "check") ok = await session.checkPassword("hidden", password ?? "");
-      else session.storage?.hidden?.lock();
+      else {
+        const hidden = session.storage?.hidden;
+        hidden?.lock();
+        for (let i = 0; hidden?.isOpen() && i < 300; i++) await new Promise((r) => setTimeout(r, 50)); // (it writes what waits first)
+      }
       return { ok, state: (await session.storage?.hidden?.state()) ?? "browser" };
     },
     flushStorage: async () => {

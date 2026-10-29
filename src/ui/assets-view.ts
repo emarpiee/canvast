@@ -1849,6 +1849,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                 extra: more("folder", f.id, f.name, [
                   { attr: 'data-folder-action="new"', label: "New subfolder", icon: ICONS.folderPlus, aria: `New folder inside ${f.name}` },
                   { attr: 'data-folder-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename folder ${f.name}` },
+                  { attr: 'data-folder-action="hide"', label: "Hide folder", icon: ICONS.eyeClosed, aria: `Hide folder ${f.name} and everything in it` },
                   { attr: 'data-folder-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete folder ${f.name}`, danger: true },
                 ]),
               })) +
@@ -3192,6 +3193,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "rename":
         naming = { kind: "rename", id };
         renderSide();
+        break;
+      case "hide":
+        if (!f) break;
+        void confirmDialog({
+          title: `Hide folder “${f.name}”?`,
+          lines: [
+            "The folder, its subfolders and every item in them are hidden: they leave every list and stay only in the Hidden list.",
+            "Showing an item again shows its folder again too.",
+          ],
+          confirmLabel: "Hide folder",
+          danger: false,
+        }).then(async (ok) => {
+          if (!ok || !(await readyForHidden(session, true))) return;
+          if ((await session.organize((c) => c.hideFolder(id), "Hidden")) && scope.startsWith("folder:")) scope = "all";
+        });
         break;
       case "delete":
         if (!f) break;

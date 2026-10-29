@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.55: Hide folder; hidden names off the device (2026-10-29)
+
+**Implemented:** security list step 3 (#1, #9; ADR 0177 "Hidden folders, and hidden names off the device"): `AssetFolder.hidden`, `hideFolder`, `visibleFolders` in listings, show-again unhides the folder chain; desktop: hidden folders sealed in `hidden.json` `folders`, out of the plain index and `library/`; canonical folder compare; the privacy setting blanks sealed hidden entries and hidden folder names at lock (after a flush; `lock()` now writes first) and start-up, refilled from the sealed index on unlock; no index write or reseal while blank.
+**Tested:** browser organize "folders nest…" extended (Hide folder: gone from the list and the picker, item hidden; showing it brings the folder back); desktop "hidden items are encrypted…" extended (folder name in no readable file, its real folder gone, another device gets the folder back from the sealed list; hidden again while locked); desktop "sync tools" extended (names blank in the cache while locked, back after unlock, the files' own names unchanged); desktop group 14 passed; library group 146 passed + the sidebar menu count (4 items now) in Chromium and Firefox.
+**Known failures:** none.
+**Unverified:** a hidden folder created on two devices at once (folders are joined by id as any).
+**Committed:** on `main`.
+**Next bounded task:** step 4, the millions phase (benchmark first).
+
 ## v0.50.54: hidden items stay encrypted in backups (2026-10-29)
 
 **Implemented:** step 2c (#11; ADR 0177 "Hidden items in backups"): archive version 7 `sealed` list + `sealed/<hash>.bin` + `hidden-key.json`; desktop import writes files to `.hidden/` and adopts or keeps the key beside; files taken without the wait (kept in app storage until taken); browser leaves them out with a note; export dialog says they stay encrypted.

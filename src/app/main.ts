@@ -463,6 +463,7 @@ async function start(): Promise<void> {
         editor.changed();
       },
       deleteTo: () => settings.get("storage.deleteTo"),
+      hiddenNamesOff: () => settings.get("library.hiddenNamesOff"),
     };
     storage = desktop ? await openDesktopStorage(desktop, opts) : await openBrowserStorage(opts);
     startStep("storage opened");

@@ -87,6 +87,10 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   (storage.backups as IdbBackups).writeOriginals = (batch) => mirror.writeOriginals(batch);
   mirror.onError = (text) => opts.onNotice?.(text);
   hidden.onNotice = (text) => opts.onNotice?.(text);
+  // Settings > Privacy: hidden items' names out of this device's cache while locked. What waits is written before the key goes; once
+  // locked (and at start-up, locked), the names are blanked; opening fills them in again from the sealed index.
+  hidden.beforeLock = () => mirror.flush();
+  hidden.subscribe(() => void (!hidden.isOpen() && opts.hiddenNamesOff?.() && mirror.blankHidden()));
   // Backups carry hidden items as they are sealed here, with the key file (archive version 7).
   sealedHooks.key = () => hidden.keyText();
   sealedHooks.write = (files, key) => mirror.importSealed(files, key);
@@ -107,6 +111,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     // The folder is read before the session opens anything (its current canvas may be one the folder brought).
     startup: async (r) => {
       await mirror.start();
+      if (opts.hiddenNamesOff?.()) await mirror.blankHidden();
       const current = await storage.workspace.current();
       return current ? { ...r, current } : r;
     },
@@ -171,6 +176,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     createFolder: library,
     renameFolder: library,
     deleteFolder: library,
+    hideFolder: library,
     restoreMeta: library,
     markDeleted: library,
     markDeletedEach: library,

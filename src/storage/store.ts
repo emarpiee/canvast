@@ -124,6 +124,8 @@ export interface CatalogStore {
   createFolder(name: string, parentId: string | null, id: string): Promise<AssetFolder>;
   renameFolder(id: string, name: string): Promise<void>;
   deleteFolder(id: string): Promise<{ folders: number; unfiled: number }>;
+  /** Hide a folder, its subfolders and every item in them; how many items were hidden. */
+  hideFolder(id: string): Promise<number>;
   snapshotMeta(): Promise<MetaSnapshot>;
   restoreMeta(s: MetaSnapshot): Promise<number>;
   lock(kind: PasswordKind): Promise<string | null>;
@@ -163,6 +165,8 @@ export interface OpenHooks {
   onNotice?: (text: string) => void;
   /** The desktop build: where a deleted file of the workspace folder goes (Settings > Storage); `.trash/` when not given. */
   deleteTo?: () => DeleteMode;
+  /** The desktop build: keep hidden items' names, tags and notes out of this device's cache while they are locked (Settings > Privacy). */
+  hiddenNamesOff?: () => boolean;
 }
 
 /** Whether the hidden items' key exists and is in memory: "none" (no Hidden password in this workspace folder yet), "locked", "open". */

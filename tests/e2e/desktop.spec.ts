@@ -624,8 +624,15 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     await expect.poll(listing).toEqual([["Secret Plan.png", false, true]]);
     hash = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries[0]!.hash));
     expect(await hid("set", "pw1")).toEqual({ ok: true, state: "open" });
-    await lib("hide", hash, "1");
+    // Filed in a library folder, then the folder hidden (Hide folder): the item is hidden with it, and the folder's name is in no
+    // readable file (its real folder leaves library/; the name is only in hidden.json, sealed).
+    await lib("createFolder", "sf1", "Secret Folder");
+    await lib("file", hash, "sf1");
     await flush();
+    expect(existsSync(join(ws, "library/secret_folder/secret_plan.png"))).toBe(true);
+    await lib("hideFolder", "sf1");
+    await flush();
+    expect(existsSync(join(ws, "library/secret_folder"))).toBe(false);
     const sealed = files(ws).filter((f) => f.startsWith(".hidden/"));
     expect(sealed).toHaveLength(1);
     sealed0 = sealed[0]!;
@@ -684,13 +691,15 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     await lib("hide", hash, "");
     await flush();
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.pictureLocked(h), hash)).toBe(false);
-    expect(files(ws).filter((f) => (f.startsWith("library/") || f.startsWith(".hidden/")) && f !== outsideFile)).toEqual(["library/images/secret_plan.png"]);
-    expect(readFileSync(join(ws, "library/images/secret_plan.png")).equals(secret)).toBe(true);
-    // Locked again: hiding waits for the key (the readable file stays until the password is given).
+    // (back into its folder, which this device knew only from the sealed list, and which shows again)
+    expect(files(ws).filter((f) => (f.startsWith("library/") || f.startsWith(".hidden/")) && f !== outsideFile)).toEqual(["library/secret_folder/secret_plan.png"]);
+    expect(readFileSync(join(ws, "library/secret_folder/secret_plan.png")).equals(secret)).toBe(true);
+    expect(await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.folders.map((f) => f.name)))).toEqual(["Secret Folder"]);
+    // Locked again: hiding (its folder, here) waits for the key (the readable file stays until the password is given).
     await hid("lock");
-    await lib("hide", hash, "1");
+    await lib("hideFolder", "sf1");
     await flush();
-    expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual(["library/images/secret_plan.png"]);
+    expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual(["library/secret_folder/secret_plan.png"]);
     expect((await hid("check", "pw2")).ok).toBe(true);
     await flush();
     expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual([]);
@@ -816,6 +825,16 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     await expect.poll(() => readFileSync(join(ws, betaFile)).equals(betaBefore), { timeout: 15_000 }).toBe(false);
     expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), sha(beta))).toEqual(Array.from(beta));
+    // Settings > Privacy, hidden items' names off this device while locked: locking clears them from its cache (the files keep them);
+    // opening brings them back from the sealed index.
+    const names = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hidden).map((e) => e.name).sort()));
+    const before = await names();
+    expect(before).toContain("Beta Renamed.png");
+    await page.evaluate(() => window.__canvastDebug.setSetting("library.hiddenNamesOff", true));
+    await page.evaluate(() => window.__canvastDebug.hiddenOp("lock"));
+    await expect.poll(names, { timeout: 15_000 }).toEqual(before.map((n) => `Hidden item.${n.split(".").pop()}`).sort());
+    expect((await hid("check", "pw")).ok).toBe(true);
+    await expect.poll(names, { timeout: 15_000 }).toEqual(before);
   } finally {
     await app.close();
   }

@@ -413,6 +413,19 @@ test("folders nest, an asset is in one folder at a time, and deleting a folder n
   await expect(p.getByTestId("assets-status")).toHaveText("A folder needs a name.");
   await expect(side(p, /^Palms/)).toBeVisible();
 
+  // Hide folder Palms: the folder leaves every list, and its item is hidden with it; showing the item again shows its folder again.
+  await sideAct(p, "folder", "Palms", "Hide folder Palms and everything in it");
+  await expect(p.getByTestId("confirm-dialog")).toContainText("every item in them are hidden");
+  await p.getByTestId("confirm-ok").click();
+  await expect(side(p, /^Palms/)).toHaveCount(0);
+  await expect(side(p, /^All items/)).toContainText("1");
+  await side(p, /^All items/).click();
+  await pick(p, GREEN_HASH);
+  await expect(p.getByTestId("asset-folders").getByLabel("Refs › Palms")).toHaveCount(0); // (not offered to file into)
+  await p.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, ""), HASH);
+  await expect(side(p, /^Palms/)).toBeVisible();
+  await expect(side(p, /^All items/)).toContainText("2");
+
   // Delete Refs (with Palms inside): confirmed; both assets stay, now unfiled.
   await sideAct(p, "folder", "Refs", "Delete folder Refs");
   await expect(p.getByTestId("confirm-dialog")).toContainText("stay in the library");
@@ -604,7 +617,7 @@ test("sidebar: one More menu per row (Escape closes only it, one click elsewhere
   await pick(p, HASH);
   const more = p.getByRole("button", { name: "More actions for folder Refs", exact: true });
   await more.click();
-  await expect(p.getByRole("menuitem")).toHaveCount(3); // New subfolder, Rename, Delete
+  await expect(p.getByRole("menuitem")).toHaveCount(4); // New subfolder, Rename, Hide folder, Delete
   await p.keyboard.press("Escape");
   await expect(p.getByRole("menu")).toHaveCount(0);
   await expect(card(p, HASH), "Escape closed the menu only").toHaveAttribute("aria-pressed", "true");

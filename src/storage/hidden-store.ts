@@ -170,10 +170,16 @@ export class HiddenVault implements HiddenStore {
 
   lock(): void {
     if (!this.key) return;
-    this.key = null;
-    this.others.clear();
-    this.changed();
+    // (What waits to be written, and anything to do with the key before it goes, is done first: then it is forgotten.)
+    const before = this.beforeLock?.() ?? Promise.resolve();
+    void before.catch(() => undefined).then(() => {
+      this.key = null;
+      this.others.clear();
+      this.changed();
+    });
   }
+  /** Run while the key is still open, just before it is forgotten (set by the app). */
+  beforeLock: (() => Promise<void>) | null = null;
 
   subscribe(fn: () => void): () => void {
     this.listeners.add(fn);
@@ -185,7 +191,7 @@ export class HiddenVault implements HiddenStore {
    * conflict copy holds what the other device hid). `whole` is false when `hidden.json` has an index this key does not open (another
    * key, or damaged): an item missing from it then was not shown or erased elsewhere.
    */
-  async readIndex(): Promise<{ items: unknown[]; whole: boolean } | null> {
+  async readIndex(): Promise<{ items: unknown[]; whole: boolean; folders: unknown[] } | null> {
     if (!this.key) return null;
     const list = async (r: VaultRecord, key: CryptoKey): Promise<unknown[] | null> => {
       if (!r.index) return [];
@@ -218,7 +224,16 @@ export class HiddenVault implements HiddenStore {
       }
     }
     this.merged = merged;
-    return { items: mergeEntries(lists), whole: !!main };
+    let folders: unknown[] = [];
+    if (record?.folders && main) {
+      try {
+        const a = JSON.parse((await openText(this.key, record.folders)) ?? "[]") as unknown;
+        folders = Array.isArray(a) ? a : [];
+      } catch {
+        folders = [];
+      }
+    }
+    return { items: mergeEntries(lists), whole: !!main, folders };
   }
 
   private fromSpare = false;
@@ -260,9 +275,9 @@ export class HiddenVault implements HiddenStore {
    * at the same time, and its file came last), it is not written over: this device's record goes beside it, joined to it when the
    * Hidden items are next opened with a password both take.
    */
-  async writeIndex(text: string): Promise<void> {
+  async writeIndex(text: string, folders = "[]"): Promise<void> {
     if (!this.key) throw new Error("the Hidden items are locked");
-    const next = { index: await sealText(this.key, text), check: await keyCheck(this.key) };
+    const next = { index: await sealText(this.key, text), check: await keyCheck(this.key), ...(folders !== "[]" ? { folders: await sealText(this.key, folders) } : {}) };
     const record = (await this.vault())?.record ?? null; // (from the spare when hidden.json is lost: it is written again whole)
     const ours = record ? ((await holdsKey(record, this.key)) ?? record.key === this.own?.key) : !!this.own;
     if (!ours) {
@@ -275,7 +290,8 @@ export class HiddenVault implements HiddenStore {
       }
       return;
     }
-    await this.save({ ...(record ?? this.own!), ...next });
+    const { folders: _was, ...base } = record ?? this.own!;
+    await this.save({ ...base, ...next });
     // The copies read into this index are no longer needed: the files of another key are sealed again with this one first.
     for (const path of this.merged) {
       const other = this.others.get(path);
