@@ -8,6 +8,17 @@ This file is for coding agents working in the repo; it applies to this code only
 
 ## Testing
 
+**Where tests run: GitHub or locally.** Wide test runs and very large benchmarks exhaust a workstation that is also in use, so they run on GitHub.
+
+| Run | Where |
+| --- | --- |
+| Specs a change reaches (`npm run test:snap -- <files or -g>`), one group at most, at most 2 workers | 💻 local |
+| Unit tests, typecheck, `check:*`, benchmarks of at most ~200k items | 💻 local |
+| `test:affected` with more than one group, `test:all`, `test:full` | ☁️ GitHub only (the `Tests` workflow; ask before pushing `main`, or push a branch) |
+| Library benchmarks of more than ~200k items, SQLite benches | ☁️ GitHub only (`Bench library`, `Bench SQLite`; `gh workflow run … --ref <branch>`) |
+
+Check free memory before any local run longer than a few minutes, and run only one at a time.
+
 Which tests when (see `docs/testing/README.md` for commands, groups and durations). The E2E specs are in **groups** (`scripts/lib/test-groups.mjs`); run only the groups a change needs:
 - While working, run the specs a change touches (`npm run test:snap -- <files or -g>`) or its groups (`npm run test:group -- <group…>`). Before committing a slice, pushing or releasing: `npm run test:affected` (or `npm test`, which runs it with typecheck, unit tests and checks); it picks the groups from what changed since `origin/main`. Start with `-- --dry` to see the groups and the estimate, and say the estimated finish time.
 - The whole quick suite (`npm run test:all`) only when `test:affected` picks every group or every few releases. `npm run test:full` **only** when a phase changed zoom, coordinates, projection, rendering, tiles or performance; record its results (suite and per-test times) in `docs/testing/` and in the commit message.
