@@ -410,10 +410,14 @@ export function createColourPicker(options: PickerOptions = {}): ColourPicker {
   }
 
   let harmonyFrame = 0;
+  let harmonyBase = "";
+  /** Repaint the harmonies on the next frame, for the colour of the last call before it (not the first). */
   function scheduleHarmony(base: string): void {
+    harmonyBase = base;
     if (harmonyFrame) return;
     harmonyFrame = requestAnimationFrame(() => {
       harmonyFrame = 0;
+      const base = harmonyBase;
       const rgb = parseColour(base)!.rgb;
       const wanted = harmony.map((k) => ({ k, colours: HARMONIES[k].map((d) => rgbToHex(turned(rgb, d, tri.h))) }));
       if (harmonyEl.childElementCount !== wanted.length) {

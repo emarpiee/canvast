@@ -2147,15 +2147,20 @@ test("small screens: the details panel is resizable by its grip (drag, arrow key
   await p.getByTestId("asset-card").first().dblclick();
   const viewer = p.getByTestId("slide-view");
   await expect(viewer).toBeVisible();
-  const stage = (await viewer.locator(".viewer-stage").boundingBox())!;
   const img = viewer.locator("figure img");
   await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
-  const ib = (await img.boundingBox())!;
   // (the picture's room keeps clear of the button that hides the controls, at the bottom: --viewer-bottom; it is centred in that room)
   const keep = await viewer.evaluate((v) => { const d = document.createElement("div"); d.style.height = "var(--viewer-bottom)"; v.append(d); const h = d.getBoundingClientRect().height; d.remove(); return h; });
   const top = await img.evaluate((i) => parseFloat(getComputedStyle(i).inset)); // (the room's top margin; the picture may be narrower than the room, so its own left gap says nothing)
-  expect(Math.abs(ib.y + ib.height / 2 - (stage.y + top + (stage.y + stage.height - keep)) / 2), "centred in its room, above and below").toBeLessThan(2);
-  expect(Math.abs(ib.x - stage.x - (stage.x + stage.width - ib.x - ib.width)), "equal room left and right").toBeLessThan(2);
+  // (measured until the viewer's layout settles: on a slow machine the bar below can still be laid out when the picture has loaded)
+  const offCentre = async () => {
+    const stage = (await viewer.locator(".viewer-stage").boundingBox())!;
+    const ib = (await img.boundingBox())!;
+    return { y: Math.round(Math.abs(ib.y + ib.height / 2 - (stage.y + top + (stage.y + stage.height - keep)) / 2)), x: Math.round(Math.abs(ib.x - stage.x - (stage.x + stage.width - ib.x - ib.width))) };
+  };
+  await expect.poll(async () => (await offCentre()).y, { message: "centred in its room, above and below" }).toBeLessThan(2);
+  expect((await offCentre()).x, "equal room left and right").toBeLessThan(2);
+  const stage = (await viewer.locator(".viewer-stage").boundingBox())!;
   // The controls are three rows on a phone: the previews; previous, play, next and the count; then zoom and the buttons, nothing wrapped.
   const controls = (await viewer.locator(".viewer-bar").boundingBox())!;
   expect(controls.height, "three tidy rows").toBeLessThan(150);

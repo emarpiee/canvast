@@ -61,6 +61,7 @@ test("colour picker package: four layouts, plane, transparency, text formats, co
   await expect(cp.locator("[data-contrast]")).toContainText(/Contrast with #ffffff: \d+(\.\d+)?:1/);
   const swatches = cp.locator("[data-harmony] .cp-swatch");
   await expect(swatches).toHaveCount(2 + 3); // complement: the colour and one; triad: the colour and two
+  await expect(swatches.first(), "the harmonies follow the colour typed last (painted on the next frame)").toHaveAttribute("data-c", "#2563eb");
   const first = await swatches.nth(1).getAttribute("data-c");
   await swatches.nth(1).click();
   expect(await page.evaluate(() => (window as unknown as { picker: { value: string } }).picker.value)).toBe(`${first}80`); // an opaque swatch keeps the current opacity (50%)

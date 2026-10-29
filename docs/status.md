@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.45: colour harmonies follow the last colour (2026-10-29)
+
+**Implemented:** the picker's harmonies are painted for the colour of the last change before the frame, not the first. Two CI flakes fixed in the tests: the picker package test waits for the harmonies of the colour typed; the small-screens viewer test measures the centring once the layout settles.
+**Tested:** `colour-picker-package.spec.ts` (Chromium, Firefox), the small-screens test three times each in Chromium, Chromium DPR 2 and Firefox.
+**Known failures:** none.
+**Unverified:** none.
+**Committed:** on `main`.
+**Next bounded task:** coverage-based test selection.
+
 ## v0.50.44: the library index in parts (2026-10-29)
 
 **Implemented:** the desktop app's library index in `.canvast/library/` (an index and sixteen parts by hash; only changed parts are written and read), `library.json` kept as a marked copy for older versions up to 10,000 items, changes by an older version taken, workspaces of earlier versions read and converted ([ADR 0179](adr/0179-library-in-parts.md)). The online copy: `.github/workflows/pages.yml` puts each release's checked `canvast.html` on GitHub Pages.

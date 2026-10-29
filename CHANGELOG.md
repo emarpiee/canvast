@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.45 — Colour harmonies follow the last colour (2026-10-29)
+
+- **Fixed:** the colour picker's harmony swatches showed the harmonies of an earlier colour when the colour changed twice within one frame (typing a colour right after another); they now follow the last one.
+
 ## 0.50.44 — The library index in parts (2026-10-29)
 
 - **Added:** try canvast online at https://emarpiee.github.io/canvast/: the latest release's single file on GitHub Pages, put there by each release (it keeps its own data, apart from a downloaded copy).
