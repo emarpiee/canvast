@@ -290,6 +290,12 @@ A sync tool (Mega, Drive, Proton Drive, Syncthing…) keeps one `hidden.json` wh
 - **An interrupted seal** (the move noted, the sealed file there, its readable source still there) is proven at start-up by opening it; unproven, or while the key is locked, the sealed file is erased and the readable one stays, to be sealed again. Before, the sealed file was trusted.
 - Sealing reports its own progress (`encrypting`), shown as *Encrypting N of M files* from five files.
 
+### Start-up, and boards changed on two devices at once (0.50.57)
+
+- **Start-up looks only at what changed**: the main process walks `library/` (folders read and files looked at many at a time, no limit; `canvast:tree` uses the same walk) and compares each file's size and modification time with the look kept for this workspace in the app's own folder (`library-looks/<sha256 of the path>.json`); the page looks only at those paths (`scanPaths`; all of `library/` when there is no look yet, a folder came, or there are many). The look is kept once the page says it has taken them (`libraryLookDone`).
+- **Deletions are said, not inferred**: `workspace.json` carries `deleted`, the ids of canvases and boards deleted lately (180 days, at most 2,000). A device reading it deletes only those; a canvas the file lacks that is not in the list, has content and was made on this device is kept, with its board (its writer did not know of it yet: two devices wrote the boards at once). A file without the list (an earlier version) is read as before: what it lacks was deleted. And before writing `workspace.json`, a device whose last read is older than the file takes the other's boards in first.
+- Found by the two-device desktop test failing about one run in three; it passed 11 runs in a row after.
+
 ### A big library: only what changed (0.50.56)
 
 Measured with `scripts/bench-library.mjs` (100,000 files on a spinning disk): a rename took about 7 s to write, a file put in from outside 29 s to be listed, a first open on a new device 64 s, because each save read the whole library from the app's storage, rebuilt all parts and kept one record of every item, and each outside change listed every file (and the listing stopped at 200,000). Now:

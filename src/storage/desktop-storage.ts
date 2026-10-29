@@ -144,7 +144,12 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
       mirror.importFiles = (files) => on.importFiles(files);
       mirror.askHiddenKey = (names) => on.hiddenNeedsKey(names);
       mirror.scanHiddenLater = () => void mirror.rescan(() => on.libraryChanged());
-      void mirror.rescan(() => on.libraryChanged());
+      // Start-up: only what changed in library/ since the last look here (the whole folder the first time); the look is then kept.
+      void raw
+        .libraryChanges()
+        .catch(() => null)
+        .then((changed) => mirror.rescan(() => on.libraryChanged(), false, changed ?? undefined))
+        .then(() => raw.libraryLookDone().catch(() => undefined));
       const check = (): void =>
         void on.beforeCheck().then(async () => {
           const r = await mirror.recheck();

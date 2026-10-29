@@ -34,6 +34,12 @@ export interface WorkspaceFile {
   boards: PlacedBoard[];
   styles: unknown[];
   locks: { hidden?: string; workspace?: string };
+  /**
+   * Ids of canvases and boards deleted (0.50.57): only these are deleted on a device that reads the file. One the file lacks that is
+   * not here was made on a device whose file this one did not know yet (two wrote at once), and is kept. Without the list (a file of
+   * an earlier version) a canvas the file lacks counts as deleted, as before.
+   */
+  deleted?: string[];
 }
 
 const encode = (text: string): Uint8Array => new TextEncoder().encode(text);
@@ -49,7 +55,11 @@ export const SYNC_COPY_WAIT = { ms: 10 * 60_000 };
 interface MirrorState {
   tree: string;
   canvases: Record<string, { file: { revision: number; savedBy: string }; local: number }>;
+  /** Canvases and boards deleted (here or on another device), with when: written in `workspace.json`'s `deleted`. */
+  deleted?: Record<string, number>;
 }
+/** How long a deletion is remembered, and how many at most. */
+const DELETED_KEEP = { ms: 180 * 86_400_000, max: 2000 };
 const STATE_KEY = "workspaceMirror";
 
 /** The header fields of a canvas file, from its first kilobyte (they come before the objects). */
@@ -418,17 +428,25 @@ export class WorkspaceMirror {
     }
     const now = Date.now();
     const inFile = new Set(fileWs.boards.flatMap((b) => b.canvases.map((c) => c.id)));
+    // What the file says was deleted (null for a file of an earlier version: then what it lacks was deleted).
+    const tombs = Array.isArray(fileWs.deleted) ? new Set(fileWs.deleted.filter((x) => typeof x === "string")) : null;
+    const deleted = (this.state.deleted ??= {});
+    for (const id of tombs ?? []) deleted[id] ??= now;
     const keep: CanvasRecord[] = [];
+    const keptBoards = new Set<string>();
     for (const bid of ws.boardIds) {
       const board = await req(tx.objectStore("boards").get(bid) as IDBRequest<BoardRecord | undefined>);
+      const boardGone = !fileWs.boards.some((b) => b.id === bid);
       for (const cid of board?.canvasIds ?? []) {
         if (inFile.has(cid)) continue;
         const c = await req(tx.objectStore("canvases").get(cid) as IDBRequest<CanvasRecord | undefined>);
         if (!c) continue;
         const known = this.state.canvases[cid];
         const unsynced = known ? c.revision !== known.local : c.objectCount > 0;
-        if (unsynced) {
+        // (one with content the file's writer did not know of, made here, and not said deleted: kept, and its board with it)
+        if (unsynced || (tombs && !tombs.has(cid) && c.objectCount > 0)) {
           keep.push(c);
+          if (boardGone && tombs && !tombs.has(bid)) keptBoards.add(bid);
           continue;
         }
         const range = IDBKeyRange.bound([cid, ""], [cid, "\uffff"]);
@@ -436,7 +454,7 @@ export class WorkspaceMirror {
         for (const store of ["canvasViews", "bookmarks", "canvases"]) tx.objectStore(store).delete(cid);
         delete this.state.canvases[cid];
       }
-      if (board && !fileWs.boards.some((b) => b.id === bid)) tx.objectStore("boards").delete(bid);
+      if (board && boardGone && !keptBoards.has(bid)) tx.objectStore("boards").delete(bid);
     }
     for (const fb of fileWs.boards) {
       const board = (await req(tx.objectStore("boards").get(fb.id) as IDBRequest<BoardRecord | undefined>)) ?? { id: fb.id, workspaceId: ws.id, name: fb.name, canvasIds: [], createdAt: now };
@@ -449,20 +467,20 @@ export class WorkspaceMirror {
     }
     // Canvases kept on a board the folder no longer has go to the first board.
     const first = fileWs.boards.find((b) => b.canvases.length)!;
-    const orphans = keep.filter((c) => !fileWs.boards.some((b) => b.id === c.boardId));
+    const orphans = keep.filter((c) => !fileWs.boards.some((b) => b.id === c.boardId) && !keptBoards.has(c.boardId));
     if (orphans.length) {
       const b = (await req(tx.objectStore("boards").get(first.id) as IDBRequest<BoardRecord>));
       tx.objectStore("boards").put({ ...b, canvasIds: [...b.canvasIds, ...orphans.map((c) => c.id)] });
       for (const c of orphans) tx.objectStore("canvases").put({ ...c, boardId: first.id });
     }
-    tx.objectStore("workspaces").put({ ...ws, displayName: typeof fileWs.name === "string" && fileWs.name ? fileWs.name : ws.displayName, ...(fileWs.viewGround ? { viewGround: fileWs.viewGround as WorkspaceRecord["viewGround"] } : {}), boardIds: fileWs.boards.map((b) => b.id) });
+    tx.objectStore("workspaces").put({ ...ws, displayName: typeof fileWs.name === "string" && fileWs.name ? fileWs.name : ws.displayName, ...(fileWs.viewGround ? { viewGround: fileWs.viewGround as WorkspaceRecord["viewGround"] } : {}), boardIds: [...fileWs.boards.map((b) => b.id), ...keptBoards] });
     if (Array.isArray(fileWs.styles)) tx.objectStore("meta").put(fileWs.styles, "styles");
     if (typeof fileWs.locks?.hidden === "string") tx.objectStore("meta").put(fileWs.locks.hidden, "hiddenLock");
     if (typeof fileWs.locks?.workspace === "string") tx.objectStore("meta").put(fileWs.locks.workspace, "workspaceLock");
     const open = fileWs.boards.some((b) => b.canvases.some((c) => c.id === cur.canvasId)) || keep.some((c) => c.id === cur.canvasId);
     if (!open) tx.objectStore("meta").put({ workspaceId: ws.id, boardId: first.id, canvasId: first.canvases[0]!.id } satisfies CurrentMeta, "current");
     await committed;
-    if (keep.length) this.treeDirty = true; // they are written back to the folder
+    if (keep.length || keptBoards.size) this.treeDirty = true; // they are written back to the folder
   }
 
   /**
@@ -601,10 +619,21 @@ export class WorkspaceMirror {
   private async write(): Promise<void> {
     const cur = await this.repo.current();
     if (!cur) return;
-    const tree = await this.repo.tree(cur.workspaceId);
+    let tree = await this.repo.tree(cur.workspaceId);
     const all = this.dirty.has("*");
     if (this.treeDirty || all) {
       this.treeDirty = false;
+      // Another device wrote the boards since this one last read them (both changed them at once): theirs are taken first, so a
+      // canvas it added is not written away (and then taken as deleted when this device reads the file back).
+      const fileWs = await this.readWorkspaceFile();
+      if (fileWs && JSON.stringify(fileWs.boards) !== this.state.tree) {
+        await this.adoptTree(fileWs);
+        this.placed = fileWs.boards;
+        this.state.tree = JSON.stringify(fileWs.boards);
+        tree = await this.repo.tree(cur.workspaceId);
+        // (the canvases it brought are read in by a look at the folder: their files are never written from here, empty)
+        setTimeout(() => this.onContested?.(), 0);
+      }
       await this.writeTree(cur.workspaceId, tree);
     }
     const ids = all ? tree.boards.flatMap((b) => b.canvases.map((c) => c.id)) : [...this.dirty];
@@ -678,8 +707,13 @@ export class WorkspaceMirror {
     const fileMoves = [...newFile].filter(([id, f]) => oldFile.has(id) && nowAt(id, oldFile.get(id)!) !== f);
     for (const [id] of fileMoves) await this.moveIfThere(nowAt(id, oldFile.get(id)!), park(id));
     for (const [id, f] of fileMoves) await this.moveIfThere(park(id), f);
-    for (const [id, f] of oldFile) if (!newFile.has(id)) await this.bridge.remove(nowAt(id, f), this.deleteTo());
-    for (const [id, f] of oldFolder) if (!newFolder.has(id)) await this.bridge.remove(f, this.deleteTo());
+    const deleted = (this.state.deleted ??= {});
+    const now = Date.now();
+    for (const [id, f] of oldFile) if (!newFile.has(id)) (await this.bridge.remove(nowAt(id, f), this.deleteTo()), (deleted[id] = now));
+    for (const [id, f] of oldFolder) if (!newFolder.has(id)) (await this.bridge.remove(f, this.deleteTo()), (deleted[id] = now));
+    // (remembered for a while, the newest first: long enough for every device to have read them)
+    const kept = Object.entries(deleted).filter(([, t]) => now - t < DELETED_KEEP.ms).sort((a, b) => b[1] - a[1]).slice(0, DELETED_KEEP.max);
+    this.state.deleted = Object.fromEntries(kept);
     for (const [id] of newFile) if (!oldFile.has(id)) this.dirty.add(id); // a new canvas: its file is written below
     const styles = await this.repo.styles().catch(() => undefined);
     // (The Hidden password's gate is not written to the folder: its vault checks it, with scrypt; a PBKDF2 form beside it, in a
@@ -694,6 +728,7 @@ export class WorkspaceMirror {
       boards: next,
       styles: Array.isArray(styles) ? styles : [],
       locks: { ...(typeof lock === "string" ? { workspace: lock } : {}) },
+      deleted: Object.keys(this.state.deleted ?? {}),
     };
     await this.bridge.write(WORKSPACE_FILE, encode(JSON.stringify(ws, null, 1)));
     this.placed = next;

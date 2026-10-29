@@ -21,6 +21,8 @@ const bridge: DesktopBridge = {
   canvasFiles: () => ipcRenderer.invoke("canvast:canvasFiles"),
   onChanged: (fn) => void ipcRenderer.on("canvast:changed", (_e, paths: string[]) => fn(paths)),
   hash: (path) => ipcRenderer.invoke("canvast:hash", path),
+  libraryChanges: () => ipcRenderer.invoke("canvast:libraryChanges"),
+  libraryLookDone: () => ipcRenderer.invoke("canvast:libraryLookDone"),
   scrypt: (password, salt, N, r, p) => ipcRenderer.invoke("canvast:scrypt", password, salt, N, r, p),
   rename: (from, to) => ipcRenderer.invoke("canvast:rename", from, to),
   erase: (path) => ipcRenderer.invoke("canvast:erase", path),

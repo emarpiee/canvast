@@ -970,6 +970,20 @@ test("library files changed outside the app: a renamed or moved file is found by
   } finally {
     await app.close();
   }
+  // A file put in while the app is closed: at the next start only what changed since the last look is looked at (kept in the app's own
+  // folder), and the new file is found that way too.
+  writeFileSync(join(ws, "library/poses/while_closed.png"), makePng(3, 3, () => [240, 120, 0, 255]));
+  ({ app, page } = await launch(ws));
+  try {
+    await expect.poll(listing, { timeout: 15_000 }).toEqual([
+      ["Loomis Hands.png", "anatomy", true, 1],
+      ["Pose One.png", "poses", true, 0],
+      ["while_closed.png", "poses", true, 0],
+    ]);
+    expect(readdirSync(join(`${ws}-userdata`, "library-looks"))).toHaveLength(1);
+  } finally {
+    await app.close();
+  }
 });
 
 test("while the app runs it follows the folder: a canvas file renamed by hand, a file dropped into library/, another device's edits (loaded again) and both sides' edits (a conflict copy)", async () => {

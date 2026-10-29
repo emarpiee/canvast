@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.57: start-up looks only at what changed (2026-10-30)
+
+**Implemented:** step 4 continued (ADR 0177 "Start-up, and boards changed on two devices at once"): `walkFiles` (parallel, no cap), `canvast:libraryChanges` / `libraryLookDone`, start-up `scanPaths` on the changes; `workspace.json` `deleted` tombstones (kept 180 days / 2,000) and a merge of the file's boards before writing it.
+**Tested:** bench 100,000: second open listed in 9.7 s (was 11), rename until written 3.6 s (was 8.4, the queue less busy). Desktop "library files changed outside" extended (a file dropped while closed is found by the look); desktop group 15 passed; the two-device tests 11 runs in a row (they failed about 1 in 3 before the tombstones).
+**Known failures:** none.
+**Unverified:** 1,000,000 files (next).
+**Committed:** on `main`.
+**Next bounded task:** benchmark at 1,000,000 files, then large files and Check workspace.
+
 ## v0.50.56: a big library writes only what changed (2026-10-30)
 
 **Implemented:** step 4 (#7/#16) first part (ADR 0177 "A big library: only what changed"): bench script; adopt with bulk reads; 256 parts (index v3), per-part state and SHA-256 fingerprints; `library(hashes)` from the catalog hooks → `write(only)` → `readSome`/`writeSome` past `library.json`'s limit (`libraryTesting.compatMax` lowers it for tests); `scanPaths` with an IndexedDB index on `file` (DB 13); a size cache cleared by the watcher's paths.

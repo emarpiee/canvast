@@ -1,11 +1,17 @@
 # Changelog
 
+## 0.50.57 — Start-up looks only at what changed (2026-10-30)
+
+- **Changed:** in the desktop app, start-up looks only at the library files that changed since the last time this device looked (the look is kept in the app's own folder), instead of every file; the first open on a device still looks at all. At 100,000 files, the second open lists the library in under 10 s.
+- **Fixed:** past 200,000 files in `library/`, start-up and a new folder put there no longer stop looking (the folder is read many files at a time, with no limit).
+- **Fixed:** two devices that changed the boards at the same moment could lose a canvas one of them had just added (the other's `workspace.json` came last, without it, and the canvas was taken as deleted). `workspace.json` now lists what was deleted, and only that is deleted on another device; and a device takes the other's boards in before it writes the file.
+
 ## 0.50.56 — A big library writes only what changed (2026-10-30)
 
 - **Changed:** in the desktop app, a big library writes only what changed: the library's index is in 256 parts, and a rename, a tag or a deletion rewrites only its item's part (at 100,000 items, a rename's write went from about 7 s to 0.14 s).
 - **Changed:** a file changed in `library/` outside the app is looked at alone instead of the whole folder being listed again (at 100,000 items, a file put in from outside is listed in about 4 s instead of 29 s); the app also remembers its files' sizes between looks.
 - **Changed:** the first open of a big workspace on a new device takes the library in about 40% less time.
-- **Fixed:** past 200,000 files in `library/`, a new file put there from outside was never found.
+- **Fixed:** past 200,000 files in `library/`, a new file put there from outside while the app ran was never found.
 - **Added:** `scripts/bench-library.mjs`, a benchmark of the desktop app on a workspace folder of N library files.
 
 ## 0.50.55 — Hide folder; hidden names off the device (2026-10-29)

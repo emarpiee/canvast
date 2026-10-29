@@ -221,6 +221,38 @@ async function inside(root: string, rel: string): Promise<string> {
  * Write a file safely: a temporary file beside it, flushed to the disk, then renamed over it (never half a file). Not `durable`:
  * not waited for on the disk (`canvast:syncFiles` does it for many at once; the app keeps its own copy until then).
  */
+/**
+ * Every file under a folder, at any depth (names starting with a dot, and what is in such folders, left out), with its size and
+ * modification time: folders are read and files looked at many at a time (a big library on a spinning disk), with no limit on how many.
+ */
+async function walkFiles(dir: string, at: string): Promise<Array<{ path: string; size: number; mtimeMs: number }>> {
+  const out: Array<{ path: string; size: number; mtimeMs: number }> = [];
+  let folders: Array<[string, string]> = [[dir, at]];
+  while (folders.length) {
+    const next: Array<[string, string]> = [];
+    const files: Array<[string, string]> = [];
+    await Promise.all(
+      folders.map(async ([d, rel]) => {
+        for (const ent of await readdir(d, { withFileTypes: true }).catch(() => [])) {
+          if (ent.name.startsWith(".")) continue;
+          if (ent.isDirectory()) next.push([join(d, ent.name), `${rel}/${ent.name}`]);
+          else if (ent.isFile()) files.push([join(d, ent.name), `${rel}/${ent.name}`]);
+        }
+      }),
+    );
+    for (let i = 0; i < files.length; i += 256) {
+      await Promise.all(
+        files.slice(i, i + 256).map(async ([full, rel]) => {
+          const s = await stat(full).catch(() => null);
+          if (s?.isFile()) out.push({ path: rel, size: s.size, mtimeMs: s.mtimeMs });
+        }),
+      );
+    }
+    folders = next;
+  }
+  return out;
+}
+
 async function writeAtomic(full: string, bytes: Uint8Array, durable = true): Promise<void> {
   await mkdir(dirname(full), { recursive: true });
   const tmp = `${full}.tmp-${process.pid}-${Date.now().toString(36)}`;
@@ -373,23 +405,33 @@ function installFileCalls(win: BrowserWindow, root: string): void {
   });
   ipcMain.handle("canvast:tree", async (e, rel: string) => {
     own(e);
-    const out: Array<{ path: string; size: number }> = [];
-    const walk = async (dir: string, at: string): Promise<void> => {
-      let entries;
-      try {
-        entries = await readdir(dir, { withFileTypes: true });
-      } catch {
-        return;
-      }
-      for (const d of entries) {
-        if (d.name.startsWith(".") || out.length >= 200_000) continue;
-        const full = join(dir, d.name);
-        if (d.isDirectory()) await walk(full, `${at}/${d.name}`);
-        else if (d.isFile()) out.push({ path: `${at}/${d.name}`, size: (await stat(full)).size });
-      }
-    };
-    await walk(await inside(root, rel), rel);
-    return out;
+    return (await walkFiles(await inside(root, rel), rel)).map(({ path, size }) => ({ path, size }));
+  });
+  // Start-up: what changed in library/ since the last look (each file's size and modification time against the look kept for this
+  // workspace in the app's own folder), so a big library is not looked through file by file in the page. Null the first time (the
+  // page then looks at everything). The look is kept only once the page says it has taken what changed (`libraryLookDone`).
+  let look: Map<string, string> | null = null;
+  const lookFile = join(app.getPath("userData"), "library-looks", `${createHash("sha256").update(root).digest("hex").slice(0, 24)}.json`);
+  ipcMain.handle("canvast:libraryChanges", async (e) => {
+    own(e);
+    look = new Map((await walkFiles(join(root, "library"), "library")).map((f) => [f.path, `${f.size}:${Math.round(f.mtimeMs)}`]));
+    let before: Record<string, string> | null = null;
+    try {
+      before = JSON.parse(await readFile(lookFile, "utf8")) as Record<string, string>;
+    } catch {
+      before = null;
+    }
+    if (!before) return null;
+    const changed = [...look].filter(([p, v]) => before![p] !== v).map(([p]) => p);
+    for (const p of Object.keys(before)) if (!look.has(p)) changed.push(p);
+    return changed;
+  });
+  ipcMain.handle("canvast:libraryLookDone", async (e) => {
+    own(e);
+    if (!look) return;
+    mkdirSync(dirname(lookFile), { recursive: true });
+    await writeAtomic(lookFile, Buffer.from(JSON.stringify(Object.fromEntries(look))), true);
+    look = null;
   });
   ipcMain.handle("canvast:canvasFiles", async (e) => {
     own(e);

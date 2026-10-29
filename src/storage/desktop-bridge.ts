@@ -69,6 +69,12 @@ export interface DesktopBridge {
   tree(path: string): Promise<Array<{ path: string; size: number }>>;
   /** The Hidden password stretched with scrypt (RFC 7914; `N` a power of two, 2^14 to 2^20), 32 bytes, in the main process. */
   scrypt(password: string, salt: Uint8Array, N: number, r: number, p: number): Promise<Uint8Array>;
+  /**
+   * At start-up: the paths under `library/` that changed (added, changed or gone) since the last look kept for this workspace on this
+   * device, or null when there is none yet (the first open here: everything is looked at). Keep the look with `libraryLookDone` once taken.
+   */
+  libraryChanges(): Promise<string[] | null>;
+  libraryLookDone(): Promise<void>;
   /** A file's SHA-256 (hex), read in the main process; null when there is no such file. */
   hash(path: string): Promise<string | null>;
   /** The canvas files of the boards: `.canvast/boards/<board>/<name>.cvst`. */
