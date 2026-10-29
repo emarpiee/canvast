@@ -39,6 +39,8 @@ jobs:
       - name: Tools for the packages and the start check
         run: sudo apt-get update && sudo apt-get install -y zsync rpm xvfb
       - run: npm ci
+      # (Electron fetches its binary the first time it is asked for, not at npm ci)
+      - run: node node_modules/electron/install.js
       # (the brand icons are drawn with Playwright's Chromium; the start check runs Electron under a virtual display)
       - run: npx playwright install --with-deps chromium
       - run: npm run build

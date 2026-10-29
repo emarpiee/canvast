@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.35 — Packages on a fresh machine (2026-10-29)
+
+- **Fixed:** packaging the desktop app on a fresh machine (GitHub's) fetches Electron first: Electron no longer fetches its binary when it is installed, so the packages of 0.50.33 and 0.50.34 were not built there.
+
 ## 0.50.34 — Packages built on GitHub, tests on GitHub (2026-10-29)
 
 - **Changed:** the desktop packages of a release are built, checked and added on GitHub's machines (x86_64 and aarch64) a few minutes after it is published; a release no longer uploads them from the developer's machine. The release notes list them by format.

@@ -19,6 +19,8 @@ const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const run = (script, args = []) => execFileSync("node", [join(root, script), ...args], { cwd: root, stdio: "inherit" });
 
 if (!existsSync(join(root, "dist/canvast.html"))) run("scripts/build.mjs");
+// (Electron fetches its binary the first time it is asked for, not at `npm ci`: on a fresh machine it is fetched here)
+if (!existsSync(join(root, "node_modules/electron/dist"))) execFileSync("node", [join(root, "node_modules/electron/install.js")], { cwd: root, stdio: "inherit" });
 run("scripts/build-desktop.mjs");
 const icons = mkdtempSync(join(tmpdir(), "canvast-icons-"));
 run("scripts/brand/icons.mjs", [icons]);
