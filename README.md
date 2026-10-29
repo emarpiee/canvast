@@ -800,6 +800,10 @@ I do not believe that images made by generative AI are art, and by the same meas
 
 The idea grew out of [Kambas](https://github.com/emarpiee/obsidian-kambas), my Obsidian plugin that extends Canvas with image controls. Shipping the app as a single HTML file was inspired by the one-file tools of [iamsingle.app](https://iamsingle.app/) and [Anton Burmistrov](https://antonburmistrov.com/).
 
+canvast is open source in the first place: anyone is welcome to fork it and build a better version of it.
+
+Apps, sites and references that help with creative work, which I use or recommend: [Tools and resources for artists](docs/creative-tools.md).
+
 ---
 
 ## Licence

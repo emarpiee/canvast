@@ -9,7 +9,8 @@ const names = ENCODED.map((s) => Buffer.from(s, "base64").toString("utf8"));
 const pattern = new RegExp(`\\b(${names.map((n) => n.replace(/\s+/g, "[\\s_-]*")).join("|")})\\b`, "i");
 
 // Third-party manifests and lockfiles are allowed to contain upstream names.
-const ALLOW = [/^package-lock\.json$/, /^node_modules\//];
+// docs/creative-tools.md is the owner's own list of other artists' tools, which names them on purpose (asked for 2026-10-29).
+const ALLOW = [/^package-lock\.json$/, /^node_modules\//, /^docs\/creative-tools\.md$/];
 const extra = process.argv.slice(2);
 const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], { encoding: "utf8" })
   .split("\n")
