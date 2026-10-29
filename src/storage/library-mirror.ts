@@ -11,7 +11,7 @@ import type { AssetField, AssetFolder, CatalogEntry } from "../assets/asset-cata
 import { FOLDERS_KEY, folderPath, meta, normalizeFields, normalizeNote, normalizeTags } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
 import { storedStub } from "../assets/asset-library";
-import type { DesktopBridge } from "./desktop-bridge";
+import type { DeleteMode, DesktopBridge } from "./desktop-bridge";
 import { externalFolder } from "./external-folder";
 import type { HiddenVault } from "./hidden-store";
 import { RECOVERED_PREFIX } from "./hidden-store";
@@ -249,6 +249,7 @@ export class LibraryMirror {
     private readonly db: IDBDatabase,
     private readonly bridge: DesktopBridge,
     private readonly vault: HiddenVault,
+    private readonly deleteTo: () => DeleteMode = () => "trash",
   ) {}
 
   /** At start-up: what another device changed in `library.json` is taken (new items, names, tags, folders, where each file is). */
@@ -263,6 +264,57 @@ export class LibraryMirror {
    * hidden items are opened: what another device hid or changed among them is known only then.
    */
   async reread(): Promise<boolean> {
+    const took = await this.rereadMain();
+    return (await this.mergeCopies()) || took;
+  }
+
+  /**
+   * Copies a sync tool made of the library's files (`items-3 (1).json`, `index (1).json`, `library (1).json`: two devices wrote one at
+   * once and the tool kept both): the items and library folders in them this device has never known are taken (added on the other
+   * device); what it knew and the kept file no longer has was deleted there, and is not brought back. The copy then goes where deleted
+   * files go: what it added is in the library, written with the next save. One that does not read (still arriving) waits. Whether
+   * anything was taken.
+   */
+  private async mergeCopies(): Promise<boolean> {
+    const copies = [
+      ...(await this.bridge.list(LIBRARY_DIR)).filter((n) => /^(items-[0-9a-f]|index)[^/]+\.json$/i.test(n)).map((n) => `${LIBRARY_DIR}/${n}`),
+      ...(await this.bridge.list(".canvast")).filter((n) => /^library[^/]+\.json$/i.test(n) && n !== "library.json").map((n) => `.canvast/${n}`),
+    ].filter((p) => !p.includes(".tmp-"));
+    if (!copies.length) return false;
+    const knownFolders = new Set((JSON.parse(this.state.folders || "[]") as AssetFolder[]).map((f) => f.id));
+    const items = new Map<string, LibraryItem>();
+    const folders = new Map<string, AssetFolder>();
+    const read: string[] = [];
+    for (const path of copies) {
+      const bytes = await this.bridge.read(path);
+      let raw: { items?: unknown; folders?: unknown } | null;
+      try {
+        raw = bytes ? (JSON.parse(new TextDecoder().decode(bytes)) as { items?: unknown; folders?: unknown }) : null;
+      } catch {
+        raw = null;
+      }
+      if (!raw || typeof raw !== "object") continue;
+      for (const i of Array.isArray(raw.items) ? raw.items.map(readItem) : []) if (i && !(i.hash in this.state.items) && !isHiddenFile(i.file)) items.set(i.hash, i);
+      for (const f of readFolders(raw.folders)) if (!knownFolders.has(f.id)) folders.set(f.id, f);
+      read.push(path);
+    }
+    let took = false;
+    if (folders.size) {
+      const local = (await idbGet<AssetFolder[]>(this.db, "meta", FOLDERS_KEY)) ?? [];
+      const ids = new Set(local.map((f) => f.id));
+      const add = [...folders.values()].filter((f) => !ids.has(f.id));
+      if (add.length) {
+        await idbPut(this.db, "meta", FOLDERS_KEY, [...local, ...add]);
+        took = true;
+      }
+    }
+    // (The folders as last read stay the folders of the file, so only the items are taken here.)
+    if (items.size && (await this.adopt(JSON.parse(this.state.folders || "[]") as AssetFolder[], [...items.values()], null))) took = true;
+    for (const path of read) await this.bridge.remove(path, this.deleteTo());
+    return took;
+  }
+
+  private async rereadMain(): Promise<boolean> {
     const vault = await this.vault.state();
     // (An index this key does not open, damaged or of another key, is not whole: the hidden items here stay as they are.)
     let hiddenWhole = true;

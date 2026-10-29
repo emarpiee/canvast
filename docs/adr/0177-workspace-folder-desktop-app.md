@@ -283,6 +283,10 @@ A sync tool (Mega, Drive, Proton Drive, Syncthing…) keeps one `hidden.json` wh
 - **A first password** is refused while `.hidden/` holds sealed files or a copy of `hidden.json` is there but `hidden.json` is not (it is on its way): a new key would be a second one.
 - `scripts/hidden-items.mjs decrypt` reads the copies too, and writes files no entry names as `recovered-<hash>.<ext>`.
 
+### Library and boards and sync tools (0.50.49)
+
+Copies a sync tool keeps of `workspace.json`, of the library's parts and index, and of `library.json` are joined by id: what is in a copy and this device never knew (a canvas whose file is there, a library item, a library folder) was added on the other device, and is taken; what this device knew and the kept file lacks was deleted there, and stays deleted. The kept `workspace.json` is written with the added canvases before the copy goes (a look at the folder in between would otherwise find them gone and delete them); library items go into the app's storage first. Copies then go where deleted files go. Field-level edits in a copy (a name or a tag changed on both devices) are not joined: the kept file's stay.
+
 ### Canvas files and sync tools (0.50.48)
 
 A sync tool's copy of a canvas file (`<name> (1).cvst` and the like) has the id of a canvas whose own file is still there, so it is neither a rename nor a new canvas. Its version (another device's edits that the canvas's file lost) becomes a canvas of its own, `<name> (conflict from sync <date>)`, with new object ids as a duplicate has, and the copy goes where deleted files go. Only the device named in its `savedBy` takes it at once; another waits 10 minutes (that device may be gone), so two running devices do not both take it. A copy with the same revision and `savedBy` as the canvas's file only goes; one that does not read whole (still arriving) waits.

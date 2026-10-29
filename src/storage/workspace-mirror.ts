@@ -92,7 +92,7 @@ export class WorkspaceMirror {
     private readonly vault: HiddenVault,
     private readonly deleteTo: () => DeleteMode = () => "trash",
   ) {
-    this.lib = new LibraryMirror(db, bridge, vault);
+    this.lib = new LibraryMirror(db, bridge, vault, deleteTo);
     this.lib.onNotice = (text) => this.onError?.(text);
     // Opened: what another device hid is read from the sealed index, and what waited for the key (hiding, showing) is done.
     vault.subscribe(() => {
@@ -149,6 +149,7 @@ export class WorkspaceMirror {
     this.libraryDirty = true;
     const fileWs = await this.readWorkspaceFile();
     if (!fileWs) return this.everything(); // a new workspace folder: all of it is written
+    await this.mergeTreeCopies(fileWs); // (written back below, with the tree)
     const tree = JSON.stringify(fileWs.boards);
     if (tree !== this.state.tree) await this.adoptTree(fileWs);
     this.placed = fileWs.boards;
@@ -209,6 +210,7 @@ export class WorkspaceMirror {
       const fileWs = await this.readWorkspaceFile();
       if (!fileWs) return { canvases: [], tree: false };
       let tree = false;
+      if (await this.mergeTreeCopies(fileWs)) this.treeDirty = true; // (the kept file gets them)
       const text = JSON.stringify(fileWs.boards);
       if (text !== this.state.tree) {
         await this.adoptTree(fileWs);
@@ -325,8 +327,41 @@ export class WorkspaceMirror {
   private readonly copySeen = new Map<string, number>();
   private copyTimer = 0;
 
-  private async readWorkspaceFile(): Promise<WorkspaceFile | null> {
-    const bytes = await this.bridge.read(WORKSPACE_FILE);
+  /**
+   * Copies a sync tool made of `workspace.json` (`workspace (1).json`: two devices changed the boards at once and the tool kept both):
+   * canvases in them this device has never known, whose files are there, are added to `fileWs` (made on the other device, and lost
+   * from the file the tool kept), on their board (added too when the kept file has none), and written into it. What this device knew
+   * and the kept file no longer has was deleted, and is not brought back. The copy then goes where deleted files go. Whether anything
+   * was added.
+   */
+  private async mergeTreeCopies(fileWs: WorkspaceFile): Promise<boolean> {
+    const copies = (await this.bridge.list(".canvast")).filter((n) => /^workspace[^/]+\.json$/i.test(n) && n !== "workspace.json" && !n.includes(".tmp-"));
+    let added = false;
+    for (const name of copies) {
+      const copy = await this.readWorkspaceFile(`.canvast/${name}`);
+      if (!copy) continue; // (not whole yet, or nothing in it: looked at again with the next change)
+      const placed = new Set(fileWs.boards.flatMap((b) => b.canvases.map((c) => c.id)));
+      for (const cb of copy.boards) {
+        for (const cc of cb.canvases) {
+          if (placed.has(cc.id) || this.state.canvases[cc.id]) continue;
+          const head = canvasHead(await this.bridge.head(cc.file));
+          if (!head || head.id !== cc.id) continue;
+          let board = fileWs.boards.find((b) => b.id === cb.id);
+          if (!board) fileWs.boards.push((board = { ...cb, canvases: [] }));
+          board.canvases.push(cc);
+          placed.add(cc.id);
+          added = true;
+        }
+      }
+      // The kept file gets them first: a look at the folder before the next save must not find them gone from it (taken as deleted).
+      if (added) await this.bridge.write(WORKSPACE_FILE, encode(JSON.stringify(fileWs, null, 1)));
+      await this.bridge.remove(`.canvast/${name}`, this.deleteTo());
+    }
+    return added;
+  }
+
+  private async readWorkspaceFile(path = WORKSPACE_FILE): Promise<WorkspaceFile | null> {
+    const bytes = await this.bridge.read(path);
     if (!bytes) return null;
     try {
       const ws = JSON.parse(new TextDecoder().decode(bytes)) as Partial<WorkspaceFile>;

@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.49: library and boards joined after sync clashes (2026-10-29)
+
+**Implemented:** sync-safety step 3 of 5 (ADR 0177, "Library and boards and sync tools"). Copies of `workspace.json`, `.canvast/library/items-*.json` / `index.json` and `library.json` are joined by id (only what this device never knew), the merged `workspace.json` written before the copy goes, copies moved to where deleted files go; the folder watcher reads them.
+**Tested:** desktop `the folder is the truth` extended (B's new canvas and library item kept from the copies at start-up; copies in `.trash/`); found and fixed a race on the way (the copy's removal made the app re-read the old `workspace.json` and delete the added canvas).
+**Known failures:** none.
+**Unverified:** joining while the app runs (only at start-up in E2E; the same code runs from the watcher).
+**Committed:** on `main`.
+**Next bounded task:** sync step 4: a damaged canvas file at start-up skipped and reported.
+
 ## v0.50.48: canvas copies made by sync tools (2026-10-29)
 
 **Implemented:** sync-safety step 2 of 5 (ADR 0177, "Canvas files and sync tools"). A `.cvst` with the id of a canvas whose own file is there becomes `<name> (conflict from sync <date>)` (new object ids), the copy moved to where deleted files go; the device in its `savedBy` takes it at once, another after 10 minutes; an identical copy only goes; one not whole yet waits.

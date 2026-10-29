@@ -235,6 +235,39 @@ test("the folder is the truth: a new device opens the whole workspace, another d
   await a.app.close();
   expect(files(ws).filter((f) => f.endsWith(".cvst")).map((f) => f.replace(/conflict_[0-9_-]+/, "conflict"))).toEqual([`${B}sketches/characters-conflict.cvst`, `${B}sketches/characters.cvst`]);
 
+  // Device B adds a canvas and a library item while this device changes the boards and the library too: the sync tool keeps this
+  // device's workspace.json and library files, and puts B's beside them (`workspace (1).json`, `items-x (1).json`). At start-up the
+  // canvas and the item B added are taken from the copies, which then go to .trash/.
+  const lib = (): Map<string, Buffer> => new Map(files(ws).filter((f) => f.startsWith(".canvast/library/") || f === ".canvast/workspace.json").map((f) => [f, readFileSync(join(ws, f))]));
+  const kept = lib();
+  b = await launch(ws, "device-b");
+  await ready(b.page);
+  await b.page.evaluate((bid) => window.__canvastDebug.workspaceOp("newCanvas", bid), t[0]!.id);
+  const poses = await b.page.evaluate(() => window.__canvastDebug.session().tree![0]!.canvases.find((c) => !c.name.startsWith("Characters"))!.id);
+  await b.page.evaluate((c) => window.__canvastDebug.workspaceOp("renameCanvas", c, "Poses"), poses);
+  await add(b.page, 1);
+  await b.page.evaluate(() => window.__canvastDebug.flushStorage());
+  await b.app.close();
+  for (const [f, was] of lib()) {
+    if (kept.get(f)?.equals(was)) continue;
+    renameSync(join(ws, f), join(ws, f.replace(/\.json$/, " (1).json")));
+    if (kept.has(f)) writeFileSync(join(ws, f), kept.get(f)!);
+  }
+  expect(files(ws).filter((f) => f.includes(" (1).json")).length).toBeGreaterThanOrEqual(2); // (workspace.json and a part, at least)
+  a = await launch(ws, "device-a");
+  await ready(a.page);
+  await expect.poll(async () => (await counts(a.page)).map(([bn, cn, n]) => [bn, cn.replace(/\(conflict [^)]*\)/, "(conflict)"), n])).toEqual([
+    ["Sketches", "Characters (conflict)", 6],
+    ["Sketches", "Characters", 7],
+    ["Sketches", "Poses", 1],
+  ]);
+  await expect.poll(() => a.page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(shade);
+  await a.page.evaluate(() => window.__canvastDebug.flushStorage());
+  await a.app.close();
+  expect(files(ws).filter((f) => f.startsWith(".canvast/") && f.includes(" (1).json"))).toEqual([]);
+  expect(files(ws).filter((f) => f.startsWith(".trash/") && f.endsWith(" (1).json")).length).toBeGreaterThanOrEqual(2);
+  expect(JSON.parse(readFileSync(join(ws, ".canvast/workspace.json"), "utf8")).boards[0].canvases.map((c: { name: string }) => c.name)).toContain("Poses");
+
   // The folder deleted and a new, empty one made at the same path: a new workspace, nothing of the old one's cache.
   rmSync(ws, { recursive: true, force: true });
   mkdirSync(ws);

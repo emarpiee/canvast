@@ -150,8 +150,8 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
         // (the library is listed again after any outside change in it: a file put back in its own place changes no item, but it is there again)
         const hiddenTouched = paths.some((p) => p.startsWith(".hidden/") && !isHiddenFile(p) && !ownWrite(p));
         if (hiddenTouched || paths.some((p) => (p === "library" || p.startsWith("library/")) && !ownWrite(p))) void mirror.rescan(() => undefined, hiddenTouched).then(() => on.libraryChanged());
-        if (paths.some((p) => p === LIBRARY_JSON || p === HIDDEN_JSON || isHiddenCopy(p) || p === LIBRARY_DIR || p.startsWith(`${LIBRARY_DIR}/`))) void mirror.rereadLibrary(() => on.libraryChanged());
-        if (paths.some((p) => p === WORKSPACE_FILE || p.startsWith(`${BOARDS_DIR}/`))) check();
+        if (paths.some((p) => p === LIBRARY_JSON || /^\.canvast\/library[^/]+\.json$/i.test(p) || p === HIDDEN_JSON || isHiddenCopy(p) || p === LIBRARY_DIR || p.startsWith(`${LIBRARY_DIR}/`))) void mirror.rereadLibrary(() => on.libraryChanged());
+        if (paths.some((p) => p === WORKSPACE_FILE || /^\.canvast\/workspace[^/]+\.json$/i.test(p) || p.startsWith(`${BOARDS_DIR}/`))) check();
       });
     },
   };

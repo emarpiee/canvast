@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.49 — Library and boards joined after sync clashes (2026-10-29)
+
+- **Fixed:** in the desktop app, when two devices changed the boards or the library at once and the sync tool kept a copy beside the file (`workspace (1).json`, `items-3 (1).json`, `index (1).json`, `library (1).json`), what the other device added (canvases, library items, library folders) was lost from the app. It is now taken from the copy, and the copy moves to where deleted files go.
+
 ## 0.50.48 — Canvas copies made by sync tools (2026-10-29)
 
 - **Fixed:** in the desktop app, a canvas file a sync tool kept beside the canvas's own (`heroes (1).cvst`, when two devices saved it at once) was ignored, so the edits in it never showed. That version now becomes a canvas of its own, `<name> (conflict from sync <date>)`, on the same board, and the copy moves to where deleted files go (a copy the same as the canvas's file only moves away).
