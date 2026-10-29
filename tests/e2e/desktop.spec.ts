@@ -2,7 +2,8 @@ import { _electron as electron, expect, test } from "@playwright/test";
 import type { ElectronApplication, Page } from "@playwright/test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { basename, join, relative } from "node:path";
+import { createHash } from "node:crypto";
 import { buildDir } from "./build-dir";
 import { makePng } from "./png";
 
@@ -499,6 +500,9 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
   const flush = () => page.evaluate(() => window.__canvastDebug.flushStorage());
   const listing = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, !!e.hidden, e.present])));
   let hash = "";
+  let sealed0 = "";
+  type Tool = { decryptHidden: (ws: string, out: string, pw: string) => Promise<number>; encryptHidden: (ws: string, files: string[], pw: string) => Promise<number> };
+  const { decryptHidden, encryptHidden } = (await import(join(process.cwd(), "scripts/hidden-items.mjs"))) as Tool;
   try {
     await page.getByTestId("import-input").setInputFiles({ name: "Secret Plan.png", mimeType: "image/png", buffer: secret });
     await expect.poll(listing).toEqual([["Secret Plan.png", false, true]]);
@@ -508,12 +512,19 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     await flush();
     const sealed = files(ws).filter((f) => f.startsWith(".hidden/"));
     expect(sealed).toHaveLength(1);
+    sealed0 = sealed[0]!;
     expect(sealed[0]).toMatch(/^\.hidden\/[0-9a-f]{32}\.bin$/);
     expect(files(ws).filter((f) => f.startsWith("library/") || f.startsWith(".trash/"))).toEqual([]);
     expect(traces()).toEqual([]);
     expect(await listing()).toEqual([["Secret Plan.png", true, true]]);
     expect(await hid("set", null as unknown as string)).toEqual({ ok: false, state: "open" }); // (not removed while an item is hidden)
     expect(await hid("set", "pw2")).toEqual({ ok: true, state: "open" }); // the same key under a new password
+    // Outside the app, scripts/hidden-items.mjs opens the same files with the password alone (the README's documented format).
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await expect(decryptHidden(ws, `${ws}-out`, "pw1")).rejects.toThrow(/wrong password/);
+    expect(await decryptHidden(ws, `${ws}-out`, "pw2")).toBe(1);
+    expect(readFileSync(join(`${ws}-out`, "Secret Plan.png")).equals(secret)).toBe(true);
+    expect(JSON.parse(readFileSync(join(`${ws}-out`, "hidden-items.json"), "utf8"))[0]).toMatchObject({ name: "Secret Plan.png", hidden: true });
     // Locked (from the command palette): the picture on the canvas leaves memory and is drawn with a padlock; the password opens it again.
     await page.keyboard.press("Control+k");
     await page.locator(".palette-input").fill("lock hidden");
@@ -527,20 +538,31 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
   } finally {
     await app.close();
   }
-  // Another device: it knows nothing of the hidden item until the password is given there.
+  // With the app closed, the same tool seals a new picture into .hidden/ and the index (its size read from the file).
+  const outside = makePng(5, 4, () => [90, 90, 250, 255]);
+  writeFileSync(`${ws}-outside.png`, outside);
+  await expect(encryptHidden(ws, [`${ws}-outside.png`], "pw1")).rejects.toThrow(/wrong password/);
+  expect(await encryptHidden(ws, [`${ws}-outside.png`], "pw2")).toBe(1);
+  const name = basename(`${ws}-outside.png`);
+  const sealedNow = files(ws).filter((f) => f.startsWith(".hidden/"));
+  expect(sealedNow).toHaveLength(2);
+  expect(sealedNow.some((f) => readFileSync(join(ws, f)).includes(outside.subarray(0, 24)))).toBe(false);
+  const outsideFile = sealedNow.find((f) => f !== sealed0)!;
+  // Another device: it knows nothing of the hidden items until the password is given there.
   ({ app, page } = await launch(ws, "device-b"));
   try {
     await expect.poll(() => hid("check", "x").then((r) => r.state)).toBe("locked");
     expect(await listing()).toEqual([]);
     expect((await hid("check", "pw1")).ok).toBe(false);
     expect(await hid("check", "pw2")).toEqual({ ok: true, state: "open" });
-    await expect.poll(listing).toEqual([["Secret Plan.png", true, true]]);
+    await expect.poll(() => listing().then((l) => l.sort())).toEqual([["Secret Plan.png", true, true], [name, true, true]].sort());
     expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toEqual(Array.from(secret));
+    expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), createHash("sha256").update(outside).digest("hex"))).toEqual(Array.from(outside));
     // Shown again: opened back into its place in library/, the sealed file erased, its picture drawn again.
     await lib("hide", hash, "");
     await flush();
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.pictureLocked(h), hash)).toBe(false);
-    expect(files(ws).filter((f) => f.startsWith("library/") || f.startsWith(".hidden/"))).toEqual(["library/images/secret_plan.png"]);
+    expect(files(ws).filter((f) => (f.startsWith("library/") || f.startsWith(".hidden/")) && f !== outsideFile)).toEqual(["library/images/secret_plan.png"]);
     expect(readFileSync(join(ws, "library/images/secret_plan.png")).equals(secret)).toBe(true);
     // Locked again: hiding waits for the key (the readable file stays until the password is given).
     await hid("lock");
@@ -561,7 +583,7 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     await page.getByTestId("prompt-input").fill("pw2");
     await page.getByTestId("prompt-ok").click();
     await expect.poll(() => files(ws).filter((f) => f.startsWith(".hidden/") && !/^\.hidden\/[0-9a-f]{32}\.bin$/.test(f)), { timeout: 15_000 }).toEqual([]);
-    expect(files(ws).filter((f) => f.startsWith(".hidden/"))).toHaveLength(2);
+    expect(files(ws).filter((f) => f.startsWith(".hidden/"))).toHaveLength(3);
     expect(files(ws).some((f) => readFileSync(join(ws, f)).includes(dropped.subarray(0, 24)))).toBe(false);
     await expect.poll(listing).toContainEqual(["Dropped Secret.png", true, true]);
   } finally {
