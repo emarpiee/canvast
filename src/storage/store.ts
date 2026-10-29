@@ -197,6 +197,8 @@ export interface FolderFile {
   folderId: string | null;
   /** Found in `.hidden/`: it becomes a hidden item (and is sealed). */
   hidden?: boolean;
+  /** What a sealed file said of its item (its tags, note…), given back to it. */
+  meta?: { tags: string[]; favorite: boolean; note: string; fields: Array<{ key: string; value: string }> };
   read(): Promise<Blob | null>;
 }
 

@@ -6,7 +6,7 @@
 import type { DesktopBridge } from "./desktop-bridge";
 import type { HiddenState, HiddenStore } from "./store";
 import type { VaultRecord } from "./hidden-vault";
-import { SEALED_COPY_RE, createVault, holdsKey, keyCheck, needsUpgrade, openBytes, openText, openVault, readVault, rewrapVault, sameKey, sealBytes, sealText } from "./hidden-vault";
+import { SEALED_COPY_RE, createVault, holdsKey, keyCheck, needsUpgrade, openBytes, openFile, openText, openVault, readVault, rewrapVault, sameKey, sealBytes, sealFile, sealText } from "./hidden-vault";
 
 export const HIDDEN_JSON = ".canvast/hidden.json";
 /**
@@ -265,28 +265,35 @@ export class HiddenVault implements HiddenStore {
       const path = `.hidden/${name}`;
       if (!SEALED_COPY_RE.test(path)) continue;
       const bytes = (await this.bridge.read(path)) as Uint8Array<ArrayBuffer> | null;
-      if (!bytes || !this.key || (await openBytes(this.key, bytes))) continue;
-      const plain = await openBytes(other, bytes);
-      if (!plain) continue;
-      await this.bridge.write(path, await sealBytes(this.key, plain));
+      if (!bytes || !this.key || (await openFile(this.key, bytes))) continue;
+      const opened = await openFile(other, bytes);
+      if (!opened) continue;
+      const plain = opened.bytes;
+      await this.bridge.write(path, opened.item ? await sealFile(this.key, plain, opened.item) : await sealBytes(this.key, plain));
       const back = (await this.bridge.read(path)) as Uint8Array<ArrayBuffer> | null;
-      const again = back && (await openBytes(this.key, back));
+      const again = back && (await openFile(this.key, back))?.bytes;
       if (!again || again.length !== plain.length || again.some((v, i) => v !== plain[i])) return false;
     }
     return true;
   }
 
-  async seal(bytes: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+  /** Seal a hidden item's bytes, with what it is (`item`), as a file that stands on its own (version 2). */
+  async seal(bytes: Uint8Array<ArrayBuffer>, item: object): Promise<Uint8Array<ArrayBuffer>> {
     if (!this.key) throw new Error("the Hidden items are locked");
-    return sealBytes(this.key, bytes);
+    return sealFile(this.key, bytes, item);
   }
 
   /** The original of a sealed file, or null while locked (or when it does not open). */
   async open(sealed: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer> | null> {
+    return (await this.openItem(sealed))?.bytes ?? null;
+  }
+
+  /** A sealed file's bytes and the item it holds (null for a version 1 file), or null while locked (or when it does not open). */
+  async openItem(sealed: Uint8Array<ArrayBuffer>): Promise<{ bytes: Uint8Array<ArrayBuffer>; item: Record<string, unknown> | null } | null> {
     if (!this.key) return null;
     for (const key of [this.key, ...this.others.values()]) {
-      const bytes = await openBytes(key, sealed);
-      if (bytes) return bytes;
+      const opened = await openFile(key, sealed);
+      if (opened) return opened;
     }
     return null;
   }

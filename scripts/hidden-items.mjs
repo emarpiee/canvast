@@ -67,6 +67,41 @@ async function seal(key, bytes) {
 }
 const open = async (key, sealed) => new Uint8Array(await subtle.decrypt({ name: "AES-GCM", iv: sealed.subarray(0, 12) }, key, sealed.subarray(12)));
 
+// A hidden file of version 2 (the README, "Hidden items: the file format"): the magic, the sealed header (the item it holds, its
+// chunking), then its bytes in chunks sealed on their own (STREAM nonces). Version 1 is one sealed piece (`open` above).
+const MAGIC = Buffer.from("CVSTHID2");
+const CHUNK = 1 << 20;
+const nonce = (prefix, i, last) => {
+  const n = Buffer.alloc(12);
+  Buffer.from(prefix).copy(n);
+  n.writeUInt32BE(i, 7);
+  n[11] = last ? 1 : 0;
+  return n;
+};
+/** A version 2 hidden file of `bytes`, holding `item`. */
+async function sealFile(key, bytes, item) {
+  const prefix = globalThis.crypto.getRandomValues(new Uint8Array(7));
+  const hiv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+  const header = Buffer.from(await subtle.encrypt({ name: "AES-GCM", iv: hiv, additionalData: MAGIC }, key, Buffer.from(JSON.stringify({ v: 2, chunk: CHUNK, prefix: b64(prefix), item }))));
+  const len = Buffer.alloc(4);
+  len.writeUInt32LE(header.length);
+  const parts = [MAGIC, hiv, len, header];
+  const n = Math.max(1, Math.ceil(bytes.length / CHUNK));
+  for (let i = 0; i < n; i++) parts.push(Buffer.from(await subtle.encrypt({ name: "AES-GCM", iv: nonce(prefix, i, i === n - 1) }, key, bytes.subarray(i * CHUNK, (i + 1) * CHUNK))));
+  return Buffer.concat(parts);
+}
+/** A hidden file's bytes and the item it holds (null for version 1); throws when it does not open with `key`. */
+async function openFile(key, sealed) {
+  if (!Buffer.from(sealed.subarray(0, 8)).equals(MAGIC)) return { bytes: await open(key, sealed), item: null };
+  const len = Buffer.from(sealed).readUInt32LE(20);
+  const start = 24 + len;
+  const h = JSON.parse(new TextDecoder().decode(await subtle.decrypt({ name: "AES-GCM", iv: sealed.subarray(8, 20), additionalData: MAGIC }, key, sealed.subarray(24, start))));
+  const prefix = unb64(h.prefix), whole = h.chunk + 16, rest = sealed.length - start, n = Math.max(1, Math.ceil(rest / whole));
+  const parts = [];
+  for (let i = 0, at = start; i < n; i++, at += whole) parts.push(Buffer.from(await subtle.decrypt({ name: "AES-GCM", iv: nonce(prefix, i, i === n - 1) }, key, sealed.subarray(at, Math.min(sealed.length, at + whole)))));
+  return { bytes: new Uint8Array(Buffer.concat(parts)), item: h.item ?? null };
+}
+
 /** The hidden items' index: the library entries of the hidden items (as in library.json), sealed in hidden.json. */
 async function readIndex(record, key) {
   if (!record.index) return [];
@@ -133,7 +168,7 @@ export async function decryptHidden(workspace, out, password) {
   const tryOpen = async (sealed) => {
     for (const v of vaults) {
       try {
-        return await open(v.key, sealed);
+        return await openFile(v.key, sealed);
       } catch {
         // another key
       }
@@ -150,7 +185,7 @@ export async function decryptHidden(workspace, out, password) {
         console.warn(`missing: ${item.file} (${item.name})`);
         continue;
       }
-      const bytes = await tryOpen(new Uint8Array(readFileSync(sealed)));
+      const bytes = (await tryOpen(new Uint8Array(readFileSync(sealed))))?.bytes;
       if (!bytes) {
         console.warn(`does not open: ${item.file} (${item.name})`);
         continue;
@@ -166,16 +201,18 @@ export async function decryptHidden(workspace, out, password) {
   const dir = join(workspace, ".hidden");
   for (const n of existsSync(dir) ? readdirSync(dir).filter((n) => SEALED_COPY_RE.test(n)).sort() : []) {
     if (files.has(`.hidden/${n}`)) continue;
-    const bytes = await tryOpen(new Uint8Array(readFileSync(join(dir, n))));
-    if (!bytes) {
+    const opened = await tryOpen(new Uint8Array(readFileSync(join(dir, n))));
+    if (!opened) {
       console.warn(`does not open with this password: .hidden/${n}`);
       continue;
     }
+    const { bytes, item: own } = opened;
     const hash = createHash("sha256").update(bytes).digest("hex");
     if (hashes.has(hash)) continue;
-    const name = freeName(out, `recovered-${hash.slice(0, 12)}.${extOfBytes(bytes)}`, taken);
+    // A version 2 file says what it was (its name, folder, tags…); one of version 1 is named by its content.
+    const name = freeName(out, own?.hash === hash && typeof own.name === "string" ? own.name : `recovered-${hash.slice(0, 12)}.${extOfBytes(bytes)}`, taken);
     writeFileSync(join(out, name), bytes);
-    written.push({ hash, name, file: `.hidden/${n}`, size: bytes.length, recovered: true, writtenAs: name });
+    written.push(own?.hash === hash ? { ...own, file: `.hidden/${n}`, hidden: true, writtenAs: name } : { hash, name, file: `.hidden/${n}`, size: bytes.length, recovered: true, writtenAs: name });
     hashes.add(hash);
   }
   writeFileSync(join(out, freeName(out, "hidden-items.json", taken)), JSON.stringify(written, null, 1));
@@ -223,7 +260,9 @@ export async function encryptHidden(workspace, files, password) {
       entry = { hash, name: basename(path), type: pic.type, size: bytes.length, pixelW: pic.w, pixelH: pic.h, importedAt: Date.now(), tags: [], favorite: false, folderId: null, note: "", fields: [], state: "active" };
     }
     const file = `.hidden/${Buffer.from(globalThis.crypto.getRandomValues(new Uint8Array(16))).toString("hex")}.bin`;
-    plans.push({ entry: { ...entry, hash, size: bytes.length, file, hidden: true }, sealed: await seal(key, bytes), path });
+    const full = { ...entry, hash, size: bytes.length, hidden: true };
+    const { folderPath = [], file: _old, ...indexed } = full;
+    plans.push({ entry: { ...indexed, file }, sealed: await sealFile(key, bytes, { ...indexed, folderPath }), path });
     known.add(hash);
   }
   if (!plans.length) return 0;
@@ -232,7 +271,7 @@ export async function encryptHidden(workspace, files, password) {
   for (const p of plans) {
     const dest = join(workspace, p.entry.file);
     writeFileSync(`${dest}.part`, p.sealed);
-    if (!Buffer.from(await open(key, new Uint8Array(readFileSync(`${dest}.part`)))).equals(readFileSync(p.path))) throw new Error(`${p.path}: the sealed copy did not read back`);
+    if (!Buffer.from((await openFile(key, new Uint8Array(readFileSync(`${dest}.part`)))).bytes).equals(readFileSync(p.path))) throw new Error(`${p.path}: the sealed copy did not read back`);
     renameSync(`${dest}.part`, dest);
   }
   const text = new TextEncoder().encode(JSON.stringify([...index, ...plans.map((p) => p.entry)]));

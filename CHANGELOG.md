@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.53 — Hidden files that stand on their own (2026-10-29)
+
+- **Changed:** in the desktop app, each encrypted hidden file holds its own name, library folder, tags, note and fields (encrypted too), and is sealed in 1 MiB chunks, each checked on its own: a file whose entry is lost comes back whole, and a file cut off or changed anywhere is refused. Files encrypted before are encrypted again this way once the Hidden password is given; a change to a hidden item here seals its file again.
+- **Changed:** `hidden-items.mjs` reads and writes files that stand on their own, and names a file with no entry from what it holds.
+
 ## 0.50.52 — scrypt for the Hidden password (2026-10-29)
 
 - **Changed:** in the desktop app, the Hidden password is stretched with scrypt (128 MiB of memory for each guess) instead of PBKDF2, so guessing it is far more costly. A workspace's vault is upgraded the next time the password is given; no file is encrypted again. `hidden-items.mjs` reads both.

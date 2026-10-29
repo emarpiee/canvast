@@ -199,6 +199,99 @@ export function readVault(text: string): VaultRecord | null {
   }
 }
 
+/**
+ * A hidden file of version 2 (0.50.53) starts with this. It stands on its own: after the magic come its header's IV (12 bytes), the
+ * header's sealed length (u32, little-endian) and the sealed header (AES-GCM, the magic as associated data): JSON with the item it holds
+ * (name, type, folder path, tags…), the chunk size and a random 7-byte nonce prefix. Then the file's bytes in chunks (1 MiB), each
+ * sealed on its own (STREAM: nonce = prefix, chunk number as u32 big-endian, 1 on the last chunk else 0), so a cut-off, reordered or
+ * swapped chunk does not open, and a file of any size is never held sealed whole. Version 1 files (IV, then one AES-GCM ciphertext)
+ * are still read.
+ */
+export const FILE_MAGIC = "CVSTHID2";
+const MAGIC = enc.encode(FILE_MAGIC);
+export const FILE_CHUNK = 1 << 20;
+
+/** Whether sealed bytes are a version 2 hidden file. */
+export const isFileV2 = (b: Uint8Array): boolean => b.length >= MAGIC.length && MAGIC.every((v, i) => b[i] === v);
+
+function streamNonce(prefix: Uint8Array, i: number, last: boolean): Uint8Array<ArrayBuffer> {
+  const n = new Uint8Array(12);
+  n.set(prefix);
+  new DataView(n.buffer).setUint32(7, i, false);
+  n[11] = last ? 1 : 0;
+  return n;
+}
+
+/** Seal a file's bytes with what it holds (`item`: any JSON object), as a version 2 hidden file. */
+export async function sealFile(key: CryptoKey, bytes: Uint8Array<ArrayBuffer>, item: object, chunk = FILE_CHUNK): Promise<Uint8Array<ArrayBuffer>> {
+  const prefix = crypto.getRandomValues(new Uint8Array(7));
+  const hiv = crypto.getRandomValues(new Uint8Array(12));
+  const header = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: hiv, additionalData: MAGIC }, key, enc.encode(JSON.stringify({ v: 2, chunk, prefix: b64(prefix), item }))));
+  const n = Math.max(1, Math.ceil(bytes.length / chunk));
+  const start = MAGIC.length + 12 + 4 + header.length;
+  const out = new Uint8Array(start + bytes.length + 16 * n);
+  out.set(MAGIC);
+  out.set(hiv, MAGIC.length);
+  new DataView(out.buffer).setUint32(MAGIC.length + 12, header.length, true);
+  out.set(header, MAGIC.length + 16);
+  let at = start;
+  for (let i = 0; i < n; i++) {
+    const part = bytes.subarray(i * chunk, Math.min(bytes.length, (i + 1) * chunk));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: streamNonce(prefix, i, i === n - 1) }, key, part));
+    out.set(ct, at);
+    at += ct.length;
+  }
+  return out;
+}
+
+/** A version 2 file's header (what it holds, its chunking, where its chunks start), or null when it does not open with `key`. */
+async function fileHeader(key: CryptoKey, b: Uint8Array<ArrayBuffer>): Promise<{ item: Record<string, unknown> | null; chunk: number; prefix: Uint8Array; start: number } | null> {
+  if (!isFileV2(b) || b.length < MAGIC.length + 16) return null;
+  const len = new DataView(b.buffer, b.byteOffset).getUint32(MAGIC.length + 12, true);
+  const start = MAGIC.length + 16 + len;
+  if (len < 16 || start > b.length) return null;
+  try {
+    const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b.subarray(MAGIC.length, MAGIC.length + 12), additionalData: MAGIC }, key, b.subarray(MAGIC.length + 16, start));
+    const h = JSON.parse(new TextDecoder().decode(plain)) as { v?: unknown; chunk?: unknown; prefix?: unknown; item?: unknown };
+    if (h.v !== 2 || !Number.isInteger(h.chunk) || (h.chunk as number) < 1024 || (h.chunk as number) > 1 << 26 || typeof h.prefix !== "string") return null;
+    const prefix = unb64(h.prefix);
+    if (prefix.length !== 7) return null;
+    return { item: h.item && typeof h.item === "object" ? (h.item as Record<string, unknown>) : null, chunk: h.chunk as number, prefix, start };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A hidden file's bytes, and what it holds (version 2; null for version 1), or null when it does not open with `key` (another key,
+ * or changed: a chunk that does not open fails the whole file).
+ */
+export async function openFile(key: CryptoKey, sealed: Uint8Array<ArrayBuffer>): Promise<{ bytes: Uint8Array<ArrayBuffer>; item: Record<string, unknown> | null } | null> {
+  if (!isFileV2(sealed)) {
+    const bytes = await openBytes(key, sealed);
+    return bytes && { bytes, item: null };
+  }
+  const h = await fileHeader(key, sealed);
+  if (!h) return null;
+  const rest = sealed.length - h.start;
+  const whole = h.chunk + 16;
+  const n = Math.max(1, Math.ceil(rest / whole));
+  if (rest < 16 || rest - 16 * n < 0) return null;
+  const out = new Uint8Array(rest - 16 * n);
+  for (let i = 0, at = h.start, put = 0; i < n; i++) {
+    const end = Math.min(sealed.length, at + whole);
+    try {
+      const part = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: streamNonce(h.prefix, i, i === n - 1) }, key, sealed.subarray(at, end)));
+      out.set(part, put);
+      put += part.length;
+    } catch {
+      return null;
+    }
+    at = end;
+  }
+  return { bytes: out, item: h.item };
+}
+
 /** A hidden item's file: `.hidden/<32 random hex>.bin`. */
 export const HIDDEN_FILE_RE = /^\.hidden\/[0-9a-f]{32}\.bin$/;
 export const isHiddenFile = (file: string | null | undefined): boolean => !!file && HIDDEN_FILE_RE.test(file);

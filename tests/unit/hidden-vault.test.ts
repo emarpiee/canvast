@@ -2,7 +2,7 @@ import { scryptSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { DesktopBridge } from "../../src/storage/desktop-bridge";
 import { HIDDEN_JSON, HIDDEN_KEY_SPARE, HiddenVault } from "../../src/storage/hidden-store";
-import { SCRYPT_DEFAULT, SEAL_OVERHEAD, SEALED_COPY_RE, createVault, needsUpgrade, useScrypt, hiddenFileName, holdsKey, openBytes, openText, openVault, readVault, rewrapVault, sameKey, sealBytes, sealText } from "../../src/storage/hidden-vault";
+import { SCRYPT_DEFAULT, SEAL_OVERHEAD, SEALED_COPY_RE, createVault, isFileV2, needsUpgrade, openFile, sealFile, useScrypt, hiddenFileName, holdsKey, openBytes, openText, openVault, readVault, rewrapVault, sameKey, sealBytes, sealText } from "../../src/storage/hidden-vault";
 
 const FAST = { name: "PBKDF2", iterations: 100_000 } as const; // (a version 1 vault, at the lowest a record may say)
 // scrypt as the desktop app's main process does it (Node's native one), with the same parameters.
@@ -101,5 +101,38 @@ describe("hidden vault", () => {
     expect([now.version, now.kdf.name, spare.version, spare.key]).toEqual([2, "scrypt", 2, now.key]);
     expect(Array.from((await vault.open(sealed))!)).toEqual([7, 8, 9]);
     expect(Array.from((await openBytes((await openVault(now, "pw"))!, sealed))!)).toEqual([7, 8, 9]);
+  });
+
+  it("a version 2 file holds its item and its bytes in chunks; any size round-trips, and a cut, a swap, a flipped bit or another key fails", async () => {
+    const { key } = await createVault("pw", FAST);
+    const other = (await createVault("pw", FAST)).key;
+    const item = { name: "Plan.png", folderPath: ["Work", "Secret"], tags: ["a"] };
+    const C = 1024; // (small chunks, so a few kilobytes make several)
+    const bytes = (n: number) => Uint8Array.from({ length: n }, (_, i) => (i * 7 + 3) & 255);
+    for (const n of [0, 1, C - 1, C, C + 1, 3 * C, 3 * C + 5]) {
+      const sealed = await sealFile(key, bytes(n), item, C);
+      expect(isFileV2(sealed)).toBe(true);
+      const opened = (await openFile(key, sealed))!;
+      expect([opened.bytes.length, opened.item]).toEqual([n, item]);
+      expect(Array.from(opened.bytes)).toEqual(Array.from(bytes(n)));
+    }
+    const sealed = await sealFile(key, bytes(3 * C + 5), item, C);
+    const start = sealed.length - (3 * C + 5) - 4 * 16;
+    expect(await openFile(other, sealed)).toBeNull(); // another key
+    expect(await openFile(key, sealed.slice(0, start + 2 * (C + 16)))).toBeNull(); // cut at a chunk's end: the last is missing
+    expect(await openFile(key, sealed.slice(0, -1))).toBeNull();
+    const swapped = sealed.slice();
+    swapped.set(sealed.subarray(start + C + 16, start + 2 * (C + 16)), start);
+    swapped.set(sealed.subarray(start, start + C + 16), start + C + 16);
+    expect(await openFile(key, swapped)).toBeNull(); // two chunks swapped
+    for (const at of [10, start - 1, start + 5, sealed.length - 1]) {
+      const flipped = sealed.slice();
+      flipped[at]! ^= 1;
+      expect(await openFile(key, flipped)).toBeNull(); // the header, a chunk, the last tag
+    }
+    // A version 1 file still opens (no item in it).
+    expect(await openFile(key, await sealBytes(key, bytes(9)))).toEqual({ bytes: bytes(9), item: null });
+    // Nothing of the item or the bytes is readable in the file.
+    expect(new TextDecoder().decode(sealed)).not.toContain("Plan");
   });
 });

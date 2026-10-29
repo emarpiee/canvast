@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.53: hidden files that stand on their own (2026-10-29)
+
+**Implemented:** step 2b of the security list (#4 + #11 first half; ADR 0177 "Hidden files that stand on their own"): version 2 `.bin` (magic, sealed header with the item and folder path, 1 MiB STREAM chunks); sealing writes it; v1 still read and upgraded after unlock (proven); a local change to a hidden item reseals its file; recovery takes name, folder, tags, note, fields from the header; the script reads/writes v2.
+**Tested:** unit `hidden-vault.test.ts` (7: sizes 0 to 3 chunks + 5, a cut at a chunk's end, a swap, flipped header/chunk/tag bytes, another key, v1 still opens, nothing readable); desktop hidden/password (4: a lost entry's file comes back under its own name; a v1 file upgraded after unlock and still opening; a rename reseals; the script, with no index, names all eight from their files).
+**Known failures:** none.
+**Unverified:** files over the 256 MiB import cap (step 4); a damaged chunk only fails its file (no partial recovery yet).
+**Committed:** on `main`.
+**Next bounded task:** step 2c, backups carry hidden items still encrypted.
+
 ## v0.50.52: scrypt for the Hidden password (2026-10-29)
 
 **Implemented:** step 2a of the security list (#4, ADR 0177 "scrypt for the Hidden password"): vault version 2 with native scrypt (N 2^17, r 8, p 1) through `canvast:scrypt`; version 1 upgraded at unlock; `locks.hidden` no longer written to `workspace.json`. Argon2id dropped: Electron's BoringSSL lacks it (found when the E2E failed; Node's `argon2Sync` exists, Electron's throws).

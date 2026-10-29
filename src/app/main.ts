@@ -516,6 +516,7 @@ async function start(): Promise<void> {
           const { record } = await assets.importFileDetailed(new File([blob], f.name, { type: typeOfName(f.name) }), false, f.path);
           if (f.folderId) await storage.catalog.updateMeta(record.hash, { addFolders: [f.folderId] });
           if (f.hidden) await storage.catalog.updateMeta(record.hash, { hidden: true });
+          if (f.meta) await storage.catalog.updateMeta(record.hash, { addTags: f.meta.tags, favorite: f.meta.favorite, note: f.meta.note, fields: f.meta.fields });
           n++;
         } catch (e) {
           console.warn(`canvast: ${f.path} could not be taken into the library: ${(e as Error).message}`); // (left where it is)

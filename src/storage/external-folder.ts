@@ -238,7 +238,7 @@ class ExternalFolder {
     try {
       let f: Blob = await (await this.dir.getFileHandle(file)).getFile();
       if (isHiddenFile(file)) {
-        const opened = this.unseal && f.size === size + SEAL_OVERHEAD ? await this.unseal.open(f) : null;
+        const opened = this.unseal && f.size >= size + SEAL_OVERHEAD ? await this.unseal.open(f) : null; // (a version 2 file has a header and a tag per chunk: longer)
         if (!opened) return null;
         f = opened;
       }
@@ -253,7 +253,7 @@ class ExternalFolder {
     if (!isHiddenFile(file)) return (await this.read(hash, size, "", file)) !== null;
     if (!this.dir || this.status !== "ready" || !this.naming.valid(hash, file)) return false;
     try {
-      return (await (await this.dir.getFileHandle(file)).getFile()).size === size + SEAL_OVERHEAD;
+      return (await (await this.dir.getFileHandle(file)).getFile()).size >= size + SEAL_OVERHEAD;
     } catch {
       return false;
     }
@@ -267,7 +267,7 @@ class ExternalFolder {
     if (this.dir?.sizes && this.status === "ready") {
       const files = items.map((i) => i.file ?? i.hash);
       const sizes = await this.dir.sizes(files);
-      return items.map((it, k) => this.naming.valid(it.hash, files[k]!) && sizes[k] === (isHiddenFile(files[k]!) ? it.size + SEAL_OVERHEAD : it.size));
+      return items.map((it, k) => this.naming.valid(it.hash, files[k]!) && (isHiddenFile(files[k]!) ? (sizes[k] ?? -1) >= it.size + SEAL_OVERHEAD : sizes[k] === it.size));
     }
     const out: boolean[] = [];
     for (let i = 0; i < items.length; i += 50) out.push(...(await Promise.all(items.slice(i, i + 50).map((s) => this.has(s.hash, s.size, s.file)))));
