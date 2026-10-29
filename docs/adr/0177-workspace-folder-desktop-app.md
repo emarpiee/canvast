@@ -283,6 +283,10 @@ A sync tool (Mega, Drive, Proton Drive, Syncthing…) keeps one `hidden.json` wh
 - **A first password** is refused while `.hidden/` holds sealed files or a copy of `hidden.json` is there but `hidden.json` is not (it is on its way): a new key would be a second one.
 - `scripts/hidden-items.mjs decrypt` reads the copies too, and writes files no entry names as `recovered-<hash>.<ext>`.
 
+### A canvas file that does not read (0.50.50)
+
+At start-up and on each look at the folder, a canvas file whose header says it changed is read whole before it is taken. One that does not read (damaged, or a sync tool still writing it) is skipped: this device's copy stays and is shown, the person is told once, and the file is read again when it changes. It is never written over (it may be another device's newer version, still arriving); deleting it lets this device's version be written again. Before 0.50.50 such a file stopped the workspace from opening.
+
 ### Library and boards and sync tools (0.50.49)
 
 Copies a sync tool keeps of `workspace.json`, of the library's parts and index, and of `library.json` are joined by id: what is in a copy and this device never knew (a canvas whose file is there, a library item, a library folder) was added on the other device, and is taken; what this device knew and the kept file lacks was deleted there, and stays deleted. The kept `workspace.json` is written with the added canvases before the copy goes (a look at the folder in between would otherwise find them gone and delete them); library items go into the app's storage first. Copies then go where deleted files go. Field-level edits in a copy (a name or a tag changed on both devices) are not joined: the kept file's stay.

@@ -187,6 +187,13 @@ export class WorkspaceMirror {
         if (localChanged) this.dirty.add(c.id);
         continue;
       }
+      // A file that does not read (damaged, or a sync tool still bringing it) is skipped: this device's copy stays, and it is read
+      // again with the next change. Nothing is written over it (it may be another device's newer version, arriving).
+      const readable = await this.readable(file);
+      if (!readable) {
+        this.tellUnreadable(c.name, file);
+        continue;
+      }
       if (localChanged && !(head.savedBy === this.deviceId && head.revision === c.revision)) {
         // Both changed: the app's version is kept as a copy beside the canvas, which takes the folder's version.
         await this.repo.duplicateCanvas(c.id, `${c.name} (conflict ${stamp()})`);
@@ -194,9 +201,26 @@ export class WorkspaceMirror {
         this.onError?.(`“${c.name}” was changed in the workspace folder and here: the folder's version is kept, and this device's as “${c.name} (conflict …)”.`);
       }
       await this.adoptCanvas(c, file);
+      this.toldUnreadable.delete(file); // (told again if it breaks again)
       adopted.push(c.id);
     }
     return adopted;
+  }
+
+  /** Whether a canvas file reads whole. */
+  private async readable(file: string): Promise<boolean> {
+    const bytes = await this.bridge.read(file);
+    try {
+      return !!bytes && !!readCanvasFile(new TextDecoder().decode(bytes), file);
+    } catch {
+      return false;
+    }
+  }
+  private readonly toldUnreadable = new Set<string>();
+  private tellUnreadable(name: string, file: string): void {
+    if (this.toldUnreadable.has(file)) return;
+    this.toldUnreadable.add(file);
+    this.onError?.(`The file of “${name}” in the workspace folder (${file}) could not be read: it is damaged, or your sync tool is still bringing it. This device's copy of the canvas is shown and kept; the file is read again when it changes.`);
   }
 
   /**

@@ -268,6 +268,18 @@ test("the folder is the truth: a new device opens the whole workspace, another d
   expect(files(ws).filter((f) => f.startsWith(".trash/") && f.endsWith(" (1).json")).length).toBeGreaterThanOrEqual(2);
   expect(JSON.parse(readFileSync(join(ws, ".canvast/workspace.json"), "utf8")).boards[0].canvases.map((c: { name: string }) => c.name)).toContain("Poses");
 
+  // A canvas file that does not read whole (a newer header, the rest cut off: damaged, or still arriving): the workspace still opens,
+  // this device's copy of the canvas stays, and the file is not written over.
+  const poseFile = join(ws, `${B}sketches/poses.cvst`);
+  const cut = readFileSync(poseFile, "utf8").replace(/"revision":(\d+)/, (_m, r) => `"revision":${Number(r) + 5}`).slice(0, 400);
+  writeFileSync(poseFile, cut);
+  a = await launch(ws, "device-a");
+  await ready(a.page);
+  await expect.poll(() => counts(a.page).then((c) => c.find((r) => r[1] === "Poses"))).toEqual(["Sketches", "Poses", 1]);
+  await a.page.evaluate(() => window.__canvastDebug.flushStorage());
+  await a.app.close();
+  expect(readFileSync(poseFile, "utf8")).toBe(cut);
+
   // The folder deleted and a new, empty one made at the same path: a new workspace, nothing of the old one's cache.
   rmSync(ws, { recursive: true, force: true });
   mkdirSync(ws);

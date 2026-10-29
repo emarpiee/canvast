@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.50 — A damaged canvas file no longer stops the workspace (2026-10-29)
+
+- **Fixed:** in the desktop app, a canvas file that changed but did not read whole (damaged, or a sync tool still writing it) stopped the workspace from opening. It is now skipped: this device's copy of the canvas is shown and kept, the app says so once, and the file is read again when it changes (it is never written over).
+- **Changed:** the README's Limitations list what sync tools can still do to a workspace folder.
+
 ## 0.50.49 — Library and boards joined after sync clashes (2026-10-29)
 
 - **Fixed:** in the desktop app, when two devices changed the boards or the library at once and the sync tool kept a copy beside the file (`workspace (1).json`, `items-3 (1).json`, `index (1).json`, `library (1).json`), what the other device added (canvases, library items, library folders) was lost from the app. It is now taken from the copy, and the copy moves to where deleted files go.

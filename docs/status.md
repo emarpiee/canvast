@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.50: a damaged canvas file no longer stops the workspace (2026-10-29)
+
+**Implemented:** sync-safety steps 4 and 5 of 5. A changed canvas file is read whole before it is taken; one that does not read is skipped (this device's copy kept, told once, never written over) instead of failing start-up. README Limitations: a *Sync tools* row.
+**Tested:** desktop `the folder is the truth` extended (a newer header with the rest cut off: the workspace opens, the canvas keeps its object, the file is unchanged); the same test fails without the fix.
+**Known failures:** none.
+**Unverified:** the same while the app runs (same code path, from the watcher).
+**Committed:** on `main`.
+**Next bounded task:** ask the owner which of the offered hardening items to do (hidden key backup or recovery code, encrypted backups, non-extractable key, Check workspace), then coverage-based test selection.
+
 ## v0.50.49: library and boards joined after sync clashes (2026-10-29)
 
 **Implemented:** sync-safety step 3 of 5 (ADR 0177, "Library and boards and sync tools"). Copies of `workspace.json`, `.canvast/library/items-*.json` / `index.json` and `library.json` are joined by id (only what this device never knew), the merged `workspace.json` written before the copy goes, copies moved to where deleted files go; the folder watcher reads them.
