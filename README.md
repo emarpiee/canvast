@@ -522,6 +522,8 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 
 canvast describes only what it does. These are the current limits, first those of both versions, then those of the browser version and of the desktop app.
 
+The list describes canvast as it is today. Some of these limits, such as fuller support for PDF and 3D files, may be lifted in later versions, but none is promised and there is no schedule: if something here matters to you, plan around it as it stands.
+
 ### Both versions
 
 **Content**
@@ -736,7 +738,7 @@ The build is deterministic: the same source produces the same `canvast.html`, an
 | `npm run check:tokens` | Fail on a hard-coded colour, size, space or radius in the CSS |
 | `npm run check:storage` | Fail if code outside the storage implementation uses IndexedDB instead of the storage interfaces |
 
-Every end-to-end run builds its own copy of the app into `test-builds/` and tests that copy, so `dist/` can be rebuilt while tests run. Tests open the built file from `file://`, drive it through a debug hook, run in Chromium (three configurations) and Firefox, and fail on any network request; the desktop shell has its own project, which runs the snapshot's Electron build on a fresh workspace folder. Test fixtures are generated in code; no binary fixtures are committed. Performance thresholds are fixed in advance and never loosened. On GitHub, a CI workflow (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: typecheck, unit tests, the build, the offline, naming, token, storage, picker and pattern checks and the reproducible-build check, and a short Chromium end-to-end run of three specs (the whole quick suite, about an hour, is run by hand). It keeps the built file as a downloadable artifact of the run. Test logs with environments and timings are in [docs/testing/](docs/testing/); [docs/status.md](docs/status.md) is the status record.
+Every end-to-end run builds its own copy of the app into `test-builds/` and tests that copy, so `dist/` can be rebuilt while tests run. Tests open the built file from `file://`, drive it through a debug hook, run in Chromium (three configurations) and Firefox, and fail on any network request; the desktop shell has its own project, which runs the snapshot's Electron build on a fresh workspace folder. Test fixtures are generated in code; no binary fixtures are committed. Performance thresholds are fixed in advance and never loosened. On GitHub, two workflows run on every push to `main` and every pull request. `CI` (`.github/workflows/ci.yml`) runs the typecheck, unit tests, the build, the offline, naming, token, storage, picker and pattern checks and the reproducible-build check, and keeps the built file as a downloadable artifact. `Tests` (`.github/workflows/tests.yml`) runs the whole end-to-end suite split into one job per test group and browser set-up (Chromium, Chromium CPU-only, Chromium at pixel ratio 2 with touch, Firefox) plus the desktop app under a virtual display, all at once; it runs the full suite every Sunday and on request. Shared machines vary in speed, so a failure there in a test that measures time is checked again on the reference machine before it counts. Test logs with environments and timings are in [docs/testing/](docs/testing/); [docs/status.md](docs/status.md) is the status record.
 
 ---
 

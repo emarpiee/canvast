@@ -1,7 +1,6 @@
 name: CI
 
-# The fast checks on every push to main and every pull request, plus a small end-to-end smoke run in Chromium.
-# The whole quick suite (about an hour) and the full suite are run by hand (docs/testing/README.md), not here.
+# The fast checks on every push to main and every pull request. The end-to-end suite runs in tests.yml.
 
 on:
   push:
@@ -43,25 +42,3 @@ jobs:
           path: dist/canvast.html
           retention-days: 14
 
-  e2e-smoke:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      # A few fast specs from a snapshot build (scripts/test-snap.mjs), as the project's own rules require: no test reads dist/.
-      - run: npm run test:snap -- --project=chromium tests/e2e/settings.spec.ts tests/e2e/zoom-controls.spec.ts tests/e2e/a11y.spec.ts
-      - name: Keep the report on a failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-results
-          path: |
-            test-results/
-            test-builds/*/run.json
-          retention-days: 7

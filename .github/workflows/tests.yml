@@ -1,0 +1,96 @@
+name: Tests
+
+# The end-to-end suite, split by test group (scripts/lib/test-groups.mjs) and browser set-up, one machine each, all at once: the quick
+# suite on every push to main and every pull request, the full suite (the long stress loops) every Sunday and by hand. Each job runs
+# its specs from a snapshot build of its own (scripts/test-snap.mjs), as everywhere else; no test reads dist/.
+# Shared machines vary in speed: a failure here in a test that measures time is checked again on the reference machine before it
+# counts (docs/testing/README.md, "Where tests run").
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: "quick (the usual loops) or full (the long stress loops)"
+        type: choice
+        options: [quick, full]
+        default: quick
+
+concurrency:
+  group: tests-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FULL: ${{ github.event_name == 'schedule' || inputs.suite == 'full' }}
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      groups: ${{ steps.groups.outputs.groups }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: groups
+        # (every group but the desktop one, which has a job of its own)
+        run: echo "groups=$(node -e 'import("./scripts/lib/test-groups.mjs").then((m) => console.log(JSON.stringify(Object.keys(m.GROUPS).filter((g) => g !== "desktop"))))')" >> "$GITHUB_OUTPUT"
+
+  browser:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        group: ${{ fromJSON(needs.plan.outputs.groups) }}
+        project: [chromium, chromium-cpu, chromium-dpr2, firefox]
+    name: ${{ matrix.group }} · ${{ matrix.project }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps ${{ matrix.project == 'firefox' && 'firefox' || 'chromium' }}
+      - name: Run the group
+        run: |
+          specs=$(node -e 'import("./scripts/lib/test-groups.mjs").then((m) => console.log(m.GROUPS[process.argv[1]].map((s) => `tests/e2e/${s}.spec.ts`).join(" ")))' "${{ matrix.group }}")
+          npm run test:snap -- ${{ env.FULL == 'true' && '-c playwright.full.config.ts' || '' }} --project=${{ matrix.project }} --pass-with-no-tests $specs
+      - name: Keep the results on a failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-${{ matrix.group }}-${{ matrix.project }}
+          path: test-builds/*/results
+          retention-days: 14
+
+  desktop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y xvfb
+      - run: npx playwright install --with-deps chromium
+      # (Electron under a virtual display; the machine's kernel may not allow Chromium's sandbox)
+      - run: xvfb-run -a npm run test:snap -- ${{ env.FULL == 'true' && '-c playwright.full.config.ts' || '' }} --project=desktop tests/e2e/desktop.spec.ts
+        env:
+          ELECTRON_DISABLE_SANDBOX: "1"
+      - name: Keep the results on a failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-desktop
+          path: test-builds/*/results
+          retention-days: 14

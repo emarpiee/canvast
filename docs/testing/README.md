@@ -49,6 +49,15 @@ differs (for example 240 instead of 1,200 wheel notches). Run the groups a chang
 A new spec goes into a group in `GROUPS` (`check:groups` fails until it does); a new source folder gets a rule. Every run keeps each
 test's time in `test-builds/times.json`, which `test:affected` estimates from.
 
+## Where tests run
+
+On GitHub, `.github/workflows/tests.yml` runs the quick suite on every push to `main` and every pull request, and the full suite every
+Sunday and on request (*Run workflow*, suite `full`). One job per group and project (`chromium`, `chromium-cpu`, `chromium-dpr2`,
+`firefox`), plus one for `desktop` under a virtual display, all at once: the hour of the quick suite becomes the time of its longest
+group. Each job runs from its own snapshot, as here. GitHub's machines are shared and vary in speed, so a failure there in a test that
+measures time (frame times, a time budget) is run again on the reference machine before it counts; such a failure is never fixed by
+loosening a limit. `npm run bench` stays on the reference machine.
+
 ## Rules
 
 1. **Run what the change needs.** `npm run test:affected` (or `npm test`) after a change and before a commit, push or release; the
