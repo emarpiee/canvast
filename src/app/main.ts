@@ -464,6 +464,7 @@ async function start(): Promise<void> {
       },
       deleteTo: () => settings.get("storage.deleteTo"),
       hiddenNamesOff: () => settings.get("library.hiddenNamesOff"),
+      trashDays: () => Number(settings.get("storage.trashDays")),
     };
     storage = desktop ? await openDesktopStorage(desktop, opts) : await openBrowserStorage(opts);
     startStep("storage opened");

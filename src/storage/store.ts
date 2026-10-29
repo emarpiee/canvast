@@ -167,6 +167,8 @@ export interface OpenHooks {
   deleteTo?: () => DeleteMode;
   /** The desktop build: keep hidden items' names, tags and notes out of this device's cache while they are locked (Settings > Privacy). */
   hiddenNamesOff?: () => boolean;
+  /** The desktop build: days after which what is in the folder's `.trash/` is erased at start-up (0: never). */
+  trashDays?: () => number;
 }
 
 /** Whether the hidden items' key exists and is in memory: "none" (no Hidden password in this workspace folder yet), "locked", "open". */

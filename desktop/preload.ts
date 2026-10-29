@@ -23,6 +23,7 @@ const bridge: DesktopBridge = {
   hash: (path) => ipcRenderer.invoke("canvast:hash", path),
   libraryChanges: () => ipcRenderer.invoke("canvast:libraryChanges"),
   libraryLookDone: () => ipcRenderer.invoke("canvast:libraryLookDone"),
+  emptyOldTrash: (days) => ipcRenderer.invoke("canvast:emptyOldTrash", days),
   scrypt: (password, salt, N, r, p) => ipcRenderer.invoke("canvast:scrypt", password, salt, N, r, p),
   rename: (from, to) => ipcRenderer.invoke("canvast:rename", from, to),
   erase: (path) => ipcRenderer.invoke("canvast:erase", path),

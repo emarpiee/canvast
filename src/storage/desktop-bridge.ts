@@ -75,6 +75,8 @@ export interface DesktopBridge {
    */
   libraryChanges(): Promise<string[] | null>;
   libraryLookDone(): Promise<void>;
+  /** Erase what has been in the folder's `.trash/` longer than `days` (counted from when it went there); how many files. */
+  emptyOldTrash(days: number): Promise<number>;
   /** A file's SHA-256 (hex), read in the main process; null when there is no such file. */
   hash(path: string): Promise<string | null>;
   /** The canvas files of the boards: `.canvast/boards/<board>/<name>.cvst`. */

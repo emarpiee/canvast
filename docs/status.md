@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.58: newer versions, old trash, sync tools (2026-10-30)
+
+**Implemented:** step 5's small items (#17, #18, #14): `workspace.json` `app` and a once-only notice on an older device; `storage.trashDays` (toTrash stamps the date, `canvast:emptyOldTrash` at start-up); README note on `*.tmp-*` for sync tools.
+**Tested:** desktop "boards are folders…" extended (a trashed canvas is dated now; at 30 days, one dated 40 days ago is gone at the next start) and "the folder is the truth" extended (a folder written by 99.0.0 shows the notice): 2 passed.
+**Known failures:** none.
+**Unverified:** 1,000,000 files: the local run hung the machine (no result); it moves to a GitHub runner.
+**Committed:** on `main`.
+**Next bounded task:** the 1M benchmark on GitHub (workflow `Bench library`), then large files (#3) and Check workspace.
+
 ## v0.50.57: start-up looks only at what changed (2026-10-30)
 
 **Implemented:** step 4 continued (ADR 0177 "Start-up, and boards changed on two devices at once"): `walkFiles` (parallel, no cap), `canvast:libraryChanges` / `libraryLookDone`, start-up `scanPaths` on the changes; `workspace.json` `deleted` tombstones (kept 180 days / 2,000) and a merge of the file's boards before writing it.

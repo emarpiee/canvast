@@ -112,6 +112,8 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     startup: async (r) => {
       await mirror.start();
       if (opts.hiddenNamesOff?.()) await mirror.blankHidden();
+      const days = opts.trashDays?.() ?? 0;
+      if (days > 0) void raw.emptyOldTrash(days).catch(() => 0); // (Settings > Storage: what has been in .trash long enough goes)
       const current = await storage.workspace.current();
       return current ? { ...r, current } : r;
     },

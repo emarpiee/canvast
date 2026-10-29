@@ -40,6 +40,20 @@ export interface WorkspaceFile {
    * an earlier version) a canvas the file lacks counts as deleted, as before.
    */
   deleted?: string[];
+  /** The version of canvast that wrote it (0.50.58): a device with an older one is asked to update. */
+  app?: string;
+}
+
+declare const __CANVAST_VERSION__: string;
+/** This app's version ("dev" when not built by the build script). */
+const APP_VERSION = typeof __CANVAST_VERSION__ === "string" ? __CANVAST_VERSION__ : "dev";
+/** Whether version `a` is newer than `b` (dotted numbers; "dev" is never newer, nor older). */
+export function newerVersion(a: string, b: string): boolean {
+  const x = a.split(".").map(Number);
+  const y = b.split(".").map(Number);
+  if ([...x, ...y].some((n) => !Number.isInteger(n))) return false;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0);
+  return false;
 }
 
 const encode = (text: string): Uint8Array => new TextEncoder().encode(text);
@@ -396,6 +410,7 @@ export class WorkspaceMirror {
     return added;
   }
 
+  private toldNewer = false;
   private async readWorkspaceFile(path = WORKSPACE_FILE): Promise<WorkspaceFile | null> {
     const bytes = await this.bridge.read(path);
     if (!bytes) return null;
@@ -406,6 +421,11 @@ export class WorkspaceMirror {
       const boards = ws.boards.filter((b) => b && ID_RE.test(b.id) && typeof b.name === "string" && typeof b.folder === "string" && Array.isArray(b.canvases));
       for (const b of boards) b.canvases = b.canvases.filter((c) => c && ID_RE.test(c.id) && typeof c.name === "string" && typeof c.file === "string");
       if (!boards.some((b) => b.canvases.length)) return null; // nothing to open: written again from the app
+      // Written by a newer canvast on another device: this one may not keep what that one wrote (said once).
+      if (path === WORKSPACE_FILE && typeof ws.app === "string" && newerVersion(ws.app, APP_VERSION) && !this.toldNewer) {
+        this.toldNewer = true;
+        this.onError?.(`This workspace folder was last written by canvast ${ws.app}, newer than this one (${APP_VERSION}). Update canvast on this device: an older version may not keep everything a newer one writes.`);
+      }
       return { ...(ws as WorkspaceFile), boards };
     } catch {
       return null; // damaged: written again from the app's storage
@@ -729,6 +749,7 @@ export class WorkspaceMirror {
       styles: Array.isArray(styles) ? styles : [],
       locks: { ...(typeof lock === "string" ? { workspace: lock } : {}) },
       deleted: Object.keys(this.state.deleted ?? {}),
+      app: APP_VERSION,
     };
     await this.bridge.write(WORKSPACE_FILE, encode(JSON.stringify(ws, null, 1)));
     this.placed = next;

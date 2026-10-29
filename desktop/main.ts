@@ -10,7 +10,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shel
 import { execFile } from "node:child_process";
 import { createHash, randomBytes, scrypt } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, watch, writeFileSync } from "node:fs";
-import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises";
+import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, utimes } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { BOARDS_DIR, isSafeRelativePath } from "../src/storage/workspace-names";
 import { pathToFileURL } from "node:url";
@@ -272,6 +272,36 @@ async function toTrash(root: string, rel: string, full: string): Promise<void> {
   for (let n = 2; existsSync(target); n++) target = resolve(root, ".trash", ...rel.split("/")).replace(/(\.[^./\\]+)?$/, `-${n}$1`);
   await mkdir(dirname(target), { recursive: true });
   await rename(full, target);
+  // Dated when it went into the trash (a move keeps a file's own date), so emptying old ones (Settings > Storage) counts from then.
+  const now = new Date();
+  const touch = async (p: string): Promise<void> => {
+    const s = await lstat(p).catch(() => null);
+    if (s?.isDirectory()) for (const n of await readdir(p).catch(() => [])) await touch(join(p, n));
+    if (s) await utimes(p, now, now).catch(() => undefined);
+  };
+  await touch(target);
+}
+
+/** Erase what has been in the workspace's `.trash/` longer than `days` (by its date there), then the folders it emptied. How many files. */
+async function emptyOldTrash(root: string, days: number): Promise<number> {
+  const cutoff = Date.now() - days * 86_400_000;
+  let n = 0;
+  const sweep = async (dir: string): Promise<boolean> => {
+    let empty = true;
+    for (const ent of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
+      const p = join(dir, ent.name);
+      if (ent.isDirectory()) {
+        if (await sweep(p)) await rmdir(p).catch(() => undefined);
+        else empty = false;
+      } else if (((await lstat(p).catch(() => null))?.mtimeMs ?? Infinity) < cutoff) {
+        await unlink(p).catch(() => undefined);
+        n++;
+      } else empty = false;
+    }
+    return empty;
+  };
+  await sweep(join(root, ".trash"));
+  return n;
 }
 
 /** The file calls of the bridge, each answering only this window's page and only inside its workspace folder. */
@@ -373,6 +403,11 @@ function installFileCalls(win: BrowserWindow, root: string): void {
     if (how === "system") return shell.trashItem(full);
     if (rel === ".trash" || rel.startsWith(".trash/")) throw new Error("already in the trash");
     await toTrash(root, rel, full);
+  });
+  ipcMain.handle("canvast:emptyOldTrash", async (e, days: unknown) => {
+    own(e);
+    if (!Number.isInteger(days) || (days as number) < 1) return 0;
+    return emptyOldTrash(root, days as number);
   });
   ipcMain.handle("canvast:rename", async (e, from: string, to: string) => {
     own(e);

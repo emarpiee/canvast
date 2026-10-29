@@ -1,6 +1,6 @@
 import { _electron as electron, expect, test } from "@playwright/test";
 import type { ElectronApplication, Page } from "@playwright/test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
 import { createHash, scryptSync } from "node:crypto";
@@ -146,6 +146,9 @@ test("boards are folders of .canvast/boards/ and canvases .cvst files: safe name
   expect(visible(ws)).toEqual([`${B}drawings/characters.cvst`, `.trash/${B}drawings/characters-2.cvst`, "library/images/dot.png"]);
   const canvas = JSON.parse(readFileSync(join(ws, `${B}drawings/characters.cvst`), "utf8"));
   expect([canvas.format, canvas.objects.length, canvas.objects[0].kind]).toEqual(["canvast-canvas", 1, "image"]);
+  // Dated when it went into .trash (a move keeps a file's own date): Empty .trash after counts from then.
+  const trashed = join(ws, `.trash/${B}drawings/characters-2.cvst`);
+  expect(Date.now() - statSync(trashed).mtimeMs).toBeLessThan(120_000);
   ({ app, page } = await launch(ws));
   try {
     await expect.poll(async () => (await tree()).map((b) => [b.name, b.canvases.map((c) => [c.name, c.objectCount])])).toEqual([["Drawings", [["Characters", 1]]]]);
@@ -159,9 +162,13 @@ test("boards are folders of .canvast/boards/ and canvases .cvst files: safe name
     await op("deleteCanvas", (await tree())[0]!.canvases[1]!.id);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     expect(visible(ws)).toEqual([`${B}drawings/characters.cvst`, `.trash/${B}drawings/characters-2.cvst`, "library/images/dot.png"]);
+    // Settings > Storage, "Empty .trash after" 30 days: at the next start, what went there 40 days ago is gone.
+    await page.evaluate(() => window.__canvastDebug.setSetting("storage.trashDays", "30"));
   } finally {
     await app.close();
   }
+  const fortyDaysAgo = new Date(Date.now() - 40 * 86_400_000);
+  utimesSync(trashed, fortyDaysAgo, fortyDaysAgo);
   // A workspace written before the boards moved into .canvast/boards/ (at the top): they are moved in, and open as before.
   renameSync(join(ws, `${B}drawings`), join(ws, "drawings"));
   const wsFile = join(ws, ".canvast/workspace.json");
@@ -172,6 +179,7 @@ test("boards are folders of .canvast/boards/ and canvases .cvst files: safe name
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     expect(visible(ws).filter((f) => f.endsWith(".cvst") && !f.startsWith(".trash/"))).toEqual([`${B}drawings/characters.cvst`]);
     expect(existsSync(join(ws, "drawings"))).toBe(false);
+    await expect.poll(() => existsSync(trashed), { timeout: 10_000 }).toBe(false);
   } finally {
     await app.close();
   }
@@ -280,6 +288,15 @@ test("the folder is the truth: a new device opens the whole workspace, another d
   await a.page.evaluate(() => window.__canvastDebug.flushStorage());
   await a.app.close();
   expect(readFileSync(poseFile, "utf8")).toBe(cut);
+
+  // Last written by a newer canvast on another device: this one says to update (once).
+  const wsJson = JSON.parse(readFileSync(join(ws, ".canvast/workspace.json"), "utf8")) as { app?: string };
+  expect(wsJson.app).toMatch(/^\d+\.\d+\.\d+$/); // (the version that wrote it)
+  writeFileSync(join(ws, ".canvast/workspace.json"), JSON.stringify({ ...wsJson, app: "99.0.0" }));
+  a = await launch(ws, "device-a");
+  await ready(a.page);
+  await expect(a.page.getByTestId("toast")).toContainText("newer than this one", { timeout: 15_000 });
+  await a.app.close();
 
   // The folder deleted and a new, empty one made at the same path: a new workspace, nothing of the old one's cache.
   rmSync(ws, { recursive: true, force: true });

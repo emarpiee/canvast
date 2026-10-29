@@ -290,6 +290,10 @@ A sync tool (Mega, Drive, Proton Drive, Syncthing…) keeps one `hidden.json` wh
 - **An interrupted seal** (the move noted, the sealed file there, its readable source still there) is proven at start-up by opening it; unproven, or while the key is locked, the sealed file is erased and the readable one stays, to be sealed again. Before, the sealed file was trusted.
 - Sealing reports its own progress (`encrypting`), shown as *Encrypting N of M files* from five files.
 
+### Versions and old trash (0.50.58)
+
+`workspace.json` names the canvast that wrote it (`app`); a device with an older one says once that it should be updated (it may not keep what a newer one writes). Moving into `.trash/` keeps a file's own date, so the app dates what it puts there (the item and everything in a trashed folder); *Empty .trash after* (30, 90 or 365 days; never by default) erases at start-up what is older than that there, and the folders it empties.
+
 ### Start-up, and boards changed on two devices at once (0.50.57)
 
 - **Start-up looks only at what changed**: the main process walks `library/` (folders read and files looked at many at a time, no limit; `canvast:tree` uses the same walk) and compares each file's size and modification time with the look kept for this workspace in the app's own folder (`library-looks/<sha256 of the path>.json`); the page looks only at those paths (`scanPaths`; all of `library/` when there is no look yet, a folder came, or there are many). The look is kept once the page says it has taken them (`libraryLookDone`).

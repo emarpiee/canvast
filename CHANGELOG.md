@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.50.58 — Newer versions, old trash, sync tools (2026-10-30)
+
+- **Added:** in the desktop app, a device whose canvast is older than the one that last wrote the workspace folder says so once, and asks to be updated (`workspace.json` now names the version that wrote it).
+- **Added:** *Empty .trash after* in Settings > Storage (desktop app, *Never* by default): 30 days, 90 days or a year after something went into `.trash/`, it is deleted for good when the app starts. Things put in `.trash/` are now dated when they went there.
+- **Changed:** the README says which files a sync tool can ignore (`*.tmp-*`, the app's half-written files).
+
 ## 0.50.57 — Start-up looks only at what changed (2026-10-30)
 
 - **Changed:** in the desktop app, start-up looks only at the library files that changed since the last time this device looked (the look is kept in the app's own folder), instead of every file; the first open on a device still looks at all. At 100,000 files, the second open lists the library in under 10 s.
