@@ -26,7 +26,8 @@ export function splitBullets(bullets) {
 const list = (items, none) => (items.length ? items.map((b) => `- ${b}`).join("\n") : `- ${none}`);
 
 /** The release notes: the title line, Features, Fixes (both always there), and what to download. */
-export function releaseNotes({ version, section, sha256, size, previousTag, repo, appImage = null }) {
+/** `desktop`: the Linux packages of this machine's architecture ({ name, size, sha256 }, the AppImage first), or empty. */
+export function releaseNotes({ version, section, sha256, size, previousTag, repo, desktop = [] }) {
   const { features, fixes } = splitBullets(section.bullets);
   const mb = (size / 1024 / 1024).toFixed(2);
   return [
@@ -40,8 +41,17 @@ export function releaseNotes({ version, section, sha256, size, previousTag, repo
     "",
     "### Download",
     `**\`canvast.html\`** (${mb} MB) is the whole app in one file: save it anywhere and open it in a browser, no install and no server. SHA-256: \`${sha256}\``,
-    ...(appImage
-      ? ["", `**\`canvast-${version}-x86_64.AppImage\`** (${(appImage.size / 1024 / 1024).toFixed(1)} MB) is the desktop app for Linux: your workspace is a folder of ordinary files on your disk. Make it executable and run it. SHA-256: \`${appImage.sha256}\``]
+    ...(desktop.length
+      ? [
+          "",
+          "The desktop app for Linux, whose workspace is a folder of ordinary files on your disk (see the README's Installation section):",
+          "",
+          "| File | Size | SHA-256 |",
+          "| --- | --- | --- |",
+          ...desktop.map((p) => `| \`${p.name}\` | ${(p.size / 1024 / 1024).toFixed(1)} MB | \`${p.sha256}\` |`),
+          "",
+          "The AppImage updates itself with an AppImage updater (its `.zsync` is beside it). The aarch64 (ARM64) packages are added to this release by the ARM build once it has passed its start check.",
+        ]
       : []),
     ...(previousTag ? ["", `**Full changelog:** https://github.com/${repo}/compare/${previousTag}...v${version}`] : []),
     "",

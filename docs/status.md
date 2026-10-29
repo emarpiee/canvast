@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.33: Linux packages, a new README, GPL v3 (2026-10-29)
+
+**Implemented:** `package-desktop.mjs` makes the AppImage, `.deb`, `.rpm` and `.tar.gz` for the machine's architecture, starts the AppImage and the unpacked tarball, and lists the `.deb` and `.rpm` for the app and its menu entry; `release.mjs` uploads them all with their SHA-256; `.github/workflows/release-arm64.yml` builds and adds the aarch64 ones on an ARM runner; `scripts/hidden-items.mjs` (decrypt and encrypt); the README reorganized; the licence is the GPL v3 or later.
+**Tested:** the hidden-items tool against a workspace the app encrypted (desktop spec: decrypt, wrong password, encrypt then listed and read by the app); the release notes unit test.
+**Known failures:** none.
+**Unverified:** the packages until rpmbuild is installed here; the aarch64 workflow until the repository is public (ARM runners); an AppImage update through zsync until the releases can be reached without signing in.
+**Committed:** on `main`.
+**Next bounded task:** package and release 0.50.33; make the repository public.
+
 ## v0.50.32: AppImage updates (2026-10-29)
 
 **Implemented:** `package-desktop.mjs` writes the update information (`gh-releases-zsync|<owner>|<repo>|latest|canvast-*-x86_64.AppImage.zsync`) into the runtime's `.upd_info` section, reads it back, and makes the `.zsync` with zsyncmake; `release.mjs` uploads and checks it.

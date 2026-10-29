@@ -37,9 +37,9 @@ const pkgOf = async (name) => JSON.parse(await readFile(resolve(root, "node_modu
 const licence = async (path) => (await readFile(resolve(root, "node_modules", path), "utf8")).replace(/--/g, "- -").trim();
 const lucide = await pkgOf("lucide-static");
 const inter = await pkgOf("@expo-google-fonts/inter");
-const own = (await readFile(resolve(root, "LICENSE"), "utf8")).replace(/--/g, "- -").trim(); // (canvast's own licence, MIT, travels in the file too)
+const own = (await readFile(resolve(root, "LICENSE"), "utf8")).replace(/--/g, "- -").trim(); // (canvast's own licence, the GNU GPL v3, travels in the file too)
 const notices =
-  `<!--\ncanvast\n${own}\n-->\n<!--\nThird-party notices\n\nLucide icons (lucide-static ${lucide.version})\n${await licence("lucide-static/LICENSE")}\n\n` +
+  `<!--\ncanvast, copyright (C) 2026 emarpiee. Free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. Source: https://github.com/emarpiee/canvast\n\n${own}\n-->\n<!--\nThird-party notices\n\nLucide icons (lucide-static ${lucide.version})\n${await licence("lucide-static/LICENSE")}\n\n` +
   `Inter Regular font (@expo-google-fonts/inter ${inter.version}, Inter_400Regular.ttf, unmodified)\n${await licence("@expo-google-fonts/inter/LICENSE_FONT")}\n-->\n`;
 const html = template
   .replaceAll("__CANVAST_VERSION__", pkg.version)

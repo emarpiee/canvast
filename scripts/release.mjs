@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, writeFileSync, statSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve, dirname } from "node:path";
+import { basename, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { changelogSection, olderThan, releaseNotes } from "./lib/release-notes.mjs";
 
@@ -46,13 +46,13 @@ const releases = JSON.parse(run("gh", ["release", "list", "--repo", repo, "--lim
 const latest = releases.find((r) => r.isLatest)?.tagName;
 if (latest && olderThan(version, latest.slice(1)) && !force) stop(`${latest} is already the latest and is newer than ${tag}: use --force only if this is meant.`);
 const previous = releases.map((r) => r.tagName).filter((t) => t !== tag && olderThan(t.slice(1), version)).sort((a, b) => (olderThan(a.slice(1), b.slice(1)) ? 1 : -1))[0] ?? null;
-// The desktop app (ADR 0177): the Linux AppImage of the same build, checked to start before it is handed out.
+// The desktop app (ADR 0177): the Linux packages of the same build (x86_64 here; the ARM build adds aarch64), checked before they are handed out.
 say("Packaging the desktop app…");
 run("node", ["scripts/package-desktop.mjs"], { stdio: ["ignore", "ignore", "inherit"] });
-const appImage = join(root, `dist-package/canvast-${version}-x86_64.AppImage`);
-const appImageSum = sha256(appImage);
-say(`dist-package/canvast-${version}-x86_64.AppImage  ${(statSync(appImage).size / 1048576).toFixed(1)} MB  sha256 ${appImageSum}`);
-const notes = releaseNotes({ version, section, sha256: sum, size: statSync(file).size, previousTag: previous, repo, appImage: { sha256: appImageSum, size: statSync(appImage).size } });
+const packages = ["AppImage", "deb", "rpm", "tar.gz"].map((ext) => join(root, `dist-package/canvast-${version}-x86_64.${ext}`));
+const desktop = packages.map((p) => ({ name: basename(p), size: statSync(p).size, sha256: sha256(p) }));
+for (const p of desktop) say(`dist-package/${p.name}  ${(p.size / 1048576).toFixed(1)} MB  sha256 ${p.sha256}`);
+const notes = releaseNotes({ version, section, sha256: sum, size: statSync(file).size, previousTag: previous, repo, desktop });
 const dir = mkdtempSync(join(tmpdir(), "canvast-release-"));
 const notesFile = join(dir, "notes.md");
 writeFileSync(notesFile, notes);
@@ -60,7 +60,7 @@ const title = `canvast ${version}`; // (the page title is the version; the notes
 if (dry) { say(`\n--dry-run: would publish ${tag} “${title}” as the latest release of ${repo}.\n\n${notes}`); rmSync(dir, { recursive: true }); process.exit(0); }
 
 // 4. Create it (or, if the tag already has a release, replace its file and notes), always as the latest
-const assets = [file, join(root, "dist/canvast.html.sha256"), appImage, `${appImage}.sha256`, `${appImage}.zsync`];
+const assets = [file, join(root, "dist/canvast.html.sha256"), ...packages.flatMap((p) => [p, `${p}.sha256`]), `${packages[0]}.zsync`];
 const exists = releases.some((r) => r.tagName === tag);
 if (exists) {
   const at = run("git", ["rev-list", "-n", "1", tag]);
@@ -75,7 +75,7 @@ if (exists) {
 const shown = JSON.parse(run("gh", ["release", "view", tag, "--repo", repo, "--json", "url,assets,isDraft,isPrerelease"]));
 const isLatest = JSON.parse(run("gh", ["release", "list", "--repo", repo, "--limit", "100", "--json", "tagName,isLatest"])).some((r) => r.tagName === tag && r.isLatest);
 if (!isLatest || shown.isDraft || shown.isPrerelease) stop(`${tag} was published but is not the latest release (${shown.url}).`);
-if (!["canvast.html", "canvast.html.sha256", `canvast-${version}-x86_64.AppImage`, `canvast-${version}-x86_64.AppImage.sha256`, `canvast-${version}-x86_64.AppImage.zsync`].every((n) => shown.assets.some((a) => a.name === n))) stop(`${tag} is missing its files (${shown.url}).`);
+if (!assets.map((a) => basename(a)).every((n) => shown.assets.some((a) => a.name === n))) stop(`${tag} is missing its files (${shown.url}).`);
 run("gh", ["release", "download", tag, "--repo", repo, "--pattern", "canvast.html", "--dir", dir, "--clobber"]);
 const served = sha256(join(dir, "canvast.html"));
 rmSync(dir, { recursive: true });

@@ -1,0 +1,43 @@
+name: Release (aarch64)
+
+# The desktop app's aarch64 (ARM64) packages: built and start-checked on an ARM machine with the same script as the x86_64 ones
+# (scripts/package-desktop.mjs packages for the machine it runs on), then added to the release they belong to. `npm run release`
+# publishes the release with the single file and the x86_64 packages; this follows it. Run it by hand for a tag with "Run workflow".
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "The release tag to build and add the aarch64 packages to (vX.Y.Z)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  aarch64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 40
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Tools for the packages and the start check
+        run: sudo apt-get update && sudo apt-get install -y zsync rpm xvfb
+      - run: npm ci
+      # (the brand icons are drawn with Playwright's Chromium; the start check runs Electron under a virtual display)
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: xvfb-run -a node scripts/package-desktop.mjs
+      - name: Add them to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" dist-package/canvast-*-aarch64.* --clobber --repo "$GITHUB_REPOSITORY"

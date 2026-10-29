@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.33 — Linux packages, a new README, GPL v3 (2026-10-29)
+
+- **Added:** the desktop app is packaged as `.deb`, `.rpm` and `.tar.gz` besides the AppImage, for x86_64 and aarch64 (ARM64, built and start-checked on an ARM machine by a release workflow). Each package is checked before it is released and has its SHA-256 beside it.
+- **Added:** `scripts/hidden-items.mjs` decrypts a desktop workspace's hidden items without the app, and encrypts files into them; the README documents the encrypted format.
+- **Changed:** the README is reorganized: what users look for first (features at a glance, installation for every package, updating, uninstalling), then the guide, your data, privacy and security, and limitations split into both versions, the browser version and the desktop app; then a developer part (how it works, API and file formats, building from source, testing, releasing).
+- **Changed:** canvast is licensed under the GNU General Public License, version 3 or later (it was MIT). The colour picker module keeps its own MIT licence.
+
 ## 0.50.32 — AppImage updates (2026-10-29)
 
 - **Added:** the AppImage carries its update address and each release has its `.zsync`, so an AppImage updater (Gear Lever, AppImageUpdate) finds the newest version and downloads only what changed. The app itself still never goes online.

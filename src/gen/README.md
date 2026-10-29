@@ -98,4 +98,4 @@ No file here may import from outside this folder or touch the page (`document`, 
 
 A generator is an object: `id`, `label`, `about`, `family`, `sections` (the settings, built with `R` range, `C` colour, `T` toggle and `Ch` choice from `kit.ts`; a section titled "Colour" gets the Background colour in front) and `run(values, rng, w, h)` returning shapes in a box that starts at (0, 0). Make everything relative to the box (`Math.min(w, h)`), draw random choices only from `rng` in a fixed order, and add it to the list of its file. `tests/unit/pattern.test.ts` then checks it with every other: sound numbers, the same output for the same seed, random and extreme settings in a wide, a tall and a tiny box.
 
-Licence: MIT, like canvast.
+Licence: the GNU GPL v3 or later, like canvast.

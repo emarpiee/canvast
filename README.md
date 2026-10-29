@@ -1,65 +1,133 @@
 <h1 align="center"><img src="docs/brand/cover.webp" width="100%" alt="canvast: every point is a canvas. An offline-first endless canvas: one HTML file, no account, works offline."></h1>
 
-**An offline-first endless canvas.** Pan in any direction and zoom in or out without ever reaching an edge or a zoom limit. Draw, write, place pictures, video and audio, and edit at whatever scale you reach. canvast is **one self-contained HTML file** that runs from your disk: no server, no account, no network connection.
+**An offline-first endless canvas.** Pan in any direction and zoom in or out without ever reaching an edge or a zoom limit. Draw, write, place pictures, video and audio, and edit at whatever scale you reach. canvast is **one self-contained HTML file** that runs from your disk, and a **Linux desktop app** whose workspace is a folder of ordinary files: no server, no account, no network connection.
 
 - **Endless in every direction.** There is no minimum or maximum zoom and no border. A line drawn at one scale stays sharp at any other, and what you drew a thousand zoom levels ago is still there when you come back.
-- **Yours, on your machine.** Everything is saved in your browser's own storage while you work. Nothing is uploaded, ever. Back up to a single `.canvast` file whenever you like.
-- **Made for projects, with a Library for what they use.** Storyboards, mood boards, references, sketches: from a small board to a very large one. Pictures, video and files you place are kept in the Library, where you can tag, sort into folders, search and reuse them. canvast is not a warehouse for tens of thousands of files, because everything lives in your browser's storage, which has a size limit (see [Limitations](#limitations)).
-- **One file.** Copy `canvast.html` anywhere (a folder, a USB stick) and open it.
+- **Yours, on your machine.** In the browser everything is saved in the browser's own storage; in the desktop app, in a folder you choose, as plain files any sync or backup tool can see. Nothing is uploaded, ever. Back up to a single `.canvast` file whenever you like.
+- **Made for projects, with a Library for what they use.** Storyboards, mood boards, references, sketches: from a small board to a very large one. Pictures, video and files you place are kept in the Library, where you can tag, sort into folders, search and reuse them. In the browser the library lives in the browser's storage, which has a size limit; the desktop app keeps it on your disk (see [Limitations](#limitations)).
+- **One file, or a desktop app.** Copy `canvast.html` anywhere (a folder, a USB stick) and open it, or install the desktop app on Linux (see [Installation](#installation)).
 
 ![One continuous dive: from the observable universe, through the Solar System and Earth, into a leaf, its DNA and an atom](docs/screenshots/dive.webp)
 
 *One continuous zoom in canvast, about 100 levels from the observable universe into a proton, followed by jumps to 1,000 and 1,000,000 levels down. Nothing is faked: every frame is the app drawing the showcase file below.*
 
-### Try the showcase: powers of two
-
-[`showcase.canvast`](showcase.canvast) is a journey through **one million and one thousand zoom levels** on a single canvas. Each scene is hidden inside a speck of the one above it, so you can get from one end to the other with nothing but the mouse wheel:
-
-| Out (zoom out from home) | In (zoom into Earth) |
-| --- | --- |
-| The Solar System (home, level 0) | Earth, the Moon and a rocket (+5) |
-| The heliosphere and the Voyager probes (−9) | An island with a reef and two boats (+12) |
-| The Sun's neighbourhood, every star within 20 light years (−18) | A tree, seen from above (+19) |
-| The Milky Way, with *You are here* (−27) | A leaf, its veins and pores (+25) |
-| The Local Group: Andromeda, Triangulum, the Magellanic Clouds (−32) | Plant cells and their nuclei (+32) |
-| The observable universe and its cosmic web (−40) | DNA (+40), a carbon atom (+47), its nucleus (+54) |
-| Other universes, **1,000 levels up** | Inside a proton (+60), the Planck length (+116) |
-| | Universes again at **+1,000**, and a last scene **one million levels down** |
-
-To open it: click the save indicator at the bottom left, choose **Import archive…** and choose the file (or drop it on the page). Open the canvas *Powers of two*, then either scroll, or open **Bookmarks** and press **Play the bookmarks as a tour** (`→` and `←` step through its 19 stops).
-
-![The journey, scene by scene](docs/screenshots/journey.webp)
-
-| | |
-| --- | --- |
-| ![A heart one million zoom levels down](docs/screenshots/deep-zoom.webp) | ![Other universes, 1,000 zoom levels up](docs/screenshots/zoom-out.webp) |
-| One million levels down: 10^301,030× magnified, still exact and editable | 1,000 levels up: our universe is the ringed bubble |
-
-The showcase is drawn by `scripts/showcase/build.mjs`, which drives the app like a person would: it pastes SVG, combines shapes, draws with the Pen, writes the labels and adds the bookmarks. The labels are set in **Space Grotesk** (SIL Open Font License 1.1, in `scripts/showcase/fonts/`), which the script imports into the Library and chooses in the Text tool, so the two font files travel inside `showcase.canvast` like any library file. On the bright scenes (the island, the tree, the cells, DNA and the proton) the text sits on a dark plate, and the script measures the contrast of every label against the pixels behind it (WCAG 2: 4.5 : 1 under 24 px, 3 : 1 from 24 px) and reports any below it; the last build had none (the tightest is 4.69 : 1). `scripts/showcase/dive.mjs` renders the animation, and `scripts/showcase/shots.mjs` takes the screenshots in the dark theme with the app's default theme colour, *Viridian*, the logo's colour.
-
-![The Solar System, home of the showcase](docs/screenshots/hero.webp)
-
 ## Contents
 
-1. [Getting started](#getting-started)
-2. [Using canvast](#using-canvast)
-3. [Keyboard and pointer reference](#keyboard-and-pointer-reference)
-4. [Your data: saving, backups, export](#your-data-saving-backups-export)
-5. [Settings and accessibility](#settings-and-accessibility)
-6. [Limitations](#limitations)
-7. [How it works](#how-it-works)
-8. [Browser support](#browser-support)
-9. [Building and testing](#building-and-testing)
-10. [Security and privacy](#security-and-privacy)
-11. [Licences](#licences)
+**Using canvast**
+
+1. [Features at a glance](#features-at-a-glance)
+2. [Installation](#installation)
+3. [Getting started](#getting-started)
+4. [Try the showcase](#try-the-showcase-powers-of-two)
+5. [User guide](#user-guide)
+6. [Keyboard and pointer reference](#keyboard-and-pointer-reference)
+7. [Settings and accessibility](#settings-and-accessibility)
+8. [Your data: saving, backups, the workspace folder](#your-data-saving-backups-the-workspace-folder)
+9. [Privacy and security](#privacy-and-security)
+10. [Limitations](#limitations)
+
+**For developers**
+
+11. [How it works](#how-it-works)
+12. [API and file formats](#api-and-file-formats)
+13. [Building from source](#building-from-source)
+14. [Testing](#testing)
+15. [Releasing and project scripts](#releasing-and-project-scripts)
+
+**Project**
+
+16. [Platform support](#platform-support)
+17. [Licence](#licence)
+
+---
+
+## Features at a glance
+
+| Area | What you get |
+| --- | --- |
+| **Endless canvas** | No edge and no zoom limit in either direction; exact positions at any depth; bookmarks, tours, camera travel between far places, search, and stepping from item to item. [Navigating](#navigating) |
+| **Drawing** | Pressure pens, shapes, Bézier paths, node editing, vector networks, boolean shapes, fills (gradients, pictures, repeated objects with variation), outlines, 39 pattern generators, SVG in and out. [Drawing](#drawing) |
+| **Colour** | One OKHSL / OKHSV / OKLCH colour picker for everything, gradients, palettes (`.gpl`, `.ase`, `.aco`, `.ggr`) and linked styles. [Colour and styles](#colour-and-styles) |
+| **Text** | Rich text stored as Markdown, imported fonts (variable fonts too), text on a path, notes, sharp letters at any zoom. [Text](#text) |
+| **Pictures and media** | Pixel-exact pictures, non-destructive adjustments and shadows, crop and masks; video, audio and GIFs play on the canvas. [Pictures, video, audio and other files](#pictures-video-audio-and-other-files) |
+| **Organizing** | Layers, groups, sheets that clip, masks, snapping, align and arrange, tags, Reveal for things under others. [Organizing](#organizing) |
+| **Library** | Every imported file once, with folders, tags, favourites, notes and fields, similar-image search, a viewer and safe deletion. [The Library](#the-library) |
+| **Privacy** | Hidden items and passwords; in the desktop app hidden files are encrypted, and can be decrypted outside the app. [Privacy and security](#privacy-and-security) |
+| **Export** | PNG, WebP, JPEG, SVG and PDF from sheets and selections; `.canvast` backups of everything. [Exporting](#exporting), [Backups](#backups) |
+| **Your data** | Saved as you work, verified, never uploaded; in the desktop app a plain folder that any sync tool can carry. [Your data](#your-data-saving-backups-the-workspace-folder) |
+
+---
+
+## Installation
+
+canvast comes in two forms. Both are the same app; they differ in where your work is kept.
+
+| | Browser version | Desktop app (Linux) |
+| --- | --- | --- |
+| What you download | `canvast.html`, one file | A package: AppImage, `.deb`, `.rpm` or `.tar.gz` |
+| Where your work is kept | The browser's own storage (IndexedDB) | A folder you choose, as ordinary files |
+| Library size | Limited by the browser's storage quota | Limited by your disk |
+| Hidden items | Hidden behind a password, not encrypted | Encrypted on disk |
+| Updates | Download the new file | The AppImage updates itself; see [Updating](#updating) |
+
+Everything is on the [latest release](https://github.com/emarpiee/canvast/releases/latest). Each release's notes list its **Features** and its **Fixes** separately, and every file has its SHA-256 beside it.
+
+### The browser version
+
+Download [`canvast.html`](https://github.com/emarpiee/canvast/releases/latest/download/canvast.html) and open it in a modern browser: double-click it, or use *File → Open*. No installation and no web server are needed, and it works with no network connection. Keep the file wherever you like; moving it to another folder keeps your data (see [Where the data lives](#where-the-data-lives)).
+
+### The desktop app (Linux)
+
+canvast is **Linux-first**: Linux is where the desktop app is made, tested and shipped. There are no Windows, macOS or Flatpak builds and none is planned for now; the desktop shell is Electron and keeps platform details in one place, so other platforms remain possible later.
+
+Each release has these packages, for 64-bit PCs (`x86_64`) and ARM64 machines (`aarch64`), named `canvast-X.Y.Z-<arch>.<format>`:
+
+| Format | For | Install | Updates |
+| --- | --- | --- | --- |
+| **AppImage** | Any distribution | `chmod +x canvast-X.Y.Z-x86_64.AppImage`, then run it (or add it with an AppImage manager such as Gear Lever) | By itself, through an AppImage updater (below) |
+| **`.deb`** | Debian, Ubuntu, Linux Mint and others | `sudo apt install ./canvast-X.Y.Z-x86_64.deb` | Install the new `.deb` the same way |
+| **`.rpm`** | Fedora, RHEL, openSUSE and others | `sudo dnf install ./canvast-X.Y.Z-x86_64.rpm` (openSUSE: `sudo zypper install`) | Install the new `.rpm` the same way |
+| **`.tar.gz`** | Anywhere, without installing | `tar -xzf canvast-X.Y.Z-x86_64.tar.gz`, then run `canvast` in the unpacked folder | Unpack the new one in its place |
+
+The `.deb` and `.rpm` install the app under `/opt/canvast` with a menu entry, the command `canvast` and its icon. Every package is started on a fresh workspace folder before it is released (the `.deb` and `.rpm` are checked for their files and menu entry), and the `aarch64` packages are built and started on an ARM machine. On first start the app asks for a workspace folder: an empty folder starts a new workspace, a folder with `.canvast/` in it opens that one.
+
+### Checking a download
+
+Each file has a `.sha256` beside it. With both in one folder:
+
+```sh
+sha256sum -c canvast-X.Y.Z-x86_64.AppImage.sha256
+```
+
+### Updating
+
+| You use | To update |
+| --- | --- |
+| The browser version | Download the new `canvast.html` and open it from the same place. Your work stays: it is in the browser, not in the file |
+| The AppImage | It carries its update address, so an AppImage updater (Gear Lever, AppImageUpdate, or AppImageLauncher's update) finds a newer release by itself and downloads only the parts that changed (zsync). The app never checks for updates or goes online itself |
+| The `.deb`, `.rpm` or `.tar.gz` | Install or unpack the new release's package. There is no package repository yet, so the system's own updates do not include canvast |
+
+Your workspace folder is never touched by an update.
+
+### Uninstalling
+
+Remove the app the way you installed it (`sudo apt remove canvast`, `sudo dnf remove canvast`, or delete the AppImage or the unpacked folder). Your workspace folders stay where they are. The app's own working copy and settings on this device are in `~/.config/canvast/`; delete that folder too to remove everything. For the browser version, delete the file and clear the site data of `file://` pages in the browser (this deletes the work kept there: export a backup first).
+
+### Building from source
+
+```sh
+git clone https://github.com/emarpiee/canvast.git
+cd canvast
+npm ci               # Node.js 26.4 (see .nvmrc) and npm
+npm run build        # → dist/canvast.html
+npm run build:all    # also the desktop packages in dist-package/ (needs zsyncmake and rpmbuild)
+```
+
+See [Building from source](#building-from-source) for what each step needs and makes.
 
 ---
 
 ## Getting started
-
-### Open it
-
-Open `canvast.html` in a modern browser: double-click it, or use *File → Open*. No installation and no web server are needed. On Linux there is also a desktop app, whose workspace is a folder of ordinary files (see [The desktop app](#the-desktop-app-linux)). The newest build is always attached to the [latest release](https://github.com/emarpiee/canvast/releases/latest) (direct link: [`canvast.html`](https://github.com/emarpiee/canvast/releases/latest/download/canvast.html), with its SHA-256 beside it); each release's notes list its **Features** and its **Fixes** separately. To build the file from source, see [Building and testing](#building-and-testing).
 
 ### Your first minutes
 
@@ -90,7 +158,35 @@ A small read-out shows the zoom level and position. Click it, type a level (`300
 
 ---
 
-## Using canvast
+## Try the showcase: powers of two
+
+[`showcase.canvast`](showcase.canvast) is a journey through **one million and one thousand zoom levels** on a single canvas. Each scene is hidden inside a speck of the one above it, so you can get from one end to the other with nothing but the mouse wheel:
+
+| Out (zoom out from home) | In (zoom into Earth) |
+| --- | --- |
+| The Solar System (home, level 0) | Earth, the Moon and a rocket (+5) |
+| The heliosphere and the Voyager probes (−9) | An island with a reef and two boats (+12) |
+| The Sun's neighbourhood, every star within 20 light years (−18) | A tree, seen from above (+19) |
+| The Milky Way, with *You are here* (−27) | A leaf, its veins and pores (+25) |
+| The Local Group: Andromeda, Triangulum, the Magellanic Clouds (−32) | Plant cells and their nuclei (+32) |
+| The observable universe and its cosmic web (−40) | DNA (+40), a carbon atom (+47), its nucleus (+54) |
+| Other universes, **1,000 levels up** | Inside a proton (+60), the Planck length (+116) |
+| | Universes again at **+1,000**, and a last scene **one million levels down** |
+
+To open it: click the save indicator at the bottom left, choose **Import archive…** and choose the file (or drop it on the page). Open the canvas *Powers of two*, then either scroll, or open **Bookmarks** and press **Play the bookmarks as a tour** (`→` and `←` step through its 19 stops).
+
+![The journey, scene by scene](docs/screenshots/journey.webp)
+
+| | |
+| --- | --- |
+| ![A heart one million zoom levels down](docs/screenshots/deep-zoom.webp) | ![Other universes, 1,000 zoom levels up](docs/screenshots/zoom-out.webp) |
+| One million levels down: 10^301,030× magnified, still exact and editable | 1,000 levels up: our universe is the ringed bubble |
+
+How the showcase and its pictures are made is in [Releasing and project scripts](#releasing-and-project-scripts).
+
+---
+
+## User guide
 
 ### Navigating
 
@@ -212,47 +308,6 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 | ![The Library](docs/screenshots/library.webp) | ![The viewer](docs/screenshots/viewer.webp) |
 | The Library, filled by six screenshots of the showcase (shown by file type: the showcase also carries its two font files) | The viewer with its filmstrip and details |
 
-### Hidden items and passwords
-
-For a workspace that is shown in a public place, an item of the Library can be **hidden**, and the workspace or the Hidden list can be guarded by a **password**. Both are gates in front of the data, not encryption (see the end of this section).
-
-| | |
-| --- | --- |
-| ![The details of a selected item, with the Hide button beside the star](docs/screenshots/library-hide.webp) | ![The Hidden list: the item that was hidden, in its own list](docs/screenshots/hidden-list.webp) |
-| **Hide** is the eye button beside the star in the details panel (also in the bulk bar of several selected items, and in the library's context menu) | The **Hidden** list, open: the hidden item is only here, and the sidebar counts do not include it |
-
-**Hiding.** A hidden item is left out of *All items*, every folder, tag and file type, the counts, searches, *Similar images*, and the pickers that list the Library (the picture of a texture fill, the fonts). Pictures of it already placed on a canvas show a padlock instead of the picture, at once and whether or not a password was given, until the item is shown again; their names stay in the Layers panel. A hidden video or sound placed on a canvas does not play. Hiding does not move, delete or change the file. In the Hidden list the same button shows the item again.
-
-**Opening the Hidden list.** It is not in the sidebar. Type its **opening word** in the library's search box (`hidden:` by default; change it, or empty it to turn this off, in Settings > Privacy): the word clears itself, the password is asked if there is one, and the list opens as one more list in the sidebar. It closes when you choose another list or leave the Library. With *Keep the Hidden items open until the tab closes* on (Settings > Privacy), it stays open, without asking again, until the tab is closed or reloaded.
-
-| | |
-| --- | --- |
-| ![Settings, Privacy: the opening word, keeping the list open, and the two passwords](docs/screenshots/privacy.webp) | ![The screen shown when the app opens on a workspace with a password](docs/screenshots/lock-screen.webp) |
-| **Settings > Privacy**: the opening word, the keep-open option and the two passwords | The **lock screen**: with a workspace password set, nothing is read or drawn until it is given |
-
-**Two passwords, set separately** in Settings > Privacy (each is typed twice; changing or removing one asks for the old one). Every password field has an eye button at its end that shows what was typed, and hides it again:
-
-| Password | Asked | Guards |
-| --- | --- | --- |
-| **Workspace** | Every time the app opens or is reloaded, before anything of the workspace is read. Escape does not close the screen | The whole workspace |
-| **Hidden items** | When the opening word is typed (unless the tab remembers it), and before an export that includes hidden items | The Hidden list and exporting its items |
-
-**Exports and backups ask.**
-
-![The question asked before an export that would carry a hidden item](docs/screenshots/export-hidden.webp)
-
-| Export | What is asked | If you leave it out |
-| --- | --- | --- |
-| Any export with hidden items in it (backup, board, canvas, files as ZIP) | *Include them, with their files and names, or leave them out?* Including asks the Hidden password first | The file has no trace of them; pictures on a canvas that use them show as missing when it is imported |
-| A workspace backup, when a password or a changed privacy setting exists | *Include the passwords and the privacy settings (the opening word, keeping the list open)?* Each password is asked first, unless it was typed a moment ago | A copy restored from it starts with no password and the default settings |
-| The library index kept in the library folder | Nothing: it is written by itself, so it always leaves hidden items and passwords out | |
-
-Whether an item is hidden is data of the item, so it travels in any export that includes it and the item comes back hidden. Importing a backup that carries a password sets it only on a device that has none, and the import dialog says so.
-
-**What this is not.** The passwords are asked by the app; the files are stored as they are. They keep people at your screen out. They do not stop someone who can open this browser's storage, or who has an exported file that includes hidden items. Only a salted hash of each password is kept, in this browser and in no archive unless you include it. A forgotten password cannot be recovered: the only way back into a locked workspace is to clear this site's data in the browser, which deletes it, so keep a backup (a backup made without the password opens without one). In the browser, hidden files are not encrypted.
-
-**In the desktop app, hidden items are encrypted.** There, hiding asks for a Hidden password first (and says that a lost password means lost files). A hidden item's file is encrypted (AES-GCM) into `.hidden/` in the workspace folder under a random name, read back to prove it, and the readable file is deleted, not moved to `.trash/`. Its name, tags, note and fields are kept only in an encrypted index (`.canvast/hidden.json`), and its thumbnail is never stored. The password, stretched with PBKDF2, wraps one random key, so changing the password re-wraps that key without re-encrypting any file. The password cannot be removed while any item is hidden. Once given (to open the Hidden list, or when hiding), the key stays in memory until the app closes or **Lock hidden items** (command palette). A hidden picture placed on a canvas always shows a padlock (as in the browser), and another device on the same folder learns of hidden items only when the password is given there. Showing an item again decrypts it back to its place in `library/`.
-
 ### Exporting
 
 **Copy to other apps.** `Ctrl/⌘+C` keeps the real objects for pasting back here and also puts on the system clipboard a PNG picture: of shapes as drawn (their SVG text is the separate command *Copy the selection as SVG*, in the right-click menu); of a picture as one PNG at full size, as it looks with its crop and adjustments; a GIF or video as the frame it shows; a shape with a picture or objects fill, or anything mixed, as a PNG of it as drawn (at most 1024 px on the long side). The picture goes alone, with no text beside it (an app that is offered both often takes the text), except for copied texts, which carry their words too. Every copy out of canvast (canvas, library, screenshot, Export) goes through one module. **Pasting back in canvast** brings the objects back as they were (links, masks, crop, adjustments, exact positions) as long as nothing else was copied in between. Shapes and texts are known by their text on the clipboard, so they come back even from another tab; a picture or GIF is known only while this window keeps the focus, and after switching to another window it comes back as a new picture (see Limitations). Anything copied in another app is imported as before: an SVG as shapes, an image as a picture. Pasting in another app takes what it accepts. Browsers cannot put files (audio, PDF) on the clipboard, so those stay in canvast. `Ctrl/⌘+X` puts the text only (the shape is gone before a picture could be drawn).
@@ -301,7 +356,33 @@ Every shortcut can be changed in **Settings → Shortcuts**: a single key or a c
 
 ---
 
-## Your data: saving, backups, export
+## Settings and accessibility
+
+Open Settings with the gear button. Settings have a *device* scope and a *canvas* scope, can be searched, and reset individually (the undo-arrow icon at the end of a row) or together. Every group has an icon in the list on the left, and the groups are indented under their heading. Device settings travel in a workspace backup and in the library index (see Backups).
+
+| Group | What it holds |
+| --- | --- |
+| Drawing and selection | Pen, colour picker model and layout, pen width and stabilizer, lasso filter, snapping, align to the selection box, grid spacing for Arrange, initial shape and paint, the distance Fill gaps closes openings by, eraser |
+| Navigation | How `W` `A` `S` `D` choose the next item (nearest in view or anywhere, by layer or by name A to Z, in view or anywhere); focus on the item or keep the zoom; camera travel (style, time, longest trip, easing) and the wait at each tour stop |
+| Shortcuts | Rebind any shortcut to a key or a chord; the full list is also on `?` |
+| Media and playback | Viewer edges, slideshow time, starting volume, step sizes, extracted frames and edited pictures (format, quality, folder, name, tags), and the folder and tags of what is saved to the library from the canvas, one pair for each kind: pictures from Export… (*Exports*, `export`), patterns (*Patterns*, `pattern`) and shapes saved as SVG (*Shapes*, `shape`); screenshots have theirs in the Screenshot group |
+| Screenshot | Format, quality, pattern, transparency, interface, clipboard, folder, name and tags |
+| Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, Actions bar place, item names, density (comfortable, compact, dense), round or sharp corners, Zen mode |
+| Panels | Minimize inactive panels, panels kept open |
+| Performance | Adaptive quality, fixed quality level, memory for pictures, animation and its speed |
+| Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, changes only, files as ZIP, import); *Start from scratch* (delete all data, after a warning with a backup offered first) |
+| Privacy | The word that opens the Hidden items, keeping them open until the tab closes, and the passwords of the workspace and of the Hidden items; what stays on your machine |
+| About and diagnostics | Version and diagnostics |
+| Develop | Developer tools (see below) |
+
+- **Accessibility:** controls are keyboard reachable with visible focus; panels have title bars that work by keyboard; status changes are announced to screen readers; the system's reduced-motion preference is honoured and animation can be turned off; colour contrast is audited automatically.
+- **Layouts** adapt to large, medium and phone-sized screens, with scroll cues on bars that scroll.
+
+![Settings, Appearance](docs/screenshots/settings.webp)
+
+---
+
+## Your data: saving, backups, the workspace folder
 
 ### Saving
 
@@ -331,15 +412,11 @@ Deleting objects; deleting a canvas or board (confirmed, cannot be undone; pictu
 
 ### Where the data lives
 
-IndexedDB database `canvast`, in the browser's storage for local files. Moving the HTML file to another folder keeps your data. Opening it in a different browser, profile or private window does not, and clearing site data deletes it. This is why regular backups matter. The browser's storage has a size limit, so canvast suits projects rather than very large collections of files; see [Limitations](#limitations). The desktop app keeps the workspace in a folder instead (below).
+IndexedDB database `canvast`, in the browser's storage for local files. Moving the HTML file to another folder keeps your data. Opening it in a different browser, profile or private window does not, and clearing site data deletes it. This is why regular backups matter. The browser's storage has a size limit, so canvast suits projects rather than very large collections of files; see [Limitations](#limitations). The desktop app keeps the workspace in a folder instead ([below](#the-workspace-folder-desktop-app)).
 
-### The desktop app (Linux)
+### The workspace folder (desktop app)
 
-The same app, packaged for the desktop (`canvast-X.Y.Z-x86_64.AppImage` on the [latest release](https://github.com/emarpiee/canvast/releases/latest): make it executable and run it). Your workspace is a **folder of ordinary files** that you choose, so any sync tool, backup tool or file manager can see it. It works offline and loads nothing from the network.
-
-canvast is **Linux-first**: Linux is where the desktop app is made, tested and shipped, and the AppImage is its only package. There are no Windows, macOS or Flatpak builds and none is planned for now. The desktop shell is Electron and keeps platform details in one place, so other platforms remain possible later.
-
-**Updates.** The AppImage carries its update address (the latest GitHub release), so an AppImage updater such as Gear Lever or AppImageUpdate finds a newer version by itself and downloads only the parts that changed (zsync). The app never checks for updates or goes online itself.
+In the desktop app your workspace is a **folder of ordinary files** that you choose, so any sync tool, backup tool or file manager can see it. It works offline and loads nothing from the network.
 
 **Switching workspaces.** *Switch workspace…* (in the Board › Canvas menu under *Whole workspace*, in Settings > Storage, or the command palette) lists the open workspace, the recent ones, **Open a folder…** (an existing workspace, or any folder to start one in) and **New workspace…** (an empty folder you name); the latest five whose folders are there are listed, and **Clear the recent list** leaves only the open one (no folder is touched). File > Open workspace folder… and File > New workspace… do the same. A switch closes the window the usual way, with your last edits written into the folder first, and the app starts again on the other folder. At start-up the app opens the last workspace; if its folder is not there any more (moved or deleted), it says so and offers the recent ones, a folder or a new workspace. While a workspace opens, a start screen (the logo and what is being done) stands in front of the app until everything is ready; each step and its time are also written to the developer tools' console (View > Toggle Developer Tools). A workspace is open in one window at a time: starting the app on a workspace that is still closing waits for it, and one still open in another window is asked about.
 
@@ -358,45 +435,94 @@ canvast is **Linux-first**: Linux is where the desktop app is made, tested and s
 
 **How it saves.** New library files are written as readable files under `library/<kind>/` (`Hand Study (Loomis).png` → `library/images/hand_study-loomis.png`, `-2` on a clash, the same file stored once); each board is a folder of `.canvast/boards/` and each canvas a `<board>/<canvas>.cvst` file in it (same safe names), with `.canvast/workspace.json` (names, order, styles) and a file per device, written about 2 seconds after editing pauses and when the window closes. Every edit is first saved in the app's own storage (one per workspace folder and device), which the folder follows. Each folder carries its own id (`.canvast/folder.json`), so a new folder made where a deleted one was is a new, empty workspace: nothing of the deleted one (its boards, library or passwords) comes back, and the deleted one's copy on this device is cleared. At start-up the folder wins: a device with no copy yet opens the whole workspace from it, a canvas another device changed (through any sync tool) is read in, and when both changed the same canvas the folder's version is kept and this device's is added beside it as `<name> (conflict <date>)`. Library folders are real folders: an item filed in a library folder is under `library/<folder path>/` (each part a safe name; a library folder named like a kind folder shares it), filing or renaming an item moves its file, the library's undo moves it back, and a renamed or deleted library folder's emptied folder is removed. `.canvast/library.json` holds the library (names, tags, folders, notes, fields, which file is which item, one item per line), and a device with no copy yet takes the library from it. Hidden items are encrypted into `.hidden/` (see [Hidden items and passwords](#hidden-items-and-passwords)); a readable file put there from outside the app becomes a hidden item and is encrypted (once the Hidden items are opened). A workspace with a password asks for it wherever its folder is opened from. A file canvast deletes from the folder (a file once undo no longer needs it, a deleted canvas or board) goes where Settings > Storage says: into `.trash/` in the workspace folder (the default, so it syncs and can be put back by hand), into the system trash, or away for good. canvast follows the folder while it runs (and catches up at start-up). A canvas file another device wrote (through any sync tool) is read in, and the open canvas is loaded again with its camera kept. If this device has edits of that canvas not yet in its file, both versions are kept, as at start-up, and a file is never written over another device's newer version. A canvas file or board folder renamed in `.canvast/boards/` (not meant for it, but possible) renames the canvas or board, and a canvas file moved into another board's folder moves the canvas; their files then take their safe names. In `library/`, canvast notices what changed in a file manager: a file renamed or moved is found again by its content (the item takes its new folder and, when renamed, its new name), a new file is imported where it lies, into the library folder of the folder it is in (made when there is none), and a deleted file shows as missing. Files being written (temporary or partial downloads) are left alone. To bring a browser workspace in, export a full backup there and import it here: its boards, canvases and files are written into the folder as folders and files (one screen keeps the app waiting through the whole import and shows how many of the files are written; then the app starts again on them and says what was imported, without asking for the workspace password again: it was given before the import)
 
-
 ---
 
-## Settings and accessibility
+## Privacy and security
 
-Open Settings with the gear button. Settings have a *device* scope and a *canvas* scope, can be searched, and reset individually (the undo-arrow icon at the end of a row) or together. Every group has an icon in the list on the left, and the groups are indented under their heading. Device settings travel in a workspace backup and in the library index (see Backups).
+### What stays on your machine
 
-| Group | What it holds |
+- The page's Content Security Policy is `default-src 'none'` with `connect-src 'none'`: it cannot make network requests, even if code tried. Only inline script and style are allowed, images come from `blob:` and `data:`, and workers (if any) from `blob:`.
+- canvast has no runtime dependencies and makes no network requests. The interface font is supplied from memory, so no font source is allowed either. `npm run check:offline` and the end-to-end suite both verify this on every build. The desktop app is the same page in Electron: it opens no connection either (its updates are fetched by an AppImage updater, not by the app).
+- Imports are limited to files of at most 256 MiB, and each is decoded before being stored. Files that fail to decode are rejected with a message.
+- Archives are verified completely (structure, checksums and content hashes) before anything is written.
+- Optional passwords for the workspace and for the Hidden items (see [Hidden items and passwords](#hidden-items-and-passwords)): only a salted PBKDF2 hash of the workspace password is kept. In the browser nothing is encrypted; in the desktop app the hidden items' files and index are encrypted (AES-256-GCM), in a documented format you can [decrypt outside the app](#decrypting-and-encrypting-outside-the-app). The library index on disk and any export you decline to include them in carry neither hidden items nor passwords.
+- No analytics, no telemetry, no account.
+
+### Hidden items and passwords
+
+For a workspace that is shown in a public place, an item of the Library can be **hidden**, and the workspace or the Hidden list can be guarded by a **password**. In the browser both are gates in front of the data, not encryption; in the desktop app hidden files are encrypted (see the end of this section).
+
+| | |
 | --- | --- |
-| Drawing and selection | Pen, colour picker model and layout, pen width and stabilizer, lasso filter, snapping, align to the selection box, grid spacing for Arrange, initial shape and paint, the distance Fill gaps closes openings by, eraser |
-| Navigation | How `W` `A` `S` `D` choose the next item (nearest in view or anywhere, by layer or by name A to Z, in view or anywhere); focus on the item or keep the zoom; camera travel (style, time, longest trip, easing) and the wait at each tour stop |
-| Shortcuts | Rebind any shortcut to a key or a chord; the full list is also on `?` |
-| Media and playback | Viewer edges, slideshow time, starting volume, step sizes, extracted frames and edited pictures (format, quality, folder, name, tags), and the folder and tags of what is saved to the library from the canvas, one pair for each kind: pictures from Export… (*Exports*, `export`), patterns (*Patterns*, `pattern`) and shapes saved as SVG (*Shapes*, `shape`); screenshots have theirs in the Screenshot group |
-| Screenshot | Format, quality, pattern, transparency, interface, clipboard, folder, name and tags |
-| Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, Actions bar place, item names, density (comfortable, compact, dense), round or sharp corners, Zen mode |
-| Panels | Minimize inactive panels, panels kept open |
-| Performance | Adaptive quality, fixed quality level, memory for pictures, animation and its speed |
-| Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, changes only, files as ZIP, import); *Start from scratch* (delete all data, after a warning with a backup offered first) |
-| Privacy | The word that opens the Hidden items, keeping them open until the tab closes, and the passwords of the workspace and of the Hidden items; what stays on your machine |
-| About and diagnostics | Version and diagnostics |
-| Develop | Developer tools (see below) |
+| ![The details of a selected item, with the Hide button beside the star](docs/screenshots/library-hide.webp) | ![The Hidden list: the item that was hidden, in its own list](docs/screenshots/hidden-list.webp) |
+| **Hide** is the eye button beside the star in the details panel (also in the bulk bar of several selected items, and in the library's context menu) | The **Hidden** list, open: the hidden item is only here, and the sidebar counts do not include it |
 
-- **Accessibility:** controls are keyboard reachable with visible focus; panels have title bars that work by keyboard; status changes are announced to screen readers; the system's reduced-motion preference is honoured and animation can be turned off; colour contrast is audited automatically.
-- **Layouts** adapt to large, medium and phone-sized screens, with scroll cues on bars that scroll.
+**Hiding.** A hidden item is left out of *All items*, every folder, tag and file type, the counts, searches, *Similar images*, and the pickers that list the Library (the picture of a texture fill, the fonts). Pictures of it already placed on a canvas show a padlock instead of the picture, at once and whether or not a password was given, until the item is shown again; their names stay in the Layers panel. A hidden video or sound placed on a canvas does not play. Hiding does not move, delete or change the file. In the Hidden list the same button shows the item again.
 
-![Settings, Appearance](docs/screenshots/settings.webp)
+**Opening the Hidden list.** It is not in the sidebar. Type its **opening word** in the library's search box (`hidden:` by default; change it, or empty it to turn this off, in Settings > Privacy): the word clears itself, the password is asked if there is one, and the list opens as one more list in the sidebar. It closes when you choose another list or leave the Library. With *Keep the Hidden items open until the tab closes* on (Settings > Privacy), it stays open, without asking again, until the tab is closed or reloaded.
+
+| | |
+| --- | --- |
+| ![Settings, Privacy: the opening word, keeping the list open, and the two passwords](docs/screenshots/privacy.webp) | ![The screen shown when the app opens on a workspace with a password](docs/screenshots/lock-screen.webp) |
+| **Settings > Privacy**: the opening word, the keep-open option and the two passwords | The **lock screen**: with a workspace password set, nothing is read or drawn until it is given |
+
+**Two passwords, set separately** in Settings > Privacy (each is typed twice; changing or removing one asks for the old one). Every password field has an eye button at its end that shows what was typed, and hides it again:
+
+| Password | Asked | Guards |
+| --- | --- | --- |
+| **Workspace** | Every time the app opens or is reloaded, before anything of the workspace is read. Escape does not close the screen | The whole workspace |
+| **Hidden items** | When the opening word is typed (unless the tab remembers it), and before an export that includes hidden items | The Hidden list and exporting its items |
+
+**Exports and backups ask.**
+
+![The question asked before an export that would carry a hidden item](docs/screenshots/export-hidden.webp)
+
+| Export | What is asked | If you leave it out |
+| --- | --- | --- |
+| Any export with hidden items in it (backup, board, canvas, files as ZIP) | *Include them, with their files and names, or leave them out?* Including asks the Hidden password first | The file has no trace of them; pictures on a canvas that use them show as missing when it is imported |
+| A workspace backup, when a password or a changed privacy setting exists | *Include the passwords and the privacy settings (the opening word, keeping the list open)?* Each password is asked first, unless it was typed a moment ago | A copy restored from it starts with no password and the default settings |
+| The library index kept in the library folder | Nothing: it is written by itself, so it always leaves hidden items and passwords out | |
+
+Whether an item is hidden is data of the item, so it travels in any export that includes it and the item comes back hidden. Importing a backup that carries a password sets it only on a device that has none, and the import dialog says so.
+
+**What this is not.** The passwords are asked by the app; the files are stored as they are. They keep people at your screen out. They do not stop someone who can open this browser's storage, or who has an exported file that includes hidden items. Only a salted hash of each password is kept, in this browser and in no archive unless you include it. A forgotten password cannot be recovered: the only way back into a locked workspace is to clear this site's data in the browser, which deletes it, so keep a backup (a backup made without the password opens without one). In the browser, hidden files are not encrypted.
+
+**In the desktop app, hidden items are encrypted.** There, hiding asks for a Hidden password first (and says that a lost password means lost files). A hidden item's file is encrypted (AES-GCM) into `.hidden/` in the workspace folder under a random name, read back to prove it, and the readable file is deleted, not moved to `.trash/`. Its name, tags, note and fields are kept only in an encrypted index (`.canvast/hidden.json`), and its thumbnail is never stored. The password, stretched with PBKDF2, wraps one random key, so changing the password re-wraps that key without re-encrypting any file. The password cannot be removed while any item is hidden. Once given (to open the Hidden list, or when hiding), the key stays in memory until the app closes or **Lock hidden items** (command palette). A hidden picture placed on a canvas always shows a padlock (as in the browser), and another device on the same folder learns of hidden items only when the password is given there. Showing an item again decrypts it back to its place in `library/`.
+
+### Hidden items: the file format
+
+In a desktop workspace folder the hidden items are open, documented files, so they can be read without canvast. Everything is standard WebCrypto (or any crypto library):
+
+| Part | Where | What it is |
+| --- | --- | --- |
+| The vault | `.canvast/hidden.json` | JSON: `format: "canvast-hidden"`, `version: 1`, `kdf: { name: "PBKDF2", hash: "SHA-256", iterations, salt }` (600,000 iterations, a 16-byte random salt), `key`, and `index` |
+| The data key | `key` in the vault | A random 256-bit AES-GCM key, wrapped (AES-KW, RFC 3394) by the key PBKDF2 makes from the Hidden password and the salt. A wrong password fails to unwrap it. Changing the password wraps the same key again, so no file is encrypted again |
+| A hidden file | `.hidden/<32 random hex digits>.bin` | 12 bytes of IV, then the file's bytes encrypted with AES-256-GCM under the data key, with the 16-byte tag at the end. The name says nothing about the item |
+| The index | `index` in the vault: `{ iv, data }` | A JSON list sealed the same way (`iv` and `data`, base64): one entry per hidden item as in `library.json` (its `hash`, `file`, `name`, `type`, `size`, `tags`, `note`, `fields`, …), which names each item's `.hidden/` file |
+
+All binary values in the vault are base64. The SHA-256 of a decrypted file is its `hash` in the index.
+
+### Decrypting and encrypting outside the app
+
+`scripts/hidden-items.mjs` does both with nothing but Node.js 20 or later (no install step, no dependencies). Close canvast on that workspace first. It asks for the Hidden password without showing it (or reads it from a pipe):
+
+```sh
+# Every hidden item's file, under its name in the library, with hidden-items.json (names, tags, notes, fields) beside them
+node scripts/hidden-items.mjs decrypt ~/Art/my-workspace ~/decrypted
+
+# Seal files into .hidden/ and the index: the app then lists them as hidden items
+node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
+```
+
+`decrypt` changes nothing in the workspace. `encrypt` takes back files that came out of `decrypt` with their names, tags, notes and fields (it finds them in the `hidden-items.json` beside them), and new PNG or JPEG pictures (it reads their size). For any other new file, put it in `.hidden/` while canvast runs with the Hidden items open: the app reads it, encrypts it and lists it. `encrypt` leaves the readable files where they are, so delete them yourself when you no longer need them.
 
 ---
 
 ## Limitations
 
-canvast describes only what it does. These are the current limits.
+canvast describes only what it does. These are the current limits, first those of both versions, then those of the browser version and of the desktop app.
 
-**Scale**
-
-| Area | Limitation |
-| --- | --- |
-| Library size | The Library manages the files your projects use. It is not meant to hold a very large archive. Files are stored in the browser's storage for local files, whose size limit depends on the browser and on the free disk space, so a library that grows past it stops accepting new files, says so in plain words and loses nothing already stored. canvast asks the browser once to keep the data under storage pressure, and warns once when 80% of the browser's quota is used. In Chromium a *library folder* removes the limit (see Library); Firefox cannot offer one |
-| What to do about it | Keep working files in canvast and long-term collections in your own folders. Use `.canvast` backups to move finished projects out, and *Delete…* in the library to free space |
+### Both versions
 
 **Content**
 
@@ -435,16 +561,29 @@ canvast describes only what it does. These are the current limits.
 
 | Area | Limitation |
 | --- | --- |
-| Storage | Browsers cap local storage, and the cap grows once the browser agrees to keep the data (*Ask the browser to keep it*, Settings > Storage): Firefox allows at most 10 GiB (or 10% of the disk, if smaller) before that and up to half the disk after, Chromium about 10 GiB (a Chromium library folder is not counted). Settings > Storage shows the current figure. With a library folder, files in it are outside the browser's protection: files removed there show as missing, and each session needs one click to allow access again. When the browser's storage is full, an import is refused with a notice that points to the backup and to *Delete from library*; edits stay queued and the indicator shows the error. Export backups regularly |
-| Origin | Data belongs to the browser profile. Another browser, profile or private window starts empty |
 | Rendering | Canvas 2D only, on the main thread; no GPU or WebGL path, no workers |
-| Browsers | Tested on Chromium and Firefox on one Linux machine. Safari has not been tested. Touch is tested by emulation |
 | Collaboration | None. There is no network by design |
-| Passwords | The workspace and Hidden passwords are gates, not encryption: the data is stored as it is, so they do not stop someone with access to the browser's storage or to an exported file that includes hidden items. They cannot be recovered. The workspace password is asked at every open and reload |
-| The desktop app | Linux-first: an x86-64 AppImage only (no Windows, macOS or Flatpak builds for now); watching the folder for outside changes is verified on Linux only. A `.cvst` copied in from another workspace is not taken in. With a very large library, each change made in `library/` outside the app makes canvast list the whole folder again. A canvas file is written about 2 seconds after editing pauses: until then the edit is safe in the app's own storage on this device, but another device does not see it yet |
-| Hidden items in the desktop app | The files and index are encrypted, but: deleting the readable file does not overwrite the disk blocks it used; an item hidden while the key is locked stays a readable file until the password is given; the app's own cache on the device keeps hidden items' names and tags (not their pictures); a canvas file names the content hash of each picture placed on it; exported backups that include hidden items are not encrypted |
 
 **Left out on purpose:** ratings, saved searches, a minimap (there are no bounds to map).
+
+### The browser version
+
+| Area | Limitation |
+| --- | --- |
+| Library size | The Library manages the files your projects use. It is not meant to hold a very large archive. Files are stored in the browser's storage for local files, whose size limit depends on the browser and on the free disk space, so a library that grows past it stops accepting new files, says so in plain words and loses nothing already stored. canvast asks the browser once to keep the data under storage pressure, and warns once when 80% of the browser's quota is used. In Chromium a *library folder* removes the limit (see Library); Firefox cannot offer one |
+| What to do about it | Keep working files in canvast and long-term collections in your own folders. Use `.canvast` backups to move finished projects out, and *Delete…* in the library to free space |
+| Storage | Browsers cap local storage, and the cap grows once the browser agrees to keep the data (*Ask the browser to keep it*, Settings > Storage): Firefox allows at most 10 GiB (or 10% of the disk, if smaller) before that and up to half the disk after, Chromium about 10 GiB (a Chromium library folder is not counted). Settings > Storage shows the current figure. With a library folder, files in it are outside the browser's protection: files removed there show as missing, and each session needs one click to allow access again. When the browser's storage is full, an import is refused with a notice that points to the backup and to *Delete from library*; edits stay queued and the indicator shows the error. Export backups regularly |
+| Origin | Data belongs to the browser profile. Another browser, profile or private window starts empty |
+| Browsers | Tested on Chromium and Firefox on one Linux machine. Safari has not been tested. Touch is tested by emulation |
+| Passwords | In the browser the workspace and Hidden passwords are gates, not encryption: the data is stored as it is, so they do not stop someone with access to the browser's storage or to an exported file that includes hidden items. They cannot be recovered. The workspace password is asked at every open and reload |
+
+### The desktop app
+
+| Area | Limitation |
+| --- | --- |
+| Platform | Linux-first: no Windows, macOS or Flatpak builds for now; watching the folder for outside changes is verified on Linux only. A `.cvst` copied in from another workspace is not taken in. With a very large library, each change made in `library/` outside the app makes canvast list the whole folder again. A canvas file is written about 2 seconds after editing pauses: until then the edit is safe in the app's own storage on this device, but another device does not see it yet |
+| Hidden items in the desktop app | The files and index are encrypted, but: deleting the readable file does not overwrite the disk blocks it used; an item hidden while the key is locked stays a readable file until the password is given; the app's own cache on the device keeps hidden items' names and tags (not their pictures); a canvas file names the content hash of each picture placed on it; exported backups that include hidden items are not encrypted |
+| Packages | Linux only, for x86_64 and aarch64. The `.deb` and `.rpm` are not in a package repository, so the system's updates do not include them; only the AppImage updates itself. The `.deb` and `.rpm` are checked for their contents before a release, not installed on every distribution they name |
 
 ---
 
@@ -514,17 +653,50 @@ The colour picker can be built alone with `npm run build:picker`, and the patter
 
 ---
 
-## Browser support
+## API and file formats
 
-- Requires `BigInt`, Pointer Events, `ResizeObserver`, Canvas 2D and IndexedDB. Roughly Chromium 67+, Firefox 68+, Safari 14+.
-- **Tested** in Chromium 156 (default, CPU-only, and devicePixelRatio 2 with touch) and Firefox 157 on Linux. **Not tested** in Safari.
-- Firefox on `file://` supports everything canvast uses (IndexedDB, Web Locks, BroadcastChannel) with frame times close to Chromium's.
+canvast has no network API, by design: it never opens a connection. Other programs work with it through its files, which are documented and versioned, and through the entry points below. Each format names itself (`format`) and its `version`; a newer version than an app reads is refused, never half-read.
+
+### File formats
+
+| File | Format | What is in it |
+| --- | --- | --- |
+| `.canvast` backup | `canvast-archive`, version 6 | An uncompressed ZIP (ZIP64 when large): `manifest.json` (format, version, scope, the boards and canvases, the list of files), `canvases/<id>.json` (`objects`, `frames`, `view`) and each library file once as `assets/<sha256>`, with a CRC on every entry. Any unzip tool opens it; do not re-compress it |
+| `.canvast/boards/<board>/<canvas>.cvst` | `canvast-canvas`, version 1 | One canvas as JSON: a header (`format`, `version`, `id`, `revision`, `savedAt`, `savedBy`) and the same canvas data a backup holds |
+| `.canvast/workspace.json` | `canvast-workspace` | The boards and canvases (names, order, ids), styles, and the passwords' kept forms (salted PBKDF2 hashes) |
+| `.canvast/library.json` | `canvast-library`, version 1 | The library: `folders`, and `items`, one per line: `hash` (SHA-256), `file` (its path under `library/`), `name`, `type`, `size`, `pixelW`, `pixelH`, `importedAt`, `tags`, `favorite`, `folderId`, `note`, `fields`, `state` |
+| `.canvast/devices/<id>.json` | `canvast-device`, version 1 | One device's open canvas and camera per canvas |
+| `.canvast/hidden.json`, `.hidden/*.bin` | `canvast-hidden`, version 1 | The encrypted hidden items: see [Hidden items: the file format](#hidden-items-the-file-format) |
+| `library/…` | The files themselves | Each library file under its own name, as you would expect to find it |
+
+Object positions are exact: a coordinate is a dyadic number (an integer mantissa and a power-of-two exponent), written as text, so nothing is lost at any depth (see [Exact coordinates](#exact-coordinates)).
+
+### Desktop command line
+
+| Option | What it does |
+| --- | --- |
+| `--workspace=<folder>` | Open that workspace folder (an empty folder starts a new one), instead of the last one opened |
+
+Any other option is passed to Electron (for example `--user-data-dir=<folder>` to keep the app's own copy and settings elsewhere).
+
+### Standalone modules
+
+Two parts of canvast are made to be used on their own, with no dependency on the app:
+
+| Module | Build | Documentation |
+| --- | --- | --- |
+| The colour picker | `npm run build:picker` | [src/colour-picker/README.md](src/colour-picker/README.md) |
+| The pattern generators | `npm run build:patterns` (a script with the global `CanvastPatterns`, an ES module, TypeScript declarations and a demo page in `dist-patterns/`) | [src/gen/README.md](src/gen/README.md) |
+
+### Automation hook
+
+Opening the app with `#debug` at the end of its address (or turning on Settings → Develop) adds `window.__canvastDebug`, which the test suite uses to drive the app: the camera, the document, storage, the library and the clipboard. It is made for tests and changes with them; it is not a stable API.
 
 ---
 
-## Building and testing
+## Building from source
 
-Requires Node.js 26.4 (see `.nvmrc`) and npm.
+Requires Node.js 26.4 (see `.nvmrc`) and npm. Packaging the desktop app also needs `zsyncmake` (the `zsync` package) and `rpmbuild` (`rpm-build` on Fedora, `rpm` on Debian and Ubuntu), and the network once (electron-builder fetches its packaging tools).
 
 ```sh
 npm ci            # install pinned dev dependencies
@@ -535,14 +707,27 @@ Open `dist/canvast.html` directly. Developer tools (frame times, camera internal
 
 | Command | Purpose |
 | --- | --- |
+| `npm run build` | The single file, `dist/canvast.html` |
+| `npm run desktop` | Build the app and run it in the desktop shell (Electron) on a workspace folder: `--workspace=<path>` after `electron dist-desktop`, else the last one opened, else a folder dialog |
+| `npm run package:desktop` | Package the desktop app for this machine's architecture into `dist-package/`: `canvast-X.Y.Z-<arch>.AppImage`, `.deb`, `.rpm` and `.tar.gz`, each with its SHA-256; the AppImage with its update address written in and its `.zsync` beside it. The AppImage and the tarball are started on a fresh workspace folder and must write it; the `.deb` and `.rpm` must hold the app and its menu entry; a package that fails is deleted |
+| `npm run build:all` | Everything a person can try: the single file, the desktop shell and all the packages |
+| `npm run build:picker` · `npm run build:patterns` | The standalone modules (see [Standalone modules](#standalone-modules)) |
+
+### Reproducible build
+
+The build is deterministic: the same source produces the same `canvast.html`, and `npm run build` prints its SHA-256. Dependencies are pinned to exact versions and line endings to LF. `npm run check:repro` builds twice in different folders, time zones and locales and compares the SHA-256.
+
+---
+
+## Testing
+
+| Command | Purpose |
+| --- | --- |
 | `npm run typecheck` | TypeScript check |
 | `npm run test:unit` | Unit tests (seconds) |
 | `npm test` | Typecheck, unit tests, the end-to-end **groups the changes need** (`test:affected`), token, storage, picker and pattern-generator checks |
 | `npm run test:affected` | Only the end-to-end groups needed by what changed since `origin/main` (`-- --dry` shows which, and how long); `npm run test:group -- <group…>` runs named groups; `npm run test:all` every group (about an hour). Groups and the change map: [docs/testing/README.md](docs/testing/README.md) |
-| `npm run build:patterns` | Build the pattern generators alone into `dist-patterns/` (script, module, types, demo page); `npm run check:patterns` fails if they import from, or touch, anything outside their folder |
-| `npm run desktop` | Build the app and run it in the desktop shell (Electron, see [The desktop app](#the-desktop-app-linux)) on a workspace folder: `--workspace=<path>` after `electron dist-desktop`, else the last one opened, else a folder dialog |
-| `npm run build:all` | Everything a person can try: `dist/canvast.html`, the desktop shell, and the AppImage in `dist-package/` (built, then checked that it starts) |
-| `npm run package:desktop` | Package the desktop app as a Linux AppImage in `dist-package/` (with its SHA-256, its update address written in and its `.zsync` beside it; needs `zsyncmake` from the zsync package), from `dist-desktop/` and the pinned Electron, then start that AppImage on a fresh workspace folder and fail unless it writes it. Making it needs the network once (electron-builder's AppImage tools); the app it makes does not |
+| `npm run check:patterns` | Fail if the pattern generators import from, or touch, anything outside their folder |
 | `npm run test:full` | The full suite with long stress loops (about 1.5 hours) |
 | `npm run test:snap -- <files or -g pattern>` | Run chosen end-to-end specs |
 | `npm run test:status` | List test builds with their result and how far each is behind the source |
@@ -550,11 +735,22 @@ Open `dist/canvast.html` directly. Developer tools (frame times, camera internal
 | `npm run check:offline` | Fail if the built file references anything outside itself |
 | `npm run check:tokens` | Fail on a hard-coded colour, size, space or radius in the CSS |
 | `npm run check:storage` | Fail if code outside the storage implementation uses IndexedDB instead of the storage interfaces |
-| `npm run check:repro` | Build twice in different folders, time zones and locales and compare the SHA-256 |
 
 Every end-to-end run builds its own copy of the app into `test-builds/` and tests that copy, so `dist/` can be rebuilt while tests run. Tests open the built file from `file://`, drive it through a debug hook, run in Chromium (three configurations) and Firefox, and fail on any network request; the desktop shell has its own project, which runs the snapshot's Electron build on a fresh workspace folder. Test fixtures are generated in code; no binary fixtures are committed. Performance thresholds are fixed in advance and never loosened. On GitHub, a CI workflow (`.github/workflows/ci.yml`) runs on every push to `main` and every pull request: typecheck, unit tests, the build, the offline, naming, token, storage, picker and pattern checks and the reproducible-build check, and a short Chromium end-to-end run of three specs (the whole quick suite, about an hour, is run by hand). It keeps the built file as a downloadable artifact of the run. Test logs with environments and timings are in [docs/testing/](docs/testing/); [docs/status.md](docs/status.md) is the status record.
 
+---
+
+## Releasing and project scripts
+
+### Releasing
+
+`npm run release` publishes `dist/canvast.html` and the desktop app's x86_64 packages (`npm run package:desktop`, which checks each before it is handed out), each with its SHA-256 (and the AppImage's `.zsync`, which updaters read), as the latest GitHub release (tag `vX.Y.Z`, the version in `package.json`). Run it after the version is bumped, `CHANGELOG.md` has its `## X.Y.Z — Title (date)` section and everything is pushed: it builds and checks the file, packages the AppImage, creates or updates the release, marks it **Latest** and reads it back to confirm that it is the latest and serves the same file. `npm run release -- --dry-run` does everything but publish and prints the notes. The notes are split into **Features** and **Fixes** from the CHANGELOG: a bullet that starts with `**Fixed:**` is a fix, any other (`**Added:**`, `**Changed:**`, `**Removed:**`) is a feature. Publishing the release starts the `Release (aarch64)` workflow (`.github/workflows/release-arm64.yml`), which builds the `aarch64` packages with the same script on an ARM machine, starts them, and adds them to the release; it can also be run by hand for a tag.
+
 ### The showcase and the screenshots
+
+The showcase is drawn by `scripts/showcase/build.mjs`, which drives the app like a person would: it pastes SVG, combines shapes, draws with the Pen, writes the labels and adds the bookmarks. The labels are set in **Space Grotesk** (SIL Open Font License 1.1, in `scripts/showcase/fonts/`), which the script imports into the Library and chooses in the Text tool, so the two font files travel inside `showcase.canvast` like any library file. On the bright scenes (the island, the tree, the cells, DNA and the proton) the text sits on a dark plate, and the script measures the contrast of every label against the pixels behind it (WCAG 2: 4.5 : 1 under 24 px, 3 : 1 from 24 px) and reports any below it; the last build had none (the tightest is 4.69 : 1). `scripts/showcase/dive.mjs` renders the animation, and `scripts/showcase/shots.mjs` takes the screenshots in the dark theme with the app's default theme colour, *Viridian*, the logo's colour.
+
+![The Solar System, home of the showcase](docs/screenshots/hero.webp)
 
 ```sh
 npm run build
@@ -582,29 +778,23 @@ The made files are kept in `docs/brand/`: the board (`canvast-brand-guidelines.c
 
 The logo (a frame, a window cut from it a little low and to the right, and the dot in the window's middle), its colours (the app's default theme, Viridian, in light mode, with an orange dot) and its nine guideline pages are defined in `scripts/brand/pages.mjs`. The build draws them on one canvas as nine sheets with bookmarks: the glyph on the construction page is made with the Shape tool and *Subtract*, the crosses with the Path tool, the labels with the Text tool in Space Grotesk (from `scripts/showcase/fonts/`), and the cover's dot holds the mark again at 1/64, twenty times over (121 zoom levels). One drawing serves every size, the favicon too. The scripts work on a copy of `dist/canvast.html` in the system's temp folder. In the app the full-colour logo is only the favicon (inline in `src/index.html`); everywhere else the app shows the one-colour mark in the theme's text colour, so it follows light, dark and the theme colour: over the lock screen and beside the name in Settings > About and diagnostics (`src/ui/brand.ts`, which holds the same geometry as `pages.mjs`). The cover at the top of this README (`docs/brand/cover.webp`, made by `cover.mjs`) is drawn as a canvas in the app's default light theme: the multi-scale grid and the orange origin axes, the tile placed and selected with its dot on the origin, the wordmark standing on the x axis, and the app's status bar along the bottom.
 
-### Releasing
+---
 
-`npm run release` publishes `dist/canvast.html` and the desktop app's AppImage (`npm run package:desktop`, which must start before it is handed out), each with its SHA-256 (and the AppImage's `.zsync`, which updaters read), as the latest GitHub release (tag `vX.Y.Z`, the version in `package.json`). Run it after the version is bumped, `CHANGELOG.md` has its `## X.Y.Z — Title (date)` section and everything is pushed: it builds and checks the file, packages the AppImage, creates or updates the release, marks it **Latest** and reads it back to confirm that it is the latest and serves the same file. `npm run release -- --dry-run` does everything but publish and prints the notes. The notes are split into **Features** and **Fixes** from the CHANGELOG: a bullet that starts with `**Fixed:**` is a fix, any other (`**Added:**`, `**Changed:**`, `**Removed:**`) is a feature.
+## Platform support
 
-### Reproducible build
-
-The build is deterministic: the same source produces the same `canvast.html`, and `npm run build` prints its SHA-256. Dependencies are pinned to exact versions and line endings to LF.
+- **Desktop app:** Linux, x86_64 and aarch64 (Linux-first; see [The desktop app](#the-desktop-app-linux)). Watching the workspace folder for changes made outside the app is verified on Linux.
+- Requires `BigInt`, Pointer Events, `ResizeObserver`, Canvas 2D and IndexedDB. Roughly Chromium 67+, Firefox 68+, Safari 14+.
+- **Tested** in Chromium 156 (default, CPU-only, and devicePixelRatio 2 with touch) and Firefox 157 on Linux. **Not tested** in Safari.
+- Firefox on `file://` supports everything canvast uses (IndexedDB, Web Locks, BroadcastChannel) with frame times close to Chromium's.
 
 ---
 
-## Security and privacy
+## Licence
 
-- The page's Content Security Policy is `default-src 'none'` with `connect-src 'none'`: it cannot make network requests, even if code tried. Only inline script and style are allowed, images come from `blob:` and `data:`, and workers (if any) from `blob:`.
-- canvast has no runtime dependencies and makes no network requests. The interface font is supplied from memory, so no font source is allowed either. `npm run check:offline` and the end-to-end suite both verify this on every build.
-- Imports are limited to files of at most 256 MiB, and each is decoded before being stored. Files that fail to decode are rejected with a message.
-- Archives are verified completely (structure, checksums and content hashes) before anything is written.
-- Optional passwords for the workspace and for the Hidden items (see [Hidden items and passwords](#hidden-items-and-passwords)): only a salted PBKDF2 hash is kept, in this browser, and nothing is encrypted. The library index on disk and any export you decline to include them in carry neither hidden items nor passwords.
-- No analytics, no telemetry, no account.
+canvast is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License** as published by the Free Software Foundation, either **version 3** of the License, or (at your option) any later version. It is distributed in the hope that it will be useful, but without any warranty; see [LICENSE](LICENSE) for the full text. Copyright (C) 2026 emarpiee.
 
----
+The colour picker in `src/colour-picker/` is also published on its own and keeps its own MIT licence ([src/colour-picker/LICENSE](src/colour-picker/LICENSE)), with Björn Ottosson's notice for the OKHSL and OKHSV code.
 
-## Licences
-
-canvast is released under the [MIT licence](LICENSE), copyright (c) 2026 emarpiee. The built file bundles the Lucide icons (ISC) and the Inter font (SIL Open Font License 1.1); their notices are embedded at the top of `canvast.html` and listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Development-only dependencies, which are not shipped: TypeScript, esbuild, Vitest and Playwright. The showcase archive `showcase.canvast` also carries the Space Grotesk font (SIL Open Font License 1.1, copyright 2020 The Space Grotesk Project Authors) as two library files; the licence text is in [scripts/showcase/fonts/OFL.txt](scripts/showcase/fonts/OFL.txt).
+The built file bundles the Lucide icons (ISC) and the Inter font (SIL Open Font License 1.1); their notices are embedded at the top of `canvast.html` with canvast's own licence, and listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The desktop packages also contain Electron (MIT) and Chromium's licences, in the packaged app. Development-only dependencies, which are not shipped: TypeScript, esbuild, Vitest, Playwright and electron-builder. The showcase archive `showcase.canvast` also carries the Space Grotesk font (SIL Open Font License 1.1, copyright 2020 The Space Grotesk Project Authors) as two library files; the licence text is in [scripts/showcase/fonts/OFL.txt](scripts/showcase/fonts/OFL.txt).
 
 A history of changes is in [CHANGELOG.md](CHANGELOG.md).
