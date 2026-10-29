@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS recs (hash TEXT PRIMARY KEY, file TEXT, json TEXT NOT
 CREATE INDEX IF NOT EXISTS recs_file ON recs(file);
 CREATE TABLE IF NOT EXISTS seen (hash TEXT PRIMARY KEY, v TEXT NOT NULL) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS parts (key TEXT PRIMARY KEY, fp TEXT NOT NULL) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS changed (hash TEXT PRIMARY KEY) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL) WITHOUT ROWID;
 `;
 
@@ -66,6 +67,8 @@ export class Library {
       putMeta: db.prepare("INSERT OR REPLACE INTO meta VALUES (?, ?)"),
       delMeta: db.prepare("DELETE FROM meta WHERE k = ?"),
       byFile: db.prepare<[string], { hash: string }>("SELECT hash FROM recs WHERE file = ?"),
+      mark: db.prepare("INSERT OR IGNORE INTO changed VALUES (?)"),
+      unmark: db.prepare("DELETE FROM changed WHERE hash = ?"),
     };
   }
 
@@ -105,10 +108,9 @@ export class Library {
     const rows = this.db.prepare<[], { json: string }>(`SELECT json FROM entries WHERE ${where}`).raw().all() as unknown as string[][];
     return `[${rows.map((r) => r[0]).join(",")}]`;
   }
-  /** The items changed here since their line was last written or read (or never written): what the folder does not have yet. */
+  /** The items changed here since they were last written to the folder: what the folder does not have yet. */
   pending(): string[] {
-    const rows = this.db.prepare("SELECT e.hash AS hash, e.json AS entry, r.json AS rec, s.v AS v FROM entries e LEFT JOIN recs r ON r.hash = e.hash LEFT JOIN seen s ON s.hash = e.hash").raw().all() as Array<[string, string, string | null, string | null]>;
-    return rows.filter(([, e, r, v]) => seen(JSON.stringify(itemOf(JSON.parse(e) as CatalogEntry, r ? (JSON.parse(r) as AssetRecord) : undefined))) !== v).map(([h]) => h);
+    return (this.db.prepare("SELECT hash FROM changed").raw().all() as string[][]).map((r) => r[0]!);
   }
   /** Each part's fingerprint as last read or written. */
   parts(): Record<string, string> {
@@ -129,8 +131,10 @@ export class Library {
     if (ops.some((o) => o.t === "meta" && o.k === "hiddenBlanked")) this.db.pragma("wal_checkpoint(TRUNCATE)");
   }
 
-  private one(op: LibraryOp): void {
+  /** One change; `mark`: made here (the page's), so the folder does not have it yet (`changed`, until written). */
+  private one(op: LibraryOp, mark = true): void {
     const s = this.s;
+    if (mark && (op.t === "entry" || op.t === "rec")) s.mark.run(op.hash);
     if (op.t === "entry") {
       if (!op.v) return void s.delEntry.run(op.hash);
       const e = op.v;
@@ -163,6 +167,7 @@ export class Library {
     const sealedOut: LibraryItem[] = [];
     const drop: string[] = [];
     const seenOps: LibraryOp[] = [];
+    const written: string[] = [];
     const partOps: LibraryOp[] = [];
     for (const key of keys.sort()) {
       const items = rowsIn.all(key, `${key}z`).map((r) => itemOf(JSON.parse(r.entry) as CatalogEntry, r.rec ? (JSON.parse(r.rec) as AssetRecord) : undefined));
@@ -171,6 +176,7 @@ export class Library {
         if (isHiddenFile(i.file)) sealedOut.push(i);
         const v = seen(JSON.stringify(i));
         if (this.seenOf(i.hash) !== v) seenOps.push({ t: "seen", hash: i.hash, v });
+        written.push(i.hash);
       }
       if (key.length === 1) {
         if (fps[key]) (drop.push(key), partOps.push({ t: "part", k: key, v: null })); // (a part of the 16 of version 2: written again as parts of 256)
@@ -185,8 +191,9 @@ export class Library {
     }
     this.db.transaction(() => {
       for (const op of [...seenOps, ...partOps]) this.one(op);
-      if (only) for (const h of only) if (!this.entry(h)) this.one({ t: "seen", hash: h, v: null });
-      if (!only) this.db.exec("DELETE FROM seen WHERE hash NOT IN (SELECT hash FROM entries)");
+      for (const h of written) this.s.unmark.run(h);
+      if (only) for (const h of only) if (!this.entry(h)) (this.one({ t: "seen", hash: h, v: null }), this.s.unmark.run(h));
+      if (!only) this.db.exec("DELETE FROM seen WHERE hash NOT IN (SELECT hash FROM entries); DELETE FROM changed WHERE hash NOT IN (SELECT hash FROM entries)");
     })();
     const folders = (this.meta(FOLDERS_KEY) as AssetFolder[] | undefined) ?? [];
     const shown = visibleFolders(folders);
@@ -228,7 +235,8 @@ export class Library {
       const e = this.entry(hash);
       return !!e && seen(JSON.stringify(itemOf(e, this.rec(hash)))) !== (was ?? "");
     };
-    const take = (it: LibraryItem): void => {
+    /** `mark`: an item given here (a sync tool's copy, an older `library.json`, the sealed index), not read from a part: the parts do not have it yet. */
+    const take = (it: LibraryItem, mark = false): void => {
       const v = seen(JSON.stringify(it));
       const was = this.seenOf(it.hash);
       if (was === v) return; // (nothing new from the folder)
@@ -239,7 +247,7 @@ export class Library {
         const stub = { hash: it.hash, type: it.type, size: it.size, name: rec?.name ?? it.name, pixelW: it.pixelW, pixelH: it.pixelH, importedAt: it.importedAt, ...(it.card ? { card: true } : {}), ...(it.duration !== undefined ? { duration: it.duration } : {}), ...(it.frames !== undefined ? { frames: it.frames } : {}), ext: 1, file: it.file };
         ops.push({ t: "rec", hash: it.hash, v: stub as unknown as AssetRecord });
       }
-      for (const op of ops) this.one(op);
+      for (const op of ops) this.one(op, mark);
       took = true;
     };
     const listed = new Set(keys);
@@ -275,7 +283,7 @@ export class Library {
       onPart?.(++done, keys.length);
     }
     this.db.transaction(() => {
-      for (const it of extra) take(it);
+      for (const it of extra) take(it, true);
       for (const k of gone) dropFp.run(k);
       if (!deletions || !whole) return;
       const candidates = all ? (this.db.prepare("SELECT hash, v FROM seen").all() as Array<{ hash: string; v: string }>) : [...[...looked, ...gone].flatMap((k) => inRange.all(k, `${k}z`)), ...sealed.all()];
@@ -283,7 +291,7 @@ export class Library {
         if (present.has(c.hash) || unchanged.has(c.hash.slice(0, 2)) || unchanged.has(c.hash.slice(0, 1))) continue;
         if (changedHere(c.hash, c.v)) continue; // changed here: kept
         const e = this.entry(c.hash);
-        if (e?.state === "active") this.one({ t: "entry", hash: c.hash, v: { ...e, state: "deleted", deletedAt: Date.now() } });
+        if (e?.state === "active") this.one({ t: "entry", hash: c.hash, v: { ...e, state: "deleted", deletedAt: Date.now() } }, false);
         this.one({ t: "seen", hash: c.hash, v: null });
         took = true;
       }

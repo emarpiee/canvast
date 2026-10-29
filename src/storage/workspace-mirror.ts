@@ -568,7 +568,10 @@ export class WorkspaceMirror {
       .then(async () => {
         const took = await this.lib.reread();
         if (took) onChange();
-        if (took || this.vault.indexWaiting) this.library(); // (copies of the hidden index read into it are erased once it is written)
+        if (!took && !this.vault.indexWaiting) return;
+        // (only what the folder does not have yet; copies of the hidden index read into it are erased once it is written)
+        const w = await this.lib.pendingWrite();
+        this.library(w === true ? undefined : [...(w || [])]);
       })
       .catch((e: unknown) => this.onError?.(`The library of the workspace folder could not be read: ${(e as Error).message}.`));
     return this.running;

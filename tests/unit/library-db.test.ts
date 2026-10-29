@@ -40,6 +40,9 @@ describe("library database (desktop)", () => {
     const lib = new Library(openLibraryDb(":memory:"));
     const f = folder([item(1), item(2)]);
     lib.sync(f.keys, f.read, [], true);
+    // An item given here (from a sync tool's copy) is not in the parts yet: it is to be written.
+    lib.sync([], () => null, [item(9)], false);
+    expect(lib.pending()).toEqual([item(9).hash]);
     expect(lib.sync([...f.keys, "ff"], (k) => (k === "ff" ? Buffer.from("{oops") : null), [], true).whole).toBe(false);
     expect(lib.entry(item(1).hash)!.state).toBe("active");
     const g = folder([item(2)]);

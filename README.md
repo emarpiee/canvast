@@ -89,7 +89,7 @@ canvast comes in two forms. Both are the same app; they differ in where your wor
 | --- | --- | --- |
 | What you download | `canvast.html`, one file | A package: AppImage, `.deb`, `.rpm` or `.tar.gz` |
 | Where your work is kept | The browser's own storage (IndexedDB) | A folder you choose, as ordinary files |
-| Library size | Limited by the browser's storage quota | Limited by your disk |
+| Library size | Limited by the browser's storage quota | Limited by your disk; a library of a million files opens (its index on this device is a SQLite database) |
 | Hidden items | Hidden behind a password, not encrypted | Encrypted on disk |
 | Updates | Download the new file | The AppImage updates itself; see [Updating](#updating) |
 
@@ -656,6 +656,7 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 **How it saves**
 
 - **Every edit** is saved first in the app's own storage on this device, then written to the folder about 2 seconds after editing pauses, and when the window closes.
+- **The library on this device** (its items, names, tags, folders and where each file is) is kept in a SQLite database in the app's own data folder (`~/.config/canvast/library-db/`), not in the workspace folder. It is a working copy of the folder's library files: a new device, or one whose copy was deleted, makes it again from them. Only the parts of the library that changed are read at start-up and written after an edit.
 - **Names on disk** are safe versions of the names in the app: lowercase, `_` between words, `-` between parts, `-2` on a clash. `Hand Study (Loomis).png` becomes `library/images/hand_study-loomis.png`, and the same file is stored once.
 - **Library folders are real folders.** An item filed in a library folder lives under `library/<folder path>/`; an unfiled one under its kind's folder. Filing or renaming an item moves its file; the library's undo moves it back; an emptied folder of a renamed or deleted library folder is removed.
 - **Deleted files** (one undo no longer needs, a deleted canvas or board) go where Settings > Storage says: into `.trash/` in the workspace folder (the default, so it syncs and can be put back by hand), into the system trash, or away for good.
@@ -844,7 +845,7 @@ These are canvast's current limits: first those of both versions, then those of 
 | Dense scenes | With hundreds to thousands of objects visible at once, zooming shows a briefly scaled image of the last exact frame and snaps to the exact picture about 150 ms after you stop. Zooming out before the next level out has been prepared (it is made while the view rests, in a fraction of a second), the edge the scaled image does not reach is drawn exactly, so those frames are slower but the view is never cut off. A zoom that goes more than one level in one gesture pauses for one exact frame at each level it has nothing prepared for |
 | Far zoom-out | Content too small to draw is shown as a soft mark in its own colour (pictures as grey). Marks cannot be selected; zoom in to edit |
 | Very large documents | A board of one million objects needs about 940 MB of memory and about 6 s to build its index on load |
-| Large libraries | The Library draws only the cards near the view, so scrolling stays smooth however deep you go (measured with 20,000 items: opening about 1 s, wheel scrolling at 60 frames a second at the top and at the end, no stall while typing a search). Search results are redrawn when typing pauses for a quarter of a second. A thumbnail missing from storage is made from its file, three at a time. Backups of many gigabytes have not been measured; an import holds about one 128 MiB batch of files in memory at a time, and each canvas is read whole |
+| Large libraries | The Library draws only the cards near the view, so scrolling stays smooth however deep you go (measured with 20,000 items: opening about 1 s, wheel scrolling at 60 frames a second at the top and at the end, no stall while typing a search). Search results are redrawn when typing pauses for a quarter of a second. A thumbnail missing from storage is made from its file, three at a time. Backups of many gigabytes have not been measured; an import holds about one 128 MiB batch of files in memory at a time, and each canvas is read whole. Desktop app, measured on a GitHub runner: a library of 300,000 files opens in about 24 s the first time on a device and 3 s after; one of a million files in about 2 minutes the first time and 16 s after. The Library view still holds every item in memory (about 600 MB at a million) and lists a million about a minute after the app opens |
 | Frame rate | Measured on one desktop machine; no results exist for other device classes |
 
 **Platform**
@@ -913,6 +914,7 @@ Every object is validated before it enters the document or is loaded: finite num
 ### Storage
 
 - **One boundary.** The app reaches storage only through the interfaces in `src/storage/store.ts` (the workspace, backups, the library's entries and its files). The browser's IndexedDB is one implementation (`src/storage/idb-storage.ts`), the workspace folder the other; `npm run check:storage` keeps IndexedDB out of the rest of the code.
+- **The desktop library is SQLite.** In the desktop app the library's entries and the records of its files are in a SQLite database ([better-sqlite3](https://github.com/WiseLibs/better-sqlite3), in the main process: `desktop/library-db.ts`), one per workspace in the app's data folder; the page reaches it through the preload bridge (`src/storage/desktop-library.ts`), never with SQL. The main process reads and writes the library's part files itself, so a million items never pass through the page to open or save. The page's IndexedDB keeps the canvases, thumbnails and passwords. The database is a working copy: the part files in the workspace folder stay what the devices share.
 - **Layout:** Workspace → Boards → Canvases. The IndexedDB schema (version 13) has stores for workspaces, boards, canvases, objects (one record each), per-canvas views, frames, bookmarks, thumbnails, assets, the asset catalog and metadata.
 - **Files** are content-addressed by SHA-256 and stored once; objects on the canvas reference them. They are removed only by reference-checked garbage collection.
 - **Several tabs:** a writer lease guarantees a stale tab cannot overwrite newer data.

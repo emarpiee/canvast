@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.51.0: the desktop library in SQLite (2026-10-30)
+
+- **Implemented:** the desktop library (entries, file records, seen marks, part fingerprints, the library's own values) in SQLite through `better-sqlite3` in the main process (`desktop/library-db.ts`, IPC `canvast:lib`); the main process reads (`sync`) and writes (`write`) the part files; `DesktopCatalog`, `DesktopOriginals` and `LibraryMirror` on it (`src/storage/desktop-library.ts`); backups and ZIP exports read it, imports write it; an existing device's library moves in once; start-up writes only pending items. ADR 0177, "The library in SQLite".
+- **Tested:** unit (`tests/unit/library-db.test.ts`: sync, this device's change wins, erasing, missing parts, the writer, pending); the whole quick suite on GitHub (desktop project included).
+- **Known failures:** none from this change. A Firefox video play/pause check (Extract frame) failed once on GitHub, unrelated to storage.
+- **Unverified:** the aarch64 packages (built on GitHub at release, each with its own ready-made module). The x86_64 AppImage and tarball built locally start and write a workspace folder, with the module unpacked beside the app archive.
+- **Committed:** branch `sqlite-desktop`, not merged.
+- **Next bounded task:** the Library view lists from the database a page at a time (it still receives the whole list: about 600 MB and a minute at a million).
+
 ## v0.50.60: quick check of library files (2026-10-30)
 
 **Implemented:** #16 quick check: `FolderSync.checkFiles(onStep, quick)` compares each library file's size (`bridge.sizes`, batches of 500) with its item's; palette command *Check library files (quick)*.

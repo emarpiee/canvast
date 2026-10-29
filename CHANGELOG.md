@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.51.0 — The desktop library in SQLite (2026-10-30)
+
+- **Changed:** the desktop app keeps the library on each device in a SQLite database (in the app's own data folder) instead of the page's storage. It reads and writes the library's files itself, only the parts that changed. Measured on a GitHub runner: a library of 300,000 files opens in about 24 s the first time on a device (56 s before) and 3 s after (9 s before); one of a million files now opens (about 2 minutes the first time, 16 s after), where before it did not open in 30 minutes. The workspace folder's files are unchanged; the first start moves what this device held of the library into the database.
+- **Changed:** in the desktop app, start-up writes only the library items changed on this device since their last write, not the whole library.
+
 ## 0.50.60 — Quick check of library files (2026-10-30)
 
 - **Added:** *Check library files (quick)* (command palette, desktop app): looks only at each library file's presence and size, without reading it, and names those gone or of another size than the library knows. It takes seconds on a big library; the full check still finds same-size changes.

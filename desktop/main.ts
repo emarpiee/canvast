@@ -547,7 +547,7 @@ function installFileCalls(win: BrowserWindow, root: string): void {
         return l.parts();
       }
       case "reset":
-        return void l.db.exec("DELETE FROM entries; DELETE FROM recs; DELETE FROM seen; DELETE FROM parts; DELETE FROM meta;");
+        return void l.db.exec("DELETE FROM entries; DELETE FROM recs; DELETE FROM seen; DELETE FROM parts; DELETE FROM meta; DELETE FROM changed;");
       default:
         throw new Error("not a library call");
     }
