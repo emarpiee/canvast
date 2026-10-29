@@ -141,7 +141,7 @@ Your workspace folder is never touched by an update.
 
 ### Uninstalling
 
-Remove the app the way you installed it (`sudo apt remove canvast`, `sudo dnf remove canvast`, or delete the AppImage or the unpacked folder). Your workspace folders stay where they are. The app's own working copy and settings on this device are in `~/.config/canvast/`; delete that folder too to remove everything. For the browser version, delete the file and clear the site data of `file://` pages in the browser (this deletes the work kept there: export a backup first).
+Remove the app the way you installed it (`sudo apt remove canvast`, `sudo dnf remove canvast`, or delete the AppImage or the unpacked folder). Your workspace folders stay where they are. The app's own working copy and settings on this device are in `~/.config/canvast/`; delete that folder too to remove everything. For the browser version, delete the file and clear the site data of `file://` pages in the browser (for the online copy, the site data of `emarpiee.github.io`); this deletes the work kept there, so export a backup first.
 
 ### Building from source
 
@@ -547,7 +547,7 @@ Open Settings with the gear button. Settings have a *device* scope and a *canvas
 | Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, Actions bar place, item names, density (comfortable, compact, dense), round or sharp corners, Zen mode |
 | Panels | Minimize inactive panels, panels kept open |
 | Performance | Adaptive quality, fixed quality level, memory for pictures, animation and its speed |
-| Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, changes only, files as ZIP, import); *Start from scratch* (delete all data, after a warning with a backup offered first) |
+| Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, changes only, files as ZIP, import); in the desktop app, where deleted files go and *Delete library files at once*; *Start from scratch* (delete all data, after a warning with a backup offered first) |
 | Privacy | The word that opens the Hidden items, keeping them open until the tab closes, and the passwords of the workspace and of the Hidden items; what stays on your machine |
 | About and diagnostics | Version and diagnostics |
 | Develop | Developer tools (see [Building from source](#building-from-source)) |
@@ -690,7 +690,7 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 To report a security problem, see [SECURITY.md](SECURITY.md).
 
 - The page's Content Security Policy is `default-src 'none'` with `connect-src 'none'`: it cannot make network requests, even if code tried. Only inline script and style are allowed, images come from `blob:` and `data:`, and workers (if any) from `blob:`.
-- canvast has no runtime dependencies and makes no network requests. The interface font is supplied from memory, so no font source is allowed either. `npm run check:offline` and the end-to-end suite both verify this on every build. The desktop app is the same page in Electron: it opens no connection either (its updates are fetched by an AppImage updater, not by the app).
+- canvast has no runtime dependencies and makes no network requests (the [online copy](#trying-it-online) is fetched once, as the page itself, and then makes none either). The interface font is supplied from memory, so no font source is allowed either. `npm run check:offline` and the end-to-end suite both verify this on every build. The desktop app is the same page in Electron: it opens no connection either (its updates are fetched by an AppImage updater, not by the app).
 - Imports are limited to files of at most 256 MiB, and each is decoded before being stored. Files that fail to decode are rejected with a message.
 - Archives are verified completely (structure, checksums and content hashes) before anything is written.
 - Optional passwords for the workspace and the Hidden items (see [Hidden items and passwords](#hidden-items-and-passwords)). Only a salted PBKDF2 hash of the workspace password is kept.
@@ -1019,6 +1019,9 @@ The build is deterministic: the same source produces the same `canvast.html`, an
 | `npm run check:offline` | Fail if the built file references anything outside itself |
 | `npm run check:tokens` | Fail on a hard-coded colour, size, space or radius in the CSS |
 | `npm run check:storage` | Fail if code outside the storage implementation uses IndexedDB instead of the storage interfaces |
+| `npm run check:names` | Fail if certain other products' names appear in the app's source or the built file |
+| `npm run check:groups` | Fail if an end-to-end spec is in no test group |
+| `npm run check:repro` | Build twice in different folders, time zones and locales and compare (see [Reproducible build](#reproducible-build)) |
 
 **How the tests work**
 
