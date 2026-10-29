@@ -2289,6 +2289,7 @@ test("Extract frame follows Settings > Media and playback: name template and sty
   // top, never under it: with the controls hidden it brings them back.
   const player = viewer.getByTestId("viewer-media-bar");
   const gifBox = async () => (await viewer.locator("canvas.viewer-gif").boundingBox())!;
+  await expect(player).toBeVisible(); // (once the GIF is read: a slow machine takes a moment)
   await expect.poll(async () => (await player.boundingBox())!.y, "over the picture").toBeLessThan((await gifBox()).y + (await gifBox()).height);
   expect((await viewer.locator(".viewer-hide").boundingBox())!.y + 40, "the hide button is at the top").toBeLessThan((await player.boundingBox())!.y);
   await viewer.locator(".viewer-hide").click();

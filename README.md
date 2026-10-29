@@ -1,4 +1,32 @@
-<h1 align="center"><img src="docs/brand/cover.webp" width="100%" alt="canvast: every point is a canvas. An offline-first endless canvas: one HTML file, no account, works offline."></h1>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/header-logo-dark.png">
+    <img src="docs/brand/header-logo-light.png" width="536" alt="canvast">
+  </picture>
+</p>
+
+<h3 align="center">An endless canvas for drawing and references</h3>
+
+<p align="center">One HTML file, or a desktop app for Linux. It works offline, with no account.</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/header-figures-dark.png">
+    <img src="docs/brand/header-figures-light.png" width="616" alt="1 file · 2.3 MB · 0 network requests · no zoom limit">
+  </picture>
+</p>
+
+<p align="center">
+  <a href="https://github.com/emarpiee/canvast/actions/workflows/tests.yml"><img src="https://github.com/emarpiee/canvast/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
+  <a href="https://github.com/emarpiee/canvast/actions/workflows/ci.yml"><img src="https://github.com/emarpiee/canvast/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/emarpiee/canvast/releases/latest"><img src="https://img.shields.io/github/v/release/emarpiee/canvast?label=release&color=007B69" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/emarpiee/canvast?color=007B69" alt="Licence: GPL-3.0"></a>
+  <a href="#installation"><img src="https://img.shields.io/badge/runs_on-Linux_%C2%B7_any_browser-007B69" alt="Runs on Linux and in any modern browser"></a>
+</p>
+
+![Thirty seconds of canvast: a zoom from the cosmos down to a leaf and one million zoom levels down, then the app's features and its logo](docs/screenshots/canvast-30s.gif)
+
+*Thirty seconds of canvast: the zoom through the showcase file below, from 30 levels out to one million levels in, recorded in the app, then a few of its features.*
 
 **An offline-first endless canvas.** Pan in any direction and zoom in or out without ever reaching an edge or a zoom limit. Draw, write, place pictures, video and audio, and edit at whatever scale you reach. canvast is **one self-contained HTML file** that runs from your disk, and a **Linux desktop app** whose workspace is a folder of ordinary files: no server, no account, no network connection.
 
@@ -6,10 +34,6 @@
 - **Yours, on your machine.** In the browser everything is saved in the browser's own storage; in the desktop app, in a folder you choose, as plain files any sync or backup tool can see. Nothing is uploaded, ever. Back up to a single `.canvast` file whenever you like.
 - **Made for projects, with a Library for what they use.** Storyboards, mood boards, references, sketches: from a small board to a very large one. Pictures, video and files you place are kept in the Library, where you can tag, sort into folders, search and reuse them. In the browser the library lives in the browser's storage, which has a size limit; the desktop app keeps it on your disk (see [Limitations](#limitations)).
 - **One file, or a desktop app.** Copy `canvast.html` anywhere (a folder, a USB stick) and open it, or install the desktop app on Linux (see [Installation](#installation)).
-
-![Thirty seconds of canvast: a zoom from the cosmos down to a leaf and one million zoom levels down, then the app's features and its logo](docs/screenshots/canvast-30s.gif)
-
-*Thirty seconds of canvast: the zoom through the showcase file below, from 30 levels out to one million levels in, recorded in the app, then a few of its features.*
 
 ## Contents
 
@@ -654,6 +678,8 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 
 ### What stays on your machine
 
+To report a security problem, see [SECURITY.md](SECURITY.md).
+
 - The page's Content Security Policy is `default-src 'none'` with `connect-src 'none'`: it cannot make network requests, even if code tried. Only inline script and style are allowed, images come from `blob:` and `data:`, and workers (if any) from `blob:`.
 - canvast has no runtime dependencies and makes no network requests. The interface font is supplied from memory, so no font source is allowed either. `npm run check:offline` and the end-to-end suite both verify this on every build. The desktop app is the same page in Electron: it opens no connection either (its updates are fetched by an AppImage updater, not by the app).
 - Imports are limited to files of at most 256 MiB, and each is decoded before being stored. Files that fail to decode are rejected with a message.
@@ -1045,6 +1071,7 @@ node scripts/brand/icons.mjs docs/brand/icons/      # the logo files: SVG master
 node scripts/brand/preview.mjs preview/ 1,3         # a quick look at pages without the app
 node scripts/brand/cover.mjs docs/brand/cover.webp  # the cover at the top of this README (cwebp -q 85)
 node scripts/brand/cover.mjs social.png 800         # the same cover at 2:1, scaled to 1280 × 640 for docs/brand/social-preview.png
+node scripts/brand/header.mjs docs/brand/            # the README's header: the logo with the wordmark, and the line of figures (dark and light)
 ```
 
 The made files are kept in `docs/brand/`: the board (`canvast-brand-guidelines.canvast`, open it with **Import archive…**), the logo files in `icons/`, the page pictures in `previews/`, the cover and `social-preview.png` (the cover drawn at 2:1 and scaled to 1280 × 640 for the repository).
@@ -1070,10 +1097,12 @@ The made files are kept in `docs/brand/`: the board (`canvast-brand-guidelines.c
 
 | You want to | How |
 | --- | --- |
-| **Report a bug** | [Open an issue](https://github.com/emarpiee/canvast/issues/new/choose) with the bug report form: what you did, what you expected, what happened, and whether it was the browser version (which browser) or the desktop app, with the version from Settings > About and diagnostics. *Save a report* there adds the details that help |
-| **Ask for a feature** | [Open an issue](https://github.com/emarpiee/canvast/issues/new/choose) with the feature request form. Check [Limitations](#limitations) first: it may already be listed |
-| **Send a change** | Pull requests are welcome. Fork the repository, make one change per pull request, and say what it does and why. Run `npm test` before sending it (see [Building from source](#building-from-source) and [Testing](#testing)); GitHub runs the checks and the end-to-end suite on it too. Keep the README true to the change. `CLAUDE.md` holds the project's conventions (design tokens instead of fixed CSS values, one icon per function, tests from a snapshot build) |
+| **Report a bug** or **ask for a feature** | [Open an issue](https://github.com/emarpiee/canvast/issues/new/choose) with its form; [CONTRIBUTING.md](CONTRIBUTING.md) says what helps |
+| **Send a change** | Pull requests are welcome: [CONTRIBUTING.md](CONTRIBUTING.md) has the steps and the project's rules |
+| **Report a security problem** | Privately, as [SECURITY.md](SECURITY.md) says, not in a public issue |
 | **Support the developer** | If canvast helps your work, you can support its development through [PayPal](https://paypal.me/emarpiee) |
+
+Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
 
 ---
 

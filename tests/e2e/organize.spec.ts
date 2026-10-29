@@ -638,6 +638,7 @@ test("the workspace menu's ⋯ menu opens right beside its button, even though t
   await btn.click();
   const menu = p.getByRole("menu", { name: /^Actions for canvas / });
   await expect(menu).toBeVisible();
+  await menu.evaluate((el) => Promise.all(el.getAnimations().map((a) => a.finished))); // (where it settles, not part-way through its pop-in)
   const b = (await btn.boundingBox())!;
   const m = (await menu.boundingBox())!;
   expect(Math.abs(m.y - (b.y + b.height))).toBeLessThan(12); // just under the button
