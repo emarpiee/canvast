@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.40 to v0.50.43: undo re-selects, font cards, search keywords, saved searches, delete at once (2026-10-29)
+
+**Implemented:** undoing a delete brings the items back selected (every kind); a font's card on the canvas shows "Aa" in the font; library and canvas search keywords (`kind:`, `is:`, `uses>`, `date:`, `on:`, `folder:`, `note:`, `field:`, `duration>`; `group:`, `in:`, `fill:`, `stroke:`); saved searches in both search boxes ([ADR 0178](adr/0178-saved-searches.md)); *Delete library files at once* (desktop); CI reports failed tests as annotations.
+**Tested:** unit suite (all passed); the specs each change reaches, in Chromium and Firefox (desktop spec for the desktop setting), from snapshots.
+**Known failures:** none new. A `library · chromium` job failed once on GitHub (a96696d) and passed on the re-run; its log could not be read here.
+**Unverified:** the saved-search chips and the save button on a narrow screen; `duration>` on a large library (lengths are read from each media file once).
+**Committed:** on `main`, not pushed.
+**Next bounded task:** big library step 2 (incremental library writes, `library.json` in parts), after the owner confirms the format.
+
 ## v0.50.34 to v0.50.39: packages and tests on GitHub, the viewer's player, a tidier repository (2026-10-29)
 
 **Implemented:** release packages built on GitHub (x86_64 and aarch64) and the end-to-end suite on GitHub by group and project; the viewer's player floats over the picture and fades (Hide the player setting); its hide/show-controls button beside the details button; Show in file manager (desktop); the version in the window and tab titles; stale workflows, plans, spike code and notes removed.
