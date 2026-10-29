@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.43 — Delete library files at once (2026-10-29)
+
+- **Added:** *Delete library files at once* in Settings > Storage (desktop app, off by default): a file deleted from the library leaves the folder at once, to where *Deleted files go* sends it, instead of when undo on the open canvas no longer needs it. Undoing then shows the picture as missing until its file is back in `library/`.
+
 ## 0.50.42 — Saved searches (2026-10-29)
 
 - **Added:** saved searches in the canvas search and the library search, each with its own list. The save button in the box keeps the search typed (pressed while it is saved; press it again to remove it). With the box empty, the eight used last are listed above the recent ones, with how many more there are; while typing, the saved ones that hold the typed words are offered. Up to 200 per list, kept on this device and carried in a workspace backup with the settings.

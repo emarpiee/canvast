@@ -101,6 +101,16 @@ test("library files are readable files under library/: the same bytes once, -2 o
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.instances, e.present]).sort())), { timeout: 10_000 }).toEqual([[1, true], [2, true]]);
     expect(await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.missing.length))).toBe(0);
     expect(existsSync(join(ws, ".trash"))).toBe(false);
+    // Deleted everywhere: the file stays while undo on the open canvas could bring its picture back...
+    const hashOf = (n: number) => page.evaluate((k) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.instances === k)!.hash), n);
+    const blueHash = await hashOf(1);
+    expect(await page.evaluate((h) => window.__canvastDebug.deleteEverywhere([h]), blueHash)).toBe(1);
+    expect(files(ws).filter((f) => f.startsWith("library/"))).toContain("library/images/hand_study-loomis-2.png");
+    // ...unless Settings > Storage says "Delete library files at once": then it goes to .trash with the next delete.
+    const redHash = await hashOf(2);
+    await page.evaluate(() => window.__canvastDebug.setSetting("storage.deleteAtOnce", true));
+    expect(await page.evaluate((h) => window.__canvastDebug.deleteEverywhere([h]), redHash)).toBe(1);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/") || f.startsWith(".trash/")).sort()).toEqual([".trash/library/images/hand_study-loomis-2.png", ".trash/library/images/hand_study-loomis.png"]);
   } finally {
     await app.close();
   }

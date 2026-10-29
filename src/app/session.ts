@@ -293,9 +293,12 @@ export class Session {
   }
 
   /** Hashes the open document can still bring back without storage: its objects and undo/redo states. */
+  /** The desktop app's "Delete library files at once": undo history no longer keeps a deleted original (set by the app). */
+  deleteAtOnce: () => boolean = () => false;
+
   gcRoots(): Set<string> {
     const roots = new Set<string>();
-    for (const o of this.doc.retainedObjects()) {
+    for (const o of this.deleteAtOnce() ? this.doc.all() : this.doc.retainedObjects()) {
       const a = assetOf(o);
       if (a) roots.add(a);
     }

@@ -227,6 +227,8 @@ export interface DebugHook {
   storedAssetHashes(): Promise<string[]>;
   /** Run asset garbage collection now (writer only). */
   gc(): Promise<GcReport | null>;
+  /** Delete library items with their instances everywhere (the library's "Delete everywhere"): how many were deleted. */
+  deleteEverywhere(hashes: string[]): Promise<number>;
   /** Hashes the open document and its undo/redo history can still use. */
   gcRoots(): string[];
   /**
@@ -636,6 +638,7 @@ export function installDebugHook(
       return (keys as string[]).sort();
     },
     gc: () => session.collectGarbage(),
+    deleteEverywhere: (hashes) => session.deleteAssetsEverywhere(hashes),
     gcRoots: () => [...session.gcRoots()].sort(),
     forceCatalogState: async (hash, state) => {
       const tx = (session.storage as IdbStorage).db.transaction("assetCatalog", "readwrite");
