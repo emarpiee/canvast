@@ -115,7 +115,7 @@ export function normalizeTags(tags: readonly string[]): string[] {
   return out;
 }
 
-function folderName(name: string): string {
+export function folderName(name: string): string {
   const n = name.replace(/\s+/g, " ").trim();
   if (!n) throw new CatalogInputError("a folder needs a name");
   if (n.length > MAX_FOLDER_NAME) throw new CatalogInputError(`a folder name can be at most ${MAX_FOLDER_NAME} characters`);
@@ -204,7 +204,7 @@ export function entryFromRecord(r: AssetRecord): CatalogEntry {
   };
 }
 
-const usageOf = (m: Map<string, { instances: number; canvases: Set<string> }>, hash: string): Usage => {
+export const usageOf = (m: Map<string, { instances: number; canvases: Set<string> }>, hash: string): Usage => {
   const u = m.get(hash);
   return { instances: u?.instances ?? 0, canvases: u?.canvases.size ?? 0, canvasIds: u ? [...u.canvases] : [] };
 };

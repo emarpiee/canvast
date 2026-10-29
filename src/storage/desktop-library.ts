@@ -1,0 +1,460 @@
+/**
+ * The desktop build's library in the page (ADR 0177): the entries and the originals' records live in the main process's SQLite file
+ * (`desktop/library-db.ts`), reached through `LibraryCalls`; thumbnails, the password locks and the canvases (which items use) stay
+ * in the page's IndexedDB. `DesktopCatalog` is the browser build's `AssetCatalog` on that storage, operation for operation.
+ */
+import type { AssetFolder, AssetLocation, CatalogEntry, CatalogListing, GcReport, MetaChange, MetaSnapshot, PasswordKind, ThumbRecord } from "../assets/asset-catalog";
+import { AssetInUseError, CatalogInputError, FOLDERS_KEY, entryFromRecord, folderName, folderSubtree, meta, normalizeFields, normalizeNote, normalizeTags, usageOf, visibleFolders } from "../assets/asset-catalog";
+import type { AssetRecord } from "../assets/asset-library";
+import { cleanFileName } from "../doc/rename-rules";
+import { formatTag, formatTags, renamedTag, tagIsOrUnder } from "../doc/tags";
+import type { LibraryCalls, LibraryOp } from "./desktop-bridge";
+import { externalFolder } from "./external-folder";
+import { done, idbGet, req } from "./idb";
+import type { CatalogStore } from "./store";
+
+/** The library calls, with every change made one after another (a read, then its write, never interleaved with another's). */
+export class DesktopLibrary {
+  private chain: Promise<unknown> = Promise.resolve();
+
+  constructor(readonly calls: LibraryCalls) {}
+
+  /** Run `fn` after every change asked before it has finished (the page's stand-in for an IndexedDB readwrite transaction). */
+  serial<T>(fn: () => Promise<T>): Promise<T> {
+    const run = this.chain.then(fn, fn);
+    this.chain = run.catch(() => undefined);
+    return run;
+  }
+
+  async entry(hash: string): Promise<CatalogEntry | undefined> {
+    return (await this.calls.get([hash]))[0]?.[1] ?? undefined;
+  }
+  async rec(hash: string): Promise<AssetRecord | undefined> {
+    return (await this.calls.get([hash]))[0]?.[2] ?? undefined;
+  }
+  /** Entries and records of some items. */
+  async rows(hashes: readonly string[]): Promise<{ entries: Map<string, CatalogEntry>; recs: Map<string, AssetRecord>; seen: Map<string, string> }> {
+    const entries = new Map<string, CatalogEntry>();
+    const recs = new Map<string, AssetRecord>();
+    const seen = new Map<string, string>();
+    for (let at = 0; at < hashes.length; at += 5000) {
+      for (const [h, e, r, s] of await this.calls.get(hashes.slice(at, at + 5000))) {
+        if (e) entries.set(h, e);
+        if (r) recs.set(h, r);
+        if (s !== null) seen.set(h, s);
+      }
+    }
+    return { entries, recs, seen };
+  }
+  async entries(which: "all" | "active" | "deleted" = "all"): Promise<CatalogEntry[]> {
+    return JSON.parse(await this.calls.entries(which)) as CatalogEntry[];
+  }
+  async recs(): Promise<AssetRecord[]> {
+    return JSON.parse(await this.calls.recs()) as AssetRecord[];
+  }
+  async folders(): Promise<AssetFolder[]> {
+    return ((await this.calls.meta(FOLDERS_KEY)) as AssetFolder[] | null) ?? [];
+  }
+  apply(ops: readonly LibraryOp[]): Promise<void> {
+    return ops.length ? this.calls.apply(ops) : Promise.resolve();
+  }
+}
+
+const putEntry = (e: CatalogEntry): LibraryOp => ({ t: "entry", hash: e.hash, v: e });
+const putFolders = (folders: AssetFolder[]): LibraryOp => ({ t: "meta", k: FOLDERS_KEY, v: folders });
+
+export class DesktopCatalog implements CatalogStore {
+  /** False: a hidden item is encrypted, its thumbnail is made in memory only, never stored (ADR 0177). */
+  keepHiddenThumbs = false;
+
+  constructor(
+    readonly db: IDBDatabase,
+    readonly lib: DesktopLibrary,
+  ) {}
+
+  async healStubs(): Promise<void> {
+    // (records here never held bytes)
+  }
+
+  async thumbHashes(): Promise<string[]> {
+    const tx = this.db.transaction("thumbs", "readonly");
+    return (await req(tx.objectStore("thumbs").getAllKeys())) as string[];
+  }
+
+  async thumb(hash: string): Promise<ThumbRecord | undefined> {
+    const tx = this.db.transaction("thumbs", "readonly");
+    return req(tx.objectStore("thumbs").get(hash) as IDBRequest<ThumbRecord | undefined>);
+  }
+
+  /** (`AssetCatalog.healThumbs`: thumbnails of types that do not always decode, dropped once.) */
+  async healThumbs(): Promise<void> {
+    const KEY = "thumbVersion";
+    if (((await idbGet<number>(this.db, "meta", KEY)) ?? 1) >= 2) return;
+    const ok = /^(image\/(png|jpeg|webp|gif|avif|bmp)|video\/|audio\/)/;
+    const drop = (await this.lib.entries()).filter((e) => !ok.test(e.type)).map((e) => e.hash);
+    const tx = this.db.transaction(["meta", "thumbs"], "readwrite");
+    for (const h of drop) tx.objectStore("thumbs").delete(h);
+    tx.objectStore("meta").put(2, KEY);
+    await done(tx);
+  }
+
+  renameAssets(changes: ReadonlyArray<{ hash: string; name: string }>): Promise<number> {
+    return this.lib.serial(async () => {
+      const { entries } = await this.lib.rows(changes.map((c) => c.hash));
+      const ops: LibraryOp[] = [];
+      for (const c of changes) {
+        const name = cleanFileName(c.name);
+        if (!name) throw new CatalogInputError("a name cannot be empty");
+        const e = entries.get(c.hash);
+        if (!e || e.state !== "active" || e.name === name) continue;
+        const next = { ...e, name };
+        entries.set(c.hash, next);
+        ops.push(putEntry(next));
+      }
+      await this.lib.apply(ops);
+      return ops.length;
+    });
+  }
+
+  async lock(kind: PasswordKind): Promise<string | null> {
+    return (await idbGet<string>(this.db, "meta", `${kind}Lock`)) ?? null;
+  }
+
+  async setLock(kind: PasswordKind, lock: string | null): Promise<void> {
+    const tx = this.db.transaction("meta", "readwrite", { durability: "strict" });
+    if (lock === null) tx.objectStore("meta").delete(`${kind}Lock`);
+    else tx.objectStore("meta").put(lock, `${kind}Lock`);
+    await done(tx);
+  }
+
+  healTags(): Promise<void> {
+    return this.lib.serial(async () => {
+      if (((await this.lib.calls.meta("tagFormat")) as number | null) ?? 0) return;
+      const ops: LibraryOp[] = [];
+      for (const e of await this.lib.entries()) {
+        const tags = e.tags ?? [];
+        if (!tags.length) continue;
+        let next: string[];
+        try {
+          next = formatTags(tags);
+        } catch {
+          next = tags;
+        }
+        if (next.length !== tags.length || next.some((t, i) => t !== tags[i])) ops.push(putEntry({ ...e, tags: next }));
+      }
+      await this.lib.apply([...ops, { t: "meta", k: "tagFormat", v: 1 }]);
+    });
+  }
+
+  async putThumb(rec: ThumbRecord): Promise<void> {
+    // Not for an item erased in the meantime: nothing would ever remove it.
+    const e = await this.lib.entry(rec.hash);
+    if (!e || (!this.keepHiddenThumbs && e.hidden)) return;
+    const tx = this.db.transaction("thumbs", "readwrite");
+    tx.objectStore("thumbs").put(rec);
+    await done(tx);
+  }
+
+  async relist(prev: CatalogListing): Promise<CatalogListing | null> {
+    const folders = visibleFolders(await this.lib.folders()).sort((a, b) => a.name.localeCompare(b.name));
+    const entries = await this.lib.entries();
+    const was = new Map(prev.entries.map((e) => [e.hash, e]));
+    const active = entries.filter((e) => e.state === "active");
+    if (active.length !== prev.entries.length) return null;
+    const out: CatalogListing["entries"] = [];
+    for (const e of active) {
+      const p = was.get(e.hash);
+      if (!p) return null;
+      out.push({ ...e, instances: p.instances, canvases: p.canvases, canvasIds: p.canvasIds, present: p.present });
+    }
+    return { entries: out, missing: prev.missing, pendingDeletion: entries.length - active.length, folders };
+  }
+
+  async list(): Promise<CatalogListing> {
+    const [folders, entries, stubs] = await Promise.all([this.lib.folders(), this.lib.entries(), this.lib.recs()]);
+    const usage = await this.usage();
+    // (originals whose bytes the page's storage still holds: an import's, not written out yet)
+    const held = new Set((await req(this.db.transaction("assets", "readonly").objectStore("assets").getAllKeys())) as string[]);
+    const have = await externalFolder.hasMany(stubs.filter((s) => s.ext));
+    const present = new Set(held);
+    stubs.filter((s) => s.ext).forEach((s, k) => have[k] && present.add(s.hash));
+    const known = new Set(entries.map((e) => e.hash));
+    return {
+      entries: entries.filter((e) => e.state === "active").map((e) => ({ ...e, ...usageOf(usage, e.hash), present: present.has(e.hash) })),
+      missing: [...usage.keys()].filter((h) => !present.has(h) && !known.has(h)).map((hash) => ({ hash, ...usageOf(usage, hash) })),
+      pendingDeletion: entries.filter((e) => e.state === "deleted").length,
+      folders: visibleFolders(folders).sort((a, b) => a.name.localeCompare(b.name)),
+    };
+  }
+
+  /** How many stored instances use each item, and on which canvases (keys only). */
+  private async usage(): Promise<Map<string, { instances: number; canvases: Set<string> }>> {
+    const usage = new Map<string, { instances: number; canvases: Set<string> }>();
+    const tx = this.db.transaction("objects", "readonly");
+    await new Promise<void>((resolve, reject) => {
+      const cur = tx.objectStore("objects").index("assetId").openKeyCursor();
+      cur.onerror = () => reject(cur.error);
+      cur.onsuccess = () => {
+        const c = cur.result;
+        if (!c) return resolve();
+        const hash = c.key as string;
+        let u = usage.get(hash);
+        if (!u) usage.set(hash, (u = { instances: 0, canvases: new Set() }));
+        u.instances++;
+        u.canvases.add((c.primaryKey as [string, string])[0]);
+        c.continue();
+      };
+    });
+    return usage;
+  }
+
+  private async uses(hash: string): Promise<number> {
+    return req(this.db.transaction("objects", "readonly").objectStore("objects").index("assetId").count(hash));
+  }
+
+  async updateMeta(hash: string, change: MetaChange): Promise<CatalogEntry> {
+    return (await this.updateMetaEach([{ hash, change }]))[0]!;
+  }
+
+  /** (`AssetCatalog.updateMetaEach`: all or nothing.) */
+  updateMetaEach(changes: ReadonlyArray<{ hash: string; change: MetaChange }>): Promise<CatalogEntry[]> {
+    return this.lib.serial(async () => {
+      let folders: AssetFolder[] | null = changes.some(({ change: c }) => c.addFolders || c.removeFolders || c.clearFolder || c.hidden === false) ? await this.lib.folders() : null;
+      const known = changes.some(({ change: c }) => c.addFolders || c.removeFolders || c.clearFolder) ? new Set(folders!.map((f) => f.id)) : null;
+      const { entries } = await this.lib.rows(changes.map((c) => c.hash));
+      const out: CatalogEntry[] = [];
+      let unhid = false;
+      for (const { hash, change } of changes) {
+        const e = entries.get(hash);
+        if (!e || e.state !== "active") throw new CatalogInputError("the item is not in the library");
+        const m = meta(e);
+        const next: CatalogEntry = { ...e, ...m };
+        if (change.favorite !== undefined) next.favorite = change.favorite;
+        if (change.hidden !== undefined) next.hidden = change.hidden;
+        // Shown again from a hidden folder: that folder and the ones above it are shown again too (their other items stay hidden).
+        if (change.hidden === false && m.folderIds.length) {
+          folders ??= await this.lib.folders();
+          const byId = new Map(folders.map((f) => [f.id, f]));
+          for (let f = byId.get(m.folderIds[0]!); f; f = f.parentId ? byId.get(f.parentId) : undefined) if (f.hidden) (delete f.hidden, (unhid = true));
+        }
+        if (change.note !== undefined) next.note = normalizeNote(change.note);
+        if (change.fields !== undefined) next.fields = normalizeFields(change.fields);
+        if (!next.note) delete next.note;
+        if (!next.fields?.length) delete next.fields;
+        if (change.addTags || change.removeTags) {
+          const drop = new Set((change.removeTags ?? []).map((t) => t.toLowerCase()));
+          next.tags = normalizeTags([...m.tags.filter((t) => !drop.has(t.toLowerCase())), ...(change.addTags ?? [])]);
+        }
+        if (known) {
+          if ((change.addFolders ?? []).some((id) => !known.has(id))) throw new CatalogInputError("that folder no longer exists");
+          const drop = new Set(change.removeFolders ?? []);
+          const added = change.addFolders ?? [];
+          if (change.addFolders || change.removeFolders || change.clearFolder) next.folderIds = change.clearFolder ? [] : added.length ? [added[added.length - 1]!] : m.folderIds.filter((id) => !drop.has(id));
+        }
+        entries.set(hash, next);
+        out.push(next);
+      }
+      await this.lib.apply([...out.map(putEntry), ...(unhid ? [putFolders(folders!)] : [])]);
+      return out;
+    });
+  }
+
+  hideFolder(id: string): Promise<number> {
+    return this.lib.serial(async () => {
+      const folders = await this.lib.folders();
+      if (!folders.some((f) => f.id === id)) throw new CatalogInputError("that folder no longer exists");
+      const inside = folderSubtree(folders, id);
+      const ops: LibraryOp[] = [putFolders(folders.map((f) => (inside.has(f.id) ? { ...f, hidden: true as const } : f)))];
+      let n = 0;
+      for (const e of await this.lib.entries("active")) {
+        if (e.hidden || !(e.folderIds ?? []).some((x) => inside.has(x))) continue;
+        ops.push(putEntry({ ...e, hidden: true }));
+        n++;
+      }
+      await this.lib.apply(ops);
+      return n;
+    });
+  }
+
+  renameTag(from: string, to: string): Promise<number> {
+    const target = formatTag(to);
+    if (!target) return Promise.reject(new CatalogInputError("a tag needs a name"));
+    const key = from.toLowerCase();
+    return this.lib.serial(async () => {
+      const ops: LibraryOp[] = [];
+      for (const e of await this.lib.entries("active")) {
+        if (!(e.tags ?? []).some((t) => tagIsOrUnder(t, key))) continue;
+        ops.push(putEntry({ ...e, tags: normalizeTags((e.tags ?? []).map((t) => renamedTag(t, key, target) ?? t)) }));
+      }
+      await this.lib.apply(ops);
+      return ops.length;
+    });
+  }
+
+  deleteTag(tag: string): Promise<number> {
+    const key = tag.toLowerCase();
+    return this.lib.serial(async () => {
+      const ops: LibraryOp[] = [];
+      for (const e of await this.lib.entries("active")) {
+        if (!(e.tags ?? []).some((t) => t.toLowerCase() === key)) continue;
+        ops.push(putEntry({ ...e, tags: (e.tags ?? []).filter((t) => t.toLowerCase() !== key) }));
+      }
+      await this.lib.apply(ops);
+      return ops.length;
+    });
+  }
+
+  createFolder(name: string, parentId: string | null, id: string): Promise<AssetFolder> {
+    return this.lib.serial(async () => {
+      const folders = await this.lib.folders();
+      if (parentId && !folders.some((f) => f.id === parentId)) throw new CatalogInputError("the parent folder no longer exists");
+      const f: AssetFolder = { id, name: folderName(name), parentId };
+      await this.lib.apply([putFolders([...folders, f])]);
+      return f;
+    });
+  }
+
+  renameFolder(id: string, name: string): Promise<void> {
+    return this.lib.serial(async () => {
+      const folders = await this.lib.folders();
+      const f = folders.find((x) => x.id === id);
+      if (!f) throw new CatalogInputError("that folder no longer exists");
+      f.name = folderName(name);
+      await this.lib.apply([putFolders(folders)]);
+    });
+  }
+
+  deleteFolder(id: string): Promise<{ folders: number; unfiled: number }> {
+    return this.lib.serial(async () => {
+      const folders = await this.lib.folders();
+      const gone = folderSubtree(folders, id);
+      const ops: LibraryOp[] = [putFolders(folders.filter((f) => !gone.has(f.id)))];
+      for (const e of await this.lib.entries()) {
+        const ids = e.folderIds ?? [];
+        if (ids.some((x) => gone.has(x))) ops.push(putEntry({ ...e, folderIds: ids.filter((x) => !gone.has(x)) }));
+      }
+      await this.lib.apply(ops);
+      return { folders: gone.size, unfiled: ops.length - 1 };
+    });
+  }
+
+  async hiddenHashes(): Promise<Set<string>> {
+    return new Set((await this.lib.entries("active")).flatMap((e) => (e.hidden ? [e.hash] : [])));
+  }
+
+  entry(hash: string): Promise<CatalogEntry | undefined> {
+    return this.lib.entry(hash);
+  }
+
+  /** Every stored instance of an item, grouped by canvas (in key order). */
+  async locations(hash: string): Promise<AssetLocation[]> {
+    const tx = this.db.transaction("objects", "readonly");
+    const keys = (await req(tx.objectStore("objects").index("assetId").getAllKeys(hash))) as unknown as Array<[string, string]>;
+    const by = new Map<string, string[]>();
+    for (const [canvasId, id] of keys) (by.get(canvasId) ?? by.set(canvasId, []).get(canvasId)!).push(id);
+    return [...by].map(([canvasId, ids]) => ({ canvasId, ids }) as AssetLocation);
+  }
+
+  /** Every original without an entry gets one (a record here, or bytes still in the page's storage). */
+  reconcile(): Promise<number> {
+    return this.lib.serial(async () => {
+      const known = new Set((await this.lib.entries()).map((e) => e.hash));
+      const ops: LibraryOp[] = [];
+      for (const r of await this.lib.recs()) if (!known.has(r.hash)) (known.add(r.hash), ops.push(putEntry(entryFromRecord(r))));
+      const tx = this.db.transaction("assets", "readonly");
+      for (const k of (await req(tx.objectStore("assets").getAllKeys())) as string[]) {
+        if (known.has(k)) continue;
+        const r = await idbGet<AssetRecord>(this.db, "assets", k);
+        if (r) (known.add(k), ops.push(putEntry(entryFromRecord({ ...r, hash: k }))));
+      }
+      await this.lib.apply(ops);
+      return ops.length;
+    });
+  }
+
+  async snapshotMeta(): Promise<MetaSnapshot> {
+    const [all, folders] = await Promise.all([this.lib.entries("active"), this.lib.folders()]);
+    return { entries: new Map(all.map((e) => [e.hash, { name: e.name, ...meta(e) }])), folders };
+  }
+
+  restoreMeta(s: MetaSnapshot): Promise<number> {
+    return this.lib.serial(async () => {
+      const ops: LibraryOp[] = [];
+      for (const e of await this.lib.entries("active")) {
+        const was = s.entries.get(e.hash);
+        if (!was) continue;
+        if (JSON.stringify({ name: e.name, ...meta(e) }) === JSON.stringify(was)) continue;
+        const next: CatalogEntry = { ...e, ...was };
+        if (!next.note) delete next.note;
+        if (!next.fields?.length) delete next.fields;
+        ops.push(putEntry(next));
+      }
+      await this.lib.apply([...ops, putFolders(s.folders)]);
+      return ops.length;
+    });
+  }
+
+  markDeletedEach(hashes: readonly string[]): Promise<{ gone: string[]; inUse: number }> {
+    return this.lib.serial(async () => {
+      const { entries } = await this.lib.rows(hashes);
+      const gone: string[] = [];
+      let inUse = 0;
+      const ops: LibraryOp[] = [];
+      for (const hash of hashes) {
+        if ((await this.uses(hash)) > 0) {
+          inUse++;
+          continue;
+        }
+        const e = entries.get(hash);
+        if (!e) continue;
+        ops.push(putEntry({ ...e, state: "deleted", deletedAt: Date.now() }));
+        gone.push(hash);
+      }
+      await this.lib.apply(ops);
+      return { gone, inUse };
+    });
+  }
+
+  markDeleted(hash: string): Promise<void> {
+    return this.lib.serial(async () => {
+      const n = await this.uses(hash);
+      if (n > 0) throw new AssetInUseError(hash, n);
+      const e = await this.lib.entry(hash);
+      if (!e) throw new Error(`item ${hash} is not in the library`);
+      await this.lib.apply([putEntry({ ...e, state: "deleted", deletedAt: Date.now() })]);
+    });
+  }
+
+  /** (`AssetCatalog.collect`.) A deleted item used again comes back; one no root needs loses its entry, record, thumbnail and file. */
+  collect(roots: ReadonlySet<string>): Promise<GcReport> {
+    return this.lib.serial(async () => {
+      const report: GcReport = { swept: [], bytesFreed: 0, retained: [], restored: [] };
+      const deleted = await this.lib.entries("deleted");
+      const { recs } = await this.lib.rows(deleted.map((e) => e.hash));
+      const ops: LibraryOp[] = [];
+      const files = new Map<string, string>();
+      for (const e of deleted) {
+        if ((await this.uses(e.hash)) > 0) {
+          ops.push(putEntry({ ...e, state: "active", deletedAt: null }));
+          report.restored.push(e.hash);
+        } else if (roots.has(e.hash)) {
+          report.retained.push(e.hash);
+        } else {
+          const r = recs.get(e.hash);
+          if (r?.ext) files.set(e.hash, r.file ?? e.hash);
+          ops.push({ t: "entry", hash: e.hash, v: null }, { t: "rec", hash: e.hash, v: null }, { t: "seen", hash: e.hash, v: null });
+          report.swept.push(e.hash);
+          report.bytesFreed += e.size;
+        }
+      }
+      await this.lib.apply(ops);
+      if (report.swept.length) {
+        const tx = this.db.transaction(["assets", "thumbs"], "readwrite", { durability: "strict" });
+        for (const h of report.swept) (tx.objectStore("assets").delete(h), tx.objectStore("thumbs").delete(h));
+        await done(tx);
+      }
+      for (const h of report.swept) if (files.has(h)) await externalFolder.remove(h, files.get(h));
+      return report;
+    });
+  }
+}
