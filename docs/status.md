@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.60: quick check of library files (2026-10-30)
+
+**Implemented:** #16 quick check: `FolderSync.checkFiles(onStep, quick)` compares each library file's size (`bridge.sizes`, batches of 500) with its item's; palette command *Check library files (quick)*.
+**Tested:** desktop "a big library…" extended (the same damaged and deleted files named by the quick check); 1 passed.
+**Known failures:** none.
+**Unverified:** a resumable full check (not done).
+**Committed:** on `main`.
+**Next bounded task:** see the open list in the handoff.
+
 ## v0.50.59: big files and Check library files (2026-10-30)
 
 **Implemented:** #3 (smallest version) and #16: `importLargeFound` (a card from the main process's hash, never read into the page); originals over the cap come back without bytes (presence by size only), and are left out of backups and ZIP exports and refused for hiding; `FolderSync.checkFiles` + palette command *Check library files*.

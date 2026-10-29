@@ -2012,6 +2012,19 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   // The command palette (ADR 0117, 0129): Ctrl+K or Ctrl+Shift+P finds any command by words, and `@kind` narrows it to a kind. The commands come
   // from the registry (src/commands): each part of the app adds its own, so a new feature or a macro has one place to put them.
   const registry = new CommandRegistry();
+  /** Settings of the two checks of the library's files (desktop): the full one reads every file, the quick one looks at sizes. */
+  const checkLibraryFiles = (quick: boolean): void => {
+    const p = busyProgress(editor, quick ? "Checking the library file sizes" : "Checking the library files", [quick ? "Each file is looked for and its size compared with the library's. Nothing is read." : "Each file is read and compared with what the library knows of it. Hidden items are left out."]);
+    void storage!.folderSync!.checkFiles((done, total) => p.update(done / total, `${done} of ${total} files`), quick).then(
+      (r) => {
+        const list = (names: string[]) => names.slice(0, 5).map((n) => `“${n}”`).join(", ") + (names.length > 5 ? ` and ${names.length - 5} more` : "");
+        const found = [r.damaged.length ? `${r.damaged.length} changed or damaged (${list(r.damaged)})` : "", r.missing.length ? `${r.missing.length} missing (${list(r.missing)})` : ""].filter(Boolean).join("; ");
+        const what = quick ? "Quick check of" : "Checked";
+        p.done(found ? `${what} ${r.checked} library files: ${found}. Put good copies back from a backup.` : quick ? `All ${r.checked} library files are there with the sizes the library knows.` : `All ${r.checked} library files are as the library knows them.`);
+      },
+      (e: unknown) => p.fail(`The check stopped: ${(e as Error).message}`),
+    );
+  };
   registry.setProvider("app", () => {
     const sel = editor.selection.size > 0;
     const onCanvas = appView === "canvas";
@@ -2086,17 +2099,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Workspace", title: "Export a backup (.canvast)", words: "save archive", run: () => void runExport(session, { kind: "workspace" }) },
       ...(canSwitchWorkspace() ? [{ group: "Workspace", title: "Switch workspace…", words: "open folder new recent workspace change", run: () => void openWorkspaceSwitcher(document.querySelector<HTMLElement>('[data-testid="workspace-chevron"]') ?? document.body) }] : []),
       ...(storage?.folderSync
-        ? [{ group: "Workspace", title: "Check library files", words: "verify damaged corrupt missing integrity hash folder", run: () => {
-            const p = busyProgress(editor, "Checking the library files", ["Each file is read and compared with what the library knows of it. Hidden items are left out."]);
-            void storage.folderSync!.checkFiles((done, total) => p.update(done / total, `${done} of ${total} files`)).then(
-              (r) => {
-                const list = (names: string[]) => names.slice(0, 5).map((n) => `“${n}”`).join(", ") + (names.length > 5 ? ` and ${names.length - 5} more` : "");
-                const found = [r.damaged.length ? `${r.damaged.length} changed or damaged (${list(r.damaged)})` : "", r.missing.length ? `${r.missing.length} missing (${list(r.missing)})` : ""].filter(Boolean).join("; ");
-                p.done(found ? `Checked ${r.checked} library files: ${found}. Put good copies back from a backup.` : `All ${r.checked} library files are as the library knows them.`);
-              },
-              (e: unknown) => p.fail(`The check stopped: ${(e as Error).message}`),
-            );
-          } }]
+        ? [
+            { group: "Workspace", title: "Check library files", words: "verify damaged corrupt missing integrity hash folder", run: () => checkLibraryFiles(false) },
+            { group: "Workspace", title: "Check library files (quick)", words: "verify damaged missing size fast folder", run: () => checkLibraryFiles(true) },
+          ]
         : []),
       ...(storage?.hidden ? [{ group: "Workspace", title: "Lock hidden items", words: "encrypt password hide close", enabled: () => !!storage.hidden?.isOpen(), run: () => { storage.hidden!.lock(); editor.message = "Hidden items are locked: the password opens them again."; editor.changed(); } }] : []),
     ];

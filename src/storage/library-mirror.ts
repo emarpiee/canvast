@@ -657,11 +657,21 @@ export class LibraryMirror {
   }
 
   /** See FolderSync.checkFiles. */
-  async checkFiles(onStep: (done: number, total: number) => void): Promise<{ checked: number; missing: string[]; damaged: string[] }> {
+  async checkFiles(onStep: (done: number, total: number) => void, quick = false): Promise<{ checked: number; missing: string[]; damaged: string[] }> {
     const { entries, recs } = await this.read();
     const items = entries.filter((e) => e.state === "active" && recs.get(e.hash)?.ext && recs.get(e.hash)?.file && !isHiddenFile(recs.get(e.hash)!.file));
     const missing: string[] = [];
     const damaged: string[] = [];
+    if (quick) {
+      // Sizes only, no reading: a file gone or of another size than its item's (a same-size change is for the full check).
+      for (let at = 0; at < items.length; at += 500) {
+        const batch = items.slice(at, at + 500);
+        const sizes = await this.bridge.sizes(batch.map((e) => recs.get(e.hash)!.file!));
+        batch.forEach((e, k) => void (sizes[k] === null ? missing.push(e.name) : sizes[k] !== e.size && damaged.push(e.name)));
+        onStep(at + batch.length, items.length);
+      }
+      return { checked: items.length, missing, damaged };
+    }
     for (const [i, e] of items.entries()) {
       const got = await this.bridge.hash(recs.get(e.hash)!.file!);
       if (got === null) missing.push(e.name);

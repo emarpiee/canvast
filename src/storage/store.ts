@@ -232,8 +232,9 @@ export interface FolderSync {
   /**
    * Read every library file of the folder and check its content against its item (SHA-256, in the main process); hidden ones are left
    * out (that needs their key). The names of those gone and those changed (damaged, or replaced by another file).
+   * `quick`: only each file's presence and size are looked at (no reading), which a big library does in seconds.
    */
-  checkFiles(onStep: (done: number, total: number) => void): Promise<{ checked: number; missing: string[]; damaged: string[] }>;
+  checkFiles(onStep: (done: number, total: number) => void, quick?: boolean): Promise<{ checked: number; missing: string[]; damaged: string[] }>;
 }
 
 /** One opened storage: what a session works on. */

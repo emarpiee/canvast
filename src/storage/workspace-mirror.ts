@@ -572,8 +572,8 @@ export class WorkspaceMirror {
     return this.running;
   }
   /** Check the library files' contents (see FolderSync.checkFiles). */
-  checkFiles(onStep: (done: number, total: number) => void): ReturnType<LibraryMirror["checkFiles"]> {
-    return this.lib.checkFiles(onStep);
+  checkFiles(onStep: (done: number, total: number) => void, quick = false): ReturnType<LibraryMirror["checkFiles"]> {
+    return this.lib.checkFiles(onStep, quick);
   }
   /** Blank hidden items' names in this device's cache (on the write queue; see LibraryMirror.blankHidden). */
   blankHidden(): Promise<void> {

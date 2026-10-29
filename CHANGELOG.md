@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.60 — Quick check of library files (2026-10-30)
+
+- **Added:** *Check library files (quick)* (command palette, desktop app): looks only at each library file's presence and size, without reading it, and names those gone or of another size than the library knows. It takes seconds on a big library; the full check still finds same-size changes.
+
 ## 0.50.59 — Big files and Check library files (2026-10-30)
 
 - **Added:** in the desktop app, a file larger than 256 MiB put into `library/` is taken in where it lies as a card (name, kind, size), from its SHA-256 read in the background; it opens in the system's app. It is never read into the app, so it is left out of backups and ZIP exports, and cannot be hidden.

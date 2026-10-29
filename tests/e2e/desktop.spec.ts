@@ -437,6 +437,12 @@ test("a big library (past the size library.json is kept for) writes only what ch
     await expect(page.locator(".palette-title").first()).toHaveText("Check library files");
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("toast")).toContainText("Checked 6 library files: 1 changed or damaged (“Pic 0.png”); 1 missing (“Pic 1.png”)", { timeout: 15_000 });
+    // The quick check looks at sizes only: the same two are found without reading anything.
+    await page.keyboard.press("Control+k");
+    await page.locator(".palette-input").fill("check library files quick");
+    await expect(page.locator(".palette-title").first()).toHaveText("Check library files (quick)");
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("toast")).toContainText("Quick check of 6 library files: 1 changed or damaged (“Pic 0.png”); 1 missing (“Pic 1.png”)", { timeout: 15_000 });
   } finally {
     await app.close();
   }
