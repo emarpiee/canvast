@@ -9,6 +9,37 @@ export interface DesktopWorkspace {
   name: string;
 }
 
+import type { CatalogEntry } from "../assets/asset-catalog";
+import type { AssetRecord } from "../assets/asset-library";
+
+/** One change to the desktop build's library (its SQLite file): a put (a value) or a delete (null) of an entry, a record, a seen mark or a meta value. */
+export type LibraryOp =
+  | { t: "entry"; hash: string; v: CatalogEntry | null }
+  | { t: "rec"; hash: string; v: AssetRecord | null }
+  | { t: "seen"; hash: string; v: string | null }
+  | { t: "meta"; k: string; v: unknown };
+
+/** The desktop build's library calls (`desktop/library-db.ts`, in the main process). */
+export interface LibraryCalls {
+  /** Entry, record and seen mark of each item that has an entry or a record. */
+  get(hashes: readonly string[]): Promise<Array<[string, CatalogEntry | null, AssetRecord | null, string | null]>>;
+  /** Every entry (or the active, or the deleted ones), as JSON array text. */
+  entries(which?: "all" | "active" | "deleted"): Promise<string>;
+  /** Every record, as JSON array text. */
+  recs(): Promise<string>;
+  /** The item whose record names this file. */
+  byFile(file: string): Promise<string | null>;
+  meta(key: string): Promise<unknown>;
+  /** Changes in one transaction: all or nothing. */
+  apply(ops: readonly LibraryOp[]): Promise<void>;
+  /** Take the changes of the part files `keys` (`extra`: the sealed index's items; `deletions`: erased items are marked deleted). */
+  sync(keys: readonly string[], extra: readonly unknown[], deletions: boolean): Promise<{ took: boolean; whole: boolean; read: number }>;
+  /** Empty it (Delete all data: it is made again from the folder). */
+  reset(): Promise<void>;
+  /** Told how many parts of how many a `sync` has read. */
+  onProgress(fn: (done: number, total: number) => void): void;
+}
+
 /** Where a deleted file of the workspace folder goes. */
 export type DeleteMode = "trash" | "system" | "erase";
 
@@ -85,6 +116,8 @@ export interface DesktopBridge {
   onChanged(fn: (paths: string[]) => void): void;
   /** The names of the files (not folders) in a folder; empty when there is none. */
   list(path: string): Promise<string[]>;
+  /** The library's own storage (SQLite, in the main process). */
+  lib: LibraryCalls;
 }
 
 /** The bridge when the app runs in the desktop build, else null. */

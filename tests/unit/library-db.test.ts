@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getRows, openLibraryDb, putRows, syncLibrary } from "../../desktop/library-db";
+import { Library, openLibraryDb } from "../../desktop/library-db";
 import { libraryPartText } from "../../src/storage/library-mirror";
 import type { LibraryItem } from "../../src/storage/library-mirror";
 
@@ -17,32 +17,31 @@ const folder = (items: LibraryItem[]) => {
 
 describe("library database (desktop)", () => {
   it("takes the folder's items, then only what changed; this device's own change wins; erased items are marked deleted", () => {
-    const db = openLibraryDb(":memory:");
+    const lib = new Library(openLibraryDb(":memory:"));
     let f = folder([item(1), item(2), item(3)]);
-    expect(syncLibrary(db, f.keys, f.read, [], true)).toEqual({ took: true, whole: true, read: 3 });
-    expect(getRows(db, [item(2).hash]).get(item(2).hash)!.rec!.file).toBe("library/images/p2.png");
+    expect(lib.sync(f.keys, f.read, [], true)).toEqual({ took: true, whole: true, read: 3 });
+    expect(lib.rec(item(2).hash)!.file).toBe("library/images/p2.png");
     // Unchanged parts are not read again.
-    expect(syncLibrary(db, f.keys, f.read, [], true)).toEqual({ took: false, whole: true, read: 0 });
+    expect(lib.sync(f.keys, f.read, [], true)).toEqual({ took: false, whole: true, read: 0 });
     // Here: item 1 renamed. There: item 1 and item 2 renamed, item 3 erased.
-    const one = getRows(db, [item(1).hash]).get(item(1).hash)!;
-    putRows(db, [{ entry: { ...one.entry, name: "mine.png" } }]);
+    lib.apply([{ t: "entry", hash: item(1).hash, v: { ...lib.entry(item(1).hash)!, name: "mine.png" } }]);
     f = folder([item(1, { name: "theirs.png" }), item(2, { name: "two.png" })]);
-    const r = syncLibrary(db, f.keys, f.read, [], true);
+    const r = lib.sync(f.keys, f.read, [], true);
     expect(r.took).toBe(true);
-    const rows = getRows(db, [item(1).hash, item(2).hash, item(3).hash]);
-    expect(rows.get(item(1).hash)!.entry.name).toBe("mine.png");
-    expect(rows.get(item(2).hash)!.entry.name).toBe("two.png");
-    expect(rows.get(item(3).hash)!.entry.state).toBe("deleted");
+    expect(lib.entry(item(1).hash)!.name).toBe("mine.png");
+    expect(lib.entry(item(2).hash)!.name).toBe("two.png");
+    expect(lib.entry(item(3).hash)!.state).toBe("deleted");
+    expect(JSON.parse(lib.entriesText("state = 'active'")).length).toBe(2);
   });
 
   it("erases nothing when a part is missing or damaged, or deletions are off (hidden items locked)", () => {
-    const db = openLibraryDb(":memory:");
+    const lib = new Library(openLibraryDb(":memory:"));
     const f = folder([item(1), item(2)]);
-    syncLibrary(db, f.keys, f.read, [], true);
-    expect(syncLibrary(db, [...f.keys, "ff"], (k) => (k === "ff" ? Buffer.from("{oops") : null), [], true).whole).toBe(false);
-    expect(getRows(db, [item(1).hash]).get(item(1).hash)!.entry.state).toBe("active");
+    lib.sync(f.keys, f.read, [], true);
+    expect(lib.sync([...f.keys, "ff"], (k) => (k === "ff" ? Buffer.from("{oops") : null), [], true).whole).toBe(false);
+    expect(lib.entry(item(1).hash)!.state).toBe("active");
     const g = folder([item(2)]);
-    syncLibrary(db, g.keys, g.read, [], false);
-    expect(getRows(db, [item(1).hash]).get(item(1).hash)!.entry.state).toBe("active");
+    lib.sync(g.keys, g.read, [], false);
+    expect(lib.entry(item(1).hash)!.state).toBe("active");
   });
 });

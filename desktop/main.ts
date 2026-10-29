@@ -13,6 +13,10 @@ import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, sta
 import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, utimes } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { BOARDS_DIR, isSafeRelativePath } from "../src/storage/workspace-names";
+import { readItem } from "../src/storage/library-mirror";
+import type { LibraryItem } from "../src/storage/library-mirror";
+import { Library, openLibraryDb } from "./library-db";
+import type { LibraryOp } from "../src/storage/desktop-bridge";
 import { pathToFileURL } from "node:url";
 
 const SCHEME = "app";
@@ -467,6 +471,65 @@ function installFileCalls(win: BrowserWindow, root: string): void {
     mkdirSync(dirname(lookFile), { recursive: true });
     await writeAtomic(lookFile, Buffer.from(JSON.stringify(Object.fromEntries(look))), true);
     look = null;
+  });
+  // The library (desktop/library-db.ts): this workspace's SQLite file in the app's own data, opened on first use.
+  let lib: Library | null = null;
+  const library = (): Library => {
+    if (lib) return lib;
+    const dir = join(app.getPath("userData"), "library-db");
+    mkdirSync(dir, { recursive: true });
+    return (lib = new Library(openLibraryDb(join(dir, `${createHash("sha256").update(root).digest("hex").slice(0, 24)}.sqlite`))));
+  };
+  const HASH = /^[0-9a-f]{64}$/;
+  const hashes = (a: unknown): string[] => (Array.isArray(a) ? a.filter((h): h is string => typeof h === "string" && HASH.test(h)) : []);
+  // (what the page sends is checked: kinds, hashes and values; no SQL from the page)
+  const opOf = (o: unknown): LibraryOp | null => {
+    if (!o || typeof o !== "object") return null;
+    const { t, hash, k, v } = o as { t?: unknown; hash?: unknown; k?: unknown; v?: unknown };
+    if (t === "meta") return typeof k === "string" && k.length < 200 ? { t, k, v } : null;
+    if (typeof hash !== "string" || !HASH.test(hash)) return null;
+    if (t === "seen") return v === null || typeof v === "string" ? { t, hash, v } : null;
+    if (t !== "entry" && t !== "rec") return null;
+    if (v !== null && (!v || typeof v !== "object" || (v as { hash?: unknown }).hash !== hash)) return null;
+    return { t, hash, v } as LibraryOp;
+  };
+  const WHERE = { all: "1", active: "state = 'active'", deleted: "state = 'deleted'" } as const;
+  ipcMain.handle("canvast:lib", async (e, op: unknown, ...args: unknown[]) => {
+    own(e);
+    const l = library();
+    switch (op) {
+      case "get":
+        return l.get(hashes(args[0]));
+      case "entries":
+        return l.entriesText(WHERE[args[0] as keyof typeof WHERE] ?? WHERE.all);
+      case "recs":
+        return l.recsText();
+      case "byFile":
+        return typeof args[0] === "string" ? (l.byFile(args[0]) ?? null) : null;
+      case "meta":
+        return typeof args[0] === "string" ? (l.meta(args[0]) ?? null) : null;
+      case "apply": {
+        const ops = Array.isArray(args[0]) ? args[0].map(opOf) : [];
+        if (ops.some((o) => !o)) throw new Error("a library change the app does not know");
+        return void l.apply(ops as LibraryOp[]);
+      }
+      case "sync": {
+        const keys = Array.isArray(args[0]) ? args[0].filter((k): k is string => typeof k === "string" && /^[0-9a-f]{1,2}$/.test(k)) : [];
+        const extra = Array.isArray(args[1]) ? args[1].map(readItem).filter((i): i is LibraryItem => i !== null) : [];
+        const read = (key: string): Buffer | null => {
+          try {
+            return readFileSync(join(root, ".canvast", "library", `items-${key}.json`));
+          } catch {
+            return null;
+          }
+        };
+        return l.sync(keys, read, extra, args[2] === true, (done, total) => !win.webContents.isDestroyed() && win.webContents.send("canvast:libProgress", done, total));
+      }
+      case "reset":
+        return void l.db.exec("DELETE FROM entries; DELETE FROM recs; DELETE FROM seen; DELETE FROM parts; DELETE FROM meta;");
+      default:
+        throw new Error("not a library call");
+    }
   });
   ipcMain.handle("canvast:canvasFiles", async (e) => {
     own(e);
