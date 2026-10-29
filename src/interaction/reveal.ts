@@ -109,12 +109,13 @@ export function createReveal(editor: EditorState, allowed: () => boolean) {
     editor.redraw(); // (the canvas only: a Layers panel being dragged in must not be rebuilt under the pointer)
   };
   return {
-    /** The pointer moved (null: it left the canvas); `ctrlHeld` is the pointer event's. */
-    move(p: { x: number; y: number } | null, ctrlHeld: boolean): void {
+    /** The pointer moved (null: it left the canvas); `ctrlHeld` is the pointer event's, `pressed` whether a button is down (a drag). */
+    move(p: { x: number; y: number } | null, ctrlHeld: boolean, pressed = false): void {
       // On the list itself the reveal stays where it is (the list does not run away from the pointer) and the row under the pointer is the hot one.
       // The way to the list counts as the list (the area from the revealed point to the list's far corner), so the list is reached by going straight at it.
+      // A drag never does: a Ctrl+drag down and right would leave the list behind where it started, under where the drag ends.
       const L = editor.revealList;
-      const toward = !!(p && ctrlHeld && L && editor.revealAt && p.x >= editor.revealAt.x && p.y >= editor.revealAt.y && p.x <= L.x + L.w && p.y <= L.y + L.h);
+      const toward = !!(p && ctrlHeld && !pressed && L && editor.revealAt && p.x >= editor.revealAt.x && p.y >= editor.revealAt.y && p.x <= L.x + L.w && p.y <= L.y + L.h);
       if (toward) {
         const row = revealRowAt(editor, p!.x, p!.y) ?? null;
         if (editor.revealHot !== row) { editor.revealHot = row; editor.redraw(); }

@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.46: Ctrl+click after a Ctrl+drag (2026-10-29)
+
+**Implemented:** the reveal's "on the way to the list" rule no longer applies while a button is held, so a Ctrl+drag does not leave the revealed list behind under the pointer. This was the cause of the CI failure of `frames.spec.ts:2179` (it reproduced locally: 2 of 20 runs, 10 of 20 with a pause before the click).
+**Tested:** `frames.spec.ts:2179` 10 times each in Chromium, Chromium DPR 2 and Firefox (30 passed); every reveal test of `frames.spec.ts` in Chromium and Firefox.
+**Known failures:** none.
+**Unverified:** none.
+**Committed:** on `main`.
+**Next bounded task:** sync-safety of the workspace folder (conflict copies made by sync tools), then coverage-based test selection.
+
 ## v0.50.45: colour harmonies follow the last colour (2026-10-29)
 
 **Implemented:** the picker's harmonies are painted for the colour of the last change before the frame, not the first. Two CI flakes fixed in the tests: the picker package test waits for the harmonies of the colour typed; the small-screens viewer test measures the centring once the layout settles.

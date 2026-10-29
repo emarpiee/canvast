@@ -2224,6 +2224,7 @@ test("Ctrl+click on a revealed outline picks the thing the outline belongs to, e
   const moved = await p.evaluate((id) => window.__canvastDebug.objectScreen(id)!.box, small.id);
   expect(Math.round(moved.minX - after.minX), "moved from the inside").toBe(30);
   expect(await p.evaluate((id) => window.__canvastDebug.objectScreen(id)!.box, big.id)).toEqual(bigBefore);
+  await app.frame(); // (the revealed list is drawn first: after a Ctrl+drag down and right it must not be left under the pointer)
   expect(await ctrlClick(mid.x + 30, mid.y + 30), "a Ctrl+click that does not move picks the top one").toEqual([big.id]);
 
   // Without Ctrl too: a picked thing is moved by a drag from inside it although the big one covers it.

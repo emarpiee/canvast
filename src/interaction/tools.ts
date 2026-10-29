@@ -1890,7 +1890,7 @@ export function attachTools(
       pan.move(e.pointerId, local(e));
       return;
     }
-    reveal.move(local(e), e.ctrlKey || e.metaKey);
+    reveal.move(local(e), e.ctrlKey || e.metaKey, e.buttons !== 0);
     if (g.kind === "none" && effectiveTool() === "select" && !e.buttons) {
       // A rotate cursor where a press would turn the selection (near a corner outside the box, or on the handle).
       const b = editor.selectionBoxOnScreen;

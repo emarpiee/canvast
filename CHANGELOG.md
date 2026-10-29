@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.46 — Ctrl+click after a Ctrl+drag (2026-10-29)
+
+- **Fixed:** after a Ctrl+drag down and to the right, the list of revealed names stayed where the drag began, under where it ended, so the next Ctrl+click there picked a row of that list instead of the thing on top. A drag no longer counts as heading for the list.
+
 ## 0.50.45 — Colour harmonies follow the last colour (2026-10-29)
 
 - **Fixed:** the colour picker's harmony swatches showed the harmonies of an earlier colour when the colour changed twice within one frame (typing a colour right after another); they now follow the last one.
