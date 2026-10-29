@@ -44,6 +44,8 @@
 
 ## Features at a glance
 
+![canvast with the showcase open: the Solar System on the canvas, the tool rail on the left, the bars at the top and the info bar along the bottom](docs/screenshots/hero.webp)
+
 | Area | What you get |
 | --- | --- |
 | **Endless canvas** | No edge and no zoom limit in either direction; exact positions at any depth; bookmarks, tours, camera travel between far places, search, and stepping from item to item. [Navigating](#navigating) |
@@ -143,14 +145,14 @@ See [Building from source](#building-from-source) for what each step needs and m
 | Find any command | Press `Ctrl/⌘+K` |
 | Undo | `Ctrl/⌘+Z` |
 
-A small read-out shows the zoom level and position. Click it, type a level (`3000`, `2^-500`, `10^900`) and press Enter to jump there.
+The info bar at the bottom left shows the zoom level and position. Click the zoom, type a level (`3000`, `2^-500`, `10^900`) and press Enter to jump there.
 
 ### Terms
 
 | Term | Meaning |
 | --- | --- |
 | Canvas | One endless surface you draw on |
-| Board | A group of canvases (a project, a topic). The board and canvas menu (the name at the top left) and *Place on…* have a search field, *Find a board or canvas*; with more than four boards, each is folded to its name but the open one (click to unfold) |
+| Board | A group of canvases (a project, a topic). The board and canvas menu (the name at the top left) switches between them |
 | Workspace | Everything you have: all boards, canvases and the library |
 | Object | Anything placed on a canvas: a stroke, shape, path, text, picture, video, audio, GIF or file card |
 | Library | The shared store of every imported file. Each file is stored once, and objects on any canvas are *instances* of it |
@@ -193,12 +195,30 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
 
 - **Zoom** with the wheel, a trackpad pinch, `+` and `−`, or the on-screen buttons. The point under the pointer (or between your fingers) stays where it is.
 - **Pan** with the middle button, `Space`+drag, the Hand tool (`H`), two fingers, `Shift`+wheel or the arrow keys.
+- **Boards and canvases:** the board and canvas menu (the name at the top left) switches between them. It and *Place on…* have a search field, *Find a board or canvas*; with more than four boards, each is folded to its name except the open one (click a name to unfold it).
 - **Return** to the origin with `0`, `Home` or the house button. *Previous view* and *Next view* walk back and forth through where you have been; the dice button takes you to a random empty place.
-- **Orientation aids:** a hierarchical grid, the axes and a live position read-out show where you are, even very deep.
-- **Bookmarks** save a place and a zoom, with a small picture of it. Rename, update, move up or down or delete them from their ⋯ menu, or drag a card to a new place in the list; the tour follows the list. The check-mark button saves a bookmark that brings the selected things into view (the camera stays where it is). `Alt+1`…`Alt+9` go to the first nine, `]` and `[` to the next and previous (all changeable in Shortcuts). A **tour** plays them in order: the bars fade, `→` and `←` step, `Esc` ends it; with *Tour: wait at each stop* set in Settings, it moves on by itself. Getting to a bookmark is a glide; a far one (another depth) zooms out from here and in to there (see *Camera travel* below).
+- **Orientation aids:** a hierarchical grid, the axes and the position in the info bar show where you are, even very deep.
+- **Bookmarks** save a place and a zoom, with a small picture of it.
+  - Rename, update, move or delete one from its ⋯ menu, or drag a card to reorder the list.
+  - The check-mark button saves a bookmark that brings the selected things into view (the camera stays where it is).
+  - `Alt+1`…`Alt+9` go to the first nine; `]` and `[` to the next and previous (changeable in Shortcuts).
+  - A **tour** plays them in list order: the bars fade, `→` and `←` step, `Esc` ends it. With *Tour: wait at each stop* (Settings) it moves on by itself.
+  - Getting to a bookmark is a glide; a far one zooms out from here and in to there (see *Camera travel* below).
 - **Search** (`Ctrl+F`) finds objects by name, tag or bookmark. Combine words with space or `AND`, `OR`, `XOR`, `NOT`, parentheses and `"phrases"`. `/` searches names only, `#` tags only, `@` bookmarks only. Searches that found something are remembered, and a help card lists the syntax.
 - **Step through items** with `W` `A` `S` `D`: the nearest in view (when you are zoomed in on an item and nothing is near enough on the screen, the nearest of its size that way, however far), the nearest anywhere, by layer or by name A to Z (each either among the items in the window or among all of them; `W` and `A` go back, `S` and `D` on). On arriving, focus on the item or keep the zoom. `F` brings the selection into view; press it again to fit everything.
-- **Jump anywhere:** click the zoom read-out and type a level. One jump can travel up to 2^50 levels.
+- **Jump anywhere:** click the zoom in the info bar and type a level. One jump can travel up to 2^50 levels.
+- **Camera travel** (Settings → Navigation) is how the view gets to a bookmark or a previous view.
+
+  | Style | What it does |
+  | --- | --- |
+  | *Fly* | One continuous path. When one place is in view of the other (nested views, a bookmark you can see), it is one zoom in or out at any depth. Farther apart, up to 20,000 zoom levels away, it zooms out until both places are about a view apart, crosses over and zooms in, so you see the way |
+  | *Glide near only* | Flies to near places and cuts to far ones |
+  | *Cut* | Always arrives at once |
+
+  - **Timing:** the time can grow with the distance (up to *Longest trip*) or stay fixed; *Travel time (base)* sets a short trip's length. Easing is smooth, linear or ease-out. A key or a drag ends the glide.
+  - **Very far trips** (more than a view apart and over 20,000 levels away) zoom out 24 levels from here and in to there, with a brief dip to dark at the switch (*Fade at the switch*, on by default).
+  - The tour has its own travel speed.
+  - **Reduced motion:** with Animation set to None the view always cuts. When the system asks for reduced motion the view cuts too and says so once, unless *Follow the system's reduced motion* is off.
 
 ![A tour of the bookmarks](docs/screenshots/tour.webp)
 
@@ -207,13 +227,26 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
 - **Pen** (`P`): four pens (fine, pencil, ink, marker) with pressure, tilt and a stabilizer. Size is 0.5–128 px. A stroke is made at the current scale, so a 3 px line drawn deep in a zoom is a 3 px line there, and it stays vector-sharp at every magnification. *Thickness lock* keeps strokes the same width on screen at any zoom.
 - **Shapes** (`U`): rectangle, ellipse, line, polygon and star. Sides, points, ratio and per-corner radii stay editable after drawing.
 - **Paths** (`B`) and **Edit nodes** (`N`): Bézier curves with handles, snapping, a lasso for several nodes, and node editing across several paths at once. *Simplify* fits a curve to a rough path; *Pen stroke to path* converts a stroke.
-- **Fill and outline:** solid colour, linear, radial or angular gradient, a picture, or other objects of the canvas repeated over the shape (*Objects*, which follows those objects as you change them, during the drag and not only on release). A repeated fill can **vary each copy**: turn it (by up to ± an angle, or in whole steps), size it, move it in its cell, mirror some, leave some cells out, copy each object on its own (in turn or shuffled) or the whole arrangement, from a seed that gives the same copies every time (*New seed* for others). New shapes have no outline: set a width (or move the Outline width slider off its left end) to add one. Outlines have a position (inside, centre, outside), corners, ends, dashes, arrow heads and a sharp-corner limit; the outline can be a gradient too.
-- **Combine shapes:** union, intersect, subtract and exclude stay editable until you flatten them; *Divide* and the *Shape builder* split overlapping shapes; *Fill gaps* fills every empty place the selected shapes close in (with the Shape tool's fill, under them), and *Fill a gap…* fills the ones you click, one by one; a place left open by a slit narrower than a few px (4 by default, in Settings) counts as closed, and its fill stops at the slit; *Outline stroke* turns a line into a shape; *Taper* gives a line a variable width; *Corner smoothing* rounds corners continuously.
+- **Fill and outline**
+  - Fills: solid colour; linear, radial or angular gradient; a picture; or other objects of the canvas repeated over the shape (*Objects*, which follows those objects live as you change them).
+  - A repeated fill can **vary each copy**: turn it (up to ± an angle, or in whole steps), size it, move it in its cell, mirror some, leave some cells out, and copy each object on its own (in turn or shuffled) or the whole arrangement. A seed gives the same copies every time; *New seed* gives others.
+  - New shapes have no outline: set a width (or move the Outline width slider off its left end) to add one.
+  - Outlines have a position (inside, centre, outside), corners, ends, dashes, arrow heads and a sharp-corner limit, and can be a gradient.
+- **Combine shapes**
+  - Union, intersect, subtract and exclude stay editable until you flatten them.
+  - *Divide* and the *Shape builder* split overlapping shapes.
+  - *Fill gaps* fills every empty place the selected shapes close in (with the Shape tool's fill, under them); *Fill a gap…* fills the ones you click, one by one. A slit narrower than a few pixels (4 by default, in Settings) counts as closed, and the fill stops at it.
+  - *Outline stroke* turns a line into a shape, *Taper* gives a line a varying width, and *Corner smoothing* rounds corners continuously.
 - **Vector networks:** paths that meet at vertices, with the regions between them filled. Edges are split where they cross.
 - **Initial state:** *Set*, *Update* and *Reset to initial state* remember a shape's geometry (and, by default, its fill and outline) so you can experiment and go back. *Apply rotation* makes a shape's current turn its new zero.
 - **Eraser** (`E`): removes whole objects (optionally whole groups), or trims strokes in scissors mode.
 - **Names on the canvas:** a sheet, picture, video or file card shows its name above its top-left corner; any other item shows its layer name while selected. Where the names of selected items would overlap (a group selected whole, a sheet and what is on it), only the outermost is written, as design tools write the name of a frame or group and not of every layer in it.
-- **Pattern** (panel, mountain button; with several sheets or shapes selected, Generate makes one pattern on each): 39 generators of vector patterns, grouped as Waves, Blobs, Soft, Lines, Tiles and Fields and shown as a grid of small pictures (Ripple, Tides, Drift, Bubbles, Glow, Grain, Stripes, Halftone, Tiles, Contours, Cells, Flow, Marble, Maze and more). Each has the settings of its own (counts, sizes, angles, colours, solid or outline), and a background you can hide. Select a sheet or a closed shape first (the result goes on the sheet; a shape becomes the clipping mask that holds it, its fill and outline kept for *Release*) or let it make a new sheet; *Generate* makes the result, every change after that replaces it live, and the whole session is one undo step until *Done*. *Randomize* picks random settings and a new seed (a snowflake on a setting keeps it); *New seed* keeps the settings and says when the seed changes nothing; the seed can be typed (or dragged) to make a result again. The seed works in every generator: the regular ones (Stripes, Tiles, Halftone and the like) have a *Looseness* setting, and at 0 they stay exact. The result is a group of ordinary editable shapes that remembers its settings: select it later and the panel shows them, and changes replace it where it is. Resizing the sheet it is on makes it again to fill the new size (it stretches while you drag).
+- **Pattern** (the mountain button) makes vector patterns.
+  - **39 generators** in six families (Waves, Blobs, Soft, Lines, Tiles, Fields), shown as small pictures: Ripple, Tides, Drift, Bubbles, Glow, Grain, Stripes, Halftone, Tiles, Contours, Cells, Flow, Marble, Maze and more. Each has its own settings (counts, sizes, angles, colours, solid or outline) and a background you can hide.
+  - **Where it goes:** select a sheet (the result goes on it) or a closed shape (it becomes the clipping mask that holds the result; its fill and outline come back on *Release*), or let it make a new sheet. With several sheets or shapes selected, it makes one pattern on each.
+  - **Making it:** *Generate* makes the result, and every change after that replaces it live. The whole session is one undo step until *Done*.
+  - **Seeds:** *Randomize* picks random settings and a new seed (a snowflake on a setting keeps that setting); *New seed* keeps the settings, and says when the seed changes nothing. Type or drag a seed to make a result again. The regular generators (Stripes, Tiles, Halftone and the like) have a *Looseness* setting; at 0 they stay exact.
+  - **Afterwards:** the result is a group of ordinary editable shapes that remembers its settings. Select it later and the panel shows them; changes replace it in place. Resizing its sheet makes it again to fill the new size (it stretches while you drag).
 - **SVG:** paste SVG text to get editable paths (gradients, including a radial one sized by its own transform and an angular one written as a CSS conic gradient box, dashes, transforms, `<use>`, symbols and clip paths, which become clipping masks), or make a vector copy of an SVG picture. Export shapes as SVG, copy them as SVG text, or save them to the library as an SVG picture.
 
 ![Boolean shapes: the rocket is a Union, and the Shapes menu is open](docs/screenshots/shapes.webp)
@@ -225,7 +258,11 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
 - **Colour picker:** one picker for every colour. Choose OKHSL, OKHSV or OKLCH (CSS `oklch()`'s own lightness, chroma and hue); a ring and box, a plane with a hue bar, or sliders; text as hex or another format. It also has an eyedropper, recent colours and saved colours. A number changes by dragging its name left or right; with `Shift` it snaps to round steps worked out from its range (steps of 5 for 0–100, 10 for 0–255).
 - **Gradients:** linear, radial and angular, with stops you drag on the canvas, a *Randomize* button and a gradient map for pictures.
 - **Palettes:** *Palette from a colour* builds harmonies, and a palette can be taken from a picture. Palettes and gradients can be imported and exported as `.gpl`, `.ase`, `.aco` and `.ggr` files.
-- **Styles panel:** saved colours, gradients, text styles, adjustment stacks and patterns (a generator with its settings and seed, saved from the Pattern panel with the *Save as a style* button and updated from it; pressing its card puts it back in the Pattern panel and makes it on what is selected, on each of several selected shapes). An object painted with a saved style is **linked** to it and follows when the style changes. A change by hand, or *Detach*, unlinks it. A colour, gradient or palette card is copied by a long press or a right click on it (a palette as CSS variables; a colour inside an opened palette as hex), or by *Copy hex* / *Copy as CSS* in its More menu (a long press does not apply it); CSS pasted (a colour in any notation, or a gradient) is saved as a new style when the pointer is over the panel or nothing is selected.
+- **Styles panel:** saved colours, gradients, text styles, adjustment stacks and patterns.
+  - An object painted with a saved style is **linked** to it and follows when the style changes. A change by hand, or *Detach*, unlinks it.
+  - A pattern style keeps a generator with its settings and seed (*Save as a style* in the Pattern panel saves or updates it). Pressing its card puts it back in the Pattern panel and makes it on what is selected (on each of several selected shapes).
+  - **Copy** a colour, gradient or palette card with a long press or right click (a palette as CSS variables; a colour inside an opened palette as hex), or with *Copy hex* / *Copy as CSS* in its More menu. A long press copies without applying.
+  - **Paste** CSS (a colour in any notation, or a gradient) with the pointer over the panel or nothing selected, and it is saved as a new style.
 
 ![The colour picker, opened from a fill: OKHSV as a ring and box, with the recent colours](docs/screenshots/colour-picker.webp)
 
@@ -246,8 +283,14 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
 - **Pictures** are placed one source pixel to one screen pixel. Zooming in shows real pixels; nothing is invented and the file is never altered.
 - **Adjustments** are non-destructive stacks you can reorder, hide and copy between pictures, video, GIFs, shapes, pen strokes and texts: exposure, contrast, highlights, shadows, temperature, tint, saturation, vibrance, red/green/blue, levels, curves, gradient map, blur, sharpen and grain.
 - **Crop**, rounded corners and an outline work on pictures, video and GIFs. A picture can be masked by a shape, by opacity or by brightness, or by a brush mask painted with the Pen.
-- **Drop shadow and inner shadow** are in the Adjust panel, for pictures, shapes, strokes and texts: opacity, across, down, blur, spread and a colour each. Turning a shadow on starts it soft and a little below. Each group of adjustments has a *Reset* button that takes that group off. The offset and blur are shares of the object's own size (an offset of 100 is a tenth of it), so they look the same at any zoom. A picture's own pixels are not touched; its shadow is drawn beside it. A video that is playing shows no shadow while it plays (its paused frame does).
-- **Adjustments on shapes, strokes and text** are applied to how the object looks once drawn (fill, outline, gradient and texture together); a blur is a share of the object's own size, so it does not change with zoom (far inside an object it keeps a width of at most about 330 px). Exporting a selection leaves room for a blur or a drop shadow. An exported SVG carries them as a filter on the shape, with room round the drawing for a blur, and making the SVG into shapes again brings the adjustments back (a vector PDF is drawn as a picture instead); see Limitations.
+- **Drop shadow and inner shadow** (Adjust panel), for pictures, shapes, strokes and texts: opacity, across, down, blur, spread and a colour each.
+  - A new shadow starts soft and a little below. Each group of adjustments has a *Reset* button.
+  - Offset and blur are shares of the object's own size (an offset of 100 is a tenth of it), so a shadow looks the same at any zoom.
+  - A picture's pixels are not touched; its shadow is drawn beside it. A playing video shows no shadow (its paused frame does).
+- **Adjustments on shapes, strokes and text** apply to the object as drawn (fill, outline, gradient and texture together).
+  - A blur is a share of the object's size, so it does not change with zoom (far inside an object it stays at most about 330 px wide).
+  - Exporting a selection leaves room for a blur or a drop shadow.
+  - An exported SVG carries them as a filter on the shape, and making the SVG into shapes again brings them back. A vector PDF draws such a shape as a picture instead (see Limitations).
 - **Make a new picture** bakes the crop and adjustments into a new library item; **Copy as picture** puts the result on the clipboard. **Copy** and **Paste adjustments** move a whole stack between items. **Make vector copy** turns an SVG picture into editable shapes in its place, at its size, turn and layer (one undo step; the file stays in the library). **Show in library** opens the Library with the file selected.
 - **Media player:** videos, audio and animated GIFs play on the canvas with a player right under the item. It has play and pause, a seek bar, step back and forward (seconds for video and audio, frames for GIFs), repeat, playback speed, volume, a waveform for audio, and a start and end to play only part of a file. The paused frame is saved. Playback continues when the item scrolls out of view.
 - **Extract frame** turns the current frame of a video or GIF into a picture in the library (PNG, WebP or JPEG). Settings name it, file it in a folder and tag it, optionally placing it on the canvas.
@@ -257,12 +300,24 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
 ### Organizing
 
 - **Layers panel:** group and nest, rename, hide, lock, re-stack, set opacity and blend mode, rotate. Select with `Ctrl` (toggle) and `Shift` (range).
-- **Sheets and masks:** a *sheet* clips what it holds and has a ratio rather than a size; a *clipping mask* is a sheet of any shape. See [Shapes, sheets and masks](docs/reference/shapes-sheets-masks.md).
-- **Snapping and arranging:** moving, resizing and turning things, dragging a node and dragging the handles of a gradient snap to others with guide lines (the magnet toggle turns it off). They line up with the sides and middles of boxes, and with the shapes themselves: a corner goes exactly onto another corner or the middle of a side (a ring marks it), a corner onto any side, including curves, and a straight side lies flush along a nearly parallel one (the side is drawn); turning brings a corner round to another or a side parallel to a nearby one. A group, and a boolean group, counts as one thing for Align, distribute and Arrange; its shapes are lined up with each other only when you select them one by one (in Layers, or inside the group). Align, distribute, arrange in a grid (by name, date, size or type), copy, cut, paste, duplicate; `Alt`+drag copies.
+- **Sheets** (`C`): a sheet clips what it holds and has a ratio rather than a size (see [Shapes, sheets and masks](docs/reference/shapes-sheets-masks.md)).
+  - Drawing a sheet over objects puts the ones wholly inside it on the sheet, in one undo step (ones it only crosses stay out).
+  - *Put the selection on a sheet*, *Fit to contents*, *Release* and *Turn on its side*.
+  - Ratio presets: `16:9`, `A4 portrait`, a number, or a size in px (`2000 x 1920` becomes `25 : 24`).
+  - Each object on a sheet has pins per axis (left, right, both, centre or scale) that decide what it does when the sheet is resized; *Scale contents* resizes everything with it.
+- **Masks:** a clipping mask (a sheet of any shape), a mask by opacity or brightness, or a brush mask painted in black and white with the Pen. Masks can be inverted, selected on their own and released. A click on a mask selects it as one unit; a double click goes inside.
+- **Snapping:** moving, resizing, turning, dragging a node and dragging a gradient's handles snap to other things, with guide lines (the magnet button turns it off).
+  - Boxes line up by their sides and middles.
+  - Shapes snap by their geometry: a corner onto another corner or the middle of a side (a ring marks it), a corner onto any side (curves too), a straight side flush along a nearly parallel one (the side is drawn).
+  - Turning brings a corner round to another, or a side parallel to a nearby one.
+- **Arranging:** align, distribute, arrange in a grid (by name, date, size or type), copy, cut, paste, duplicate; `Alt`+drag copies. A group (also a boolean group) counts as one thing; its shapes line up with each other only when you select them one by one (in Layers, or inside the group).
 - **Tags** on the selection, with a Tags panel listing every tag and its count. Renaming or deleting a tag applies to every canvas.
-- **Reveal:** hold `Ctrl` and move over the canvas to see the outline of everything under the pointer; `Ctrl`+click selects exactly that thing, even deep inside a group, mask or sheet. Click on a revealed outline and you get the thing the outline belongs to, even when a filled shape covers it; click anywhere else and you get the top thing there (`Ctrl`+`Alt`+click goes down the stack). The names beside the pointer are a list: move onto a row (it stays put and its outline turns strong) and `Ctrl`+click selects that very thing, `Ctrl`+`Shift`+click adds it or takes it away; selected ones are ticked. A thing you have selected is moved by dragging from anywhere inside it, even when other things cover it; a click that does not move still selects what is on top (with `Ctrl`, what `Ctrl`+click selects). A sheet is ground, so dragging on a sheet you selected still draws a selection box (hold `Ctrl` to move it).
-- **Sheets:** drawing a sheet (`C`) over objects puts the ones wholly inside it on the sheet (one undo step; ones it only crosses stay out); *Put the selection on a sheet*, *Fit to contents*, *Release*, ratio presets (`16:9`, `A4 portrait`, a number, or a size in px: `2000 x 1920` or `2000x1920px` becomes `25 : 24`) and *Turn on its side*. Each object on a sheet has pins (left, right, both, centre or scale, per axis) that decide what it does when the sheet is resized, and *Scale contents* resizes everything with it.
-- **Masks:** a clipping mask of any shape, a mask by opacity or brightness, or a brush mask painted in black and white with the Pen. Masks can be inverted, selected on their own and released. A click on a mask selects it as one unit; a double click goes inside.
+- **Reveal** finds things hidden under others.
+  - Hold `Ctrl` and move over the canvas: the outline of everything under the pointer shows, with their names in a list beside it.
+  - `Ctrl`+click selects exactly that thing, even deep inside a group, mask or sheet. On a revealed outline you get the thing it belongs to, even under a filled shape; elsewhere you get the top thing (`Ctrl`+`Alt`+click goes down the stack).
+  - In the list of names, move onto a row (its outline turns strong): `Ctrl`+click selects it, `Ctrl`+`Shift`+click adds or removes it. Selected ones are ticked.
+  - A selected thing moves when you drag from anywhere inside it, even under other things. A click without moving still selects the top thing.
+  - A sheet is ground: dragging on a selected sheet draws a selection box (hold `Ctrl` to move the sheet).
 - **Hide and lock:** *Show all hidden* and *Unlock all* bring everything back.
 - **Kind chips:** with a mixed selection, chips at the start of the Actions bar (All, Pictures, Media, Shapes, Strokes, Texts) narrow it to one kind.
 
@@ -270,15 +325,33 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
 
 ### The interface
 
-- **Tool rail** on the left: Undo and Redo, the tools (with Import after Note), then Screenshot and Search. **Properties bar** at the top: the options of the tool or of what is selected. A selected pen stroke, or several selected things, show their colours there as chips; a chip changes that colour everywhere it is used. Pasting CSS text with shapes selected makes it their fill: a gradient (`linear-gradient(...)`, `radial-gradient(...)`, `conic-gradient(...)`) or a colour (hex, `rgb()`, `hsl()`, `oklch()` and the other CSS notations, or a colour name such as `rebeccapurple`). In the colour picker a long press (or right click) on a swatch or a saved gradient copies it (hex, or CSS for a gradient) without choosing it; copying the hex field includes the `#` and pasting one drops it. Copy and paste use the same CSS text: the Styles panel copies a colour as hex and a gradient as CSS. **Actions bar**: what can be done with the selection, grouped in menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. It sits at the bottom or follows the selection. A bar wider than the window shows a fade and an arrow at the end with more; the mouse wheel (with or without Shift) scrolls it sideways.
+- **Tool rail** (left): Undo and Redo, the tools (Import after Note), then Screenshot and Search.
+- **Properties bar** (top): the options of the tool or of what is selected.
+  - The colours of a selected pen stroke, or of several selected things, show as chips; changing a chip changes that colour everywhere it is used.
+  - Pasting CSS with shapes selected sets their fill: a gradient (`linear-gradient(...)`, `radial-gradient(...)`, `conic-gradient(...)`) or a colour (hex, `rgb()`, `hsl()`, `oklch()` and the other CSS notations, or a name such as `rebeccapurple`).
+  - In the colour picker, a long press (or right click) on a swatch or saved gradient copies it without choosing it. Copying the hex field includes the `#`; pasting one drops it. The Styles panel copies the same text (a colour as hex, a gradient as CSS).
+- **Actions bar:** what can be done with the selection, grouped in menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies.
+  - It sits at the bottom or follows the selection (Settings).
+  - When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways.
 - **Panels** (Layers, Bookmarks, Tags, Styles, Adjust, Pattern) float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back.
-- **Command palette** (`Ctrl/⌘+K`) runs any command by name, takes a value where one is needed (`@kind` narrows the list), and records and replays **macros**. **Context menus:** a right click (or the menu key, or a long press on a touch screen) opens a menu of what fits where you are, in groups. On the canvas: the commands that apply to what is under the pointer (on a picture, *Rename* renames its file in the library with the library's own dialog, and a layer that has a name of its own takes the new name), or to the empty canvas (a long touch lists what is under the finger first, then the same commands). In the library: on an item its details-panel actions plus *Copy*, *Copy file name* and *Paste*; on empty ground *Select everything*, *Paste*, the imports, *New folder*, *Slideshow* and the details panel. In Settings: on a setting its reset, on a shortcut its key actions. The viewer has none.
+- **Command palette** (`Ctrl/⌘+K`) runs any command by name, takes a value where one is needed (`@kind` narrows the list), and records and replays **macros**.
+- **Context menus** open with a right click, the menu key, or a long press on a touch screen, and list what fits where you are:
+
+  | Where | What it offers |
+  | --- | --- |
+  | On something on the canvas | The commands for it. On a picture, *Rename* renames its file in the library (a layer with a name of its own takes the new name) |
+  | On empty canvas | The canvas commands. A long touch first lists what is under the finger |
+  | On a library item | Its details-panel actions, plus *Copy*, *Copy file name* and *Paste* |
+  | On empty library ground | *Select everything*, *Paste*, the imports, *New folder*, *Slideshow* and the details panel |
+  | In Settings | A setting's reset; a shortcut's key actions |
+
+  The viewer has no context menu.
 - **Zen mode** (`Z`, or the leaf button) fades the bars and panels until the pointer is over them.
 - **Screenshot** (camera button) saves the selection, or the whole view, to the library. Settings choose the format, quality, name, folder and tags. They also choose whether to include the canvas pattern and the interface, a transparent background, and a copy on the clipboard.
-- **Previous view** and **Next view** walk your camera history; the **dice** goes to a random empty place.
-- **Camera travel** (Settings → Navigation) is how the view reaches a bookmark or a previous view: *Fly* moves the camera along one continuous path. When one place is within a view of the other (nested views, a bookmark you can see), it is one zoom in or out, at any depth, with no zoom out first. Farther apart, up to 20,000 levels of zoom away (another depth or frame), it zooms out until the two places are about a view apart, crosses over and zooms in, so the way is seen; *Glide near only* cuts to far ones; *Cut* always arrives at once. The time can grow with the distance (up to *Longest trip*) or stay fixed, the easing is smooth, linear or ease-out, and a key or a drag during the glide ends it. On a trip more than a view apart and over 20,000 levels away (it zooms out 24 levels and in) the canvas dips dark for a moment at the switch (*Fade at the switch*, on by default); the tour has its own travel speed. Animation set to None always cuts; with the system's reduced-motion request the view cuts too and says so once, unless *Follow the system's reduced motion* is turned off. *Travel time (base)* sets the length of a short trip.
-- **Read-outs:** the bottom left shows the zoom, position and save state. *Information shown* switches between simple and technical (exact zoom as a power of two, frame rate, diagnostics). The bottom-right buttons cycle the canvas pattern (grid and others) and the item names (always, when selected, hidden).
-- **Hint line** at the bottom says what the tool does and what each key does over a handle. **Notices** report results, often with a *View* button that opens what was made, and fade after a time that follows their words (a short one goes in a couple of seconds, a long one or an error stays to be read); they stack above the Actions bar, never over it. Anything that makes you wait (exporting, importing, opening a library, moving files, deleting everything) shows a notice with a bar and the stage it is at, which stays until the work ends and then says the result.
+- **Info bar** (bottom left): the zoom, position and save state. *Information shown* switches between simple and technical (exact zoom as a power of two, frame rate, diagnostics). The bottom-right buttons cycle the canvas pattern (grid and others) and the item names (always, when selected, hidden).
+- **Hint line** (bottom): what the tool does, and what each key does over a handle.
+- **Notices** report results, often with a *View* button that opens what was made. They fade after a time that fits their length (an error stays to be read), and stack above the Actions bar, never over it.
+- **Long work** (exporting, importing, opening a library, moving files, deleting everything) shows a notice with a progress bar and its current stage, which stays until the work ends and then says the result.
 
 | | |
 | --- | --- |
@@ -289,20 +362,51 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
 
 Switch between **Canvas** and **Library** at the top left. The canvas keeps its view, selection and undo history while you are away.
 
-- A gallery of every imported file with its size, type and usage ("4 uses · 3 canvases"), with search, filters by file type and sorting. The sidebar's sections (Folders, File types, Tags, Canvas tags) can be put in any order by dragging their heads, or with Alt+Up and Alt+Down on a section's name. The filters (Show, Sort by, its direction, the sidebar's list) are kept over a restart; the funnel-with-a-cross button beside them resets them all. A font shows "Aa" in that font as its thumbnail; selected, the details show "The quick brown fox jumps over the lazy dog" in it, and the viewer shows that sentence at four sizes with the alphabet and digits. **Back to top** (the arrow in the status bar) shows once you have scrolled down. In the list, drag a column header's right edge to resize the column (double-click for its usual width); widths, columns and the thumbnail size are kept. Thumbnails are made in the background after an import, so the grid fills in on its own. Dragging items shows up to five of them stacked, with how many there are; drag them onto a folder, a tag or Favourites in the sidebar to file them, or onto the strip that shows across the top to place them on the open canvas (the library stays open). The **status bar** is the canvas's: the full-width strip along the bottom shows how many items are listed (*3 of 5 items*), how many are selected and their size, and the size of the whole library; at its right end are the grid or list layout, the list's columns and the thumbnail size. In the desktop app, **Open in default app** (the details, the right-click menu, and the Actions bar of a file card on a canvas) opens an item's file in the app your system uses for that kind of file, for a file canvast cannot play or show, or to edit a picture elsewhere.
+- **The gallery:** every imported file with its size, type and usage (*4 uses · 3 canvases*), with search, filters by file type, and sorting.
+  - **Grid or list.** In the list, drag a column header's edge to resize it (double-click for its usual width). Columns, widths and the thumbnail size are kept.
+  - **The sidebar's sections** (Folders, File types, Tags, Canvas tags) can be reordered by dragging their heads, or with `Alt+↑` / `Alt+↓` on a section's name.
+  - **Filters** (Show, Sort by and its direction, the sidebar's list) are kept over a restart; the funnel-with-a-cross button resets them.
+  - **Thumbnails** are made in the background after an import, so the grid fills in on its own. A font shows "Aa" in its letters; selected, its details show a sample sentence, and the viewer shows it at four sizes with the alphabet and digits.
+  - **Back to top:** the arrow in the status bar, once you have scrolled down.
+- **Dragging items** shows up to five of them stacked, with their count. Drop them on a folder, a tag or Favourites in the sidebar to file them, or on the strip across the top to place them on the open canvas (the library stays open).
+- **The status bar** along the bottom (the same as the canvas's) shows how many items are listed (*3 of 5 items*), how many are selected and their size, and the size of the whole library. At its right end: grid or list, the list's columns, and the thumbnail size.
+- **Open in default app** (desktop app; in the details, the right-click menu, and a file card's Actions bar on a canvas) opens an item's file in your system's app for that kind of file: for a file canvast cannot show, or to edit a picture elsewhere.
 - A **viewer** with filmstrip, zoom, pan, slideshow and a details panel. The details show where an item is used (*Used on 3 canvases (4 times)*, then each canvas with its own count; past five canvases, **Show all** lists the rest), and **Show** takes you to it on the canvas at any depth. A button switches the background behind the picture, the controls can be hidden, and a double tap opens it on phones.
 - **Folders** (an item lives in one folder, folders nest; a long list in the sidebar shows its first rows and **Show N more**, remembered on this device), **tags** (several per item, renamable), **favourites**, file types, **Similar images** (duplicates and near-duplicates found by their pixels) and **Hidden** items, which are kept out of every list until you open them (see [Hidden items and passwords](#hidden-items-and-passwords)).
-- **Selecting and the details panel:** a click selects an item; the details panel is opened and closed with its button (or `I`) and, while open, shows what is selected (several: their tags and folder together), so a click never moves the grid under the pointer. When the grid is laid out again (the panel toggled, the window or the thumbnails resized), the selected item stays where it is on the screen. `Ctrl+A` selects all shown; a plain click then selects one alone (`Ctrl`+click adds or removes; on a touch screen, a tap adds or removes). Selected items a search or filter hides are counted in the panel, with a button to keep only the shown. The *Details* fold (the file's own metadata) stays open or closed as you left it when you select another item.
+- **Selecting and the details panel**
+  - A click selects an item. The details panel opens and closes with its button (or `I`) and shows what is selected (for several: their tags and folder together). A click never moves the grid under the pointer.
+  - When the grid is laid out again (the panel toggled, the window or thumbnails resized), the selected item stays where it is on the screen.
+  - `Ctrl+A` selects all shown; a plain click then selects one alone. `Ctrl`+click adds or removes (on a touch screen, a tap does).
+  - Selected items hidden by a search or filter are counted in the panel, with a button to keep only the shown ones.
+  - The *Details* fold (the file's own metadata) stays open or closed as you left it.
 - **Drag items onto the sidebar:** onto a folder to move them into it, onto *Unfiled* to take them out of their folders, onto a tag to tag them, onto *Favourites* to mark them; a selected item carries the whole select.
 - **Undo in the library:** `Ctrl+Z` undoes the last change to tags, favourites, folders or names (`Ctrl+Shift+Z` or `Ctrl+Y` redoes), up to 50 steps; deleting from the library has its own safety (files are kept while undo on a canvas can need them).
-- **Tags and folders of several items at once:** with several selected, the details panel lists every tag any of them has, with how many have it (*2/4*); **×** takes a tag off all of them and **+** puts it on the rest. The tag field suggests the library's tags and takes several at once, separated by commas. Each folder shows how many of them it holds (a mixed select has none ticked), and *New folder for these…* makes one and moves them into it. Changes to hundreds of items are one write, so they take a moment, not minutes.
-- **Note and fields:** the details panel of one item has a **Note** box (plain text, not Markdown) and, under it, **Add a field**, which adds a row with a name you choose and its value (`link` and an address, `author`, `source`, `licence`…; names already used in the library are suggested). Each is stored when you leave it or press `Enter` in a field, **×** removes a field, the grip at the start of a row moves it (drag it, or press the Up and Down arrows on it; the order is kept), and `Ctrl+Z` in the library undoes the change. The library search (All) finds words in the note and in the fields' names and values. Notes and fields travel in backups and in the library index; importing keeps an item's own note (the backup's fills an empty one) and adds the fields it does not have yet.
+- **Tags and folders of several items at once**
+  - The details panel lists every tag any of them has, with how many have it (*2/4*). **×** takes a tag off all of them; **+** puts it on the rest.
+  - The tag field suggests the library's tags and takes several at once, separated by commas.
+  - Each folder shows how many of them it holds (a mixed selection has none ticked); *New folder for these…* makes one and moves them into it.
+  - Changes to hundreds of items are one write, so they take a moment, not minutes.
+- **Note and fields** (the details panel of one item)
+  - **Note:** a plain-text box (not Markdown).
+  - **Add a field** adds a row with a name you choose and its value: `link` and an address, `author`, `source`, `licence`… Names already used in the library are suggested.
+  - Each is saved when you leave it or press `Enter`. **×** removes a field; the grip at its start moves it (drag it, or press `↑` / `↓` on it). `Ctrl+Z` undoes.
+  - The library search (All) finds words in notes and in fields.
+  - Notes and fields travel in backups and in the library index. Importing keeps an item's own note (the backup's fills an empty one) and adds the fields it does not have yet.
 - **Rename** one item or many at once, with a preview: number them, replace text, add text or change the extension. Renaming one item edits only the name before the extension (it stays, so it cannot change by accident); *Change the extension too* opens the whole name.
 - **Copy and paste** with the system clipboard: *Copy* (the menu, or `Ctrl`+`C` over the library) puts the picture, as a PNG, alone on the clipboard (a name beside it would be pasted instead of the picture by many programs); *Copy file name* puts the name as text; a file that is not a picture is copied as its name. *Paste* brings a picture from the clipboard in, named by the text beside it when there is one and it is a file name, else `image`.
 - **Export** items as a `.canvast` archive, download files, or export all files as a plain ZIP sorted by file type or by folder.
-- **Safe deletion:** the details have one **Delete…** button. An unused item is deleted from the library; an item in use is deleted everywhere, after a confirmation that says how often and where it is used (the first three canvases and how many others), which removes its instances from every canvas first, a text using it as its font keeping its words in the default font. On the open canvas Undo brings them back; on the others they cannot be brought back. A file is erased only when nothing, including undo, can bring it back.
+- **Safe deletion:** the details panel has one **Delete…** button.
+  - An unused item is deleted from the library.
+  - An item in use is deleted everywhere, after a confirmation that says where it is used (the first three canvases and how many others). Its instances are removed from every canvas first; a text using it as its font keeps its words in the default font.
+  - Undo brings them back on the open canvas, not on the others.
+  - A file is erased only when nothing, undo included, can bring it back.
 - **Missing files** (for example after clearing site data, or a file taken out of the library folder) are flagged with their usage; importing the same file again restores every instance.
-- **Library folder** (Chromium): in **Settings > Storage**, *Choose library folder…* keeps your files as plain files in a folder of your disk, named by their content and keeping their extension (`a07c9f….png`, so other programs can open them), instead of in the browser's storage, so the library is limited by your disk and not by the browser. *Move into folder* and *Move back to browser* move what is already there. The library index is kept up to date by itself a little after each change (a checkbox turns it off; **Save index** writes it at once). It is the hidden file `.canvast-index` beside the files: the whole workspace (boards, canvases, objects, names, tags, folders, notes and fields, styles, settings) without the files themselves. It is not a backup, and not a cache to delete: on another device it is your canvases (a backup, `.canvast`, is a different file and holds the files). On another device, choose the same folder: when it holds a library index you are offered to open it at once (**Open index** does the same later); the canvases are added and every file is matched by its name. Do this on a device that has no canvases of its own yet, or they are added a second time. After a restart the browser asks permission once more: press *Reconnect folder*. Do not move, rename or edit the files in that folder (canvast finds each one by its name); files kept before extensions were added get one with the *Add extensions* button on the card; backups (`.canvast`) hold their bytes as always.
+- **Library folder** (browser version, Chromium only): keep the library's files on your disk instead of in the browser's storage, so its size is limited by your disk.
+  - **Set it up** in Settings > Storage with *Choose library folder…*. Files are named by their content and keep their extension (`a07c9f….png`), so other programs can open them. *Move into folder* and *Move back to browser* move what is already there.
+  - **The library index** (`.canvast-index`, a hidden file beside the files) is the whole workspace without the files: boards, canvases, objects, names, tags, folders, notes, fields, styles, settings. It is saved by itself shortly after each change (a checkbox turns that off; **Save index** saves at once). It is not a backup (a `.canvast` backup holds the files), and not a cache to delete: on another device it is your canvases.
+  - **On another device**, choose the same folder: you are offered to open its index (**Open index** does it later). The canvases are added and every file is matched by name. Do this on a device with no canvases of its own yet, or they are added twice.
+  - **After a restart** the browser asks for permission again: press *Reconnect folder*.
+  - **Leave the files alone:** don't move, rename or edit them, as canvast finds each by its name. Files kept before extensions were added get one with *Add extensions* on the card.
 
 | | |
 | --- | --- |
@@ -311,11 +415,37 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 
 ### Exporting
 
-**Copy to other apps.** `Ctrl/⌘+C` keeps the real objects for pasting back here and also puts on the system clipboard a PNG picture: of shapes as drawn (their SVG text is the separate command *Copy the selection as SVG*, in the right-click menu); of a picture as one PNG at full size, as it looks with its crop and adjustments; a GIF or video as the frame it shows; a shape with a picture or objects fill, or anything mixed, as a PNG of it as drawn (at most 1024 px on the long side). The picture goes alone, with no text beside it (an app that is offered both often takes the text), except for copied texts, which carry their words too. Every copy out of canvast (canvas, library, screenshot, Export) goes through one module. **Pasting back in canvast** brings the objects back as they were (links, masks, crop, adjustments, exact positions) as long as nothing else was copied in between. Shapes and texts are known by their text on the clipboard, so they come back even from another tab; a picture or GIF is known only while this window keeps the focus, and after switching to another window it comes back as a new picture (see Limitations). Anything copied in another app is imported as before: an SVG as shapes, an image as a picture. Pasting in another app takes what it accepts. Browsers cannot put files (audio, PDF) on the clipboard, so those stay in canvast. `Ctrl/⌘+X` puts the text only (the shape is gone before a picture could be drawn).
+**Copy to other apps.** `Ctrl/⌘+C` keeps the real objects for pasting back here, and also puts a PNG picture on the system clipboard:
 
-**What you export is what you see.** Colours, widths and shapes are the ones stored in the document: nothing is changed by the theme when drawing or exporting. A new shape starts with a fill and no outline (a line and an open path get one, or they would not show). The default ink, for the pen, those lines and a first outline, is near-black on a light canvas and a light ink on a dark one, chosen when the object is made and stored with it (*Change the old default ink to the canvas ink* in the command palette gives it to older drawings). Exports match the canvas in every format; the one thing SVG cannot say is an angular gradient: an SVG holds a picture of it (a PNG of up to 384 px a side, cut to the shape or the line) and, on the element, the real gradient: canvast reads it back, so *Make vector copy* or pasting the SVG gives the editable angular gradient again (other programs show the picture). The Export dialog and the SVG saves warn when a shape has one.
+| You copy | The PNG is |
+| --- | --- |
+| Shapes | The shapes as drawn (their SVG text is a separate command, *Copy the selection as SVG*, in the right-click menu) |
+| A picture | One PNG at full size, as it looks with its crop and adjustments |
+| A GIF or video | The frame it shows |
+| A shape with a picture or objects fill, or anything mixed | It as drawn, at most 1024 px on the long side |
 
-**Export…** works on a sheet, a picture or selected shapes. The size comes from the shape: type a width or height in px, in, cm or mm at 72–600 ppi, or choose a preset (A4, Full HD, a story, the picture's own pixels). Formats: PNG, WebP, JPEG, SVG and PDF (what is on a sheet that clips is cut to the sheet in every format, and the picture is framed by the part that shows), with a transparent, white or black background; download it, copy it or keep it in the library. PNG, JPEG and WebP carry their resolution. Several sheets export together as a ZIP or as one multi-page PDF whose pages you can reorder. Plain shapes export to PDF and SVG as true vectors, masks as SVG masks, and picture or pattern fills as embedded pictures clipped to the shape.
+- The picture goes alone, with no text beside it (an app offered both often takes the text). Copied texts carry their words too.
+- `Ctrl/⌘+X` puts the text only (the shape is gone before a picture could be drawn).
+- Browsers cannot put files (audio, PDF) on the clipboard, so those stay in canvast.
+
+**Pasting back in canvast** brings the objects back exactly as they were (links, masks, crop, adjustments, exact positions), as long as nothing else was copied in between. Shapes and texts come back even from another tab; a picture or GIF only while this window keeps the focus (after switching windows it comes back as a new picture; see Limitations). Anything copied in another app is imported as usual: an SVG as shapes, an image as a picture.
+
+**What you export is what you see.**
+
+- Colours, widths and shapes are the ones stored in the document; the theme never changes them, on the canvas or in an export.
+- A new shape starts with a fill and no outline (a line and an open path get one, or they would not show). The default ink (for the pen, those lines and a first outline) is near-black on a light canvas and light on a dark one, chosen when the object is made and stored with it. *Change the old default ink to the canvas ink* (command palette) updates older drawings.
+- Exports match the canvas in every format, with one exception: **SVG has no angular gradient.** An SVG then holds a picture of it (a PNG up to 384 px a side, cut to the shape) plus the real gradient, which canvast reads back (so *Make vector copy* or pasting the SVG gives it back editable; other programs show the picture). The Export dialog and the SVG saves warn about it.
+
+**Export…** works on a sheet, a picture or selected shapes.
+
+| | |
+| --- | --- |
+| Size | From the shape: a width or height in px, in, cm or mm at 72–600 ppi, or a preset (A4, Full HD, a story, the picture's own pixels) |
+| Formats | PNG, WebP, JPEG, SVG and PDF. What is on a sheet that clips is cut to the sheet in every format. PNG, JPEG and WebP carry their resolution |
+| Background | Transparent, white or black |
+| Result | Download it, copy it, or keep it in the library |
+| Several sheets | One ZIP, or one multi-page PDF whose pages you can reorder |
+| Vectors | Plain shapes are true vectors in PDF and SVG; masks are SVG masks; picture and pattern fills are embedded pictures clipped to the shape |
 
 ![Export dialog for the Earth, a clipping mask](docs/screenshots/export.webp)
 
@@ -351,7 +481,7 @@ Every shortcut can be changed in **Settings → Shortcuts**: a single key or a c
 | Resize | Drag a handle; `Shift` keeps proportions, `Alt` resizes about the middle, `Ctrl` turns snapping off |
 | Copy by dragging | `Alt` as the drag starts |
 | Layer selection | `Ctrl`+click toggles · `Shift`+click selects a range |
-| Jump to a zoom level | Click the zoom read-out, type `3000`, `2^-500` or `10^900`, Enter |
+| Jump to a zoom level | Click the zoom in the info bar, type `3000`, `2^-500` or `10^900`, Enter |
 
 **Touch:** two-finger drag pans and pinches zooms; a two-finger tap is undo and a three-finger tap is redo; a long press on Select lists what is under the finger; a resting finger while another drags acts as `Shift`, two as `Alt`. Number fields change by dragging their name.
 
@@ -374,7 +504,7 @@ Open Settings with the gear button. Settings have a *device* scope and a *canvas
 | Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, changes only, files as ZIP, import); *Start from scratch* (delete all data, after a warning with a backup offered first) |
 | Privacy | The word that opens the Hidden items, keeping them open until the tab closes, and the passwords of the workspace and of the Hidden items; what stays on your machine |
 | About and diagnostics | Version and diagnostics |
-| Develop | Developer tools (see below) |
+| Develop | Developer tools (see [Building from source](#building-from-source)) |
 
 - **Accessibility:** controls are keyboard reachable with visible focus; panels have title bars that work by keyboard; status changes are announced to screen readers; the system's reduced-motion preference is honoured and animation can be turned off; colour contrast is audited automatically.
 - **Layouts** adapt to large, medium and phone-sized screens, with scroll cues on bars that scroll.
@@ -387,7 +517,10 @@ Open Settings with the gear button. Settings have a *device* scope and a *canvas
 
 ### Saving
 
-Every change is saved automatically within a fraction of a second, together with the camera, in your browser's IndexedDB. Only the objects that changed are written, in one atomic transaction, and then read back to check. The indicator shows *Unsaved changes… → Saving… → Saved → Saved (verified)*; click it to open **Settings > Storage**: space used, whether the browser keeps the data, the library folder, how saving is going (and the role of this tab) and backups. Reloading restores the canvas and the view.
+- Every change is saved automatically within a fraction of a second, with the camera. Only the objects that changed are written, in one atomic transaction, then read back to check.
+- The indicator shows *Unsaved changes… → Saving… → Saved → Saved (verified)*. Click it to open **Settings > Storage**: space used, whether the browser keeps the data, the library folder, how saving is going (and this tab's role) and backups.
+- Reloading restores the canvas and the view.
+- In the desktop app, the workspace folder follows these saves (see [The workspace folder](#the-workspace-folder-desktop-app)).
 
 If storage cannot be opened, canvast keeps working in memory and says so.
 
@@ -409,17 +542,36 @@ The browser does not say whether a download finished, so keep your backups somew
 
 ### What can delete data
 
-Deleting objects; deleting a canvas or board (confirmed, cannot be undone; pictures placed there stay in the library); *Delete…* in the library, which erases an unused file once undo can no longer need it; and **Delete all data** (Settings > Storage, *Start from scratch*), which asks first, offers a backup, an export of the files and the library index, makes you type `DELETE`, and then removes everything canvast keeps in this browser. It never deletes files from your disk: the files in a library folder stay where they are. Nothing else removes anything. Damaged objects found on load are skipped and reported, never silently changed.
+Only these remove anything:
+
+| Action | What it removes |
+| --- | --- |
+| Deleting objects | Those objects (undo brings them back) |
+| Deleting a canvas or board | It, after a confirmation; this cannot be undone. Pictures placed there stay in the library |
+| *Delete…* in the library | An unused file, once undo can no longer need it |
+| **Delete all data** (Settings > Storage, *Start from scratch*) | Everything canvast keeps in this browser. It asks first, offers a backup, an export of the files and the library index, and makes you type `DELETE`. Files on your disk (a library folder) stay where they are |
+
+Damaged objects found when loading are skipped and reported, never silently changed.
 
 ### Where the data lives
 
-IndexedDB database `canvast`, in the browser's storage for local files. Moving the HTML file to another folder keeps your data. Opening it in a different browser, profile or private window does not, and clearing site data deletes it. This is why regular backups matter. The browser's storage has a size limit, so canvast suits projects rather than very large collections of files; see [Limitations](#limitations). The desktop app keeps the workspace in a folder instead ([below](#the-workspace-folder-desktop-app)).
+- **Browser version:** the IndexedDB database `canvast`, in the browser's storage for local files.
+  - Moving the HTML file to another folder keeps your data.
+  - A different browser, profile or private window starts empty, and clearing the site data deletes it. This is why regular backups matter.
+  - The browser's storage has a size limit, so the browser version suits projects rather than very large collections (see [Limitations](#limitations)).
+- **Desktop app:** a folder you choose ([below](#the-workspace-folder-desktop-app)).
 
 ### The workspace folder (desktop app)
 
 In the desktop app your workspace is a **folder of ordinary files** that you choose, so any sync tool, backup tool or file manager can see it. It works offline and loads nothing from the network.
 
-**Switching workspaces.** *Switch workspace…* (in the Board › Canvas menu under *Whole workspace*, in Settings > Storage, or the command palette) lists the open workspace, the recent ones, **Open a folder…** (an existing workspace, or any folder to start one in) and **New workspace…** (an empty folder you name); the latest five whose folders are there are listed, and **Clear the recent list** leaves only the open one (no folder is touched). File > Open workspace folder… and File > New workspace… do the same. A switch closes the window the usual way, with your last edits written into the folder first, and the app starts again on the other folder. At start-up the app opens the last workspace; if its folder is not there any more (moved or deleted), it says so and offers the recent ones, a folder or a new workspace. While a workspace opens, a start screen (the logo and what is being done) stands in front of the app until everything is ready; each step and its time are also written to the developer tools' console (View > Toggle Developer Tools). A workspace is open in one window at a time: starting the app on a workspace that is still closing waits for it, and one still open in another window is asked about.
+**Switching workspaces.** *Switch workspace…* is in the board and canvas menu (under *Whole workspace*), in Settings > Storage and in the command palette; *File > Open workspace folder…* and *File > New workspace…* do the same.
+
+- It lists the open workspace and the five latest ones whose folders still exist, plus **Open a folder…** (an existing workspace, or any folder to start one in) and **New workspace…** (an empty folder you name). **Clear the recent list** keeps only the open one (no folder is touched).
+- A switch writes your last edits into the folder, closes the window and starts the app again on the other folder.
+- At start-up the app opens the last workspace. If its folder is gone (moved or deleted), it says so and offers the recent ones, a folder, or a new workspace.
+- While a workspace opens, a start screen shows what is being done. Each step and its time also go to the developer tools' console (*View > Toggle Developer Tools*).
+- A workspace is open in one window at a time: starting it while it is still closing waits for it, and one open in another window is asked about.
 
 **Closing while files are written.** When the app is still writing many files into the folder (an import's), closing asks first: *Close anyway* keeps your work safe in the app and writes the rest the next time you open the workspace.
 
@@ -434,7 +586,31 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 | `.hidden/`, `.canvast/hidden.json` | Hidden items, encrypted (see [Hidden items and passwords](#hidden-items-and-passwords)) |
 | `.trash/` | What canvast deleted, when Settings > Storage says so (the default) |
 
-**How it saves.** New library files are written as readable files under `library/<kind>/` (`Hand Study (Loomis).png` → `library/images/hand_study-loomis.png`, `-2` on a clash, the same file stored once); each board is a folder of `.canvast/boards/` and each canvas a `<board>/<canvas>.cvst` file in it (same safe names), with `.canvast/workspace.json` (names, order, styles) and a file per device, written about 2 seconds after editing pauses and when the window closes. Every edit is first saved in the app's own storage (one per workspace folder and device), which the folder follows. Each folder carries its own id (`.canvast/folder.json`), so a new folder made where a deleted one was is a new, empty workspace: nothing of the deleted one (its boards, library or passwords) comes back, and the deleted one's copy on this device is cleared. At start-up the folder wins: a device with no copy yet opens the whole workspace from it, a canvas another device changed (through any sync tool) is read in, and when both changed the same canvas the folder's version is kept and this device's is added beside it as `<name> (conflict <date>)`. Library folders are real folders: an item filed in a library folder is under `library/<folder path>/` (each part a safe name; a library folder named like a kind folder shares it), filing or renaming an item moves its file, the library's undo moves it back, and a renamed or deleted library folder's emptied folder is removed. `.canvast/library.json` holds the library (names, tags, folders, notes, fields, which file is which item, one item per line), and a device with no copy yet takes the library from it. Hidden items are encrypted into `.hidden/` (see [Hidden items and passwords](#hidden-items-and-passwords)); a readable file put there from outside the app becomes a hidden item and is encrypted (once the Hidden items are opened). A workspace with a password asks for it wherever its folder is opened from. A file canvast deletes from the folder (a file once undo no longer needs it, a deleted canvas or board) goes where Settings > Storage says: into `.trash/` in the workspace folder (the default, so it syncs and can be put back by hand), into the system trash, or away for good. canvast follows the folder while it runs (and catches up at start-up). A canvas file another device wrote (through any sync tool) is read in, and the open canvas is loaded again with its camera kept. If this device has edits of that canvas not yet in its file, both versions are kept, as at start-up, and a file is never written over another device's newer version. A canvas file or board folder renamed in `.canvast/boards/` (not meant for it, but possible) renames the canvas or board, and a canvas file moved into another board's folder moves the canvas; their files then take their safe names. In `library/`, canvast notices what changed in a file manager: a file renamed or moved is found again by its content (the item takes its new folder and, when renamed, its new name), a new file is imported where it lies, into the library folder of the folder it is in (made when there is none), and a deleted file shows as missing. Files being written (temporary or partial downloads) are left alone. To bring a browser workspace in, export a full backup there and import it here: its boards, canvases and files are written into the folder as folders and files (one screen keeps the app waiting through the whole import and shows how many of the files are written; then the app starts again on them and says what was imported, without asking for the workspace password again: it was given before the import)
+**How it saves**
+
+- **Every edit** is saved first in the app's own storage on this device, then written to the folder about 2 seconds after editing pauses, and when the window closes.
+- **Names on disk** are safe versions of the names in the app: lowercase, `_` between words, `-` between parts, `-2` on a clash. `Hand Study (Loomis).png` becomes `library/images/hand_study-loomis.png`, and the same file is stored once.
+- **Library folders are real folders.** An item filed in a library folder lives under `library/<folder path>/`; an unfiled one under its kind's folder. Filing or renaming an item moves its file; the library's undo moves it back; an emptied folder of a renamed or deleted library folder is removed.
+- **Deleted files** (one undo no longer needs, a deleted canvas or board) go where Settings > Storage says: into `.trash/` in the workspace folder (the default, so it syncs and can be put back by hand), into the system trash, or away for good.
+- **Hidden items** are encrypted into `.hidden/` (see [Hidden items and passwords](#hidden-items-and-passwords)). A readable file put there from outside becomes a hidden item and is encrypted (once the Hidden items are opened).
+- **A password** on the workspace is asked for wherever its folder is opened from.
+- **Each folder has its own id** (`.canvast/folder.json`): a new folder made where a deleted one was is a new, empty workspace. Nothing of the deleted one comes back, and its copy on this device is cleared.
+
+**Changes made outside the app** (by a sync tool, another device or a file manager). canvast watches the folder while it runs and catches up at start-up.
+
+| What changed | What canvast does |
+| --- | --- |
+| A canvas file another device wrote | Reads it in; the open canvas is loaded again with its camera kept |
+| The same canvas changed here and there | Keeps both: the folder's version, and this device's beside it as `<name> (conflict <date>)`. A file is never written over another device's newer version |
+| A canvas file or board folder renamed in `.canvast/boards/` | Renames the canvas or board (its files then take their safe names) |
+| A canvas file moved into another board's folder | Moves the canvas to that board |
+| A file in `library/` renamed or moved | Finds it again by its content; the item takes its new folder and name |
+| A new file in `library/` | Imports it where it lies, into the library folder of its folder (made if needed) |
+| A file deleted from `library/` | Shows the item as missing |
+| A file still being written (temporary, partial download) | Leaves it alone |
+| `library.json` on a device with no copy yet | Takes the library from it; a device with no copy at all opens the whole workspace from the folder |
+
+**Bringing a browser workspace in:** export a full backup in the browser and import it in the desktop app. One screen shows the import and how many files are written into the folder; then the app starts again on them and says what was imported, without asking for the workspace password again (it was given before the import).
 
 ---
 
@@ -446,7 +622,10 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 - canvast has no runtime dependencies and makes no network requests. The interface font is supplied from memory, so no font source is allowed either. `npm run check:offline` and the end-to-end suite both verify this on every build. The desktop app is the same page in Electron: it opens no connection either (its updates are fetched by an AppImage updater, not by the app).
 - Imports are limited to files of at most 256 MiB, and each is decoded before being stored. Files that fail to decode are rejected with a message.
 - Archives are verified completely (structure, checksums and content hashes) before anything is written.
-- Optional passwords for the workspace and for the Hidden items (see [Hidden items and passwords](#hidden-items-and-passwords)): only a salted PBKDF2 hash of the workspace password is kept. In the browser nothing is encrypted; in the desktop app the hidden items' files and index are encrypted (AES-256-GCM), in a documented format you can [decrypt outside the app](#decrypting-and-encrypting-outside-the-app). The library index on disk and any export you decline to include them in carry neither hidden items nor passwords.
+- Optional passwords for the workspace and the Hidden items (see [Hidden items and passwords](#hidden-items-and-passwords)). Only a salted PBKDF2 hash of the workspace password is kept.
+  - In the browser, nothing is encrypted.
+  - In the desktop app, the hidden items' files and index are encrypted (AES-256-GCM), in a documented format you can [decrypt outside the app](#decrypting-and-encrypting-outside-the-app).
+  - The library index on disk, and any export you leave them out of, carry neither hidden items nor passwords.
 - No analytics, no telemetry, no account.
 
 ### Hidden items and passwords
@@ -458,9 +637,17 @@ For a workspace that is shown in a public place, an item of the Library can be *
 | ![The details of a selected item, with the Hide button beside the star](docs/screenshots/library-hide.webp) | ![The Hidden list: the item that was hidden, in its own list](docs/screenshots/hidden-list.webp) |
 | **Hide** is the eye button beside the star in the details panel (also in the bulk bar of several selected items, and in the library's context menu) | The **Hidden** list, open: the hidden item is only here, and the sidebar counts do not include it |
 
-**Hiding.** A hidden item is left out of *All items*, every folder, tag and file type, the counts, searches, *Similar images*, and the pickers that list the Library (the picture of a texture fill, the fonts). Pictures of it already placed on a canvas show a padlock instead of the picture, at once and whether or not a password was given, until the item is shown again; their names stay in the Layers panel. A hidden video or sound placed on a canvas does not play. Hiding does not move, delete or change the file. In the Hidden list the same button shows the item again.
+**Hiding**
 
-**Opening the Hidden list.** It is not in the sidebar. Type its **opening word** in the library's search box (`hidden:` by default; change it, or empty it to turn this off, in Settings > Privacy): the word clears itself, the password is asked if there is one, and the list opens as one more list in the sidebar. It closes when you choose another list or leave the Library. With *Keep the Hidden items open until the tab closes* on (Settings > Privacy), it stays open, without asking again, until the tab is closed or reloaded.
+- A hidden item is left out of *All items*, every folder, tag and file type, the counts, searches, *Similar images*, and the pickers that list the library (a texture fill's picture, the fonts).
+- Where it is already placed on a canvas, its picture shows a padlock at once (with or without a password) until it is shown again; its name stays in the Layers panel. A hidden video or sound does not play.
+- Hiding does not move, delete or change the file. In the Hidden list, the same button shows the item again.
+
+**Opening the Hidden list**
+
+- It is not in the sidebar. Type its **opening word** in the library's search box (`hidden:` by default; change it, or empty it to turn this off, in Settings > Privacy).
+- The word clears itself, the password is asked for if there is one, and the list opens as one more list in the sidebar.
+- It closes when you choose another list or leave the library. With *Keep the Hidden items open until the tab closes* (Settings > Privacy) it stays open until the tab is closed or reloaded.
 
 | | |
 | --- | --- |
@@ -486,9 +673,23 @@ For a workspace that is shown in a public place, an item of the Library can be *
 
 Whether an item is hidden is data of the item, so it travels in any export that includes it and the item comes back hidden. Importing a backup that carries a password sets it only on a device that has none, and the import dialog says so.
 
-**What this is not.** The passwords are asked by the app; the files are stored as they are. They keep people at your screen out. They do not stop someone who can open this browser's storage, or who has an exported file that includes hidden items. Only a salted hash of each password is kept, in this browser and in no archive unless you include it. A forgotten password cannot be recovered: the only way back into a locked workspace is to clear this site's data in the browser, which deletes it, so keep a backup (a backup made without the password opens without one). In the browser, hidden files are not encrypted.
+**What this is not (browser version).**
 
-**In the desktop app, hidden items are encrypted.** There, hiding asks for a Hidden password first (and says that a lost password means lost files). A hidden item's file is encrypted (AES-GCM) into `.hidden/` in the workspace folder under a random name, read back to prove it, and the readable file is deleted, not moved to `.trash/`. Its name, tags, note and fields are kept only in an encrypted index (`.canvast/hidden.json`), and its thumbnail is never stored. The password, stretched with PBKDF2, wraps one random key, so changing the password re-wraps that key without re-encrypting any file. The password cannot be removed while any item is hidden. Once given (to open the Hidden list, or when hiding), the key stays in memory until the app closes or **Lock hidden items** (command palette). A hidden picture placed on a canvas always shows a padlock (as in the browser), and another device on the same folder learns of hidden items only when the password is given there. Showing an item again decrypts it back to its place in `library/`.
+- The passwords are asked by the app; the files are stored as they are. They keep out people at your screen, not someone who can open this browser's storage or who has an exported file with hidden items in it.
+- Only a salted hash of each password is kept: in this browser, and in an archive only if you include it.
+- A forgotten password cannot be recovered. The only way back into a locked workspace is to clear this site's data in the browser, which deletes it, so keep a backup (one made without the password opens without one).
+- In the browser, hidden files are not encrypted (in the desktop app they are, below).
+
+**In the desktop app, hidden items are encrypted.**
+
+- Hiding asks for a Hidden password first, and warns that a lost password means lost files.
+- The file is encrypted (AES-GCM) into `.hidden/` under a random name, read back to prove it, and the readable file is deleted (not moved to `.trash/`).
+- Its name, tags, note and fields are kept only in an encrypted index (`.canvast/hidden.json`); its thumbnail is never stored.
+- The password (stretched with PBKDF2) wraps one random key, so changing the password never re-encrypts a file. It cannot be removed while any item is hidden.
+- Once given (to open the Hidden list, or when hiding), the key stays in memory until the app closes or you choose **Lock hidden items** (command palette).
+- A hidden picture placed on a canvas always shows a padlock. Another device on the same folder learns of hidden items only when the password is given there.
+- Showing an item again decrypts it back to its place in `library/`.
+- The format is documented below, and the files can be decrypted outside the app.
 
 ### Hidden items: the file format
 
@@ -521,9 +722,7 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 
 ## Limitations
 
-canvast describes only what it does. These are the current limits, first those of both versions, then those of the browser version and of the desktop app.
-
-The list describes canvast as it is today. Some of these limits, such as fuller support for PDF and 3D files, may be lifted in later versions, but none is promised and there is no schedule: if something here matters to you, plan around it as it stands.
+These are canvast's current limits: first those of both versions, then those of the browser version and of the desktop app. They describe the app as it is today. Some of them, such as fuller support for PDF and 3D files, may be lifted in later versions, but none is promised and there is no schedule: if one matters to you, plan around it as it stands.
 
 ### Both versions
 
@@ -624,9 +823,18 @@ Every object is validated before it enters the document or is loaded: finite num
 
 ### Storage
 
-The app reaches storage only through the interfaces in `src/storage/store.ts` (the workspace, backups, the library's entries and its files); the browser's IndexedDB is one implementation of them (`src/storage/idb-storage.ts`), and `npm run check:storage` keeps IndexedDB out of the rest of the code. Hierarchy: Workspace → Boards → Canvases. The IndexedDB schema (version 12) has stores for workspaces, boards, canvases, objects (one record each), per-canvas views, frames, bookmarks, thumbnails, assets, the asset catalog and metadata. Assets are content-addressed by SHA-256 and stored once; objects on the canvas reference them. A multi-tab **writer lease** guarantees a stale tab cannot overwrite newer data. Files are removed only by reference-checked garbage collection. With a library folder a file is a file named `<sha256>.<ext>` (written, read back and compared before the browser keeps a stub of it: an `assets` record with an empty blob and `ext: 1`), so every rule keyed by hash is unchanged.
+- **One boundary.** The app reaches storage only through the interfaces in `src/storage/store.ts` (the workspace, backups, the library's entries and its files). The browser's IndexedDB is one implementation (`src/storage/idb-storage.ts`), the workspace folder the other; `npm run check:storage` keeps IndexedDB out of the rest of the code.
+- **Layout:** Workspace → Boards → Canvases. The IndexedDB schema (version 12) has stores for workspaces, boards, canvases, objects (one record each), per-canvas views, frames, bookmarks, thumbnails, assets, the asset catalog and metadata.
+- **Files** are content-addressed by SHA-256 and stored once; objects on the canvas reference them. They are removed only by reference-checked garbage collection.
+- **Several tabs:** a writer lease guarantees a stale tab cannot overwrite newer data.
+- **Library folder:** a file is named `<sha256>.<ext>`; it is written, read back and compared before the browser keeps a stub of it (an `assets` record with an empty blob and `ext: 1`), so every rule keyed by hash is unchanged.
 
-A `.canvast` archive holds a versioned `manifest.json`, one JSON file per canvas and each file once under `assets/<sha256>`, with a CRC on every entry. It is an uncompressed ZIP (ZIP64 beyond 4 GiB or 65,535 files), always one file however big. Import is verified completely before anything is written. The files are then written a batch at a time (up to 128 MiB each), so an import needs about that much memory whatever the size of the backup, and everything else (boards, canvases, library entries) in one transaction, so it shows all at once or not at all; files written by an import that did not finish are erased at once, or when the app next opens.
+**Archives.** A `.canvast` archive holds a versioned `manifest.json`, one JSON file per canvas, and each file once under `assets/<sha256>`, with a CRC on every entry. It is an uncompressed ZIP (ZIP64 beyond 4 GiB or 65,535 files), always one file however big.
+
+- Import is verified completely before anything is written.
+- Files are then written a batch at a time (up to 128 MiB each), so an import needs about that much memory whatever the backup's size.
+- Everything else (boards, canvases, library entries) is written in one transaction: it shows all at once or not at all.
+- Files written by an import that did not finish are erased at once, or when the app next opens.
 
 ### Source layout
 
@@ -739,7 +947,22 @@ The build is deterministic: the same source produces the same `canvast.html`, an
 | `npm run check:tokens` | Fail on a hard-coded colour, size, space or radius in the CSS |
 | `npm run check:storage` | Fail if code outside the storage implementation uses IndexedDB instead of the storage interfaces |
 
-Every end-to-end run builds its own copy of the app into `test-builds/` and tests that copy, so `dist/` can be rebuilt while tests run. Tests open the built file from `file://`, drive it through a debug hook, run in Chromium (three configurations) and Firefox, and fail on any network request; the desktop shell has its own project, which runs the snapshot's Electron build on a fresh workspace folder. Test fixtures are generated in code; no binary fixtures are committed. Performance thresholds are fixed in advance and never loosened. On GitHub, two workflows run on every push to `main` and every pull request. `CI` (`.github/workflows/ci.yml`) runs the typecheck, unit tests, the build, the offline, naming, token, storage, picker and pattern checks and the reproducible-build check, and keeps the built file as a downloadable artifact. `Tests` (`.github/workflows/tests.yml`) runs the whole end-to-end suite split into one job per test group and browser set-up (Chromium, Chromium CPU-only, Chromium at pixel ratio 2 with touch, Firefox) plus the desktop app under a virtual display, all at once; it runs the full suite every Sunday and on request. Shared machines vary in speed, so a failure there in a test that measures time is checked again on the reference machine before it counts. Test logs with environments and timings are in [docs/testing/](docs/testing/); [docs/status.md](docs/status.md) is the status record.
+**How the tests work**
+
+- Every end-to-end run builds its own copy of the app into `test-builds/` and tests that copy, so `dist/` can be rebuilt while tests run.
+- Tests open the built file from `file://`, drive it through a debug hook, and fail on any network request. They run in Chromium (three set-ups) and Firefox; the desktop app has its own project, which runs the Electron build on a fresh workspace folder.
+- Fixtures are generated in code; no binary fixtures are committed.
+- Performance limits are fixed in advance and never loosened.
+- Test logs with environments and timings are in [docs/testing/](docs/testing/); [docs/status.md](docs/status.md) is the status record.
+
+**On GitHub** (every push to `main` and every pull request)
+
+| Workflow | What it runs |
+| --- | --- |
+| `CI` (`.github/workflows/ci.yml`) | Typecheck, unit tests, the build, the offline, naming, token, storage, picker and pattern checks, and the reproducible-build check; keeps the built file as an artifact |
+| `Tests` (`.github/workflows/tests.yml`) | The whole end-to-end suite, one job per test group and browser set-up (Chromium, Chromium CPU-only, Chromium at pixel ratio 2 with touch, Firefox) plus the desktop app under a virtual display, all at once. The full suite every Sunday and on request |
+
+Shared machines vary in speed, so a failure there in a test that measures time is checked again on the reference machine before it counts.
 
 ---
 
@@ -747,13 +970,21 @@ Every end-to-end run builds its own copy of the app into `test-builds/` and test
 
 ### Releasing
 
-`npm run release` publishes `dist/canvast.html` with its SHA-256 as the latest GitHub release (tag `vX.Y.Z`, the version in `package.json`). Run it after the version is bumped, `CHANGELOG.md` has its `## X.Y.Z — Title (date)` section and everything is pushed: it builds and checks the file, creates or updates the release, marks it **Latest** and reads it back to confirm that it is the latest and serves the same file. `npm run release -- --dry-run` does everything but publish and prints the notes. The notes are split into **Features** and **Fixes** from the CHANGELOG: a bullet that starts with `**Fixed:**` is a fix, any other (`**Added:**`, `**Changed:**`, `**Removed:**`) is a feature. Publishing the release starts the `Release packages` workflow (`.github/workflows/release-packages.yml`): on an x86_64 and an ARM machine it builds the app from the tag, checks that its single file is the one released (the build is reproducible), makes the packages with `npm run package:desktop` (which checks each), and adds them to the release with their SHA-256 and the AppImage's `.zsync`. No package is uploaded from the developer's machine. It can also be run by hand for a tag.
+`npm run release` publishes a version. Run it after the version is bumped, `CHANGELOG.md` has its `## X.Y.Z — Title (date)` section, and everything is pushed.
+
+1. It builds and checks `dist/canvast.html`.
+2. It creates (or updates) the GitHub release `vX.Y.Z` with the file and its SHA-256, and marks it **Latest**.
+3. It reads the release back to confirm it is the latest and serves the same file.
+4. Publishing starts the `Release packages` workflow (`.github/workflows/release-packages.yml`). On an x86_64 and an ARM machine it builds the app from the tag, checks that its single file is the one released (the build is reproducible), makes the packages with `npm run package:desktop` (which checks each), and adds them with their SHA-256 and the AppImage's `.zsync`. No package is uploaded from the developer's machine; the workflow can also be run by hand for a tag.
+
+`npm run release -- --dry-run` does everything but publish and prints the notes. The notes are split into **Features** and **Fixes** from the CHANGELOG: a bullet starting with `**Fixed:**` is a fix; `**Added:**`, `**Changed:**` and `**Removed:**` are features.
 
 ### The showcase and the screenshots
 
-The showcase is drawn by `scripts/showcase/build.mjs`, which drives the app like a person would: it pastes SVG, combines shapes, draws with the Pen, writes the labels and adds the bookmarks. The labels are set in **Space Grotesk** (SIL Open Font License 1.1, in `scripts/showcase/fonts/`), which the script imports into the Library and chooses in the Text tool, so the two font files travel inside `showcase.canvast` like any library file. On the bright scenes (the island, the tree, the cells, DNA and the proton) the text sits on a dark plate, and the script measures the contrast of every label against the pixels behind it (WCAG 2: 4.5 : 1 under 24 px, 3 : 1 from 24 px) and reports any below it; the last build had none (the tightest is 4.69 : 1). `scripts/showcase/dive.mjs` renders the animation, and `scripts/showcase/shots.mjs` takes the screenshots in the dark theme with the app's default theme colour, *Viridian*, the logo's colour.
-
-![The Solar System, home of the showcase](docs/screenshots/hero.webp)
+- `scripts/showcase/build.mjs` draws the showcase by driving the app like a person: it pastes SVG, combines shapes, draws with the Pen, writes the labels and adds the bookmarks.
+- The labels are in **Space Grotesk** (SIL Open Font License 1.1, in `scripts/showcase/fonts/`), imported into the library and chosen in the Text tool, so the two font files travel inside `showcase.canvast`.
+- On the bright scenes (the island, the tree, the cells, DNA, the proton) the text sits on a dark plate. The script measures every label's contrast against the pixels behind it (WCAG 2: 4.5 : 1 under 24 px, 3 : 1 from 24 px); the last build had none below (the tightest is 4.69 : 1).
+- `scripts/showcase/dive.mjs` renders the animation; the `shots` scripts take the screenshots in the dark theme with the default theme colour, *Viridian*.
 
 ```sh
 npm run build
@@ -779,7 +1010,11 @@ node scripts/brand/cover.mjs social.png 800         # the same cover at 2:1, sca
 
 The made files are kept in `docs/brand/`: the board (`canvast-brand-guidelines.canvast`, open it with **Import archive…**), the logo files in `icons/`, the page pictures in `previews/`, the cover and `social-preview.png` (the cover drawn at 2:1 and scaled to 1280 × 640 for the repository).
 
-The logo (a frame, a window cut from it a little low and to the right, and the dot in the window's middle), its colours (the app's default theme, Viridian, in light mode, with an orange dot) and its nine guideline pages are defined in `scripts/brand/pages.mjs`. The build draws them on one canvas as nine sheets with bookmarks: the glyph on the construction page is made with the Shape tool and *Subtract*, the crosses with the Path tool, the labels with the Text tool in Space Grotesk (from `scripts/showcase/fonts/`), and the cover's dot holds the mark again at 1/64, twenty times over (121 zoom levels). One drawing serves every size, the favicon too. The scripts work on a copy of `dist/canvast.html` in the system's temp folder. In the app the full-colour logo is only the favicon (inline in `src/index.html`); everywhere else the app shows the one-colour mark in the theme's text colour, so it follows light, dark and the theme colour: over the lock screen and beside the name in Settings > About and diagnostics (`src/ui/brand.ts`, which holds the same geometry as `pages.mjs`). The cover at the top of this README (`docs/brand/cover.webp`, made by `cover.mjs`) is drawn as a canvas in the app's default light theme: the multi-scale grid and the orange origin axes, the tile placed and selected with its dot on the origin, the wordmark standing on the x axis, and the app's status bar along the bottom.
+- **Defined in** `scripts/brand/pages.mjs`: the logo (a frame, a window cut from it a little low and to the right, and a dot in the window's middle), its colours (the default theme's Viridian in light mode, with an orange dot) and the nine guideline pages.
+- **Drawn in the app:** the build draws the pages on one canvas as nine sheets with bookmarks. The construction glyph is made with the Shape tool and *Subtract*, the crosses with the Path tool, the labels with the Text tool in Space Grotesk. The cover's dot holds the mark again at 1/64, twenty times over (121 zoom levels). The scripts work on a copy of `dist/canvast.html` in the system's temp folder.
+- **One drawing for every size**, the favicon too.
+- **In the app:** the full-colour logo is only the favicon (inline in `src/index.html`). Everywhere else (over the lock screen, beside the name in Settings > About and diagnostics) the app shows the one-colour mark in the theme's text colour, so it follows light, dark and the theme colour (`src/ui/brand.ts`, the same geometry as `pages.mjs`).
+- **The README cover** (`docs/brand/cover.webp`, made by `cover.mjs`) is drawn as a canvas in the default light theme: the grid and the orange origin axes, the tile selected with its dot on the origin, the wordmark on the x axis, and the status bar along the bottom.
 
 ---
 
@@ -812,6 +1047,13 @@ canvast is free software: you can redistribute it and/or modify it under the ter
 
 The colour picker in `src/colour-picker/` is also published on its own and keeps its own MIT licence ([src/colour-picker/LICENSE](src/colour-picker/LICENSE)), with Björn Ottosson's notice for the OKHSL and OKHSV code.
 
-The built file bundles the Lucide icons (ISC) and the Inter font (SIL Open Font License 1.1); their notices are embedded at the top of `canvast.html` with canvast's own licence, and listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The desktop packages also contain Electron (MIT) and Chromium's licences, in the packaged app. Development-only dependencies, which are not shipped: TypeScript, esbuild, Vitest, Playwright and electron-builder. The showcase archive `showcase.canvast` also carries the Space Grotesk font (SIL Open Font License 1.1, copyright 2020 The Space Grotesk Project Authors) as two library files; the licence text is in [scripts/showcase/fonts/OFL.txt](scripts/showcase/fonts/OFL.txt).
+| Part | Licence |
+| --- | --- |
+| Lucide icons, in the built file | ISC |
+| Inter font, in the built file | SIL Open Font License 1.1 |
+| Electron and Chromium, in the desktop packages | MIT and Chromium's licences (inside the packaged app) |
+| Space Grotesk, two library files in `showcase.canvast` | SIL Open Font License 1.1, copyright 2020 The Space Grotesk Project Authors ([OFL.txt](scripts/showcase/fonts/OFL.txt)) |
+
+The notices of what the built file bundles are embedded at its top, with canvast's own licence, and listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Development-only tools, which are not shipped: TypeScript, esbuild, Vitest, Playwright and electron-builder.
 
 A history of changes is in [CHANGELOG.md](CHANGELOG.md).
