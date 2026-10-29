@@ -6,6 +6,7 @@
  * in its place under `library/` (library-mirror.ts), and this device's state in `.canvast/devices/<id>.json`.
  * Boards and canvases renamed, moved or deleted in the app are renamed, moved or put in `.trash/` on disk.
  */
+import type { DesktopLibrary } from "./desktop-library";
 import { canvasJson, putCanvasContent } from "./archive";
 import { canvasFileHead, readCanvasFile } from "./canvas-file";
 import type { DeleteMode, DesktopBridge } from "./desktop-bridge";
@@ -111,13 +112,14 @@ export class WorkspaceMirror {
 
   constructor(
     private readonly db: IDBDatabase,
+    library: DesktopLibrary,
     private readonly repo: WorkspaceStore,
     private readonly bridge: DesktopBridge,
     readonly deviceId: string,
     private readonly vault: HiddenVault,
     private readonly deleteTo: () => DeleteMode = () => "trash",
   ) {
-    this.lib = new LibraryMirror(db, bridge, vault, deleteTo);
+    this.lib = new LibraryMirror(db, library, bridge, vault, deleteTo);
     this.lib.onNotice = (text) => this.onError?.(text);
     // Opened: what another device hid is read from the sealed index, and what waited for the key (hiding, showing) is done.
     vault.subscribe(() => {

@@ -1,5 +1,5 @@
 /** The browser build's storage: the workspace, its backups and the library in IndexedDB (ADR 0006–0008, 0176, 0177). */
-import type { ExportScope, ImportPlan, OriginalWriter, ProgressFn } from "./archive";
+import type { ExportScope, ImportPlan, LibraryStore, OriginalWriter, ProgressFn } from "./archive";
 import { applyImport, buildArchive, hiddenInScope, sweepImportStaging } from "./archive";
 import type { FilesLayout } from "./files-zip";
 import { buildFilesZip } from "./files-zip";
@@ -65,21 +65,23 @@ export class IdbBackups implements BackupStore {
 
   /** Where an import's originals are written instead of the database (set by the desktop build: its workspace folder). */
   writeOriginals: OriginalWriter | null = null;
+  /** The desktop build's library (SQLite), where the library's entries and records are instead of the database. */
+  library: LibraryStore | undefined = undefined;
 
   buildArchive(workspaceId: string, scope: ExportScope, appVersion: string, settings: Record<string, unknown> | undefined, progress?: ProgressFn) {
-    return buildArchive(this.db, workspaceId, scope, appVersion, settings, progress);
+    return buildArchive(this.db, workspaceId, scope, appVersion, settings, progress, this.library);
   }
 
   buildFilesZip(workspaceId: string, scope: ExportScope, layout: FilesLayout, progress?: ProgressFn) {
-    return buildFilesZip(this.db, workspaceId, scope, layout, progress);
+    return buildFilesZip(this.db, workspaceId, scope, layout, progress, this.library);
   }
 
   hiddenInScope(scope: ExportScope): Promise<number> {
-    return hiddenInScope(this.db, scope);
+    return hiddenInScope(this.db, scope, this.library);
   }
 
   applyImport(workspaceId: string, boardId: string, plan: ImportPlan, progress?: ProgressFn) {
-    return applyImport(this.db, workspaceId, boardId, plan, progress, this.writeOriginals ?? undefined);
+    return applyImport(this.db, workspaceId, boardId, plan, progress, this.writeOriginals ?? undefined, this.library);
   }
 
   sweepImportStaging(): Promise<number> {

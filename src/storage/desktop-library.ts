@@ -6,12 +6,14 @@
 import type { AssetFolder, AssetLocation, CatalogEntry, CatalogListing, GcReport, MetaChange, MetaSnapshot, PasswordKind, ThumbRecord } from "../assets/asset-catalog";
 import { AssetInUseError, CatalogInputError, FOLDERS_KEY, entryFromRecord, folderName, folderSubtree, meta, normalizeFields, normalizeNote, normalizeTags, usageOf, visibleFolders } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
+import { ImportError, MAX_IMPORT_BYTES, storedStub } from "../assets/asset-library";
+import { isHiddenFile } from "./hidden-vault";
 import { cleanFileName } from "../doc/rename-rules";
 import { formatTag, formatTags, renamedTag, tagIsOrUnder } from "../doc/tags";
 import type { LibraryCalls, LibraryOp } from "./desktop-bridge";
 import { externalFolder } from "./external-folder";
 import { done, idbGet, req } from "./idb";
-import type { CatalogStore } from "./store";
+import type { CatalogStore, OriginalStore } from "./store";
 
 /** The library calls, with every change made one after another (a read, then its write, never interleaved with another's). */
 export class DesktopLibrary {
@@ -457,4 +459,130 @@ export class DesktopCatalog implements CatalogStore {
       return report;
     });
   }
+}
+
+/** The originals of the desktop build (`IdbOriginals` on the library): files of the workspace folder, each named by its record. */
+export class DesktopOriginals implements OriginalStore {
+  onNotice: ((text: string) => void) | null = null;
+
+  constructor(
+    private readonly db: IDBDatabase,
+    private readonly lib: DesktopLibrary,
+    private readonly catalog: DesktopCatalog,
+  ) {}
+
+  /** A record here, or (bytes an import has not written out yet) in the page's storage. */
+  private async recOf(hash: string): Promise<AssetRecord | undefined> {
+    return (await this.lib.rec(hash)) ?? (await idbGet<AssetRecord>(this.db, "assets", hash).catch(() => undefined));
+  }
+
+  async get(hash: string): Promise<AssetRecord | undefined> {
+    const [row] = await this.lib.calls.get([hash]);
+    let rec = row?.[2] ?? (await idbGet<AssetRecord>(this.db, "assets", hash).catch(() => undefined));
+    if (!rec) return rec;
+    if (rec.ext && rec.size > MAX_IMPORT_BYTES) {
+      // Too big to read into the page (a card, opened in the system's app): only whether its file is there.
+      if (!(await externalFolder.hasMany([{ hash, size: rec.size, file: rec.file }]))[0]) return undefined;
+      rec = { ...rec, blob: new Blob([]) };
+    } else if (rec.ext) {
+      const blob = await externalFolder.read(hash, rec.size, rec.type, rec.file);
+      if (!blob) return undefined;
+      rec = { ...rec, blob };
+    }
+    // The name is the entry's: renaming an item changes its entry, never the stored bytes.
+    const entry = row?.[1];
+    return entry && entry.name !== rec.name ? { ...rec, name: entry.name } : rec;
+  }
+
+  async locked(hash: string): Promise<boolean> {
+    if (!externalFolder.unseal || externalFolder.unseal.ready()) return false;
+    const rec = await this.recOf(hash);
+    return !!rec?.ext && isHiddenFile(rec.file);
+  }
+
+  async fileOf(hash: string): Promise<string | null> {
+    const rec = await this.recOf(hash);
+    return rec?.ext && rec.file && !isHiddenFile(rec.file) ? rec.file : null;
+  }
+
+  async entryState(hash: string): Promise<CatalogEntry["state"] | undefined> {
+    return (await this.lib.entry(hash))?.state;
+  }
+
+  /** Write the original into the workspace folder (when new), then its record and entry, as one change (`IdbOriginals.put`). */
+  async put(record: AssetRecord, writeBytes: boolean): Promise<void> {
+    const toFolder = writeBytes && externalFolder.ready;
+    const kept = toFolder && !record.ext && record.file ? record.file : "";
+    const file = kept || (toFolder ? await externalFolder.fileFor(record.hash, record.name, record.type) : "");
+    if (toFolder && !kept) {
+      try {
+        await externalFolder.write(record.hash, record.blob, file);
+      } catch (err) {
+        externalFolder.release(file);
+        throw new ImportError((err as Error).message);
+      }
+    }
+    try {
+      if (writeBytes && !toFolder) {
+        // (no folder to write to: kept in the page's storage until the next write of the library puts it there)
+        const tx = this.db.transaction("assets", "readwrite", { durability: "strict" });
+        tx.objectStore("assets").put(record, record.hash);
+        await done(tx);
+      }
+      await this.lib.serial(async () => {
+        const e = await this.lib.entry(record.hash);
+        const ops: LibraryOp[] = [];
+        if (toFolder) ops.push({ t: "rec", hash: record.hash, v: storedStub({ ...record, blob: new Blob([]), ext: 1, file }) });
+        if (!e) ops.push(putEntry(entryFromRecord(record)));
+        else if (e.state !== "active") ops.push(putEntry({ ...e, state: "active", deletedAt: null }));
+        await this.lib.apply(ops);
+      });
+    } finally {
+      if (file && !kept) externalFolder.release(file);
+    }
+  }
+
+  putThumb(rec: ThumbRecord): Promise<void> {
+    return this.catalog.putThumb(rec);
+  }
+}
+
+/** The library's own keys of the page's storage (`meta`), moved with it. */
+const MOVED_META = [FOLDERS_KEY, "hiddenBlanked", "hiddenNoWait", "libraryMoving", "tagFormat"];
+
+/**
+ * Once, when this device first opens the workspace with its library in SQLite (0.51): what the page's storage held of the library
+ * moves there (the entries, the records of files, the library folders and this device's marks of what it last saw in the folder), so
+ * nothing this device had not written to the folder yet is lost. Bytes an import has not written out stay where they are. How many items.
+ */
+export async function moveIdbLibrary(db: IDBDatabase, lib: DesktopLibrary): Promise<number> {
+  if ((await lib.calls.meta("fromIdb")) !== null) return 0;
+  const tx = db.transaction(["assetCatalog", "assets", "meta"], "readonly");
+  const entries = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
+  const stubKeys = (await req(tx.objectStore("assets").index("ext").getAllKeys())) as string[];
+  const stubs = (await req(tx.objectStore("assets").index("ext").getAll())) as AssetRecord[];
+  const meta = tx.objectStore("meta");
+  const metas = await Promise.all(MOVED_META.map((k) => req(meta.get(k) as IDBRequest<unknown>)));
+  const state = (await req(meta.get("libraryMirror") as IDBRequest<{ folders?: string; items?: Record<string, string> } | undefined>)) ?? {};
+  const parts = (await req(meta.getAll(IDBKeyRange.bound("libraryPart:", "libraryPart:￿")) as IDBRequest<Array<Record<string, string>>>)) ?? [];
+  const seen: Record<string, string> = Object.assign({}, state.items ?? {}, ...parts);
+  const ops: LibraryOp[] = [
+    ...entries.map(putEntry),
+    ...stubs.map((r, i): LibraryOp => ({ t: "rec", hash: stubKeys[i]!, v: { ...r, hash: stubKeys[i]! } })),
+    ...Object.entries(seen).flatMap(([hash, v]): LibraryOp[] => (/^[0-9a-f]{64}$/.test(hash) ? [{ t: "seen", hash, v }] : [])),
+  ];
+  for (let at = 0; at < ops.length; at += 5000) await lib.apply(ops.slice(at, at + 5000));
+  await lib.apply([
+    ...MOVED_META.flatMap((k, i): LibraryOp[] => (metas[i] === undefined ? [] : [{ t: "meta", k, v: metas[i] }])),
+    { t: "meta", k: "libraryMirror", v: { folders: state.folders ?? "" } },
+    { t: "meta", k: "fromIdb", v: 1 }, // (last: a stop before it moves it all again, the same)
+  ]);
+  // The page's copies go (the library's own storage has them now); bytes waiting to be written out stay.
+  const wtx = db.transaction(["assetCatalog", "assets", "meta"], "readwrite", { durability: "strict" });
+  wtx.objectStore("assetCatalog").clear();
+  for (const k of stubKeys) wtx.objectStore("assets").delete(k);
+  for (const k of [...MOVED_META, "libraryMirror"]) wtx.objectStore("meta").delete(k);
+  wtx.objectStore("meta").delete(IDBKeyRange.bound("libraryPart:", "libraryPart:￿"));
+  await done(wtx);
+  return entries.length;
 }

@@ -7,8 +7,8 @@ import { storedAssetOf } from "../doc/model";
 import { req } from "./idb";
 import { externalFolder } from "./external-folder";
 import type { BoardRecord, CanvasRecord, ObjectRecord } from "./workspace-repo";
-import { hiddenSet } from "./archive";
-import type { ExportScope, ProgressFn } from "./archive";
+import { hiddenSet, libraryIn, snapOf } from "./archive";
+import type { ExportScope, LibraryStore, ProgressFn } from "./archive";
 import type { ZipInput } from "./zip";
 import { writeZip } from "./zip";
 
@@ -62,12 +62,13 @@ export function uniquePath(taken: Set<string>, dir: string, file: string): strin
 
 const range = (canvasId: string): IDBKeyRange => IDBKeyRange.bound([canvasId, ""], [canvasId, "￿"]);
 
-export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope: ExportScope, layout: FilesLayout, progress?: ProgressFn): Promise<FilesZipResult> {
+export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope: ExportScope, layout: FilesLayout, progress?: ProgressFn, lib?: LibraryStore): Promise<FilesZipResult> {
+  const snap = await snapOf(lib);
   const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "assets", "assetCatalog", "meta"], "readonly");
   const hashes = new Set<string>(scope.kind === "assets" ? scope.hashes : []);
   if (scope.kind === "workspace") {
     // A whole workspace: every asset in the library, used or not.
-    for (const e of await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>)) if (e.state === "active") hashes.add(e.hash);
+    for (const e of await libraryIn(tx, snap).entries()) if (e.state === "active") hashes.add(e.hash);
   } else if (scope.kind !== "assets") {
     const canvasIds: string[] = [];
     if (scope.kind === "canvas") canvasIds.push(scope.canvasId);
@@ -84,9 +85,9 @@ export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope:
       }
     }
   }
-  if (scope.skipHidden) for (const h of await hiddenSet(tx)) hashes.delete(h);
+  if (scope.skipHidden) for (const h of await hiddenSet(tx, snap)) hashes.delete(h);
   void workspaceId; // one workspace per profile today; kept so the scopes read the same as the archive's
-  const folders = (await req(tx.objectStore("meta").get("assetFolders") as IDBRequest<AssetFolder[] | undefined>)) ?? [];
+  const folders = await libraryIn(tx, snap).folders();
   const taken = new Set<string>();
   const inputs: ZipInput[] = [];
   const paths: string[] = [];
@@ -96,12 +97,12 @@ export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope:
   let looked = 0;
   for (const hash of hashes) {
     progress?.("Reading the library", looked++, hashes.size);
-    const rec = await req(tx.objectStore("assets").get(hash) as IDBRequest<AssetRecord | undefined>);
+    const rec = await libraryIn(tx, snap).rec(hash);
     if (!rec) {
       missing++;
       continue;
     }
-    rows.push({ hash, rec, entry: await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>) });
+    rows.push({ hash, rec, entry: await libraryIn(tx, snap).entry(hash) });
   }
   // Originals kept in the library folder are read now, after the last read of the database (ADR 0159).
   for (const [i, r] of [...rows.entries()].reverse()) {

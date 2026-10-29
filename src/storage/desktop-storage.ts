@@ -9,6 +9,7 @@ import type { DeleteMode, DesktopBridge } from "./desktop-bridge";
 import type { Dir } from "./external-folder";
 import { externalFolder } from "./external-folder";
 import { openBrowserStorage } from "./idb-storage";
+import { DesktopCatalog, DesktopLibrary, DesktopOriginals, moveIdbLibrary } from "./desktop-library";
 import type { IdbBackups, IdbStorage } from "./idb-storage";
 import type { FolderSync, FolderWriting, OpenHooks } from "./store";
 import { LIBRARY_DIR, LIBRARY_JSON } from "./library-mirror";
@@ -18,7 +19,6 @@ import { HIDDEN_JSON, HiddenVault, isHiddenCopy } from "./hidden-store";
 import { useScrypt } from "./hidden-vault";
 import { sealedHooks } from "./archive";
 import { resetAllData } from "./reset";
-import type { AssetCatalog } from "../assets/asset-catalog";
 
 
 /** The workspace folder as a directory of the library-folder code; paths are relative to the workspace. */
@@ -72,8 +72,12 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   const deleteTo = (): DeleteMode => opts.deleteTo?.() ?? "trash";
   await externalFolder.use(bridgeDir(bridge, ws.name, deleteTo));
   useScrypt((password, salt, N, r, p) => raw.scrypt(password, salt, N, r, p)); // (natively, in the main process)
-  const hidden = new HiddenVault(bridge, async () => [...(await storage.catalog.snapshotMeta()).entries.values()].filter((e) => e.hidden).length);
-  const mirror = new WorkspaceMirror(storage.db, storage.workspace, bridge, deviceId(), hidden, deleteTo);
+  // The library: in the main process's SQLite file (a library of a million items opens in seconds there), not in the page's storage.
+  const lib = new DesktopLibrary(raw.lib);
+  await moveIdbLibrary(storage.db, lib);
+  const desktopCatalog = new DesktopCatalog(storage.db, lib);
+  const hidden = new HiddenVault(bridge, async () => (await desktopCatalog.hiddenHashes()).size);
+  const mirror = new WorkspaceMirror(storage.db, lib, storage.workspace, bridge, deviceId(), hidden, deleteTo);
   // Hidden originals are sealed files: read through the key, in memory (none while locked); their thumbnails are never stored.
   externalFolder.unseal = {
     open: async (blob) => {
@@ -82,9 +86,9 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     },
     ready: () => hidden.isOpen(),
   };
-  (storage.catalog as AssetCatalog).keepHiddenThumbs = false;
   // An import's originals go straight into the workspace folder: nothing large passes through the app's storage (ADR 0177).
   (storage.backups as IdbBackups).writeOriginals = (batch) => mirror.writeOriginals(batch);
+  (storage.backups as IdbBackups).library = lib;
   mirror.onError = (text) => opts.onNotice?.(text);
   hidden.onNotice = (text) => opts.onNotice?.(text);
   // Settings > Privacy: hidden items' names out of this device's cache while locked. What waits is written before the key goes; once
@@ -178,7 +182,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   };
   // (Changes to some items say which: a big library then writes only their parts. Showing an item again may show its folder: all.)
   const some = (hashes: readonly string[]): void => mirror.library(hashes);
-  const catalog = watched(storage.catalog, {
+  const catalog = watched(desktopCatalog as typeof storage.catalog, {
     setLock: tree,
     renameAssets: (_n, changes) => some(changes.map((c) => c.hash)),
     updateMeta: (_e, hash, change) => (change.hidden === false ? library() : some([hash])),
@@ -195,10 +199,13 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     collect: library,
     reconcile: (n) => void (n && mirror.library()),
   });
-  const originals = watched(storage.originals, { put: (_r, record) => some([record.hash]) });
+  const desktopOriginals = new DesktopOriginals(storage.db, lib, desktopCatalog);
+  desktopOriginals.onNotice = storage.originals.onNotice;
+  const originals = watched(desktopOriginals as typeof storage.originals, { put: (_r, record) => some([record.hash]) });
   // Rebuild from the folder: what is not in the folder yet is written first, then only the working copy goes (the settings stay).
   const resetAll = async (onBlocked?: () => void): Promise<void> => {
     await mirror.flush();
+    await lib.calls.reset();
     await resetAllData({ db: storage.db, keepSettings: true, ...(onBlocked ? { onBlocked } : {}) });
   };
   return { ...storage, resetAll, workspace, backups, catalog, originals, libraryFolder: null, workspaceFolder: ws.path, hidden, folderSync, folderWriting, flush: () => mirror.flush() };

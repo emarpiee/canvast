@@ -1,3 +1,4 @@
+import type { DesktopCatalog, DesktopLibrary } from "../storage/desktop-library";
 import { externalFolder } from "../storage/external-folder";
 import { importTesting } from "../storage/archive";
 import { libraryTesting } from "../storage/library-mirror";
@@ -634,21 +635,26 @@ export function installDebugHook(
       await writer.flush();
       return session.catalog!.list();
     },
-    catalogEntries: () => readAll<CatalogEntry>("assetCatalog"),
+    catalogEntries: () => (desktopLib() ? desktopLib()!.entries() : readAll<CatalogEntry>("assetCatalog")),
     thumbRecords: async () => (await readAll<ThumbRecord>("thumbs")).map((t) => ({ hash: t.hash, type: t.blob.type, bytes: t.blob.size, w: t.w, h: t.h })),
     storedAssetHashes: async () => {
+      const lib = desktopLib();
+      const inLib = lib ? (await lib.recs()).map((r) => r.hash) : [];
       const tx = (session.storage as IdbStorage).db.transaction("assets", "readonly");
       const keys = await new Promise<IDBValidKey[]>((res, rej) => {
         const r = tx.objectStore("assets").getAllKeys();
         r.onsuccess = () => res(r.result);
         r.onerror = () => rej(r.error);
       });
-      return (keys as string[]).sort();
+      return [...new Set([...inLib, ...(keys as string[])])].sort();
     },
     gc: () => session.collectGarbage(),
     deleteEverywhere: (hashes) => session.deleteAssetsEverywhere(hashes),
     gcRoots: () => [...session.gcRoots()].sort(),
     forceCatalogState: async (hash, state) => {
+      const lib = desktopLib();
+      const e = lib && (await lib.entry(hash));
+      if (e) return void (await lib!.apply([{ t: "entry", hash, v: { ...e, state, deletedAt: state === "deleted" ? Date.now() : null } }]));
       const tx = (session.storage as IdbStorage).db.transaction("assetCatalog", "readwrite");
       const store = tx.objectStore("assetCatalog");
       const r = store.get(hash);
@@ -714,6 +720,7 @@ export function installDebugHook(
       });
     },
     removeAssetBytes: async (hash) => {
+      await desktopLib()?.apply([{ t: "rec", hash, v: null }]);
       const tx = (session.storage as IdbStorage).db.transaction("assets", "readwrite");
       tx.objectStore("assets").delete(hash);
       await done(tx);
@@ -736,6 +743,10 @@ export function installDebugHook(
       return { x: D.toString(D.add(at.x, D.shift(lx, o.unit))), y: D.toString(D.add(at.y, D.shift(ly, o.unit))) };
     },
   };
+  /** The desktop build's library (SQLite), where its entries and records are instead of the page's storage. */
+  function desktopLib(): DesktopLibrary | null {
+    return (session.catalog as Partial<DesktopCatalog> | null)?.lib ?? null;
+  }
   function readAll<T>(store: string): Promise<T[]> {
     return new Promise((res, rej) => {
       const r = (session.storage as IdbStorage).db.transaction(store, "readonly").objectStore(store).getAll();

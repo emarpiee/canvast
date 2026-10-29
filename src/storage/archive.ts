@@ -16,6 +16,7 @@ import { sha256Hex } from "../assets/sha256";
 import type { StyleItem } from "../assets/styles";
 import { cleanStyles } from "../assets/styles";
 import { done, req } from "./idb";
+import type { LibraryOp } from "./desktop-bridge";
 import { isFileV2, isHiddenFile, readVault } from "./hidden-vault";
 import type { Bookmark } from "./bookmarks";
 import { readBookmarks } from "./bookmarks";
@@ -75,16 +76,45 @@ export type ExportScope = (
   withPrivacy?: boolean;
 };
 
+/**
+ * The desktop build's library (ADR 0177): its entries and records are in the main process's SQLite file, not in this database. Read
+ * whole before a transaction here starts (a call to the main process in the middle of one would end it), changed after it ends.
+ */
+export interface LibraryStore {
+  entries(): Promise<CatalogEntry[]>;
+  recs(): Promise<AssetRecord[]>;
+  folders(): Promise<AssetFolder[]>;
+  apply(ops: readonly LibraryOp[]): Promise<void>;
+}
+/** The library as read before a transaction: from the library store (desktop), else read in the transaction itself. */
+export type LibrarySnap = { entries: Map<string, CatalogEntry>; recs: Map<string, AssetRecord>; folders: AssetFolder[] } | null;
+export async function snapOf(lib: LibraryStore | undefined): Promise<LibrarySnap> {
+  if (!lib) return null;
+  const [entries, recs, folders] = await Promise.all([lib.entries(), lib.recs(), lib.folders()]);
+  return { entries: new Map(entries.map((e) => [e.hash, e])), recs: new Map(recs.map((r) => [r.hash, r])), folders };
+}
+/** Library reads in `tx`, or from `snap` (a record not there may still be bytes this database holds). */
+export function libraryIn(tx: IDBTransaction, snap: LibrarySnap) {
+  return {
+    entries: async (): Promise<CatalogEntry[]> => (snap ? [...snap.entries.values()] : req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>)),
+    entry: async (hash: string): Promise<CatalogEntry | undefined> => (snap ? snap.entries.get(hash) : req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>)),
+    rec: async (hash: string): Promise<AssetRecord | undefined> => snap?.recs.get(hash) ?? req(tx.objectStore("assets").get(hash) as IDBRequest<AssetRecord | undefined>),
+    has: async (hash: string): Promise<boolean> => !!snap?.recs.has(hash) || (await req(tx.objectStore("assets").count(hash))) > 0,
+    folders: async (): Promise<AssetFolder[]> => snap?.folders ?? ((await req(tx.objectStore("meta").get("assetFolders") as IDBRequest<AssetFolder[] | undefined>)) ?? []),
+  };
+}
+
 /** The hashes of the hidden library items. */
-export async function hiddenSet(tx: IDBTransaction): Promise<Set<string>> {
-  const all = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
+export async function hiddenSet(tx: IDBTransaction, snap: LibrarySnap = null): Promise<Set<string>> {
+  const all = await libraryIn(tx, snap).entries();
   return new Set(all.filter((e) => e.state === "active" && e.hidden).map((e) => e.hash));
 }
 
 /** How many hidden library items a scope would carry (asked before exporting). */
-export async function hiddenInScope(db: IDBDatabase, scope: ExportScope): Promise<number> {
+export async function hiddenInScope(db: IDBDatabase, scope: ExportScope, lib?: LibraryStore): Promise<number> {
+  const snap = await snapOf(lib);
   const tx = db.transaction(["boards", "canvases", "objects", "assetCatalog"], "readonly");
-  const hidden = await hiddenSet(tx);
+  const hidden = await hiddenSet(tx, snap);
   if (!hidden.size || scope.kind === "workspace") return hidden.size;
   const used = new Set<string>(scope.kind === "assets" ? scope.hashes : []);
   if (scope.kind !== "assets") {
@@ -232,7 +262,8 @@ export async function canvasJson(tx: IDBTransaction, cid: string, head: Record<s
 }
 
 /** Build and verify an archive for `scope`. Nothing is written to storage. */
-export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: ExportScope, app: string, settings?: Record<string, unknown>, progress?: ProgressFn): Promise<ExportResult> {
+export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: ExportScope, app: string, settings?: Record<string, unknown>, progress?: ProgressFn, lib?: LibraryStore): Promise<ExportResult> {
+  const snap = await snapOf(lib);
   const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks", "assets", "assetCatalog", "meta"], "readonly");
   const ws = await req(tx.objectStore("workspaces").get(workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
   if (!ws) throw new ArchiveError("workspace not found");
@@ -285,9 +316,9 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   }
   if (scope.kind === "workspace") {
     // A full backup also keeps library assets that nothing uses yet.
-    for (const e of await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>)) if (e.state === "active") hashes.add(e.hash);
+    for (const e of await libraryIn(tx, snap).entries()) if (e.state === "active") hashes.add(e.hash);
   }
-  if (scope.skipHidden) for (const h of await hiddenSet(tx)) hashes.delete(h);
+  if (scope.skipHidden) for (const h of await hiddenSet(tx, snap)) hashes.delete(h);
   const hiddenLock = scope.kind === "workspace" && scope.withPrivacy && !noBytes ? await req(tx.objectStore("meta").get("hiddenLock") as IDBRequest<unknown>) : undefined;
   const workspaceLock = scope.kind === "workspace" && scope.withPrivacy && !noBytes ? await req(tx.objectStore("meta").get("workspaceLock") as IDBRequest<unknown>) : undefined;
   const assets: ManifestAsset[] = [];
@@ -300,7 +331,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   const sortedHashes = [...hashes].sort();
   for (const [i, hash] of sortedHashes.entries()) {
     progress?.("Reading the library", i, sortedHashes.length);
-    const r = await req(tx.objectStore("assets").get(hash) as IDBRequest<AssetRecord | undefined>);
+    const r = await libraryIn(tx, snap).rec(hash);
     if (!r) {
       missingAssets.push(hash);
       continue;
@@ -321,9 +352,9 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     }
     const file = `assets/${hash}`;
     const known = noBytes || (since !== undefined && r.importedAt <= since); // already in an earlier file of the chain: its list entry, not its bytes
-    const entry = await req(tx.objectStore("assetCatalog").get(hash) as IDBRequest<CatalogEntry | undefined>);
+    const entry = await libraryIn(tx, snap).entry(hash);
     const m = entry ? meta(entry) : { tags: [], favorite: false, hidden: false, folderIds: [], note: "", fields: [] };
-    folders ??= (await req(tx.objectStore("meta").get("assetFolders") as IDBRequest<AssetFolder[] | undefined>)) ?? [];
+    folders ??= await libraryIn(tx, snap).folders();
     const allFolders = folders;
     assets.push({
       hash,
@@ -850,7 +881,7 @@ export type OriginalWriter = (batch: readonly AssetRecord[]) => Promise<Map<stri
  * of bytes is in memory at once, so the size of an archive is not limited by memory. Returns the hashes written. With `writer`, the
  * originals that are not hidden go to it (hidden ones are never written readable: they stay in the database until they can be sealed).
  */
-async function stageOriginals(db: IDBDatabase, assets: readonly AssetRecord[], progress?: ProgressFn, writer?: OriginalWriter, hidden?: (hash: string) => boolean): Promise<Set<string>> {
+async function stageOriginals(db: IDBDatabase, assets: readonly AssetRecord[], progress?: ProgressFn, writer?: OriginalWriter, hidden?: (hash: string) => boolean, snap: LibrarySnap = null): Promise<Set<string>> {
   const written = new Set<string>();
   const total = assets.length;
   let i = 0;
@@ -867,7 +898,7 @@ async function stageOriginals(db: IDBDatabase, assets: readonly AssetRecord[], p
     if (!batch.length) break;
     const have = await (async () => {
       const t = db.transaction("assets", "readonly");
-      return Promise.all(batch.map(async (a) => (await req(t.objectStore("assets").count(a.hash))) > 0));
+      return Promise.all(batch.map((a) => libraryIn(t, snap).has(a.hash)));
     })();
     const fresh = batch.filter((_, k) => !have[k]);
     if (fresh.length) {
@@ -902,14 +933,17 @@ async function stageOriginals(db: IDBDatabase, assets: readonly AssetRecord[], p
  * list, so the import shows all at once or not at all. If it stops before that, the staged originals are erased at once, or when the
  * app next opens (ADR 0176).
  */
-export async function applyImport(db: IDBDatabase, workspaceId: string, targetBoardId: string, plan: ImportPlan, progress?: ProgressFn, writer?: OriginalWriter): Promise<ImportResult> {
+export async function applyImport(db: IDBDatabase, workspaceId: string, targetBoardId: string, plan: ImportPlan, progress?: ProgressFn, writer?: OriginalWriter, lib?: LibraryStore): Promise<ImportResult> {
   await sweepImportStaging(db);
   let staged: Set<string>;
   try {
-    staged = await stageOriginals(db, plan.assets, progress, writer, (h) => plan.organization.get(h)?.hidden === true);
+    const snap = await snapOf(lib);
+    staged = await stageOriginals(db, plan.assets, progress, writer, (h) => plan.organization.get(h)?.hidden === true, snap);
     if (importTesting.stopAfterFiles === "crash") return { boards: 0, canvases: 0, objects: 0, assetsAdded: 0, stillMissing: 0, firstCanvasId: null, stylesAdded: 0 };
     if (importTesting.stopAfterFiles === "fail") throw new ArchiveError("stopped after the files (test)");
-    const result = await applyRest(db, workspaceId, targetBoardId, plan, staged);
+    const libOps: LibraryOp[] = [];
+    const result = await applyRest(db, workspaceId, targetBoardId, plan, staged, snap, libOps);
+    if (lib) await moveToLibrary(db, lib, libOps);
     if (plan.sealed.length && sealedHooks.write) await sealedHooks.write(plan.sealed, plan.hiddenKey);
     return result;
   } catch (e) {
@@ -918,7 +952,21 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
   }
 }
 
-async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: string, plan: ImportPlan, staged: ReadonlySet<string>): Promise<ImportResult> {
+/**
+ * The desktop build: the import's library entries and folders (`ops`), and the records of the files it wrote (staged in this database
+ * as for the browser), go to the library store, then leave this database. Bytes it could not write out stay here, to be written later.
+ */
+async function moveToLibrary(db: IDBDatabase, lib: LibraryStore, ops: LibraryOp[]): Promise<void> {
+  const tx = db.transaction("assets", "readonly");
+  const keys = (await req(tx.objectStore("assets").index("ext").getAllKeys())) as string[];
+  const stubs = (await req(tx.objectStore("assets").index("ext").getAll())) as AssetRecord[];
+  await lib.apply([...stubs.map((r, i): LibraryOp => ({ t: "rec", hash: keys[i]!, v: { ...r, hash: keys[i]! } })), ...ops]);
+  const wtx = db.transaction("assets", "readwrite", { durability: "strict" });
+  for (const k of keys) wtx.objectStore("assets").delete(k);
+  await done(wtx);
+}
+
+async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: string, plan: ImportPlan, staged: ReadonlySet<string>, snap: LibrarySnap = null, libOps: LibraryOp[] = []): Promise<ImportResult> {
   const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks", "assets", "assetCatalog", "meta"], "readwrite", { durability: "strict" });
   const committed = done(tx);
   const result: ImportResult = { boards: 0, canvases: 0, objects: 0, assetsAdded: 0, stillMissing: 0, firstCanvasId: null, stylesAdded: 0 };
@@ -954,17 +1002,17 @@ async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: st
     }
     for (const a of plan.assets) {
       if (staged.has(a.hash)) result.assetsAdded++; // written ahead (stageOriginals)
-      else if ((await req(tx.objectStore("assets").count(a.hash))) === 0) {
+      else if (!(await libraryIn(tx, snap).has(a.hash))) {
         tx.objectStore("assets").put(a.ext ? storedStub(a) : a, a.hash);
         result.assetsAdded++;
       }
-      const e = await req(tx.objectStore("assetCatalog").get(a.hash) as IDBRequest<CatalogEntry | undefined>);
+      const e = await libraryIn(tx, snap).entry(a.hash);
       let entry: CatalogEntry = !e ? entryFromRecord(a) : e.state !== "active" ? { ...e, state: "active", deletedAt: null } : e;
       const org = plan.organization.get(a.hash);
       if (org) {
         // Merge, never replace: tags are unioned, a favourite stays a favourite, folders are matched by path, a note is kept (the archive's
         // only fills an empty one), and the archive's fields this asset does not have yet (same name and value) are added after its own.
-        folders ??= (await req(tx.objectStore("meta").get("assetFolders") as IDBRequest<AssetFolder[] | undefined>)) ?? [];
+        folders ??= [...(await libraryIn(tx, snap).folders())];
         const m = meta(entry);
         // One folder per asset: an asset already filed keeps its folder; otherwise the archive's (first) folder is used.
         const ids = m.folderIds.length || !org.folders.length ? m.folderIds : [resolveFolder(folders, org.folders[0]!)];
@@ -973,9 +1021,9 @@ async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: st
         if (m.note || org.note) entry.note = m.note || org.note;
         if (fields.length) entry.fields = fields;
       }
-      if (entry !== e) tx.objectStore("assetCatalog").put(entry);
+      if (entry !== e) (snap ? libOps.push({ t: "entry", hash: entry.hash, v: entry }) : tx.objectStore("assetCatalog").put(entry));
     }
-    if (folders) tx.objectStore("meta").put(folders, "assetFolders");
+    if (folders) (snap ? libOps.push({ t: "meta", k: "assetFolders", v: folders }) : tx.objectStore("meta").put(folders, "assetFolders"));
     // The password of the archive is taken only where this device has none: an import never replaces a password.
     if (plan.workspaceLock && !(await req(tx.objectStore("meta").get("workspaceLock") as IDBRequest<unknown>))) tx.objectStore("meta").put(plan.workspaceLock, "workspaceLock");
     if (plan.hiddenLock && !(await req(tx.objectStore("meta").get("hiddenLock") as IDBRequest<unknown>))) tx.objectStore("meta").put(plan.hiddenLock, "hiddenLock");
@@ -989,7 +1037,7 @@ async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: st
         result.stylesAdded = added.length;
       }
     }
-    for (const h of plan.unresolved) if ((await req(tx.objectStore("assets").count(h))) === 0) result.stillMissing++;
+    for (const h of plan.unresolved) if (!(await libraryIn(tx, snap).has(h))) result.stillMissing++;
     tx.objectStore("meta").delete(STAGED_KEY); // the staged originals now have their entries
     await committed;
     return result;
