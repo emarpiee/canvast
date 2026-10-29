@@ -152,6 +152,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
         });
       mirror.onContested = check;
       raw.onChanged((paths) => {
+        externalFolder.forgetSizes(paths); // (their sizes are looked at again)
         const now = Date.now();
         for (const [p, t] of recent) if (now - t > 5000) recent.delete(p);
         // Library paths the app itself just wrote (or a folder holding one) are not looked through again: that costs a listing of
@@ -160,17 +161,20 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
         const ownWrite = (p: string): boolean => [...recent.keys()].some((r) => r === p || r.startsWith(`${p}/`));
         // (the library is listed again after any outside change in it: a file put back in its own place changes no item, but it is there again)
         const hiddenTouched = paths.some((p) => p.startsWith(".hidden/") && !isHiddenFile(p) && !ownWrite(p));
-        if (hiddenTouched || paths.some((p) => (p === "library" || p.startsWith("library/")) && !ownWrite(p))) void mirror.rescan(() => undefined, hiddenTouched).then(() => on.libraryChanged());
+        const outside = paths.filter((p) => (p === "library" || p.startsWith("library/")) && !ownWrite(p));
+        if (hiddenTouched || outside.length) void mirror.rescan(() => undefined, hiddenTouched, outside).then(() => on.libraryChanged());
         if (paths.some((p) => p === LIBRARY_JSON || /^\.canvast\/library[^/]+\.json$/i.test(p) || p === HIDDEN_JSON || isHiddenCopy(p) || p === LIBRARY_DIR || p.startsWith(`${LIBRARY_DIR}/`))) void mirror.rereadLibrary(() => on.libraryChanged());
         if (paths.some((p) => p === WORKSPACE_FILE || /^\.canvast\/workspace[^/]+\.json$/i.test(p) || p.startsWith(`${BOARDS_DIR}/`))) check();
       });
     },
   };
+  // (Changes to some items say which: a big library then writes only their parts. Showing an item again may show its folder: all.)
+  const some = (hashes: readonly string[]): void => mirror.library(hashes);
   const catalog = watched(storage.catalog, {
     setLock: tree,
-    renameAssets: library,
-    updateMeta: library,
-    updateMetaEach: library,
+    renameAssets: (_n, changes) => some(changes.map((c) => c.hash)),
+    updateMeta: (_e, hash, change) => (change.hidden === false ? library() : some([hash])),
+    updateMetaEach: (_e, changes) => (changes.some((c) => c.change.hidden === false) ? library() : some(changes.map((c) => c.hash))),
     renameTag: library,
     deleteTag: library,
     createFolder: library,
@@ -178,12 +182,12 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     deleteFolder: library,
     hideFolder: library,
     restoreMeta: library,
-    markDeleted: library,
-    markDeletedEach: library,
+    markDeleted: (_r, hash) => some([hash]),
+    markDeletedEach: (_r, hashes) => some(hashes),
     collect: library,
     reconcile: (n) => void (n && mirror.library()),
   });
-  const originals = watched(storage.originals, { put: library });
+  const originals = watched(storage.originals, { put: (_r, record) => some([record.hash]) });
   // Rebuild from the folder: what is not in the folder yet is written first, then only the working copy goes (the settings stay).
   const resetAll = async (onBlocked?: () => void): Promise<void> => {
     await mirror.flush();

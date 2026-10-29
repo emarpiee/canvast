@@ -31,7 +31,7 @@
  * schema.
  */
 export const DB_NAME = "canvast";
-export const DB_VERSION = 12;
+export const DB_VERSION = 13;
 
 export type { OpenHooks as OpenOptions } from "./store";
 import type { OpenHooks as OpenOptions } from "./store";
@@ -51,6 +51,8 @@ export function openDb(name = DB_NAME, opts: OpenOptions = {}): Promise<IDBDatab
       // v10: originals kept in the library folder are stubs with ext = 1 (ADR 0159); the index lists them.
       const assetsStore = req.transaction!.objectStore("assets");
       if (!assetsStore.indexNames.contains("ext")) assetsStore.createIndex("ext", "ext");
+      // v13: the stub of a file of the folder by its path, so a file the folder says changed is looked up alone, not with the whole library.
+      if (!assetsStore.indexNames.contains("file")) assetsStore.createIndex("file", "file");
       if (!has("meta")) db.createObjectStore("meta");
       if (!has("workspaces")) db.createObjectStore("workspaces", { keyPath: "id" });
       if (!has("boards")) db.createObjectStore("boards", { keyPath: "id" });

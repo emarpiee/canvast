@@ -67,7 +67,8 @@ export class WorkspaceMirror {
   private readonly dirty = new Set<string>();
   private treeDirty = false;
   private deviceDirty = false;
-  private libraryDirty = false;
+  /** The library to write: all of it (true), some items (their hashes), or nothing. */
+  private libraryDirty: boolean | Set<string> = false;
   private readonly lib: LibraryMirror;
   /** The boards and canvases as last written to `workspace.json` (where each one is on disk now). */
   private placed: PlacedBoard[] = [];
@@ -504,13 +505,18 @@ export class WorkspaceMirror {
     this.later();
   }
   /** Look through `library/` for files changed outside the app (on the write queue); the library is written after, when it changed. */
-  rescan(onChange: () => void, hiddenTouched = false): Promise<void> {
+  rescan(onChange: () => void, hiddenTouched = false, paths?: readonly string[]): Promise<void> {
     this.running = Promise.all([this.running, this.ready])
       .then(async () => {
-        const scanned = await this.lib.scan();
-        if ((await this.lib.scanHidden(hiddenTouched)) || scanned) {
+        // The paths the folder said changed, alone (a big library is not listed again); all of `library/` when they cannot say enough.
+        const some = paths ? await this.lib.scanPaths(paths) : null;
+        const scanned = some ? some.changed.length > 0 || some.imported : await this.lib.scan();
+        const hid = await this.lib.scanHidden(hiddenTouched);
+        if (hid || scanned) {
           onChange();
-          this.library();
+          // (files taken in where they lie: the library is written whole, as a full look would; relinked ones: only theirs)
+          if (!hid && some && !some.imported) this.library(some.changed);
+          else this.library();
         }
       })
       .catch((e: unknown) => this.onError?.(`The workspace folder could not be looked through: ${(e as Error).message}.`));
@@ -553,9 +559,13 @@ export class WorkspaceMirror {
     this.lib.importFiles = fn;
   }
 
-  /** The library changed: its items, their names, tags or folders, the library folders, or the originals stored. */
-  library(): void {
-    this.libraryDirty = true;
+  /**
+   * The library changed: its items, their names, tags or folders, the library folders, or the originals stored. `hashes`: only these
+   * items changed (a big library then writes only their parts); none given, anything may have.
+   */
+  library(hashes?: readonly string[]): void {
+    if (!hashes || this.libraryDirty === true) this.libraryDirty = true;
+    else this.libraryDirty = new Set([...(this.libraryDirty || []), ...hashes]);
     this.later();
   }
   /** This device's state changed (open canvas, a camera, the last backup). */
@@ -622,9 +632,10 @@ export class WorkspaceMirror {
       }
     }
     if (this.libraryDirty) {
+      const only = this.libraryDirty === true ? undefined : this.libraryDirty;
       this.libraryDirty = false;
       try {
-        if (!(await this.lib.write())) this.libraryDirty = true; // (not timed again: tried with the next change)
+        if (!(await this.lib.write(only))) this.libraryDirty = true; // (not timed again: tried with the next change)
       } catch (e) {
         this.libraryDirty = true;
         throw e;

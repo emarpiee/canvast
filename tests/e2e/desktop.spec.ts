@@ -262,7 +262,7 @@ test("the folder is the truth: a new device opens the whole workspace, another d
     ["Sketches", "Characters", 7],
     ["Sketches", "Poses", 1],
   ]);
-  await expect.poll(() => a.page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(shade);
+  await expect.poll(() => a.page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length)), { timeout: 15_000 }).toBe(shade); // (taken from the copy after start-up)
   await a.page.evaluate(() => window.__canvastDebug.flushStorage());
   await a.app.close();
   expect(files(ws).filter((f) => f.startsWith(".canvast/") && f.includes(" (1).json"))).toEqual([]);
@@ -333,9 +333,11 @@ test("library folders are real folders: filing or renaming an item moves its fil
     expect(libraryFiles()).toEqual(["library/anatomy/sub/hand_study.png", "library/images/pose.png"]);
     expect(existsSync(join(ws, "library/refs-hands"))).toBe(false);
     expect(await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.every((e) => e.present)))).toBe(true);
-    // The library is kept in parts (by the first letter of each hash), with an index naming them; library.json stays as a copy for older apps.
-    const index = JSON.parse(readFileSync(join(ws, ".canvast/library/index.json"), "utf8")) as { parts: string[]; folders: unknown[] };
+    // The library is kept in parts (by the first two hex digits of each hash: 256 at most), with an index naming them (version 3);
+    // library.json stays as a copy for older apps.
+    const index = JSON.parse(readFileSync(join(ws, ".canvast/library/index.json"), "utf8")) as { version: number; parts: string[]; folders: unknown[] };
     expect(index.folders.length).toBe(2);
+    expect([index.version, index.parts.every((k) => /^[0-9a-f]{2}$/.test(k))]).toEqual([3, true]);
     const inParts = index.parts.flatMap((k) => (JSON.parse(readFileSync(join(ws, `.canvast/library/items-${k}.json`), "utf8")) as { items: { name: string }[] }).items.map((i) => i.name));
     expect(inParts.sort()).toEqual(["Hand Study.png", "Pose.png"]);
     const json = readFileSync(join(ws, ".canvast/library.json"), "utf8");
@@ -384,6 +386,39 @@ test("library folders are real folders: filing or renaming an item moves its fil
       ["Anatomy", "Sub"],
       [["Hand Study.png", "f2", true], ["Pose (renamed).png", null, true]],
     ]);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a big library (past the size library.json is kept for) writes only what changed: a rename rewrites its item's part, nothing else", async () => {
+  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  let { app, page } = await launch(ws);
+  const parts = () => new Map(files(ws).filter((f) => /^\.canvast\/library\/items-[0-9a-f]{2}\.json$/.test(f)).map((f) => [f, readFileSync(join(ws, f), "utf8")]));
+  const listing = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, e.present]).sort()));
+  const pics = [1, 2, 3, 4, 5, 6].map((k) => makePng(k, 3, () => [k * 30, 200 - k * 20, 90, 255]));
+  try {
+    await page.evaluate(() => window.__canvastDebug.libraryTesting({ compatMax: 0 })); // (as if past 10,000 items)
+    await page.getByTestId("import-input").setInputFiles(pics.map((buffer, k) => ({ name: `Pic ${k}.png`, mimeType: "image/png", buffer })));
+    await expect.poll(() => listing().then((l) => l.length)).toBe(6);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    expect(existsSync(join(ws, ".canvast/library.json"))).toBe(false); // (not kept past the limit)
+    const before = parts();
+    const hash = createHash("sha256").update(pics[2]!).digest("hex");
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("rename", h, "Renamed One.png"), hash);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    const after = parts();
+    const changed = [...after.keys()].filter((f) => after.get(f) !== before.get(f));
+    expect(changed).toEqual([`.canvast/library/items-${hash.slice(0, 2)}.json`]);
+    expect(after.get(changed[0]!)).toContain("Renamed One.png");
+    expect(existsSync(join(ws, "library/images/renamed_one.png"))).toBe(true);
+  } finally {
+    await app.close();
+  }
+  // Another device reads the whole library from the parts.
+  ({ app, page } = await launch(ws, "device-b"));
+  try {
+    await expect.poll(listing, { timeout: 15_000 }).toEqual(["Pic 0.png", "Pic 1.png", "Renamed One.png", "Pic 3.png", "Pic 4.png", "Pic 5.png"].map((n) => [n, true]).sort());
   } finally {
     await app.close();
   }

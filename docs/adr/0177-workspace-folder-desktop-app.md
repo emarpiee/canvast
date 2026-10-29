@@ -290,6 +290,18 @@ A sync tool (Mega, Drive, Proton Drive, Syncthing…) keeps one `hidden.json` wh
 - **An interrupted seal** (the move noted, the sealed file there, its readable source still there) is proven at start-up by opening it; unproven, or while the key is locked, the sealed file is erased and the readable one stays, to be sealed again. Before, the sealed file was trusted.
 - Sealing reports its own progress (`encrypting`), shown as *Encrypting N of M files* from five files.
 
+### A big library: only what changed (0.50.56)
+
+Measured with `scripts/bench-library.mjs` (100,000 files on a spinning disk): a rename took about 7 s to write, a file put in from outside 29 s to be listed, a first open on a new device 64 s, because each save read the whole library from the app's storage, rebuilt all parts and kept one record of every item, and each outside change listed every file (and the listing stopped at 200,000). Now:
+
+- **256 parts** (`items-00` … `items-ff`, by the first two hex digits of the hash; index version 3, version 2's 16 still read). An older app finds no parts it knows in version 3: it reads `library.json` (kept up to 10,000 items) or nothing, and never takes the library as erased.
+- **A save writes only what changed** in a library past `library.json`'s limit: catalog changes say which items (renames, metadata, deletions, an original stored); those items alone are read, placed and written, with their parts, each part read from the app's storage by its range of hashes. Changes that may touch many (folders, tags, showing an item again) write the whole library as before. This device's record of the library is kept per part (meta `libraryPart:<xx>`), and each part is remembered by its SHA-256, not its text.
+- **An outside change is looked at alone**: the watcher's paths, each looked up through a new index of the stored originals by file path (IndexedDB version 13). A path with no file that no item names (a folder came or went: the watcher names only the folder) looks through all of `library/` as before; a file taken in where it lies still writes the whole library (needed for now; see status).
+- **Sizes of the library's files are remembered** until the watcher says a file changed, so a listing does not ask for every file's size again.
+- A first open on a new device reads what it has in two reads, not two per item.
+
+Measured after (100,000): a rename's write 0.14 s, a file put in from outside listed in 4.4 s, a first open 38 s. Start-up still looks through the whole folder; that is next.
+
 ### Hidden folders, and hidden names off the device (0.50.55)
 
 - **Hide folder**: a library folder gets `hidden: true`, with its subfolders, and every item in them is hidden. Lists show `visibleFolders` only; showing an item again shows its folder and those above it. The plain library index (and `library.json`) leaves hidden folders out; their list is sealed in `hidden.json` (`folders`, with the data key) and read back when the key is open (while locked, this device keeps its own as they were). Folder lists are compared in one order (by id), so the order two devices wrote them in is not a change. A hidden folder's real folder leaves `library/` (its items are in `.hidden/`).

@@ -1,5 +1,6 @@
 import { externalFolder } from "../storage/external-folder";
 import { importTesting } from "../storage/archive";
+import { libraryTesting } from "../storage/library-mirror";
 import type { IdbStorage } from "../storage/idb-storage";
 import { beginProgress } from "./progress";
 import type { Progress } from "./progress";
@@ -243,6 +244,8 @@ export interface DebugHook {
   removeAssetBytes(hash: string): Promise<void>;
   /** Import tuning (ADR 0176): the byte budget of a batch of originals, and stopping after them as a failure or as a closed tab. */
   importTesting(o: Partial<typeof importTesting>): void;
+  /** The desktop build's library writes: `compatMax` 0 makes any library write only what changed (as a big one does). */
+  libraryTesting(o: Partial<typeof libraryTesting>): void;
   /** The originals listed as written ahead by an import that has not finished. */
   importStaged(): Promise<string[]>;
   /** Use a private browser directory (OPFS) as the library folder, as the picker would. */
@@ -701,6 +704,7 @@ export function installDebugHook(
     },
     folderState: () => externalFolder.state,
     importTesting: (o) => void Object.assign(importTesting, o),
+    libraryTesting: (o) => void Object.assign(libraryTesting, o),
     importStaged: async () => {
       const tx = (session.storage as IdbStorage).db.transaction("meta", "readonly");
       const r = tx.objectStore("meta").get("importStaged");

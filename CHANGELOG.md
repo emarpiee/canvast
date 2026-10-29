@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.50.56 — A big library writes only what changed (2026-10-30)
+
+- **Changed:** in the desktop app, a big library writes only what changed: the library's index is in 256 parts, and a rename, a tag or a deletion rewrites only its item's part (at 100,000 items, a rename's write went from about 7 s to 0.14 s).
+- **Changed:** a file changed in `library/` outside the app is looked at alone instead of the whole folder being listed again (at 100,000 items, a file put in from outside is listed in about 4 s instead of 29 s); the app also remembers its files' sizes between looks.
+- **Changed:** the first open of a big workspace on a new device takes the library in about 40% less time.
+- **Fixed:** past 200,000 files in `library/`, a new file put there from outside was never found.
+- **Added:** `scripts/bench-library.mjs`, a benchmark of the desktop app on a workspace folder of N library files.
+
 ## 0.50.55 — Hide folder; hidden names off the device (2026-10-29)
 
 - **Added:** *Hide folder* in a library folder's menu: the folder, its subfolders and every item in them are hidden, and the folders leave every list. Showing an item again shows its folder again. In the desktop app the folder's name is kept only encrypted, and its real folder leaves `library/`.

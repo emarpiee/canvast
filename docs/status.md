@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.56: a big library writes only what changed (2026-10-30)
+
+**Implemented:** step 4 (#7/#16) first part (ADR 0177 "A big library: only what changed"): bench script; adopt with bulk reads; 256 parts (index v3), per-part state and SHA-256 fingerprints; `library(hashes)` from the catalog hooks → `write(only)` → `readSome`/`writeSome` past `library.json`'s limit (`libraryTesting.compatMax` lowers it for tests); `scanPaths` with an IndexedDB index on `file` (DB 13); a size cache cleared by the watcher's paths.
+**Tested:** bench at 100,000 (before → after): first open 64 → 38 s, outside file 29 → 4.4 s, rename write ~7 s → 0.14 s, second open 11 s (unchanged). Desktop group 15 passed (new: "a big library … writes only what changed"; "the folder is the truth" copy poll given 15 s, a race of the test); storage group 42 passed (DB 13 upgrade).
+**Known failures:** none.
+**Unverified:** why an import found by the paths' look must still write the whole library (without it, the sync-copy step of "it follows the folder" fails on device A); 1,000,000 files (after start-up is made fast).
+**Committed:** on `main`.
+**Next bounded task:** start-up: one look through the folder in the main process (parallel, no cap) compared with what is stored, then 1,000,000 files.
+
 ## v0.50.55: Hide folder; hidden names off the device (2026-10-29)
 
 **Implemented:** security list step 3 (#1, #9; ADR 0177 "Hidden folders, and hidden names off the device"): `AssetFolder.hidden`, `hideFolder`, `visibleFolders` in listings, show-again unhides the folder chain; desktop: hidden folders sealed in `hidden.json` `folders`, out of the plain index and `library/`; canonical folder compare; the privacy setting blanks sealed hidden entries and hidden folder names at lock (after a flush; `lock()` now writes first) and start-up, refilled from the sealed index on unlock; no index write or reseal while blank.

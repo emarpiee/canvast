@@ -248,6 +248,17 @@ class ExternalFolder {
     }
   }
 
+  /** Sizes of the folder's files as last looked at (desktop build), until `forgetSizes`. */
+  private readonly sizeOf = new Map<string, number | null>();
+  /** Files (or folders: everything in them) changed in the folder: their sizes are looked at again. */
+  forgetSizes(paths: readonly string[]): void {
+    if (!this.sizeOf.size) return;
+    for (const p of paths) {
+      this.sizeOf.delete(p);
+      if (this.sizeOf.size && !/\.[^/]+$/.test(p)) for (const f of this.sizeOf.keys()) if (f.startsWith(`${p}/`)) this.sizeOf.delete(f); // (a folder)
+    }
+  }
+
   /** A file of the folder as it is on disk (a sealed hidden file stays sealed), or null when it is not there. */
   async readRaw(file: string): Promise<Blob | null> {
     if (!this.dir || this.status !== "ready" || !this.naming.valid("0".repeat(64), file)) return null;
@@ -276,7 +287,11 @@ class ExternalFolder {
   async hasMany(items: ReadonlyArray<{ hash: string; size: number; file?: string | undefined }>): Promise<boolean[]> {
     if (this.dir?.sizes && this.status === "ready") {
       const files = items.map((i) => i.file ?? i.hash);
-      const sizes = await this.dir.sizes(files);
+      // Sizes looked at before are known until the folder says the file changed (`forgetSizes`): a big library is looked through once.
+      const ask = files.filter((f) => !this.sizeOf.has(f));
+      const got = ask.length ? await this.dir.sizes(ask) : [];
+      ask.forEach((f, k) => this.sizeOf.set(f, got[k] ?? null));
+      const sizes = files.map((f) => this.sizeOf.get(f) ?? null);
       return items.map((it, k) => this.naming.valid(it.hash, files[k]!) && (isHiddenFile(files[k]!) ? (sizes[k] ?? -1) >= it.size + SEAL_OVERHEAD : sizes[k] === it.size));
     }
     const out: boolean[] = [];

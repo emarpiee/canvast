@@ -31,9 +31,15 @@ export const LIBRARY_DIR = ".canvast/library";
 export const LIBRARY_INDEX = `${LIBRARY_DIR}/index.json`;
 export const LIBRARY_PART_FORMAT = "canvast-library-items";
 const partPath = (key: string): string => `${LIBRARY_DIR}/items-${key}.json`;
-const PART_KEYS = "0123456789abcdef".split("");
+/** The part an item is in: the first two hex digits of its hash (256 parts; version 2 of the index had 16, by one digit, still read). */
+const partKey = (hash: string): string => hash.slice(0, 2);
+const PART_KEY_RE = /^[0-9a-f]{1,2}$/;
+/** This device's record of what it last wrote or read of each part, kept per part (meta `libraryPart:<key>`): one save writes only its parts'. */
+const PART_STATE = "libraryPart:";
 /** Up to this many items, `library.json` (the single file of earlier versions) is still written, so an older app keeps working on the workspace. */
 export const COMPAT_MAX_ITEMS = 10_000;
+/** The limit in use (tests lower it, so a small library takes the path of a big one: only what changed is written). */
+export const libraryTesting = { compatMax: COMPAT_MAX_ITEMS };
 /** How long a sealed file with no entry waits before it is taken back as a hidden item (its entry may still be on its way); tests shorten it. */
 export const HIDDEN_ORPHAN_WAIT = { ms: 30_000 };
 /** Hidden items (hashes) and folders (`folder:<id>`) blanked in this device's cache while locked (app storage `meta`). */
@@ -74,7 +80,8 @@ export interface LibraryJson {
 /** `.canvast/library/index.json`. */
 export interface LibraryIndex {
   format: typeof LIBRARY_JSON_FORMAT;
-  version: 2;
+  /** 3: 256 parts by two hex digits (0.50.56); 2: 16 by one (still read). An older app reads neither of 3's, and never erases for it. */
+  version: 2 | 3;
   folders: AssetFolder[];
   /** The parts there are (`0` … `f`): a part not named has no items. */
   parts: string[];
@@ -242,8 +249,10 @@ export class LibraryMirror {
   private dirs = new Set<string>();
   /** `library.json` as last written or read (another text there was written by an older app). */
   private lastText = "";
-  /** The parts as last written or read: their text, and the hashes each holds (an unchanged part is not read again). */
-  private parts = new Map<string, { text: string; hashes: string[] }>();
+  /** The parts as last written or read: their text's SHA-256, and the hashes each holds (an unchanged part is not read again). */
+  private parts = new Map<string, { fp: string; hashes: string[] }>();
+  /** Parts of `state.items` changed since it was last kept. */
+  private stateDirty = new Set<string>();
   private lastPartsIndex = "";
   private lastIndex = "";
   private lastFolders = "[]";
@@ -265,6 +274,14 @@ export class LibraryMirror {
   /** At start-up: what another device changed in `library.json` is taken (new items, names, tags, folders, where each file is). */
   async start(): Promise<void> {
     this.state = (await idbGet<LibraryState>(this.db, "meta", STATE_KEY).catch(() => undefined)) ?? { folders: "", items: {} };
+    // (kept per part since 0.50.56; a record of an earlier version, whole, is split at the next save)
+    if (Object.keys(this.state.items ?? {}).length) for (const h of Object.keys(this.state.items)) this.stateDirty.add(partKey(h));
+    else {
+      const tx = this.db.transaction("meta", "readonly");
+      const range = IDBKeyRange.bound(PART_STATE, `${PART_STATE}\uffff`);
+      const parts = (await req(tx.objectStore("meta").getAll(range) as IDBRequest<Array<Record<string, string>>>).catch(() => [])) as Array<Record<string, string>>;
+      this.state.items = Object.assign({}, ...parts);
+    }
     await this.finishMove();
     await this.reread();
   }
@@ -287,7 +304,8 @@ export class LibraryMirror {
    */
   private async mergeCopies(): Promise<boolean> {
     const copies = [
-      ...(await this.bridge.list(LIBRARY_DIR)).filter((n) => /^(items-[0-9a-f]|index)[^/]+\.json$/i.test(n)).map((n) => `${LIBRARY_DIR}/${n}`),
+      // (a part's own name is `items-<1 or 2 hex digits>.json`; a copy has more before `.json`: `items-3a (1).json`)
+      ...(await this.bridge.list(LIBRARY_DIR)).filter((n) => /^(items-[0-9a-f]{1,2}|index)[^/]+\.json$/i.test(n) && !/^items-[0-9a-f]{1,2}\.json$/.test(n)).map((n) => `${LIBRARY_DIR}/${n}`),
       ...(await this.bridge.list(".canvast")).filter((n) => /^library[^/]+\.json$/i.test(n) && n !== "library.json").map((n) => `.canvast/${n}`),
     ].filter((p) => !p.includes(".tmp-"));
     if (!copies.length) return false;
@@ -349,22 +367,23 @@ export class LibraryMirror {
     } catch {
       index = null; // damaged: written again from the app's storage
     }
-    const hasParts = !!index && index.format === LIBRARY_JSON_FORMAT && index.version === 2 && Array.isArray(index.parts);
+    const hasParts = !!index && index.format === LIBRARY_JSON_FORMAT && (index.version === 2 || index.version === 3) && Array.isArray(index.parts);
     if (index && hasParts) {
-      const keys = index.parts!.filter((k): k is string => typeof k === "string" && PART_KEYS.includes(k));
+      const keys = index.parts!.filter((k): k is string => typeof k === "string" && PART_KEY_RE.test(k));
       const items: LibraryItem[] = [];
       const present = new Set<string>();
       let whole = true;
-      const parts = new Map<string, { text: string; hashes: string[] }>();
+      const parts = new Map<string, { fp: string; hashes: string[] }>();
       for (const key of keys) {
         const bytes = await this.bridge.read(partPath(key));
-        const text = bytes ? new TextDecoder().decode(bytes) : null;
+        const fp = bytes ? await sha256Hex((bytes as Uint8Array<ArrayBuffer>).slice().buffer) : null;
         const was = this.parts.get(key);
-        if (text !== null && was?.text === text) {
+        if (fp !== null && was?.fp === fp) {
           parts.set(key, was);
           for (const h of was.hashes) present.add(h);
           continue;
         }
+        const text = bytes ? new TextDecoder().decode(bytes) : null;
         let raw: { format?: unknown; items?: unknown } | null = null;
         try {
           raw = text === null ? null : (JSON.parse(text) as { format?: unknown; items?: unknown });
@@ -378,7 +397,7 @@ export class LibraryMirror {
         const read = raw.items.map(readItem).filter((i): i is LibraryItem => i !== null);
         items.push(...read);
         for (const i of read) present.add(i.hash);
-        parts.set(key, { text: text!, hashes: read.map((i) => i.hash) });
+        parts.set(key, { fp: fp!, hashes: read.map((i) => i.hash) });
       }
       const hidden = await hiddenItems();
       items.push(...hidden);
@@ -484,11 +503,23 @@ export class LibraryMirror {
       took = true;
     }
 
-    for (const it of items) {
+    const todo = items.flatMap((it) => {
       const text = JSON.stringify(it);
-      if (seen(text) === known[it.hash]) continue; // nothing new from the folder
-      const e = await req(catalog.get(it.hash) as IDBRequest<CatalogEntry | undefined>);
-      const rec = await req(assets.get(it.hash) as IDBRequest<AssetRecord | undefined>);
+      return seen(text) === known[it.hash] ? [] : [{ it, text }]; // (nothing new from the folder for the rest)
+    });
+    // Many to look at (a new device, a big change elsewhere): what this device has is read in two reads, not two per item.
+    let entryAt = async (h: string): Promise<CatalogEntry | undefined> => req(catalog.get(h) as IDBRequest<CatalogEntry | undefined>);
+    let recAt = async (h: string): Promise<AssetRecord | undefined> => req(assets.get(h) as IDBRequest<AssetRecord | undefined>);
+    if (todo.length > 200) {
+      const entries = new Map((await req(catalog.getAll() as IDBRequest<CatalogEntry[]>)).map((e) => [e.hash, e]));
+      const stubs = new Map(((await req(assets.index("ext").getAll())) as AssetRecord[]).map((r) => [r.hash, r]));
+      const keys = new Set((await req(assets.getAllKeys())) as string[]);
+      entryAt = async (h) => entries.get(h);
+      recAt = async (h) => stubs.get(h) ?? (keys.has(h) ? req(assets.get(h) as IDBRequest<AssetRecord | undefined>) : undefined); // (bytes held here: rare)
+    }
+    for (const { it, text } of todo) {
+      const e = await entryAt(it.hash);
+      const rec = await recAt(it.hash);
       if (e && seen(JSON.stringify(itemOf(e, rec))) !== (known[it.hash] ?? "")) continue; // changed here too: this device's stays
       catalog.put(entryOf(it, e));
       if (it.file && (!rec || rec.ext)) {
@@ -496,6 +527,7 @@ export class LibraryMirror {
         assets.put(storedStub(stub), it.hash);
       }
       known[it.hash] = seen(text);
+      this.stateDirty.add(partKey(it.hash));
       took = true;
     }
     for (const hash of present ? Object.keys(known) : []) {
@@ -505,9 +537,10 @@ export class LibraryMirror {
       if (e && seen(JSON.stringify(itemOf(e, rec))) !== known[hash]) continue; // changed here: kept
       if (e?.state === "active") catalog.put({ ...e, state: "deleted", deletedAt: Date.now() } satisfies CatalogEntry);
       delete known[hash];
+      this.stateDirty.add(partKey(hash));
       took = true;
     }
-    tx.objectStore("meta").put(this.state, STATE_KEY);
+    this.keepState(tx);
     await committed;
     return took;
   }
@@ -516,9 +549,11 @@ export class LibraryMirror {
    * Put each original where its folder and name say, write the ones only the app's storage holds, then `library.json`.
    * False when a file could not be moved or written (it is tried again with the next change).
    */
-  async write(): Promise<boolean> {
+  async write(only?: ReadonlySet<string>): Promise<boolean> {
     await this.finishMove();
-    const read = await this.read();
+    // Some items changed, in a library too big for `library.json`: only they are read, placed and written (with their parts).
+    const some = only && this.lastText === "-" ? only : undefined;
+    const read = some ? await this.readSome(some) : await this.read();
     const { entries, recs, folders } = read;
     const folderOk = new Set(folders.map((f) => f.id));
     // Places kept: every file of an item that is not moved (deleted items stay where they are until they are erased).
@@ -614,10 +649,49 @@ export class LibraryMirror {
     }
     this.dirs = wanted;
     const placedAll = total === 0; // (no file moved, sealed or written: the records are as they were read)
-    await this.writeJson(placedAll ? read : undefined);
+    if (some) await this.writeSome(some);
+    else await this.writeJson(placedAll ? read : undefined);
     if (failed.length && !this.failing) this.onNotice?.(`${failed.length === 1 ? "A library file" : `${failed.length} library files`} could not be moved to ${failed.length === 1 ? "its" : "their"} place in the workspace folder (${failed[0]}). ${failed.length === 1 ? "It is" : "They are"} tried again with the next change.`);
     this.failing = failed.length > 0;
     return !this.failing;
+  }
+
+  /**
+   * The files the folder says changed (the watcher's paths), looked at alone instead of all of `library/` (ADR 0177): a file no item
+   * names is found by its content (an item's file renamed or moved: the item follows it) or imported where it lies; one that is gone
+   * shows as missing (its size is looked at again). Null when a folder came or there are many: then `scan` looks through all. Which items
+   * changed (imports report themselves).
+   */
+  async scanPaths(paths: readonly string[]): Promise<{ changed: string[]; imported: boolean } | null> {
+    const lib = [...new Set(paths.filter((p) => p.startsWith("library/") && usable(p) && !externalFolder.claimed(p)))];
+    if (paths.includes("library") || lib.length > 500) return null;
+    if (!lib.length) return { changed: [], imported: false };
+    const sizes = await this.bridge.sizes(lib);
+    const changed: string[] = [];
+    const found: FolderFile[] = [];
+    for (const [k, path] of lib.entries()) {
+      const tx = this.db.transaction("assets", "readonly");
+      const named = await req(tx.objectStore("assets").index("file").getKey(path));
+      if (named !== undefined) continue; // an item's own file (gone: its item shows as missing)
+      // No file, and no item's: a folder came (what is in it was not said one by one) or went. All is looked through.
+      if (sizes[k] === null) return null;
+      const hash = await this.bridge.hash(path);
+      if (!hash) continue;
+      const rec = await idbGet<AssetRecord>(this.db, "assets", hash);
+      if (rec) {
+        if (rec.ext && rec.file && !isHiddenFile(rec.file) && rec.file !== path && !(await this.bridge.exists(rec.file))) {
+          await this.relink(hash, await idbGet<CatalogEntry>(this.db, "assetCatalog", hash), rec.file, path);
+          changed.push(hash);
+        }
+        continue; // (a copy of a file the library has: left alone)
+      }
+      found.push({ path, name: path.slice(path.lastIndexOf("/") + 1), folderId: await this.folderFor(parentOf(path)), read: async () => {
+        const bytes = await this.bridge.read(path);
+        return bytes && new Blob([bytes as Uint8Array<ArrayBuffer>]);
+      } });
+    }
+    if (found.length && this.importFiles) await this.importFiles(found);
+    return { changed, imported: found.length > 0 };
   }
 
   /**
@@ -1125,6 +1199,73 @@ export class LibraryMirror {
     await committed;
   }
 
+  /** `read`, for some items only. */
+  private async readSome(hashes: ReadonlySet<string>): Promise<{ entries: CatalogEntry[]; recs: Map<string, AssetRecord>; folders: AssetFolder[] }> {
+    const tx = this.db.transaction(["assetCatalog", "assets", "meta"], "readonly");
+    const folders = (await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? [];
+    const entries: CatalogEntry[] = [];
+    const recs = new Map<string, AssetRecord>();
+    for (const h of hashes) {
+      const e = await req(tx.objectStore("assetCatalog").get(h) as IDBRequest<CatalogEntry | undefined>);
+      const r = await req(tx.objectStore("assets").get(h) as IDBRequest<AssetRecord | undefined>);
+      if (e) entries.push(e);
+      if (r) recs.set(h, { ...r, hash: h });
+    }
+    return { entries, recs, folders };
+  }
+
+  /**
+   * `writeJson` for some items: only the parts they are in are made again (each read from the app's storage by its range of hashes),
+   * the sealed index from the hidden items known (`hiddenItems`, kept by `writeJson`), and this device's record for them.
+   */
+  private async writeSome(hashes: ReadonlySet<string>): Promise<void> {
+    const keys = new Set([...hashes].map(partKey));
+    const tx = this.db.transaction(["assetCatalog", "assets", "meta"], "readonly");
+    const folders = (await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? [];
+    const lists = new Map<string, LibraryItem[]>();
+    for (const k of keys) {
+      const range = IDBKeyRange.bound(k, `${k}\uffff`);
+      const entries = await req(tx.objectStore("assetCatalog").getAll(range) as IDBRequest<CatalogEntry[]>);
+      // (the store's keys are the hashes; a record need not hold its own)
+      const ks = (await req(tx.objectStore("assets").getAllKeys(range))) as string[];
+      const vals = (await req(tx.objectStore("assets").getAll(range))) as AssetRecord[];
+      const recs = new Map(ks.map((h, i) => [h, vals[i]!]));
+      lists.set(k, entries.map((e) => itemOf(e, recs.get(e.hash))));
+    }
+    await done(tx);
+    for (const [k, items] of lists) {
+      const open = items.filter((i) => !isHiddenFile(i.file));
+      for (const i of items) if (hashes.has(i.hash)) (isHiddenFile(i.file) ? this.hiddenItems.set(i.hash, i) : this.hiddenItems.delete(i.hash));
+      if (open.length) {
+        const bytes = encode(libraryPartText(open));
+        const fp = await sha256Hex((bytes as Uint8Array<ArrayBuffer>).buffer);
+        if (this.parts.get(k)?.fp !== fp) await this.bridge.write(partPath(k), bytes);
+        this.parts.set(k, { fp, hashes: open.map((i) => i.hash) });
+      } else if (this.parts.delete(k)) await this.bridge.remove(partPath(k), "erase");
+      const now = new Set(items.map((i) => i.hash));
+      for (const h of hashes) if (partKey(h) === k && !now.has(h)) (this.hiddenItems.delete(h), delete this.state.items[h]);
+      for (const i of items) {
+        const v = seen(JSON.stringify(i));
+        if (this.state.items[i.hash] !== v) (this.state.items[i.hash] = v), this.stateDirty.add(k);
+      }
+      this.stateDirty.add(k);
+    }
+    const shown = visibleFolders(folders);
+    const indexText = `${JSON.stringify({ format: LIBRARY_JSON_FORMAT, version: 3, folders: shown, parts: [...this.parts.keys()].sort() } satisfies LibraryIndex)}\n`;
+    if (indexText !== this.lastPartsIndex) await this.bridge.write(LIBRARY_INDEX, encode(indexText));
+    this.lastPartsIndex = indexText;
+    const index = JSON.stringify([...this.hiddenItems.values()].sort((a, b) => (a.hash < b.hash ? -1 : 1)));
+    const sealedFolders = JSON.stringify(folders.filter((f) => !shown.includes(f)));
+    if (this.vault.dataKey && !(await this.anyBlank()) && (index !== this.lastIndex || sealedFolders !== this.lastFolders || this.vault.indexWaiting) && (index !== "[]" || sealedFolders !== "[]" || (await this.vault.state()) !== "none")) await this.vault.writeIndex(index, sealedFolders);
+    if (this.vault.dataKey) (this.lastIndex = index), (this.lastFolders = sealedFolders);
+    const wtx = this.db.transaction("meta", "readwrite", { durability: "strict" });
+    const committed = done(wtx);
+    this.keepState(wtx);
+    await committed;
+  }
+  /** The hidden items sealed, as last written (for `writeSome`). */
+  private hiddenItems = new Map<string, LibraryItem>();
+
   private async read(): Promise<{ entries: CatalogEntry[]; recs: Map<string, AssetRecord>; folders: AssetFolder[] }> {
     const tx = this.db.transaction(["assetCatalog", "assets", "meta"], "readonly");
     const entries = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
@@ -1149,22 +1290,23 @@ export class LibraryMirror {
     const open = items.filter((i) => !isHiddenFile(i.file));
     // The parts first, then the index that names them, so a reader never finds the index naming a part not written yet.
     const byKey = new Map<string, LibraryItem[]>();
-    for (const i of open) (byKey.get(i.hash[0]!) ?? byKey.set(i.hash[0]!, []).get(i.hash[0]!)!).push(i);
-    const parts = new Map<string, { text: string; hashes: string[] }>();
+    for (const i of open) (byKey.get(partKey(i.hash)) ?? byKey.set(partKey(i.hash), []).get(partKey(i.hash))!).push(i);
+    const parts = new Map<string, { fp: string; hashes: string[] }>();
     for (const [key, list] of [...byKey].sort()) {
-      const text = libraryPartText(list);
-      if (this.parts.get(key)?.text !== text) await this.bridge.write(partPath(key), encode(text));
-      parts.set(key, { text, hashes: list.map((i) => i.hash) });
+      const bytes = encode(libraryPartText(list));
+      const fp = await sha256Hex((bytes as Uint8Array<ArrayBuffer>).buffer);
+      if (this.parts.get(key)?.fp !== fp) await this.bridge.write(partPath(key), bytes);
+      parts.set(key, { fp, hashes: list.map((i) => i.hash) });
     }
     // Hidden folders are only in the sealed index: their names are written nowhere readable.
     const shown = visibleFolders(folders);
-    const indexText = `${JSON.stringify({ format: LIBRARY_JSON_FORMAT, version: 2, folders: shown, parts: [...parts.keys()] } satisfies LibraryIndex)}\n`;
+    const indexText = `${JSON.stringify({ format: LIBRARY_JSON_FORMAT, version: 3, folders: shown, parts: [...parts.keys()] } satisfies LibraryIndex)}\n`;
     if (indexText !== this.lastPartsIndex) await this.bridge.write(LIBRARY_INDEX, encode(indexText));
     for (const key of this.parts.keys()) if (!parts.has(key)) await this.bridge.remove(partPath(key), "erase"); // (after the index stopped naming it)
     this.parts = parts;
     this.lastPartsIndex = indexText;
     // The single file of earlier versions, for an older app on another device; past COMPAT_MAX_ITEMS it is no longer kept.
-    if (open.length <= COMPAT_MAX_ITEMS) {
+    if (open.length <= libraryTesting.compatMax) {
       const text = libraryJsonText(shown, open, true);
       if (text !== this.lastText) await this.bridge.write(LIBRARY_JSON, encode(text));
       this.lastText = text;
@@ -1172,11 +1314,38 @@ export class LibraryMirror {
       await this.bridge.remove(LIBRARY_JSON, "erase");
       this.lastText = "-";
     }
-    const index = JSON.stringify(items.filter((i) => isHiddenFile(i.file)));
+    const sealedItems = items.filter((i) => isHiddenFile(i.file)).sort((a, b) => (a.hash < b.hash ? -1 : 1));
+    this.hiddenItems = new Map(sealedItems.map((i) => [i.hash, i]));
+    const index = JSON.stringify(sealedItems);
     const sealedFolders = JSON.stringify(folders.filter((f) => !shown.includes(f)));
     if (this.vault.dataKey && !(await this.anyBlank()) && (index !== this.lastIndex || sealedFolders !== this.lastFolders || this.vault.indexWaiting) && (index !== "[]" || sealedFolders !== "[]" || (await this.vault.state()) !== "none")) await this.vault.writeIndex(index, sealedFolders);
     if (this.vault.dataKey) (this.lastIndex = index), (this.lastFolders = sealedFolders);
-    this.state = { folders: canonFolders(folders), items: Object.fromEntries(items.map((i) => [i.hash, seen(JSON.stringify(i))])) };
-    await idbPut(this.db, "meta", STATE_KEY, this.state);
+    // What this device now knows of each item: only the parts where something changed are kept again.
+    const next: Record<string, string> = {};
+    for (const i of items) {
+      const v = seen(JSON.stringify(i));
+      next[i.hash] = v;
+      if (this.state.items[i.hash] !== v) this.stateDirty.add(partKey(i.hash));
+    }
+    for (const h of Object.keys(this.state.items)) if (!(h in next)) this.stateDirty.add(partKey(h));
+    this.state = { folders: canonFolders(folders), items: next };
+    const tx = this.db.transaction("meta", "readwrite", { durability: "strict" });
+    const committed = done(tx);
+    this.keepState(tx);
+    await committed;
+  }
+
+  /** Keep this device's record of the library in `tx`: the folders, and each part changed since it was last kept. */
+  private keepState(tx: IDBTransaction): void {
+    const meta = tx.objectStore("meta");
+    meta.put({ folders: this.state.folders, items: {} } satisfies LibraryState, STATE_KEY);
+    if (!this.stateDirty.size) return;
+    const byPart = new Map<string, Record<string, string>>([...this.stateDirty].map((k) => [k, {}]));
+    for (const [h, v] of Object.entries(this.state.items)) {
+      const rec = byPart.get(partKey(h));
+      if (rec) rec[h] = v;
+    }
+    for (const [k, rec] of byPart) Object.keys(rec).length ? meta.put(rec, `${PART_STATE}${k}`) : meta.delete(`${PART_STATE}${k}`);
+    this.stateDirty.clear();
   }
 }
