@@ -30,10 +30,10 @@ export const LIBRARY_JSON_FORMAT = "canvast-library";
 export const LIBRARY_DIR = ".canvast/library";
 export const LIBRARY_INDEX = `${LIBRARY_DIR}/index.json`;
 export const LIBRARY_PART_FORMAT = "canvast-library-items";
-const partPath = (key: string): string => `${LIBRARY_DIR}/items-${key}.json`;
+export const partPath = (key: string): string => `${LIBRARY_DIR}/items-${key}.json`;
 /** The part an item is in: the first two hex digits of its hash (256 parts; version 2 of the index had 16, by one digit, still read). */
-const partKey = (hash: string): string => hash.slice(0, 2);
-const PART_KEY_RE = /^[0-9a-f]{1,2}$/;
+export const partKey = (hash: string): string => hash.slice(0, 2);
+export const PART_KEY_RE = /^[0-9a-f]{1,2}$/;
 /** This device's record of what it last wrote or read of each part, kept per part (meta `libraryPart:<key>`): one save writes only its parts'. */
 const PART_STATE = "libraryPart:";
 /** Up to this many items, `library.json` (the single file of earlier versions) is still written, so an older app keeps working on the workspace. */
@@ -173,7 +173,7 @@ export function readItem(a: unknown): LibraryItem | null {
 }
 
 /** The library folders read from the file: well-formed ones only, a parent that is not there made none. */
-function readFolders(a: unknown): AssetFolder[] {
+export function readFolders(a: unknown): AssetFolder[] {
   if (!Array.isArray(a)) return [];
   const out = (a as unknown[]).filter((f): f is AssetFolder => !!f && typeof (f as AssetFolder).id === "string" && typeof (f as AssetFolder).name === "string" && !!(f as AssetFolder).name.trim());
   const ids = new Set(out.map((f) => f.id));
@@ -186,7 +186,7 @@ function canonFolders(folders: readonly AssetFolder[]): string {
 }
 
 /** The entry an item from the file makes (what this device had of it, `prev`, gives only its deletion time). */
-function entryOf(it: LibraryItem, prev: CatalogEntry | undefined): CatalogEntry {
+export function entryOf(it: LibraryItem, prev: CatalogEntry | undefined): CatalogEntry {
   return {
     hash: it.hash,
     name: it.name,
@@ -221,7 +221,7 @@ export function libraryJsonText(folders: readonly AssetFolder[], items: readonly
  * What this device last knew of an item of `library.json`: a short fingerprint of its line (FNV-1a), not the line itself, so the record
  * kept of a big library stays small (it is written with each change).
  */
-function seen(text: string): string {
+export function seen(text: string): string {
   let h1 = 0x811c9dc5;
   let h2 = 0x01000193;
   for (let i = 0; i < text.length; i++) {
