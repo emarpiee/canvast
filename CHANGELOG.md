@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.32 — AppImage updates (2026-10-29)
+
+- **Added:** the AppImage carries its update address and each release has its `.zsync`, so an AppImage updater (Gear Lever, AppImageUpdate) finds the newest version and downloads only what changed. The app itself still never goes online.
+- **Changed:** the README says canvast is Linux-first: the AppImage is its only desktop package, other platforms stay possible later. The README screenshots use the app's default theme colour, Viridian.
+
 ## 0.50.31 — Font samples, and no second password after an import (2026-10-29)
 
 - **Added:** a font in the library shows a sample in its own letters: the details show "Aa" and "The quick brown fox jumps over the lazy dog", and the viewer shows the sentence at four sizes with the alphabet and the digits, in place of "No preview for this kind of file". A font the browser cannot read says so.

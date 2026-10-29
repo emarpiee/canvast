@@ -60,7 +60,7 @@ const title = `canvast ${version}`; // (the page title is the version; the notes
 if (dry) { say(`\n--dry-run: would publish ${tag} “${title}” as the latest release of ${repo}.\n\n${notes}`); rmSync(dir, { recursive: true }); process.exit(0); }
 
 // 4. Create it (or, if the tag already has a release, replace its file and notes), always as the latest
-const assets = [file, join(root, "dist/canvast.html.sha256"), appImage, `${appImage}.sha256`];
+const assets = [file, join(root, "dist/canvast.html.sha256"), appImage, `${appImage}.sha256`, `${appImage}.zsync`];
 const exists = releases.some((r) => r.tagName === tag);
 if (exists) {
   const at = run("git", ["rev-list", "-n", "1", tag]);
@@ -75,7 +75,7 @@ if (exists) {
 const shown = JSON.parse(run("gh", ["release", "view", tag, "--repo", repo, "--json", "url,assets,isDraft,isPrerelease"]));
 const isLatest = JSON.parse(run("gh", ["release", "list", "--repo", repo, "--limit", "100", "--json", "tagName,isLatest"])).some((r) => r.tagName === tag && r.isLatest);
 if (!isLatest || shown.isDraft || shown.isPrerelease) stop(`${tag} was published but is not the latest release (${shown.url}).`);
-if (!["canvast.html", "canvast.html.sha256", `canvast-${version}-x86_64.AppImage`, `canvast-${version}-x86_64.AppImage.sha256`].every((n) => shown.assets.some((a) => a.name === n))) stop(`${tag} is missing its files (${shown.url}).`);
+if (!["canvast.html", "canvast.html.sha256", `canvast-${version}-x86_64.AppImage`, `canvast-${version}-x86_64.AppImage.sha256`, `canvast-${version}-x86_64.AppImage.zsync`].every((n) => shown.assets.some((a) => a.name === n))) stop(`${tag} is missing its files (${shown.url}).`);
 run("gh", ["release", "download", tag, "--repo", repo, "--pattern", "canvast.html", "--dir", dir, "--clobber"]);
 const served = sha256(join(dir, "canvast.html"));
 rmSync(dir, { recursive: true });
