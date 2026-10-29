@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.31 — Font samples, and no second password after an import (2026-10-29)
+
+- **Added:** a font in the library shows a sample in its own letters: the details show "Aa" and "The quick brown fox jumps over the lazy dog", and the viewer shows the sentence at four sizes with the alphabet and the digits, in place of "No preview for this kind of file". A font the browser cannot read says so.
+- **Fixed:** after importing a backup in the desktop app, the app starts again without asking for the workspace password: it was given before the import, in the same window. The next time the app is opened it asks as usual.
+- **Added:** the desktop app has a short description in the system's app list ("Endless canvas for drawing and references").
+- **Fixed:** the CI smoke tests: the Zen mode test (and two others) looked for the canvas's status bar by a class the library's status bar now shares.
+
 ## 0.50.30 — The logo as chosen (2026-10-29)
 
 - **Fixed:** the logo is the one the owner chose: on the Viridian tile, a Paper frame with a window cut from it a little low and to the right, and the orange dot in the window's middle. 0.50.29 had drawn a solid square instead, and 0.50.28 a frame with different proportions. One drawing serves every size, the favicon too; there is no line version. The favicon, the app's own mark, the logo files, the guidelines, the README cover and the social preview are made again from it.

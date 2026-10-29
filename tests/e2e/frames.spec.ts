@@ -1357,7 +1357,7 @@ test("a big document is indexed in slices and ends up with every object (ADR 002
   expect((await p.evaluate(() => window.__canvastDebug.indexStats())).objects, "every object is in the index when the build is done").toBe(60_000);
   await app.frame();
   expect(await p.evaluate(() => window.__canvastDebug.inkedPixels(2)), "and it draws").toBeGreaterThan(100);
-  expect(await p.evaluate(() => document.querySelector(".hud-readout")?.textContent ?? ""), "the progress message is gone").not.toContain("Indexing");
+  expect(await p.evaluate(() => document.querySelector(".hud-readout:not(.assets-readout)")?.textContent ?? ""), "the progress message is gone").not.toContain("Indexing");
 });
 
 test("a batch import is laid out in a grid in one undo step, and big images drawn small are served from reduced copies (ADR 0030)", async ({ app }) => {

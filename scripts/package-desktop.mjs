@@ -44,6 +44,8 @@ await build({
       category: "Graphics",
       icon: join(icons, "canvast-icon-512.png"),
       synopsis: "An endless canvas for drawing and references, offline",
+      // (the line under the name in the system's app list)
+      desktop: { entry: { Comment: "Endless canvas for drawing and references", GenericName: "Reference canvas", Keywords: "canvas;drawing;reference;moodboard;" } },
       executableName: "canvast",
     },
   },

@@ -2388,7 +2388,7 @@ test("a picture with a player: the selection bar and the player bar never sit on
   // The floating bars on the edges are above everything on the canvas: the status bar and the view controls win over the picture.
   const above = await p.evaluate(() => {
     const pic = document.querySelector(".media-video") as HTMLElement | null;
-    const hud = [document.querySelector(".hud-readout"), document.querySelector(".hud-controls")].filter(Boolean) as HTMLElement[];
+    const hud = [document.querySelector(".hud-readout:not(.assets-readout)"), document.querySelector(".hud-controls")].filter(Boolean) as HTMLElement[];
     const z = (e: Element): number => {
       let n: Element | null = e;
       const chain: number[] = [];

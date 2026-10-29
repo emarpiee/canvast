@@ -328,7 +328,7 @@ test("Settings > Develop switches the developer tools on and off for every sessi
 test("Zen mode fades the floating bars out, each shows while the pointer is over it, the Z key and the button toggle it, and it is remembered (ADR 0075)", async ({ app }) => {
   const p = app.page;
   const rail = p.locator("#toolbar > .rail");
-  const readout = p.locator(".hud-readout");
+  const readout = p.locator(".hud-readout:not(.assets-readout)");
   const zen = p.getByRole("button", { name: "Zen mode" });
   await expect(rail).toHaveCSS("opacity", "1");
   await zen.click();

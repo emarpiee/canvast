@@ -36,6 +36,15 @@ Unverified / Committed / Next bounded task**.
 | PV | Painting view ([ADR 0164](adr/0164-brush-engine-webassembly.md) to [0169](adr/0169-brush-presets.md)) | **removed (v0.37.0, [ADR 0170](adr/0170-painting-view-removed.md))**: built to P4 slice 1 (v0.36.0), then discontinued by the owner |
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** ([plan](plans/arrange-commands.md)) | planned |
 
+## v0.50.31: font samples, no second password after an import (2026-10-29)
+
+**Implemented:** `src/ui/font-specimen.ts` (one sample for the details and the viewer: the font loaded once per file under its own family, the last six kept); the inspector's preview and the viewer show it for a font file; the start right after an import (desktop) skips the lock screen once (`stayUnlockedOnReload` / `takeStayUnlocked`, session storage of that window).
+**Tested:** the font spec in `text.spec` (Chromium) and the backup import spec in `desktop.spec` (with a workspace password set before the import), from a snapshot.
+**Known failures:** none.
+**Unverified:** Firefox.
+**Committed:** on `main`.
+**Next bounded task:** owner review.
+
 ## v0.50.30: the logo as chosen (2026-10-29)
 
 **Implemented:** the owner's chosen drawing (the filled Tunnel concept, 24-unit grid) scaled exactly to the 64 grid in `scripts/brand/pages.mjs` (frame 34.67 r9.53, window 19.93 r5.89 set low and right, dot 6.93 r1.91 in the window's middle), `src/ui/brand.ts` and the favicon; no small master, no line version; pages, board recursion (off-centre dot), kit, cover and social preview made again.

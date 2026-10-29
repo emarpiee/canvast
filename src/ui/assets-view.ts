@@ -17,6 +17,7 @@ import { itemsIn, justifiedLayout, listLayout, nearestInRow, rowOf, squaresLayou
 import { storeFrame } from "../app/frames";
 import { chipOf, describeFile, extOf, hasThumb, isCard, isFontFile } from "../assets/file-kind";
 import { FILE_CARD_NOTE } from "../assets/card";
+import { fontSampleHtml, showFont } from "./font-specimen";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actions";
 import { LIBRARY_ROWS, searchHelpButton, wireSearchHelp } from "./search-help";
 import { ASSETS_RECENT, rememberSearch } from "../search/history";
@@ -1090,6 +1091,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       slideImg.src = await thumbFor(hash).catch(() => "");
     };
     if (!rec) return void (await thumbnail());
+    if (isFontFile(rec)) {
+      // A font: its sample, in its own letters, at several sizes.
+      slideImg.hidden = true;
+      slideTile.innerHTML = fontSampleHtml(rec.name, true);
+      slideTile.hidden = false;
+      slideCaption.textContent = `${e.name || "Untitled"}, ${fmtBytes(e.size)}`;
+      void showFont(slideTile.querySelector<HTMLElement>(".font-sample")!, hash, async () => rec.blob);
+      armShow();
+      return;
+    }
     if (isCard(rec)) {
       // Not something the browser can show: its card, large, and what it is (ADR 0078).
       const d = describeFile(rec.name, rec.type);
@@ -2028,7 +2039,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="asset-insp-head">
         <h2 title="${esc(e ? e.name || "Untitled" : "Missing original")}">${esc(e ? e.name || "Untitled" : "Missing original")}</h2>
       </div>
-      ${e ? `<button type="button" class="asset-preview thumb-slot" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open in the viewer (double-click a card, or Enter)">${isCard(e) ? fileTile(e) : `<img alt="Preview of ${esc(e.name)}" draggable="false" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}">`}</button>` : ""}
+      ${e ? `<button type="button" class="asset-preview thumb-slot" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open in the viewer (double-click a card, or Enter)">${isFontFile(e) ? fontSampleHtml(e.name, false) : isCard(e) ? fileTile(e) : `<img alt="Preview of ${esc(e.name)}" draggable="false" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}">`}</button>` : ""}
       ${
         e
           ? `<div class="asset-quick">
@@ -2041,7 +2052,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="asset-facts">
         ${e ? `<span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>${!isCard(e) ? `<span>${e.pixelW} × ${e.pixelH} px</span>` : ""}<span>${fmtBytes(e.size)}</span>` : ""}
       </div>
-      ${e && isCard(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>No preview for this file</h3><p class="asset-note">${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as a card. ${esc(d.todo)}</p></section>`; })() : ""}
+      ${e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>No preview for this file</h3><p class="asset-note">${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as a card. ${esc(d.todo)}</p></section>`; })() : ""}
       ${e && !e.present ? `<p class="asset-warn">The file is missing from storage. Import the same file again to restore it everywhere.</p>` : ""}
       ${m ? `<p class="asset-warn" data-testid="asset-missing-help">Instances use a file that is not stored. Import the same file again to restore all ${instances} of them.</p>` : ""}
       ${e ? organizeHtml(e) : ""}
@@ -2073,6 +2084,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (e?.present && !isCard(e)) void fillMetadata(e.hash, e.type);
     const prev = inspector.querySelector<HTMLImageElement>(".asset-preview img");
     if (prev) loadThumb(prev);
+    const sample = inspector.querySelector<HTMLElement>(".asset-preview .font-sample");
+    if (sample && e) void showFont(sample, e.hash, async () => (await assets.record(e.hash))?.blob);
     const tagInput = inspector.querySelector<HTMLInputElement>(".tag-input");
     if (tagInput && draft) tagInput.value = draft;
     if (tagInput && hadFocus) tagInput.focus();

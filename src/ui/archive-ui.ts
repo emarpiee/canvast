@@ -170,6 +170,7 @@ export async function runImport(session: Session, picked: File | readonly File[]
       saving.update(null, "Writing the files into the workspace folder");
       await session.storage.flush(); // (its progress shows on this screen)
       sayAfterReload(result);
+      stayUnlockedOnReload(); // (the person was in the workspace already: the start after the import does not ask for the password)
       location.reload(); // (the screen stays until the app starts again)
       return;
     }
@@ -216,6 +217,28 @@ export function sayAfterReload(text: string): void {
     sessionStorage.setItem(AFTER_RELOAD_KEY, text);
   } catch {
     // (no session storage: the reload just says nothing)
+  }
+}
+
+const UNLOCKED_KEY = "canvast.stayUnlocked";
+
+/** The next start of this window (the reload right after an import) opens without the password: it was given before the import. */
+export function stayUnlockedOnReload(): void {
+  try {
+    sessionStorage.setItem(UNLOCKED_KEY, "1");
+  } catch {
+    // (no session storage: the start asks for the password as usual)
+  }
+}
+
+/** Whether this start is that reload (asked once, then forgotten). */
+export function takeStayUnlocked(): boolean {
+  try {
+    const yes = sessionStorage.getItem(UNLOCKED_KEY) === "1";
+    sessionStorage.removeItem(UNLOCKED_KEY);
+    return yes;
+  } catch {
+    return false;
   }
 }
 

@@ -113,7 +113,7 @@ import { openExportDialog } from "../ui/export-dialog";
 import { mountViewSwitch } from "../ui/view-switch";
 import type { AppView } from "../ui/view-switch";
 import { entriesOfDrop, fileByFolders, filesOfEntries, hasFolder } from "./directory";
-import { isArchiveFile, runExport, runExportChanges, runExportFiles, runImport, takeAfterReload } from "../ui/archive-ui";
+import { isArchiveFile, runExport, runExportChanges, runExportFiles, runImport, takeAfterReload, takeStayUnlocked } from "../ui/archive-ui";
 import { copyText, mountTextEditor } from "../ui/text-editor";
 import { FontLoader, whyNotFont } from "./font-loader";
 import { onFontsChange } from "../text/fonts";
@@ -786,7 +786,9 @@ async function start(): Promise<void> {
       const lock = await session.catalog?.lock("workspace").catch(() => null);
       // (checked against the password read here, so the check never waits for the storage, busy right after an import)
       startStep("lock read");
-      if (lock) {
+      // (not on the start right after an import: the password was given before it, in this same window)
+      const afterImport = takeStayUnlocked(); // (taken in any case, so it never outlives this start)
+      if (lock && !afterImport) {
         opening?.close(); // (the lock screen in its place)
         await openLockScreen((typed) => checkLock(lock, typed));
         opening = openStartScreen("");

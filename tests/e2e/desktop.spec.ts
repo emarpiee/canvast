@@ -384,6 +384,15 @@ test("a backup of many files: the busy screen shows how far its files are writte
   const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
   ({ app, page } = await launch(ws));
   try {
+    // (this workspace has a password, given when it was opened)
+    await page.getByTestId("view-settings").click();
+    await page.getByRole("tab", { name: /Privacy/ }).click();
+    await page.getByTestId("workspace-pw-set").click();
+    for (let i = 0; i < 2; i++) {
+      await page.getByTestId("prompt-input").fill("open sesame");
+      await page.getByTestId("prompt-ok").click();
+    }
+    await page.getByTestId("view-canvas").click();
     await page.getByTestId("save-status").click();
     await page.getByTestId("set-import-input").setInputFiles({ name: "backup.canvast", mimeType: "application/zip", buffer: backup });
     // (on a fast disk the screen may come and go in a moment: what it said is collected as it changes, across the reload)
@@ -402,7 +411,9 @@ test("a backup of many files: the busy screen shows how far its files are writte
     expect(files.length).toBeGreaterThan(0);
     expect(files.some((t) => /25 of 25/.test(t))).toBe(true);
     await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
+    // (the app starts again without asking for the password: it was given before the import, in this window)
     await expect(page.getByTestId("toast")).toContainText(/Imported/);
+    await expect(page.getByTestId("lock-screen")).toHaveCount(0);
     expect(visible(ws).filter((f) => f.startsWith("library/"))).toHaveLength(25);
   } finally {
     await app.close();

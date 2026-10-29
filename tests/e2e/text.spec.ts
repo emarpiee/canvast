@@ -276,6 +276,17 @@ test("a font file is imported from the options bar, a text is set in it, and it 
   await p.getByTestId("view-assets").click();
   await expect(p.locator('[data-testid="asset-card"] img.is-font-thumb')).toHaveClass(/is-loaded/);
   expect(await p.locator('[data-testid="asset-card"] img.is-font-thumb').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+  // Selected, the details show its sample sentence in the font; the viewer shows it at several sizes with the letters and digits.
+  await p.locator('[data-testid="asset-card"]').click();
+  const sample = p.getByTestId("asset-preview").getByTestId("font-sample");
+  await expect(sample).toHaveClass(/is-ready/);
+  expect(await sample.evaluate((el) => getComputedStyle(el).fontFamily)).toMatch(/canvast-font-/);
+  await expect(sample).toContainText("The quick brown fox jumps over the lazy dog");
+  await p.keyboard.press("Enter");
+  const big = p.locator(".viewer-tile").getByTestId("font-sample");
+  await expect(big).toHaveClass(/is-ready/);
+  await expect(big.locator(".font-sample-line")).toHaveCount(4);
+  await expect(big).toContainText("0123456789");
 });
 
 test("a read-only tab cannot create or edit text", async ({ app, context }) => {
