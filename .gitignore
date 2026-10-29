@@ -14,3 +14,6 @@ test-builds/
 
 # Rendered video, too big to commit for now
 docs/media/
+
+# The showcase motion piece: kept on the owner's machine, not in the repository
+scripts/showcase/motion/
