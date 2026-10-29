@@ -10,13 +10,6 @@
 <p align="center">One HTML file, or a desktop app for Linux. It works offline, with no account.</p>
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/header-figures-dark.png">
-    <img src="docs/brand/header-figures-light.png" width="616" alt="1 file · 2.3 MB · 0 network requests · no zoom limit">
-  </picture>
-</p>
-
-<p align="center">
   <a href="https://github.com/emarpiee/canvast/actions/workflows/tests.yml"><img src="https://github.com/emarpiee/canvast/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="https://github.com/emarpiee/canvast/actions/workflows/ci.yml"><img src="https://github.com/emarpiee/canvast/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/emarpiee/canvast/releases/latest"><img src="https://img.shields.io/github/v/release/emarpiee/canvast?label=release&color=007B69" alt="Latest release"></a>
@@ -1071,7 +1064,7 @@ node scripts/brand/icons.mjs docs/brand/icons/      # the logo files: SVG master
 node scripts/brand/preview.mjs preview/ 1,3         # a quick look at pages without the app
 node scripts/brand/cover.mjs docs/brand/cover.webp  # the cover at the top of this README (cwebp -q 85)
 node scripts/brand/cover.mjs social.png 800         # the same cover at 2:1, scaled to 1280 × 640 for docs/brand/social-preview.png
-node scripts/brand/header.mjs docs/brand/            # the README's header: the logo with the wordmark, and the line of figures (dark and light)
+node scripts/brand/header.mjs docs/brand/            # the README's header: the logo with the wordmark (dark and light)
 ```
 
 The made files are kept in `docs/brand/`: the board (`canvast-brand-guidelines.canvast`, open it with **Import archive…**), the logo files in `icons/`, the page pictures in `previews/`, the cover and `social-preview.png` (the cover drawn at 2:1 and scaled to 1280 × 640 for the repository).
