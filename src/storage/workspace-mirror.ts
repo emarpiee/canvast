@@ -527,6 +527,10 @@ export class WorkspaceMirror {
       .catch((e: unknown) => this.onError?.(`The library of the workspace folder could not be read: ${(e as Error).message}.`));
     return this.running;
   }
+  /** Sealed hidden files a backup brought, and their key (see LibraryMirror.importSealed). */
+  importSealed(files: ReadonlyArray<{ hash: string; data: Blob }>, key: string | null): Promise<number> {
+    return this.lib.importSealed(files, key);
+  }
   /** An import's originals, written straight into `library/` (see LibraryMirror.writeOriginals). */
   writeOriginals(batch: readonly AssetRecord[]): Promise<Map<string, string>> {
     return this.lib.writeOriginals(batch);

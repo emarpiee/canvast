@@ -248,6 +248,16 @@ class ExternalFolder {
     }
   }
 
+  /** A file of the folder as it is on disk (a sealed hidden file stays sealed), or null when it is not there. */
+  async readRaw(file: string): Promise<Blob | null> {
+    if (!this.dir || this.status !== "ready" || !this.naming.valid("0".repeat(64), file)) return null;
+    try {
+      return await (await this.dir.getFileHandle(file)).getFile();
+    } catch {
+      return null;
+    }
+  }
+
   /** Does the file exist with this size (no bytes read; a sealed hidden file is checked by its sealed size, not opened). */
   async has(hash: string, size: number, file = hash): Promise<boolean> {
     if (!isHiddenFile(file)) return (await this.read(hash, size, "", file)) !== null;

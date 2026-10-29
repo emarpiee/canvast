@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.54 — Hidden items stay encrypted in backups (2026-10-29)
+
+- **Changed:** in the desktop app, a backup that includes hidden items carries them still encrypted, with their key file, instead of readable: nothing of them can be read from the backup. Importing it in the desktop app brings them back once the Hidden items are opened with their password; the browser leaves them out and says so. Backups are now version 7 (older versions of the app ask to be updated to import one).
+
 ## 0.50.53 — Hidden files that stand on their own (2026-10-29)
 
 - **Changed:** in the desktop app, each encrypted hidden file holds its own name, library folder, tags, note and fields (encrypted too), and is sealed in 1 MiB chunks, each checked on its own: a file whose entry is lost comes back whole, and a file cut off or changed anywhere is refused. Files encrypted before are encrypted again this way once the Hidden password is given; a change to a hidden item here seals its file again.

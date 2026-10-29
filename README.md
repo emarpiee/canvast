@@ -582,7 +582,7 @@ The first tab to open a workspace edits it. Other tabs are read-only, follow its
 - A `.canvast` file is a standard, uncompressed ZIP you can open with any unzip tool. Do not re-compress it.
 - Backups made in one browser import into another (tested between Chromium and Firefox).
 - Incremental backups are available after the first full one.
-- A backup asks what to do with hidden items and with the passwords and privacy settings (see [Hidden items and passwords](#hidden-items-and-passwords)); by default they stay out of it.
+- A backup asks what to do with hidden items and with the passwords and privacy settings (see [Hidden items and passwords](#hidden-items-and-passwords)); by default they stay out of it. In the desktop app, hidden items included in a backup go into it **still encrypted**, with their key file: nothing of them is readable in it, and importing it in the desktop app brings them back once the Hidden items are opened with their password (the browser leaves them out).
 
 The browser does not say whether a download finished, so keep your backups somewhere safe.
 
@@ -866,7 +866,7 @@ These are canvast's current limits: first those of both versions, then those of 
 | Area | Limitation |
 | --- | --- |
 | Platform | Linux-first: no Windows, macOS or Flatpak builds for now; watching the folder for outside changes is verified on Linux only. A `.cvst` copied in from another workspace is not taken in. With a very large library, each change made in `library/` outside the app makes canvast list the whole folder again. A canvas file is written about 2 seconds after editing pauses: until then the edit is safe in the app's own storage on this device, but another device does not see it yet |
-| Hidden items in the desktop app | The files and index are encrypted, but: deleting the readable file does not overwrite the disk blocks it used; an item hidden while the key is locked stays a readable file until the password is given; the app's own cache on the device keeps hidden items' names and tags (not their pictures); a canvas file names the content hash of each picture placed on it; exported backups that include hidden items are not encrypted |
+| Hidden items in the desktop app | The files and index are encrypted, but: deleting the readable file does not overwrite the disk blocks it used; an item hidden while the key is locked stays a readable file until the password is given; the app's own cache on the device keeps hidden items' names and tags (not their pictures); a canvas file names the content hash of each picture placed on it (and a backup, the content hash of each hidden item); a backup made in the browser that includes hidden items is not encrypted |
 | Sync tools | Tested with the copy names sync tools use (`name (1).ext`, `name.sync-conflict-….ext`), not live with each tool. The same canvas changed on two devices at once is kept as two canvases, not merged; the same library item changed on both keeps the kept file's version. A canvas copy saved by another device waits 10 minutes before this device takes it. A copy of the hidden items under another Hidden password is opened only with `hidden-items.mjs`, and a hidden file encrypted before 0.50.53 whose entry was lost comes back without its name (`recovered-…`) if it was not sealed again first. Losing both `.canvast/hidden.json` and its spare `.canvast/keys/hidden.json` loses every hidden item: keep backups |
 | Packages | Linux only, for x86_64 and aarch64. The `.deb` and `.rpm` are not in a package repository, so the system's updates do not include them; only the AppImage updates itself. The `.deb` and `.rpm` are checked for their contents before a release, not installed on every distribution they name |
 
@@ -957,7 +957,7 @@ canvast has no network API, by design: it never opens a connection. Other progra
 
 | File | Format | What is in it |
 | --- | --- | --- |
-| `.canvast` backup | `canvast-archive`, version 6 | An uncompressed ZIP (ZIP64 when large): `manifest.json` (format, version, scope, the boards and canvases, the list of files), `canvases/<id>.json` (`objects`, `frames`, `view`) and each library file once as `assets/<sha256>`, with a CRC on every entry. Any unzip tool opens it; do not re-compress it |
+| `.canvast` backup | `canvast-archive`, version 7 | An uncompressed ZIP (ZIP64 when large): `manifest.json` (format, version, scope, the boards and canvases, the list of files), `canvases/<id>.json` (`objects`, `frames`, `view`) and each library file once as `assets/<sha256>`, with a CRC on every entry. From the desktop app, hidden items it includes are `sealed/<sha256>.bin` (each file as it is in `.hidden/`, listed in the manifest's `sealed` by content hash only) with `hidden-key.json` (the key file). Any unzip tool opens it; do not re-compress it |
 | `.canvast/boards/<board>/<canvas>.cvst` | `canvast-canvas`, version 1 | One canvas as JSON: a header (`format`, `version`, `id`, `revision`, `savedAt`, `savedBy`) and the same canvas data a backup holds |
 | `.canvast/workspace.json` | `canvast-workspace` | The boards and canvases (names, order, ids), styles, and the workspace password's kept form (a salted PBKDF2 hash; the Hidden password's is not written there) |
 | `.canvast/library/index.json` | `canvast-library`, version 2 | The library folders (`folders`) and the parts there are (`parts`: `0` to `f`) |

@@ -16,6 +16,7 @@ import { sha256Hex } from "../assets/sha256";
 import type { StyleItem } from "../assets/styles";
 import { cleanStyles } from "../assets/styles";
 import { done, req } from "./idb";
+import { isFileV2, isHiddenFile, readVault } from "./hidden-vault";
 import type { Bookmark } from "./bookmarks";
 import { readBookmarks } from "./bookmarks";
 import type { BoardRecord, CanvasRecord, FrameStoreRecord, ObjectRecord, StoredView, WorkspaceRecord } from "./workspace-repo";
@@ -44,7 +45,18 @@ import { ZipError, readZip, verifyEntry, writeZip } from "./zip";
  * Originals are deduplicated by hash.
  */
 export const ARCHIVE_FORMAT = "canvast-archive";
-export const ARCHIVE_VERSION = 6;
+export const ARCHIVE_VERSION = 7;
+
+/**
+ * The desktop build's hidden items in a backup (version 7): each hidden file as it is sealed in `.hidden/` (it holds its own item), and
+ * the key file; nothing readable of them is in the backup. Set by the desktop build; null in the browser, which cannot open them.
+ */
+export const sealedHooks: {
+  /** The vault's key, as its spare is written (no index), or null when there is none. */
+  key: (() => Promise<string | null>) | null;
+  /** Put sealed files and their key into the workspace folder; how many were new. */
+  write: ((files: ReadonlyArray<{ hash: string; data: Blob }>, key: string | null) => Promise<number>) | null;
+} = { key: null, write: null };
 export const ARCHIVE_EXTENSION = ".canvast";
 
 /** Where a long job is: the stage in words and how far (done of total). The caller turns it into a progress notice. */
@@ -158,6 +170,10 @@ export interface Manifest {
   hiddenLock?: string;
   /** The same for the password of the whole workspace. */
   workspaceLock?: string;
+  /** Hidden items sealed as they are in the desktop build (version 7): only their content hash and file; their item is inside the file. */
+  sealed?: Array<{ hash: string; file: string }>;
+  /** The key file of the sealed items (version 7). */
+  hiddenKey?: string;
   /** Brush presets (version 6), written by builds that had the Painting view: no longer read. */
   brushes?: unknown[];
   /** Paintings (versions 5 and 6), written by builds that had the Painting view: no longer read. */
@@ -276,6 +292,8 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   const workspaceLock = scope.kind === "workspace" && scope.withPrivacy && !noBytes ? await req(tx.objectStore("meta").get("workspaceLock") as IDBRequest<unknown>) : undefined;
   const assets: ManifestAsset[] = [];
   const assetBlobs: ZipInput[] = [];
+  const sealed: Array<{ hash: string; file: string }> = [];
+  const sealedReads: Array<{ input: ZipInput; file: string }> = [];
   const missingAssets: string[] = [];
   const kept: Array<{ input: ZipInput; hash: string; size: number; type: string; file: string | undefined }> = [];
   let folders: AssetFolder[] | undefined;
@@ -285,6 +303,15 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     const r = await req(tx.objectStore("assets").get(hash) as IDBRequest<AssetRecord | undefined>);
     if (!r) {
       missingAssets.push(hash);
+      continue;
+    }
+    // A hidden item sealed in the workspace folder goes as it is: its file holds its name and the rest, so the list says nothing of it.
+    if (r.ext && isHiddenFile(r.file) && sealedHooks.key) {
+      if (noBytes || (since !== undefined && r.importedAt <= since)) continue;
+      const input: ZipInput = { name: `sealed/${hash}.bin`, data: new Blob([]) };
+      sealed.push({ hash, file: input.name });
+      assetBlobs.push(input);
+      sealedReads.push({ input, file: r.file! });
       continue;
     }
     const file = `assets/${hash}`;
@@ -332,7 +359,16 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     ...(scope.kind === "workspace" && settings && Object.keys(settings).length ? { settings } : {}),
     ...(typeof hiddenLock === "string" ? { hiddenLock } : {}),
     ...(typeof workspaceLock === "string" ? { workspaceLock } : {}),
+    ...(sealed.length ? { sealed, hiddenKey: "hidden-key.json" } : {}),
   };
+  const keyText = sealed.length ? await sealedHooks.key!() : null;
+  if (sealed.length && !keyText) throw new ArchiveError("the hidden items' key file could not be read, so their sealed files would not open from the backup");
+  for (const s of sealedReads) {
+    const blob = await externalFolder.readRaw(s.file);
+    if (!blob) throw new ArchiveError("a hidden item's sealed file is missing from the workspace folder");
+    s.input.data = blob;
+  }
+  if (keyText) assetBlobs.push({ name: "hidden-key.json", data: new Blob([keyText], { type: "application/json" }) });
   // Originals kept in the library folder are read now, after the last read of the database (the manifest's styles) (ADR 0159). A backup that
   // cannot hold one says so and stops: it never leaves an original out.
   for (const [i, k] of kept.entries()) {
@@ -405,6 +441,9 @@ export interface ImportPlan {
   files: number;
   /** This one file is an incremental backup on its own: what did not change is in the files before it, which were not added. */
   incrementalOnly: boolean;
+  /** Hidden items sealed by the desktop build (version 7), as they are, and their key file: put into the workspace folder there. */
+  sealed: Array<{ hash: string; data: Blob }>;
+  hiddenKey: string | null;
 }
 
 export interface ImportResult {
@@ -583,6 +622,8 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
     styles: [],
     files: parts.length,
     incrementalOnly: parts.length === 1 && sinceOf(latest) !== null,
+    sealed: [],
+    hiddenKey: null,
   };
   // where a canvas is: in the newest file that has its content
   const canvasAt = (id: string): { entries: Map<string, ZipEntry>; file: string } | null => {
@@ -691,7 +732,35 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
     const org = readOrganization(a, label, problems);
     if (org) plan.organization.set(hash, org);
   }
-  plan.unresolved = [...referenced].filter((h) => !valid.has(h)).sort();
+  // Hidden items sealed as they were in the desktop build (version 7): they stay sealed; the desktop build puts them into `.hidden/`, and
+  // they show once the Hidden items are opened (each file holds its item). Their content hash cannot be checked without the password.
+  const sealedSeen = new Set<string>();
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const pm = parts[i]!.m;
+    for (const s of Array.isArray(pm["sealed"]) ? (pm["sealed"] as unknown[]) : []) {
+      if (!isObj(s) || typeof s["hash"] !== "string" || !HASH_RE.test(s["hash"]) || typeof s["file"] !== "string" || sealedSeen.has(s["hash"]) || valid.has(s["hash"])) continue;
+      const e = parts[i]!.entries.get(s["file"]);
+      const head = e ? new Uint8Array(await e.data.slice(0, 8).arrayBuffer()) : null;
+      if (!e || !head || e.size < 28 || e.size > MAX_IMPORT_BYTES + 2 ** 22 || (e.size > 64 && !isFileV2(head) && e.size > MAX_IMPORT_BYTES + 28)) {
+        problems.push("A hidden item's sealed file is missing or damaged in the archive and was skipped.");
+        continue;
+      }
+      sealedSeen.add(s["hash"]);
+      plan.sealed.push({ hash: s["hash"], data: e.data.slice(0, e.size) });
+    }
+    if (plan.hiddenKey === null && typeof pm["hiddenKey"] === "string") {
+      const ke = parts[i]!.entries.get(pm["hiddenKey"]);
+      const text = ke && ke.size < 4096 ? await ke.data.text() : null;
+      if (text && readVault(text)) plan.hiddenKey = text;
+    }
+  }
+  if (plan.sealed.length && (!plan.hiddenKey || !sealedHooks.write)) {
+    const n = plan.sealed.length;
+    problems.push(!sealedHooks.write ? `${plural(n, "hidden item")} ${were(n)} encrypted by the desktop app and ${n === 1 ? "is" : "are"} left out here: import this backup in the desktop app, where the Hidden items' password opens ${n === 1 ? "it" : "them"}.` : `${plural(n, "hidden item")} came without ${n === 1 ? "its" : "their"} key file and ${were(n)} skipped.`);
+    plan.sealed = [];
+  }
+  const sealedHashes = new Set(plan.sealed.map((s) => s.hash));
+  plan.unresolved = [...referenced].filter((h) => !valid.has(h) && !sealedHashes.has(h)).sort();
   // paintings and brush presets (versions 5 and 6): the Painting view is gone, so they are left out, and said so
   const paintings = isObj(m["paintings"]) && typeof m["paintings"]["count"] === "number" ? m["paintings"]["count"] : 0;
   const brushes = Array.isArray(m["brushes"]) ? m["brushes"].length : 0;
@@ -835,7 +904,9 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
     staged = await stageOriginals(db, plan.assets, progress, writer, (h) => plan.organization.get(h)?.hidden === true);
     if (importTesting.stopAfterFiles === "crash") return { boards: 0, canvases: 0, objects: 0, assetsAdded: 0, stillMissing: 0, firstCanvasId: null, stylesAdded: 0 };
     if (importTesting.stopAfterFiles === "fail") throw new ArchiveError("stopped after the files (test)");
-    return await applyRest(db, workspaceId, targetBoardId, plan, staged);
+    const result = await applyRest(db, workspaceId, targetBoardId, plan, staged);
+    if (plan.sealed.length && sealedHooks.write) await sealedHooks.write(plan.sealed, plan.hiddenKey);
+    return result;
   } catch (e) {
     await sweepImportStaging(db).catch(() => undefined);
     throw e;

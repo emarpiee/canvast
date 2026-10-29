@@ -36,6 +36,8 @@ const PART_KEYS = "0123456789abcdef".split("");
 export const COMPAT_MAX_ITEMS = 10_000;
 /** How long a sealed file with no entry waits before it is taken back as a hidden item (its entry may still be on its way); tests shorten it. */
 export const HIDDEN_ORPHAN_WAIT = { ms: 30_000 };
+/** Sealed files a backup put into `.hidden/`, taken in without that wait (app storage `meta`). */
+const NO_WAIT_KEY = "hiddenNoWait";
 
 /** One library item as `library.json` keeps it. */
 export interface LibraryItem {
@@ -648,6 +650,9 @@ export class LibraryMirror {
     const named = new Set(stubs.flatMap((r) => (r.file && isHiddenFile(r.file) ? [r.file] : [])));
     const now = Date.now();
     for (const p of [...this.unnamedSince.keys()]) if (!paths.includes(p) || named.has(p)) this.unnamedSince.delete(p);
+    const noWait = (await idbGet<string[]>(this.db, "meta", NO_WAIT_KEY)) ?? [];
+    for (const p of noWait) if (paths.includes(p) && !named.has(p)) this.unnamedSince.set(p, 0); // (a backup's: no entry is on its way)
+    if (noWait.length) await idbPut(this.db, "meta", NO_WAIT_KEY, noWait.filter((p) => paths.includes(p) && !named.has(p)));
     const due: string[] = [];
     for (const p of paths) {
       if (named.has(p)) continue;
@@ -716,6 +721,29 @@ export class LibraryMirror {
       changed = true;
     }
     return changed;
+  }
+  /**
+   * Sealed hidden files a backup brought (and their key file): each put into `.hidden/` under a new name unless the library has its item,
+   * to be taken in from what it holds once the Hidden items are opened (at once if they are open). How many were put.
+   */
+  async importSealed(files: ReadonlyArray<{ hash: string; data: Blob }>, key: string | null): Promise<number> {
+    if (key) await this.vault.adoptKey(key);
+    const written: string[] = [];
+    for (const f of files) {
+      const rec = await idbGet<AssetRecord>(this.db, "assets", f.hash);
+      if (rec && (!rec.ext || (rec.file && (await this.bridge.exists(rec.file))))) continue; // (the library has it)
+      const at = hiddenFileName();
+      await this.bridge.write(at, new Uint8Array(await f.data.arrayBuffer()), { durable: false });
+      written.push(at);
+    }
+    const put = written.length;
+    if (put) await this.bridge.syncFiles(written);
+    // No entry is on their way: they are taken without waiting, even after a restart (kept until taken).
+    const was = (await idbGet<string[]>(this.db, "meta", NO_WAIT_KEY)) ?? [];
+    if (put) await idbPut(this.db, "meta", NO_WAIT_KEY, [...was, ...written]);
+    if (put) this.onNotice?.(`${put === 1 ? "A hidden item" : `${put} hidden items`} came in the backup, still encrypted. ${put === 1 ? "It shows" : "They show"} once the Hidden items are opened with the password ${put === 1 ? "it was" : "they were"} hidden with.`);
+    if (put && this.vault.dataKey) this.scanLater?.();
+    return put;
   }
   private readonly unnamedSince = new Map<string, number>();
   private readonly toldShut = new Set<string>();

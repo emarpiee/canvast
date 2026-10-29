@@ -222,6 +222,34 @@ export class HiddenVault implements HiddenStore {
   }
 
   private fromSpare = false;
+  /** The vault's key as its spare is written (no index), for a backup: null when there is none. */
+  async keyText(): Promise<string | null> {
+    const record = (await this.vault())?.record;
+    if (!record) return null;
+    const { format, version, kdf, key, check } = record;
+    return JSON.stringify({ format, version, kdf, key, ...(check ? { check } : {}) }, null, 1);
+  }
+
+  /**
+   * A key file a backup brought: with no vault here it becomes the vault (its files open with its password); with another, it is kept
+   * beside `hidden.json` as a copy, joined when a password opens both (its files are then sealed again with this key). The same key
+   * wrapped the same way is already here.
+   */
+  async adoptKey(text: string): Promise<void> {
+    const theirs = readVault(text);
+    if (!theirs) return;
+    const mine = await this.vault();
+    if (!mine) {
+      await this.save(theirs);
+      this.changed();
+      return;
+    }
+    if (mine.record.key === theirs.key) return;
+    if (this.key && (await holdsKey(theirs, this.key))) return; // (the same key under another password: nothing to join)
+    const at = `.canvast/hidden (backup ${new Date().toISOString().slice(0, 10)} ${Math.random().toString(36).slice(2, 6)}).json`;
+    await this.bridge.write(at, new TextEncoder().encode(JSON.stringify(theirs, null, 1)));
+  }
+
   /** Whether the index waits to be written even if it did not change: copies were read into it (erased then), or hidden.json was lost. */
   get indexWaiting(): boolean {
     return this.merged.length > 0 || this.fromSpare;

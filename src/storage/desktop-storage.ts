@@ -16,6 +16,7 @@ import { WORKSPACE_FILE, WorkspaceMirror, watched } from "./workspace-mirror";
 import { BOARDS_DIR, WORKSPACE_NAMING } from "./workspace-names";
 import { HIDDEN_JSON, HiddenVault, isHiddenCopy } from "./hidden-store";
 import { useScrypt } from "./hidden-vault";
+import { sealedHooks } from "./archive";
 import { resetAllData } from "./reset";
 import type { AssetCatalog } from "../assets/asset-catalog";
 
@@ -86,6 +87,9 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   (storage.backups as IdbBackups).writeOriginals = (batch) => mirror.writeOriginals(batch);
   mirror.onError = (text) => opts.onNotice?.(text);
   hidden.onNotice = (text) => opts.onNotice?.(text);
+  // Backups carry hidden items as they are sealed here, with the key file (archive version 7).
+  sealedHooks.key = () => hidden.keyText();
+  sealedHooks.write = (files, key) => mirror.importSealed(files, key);
   await mirror.adoptLocks().catch(() => undefined); // (before the app asks for the workspace password)
   const writingFns = new Set<(done: number, total: number, encrypting?: boolean) => void>();
   let writingNow: { done: number; total: number } | null = null;

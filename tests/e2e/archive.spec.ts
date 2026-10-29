@@ -347,6 +347,12 @@ test("damaged and hostile archives are refused or reported, and nothing partial 
   const old = await importArchive(p, "old-paint.canvast", await rebuild((m) => { m["paintings"] = { file: "paintings.json", count: 2, tiles: 0 }; m["brushes"] = [{}]; }));
   expect(old).toContain("It carries 2 paintings and 1 brush preset from the Painting view, which canvast no longer has; they are not imported.");
   expect((await sess(p)).tree!.length).toBe(4);
+  // A desktop backup with a hidden item, still encrypted (version 7): the browser cannot open it, leaves it out, and says so.
+  const sealedHash = "ab".repeat(32);
+  const sealedZip = await rebuild((m) => { m["version"] = 7; m["sealed"] = [{ hash: sealedHash, file: `assets/${HASH}` }]; });
+  const desktopOnly = await importArchive(p, "desktop-hidden.canvast", sealedZip, false); // (the note is in the question; cancelled)
+  expect(desktopOnly).toContain("1 hidden item was encrypted by the desktop app and is left out here: import this backup in the desktop app");
+  expect((await sess(p)).tree!.length).toBe(4);
   expect(app.consoleErrors).toEqual([]);
 
   // The originals are written a batch at a time before the canvases (ADR 0176); here one per batch. In a fresh profile, so none is in

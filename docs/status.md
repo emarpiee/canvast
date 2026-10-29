@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.54: hidden items stay encrypted in backups (2026-10-29)
+
+**Implemented:** step 2c (#11; ADR 0177 "Hidden items in backups"): archive version 7 `sealed` list + `sealed/<hash>.bin` + `hidden-key.json`; desktop import writes files to `.hidden/` and adopts or keeps the key beside; files taken without the wait (kept in app storage until taken); browser leaves them out with a note; export dialog says they stay encrypted.
+**Tested:** desktop `a backup exported from Settings…` extended (the backup holds `sealed/` and the key, no name or picture bytes; imported into a new folder: the file in `.hidden/` and `hidden.json`, after a restart the password brings the item back, hidden, its bytes the same); desktop group 14 passed; storage group 41 passed plus `archive.spec` "damaged and hostile" extended (a version 7 backup with a hidden item: the browser says it is left out).
+**Known failures:** none.
+**Unverified:** importing into a workspace with another vault (the copy-join path is the one of v0.50.47).
+**Committed:** on `main`.
+**Next bounded task:** step 3: Hide folder (#1), hidden names out of the cache (#9).
+
 ## v0.50.53: hidden files that stand on their own (2026-10-29)
 
 **Implemented:** step 2b of the security list (#4 + #11 first half; ADR 0177 "Hidden files that stand on their own"): version 2 `.bin` (magic, sealed header with the item and folder path, 1 MiB STREAM chunks); sealing writes it; v1 still read and upgraded after unlock (proven); a local change to a hidden item reseals its file; recovery takes name, folder, tags, note, fields from the header; the script reads/writes v2.
