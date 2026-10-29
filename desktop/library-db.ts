@@ -36,6 +36,7 @@ export function openLibraryDb(file: string): LibraryDb {
   db.pragma("journal_mode = WAL");
   db.pragma("synchronous = NORMAL"); // (safe with WAL: a crash may lose the last moments, never corrupts)
   db.pragma("cache_size = -65536");
+  db.pragma("secure_delete = ON"); // (a hidden item's name blanked here is overwritten, not left in a free page)
   db.exec(SCHEMA);
   return db;
 }
@@ -119,6 +120,8 @@ export class Library {
     this.db.transaction(() => {
       for (const op of ops) this.one(op);
     })();
+    // Hidden items' names blanked (Settings > Privacy): the log of earlier pages, which still holds them, is emptied at once.
+    if (ops.some((o) => o.t === "meta" && o.k === "hiddenBlanked")) this.db.pragma("wal_checkpoint(TRUNCATE)");
   }
 
   private one(op: LibraryOp): void {
