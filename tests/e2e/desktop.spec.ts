@@ -510,16 +510,14 @@ test("a backup exported from Settings and imported into a workspace folder: writ
     expect(canvas.objects.map((o: { kind: string }) => o.kind)).toEqual(["image"]);
     // As if the app had stopped after writing the file but before its record was kept: the next write finds the file by its
     // content and takes it, never writing it a second time beside itself (green_leaf-2.png).
+    // (the library's record of the file gone, its bytes held in the page's storage, as an import keeps them until written out)
     await page.evaluate(async (bytes) => {
-      const db = await new Promise<IDBDatabase>((ok, ko) => Object.assign(indexedDB.open("canvast"), { onsuccess(this: IDBRequest<IDBDatabase>) { ok(this.result); }, onerror: ko }));
       const hash = (await window.__canvastDebug.assetListing()).entries[0]!.hash;
+      await window.__canvastDebug.removeAssetBytes(hash);
+      const db = await new Promise<IDBDatabase>((ok, ko) => Object.assign(indexedDB.open("canvast"), { onsuccess(this: IDBRequest<IDBDatabase>) { ok(this.result); }, onerror: ko }));
       const tx = db.transaction("assets", "readwrite");
-      const st = tx.objectStore("assets");
-      await new Promise((ok) => (st.get(hash).onsuccess = (e) => {
-        const r = (e.target as IDBRequest<Record<string, unknown>>).result;
-        const { ext: _ext, file: _file, ...rest } = r;
-        st.put({ ...rest, blob: new Blob([new Uint8Array(bytes)], { type: "image/png" }) }, hash).onsuccess = ok;
-      }));
+      tx.objectStore("assets").put({ hash, type: "image/png", size: bytes.length, name: "Green Leaf.png", pixelW: 3, pixelH: 2, importedAt: 1, blob: new Blob([new Uint8Array(bytes)], { type: "image/png" }) }, hash);
+      await new Promise((ok) => (tx.oncomplete = ok));
       db.close();
     }, Array.from(green));
     await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f9", "Later")); // (any change writes the library again)
@@ -725,8 +723,9 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     await page.locator(".palette-input").fill("lock hidden");
     await expect(page.locator(".palette-title").first()).toHaveText("Lock hidden items");
     await page.keyboard.press("Enter");
-    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.pictureLocked(h), hash)).toBe(true);
-    expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toBeNull();
+    // (the key goes once what waits is written: the bytes stop opening a moment later)
+    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toBeNull();
+    expect(await page.evaluate((h) => window.__canvastDebug.pictureLocked(h), hash)).toBe(true);
     expect((await hid("check", "pw2")).ok).toBe(true);
     expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toEqual(Array.from(secret));
     expect(await page.evaluate((h) => window.__canvastDebug.pictureLocked(h), hash)).toBe(true); // (opened, but still hidden: a padlock)
