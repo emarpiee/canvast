@@ -34,7 +34,7 @@ if (!section) stop(`CHANGELOG.md has no section "## ${version} — Title (date)"
 
 // 2. Build the file and check it
 say(`Building canvast ${version} (${head.slice(0, 7)})…`);
-for (const script of ["typecheck", "build", "check:offline", "check:names", "check:tokens"]) run("npm", ["run", script, "--silent"], { stdio: ["ignore", "ignore", "inherit"] });
+for (const script of ["typecheck", "build", "check:offline", "check:names", "check:tokens"]) run("npm", ["run", script, "--silent", ...(script === "check:names" ? ["--", "dist/canvast.html"] : [])], { stdio: ["ignore", "ignore", "inherit"] });
 const file = join(root, "dist/canvast.html");
 const built = JSON.parse(readFileSync(join(root, "dist/build.json"), "utf8"));
 const sum = sha256(file);
