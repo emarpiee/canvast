@@ -767,9 +767,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const controls = mountPlayerControls(stage, settings, {
     extract: () => void extractFrame(),
   });
-  // The player's height too: a video or GIF fits above it (never under it), and the button that hides the controls sits above it.
-  const mediaBarEl = viewer.querySelector<HTMLElement>('[data-testid="viewer-media-bar"]');
-  if (mediaBarEl) new ResizeObserver(() => mediaBarEl.offsetHeight && viewer.style.setProperty("--viewer-media-h", `${mediaBarEl.offsetHeight}px`)).observe(mediaBarEl);
   let eng: Engine | null = null;
   const unloadMedia = (): void => {
     eng?.pause();
@@ -777,8 +774,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     gifEng.unload();
     eng = null;
     controls.hide();
-    clearTimeout(peekTimer);
-    viewer.classList.remove("show-player");
+    clearTimeout(idleTimer);
+    viewer.classList.remove("is-idle");
     slideMedia.hidden = true;
     slideGif.hidden = true;
   };
@@ -809,24 +806,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     session.editor.message = id ? `Frame placed on ${here ? `${here.b} › ${here.c.name}` : "the open canvas"} and added to the library.` : "The frame was added to the library; it could not be placed.";
     session.editor.changed();
   };
-  // With the viewer's controls hidden the player is hidden too; a click inside the viewer brings back the player only (not the controls),
-  // and it goes again after a few quiet seconds.
-  let peekTimer = 0;
-  const peek = (): void => {
-    viewer.classList.add("show-player");
-    clearTimeout(peekTimer);
-    peekTimer = window.setTimeout(() => viewer.classList.remove("show-player"), 4000);
+  // The player floats over the picture: while a video or GIF plays and the pointer rests, it fades away after a few seconds; any move,
+  // touch or key brings it back (it stays while paused, and while the pointer is on it).
+  let idleTimer = 0;
+  const wake = (): void => {
+    viewer.classList.remove("is-idle");
+    clearTimeout(idleTimer);
+    idleTimer = window.setTimeout(() => eng?.playing() && viewer.classList.add("is-idle"), 2500);
   };
-  let downAt: { x: number; y: number } | null = null;
-  stage.addEventListener("pointerdown", (e) => void (downAt = { x: e.clientX, y: e.clientY }), true);
-  stage.addEventListener("click", (e) => {
-    const moved = downAt ? Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) : 0;
-    if (moved > 5 || !eng || !viewer.classList.contains("no-bar")) return;
-    if ((e.target as HTMLElement).closest("button, .viewer-zoom, .media-bar, .viewer-edge")) return;
-    peek();
-  });
-  controls.el.addEventListener("pointerdown", () => viewer.classList.contains("show-player") && peek(), true);
-  controls.el.addEventListener("input", () => viewer.classList.contains("show-player") && peek());
+  for (const type of ["pointermove", "pointerdown", "keydown"]) viewer.addEventListener(type, wake, true);
+  controls.el.addEventListener("input", wake);
+  for (const type of ["pause", "ended"]) slideMedia.addEventListener(type, wake); // (a stop brings it back by itself)
   /** What a loaded file needs of the object the canvas player takes: where to start, and whether to loop. */
   const playOf = (repeat: boolean): ImageObject => ({ media: { t: 0, repeat } }) as unknown as ImageObject;
   const zoomPct = viewer.querySelector<HTMLElement>(".viewer-zoom-pct")!;

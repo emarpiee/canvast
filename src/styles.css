@@ -1839,9 +1839,6 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 /* The picture keeps clear of a strip at the bottom for the button that hides the controls (the same strip, so the picture is the same size, whether the controls are shown or hidden). */
 .viewer { --edge-w: 15; --viewer-bottom: calc(var(--ctl) + 2 * var(--near)); }
 .viewer.no-bar { --viewer-bottom: calc(var(--ctl) + 2 * var(--near) + var(--viewer-bar-h, 0px)); }
-/* A video or GIF with its player: the picture fits above the player, which no longer covers its bottom; the hide button sits above both. */
-.viewer:not(.no-bar):has(.viewer-media-bar:not([hidden])) { --viewer-bottom: calc(var(--viewer-media-h, 96px) + 2 * var(--sp-7)); }
-.viewer:not(.no-bar):has(.viewer-media-bar:not([hidden])) .vbtn.viewer-hide { bottom: calc(var(--viewer-bar-h, 56px) + var(--viewer-media-h, 96px) + var(--sp-7) + var(--near)); }
 .viewer-stage .viewer-edge { -webkit-tap-highlight-color: transparent; }
 .viewer figcaption:not(.is-note) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; background: none; }
 
@@ -1915,13 +1912,13 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 /* zoomed in, a drag pans: the hand says so */
 .viewer.is-zoomed .viewer-stage, .viewer.is-zoomed img, .viewer.is-zoomed video, .viewer.is-zoomed canvas.viewer-gif { cursor: grab; }
 .viewer.is-grabbing .viewer-stage, .viewer.is-grabbing figure img, .viewer.is-grabbing figure video, .viewer.is-grabbing figure canvas.viewer-gif { cursor: grabbing; }
-.viewer-media-bar { position: absolute; left: 50%; bottom: 14px; top: auto; transform: translateX(-50%); z-index: 3; width: min(560px, calc(100% - 24px)); background: var(--v-pill); color: var(--v-fg); border: 1px solid var(--v-line); backdrop-filter: blur(10px); }
+/* A video's or GIF's player floats over the bottom of the picture, just above the strip of the button that hides the controls (so it never
+   covers that button, and the picture keeps its size); while it plays and the pointer rests, it fades away until the pointer moves. */
+.viewer-media-bar { position: absolute; left: 50%; bottom: var(--viewer-bottom); top: auto; transform: translateX(-50%); z-index: 3; width: min(560px, calc(100% - 24px)); background: var(--v-pill); color: var(--v-fg); border: 1px solid var(--v-line); backdrop-filter: blur(10px); transition: opacity var(--dur-base); }
+.viewer.is-idle .viewer-media-bar:not(:hover):not(:has(:focus-visible)) { opacity: 0; pointer-events: none; }
 .viewer-media-bar[hidden] { display: none; }
 .viewer-media-bar .media-gap { flex: 1; }
 
-/* With the controls hidden the player is hidden too; a click in the viewer shows the player alone for a few seconds */
-.viewer.no-bar .viewer-media-bar { display: none; }
-.viewer.no-bar.show-player .viewer-media-bar:not([hidden]) { display: flex; }
 .viewer-media-bar .media-bar-extract { margin-left: var(--sp-2); }
 
 /* ---- Bookmarks panel (ADR 0065): cards with picture, name, date and Rename / Update / Delete; large and always shown on touch ---- */

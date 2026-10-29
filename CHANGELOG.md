@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.50.36 — The viewer's player floats (2026-10-29)
+
+- **Changed:** in the library's viewer, the player of a video or GIF floats over the bottom of the picture instead of taking a strip of its own, so the picture keeps its size. While it plays and the pointer rests, the player fades away; any move, touch or key brings it back, and it stays while paused.
+- **Fixed:** with the viewer's controls hidden, the player covered the button that shows them again, so they could not be brought back.
+- **Added:** README screenshots of the desktop app on its workspace folder (and the folder's files), the board and canvas menu, a video with its player, the Adjust panel, the Styles panel and the library's list with a font's sample.
+
 ## 0.50.35 — Packages on a fresh machine (2026-10-29)
 
 - **Fixed:** packaging the desktop app on a fresh machine (GitHub's) fetches Electron first: Electron no longer fetches its binary when it is installed, so the packages of 0.50.33 and 0.50.34 were not built there.

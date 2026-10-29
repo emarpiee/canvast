@@ -220,7 +220,10 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
   - The tour has its own travel speed.
   - **Reduced motion:** with Animation set to None the view always cuts. When the system asks for reduced motion the view cuts too and says so once, unless *Follow the system's reduced motion* is off.
 
-![A tour of the bookmarks](docs/screenshots/tour.webp)
+| | |
+| --- | --- |
+| ![A tour of the bookmarks](docs/screenshots/tour.webp) | ![The board and canvas menu, searched for "st": the boards and canvases that match, each board with its canvases](docs/screenshots/switcher.webp) |
+| A tour of the bookmarks | The board and canvas menu, searched |
 
 ### Drawing
 
@@ -264,7 +267,10 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
   - **Copy** a colour, gradient or palette card with a long press or right click (a palette as CSS variables; a colour inside an opened palette as hex), or with *Copy hex* / *Copy as CSS* in its More menu. A long press copies without applying.
   - **Paste** CSS (a colour in any notation, or a gradient) with the pointer over the panel or nothing selected, and it is saved as a new style.
 
-![The colour picker, opened from a fill: OKHSV as a ring and box, with the recent colours](docs/screenshots/colour-picker.webp)
+| | |
+| --- | --- |
+| ![The colour picker, opened from a fill: OKHSV as a ring and box, with the recent colours](docs/screenshots/colour-picker.webp) | ![The Styles panel with saved colours](docs/screenshots/styles.webp) |
+| The colour picker, opened from a fill | The Styles panel: saved colours, gradients, text styles, adjustments and patterns |
 
 ### Text
 
@@ -296,6 +302,11 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
 - **Extract frame** turns the current frame of a video or GIF into a picture in the library (PNG, WebP or JPEG). Settings name it, file it in a folder and tag it, optionally placing it on the canvas.
 - **File details:** EXIF, colour profile and codec information are shown. STL and OBJ 3D models and PDFs are kept as cards with a preview; any other file is kept as a card with its extension and can be downloaded again.
 - **Import** by button (in the Library the Import button has a menu for files or for a whole folder), drag and drop, paste, or a whole folder. Files up to 256 MiB are accepted and decoded before being stored.
+
+| | |
+| --- | --- |
+| ![A video playing on the canvas, with its player under it](docs/screenshots/media.webp) | ![The Adjust panel on the same video: exposure, contrast, temperature, saturation and vibrance changed](docs/screenshots/adjust.webp) |
+| A video playing on the canvas, with its player | The Adjust panel: the file itself is not changed |
 
 ### Organizing
 
@@ -371,7 +382,7 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 - **Dragging items** shows up to five of them stacked, with their count. Drop them on a folder, a tag or Favourites in the sidebar to file them, or on the strip across the top to place them on the open canvas (the library stays open).
 - **The status bar** along the bottom (the same as the canvas's) shows how many items are listed (*3 of 5 items*), how many are selected and their size, and the size of the whole library. At its right end: grid or list, the list's columns, and the thumbnail size.
 - **Open in default app** (desktop app; in the details, the right-click menu, and a file card's Actions bar on a canvas) opens an item's file in your system's app for that kind of file: for a file canvast cannot show, or to edit a picture elsewhere.
-- A **viewer** with filmstrip, zoom, pan, slideshow and a details panel. The details show where an item is used (*Used on 3 canvases (4 times)*, then each canvas with its own count; past five canvases, **Show all** lists the rest), and **Show** takes you to it on the canvas at any depth. A button switches the background behind the picture, the controls can be hidden, and a double tap opens it on phones.
+- A **viewer** with filmstrip, zoom, pan, slideshow and a details panel. The details show where an item is used (*Used on 3 canvases (4 times)*, then each canvas with its own count; past five canvases, **Show all** lists the rest), and **Show** takes you to it on the canvas at any depth. A button switches the background behind the picture, the controls can be hidden, and a double tap opens it on phones. A video or GIF plays with the canvas's player, floating over the bottom of the picture: while it plays and the pointer rests, the player fades away, and any move brings it back.
 - **Folders** (an item lives in one folder, folders nest; a long list in the sidebar shows its first rows and **Show N more**, remembered on this device), **tags** (several per item, renamable), **favourites**, file types, **Similar images** (duplicates and near-duplicates found by their pixels) and **Hidden** items, which are kept out of every list until you open them (see [Hidden items and passwords](#hidden-items-and-passwords)).
 - **Selecting and the details panel**
   - A click selects an item. The details panel opens and closes with its button (or `I`) and shows what is selected (for several: their tags and folder together). A click never moves the grid under the pointer.
@@ -412,6 +423,10 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 | --- | --- |
 | ![The Library](docs/screenshots/library.webp) | ![The viewer](docs/screenshots/viewer.webp) |
 | The Library, filled by six screenshots of the showcase (shown by file type: the showcase also carries its two font files) | The viewer with its filmstrip and details |
+
+![The Library as a list, with a font selected: its sample in the details panel](docs/screenshots/library-list.webp)
+
+*The list layout with its columns, and a font's sample in the details panel.*
 
 ### Exporting
 
@@ -562,6 +577,25 @@ Damaged objects found when loading are skipped and reported, never silently chan
 - **Desktop app:** a folder you choose ([below](#the-workspace-folder-desktop-app)).
 
 ### The workspace folder (desktop app)
+
+![The desktop app on the workspace folder "My art", with the Switch workspace menu open](docs/screenshots/desktop.webp)
+
+The same workspace on disk, as a file manager shows it:
+
+```
+My art/
+  .canvast/
+    boards/
+      board_1/canvas_1.cvst
+      cosmos/powers_of_two.cvst
+    devices/<device id>.json
+    folder.json
+    library.json
+    workspace.json
+  library/
+    fonts/space_grotesk.ttf, space_grotesk_bold.ttf
+    images/deep-zoom.webp, hero.webp, journey.webp
+```
 
 In the desktop app your workspace is a **folder of ordinary files** that you choose, so any sync tool, backup tool or file manager can see it. It works offline and loads nothing from the network.
 
@@ -992,6 +1026,8 @@ node scripts/showcase/build.mjs showcase.canvast            # draws the showcase
 node scripts/showcase/shots.mjs showcase.canvast shots/     # imports it in a fresh profile and takes the README pictures (PNG)
 node scripts/showcase/shots-privacy.mjs showcase.canvast shots/  # the same for the context menu, hiding, passwords and the lock screen
 node scripts/showcase/shots-more.mjs showcase.canvast shots/     # the same for the text, Pattern panel and colour picker pictures
+node scripts/showcase/shots-features.mjs showcase.canvast shots/ # the board menu, the video player, Adjust, Styles, the library list (needs ffmpeg)
+node scripts/showcase/shots-desktop.mjs showcase.canvast shots/  # the desktop app on a workspace folder (after npm run desktop's build)
 node scripts/showcase/dive.mjs showcase.canvast frames/     # renders the dive, frame by frame (PNG and frames.txt)
 ```
 

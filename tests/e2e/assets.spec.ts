@@ -2247,16 +2247,12 @@ test("the viewer plays audio, video and GIF with the on-canvas player's controls
     return l.entries.map((e) => ({ name: e.name, tags: [...(e.tags ?? [])], folder: l.folders.find((f) => f.id === e.folderIds?.[0])?.name ?? "" }));
   });
   expect(filed.find((e) => /^clip-\d+m\d{2}s\.png$/.test(e.name))).toMatchObject({ folder: "Extracted frames", tags: ["extracted-frame"] });
-  // With the controls hidden (F) the player hides too; a click inside the viewer brings back the player alone, and it goes again.
+  // With the controls hidden (F) the player stays, floating over the picture.
   await p.keyboard.press("f");
-  await expect(bar).toBeHidden();
   await expect(viewer.locator(".viewer-bar")).toBeHidden();
-  await p.mouse.click(st.x + st.width / 2, st.y + st.height / 2 - 40);
   await expect(bar).toBeVisible();
-  await expect(viewer.locator(".viewer-bar"), "the controls stay hidden").toBeHidden();
-  await expect(bar).toBeHidden({ timeout: 8000 });
   await p.keyboard.press("f");
-  await expect(bar).toBeVisible();
+  await expect(viewer.locator(".viewer-bar")).toBeVisible();
   // A GIF: frame by frame.
   await p.keyboard.press("Escape");
   await openOn("anim.gif");
@@ -2294,11 +2290,28 @@ test("Extract frame follows Settings > Media and playback: name template and sty
   await p.getByTestId("asset-preview").click();
   const viewer = p.getByTestId("slide-view");
   await expect(viewer).toBeVisible();
-  // The player does not cover the GIF: the picture fits above it, and the button that hides the controls sits above the player.
-  const playerBox = (await viewer.getByTestId("viewer-media-bar").boundingBox())!;
-  await expect.poll(async () => (await viewer.locator("canvas.viewer-gif").boundingBox())!.y + (await viewer.locator("canvas.viewer-gif").boundingBox())!.height).toBeLessThanOrEqual(playerBox.y + 1);
-  const hideBox = (await viewer.locator(".viewer-hide").boundingBox())!;
-  expect(hideBox.y + hideBox.height).toBeLessThanOrEqual(playerBox.y + 1);
+  // The player floats over the bottom of the GIF, just above the button that hides the controls, which it never covers: with the
+  // controls shown and with them hidden (the button that shows them again stays free to press).
+  const player = viewer.getByTestId("viewer-media-bar");
+  const clear = async (button: string): Promise<void> => {
+    const pb = (await player.boundingBox())!;
+    const hb = (await viewer.locator(button).boundingBox())!;
+    expect(pb.y + pb.height, "the player ends above the button").toBeLessThanOrEqual(hb.y + 1);
+  };
+  await clear(".viewer-hide");
+  await viewer.locator(".viewer-hide").click();
+  await expect(viewer.locator(".viewer-bar")).toBeHidden();
+  await clear('.viewer-handle [data-act="bar"]');
+  await viewer.locator('.viewer-handle [data-act="bar"]').click(); // (shown again: the button was not covered)
+  await expect(viewer.locator(".viewer-bar")).toBeVisible();
+  // While it plays and the pointer rests, the player fades away; a move brings it back.
+  const playBtn = player.locator('[data-cmd="play"]'); // (a GIF starts playing by itself)
+  if ((await playBtn.getAttribute("aria-label")) === "Play") await playBtn.click();
+  await p.mouse.move(5, 5);
+  await expect(viewer).toHaveClass(/is-idle/, { timeout: 6000 });
+  await expect.poll(() => player.evaluate((el) => getComputedStyle(el).opacity)).toBe("0");
+  await p.mouse.move(400, 300);
+  await expect(viewer).not.toHaveClass(/is-idle/);
   await viewer.getByRole("button", { name: /^Extract frame/ }).click();
   await expect(p.getByTestId("toast")).toContainText("added to the library");
   await expect.poll(async () => (await p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.length))).toBe(2);
