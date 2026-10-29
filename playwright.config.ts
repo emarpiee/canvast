@@ -13,7 +13,8 @@ export default defineConfig({
   timeout: 180_000,
   fullyParallel: false,
   workers: 1,
-  reporter: [["list"]],
+  // On GitHub, failures are also annotations (readable through the API without the log).
+  reporter: process.env.CI ? [["list"], ["github"]] : [["list"]],
   use: {
     viewport: { width: 1280, height: 800 },
     deviceScaleFactor: 1,

@@ -161,7 +161,7 @@ See [Building from source](#building-from-source) for what each step needs and m
 | Move around | Drag with the middle button, hold `Space` and drag, or use two fingers; scroll the wheel to zoom |
 | Go back to the start | Press `0` or `Home` |
 | Find any command | Press `Ctrl/⌘+K` |
-| Undo | `Ctrl/⌘+Z` |
+| Undo | `Ctrl/⌘+Z` (undoing a delete brings the items back selected) |
 
 The info bar at the bottom left shows the zoom level and position. Click the zoom, type a level (`3000`, `2^-500`, `10^900`) and press Enter to jump there.
 
@@ -820,8 +820,6 @@ These are canvast's current limits: first those of both versions, then those of 
 | --- | --- |
 | Rendering | Canvas 2D only, on the main thread; no GPU or WebGL path, no workers |
 | Collaboration | None. There is no network by design |
-
-**Left out on purpose:** ratings, saved searches, a minimap (there are no bounds to map).
 
 ### The browser version
 

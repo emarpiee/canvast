@@ -289,6 +289,37 @@ test("a font file is imported from the options bar, a text is set in it, and it 
   await expect(big).toContainText("0123456789");
 });
 
+test("a font placed on the canvas is a card that shows Aa in that font, not the plain file card", async ({ app }) => {
+  const p = app.page;
+  // Share of light pixels (the card's letters) inside the card on the screen.
+  const lightShare = async (n: number): Promise<number> => {
+    await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(n);
+    await p.evaluate(() => window.__canvastDebug.nextFrame());
+    await expect.poll(() => p.evaluate(() => window.__canvastDebug.decodedStats().count)).toBeGreaterThan(0);
+    await p.evaluate(() => window.__canvastDebug.nextFrame());
+    return p.evaluate((i) => {
+      const d = window.__canvastDebug;
+      const b = d.objectScreen(d.objects()[i]!.id)!.box;
+      let light = 0;
+      let n = 0;
+      for (let y = Math.ceil(b.minY) + 4; y < b.maxY - 4; y += 2)
+        for (let x = Math.ceil(b.minX) + 4; x < b.maxX - 4; x += 2) {
+          const [r] = d.pixelAt(x, y);
+          n++;
+          if (r! > 200) light++;
+        }
+      return light / n;
+    }, n - 1);
+  };
+  await p.getByTestId("import-input").setInputFiles({ name: "notes.xyz", mimeType: "application/octet-stream", buffer: Buffer.from("plain file") });
+  const plain = await lightShare(1);
+  const font = readFileSync("node_modules/@expo-google-fonts/inter/900Black/Inter_900Black.ttf");
+  await p.getByTestId("import-input").setInputFiles({ name: "Inter-Black.ttf", mimeType: "font/ttf", buffer: font });
+  const aa = await lightShare(2); // on top of the plain card
+  expect(aa).toBeGreaterThan(plain * 3);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("a read-only tab cannot create or edit text", async ({ app, context }) => {
   const p1 = app.page;
   await newText(p1, 300, 300);

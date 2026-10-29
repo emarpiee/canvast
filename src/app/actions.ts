@@ -69,8 +69,11 @@ import type { ViewState } from "./view-state";
 
 export function undo(doc: DocumentStore, editor: EditorState): void {
   if (editor.blockEdit()) return;
-  doc.undo();
-  pruneSelection(doc, editor);
+  const tx = doc.undo();
+  // Undoing a delete brings the items back selected (every kind), so they can be moved or deleted again at once.
+  const back = tx ? [...tx.after].flatMap(([id, o]) => (o === null && tx.before.get(id) && doc.get(id) ? [id] : [])) : [];
+  if (back.length) editor.select(back);
+  else pruneSelection(doc, editor);
 }
 
 export function redo(doc: DocumentStore, editor: EditorState): void {

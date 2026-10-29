@@ -1,4 +1,4 @@
-import { extOf } from "./file-kind";
+import { extOf, isFontFile } from "./file-kind";
 import { FILE_CARD_H, FILE_CARD_W, makeFileCard } from "./card";
 
 /** Triangles as a flat list of x,y,z (nine numbers each). */
@@ -79,8 +79,12 @@ export function pdfPages(bytes: Uint8Array): number | null {
 
 /** The card of a file, with what can be drawn from its bytes: a 3D model's shape, a PDF's page count. Never fails: the plain card is the fallback. */
 export async function makeFileCardFrom(name: string, chip: string, bytes: Uint8Array): Promise<ImageBitmap> {
-  const card = await makeFileCard(chip);
   const ext = extOf(name);
+  if (isFontFile({ type: "", name })) {
+    const sample = await fontCard(chip, bytes).catch(() => null);
+    if (sample) return sample;
+  }
+  const card = await makeFileCard(chip);
   try {
     const tri = parseModel(bytes, ext);
     const pages = ext === "pdf" ? pdfPages(bytes) : null;
@@ -110,5 +114,38 @@ export async function makeFileCardFrom(name: string, chip: string, bytes: Uint8A
     return await createImageBitmap(c);
   } catch {
     return card;
+  }
+}
+
+/** A font's card: "Aa" in the font itself, large, with the type under it (null when the browser cannot read the font). */
+async function fontCard(chip: string, bytes: Uint8Array): Promise<ImageBitmap | null> {
+  const face = new FontFace(`canvast-card-${Math.random().toString(36).slice(2)}`, bytes.slice().buffer);
+  await face.load();
+  document.fonts.add(face);
+  try {
+    const c = document.createElement("canvas");
+    c.width = FILE_CARD_W;
+    c.height = FILE_CARD_H;
+    const x = c.getContext("2d")!;
+    x.fillStyle = "oklch(0.3 0 0)";
+    x.fillRect(0, 0, c.width, c.height);
+    x.strokeStyle = "oklch(1 0 0 / 0.1)";
+    x.lineWidth = 2;
+    x.strokeRect(1, 1, c.width - 2, c.height - 2);
+    x.textAlign = "center";
+    x.textBaseline = "middle";
+    // As large as fits, measured once at a reference size (the same way as the library's thumbnail).
+    x.font = `100px "${face.family}"`;
+    const w = x.measureText("Aa").width || 100;
+    const size = Math.min(c.height * 0.5, (100 * c.width * 0.7) / w);
+    x.font = `${size}px "${face.family}"`;
+    x.fillStyle = "oklch(0.93 0 0)";
+    x.fillText("Aa", c.width / 2, c.height * 0.44);
+    x.font = "14px system-ui, sans-serif";
+    x.fillStyle = "oklch(0.8 0 0)";
+    x.fillText(chip, c.width / 2, c.height - 22);
+    return await createImageBitmap(c);
+  } finally {
+    document.fonts.delete(face);
   }
 }

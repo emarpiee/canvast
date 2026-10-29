@@ -327,16 +327,18 @@ test("U8: strokes in far-apart regions stay independent, addressable and persist
   recordMetric(info, "u8", { farDistanceLog2: D.bitLength(farX.m) + farX.e, objects: all.length });
 });
 
-test("delete, undo delete, and invalid imports are reported without corrupting the document", async ({ app }) => {
+test("delete, undo delete (what comes back is selected), and invalid imports are reported without corrupting the document", async ({ app }) => {
   const s = await penStroke(app, [[300, 300], [400, 350]]);
   await key(app, "v");
   await click(app, 350, 325);
   await key(app, "Delete");
   await app.frame();
   expect(await objects(app)).toEqual([]);
+  expect(await selection(app)).toEqual([]);
   await app.page.keyboard.press("Control+z");
   await app.frame();
   expect(await objects(app)).toEqual([s]);
+  expect(await selection(app)).toEqual([s.id]);
   await app.page
     .getByTestId("import-input")
     .setInputFiles({ name: "not-an-image.png", mimeType: "image/png", buffer: Buffer.from("definitely not a png") });

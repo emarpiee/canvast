@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.40 — Undo brings deleted items back selected; fonts show their letters on the canvas (2026-10-29)
+
+- **Changed:** undoing a delete brings the items back selected, whatever their kind (strokes, shapes, text, pictures, videos, sheets), so they can be moved or deleted again at once.
+- **Added:** a font placed on the canvas shows "Aa" in that font on its card, as it does in the library, instead of the plain file card.
+- **Changed:** the README no longer lists features left out.
+- **Changed:** on GitHub, a failed end-to-end test is also reported as an annotation on its job, so it can be read without the full log.
+
 ## 0.50.39 — The version in the title, a tidier repository (2026-10-29)
 
 - **Added:** the version after the name in the browser tab (`canvast 0.50.39`) and in the desktop app's window title (`<workspace> — canvast 0.50.39`).
