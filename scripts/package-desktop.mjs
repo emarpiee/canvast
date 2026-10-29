@@ -90,8 +90,9 @@ await build({
     electronVersion: pkg.devDependencies.electron,
     electronDist: join(root, "node_modules/electron/dist"), // (the tested binary, not another download)
     directories: { output: out, buildResources: icons },
-    files: ["main.cjs", "preload.cjs", "canvast.html", "package.json"],
+    files: ["main.cjs", "preload.cjs", "canvast.html", "package.json", "*.node"],
     asar: true,
+    asarUnpack: ["*.node"], // (a native module cannot load from inside the asar)
     // (the .deb and .rpm name the project's home and say what it is)
     extraMetadata: { homepage: `https://github.com/${repo.replace("|", "/")}`, description: "An offline-first endless canvas for drawing and references", license: pkg.license },
     npmRebuild: false,

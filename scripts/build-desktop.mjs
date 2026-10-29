@@ -4,7 +4,7 @@
 import { build } from "esbuild";
 import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -21,7 +21,24 @@ if (!existsSync(html)) {
 const pkg = JSON.parse(await readFile(resolve(root, "package.json"), "utf8"));
 
 await mkdir(out, { recursive: true });
-const common = { bundle: true, platform: "node", format: "cjs", target: "node22", external: ["electron"], logLevel: "warning" };
+// better-sqlite3 ships a ready-made N-API binary per platform (no rebuild for Electron): bundle the entry for this machine and
+// copy its .node next to main.cjs and require it from there (package-desktop unpacks it from the asar).
+const sqlite = resolve(root, `node_modules/better-sqlite3/lib/${process.platform}-${process.arch}.js`);
+if (!existsSync(sqlite)) {
+  console.error(`no better-sqlite3 binary for ${process.platform}-${process.arch}`);
+  process.exit(1);
+}
+const nativeAddon = {
+  name: "native-addon",
+  setup(b) {
+    b.onResolve({ filter: /\.node$/ }, async (a) => {
+      const file = resolve(a.resolveDir, a.path);
+      await copyFile(file, resolve(out, basename(file)));
+      return { path: `./${basename(file)}`, external: true };
+    });
+  },
+};
+const common = { bundle: true, platform: "node", format: "cjs", target: "node22", external: ["electron"], alias: { "better-sqlite3": sqlite }, plugins: [nativeAddon], logLevel: "warning" };
 await build({ ...common, entryPoints: [resolve(root, "desktop/main.ts")], outfile: resolve(out, "main.cjs") });
 await build({ ...common, entryPoints: [resolve(root, "desktop/preload.ts")], outfile: resolve(out, "preload.cjs") });
 await copyFile(html, resolve(out, "canvast.html"));
