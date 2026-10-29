@@ -2,11 +2,14 @@ name: Try it online
 
 # The online copy of the app on GitHub Pages (https://emarpiee.github.io/canvast/): the single file of the latest release, served as
 # index.html, so anyone can try canvast without downloading it. It is the released file itself (checked against its SHA-256), never a
-# new build. Runs when a release is published, and by hand with "Run workflow" to publish the latest release again.
+# new build. Runs after the Release packages workflow (which every published release starts), and by hand with "Run workflow" to publish
+# the latest release again. (Not on the release itself: that run belongs to the tag, and the github-pages environment deploys from main
+# only; a workflow_run runs on main.)
 
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Release packages"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
