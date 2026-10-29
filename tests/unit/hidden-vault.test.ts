@@ -1,7 +1,14 @@
+import { scryptSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { SEAL_OVERHEAD, SEALED_COPY_RE, createVault, hiddenFileName, holdsKey, openBytes, openText, openVault, readVault, rewrapVault, sameKey, sealBytes, sealText } from "../../src/storage/hidden-vault";
+import type { DesktopBridge } from "../../src/storage/desktop-bridge";
+import { HIDDEN_JSON, HIDDEN_KEY_SPARE, HiddenVault } from "../../src/storage/hidden-store";
+import { SCRYPT_DEFAULT, SEAL_OVERHEAD, SEALED_COPY_RE, createVault, needsUpgrade, useScrypt, hiddenFileName, holdsKey, openBytes, openText, openVault, readVault, rewrapVault, sameKey, sealBytes, sealText } from "../../src/storage/hidden-vault";
 
-const FAST = 100_000; // (the lowest a record may say; the app uses 600,000)
+const FAST = { name: "PBKDF2", iterations: 100_000 } as const; // (a version 1 vault, at the lowest a record may say)
+// scrypt as the desktop app's main process does it (Node's native one), with the same parameters.
+const nodeScrypt = async (password: string, salt: Uint8Array, N: number, r: number, p: number) =>
+  new Uint8Array(scryptSync(Buffer.from(password, "utf8"), Buffer.from(salt), 32, { N, r, p, maxmem: 256 * N * r + 2 ** 24 }));
+useScrypt(nodeScrypt);
 
 describe("hidden vault", () => {
   it("seals and opens bytes and the index with the data key; the right password opens it, a wrong one does not", async () => {
@@ -65,5 +72,34 @@ describe("hidden vault", () => {
     // A sync tool's copy of a sealed file is still a sealed file (never sealed again); a readable file is not.
     for (const copy of [a.replace(".bin", " (1).bin"), a.replace(".bin", ".sync-conflict-20261029-1200-ABC.bin"), a]) expect(copy).toMatch(SEALED_COPY_RE);
     expect(".hidden/Secret.png").not.toMatch(SEALED_COPY_RE);
+  });
+
+  it("scrypt as the app calls it gives RFC 7914's test value; a new vault uses it (version 2), and an old one is upgraded when opened", async () => {
+    const rfc = Array.from(await nodeScrypt("pleaseletmein", new TextEncoder().encode("SodiumChloride"), 16_384, 8, 1), (b) => b.toString(16).padStart(2, "0")).join("");
+    expect(rfc).toBe("7023bdcb3afd7348461c06cd81fd38ebfda8fbba904f8e3ea9b543f6545da1f2"); // (RFC 7914 §12, its first 32 bytes)
+    const made = await createVault("pw");
+    expect([made.record.version, made.record.kdf]).toEqual([2, { name: "scrypt", ...SCRYPT_DEFAULT, salt: made.record.kdf.salt }]);
+    expect(readVault(JSON.stringify(made.record))).not.toBeNull();
+    expect(await openVault(made.record, "nope")).toBeNull();
+    // A version 1 vault (PBKDF2) in a folder: opening it wraps the same key with scrypt, its spare too; files sealed before still open.
+    const files = new Map<string, Uint8Array>();
+    const bridge = {
+      read: async (p: string) => files.get(p) ?? null,
+      write: async (p: string, b: Uint8Array) => void files.set(p, b),
+      exists: async (p: string) => files.has(p),
+      erase: async (p: string) => void files.delete(p),
+      list: async (dir: string) => [...files.keys()].filter((p) => p.startsWith(`${dir}/`) && !p.slice(dir.length + 1).includes("/")).map((p) => p.slice(dir.length + 1)),
+    } as unknown as DesktopBridge;
+    const old = await createVault("pw", FAST);
+    const sealed = await sealBytes(old.key, new Uint8Array([7, 8, 9]));
+    files.set(HIDDEN_JSON, new TextEncoder().encode(JSON.stringify(old.record)));
+    expect(needsUpgrade(old.record)).toBe(true);
+    const vault = new HiddenVault(bridge, async () => 0);
+    expect(await vault.unlock("pw")).toBe(true);
+    const now = readVault(new TextDecoder().decode(files.get(HIDDEN_JSON)!))!;
+    const spare = readVault(new TextDecoder().decode(files.get(HIDDEN_KEY_SPARE)!))!;
+    expect([now.version, now.kdf.name, spare.version, spare.key]).toEqual([2, "scrypt", 2, now.key]);
+    expect(Array.from((await vault.open(sealed))!)).toEqual([7, 8, 9]);
+    expect(Array.from((await openBytes((await openVault(now, "pw"))!, sealed))!)).toEqual([7, 8, 9]);
   });
 });

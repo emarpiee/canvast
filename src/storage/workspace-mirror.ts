@@ -661,7 +661,8 @@ export class WorkspaceMirror {
     for (const [id, f] of oldFolder) if (!newFolder.has(id)) await this.bridge.remove(f, this.deleteTo());
     for (const [id] of newFile) if (!oldFile.has(id)) this.dirty.add(id); // a new canvas: its file is written below
     const styles = await this.repo.styles().catch(() => undefined);
-    const hidden = await idbGet<string>(this.db, "meta", "hiddenLock").catch(() => undefined);
+    // (The Hidden password's gate is not written to the folder: its vault checks it, with scrypt; a PBKDF2 form beside it, in a
+    // synced file, would let the password be guessed far more cheaply. This device's own copy of the gate stays in its cache.)
     const lock = await idbGet<string>(this.db, "meta", "workspaceLock").catch(() => undefined);
     const ws: WorkspaceFile = {
       format: WORKSPACE_FILE_FORMAT,
@@ -671,7 +672,7 @@ export class WorkspaceMirror {
       ...(tree.workspace.viewGround ? { viewGround: tree.workspace.viewGround } : {}),
       boards: next,
       styles: Array.isArray(styles) ? styles : [],
-      locks: { ...(typeof hidden === "string" ? { hidden } : {}), ...(typeof lock === "string" ? { workspace: lock } : {}) },
+      locks: { ...(typeof lock === "string" ? { workspace: lock } : {}) },
     };
     await this.bridge.write(WORKSPACE_FILE, encode(JSON.stringify(ws, null, 1)));
     this.placed = next;

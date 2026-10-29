@@ -5,14 +5,34 @@
  * encrypted again. WebCrypto only; nothing here touches storage.
  */
 export const VAULT_FORMAT = "canvast-hidden";
+/** PBKDF2 rounds of a version 1 vault (read, and upgraded to scrypt when opened). */
 export const VAULT_ITERATIONS = 600_000;
+/** scrypt for a new or upgraded vault: N = 2^17, r = 8 (128 MiB of memory per guess, eight times rclone's default), about 0.7 s natively. */
+export const SCRYPT_DEFAULT = { N: 131_072, r: 8, p: 1 } as const;
 /** A sealed file is this much longer than the original: the IV in front, the GCM tag at the end. */
 export const SEAL_OVERHEAD = 12 + 16;
 
+/** How the password is stretched: PBKDF2 (version 1) or scrypt (version 2, memory-hard). */
+export type Kdf =
+  | { name: "PBKDF2"; hash: "SHA-256"; iterations: number; salt: string }
+  | { name: "scrypt"; N: number; r: number; p: number; salt: string };
+/** The stretching a new wrap uses (its salt is made then). */
+export type KdfChoice = { name: "PBKDF2"; iterations: number } | { name: "scrypt"; N: number; r: number; p: number };
+const SCRYPT: KdfChoice = { name: "scrypt", ...SCRYPT_DEFAULT };
+
+/** scrypt, where it is done: natively, in the desktop app's main process (WebCrypto has no memory-hard function). */
+export type Scrypt = (password: string, salt: Uint8Array, N: number, r: number, p: number) => Promise<Uint8Array>;
+let scrypt: Scrypt | null = null;
+/** Set where scrypt is done (the desktop bridge; Node's in tests). */
+export function useScrypt(fn: Scrypt | null): void {
+  scrypt = fn;
+}
+
 export interface VaultRecord {
   format: typeof VAULT_FORMAT;
-  version: 1;
-  kdf: { name: "PBKDF2"; hash: "SHA-256"; iterations: number; salt: string };
+  /** 1: PBKDF2; 2: scrypt. */
+  version: 1 | 2;
+  kdf: Kdf;
   /** The data key, wrapped by the password's key (AES-KW), base64. */
   key: string;
   /** The hidden items' entries (JSON), sealed with the data key. */
@@ -35,35 +55,50 @@ const b64 = (b: Uint8Array): string => {
 const unb64 = (s: string): Uint8Array<ArrayBuffer> => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 const B64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
 
-async function passwordKey(password: string, salt: Uint8Array<ArrayBuffer>, iterations: number): Promise<CryptoKey> {
+/** The key-encryption key a password and a vault's stretching give. */
+async function passwordKey(password: string, kdf: Kdf): Promise<CryptoKey> {
+  const salt = unb64(kdf.salt);
+  if (kdf.name === "scrypt") {
+    if (!scrypt) throw new Error("scrypt is not available here");
+    const raw = new Uint8Array(await scrypt(password, salt, kdf.N, kdf.r, kdf.p));
+    try {
+      return await crypto.subtle.importKey("raw", raw, "AES-KW", false, ["wrapKey", "unwrapKey"]);
+    } finally {
+      raw.fill(0);
+    }
+  }
   const base = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
-  return crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt, iterations }, base, { name: "AES-KW", length: 256 }, false, ["wrapKey", "unwrapKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt, iterations: kdf.iterations }, base, { name: "AES-KW", length: 256 }, false, ["wrapKey", "unwrapKey"]);
 }
 
-async function wrap(dataKey: CryptoKey, password: string, iterations: number): Promise<VaultRecord> {
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const kek = await passwordKey(password, salt, iterations);
+async function wrap(dataKey: CryptoKey, password: string, choice: KdfChoice): Promise<VaultRecord> {
+  const salt = b64(crypto.getRandomValues(new Uint8Array(16)));
+  const kdf: Kdf = choice.name === "PBKDF2" ? { name: "PBKDF2", hash: "SHA-256", iterations: choice.iterations, salt } : { ...choice, salt };
+  const kek = await passwordKey(password, kdf);
   const key = new Uint8Array(await crypto.subtle.wrapKey("raw", dataKey, kek, "AES-KW"));
-  return { format: VAULT_FORMAT, version: 1, kdf: { name: "PBKDF2", hash: "SHA-256", iterations, salt: b64(salt) }, key: b64(key) };
+  return { format: VAULT_FORMAT, version: kdf.name === "scrypt" ? 2 : 1, kdf, key: b64(key) };
 }
 
-/** The data key, or null when the password is wrong or the record damaged. */
+/** The data key, or null when the password is wrong or the record damaged (scrypt not being available throws). */
 async function unwrap(record: VaultRecord, password: string, extractable: boolean): Promise<CryptoKey | null> {
+  const kek = await passwordKey(password, record.kdf);
   try {
-    const kek = await passwordKey(password, unb64(record.kdf.salt), record.kdf.iterations);
     return await crypto.subtle.unwrapKey("raw", unb64(record.key), kek, "AES-KW", { name: "AES-GCM", length: 256 }, extractable, ["encrypt", "decrypt"]);
   } catch {
     return null;
   }
 }
 
+/** Whether a vault still stretches its password with PBKDF2 (version 1): it is wrapped again with scrypt once opened. */
+export const needsUpgrade = (record: VaultRecord): boolean => record.kdf.name !== "scrypt";
+
 /**
  * A new vault for a password: its record (to keep in the folder) and the data key, kept in memory only and not extractable (no
  * code in the page can read it out; on disk it is only ever wrapped).
  */
-export async function createVault(password: string, iterations = VAULT_ITERATIONS): Promise<{ record: VaultRecord; key: CryptoKey }> {
+export async function createVault(password: string, choice: KdfChoice = SCRYPT): Promise<{ record: VaultRecord; key: CryptoKey }> {
   const made = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
-  const record = { ...(await wrap(made, password, iterations)), check: await keyCheck(made) };
+  const record = { ...(await wrap(made, password, choice)), check: await keyCheck(made) };
   const raw = new Uint8Array(await crypto.subtle.exportKey("raw", made));
   const key = await crypto.subtle.importKey("raw", raw, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
   raw.fill(0);
@@ -77,10 +112,10 @@ export const openVault = (record: VaultRecord, password: string): Promise<Crypto
  * The same data key under a new password, given the current one (the key in memory cannot be read out to wrap again). The sealed
  * index and files stay as they are. Null when `password` is not the current password.
  */
-export async function rewrapVault(record: VaultRecord, password: string, newPassword: string, iterations = record.kdf.iterations): Promise<VaultRecord | null> {
+export async function rewrapVault(record: VaultRecord, password: string, newPassword: string, choice: KdfChoice = SCRYPT): Promise<VaultRecord | null> {
   const key = await unwrap(record, password, true);
   if (!key) return null;
-  return { ...(await wrap(key, newPassword, iterations)), ...(record.index ? { index: record.index } : {}), check: await keyCheck(key) };
+  return { ...(await wrap(key, newPassword, choice)), ...(record.index ? { index: record.index } : {}), check: await keyCheck(key) };
 }
 
 /** Whether two data keys are the same key, without reading either out: what one seals, the other opens. */
@@ -146,13 +181,16 @@ export async function openText(key: CryptoKey, sealed: Sealed): Promise<string |
 export function readVault(text: string): VaultRecord | null {
   try {
     const r = JSON.parse(text) as Partial<VaultRecord>;
-    const k = r.kdf;
+    const k = r.kdf as (Partial<Kdf> & Record<string, unknown>) | undefined;
+    const int = (v: unknown, lo: number, hi: number): boolean => Number.isInteger(v) && (v as number) >= lo && (v as number) <= hi;
+    const kdfOk =
+      !!k &&
+      ((r.version === 1 && k.name === "PBKDF2" && k["hash"] === "SHA-256" && int(k["iterations"], 100_000, 10_000_000)) ||
+        (r.version === 2 && k.name === "scrypt" && int(k["N"], 16_384, 1_048_576) && Number.isInteger(Math.log2(k["N"] as number)) && int(k["r"], 8, 16) && int(k["p"], 1, 4)));
     const ok =
       r.format === VAULT_FORMAT &&
-      r.version === 1 &&
-      !!k && k.name === "PBKDF2" && k.hash === "SHA-256" &&
-      Number.isInteger(k.iterations) && k.iterations >= 100_000 && k.iterations <= 10_000_000 &&
-      typeof k.salt === "string" && B64_RE.test(k.salt) &&
+      kdfOk &&
+      typeof k!.salt === "string" && B64_RE.test(k!.salt) &&
       typeof r.key === "string" && B64_RE.test(r.key) && r.key.length <= 64 &&
       [r.index, r.check].every((x) => x === undefined || (typeof x.iv === "string" && B64_RE.test(x.iv) && typeof x.data === "string" && B64_RE.test(x.data)));
     return ok ? (r as VaultRecord) : null;

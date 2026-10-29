@@ -15,6 +15,7 @@ import { LIBRARY_DIR, LIBRARY_JSON } from "./library-mirror";
 import { WORKSPACE_FILE, WorkspaceMirror, watched } from "./workspace-mirror";
 import { BOARDS_DIR, WORKSPACE_NAMING } from "./workspace-names";
 import { HIDDEN_JSON, HiddenVault, isHiddenCopy } from "./hidden-store";
+import { useScrypt } from "./hidden-vault";
 import { resetAllData } from "./reset";
 import type { AssetCatalog } from "../assets/asset-catalog";
 
@@ -69,6 +70,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   externalFolder.saveHandle = false; // (the folder is the workspace itself, never a handle kept in the database)
   const deleteTo = (): DeleteMode => opts.deleteTo?.() ?? "trash";
   await externalFolder.use(bridgeDir(bridge, ws.name, deleteTo));
+  useScrypt((password, salt, N, r, p) => raw.scrypt(password, salt, N, r, p)); // (natively, in the main process)
   const hidden = new HiddenVault(bridge, async () => [...(await storage.catalog.snapshotMeta()).entries.values()].filter((e) => e.hidden).length);
   const mirror = new WorkspaceMirror(storage.db, storage.workspace, bridge, deviceId(), hidden, deleteTo);
   // Hidden originals are sealed files: read through the key, in memory (none while locked); their thumbnails are never stored.

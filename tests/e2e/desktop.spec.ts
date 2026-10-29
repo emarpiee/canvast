@@ -605,6 +605,10 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     expect(sealed).toHaveLength(1);
     sealed0 = sealed[0]!;
     expect(sealed[0]).toMatch(/^\.hidden\/[0-9a-f]{32}\.bin$/);
+    // The password is stretched with scrypt (version 2 of the vault, 128 MiB), done natively in the main process.
+    expect(JSON.parse(readFileSync(join(ws, ".canvast/hidden.json"), "utf8"))).toMatchObject({ version: 2, kdf: { name: "scrypt", N: 131072, r: 8, p: 1 } });
+    // No cheaper form of the same password beside it in a synced file (the browser's PBKDF2 gate stays on this device).
+    expect(JSON.parse(readFileSync(join(ws, ".canvast/workspace.json"), "utf8")).locks?.hidden).toBeUndefined();
     expect(files(ws).filter((f) => f.startsWith("library/") || f.startsWith(".trash/"))).toEqual([]);
     expect(traces()).toEqual([]);
     expect(await listing()).toEqual([["Secret Plan.png", true, true]]);

@@ -67,6 +67,8 @@ export interface DesktopBridge {
   forgetWorkspace(path: string): Promise<void>;
   /** Every file under a folder, at any depth, with its size (names starting with a dot, and what is in such folders, left out). */
   tree(path: string): Promise<Array<{ path: string; size: number }>>;
+  /** The Hidden password stretched with scrypt (RFC 7914; `N` a power of two, 2^14 to 2^20), 32 bytes, in the main process. */
+  scrypt(password: string, salt: Uint8Array, N: number, r: number, p: number): Promise<Uint8Array>;
   /** A file's SHA-256 (hex), read in the main process; null when there is no such file. */
   hash(path: string): Promise<string | null>;
   /** The canvas files of the boards: `.canvast/boards/<board>/<name>.cvst`. */

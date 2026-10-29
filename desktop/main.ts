@@ -8,7 +8,7 @@
  */
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } from "electron";
 import { execFile } from "node:child_process";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, scrypt } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, watch, writeFileSync } from "node:fs";
 import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
@@ -400,6 +400,15 @@ function installFileCalls(win: BrowserWindow, root: string): void {
       for (const f of await readdir(join(boards, d.name), { withFileTypes: true }).catch(() => [])) if (f.isFile() && f.name.endsWith(".cvst")) out.push(`${BOARDS_DIR}/${d.name}/${f.name}`);
     }
     return out;
+  });
+  // The Hidden password stretched with scrypt (RFC 7914), natively: the page's WebCrypto has no memory-hard function (and Electron's
+  // crypto has no Argon2). Only the ranges a vault may name are done (a page cannot ask for gigabytes); nothing is kept.
+  ipcMain.handle("canvast:scrypt", async (e, password: string, salt: Uint8Array, N: number, r: number, p: number) => {
+    own(e);
+    if (typeof password !== "string" || !(salt instanceof Uint8Array) || salt.length < 16 || salt.length > 64) throw new Error("bad scrypt input");
+    if (!Number.isInteger(Math.log2(N)) || N < 2 ** 14 || N > 2 ** 20 || !Number.isInteger(r) || r < 8 || r > 16 || !Number.isInteger(p) || p < 1 || p > 4) throw new Error("bad scrypt parameters");
+    const key = await new Promise<Buffer>((done, fail) => scrypt(Buffer.from(password, "utf8"), Buffer.from(salt), 32, { N, r, p, maxmem: 256 * N * r + 2 ** 24 }, (err, k) => (err ? fail(err) : done(k))));
+    return new Uint8Array(key);
   });
   ipcMain.handle("canvast:hash", async (e, rel: string) => {
     own(e);

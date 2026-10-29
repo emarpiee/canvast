@@ -6,7 +6,7 @@
 import type { DesktopBridge } from "./desktop-bridge";
 import type { HiddenState, HiddenStore } from "./store";
 import type { VaultRecord } from "./hidden-vault";
-import { SEALED_COPY_RE, createVault, holdsKey, keyCheck, openBytes, openText, openVault, readVault, rewrapVault, sameKey, sealBytes, sealText } from "./hidden-vault";
+import { SEALED_COPY_RE, createVault, holdsKey, keyCheck, needsUpgrade, openBytes, openText, openVault, readVault, rewrapVault, sameKey, sealBytes, sealText } from "./hidden-vault";
 
 export const HIDDEN_JSON = ".canvast/hidden.json";
 /**
@@ -107,9 +107,18 @@ export class HiddenVault implements HiddenStore {
   }
 
   async unlock(password: string): Promise<boolean> {
-    const record = (await this.vault())?.record ?? null;
+    const found = await this.vault();
+    let record = found?.record ?? null;
     const key = record ? await openVault(record, password) : null;
     if (!key) return false;
+    // A vault of an earlier version (PBKDF2) is wrapped again with scrypt now that the password is here: the same key, no file changes.
+    if (record && found && !found.spare && needsUpgrade(record)) {
+      const up = await rewrapVault(record, password, password);
+      if (up) {
+        await this.save(up);
+        record = up;
+      }
+    }
     // A copy of hidden.json with another key (two devices set the first password at once) that this password opens too: joined to this one.
     for (const path of await this.copies()) {
       const copy = await this.load(path);

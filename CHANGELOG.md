@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.52 — scrypt for the Hidden password (2026-10-29)
+
+- **Changed:** in the desktop app, the Hidden password is stretched with scrypt (128 MiB of memory for each guess) instead of PBKDF2, so guessing it is far more costly. A workspace's vault is upgraded the next time the password is given; no file is encrypted again. `hidden-items.mjs` reads both.
+- **Fixed:** `workspace.json` carried a PBKDF2 form of the Hidden password (the browser's gate), which let it be guessed more cheaply than through the vault; the desktop app no longer writes it there.
+
 ## 0.50.51 — The hidden items' key, safer (2026-10-29)
 
 - **Changed:** in the desktop app, the hidden items' key is held so that no code in the page can read it out of memory; changing the Hidden password asks for the current one.

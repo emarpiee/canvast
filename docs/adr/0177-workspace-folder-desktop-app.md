@@ -290,6 +290,11 @@ A sync tool (Mega, Drive, Proton Drive, Syncthing…) keeps one `hidden.json` wh
 - **An interrupted seal** (the move noted, the sealed file there, its readable source still there) is proven at start-up by opening it; unproven, or while the key is locked, the sealed file is erased and the readable one stays, to be sealed again. Before, the sealed file was trusted.
 - Sealing reports its own progress (`encrypting`), shown as *Encrypting N of M files* from five files.
 
+### scrypt for the Hidden password (0.50.52)
+
+- The vault's password is stretched with **scrypt** (RFC 7914; N = 2^17, r = 8, p = 1: 128 MiB per guess, about 0.7 s), natively in the main process (`canvast:scrypt`, which only accepts the ranges a vault may name). Argon2id was the first choice, but Electron's crypto (BoringSSL) has no Argon2, and one written in JavaScript would be slow enough to force weaker settings than native scrypt. Vault version 2 names `kdf: { name: "scrypt", N, r, p, salt }`; version 1 (PBKDF2) is still read, and wrapped again with scrypt when it is opened (the same key: no file changes). `hidden-items.mjs` needs only Node.js 20 for both.
+- The Hidden password's gate (`locks.hidden`, PBKDF2) is no longer written to `workspace.json`: in a synced file it would let the password be guessed far more cheaply than through the vault. The desktop app checks the Hidden password with the vault; this device's own gate stays in its cache.
+
 ### A canvas file that does not read (0.50.50)
 
 At start-up and on each look at the folder, a canvas file whose header says it changed is read whole before it is taken. One that does not read (damaged, or a sync tool still writing it) is skipped: this device's copy stays and is shown, the person is told once, and the file is read again when it changes. It is never written over (it may be another device's newer version, still arriving); deleting it lets this device's version be written again. Before 0.50.50 such a file stopped the workspace from opening.

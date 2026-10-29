@@ -11,10 +11,10 @@
 //       `decrypt` (a hidden-items.json beside it names it) gets its name, tags, note and fields back; any other file must be a PNG or
 //       JPEG picture (its size is read from it). For other kinds, put the file in .hidden/ while the app runs with the Hidden items
 //       open: the app reads it and encrypts it. Close the app on that workspace first; the workspace needs a Hidden password.
-// Both ask for the Hidden items password (or read it from stdin when it is piped). Needs only Node.js 20 or later (its built-in
-// WebCrypto): PBKDF2-SHA-256 stretches the password into a key that unwraps (AES-KW) the data key; the data key opens each file and
-// the index (AES-256-GCM).
-import { createHash } from "node:crypto";
+// Both ask for the Hidden items password (or read it from stdin when it is piped). Needs only Node.js 20 or later, nothing installed:
+// scrypt (version 2) or PBKDF2-SHA-256 (version 1) stretches the password into a key that unwraps (AES-KW) the data key; the data key
+// opens each file and the index (AES-256-GCM).
+import { createHash, scryptSync } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,9 +39,20 @@ async function openVault(workspace, password, file = HIDDEN_JSON) {
   const path = join(workspace, file);
   if (!existsSync(path)) throw new Error(`no ${file}: this workspace has no Hidden items password`);
   const record = JSON.parse(readFileSync(path, "utf8"));
-  if (record?.format !== "canvast-hidden" || record.version !== 1 || record.kdf?.name !== "PBKDF2" || record.kdf.hash !== "SHA-256") throw new Error(`${file} is not a canvast vault (format canvast-hidden, version 1)`);
-  const base = await subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
-  const kek = await subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt: unb64(record.kdf.salt), iterations: record.kdf.iterations }, base, { name: "AES-KW", length: 256 }, false, ["unwrapKey"]);
+  const v1 = record?.version === 1 && record.kdf?.name === "PBKDF2" && record.kdf.hash === "SHA-256";
+  const v2 = record?.version === 2 && record.kdf?.name === "scrypt";
+  if (record?.format !== "canvast-hidden" || !(v1 || v2)) throw new Error(`${file} is not a canvast vault (format canvast-hidden, version 1 or 2)`);
+  let kek;
+  if (v2) {
+    // scrypt (RFC 7914), as the app does it.
+    const { N, r, p, salt } = record.kdf;
+    const raw = scryptSync(Buffer.from(password, "utf8"), Buffer.from(unb64(salt)), 32, { N, r, p, maxmem: 256 * N * r + 2 ** 24 });
+    kek = await subtle.importKey("raw", raw, "AES-KW", false, ["unwrapKey"]);
+    raw.fill(0);
+  } else {
+    const base = await subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+    kek = await subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt: unb64(record.kdf.salt), iterations: record.kdf.iterations }, base, { name: "AES-KW", length: 256 }, false, ["unwrapKey"]);
+  }
   try {
     return { record, key: await subtle.unwrapKey("raw", unb64(record.key), kek, "AES-KW", { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]) };
   } catch {

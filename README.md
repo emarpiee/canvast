@@ -762,7 +762,8 @@ Whether an item is hidden is data of the item, so it travels in any export that 
 - Hiding asks for a Hidden password first, and warns that a lost password means lost files.
 - The file is encrypted (AES-GCM) into `.hidden/` under a random name, read back to prove it, and the readable file is deleted (not moved to `.trash/`).
 - Its name, tags, note and fields are kept only in an encrypted index (`.canvast/hidden.json`); its thumbnail is never stored.
-- The password (stretched with PBKDF2) wraps one random key, so changing the password never re-encrypts a file. It cannot be removed while any item is hidden.
+- The password, stretched with **scrypt** (128 MiB of memory for each guess, so guessing it on many machines at once is costly), wraps one random key, so changing the password never re-encrypts a file. It cannot be removed while any item is hidden. A workspace from before 0.50.52 (PBKDF2) is upgraded the next time the password is given.
+- The Hidden password is checked only by its vault: no cheaper form of it is written into the workspace folder.
 - Once given (to open the Hidden list, or when hiding), the key stays in memory until the app closes or you choose **Lock hidden items** (command palette). It is held so that no code in the page can read it out; changing the password therefore asks for the current one.
 - A spare of the wrapped key is kept in `.canvast/keys/hidden.json`: if `hidden.json` is lost or damaged, the same password still opens every hidden file, and the app writes `hidden.json` again.
 - Hiding several files at once shows *Encrypting N of M files* from five files on.
@@ -777,8 +778,8 @@ In a desktop workspace folder the hidden items are open, documented files, so th
 
 | Part | Where | What it is |
 | --- | --- | --- |
-| The vault | `.canvast/hidden.json` | JSON: `format: "canvast-hidden"`, `version: 1`, `kdf: { name: "PBKDF2", hash: "SHA-256", iterations, salt }` (600,000 iterations, a 16-byte random salt), `key`, and `index` |
-| The data key | `key` in the vault | A random 256-bit AES-GCM key, wrapped (AES-KW, RFC 3394) by the key PBKDF2 makes from the Hidden password and the salt. A wrong password fails to unwrap it. Changing the password wraps the same key again, so no file is encrypted again |
+| The vault | `.canvast/hidden.json` | JSON: `format: "canvast-hidden"`, `version: 2`, `kdf: { name: "scrypt", N, r, p, salt }` (N = 131072, r = 8, p = 1, a 16-byte random salt), `key`, `check` and `index`. Version 1 (written before 0.50.52) has `kdf: { name: "PBKDF2", hash: "SHA-256", iterations, salt }` instead, and is still read |
+| The data key | `key` in the vault | A random 256-bit AES-GCM key, wrapped (AES-KW, RFC 3394) by the 32-byte key scrypt (RFC 7914; PBKDF2-SHA-256 in version 1) makes from the Hidden password (UTF-8) and the salt. A wrong password fails to unwrap it. Changing the password wraps the same key again, so no file is encrypted again |
 | A hidden file | `.hidden/<32 random hex digits>.bin` | 12 bytes of IV, then the file's bytes encrypted with AES-256-GCM under the data key, with the 16-byte tag at the end. The name says nothing about the item |
 | The spare | `.canvast/keys/hidden.json` | The same `format`, `version`, `kdf`, `key` and `check` as the vault, without the index |
 | The key check | `check` in the vault: `{ iv, data }` | The text `canvast-hidden` sealed with the data key, so the app knows whether a vault holds its key without the password (a vault written before 0.50.47 may lack it) |
@@ -957,7 +958,7 @@ canvast has no network API, by design: it never opens a connection. Other progra
 | --- | --- | --- |
 | `.canvast` backup | `canvast-archive`, version 6 | An uncompressed ZIP (ZIP64 when large): `manifest.json` (format, version, scope, the boards and canvases, the list of files), `canvases/<id>.json` (`objects`, `frames`, `view`) and each library file once as `assets/<sha256>`, with a CRC on every entry. Any unzip tool opens it; do not re-compress it |
 | `.canvast/boards/<board>/<canvas>.cvst` | `canvast-canvas`, version 1 | One canvas as JSON: a header (`format`, `version`, `id`, `revision`, `savedAt`, `savedBy`) and the same canvas data a backup holds |
-| `.canvast/workspace.json` | `canvast-workspace` | The boards and canvases (names, order, ids), styles, and the passwords' kept forms (salted PBKDF2 hashes) |
+| `.canvast/workspace.json` | `canvast-workspace` | The boards and canvases (names, order, ids), styles, and the workspace password's kept form (a salted PBKDF2 hash; the Hidden password's is not written there) |
 | `.canvast/library/index.json` | `canvast-library`, version 2 | The library folders (`folders`) and the parts there are (`parts`: `0` to `f`) |
 | `.canvast/library/items-<x>.json` | `canvast-library-items`, version 2 | The items whose hash starts with `x`, one per line: `hash` (SHA-256), `file` (its path under `library/`), `name`, `type`, `size`, `pixelW`, `pixelH`, `importedAt`, `tags`, `favorite`, `folderId`, `note`, `fields`, `state` |
 | `.canvast/library.json` | `canvast-library`, version 1 | The same library in one file (`folders`, `items`), kept for older versions of the app while the library has up to 10,000 items. The app's own copy says `"copyOf": ".canvast/library"`; one without it was written by an older version and what it changed is taken |

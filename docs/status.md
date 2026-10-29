@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.52: scrypt for the Hidden password (2026-10-29)
+
+**Implemented:** step 2a of the security list (#4, ADR 0177 "scrypt for the Hidden password"): vault version 2 with native scrypt (N 2^17, r 8, p 1) through `canvast:scrypt`; version 1 upgraded at unlock; `locks.hidden` no longer written to `workspace.json`. Argon2id dropped: Electron's BoringSSL lacks it (found when the E2E failed; Node's `argon2Sync` exists, Electron's throws).
+**Tested:** unit `hidden-vault.test.ts` (6: RFC 7914 value through the app's call, new vaults version 2, a version 1 vault upgraded at unlock with its spare, old files still open); desktop hidden/password (4: vault version 2 scrypt, no `locks.hidden` in workspace.json, the script opens it).
+**Known failures:** none.
+**Unverified:** scrypt time on a slow ARM device (0.7 s here).
+**Committed:** on `main`.
+**Next bounded task:** step 2b, chunked self-describing hidden files.
+
 ## v0.50.51: the hidden items' key, safer (2026-10-29)
 
 **Implemented:** security list step 1 (#12, #2, #5, #6; ADR 0177, "The key in memory, its spare, and an interrupted seal"): a non-extractable data key (rewrap from the current password); `.canvast/keys/hidden.json` spare used when `hidden.json` is lost or damaged (index not whole, written again); an interrupted seal proven at start-up; *Encrypting N of M files* from five.
