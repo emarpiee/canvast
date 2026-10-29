@@ -29,7 +29,7 @@ jobs:
       - run: xvfb-run -a npm run test:snap -- --project=desktop tests/e2e/desktop.spec.ts -g sandboxed
         env:
           ELECTRON_DISABLE_SANDBOX: "1"
-      - run: xvfb-run -a node scripts/bench-library.mjs ${{ inputs.items }} --dir "$RUNNER_TEMP/bench" | tee bench.txt
+      - run: set -o pipefail; xvfb-run -a node scripts/bench-library.mjs ${{ inputs.items }} --dir "$RUNNER_TEMP/bench" | tee bench.txt
         env:
           ELECTRON_DISABLE_SANDBOX: "1"
       - if: always()
