@@ -2,7 +2,9 @@
 // The hidden items of a desktop workspace folder, without the app (the format is in the README, "Hidden items: the file format"):
 //   node scripts/hidden-items.mjs decrypt <workspace folder> <output folder>
 //       writes every hidden item's file into the output folder under its name in the library, with hidden-items.json (their names,
-//       tags, notes and fields) beside them. Nothing in the workspace is changed.
+//       tags, notes and fields) beside them. Nothing in the workspace is changed. Copies of hidden.json beside it (a sync tool's, when
+//       two devices wrote it at once) are read too, each with the same password, and a sealed file in .hidden/ that no entry names (its
+//       entry lost, or a sync tool's copy) is written as recovered-<hash>.<ext> when the password opens it.
 //   node scripts/hidden-items.mjs encrypt <workspace folder> <file>…
 //       seals each file into .hidden/ and adds it to the sealed index, so the app lists it as a hidden item. A file that came out of
 //       `decrypt` (a hidden-items.json beside it names it) gets its name, tags, note and fields back; any other file must be a PNG or
@@ -12,7 +14,7 @@
 // WebCrypto): PBKDF2-SHA-256 stretches the password into a key that unwraps (AES-KW) the data key; the data key opens each file and
 // the index (AES-256-GCM).
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -21,13 +23,20 @@ const unb64 = (s) => Uint8Array.from(Buffer.from(s, "base64"));
 const b64 = (b) => Buffer.from(b).toString("base64");
 const HIDDEN_JSON = ".canvast/hidden.json";
 const HIDDEN_FILE_RE = /^\.hidden\/[0-9a-f]{32}\.bin$/;
+/** A sealed file under any name a sync tool gives a copy of one. */
+const SEALED_COPY_RE = /^[0-9a-f]{32}[^/]*\.bin$/i;
+/** Copies of hidden.json beside it (`hidden (1).json`, `hidden.sync-conflict-….json`, or the app's own when hidden.json held another key). */
+const hiddenCopies = (workspace) => {
+  const dir = join(workspace, ".canvast");
+  return existsSync(dir) ? readdirSync(dir).filter((n) => /^hidden[^/]*\.json$/i.test(n) && n !== "hidden.json" && !n.includes(".tmp-")).map((n) => `.canvast/${n}`) : [];
+};
 
 /** The vault of `hidden.json`: its record and data key for a password. Throws on a wrong password or a file that is not one. */
-async function openVault(workspace, password) {
-  const path = join(workspace, HIDDEN_JSON);
-  if (!existsSync(path)) throw new Error(`no ${HIDDEN_JSON}: this workspace has no Hidden items password`);
+async function openVault(workspace, password, file = HIDDEN_JSON) {
+  const path = join(workspace, file);
+  if (!existsSync(path)) throw new Error(`no ${file}: this workspace has no Hidden items password`);
   const record = JSON.parse(readFileSync(path, "utf8"));
-  if (record?.format !== "canvast-hidden" || record.version !== 1 || record.kdf?.name !== "PBKDF2" || record.kdf.hash !== "SHA-256") throw new Error(`${HIDDEN_JSON} is not a canvast vault (format canvast-hidden, version 1)`);
+  if (record?.format !== "canvast-hidden" || record.version !== 1 || record.kdf?.name !== "PBKDF2" || record.kdf.hash !== "SHA-256") throw new Error(`${file} is not a canvast vault (format canvast-hidden, version 1)`);
   const base = await subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
   const kek = await subtle.deriveKey({ name: "PBKDF2", hash: "SHA-256", salt: unb64(record.kdf.salt), iterations: record.kdf.iterations }, base, { name: "AES-KW", length: 256 }, false, ["unwrapKey"]);
   try {
@@ -66,22 +75,91 @@ function freeName(dir, name, taken) {
   }
 }
 
-/** Decrypt every hidden item of `workspace` into `out`. Returns how many were written. */
+/** The extension a file's first bytes say it has (as the app names a recovered file), else "bin". */
+function extOfBytes(b) {
+  const t = (i, n) => Buffer.from(b.subarray(i, i + n)).toString("latin1");
+  if (t(0, 4) === "\x89PNG") return "png";
+  if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "jpg";
+  if (t(0, 4) === "GIF8") return "gif";
+  if (t(0, 4) === "RIFF") return t(8, 4) === "WEBP" ? "webp" : t(8, 4) === "WAVE" ? "wav" : "bin";
+  if (t(4, 4) === "ftyp") return /^(avif|avis)/.test(t(8, 4)) ? "avif" : t(8, 2) === "qt" ? "mov" : /^M4A/.test(t(8, 4)) ? "m4a" : "mp4";
+  if (t(0, 4) === "\x1aE\xdf\xa3") return "webm";
+  if (t(0, 2) === "BM") return "bmp";
+  if (t(0, 4) === "%PDF") return "pdf";
+  if (t(0, 3) === "ID3" || (b[0] === 0xff && b[1] === 0xfb)) return "mp3";
+  if (t(0, 4) === "OggS") return "ogg";
+  if (t(0, 4) === "fLaC") return "flac";
+  if (t(0, 4) === "wOFF") return "woff";
+  if (t(0, 4) === "wOF2") return "woff2";
+  if (t(0, 4) === "OTTO") return "otf";
+  if (b[0] === 0 && b[1] === 1 && b[2] === 0 && b[3] === 0) return "ttf";
+  if (t(0, 4) === "PK\x03\x04") return "zip";
+  if (/<svg[\s>]/.test(Buffer.from(b.subarray(0, 1024)).toString("utf8"))) return "svg";
+  return "bin";
+}
+
+/**
+ * Decrypt every hidden item of `workspace` into `out`: those of hidden.json and of each copy beside it the password opens, then every
+ * sealed file of .hidden/ no entry named that one of their keys opens (as recovered-<hash>.<ext>). Returns how many were written.
+ */
 export async function decryptHidden(workspace, out, password) {
-  const { record, key } = await openVault(workspace, password);
-  const index = await readIndex(record, key);
+  const vaults = [];
+  for (const file of [HIDDEN_JSON, ...hiddenCopies(workspace)]) {
+    try {
+      vaults.push(await openVault(workspace, password, file));
+    } catch (e) {
+      if (file === HIDDEN_JSON && !hiddenCopies(workspace).length) throw e;
+      console.warn(`${file}: ${e.message}`);
+    }
+  }
+  if (!vaults.length) throw new Error("wrong password");
+  const tryOpen = async (sealed) => {
+    for (const v of vaults) {
+      try {
+        return await open(v.key, sealed);
+      } catch {
+        // another key
+      }
+    }
+    return null;
+  };
   mkdirSync(out, { recursive: true });
-  const taken = new Set(), written = [];
-  for (const item of index) {
-    if (!HIDDEN_FILE_RE.test(item.file ?? "")) continue;
-    const sealed = join(workspace, item.file);
-    if (!existsSync(sealed)) {
-      console.warn(`missing: ${item.file} (${item.name})`);
+  const taken = new Set(), written = [], hashes = new Set(), files = new Set();
+  for (const v of vaults) {
+    for (const item of await readIndex(v.record, v.key)) {
+      if (!HIDDEN_FILE_RE.test(item.file ?? "") || hashes.has(item.hash)) continue;
+      const sealed = join(workspace, item.file);
+      if (!existsSync(sealed)) {
+        console.warn(`missing: ${item.file} (${item.name})`);
+        continue;
+      }
+      const bytes = await tryOpen(new Uint8Array(readFileSync(sealed)));
+      if (!bytes) {
+        console.warn(`does not open: ${item.file} (${item.name})`);
+        continue;
+      }
+      const name = freeName(out, item.name, taken);
+      writeFileSync(join(out, name), bytes);
+      written.push({ ...item, writtenAs: name });
+      hashes.add(item.hash);
+      files.add(item.file);
+    }
+  }
+  // Sealed files no entry names: their entries were lost (or each is a sync tool's copy of one written above, then skipped by its content).
+  const dir = join(workspace, ".hidden");
+  for (const n of existsSync(dir) ? readdirSync(dir).filter((n) => SEALED_COPY_RE.test(n)).sort() : []) {
+    if (files.has(`.hidden/${n}`)) continue;
+    const bytes = await tryOpen(new Uint8Array(readFileSync(join(dir, n))));
+    if (!bytes) {
+      console.warn(`does not open with this password: .hidden/${n}`);
       continue;
     }
-    const name = freeName(out, item.name, taken);
-    writeFileSync(join(out, name), await open(key, new Uint8Array(readFileSync(sealed))));
-    written.push({ ...item, writtenAs: name });
+    const hash = createHash("sha256").update(bytes).digest("hex");
+    if (hashes.has(hash)) continue;
+    const name = freeName(out, `recovered-${hash.slice(0, 12)}.${extOfBytes(bytes)}`, taken);
+    writeFileSync(join(out, name), bytes);
+    written.push({ hash, name, file: `.hidden/${n}`, size: bytes.length, recovered: true, writtenAs: name });
+    hashes.add(hash);
   }
   writeFileSync(join(out, freeName(out, "hidden-items.json", taken)), JSON.stringify(written, null, 1));
   return written.length;
@@ -115,9 +193,9 @@ export async function encryptHidden(workspace, files, password) {
       console.warn(`already hidden: ${path}`);
       continue;
     }
-    // A file from `decrypt`: its entry, as it was (the same content, so the same hash).
+    // A file from `decrypt`: its entry, as it was (the same content, so the same hash); a recovered one had none.
     const listPath = join(dirname(path), "hidden-items.json");
-    const before = existsSync(listPath) ? JSON.parse(readFileSync(listPath, "utf8")).find((i) => i.hash === hash) : undefined;
+    const before = existsSync(listPath) ? JSON.parse(readFileSync(listPath, "utf8")).find((i) => i.hash === hash && !i.recovered) : undefined;
     let entry;
     if (before) {
       const { writtenAs: _w, ...rest } = before;

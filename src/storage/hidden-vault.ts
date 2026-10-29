@@ -17,6 +17,8 @@ export interface VaultRecord {
   key: string;
   /** The hidden items' entries (JSON), sealed with the data key. */
   index?: Sealed;
+  /** A known text sealed with the data key: whether a key is this record's, without the password (records of 0.50.46 and before have none). */
+  check?: Sealed;
 }
 
 export interface Sealed {
@@ -61,7 +63,7 @@ async function unwrap(record: VaultRecord, password: string, extractable: boolea
  */
 export async function createVault(password: string, iterations = VAULT_ITERATIONS): Promise<{ record: VaultRecord; key: CryptoKey }> {
   const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
-  return { record: await wrap(key, password, iterations), key };
+  return { record: { ...(await wrap(key, password, iterations)), check: await keyCheck(key) }, key };
 }
 
 /** The data key for a password, or null when it is not the password. */
@@ -69,7 +71,21 @@ export const openVault = (record: VaultRecord, password: string): Promise<Crypto
 
 /** The same data key under a new password. The sealed index and files stay as they are. */
 export async function rewrapVault(record: VaultRecord, key: CryptoKey, newPassword: string, iterations = record.kdf.iterations): Promise<VaultRecord> {
-  return { ...(await wrap(key, newPassword, iterations)), ...(record.index ? { index: record.index } : {}) };
+  return { ...(await wrap(key, newPassword, iterations)), ...(record.index ? { index: record.index } : {}), check: await keyCheck(key) };
+}
+
+const CHECK_TEXT = VAULT_FORMAT;
+/** The record's `check` for a data key. */
+export const keyCheck = (key: CryptoKey): Promise<Sealed> => sealText(key, CHECK_TEXT);
+
+/**
+ * Whether `key` is the record's data key, told by what the key opens (its check, else its index); null when the record has
+ * neither (a record of an earlier version with nothing hidden yet: only its password can tell).
+ */
+export async function holdsKey(record: VaultRecord, key: CryptoKey): Promise<boolean | null> {
+  if (record.check) return (await openText(key, record.check)) === CHECK_TEXT;
+  if (record.index) return (await openText(key, record.index)) !== null;
+  return null;
 }
 
 /** Bytes sealed with the data key: a random IV, then the AES-GCM ciphertext and tag. */
@@ -124,7 +140,7 @@ export function readVault(text: string): VaultRecord | null {
       Number.isInteger(k.iterations) && k.iterations >= 100_000 && k.iterations <= 10_000_000 &&
       typeof k.salt === "string" && B64_RE.test(k.salt) &&
       typeof r.key === "string" && B64_RE.test(r.key) && r.key.length <= 64 &&
-      (r.index === undefined || (typeof r.index.iv === "string" && B64_RE.test(r.index.iv) && typeof r.index.data === "string" && B64_RE.test(r.index.data)));
+      [r.index, r.check].every((x) => x === undefined || (typeof x.iv === "string" && B64_RE.test(x.iv) && typeof x.data === "string" && B64_RE.test(x.data)));
     return ok ? (r as VaultRecord) : null;
   } catch {
     return null;
@@ -134,6 +150,8 @@ export function readVault(text: string): VaultRecord | null {
 /** A hidden item's file: `.hidden/<32 random hex>.bin`. */
 export const HIDDEN_FILE_RE = /^\.hidden\/[0-9a-f]{32}\.bin$/;
 export const isHiddenFile = (file: string | null | undefined): boolean => !!file && HIDDEN_FILE_RE.test(file);
+/** A sealed file under another name: a sync tool's copy of one (`<32 hex> (1).bin`, `<32 hex>.sync-conflict-….bin`…). Never sealed again. */
+export const SEALED_COPY_RE = /^\.hidden\/[0-9a-f]{32}[^/]*\.bin$/i;
 
 /** A new name for a hidden file: random, so it says nothing about the item. */
 export function hiddenFileName(): string {

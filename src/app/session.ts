@@ -704,7 +704,14 @@ export class Session {
       this.tell("Show the hidden items first: in this app hidden items are encrypted with this password, so it stays while there are any.");
       return false;
     }
-    if (hidden && password !== null) await hidden.setPassword(password);
+    if (hidden && password !== null) {
+      try {
+        await hidden.setPassword(password);
+      } catch (e) {
+        this.tell((e as Error).message);
+        return false;
+      }
+    }
     await this.catalog.setLock(kind, password === null ? null : await makeLock(password));
     return true;
   }
@@ -715,7 +722,8 @@ export class Session {
     if (hidden && (await hidden.state()) !== "none") return hidden.unlock(password);
     const lock = await this.catalog?.lock(kind).catch(() => null);
     const ok = !lock || (await checkLock(lock, password));
-    if (ok && lock && hidden) await hidden.setPassword(password); // (a password set before the key, or brought by a backup: its key is made now)
+    // (a password set before the key, or brought by a backup: its key is made now; not while another device's key is on its way)
+    if (ok && lock && hidden) await hidden.setPassword(password).catch((e: unknown) => this.tell((e as Error).message));
     return ok;
   }
 

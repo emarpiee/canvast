@@ -85,7 +85,7 @@ export class WorkspaceMirror {
     private readonly repo: WorkspaceStore,
     private readonly bridge: DesktopBridge,
     readonly deviceId: string,
-    vault: HiddenVault,
+    private readonly vault: HiddenVault,
     private readonly deleteTo: () => DeleteMode = () => "trash",
   ) {
     this.lib = new LibraryMirror(db, bridge, vault);
@@ -393,9 +393,9 @@ export class WorkspaceMirror {
   rereadLibrary(onChange: () => void): Promise<void> {
     this.running = Promise.all([this.running, this.ready])
       .then(async () => {
-        if (!(await this.lib.reread())) return;
-        onChange();
-        this.library();
+        const took = await this.lib.reread();
+        if (took) onChange();
+        if (took || this.vault.copiesWaiting) this.library(); // (copies of the hidden index read into it are erased once it is written)
       })
       .catch((e: unknown) => this.onError?.(`The library of the workspace folder could not be read: ${(e as Error).message}.`));
     return this.running;
@@ -407,6 +407,10 @@ export class WorkspaceMirror {
   /** Who asks for the hidden items' password when readable files wait in `.hidden/`. */
   set askHiddenKey(fn: LibraryMirror["askKey"]) {
     this.lib.askKey = fn;
+  }
+  /** Who looks through `.hidden/` again later (a sealed file with no entry waits before it is taken back). */
+  set scanHiddenLater(fn: LibraryMirror["scanLater"]) {
+    this.lib.scanLater = fn;
   }
   /** Who imports files found in `library/`. */
   set importFiles(fn: LibraryMirror["importFiles"]) {

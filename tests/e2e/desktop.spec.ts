@@ -637,6 +637,78 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
   }
 });
 
+test("hidden items and sync tools: a conflict copy of hidden.json is joined, a lost entry's file comes back, a copied sealed file is not sealed twice, no second key", async () => {
+  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const alpha = makePng(3, 2, () => [200, 40, 160, 255]);
+  const beta = makePng(2, 2, () => [20, 200, 60, 255]);
+  const gamma = makePng(4, 1, () => [30, 30, 220, 255]);
+  const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
+  type Tool = { decryptHidden: (ws: string, out: string, pw: string) => Promise<number>; encryptHidden: (ws: string, files: string[], pw: string) => Promise<number> };
+  const { decryptHidden, encryptHidden } = (await import(join(process.cwd(), "scripts/hidden-items.mjs"))) as Tool;
+  let { app, page } = await launch(ws);
+  const hid = (op: "set" | "check", pw?: string) => page.evaluate(([op, pw]) => window.__canvastDebug.hiddenOp(op as "set", pw), [op, pw] as const);
+  const listing = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, !!e.hidden, e.present]).sort()));
+  const sealedNames = () => files(ws).filter((f) => f.startsWith(".hidden/"));
+  try {
+    await page.getByTestId("import-input").setInputFiles({ name: "Alpha.png", mimeType: "image/png", buffer: alpha });
+    await expect.poll(listing).toEqual([["Alpha.png", false, true]]);
+    expect(await hid("set", "pw")).toEqual({ ok: true, state: "open" });
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), sha(alpha));
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    expect(sealedNames()).toHaveLength(1);
+  } finally {
+    await app.close();
+  }
+  const alphaFile = sealedNames()[0]!;
+  const json = join(ws, ".canvast/hidden.json");
+  const added = (had: string[]) => sealedNames().find((f) => !had.includes(f))!;
+  // Another device hid Beta while this one's hidden.json changed too: the sync tool kept this one's and put the other beside it.
+  const before = readFileSync(json);
+  writeFileSync(`${ws}-beta.png`, beta);
+  expect(await encryptHidden(ws, [`${ws}-beta.png`], "pw")).toBe(1);
+  const betaFile = added([alphaFile]);
+  renameSync(json, join(ws, ".canvast/hidden (1).json"));
+  writeFileSync(json, before);
+  // Gamma's entry was lost for good (no copy kept it), and the sync tool left its file under a copy's name; and a copy of Alpha's file.
+  writeFileSync(`${ws}-gamma.png`, gamma);
+  expect(await encryptHidden(ws, [`${ws}-gamma.png`], "pw")).toBe(1);
+  const gammaFile = added([alphaFile, betaFile]);
+  writeFileSync(json, before);
+  renameSync(join(ws, gammaFile), join(ws, gammaFile.replace(".bin", " (1).bin")));
+  writeFileSync(join(ws, alphaFile.replace(".bin", " (1).bin")), readFileSync(join(ws, alphaFile)));
+  ({ app, page } = await launch(ws));
+  try {
+    // Locked at first, as on any start; the password opens the key, and with it what the sync tool left.
+    await expect.poll(() => hid("check", "x").then((r) => r.state)).toBe("locked");
+    expect(await hid("check", "pw")).toEqual({ ok: true, state: "open" });
+    const recovered = `recovered-${sha(gamma).slice(0, 12)}.png`;
+    await expect.poll(listing, { timeout: 15_000 }).toEqual([["Alpha.png", true, true], [basename(`${ws}-beta.png`), true, true], [recovered, true, true]].sort());
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    // The copy of hidden.json was joined and erased; the copy of Alpha's file erased; Gamma's renamed back to a hidden file's name, not sealed again.
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(".canvast/hidden")), { timeout: 15_000 }).toEqual([".canvast/hidden.json"]);
+    expect(sealedNames()).toHaveLength(3);
+    for (const f of sealedNames()) expect(f).toMatch(/^\.hidden\/[0-9a-f]{32}\.bin$/);
+    expect(sealedNames()).toContain(betaFile);
+    expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), sha(gamma))).toEqual(Array.from(gamma));
+  } finally {
+    await app.close();
+  }
+  // The tool reads the joined index: all three come out, Gamma under its recovered name.
+  expect(await decryptHidden(ws, `${ws}-out`, "pw")).toBe(3);
+  expect(readFileSync(join(`${ws}-out`, `recovered-${sha(gamma).slice(0, 12)}.png`)).equals(gamma)).toBe(true);
+  // A workspace whose sealed files came before their hidden.json: no new key is made (it would be a second one).
+  const ws2 = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  mkdirSync(join(ws2, ".hidden"));
+  writeFileSync(join(ws2, alphaFile), readFileSync(join(ws, betaFile)));
+  ({ app, page } = await launch(ws2));
+  try {
+    expect(await hid("set", "other")).toEqual({ ok: false, state: "none" });
+    expect(existsSync(join(ws2, ".canvast/hidden.json"))).toBe(false);
+  } finally {
+    await app.close();
+  }
+});
+
 test("a hidden item's picture is not read while locked, so after a restart its card shows once its list is opened", async () => {
   const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
   const pic = (k: number) => makePng(600, 400, (x, y) => [(x * k) % 256, y % 256, 120, 255]); // (bigger than a thumbnail: one is made)

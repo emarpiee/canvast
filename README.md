@@ -678,6 +678,9 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 | A file still being written (temporary, partial download) | Leaves it alone |
 | The library's files (`.canvast/library/`) on a device with no copy yet | Takes the library from them; a device with no copy at all opens the whole workspace from the folder |
 | `library.json` changed by an older version of the app | Takes what it changed; a workspace that has only `library.json` (made by an older version) is read from it and gets the parts |
+| The hidden items changed on two devices at once (the sync tool keeps a copy such as `.canvast/hidden (1).json`) | Once the Hidden items are opened, takes the copy's items too, then deletes the copy. A copy made under another Hidden password is joined when that password is the same as this one; otherwise the app says so, and `hidden-items.mjs` opens it with its own password |
+| An encrypted file in `.hidden/` that no hidden item names (its entry lost in such a clash), or a sync tool's copy of one (`… (1).bin`) | A copy of an item's file is deleted. Any other file comes back as a hidden item named `recovered-<hash>.<ext>`, once it has had no entry for 30 seconds (its entry may still be on its way). An encrypted file is never encrypted a second time |
+| `.hidden/` has encrypted files but `.canvast/hidden.json` has not arrived yet | Setting a first Hidden password is refused until it arrives: a new key would be a second one, and the files of one device would not open on the other |
 
 **Bringing a browser workspace in:** export a full backup in the browser and import it in the desktop app. One screen shows the import and how many files are written into the folder; then the app starts again on them and says what was imported, without asking for the workspace password again (it was given before the import).
 
@@ -771,6 +774,7 @@ In a desktop workspace folder the hidden items are open, documented files, so th
 | The vault | `.canvast/hidden.json` | JSON: `format: "canvast-hidden"`, `version: 1`, `kdf: { name: "PBKDF2", hash: "SHA-256", iterations, salt }` (600,000 iterations, a 16-byte random salt), `key`, and `index` |
 | The data key | `key` in the vault | A random 256-bit AES-GCM key, wrapped (AES-KW, RFC 3394) by the key PBKDF2 makes from the Hidden password and the salt. A wrong password fails to unwrap it. Changing the password wraps the same key again, so no file is encrypted again |
 | A hidden file | `.hidden/<32 random hex digits>.bin` | 12 bytes of IV, then the file's bytes encrypted with AES-256-GCM under the data key, with the 16-byte tag at the end. The name says nothing about the item |
+| The key check | `check` in the vault: `{ iv, data }` | The text `canvast-hidden` sealed with the data key, so the app knows whether a vault holds its key without the password (a vault written before 0.50.47 may lack it) |
 | The index | `index` in the vault: `{ iv, data }` | A JSON list sealed the same way (`iv` and `data`, base64): one entry per hidden item as in `library.json` (its `hash`, `file`, `name`, `type`, `size`, `tags`, `note`, `fields`, …), which names each item's `.hidden/` file |
 
 All binary values in the vault are base64. The SHA-256 of a decrypted file is its `hash` in the index.
@@ -787,7 +791,7 @@ node scripts/hidden-items.mjs decrypt ~/Art/my-workspace ~/decrypted
 node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 ```
 
-`decrypt` changes nothing in the workspace. `encrypt` takes back files that came out of `decrypt` with their names, tags, notes and fields (it finds them in the `hidden-items.json` beside them), and new PNG or JPEG pictures (it reads their size). For any other new file, put it in `.hidden/` while canvast runs with the Hidden items open: the app reads it, encrypts it and lists it. `encrypt` leaves the readable files where they are, so delete them yourself when you no longer need them.
+`decrypt` changes nothing in the workspace. It also reads copies of `hidden.json` that a sync tool left beside it (each opened with the password given), and writes any encrypted file of `.hidden/` that no entry names as `recovered-<hash>.<ext>`. `encrypt` takes back files that came out of `decrypt` with their names, tags, notes and fields (it finds them in the `hidden-items.json` beside them), and new PNG or JPEG pictures (it reads their size). For any other new file, put it in `.hidden/` while canvast runs with the Hidden items open: the app reads it, encrypts it and lists it. `encrypt` leaves the readable files where they are, so delete them yourself when you no longer need them.
 
 ---
 

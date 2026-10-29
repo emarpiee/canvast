@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SEAL_OVERHEAD, createVault, hiddenFileName, openBytes, openText, openVault, readVault, rewrapVault, sealBytes, sealText } from "../../src/storage/hidden-vault";
+import { SEAL_OVERHEAD, SEALED_COPY_RE, createVault, hiddenFileName, holdsKey, openBytes, openText, openVault, readVault, rewrapVault, sealBytes, sealText } from "../../src/storage/hidden-vault";
 
 const FAST = 100_000; // (the lowest a record may say; the app uses 600,000)
 
@@ -40,9 +40,25 @@ describe("hidden vault", () => {
     expect(Array.from((await openBytes((await openVault(next, "new"))!, sealed))!)).toEqual([42]);
   });
 
+  it("a record tells whether a key is its own without the password (two devices that set a first password at once have two)", async () => {
+    const a = await createVault("same", FAST);
+    const b = await createVault("same", FAST);
+    expect(await holdsKey(a.record, a.key)).toBe(true);
+    expect(await holdsKey(a.record, b.key)).toBe(false);
+    const rewrapped = readVault(JSON.stringify(await rewrapVault(a.record, a.key, "next")))!;
+    expect(await holdsKey(rewrapped, a.key)).toBe(true); // (kept under a new password)
+    // A record of an earlier version has no check: its index tells, and with none, only the password can.
+    const { check: _c, ...old } = a.record;
+    expect(await holdsKey({ ...old, index: await sealText(a.key, "[]") }, b.key)).toBe(false);
+    expect(await holdsKey(old, a.key)).toBeNull();
+  });
+
   it("hidden file names are random and say nothing", () => {
     const a = hiddenFileName();
     expect(a).toMatch(/^\.hidden\/[0-9a-f]{32}\.bin$/);
     expect(hiddenFileName()).not.toBe(a);
+    // A sync tool's copy of a sealed file is still a sealed file (never sealed again); a readable file is not.
+    for (const copy of [a.replace(".bin", " (1).bin"), a.replace(".bin", ".sync-conflict-20261029-1200-ABC.bin"), a]) expect(copy).toMatch(SEALED_COPY_RE);
+    expect(".hidden/Secret.png").not.toMatch(SEALED_COPY_RE);
   });
 });

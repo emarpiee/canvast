@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.47: hidden items survive sync clashes (2026-10-29)
+
+**Implemented:** sync-safety step 1 of 5 (ADR 0177, "Hidden items and sync tools"). Copies of `hidden.json` are joined into the index and erased once it is written; a copy with another key the same password opens is joined, its files sealed again first; a `check` in the vault tells whether it holds the key in memory, and the index is never written into one that holds another (this device's record goes beside it); an index that does not open is not whole (nothing taken as erased); sealed files no entry names are erased (copies) or taken back as `recovered-<hash>.<ext>` (after 30 s for a hidden file's name); a file the key opens is never sealed again; a first password is refused while sealed files wait for their `hidden.json`. `hidden-items.mjs decrypt` reads copies and unnamed files.
+**Tested:** unit `hidden-vault.test.ts` (5); desktop `hidden items and sync tools` (new: a conflict copy joined, a lost entry's file recovered, a copied sealed file erased, no second key) and the other hidden/password desktop tests (4 passed).
+**Known failures:** none.
+**Unverified:** the 30 s wait for a sealed file with a hidden file's name (no E2E: it would cost 30 s); joining a copy with another key and the `hidden (this device …).json` path (unit-tested parts only: `holdsKey`).
+**Committed:** on `main`.
+**Next bounded task:** sync step 2: canvas copies a sync tool makes shown as "(conflict from sync)".
+
 ## v0.50.46: Ctrl+click after a Ctrl+drag (2026-10-29)
 
 **Implemented:** the reveal's "on the way to the list" rule no longer applies while a button is held, so a Ctrl+drag does not leave the revealed list behind under the pointer. This was the cause of the CI failure of `frames.spec.ts:2179` (it reproduced locally: 2 of 20 runs, 10 of 20 with a pause before the click).

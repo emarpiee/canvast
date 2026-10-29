@@ -14,10 +14,11 @@ import { storedStub } from "../assets/asset-library";
 import type { DesktopBridge } from "./desktop-bridge";
 import { externalFolder } from "./external-folder";
 import type { HiddenVault } from "./hidden-store";
-import { hiddenFileName, isHiddenFile } from "./hidden-vault";
+import { RECOVERED_PREFIX } from "./hidden-store";
+import { SEALED_COPY_RE, hiddenFileName, isHiddenFile } from "./hidden-vault";
 import { sha256Hex } from "../assets/sha256";
 import { done, idbGet, idbPut, req } from "./idb";
-import { KIND_FOLDERS, fileExt, fitsPlace, freePath, isSafeRelativePath, libraryDir, nameBase, safeBase } from "./workspace-names";
+import { KIND_FOLDERS, extOfBytes, fileExt, fitsPlace, freePath, isSafeRelativePath, libraryDir, nameBase, safeBase } from "./workspace-names";
 import type { FolderFile } from "./store";
 
 export const LIBRARY_JSON = ".canvast/library.json";
@@ -33,6 +34,8 @@ const partPath = (key: string): string => `${LIBRARY_DIR}/items-${key}.json`;
 const PART_KEYS = "0123456789abcdef".split("");
 /** Up to this many items, `library.json` (the single file of earlier versions) is still written, so an older app keeps working on the workspace. */
 export const COMPAT_MAX_ITEMS = 10_000;
+/** How long a sealed file with no entry waits before it is taken back as a hidden item (its entry may still be on its way); tests shorten it. */
+export const HIDDEN_ORPHAN_WAIT = { ms: 30_000 };
 
 /** One library item as `library.json` keeps it. */
 export interface LibraryItem {
@@ -261,14 +264,13 @@ export class LibraryMirror {
    */
   async reread(): Promise<boolean> {
     const vault = await this.vault.state();
+    // (An index this key does not open, damaged or of another key, is not whole: the hidden items here stay as they are.)
+    let hiddenWhole = true;
     const hiddenItems = async (): Promise<LibraryItem[]> => {
       if (vault !== "open") return [];
-      try {
-        const hidden = JSON.parse((await this.vault.readIndex()) ?? "[]") as unknown[];
-        return Array.isArray(hidden) ? hidden.map(readItem).filter((i): i is LibraryItem => i !== null) : [];
-      } catch {
-        return []; // a damaged index: the hidden items here stay as they are
-      }
+      const read = await this.vault.readIndex().catch(() => null);
+      if (!read?.whole) hiddenWhole = false;
+      return (read?.items ?? []).map(readItem).filter((i): i is LibraryItem => i !== null);
     };
     let took = false;
     // The library in parts: only the parts whose text changed are read; the others' items are known to be there still.
@@ -314,7 +316,7 @@ export class LibraryMirror {
       items.push(...hidden);
       for (const i of hidden) present.add(i.hash);
       // (While the hidden items are locked, an item missing from the library may have been hidden elsewhere, not erased.)
-      took = await this.adopt(readFolders(index.folders), items, whole && vault !== "locked" ? present : null);
+      took = await this.adopt(readFolders(index.folders), items, whole && hiddenWhole && vault !== "locked" ? present : null);
       this.parts = parts;
     }
     // `library.json`: read when it is the only form (a workspace of an earlier version), or when an older app changed it since.
@@ -334,7 +336,7 @@ export class LibraryMirror {
     if (hasParts && (raw as { copyOf?: unknown }).copyOf === LIBRARY_DIR) return took;
     const items = raw.items.map(readItem).filter((i): i is LibraryItem => i !== null);
     items.push(...(await hiddenItems()));
-    return (await this.adopt(readFolders(raw.folders), items, vault !== "locked" ? new Set(items.map((i) => i.hash)) : null)) || took;
+    return (await this.adopt(readFolders(raw.folders), items, hiddenWhole && vault !== "locked" ? new Set(items.map((i) => i.hash)) : null)) || took;
   }
 
   /**
@@ -536,13 +538,15 @@ export class LibraryMirror {
   /**
    * Readable files someone put in `.hidden/` (a sealed one is `<32 hex>.bin`): while the hidden items are open they become hidden items,
    * taken where they lie, and the next write seals them and erases the readable file (a copy of an item the library has is erased at
-   * once: its bytes are in that item, which is hidden too). While they are locked, the person is told once, to open them. Whether anything
-   * was taken.
+   * once: its bytes are in that item, which is hidden too). While they are locked, the person is told once, to open them. Sealed files
+   * are never sealed again, whatever their name: those no item names are taken back (see `recoverSealed`). Whether anything was taken.
    */
   async scanHidden(tellAgain = false): Promise<boolean> {
-    const plain = (await this.bridge.list(".hidden")).map((n) => `.hidden/${n}`).filter((p) => !isHiddenFile(p) && !p.includes(".tmp-"));
-    if (!plain.length) return false;
+    const all = (await this.bridge.list(".hidden")).map((n) => `.hidden/${n}`).filter((p) => !p.includes(".tmp-"));
+    let plain = all.filter((p) => !SEALED_COPY_RE.test(p));
+    const sealed = all.filter((p) => SEALED_COPY_RE.test(p));
     if (!this.vault.dataKey) {
+      if (!plain.length) return false;
       if (tellAgain) this.toldPlain.clear(); // (a file was just put there: said again, even about one said before)
       const fresh = plain.filter((p) => !this.toldPlain.has(p));
       for (const p of fresh) this.toldPlain.add(p);
@@ -550,7 +554,15 @@ export class LibraryMirror {
       else if (fresh.length) this.onNotice?.(`${fresh.length === 1 ? `A readable file (${fresh[0]!.slice(8)}) is` : `${fresh.length} readable files are`} in .hidden/ of the workspace folder. Open the Hidden items to encrypt ${fresh.length === 1 ? "it" : "them"}.`);
       return false;
     }
-    if (!this.importFiles) return false;
+    // A file the key opens is sealed, whatever its name (a sync tool's copy renamed further): it is not readable.
+    const opens = await Promise.all(plain.map(async (p) => {
+      const bytes = await this.bridge.read(p);
+      return !!bytes && !!(await this.vault.open(bytes as Uint8Array<ArrayBuffer>));
+    }));
+    sealed.push(...plain.filter((_, i) => opens[i]));
+    plain = plain.filter((_, i) => !opens[i]);
+    let took = sealed.length ? await this.recoverSealed(sealed) : false;
+    if (!plain.length || !this.importFiles) return took;
     await this.importFiles(plain.map((path) => ({ path, name: path.slice(8), folderId: null, hidden: true, read: async () => {
       const bytes = await this.bridge.read(path);
       return bytes && new Blob([bytes as Uint8Array<ArrayBuffer>]);
@@ -560,8 +572,83 @@ export class LibraryMirror {
       const rec = hash ? await idbGet<AssetRecord>(this.db, "assets", hash) : undefined;
       if (rec && rec.file !== path) await this.bridge.erase(path); // (a copy: the item has the bytes, and is hidden now)
     }
-    return true;
+    took = true;
+    return took;
   }
+
+  /**
+   * Sealed files in `.hidden/` that no item names (ADR 0177, "Hidden items and sync tools"): its entry was lost (two devices wrote
+   * `hidden.json` at once and the sync tool kept one), or the file is a sync tool's copy of another. One with the content of an item
+   * whose file is there is a copy: erased (it is sealed: nothing readable goes). Any other is taken back as a hidden item, where it
+   * lies (renamed to a hidden file's name first), named `recovered-<hash>.<ext>` as its name is not known. A file with a hidden file's
+   * name is taken only once it has had no entry for `HIDDEN_ORPHAN_WAIT.ms`: its entry may still be on its way. Whether anything changed.
+   */
+  private async recoverSealed(paths: string[]): Promise<boolean> {
+    const tx = this.db.transaction("assets", "readonly");
+    const stubs = (await req(tx.objectStore("assets").index("ext").getAll())) as AssetRecord[];
+    const named = new Set(stubs.flatMap((r) => (r.file && isHiddenFile(r.file) ? [r.file] : [])));
+    const now = Date.now();
+    for (const p of [...this.unnamedSince.keys()]) if (!paths.includes(p) || named.has(p)) this.unnamedSince.delete(p);
+    const due: string[] = [];
+    for (const p of paths) {
+      if (named.has(p)) continue;
+      const since = this.unnamedSince.get(p) ?? (isHiddenFile(p) ? now : 0);
+      this.unnamedSince.set(p, since);
+      if (now - since >= HIDDEN_ORPHAN_WAIT.ms) due.push(p);
+    }
+    if (due.length < this.unnamedSince.size && !this.laterTimer) {
+      this.laterTimer = setTimeout(() => {
+        this.laterTimer = 0;
+        this.scanLater?.();
+      }, HIDDEN_ORPHAN_WAIT.ms + 1000) as unknown as number;
+    }
+    let changed = false;
+    const found: FolderFile[] = [];
+    const shut: string[] = [];
+    for (const p of due) {
+      const bytes = await this.bridge.read(p);
+      const plain = bytes && (await this.vault.open(bytes as Uint8Array<ArrayBuffer>));
+      if (!plain) {
+        if (bytes) shut.push(p);
+        continue;
+      }
+      const hash = await sha256Hex(plain.buffer);
+      const rec = await idbGet<AssetRecord>(this.db, "assets", hash);
+      if (rec && (!rec.ext || (rec.file && rec.file !== p && (await this.bridge.exists(rec.file))))) {
+        await this.bridge.erase(p); // a copy of what an item has
+        this.unnamedSince.delete(p);
+        changed = true;
+        continue;
+      }
+      let at = p;
+      if (!isHiddenFile(p)) {
+        at = hiddenFileName();
+        await this.bridge.rename(p, at);
+      }
+      this.unnamedSince.delete(p);
+      if (rec) {
+        await this.setFile(hash, (r) => r.ext === 1, at); // (its item's file was lost: this is it)
+        changed = true;
+        continue;
+      }
+      found.push({ path: at, name: `${RECOVERED_PREFIX}${hash.slice(0, 12)}.${extOfBytes(plain)}`, folderId: null, hidden: true, read: async () => new Blob([plain]) });
+    }
+    if (shut.some((p) => !this.toldShut.has(p))) {
+      for (const p of shut) this.toldShut.add(p);
+      this.onNotice?.(`${shut.length === 1 ? "A hidden file" : `${shut.length} hidden files`} in .hidden/ of the workspace folder ${shut.length === 1 ? "does" : "do"} not open with this Hidden password (encrypted with another one). ${shut.length === 1 ? "It is" : "They are"} left as ${shut.length === 1 ? "it is" : "they are"}: scripts/hidden-items.mjs opens ${shut.length === 1 ? "it" : "them"} with that password.`);
+    }
+    if (found.length && this.importFiles) {
+      await this.importFiles(found);
+      this.onNotice?.(`${found.length === 1 ? "A hidden file" : `${found.length} hidden files`} had lost ${found.length === 1 ? "its" : "their"} entry (a sync tool kept another device's copy of the hidden items' list). ${found.length === 1 ? "It is" : "They are"} back among the Hidden items, named “${RECOVERED_PREFIX}…”.`);
+      changed = true;
+    }
+    return changed;
+  }
+  private readonly unnamedSince = new Map<string, number>();
+  private readonly toldShut = new Set<string>();
+  private laterTimer = 0;
+  /** Look through `.hidden/` again (set by the app): a sealed file no item names waits before it is taken back. */
+  scanLater: (() => void) | null = null;
   private readonly toldPlain = new Set<string>();
   /** Asks for the hidden items' password when readable files wait in `.hidden/` (set by the app). */
   askKey: ((names: string[]) => void) | null = null;
@@ -850,7 +937,7 @@ export class LibraryMirror {
       this.lastText = "-";
     }
     const index = JSON.stringify(items.filter((i) => isHiddenFile(i.file)));
-    if (this.vault.dataKey && index !== this.lastIndex && (index !== "[]" || (await this.vault.state()) !== "none")) await this.vault.writeIndex(index);
+    if (this.vault.dataKey && (index !== this.lastIndex || this.vault.copiesWaiting) && (index !== "[]" || (await this.vault.state()) !== "none")) await this.vault.writeIndex(index);
     if (this.vault.dataKey) this.lastIndex = index;
     this.state = { folders: JSON.stringify(folders), items: Object.fromEntries(items.map((i) => [i.hash, seen(JSON.stringify(i))])) };
     await idbPut(this.db, "meta", STATE_KEY, this.state);

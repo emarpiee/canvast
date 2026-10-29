@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.50.47 — Hidden items survive sync clashes (2026-10-29)
+
+- **Fixed:** in the desktop app, when a sync tool kept one device's `hidden.json` and put the other's beside it (`hidden (1).json`), the items hidden on the other device were lost from the app (their encrypted files stayed, with no way to open them). The copy is now joined into the hidden items once they are opened, then deleted.
+- **Fixed:** an encrypted file in `.hidden/` that no hidden item names comes back as a hidden item named `recovered-<hash>.<ext>`; a sync tool's copy of an encrypted file (`… (1).bin`) is no longer encrypted a second time (a copy of an item's file is deleted).
+- **Fixed:** two devices that set a first Hidden password at the same time no longer lose one device's hidden items: the app never writes its index into a `hidden.json` that holds another key, keeps its own beside it, and joins the two when the same password opens both. A first password is refused while encrypted files of another device are there without their `hidden.json`.
+- **Fixed:** a hidden index that does not open (another key, or damaged) no longer makes the app take its hidden items as deleted on another device.
+- **Changed:** `scripts/hidden-items.mjs decrypt` also reads copies of `hidden.json` and writes encrypted files no entry names as `recovered-<hash>.<ext>`.
+
 ## 0.50.46 — Ctrl+click after a Ctrl+drag (2026-10-29)
 
 - **Fixed:** after a Ctrl+drag down and to the right, the list of revealed names stayed where the drag began, under where it ended, so the next Ctrl+click there picked a row of that list instead of the thing on top. A drag no longer counts as heading for the list.

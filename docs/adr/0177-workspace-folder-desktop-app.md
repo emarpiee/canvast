@@ -272,6 +272,17 @@ The browser build keeps the Hidden password as a gate, as today. In the desktop 
 - Another device reads the encrypted index when the password is given there (until then, it does not know the hidden items, and pictures that use them show as missing).
 - Erasing deletes the file; it does not overwrite the disk blocks. Limitations say so.
 
+### Hidden items and sync tools (0.50.47)
+
+A sync tool (Mega, Drive, Proton Drive, Syncthing…) keeps one `hidden.json` when two devices wrote it at once, and puts the other beside it under another name, or keeps only the last. Without care, the items of the other copy lose their entries, so their `.hidden/` files can no longer be opened from the app. What the app does:
+
+- **Copies of `hidden.json`** (`.canvast/hidden*.json`): read into the index with each read while the Hidden items are open, and erased once the index holding their items is written. A copy that holds another key (two devices set a first password at the same time) is joined when the password given opens it too: its files are sealed again with this key, read back, and only then is the copy erased. One that does not open is left, and the person is told.
+- **A key check** (`check`: a known text sealed with the data key) tells whether a vault holds the key in memory without the password. The index is never written into a `hidden.json` that holds another key: this device's record goes beside it as `hidden (this device …).json`, to be joined as above.
+- **An index the key does not open** (another key, damaged) is not whole: no hidden item is taken as erased elsewhere because it is missing from it.
+- **Sealed files no entry names** (`<32 hex>*.bin`): a copy of a file an item has is erased (it is sealed, so nothing readable goes); any other comes back as a hidden item `recovered-<hash>.<ext>`, renamed to a hidden file's name first. A file of a hidden file's name waits 30 s with no entry before that (its entry may be on its way). A file the key opens is never sealed again, whatever its name.
+- **A first password** is refused while `.hidden/` holds sealed files or a copy of `hidden.json` is there but `hidden.json` is not (it is on its way): a new key would be a second one.
+- `scripts/hidden-items.mjs decrypt` reads the copies too, and writes files no entry names as `recovered-<hash>.<ext>`.
+
 ## Order of work
 
 Each step ends in a working app and is committed and released on its own.

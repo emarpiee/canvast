@@ -65,6 +65,30 @@ const TYPES: Record<string, string> = {
 /** The type of a file by its extension (a file found in the workspace folder has no other), else "application/octet-stream". */
 export const typeOfName = (name: string): string => TYPES[extOf(name).toLowerCase()] ?? "application/octet-stream";
 
+/** The extension a file's first bytes say it has (a hidden file found with no entry has no name to tell), else "bin". */
+export function extOfBytes(b: Uint8Array): string {
+  const at = (i: number, ...v: number[]): boolean => v.every((x, k) => b[i + k] === x);
+  const text = (i: number, n: number): string => String.fromCharCode(...b.subarray(i, i + n));
+  if (at(0, 0x89, 0x50, 0x4e, 0x47)) return "png";
+  if (at(0, 0xff, 0xd8, 0xff)) return "jpg";
+  if (text(0, 4) === "GIF8") return "gif";
+  if (text(0, 4) === "RIFF") return text(8, 4) === "WEBP" ? "webp" : text(8, 4) === "WAVE" ? "wav" : "bin";
+  if (text(4, 4) === "ftyp") return /^(avif|avis)/.test(text(8, 4)) ? "avif" : text(8, 2) === "qt" ? "mov" : /^M4A/.test(text(8, 4)) ? "m4a" : "mp4";
+  if (at(0, 0x1a, 0x45, 0xdf, 0xa3)) return "webm";
+  if (text(0, 2) === "BM") return "bmp";
+  if (text(0, 4) === "%PDF") return "pdf";
+  if (text(0, 3) === "ID3" || at(0, 0xff, 0xfb)) return "mp3";
+  if (text(0, 4) === "OggS") return "ogg";
+  if (text(0, 4) === "fLaC") return "flac";
+  if (text(0, 4) === "wOFF") return "woff";
+  if (text(0, 4) === "wOF2") return "woff2";
+  if (text(0, 4) === "OTTO") return "otf";
+  if (at(0, 0, 1, 0, 0)) return "ttf";
+  if (text(0, 4) === "PK\u0003\u0004") return "zip";
+  if (/<svg[\s>]/.test(new TextDecoder().decode(b.subarray(0, 1024)))) return "svg";
+  return "bin";
+}
+
 /** The kind folders of `library/` (an item in no library folder is in one of these). */
 export const KIND_FOLDERS: ReadonlySet<string> = new Set(["images", "vectors", "icons", "art_sources", "presets", "3d", "video", "audio", "fonts", "documents", "archives", "other"]);
 
