@@ -1,0 +1,36 @@
+# The desktop app on a workspace folder of N library files (scripts/bench-library.mjs), on GitHub's machine: a million files is
+# too much for a workstation in use. Run by hand (Run workflow); the table lands in the run's summary.
+name: Bench library
+
+on:
+  workflow_dispatch:
+    inputs:
+      items:
+        description: How many library files
+        default: "1000000"
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y xvfb
+      - run: npx playwright install --with-deps chromium
+      # (a test snapshot holds the desktop build the bench opens)
+      - run: xvfb-run -a npm run test:snap -- --project=desktop tests/e2e/desktop.spec.ts -g sandboxed
+        env:
+          ELECTRON_DISABLE_SANDBOX: "1"
+      - run: xvfb-run -a node scripts/bench-library.mjs ${{ inputs.items }} --dir "$RUNNER_TEMP/bench" | tee bench.txt
+        env:
+          ELECTRON_DISABLE_SANDBOX: "1"
+      - if: always()
+        run: grep -E '^\|' bench.txt >> "$GITHUB_STEP_SUMMARY" || true
