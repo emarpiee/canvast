@@ -1282,19 +1282,18 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer.no-bar .viewer-bar { display: none; }
 .viewer-nav, .viewer-tools { display: flex; align-items: center; gap: var(--sp-2); flex: none; }
 .viewer-pos { min-width: calc(var(--ctl) * 2.4); padding: 0 var(--sp-4); font-variant-numeric: tabular-nums; color: var(--media-muted); }
-.vbtn.viewer-back, .vbtn.viewer-details { color: var(--media-fg); position: absolute; top: var(--sp-6); z-index: var(--z-item-bar); background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); }
+.vbtn.viewer-back, .vbtn.viewer-details, .vbtn.viewer-hide { color: var(--media-fg); position: absolute; top: var(--sp-6); z-index: var(--z-item-bar); background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); }
 .vbtn.viewer-back { left: var(--sp-6); }
 .vbtn.viewer-details { right: var(--sp-6); }
+/* Hide or show the controls (F): beside the details button, and like it, faded out with the controls hidden until the pointer is near the top */
+.vbtn.viewer-back, .vbtn.viewer-details, .vbtn.viewer-hide { width: var(--ctl); padding: 0; }
+.vbtn.viewer-hide { right: calc(var(--sp-6) + var(--ctl) + var(--sp-4)); }
 /* with the controls hidden the two at the top fade out, and come back when the pointer is near the top edge (the handle brings the controls back) */
-/* The button that hides the controls floats at the bottom centre, just above them, where the one that shows them comes back to; the picture keeps clear of that strip. */
-.vbtn.viewer-hide { position: absolute; left: 50%; bottom: calc(var(--viewer-bar-h, 56px) + var(--near)); transform: translateX(-50%); z-index: var(--z-item-bar); color: var(--v-fg); background: transparent; border: 0; filter: drop-shadow(0 0 var(--sp-1) var(--v-stage)); }
-.vbtn.viewer-hide:hover { color: var(--hud-accent); }
-.viewer.no-bar .viewer-hide { display: none; }
 .viewer .viewer-ground { display: none; }
 .viewer.has-alpha .viewer-ground { display: inline-flex; }
 .vbtn.viewer-ground { position: absolute; right: var(--sp-6); bottom: var(--sp-6); z-index: var(--z-item-bar); color: var(--media-fg); background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); }
-.viewer.no-bar .viewer-back, .viewer.no-bar .viewer-details, .viewer.no-bar .viewer-ground { opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
-.viewer.no-bar.is-near-top .viewer-back, .viewer.no-bar.is-near-top .viewer-details, .viewer.no-bar.is-near-bottom .viewer-ground, .viewer.no-bar .viewer-ground:hover, .viewer.no-bar .viewer-back:hover, .viewer.no-bar .viewer-details:hover, .viewer.no-bar .viewer-back:focus-visible, .viewer.no-bar .viewer-details:focus-visible { opacity: 1; }
+.viewer.no-bar .viewer-back, .viewer.no-bar .viewer-details, .viewer.no-bar .viewer-hide, .viewer.no-bar .viewer-ground { opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
+.viewer.no-bar.is-near-top .viewer-back, .viewer.no-bar.is-near-top .viewer-details, .viewer.no-bar.is-near-top .viewer-hide, .viewer.no-bar .viewer-hide:hover, .viewer.no-bar .viewer-hide:focus-visible, .viewer.no-bar.is-near-bottom .viewer-ground, .viewer.no-bar .viewer-ground:hover, .viewer.no-bar .viewer-back:hover, .viewer.no-bar .viewer-details:hover, .viewer.no-bar .viewer-back:focus-visible, .viewer.no-bar .viewer-details:focus-visible { opacity: 1; }
 .vbtn { display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-3); min-width: var(--ctl); height: var(--ctl); padding: 0 var(--sp-5); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
 .vbtn svg { width: 18px; height: 18px; }
 .vbtn:hover:not(:disabled) { background: var(--white-a12); }
@@ -1478,6 +1477,8 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer-handle [data-act="play"] { display: none; }
 .viewer.is-showing .viewer-handle [data-act="play"] { display: inline-flex; }
 .viewer.is-showing .viewer-handle { opacity: 0.5; }
+/* (it holds only the slideshow's pause button now: away outside a slideshow, so it never sits over the picture or the player) */
+.viewer:not(.is-showing) .viewer-handle { display: none; }
 .viewer.is-showing .viewer-handle:hover, .viewer.is-showing .viewer-handle:focus-within { opacity: 1; }
 @media (hover: none), (max-width: 640px) { .viewer-handle { opacity: 0.7; } }
 @media (prefers-reduced-motion: reduce) { .viewer-handle { transition: none; } }
@@ -1836,9 +1837,8 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .viewer-edge.is-prev { left: 0; }
 .viewer-edge.is-next { right: 0; }
 .viewer.is-zoomed .viewer-edge, .viewer.is-actual .viewer-edge { display: none; }
-/* The picture keeps clear of a strip at the bottom for the button that hides the controls (the same strip, so the picture is the same size, whether the controls are shown or hidden). */
-.viewer { --edge-w: 15; --viewer-bottom: calc(var(--ctl) + 2 * var(--near)); }
-.viewer.no-bar { --viewer-bottom: calc(var(--ctl) + 2 * var(--near) + var(--viewer-bar-h, 0px)); }
+/* The picture uses the whole stage, with the same margin on every side; with the controls hidden the stage, and so the picture, grows. */
+.viewer { --edge-w: 15; --viewer-bottom: var(--sp-8); }
 .viewer-stage .viewer-edge { -webkit-tap-highlight-color: transparent; }
 .viewer figcaption:not(.is-note) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; background: none; }
 
@@ -1912,9 +1912,9 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 /* zoomed in, a drag pans: the hand says so */
 .viewer.is-zoomed .viewer-stage, .viewer.is-zoomed img, .viewer.is-zoomed video, .viewer.is-zoomed canvas.viewer-gif { cursor: grab; }
 .viewer.is-grabbing .viewer-stage, .viewer.is-grabbing figure img, .viewer.is-grabbing figure video, .viewer.is-grabbing figure canvas.viewer-gif { cursor: grabbing; }
-/* A video's or GIF's player floats over the bottom of the picture, just above the strip of the button that hides the controls (so it never
-   covers that button, and the picture keeps its size); while it plays and the pointer rests, it fades away until the pointer moves. */
-.viewer-media-bar { position: absolute; left: 50%; bottom: var(--viewer-bottom); top: auto; transform: translateX(-50%); z-index: 3; width: min(560px, calc(100% - 24px)); background: var(--v-pill); color: var(--v-fg); border: 1px solid var(--v-line); backdrop-filter: blur(10px); transition: opacity var(--dur-base); }
+/* A video's or GIF's player floats over the bottom of the picture (the picture keeps its size); while it plays and the pointer rests,
+   it fades away (after Settings > Media and playback, Hide the player) until the pointer moves. */
+.viewer-media-bar { position: absolute; left: 50%; bottom: calc(var(--viewer-bottom) + var(--sp-4)); top: auto; transform: translateX(-50%); z-index: 3; width: min(560px, calc(100% - 24px)); background: var(--v-pill); color: var(--v-fg); border: 1px solid var(--v-line); backdrop-filter: blur(10px); transition: opacity var(--dur-base); }
 .viewer.is-idle .viewer-media-bar:not(:hover):not(:has(:focus-visible)) { opacity: 0; pointer-events: none; }
 .viewer-media-bar[hidden] { display: none; }
 .viewer-media-bar .media-gap { flex: 1; }

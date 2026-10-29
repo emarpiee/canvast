@@ -1193,17 +1193,13 @@ test("gallery viewer: the view tabs, the workspace menu and the Settings button 
   const vb = (await viewer.boundingBox())!;
   expect(Math.abs(bb.y - db.y), "on one line").toBeLessThan(2);
   expect(db.x, "details at the right, back at the left").toBeGreaterThan(bb.x + 200);
-  // the button that hides the controls floats at the bottom centre just above them, clear of the picture; the one that shows them is at the same centre
+  // the button that hides the controls sits at the top, beside the details button, on its line; the same button shows them again
   const hide = viewer.getByRole("button", { name: "Hide the controls" });
   const hb = (await hide.boundingBox())!;
-  const bar = (await viewer.locator(".viewer-bar").boundingBox())!;
-  const pic = (await viewer.locator("figure img").boundingBox())!;
-  expect(hb.y + hb.height, "above the controls").toBeLessThanOrEqual(bar.y + 1);
-  expect(hb.y, "below the picture's own room").toBeGreaterThanOrEqual(pic.y + pic.height - 1);
-  const stageBox = (await viewer.locator(".viewer-stage").boundingBox())!;
-  expect(Math.abs(hb.x + hb.width / 2 - (stageBox.x + stageBox.width / 2)), "in the middle").toBeLessThan(2);
-  // the picture is the same size and place with the controls shown or hidden (nothing stretches or shrinks when they go)
-  const picBefore = (await viewer.locator("figure img").boundingBox())!;
+  expect(Math.abs(hb.y - db.y), "on the line of the details button").toBeLessThan(2);
+  expect(hb.x + hb.width, "just left of it").toBeLessThanOrEqual(db.x);
+  expect(hb.x + hb.width, "beside it").toBeGreaterThan(db.x - 20);
+  const roomBefore = (await viewer.locator(".viewer-stage").boundingBox())!;
   // and the controls follow Size and comfort: denser, they are shorter
   const barH = async () => (await viewer.locator(".viewer-bar").boundingBox())!.height;
   const compact = await barH();
@@ -1212,11 +1208,10 @@ test("gallery viewer: the view tabs, the workspace menu and the Settings button 
   await p.evaluate(() => delete document.documentElement.dataset["density"]);
   await expect.poll(barH, "the control row is back to its own height").toBe(compact);
   await p.keyboard.press("f"); // (with its own controls hidden too)
-  // (the room kept for the controls follows their height through a ResizeObserver, a frame later: poll)
-  const moved = async () => { const a = (await viewer.locator("figure img").boundingBox())!; return Math.max(...(["x", "y", "width", "height"] as const).map((k) => Math.abs(a[k] - picBefore[k]))); };
-  await expect.poll(moved, "the picture is the same size and place with the controls hidden").toBeLessThan(1.5);
+  // with the controls hidden the picture gets their room (its stage grows down; nothing is kept back), and the same button shows them again
+  await expect.poll(async () => (await viewer.locator(".viewer-stage").boundingBox())!.height, "the picture's room grows into the controls'").toBeGreaterThan(roomBefore.height + 20);
   const showB = (await viewer.getByRole("button", { name: "Show the controls" }).boundingBox())!;
-  expect(Math.abs(showB.x + showB.width / 2 - (hb.x + hb.width / 2)), "the show button is at the same centre").toBeLessThan(2);
+  expect(Math.abs(showB.x - hb.x) + Math.abs(showB.y - hb.y), "the show button is the same button, in the same place").toBeLessThan(2);
   for (const el of away) await expect(el).toBeHidden();
   await expect(back, "faded out with the controls").toHaveCSS("opacity", "0");
   await expect(details).toHaveCSS("opacity", "0");
@@ -2290,25 +2285,22 @@ test("Extract frame follows Settings > Media and playback: name template and sty
   await p.getByTestId("asset-preview").click();
   const viewer = p.getByTestId("slide-view");
   await expect(viewer).toBeVisible();
-  // The player floats over the bottom of the GIF, just above the button that hides the controls, which it never covers: with the
-  // controls shown and with them hidden (the button that shows them again stays free to press).
+  // The player floats over the bottom of the GIF (no strip of its own), and the button that hides and shows the controls is at the
+  // top, never under it: with the controls hidden it brings them back.
   const player = viewer.getByTestId("viewer-media-bar");
-  const clear = async (button: string): Promise<void> => {
-    const pb = (await player.boundingBox())!;
-    const hb = (await viewer.locator(button).boundingBox())!;
-    expect(pb.y + pb.height, "the player ends above the button").toBeLessThanOrEqual(hb.y + 1);
-  };
-  await clear(".viewer-hide");
+  const gifBox = async () => (await viewer.locator("canvas.viewer-gif").boundingBox())!;
+  await expect.poll(async () => (await player.boundingBox())!.y, "over the picture").toBeLessThan((await gifBox()).y + (await gifBox()).height);
+  expect((await viewer.locator(".viewer-hide").boundingBox())!.y + 40, "the hide button is at the top").toBeLessThan((await player.boundingBox())!.y);
   await viewer.locator(".viewer-hide").click();
   await expect(viewer.locator(".viewer-bar")).toBeHidden();
-  await clear('.viewer-handle [data-act="bar"]');
-  await viewer.locator('.viewer-handle [data-act="bar"]').click(); // (shown again: the button was not covered)
+  await viewer.locator(".viewer-hide").click(); // (shown again with the same button)
   await expect(viewer.locator(".viewer-bar")).toBeVisible();
-  // While it plays and the pointer rests, the player fades away; a move brings it back.
+  // While it plays and the pointer rests, the player fades away after the time in Settings (Hide the player); a move brings it back.
+  await p.evaluate(() => window.__canvastDebug.setSetting("assets.playerHideSeconds", 0.5));
   const playBtn = player.locator('[data-cmd="play"]'); // (a GIF starts playing by itself)
   if ((await playBtn.getAttribute("aria-label")) === "Play") await playBtn.click();
   await p.mouse.move(5, 5);
-  await expect(viewer).toHaveClass(/is-idle/, { timeout: 6000 });
+  await expect(viewer).toHaveClass(/is-idle/, { timeout: 1500 });
   await expect.poll(() => player.evaluate((el) => getComputedStyle(el).opacity)).toBe("0");
   await p.mouse.move(400, 300);
   await expect(viewer).not.toHaveClass(/is-idle/);

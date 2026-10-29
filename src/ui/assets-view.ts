@@ -247,7 +247,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           </div>
           <div class="viewer-handle" hidden>
             <button type="button" class="vbtn" data-act="play" aria-label="Pause the slideshow" title="Pause the slideshow (Space)">${ICONS.pause}</button>
-            <button type="button" class="vbtn" data-act="bar" aria-label="Show the controls" title="Show the controls (F)">${ICONS.chevronsUp}</button>
           </div>
         </div>
       </div>
@@ -437,6 +436,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       else body.style.removeProperty(prop);
     }
     viewer.querySelector<HTMLElement>(".viewer-handle")!.hidden = ui.bar;
+    // One button hides and shows the controls (beside the details button): it says which it does now.
+    const barBtn = viewer.querySelector<HTMLElement>(".viewer-hide")!;
+    const barWord = ui.bar ? "Hide the controls" : "Show the controls";
+    barBtn.setAttribute("aria-label", barWord);
+    barBtn.title = `${barWord} (F)`;
+    barBtn.innerHTML = ui.bar ? ICONS.chevronsDown : ICONS.chevronsUp;
     for (const b of root.querySelectorAll<HTMLElement>('[data-act="details"], [data-action="details"]')) b.setAttribute("aria-pressed", String(ui.details));
     onLayoutChange();
   };
@@ -812,7 +817,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const wake = (): void => {
     viewer.classList.remove("is-idle");
     clearTimeout(idleTimer);
-    idleTimer = window.setTimeout(() => eng?.playing() && viewer.classList.add("is-idle"), 2500);
+    idleTimer = window.setTimeout(() => eng?.playing() && viewer.classList.add("is-idle"), settings.get("assets.playerHideSeconds") * 1000);
   };
   for (const type of ["pointermove", "pointerdown", "keydown"]) viewer.addEventListener(type, wake, true);
   controls.el.addEventListener("input", wake);

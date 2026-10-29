@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.50.38 — The viewer's controls button at the top (2026-10-29)
+
+- **Changed:** the library viewer's button that hides and shows the controls (`F`) is at the top, beside the details button, and behaves like it (with the controls hidden it fades until the pointer is near the top). It no longer sits over the bottom of the picture, and the strip kept for it is gone: the picture uses the whole stage, and grows when the controls are hidden.
+- **Added:** *Hide the player* in Settings > Media and playback: how long the viewer's video and GIF player stays after the pointer stops while it plays (1.5 s by default, it was 2.5 s).
+- **Fixed:** the viewer's player floats over the picture instead of leaving an empty strip under it when the controls are hidden.
+
 ## 0.50.37 — Show in file manager (2026-10-29)
 
 - **Added:** *Show in file manager* (desktop app) in the details of one library item and in its right-click menu: the item's folder opens in the system's file manager with its file selected. Hidden items do not have it.
