@@ -2328,7 +2328,8 @@ test("Extract frame follows Settings > Media and playback: name template and sty
   await expect.poll(() => player.evaluate((el) => getComputedStyle(el).opacity)).toBe("0");
   await p.mouse.move(400, 300);
   await expect(viewer).not.toHaveClass(/is-idle/);
-  // Paused, it fades the same way.
+  // Paused, it fades the same way. (Clicked once the player is back in full: a click on it while it is still fading in can be missed.)
+  await expect.poll(() => player.evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
   await playBtn.click();
   await expect(playBtn).toHaveAttribute("aria-label", "Play");
   await p.mouse.move(5, 5);
