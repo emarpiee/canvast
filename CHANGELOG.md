@@ -2,6 +2,7 @@
 
 ## 0.50.44 — The library index in parts (2026-10-29)
 
+- **Added:** try canvast online at https://emarpiee.github.io/canvast/: the latest release's single file on GitHub Pages, put there by each release (it keeps its own data, apart from a downloaded copy).
 - **Changed:** the desktop app keeps the library's names, tags, folders, notes and fields in `.canvast/library/`: an index and sixteen parts, so a change rewrites one small file instead of the whole library, and a sync tool copies only that part. A workspace of an earlier version (with `library.json` only) is read as before and gets the parts with the next save.
 - **Changed:** `library.json` is still written as a copy while the library has up to 10,000 items, so an older version of the app keeps working on the workspace; what an older version changes in it is taken.
 

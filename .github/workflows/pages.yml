@@ -1,0 +1,41 @@
+name: Try it online
+
+# The online copy of the app on GitHub Pages (https://emarpiee.github.io/canvast/): the single file of the latest release, served as
+# index.html, so anyone can try canvast without downloading it. It is the released file itself (checked against its SHA-256), never a
+# new build. Runs when a release is published, and by hand with "Run workflow" to publish the latest release again.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: The latest release's single file
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download --pattern 'canvast.html*' --dir site --repo "$GITHUB_REPOSITORY"
+          cd site && sha256sum -c canvast.html.sha256
+          cp canvast.html index.html
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

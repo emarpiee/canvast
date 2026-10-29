@@ -39,10 +39,10 @@ Unverified / Committed / Next bounded task**.
 
 ## v0.50.44: the library index in parts (2026-10-29)
 
-**Implemented:** the desktop app's library index in `.canvast/library/` (an index and sixteen parts by hash; only changed parts are written and read), `library.json` kept as a marked copy for older versions up to 10,000 items, changes by an older version taken, workspaces of earlier versions read and converted ([ADR 0179](adr/0179-library-in-parts.md)).
-**Tested:** the whole desktop spec (13 passed), unit suite.
+**Implemented:** the desktop app's library index in `.canvast/library/` (an index and sixteen parts by hash; only changed parts are written and read), `library.json` kept as a marked copy for older versions up to 10,000 items, changes by an older version taken, workspaces of earlier versions read and converted ([ADR 0179](adr/0179-library-in-parts.md)). The online copy: `.github/workflows/pages.yml` puts each release's checked `canvast.html` on GitHub Pages.
+**Tested:** the whole desktop spec (13 passed), unit suite; the built file served over HTTP loads in Chromium and Firefox with no other request and no error.
 **Known failures:** none.
-**Unverified:** a library over 10,000 items on disk (not measured after this change); an older app version and this one on the same workspace through a real sync tool (simulated in the test by writing `library.json` by hand).
+**Unverified:** a library over 10,000 items on disk (not measured after this change); an older app version and this one on the same workspace through a real sync tool (simulated in the test by writing `library.json` by hand); the Pages workflow until its first run.
 **Committed:** on `main`, not pushed.
 **Next bounded task:** coverage-based test selection; for very large libraries, an in-memory list of changed items so a save does not read the whole catalog.
 

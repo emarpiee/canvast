@@ -9,6 +9,8 @@
 
 <p align="center">One HTML file, or a desktop app for Linux. It works offline, with no account.</p>
 
+<p align="center"><a href="https://emarpiee.github.io/canvast/"><b>Try it in your browser</b></a> · <a href="https://github.com/emarpiee/canvast/releases/latest/download/canvast.html">Download canvast.html</a></p>
+
 <p align="center">
   <a href="https://github.com/emarpiee/canvast/actions/workflows/tests.yml"><img src="https://github.com/emarpiee/canvast/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="https://github.com/emarpiee/canvast/actions/workflows/ci.yml"><img src="https://github.com/emarpiee/canvast/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -91,11 +93,18 @@ canvast comes in two forms. Both are the same app; they differ in where your wor
 | Hidden items | Hidden behind a password, not encrypted | Encrypted on disk |
 | Updates | Download the new file | The AppImage updates itself; see [Updating](#updating) |
 
-Everything is on the [latest release](https://github.com/emarpiee/canvast/releases/latest). Each release's notes list its **Features** and its **Fixes** separately, and every file has its SHA-256 beside it.
+To look around first, [try it in your browser](https://emarpiee.github.io/canvast/) (see [Trying it online](#trying-it-online)). Everything to download is on the [latest release](https://github.com/emarpiee/canvast/releases/latest). Each release's notes list its **Features** and its **Fixes** separately, and every file has its SHA-256 beside it.
 
 ### The browser version
 
 Download [`canvast.html`](https://github.com/emarpiee/canvast/releases/latest/download/canvast.html) and open it in a modern browser: double-click it, or use *File → Open*. No installation and no web server are needed, and it works with no network connection. Keep the file wherever you like; moving it to another folder keeps your data (see [Where the data lives](#where-the-data-lives)).
+
+### Trying it online
+
+[emarpiee.github.io/canvast](https://emarpiee.github.io/canvast/) opens the same single file as the latest release, so you can try canvast without downloading anything. Once loaded it makes no network requests, like the downloaded file.
+
+- Your work is kept in this browser's storage for that web address, apart from the work of a downloaded `canvast.html`. To move it to the downloaded file (or back), export a backup in one and import it in the other (see [Backups](#backups)).
+- The online copy changes to each new release by itself. For work you want to keep, use the downloaded file or the desktop app and make backups.
 
 ### The desktop app (Linux)
 
@@ -592,7 +601,7 @@ Damaged objects found when loading are skipped and reported, never silently chan
 
 ### Where the data lives
 
-- **Browser version:** the IndexedDB database `canvast`, in the browser's storage for local files.
+- **Browser version:** the IndexedDB database `canvast`, in the browser's storage for local files (the [online copy](#trying-it-online) has its own, for its web address).
   - Moving the HTML file to another folder keeps your data.
   - A different browser, profile or private window starts empty, and clearing the site data deletes it. This is why regular backups matter.
   - The browser's storage has a size limit, so the browser version suits projects rather than very large collections (see [Limitations](#limitations)).
@@ -1040,6 +1049,7 @@ Shared machines vary in speed, so a failure there in a test that measures time i
 2. It creates (or updates) the GitHub release `vX.Y.Z` with the file and its SHA-256, and marks it **Latest**.
 3. It reads the release back to confirm it is the latest and serves the same file.
 4. Publishing starts the `Release packages` workflow (`.github/workflows/release-packages.yml`). On an x86_64 and an ARM machine it builds the app from the tag, checks that its single file is the one released (the build is reproducible), makes the packages with `npm run package:desktop` (which checks each), and adds them with their SHA-256 and the AppImage's `.zsync`. No package is uploaded from the developer's machine; the workflow can also be run by hand for a tag.
+5. Publishing also starts the `Try it online` workflow (`.github/workflows/pages.yml`), which checks the released `canvast.html` against its SHA-256 and puts it on GitHub Pages as the [online copy](#trying-it-online). It can be run by hand to publish the latest release again.
 
 `npm run release -- --dry-run` does everything but publish and prints the notes. The notes are split into **Features** and **Fixes** from the CHANGELOG: a bullet starting with `**Fixed:**` is a fix; `**Added:**`, `**Changed:**` and `**Removed:**` are features.
 
