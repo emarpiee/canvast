@@ -828,6 +828,7 @@ test("while the app runs it follows the folder: a canvas file renamed by hand, a
     await add(b.page, 2);
     await b.page.evaluate(() => window.__canvastDebug.flushStorage());
     await expect.poll(() => a.page.evaluate(() => window.__canvastDebug.objects().length), { timeout: 10_000 }).toBe(3);
+    const savedByB = readFileSync(join(ws, `${B}sketches/heroes.cvst`)); // (device B's version: kept for the sync tool's copy below)
 
     // Both edit before either file is written: this device keeps the folder's version, and its own as a conflict copy.
     await add(a.page, 1);
@@ -835,6 +836,19 @@ test("while the app runs it follows the folder: a canvas file renamed by hand, a
     await b.page.evaluate(() => window.__canvastDebug.flushStorage());
     await expect.poll(async () => (await tree(a.page)).map(([n, cs]) => [n, (cs as string[]).map((c) => c.replace(/\(conflict [^)]*\)/, "(conflict)"))]), { timeout: 10_000 }).toEqual([["Sketches", ["Heroes", "Heroes (conflict)"]]]);
     await expect.poll(() => a.page.evaluate(() => window.__canvastDebug.objects().length)).toBe(4); // (the folder's version: 3 + device B's one)
+
+    // A sync tool kept two versions of the canvas file: device B's beside the canvas's own. Device B (whose edits it holds) makes it a
+    // canvas of its own at once; device A waits (so they do not both). A copy the same as the canvas's file only goes, into .trash/.
+    await b.page.evaluate(() => window.__canvastDebug.flushStorage());
+    await a.page.evaluate(() => window.__canvastDebug.flushStorage());
+    writeFileSync(join(ws, `${B}sketches/heroes (1).cvst`), savedByB);
+    writeFileSync(join(ws, `${B}sketches/heroes (2).cvst`), readFileSync(join(ws, `${B}sketches/heroes.cvst`)));
+    const names = (p: Page) => tree(p).then((t) => t.flatMap(([, cs]) => (cs as string[]).map((c) => c.replace(/\(conflict from sync [^)]*\)/, "(sync)").replace(/\(conflict [^)]*\)/, "(conflict)"))));
+    for (const p of [b.page, a.page]) await expect.poll(() => names(p), { timeout: 15_000 }).toEqual(["Heroes", "Heroes (conflict)", "Heroes (sync)"]);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(`${B}sketches/heroes (`)), { timeout: 10_000 }).toEqual([]);
+    expect(files(ws).filter((f) => f.startsWith(".trash/") && f.endsWith(".cvst"))).toHaveLength(2);
+    const synced = files(ws).find((f) => /sketches\/heroes-conflict_from_sync.*\.cvst$/.test(f))!;
+    expect((JSON.parse(readFileSync(join(ws, synced), "utf8")) as { objects: unknown[] }).objects).toHaveLength(3); // (device B's version: 3 objects)
   } finally {
     await b?.app.close();
     await a.app.close();

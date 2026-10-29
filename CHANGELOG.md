@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.50.48 — Canvas copies made by sync tools (2026-10-29)
+
+- **Fixed:** in the desktop app, a canvas file a sync tool kept beside the canvas's own (`heroes (1).cvst`, when two devices saved it at once) was ignored, so the edits in it never showed. That version now becomes a canvas of its own, `<name> (conflict from sync <date>)`, on the same board, and the copy moves to where deleted files go (a copy the same as the canvas's file only moves away).
+
 ## 0.50.47 — Hidden items survive sync clashes (2026-10-29)
 
 - **Fixed:** in the desktop app, when a sync tool kept one device's `hidden.json` and put the other's beside it (`hidden (1).json`), the items hidden on the other device were lost from the app (their encrypted files stayed, with no way to open them). The copy is now joined into the hidden items once they are opened, then deleted.

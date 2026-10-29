@@ -283,6 +283,10 @@ A sync tool (Mega, Drive, Proton Drive, Syncthing…) keeps one `hidden.json` wh
 - **A first password** is refused while `.hidden/` holds sealed files or a copy of `hidden.json` is there but `hidden.json` is not (it is on its way): a new key would be a second one.
 - `scripts/hidden-items.mjs decrypt` reads the copies too, and writes files no entry names as `recovered-<hash>.<ext>`.
 
+### Canvas files and sync tools (0.50.48)
+
+A sync tool's copy of a canvas file (`<name> (1).cvst` and the like) has the id of a canvas whose own file is still there, so it is neither a rename nor a new canvas. Its version (another device's edits that the canvas's file lost) becomes a canvas of its own, `<name> (conflict from sync <date>)`, with new object ids as a duplicate has, and the copy goes where deleted files go. Only the device named in its `savedBy` takes it at once; another waits 10 minutes (that device may be gone), so two running devices do not both take it. A copy with the same revision and `savedBy` as the canvas's file only goes; one that does not read whole (still arriving) waits.
+
 ## Order of work
 
 Each step ends in a working app and is committed and released on its own.

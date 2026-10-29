@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.48: canvas copies made by sync tools (2026-10-29)
+
+**Implemented:** sync-safety step 2 of 5 (ADR 0177, "Canvas files and sync tools"). A `.cvst` with the id of a canvas whose own file is there becomes `<name> (conflict from sync <date>)` (new object ids), the copy moved to where deleted files go; the device in its `savedBy` takes it at once, another after 10 minutes; an identical copy only goes; one not whole yet waits.
+**Tested:** desktop `while the app runs it follows the folder` extended (two running devices: one sync canvas, both copies in `.trash/`, B's 3 objects).
+**Known failures:** none.
+**Unverified:** the 10-minute wait of the other device (no E2E: it would cost 10 minutes).
+**Committed:** on `main`.
+**Next bounded task:** sync step 3: library and workspace sync copies merged by id.
+
 ## v0.50.47: hidden items survive sync clashes (2026-10-29)
 
 **Implemented:** sync-safety step 1 of 5 (ADR 0177, "Hidden items and sync tools"). Copies of `hidden.json` are joined into the index and erased once it is written; a copy with another key the same password opens is joined, its files sealed again first; a `check` in the vault tells whether it holds the key in memory, and the index is never written into one that holds another (this device's record goes beside it); an index that does not open is not whole (nothing taken as erased); sealed files no entry names are erased (copies) or taken back as `recovered-<hash>.<ext>` (after 30 s for a hidden file's name); a file the key opens is never sealed again; a first password is refused while sealed files wait for their `hidden.json`. `hidden-items.mjs decrypt` reads copies and unnamed files.

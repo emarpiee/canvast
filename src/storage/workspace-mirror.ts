@@ -13,6 +13,8 @@ import { done, idbGet, idbPut, req } from "./idb";
 import { LibraryMirror } from "./library-mirror";
 import type { HiddenVault } from "./hidden-store";
 import type { AssetRecord } from "../assets/asset-library";
+import { duplicateRecords } from "../doc/duplicate";
+import { serializeObject } from "../doc/model";
 import type { BackupRecord, WorkspaceStore } from "./store";
 import type { BoardRecord, CanvasRecord, CurrentMeta, StoredView, WorkspaceRecord } from "./workspace-repo";
 import type { PlacedBoard } from "./workspace-names";
@@ -36,6 +38,8 @@ export interface WorkspaceFile {
 
 const encode = (text: string): Uint8Array => new TextEncoder().encode(text);
 const ID_RE = /^[0-9a-f]{32}$/;
+/** How long a sync tool's copy of a canvas saved by another device waits before this one takes it (that device takes it at once). */
+export const SYNC_COPY_WAIT = { ms: 10 * 60_000 };
 
 /**
  * What this device last knew of the folder (kept in IndexedDB, meta "workspaceMirror"): the boards of `workspace.json` as
@@ -150,6 +154,7 @@ export class WorkspaceMirror {
     this.placed = fileWs.boards;
     this.state.tree = tree;
     await this.reconcile(fileWs.boards);
+    await this.takeSyncCopies();
     await idbPut(this.db, "meta", STATE_KEY, this.state);
     this.treeDirty = true;
     this.deviceDirty = true;
@@ -212,6 +217,7 @@ export class WorkspaceMirror {
         tree = true;
       }
       if (await this.followMoved()) tree = true;
+      if (await this.takeSyncCopies()) tree = true;
       const canvases = await this.reconcile(this.placed);
       await idbPut(this.db, "meta", STATE_KEY, this.state);
       if (this.treeDirty || this.dirty.size) this.later();
@@ -266,6 +272,58 @@ export class WorkspaceMirror {
     if (changed) this.treeDirty = true; // (their files take their safe names)
     return changed;
   }
+
+  /**
+   * Canvas files a sync tool made beside a canvas's own (`heroes (1).cvst`, `heroes.sync-conflict-….cvst`): two devices saved it at
+   * once and the tool kept both. The other version becomes a canvas of its own on the same board, `<name> (conflict from sync <date>)`
+   * (its objects with new ids, as a duplicate's), and the copy goes where deleted files go; a copy the same as the canvas's file only
+   * goes. The device that saved the copy takes it (its edits are the ones the canvas lost); another one only once it has waited
+   * `SYNC_COPY_WAIT.ms` (that device may never come back), so two devices do not both take it. One that does not read whole yet
+   * (still arriving) waits. Whether any was taken.
+   */
+  private async takeSyncCopies(): Promise<boolean> {
+    const now = Date.now();
+    let waiting = false;
+    const where = new Map(this.placed.flatMap((b) => b.canvases.map((c) => [c.id, { board: b, canvas: c }] as const)));
+    const placedPaths = new Set([...where.values()].map((v) => v.canvas.file.toLowerCase()));
+    let changed = false;
+    for (const path of await this.bridge.canvasFiles()) {
+      if (placedPaths.has(path.toLowerCase())) continue;
+      const head = canvasHead(await this.bridge.head(path));
+      const was = head && where.get(head.id);
+      if (!was || !(await this.bridge.exists(was.canvas.file))) continue; // (another workspace's canvas, or a moved file: followed instead)
+      const own = canvasHead(await this.bridge.head(was.canvas.file));
+      if (!own || own.revision !== head.revision || own.savedBy !== head.savedBy) {
+        const since = this.copySeen.get(path) ?? now;
+        this.copySeen.set(path, since);
+        if (head.savedBy !== this.deviceId && now - since < SYNC_COPY_WAIT.ms) {
+          waiting = true;
+          continue;
+        }
+        const bytes = await this.bridge.read(path);
+        try {
+          readCanvasFile(new TextDecoder().decode(bytes ?? new Uint8Array()), was.canvas.name);
+        } catch {
+          continue; // not whole yet
+        }
+        const name = `${was.canvas.name} (conflict from sync ${stamp()})`;
+        await this.adoptCanvas(await this.repo.createCanvas(was.board.id, name), path, true);
+        this.onError?.(`Your sync tool kept two versions of “${was.canvas.name}” (two devices saved it at once): the other one is kept as “${name}”.`);
+      }
+      await this.bridge.remove(path, this.deleteTo());
+      this.copySeen.delete(path);
+      changed = true;
+    }
+    if (changed) this.treeDirty = true;
+    if (waiting && !this.copyTimer)
+      this.copyTimer = setTimeout(() => {
+        this.copyTimer = 0;
+        this.onContested?.(); // (the folder is compared again)
+      }, SYNC_COPY_WAIT.ms + 1000) as unknown as number;
+    return changed;
+  }
+  private readonly copySeen = new Map<string, number>();
+  private copyTimer = 0;
 
   private async readWorkspaceFile(): Promise<WorkspaceFile | null> {
     const bytes = await this.bridge.read(WORKSPACE_FILE);
@@ -346,8 +404,11 @@ export class WorkspaceMirror {
     if (keep.length) this.treeDirty = true; // they are written back to the folder
   }
 
-  /** Read a canvas file into the app's storage, in place of what it held (its id kept), at the next revision. */
-  private async adoptCanvas(c: CanvasRecord, file: string): Promise<void> {
+  /**
+   * Read a canvas file into the app's storage, in place of what it held (its id kept), at the next revision. `asNew`: into a canvas
+   * just made, as a copy of the file's (its objects get new ids, so no link leads to the canvas it was a version of), to be written.
+   */
+  private async adoptCanvas(c: CanvasRecord, file: string, asNew = false): Promise<void> {
     const bytes = await this.bridge.read(file);
     if (!bytes) return;
     const read = readCanvasFile(new TextDecoder().decode(bytes), c.name);
@@ -358,11 +419,17 @@ export class WorkspaceMirror {
     tx.objectStore("objects").delete(range);
     tx.objectStore("frames").delete(range);
     tx.objectStore("bookmarks").delete(c.id);
-    putCanvasContent(tx, c.id, read.canvas);
+    putCanvasContent(tx, c.id, asNew ? { ...read.canvas, objects: [] } : read.canvas);
+    if (asNew) for (const data of duplicateRecords(read.canvas.objects.map(serializeObject))) tx.objectStore("objects").put({ canvasId: c.id, id: data.id, data });
     const now = (await req(tx.objectStore("canvases").get(c.id) as IDBRequest<CanvasRecord | undefined>)) ?? c;
     const revision = now.revision + 1;
     tx.objectStore("canvases").put({ ...now, revision, objectCount: read.canvas.objects.length, updatedAt: Date.now() } satisfies CanvasRecord);
     await committed;
+    if (asNew) {
+      delete this.state.canvases[c.id];
+      this.dirty.add(c.id); // (into a file of its own)
+      return;
+    }
     this.state.canvases[c.id] = { file: { revision: read.head.revision, savedBy: read.head.savedBy }, local: revision };
   }
 

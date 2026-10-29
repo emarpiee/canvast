@@ -670,6 +670,7 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 | --- | --- |
 | A canvas file another device wrote | Reads it in; the open canvas is loaded again with its camera kept |
 | The same canvas changed here and there | Keeps both: the folder's version, and this device's beside it as `<name> (conflict <date>)`. A file is never written over another device's newer version |
+| A sync tool kept two versions of a canvas file (`heroes (1).cvst`, `heroes.sync-conflict-….cvst`) | Keeps the other version as a canvas of its own on the same board, `<name> (conflict from sync <date>)`, and moves the copy to where deleted files go. The device that saved that version does it at once; another device waits 10 minutes first, so two devices do not both do it. A copy that is the same as the canvas's file is only moved away |
 | A canvas file or board folder renamed in `.canvast/boards/` | Renames the canvas or board (its files then take their safe names) |
 | A canvas file moved into another board's folder | Moves the canvas to that board |
 | A file in `library/` renamed or moved | Finds it again by its content; the item takes its new folder and name |
