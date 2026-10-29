@@ -26,14 +26,22 @@ export async function askPassword(session: Session, kind: PasswordKind, why: str
     if (remember && rememberedHere) return true;
   }
   if (!(await session.hasPassword(kind))) return true;
+  const typed = await askCurrentPassword(session, kind, why);
+  if (typed === null) return false;
+  if (kind === "hidden") rememberedHere = remember;
+  return true;
+}
+
+/** Ask for the password until it is right: what was typed ("" when there is none), or null when cancelled. */
+export async function askCurrentPassword(session: Session, kind: PasswordKind, why: string): Promise<string | null> {
+  if (!(await session.hasPassword(kind))) return "";
   let wrong = false;
   for (;;) {
     const typed = await promptDialog({ title: "Password", lines: [why, ...(wrong ? ["That is not the password."] : [])], value: "", confirmLabel: "Continue", secret: true });
-    if (typed === null) return false;
+    if (typed === null) return null;
     if (await session.checkPassword(kind, typed)) {
       verifiedAt[kind] = Date.now();
-      if (kind === "hidden") rememberedHere = remember;
-      return true;
+      return typed;
     }
     wrong = true;
   }

@@ -78,7 +78,7 @@ export class WorkspaceMirror {
   /** Told when a write failed (once per streak), in plain words. */
   onError: ((text: string) => void) | null = null;
   /** Told how far a write of library files is (see LibraryMirror.onProgress). */
-  set onProgress(fn: ((done: number, total: number) => void) | null) {
+  set onProgress(fn: LibraryMirror["onProgress"]) {
     this.lib.onProgress = fn;
   }
   private failing = false;
@@ -521,7 +521,7 @@ export class WorkspaceMirror {
       .then(async () => {
         const took = await this.lib.reread();
         if (took) onChange();
-        if (took || this.vault.copiesWaiting) this.library(); // (copies of the hidden index read into it are erased once it is written)
+        if (took || this.vault.indexWaiting) this.library(); // (copies of the hidden index read into it are erased once it is written)
       })
       .catch((e: unknown) => this.onError?.(`The library of the workspace folder could not be read: ${(e as Error).message}.`));
     return this.running;

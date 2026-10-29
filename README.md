@@ -650,7 +650,7 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 | `.canvast/library.json` | A copy of the library in one file, for an older version of the app (kept up to 10,000 items) |
 | `.canvast/devices/` | One file per device: its open canvas and cameras |
 | `.canvast/folder.json` | This folder's own id, so a new folder at the same place is a new workspace |
-| `.hidden/`, `.canvast/hidden.json` | Hidden items, encrypted (see [Hidden items and passwords](#hidden-items-and-passwords)) |
+| `.hidden/`, `.canvast/hidden.json`, `.canvast/keys/hidden.json` | Hidden items, encrypted, and a spare of their key (see [Hidden items and passwords](#hidden-items-and-passwords)) |
 | `.trash/` | What canvast deleted, when Settings > Storage says so (the default) |
 
 **How it saves**
@@ -763,7 +763,10 @@ Whether an item is hidden is data of the item, so it travels in any export that 
 - The file is encrypted (AES-GCM) into `.hidden/` under a random name, read back to prove it, and the readable file is deleted (not moved to `.trash/`).
 - Its name, tags, note and fields are kept only in an encrypted index (`.canvast/hidden.json`); its thumbnail is never stored.
 - The password (stretched with PBKDF2) wraps one random key, so changing the password never re-encrypts a file. It cannot be removed while any item is hidden.
-- Once given (to open the Hidden list, or when hiding), the key stays in memory until the app closes or you choose **Lock hidden items** (command palette).
+- Once given (to open the Hidden list, or when hiding), the key stays in memory until the app closes or you choose **Lock hidden items** (command palette). It is held so that no code in the page can read it out; changing the password therefore asks for the current one.
+- A spare of the wrapped key is kept in `.canvast/keys/hidden.json`: if `hidden.json` is lost or damaged, the same password still opens every hidden file, and the app writes `hidden.json` again.
+- Hiding several files at once shows *Encrypting N of M files* from five files on.
+- If the app stops while a file is being encrypted, the next start checks the encrypted file opens before the readable one is deleted (otherwise the readable one stays, and is encrypted again).
 - A hidden picture placed on a canvas always shows a padlock. Another device on the same folder learns of hidden items only when the password is given there.
 - Showing an item again decrypts it back to its place in `library/`.
 - The format is documented below, and the files can be decrypted outside the app.
@@ -777,6 +780,7 @@ In a desktop workspace folder the hidden items are open, documented files, so th
 | The vault | `.canvast/hidden.json` | JSON: `format: "canvast-hidden"`, `version: 1`, `kdf: { name: "PBKDF2", hash: "SHA-256", iterations, salt }` (600,000 iterations, a 16-byte random salt), `key`, and `index` |
 | The data key | `key` in the vault | A random 256-bit AES-GCM key, wrapped (AES-KW, RFC 3394) by the key PBKDF2 makes from the Hidden password and the salt. A wrong password fails to unwrap it. Changing the password wraps the same key again, so no file is encrypted again |
 | A hidden file | `.hidden/<32 random hex digits>.bin` | 12 bytes of IV, then the file's bytes encrypted with AES-256-GCM under the data key, with the 16-byte tag at the end. The name says nothing about the item |
+| The spare | `.canvast/keys/hidden.json` | The same `format`, `version`, `kdf`, `key` and `check` as the vault, without the index |
 | The key check | `check` in the vault: `{ iv, data }` | The text `canvast-hidden` sealed with the data key, so the app knows whether a vault holds its key without the password (a vault written before 0.50.47 may lack it) |
 | The index | `index` in the vault: `{ iv, data }` | A JSON list sealed the same way (`iv` and `data`, base64): one entry per hidden item as in `library.json` (its `hash`, `file`, `name`, `type`, `size`, `tags`, `note`, `fields`, …), which names each item's `.hidden/` file |
 
@@ -794,7 +798,7 @@ node scripts/hidden-items.mjs decrypt ~/Art/my-workspace ~/decrypted
 node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 ```
 
-`decrypt` changes nothing in the workspace. It also reads copies of `hidden.json` that a sync tool left beside it (each opened with the password given), and writes any encrypted file of `.hidden/` that no entry names as `recovered-<hash>.<ext>`. `encrypt` takes back files that came out of `decrypt` with their names, tags, notes and fields (it finds them in the `hidden-items.json` beside them), and new PNG or JPEG pictures (it reads their size). For any other new file, put it in `.hidden/` while canvast runs with the Hidden items open: the app reads it, encrypts it and lists it. `encrypt` leaves the readable files where they are, so delete them yourself when you no longer need them.
+`decrypt` changes nothing in the workspace. It also reads copies of `hidden.json` that a sync tool left beside it (each opened with the password given), and writes any encrypted file of `.hidden/` that no entry names as `recovered-<hash>.<ext>`; with `hidden.json` lost, the spare of its key opens the files (all named that way). `encrypt` takes back files that came out of `decrypt` with their names, tags, notes and fields (it finds them in the `hidden-items.json` beside them), and new PNG or JPEG pictures (it reads their size). For any other new file, put it in `.hidden/` while canvast runs with the Hidden items open: the app reads it, encrypts it and lists it. `encrypt` leaves the readable files where they are, so delete them yourself when you no longer need them.
 
 ---
 
@@ -861,7 +865,7 @@ These are canvast's current limits: first those of both versions, then those of 
 | --- | --- |
 | Platform | Linux-first: no Windows, macOS or Flatpak builds for now; watching the folder for outside changes is verified on Linux only. A `.cvst` copied in from another workspace is not taken in. With a very large library, each change made in `library/` outside the app makes canvast list the whole folder again. A canvas file is written about 2 seconds after editing pauses: until then the edit is safe in the app's own storage on this device, but another device does not see it yet |
 | Hidden items in the desktop app | The files and index are encrypted, but: deleting the readable file does not overwrite the disk blocks it used; an item hidden while the key is locked stays a readable file until the password is given; the app's own cache on the device keeps hidden items' names and tags (not their pictures); a canvas file names the content hash of each picture placed on it; exported backups that include hidden items are not encrypted |
-| Sync tools | Tested with the copy names sync tools use (`name (1).ext`, `name.sync-conflict-….ext`), not live with each tool. The same canvas changed on two devices at once is kept as two canvases, not merged; the same library item changed on both keeps the kept file's version. A canvas copy saved by another device waits 10 minutes before this device takes it. A copy of the hidden items under another Hidden password is opened only with `hidden-items.mjs`, and a hidden file whose entry was lost comes back without its name (`recovered-…`). Losing `.canvast/hidden.json` loses every hidden item: keep backups |
+| Sync tools | Tested with the copy names sync tools use (`name (1).ext`, `name.sync-conflict-….ext`), not live with each tool. The same canvas changed on two devices at once is kept as two canvases, not merged; the same library item changed on both keeps the kept file's version. A canvas copy saved by another device waits 10 minutes before this device takes it. A copy of the hidden items under another Hidden password is opened only with `hidden-items.mjs`, and a hidden file whose entry was lost comes back without its name (`recovered-…`). Losing both `.canvast/hidden.json` and its spare `.canvast/keys/hidden.json` loses every hidden item: keep backups |
 | Packages | Linux only, for x86_64 and aarch64. The `.deb` and `.rpm` are not in a package repository, so the system's updates do not include them; only the AppImage updates itself. The `.deb` and `.rpm` are checked for their contents before a release, not installed on every distribution they name |
 
 ---

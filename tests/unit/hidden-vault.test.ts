@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SEAL_OVERHEAD, SEALED_COPY_RE, createVault, hiddenFileName, holdsKey, openBytes, openText, openVault, readVault, rewrapVault, sealBytes, sealText } from "../../src/storage/hidden-vault";
+import { SEAL_OVERHEAD, SEALED_COPY_RE, createVault, hiddenFileName, holdsKey, openBytes, openText, openVault, readVault, rewrapVault, sameKey, sealBytes, sealText } from "../../src/storage/hidden-vault";
 
 const FAST = 100_000; // (the lowest a record may say; the app uses 600,000)
 
@@ -34,7 +34,8 @@ describe("hidden vault", () => {
   it("a new password wraps the same key: files sealed before still open, the old password no longer does", async () => {
     const { record, key } = await createVault("old", FAST);
     const sealed = await sealBytes(key, new Uint8Array([42]));
-    const next = await rewrapVault(record, (await openVault(record, "old"))!, "new");
+    expect(await rewrapVault(record, "wrong", "new")).toBeNull(); // (the current password is needed: the key in memory cannot be read out)
+    const next = (await rewrapVault(record, "old", "new"))!;
     expect(next.kdf.salt).not.toBe(record.kdf.salt);
     expect(await openVault(next, "old")).toBeNull();
     expect(Array.from((await openBytes((await openVault(next, "new"))!, sealed))!)).toEqual([42]);
@@ -45,7 +46,11 @@ describe("hidden vault", () => {
     const b = await createVault("same", FAST);
     expect(await holdsKey(a.record, a.key)).toBe(true);
     expect(await holdsKey(a.record, b.key)).toBe(false);
-    const rewrapped = readVault(JSON.stringify(await rewrapVault(a.record, a.key, "next")))!;
+    expect([await sameKey(a.key, a.key), await sameKey(a.key, b.key)]).toEqual([true, false]);
+    // The key in memory is never extractable: no code in the page can read it out.
+    expect([a.key.extractable, (await openVault(a.record, "same"))!.extractable]).toEqual([false, false]);
+    await expect(crypto.subtle.exportKey("raw", a.key)).rejects.toThrow();
+    const rewrapped = readVault(JSON.stringify(await rewrapVault(a.record, "same", "next")))!;
     expect(await holdsKey(rewrapped, a.key)).toBe(true); // (kept under a new password)
     // A record of an earlier version has no check: its index tells, and with none, only the password can.
     const { check: _c, ...old } = a.record;

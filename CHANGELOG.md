@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.50.51 — The hidden items' key, safer (2026-10-29)
+
+- **Changed:** in the desktop app, the hidden items' key is held so that no code in the page can read it out of memory; changing the Hidden password asks for the current one.
+- **Added:** a spare of the hidden items' key, `.canvast/keys/hidden.json`: if `hidden.json` is lost or damaged, the same password still opens every hidden file, and the app writes `hidden.json` again. `hidden-items.mjs` uses it too.
+- **Added:** hiding five files or more at once shows *Encrypting N of M files*.
+- **Fixed:** if the app stopped while encrypting a file, the next start deleted the readable file without checking that the encrypted one opens; it now checks first, and keeps the readable one otherwise.
+
 ## 0.50.50 — A damaged canvas file no longer stops the workspace (2026-10-29)
 
 - **Fixed:** in the desktop app, a canvas file that changed but did not read whole (damaged, or a sync tool still writing it) stopped the workspace from opening. It is now skipped: this device's copy of the canvas is shown and kept, the app says so once, and the file is read again when it changes (it is never written over).

@@ -85,11 +85,11 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   mirror.onError = (text) => opts.onNotice?.(text);
   hidden.onNotice = (text) => opts.onNotice?.(text);
   await mirror.adoptLocks().catch(() => undefined); // (before the app asks for the workspace password)
-  const writingFns = new Set<(done: number, total: number) => void>();
+  const writingFns = new Set<(done: number, total: number, encrypting?: boolean) => void>();
   let writingNow: { done: number; total: number } | null = null;
-  mirror.onProgress = (done, total) => {
+  mirror.onProgress = (done, total, encrypting) => {
     writingNow = total ? { done, total } : null;
-    for (const fn of writingFns) fn(done, total);
+    for (const fn of writingFns) fn(done, total, encrypting);
   };
   const folderWriting: FolderWriting = {
     subscribe: (fn) => (writingFns.add(fn), () => void writingFns.delete(fn)),

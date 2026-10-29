@@ -697,7 +697,7 @@ export class Session {
    * In the desktop build the Hidden password also wraps the key the hidden items are encrypted with (ADR 0177): a new one wraps
    * the same key again, and it cannot be removed while items are hidden.
    */
-  async setPassword(kind: PasswordKind, password: string | null): Promise<boolean> {
+  async setPassword(kind: PasswordKind, password: string | null, current?: string): Promise<boolean> {
     if (!this.guardWrite() || !this.catalog) return false;
     const hidden = kind === "hidden" ? this.storage?.hidden : null;
     if (hidden && password === null && !(await hidden.remove())) {
@@ -706,7 +706,7 @@ export class Session {
     }
     if (hidden && password !== null) {
       try {
-        await hidden.setPassword(password);
+        await hidden.setPassword(password, current);
       } catch (e) {
         this.tell((e as Error).message);
         return false;

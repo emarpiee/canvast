@@ -283,6 +283,13 @@ A sync tool (Mega, Drive, Proton Drive, Syncthing…) keeps one `hidden.json` wh
 - **A first password** is refused while `.hidden/` holds sealed files or a copy of `hidden.json` is there but `hidden.json` is not (it is on its way): a new key would be a second one.
 - `scripts/hidden-items.mjs decrypt` reads the copies too, and writes files no entry names as `recovered-<hash>.<ext>`.
 
+### The key in memory, its spare, and an interrupted seal (0.50.51)
+
+- The data key is imported **not extractable**: no code in the page can export it. A new password is wrapped by unwrapping the key again with the current password (so changing it asks for that), never by exporting the key in memory. Keys are compared by sealing with one and opening with the other.
+- **A spare of the key**, `.canvast/keys/hidden.json` (format, kdf, wrapped key, check; no index), is written whenever the vault's key or password changes, and at unlock when it is missing. With `hidden.json` lost or damaged, the vault is read from the spare: its index is not known, so nothing missing from it counts as shown or erased, and the index is written again whole from this device. A first password is refused while `hidden.json` is there but damaged and there is no spare (a new key would orphan the files). Removing the password erases both.
+- **An interrupted seal** (the move noted, the sealed file there, its readable source still there) is proven at start-up by opening it; unproven, or while the key is locked, the sealed file is erased and the readable one stays, to be sealed again. Before, the sealed file was trusted.
+- Sealing reports its own progress (`encrypting`), shown as *Encrypting N of M files* from five files.
+
 ### A canvas file that does not read (0.50.50)
 
 At start-up and on each look at the folder, a canvas file whose header says it changed is read whole before it is taken. One that does not read (damaged, or a sync tool still writing it) is skipped: this device's copy stays and is shown, the person is told once, and the file is read again when it changes. It is never written over (it may be another device's newer version, still arriving); deleting it lets this device's version be written again. Before 0.50.50 such a file stopped the workspace from opening.

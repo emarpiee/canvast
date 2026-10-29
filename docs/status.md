@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.50.51: the hidden items' key, safer (2026-10-29)
+
+**Implemented:** security list step 1 (#12, #2, #5, #6; ADR 0177, "The key in memory, its spare, and an interrupted seal"): a non-extractable data key (rewrap from the current password); `.canvast/keys/hidden.json` spare used when `hidden.json` is lost or damaged (index not whole, written again); an interrupted seal proven at start-up; *Encrypting N of M files* from five.
+**Tested:** unit `hidden-vault.test.ts` (5: non-extractable, sameKey, rewrap needs the current password); desktop hidden/password tests (4: a password change needs the current one; hidden.json deleted → the tool opens all three from the spare, the app rewrites hidden.json and keeps its items; five hidden at once show *Encrypting … of 5 files*); browser settings:459, organize:249, archive:535 (3).
+**Known failures:** none.
+**Unverified:** the interrupted-seal path (no E2E: it needs the app stopped between two writes).
+**Committed:** on `main`.
+**Next bounded task:** step 2, the new encrypted format (Argon2id, chunked, self-standing files).
+
 ## v0.50.50: a damaged canvas file no longer stops the workspace (2026-10-29)
 
 **Implemented:** sync-safety steps 4 and 5 of 5. A changed canvas file is read whole before it is taken; one that does not read is skipped (this device's copy kept, told once, never written over) instead of failing start-up. README Limitations: a *Sync tools* row.

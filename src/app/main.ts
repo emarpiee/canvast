@@ -41,7 +41,7 @@ import { syncScroll } from "../ui/bar";
 import { parseHex, rgbToOklch } from "../colour-picker/colour";
 import { canvasItems, mountContextMenu } from "../ui/context-menu";
 import { openBatchRename } from "../ui/batch-rename";
-import { askPassword, forgetHiddenPassword } from "../ui/hidden-access";
+import { askCurrentPassword, askPassword, forgetHiddenPassword } from "../ui/hidden-access";
 import { typeOfName } from "../storage/workspace-names";
 import { openLockScreen } from "../ui/lock-screen";
 import { writeSystemClipboard } from "./system-clipboard";
@@ -146,6 +146,8 @@ import { paintFromText, paintToText } from "../doc/paint";
 
 /** A write of this many files into the workspace folder (an import's) shows the busy screen and asks before closing; fewer go by quietly. */
 const BUSY_FILES = 20;
+/** From this many files encrypted at once (hiding them), the busy screen shows how far it is. */
+const BUSY_SEALS = 5;
 
 declare const __CANVAST_VERSION__: string;
 
@@ -745,19 +747,21 @@ async function start(): Promise<void> {
   });
   // A long write of files into the workspace folder (an import's) keeps the app waiting, so nothing is changed half-way.
   let busy: BusyScreen | null = null;
-  storage?.folderWriting?.subscribe((done, total) => {
+  storage?.folderWriting?.subscribe((done, total, encrypting) => {
     if (!total) {
       busy?.close();
       busy = null;
       return;
     }
+    const doing = encrypting ? "Encrypting hidden files" : "Writing the files into the workspace folder";
     const shown = currentBusy();
-    if (shown && shown !== busy) return shown.update(done / total, `Writing the files into the workspace folder: ${done} of ${total}`); // (a task's own screen, as an import's: one bar)
-    if (!busy && total < BUSY_FILES) return;
-    busy ??= openBusyScreen("Writing the workspace to its folder", [
-      "The files are copied into the workspace folder, so other programs and devices see them. Keep the app open until it ends.",
-    ]);
-    busy.update(done / total, `${done} of ${total} files`);
+    if (shown && shown !== busy) return shown.update(done / total, `${doing}: ${done} of ${total}`); // (a task's own screen, as an import's: one bar)
+    // (Encrypting reads each file back and opens it to prove it, so a few already take a while: shown from BUSY_SEALS on.)
+    if (!busy && total < (encrypting ? BUSY_SEALS : BUSY_FILES)) return;
+    busy ??= encrypting
+      ? openBusyScreen("Encrypting hidden items", ["Each file is encrypted into .hidden/, read back to prove it, and only then is the readable one deleted. Keep the app open until it ends."])
+      : openBusyScreen("Writing the workspace to its folder", ["The files are copied into the workspace folder, so other programs and devices see them. Keep the app open until it ends."]);
+    busy.update(done / total, `${encrypting ? "Encrypting" : "Writing"} ${done} of ${total} files`);
   });
   // Objects that follow a saved colour or gradient (ADR 0157) are brought in step when the style changes and when a canvas is opened: one undo
   // step while there is history; right after opening there is none, so the change is quiet.
@@ -1884,14 +1888,15 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       };
       if (action === "status") return state();
       if (session.readOnly) return state("Another tab is editing, so the password cannot change here.");
-      if (!(await askPassword(session, kind, "Enter the current password."))) return state("Not changed.");
+      const current = await askCurrentPassword(session, kind, "Enter the current password.");
+      if (current === null) return state("Not changed.");
       if (kind === "hidden") forgetHiddenPassword();
       if (action === "remove") return (await session.setPassword(kind, null)) ? state("The password was removed.", true) : state();
       const first = await promptDialog({ title: `New password for the ${what}`, lines: ["It cannot be recovered. Keep it somewhere safe."], value: "", confirmLabel: "Next", secret: true });
       if (!first) return state("Not changed.");
       const again = await promptDialog({ title: `New password for the ${what}`, lines: ["Type it again."], value: "", confirmLabel: "Set the password", secret: true });
       if (again !== first) return state("The two did not match, so nothing changed.");
-      return (await session.setPassword(kind, first)) ? state("The password was set.", true) : state();
+      return (await session.setPassword(kind, first, current)) ? state("The password was set.", true) : state();
     },
     reset: async () => {
       if (session.storage?.workspaceFolder) {

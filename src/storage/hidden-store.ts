@@ -6,9 +6,14 @@
 import type { DesktopBridge } from "./desktop-bridge";
 import type { HiddenState, HiddenStore } from "./store";
 import type { VaultRecord } from "./hidden-vault";
-import { SEALED_COPY_RE, createVault, holdsKey, keyCheck, openBytes, openText, openVault, readVault, rewrapVault, sealBytes, sealText } from "./hidden-vault";
+import { SEALED_COPY_RE, createVault, holdsKey, keyCheck, openBytes, openText, openVault, readVault, rewrapVault, sameKey, sealBytes, sealText } from "./hidden-vault";
 
 export const HIDDEN_JSON = ".canvast/hidden.json";
+/**
+ * A spare of the vault's key (its wrapped key, salt and check; no index), written with it: when `hidden.json` is lost or damaged the
+ * password still opens the files, and the index is written again from what this device has.
+ */
+export const HIDDEN_KEY_SPARE = ".canvast/keys/hidden.json";
 /**
  * A copy of `hidden.json` beside it: a sync tool's when two devices wrote it at once (`hidden (1).json`, `hidden.sync-conflict-….json`…),
  * or this app's when `hidden.json` holds another key. Read into the index, then erased once the index has its items.
@@ -31,10 +36,6 @@ function mergeEntries(lists: unknown[][]): unknown[] {
 /** The start of the name given to a hidden file found with no entry (its name was lost): `recovered-<hash>.<ext>`. */
 export const RECOVERED_PREFIX = "recovered-";
 
-async function sameKey(a: CryptoKey, b: CryptoKey): Promise<boolean> {
-  const [x, y] = await Promise.all([crypto.subtle.exportKey("raw", a), crypto.subtle.exportKey("raw", b)]);
-  return new Uint8Array(x).every((v, i) => v === new Uint8Array(y)[i]);
-}
 
 export class HiddenVault implements HiddenStore {
   private key: CryptoKey | null = null;
@@ -64,8 +65,28 @@ export class HiddenVault implements HiddenStore {
   private async copies(): Promise<string[]> {
     return (await this.bridge.list(".canvast")).map((n) => `.canvast/${n}`).filter(isHiddenCopy);
   }
-  private save(record: VaultRecord): Promise<void> {
-    return this.bridge.write(HIDDEN_JSON, new TextEncoder().encode(JSON.stringify(record, null, 1)));
+  private async save(record: VaultRecord): Promise<void> {
+    await this.bridge.write(HIDDEN_JSON, new TextEncoder().encode(JSON.stringify(record, null, 1)));
+    await this.keepSpare(record);
+  }
+  private lastSpare = "";
+  /** Write the spare of the key when it is not what the vault's key now is. */
+  private async keepSpare(record: VaultRecord): Promise<void> {
+    const { format, version, kdf, key, check } = record;
+    const text = JSON.stringify({ format, version, kdf, key, ...(check ? { check } : {}) }, null, 1);
+    if (text === this.lastSpare) return;
+    const now = await this.bridge.read(HIDDEN_KEY_SPARE);
+    if (!now || new TextDecoder().decode(now) !== text) await this.bridge.write(HIDDEN_KEY_SPARE, new TextEncoder().encode(text));
+    this.lastSpare = text;
+  }
+  /** The vault: `hidden.json`, or the spare of its key when that is lost or damaged (`spare`: its index is not known). */
+  private async vault(): Promise<{ record: VaultRecord; spare: boolean } | null> {
+    const record = await this.load();
+    this.fromSpare = false;
+    if (record) return { record, spare: false };
+    const spare = await this.load(HIDDEN_KEY_SPARE);
+    this.fromSpare = !!spare;
+    return spare ? { record: spare, spare: true } : null;
   }
   private changed(): void {
     for (const fn of this.listeners) fn();
@@ -82,11 +103,11 @@ export class HiddenVault implements HiddenStore {
 
   async state(): Promise<HiddenState> {
     if (this.key) return "open";
-    return (await this.load()) ? "locked" : "none";
+    return (await this.vault()) ? "locked" : "none";
   }
 
   async unlock(password: string): Promise<boolean> {
-    const record = await this.load();
+    const record = (await this.vault())?.record ?? null;
     const key = record ? await openVault(record, password) : null;
     if (!key) return false;
     // A copy of hidden.json with another key (two devices set the first password at once) that this password opens too: joined to this one.
@@ -98,12 +119,15 @@ export class HiddenVault implements HiddenStore {
     const was = this.key;
     this.key = key;
     this.own = record;
+    await this.keepSpare(record!).catch(() => undefined); // (a workspace of an earlier version gets its spare now)
     if (!was) this.changed();
     return true;
   }
 
-  async setPassword(password: string): Promise<void> {
-    const record = await this.load();
+  async setPassword(password: string, current?: string): Promise<void> {
+    const record = (await this.vault())?.record ?? null;
+    if (!record && (await this.bridge.exists(HIDDEN_JSON)))
+      throw new Error("The Hidden items' password file (.canvast/hidden.json) is damaged, and its spare (.canvast/keys/hidden.json) is not there: put a good copy of either back from a backup. A new password would make a new key, and the hidden files could not be opened.");
     if (!record) {
       // Sealed files, or a copy of hidden.json, with no hidden.json: another device set the password and its hidden.json is still on
       // its way. A key made now would be a second one, and the files of one of them would never open on the other device.
@@ -114,8 +138,9 @@ export class HiddenVault implements HiddenStore {
       this.key = made.key;
       this.own = made.record;
     } else {
-      if (!this.key) throw new Error("the Hidden items are locked: give the current password first");
-      const next = await rewrapVault(record, this.key, password);
+      if (!this.key || current === undefined) throw new Error("the Hidden items are locked: give the current password first");
+      const next = await rewrapVault(record, current, password);
+      if (!next) throw new Error("That is not the current password, so nothing changed.");
       await this.save(next);
       this.own = next;
     }
@@ -125,6 +150,8 @@ export class HiddenVault implements HiddenStore {
   async remove(): Promise<boolean> {
     if ((await this.countHidden()) > 0) return false;
     await this.bridge.erase(HIDDEN_JSON);
+    await this.bridge.erase(HIDDEN_KEY_SPARE);
+    this.lastSpare = "";
     this.key = null;
     this.own = null;
     this.others.clear();
@@ -162,8 +189,10 @@ export class HiddenVault implements HiddenStore {
       }
     };
     const lists: unknown[][] = [];
-    const record = await this.load();
-    const main = record && (await holdsKey(record, this.key)) !== false ? await list(record, this.key) : record ? null : [];
+    const found = await this.vault();
+    const record = found?.record ?? null;
+    // (from the spare, the index is not known: nothing missing from it counts as shown or erased elsewhere)
+    const main = found?.spare ? null : record && (await holdsKey(record, this.key)) !== false ? await list(record, this.key) : record ? null : [];
     if (main) lists.push(main);
     const merged: string[] = [];
     for (const path of await this.copies()) {
@@ -183,9 +212,10 @@ export class HiddenVault implements HiddenStore {
     return { items: mergeEntries(lists), whole: !!main };
   }
 
-  /** Whether copies were read into the index and wait for it to be written (then they are erased). */
-  get copiesWaiting(): boolean {
-    return this.merged.length > 0;
+  private fromSpare = false;
+  /** Whether the index waits to be written even if it did not change: copies were read into it (erased then), or hidden.json was lost. */
+  get indexWaiting(): boolean {
+    return this.merged.length > 0 || this.fromSpare;
   }
 
   /**
@@ -196,7 +226,7 @@ export class HiddenVault implements HiddenStore {
   async writeIndex(text: string): Promise<void> {
     if (!this.key) throw new Error("the Hidden items are locked");
     const next = { index: await sealText(this.key, text), check: await keyCheck(this.key) };
-    const record = await this.load();
+    const record = (await this.vault())?.record ?? null; // (from the spare when hidden.json is lost: it is written again whole)
     const ours = record ? ((await holdsKey(record, this.key)) ?? record.key === this.own?.key) : !!this.own;
     if (!ours) {
       if (!this.own) throw new Error("the Hidden items are locked");

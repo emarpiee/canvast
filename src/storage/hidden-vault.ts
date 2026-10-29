@@ -58,20 +58,34 @@ async function unwrap(record: VaultRecord, password: string, extractable: boolea
 }
 
 /**
- * A new vault for a password: its record (to keep in the folder) and the data key, kept in memory only (extractable only so a
- * new password can wrap it again without asking for the old one twice: on disk it is only ever wrapped).
+ * A new vault for a password: its record (to keep in the folder) and the data key, kept in memory only and not extractable (no
+ * code in the page can read it out; on disk it is only ever wrapped).
  */
 export async function createVault(password: string, iterations = VAULT_ITERATIONS): Promise<{ record: VaultRecord; key: CryptoKey }> {
-  const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
-  return { record: { ...(await wrap(key, password, iterations)), check: await keyCheck(key) }, key };
+  const made = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+  const record = { ...(await wrap(made, password, iterations)), check: await keyCheck(made) };
+  const raw = new Uint8Array(await crypto.subtle.exportKey("raw", made));
+  const key = await crypto.subtle.importKey("raw", raw, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  raw.fill(0);
+  return { record, key };
 }
 
-/** The data key for a password, or null when it is not the password. */
-export const openVault = (record: VaultRecord, password: string): Promise<CryptoKey | null> => unwrap(record, password, true);
+/** The data key for a password (not extractable), or null when it is not the password. */
+export const openVault = (record: VaultRecord, password: string): Promise<CryptoKey | null> => unwrap(record, password, false);
 
-/** The same data key under a new password. The sealed index and files stay as they are. */
-export async function rewrapVault(record: VaultRecord, key: CryptoKey, newPassword: string, iterations = record.kdf.iterations): Promise<VaultRecord> {
+/**
+ * The same data key under a new password, given the current one (the key in memory cannot be read out to wrap again). The sealed
+ * index and files stay as they are. Null when `password` is not the current password.
+ */
+export async function rewrapVault(record: VaultRecord, password: string, newPassword: string, iterations = record.kdf.iterations): Promise<VaultRecord | null> {
+  const key = await unwrap(record, password, true);
+  if (!key) return null;
   return { ...(await wrap(key, newPassword, iterations)), ...(record.index ? { index: record.index } : {}), check: await keyCheck(key) };
+}
+
+/** Whether two data keys are the same key, without reading either out: what one seals, the other opens. */
+export async function sameKey(a: CryptoKey, b: CryptoKey): Promise<boolean> {
+  return (await openBytes(b, await sealBytes(a, new Uint8Array([1])))) !== null;
 }
 
 const CHECK_TEXT = VAULT_FORMAT;

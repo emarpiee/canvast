@@ -4,7 +4,8 @@
 //       writes every hidden item's file into the output folder under its name in the library, with hidden-items.json (their names,
 //       tags, notes and fields) beside them. Nothing in the workspace is changed. Copies of hidden.json beside it (a sync tool's, when
 //       two devices wrote it at once) are read too, each with the same password, and a sealed file in .hidden/ that no entry names (its
-//       entry lost, or a sync tool's copy) is written as recovered-<hash>.<ext> when the password opens it.
+//       entry lost, or a sync tool's copy) is written as recovered-<hash>.<ext> when the password opens it. With hidden.json lost, the
+//       spare of its key (.canvast/keys/hidden.json) opens the files, all as recovered-<hash>.<ext>.
 //   node scripts/hidden-items.mjs encrypt <workspace folder> <file>…
 //       seals each file into .hidden/ and adds it to the sealed index, so the app lists it as a hidden item. A file that came out of
 //       `decrypt` (a hidden-items.json beside it names it) gets its name, tags, note and fields back; any other file must be a PNG or
@@ -22,6 +23,8 @@ const { subtle } = globalThis.crypto;
 const unb64 = (s) => Uint8Array.from(Buffer.from(s, "base64"));
 const b64 = (b) => Buffer.from(b).toString("base64");
 const HIDDEN_JSON = ".canvast/hidden.json";
+/** The spare of the vault's key (no index), kept beside it by the app. */
+const KEY_SPARE = ".canvast/keys/hidden.json";
 const HIDDEN_FILE_RE = /^\.hidden\/[0-9a-f]{32}\.bin$/;
 /** A sealed file under any name a sync tool gives a copy of one. */
 const SEALED_COPY_RE = /^[0-9a-f]{32}[^/]*\.bin$/i;
@@ -104,15 +107,18 @@ function extOfBytes(b) {
  */
 export async function decryptHidden(workspace, out, password) {
   const vaults = [];
-  for (const file of [HIDDEN_JSON, ...hiddenCopies(workspace)]) {
+  let failed = null;
+  // hidden.json, the copies a sync tool left beside it, and the spare of its key (when hidden.json is lost: files then come out as recovered-…).
+  for (const file of [HIDDEN_JSON, ...hiddenCopies(workspace), KEY_SPARE]) {
+    if (!existsSync(join(workspace, file))) continue;
     try {
       vaults.push(await openVault(workspace, password, file));
     } catch (e) {
-      if (file === HIDDEN_JSON && !hiddenCopies(workspace).length) throw e;
-      console.warn(`${file}: ${e.message}`);
+      failed ??= e;
+      if (file !== KEY_SPARE) console.warn(`${file}: ${e.message}`);
     }
   }
-  if (!vaults.length) throw new Error("wrong password");
+  if (!vaults.length) throw failed ?? new Error(`no ${HIDDEN_JSON}: this workspace has no Hidden items password`);
   const tryOpen = async (sealed) => {
     for (const v of vaults) {
       try {

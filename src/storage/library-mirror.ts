@@ -243,7 +243,7 @@ export class LibraryMirror {
   /** Told when an item could not be moved or written, in plain words. */
   onNotice: ((text: string) => void) | null = null;
   /** Told how far a write of files is (files written or moved of all it has to), after each one; `total` 0 when it ended. */
-  onProgress: ((done: number, total: number) => void) | null = null;
+  onProgress: ((done: number, total: number, encrypting?: boolean) => void) | null = null;
 
   constructor(
     private readonly db: IDBDatabase,
@@ -485,7 +485,7 @@ export class LibraryMirror {
     const failed: string[] = [];
     const total = moves.length + toSeal.length;
     let done = 0;
-    const step = (): void => this.onProgress?.(++done, total);
+    const step = (encrypting = false): void => this.onProgress?.(++done, total, encrypting);
     // A move whose name another move still holds waits for it (undo puts two swapped files back exactly); a cycle takes the next free names.
     for (let pending = moves; pending.length; ) {
       const held = new Set(pending.flatMap((m) => (m.from ? [m.from.toLowerCase()] : [])));
@@ -528,7 +528,7 @@ export class LibraryMirror {
     }
     for (const hash of toSeal) {
       if (this.vault.dataKey) await this.seal(hash, failed);
-      step();
+      step(true);
     }
     if (total) this.onProgress?.(total, 0);
     // Library folders are real folders, even empty; the places a move or a rename emptied are removed.
@@ -756,12 +756,23 @@ export class LibraryMirror {
   private async finishMove(): Promise<void> {
     const m = await idbGet<Moving | null>(this.db, "meta", MOVING_KEY).catch(() => null);
     if (!m) return;
-    if (await this.bridge.exists(m.to)) {
+    // A file being sealed when the app stopped, with its readable original still there, is proven first (read back and opened):
+    // unproven, or while the key is locked, the sealed one goes and the readable one stays, to be sealed again with the next write.
+    const source = m.from === "" || (await this.bridge.exists(m.from));
+    if (isHiddenFile(m.to) && source && (await this.bridge.exists(m.to)) && !(await this.sealedHolds(m.to, m.hash))) await this.bridge.erase(m.to);
+    else if (await this.bridge.exists(m.to)) {
       await this.setFile(m.hash, (r) => r.ext === 1 && r.file === m.from, m.to);
       // Sealed or opened: the file it came from (readable, or sealed) is erased once the new one is there.
       if ((isHiddenFile(m.from) || isHiddenFile(m.to)) && (await idbGet<AssetRecord>(this.db, "assets", m.hash))?.file === m.to) await this.bridge.erase(m.from);
     }
     await idbPut(this.db, "meta", MOVING_KEY, null);
+  }
+
+  /** Whether a sealed file opens, with the key in memory, into the bytes of `hash` (false while locked). */
+  private async sealedHolds(file: string, hash: string): Promise<boolean> {
+    const sealed = await this.bridge.read(file);
+    const bytes = sealed && (await this.vault.open(sealed as Uint8Array<ArrayBuffer>));
+    return !!bytes && (await sha256Hex(bytes.buffer)) === hash;
   }
 
   /** Move an item's file to the first free place for its name (a sealed one is opened back into it). */
@@ -989,7 +1000,7 @@ export class LibraryMirror {
       this.lastText = "-";
     }
     const index = JSON.stringify(items.filter((i) => isHiddenFile(i.file)));
-    if (this.vault.dataKey && (index !== this.lastIndex || this.vault.copiesWaiting) && (index !== "[]" || (await this.vault.state()) !== "none")) await this.vault.writeIndex(index);
+    if (this.vault.dataKey && (index !== this.lastIndex || this.vault.indexWaiting) && (index !== "[]" || (await this.vault.state()) !== "none")) await this.vault.writeIndex(index);
     if (this.vault.dataKey) this.lastIndex = index;
     this.state = { folders: JSON.stringify(folders), items: Object.fromEntries(items.map((i) => [i.hash, seen(JSON.stringify(i))])) };
     await idbPut(this.db, "meta", STATE_KEY, this.state);

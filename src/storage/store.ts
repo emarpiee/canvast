@@ -176,8 +176,8 @@ export interface HiddenStore {
   state(): Promise<HiddenState>;
   /** Open with the password (false when it is not the password); the key stays in memory until `lock` or the app closes. */
   unlock(password: string): Promise<boolean>;
-  /** Make the key for a first password, or wrap it with a new one (it must be open). */
-  setPassword(password: string): Promise<void>;
+  /** Make the key for a first password, or wrap it with a new one, given the current one (the key in memory cannot be read out). */
+  setPassword(password: string, current?: string): Promise<void>;
   /** Whether the key is in memory now. */
   isOpen(): boolean;
   /** Remove the key; refused (false) while any item is hidden, since hidden means encrypted. */
@@ -244,7 +244,8 @@ export interface Storage {
 
 /** How far the files being written into the workspace folder are: `done` of `total` after each file; `total` 0 when it ended. */
 export interface FolderWriting {
-  subscribe(fn: (done: number, total: number) => void): () => void;
+  /** `encrypting`: the file just done was a hidden item's, encrypted into `.hidden/`. */
+  subscribe(fn: (done: number, total: number, encrypting?: boolean) => void): () => void;
   /** The write going on now, if any. */
   now(): { done: number; total: number } | null;
 }
