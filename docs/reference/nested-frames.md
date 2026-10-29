@@ -1,9 +1,9 @@
 # Nested frames: technical reference
 
 - Decision: [ADR 0014](../adr/0014-nested-frames.md) (accepted 2026-10-14)
-- Plan and measurements: [plans/nested-frames.md](../plans/nested-frames.md)
-- Code: `src/core/frames.ts`; spike page: `src/spike/main.ts`; tests: `tests/unit/frames.test.ts`; browser gate:
-  `scripts/spike-measure.mjs`
+- Plan: removed (2026-10-29) once built; the measurements are below
+- Code: `src/core/frames.ts`; the spike page and its measuring script (removed 2026-10-29); tests: `tests/unit/frames.test.ts`; browser gate:
+  `scripts/spike-measure.mjs` (removed with the spike)
 
 This document is self-contained. It describes how canvast represents
 positions on an unbounded canvas so that **the cost of every per-frame
@@ -481,7 +481,7 @@ form, works at any depth; `objects()` is the absolute form and throws beyond
 | No hangs | Fuzz: 3 seeds × 2,500 random jumps, Home, pans, zooms, strokes, both browsers; no step over 250 ms | `spike-measure.mjs` |
 
 Run: `npx vitest run tests/unit/frames.test.ts`;
-`node scripts/build-spike.mjs && node scripts/spike-measure.mjs`.
+(`scripts/build-spike.mjs` and `scripts/spike-measure.mjs`, removed on 2026-10-29: the numbers here are their last results).
 
 ## 12. Lessons (pitfalls to avoid in any implementation)
 

@@ -1,6 +1,6 @@
 # ADR 0036 — Arrange in a grid, align and distribute
 
-- Status: accepted (Phase 5, slice 1; plan: `docs/plans/arrange-commands.md`)
+- Status: accepted (Phase 5, slice 1; its plan was removed 2026-10-29 once built)
 - Related: ADR 0030 (the import grid shares `gridCells`), ADR 0020 (groups), ADR 0021 (locks)
 
 ## Decision

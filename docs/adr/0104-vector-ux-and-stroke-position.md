@@ -1,7 +1,7 @@
 # ADR 0104: Vector UX first pass and stroke position
 
 ## Status
-Accepted (v0.17.0). The audit is `docs/reference/vector-ux-audit.md`.
+Accepted (v0.17.0). The audit (`docs/reference/vector-ux-audit.md`) was removed on 2026-10-29 once acted on; its findings are summed up here.
 
 ## Decision
 **Stroke position.** A path has an optional `align`: absent (centred on the edge), `"inside"` or `"outside"`. It applies only when the object has an outline and every sub-path is closed (`alignOf`); an open line is always centred. The whole width is on the chosen side of the edge, so a 20 px outline outside a rectangle reaches 20 px beyond it and none of it is over the fill.

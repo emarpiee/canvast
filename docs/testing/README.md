@@ -14,7 +14,7 @@ differs (for example 240 instead of 1,200 wheel notches). Run the groups a chang
 | `npm run test:snap -- <args>` | Playwright against a snapshot build of its own in `test-builds/` (the same tests; every suite goes through it, so no test reads `dist/`). `npm run test:status` shows each snapshot against the source and `dist/` | as the tests chosen | **Whenever work goes on while tests run** (the default way to run E2E during a session) |
 | `npm run test:unit` | Unit tests only (Vitest) | ~15 s | While developing |
 | `npm run test:snap -- -g "<name>"` | Selected quick E2E tests (a bare `npx playwright test` fails on purpose: it has no snapshot) | seconds + build | While developing a specific feature |
-| `npm run bench` | Scale benchmarks, 1K–1M objects, plus tile-cache benchmarks (tiles on/off; pan, still, pan+zoom) in Chromium, Chromium CPU-only and Firefox. Not a pass/fail gate | ~15–25 min (not yet timed with Firefox; tile benchmarks alone 2.2 min) | After rendering or performance changes; compare with `metrics/bench-*.json`, `metrics/tiles-*.json`, docs/testing/phase-0c.md and phase-1d.md |
+| `npm run bench` | Scale benchmarks, 1K–1M objects, plus tile-cache benchmarks (tiles on/off; pan, still, pan+zoom) in Chromium, Chromium CPU-only and Firefox. Not a pass/fail gate | ~15–25 min (not yet timed with Firefox; tile benchmarks alone 2.2 min) | After rendering or performance changes; compare with the results kept on the reference machine (`metrics/`, not in the repository: it is ignored by git) and with docs/testing/phase-0c.md and phase-1d.md |
 
 ## Groups
 

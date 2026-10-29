@@ -20,7 +20,7 @@ Decoded images are a **cache**; the original stays stored and is decoded again w
 ## Other caches, for the record
 
 - The raster tile cache holds only the tiles around the viewport and releases the rest (ADR 0009).
-- Assets-view thumbnails are in-memory object URLs made from the original and revoked when an asset is deleted; persisted thumbnails and a virtualized grid are planned (`docs/plans/asset-thumbnails.md`).
+- Assets-view thumbnails are in-memory object URLs made from the original and revoked when an asset is deleted; persisted thumbnails and a virtualized grid are planned (the thumbnails plan, removed 2026-10-29).
 - The density layer and the text raster fall-backs are single canvases sized to the view.
 
 ## Not in this slice

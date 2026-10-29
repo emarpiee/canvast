@@ -4,7 +4,7 @@
 - Date: 2026-10-14
 - Supersedes, once accepted: the *representation* in
   [ADR 0001](0001-exact-dyadic-world-coordinates.md). Its exactness rules stay.
-- Plan and measurements: [docs/plans/nested-frames.md](../plans/nested-frames.md)
+- Plan and measurements: the plan was removed (2026-10-29) once built; the measurements are in [docs/reference/nested-frames.md](../reference/nested-frames.md)
 - Technical reference (model, formulas, invariants, error bounds, limits): [docs/reference/nested-frames.md](../reference/nested-frames.md)
 
 ## Decision
@@ -59,7 +59,7 @@ is tested by running both systems side by side (`tests/unit/frames.test.ts`):
   lies below 2^-192 camera-frame units (far below 10^-6 px). Stored
   positions and every edit stay exact; exact conversion is separate.
 - Limits found by stress tests (`tests/unit/frames.test.ts`, the fuzz in
-  `scripts/spike-measure.mjs`):
+  `scripts/spike-measure.mjs`, removed 2026-10-29 with the spike):
   - Depth is unbounded (frame levels are BigInt): 10^18 levels by 1,000
     jumps, exact both ways. **One jump is capped at 2^50 levels** (zoom
     counts are doubles; past that a jump would be off by whole levels).

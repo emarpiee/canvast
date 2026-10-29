@@ -52,7 +52,7 @@ test("the desktop page is sandboxed: no Node, no path outside the workspace fold
   const { app, page, requests } = await launch(ws);
   try {
     expect(page.url()).toBe("app://canvast/#debug");
-    expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getTitle())).toBe(`${ws.split("/").pop()} — canvast`);
+    expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getTitle())).toMatch(new RegExp(`^${ws.split("/").pop()} — canvast \\d+\\.\\d+\\.\\d+$`));
     expect(await page.evaluate(() => [typeof (globalThis as { require?: unknown }).require, typeof (globalThis as { process?: unknown }).process])).toEqual(["undefined", "undefined"]);
     expect(await page.evaluate(() => window.canvastDesktop!.workspace())).toEqual({ path: ws, name: ws.split("/").pop() });
     const refused = await page.evaluate(async () => {

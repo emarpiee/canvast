@@ -55,7 +55,8 @@ SOFTWARE.
 ```
 
 Development-only tools (not shipped): TypeScript (Apache-2.0), esbuild (MIT),
-Vitest (MIT), Playwright (Apache-2.0).
+Vitest (MIT), Playwright (Apache-2.0), GSAP (GreenSock standard licence; the
+showcase motion piece only).
 
 ## Inter font
 

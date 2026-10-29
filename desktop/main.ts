@@ -575,7 +575,7 @@ async function openWindow(workspace: string): Promise<void> {
     width: 1400,
     height: 900,
     show: !hidden,
-    title: `${basename(workspace)} — canvast`,
+    title: `${basename(workspace)} — canvast ${app.getVersion()}`, // (the version, as the browser tab shows it)
     backgroundColor: "#1f1f1f",
     webPreferences: {
       partition,

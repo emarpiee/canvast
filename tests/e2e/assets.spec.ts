@@ -2304,6 +2304,13 @@ test("Extract frame follows Settings > Media and playback: name template and sty
   await expect.poll(() => player.evaluate((el) => getComputedStyle(el).opacity)).toBe("0");
   await p.mouse.move(400, 300);
   await expect(viewer).not.toHaveClass(/is-idle/);
+  // Paused, it fades the same way.
+  await playBtn.click();
+  await expect(playBtn).toHaveAttribute("aria-label", "Play");
+  await p.mouse.move(5, 5);
+  await expect(viewer).toHaveClass(/is-idle/, { timeout: 1500 });
+  await p.mouse.move(400, 300);
+  await expect(viewer).not.toHaveClass(/is-idle/);
   await viewer.getByRole("button", { name: /^Extract frame/ }).click();
   await expect(p.getByTestId("toast")).toContainText("added to the library");
   await expect.poll(async () => (await p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.length))).toBe(2);

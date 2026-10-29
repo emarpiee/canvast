@@ -1912,8 +1912,8 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 /* zoomed in, a drag pans: the hand says so */
 .viewer.is-zoomed .viewer-stage, .viewer.is-zoomed img, .viewer.is-zoomed video, .viewer.is-zoomed canvas.viewer-gif { cursor: grab; }
 .viewer.is-grabbing .viewer-stage, .viewer.is-grabbing figure img, .viewer.is-grabbing figure video, .viewer.is-grabbing figure canvas.viewer-gif { cursor: grabbing; }
-/* A video's or GIF's player floats over the bottom of the picture (the picture keeps its size); while it plays and the pointer rests,
-   it fades away (after Settings > Media and playback, Hide the player) until the pointer moves. */
+/* A video's or GIF's player floats over the bottom of the picture (the picture keeps its size); while the pointer rests, playing or
+   paused, it fades away (after Settings > Media and playback, Hide the player) until the pointer moves. */
 .viewer-media-bar { position: absolute; left: 50%; bottom: calc(var(--viewer-bottom) + var(--sp-4)); top: auto; transform: translateX(-50%); z-index: 3; width: min(560px, calc(100% - 24px)); background: var(--v-pill); color: var(--v-fg); border: 1px solid var(--v-line); backdrop-filter: blur(10px); transition: opacity var(--dur-base); }
 .viewer.is-idle .viewer-media-bar:not(:hover):not(:has(:focus-visible)) { opacity: 0; pointer-events: none; }
 .viewer-media-bar[hidden] { display: none; }

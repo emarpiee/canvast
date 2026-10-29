@@ -3,7 +3,7 @@ import type { CanvasObject } from "./model";
 import { translate, unionBounds } from "./edit-ops";
 
 /**
- * Arrange, align and distribute (docs/plans/arrange-commands.md). Pure: each command returns the objects to replace,
+ * Arrange, align and distribute (ADR 0036). Pure: each command returns the objects to replace,
  * every one moved by one exact translation (`translate`), so sizes, rotation and groups are untouched. A unit is a
  * group (at the level being worked at) or a single object; its box is the exact union of its members' boxes.
  * Positions are decided in doubles relative to the largest unit (so units 2^-1000 and 2^1000 apart do not overflow),

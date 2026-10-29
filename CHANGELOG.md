@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.50.39 — The version in the title, a tidier repository (2026-10-29)
+
+- **Added:** the version after the name in the browser tab (`canvast 0.50.39`) and in the desktop app's window title (`<workspace> — canvast 0.50.39`).
+- **Changed:** the library viewer's player fades after *Hide the player* whether the video or GIF is playing or paused.
+- **Removed:** the two Claude Code workflows (they would have run on anyone's `@claude` in this public repository), the nested-frames spike and its scripts, the finished plans in `docs/plans/`, and two reference notes that were out of date (the plan-gaps list and the vector tools audit). Links to them now say they were removed.
+- **Changed:** `docs/status.md`'s overview is up to date (nested frames, Phases 2, 5, 8 and 9 done; the desktop app and its packages). The README links the pen and deep-zoom algorithms and the nested-frames reference. The showcase motion piece's GSAP is listed as a development-only tool.
+- **Fixed:** the text-to-path test no longer depends on how a machine's system snaps small text to pixels: its exact check is now made zoomed in, where text and path are drawn from the same font outlines.
+
 ## 0.50.38 — The viewer's controls button at the top (2026-10-29)
 
 - **Changed:** the library viewer's button that hides and shows the controls (`F`) is at the top, beside the details button, and behaves like it (with the controls hidden it fades until the pointer is near the top). It no longer sits over the bottom of the picture, and the strip kept for it is gone: the picture uses the whole stage, and grows when the controls are hidden.

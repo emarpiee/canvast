@@ -23,4 +23,4 @@ A button in the navigation controls shows a continuous FPS readout (`app/fps-met
 
 ## Not in this slice
 
-A stored (persisted) thumbnail, a virtualized Assets grid and progressive tile loading (Phase 4, `docs/plans/asset-thumbnails.md`), and arranging an existing selection in a grid with a chosen order (`docs/plans/arrange-commands.md`, Phase 5; it reuses `gridLayout`).
+A stored (persisted) thumbnail, a virtualized Assets grid and progressive tile loading (Phase 4, the thumbnails plan (removed 2026-10-29; see ADR 0034)), and arranging an existing selection in a grid with a chosen order (the arrange plan, removed 2026-10-29, Phase 5; it reuses `gridLayout`).

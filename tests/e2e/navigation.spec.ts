@@ -23,7 +23,7 @@ async function expectInked(app: App, label: string): Promise<number> {
 }
 
 test("loads offline from file:// with no network requests or errors", async ({ app }) => {
-  await expect(app.page).toHaveTitle("canvast");
+  await expect(app.page).toHaveTitle(/^canvast \d+\.\d+\.\d+$/); // (the version follows the name)
   await showTechnicalReadout(app.page);
   await expect(app.page.getByTestId("zoom-readout")).toContainText("zoom 2^0.00");
   await expectInked(app, "home");

@@ -497,8 +497,9 @@ test("convert text to path (Ctrl+E and the selection bar): the same pixels, the 
   await p.mouse.click(1000, 600);
   const after = await picture();
   expect(after.filter((v) => v < 3 * 90).length, "dark pixels of the path").toBeGreaterThan(50);
-  // A browser draws thin text lighter than a filled path (Chromium: about a factor of two in ink at 16 px) and puts a glyph on a whole pixel,
-  // so edges differ; what must match is where the ink is (its middle) and that there is about as much, not the exact pixels.
+  // At 16 px the browser draws the text with its own glyphs: thinner than a filled path (Chromium: about a factor of two in ink) and
+  // snapped to pixels the way the system's font settings say, which differs between machines (up to about 2 px of the ink's middle).
+  // So here only about as much ink, in about the same place; the exact check is the deep one below, where both are the font's outlines.
   const ink = (pic: number[]) => {
     const w = 64;
     let mass = 0, mx = 0, my = 0;
@@ -514,7 +515,7 @@ test("convert text to path (Ctrl+E and the selection bar): the same pixels, the 
   const a2 = ink(after);
   expect(a2.mass / a1.mass, `ink ${a1.mass} -> ${a2.mass}`).toBeGreaterThan(0.6);
   expect(a2.mass / a1.mass, `ink ${a1.mass} -> ${a2.mass}`).toBeLessThan(3.2); // (a filled path is 1.6 to 2.7 times the ink of hinted text, depending on how the browser placed the glyphs)
-  expect(Math.hypot(a2.x - a1.x, a2.y - a1.y), `centre (${a1.x.toFixed(2)}, ${a1.y.toFixed(2)}) -> (${a2.x.toFixed(2)}, ${a2.y.toFixed(2)})`).toBeLessThan(1.5);
+  expect(Math.hypot(a2.x - a1.x, a2.y - a1.y), `centre (${a1.x.toFixed(2)}, ${a1.y.toFixed(2)}) -> (${a2.x.toFixed(2)}, ${a2.y.toFixed(2)})`).toBeLessThan(3);
 
   // one undo gives the text back, exactly
   await p.keyboard.press("Control+z");
@@ -524,6 +525,36 @@ test("convert text to path (Ctrl+E and the selection bar): the same pixels, the 
   await p.mouse.click(500, 380);
   await pathWith(p, "outline");
   expect((await objects(p))[0]!.kind).toBe("path");
+
+  // The exact check, the same on every machine: zoomed in until a letter is about 4,000 px tall, the text is drawn from the font's own
+  // outlines (past DEEP_EM_PX), so the path made from them must cover the very same pixels, edge for edge.
+  await p.keyboard.press("Control+z");
+  await p.keyboard.press("Escape");
+  const dark = before.findIndex((v) => v < 3 * 90); // (a point on the first letter's edge, from the 16 px picture)
+  const at = await app.worldAt(476 + (dark % 64), 366 + Math.floor(dark / 64));
+  const cam = await app.camera();
+  await p.evaluate((c) => window.__canvastDebug.setCamera(c), { ...cam, cx: at.x, cy: at.y, zi: cam.zi + 8, zf: 0, pz: cam.zi + 8 });
+  await app.frame();
+  const deep = () =>
+    p.evaluate(() => {
+      const out: number[] = [];
+      for (let y = 100; y < 800; y += 10) for (let x = 100; x < 1300; x += 10) {
+        const c = window.__canvastDebug.pixelAt(x, y);
+        out.push(c[0]! + c[1]! + c[2]!);
+      }
+      return out;
+    });
+  const d1 = await deep();
+  expect(d1.filter((v) => v < 3 * 90).length, "the letter fills part of the view").toBeGreaterThan(200);
+  expect(d1.filter((v) => v > 3 * 200).length, "and the canvas the rest").toBeGreaterThan(200);
+  await p.keyboard.press("Control+a");
+  await p.keyboard.press("Control+e");
+  await p.keyboard.press("Escape");
+  await app.frame();
+  expect((await objects(p))[0]!.kind).toBe("path");
+  const d2 = await deep();
+  const differ = d1.filter((v, i) => Math.abs(v - d2[i]!) > 60).length;
+  expect(differ, `samples that changed: ${differ} of ${d1.length}`).toBeLessThan(d1.length * 0.005);
 });
 
 test("line height and letter spacing: set for the picked text, drawn and measured by them, saved, one undo step each (ADR 0113)", async ({ app }) => {

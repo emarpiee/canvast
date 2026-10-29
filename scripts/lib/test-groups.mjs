@@ -24,7 +24,7 @@ const ALL = Object.keys(GROUPS);
  */
 export const RULES = [
   // nothing an end-to-end test reads
-  [/^(docs\/|README\.md$|CHANGELOG\.md$|CLAUDE\.md$|THIRD_PARTY_NOTICES\.md$|LICENSE$|metrics\/|\.github\/|\.gitignore$|tests\/unit\/|vitest\.config\.ts$|src\/spike\/|scripts\/brand\/|scripts\/test-affected\.mjs$|scripts\/lib\/test-groups\.mjs$|playwright\.(full|bench)\.config\.ts$)/, []],
+  [/^(docs\/|README\.md$|CHANGELOG\.md$|CLAUDE\.md$|THIRD_PARTY_NOTICES\.md$|LICENSE$|metrics\/|\.github\/|\.gitignore$|tests\/unit\/|vitest\.config\.ts$|scripts\/brand\/|scripts\/test-affected\.mjs$|scripts\/lib\/test-groups\.mjs$|playwright\.(full|bench)\.config\.ts$)/, []],
   // package.json: the app has no runtime dependencies, so only what builds or runs the tests matters
   [/^package\.json$/, (_m, diff) => {
     if (diff === undefined) return ALL;

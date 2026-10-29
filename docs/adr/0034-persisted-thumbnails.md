@@ -1,7 +1,7 @@
 # ADR 0034 — Persisted lower-quality thumbnails
 
 - Status: accepted (Phase 4, slice 2)
-- Related: ADR 0007 (asset catalog; it deferred persisted thumbnails), `docs/plans/asset-thumbnails.md`
+- Related: ADR 0007 (asset catalog; it deferred persisted thumbnails), the thumbnails plan (removed 2026-10-29 once built)
 
 ## Decision
 
@@ -19,4 +19,4 @@ A library of 1,000 images (600 x 400) imported through the Assets view: import t
 
 ## Not done yet (plan requirements still open)
 
-Thumbnails inside `.canvast` archives, regenerating a bad stored thumbnail, re-importing from the broken card's own button (importing the same file still restores it). These stay in `docs/plans/asset-thumbnails.md`.
+Thumbnails inside `.canvast` archives, regenerating a bad stored thumbnail, re-importing from the broken card's own button (importing the same file still restores it). These stay in the thumbnails plan (removed 2026-10-29 once built).

@@ -1,6 +1,6 @@
 {
   "name": "canvast",
-  "version": "0.50.38",
+  "version": "0.50.39",
   "private": true,
   "description": "canvast — an offline-first endless canvas that ships as a single HTML file",
   "type": "module",
@@ -44,6 +44,7 @@
     "electron": "44.7.1",
     "electron-builder": "26.17.0",
     "esbuild": "0.28.2",
+    "gsap": "3.12.5",
     "lucide-static": "1.48.0",
     "typescript": "7.0.2",
     "vitest": "5.0.4"
