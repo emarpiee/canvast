@@ -26,6 +26,9 @@ const KNOWN = [
   /^https:\/\/scripts\.sil\.org\/OFL$/, // the Inter licence text
   /^https:\/\/bottosson\.github\.io\/posts\/colorpicker\/$/, // a credit in the colour picker's code
   /^https:\/\/\\u2026$/, // the placeholder "https://…" in the link dialog's text
+  /^https:\/\/github\.com\/emarpiee\/canvast$/, // canvast's own licence notice: where its source is
+  /^https:\/\/fsf\.org\/$/, // the GNU GPL text
+  /^https:\/\/www\.gnu\.org\/licenses\/(why-not-lgpl\.html)?$/, // the GNU GPL text
 ];
 for (const m of html.matchAll(/(?:https?|wss?):\/\/[^\s"'`)<>]+/gi)) {
   if (!KNOWN.some((re) => re.test(m[0]))) problems.push(`unknown URL string (look at it, then add it to KNOWN if it is only text): ${m[0]}`);
