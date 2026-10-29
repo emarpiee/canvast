@@ -31,6 +31,8 @@ export interface DesktopBridge {
   sizes(paths: string[]): Promise<Array<number | null>>;
   /** Open a file of the workspace folder in the system's default app for its kind. An error in plain words, or "" when it opened. */
   openFile(path: string): Promise<string>;
+  /** Show a file of the workspace folder in the system's file manager (its folder opened, the file selected). */
+  showFile(path: string): Promise<void>;
   /** Wait until the files written with `durable: false` are really on the disk (one request for the whole disk where it can). */
   syncFiles(paths: string[]): Promise<void>;
   /**

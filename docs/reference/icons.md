@@ -124,6 +124,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `arrow-left-right` | Switch workspace (desktop app: the navigator's menu, Settings > Storage) |
 | `folder-clock` | A recent workspace in the workspace switcher |
 | `folder-open` | Open a folder as the workspace (workspace switcher) |
+| `folder-search` | Show in file manager: a library item's file in the system's file manager (desktop app) |
 | `folder-root` | New workspace (workspace switcher) |
 | `list-x` | Take a workspace whose folder is gone off the recent list |
 | `file-archive` | Export all files as ZIP; Export the files of canvas Canvas 1 as a ZIP |

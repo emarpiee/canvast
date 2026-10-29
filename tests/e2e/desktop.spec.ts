@@ -282,6 +282,20 @@ test("library folders are real folders: filing or renaming an item moves its fil
       ["Hand Study.png", "library/anatomy/sub/hand_study.png", "f2"],
       ["Pose.png", "library/images/pose.png", null],
     ]);
+    // Show in file manager (the details, and the item's right-click menu): the system is asked to show that very file in its folder.
+    await app.evaluate(({ shell }) => {
+      const g = globalThis as unknown as { shown: string[] };
+      g.shown = [];
+      shell.showItemInFolder = (path: string) => void g.shown.push(path);
+    });
+    const shown = () => app.evaluate(() => (globalThis as unknown as { shown: string[] }).shown);
+    await page.getByTestId("view-assets").click();
+    await page.locator('[data-testid="asset-card"][aria-label^="Hand Study.png"]').click();
+    await page.getByTestId("asset-show-file").click();
+    await expect.poll(shown).toEqual([join(ws, "library/anatomy/sub/hand_study.png")]);
+    await page.locator('[data-testid="asset-card"][aria-label^="Pose.png"]').click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Show in file manager" }).click();
+    await expect.poll(shown).toEqual([join(ws, "library/anatomy/sub/hand_study.png"), join(ws, "library/images/pose.png")]);
   } finally {
     await app.close();
   }

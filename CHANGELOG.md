@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.37 — Show in file manager (2026-10-29)
+
+- **Added:** *Show in file manager* (desktop app) in the details of one library item and in its right-click menu: the item's folder opens in the system's file manager with its file selected. Hidden items do not have it.
+- **Added:** the README has a Contributing and support section: reporting bugs, asking for features, sending pull requests, and supporting the developer.
+
 ## 0.50.36 — The viewer's player floats (2026-10-29)
 
 - **Changed:** in the library's viewer, the player of a video or GIF floats over the bottom of the picture instead of taking a strip of its own, so the picture keeps its size. While it plays and the pointer rests, the player fades away; any move, touch or key brings it back, and it stays while paused.

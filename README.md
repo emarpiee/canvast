@@ -37,8 +37,9 @@
 **Project**
 
 16. [Platform support](#platform-support)
-17. [Notes from the developer](#notes-from-the-developer)
-18. [Licence](#licence)
+17. [Contributing and support](#contributing-and-support)
+18. [Notes from the developer](#notes-from-the-developer)
+19. [Licence](#licence)
 
 ---
 
@@ -382,6 +383,7 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 - **Dragging items** shows up to five of them stacked, with their count. Drop them on a folder, a tag or Favourites in the sidebar to file them, or on the strip across the top to place them on the open canvas (the library stays open).
 - **The status bar** along the bottom (the same as the canvas's) shows how many items are listed (*3 of 5 items*), how many are selected and their size, and the size of the whole library. At its right end: grid or list, the list's columns, and the thumbnail size.
 - **Open in default app** (desktop app; in the details, the right-click menu, and a file card's Actions bar on a canvas) opens an item's file in your system's app for that kind of file: for a file canvast cannot show, or to edit a picture elsewhere.
+- **Show in file manager** (desktop app; in the details of one item, and its right-click menu) opens the item's folder in your system's file manager with its file selected. Hidden items have neither this nor *Open in default app*.
 - A **viewer** with filmstrip, zoom, pan, slideshow and a details panel. The details show where an item is used (*Used on 3 canvases (4 times)*, then each canvas with its own count; past five canvases, **Show all** lists the rest), and **Show** takes you to it on the canvas at any depth. A button switches the background behind the picture, the controls can be hidden, and a double tap opens it on phones. A video or GIF plays with the canvas's player, floating over the bottom of the picture: while it plays and the pointer rests, the player fades away, and any move brings it back.
 - **Folders** (an item lives in one folder, folders nest; a long list in the sidebar shows its first rows and **Show N more**, remembered on this device), **tags** (several per item, renamable), **favourites**, file types, **Similar images** (duplicates and near-duplicates found by their pixels) and **Hidden** items, which are kept out of every list until you open them (see [Hidden items and passwords](#hidden-items-and-passwords)).
 - **Selecting and the details panel**
@@ -1060,6 +1062,17 @@ The made files are kept in `docs/brand/`: the board (`canvast-brand-guidelines.c
 - Requires `BigInt`, Pointer Events, `ResizeObserver`, Canvas 2D and IndexedDB. Roughly Chromium 67+, Firefox 68+, Safari 14+.
 - **Tested** in Chromium 156 (default, CPU-only, and devicePixelRatio 2 with touch) and Firefox 157 on Linux. **Not tested** in Safari.
 - Firefox on `file://` supports everything canvast uses (IndexedDB, Web Locks, BroadcastChannel) with frame times close to Chromium's.
+
+---
+
+## Contributing and support
+
+| You want to | How |
+| --- | --- |
+| **Report a bug** | [Open an issue](https://github.com/emarpiee/canvast/issues/new/choose) with the bug report form: what you did, what you expected, what happened, and whether it was the browser version (which browser) or the desktop app, with the version from Settings > About and diagnostics. *Save a report* there adds the details that help |
+| **Ask for a feature** | [Open an issue](https://github.com/emarpiee/canvast/issues/new/choose) with the feature request form. Check [Limitations](#limitations) first: it may already be listed |
+| **Send a change** | Pull requests are welcome. Fork the repository, make one change per pull request, and say what it does and why. Run `npm test` before sending it (see [Building from source](#building-from-source) and [Testing](#testing)); GitHub runs the checks and the end-to-end suite on it too. Keep the README true to the change. `CLAUDE.md` holds the project's conventions (design tokens instead of fixed CSS values, one icon per function, tests from a snapshot build) |
+| **Support the developer** | If canvast helps your work, you can support its development through [PayPal](https://paypal.me/emarpiee) |
 
 ---
 

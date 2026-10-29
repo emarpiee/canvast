@@ -2057,7 +2057,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         ${e?.present ? `<button type="button" class="assets-btn" data-action="download" data-testid="asset-download" title="Save a copy of the file">${ICONS.download}<span>Download</span></button>` : ""}
         ${
           !e?.present ? ""
-          : desktopBridge() ? (meta(e).hidden ? "" : `<button type="button" class="assets-btn" data-action="open-app" data-testid="asset-open-app" title="Open it in the app your system uses for this kind of file">${ICONS.externalLink}<span>Open in default app</span></button>`)
+          : desktopBridge() ? (meta(e).hidden ? "" : `<button type="button" class="assets-btn" data-action="open-app" data-testid="asset-open-app" title="Open it in the app your system uses for this kind of file">${ICONS.externalLink}<span>Open in default app</span></button><button type="button" class="assets-btn" data-action="show-file" data-testid="asset-show-file" title="Show its file in your system's file manager, selected in its folder">${ICONS.folderSearch}<span>Show in file manager</span></button>`)
           : fileActionsOf(e.name, e.type).canOpen ? `<button type="button" class="assets-btn" data-action="open-tab" data-testid="asset-open-tab" title="Show it in a new browser tab">${ICONS.externalLink}<span>Open in tab</span></button>`
           : ""
         }
@@ -2583,6 +2583,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           const file = await session.storage?.originals.fileOf(hash).catch(() => null);
           const problem = file ? await desktopBridge()!.openFile(file) : "its file is not in the workspace folder yet; try again in a moment";
           if (problem && visible) status.textContent = `Could not open it: ${problem}.`;
+        })();
+        break;
+      case "show-file":
+        // The desktop app: the item's file, selected in its folder in the system's file manager (never a hidden item's: no button).
+        void (async () => {
+          const file = await session.storage?.originals.fileOf(hash).catch(() => null);
+          if (file) await desktopBridge()!.showFile(file);
+          else if (visible) status.textContent = "Could not show it: its file is not in the workspace folder yet; try again in a moment.";
         })();
         break;
       case "export":
@@ -3284,7 +3292,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // The item rows are read from the panel's buttons (their words, icon and state) and press them, so the menu and the panel can never disagree.
   const PANEL_GROUPS: ReadonlyArray<ReadonlyArray<readonly [string, string?]>> = [
     [["slide", "Open in the viewer"], ["place"], ["place-all"], ["slideshow-all"], ["favorite"], ["favorite-all"], ["hide"], ["hide-all"]],
-    [["rename", "Rename…"], ["rename-all"], ["download", "Download"], ["open-tab"], ["open-app"], ["export", "Export as archive"], ["export-all"], ["export-files-all"]],
+    [["rename", "Rename…"], ["rename-all"], ["download", "Download"], ["open-tab"], ["open-app"], ["show-file"], ["export", "Export as archive"], ["export-all"], ["export-files-all"]],
     [["delete"], ["delete-all"], ["delete-everywhere"]],
   ];
   const panelGroups = (): MenuItem[][] =>
