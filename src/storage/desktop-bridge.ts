@@ -17,23 +17,34 @@ export type LibraryOp =
   | { t: "entry"; hash: string; v: CatalogEntry | null }
   | { t: "rec"; hash: string; v: AssetRecord | null }
   | { t: "seen"; hash: string; v: string | null }
-  | { t: "meta"; k: string; v: unknown };
+  | { t: "meta"; k: string; v: unknown }
+  | { t: "part"; k: string; v: string | null };
 
 /** The desktop build's library calls (`desktop/library-db.ts`, in the main process). */
 export interface LibraryCalls {
   /** Entry, record and seen mark of each item that has an entry or a record. */
   get(hashes: readonly string[]): Promise<Array<[string, CatalogEntry | null, AssetRecord | null, string | null]>>;
   /** Every entry (or the active, or the deleted ones), as JSON array text. */
-  entries(which?: "all" | "active" | "deleted"): Promise<string>;
-  /** Every record, as JSON array text. */
-  recs(): Promise<string>;
+  entries(which?: "all" | "active" | "deleted" | "hidden"): Promise<string>;
+  /** Every record (or those of sealed files), as JSON array text. */
+  recs(which?: "all" | "sealed"): Promise<string>;
   /** The item whose record names this file. */
   byFile(file: string): Promise<string | null>;
   meta(key: string): Promise<unknown>;
   /** Changes in one transaction: all or nothing. */
   apply(ops: readonly LibraryOp[]): Promise<void>;
-  /** Take the changes of the part files `keys` (`extra`: the sealed index's items; `deletions`: erased items are marked deleted). */
-  sync(keys: readonly string[], extra: readonly unknown[], deletions: boolean): Promise<{ took: boolean; whole: boolean; read: number }>;
+  /**
+   * Take the changes of the part files `keys` (`extra`: items given here, the sealed index's or an older `library.json`'s; `deletions`:
+   * erased items are marked deleted; `all`: every item not given or in a part read counts, as for a whole `library.json`).
+   */
+  sync(keys: readonly string[], extra: readonly unknown[], deletions: boolean, all?: boolean): Promise<{ took: boolean; whole: boolean; read: number }>;
+  /**
+   * Write the part files (of `only`'s items, or all), `index.json` and, small enough, `library.json`, in the main process. The hidden
+   * items among them whose files are sealed (for the sealed index), and `library.json`'s text ("-": none, the library is too big).
+   */
+  write(only: readonly string[] | null, compatMax: number): Promise<{ sealed: unknown[]; compat: string }>;
+  /** Each part's fingerprint (SHA-256 of its text) as last read or written here. */
+  parts(): Promise<Record<string, string>>;
   /** Empty it (Delete all data: it is made again from the folder). */
   reset(): Promise<void>;
   /** Told how many parts of how many a `sync` has read. */

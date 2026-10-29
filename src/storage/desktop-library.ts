@@ -46,11 +46,11 @@ export class DesktopLibrary {
     }
     return { entries, recs, seen };
   }
-  async entries(which: "all" | "active" | "deleted" = "all"): Promise<CatalogEntry[]> {
+  async entries(which: "all" | "active" | "deleted" | "hidden" = "all"): Promise<CatalogEntry[]> {
     return JSON.parse(await this.calls.entries(which)) as CatalogEntry[];
   }
-  async recs(): Promise<AssetRecord[]> {
-    return JSON.parse(await this.calls.recs()) as AssetRecord[];
+  async recs(which: "all" | "sealed" = "all"): Promise<AssetRecord[]> {
+    return JSON.parse(await this.calls.recs(which)) as AssetRecord[];
   }
   async folders(): Promise<AssetFolder[]> {
     return ((await this.calls.meta(FOLDERS_KEY)) as AssetFolder[] | null) ?? [];

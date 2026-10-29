@@ -6,12 +6,14 @@
  */
 import Database from "better-sqlite3";
 import { createHash } from "node:crypto";
-import type { CatalogEntry } from "../src/assets/asset-catalog";
+import type { AssetFolder, CatalogEntry } from "../src/assets/asset-catalog";
+import { FOLDERS_KEY, visibleFolders } from "../src/assets/asset-catalog";
 import type { AssetRecord } from "../src/assets/asset-library";
 import type { LibraryItem } from "../src/storage/library-mirror";
 import type { LibraryOp } from "../src/storage/desktop-bridge";
 export type { LibraryOp };
-import { entryOf, itemOf, readItem, seen } from "../src/storage/library-mirror";
+import { LIBRARY_INDEX, LIBRARY_JSON, LIBRARY_JSON_FORMAT, entryOf, itemOf, libraryJsonText, libraryPartText, partKey, partPath, readItem, seen } from "../src/storage/library-mirror";
+import { isHiddenFile } from "../src/storage/hidden-vault";
 
 export type LibraryDb = InstanceType<typeof Database>;
 
@@ -102,9 +104,13 @@ export class Library {
     const rows = this.db.prepare<[], { json: string }>(`SELECT json FROM entries WHERE ${where}`).raw().all() as unknown as string[][];
     return `[${rows.map((r) => r[0]).join(",")}]`;
   }
+  /** Each part's fingerprint as last read or written. */
+  parts(): Record<string, string> {
+    return Object.fromEntries((this.db.prepare("SELECT key, fp FROM parts").all() as Array<{ key: string; fp: string }>).map((r) => [r.key, r.fp]));
+  }
   /** Every record, as one JSON array text. */
-  recsText(): string {
-    const rows = this.db.prepare("SELECT json FROM recs").raw().all() as unknown as string[][];
+  recsText(sealedOnly = false): string {
+    const rows = this.db.prepare(`SELECT json FROM recs${sealedOnly ? " WHERE file LIKE '.hidden/%'" : ""}`).raw().all() as unknown as string[][];
     return `[${rows.map((r) => r[0]).join(",")}]`;
   }
 
@@ -128,8 +134,65 @@ export class Library {
     } else if (op.t === "seen") {
       if (op.v === null) s.delSeen.run(op.hash);
       else s.putSeen.run(op.hash, op.v);
+    } else if (op.t === "part") {
+      if (op.v === null) this.db.prepare("DELETE FROM parts WHERE key = ?").run(op.k);
+      else this.db.prepare("INSERT OR REPLACE INTO parts VALUES (?, ?)").run(op.k, op.v);
     } else if (op.v === undefined || op.v === null) s.delMeta.run(op.k);
     else s.putMeta.run(op.k, JSON.stringify(op.v));
+  }
+
+  /**
+   * Write the library's part files from here (`LibraryMirror.writeJson` in the page's storage): only the parts of `only` (some items
+   * changed), or all of them; a part is written only when its text changed. Then `index.json` naming them (the parts first, so a reader
+   * never finds it naming one not written yet), then the parts no item is in any more go. Each item's line is noted as seen. Hidden
+   * items whose files are sealed are in no part (they go in the sealed index). Up to `compatMax` items, `library.json` (the single
+   * file of earlier versions) is written too, for an older app on another device; past it, it goes.
+   */
+  async writeParts(only: readonly string[] | null, compatMax: number, files: PartFiles): Promise<WriteResult> {
+    const rowsIn = this.db.prepare<[string, string], { entry: string; rec: string | null }>("SELECT e.json AS entry, r.json AS rec FROM entries e LEFT JOIN recs r ON r.hash = e.hash WHERE e.hash >= ? AND e.hash < ? ORDER BY e.hash");
+    const fps = this.parts();
+    const keys = only ? [...new Set(only.map(partKey))] : [...new Set([...(this.db.prepare("SELECT DISTINCT substr(hash, 1, 2) AS k FROM entries").raw().all() as string[][]).map((r) => r[0]!), ...Object.keys(fps)])];
+    const sealedOut: LibraryItem[] = [];
+    const drop: string[] = [];
+    const seenOps: LibraryOp[] = [];
+    const partOps: LibraryOp[] = [];
+    for (const key of keys.sort()) {
+      const items = rowsIn.all(key, `${key}z`).map((r) => itemOf(JSON.parse(r.entry) as CatalogEntry, r.rec ? (JSON.parse(r.rec) as AssetRecord) : undefined));
+      const open = items.filter((i) => !isHiddenFile(i.file));
+      for (const i of items) {
+        if (isHiddenFile(i.file)) sealedOut.push(i);
+        seenOps.push({ t: "seen", hash: i.hash, v: seen(JSON.stringify(i)) });
+      }
+      if (key.length === 1) {
+        if (fps[key]) (drop.push(key), partOps.push({ t: "part", k: key, v: null })); // (a part of the 16 of version 2: written again as parts of 256)
+        continue;
+      }
+      if (open.length) {
+        const text = libraryPartText(open);
+        const fp = createHash("sha256").update(text).digest("hex");
+        if (fps[key] !== fp) await files.write(partPath(key), text);
+        partOps.push({ t: "part", k: key, v: fp });
+      } else if (fps[key]) (drop.push(key), partOps.push({ t: "part", k: key, v: null }));
+    }
+    this.db.transaction(() => {
+      for (const op of [...seenOps, ...partOps]) this.one(op);
+      if (only) for (const h of only) if (!this.entry(h)) this.one({ t: "seen", hash: h, v: null });
+      if (!only) this.db.exec("DELETE FROM seen WHERE hash NOT IN (SELECT hash FROM entries)");
+    })();
+    const folders = (this.meta(FOLDERS_KEY) as AssetFolder[] | undefined) ?? [];
+    const shown = visibleFolders(folders);
+    const indexText = `${JSON.stringify({ format: LIBRARY_JSON_FORMAT, version: 3, folders: shown, parts: Object.keys(this.parts()).sort() })}\n`;
+    if (files.read(LIBRARY_INDEX)?.toString("utf8") !== indexText) await files.write(LIBRARY_INDEX, indexText);
+    for (const k of drop) await files.remove(partPath(k)); // (after the index stopped naming it)
+    const count = (this.db.prepare("SELECT count(*) AS n FROM entries e LEFT JOIN recs r ON r.hash = e.hash WHERE r.file IS NULL OR r.file NOT LIKE '.hidden/%'").get() as { n: number }).n;
+    let compat = "-";
+    if (count <= compatMax) {
+      const all = this.db.prepare<[], { entry: string; rec: string | null }>("SELECT e.json AS entry, r.json AS rec FROM entries e LEFT JOIN recs r ON r.hash = e.hash ORDER BY e.hash").all();
+      const open = all.map((r) => itemOf(JSON.parse(r.entry) as CatalogEntry, r.rec ? (JSON.parse(r.rec) as AssetRecord) : undefined)).filter((i) => !isHiddenFile(i.file));
+      compat = libraryJsonText(shown, open, true);
+      if (files.read(LIBRARY_JSON)?.toString("utf8") !== compat) await files.write(LIBRARY_JSON, compat);
+    } else if (files.read(LIBRARY_JSON)) await files.remove(LIBRARY_JSON);
+    return { sealed: sealedOut, compat };
   }
 
   /**
@@ -138,7 +201,7 @@ export class Library {
    * this device's version. With `deletions` (the library read whole, the hidden items not locked) an item no longer in its part was
    * erased on another device and is marked deleted here; `extra` are the hidden items of the sealed index, which no part holds.
    */
-  sync(keys: readonly string[], readPart: (key: string) => Buffer | null, extra: readonly LibraryItem[], deletions: boolean, onPart?: (done: number, total: number) => void): SyncResult {
+  sync(keys: readonly string[], readPart: (key: string) => Buffer | null, extra: readonly LibraryItem[], deletions: boolean, onPart?: (done: number, total: number) => void, all = false): SyncResult {
     const fpOf = this.db.prepare<[string], { fp: string }>("SELECT fp FROM parts WHERE key = ?");
     const setFp = this.db.prepare("INSERT OR REPLACE INTO parts VALUES (?, ?)");
     const dropFp = this.db.prepare("DELETE FROM parts WHERE key = ?");
@@ -206,7 +269,8 @@ export class Library {
       for (const it of extra) take(it);
       for (const k of gone) dropFp.run(k);
       if (!deletions || !whole) return;
-      for (const c of [...[...looked, ...gone].flatMap((k) => inRange.all(k, `${k}z`)), ...sealed.all()]) {
+      const candidates = all ? (this.db.prepare("SELECT hash, v FROM seen").all() as Array<{ hash: string; v: string }>) : [...[...looked, ...gone].flatMap((k) => inRange.all(k, `${k}z`)), ...sealed.all()];
+      for (const c of candidates) {
         if (present.has(c.hash) || unchanged.has(c.hash.slice(0, 2)) || unchanged.has(c.hash.slice(0, 1))) continue;
         if (changedHere(c.hash, c.v)) continue; // changed here: kept
         const e = this.entry(c.hash);
@@ -217,6 +281,20 @@ export class Library {
     })();
     return { took, whole, read };
   }
+}
+
+/** The files `writeParts` reads and writes (paths relative to the workspace folder; written whole, never half). */
+export interface PartFiles {
+  read(path: string): Buffer | null;
+  write(path: string, text: string): Promise<void>;
+  remove(path: string): Promise<void>;
+}
+
+export interface WriteResult {
+  /** The hidden items whose files are sealed, among those written (all of them, for a whole write): they go in the sealed index. */
+  sealed: LibraryItem[];
+  /** `library.json`'s text as written (a library small enough for it), or "-" when there is none (too big). */
+  compat: string;
 }
 
 export interface SyncResult {

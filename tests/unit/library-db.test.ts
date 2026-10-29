@@ -44,4 +44,26 @@ describe("library database (desktop)", () => {
     lib.sync(g.keys, g.read, [], false);
     expect(lib.entry(item(1).hash)!.state).toBe("active");
   });
+
+  it("writes the parts from here: only changed ones, then the index; what it wrote reads back as nothing new", async () => {
+    const lib = new Library(openLibraryDb(":memory:"));
+    const disk = new Map<string, string>();
+    const files = { read: (p: string) => (disk.has(p) ? Buffer.from(disk.get(p)!) : null), write: async (p: string, t: string) => void disk.set(p, t), remove: async (p: string) => void disk.delete(p) };
+    const f = folder([item(1), item(2)]);
+    for (const k of f.keys) disk.set(`.canvast/library/items-${k}.json`, f.read(k)!.toString());
+    lib.sync(f.keys, f.read, [], true);
+    await lib.writeParts(null, 10, files);
+    expect(disk.get(".canvast/library/items-01.json")).toBe(f.read("01")!.toString());
+    expect(JSON.parse(disk.get(".canvast/library/index.json")!).parts).toEqual(["01", "02"]);
+    expect(disk.has(".canvast/library.json")).toBe(true);
+    // A rename here: only its part is written again, and reading the folder back takes nothing.
+    lib.apply([{ t: "entry", hash: item(2).hash, v: { ...lib.entry(item(2).hash)!, name: "two.png" } }]);
+    const writes: string[] = [];
+    const w = await lib.writeParts([item(2).hash], 1, { ...files, write: async (p, t) => void (writes.push(p), disk.set(p, t)) });
+    expect(writes).toEqual([".canvast/library/items-02.json"]);
+    expect(w.compat).toBe("-");
+    expect(disk.has(".canvast/library.json")).toBe(false);
+    const keys = JSON.parse(disk.get(".canvast/library/index.json")!).parts as string[];
+    expect(lib.sync(keys, (k) => files.read(`.canvast/library/items-${k}.json`), [], true).took).toBe(false);
+  });
 });

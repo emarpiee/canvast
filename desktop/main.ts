@@ -487,13 +487,14 @@ function installFileCalls(win: BrowserWindow, root: string): void {
     if (!o || typeof o !== "object") return null;
     const { t, hash, k, v } = o as { t?: unknown; hash?: unknown; k?: unknown; v?: unknown };
     if (t === "meta") return typeof k === "string" && k.length < 200 ? { t, k, v } : null;
+    if (t === "part") return typeof k === "string" && /^[0-9a-f]{1,2}$/.test(k) && (v === null || (typeof v === "string" && /^[0-9a-f]{64}$/.test(v))) ? { t, k, v } : null;
     if (typeof hash !== "string" || !HASH.test(hash)) return null;
     if (t === "seen") return v === null || typeof v === "string" ? { t, hash, v } : null;
     if (t !== "entry" && t !== "rec") return null;
     if (v !== null && (!v || typeof v !== "object" || (v as { hash?: unknown }).hash !== hash)) return null;
     return { t, hash, v } as LibraryOp;
   };
-  const WHERE = { all: "1", active: "state = 'active'", deleted: "state = 'deleted'" } as const;
+  const WHERE = { all: "1", active: "state = 'active'", deleted: "state = 'deleted'", hidden: "hidden = 1" } as const;
   ipcMain.handle("canvast:lib", async (e, op: unknown, ...args: unknown[]) => {
     own(e);
     const l = library();
@@ -503,7 +504,7 @@ function installFileCalls(win: BrowserWindow, root: string): void {
       case "entries":
         return l.entriesText(WHERE[args[0] as keyof typeof WHERE] ?? WHERE.all);
       case "recs":
-        return l.recsText();
+        return l.recsText(args[0] === "sealed");
       case "byFile":
         return typeof args[0] === "string" ? (l.byFile(args[0]) ?? null) : null;
       case "meta":
@@ -523,7 +524,25 @@ function installFileCalls(win: BrowserWindow, root: string): void {
             return null;
           }
         };
-        return l.sync(keys, read, extra, args[2] === true, (done, total) => !win.webContents.isDestroyed() && win.webContents.send("canvast:libProgress", done, total));
+        return l.sync(keys, read, extra, args[2] === true, (done, total) => !win.webContents.isDestroyed() && win.webContents.send("canvast:libProgress", done, total), args[3] === true);
+      }
+      case "write": {
+        const only = args[0] === null ? null : hashes(args[0]);
+        const at = (rel: string): string => join(root, ...rel.split("/"));
+        return l.writeParts(only, typeof args[1] === "number" ? args[1] : 10_000, {
+          read: (rel) => {
+            try {
+              return readFileSync(at(rel));
+            } catch {
+              return null;
+            }
+          },
+          write: (rel, text) => writeAtomic(at(rel), Buffer.from(text)),
+          remove: (rel) => unlink(at(rel)).catch(() => undefined),
+        });
+      }
+      case "parts": {
+        return l.parts();
       }
       case "reset":
         return void l.db.exec("DELETE FROM entries; DELETE FROM recs; DELETE FROM seen; DELETE FROM parts; DELETE FROM meta;");
