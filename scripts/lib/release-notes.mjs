@@ -17,6 +17,20 @@ export function changelogSection(changelog, version) {
   return { title, date: date ?? "", bullets };
 }
 
+/**
+ * The section of `version` with the bullets of every version after `previousVersion` (the release before it) added: versions that were
+ * committed but never released are in their next release's notes. `earlier` names those versions with their titles. Null when `version`
+ * has no section.
+ */
+export function changelogSince(changelog, version, previousVersion) {
+  const section = changelogSection(changelog, version);
+  if (!section || !previousVersion) return section && { ...section, earlier: [] };
+  const versions = [...changelog.matchAll(/^## (\d+\.\d+\.\d+)(?: to [\d.]+)? — /gm)].map((m) => m[1]);
+  const between = versions.filter((v) => olderThan(previousVersion, v) && olderThan(v, version));
+  const earlier = between.map((v) => ({ version: v, ...changelogSection(changelog, v) }));
+  return { ...section, bullets: [...section.bullets, ...earlier.flatMap((e) => e.bullets)], earlier: earlier.map((e) => `${e.version} (${e.title})`) };
+}
+
 /** Features and fixes of a section's bullets. */
 export function splitBullets(bullets) {
   const isFix = (b) => /^\*\*Fix(ed)?\b[^*]*:?\*\*/i.test(b);
@@ -33,6 +47,7 @@ export function releaseNotes({ version, section, sha256, size, previousTag, repo
   return [
     `## ${section.title}${section.date ? ` (${section.date})` : ""}`,
     "",
+    ...(section.earlier?.length ? [`With the changes of ${section.earlier.join(", ")}, which had no release of their own.`, ""] : []),
     "### Features",
     list(features, "Nothing new in this release."),
     "",

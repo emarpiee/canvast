@@ -10,7 +10,7 @@ import { mkdtempSync, readFileSync, writeFileSync, statSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { basename, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { changelogSection, olderThan, releaseNotes } from "./lib/release-notes.mjs";
+import { changelogSection, changelogSince, olderThan, releaseNotes } from "./lib/release-notes.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dry = process.argv.includes("--dry-run"), force = process.argv.includes("--force");
@@ -29,8 +29,7 @@ if (run("git", ["status", "--porcelain"])) stop("the working tree is not clean: 
 run("git", ["fetch", "origin", "main", "--tags", "--quiet"]); // (tags too: a release made earlier has its tag on the remote only)
 const head = run("git", ["rev-parse", "HEAD"]);
 if (head !== run("git", ["rev-parse", "origin/main"])) stop("HEAD is not what origin/main has: push first (a release points at a pushed commit).");
-const section = changelogSection(readFileSync(join(root, "CHANGELOG.md"), "utf8"), version);
-if (!section) stop(`CHANGELOG.md has no section "## ${version} — Title (date)".`);
+if (!changelogSection(readFileSync(join(root, "CHANGELOG.md"), "utf8"), version)) stop(`CHANGELOG.md has no section "## ${version} — Title (date)".`);
 
 // 2. Build the file and check it
 say(`Building canvast ${version} (${head.slice(0, 7)})…`);
@@ -49,6 +48,7 @@ if (latest && olderThan(version, latest.slice(1)) && !force) stop(`${latest} is 
 const previous = releases.map((r) => r.tagName).filter((t) => t !== tag && olderThan(t.slice(1), version)).sort((a, b) => (olderThan(a.slice(1), b.slice(1)) ? 1 : -1))[0] ?? null;
 // The desktop app (ADR 0177): its packages are not made or uploaded here. Publishing the release starts the Release packages workflow
 // (.github/workflows/release-packages.yml), which builds them on GitHub's machines from this tag, checks them and adds them.
+const section = changelogSince(readFileSync(join(root, "CHANGELOG.md"), "utf8"), version, previous?.slice(1));
 const notes = releaseNotes({ version, section, sha256: sum, size: statSync(file).size, previousTag: previous, repo, desktop: true });
 const dir = mkdtempSync(join(tmpdir(), "canvast-release-"));
 const notesFile = join(dir, "notes.md");

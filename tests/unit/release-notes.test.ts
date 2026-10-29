@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error (a build script, plain JavaScript)
-import { changelogSection, olderThan, releaseNotes, splitBullets } from "../../scripts/lib/release-notes.mjs";
+import { changelogSection, changelogSince, olderThan, releaseNotes, splitBullets } from "../../scripts/lib/release-notes.mjs";
 
 const CHANGELOG = `# Changelog
 
@@ -44,6 +44,18 @@ describe("release notes", () => {
     const desktop = releaseNotes({ version: "0.2.0", section: changelogSection(CHANGELOG, "0.2.0"), sha256: "cd", size: 2097152, previousTag: null, repo: "o/r", desktop: true });
     expect(desktop).toContain("`canvast-0.2.0-<arch>.AppImage`");
     expect(desktop).toContain("`canvast-0.2.0-<arch>.rpm`");
+  });
+
+  it("takes in the versions since the last release that had none of their own", () => {
+    const log = `## 0.3.0 — Third (2026-10-28)\n\n- **Fixed:** three.\n\n${CHANGELOG.replace("# Changelog\n\n", "")}`;
+    const s = changelogSince(log, "0.3.0", "0.1.0");
+    expect(s.bullets).toEqual(["**Fixed:** three.", ...changelogSection(CHANGELOG, "0.2.0")!.bullets]);
+    expect(s.earlier).toEqual(["0.2.0 (Hiding things)"]);
+    const notes = releaseNotes({ version: "0.3.0", section: s, sha256: "ef", size: 1, previousTag: "v0.1.0", repo: "o/r" });
+    expect(notes).toContain("With the changes of 0.2.0 (Hiding things), which had no release of their own.");
+    expect(notes).toContain("### Features\n- **Added:** hide an item.");
+    expect(changelogSince(log, "0.3.0", "0.2.0").earlier).toEqual([]);
+    expect(changelogSince(log, "0.3.0", null).bullets).toEqual(["**Fixed:** three."]);
   });
 
   it("orders versions", () => {
