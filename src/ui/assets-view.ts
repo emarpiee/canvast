@@ -21,7 +21,7 @@ import { fontSampleHtml, showFont } from "./font-specimen";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actions";
 import { LIBRARY_ROWS, searchHelpButton, wireSearchHelp } from "./search-help";
 import { ASSETS_RECENT, rememberSearch } from "../search/history";
-import { paintRecent, wireRecent } from "./search-recent";
+import { paintRecent, paintSaveToggle, saveToggleHtml, wireRecent, wireSaveToggle, type SavedStore } from "./search-recent";
 import { evalQuery, parseQuery, type Query } from "../search/query";
 import { parseFilter, type Extra, type Filter } from "../assets/filters";
 import { LOOK_SIZE, lookOf, similarGroups, type Look } from "../assets/look";
@@ -185,6 +185,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="assets-searchbox">
               <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search" title="Search by name, type or tag; #tag is a tag, .png a file type; width>1000, ratio:16x9, orientation:portrait, colour:red filter by what the picture is" aria-label="Search the library">
         <button type="button" class="cs-clear" aria-label="Clear the search" title="Clear the search" hidden>${ICONS.x}</button>
+        ${saveToggleHtml()}
         ${searchHelpButton()}
         <div class="assets-search-pop" data-testid="assets-search-pop">
           ${searchWaysHtml(["all", "name", "tag"])}
@@ -3598,11 +3599,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     e.stopPropagation();
     search.blur();
   });
+  const savedSearches: SavedStore = { get: () => settings.get("search.saved.library"), set: (v) => void settings.set("search.saved.library", v) };
+  const saveBtn = root.querySelector<HTMLButtonElement>(".assets-searchbox .cs-save")!;
   const paintSearchUi = (): void => {
     clearBtn.hidden = !search.value;
     searchHelpLine.hidden = !!search.value; // (what to type: only while nothing is typed)
-    paintRecent(recentBox, ASSETS_RECENT, !search.value.trim());
+    paintRecent(recentBox, ASSETS_RECENT, search.value, savedSearches);
+    paintSaveToggle(saveBtn, search.value, way, savedSearches);
   };
+  wireSaveToggle(saveBtn, search, () => way, savedSearches, () => paintSearchUi());
   /** A search that found something and was used (Enter, or a card chosen) goes to the recent list. */
   const rememberNow = (): void => {
     if (search.value.trim() && filtered().length) rememberSearch(ASSETS_RECENT, search.value, way);
@@ -3683,6 +3688,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       paintSearchUi();
       search.focus();
     },
+    savedSearches,
   );
   grid.addEventListener("click", rememberNow);
   for (const el of [usageSel, sortSel]) el.addEventListener("input", () => render());

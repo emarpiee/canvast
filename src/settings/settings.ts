@@ -15,6 +15,7 @@
  */
 import { DOCK_PANEL_IDS } from "./panels";
 import { paintFromText } from "../doc/paint";
+import { validSaved } from "../search/saved";
 
 /** The ways W A S D step to the next item (interaction/item-navigation.ts), in the order Settings lists them. */
 export const NAV_MODES = ["view", "anywhere", "layer-view", "layer", "az-view", "az"] as const;
@@ -70,6 +71,9 @@ export const SETTINGS = {
   "colour.view": { scope: "device", default: "wheel", validate: oneOf("wheel", "plane", "sliders", "mixer"), effect: "immediate" } as Def<"wheel" | "plane" | "sliders" | "mixer">,
   "colour.format": { scope: "device", default: "hex", validate: oneOf("hex", "rgb", "oklch"), effect: "immediate" } as Def<"hex" | "rgb" | "oklch">,
   "colour.recent": { scope: "device", default: "#1f2329,#2563eb,#dc2626,#16a34a", validate: colourList, effect: "immediate" } as Def<string>,
+  // Saved searches (search/saved.ts): the library's and the canvas search's own lists, as JSON. Not shown in Settings: the search boxes manage them.
+  "search.saved.library": { scope: "device", default: "[]", validate: validSaved, effect: "immediate" } as Def<string>,
+  "search.saved.canvas": { scope: "device", default: "[]", validate: validSaved, effect: "immediate" } as Def<string>,
   // Shapes and paths (ADR 0099): what the Shape and Path tools make. The outline is not remembered: every session starts with none.
   "shape.kind": { scope: "device", default: "rect", validate: oneOf("rect", "ellipse", "line", "polygon", "star"), effect: "immediate" } as Def<"rect" | "ellipse" | "line" | "polygon" | "star">,
   "shape.fill": { scope: "device", default: "#2563eb", validate: paint, effect: "immediate" } as Def<string>,

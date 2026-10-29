@@ -1699,6 +1699,11 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await expect(results.getByRole("option")).toHaveCount(1);
   await box.fill("kind:text");
   await expect(results.getByRole("option")).toHaveCount(0);
+  // Saved: the box's save button keeps a search in this canvas search's own list (pressed while it is saved).
+  await box.fill("kind:picture blocks");
+  const save = results.getByRole("button", { name: "Save this search" });
+  await save.click();
+  await expect(save).toHaveAttribute("aria-pressed", "true");
   // AND, OR, XOR, NOT work here too (ADR 0069): by name, and over a picture's whole tag list.
   await box.fill("/blocks OR green");
   await expect(results.getByRole("option")).toHaveCount(2);
@@ -1787,6 +1792,14 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   await results.getByRole("button", { name: "Clear the search" }).click();
   await expect(box).toHaveValue("");
   await recent.getByRole("button", { name: "Clear recent" }).click();
+  // the saved search stays (Clear recent is only about the recent ones); typing a part of it offers it, its × removes it
+  await expect(recent.getByTestId("search-saved")).toContainText("kind:picture blocks");
+  await box.fill("blocks pic");
+  await recent.getByRole("button", { name: "/ kind:picture blocks", exact: true }).click();
+  await expect(box).toHaveValue("kind:picture blocks");
+  await expect(results.getByRole("option")).toHaveCount(1);
+  await box.fill("");
+  await recent.getByRole("button", { name: /^Remove kind:picture blocks from saved/ }).click();
   await expect(recent).toBeHidden();
   await p.keyboard.press("p");
   expect(await p.evaluate(() => window.__canvastDebug.tool())).toBe("select");

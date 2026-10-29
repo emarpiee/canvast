@@ -4,7 +4,7 @@ import { tagIsOrUnder } from "../doc/tags";
 import { mountSuggest } from "./search-suggest";
 import { extOf } from "../assets/file-kind";
 import { CANVAS_RECENT, rememberSearch } from "../search/history";
-import { paintRecent, wireRecent } from "./search-recent";
+import { paintRecent, paintSaveToggle, saveToggleHtml, wireRecent, wireSaveToggle, type SavedStore } from "./search-recent";
 import { CANVAS_ROWS, searchHelpButton, wireSearchHelp } from "./search-help";
 import { evalQuery, parseQuery } from "../search/query";
 import { parseCanvasFilter, type CanvasContext, type CanvasFilter } from "../search/canvas-filters";
@@ -30,6 +30,8 @@ export interface SearchDeps {
   focus(ids: readonly string[]): void;
   /** Whether an object is in the view now (`is:offscreen`). */
   onScreen(o: CanvasObject): boolean;
+  /** The canvas search's saved searches. */
+  saved: SavedStore;
 }
 
 interface Result {
@@ -55,7 +57,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   root.setAttribute("aria-label", "Search the canvas");
   root.hidden = true;
   root.innerHTML = `
-    <div class="cs-box">${ICONS.search}<input type="text" role="combobox" aria-expanded="true" aria-controls="cs-list" aria-label="Search the canvas" autocomplete="off" spellcheck="false"><button type="button" class="cs-clear" aria-label="Clear the search" title="Clear the search" hidden>${ICONS.x}</button>${searchHelpButton()}</div>
+    <div class="cs-box">${ICONS.search}<input type="text" role="combobox" aria-expanded="true" aria-controls="cs-list" aria-label="Search the canvas" autocomplete="off" spellcheck="false"><button type="button" class="cs-clear" aria-label="Clear the search" title="Clear the search" hidden>${ICONS.x}</button>${saveToggleHtml()}${searchHelpButton()}</div>
     ${searchWaysHtml(["all", "name", "tag", "bookmark"])}
     <div class="search-suggest" data-testid="search-suggest" hidden></div>
     <div class="cs-recent" data-testid="search-recent" hidden></div>
@@ -185,7 +187,12 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
   const idsOf = (r: Result): string[] => r.ids ?? [];
   const isChecked = (r: Result): boolean => idsOf(r).length > 0 && idsOf(r).every((id) => deps.editor.selection.has(id));
 
-  const paintRecentBox = (): void => paintRecent(recentBox, CANVAS_RECENT, !input.value.trim());
+  const saveBtn = root.querySelector<HTMLButtonElement>(".cs-save")!;
+  const paintRecentBox = (): void => {
+    paintRecent(recentBox, CANVAS_RECENT, input.value, deps.saved);
+    paintSaveToggle(saveBtn, input.value, mode, deps.saved);
+  };
+  wireSaveToggle(saveBtn, input, () => mode, deps.saved, () => paintRecentBox());
 
   const paint = (): void => {
     clearBtn.hidden = !input.value;
@@ -324,6 +331,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
       paintRecentBox();
       input.focus();
     },
+    deps.saved,
   );
   // A press outside closes the search. If it lands on the canvas while items are selected (the ones just picked here), that first press
   // only closes the search: it does not also clear the selection. The next press works as usual.

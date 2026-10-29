@@ -2066,11 +2066,16 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 
 /* Canvas search: checkboxes, recent searches, clear button (ADR 0071). */
 .cs-check { flex: none; width: var(--icon-md); height: var(--icon-md); margin: 0; accent-color: var(--hud-accent); cursor: pointer; }
-.cs-clear { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--icon-xl); height: var(--icon-xl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-pill); cursor: pointer; }
-.cs-clear:hover { color: var(--hud-fg); background: var(--hud-hover); }
-.cs-clear[hidden] { display: none; }
-.cs-clear svg { width: var(--icon-md); height: var(--icon-md); }
-.cs-recent { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--hud-border); }
+.cs-clear, .cs-save { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--icon-xl); height: var(--icon-xl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-pill); cursor: pointer; }
+.cs-clear:hover, .cs-save:hover:not(:disabled) { color: var(--hud-fg); background: var(--hud-hover); }
+.cs-clear[hidden], .cs-save[hidden] { display: none; }
+.cs-clear svg, .cs-save svg { width: var(--icon-md); height: var(--icon-md); }
+.cs-save[aria-pressed="true"] { color: var(--hud-accent); }
+.cs-save:disabled { opacity: 0.5; cursor: default; }
+.cs-recent { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--hud-border); }
+.cs-recent-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.cs-recent-more { color: var(--hud-muted); font-size: var(--text-xs); padding-left: var(--sp-2); }
+.cs-chip.is-saved { box-shadow: inset 0 0 0 1px var(--hud-border); }
 .cs-recent[hidden], .cs-bar[hidden] { display: none; }
 .cs-recent-title { color: var(--hud-muted); font-size: var(--text-xs); padding-right: var(--sp-2); }
 .cs-chip { display: inline-flex; align-items: center; max-width: 100%; background: var(--hud-hover); border-radius: var(--r-pill); }
@@ -2086,11 +2091,12 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 
 /* The library search box, the same parts as the canvas search (ADR 0071). */
 .assets-searchbox { position: relative; display: flex; align-items: center; gap: var(--sp-1); flex: 1 1 220px; min-width: 0; max-width: 380px; }
-.assets-searchbox .assets-search { flex: 1 1 auto; min-width: 0; max-width: none; padding-right: calc(var(--icon-xl) * 2 + var(--sp-4)); }
+.assets-searchbox .assets-search { flex: 1 1 auto; min-width: 0; max-width: none; padding-right: calc(var(--icon-xl) * 3 + var(--sp-4)); }
 .assets-searchbox .assets-search::-webkit-search-cancel-button { display: none; }
-.assets-searchbox .cs-clear, .assets-searchbox .search-help-btn { position: absolute; top: 50%; transform: translateY(-50%); }
+.assets-searchbox .cs-clear, .assets-searchbox .cs-save, .assets-searchbox .search-help-btn { position: absolute; top: 50%; transform: translateY(-50%); }
 .assets-searchbox .search-help-btn { right: var(--sp-2); }
-.assets-searchbox .cs-clear { right: calc(var(--icon-xl) + var(--sp-2)); }
+.assets-searchbox .cs-save { right: calc(var(--icon-xl) + var(--sp-2)); }
+.assets-searchbox .cs-clear { right: calc(var(--icon-xl) * 2 + var(--sp-2)); }
 .assets-search-pop { display: none; position: absolute; z-index: 30; top: calc(100% + var(--sp-2)); left: 0; width: max(100%, 300px); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
 .assets-searchbox:focus-within .assets-search-pop { display: block; }
 .assets-search-pop .cs-modes { padding-top: var(--sp-4); }

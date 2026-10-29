@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.50.42 — Saved searches (2026-10-29)
+
+- **Added:** saved searches in the canvas search and the library search, each with its own list. The save button in the box keeps the search typed (pressed while it is saved; press it again to remove it). With the box empty, the eight used last are listed above the recent ones, with how many more there are; while typing, the saved ones that hold the typed words are offered. Up to 200 per list, kept on this device and carried in a workspace backup with the settings.
+- **Changed:** a recent search that is also saved shows only under Saved.
+
 ## 0.50.41 — Search keywords (2026-10-29)
 
 - **Added:** library search keywords: `kind:` (picture, video, audio, gif, font, file), `is:` (favourite, used, unused, missing, filed, unfiled, tagged, untagged), `uses>` and `canvases>`, `date:` (a day, month or year, `today`, `yesterday`, `week`, `month`, `year`, and `date>` / `date<`), `on:` (a canvas or board it is placed on), `folder:`, `note:`, `field:key` and `field:key=value`, and `duration>` for videos, sounds and GIFs (`30s`, `2m`, `1:30`).

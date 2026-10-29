@@ -152,6 +152,22 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await expect(recent).not.toContainText("zzz-nothing");
   await recent.getByRole("button", { name: "Clear recent" }).click();
   await expect(recent).toBeHidden();
+  // Saved searches: the library keeps its own list (the canvas search's is separate), kept over a reload.
+  await box.fill("green");
+  await p.getByRole("button", { name: "Save this search" }).click();
+  await box.fill("");
+  await expect(recent.getByTestId("search-saved")).toContainText("/ green");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await box.focus();
+  await recent.getByRole("button", { name: "/ green", exact: true }).click();
+  await expect(box).toHaveValue("green");
+  await expect(cards(p)).toHaveCount(1);
+  await expect(p.getByRole("button", { name: "Save this search" })).toHaveAttribute("aria-pressed", "true");
+  await p.getByRole("button", { name: "Save this search" }).click(); // pressed again: no longer saved
+  await box.fill("");
+  await expect(recent).toBeHidden();
   await pop.getByRole("tab", { name: "All" }).click();
   await searchFor("", 2);
 

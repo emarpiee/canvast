@@ -910,6 +910,7 @@ async function start(): Promise<void> {
       return e ? { name: e.name, tags: e.tags ?? [] } : undefined;
     },
     focus: (ids) => focusObjects(doc, view, ids, settings.get("nav.arrive") === "focus"),
+    saved: { get: () => settings.get("search.saved.canvas"), set: (v) => void settings.set("search.saved.canvas", v) },
     onScreen: (o) => {
       const fc = view.frameCamera;
       const oc = cameraIn(fc, o.frame ?? doc.space.world);
