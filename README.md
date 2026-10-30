@@ -801,14 +801,15 @@ All binary values in the vault are base64. The SHA-256 of a decrypted file is it
 `scripts/hidden-items.mjs` does both with nothing but Node.js 20 or later (no install step, no dependencies). Close canvast on that workspace first. It asks for the Hidden password without showing it (or reads it from a pipe):
 
 ```sh
-# Every hidden item's file, under its name in the library, with hidden-items.json (names, tags, notes, fields) beside them
+# Every hidden item's file, under its name in the library and in its library folders, with hidden-items.json (names, tags, notes,
+# fields, where each was written) at the top; --flat puts every file at the top instead
 node scripts/hidden-items.mjs decrypt ~/Art/my-workspace ~/decrypted
 
 # Seal files into .hidden/ and the index: the app then lists them as hidden items
 node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 ```
 
-`decrypt` changes nothing in the workspace. It also reads copies of `hidden.json` that a sync tool left beside it (each opened with the password given), and writes any encrypted file of `.hidden/` that no entry names under the name it holds (`recovered-<hash>.<ext>` for one encrypted before 0.50.53); with `hidden.json` lost, the spare of its key opens the files. `encrypt` writes files that stand on their own too. `encrypt` takes back files that came out of `decrypt` with their names, tags, notes and fields (it finds them in the `hidden-items.json` beside them), and new PNG or JPEG pictures (it reads their size). For any other new file, put it in `.hidden/` while canvast runs with the Hidden items open: the app reads it, encrypts it and lists it. `encrypt` leaves the readable files where they are, so delete them yourself when you no longer need them.
+`decrypt` changes nothing in the workspace. The folder tree comes from the files themselves (each one's encrypted header names the library folders it was in), so copying `.hidden/` and `.canvast/hidden.json` (or its spare, `.canvast/keys/hidden.json`) to another machine is enough to get the files back with their names and folders; tags, notes and fields are in `hidden-items.json`. It also reads copies of `hidden.json` that a sync tool left beside it (each opened with the password given), and writes any encrypted file of `.hidden/` that no entry names under the name it holds (`recovered-<hash>.<ext>` for one encrypted before 0.50.53); with `hidden.json` lost, the spare of its key opens the files. `encrypt` writes files that stand on their own too. `encrypt` takes back files that came out of `decrypt` with their names, tags, notes and fields (it finds them in the `hidden-items.json` beside them or in a folder above them), and new PNG or JPEG pictures (it reads their size). For any other new file, put it in `.hidden/` while canvast runs with the Hidden items open: the app reads it, encrypts it and lists it. `encrypt` leaves the readable files where they are, so delete them yourself when you no longer need them.
 
 ---
 

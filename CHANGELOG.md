@@ -3,6 +3,7 @@
 ## 0.52.1 — Export folder; hidden thumbnails encrypted (2026-10-30)
 
 - **Added:** *Export folder…* (a library folder's ⋯ menu): its files and its subfolders', as a ZIP or, in the desktop app, as a folder where you choose outside the workspace, keeping its folders or all together; each file written to a folder is read back and checked. In hidden mode it exports the hidden items, readable, after asking.
+- **Changed:** `scripts/hidden-items.mjs decrypt` writes the hidden items into their library folders, from each file's own encrypted header (`--flat`: all at the top, as before), with `hidden-items.json` at the top saying where each went; `encrypt` finds that list from a file in a subfolder.
 - **Changed:** in the desktop app, a hidden item's thumbnail is stored encrypted with the hidden items' key (in the app's own cache), so hidden mode no longer opens and decodes each whole file again to draw its card or compare its look.
 
 ## 0.52.0 — Hidden mode (2026-10-30)

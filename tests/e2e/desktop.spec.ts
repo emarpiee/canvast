@@ -697,7 +697,7 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
   const listing = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, !!e.hidden, e.present])));
   let hash = "";
   let sealed0 = "";
-  type Tool = { decryptHidden: (ws: string, out: string, pw: string) => Promise<number>; encryptHidden: (ws: string, files: string[], pw: string) => Promise<number> };
+  type Tool = { decryptHidden: (ws: string, out: string, pw: string, opts?: { flat?: boolean }) => Promise<number>; encryptHidden: (ws: string, files: string[], pw: string) => Promise<number> };
   const { decryptHidden, encryptHidden } = (await import(join(process.cwd(), "scripts/hidden-items.mjs"))) as Tool;
   try {
     await page.getByTestId("import-input").setInputFiles({ name: "Secret Plan.png", mimeType: "image/png", buffer: secret });
@@ -732,8 +732,11 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     await expect(decryptHidden(ws, `${ws}-out`, "pw1")).rejects.toThrow(/wrong password/);
     expect(await decryptHidden(ws, `${ws}-out`, "pw2")).toBe(1);
-    expect(readFileSync(join(`${ws}-out`, "Secret Plan.png")).equals(secret)).toBe(true);
-    expect(JSON.parse(readFileSync(join(`${ws}-out`, "hidden-items.json"), "utf8"))[0]).toMatchObject({ name: "Secret Plan.png", hidden: true });
+    // (in its library folder, which the file's own header names: the tree comes back from the files alone; --flat puts it at the top)
+    expect(readFileSync(join(`${ws}-out`, "Secret Folder", "Secret Plan.png")).equals(secret)).toBe(true);
+    expect(JSON.parse(readFileSync(join(`${ws}-out`, "hidden-items.json"), "utf8"))[0]).toMatchObject({ name: "Secret Plan.png", hidden: true, writtenAs: "Secret Folder/Secret Plan.png" });
+    expect(await decryptHidden(ws, `${ws}-flat`, "pw2", { flat: true })).toBe(1);
+    expect(readFileSync(join(`${ws}-flat`, "Secret Plan.png")).equals(secret)).toBe(true);
     // Locked (from the command palette): the picture on the canvas leaves memory and is drawn with a padlock; the password opens it again.
     await page.keyboard.press("Control+k");
     await page.locator(".palette-input").fill("lock hidden");
@@ -820,7 +823,7 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
   const beta = makePng(2, 2, () => [20, 200, 60, 255]);
   const gamma = makePng(4, 1, () => [30, 30, 220, 255]);
   const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
-  type Tool = { decryptHidden: (ws: string, out: string, pw: string) => Promise<number>; encryptHidden: (ws: string, files: string[], pw: string) => Promise<number> };
+  type Tool = { decryptHidden: (ws: string, out: string, pw: string, opts?: { flat?: boolean }) => Promise<number>; encryptHidden: (ws: string, files: string[], pw: string) => Promise<number> };
   const { decryptHidden, encryptHidden } = (await import(join(process.cwd(), "scripts/hidden-items.mjs"))) as Tool;
   let { app, page } = await launch(ws);
   const hid = (op: "set" | "check", pw?: string) => page.evaluate(([op, pw]) => window.__canvastDebug.hiddenOp(op as "set", pw), [op, pw] as const);

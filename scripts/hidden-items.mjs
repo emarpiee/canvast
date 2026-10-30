@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // The hidden items of a desktop workspace folder, without the app (the format is in the README, "Hidden items: the file format"):
-//   node scripts/hidden-items.mjs decrypt <workspace folder> <output folder>
-//       writes every hidden item's file into the output folder under its name in the library, with hidden-items.json (their names,
-//       tags, notes and fields) beside them. Nothing in the workspace is changed. Copies of hidden.json beside it (a sync tool's, when
+//   node scripts/hidden-items.mjs decrypt <workspace folder> <output folder> [--flat]
+//       writes every hidden item's file into the output folder under its name in the library, in the library folders it was in (each
+//       file's own encrypted header names them: the tree comes back from the files alone), with hidden-items.json (their names, tags,
+//       notes and fields, and where each was written) at the top. --flat: every file at the top, as before. Nothing in the workspace is changed. Copies of hidden.json beside it (a sync tool's, when
 //       two devices wrote it at once) are read too, each with the same password, and a sealed file in .hidden/ that no entry names (its
 //       entry lost, or a sync tool's copy) is written as recovered-<hash>.<ext> when the password opens it. With hidden.json lost, the
 //       spare of its key (.canvast/keys/hidden.json) opens the files, all as recovered-<hash>.<ext>.
@@ -111,17 +112,30 @@ async function readIndex(record, key) {
 }
 
 /** A name safe to write: its last part only, with no path separators or control characters; `-2`, `-3`… before the extension on a clash. */
-function freeName(dir, name, taken) {
-  const clean = basename(String(name || "untitled")).replace(/[\u0000-\u001f/\\]/g, "_").replace(/^\.+/, "") || "untitled";
+function freeName(dir, name, taken, sub = "") {
+  const clean = safePart(name, "untitled");
   const dot = clean.lastIndexOf(".");
   const [stem, ext] = dot > 0 ? [clean.slice(0, dot), clean.slice(dot)] : [clean, ""];
   for (let n = 1; ; n++) {
     const candidate = n === 1 ? clean : `${stem}-${n}${ext}`;
-    if (!taken.has(candidate) && !existsSync(join(dir, candidate))) {
-      taken.add(candidate);
+    const key = sub ? `${sub}/${candidate}` : candidate;
+    if (!taken.has(key) && !existsSync(join(dir, candidate))) {
+      taken.add(key);
       return candidate;
     }
   }
+}
+/** One part of a path, safe to write: no separators, control characters or leading dots. */
+const safePart = (name, fallback) => basename(String(name || fallback)).replace(/[\u0000-\u001f/\\]/g, "_").replace(/^\.+/, "") || fallback;
+/** Where a file goes under the output folder: its library folders (from its own header), or the top (`flat`, or none). */
+const folderOf = (item, flat) => (flat || !Array.isArray(item?.folderPath) ? "" : item.folderPath.filter((p) => typeof p === "string").map((p) => safePart(p, "Folder")).join("/"));
+/** Write `bytes` as `name` in `sub` of `out` (made when missing): the path written, relative to `out`. */
+function place(out, sub, name, bytes, taken) {
+  const dir = sub ? join(out, ...sub.split("/")) : out;
+  mkdirSync(dir, { recursive: true });
+  const file = freeName(dir, name, taken, sub);
+  writeFileSync(join(dir, file), bytes);
+  return sub ? `${sub}/${file}` : file;
 }
 
 /** The extension a file's first bytes say it has (as the app names a recovered file), else "bin". */
@@ -151,7 +165,7 @@ function extOfBytes(b) {
  * Decrypt every hidden item of `workspace` into `out`: those of hidden.json and of each copy beside it the password opens, then every
  * sealed file of .hidden/ no entry named that one of their keys opens (as recovered-<hash>.<ext>). Returns how many were written.
  */
-export async function decryptHidden(workspace, out, password) {
+export async function decryptHidden(workspace, out, password, { flat = false } = {}) {
   const vaults = [];
   let failed = null;
   // hidden.json, the copies a sync tool left beside it, and the spare of its key (when hidden.json is lost: files then come out as recovered-…).
@@ -185,13 +199,12 @@ export async function decryptHidden(workspace, out, password) {
         console.warn(`missing: ${item.file} (${item.name})`);
         continue;
       }
-      const bytes = (await tryOpen(new Uint8Array(readFileSync(sealed))))?.bytes;
-      if (!bytes) {
+      const opened = await tryOpen(new Uint8Array(readFileSync(sealed)));
+      if (!opened) {
         console.warn(`does not open: ${item.file} (${item.name})`);
         continue;
       }
-      const name = freeName(out, item.name, taken);
-      writeFileSync(join(out, name), bytes);
+      const name = place(out, folderOf(opened.item, flat), item.name, opened.bytes, taken);
       written.push({ ...item, writtenAs: name });
       hashes.add(item.hash);
       files.add(item.file);
@@ -210,8 +223,8 @@ export async function decryptHidden(workspace, out, password) {
     const hash = createHash("sha256").update(bytes).digest("hex");
     if (hashes.has(hash)) continue;
     // A version 2 file says what it was (its name, folder, tags…); one of version 1 is named by its content.
-    const name = freeName(out, own?.hash === hash && typeof own.name === "string" ? own.name : `recovered-${hash.slice(0, 12)}.${extOfBytes(bytes)}`, taken);
-    writeFileSync(join(out, name), bytes);
+    const mine = own?.hash === hash && typeof own.name === "string";
+    const name = place(out, mine ? folderOf(own, flat) : "", mine ? own.name : `recovered-${hash.slice(0, 12)}.${extOfBytes(bytes)}`, bytes, taken);
     written.push(own?.hash === hash ? { ...own, file: `.hidden/${n}`, hidden: true, writtenAs: name } : { hash, name, file: `.hidden/${n}`, size: bytes.length, recovered: true, writtenAs: name });
     hashes.add(hash);
   }
@@ -248,7 +261,10 @@ export async function encryptHidden(workspace, files, password) {
       continue;
     }
     // A file from `decrypt`: its entry, as it was (the same content, so the same hash); a recovered one had none.
-    const listPath = join(dirname(path), "hidden-items.json");
+    // (looked for beside it and in the folders above it: `decrypt` puts it at the top of the folder tree it writes)
+    let listPath = dirname(path);
+    for (let up = 0; up < 64 && !existsSync(join(listPath, "hidden-items.json")) && dirname(listPath) !== listPath; up++) listPath = dirname(listPath);
+    listPath = join(listPath, "hidden-items.json");
     const before = existsSync(listPath) ? JSON.parse(readFileSync(listPath, "utf8")).find((i) => i.hash === hash && !i.recovered) : undefined;
     let entry;
     if (before) {
@@ -310,7 +326,9 @@ async function askPassword() {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [mode, workspace, ...rest] = process.argv.slice(2);
-  const usage = "usage: node scripts/hidden-items.mjs decrypt <workspace folder> <output folder>\n       node scripts/hidden-items.mjs encrypt <workspace folder> <file>…";
+  const usage = "usage: node scripts/hidden-items.mjs decrypt <workspace folder> <output folder> [--flat]\n       node scripts/hidden-items.mjs encrypt <workspace folder> <file>…";
+  const flat = mode === "decrypt" && rest.includes("--flat");
+  if (flat) rest.splice(rest.indexOf("--flat"), 1);
   if (!workspace || !rest.length || (mode !== "decrypt" && mode !== "encrypt") || (mode === "decrypt" && rest.length !== 1)) {
     console.error(usage);
     process.exit(2);
@@ -318,7 +336,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   try {
     const password = await askPassword();
     if (mode === "decrypt") {
-      const n = await decryptHidden(resolve(workspace), resolve(rest[0]), password);
+      const n = await decryptHidden(resolve(workspace), resolve(rest[0]), password, { flat });
       console.log(`${n} hidden item${n === 1 ? "" : "s"} written to ${resolve(rest[0])}`);
     } else {
       const n = await encryptHidden(resolve(workspace), rest.map((f) => resolve(f)), password);
