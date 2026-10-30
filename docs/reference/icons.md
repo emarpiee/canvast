@@ -115,7 +115,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `ellipsis` | More actions for board Board 1; More actions for canvas Canvas 1 |
 | `eraser` | Object eraser |
 | `external-link` | Open in a new tab |
-| `eye` | Show all hidden |
+| `eye` | Show all hidden; Unhide folder (Library, hidden mode) |
 | `eye-closed` | Hide from the library (an item, or a folder with everything in it: Hide folder); the Hidden list of the library |
 | `eye-off` | Hide the selection; Hide selection |
 | `view` | Show the password (a password field) |

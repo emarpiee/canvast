@@ -1,4 +1,4 @@
-// README screenshots of the privacy features: the canvas context menu, hiding in the library, the Hidden list, the export questions, Settings > Privacy and the lock screen.
+// README screenshots of the privacy features: the canvas context menu, hiding in the library, hidden mode, the export questions, Settings > Privacy and the lock screen.
 // Imports showcase.canvast into a fresh profile, like shots.mjs. Run from the repo root after `npm run build`: node scripts/showcase/shots-privacy.mjs <showcase.canvast> <outDir>
 import { chromium } from "@playwright/test";
 import { mkdtempSync } from "node:fs";
@@ -78,7 +78,7 @@ await shot("library-hide");
 await p.getByTestId("asset-hide").click();
 await settle(400);
 
-// 3. The Hidden list: the opening word typed in the search
+// 3. Hidden mode: the opening word typed in the search
 await p.getByTestId("assets-search").fill("hidden:");
 await p.getByTestId("asset-card").first().waitFor();
 await p.mouse.click(700, 600); // (leaves the search box: its modes popover would cover the first item)

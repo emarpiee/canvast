@@ -83,8 +83,11 @@ describe("library database (desktop)", () => {
     expect(list()).toEqual([item(2).hash, item(1).hash]); // (hidden: only in the Hidden scope)
     expect(list({ text: "#cat" })).toEqual([item(1).hash]);
     expect(list({ scope: "favorites" })).toEqual([item(2).hash]);
-    expect(list({ scope: "hidden" })).toEqual([item(3).hash]);
-    expect(index.query(q, new Set()).total).toBe(3);
+    expect(list({ hidden: true })).toEqual([item(3).hash]); // hidden mode: the hidden items only
+    expect(list({ hidden: true, scope: "favorites" })).toEqual([]);
+    expect(index.counts(true)).toMatchObject({ hidden: 1, shown: 2, favourites: 0, types: [["jpg", 1]] });
+    expect(index.query(q, new Set()).total).toBe(2); // (the shown items; the hidden one in hidden mode only)
+    expect(index.query({ ...q, hidden: true }, new Set()).total).toBe(1);
     lib.apply([{ t: "entry", hash: item(1).hash, v: { ...lib.entry(item(1).hash)!, name: "0.png" } }]);
     expect(list()).toEqual([item(1).hash, item(2).hash]);
     expect(index.counts().tags).toEqual([["cat", "Cat", 1]]);

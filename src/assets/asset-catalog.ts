@@ -76,6 +76,38 @@ export function visibleFolders(folders: readonly AssetFolder[]): AssetFolder[] {
   return folders.filter((f) => !out.has(f.id));
 }
 
+/** Whether a folder, or one it is inside, is hidden: an item filed there is hidden, and so is a folder made there. */
+export function inHiddenFolder(folders: readonly AssetFolder[], id: string): boolean {
+  const byId = new Map(folders.map((f) => [f.id, f]));
+  for (let f = byId.get(id), guard = 0; f && guard < 1000; f = f.parentId ? byId.get(f.parentId) : undefined, guard++) if (f.hidden) return true;
+  return false;
+}
+
+/** Unhide folder: the folders with the folder, those inside it and those above it shown; and which folders it holds (their items are shown). */
+export function unhiddenFolders(folders: readonly AssetFolder[], id: string): { folders: AssetFolder[]; inside: Set<string> } {
+  const inside = folderSubtree(folders, id);
+  const above = new Set<string>();
+  const byId = new Map(folders.map((f) => [f.id, f]));
+  for (let f = byId.get(id)?.parentId ? byId.get(byId.get(id)!.parentId!) : undefined, guard = 0; f && guard < 1000; f = f.parentId ? byId.get(f.parentId) : undefined, guard++) above.add(f.id);
+  return { folders: folders.map((f) => (f.hidden && (inside.has(f.id) || above.has(f.id)) ? { id: f.id, name: f.name, parentId: f.parentId } : f)), inside };
+}
+
+/** A listing's folders by name: those lists show, and the hidden ones (see `CatalogListing`). */
+export function listedFolders(all: readonly AssetFolder[]): Pick<CatalogListing, "folders" | "hiddenFolders"> {
+  const shown = visibleFolders(all).sort((a, b) => a.name.localeCompare(b.name));
+  const ids = new Set(shown.map((f) => f.id));
+  return { folders: shown, hiddenFolders: all.filter((f) => !ids.has(f.id)).sort((a, b) => a.name.localeCompare(b.name)) };
+}
+
+/** The folders hidden mode shows: the hidden ones, and those holding hidden items (`holding`), with the folders above them. */
+export function hiddenModeFolders(folders: readonly AssetFolder[], holding: Iterable<string>): AssetFolder[] {
+  const want = new Set(holding);
+  for (const f of folders) if (f.hidden) for (const id of folderSubtree(folders, f.id)) want.add(id);
+  const parentOf = new Map(folders.map((f) => [f.id, f.parentId]));
+  for (const id of [...want]) for (let p = parentOf.get(id), guard = 0; p && !want.has(p) && guard < 1000; p = parentOf.get(p), guard++) want.add(p);
+  return folders.filter((f) => want.has(f.id));
+}
+
 /** Organization fields of an entry, with defaults for entries that predate them. */
 export function meta(e: CatalogEntry): { tags: string[]; favorite: boolean; hidden: boolean; folderIds: string[]; note: string; fields: AssetField[] } {
   return { tags: e.tags ?? [], favorite: e.favorite ?? false, hidden: e.hidden ?? false, folderIds: (e.folderIds ?? []).slice(0, 1), note: e.note ?? "", fields: e.fields ?? [] };
@@ -159,7 +191,10 @@ export interface CatalogListing {
   missing: Array<{ hash: string } & Usage>;
   /** Entries deleted by the user but still retained (needed by undo history). */
   pendingDeletion: number;
+  /** The folders lists show (none hidden, or inside a hidden one). */
   folders: AssetFolder[];
+  /** The hidden folders and those inside them (hidden mode lists them). */
+  hiddenFolders?: AssetFolder[];
 }
 
 export interface AssetLocation {
@@ -370,7 +405,7 @@ export class AssetCatalog implements CatalogStore {
    */
   async relist(prev: CatalogListing): Promise<CatalogListing | null> {
     const tx = this.db.transaction(["assetCatalog", "meta"], "readonly");
-    const folders = visibleFolders((await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? []).sort((a, b) => a.name.localeCompare(b.name));
+    const folders = listedFolders((await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? []);
     const entries = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
     const was = new Map(prev.entries.map((e) => [e.hash, e]));
     const active = entries.filter((e) => e.state === "active");
@@ -381,13 +416,13 @@ export class AssetCatalog implements CatalogStore {
       if (!p) return null;
       out.push({ ...e, instances: p.instances, canvases: p.canvases, canvasIds: p.canvasIds, present: p.present });
     }
-    return { entries: out, missing: prev.missing, pendingDeletion: entries.filter((e) => e.state === "deleted").length, folders };
+    return { entries: out, missing: prev.missing, pendingDeletion: entries.filter((e) => e.state === "deleted").length, ...folders };
   }
 
   /** The whole library with usage, in one read-only transaction (keys only for usage; no bytes are read). */
   async list(): Promise<CatalogListing> {
     const tx = this.db.transaction(["assetCatalog", "assets", "objects", "meta"], "readonly");
-    const folders = visibleFolders((await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? []).sort((a, b) => a.name.localeCompare(b.name));
+    const folders = listedFolders((await req(tx.objectStore("meta").get(FOLDERS_KEY) as IDBRequest<AssetFolder[] | undefined>)) ?? []);
     const entries = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
     const blobKeys = new Set((await req(tx.objectStore("assets").getAllKeys())) as string[]);
     const stubs = (await req(tx.objectStore("assets").index("ext").getAll())) as Array<{ hash: string; size: number; file?: string }>; // (stubs hold no bytes)
@@ -415,7 +450,7 @@ export class AssetCatalog implements CatalogStore {
       entries: entries.filter((e) => e.state === "active").map((e) => ({ ...e, ...usageOf(usage, e.hash), present: blobKeys.has(e.hash) })),
       missing: [...usage.keys()].filter((h) => !blobKeys.has(h) && !known.has(h)).map((hash) => ({ hash, ...usageOf(usage, hash) })),
       pendingDeletion: entries.filter((e) => e.state === "deleted").length,
-      folders,
+      ...folders,
     };
   }
 
@@ -466,6 +501,8 @@ export class AssetCatalog implements CatalogStore {
           // One folder per asset: adding replaces the folder; removing clears it.
           const added = change.addFolders ?? [];
           if (change.addFolders || change.removeFolders || change.clearFolder) next.folderIds = change.clearFolder ? [] : added.length ? [added[added.length - 1]!] : m.folderIds.filter((id) => !drop.has(id));
+          // Filed into a hidden folder: hidden with it.
+          if (added.length && !next.hidden && inHiddenFolder((folders ??= await this.readFolders(tx)), next.folderIds![0]!)) next.hidden = true;
         }
         tx.objectStore("assetCatalog").put(next);
         out.push(next);
@@ -486,6 +523,23 @@ export class AssetCatalog implements CatalogStore {
       for (const e of await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>)) {
         if (e.state !== "active" || e.hidden || !(e.folderIds ?? []).some((x) => inside.has(x))) continue;
         tx.objectStore("assetCatalog").put({ ...e, hidden: true });
+        n++;
+      }
+      return n;
+    });
+  }
+
+  /** Unhide a folder with what is in it: its subfolders, every item filed in any of them (also those hidden one by one), and the folders above it. How many items were shown. */
+  async showFolder(id: string): Promise<number> {
+    return this.write(["meta", "assetCatalog"], async (tx) => {
+      const all = await this.readFolders(tx);
+      if (!all.some((f) => f.id === id)) throw new CatalogInputError("that folder no longer exists");
+      const { folders, inside } = unhiddenFolders(all, id);
+      tx.objectStore("meta").put(folders, FOLDERS_KEY);
+      let n = 0;
+      for (const e of await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>)) {
+        if (e.state !== "active" || !e.hidden || !(e.folderIds ?? []).some((x) => inside.has(x))) continue;
+        tx.objectStore("assetCatalog").put({ ...e, hidden: false });
         n++;
       }
       return n;
@@ -532,7 +586,7 @@ export class AssetCatalog implements CatalogStore {
     return this.write(["meta"], async (tx) => {
       const folders = await this.readFolders(tx);
       if (parentId && !folders.some((f) => f.id === parentId)) throw new CatalogInputError("the parent folder no longer exists");
-      const f: AssetFolder = { id, name: folderName(name), parentId };
+      const f: AssetFolder = { id, name: folderName(name), parentId, ...(parentId && inHiddenFolder(folders, parentId) ? { hidden: true as const } : {}) };
       tx.objectStore("meta").put([...folders, f], FOLDERS_KEY);
       return f;
     });

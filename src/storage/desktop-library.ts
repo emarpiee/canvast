@@ -4,7 +4,7 @@
  * in the page's IndexedDB. `DesktopCatalog` is the browser build's `AssetCatalog` on that storage, operation for operation.
  */
 import type { AssetFolder, AssetLocation, CatalogEntry, CatalogListing, GcReport, MetaChange, MetaSnapshot, PasswordKind, ThumbRecord } from "../assets/asset-catalog";
-import { AssetInUseError, CatalogInputError, FOLDERS_KEY, entryFromRecord, folderName, folderSubtree, meta, normalizeFields, normalizeNote, normalizeTags, usageOf, visibleFolders } from "../assets/asset-catalog";
+import { AssetInUseError, CatalogInputError, FOLDERS_KEY, entryFromRecord, folderName, folderSubtree, meta, normalizeFields, normalizeNote, normalizeTags, usageOf, listedFolders, inHiddenFolder, unhiddenFolders } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
 import { ImportError, MAX_IMPORT_BYTES, storedStub } from "../assets/asset-library";
 import { isHiddenFile } from "./hidden-vault";
@@ -192,7 +192,7 @@ export class DesktopCatalog implements CatalogStore {
   }
 
   async relist(prev: CatalogListing): Promise<CatalogListing | null> {
-    const folders = visibleFolders(await this.lib.folders()).sort((a, b) => a.name.localeCompare(b.name));
+    const folders = listedFolders(await this.lib.folders());
     const entries = await this.lib.entries();
     const was = new Map(prev.entries.map((e) => [e.hash, e]));
     const active = entries.filter((e) => e.state === "active");
@@ -203,7 +203,7 @@ export class DesktopCatalog implements CatalogStore {
       if (!p) return null;
       out.push({ ...e, instances: p.instances, canvases: p.canvases, canvasIds: p.canvasIds, present: p.present });
     }
-    return { entries: out, missing: prev.missing, pendingDeletion: entries.length - active.length, folders };
+    return { entries: out, missing: prev.missing, pendingDeletion: entries.length - active.length, ...folders };
   }
 
   async list(): Promise<CatalogListing> {
@@ -219,13 +219,13 @@ export class DesktopCatalog implements CatalogStore {
       entries: entries.filter((e) => e.state === "active").map((e) => ({ ...e, ...usageOf(usage, e.hash), present: present(e.hash) })),
       missing: [...usage.keys()].filter((h) => !held.has(h) && !known.has(h)).map((hash) => ({ hash, ...usageOf(usage, hash) })),
       pendingDeletion: entries.filter((e) => e.state === "deleted").length,
-      folders: visibleFolders(folders).sort((a, b) => a.name.localeCompare(b.name)),
+      ...listedFolders(folders),
     };
   }
 
   readonly pages: LibraryPages = {
     query: (q) => this.lib.calls.query(q),
-    counts: () => this.lib.calls.counts(),
+    counts: (hidden) => this.lib.calls.counts(hidden),
     fieldKeys: () => this.lib.calls.fieldKeys(),
     listed: (hashes) => this.lib.calls.listed(hashes),
     folders: () => this.lib.folders(),
@@ -295,6 +295,8 @@ export class DesktopCatalog implements CatalogStore {
           const drop = new Set(change.removeFolders ?? []);
           const added = change.addFolders ?? [];
           if (change.addFolders || change.removeFolders || change.clearFolder) next.folderIds = change.clearFolder ? [] : added.length ? [added[added.length - 1]!] : m.folderIds.filter((id) => !drop.has(id));
+          // Filed into a hidden folder: hidden with it.
+          if (added.length && !next.hidden && inHiddenFolder(folders!, next.folderIds![0]!)) next.hidden = true;
         }
         entries.set(hash, next);
         out.push(next);
@@ -318,6 +320,22 @@ export class DesktopCatalog implements CatalogStore {
       }
       await this.lib.apply(ops);
       return n;
+    });
+  }
+
+  /** (`AssetCatalog.showFolder`.) */
+  showFolder(id: string): Promise<number> {
+    return this.lib.serial(async () => {
+      const all = await this.lib.folders();
+      if (!all.some((f) => f.id === id)) throw new CatalogInputError("that folder no longer exists");
+      const { folders, inside } = unhiddenFolders(all, id);
+      const ops: LibraryOp[] = [putFolders(folders)];
+      for (const e of await this.lib.entries("hidden")) {
+        if (e.state !== "active" || !(e.folderIds ?? []).some((x) => inside.has(x))) continue;
+        ops.push(putEntry({ ...e, hidden: false }));
+      }
+      await this.lib.apply(ops);
+      return ops.length - 1;
     });
   }
 
@@ -353,7 +371,7 @@ export class DesktopCatalog implements CatalogStore {
     return this.lib.serial(async () => {
       const folders = await this.lib.folders();
       if (parentId && !folders.some((f) => f.id === parentId)) throw new CatalogInputError("the parent folder no longer exists");
-      const f: AssetFolder = { id, name: folderName(name), parentId };
+      const f: AssetFolder = { id, name: folderName(name), parentId, ...(parentId && inHiddenFolder(folders, parentId) ? { hidden: true as const } : {}) };
       await this.lib.apply([putFolders([...folders, f])]);
       return f;
     });

@@ -618,6 +618,12 @@ export class WorkspaceMirror {
     else this.libraryDirty = new Set([...(this.libraryDirty || []), ...hashes]);
     this.later();
   }
+  /** The library changed in items it marked as not written yet (hiding, showing): those are written, with the folders. */
+  libraryMarked(): void {
+    this.markedDirty = true;
+    this.later();
+  }
+  private markedDirty = false;
   /** This device's state changed (open canvas, a camera, the last backup). */
   device(): void {
     this.deviceDirty = true;
@@ -691,6 +697,12 @@ export class WorkspaceMirror {
         this.dirty.add(id); // tried again with the next write
         throw e;
       }
+    }
+    if (this.markedDirty) {
+      this.markedDirty = false;
+      const marked = await this.lib.pendingWrite();
+      if (marked === true) this.libraryDirty = true;
+      else if (this.libraryDirty !== true) this.libraryDirty = new Set([...(this.libraryDirty || []), ...(marked || [])]);
     }
     if (this.libraryDirty) {
       const only = this.libraryDirty === true ? undefined : this.libraryDirty;

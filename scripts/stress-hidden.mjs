@@ -2,13 +2,14 @@
 // Hidden items under load and under crashes, in the desktop app of a test snapshot (GitHub's machine: `Stress hidden` workflow).
 //   node scripts/stress-hidden.mjs [--items N] [--rounds R] [--kill-items M] [--seed S] [--build <test-builds/…>] [--dir <folder>] [--keep]
 // 1. Scale: a workspace of N library files (default 10,000) in nested folders; every folder hidden (each file sealed into .hidden/),
-//    locked, opened, the app restarted and opened again, 1,000 items shown one at a time and hidden again, then the outside tool
+//    locked, opened, the app restarted and opened again, hidden mode begun and ended, 1,000 items shown one at a time and hidden
+//    again, then the outside tool
 //    (scripts/hidden-items.mjs) decrypts them all. Each step's time, the app's CPU time and its peak memory (every process); every file
 //    checked by SHA-256.
 // 2. Crashes: a workspace of M files (default 300), R rounds (default 30): an action (hide a folder, hide or show some items, file some
 //    into a folder, lock and open) started, the app killed (SIGKILL, every process) at a random moment, started again and opened. After
 //    each round, on disk: no item lost (each is a readable file in library/ or a sealed file the password opens, with its bytes), no
-//    sealed file that does not open, nothing unknown. Exits 1 when any round lost or damaged anything.
+//    sealed file that does not open, nothing unknown, no temporary file of a cut-off write left. Exits 1 when any round failed.
 // Never point --dir inside a synced folder.
 import { _electron as electron } from "@playwright/test";
 import { createHash } from "node:crypto";
@@ -44,7 +45,7 @@ const secs = (ms) => `${(ms / 1000).toFixed(1)} s`;
 
 // ---- the app ----
 async function launch(ws) {
-  const app = await electron.launch({ args: [join(build, "desktop"), `--workspace=${ws}`, `--user-data-dir=${ws}-data`, ...(process.env.CI ? ["--no-sandbox"] : [])], env: { ...process.env, CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug" }, timeout: 600_000 });
+  const app = await electron.launch({ args: [join(build, "desktop"), `--workspace=${ws}`, `--user-data-dir=${ws}-data`, ...(process.env.CI ? ["--no-sandbox"] : [])], env: { ...process.env, CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug", CANVAST_STALE_TMP_MS: "0" }, timeout: 600_000 });
   const page = await app.firstWindow({ timeout: 600_000 });
   page.setDefaultTimeout(1_800_000);
   await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 1_800_000, polling: 250 });
@@ -190,6 +191,18 @@ console.log(`seed ${SEED}`);
     await s.hid("check", PW);
     await until(s.hiddenCount, N);
   }));
+  // Hidden mode: the Library view over every hidden item (the word, then the password if asked), and back.
+  note(`hidden mode: the Library view lists the ${N.toLocaleString()} hidden items`, await measured(s.app, async () => {
+    await s.page.evaluate(() => window.__canvastDebug.setView("assets"));
+    await s.page.getByTestId("assets-search").fill("hidden:");
+    const asked = s.page.getByTestId("prompt-input");
+    if (await asked.isVisible({ timeout: 2000 }).catch(() => false)) (await asked.fill(PW), await s.page.getByTestId("prompt-ok").click());
+    await s.page.locator('[data-testid="assets-count"]').filter({ hasText: new RegExp(`^${N} items?$`) }).waitFor();
+  }));
+  note("hidden mode ended (Exit), the Library view empty again", await measured(s.app, async () => {
+    await s.page.getByTestId("hidden-mode-exit").click();
+    await s.page.locator('[data-testid="assets-count"]').filter({ hasText: /^0 items?$/ }).waitFor();
+  }));
   const some = items.slice(0, SHOWN).map((i) => i.hash);
   note(`show ${SHOWN.toLocaleString()} items one at a time`, await measured(s.app, async () => {
     for (const h of some) await s.lib("hide", h, "");
@@ -226,14 +239,14 @@ const crashes = [];
   await s.app.close();
   const ACTIONS = {
     "hide a folder": (s) => s.lib("hideFolder", pick(folders, 1)[0].id),
-    "hide 20 items": async (s) => { for (const h of pick(hashes, 20)) await s.lib("hide", h, "1"); },
-    "show 20 items": async (s) => { for (const h of pick(hashes, 20)) await s.lib("hide", h, ""); },
-    "file 20 items into a folder": async (s) => { const f = pick(folders, 1)[0].id; for (const h of pick(hashes, 20)) await s.lib("file", h, f); },
+    "hide 60 items": async (s) => { for (const h of pick(hashes, 60)) await s.lib("hide", h, "1"); },
+    "show 60 items": async (s) => { for (const h of pick(hashes, 60)) await s.lib("hide", h, ""); },
+    "file 60 items into a folder": async (s) => { const f = pick(folders, 1)[0].id; for (const h of pick(hashes, 60)) await s.lib("file", h, f); },
     "lock and open": async (s) => { await s.hid("lock"); await s.hid("check", PW); },
   };
   for (let r = 1; r <= ROUNDS; r++) {
     const action = pick(Object.keys(ACTIONS), 1)[0];
-    const after = Math.round(rand() * 3000);
+    const after = Math.round(rand() * 1500);
     s = await launch(ws);
     await s.hid("check", PW);
     let done = false;
@@ -252,7 +265,8 @@ const crashes = [];
     const both = [...d.readable].filter((h) => d.sealed.has(h)).length;
     crashes.push([r, action, `${after} ms`, cut ? "yes" : "no", lost, d.damaged.length, unknown, both, d.temps.length]);
     console.log(`round ${r}: ${action}, killed after ${after} ms${cut ? " (cut off)" : " (had finished)"}: lost ${lost}, damaged ${d.damaged.length}, unknown ${unknown}, readable and sealed ${both}, temporary files ${d.temps.length}`);
-    if (lost || d.damaged.length || unknown) failed = true;
+    if (d.temps.length) console.log(`  left behind: ${d.temps.join(", ")}`);
+    if (lost || d.damaged.length || unknown || d.temps.length) failed = true;
   }
   // The library itself, once the app has had time to take back sealed files whose entries a kill lost: every item there.
   s = await launch(ws);

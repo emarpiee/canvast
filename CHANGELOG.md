@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.52.0 — Hidden mode (2026-10-30)
+
+- **Added:** hidden mode of the Library: the opening word (`hidden:`) and the password turn the whole Library into a list of the hidden items only, with every function of the normal view (folders, *Unfiled*, *Favourites*, tags, file types, *Similar images*, search, sorts, layouts, viewer, slideshow, rename, notes and fields, filing, bulk actions). Its folders are the hidden ones and those holding hidden items, with counts of hidden items. A bar across the library says it is on; it ends with *Exit hidden mode*, by deleting the word, by locking, or by leaving the library, and the library is then as it was before, with the hidden items' pictures dropped from memory. Replaces the Hidden list.
+- **Added:** *Unhide folder* (a folder's ⋯ menu in hidden mode): the folder, its subfolders and every item in them shown again, also the items in it hidden one by one.
+- **Changed:** an item filed into a hidden folder is hidden with it, and a folder made inside a hidden folder or in hidden mode is hidden.
+- **Changed:** *Keep the Hidden items open until the tab closes* is now *Remember the Hidden password until the tab closes*: hidden mode always ends when you leave the library, and begins again without the password while the tab remembers it.
+- **Changed:** in the desktop app, hiding or showing an item writes only the items it changed, not the whole library.
+- **Added:** a stress run of the hidden items (`scripts/stress-hidden.mjs`, the `Stress hidden` workflow on GitHub): 10,000 hidden items with times, CPU and memory, and the app killed at random moments during hiding, showing, moving and locking, each round checked for lost or damaged files.
+- **Fixed:** outside hidden mode, the library's item count, total size and search suggestions no longer include hidden items.
+- **Fixed:** in the desktop app, a folder hidden while the hidden items were locked is no longer dropped from the folder list when they are opened.
+- **Fixed:** in the desktop app, a temporary file left by a write that a crash cut off is removed at the next start.
+- **Fixed:** two tests that raced on GitHub (the canvas search's Shift+Enter, the video player's Pause in Firefox).
+
 ## 0.51.1 — A million items in the Library (2026-10-30)
 
 - **Changed:** in the desktop app, the Library view of a library of 20,000 items or more lists a page at a time: only the cards near the view are read, and the search, sort and counts are worked out in the app's main process. Measured with a million files on a GitHub runner: the Library shows them all about 10 s after the app opens (before: about a minute, and 1.9 GB of memory; now about 500 MB). *Similar images* is not offered for a library that big.

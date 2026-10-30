@@ -1205,10 +1205,12 @@ export class LibraryMirror {
     const shown = visibleFolders(folders);
     const index = JSON.stringify([...this.hiddenItems.values()].sort((a, b) => (a.hash < b.hash ? -1 : 1)));
     const sealedFolders = JSON.stringify(folders.filter((f) => !shown.includes(f)));
-    if (this.vault.dataKey && !(await this.anyBlank()) && (index !== this.lastIndex || sealedFolders !== this.lastFolders || this.vault.indexWaiting) && (index !== "[]" || sealedFolders !== "[]" || (await this.vault.state()) !== "none")) await this.vault.writeIndex(index, sealedFolders);
+    const sealing = !!this.vault.dataKey && !(await this.anyBlank());
+    if (sealing && (index !== this.lastIndex || sealedFolders !== this.lastFolders || this.vault.indexWaiting) && (index !== "[]" || sealedFolders !== "[]" || (await this.vault.state()) !== "none")) await this.vault.writeIndex(index, sealedFolders);
     if (this.vault.dataKey) (this.lastIndex = index), (this.lastFolders = sealedFolders);
-    // (the folders are now what the files say)
-    this.state = { folders: canonFolders(folders) };
+    // (the folders are now what the files say: with the hidden ones only when the sealed index was written; a folder hidden while locked
+    // is not in it yet, and stays this device's until it is, instead of being dropped when the key opens an older index)
+    this.state = { folders: canonFolders(sealing ? folders : shown) };
     await this.setMeta(STATE_KEY, this.state);
   }
   /** The hidden items sealed, as last written. */

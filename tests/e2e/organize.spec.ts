@@ -285,8 +285,42 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   await expect(p.getByTestId("prompt-dialog")).toContainText("not the password");
   await p.getByTestId("prompt-input").fill("secret");
   await p.getByTestId("prompt-ok").click();
-  await expect(side(p, /Hidden/)).toContainText("1");
+  // Hidden mode: the same view, listing the hidden items only, with a bar and the word in the search box.
+  const bar = p.getByTestId("hidden-mode-bar");
+  await expect(bar).toBeVisible();
+  await expect(p.getByTestId("hidden-chip")).toHaveText("hidden:");
+  await expect(side(p, /^All hidden items/)).toContainText("1");
   await expect(card(p, HASH)).toBeVisible();
+  await expect(cards(p)).toHaveCount(1);
+  // Tags and folders work here as anywhere: a folder made here is hidden, and a shown item filed into it is hidden with it.
+  await addTags(p, HASH, "secretTag");
+  await expect(p.getByTestId("tag-list")).toContainText("#secretTag");
+  await newFolder(p, "Vault");
+  const vault = await p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.hiddenFolders!.find((f) => f.name === "Vault")!.id));
+  for (const h of [HASH, GREEN_HASH]) await p.evaluate(([h, f]) => window.__canvastDebug.libraryOp("file", h, f), [h, vault] as const);
+  await expect(side(p, /^All hidden items/)).toContainText("2");
+  await expect(side(p, /^Vault/)).toContainText("2");
+  // Deleting the word ends it: the view as it was, with nothing hidden anywhere in it.
+  await search.focus();
+  await search.press("Backspace");
+  await expect(bar).toBeHidden();
+  await expect(cards(p)).toHaveCount(0);
+  await expect(p.getByTestId("tag-list")).not.toContainText("secretTag");
+  await expect(p.getByTestId("folder-tree")).not.toContainText("Vault");
+  // Unhide folder (in hidden mode) shows it and everything in it; Exit ends hidden mode.
+  await search.fill("hidden:");
+  await p.getByTestId("prompt-input").fill("secret");
+  await p.getByTestId("prompt-ok").click();
+  await sideAct(p, "folder", "Vault", "Unhide folder Vault and everything in it");
+  await p.getByTestId("confirm-ok").click();
+  await expect(side(p, /^All hidden items/)).toContainText("0");
+  await p.getByTestId("hidden-mode-exit").click();
+  await expect(bar).toBeHidden();
+  await expect(cards(p)).toHaveCount(2);
+  await expect(side(p, /^Vault/)).toContainText("2");
+  // Hidden again (one by one, from a shown folder), for what follows.
+  await pick(p, HASH);
+  await p.getByTestId("asset-hide").click();
   await expect(cards(p)).toHaveCount(1);
 
   // An export that would carry it asks; leaving it out keeps it out of the file.
@@ -303,9 +337,9 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   const manifest = JSON.parse(await z.get("manifest.json")!.data.text()) as { assets: Array<{ hash: string }> };
   expect(manifest.assets.map((a) => a.hash)).toEqual([GREEN_HASH]);
 
-  // Left alone, the list closes with the library; with "keep open" on, it stays (and asks no more) until the tab closes.
+  // Hidden mode ends when the library is left; with "remember the password" on, it begins again without asking until the tab closes.
   await p.getByTestId("view-assets").click();
-  await expect(side(p, /Hidden/)).toHaveCount(0);
+  await expect(bar).toBeHidden();
   await p.getByTestId("view-settings").click();
   await p.getByRole("tab", { name: /Privacy/ }).click();
   await p.locator('[data-row="library.hiddenRemember"] input').check();
@@ -313,10 +347,12 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   await search.fill("hidden:");
   await p.getByTestId("prompt-input").fill("secret");
   await p.getByTestId("prompt-ok").click();
-  await expect(side(p, /Hidden/)).toContainText("1");
+  await expect(side(p, /^All hidden items/)).toContainText("1");
   await p.getByTestId("view-canvas").click();
   await p.getByTestId("view-assets").click();
-  await expect(side(p, /Hidden/)).toContainText("1");
+  await expect(bar).toBeHidden();
+  await search.fill("hidden:");
+  await expect(side(p, /^All hidden items/)).toContainText("1");
   await expect(p.getByTestId("prompt-dialog")).toHaveCount(0);
 
   // The password and these settings stay out of a backup unless the person includes them when asked.
@@ -343,8 +379,9 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   expect(withIt.settings?.["library.hiddenRemember"]).toBe(true);
   expect(await locked()).toBe(true); // (the list open and the password given: still a padlock)
 
-  // Shown again: its pictures are drawn again.
+  // Shown again (from hidden mode, begun without the password now): its pictures are drawn again.
   await p.getByTestId("view-assets").click();
+  await search.fill("hidden:");
   await pick(p, HASH);
   await p.getByTestId("asset-hide").click();
   await expect.poll(locked).toBe(false);

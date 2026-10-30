@@ -415,7 +415,7 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 - **Open in default app** (desktop app; in the details, the right-click menu, and a file card's Actions bar on a canvas) opens an item's file in your system's app for that kind of file: for a file canvast cannot show, or to edit a picture elsewhere.
 - **Show in file manager** (desktop app; in the details of one item, and its right-click menu) opens the item's folder in your system's file manager with its file selected. Hidden items have neither this nor *Open in default app*.
 - A **viewer** with filmstrip, zoom, pan, slideshow and a details panel. The details show where an item is used (*Used on 3 canvases (4 times)*, then each canvas with its own count; past five canvases, **Show all** lists the rest), and **Show** takes you to it on the canvas at any depth. A button switches the background behind the picture, the controls can be hidden, and a double tap opens it on phones. The button beside the details button (or `F`) hides and shows the controls; with them hidden, the picture gets their room. A video or GIF plays with the canvas's player, floating over the bottom of the picture: while the pointer rests, playing or paused, the player fades away (after *Hide the player* in Settings > Media and playback, 1.5 s by default), and any move brings it back.
-- **Folders** (an item lives in one folder, folders nest; a long list in the sidebar shows its first rows and **Show N more**, remembered on this device), **tags** (several per item, renamable), **favourites**, file types, **Similar images** (duplicates and near-duplicates found by their pixels) and **Hidden** items, which are kept out of every list until you open them (see [Hidden items and passwords](#hidden-items-and-passwords)).
+- **Folders** (an item lives in one folder, folders nest; a long list in the sidebar shows its first rows and **Show N more**, remembered on this device), **tags** (several per item, renamable), **favourites**, file types, **Similar images** (duplicates and near-duplicates found by their pixels) and **hidden** items, which are kept out of every list and listed only in hidden mode (see [Hidden items and passwords](#hidden-items-and-passwords)).
 - **Selecting and the details panel**
   - A click selects an item. The details panel opens and closes with its button (or `I`) and shows what is selected (for several: their tags and folder together). A click never moves the grid under the pointer.
   - When the grid is laid out again (the panel toggled, the window or thumbnails resized), the selected item stays where it is on the screen.
@@ -549,7 +549,7 @@ Open Settings with the gear button. Settings have a *device* scope and a *canvas
 | Panels | Minimize inactive panels, panels kept open |
 | Performance | Adaptive quality, fixed quality level, memory for pictures, animation and its speed |
 | Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, changes only, files as ZIP, import); in the desktop app, where deleted files go and *Delete library files at once*; *Start from scratch* (delete all data, after a warning with a backup offered first) |
-| Privacy | The word that opens the Hidden items, keeping them open until the tab closes, and the passwords of the workspace and of the Hidden items; what stays on your machine |
+| Privacy | The word that begins hidden mode, remembering the Hidden password until the tab closes, and the passwords of the workspace and of the Hidden items; what stays on your machine |
 | About and diagnostics | Version and diagnostics |
 | Develop | Developer tools (see [Building from source](#building-from-source)) |
 
@@ -712,37 +712,38 @@ To report a security problem, see [SECURITY.md](SECURITY.md).
 
 ### Hidden items and passwords
 
-For a workspace that is shown in a public place, an item of the Library can be **hidden**, and the workspace or the Hidden list can be guarded by a **password**. In the browser both are gates in front of the data, not encryption; in the desktop app hidden files are encrypted (see the end of this section).
+For a workspace that is shown in a public place, an item of the Library can be **hidden**, and the workspace or the hidden items can be guarded by a **password**. In the browser both are gates in front of the data, not encryption; in the desktop app hidden files are encrypted (see the end of this section).
 
 | | |
 | --- | --- |
-| ![The details of a selected item, with the Hide button beside the star](docs/screenshots/library-hide.webp) | ![The Hidden list: the item that was hidden, in its own list](docs/screenshots/hidden-list.webp) |
-| **Hide** is the eye button beside the star in the details panel (also in the bulk bar of several selected items, and in the library's context menu) | The **Hidden** list, open: the hidden item is only here, and the sidebar counts do not include it |
+| ![The details of a selected item, with the Hide button beside the star](docs/screenshots/library-hide.webp) | ![Hidden mode: the Library listing the hidden items only](docs/screenshots/hidden-list.webp) |
+| **Hide** is the eye button beside the star in the details panel (also in the bulk bar of several selected items, and in the library's context menu) | **Hidden mode**: the Library listing the hidden items only |
 
 **Hiding**
 
-- A hidden item is left out of *All items*, every folder, tag and file type, the counts, searches, *Similar images*, and the pickers that list the library (a texture fill's picture, the fonts).
+- A hidden item is left out of *All items*, every folder, tag and file type, the counts and totals, searches and their suggestions, *Similar images*, and the pickers that list the library (a texture fill's picture, the fonts).
 - Where it is already placed on a canvas, its picture shows a padlock at once (with or without a password) until it is shown again; its name stays in the Layers panel. A hidden video or sound does not play.
-- Hiding does not move, delete or change the file. In the Hidden list, the same button shows the item again.
-- **Hide folder** (a library folder's ⋯ menu) hides the folder, its subfolders and every item in them: the folders leave every list and are not offered to file into. Showing an item again shows its folder (and the ones above it) again. In the desktop app a hidden folder's name is kept only encrypted, and its real folder leaves `library/`.
+- Hiding does not move, delete or change the file. In hidden mode, the same button shows the item again.
+- **Hide folder** (a library folder's ⋯ menu) hides the folder, its subfolders and every item in them. An item filed into a hidden folder later is hidden with it, and a folder made inside one is hidden too. Showing one item again shows its folder (and the ones above it) again; its other items stay hidden. In the desktop app a hidden folder's name is kept only encrypted, and its real folder leaves `library/`.
 
-**Opening the Hidden list**
+**Hidden mode**
 
-- It is not in the sidebar. Type its **opening word** in the library's search box (`hidden:` by default; change it, or empty it to turn this off, in Settings > Privacy).
-- The word clears itself, the password is asked for if there is one, and the list opens as one more list in the sidebar.
-- It closes when you choose another list or leave the library. With *Keep the Hidden items open until the tab closes* (Settings > Privacy) it stays open until the tab is closed or reloaded.
+- Outside it, nothing hidden is listed, counted or suggested anywhere. To begin it, type the **opening word** in the library's search box (`hidden:` by default; change it, or empty it to turn this off, in Settings > Privacy); the password is asked for if there is one.
+- In hidden mode the Library is the same view with every function (folders, *Unfiled*, *Favourites*, tags, file types, *Similar images*, search, sorts, layouts, the viewer and slideshow, rename, notes and fields, filing, bulk actions), over the hidden items only. The folders listed are the hidden ones and those holding hidden items; the counts are of hidden items. A bar across the library and the word in the search box say it is on.
+- A folder made in hidden mode is hidden. **Unhide folder** (a folder's ⋯ menu in hidden mode) shows the folder, its subfolders and every item in them again, also the items in it that were hidden one by one, and the folders above it.
+- It ends with **Exit hidden mode** on the bar, by deleting the word (Backspace in the empty search box), when the hidden items are locked, or when you leave the library. The library is then as it was before (its list, search and scroll), and the hidden items' pictures are dropped from memory. With *Remember the Hidden password until the tab closes* (Settings > Privacy) it begins again without the password until the tab is closed or reloaded.
 
 | | |
 | --- | --- |
-| ![Settings, Privacy: the opening word, keeping the list open, and the two passwords](docs/screenshots/privacy.webp) | ![The screen shown when the app opens on a workspace with a password](docs/screenshots/lock-screen.webp) |
-| **Settings > Privacy**: the opening word, the keep-open option and the two passwords | The **lock screen**: with a workspace password set, nothing is read or drawn until it is given |
+| ![Settings, Privacy: the opening word, remembering the password, and the two passwords](docs/screenshots/privacy.webp) | ![The screen shown when the app opens on a workspace with a password](docs/screenshots/lock-screen.webp) |
+| **Settings > Privacy**: the opening word, remembering the Hidden password and the two passwords | The **lock screen**: with a workspace password set, nothing is read or drawn until it is given |
 
 **Two passwords, set separately** in Settings > Privacy (each is typed twice; changing or removing one asks for the old one). Every password field has an eye button at its end that shows what was typed, and hides it again:
 
 | Password | Asked | Guards |
 | --- | --- | --- |
 | **Workspace** | Every time the app opens or is reloaded, before anything of the workspace is read. Escape does not close the screen | The whole workspace |
-| **Hidden items** | When the opening word is typed (unless the tab remembers it), and before an export that includes hidden items | The Hidden list and exporting its items |
+| **Hidden items** | When the opening word is typed (unless the tab remembers it), and before an export that includes hidden items | Hidden mode and exporting hidden items |
 
 **Exports and backups ask.**
 
@@ -770,7 +771,7 @@ Whether an item is hidden is data of the item, so it travels in any export that 
 - Its name, tags, note and fields are kept only in an encrypted index (`.canvast/hidden.json`); its thumbnail is never stored.
 - The password, stretched with **scrypt** (128 MiB of memory for each guess, so guessing it on many machines at once is costly), wraps one random key, so changing the password never re-encrypts a file. It cannot be removed while any item is hidden. A workspace from before 0.50.52 (PBKDF2) is upgraded the next time the password is given.
 - The Hidden password is checked only by its vault: no cheaper form of it is written into the workspace folder.
-- Once given (to open the Hidden list, or when hiding), the key stays in memory until the app closes or you choose **Lock hidden items** (command palette). It is held so that no code in the page can read it out; changing the password therefore asks for the current one.
+- Once given (to begin hidden mode, or when hiding), the key stays in memory until the app closes or you choose **Lock hidden items** (command palette). It is held so that no code in the page can read it out; changing the password therefore asks for the current one.
 - A spare of the wrapped key is kept in `.canvast/keys/hidden.json`: if `hidden.json` is lost or damaged, the same password still opens every hidden file, and the app writes `hidden.json` again.
 - Each encrypted file stands on its own: inside it, encrypted too, are its name, library folder, tags, note and fields, so a `.hidden/` file copied anywhere comes back whole with the key file and the password, even with the index lost. A change to a hidden item here (its name, folder, tags…) seals its file again.
 - Hiding several files at once shows *Encrypting N of M files* from five files on.

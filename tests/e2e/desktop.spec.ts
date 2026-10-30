@@ -797,6 +797,17 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     expect(files(ws).filter((f) => f.startsWith(".hidden/"))).toHaveLength(3);
     expect(files(ws).some((f) => readFileSync(join(ws, f)).includes(dropped.subarray(0, 24)))).toBe(false);
     await expect.poll(listing).toContainEqual(["Dropped Secret.png", true, true]);
+    // Unhide folder: the folder and what is in it opened back into library/; a shown item filed into a hidden folder is sealed with it.
+    await lib("showFolder", "sf1");
+    await flush();
+    expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual(["library/secret_folder/secret_plan.png"]);
+    expect(readFileSync(join(ws, "library/secret_folder/secret_plan.png")).equals(secret)).toBe(true);
+    await lib("createFolder", "sf2", "Other Secret");
+    await lib("hideFolder", "sf2");
+    await lib("file", hash, "sf2");
+    await flush();
+    expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual([]);
+    expect(files(ws).some((f) => readFileSync(join(ws, f)).includes(secret.subarray(0, 24)))).toBe(false); // (its folder is shown now: only the picture is checked)
   } finally {
     await app.close();
   }

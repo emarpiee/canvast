@@ -180,19 +180,22 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
       });
     },
   };
-  // (Changes to some items say which: a big library then writes only their parts. Showing an item again may show its folder: all.)
+  // (Changes to some items say which: a big library then writes only their parts. Hiding and showing: the items the library marked
+  // as not written yet, with the folders.)
   const some = (hashes: readonly string[]): void => mirror.library(hashes);
+  const marked = (): void => mirror.libraryMarked();
   const catalog = watched(desktopCatalog as typeof storage.catalog, {
     setLock: tree,
     renameAssets: (_n, changes) => some(changes.map((c) => c.hash)),
-    updateMeta: (_e, hash, change) => (change.hidden === false ? library() : some([hash])),
-    updateMetaEach: (_e, changes) => (changes.some((c) => c.change.hidden === false) ? library() : some(changes.map((c) => c.hash))),
+    updateMeta: (_e, hash, change) => (change.hidden === false ? marked() : some([hash])),
+    updateMetaEach: (_e, changes) => (changes.some((c) => c.change.hidden === false) ? marked() : some(changes.map((c) => c.hash))),
     renameTag: library,
     deleteTag: library,
     createFolder: () => some([]), // (a new folder holds nothing: the index and its real folder only)
     renameFolder: library,
     deleteFolder: library,
-    hideFolder: library,
+    hideFolder: marked,
+    showFolder: marked,
     restoreMeta: library,
     markDeleted: (_r, hash) => some([hash]),
     markDeletedEach: (_r, hashes) => some(hashes),

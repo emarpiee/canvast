@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.52.0: hidden mode (2026-10-30)
+
+- **Implemented:** hidden mode of the Library view (one flag through `inScope`, `countSide`, the desktop index's query and counts; `hiddenModeFolders`, `listedFolders`); *Unhide folder* (`CatalogStore.showFolder`, both builds); filing into a hidden folder hides; folders made in hidden folders or hidden mode are hidden; counts and totals of the mode's items only; desktop hide and show write only marked items (`WorkspaceMirror.libraryMarked`); a folder hidden while locked is kept on unlock; stale temporary files swept at start-up; `scripts/stress-hidden.mjs` and the `Stress hidden` workflow.
+- **Tested:** unit (`library-db.test.ts`: hidden mode lists and counts); E2E `organize.spec.ts` hiding test (Chromium and Firefox: hidden mode, tags and folders in it, Backspace and Exit, Unhide folder, remembered password); desktop E2E hidden tests 3/3 (Unhide folder and filing into a hidden folder on disk). Baseline stress run on GitHub (10,000 items, 30 kill rounds): nothing lost or damaged; one temporary file left (fixed); unhiding 1,000 one at a time peaked at 4.2 GB (each wrote the whole library; now only what changed).
+- **Known failures:** none known.
+- **Unverified:** the stress run after these changes; the README screenshot of hidden mode is the old Hidden list (retake with `scripts/showcase/shots-privacy.mjs`).
+- **Committed:** main.
+- **Next bounded task:** hidden thumbnails and looks encrypted (plan H7), then exporting chosen folders (H4) and the outside tool's folder tree (H5).
+
 ## v0.51.1: a million items in the Library (2026-10-30)
 
 - **Implemented:** the desktop Library lists a page at a time from 20,000 items (`CatalogStore.pages`, `desktop/library-index.ts`, shared `src/assets/library-match.ts`); whole-library passes removed (copy-on-write undo, presence per item, sizes from the start-up walk, orphan check once, import writes what is new, fast first load, full look compared in the main process). ADR 0177, "The Library view a page at a time".
@@ -44,7 +53,7 @@ Unverified / Committed / Next bounded task**.
 - **Known failures:** none.
 - **Unverified:** the first open of a million-file workspace on a new device still peaks at about 1.4 GB (it writes everything once and looks through every file once).
 - **Committed:** main.
-- **Next bounded task:** the Hidden mode of the Library (plan agreed with the owner, outside the repo).
+- **Next bounded task:** hidden mode (v0.52.0).
 
 ## v0.51.0: the desktop library in SQLite (2026-10-30)
 

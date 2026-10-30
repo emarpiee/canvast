@@ -106,7 +106,8 @@ export interface BackupStore {
  */
 export interface LibraryPages {
   query(q: LibraryQuery): Promise<{ hashes: string; ratios: Float32Array; total: number; bytes: number }>;
-  counts(): Promise<{ hidden: number; shown: number; favourites: number; unfiled: number; tags: Array<[string, string, number]>; types: Array<[string, number]>; folders: Array<[string, number]> }>;
+  /** The sidebar's counts; of the hidden items in hidden mode (`hidden`). */
+  counts(hidden?: boolean): Promise<{ hidden: number; shown: number; favourites: number; unfiled: number; tags: Array<[string, string, number]>; types: Array<[string, number]>; folders: Array<[string, number]> }>;
   fieldKeys(): Promise<string[]>;
   /** Some items' entries, with whether each one's file is there. */
   listed(hashes: readonly string[]): Promise<Array<CatalogEntry & { present: boolean }>>;
@@ -144,6 +145,8 @@ export interface CatalogStore {
   deleteFolder(id: string): Promise<{ folders: number; unfiled: number }>;
   /** Hide a folder, its subfolders and every item in them; how many items were hidden. */
   hideFolder(id: string): Promise<number>;
+  /** Unhide a folder: it, its subfolders and every item in them (also those hidden one by one), and the folders above it. How many items were shown. */
+  showFolder(id: string): Promise<number>;
   snapshotMeta(): Promise<MetaSnapshot>;
   restoreMeta(s: MetaSnapshot): Promise<number>;
   lock(kind: PasswordKind): Promise<string | null>;

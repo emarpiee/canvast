@@ -232,6 +232,21 @@ async function inside(root: string, rel: string): Promise<string> {
  * Every file under a folder, at any depth (names starting with a dot, and what is in such folders, left out), with its size and
  * modification time: folders are read and files looked at many at a time (a big library on a spinning disk), with no limit on how many.
  */
+/**
+ * Temporary files of writes a crash or a kill cut off (`writeAtomic`): removed at start-up once old enough to be no write in progress,
+ * another device's included (the stress run shortens the wait).
+ */
+const STALE_TMP_MS = Number(process.env["CANVAST_STALE_TMP_MS"] ?? 10 * 60_000);
+const TMP_RE = /\.tmp-\d+-[0-9a-z]+$/;
+const staleTmp = (name: string, mtimeMs: number): boolean => TMP_RE.test(name) && Date.now() - mtimeMs >= STALE_TMP_MS;
+async function sweepTemps(dir: string): Promise<void> {
+  for (const ent of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
+    const full = join(dir, ent.name);
+    if (ent.isDirectory()) await sweepTemps(full);
+    else if (TMP_RE.test(ent.name) && staleTmp(ent.name, (await stat(full).catch(() => null))?.mtimeMs ?? Date.now())) await unlink(full).catch(() => undefined);
+  }
+}
+
 async function walkFiles(dir: string, at: string): Promise<Array<{ path: string; size: number; mtimeMs: number }>> {
   const out: Array<{ path: string; size: number; mtimeMs: number }> = [];
   let folders: Array<[string, string]> = [[dir, at]];
@@ -251,7 +266,8 @@ async function walkFiles(dir: string, at: string): Promise<Array<{ path: string;
       await Promise.all(
         files.slice(i, i + 256).map(async ([full, rel]) => {
           const s = await stat(full).catch(() => null);
-          if (s?.isFile()) out.push({ path: rel, size: s.size, mtimeMs: s.mtimeMs });
+          if (s?.isFile() && staleTmp(rel, s.mtimeMs)) await unlink(full).catch(() => undefined);
+          else if (s?.isFile()) out.push({ path: rel, size: s.size, mtimeMs: s.mtimeMs });
         }),
       );
     }
@@ -477,6 +493,7 @@ function installFileCalls(win: BrowserWindow, root: string): void {
   const lookFile = join(app.getPath("userData"), "library-looks", `${createHash("sha256").update(root).digest("hex").slice(0, 24)}.json`);
   ipcMain.handle("canvast:libraryChanges", async (e) => {
     own(e);
+    await Promise.all([sweepTemps(join(root, ".canvast")), sweepTemps(join(root, ".hidden"))]);
     const walked = await walkFiles(join(root, "library"), "library");
     walkedSizes.clear();
     for (const f of walked) walkedSizes.set(f.path, f.size);
@@ -617,7 +634,7 @@ function installFileCalls(win: BrowserWindow, root: string): void {
         return index!.query(q, /missing/i.test(q.text) ? await absentNow(l) : new Set());
       }
       case "counts":
-        return index!.counts();
+        return index!.counts(args[0] === true);
       case "fieldKeys":
         return index!.fieldKeys();
       case "listed": {

@@ -31,7 +31,7 @@ const bridge: DesktopBridge = {
     orphans: () => ipcRenderer.invoke("canvast:lib", "orphans"),
     absent: () => ipcRenderer.invoke("canvast:lib", "absent"),
     query: (q) => ipcRenderer.invoke("canvast:lib", "query", q),
-    counts: () => ipcRenderer.invoke("canvast:lib", "counts"),
+    counts: (hidden) => ipcRenderer.invoke("canvast:lib", "counts", hidden === true),
     fieldKeys: () => ipcRenderer.invoke("canvast:lib", "fieldKeys"),
     listed: (hashes) => ipcRenderer.invoke("canvast:lib", "listed", hashes),
     unnamed: () => ipcRenderer.invoke("canvast:lib", "unnamed"),

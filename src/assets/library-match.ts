@@ -41,6 +41,8 @@ export interface LibraryQuery {
   inFolders?: string[];
   /** Scope `ctag:`: the items the canvas tag is on. */
   canvasTagged?: string[];
+  /** Hidden mode: the hidden items instead of the shown ones. */
+  hidden?: boolean;
 }
 
 /** What a keyword reads besides the entry: the canvases' names, files' lengths and pictures' looks (unknown where not given). */
@@ -108,13 +110,12 @@ export function matcher(ctx: MatchContext): (e: ListedEntry, query: Query | null
 }
 
 /**
- * Whether an item is in a scope. Hidden items are in the Hidden scope only. `inFolders`: a folder's subtree (scope `folder:`);
- * `canvasTagged`: the items a canvas tag is on (scope `ctag:`); `similar`: the items in a look-alike group (scope `similar`).
+ * Whether an item is in a scope. Hidden items are listed in hidden mode only, and only they are (`hiddenMode`). `inFolders`: a folder's
+ * subtree (scope `folder:`); `canvasTagged`: the items a canvas tag is on (scope `ctag:`); `similar`: the items in a look-alike group.
  */
-export function inScope(e: ListedEntry, scope: string, sets: { inFolders?: Has | null; canvasTagged?: Has | null; similar?: Has | null } = {}): boolean {
+export function inScope(e: ListedEntry, scope: string, sets: { inFolders?: Has | null; canvasTagged?: Has | null; similar?: Has | null } = {}, hiddenMode = false): boolean {
   const m = meta(e);
-  if (scope === "hidden") return m.hidden;
-  if (m.hidden) return false; // hidden items show in the Hidden scope only, whatever is searched
+  if (m.hidden !== hiddenMode) return false;
   if (scope === "similar") return !!sets.similar?.has(e.hash);
   if (scope === "favorites") return m.favorite;
   if (scope === "unfiled") return m.folderIds.length === 0;
@@ -155,7 +156,10 @@ export function sortListed<T extends ListedEntry>(rows: T[], key: SortKey, rever
   return rows.sort((a, b) => flip * cmp[key](a, b) || (a.hash < b.hash ? -1 : 1));
 }
 
-/** The sidebar's counts: hidden and shown items, favourites, unfiled, each tag (by its lower-case form), file type and folder (with its subfolders). */
+/**
+ * The sidebar's counts: hidden and shown items, then favourites, unfiled, each tag (by its lower-case form), file type and folder (with its
+ * subfolders) of the shown items, or of the hidden ones in hidden mode (`hiddenMode`).
+ */
 export interface SideCounts {
   hidden: number;
   shown: number;
@@ -165,16 +169,14 @@ export interface SideCounts {
   types: Map<string, number>;
   folders: Map<string, number>;
 }
-export function countSide(entries: Iterable<CatalogEntry>, folders: readonly AssetFolder[]): SideCounts {
+export function countSide(entries: Iterable<CatalogEntry>, folders: readonly AssetFolder[], hiddenMode = false): SideCounts {
   const c: SideCounts = { hidden: 0, shown: 0, favourites: 0, unfiled: 0, tags: new Map(), types: new Map(), folders: new Map() };
   const parentOf = new Map(folders.map((f) => [f.id, f.parentId]));
   for (const e of entries) {
     const m = meta(e);
-    if (m.hidden) {
-      c.hidden++;
-      continue; // (what is hidden is in no count, tag list or file type list but its own scope)
-    }
-    c.shown++;
+    if (m.hidden) c.hidden++;
+    else c.shown++;
+    if (m.hidden !== hiddenMode) continue; // (what is hidden is counted in hidden mode only, and only it is)
     if (m.favorite) c.favourites++;
     if (!m.folderIds.length) c.unfiled++;
     for (const t of m.tags) {

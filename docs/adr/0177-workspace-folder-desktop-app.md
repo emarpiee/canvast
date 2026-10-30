@@ -393,3 +393,7 @@ Each step ends in a working app and is committed and released on its own.
 - A desktop package of about 100 MB or more per platform, next to the 2 MB HTML file.
 - The desktop build has no Firefox; the browser build keeps it.
 - Hidden items are protected for real in the desktop build; a lost password cannot be recovered.
+
+## Hidden mode (0.52.0)
+
+The Hidden list was a separate scope with fewer functions than the rest of the Library. Hidden mode replaces it: one flag (`hiddenMode` in the view, `hidden` in `LibraryQuery`, `countSide` and the desktop index's counts) makes every scope, search, sort, count and folder list work over the hidden items instead of the shown ones, so there is no hidden-only code path. Outside it nothing hidden is listed, counted or suggested. The flag on each item stays the one rule of what is hidden (a folder's flag is copied onto the items in it; filing into a hidden folder hides; *Unhide folder* clears both), because hiding a folder must seal each of its files anyway, so an inherited, computed flag would save no work. Hidden mode ends on leaving the library, locking, Exit or deleting the word, and drops the hidden items' pictures and looks from memory. `.hidden/` stays flat (random names); the folder tree is recoverable from each sealed file's own header.

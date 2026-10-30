@@ -49,8 +49,8 @@ export interface LibraryCalls {
   holds(dir: string): Promise<boolean>;
   /** The Library view's list: the items a scope, search and sort list, in order (hashes, 64 characters each), their picture shapes, and the library's size. */
   query(q: unknown): Promise<{ hashes: string; ratios: Float32Array; total: number; bytes: number }>;
-  /** The sidebar's counts (tags as [lower case, label, count]). */
-  counts(): Promise<{ hidden: number; shown: number; favourites: number; unfiled: number; tags: Array<[string, string, number]>; types: Array<[string, number]>; folders: Array<[string, number]> }>;
+  /** The sidebar's counts (tags as [lower case, label, count]); of the hidden items in hidden mode (`hidden`). */
+  counts(hidden?: boolean): Promise<{ hidden: number; shown: number; favourites: number; unfiled: number; tags: Array<[string, string, number]>; types: Array<[string, number]>; folders: Array<[string, number]> }>;
   /** Every field name the items use. */
   fieldKeys(): Promise<string[]>;
   /** Some items' entries, with whether each one's file is there. */

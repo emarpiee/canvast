@@ -29,7 +29,7 @@ import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
 import type { AssetField, AssetFolder, CatalogEntry, CatalogListing } from "../assets/asset-catalog";
 import type { LibraryPages } from "../storage/store";
-import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, folderPath, folderSubtree, meta, usageOf, visibleFolders } from "../assets/asset-catalog";
+import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, folderPath, folderSubtree, hiddenModeFolders, meta, usageOf, visibleFolders } from "../assets/asset-catalog";
 import { THUMB_PX, makeThumb } from "../assets/thumb";
 import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
@@ -183,6 +183,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     <div class="assets-place-zone drop-zone" data-testid="assets-place-zone" hidden>${ICONS.mapPin}<span></span></div>
     <div class="assets-bar" role="toolbar" aria-label="Library">
       <div class="assets-searchbox">
+        <span class="assets-hidden-chip" data-testid="hidden-chip" title="Hidden mode: delete this (Backspace in an empty search) to leave it" hidden></span>
               <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search" title="Search by name, type or tag; #tag is a tag, .png a file type; width>1000, ratio:16x9, orientation:portrait, colour:red filter by what the picture is" aria-label="Search the library">
         <button type="button" class="cs-clear" aria-label="Clear the search" title="Clear the search" hidden>${ICONS.x}</button>
         ${saveToggleHtml()}
@@ -214,6 +215,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <input type="file" multiple hidden data-testid="assets-import-input">
       <input type="file" multiple hidden webkitdirectory data-testid="assets-import-folder-input">
     </div>
+    <div class="assets-hidden-bar" data-testid="hidden-mode-bar" role="status" hidden>${ICONS.eyeClosed}<span>Hidden mode: only hidden items are listed, and what you do here is done to them.</span><button type="button" class="assets-btn" data-action="exit-hidden" data-testid="hidden-mode-exit">Exit hidden mode</button></div>
     <div class="assets-columns" role="dialog" aria-label="List columns" data-testid="columns-panel" hidden></div>
     <p class="assets-status" role="status" data-testid="assets-status"></p>
     <div class="assets-body">
@@ -289,7 +291,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const total = root.querySelector<HTMLElement>(".assets-total")!;
   const pickedOut = root.querySelector<HTMLElement>(".assets-picked")!;
   /** The listing (or the page-at-a-time list) whose total size the status bar shows (worked out again only for a new one). */
-  let totalOf: unknown = null;
+  let totalOf: { of: unknown; n: number; bytes: number } | null = null;
   /** The status bar: how many are picked and their size. */
   const showPicked = (): void => {
     pickedOut.hidden = picked.size === 0;
@@ -501,7 +503,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let places: AssetPlace[] = [];
   let generation = 0;
   /** Sidebar scope: "all", "favorites", "unfiled", "folder:<id>" or "tag:<lowercased tag>". */
-  let scope = ui.filters.scope; // (the filters are kept with the library's layout: a restart opens the library as it was left)
+  let scope = ui.filters.scope === "hidden" ? "all" : ui.filters.scope; // (the filters are kept with the library's layout: a restart opens the library as it was left)
+  /** Hidden mode (the word that opens the hidden items, then their password): the same view, listing the hidden items only. */
+  let hiddenMode = false;
+  /** The view as it was before hidden mode, put back when it ends. */
+  let beforeHidden: { scope: string; search: string; way: "all" | "name" | "tag"; top: number } | null = null;
+  /** Every folder, the hidden ones too (a listing's `folders` are those the mode shows). */
+  let allFolders: AssetFolder[] = [];
+  /** The folders the mode shows: in hidden mode the hidden ones and those holding hidden items (`holding`), else those not hidden. */
+  const modeFolders = (holding: Iterable<string>): AssetFolder[] => (hiddenMode ? hiddenModeFolders(allFolders, holding) : visibleFolders(allFolders)).sort((a, b) => a.name.localeCompare(b.name));
   /** Inline name input in the sidebar: a new folder (under `parent`) or a rename. */
   /** In-canvas tags across the workspace (ADR 0062), and those carried by instances of the open asset. */
   let canvasTags = new Map<string, { label: string; objects: number; canvases: Set<string>; assets: Set<string> }>();
@@ -667,7 +677,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const similar = (): string[][] => {
     if (similarMemo?.of === listing && similarMemo.gen === looksGen) return similarMemo.groups;
     const hidden = new Set(listing?.entries.flatMap((x) => (meta(x).hidden ? [x.hash] : [])));
-    const groups = similarGroups([...looks].flatMap(([id, l]) => (l && !hidden.has(id) ? [{ id, dhash: l.dhash }] : [])));
+    const groups = similarGroups([...looks].flatMap(([id, l]) => (l && hidden.has(id) === hiddenMode ? [{ id, dhash: l.dhash }] : [])));
     similarMemo = { of: listing, gen: looksGen, groups };
     return groups;
   };
@@ -1384,8 +1394,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
    */
   const pagedListing = async (pages: LibraryPages, metaOnly: boolean): Promise<CatalogListing | null> => {
     const gen = generation;
-    const [folders, counts, usage, keys] = await Promise.all([pages.folders(), pages.counts(), metaOnly ? Promise.resolve(usageMap) : pages.usage(), pages.fieldKeys()]);
+    const [folders, counts, usage, keys] = await Promise.all([pages.folders(), pages.counts(hiddenMode), metaOnly ? Promise.resolve(usageMap) : pages.usage(), pages.fieldKeys()]);
     if (gen !== generation) return null;
+    allFolders = folders;
     usageMap = usage;
     pagedCounts = counts;
     pagedFieldKeys = keys;
@@ -1403,7 +1414,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       entries: [],
       missing: used.filter((h) => !have.has(h)).map((hash) => ({ hash, ...usageOf(usage, hash) })),
       pendingDeletion: 0,
-      folders: visibleFolders(folders).sort((a, b) => a.name.localeCompare(b.name)),
+      folders: modeFolders(counts.folders.map(([id]) => id)),
     };
   };
   // ---- data
@@ -1427,8 +1438,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const light = !pages && metaOnly && listing ? await session.catalog.relist(listing) : null;
     if (gen !== generation) return;
     if (!light && !(pages && metaOnly)) await session.persistence.flush(); // usage reflects every edit made so far
-    const l = pages ? await pagedListing(pages, metaOnly) : (light ?? (await session.catalog.list()));
+    let l = pages ? await pagedListing(pages, metaOnly) : (light ?? (await session.catalog.list()));
     if (!l) return;
+    if (!pages) {
+      allFolders = [...l.folders, ...(l.hiddenFolders ?? [])];
+      if (hiddenMode) l = { ...l, folders: modeFolders(countSideOf(l.entries, allFolders, true).folders.keys()) };
+    }
     startStep("library listed");
     if (gen !== generation) return;
     listing = l;
@@ -1512,7 +1527,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let filterMemo: { key: string; of: CatalogListing; tags: typeof canvasTags; wantsLooks: boolean; looksGen: number; durationsGen: number; tree: unknown; rows: CatalogListing["entries"] } | null = null;
   const filteredEntries = (): CatalogListing["entries"] => {
     if (!listing) return [];
-    const memoKey = [search.value, way, usageSel.value, sortSel.value, reversed, scope].join("\u0001");
+    const memoKey = [search.value, way, usageSel.value, sortSel.value, reversed, scope, hiddenMode].join("\u0001");
     const m = filterMemo;
     if (m && m.key === memoKey && m.of === listing && m.tags === canvasTags && m.tree === session.tree && m.durationsGen === durationsGen && (!m.wantsLooks || m.looksGen === looksGen)) {
       wantsLooks = m.wantsLooks;
@@ -1549,14 +1564,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (scope === "similar") similar().forEach((g, i) => g.forEach((h) => group.set(h, i)));
     const inFolders = scope.startsWith("folder:") ? folderSubtree(listing.folders, scope.slice(7)) : null;
     const sets = { inFolders, canvasTagged: scope.startsWith("ctag:") ? (canvasTags.get(scope.slice(5))?.assets ?? null) : null, similar: group };
-    const inScope = (e: CatalogListing["entries"][number]): boolean => inScopeOf(e, scope, sets);
+    const inScope = (e: CatalogListing["entries"][number]): boolean => inScopeOf(e, scope, sets, hiddenMode);
     // The library sorted once for this sort (kept until the library or the sort changes); a search or a filter only keeps rows of it, in
     // that order: sorting again on every keystroke cost most of the time with tens of thousands of items.
     const base = scope === "similar" ? listing.entries : sortedAll();
     const rows = base.filter((e) => inScope(e) && matchesQuery(e, words, usage));
-    // (hidden items only while their list is open: they are in no Similar group, and their files may be locked)
+    // (hidden items only in hidden mode: they are in no Similar group outside it, and their files may be locked)
     if (wantsDurations) void readDurations();
-    if (wantsLooks) ensureLooks(listing.entries.filter((e) => !isCard(e) && (scope === "hidden" || !meta(e).hidden)).map((e) => e.hash));
+    if (wantsLooks) ensureLooks(listing.entries.filter((e) => !isCard(e) && meta(e).hidden === hiddenMode).map((e) => e.hash));
     // Look-alikes are listed together, the biggest group first, whatever the sort (the point is to see them side by side).
     if (scope === "similar") return rows.sort((a, b) => group.get(a.hash)! - group.get(b.hash)! || collator.compare(a.name, b.name));
     return rows;
@@ -1741,14 +1756,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let filmOf: string[] | null = null;
   /** Keep the filters (not the search) with the layout, and show the reset button only when one is not its default. */
   const keepFilters = (): void => {
-    const f = { usage: usageSel.value, sort: sortSel.value, reversed, scope };
+    const f = { usage: usageSel.value, sort: sortSel.value, reversed, scope: beforeHidden?.scope ?? scope }; // (hidden mode's scope is not kept)
     resetFiltersBtn.hidden = f.usage === NO_FILTERS.usage && f.sort === NO_FILTERS.sort && !f.reversed && f.scope === NO_FILTERS.scope;
     if (JSON.stringify(f) === JSON.stringify(ui.filters)) return;
     ui.filters = f;
     saveUi();
   };
   /** What the page-at-a-time list depends on: the scope, the search and how, the usage filter, the sort. */
-  const queryKey = (): string => [search.value, way, usageSel.value, sortSel.value, reversed, scope, durationsGen].join("\u0001");
+  const queryKey = (): string => [search.value, way, usageSel.value, sortSel.value, reversed, scope, durationsGen, hiddenMode].join("\u0001");
   let querying = "";
   const requery = async (pages: LibraryPages): Promise<void> => {
     const key = queryKey();
@@ -1769,6 +1784,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       canvasNames,
       ...(scope.startsWith("folder:") && listing ? { inFolders: [...folderSubtree(listing.folders, scope.slice(7))] } : {}),
       ...(scope.startsWith("ctag:") ? { canvasTagged: [...(canvasTags.get(scope.slice(5))?.assets ?? [])] } : {}),
+      ...(hiddenMode ? { hidden: true } : {}),
     };
     const r = await pages.query(q).catch(() => null);
     if (querying !== key) return; // (another was asked for meanwhile)
@@ -1796,12 +1812,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     const rows = filtered();
     const usageAll = usageSel.value === "all" && !search.value.trim() && scope === "all";
-    const all = paged ? paged.total : listing.entries.length;
-    count.textContent = `${rows.length === all ? "" : `${rows.length} of `}${all} item${all === 1 ? "" : "s"}`;
-    if (totalOf !== (paged ?? listing)) {
-      totalOf = paged ?? listing;
-      total.textContent = `${fmtBytes(paged ? paged.bytes : listing.entries.reduce((n, e) => n + e.size, 0))} in all`;
+    // (the items of the mode: hidden ones are counted in hidden mode only, and only they are)
+    if (totalOf?.of !== (paged ?? listing)) {
+      const mine = paged ? null : listing.entries.filter((e) => meta(e).hidden === hiddenMode);
+      totalOf = { of: paged ?? listing, n: paged ? paged.total : mine!.length, bytes: paged ? paged.bytes : mine!.reduce((n, e) => n + e.size, 0) };
+      total.textContent = `${fmtBytes(totalOf.bytes)} in all`;
     }
+    const all = totalOf.n;
+    count.textContent = `${rows.length === all ? "" : `${rows.length} of `}${all} item${all === 1 ? "" : "s"}`;
     showPicked();
     if (cardsOf !== listing || cardsReadOnly !== session.readOnly) {
       cardHtml = new WeakMap();
@@ -1862,7 +1880,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         of: l,
         counts: p
           ? { hidden: p.hidden, shown: p.shown, favourites: p.favourites, unfiled: p.unfiled, tags: new Map(p.tags.map(([k, label, n]) => [k, { label, n }])), types: new Map(p.types), folders: new Map(p.folders) }
-          : countSideOf(l.entries, l.folders),
+          : countSideOf(l.entries, allFolders, hiddenMode),
       };
     }
     return sideCounts.counts;
@@ -1871,7 +1889,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const renderSide = (): void => {
     if (!listing) return;
     const counts = countSide(listing);
-    const hiddenCount = counts.hidden;
     const tagCounts = counts.tags;
     const typeCounts = counts.types;
     const ro = session.readOnly;
@@ -1909,7 +1926,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                 extra: more("folder", f.id, f.name, [
                   { attr: 'data-folder-action="new"', label: "New subfolder", icon: ICONS.folderPlus, aria: `New folder inside ${f.name}` },
                   { attr: 'data-folder-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename folder ${f.name}` },
-                  { attr: 'data-folder-action="hide"', label: "Hide folder", icon: ICONS.eyeClosed, aria: `Hide folder ${f.name} and everything in it` },
+                  hiddenMode
+                    ? { attr: 'data-folder-action="show"', label: "Unhide folder", icon: ICONS.eye, aria: `Unhide folder ${f.name} and everything in it` }
+                    : { attr: 'data-folder-action="hide"', label: "Hide folder", icon: ICONS.eyeClosed, aria: `Hide folder ${f.name} and everything in it` },
                   { attr: 'data-folder-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete folder ${f.name}`, danger: true },
                 ]),
               })) +
@@ -1934,7 +1953,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const scopeName = ((): string => {
       if (scope === "all") return "All items";
       if (scope === "favorites") return "Favourites";
-      if (scope === "hidden") return "Hidden";
       if (scope === "unfiled") return "Unfiled";
       if (scope === "similar") return "Similar images";
       if (scope.startsWith("folder:")) return listing!.folders.find((f) => `folder:${f.id}` === scope)?.name ?? "Folder";
@@ -1948,10 +1966,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <button type="button" class="side-collapse" data-side-toggle aria-expanded="${sideOpen}">${ICONS.panelLeft}<span class="side-label">Library: ${esc(scopeName)}</span>${sideOpen ? ICONS.chevronUp : ICONS.chevronDown}</button>
       <div class="side-body">
         <ul class="side-list side-views">
-          ${item("all", "All items", counts.shown, { icon: ICONS.images })}
+          ${item("all", hiddenMode ? "All hidden items" : "All items", hiddenMode ? counts.hidden : counts.shown, { icon: ICONS.images })}
           ${item("favorites", "Favourites", counts.favourites, { icon: ICONS.star })}
           ${item("unfiled", "Unfiled", counts.unfiled, { icon: ICONS.folderX })}
-          ${scope === "hidden" ? item("hidden", "Hidden", hiddenCount, { icon: ICONS.eyeClosed }) : ""}
           ${pagesNow() ? "" : item("similar", "Similar images", similar().reduce((n, g) => n + g.length, 0), { icon: ICONS.copyCheck })}
         </ul>
         ${section(
@@ -2611,14 +2628,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "hide-all": {
         const on = b.getAttribute("aria-pressed") !== "true";
         void readyForHidden(session, on).then((ready) => void (ready && session.organize((c) => c.updateMetaEach(group.map((h) => ({ hash: h, change: { hidden: on } }))), on ? "Hidden" : "Not hidden").then((ok) => {
-          if (ok && on) void select(null); // (they leave the list: nothing stays picked)
+          if (ok) void select(null); // (they leave the list, hidden or shown: nothing stays picked)
         })));
         break;
       }
       case "hide": {
         const on = b.getAttribute("aria-pressed") !== "true";
         void readyForHidden(session, on).then((ready) => void (ready && session.organize((c) => c.updateMeta(hash, { hidden: on }), on ? "Hidden" : "Not hidden").then((ok) => {
-          if (ok && on) void select(null);
+          if (ok) void select(null);
         })));
         break;
       }
@@ -2670,6 +2687,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           const id = newObjectId();
           void session.organize(async (c) => {
             await c.createFolder(name.trim(), null, id);
+            if (hiddenMode) await c.hideFolder(id); // (a folder made in hidden mode is hidden)
             await c.updateMetaEach(group.map((h) => ({ hash: h, change: { addFolders: [id] } })));
           });
         });
@@ -3261,14 +3279,26 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void confirmDialog({
           title: `Hide folder “${f.name}”?`,
           lines: [
-            "The folder, its subfolders and every item in them are hidden: they leave every list and stay only in the Hidden list.",
-            "Showing an item again shows its folder again too.",
+            "The folder, its subfolders and every item in them are hidden: they leave every list and are listed only in hidden mode.",
+            "An item put in it later is hidden too. Unhide folder (in hidden mode) shows them all again.",
           ],
           confirmLabel: "Hide folder",
           danger: false,
         }).then(async (ok) => {
           if (!ok || !(await readyForHidden(session, true))) return;
           if ((await session.organize((c) => c.hideFolder(id), "Hidden")) && scope.startsWith("folder:")) scope = "all";
+        });
+        break;
+      case "show":
+        if (!f) break;
+        void confirmDialog({
+          title: `Unhide folder “${f.name}”?`,
+          lines: ["The folder, its subfolders and every item in them are shown again, also the items in it you hid one by one. The folders above it are shown too."],
+          confirmLabel: "Unhide folder",
+          danger: false,
+        }).then(async (ok) => {
+          if (!ok || !(await readyForHidden(session, false))) return;
+          if ((await session.organize((c) => c.showFolder(id), "Not hidden")) && scope.startsWith("folder:")) scope = "all";
         });
         break;
       case "delete":
@@ -3322,7 +3352,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         });
       } else if (n.kind === "new") {
         const id = newObjectId();
-        void session.organize((c) => c.createFolder(name, n.parent, id)).then((ok) => {
+        void session.organize(async (c) => {
+          await c.createFolder(name, n.parent, id);
+          if (hiddenMode) await c.hideFolder(id); // (a folder made in hidden mode is hidden)
+        }).then((ok) => {
           if (!ok) renderSide();
         });
       } else void session.organize((c) => c.renameFolder(n.id, name)).then(() => renderSide());
@@ -3695,6 +3728,62 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     paintSearchUi();
     render();
   };
+  // ---- hidden mode: the same view over the hidden items. It begins with the word and the password, and ends with Exit, the word
+  // deleted, locking, or leaving the library; the view is then as it was before, and no hidden item's picture is kept.
+  const hiddenChip = root.querySelector<HTMLElement>(".assets-hidden-chip")!;
+  const hiddenBar = root.querySelector<HTMLElement>(".assets-hidden-bar")!;
+  const paintHiddenMode = (): void => {
+    hiddenChip.hidden = hiddenBar.hidden = !hiddenMode;
+    hiddenChip.textContent = settings.get("library.hiddenWord").trim();
+    root.classList.toggle("is-hidden-mode", hiddenMode);
+  };
+  const leaveSelection = (): void => {
+    picked.clear();
+    selected = null;
+    if (!viewer.hidden) closeSlide();
+  };
+  const enterHidden = (): void => {
+    if (!hiddenMode) beforeHidden = { scope, search: search.value, way, top: scroller.scrollTop };
+    hiddenMode = true;
+    scope = "all";
+    sideMenu = null;
+    search.value = "";
+    search.blur(); // (its panel would cover the first items)
+    leaveSelection();
+    paintHiddenMode();
+    paintSearchUi();
+    listing = null;
+    void refresh();
+  };
+  const exitHidden = (): void => {
+    if (!hiddenMode) return;
+    // Every hidden item's picture and look goes now (they were made from its file, opened with the key).
+    for (const h of [...thumbs.keys(), ...looks.keys()]) {
+      const e = entryOf(h);
+      if (!e || !meta(e).hidden) continue;
+      const job = thumbs.get(h);
+      thumbs.delete(h);
+      thumbUrls.delete(h);
+      looks.delete(h);
+      if (job) void job.p.then((url) => URL.revokeObjectURL(url), () => undefined);
+    }
+    looksGen++;
+    pagedCache.clear();
+    hiddenMode = false;
+    const was = beforeHidden;
+    beforeHidden = null;
+    leaveSelection();
+    if (was) {
+      scope = was.scope;
+      search.value = was.search;
+      setWay(was.way);
+    }
+    paintHiddenMode();
+    paintSearchUi();
+    listing = null;
+    void refresh().then(() => was && visible && (scroller.scrollTop = was.top));
+  };
+  hiddenBar.querySelector('[data-action="exit-hidden"]')!.addEventListener("click", exitHidden);
   setWay("all");
   let suggestFor: CatalogListing | null = null;
   let suggestSources: SuggestSources = { tags: [], types: [] };
@@ -3708,6 +3797,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const tags = new Map<string, { label: string; n: number }>();
     const types = new Map<string, number>();
     for (const e of listing?.entries ?? []) {
+      if (meta(e).hidden !== hiddenMode) continue; // (what is hidden is suggested in hidden mode only, and only it is)
       for (const t of meta(e).tags) {
         const c = tags.get(t.toLowerCase());
         if (c) c.n++;
@@ -3731,12 +3821,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (word && search.value.trim().toLowerCase() === word) {
       search.value = "";
       paintSearchUi();
-      void askHiddenPassword(session, "Enter the password to open the Hidden items.", settings.get("library.hiddenRemember")).then((ok) => {
-        if (!ok) return searchChanged();
-        scope = "hidden";
-        sideMenu = null;
-        render();
-      });
+      void askHiddenPassword(session, "Enter the password to open the Hidden items.", settings.get("library.hiddenRemember")).then((ok) => (ok ? enterHidden() : searchChanged()));
     }
   });
   search.addEventListener("keydown", (e) => {
@@ -3744,7 +3829,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     else if (e.key === "Backspace" && !search.value && way !== "all") {
       setWay("all"); // nothing left to delete: back to searching everything
       searchChanged();
-    }
+    } else if (e.key === "Backspace" && !search.value && hiddenMode) exitHidden(); // (the word deleted: hidden mode ends)
   });
   pop.querySelector(".cs-modes")!.addEventListener("click", (e) => {
     const t = (e.target as HTMLElement).closest<HTMLElement>("[data-m]");
@@ -3925,7 +4010,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   session.subscribeAssets(refreshSoon);
   session.subscribe(() => refreshSoon()); // tree renamed, role changed
-  session.storage?.hidden?.subscribe(() => refreshSoon(true)); // hidden items opened or locked: pictures that could not be read are tried again
+  session.storage?.hidden?.subscribe(() => {
+    if (hiddenMode && !session.storage?.hidden?.isOpen()) exitHidden(); // (locked: hidden mode ends at once)
+    refreshSoon(true); // hidden items opened or locked: pictures that could not be read are tried again
+  });
 
   const view: AssetsView = {
     show() {
@@ -3974,8 +4062,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       search.select();
     },
     hide() {
-      if (scope === "hidden" && !settings.get("library.hiddenRemember")) scope = "all"; // (leaving the library locks the Hidden items again, unless the tab remembers the password)
       visible = false;
+      exitHidden(); // (leaving the library ends hidden mode)
       // The viewer stays as it is for when the library is opened again (after placing an asset, say); only sound and the show stop.
       eng?.pause();
       stopShow();
