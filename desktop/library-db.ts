@@ -116,6 +116,15 @@ export class Library {
   parts(): Record<string, string> {
     return Object.fromEntries((this.db.prepare("SELECT key, fp FROM parts").all() as Array<{ key: string; fp: string }>).map((r) => [r.key, r.fp]));
   }
+  /** Of `files` (paths), those no record names, compared without case (a file the app did not put there). */
+  unnamed<T extends { path: string }>(files: readonly T[]): T[] {
+    const named = new Set((this.db.prepare("SELECT file FROM recs WHERE file IS NOT NULL").raw().all() as string[][]).map((r) => r[0]!.toLowerCase()));
+    return files.filter((f) => !named.has(f.path.toLowerCase()));
+  }
+  /** Whether a record names a file under the folder `dir`. */
+  holds(dir: string): boolean {
+    return !!this.db.prepare("SELECT 1 FROM recs WHERE file > ? AND file < ? LIMIT 1").get(`${dir}/`, `${dir}0`);
+  }
   /** The records with no entry (an interrupted write), as JSON array text. */
   orphansText(): string {
     const rows = this.db.prepare("SELECT r.json FROM recs r LEFT JOIN entries e ON e.hash = r.hash WHERE e.hash IS NULL").raw().all() as string[][];

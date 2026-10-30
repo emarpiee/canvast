@@ -562,6 +562,13 @@ function installFileCalls(win: BrowserWindow, root: string): void {
           remove: (rel) => unlink(at(rel)).catch(() => undefined),
         });
       }
+      case "unnamed": {
+        // (library/ walked here: the files no record names, with their sizes; a million known files never cross to the page)
+        const walked = await walkFiles(join(root, "library"), "library");
+        return l.unnamed(walked).map(({ path, size }) => ({ path, size }));
+      }
+      case "holds":
+        return typeof args[0] === "string" && l.holds(args[0]);
       case "orphans":
         return l.orphansText();
       case "pending":

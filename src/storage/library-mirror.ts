@@ -635,8 +635,12 @@ export class LibraryMirror {
     const found: FolderFile[] = [];
     for (const [k, path] of lib.entries()) {
       if ((await this.lib.calls.byFile(path)) !== null) continue; // an item's own file (gone: its item shows as missing)
-      // No file, and no item's: a folder came (what is in it was not said one by one) or went. All is looked through.
-      if (sizes[k] === null) return null;
+      // No file, and no item's: a folder. One the library has files in changed (its files are said one by one); another came (what is
+      // in it was not said one by one) or went: all is looked through.
+      if (sizes[k] === null) {
+        if (await this.lib.calls.holds(path)) continue;
+        return null;
+      }
       const hash = await this.bridge.hash(path);
       if (!hash) continue;
       const rec = await this.recOf(hash);
@@ -663,23 +667,20 @@ export class LibraryMirror {
    * folder of its folder. A copy of a file the library has is left alone. Whether anything changed.
    */
   async scan(): Promise<boolean> {
-    const found = (await this.bridge.tree("library")).filter((f) => usable(f.path));
-    const { entries, recs } = await this.read();
-    const known = new Set([...recs.values()].flatMap((r) => (r.ext && r.file ? [r.file.toLowerCase()] : [])));
-    const fresh = found.filter((f) => !known.has(f.path.toLowerCase()) && !externalFolder.claimed(f.path));
+    // (the main process walks library/ and leaves out every file an item names: only the others come here, not the whole library)
+    const fresh = (await this.lib.calls.unnamed()).filter((f) => usable(f.path) && !externalFolder.claimed(f.path));
     if (!fresh.length) return false;
-    const onDisk = new Set(found.map((f) => f.path.toLowerCase()));
-    const byHash = new Map(entries.map((e) => [e.hash, e]));
+    const relinked = new Set<string>();
     const found2: FolderFile[] = [];
     let changed = false;
     for (const f of fresh) {
       const hash = await this.bridge.hash(f.path);
       if (!hash) continue;
-      const rec = recs.get(hash);
+      const rec = await this.recOf(hash);
       if (rec) {
-        if (rec.ext && rec.file && !isHiddenFile(rec.file) && !onDisk.has(rec.file.toLowerCase())) {
-          await this.relink(hash, byHash.get(hash), rec.file, f.path);
-          onDisk.add(rec.file.toLowerCase()); // (a second copy of it is not relinked too)
+        if (rec.ext && rec.file && !isHiddenFile(rec.file) && !relinked.has(hash) && !(await this.bridge.exists(rec.file))) {
+          await this.relink(hash, await this.lib.entry(hash), rec.file, f.path);
+          relinked.add(hash); // (a second copy of it is not relinked too)
           changed = true;
         }
         continue; // a copy of a file the library has, or bytes it keeps otherwise: left alone

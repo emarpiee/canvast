@@ -43,6 +43,10 @@ export interface LibraryCalls {
    * items among them whose files are sealed (for the sealed index), and `library.json`'s text ("-": none, the library is too big).
    */
   write(only: readonly string[] | null, compatMax: number): Promise<{ sealed: unknown[]; compat: string }>;
+  /** The files of `library/` no record names (a file put there from outside), with their sizes. */
+  unnamed(): Promise<Array<{ path: string; size: number }>>;
+  /** Whether a record names a file under this folder of the workspace. */
+  holds(dir: string): Promise<boolean>;
   /** The records with no entry, as JSON array text. */
   orphans(): Promise<string>;
   /** The items changed here since they were last written to (or read from) the folder. */

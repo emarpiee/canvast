@@ -29,6 +29,8 @@ const bridge: DesktopBridge = {
     parts: () => ipcRenderer.invoke("canvast:lib", "parts"),
     pending: () => ipcRenderer.invoke("canvast:lib", "pending"),
     orphans: () => ipcRenderer.invoke("canvast:lib", "orphans"),
+    unnamed: () => ipcRenderer.invoke("canvast:lib", "unnamed"),
+    holds: (dir) => ipcRenderer.invoke("canvast:lib", "holds", dir),
     reset: () => ipcRenderer.invoke("canvast:lib", "reset"),
     onProgress: (fn) => void ipcRenderer.on("canvast:libProgress", (_e, done: number, total: number) => fn(done, total)),
   },

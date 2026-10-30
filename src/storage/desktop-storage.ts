@@ -189,14 +189,14 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     updateMetaEach: (_e, changes) => (changes.some((c) => c.change.hidden === false) ? library() : some(changes.map((c) => c.hash))),
     renameTag: library,
     deleteTag: library,
-    createFolder: library,
+    createFolder: () => some([]), // (a new folder holds nothing: the index and its real folder only)
     renameFolder: library,
     deleteFolder: library,
     hideFolder: library,
     restoreMeta: library,
     markDeleted: (_r, hash) => some([hash]),
     markDeletedEach: (_r, hashes) => some(hashes),
-    collect: library,
+    collect: (r) => void ((r.swept.length || r.restored.length) && some([...r.swept, ...r.restored])),
     reconcile: (n) => void (n && mirror.library()),
   });
   const desktopOriginals = new DesktopOriginals(storage.db, lib, desktopCatalog);
