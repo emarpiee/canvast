@@ -644,7 +644,11 @@ test("a video is placed paused; its player steps, repeats, plays and keeps the p
   await expectSlow.poll(isPaused).toBe(true);
   await p.mouse.up();
   await expectSlow.poll(isPaused).toBe(false);
-  await bar.getByRole("button", { name: "Pause", exact: true }).click();
+  // (Firefox can miss a click on the bar just after the drag: clicked again until the video is paused)
+  await expectSlow(async () => {
+    if (!(await isPaused())) await bar.getByRole("button", { name: "Pause", exact: true }).click({ timeout: 2000 });
+    expect(await isPaused()).toBe(true);
+  }).toPass();
   await expectSlow.poll(t).toBeGreaterThan(paused);
   paused = await t();
   await saved(p);
