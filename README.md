@@ -151,6 +151,7 @@ cd canvast
 npm ci               # Node.js 26.4 (see .nvmrc) and npm
 npm run build        # → dist/canvast.html
 npm run build:all    # also the desktop packages in dist-package/ (needs zsyncmake and rpmbuild)
+npm run build:appimage   # or only the AppImage (needs zsyncmake)
 ```
 
 See [Building from source](#building-from-source) for what each step needs and makes.
@@ -1013,8 +1014,10 @@ Open `dist/canvast.html` directly. Developer tools (frame times, camera internal
 | --- | --- |
 | `npm run build` | The single file, `dist/canvast.html` |
 | `npm run desktop` | Build the app and run it in the desktop shell (Electron) on a workspace folder: `--workspace=<path>` after `electron dist-desktop`, else the last one opened, else a folder dialog |
-| `npm run package:desktop` | Package the desktop app for this machine's architecture into `dist-package/`: `canvast-X.Y.Z-<arch>.AppImage`, `.deb`, `.rpm` and `.tar.gz`, each with its SHA-256; the AppImage with its update address written in and its `.zsync` beside it. The AppImage and the tarball are started on a fresh workspace folder and must write it; the `.deb` and `.rpm` must hold the app and its menu entry; a package that fails is deleted |
+| `npm run package:desktop` | Package the desktop app for this machine's architecture into `dist-package/` (emptied first): `canvast-X.Y.Z-<arch>.AppImage`, `.deb`, `.rpm` and `.tar.gz`, each with its SHA-256; the AppImage with its update address written in and its `.zsync` beside it. The AppImage and the tarball are started on a fresh workspace folder and must write it; the `.deb` and `.rpm` must hold the app and its menu entry; a package that fails is deleted. Name formats to make only those: `node scripts/package-desktop.mjs appimage deb` |
+| `npm run package:appimage`, `package:deb`, `package:rpm`, `package:tar` | One format only, checked the same way (the AppImage needs `zsyncmake`, the `.rpm` needs `rpmbuild`) |
 | `npm run build:all` | Everything a person can try: the single file, the desktop shell and all the packages |
+| `npm run build:appimage` | The single file and the AppImage only |
 | `npm run build:picker` · `npm run build:patterns` | The standalone modules (see [Standalone modules](#standalone-modules)) |
 
 ### Reproducible build
