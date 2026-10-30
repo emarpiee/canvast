@@ -147,6 +147,15 @@ export interface DesktopBridge {
   list(path: string): Promise<string[]>;
   /** The library's own storage (SQLite, in the main process). */
   lib: LibraryCalls;
+  /**
+   * An export written outside the workspace: `begin` asks for a folder (the system's dialog, never inside the workspace) and makes
+   * `name` in it; `write` puts a file at a relative path under it and answers the SHA-256 of what was read back; `end` forgets it.
+   */
+  exportTo: {
+    begin(name: string): Promise<{ id: string; path: string } | null>;
+    write(id: string, path: string, bytes: Uint8Array): Promise<string>;
+    end(id: string): Promise<void>;
+  };
 }
 
 /** The bridge when the app runs in the desktop build, else null. */

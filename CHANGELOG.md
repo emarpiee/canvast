@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.52.1 — Export folder; hidden thumbnails encrypted (2026-10-30)
+
+- **Added:** *Export folder…* (a library folder's ⋯ menu): its files and its subfolders', as a ZIP or, in the desktop app, as a folder where you choose outside the workspace, keeping its folders or all together; each file written to a folder is read back and checked. In hidden mode it exports the hidden items, readable, after asking.
+- **Changed:** in the desktop app, a hidden item's thumbnail is stored encrypted with the hidden items' key (in the app's own cache), so hidden mode no longer opens and decodes each whole file again to draw its card or compare its look.
+
 ## 0.52.0 — Hidden mode (2026-10-30)
 
 - **Added:** hidden mode of the Library: the opening word (`hidden:`) and the password turn the whole Library into a list of the hidden items only, with every function of the normal view (folders, *Unfiled*, *Favourites*, tags, file types, *Similar images*, search, sorts, layouts, viewer, slideshow, rename, notes and fields, filing, bulk actions). Its folders are the hidden ones and those holding hidden items, with counts of hidden items. A bar across the library says it is on; it ends with *Exit hidden mode*, by deleting the word, by locking, or by leaving the library, and the library is then as it was before, with the hidden items' pictures dropped from memory. Replaces the Hidden list.
@@ -7,7 +12,6 @@
 - **Changed:** an item filed into a hidden folder is hidden with it, and a folder made inside a hidden folder or in hidden mode is hidden.
 - **Changed:** *Keep the Hidden items open until the tab closes* is now *Remember the Hidden password until the tab closes*: hidden mode always ends when you leave the library, and begins again without the password while the tab remembers it.
 - **Changed:** in the desktop app, hiding or showing an item writes only the items it changed, not the whole library.
-- **Changed:** in the desktop app, a hidden item's thumbnail is stored encrypted with the hidden items' key (in the app's own cache), so hidden mode no longer opens and decodes each whole file again to draw its card or compare its look.
 - **Added:** a stress run of the hidden items (`scripts/stress-hidden.mjs`, the `Stress hidden` workflow on GitHub): 10,000 hidden items with times, CPU and memory, and the app killed at random moments during hiding, showing, moving and locking, each round checked for lost or damaged files.
 - **Fixed:** outside hidden mode, the library's item count, total size and search suggestions no longer include hidden items.
 - **Fixed:** in the desktop app, a folder hidden while the hidden items were locked is no longer dropped from the folder list when they are opened.

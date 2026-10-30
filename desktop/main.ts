@@ -8,7 +8,7 @@
  */
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } from "electron";
 import { execFile } from "node:child_process";
-import { createHash, randomBytes, scrypt } from "node:crypto";
+import { createHash, randomBytes, randomUUID, scrypt } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, watch, writeFileSync } from "node:fs";
 import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, utimes } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
@@ -346,6 +346,36 @@ function installFileCalls(win: BrowserWindow, root: string): void {
   const own = (e: Electron.IpcMainInvokeEvent): void => {
     if (e.sender !== win.webContents) throw new Error("not this window");
   };
+  // An export outside the workspace: only into a folder the person chose in the system's dialog (tests name one), never inside the
+  // workspace, and only at safe relative paths under the folder made there. Each file is read back and its SHA-256 answered.
+  const exports = new Map<string, string>();
+  ipcMain.handle("canvast:export", async (e, op: unknown, ...args: unknown[]) => {
+    own(e);
+    if (op === "begin") {
+      const name = typeof args[0] === "string" && isSafeRelativePath(args[0]) && !args[0].includes("/") ? args[0] : "canvast export";
+      const chosen = process.env["CANVAST_EXPORT_DIR"] ?? (await dialog.showOpenDialog(win, { title: "Export to a folder", buttonLabel: "Export here", properties: ["openDirectory", "createDirectory"] })).filePaths[0];
+      if (!chosen) return null;
+      const dest = await realpath(chosen);
+      const realRoot = await realpath(root);
+      if (dest === realRoot || dest.startsWith(realRoot + sep)) throw new Error("choose a folder outside the workspace");
+      let target = join(dest, name);
+      for (let n = 2; existsSync(target); n++) target = join(dest, `${name} (${n})`);
+      await mkdir(target, { recursive: true });
+      const id = randomUUID();
+      exports.set(id, target);
+      return { id, path: target };
+    }
+    const base = exports.get(String(args[0]));
+    if (!base) throw new Error("no such export");
+    if (op === "end") return void exports.delete(String(args[0]));
+    if (op !== "write") throw new Error("an export call the app does not know");
+    const rel = args[1];
+    if (typeof rel !== "string" || !isSafeRelativePath(rel) || !(args[2] instanceof Uint8Array)) throw new Error("not a path inside the export");
+    const full = resolve(base, ...rel.split("/"));
+    if (!full.startsWith(base + sep)) throw new Error("not a path inside the export");
+    await writeAtomic(full, args[2]);
+    return createHash("sha256").update(await readFile(full)).digest("hex");
+  });
   ipcMain.handle("canvast:read", async (e, rel: string) => {
     own(e);
     try {

@@ -17,7 +17,7 @@ import type { ExportResult, ExportScope, ImportPlan, ImportResult } from "../sto
 import { checkLock, makeLock } from "../assets/hidden-lock";
 import { archiveFileName, readArchive, readArchiveChain } from "../storage/archive";
 import type { FolderFiles, ProgressFn } from "../storage/archive";
-import type { FilesLayout, FilesZipResult } from "../storage/files-zip";
+import type { FilesLayout, FilesPlan, FilesZipResult } from "../storage/files-zip";
 import type { DocumentStore } from "../doc/document-store";
 import type { ViewState } from "./view-state";
 import type { EditorState } from "./editor-state";
@@ -680,6 +680,13 @@ export class Session {
       : "assets";
     const fileName = archiveFileName(`${label}-files`, new Date()).replace(/\.canvast$/, ".zip");
     return { ...r, fileName };
+  }
+
+  /** What an export of `scope` writes, by path, each file read when asked for (an export written file by file, see `files-zip.ts`). */
+  async planFiles(scope: ExportScope, layout: FilesLayout, progress?: ProgressFn): Promise<FilesPlan> {
+    if (!this.repo || !this.current) throw new Error("storage is unavailable, so there is nothing to export");
+    await this.persistence.flush();
+    return this.backups!.planFiles(this.current.workspaceId, scope, layout, progress);
   }
 
   /** How many hidden library items an export of `scope` would carry. */

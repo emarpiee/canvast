@@ -14,7 +14,8 @@ import { makePng } from "./png";
 async function launch(workspace: string, device = "userdata"): Promise<{ app: ElectronApplication; page: Page; requests: string[] }> {
   const app = await electron.launch({
     args: [join(buildDir(), "desktop"), `--workspace=${workspace}`, `--user-data-dir=${workspace}-${device}`],
-    env: { ...process.env, CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug" },
+    // (an export outside the workspace goes to `<workspace>-exports`, standing for the folder chosen in the system's dialog)
+    env: { ...process.env, CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug", CANVAST_EXPORT_DIR: `${workspace}-exports` },
   });
   const page = await app.firstWindow();
   const requests: string[] = [];
@@ -985,9 +986,25 @@ test("a hidden item's picture is not read while locked, so after a restart its c
     expect((await stored())!.head).not.toMatch(/RIFF|PNG|JFIF|WEBP/);
     // Out of hidden mode and in again: the card is drawn from that thumbnail, opened with the key.
     await page.getByTestId("hidden-mode-exit").click();
+    await expect(img).toHaveCount(0);
     await page.getByTestId("assets-search").fill("hidden:");
-    if (await page.getByTestId("prompt-input").isVisible({ timeout: 2000 }).catch(() => false)) (await page.getByTestId("prompt-input").fill("pw"), await page.getByTestId("prompt-ok").click());
+    await page.getByTestId("prompt-input").fill("pw");
+    await page.getByTestId("prompt-ok").click();
+    await expect(page.getByTestId("hidden-mode-bar")).toBeVisible();
     await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth)).toBeGreaterThan(0);
+    // Export folder, from hidden mode: its hidden items written readable (after asking) into a folder outside the workspace, each checked.
+    await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "pf", "Private"));
+    await page.evaluate(() => window.__canvastDebug.libraryOp("hideFolder", "pf"));
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("file", h, "pf"), hash);
+    await page.waitForTimeout(1000);
+    mkdirSync(`${ws}-exports`, { recursive: true });
+    await page.getByRole("button", { name: "More actions for folder Private", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Export folder Private and what is in it", exact: true }).click();
+    await expect(page.getByTestId("confirm-dialog")).toContainText("1 hidden item will be written readable");
+    await page.getByTestId("confirm-ok").click();
+    await page.getByTestId("choose-ok").click(); // (the first way: a folder, keeping its folders)
+    await expect.poll(() => existsSync(join(`${ws}-exports`, "Private", "p1.png"))).toBe(true);
+    expect(readFileSync(join(`${ws}-exports`, "Private", "p1.png")).equals(pic(1))).toBe(true);
   } finally {
     await app.close();
   }

@@ -14,10 +14,18 @@ import { writeZip } from "./zip";
 
 /**
  * A plain ZIP of the original files (not a `.canvast` archive): ordinary files under their own names, grouped in folders, that any
- * tool can open. Two ways to group them: by file type (a folder for each extension: png, mp4, obj, ...) or by the folder each asset is filed in
- * inside the app (an asset with no folder goes in the folder of its kind).
+ * tool can open. Grouped by file type (a folder for each extension: png, mp4, obj, ...), by the folder each asset is filed in inside the
+ * app (an asset with no folder goes in the folder of its kind; for a folder's export, `under`, the paths start at that folder), or not
+ * at all (`flat`: every file at the top, numbered when two share a name).
  */
-export type FilesLayout = "type" | "folder";
+export type FilesLayout = "type" | "folder" | "flat";
+
+/** The files an export writes: each one's path in it, and its bytes, read when asked for (one at a time: a folder of many GB is never held whole). */
+export interface FilesPlan {
+  files: Array<{ hash: string; path: string; read(): Promise<Blob | null> }>;
+  /** Assets referenced but whose original is missing (not included). */
+  missing: number;
+}
 
 export interface FilesZipResult {
   blob: Blob;
@@ -51,7 +59,7 @@ export function uniquePath(taken: Set<string>, dir: string, file: string): strin
   const stem = dot > 0 ? file.slice(0, dot) : file;
   const ext = dot > 0 ? file.slice(dot) : "";
   for (let n = 1; ; n++) {
-    const candidate = `${dir}/${n === 1 ? file : `${stem} (${n})${ext}`}`;
+    const candidate = `${dir ? `${dir}/` : ""}${n === 1 ? file : `${stem} (${n})${ext}`}`;
     const key = candidate.toLowerCase();
     if (!taken.has(key)) {
       taken.add(key);
@@ -63,6 +71,21 @@ export function uniquePath(taken: Set<string>, dir: string, file: string): strin
 const range = (canvasId: string): IDBKeyRange => IDBKeyRange.bound([canvasId, ""], [canvasId, "￿"]);
 
 export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope: ExportScope, layout: FilesLayout, progress?: ProgressFn, lib?: LibraryStore): Promise<FilesZipResult> {
+  const plan = await planFiles(db, workspaceId, scope, layout, progress, lib);
+  const inputs: ZipInput[] = [];
+  let missing = plan.missing;
+  for (const [i, f] of plan.files.entries()) {
+    progress?.("Reading the files of the library folder", i, plan.files.length);
+    const blob = await f.read();
+    if (blob) inputs.push({ name: f.path, data: blob });
+    else missing++;
+  }
+  // shortcut: the ZIP is made in memory (its files are read one at a time, then written together); stream it to disk for exports of many GB.
+  return { blob: await writeZip(inputs, new Date(), false, (d, n) => progress?.("Writing the ZIP", d, n)), files: inputs.length, missing, paths: inputs.map((i) => i.name) };
+}
+
+/** What an export of `scope` writes, named and grouped as asked (see `FilesLayout`), without reading the files yet. */
+export async function planFiles(db: IDBDatabase, workspaceId: string, scope: ExportScope, layout: FilesLayout, progress?: ProgressFn, lib?: LibraryStore): Promise<FilesPlan> {
   const snap = await snapOf(lib);
   const tx = db.transaction(["workspaces", "boards", "canvases", "objects", "assets", "assetCatalog", "meta"], "readonly");
   const hashes = new Set<string>(scope.kind === "assets" ? scope.hashes : []);
@@ -89,8 +112,6 @@ export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope:
   void workspaceId; // one workspace per profile today; kept so the scopes read the same as the archive's
   const folders = await libraryIn(tx, snap).folders();
   const taken = new Set<string>();
-  const inputs: ZipInput[] = [];
-  const paths: string[] = [];
   let missing = 0;
   // Sorted by name so that duplicates are numbered the same way every time.
   const rows: Array<{ hash: string; rec: AssetRecord; entry: CatalogEntry | undefined }> = [];
@@ -104,33 +125,26 @@ export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope:
     }
     rows.push({ hash, rec, entry: await libraryIn(tx, snap).entry(hash) });
   }
-  // Originals kept in the library folder are read now, after the last read of the database (ADR 0159).
-  for (const [i, r] of [...rows.entries()].reverse()) {
-    if (!r.rec.ext) continue;
-    progress?.("Reading the files of the library folder", rows.length - i, rows.length);
-    if (r.rec.size > MAX_IMPORT_BYTES) {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    if (rows[i]!.rec.ext && rows[i]!.rec.size > MAX_IMPORT_BYTES) {
       rows.splice(i, 1); // (too big to read into the page: left out, and counted as not included)
-      missing++;
-      continue;
-    }
-    const blob = await externalFolder.read(r.hash, r.rec.size, r.rec.type, r.rec.file);
-    if (blob) r.rec = { ...r.rec, blob };
-    else {
-      rows.splice(i, 1);
       missing++;
     }
   }
   for (const r of rows) if (r.entry && r.entry.name !== r.rec.name) r.rec = { ...r.rec, name: r.entry.name }; // the catalog holds the current name
   rows.sort((a, b) => a.rec.name.localeCompare(b.rec.name) || a.hash.localeCompare(b.hash));
+  // A folder's export: its own path is cut down to its name, so the files start at it.
+  const cut = scope.kind === "assets" && scope.under ? Math.max(0, folderPath(folders, scope.under).length - 1) : 0;
+  const files: FilesPlan["files"] = [];
   for (const { hash, rec, entry } of rows) {
     const kind = kindFolder(rec.type, rec.name);
     const own = layout === "folder" && entry ? meta(entry).folderIds[0] : undefined;
-    const parts = own ? folderPath(folders, own).map((n) => safeName(n, "Folder")) : [];
-    const dir = parts.length ? parts.join("/") : kind;
-    const path = uniquePath(taken, dir, safeName(rec.name, `file-${hash.slice(0, 8)}`));
-    inputs.push({ name: path, data: rec.blob });
-    paths.push(path);
+    const parts = own ? folderPath(folders, own).slice(cut).map((n) => safeName(n, "Folder")) : [];
+    const dir = layout === "flat" ? "" : parts.length ? parts.join("/") : kind;
+    // Originals kept in the library folder are read when written, after the last read of the database (ADR 0159).
+    const read = (): Promise<Blob | null> => (rec.ext ? externalFolder.read(hash, rec.size, rec.type, rec.file) : Promise.resolve(rec.blob));
+    files.push({ hash, path: uniquePath(taken, dir, safeName(rec.name, `file-${hash.slice(0, 8)}`)), read });
   }
-  return { blob: await writeZip(inputs, new Date(), false, (d, n) => progress?.("Writing the ZIP", d, n)), files: inputs.length, missing, paths };
+  return { files, missing };
 }
 

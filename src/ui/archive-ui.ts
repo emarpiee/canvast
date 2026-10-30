@@ -10,6 +10,8 @@ import { ARCHIVE_EXTENSION, ArchiveError } from "../storage/archive";
 import { chooseDialog, confirmDialog } from "./confirm";
 import { fmtBytes } from "./format";
 import { busyProgress } from "./busy-screen";
+import { desktopBridge } from "../storage/desktop-bridge";
+import { safeName } from "../storage/files-zip";
 
 /** Export, download and import of `.canvast` archives (ADR 0008). Results are reported through the editor message. */
 
@@ -89,6 +91,67 @@ export async function runExportFiles(session: Session, asked: ExportScope): Prom
     download(r.blob, r.fileName);
     p.done(`Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${plural(r.files, "file")}).` + (r.missing ? ` ${plural(r.missing, "file")} ${were(r.missing)} missing and ${be(r.missing)} not included.` : ""));
     return true;
+  } catch (e) {
+    p.fail(`Export failed: ${(e as Error).message}`);
+    return false;
+  }
+}
+
+/**
+ * Export a library folder: its files and those of its subfolders (the items listed in the mode the Library is in: shown ones, or hidden
+ * ones in hidden mode, which are written readable after asking). As a folder on disk (desktop app, outside the workspace) or a ZIP,
+ * keeping its folders or flat. A folder on disk is written file by file, each read back and checked against its SHA-256.
+ */
+export async function runExportFolder(session: Session, folder: { id: string; name: string }, hashes: string[], hidden: boolean): Promise<boolean> {
+  if (!hashes.length) return tell(session, `There are no files in “${folder.name}” to export.`), false;
+  if (hidden && !(await confirmDialog({ title: "Export hidden items", lines: [`${plural(hashes.length, "hidden item")} will be written readable (decrypted) where you export ${hashes.length === 1 ? "it" : "them"}, outside the app's protection.`], confirmLabel: "Export readable", danger: false }))) return false;
+  const bridge = desktopBridge();
+  const how = await chooseDialog({
+    title: `Export “${folder.name}”`,
+    lines: [`${plural(hashes.length, "file")}, with ${hashes.length === 1 ? "its" : "their"} names in the library.`],
+    choices: [
+      ...(bridge ? [{ value: "dir-folder", label: "A folder, keeping its folders", help: "A folder of the same name, where you choose (outside the workspace), with its subfolders inside it." }, { value: "dir-flat", label: "A folder, all files together", help: "Every file in one folder; two of the same name are numbered." }] : []),
+      { value: "zip-folder", label: "A ZIP, keeping its folders", help: "Its subfolders inside the ZIP." },
+      { value: "zip-flat", label: "A ZIP, all files together", help: "Every file at the top of the ZIP; two of the same name are numbered." },
+    ],
+    confirmLabel: "Export",
+  });
+  if (!how) return false;
+  const layout = how.endsWith("flat") ? "flat" : "folder";
+  const scope: ExportScope = { kind: "assets", hashes, under: folder.id, skipHidden: !hidden };
+  const p = beginProgress(session.editor, "export", `Exporting “${folder.name}”`);
+  try {
+    if (how.startsWith("zip")) {
+      const r = await session.exportFiles(scope, layout, stages(p));
+      p.update(null, "handing the file over");
+      download(r.blob, `${safeName(folder.name, "Folder")}.zip`);
+      p.done(`Exported ${safeName(folder.name, "Folder")}.zip (${fmtBytes(r.blob.size)}; ${plural(r.files, "file")}).` + (r.missing ? ` ${plural(r.missing, "file")} ${were(r.missing)} missing and ${be(r.missing)} not included.` : ""));
+      return true;
+    }
+    const plan = await session.planFiles(scope, layout, stages(p));
+    const out = await bridge!.exportTo.begin(safeName(folder.name, "Folder"));
+    if (!out) return p.done("Nothing was exported."), false;
+    let written = 0, missing = plan.missing;
+    const failed: string[] = [];
+    try {
+      // (the folder's own name is the folder made there: its files go in it, not in a second one inside)
+      const top = layout === "folder" ? `${safeName(folder.name, "Folder")}/` : "";
+      for (const [i, f] of plan.files.entries()) {
+        p.update(i / plan.files.length, `writing ${i + 1} of ${plan.files.length}`);
+        const blob = await f.read();
+        if (!blob) {
+          missing++;
+          continue;
+        }
+        const path = top && f.path.startsWith(top) ? f.path.slice(top.length) : f.path;
+        if ((await bridge!.exportTo.write(out.id, path, new Uint8Array(await blob.arrayBuffer()))) === f.hash) written++;
+        else failed.push(path);
+      }
+    } finally {
+      await bridge!.exportTo.end(out.id);
+    }
+    p.done(`Exported ${plural(written, "file")} to ${out.path}; each was read back and checked.` + (missing ? ` ${plural(missing, "file")} ${were(missing)} missing and ${be(missing)} not included.` : "") + (failed.length ? ` ${plural(failed.length, "file")} did not read back as written: ${failed.slice(0, 3).join(", ")}${failed.length > 3 ? "…" : ""}.` : ""));
+    return !failed.length;
   } catch (e) {
     p.fail(`Export failed: ${(e as Error).message}`);
     return false;

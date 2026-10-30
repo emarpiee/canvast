@@ -2,7 +2,7 @@
 import type { ExportScope, ImportPlan, LibraryStore, OriginalWriter, ProgressFn } from "./archive";
 import { applyImport, buildArchive, hiddenInScope, sweepImportStaging } from "./archive";
 import type { FilesLayout } from "./files-zip";
-import { buildFilesZip } from "./files-zip";
+import { buildFilesZip, planFiles } from "./files-zip";
 import { done, idbGet, openDb, req } from "./idb";
 import type { OpenOptions } from "./idb";
 import type { BackupRecord, BackupStore, LibraryFolderStore, OriginalStore, Storage } from "./store";
@@ -74,6 +74,10 @@ export class IdbBackups implements BackupStore {
 
   buildFilesZip(workspaceId: string, scope: ExportScope, layout: FilesLayout, progress?: ProgressFn) {
     return buildFilesZip(this.db, workspaceId, scope, layout, progress, this.library);
+  }
+
+  planFiles(workspaceId: string, scope: ExportScope, layout: FilesLayout, progress?: ProgressFn) {
+    return planFiles(this.db, workspaceId, scope, layout, progress, this.library);
   }
 
   hiddenInScope(scope: ExportScope): Promise<number> {

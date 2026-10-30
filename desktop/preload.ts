@@ -17,6 +17,11 @@ const bridge: DesktopBridge = {
   sizes: (paths) => ipcRenderer.invoke("canvast:sizes", paths),
   remove: (path, how) => ipcRenderer.invoke("canvast:remove", path, how ?? "trash"),
   list: (path) => ipcRenderer.invoke("canvast:list", path),
+  exportTo: {
+    begin: (name) => ipcRenderer.invoke("canvast:export", "begin", name),
+    write: (id, path, bytes) => ipcRenderer.invoke("canvast:export", "write", id, path, bytes),
+    end: (id) => ipcRenderer.invoke("canvast:export", "end", id),
+  },
   lib: {
     get: (hashes) => ipcRenderer.invoke("canvast:lib", "get", hashes),
     entries: (which) => ipcRenderer.invoke("canvast:lib", "entries", which ?? "all"),

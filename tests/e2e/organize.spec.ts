@@ -438,6 +438,19 @@ test("folders nest, an asset is in one folder at a time, and deleting a folder n
   await expect(cards(p)).toHaveCount(0);
   expect(await p.evaluate(() => window.__canvastDebug.storedAssetHashes())).toEqual([HASH, GREEN_HASH].sort());
 
+  // Export folder: its files and its subfolders', as a ZIP that keeps its folders (from the folder itself) or puts them all together.
+  const exported = async (flat: boolean): Promise<string[]> => {
+    const [dl] = await Promise.all([p.waitForEvent("download"), (async () => {
+      await sideAct(p, "folder", "Refs", "Export folder Refs and what is in it");
+      if (flat) await p.getByRole("radio", { name: /A ZIP, all files together/ }).check();
+      await p.getByTestId("choose-ok").click();
+    })()]);
+    expect(dl.suggestedFilename()).toBe("Refs.zip");
+    return [...(await readZip(new Blob([new Uint8Array(await readFile((await dl.path())!))]))).keys()].sort();
+  };
+  expect(await exported(false)).toEqual(["Refs/Hands/blocks.png", "Refs/green.png"]);
+  expect(await exported(true)).toEqual(["blocks.png", "green.png"]);
+
   // Rename.
   await sideAct(p, "folder", "Hands", "Rename folder Hands");
   await p.getByTestId("folder-name-input").fill("Palms");
@@ -654,7 +667,7 @@ test("sidebar: one More menu per row (Escape closes only it, one click elsewhere
   await pick(p, HASH);
   const more = p.getByRole("button", { name: "More actions for folder Refs", exact: true });
   await more.click();
-  await expect(p.getByRole("menuitem")).toHaveCount(4); // New subfolder, Rename, Hide folder, Delete
+  await expect(p.getByRole("menuitem")).toHaveCount(5); // New subfolder, Rename, Hide folder, Export folder, Delete
   await p.keyboard.press("Escape");
   await expect(p.getByRole("menu")).toHaveCount(0);
   await expect(card(p, HASH), "Escape closed the menu only").toHaveAttribute("aria-pressed", "true");

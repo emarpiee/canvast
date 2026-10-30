@@ -9,7 +9,7 @@ import type { Bookmark } from "./bookmarks";
 import type { BoardRecord, CanvasRecord, CommitResult, CurrentMeta, LoadedCanvas, StoredView, ViewGround, WorkspaceRecord } from "./workspace-repo";
 import type { StartupOutcome } from "./migrate-v1";
 import type { ExportResult, ExportScope, ImportPlan, ImportResult, ProgressFn } from "./archive";
-import type { FilesLayout, FilesZipResult } from "./files-zip";
+import type { FilesLayout, FilesPlan, FilesZipResult } from "./files-zip";
 import type { MoveReport } from "./folder-move";
 import type { AssetFolder, AssetLocation, CatalogEntry, CatalogListing, GcReport, MetaChange, MetaSnapshot, PasswordKind, ThumbRecord } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
@@ -92,6 +92,8 @@ export interface BackupRecord {
 export interface BackupStore {
   buildArchive(workspaceId: string, scope: ExportScope, appVersion: string, settings: Record<string, unknown> | undefined, progress?: ProgressFn): Promise<ExportResult>;
   buildFilesZip(workspaceId: string, scope: ExportScope, layout: FilesLayout, progress?: ProgressFn): Promise<FilesZipResult>;
+  /** The files such a ZIP would hold, by path, each read when asked for (an export written file by file). */
+  planFiles(workspaceId: string, scope: ExportScope, layout: FilesLayout, progress?: ProgressFn): Promise<FilesPlan>;
   hiddenInScope(scope: ExportScope): Promise<number>;
   applyImport(workspaceId: string, boardId: string, plan: ImportPlan, progress?: ProgressFn): Promise<ImportResult>;
   /** Erase originals written by an import that did not finish; how many. */

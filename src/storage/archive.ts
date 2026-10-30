@@ -68,7 +68,7 @@ export type ExportScope = (
   | { kind: "workspace"; since?: number; /** The library index kept in the library folder (ADR 0159): everything but the bytes of the originals. Not a backup. */ noBytes?: boolean }
   | { kind: "board"; boardId: string }
   | { kind: "canvas"; canvasId: string }
-  | { kind: "assets"; hashes: string[] }
+  | { kind: "assets"; hashes: string[]; /** A library folder's export: the paths start at this folder. */ under?: string }
 ) & {
   /** Leave out the originals hidden in the library, and their names and tags (what the person chose when asked, or always for the library index). */
   skipHidden?: boolean;

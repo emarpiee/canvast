@@ -40,7 +40,7 @@ import { cleanFileName, splitName } from "../doc/rename-rules";
 import { asPng, writeSystemClipboard } from "../app/system-clipboard";
 import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
-import { runExport, runExportFiles } from "./archive-ui";
+import { runExport, runExportFiles, runExportFolder } from "./archive-ui";
 import { hasAlpha } from "./alpha";
 import { VIEW_GROUNDS, type ViewGround } from "../storage/workspace-repo";
 import type { Engine } from "./media-player";
@@ -1929,6 +1929,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                   hiddenMode
                     ? { attr: 'data-folder-action="show"', label: "Unhide folder", icon: ICONS.eye, aria: `Unhide folder ${f.name} and everything in it` }
                     : { attr: 'data-folder-action="hide"', label: "Hide folder", icon: ICONS.eyeClosed, aria: `Hide folder ${f.name} and everything in it` },
+                  { attr: 'data-folder-action="export"', label: "Export folder…", icon: ICONS.fileArchive, aria: `Export folder ${f.name} and what is in it` },
                   { attr: 'data-folder-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete folder ${f.name}`, danger: true },
                 ]),
               })) +
@@ -3289,6 +3290,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           if ((await session.organize((c) => c.hideFolder(id), "Hidden")) && scope.startsWith("folder:")) scope = "all";
         });
         break;
+      case "export":
+        if (f) void folderHashes(f.id).then((hashes) => runExportFolder(session, f, hashes, hiddenMode));
+        break;
       case "show":
         if (!f) break;
         void confirmDialog({
@@ -3727,6 +3731,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const searchChanged = (): void => {
     paintSearchUi();
     render();
+  };
+  /** The items of a folder and its subfolders that the mode lists (shown ones, or hidden ones in hidden mode) and whose file is there. */
+  const folderHashes = async (id: string): Promise<string[]> => {
+    const inFolders = listing ? folderSubtree(listing.folders, id) : new Set([id]);
+    const pages = pagesNow();
+    if (!pages) return (listing?.entries ?? []).filter((e) => e.present && inScopeOf(e, `folder:${id}`, { inFolders }, hiddenMode)).map((e) => e.hash);
+    const q: LibraryQuery = { scope: `folder:${id}`, text: "", way: "all", usage: "all", sort: "name", reversed: false, used: {}, canvasNames: {}, inFolders: [...inFolders], ...(hiddenMode ? { hidden: true } : {}) };
+    const r = await pages.query(q);
+    return r.hashes.match(/.{64}/g) ?? [];
   };
   // ---- hidden mode: the same view over the hidden items. It begins with the word and the password, and ends with Exit, the word
   // deleted, locking, or leaving the library; the view is then as it was before, and no hidden item's picture is kept.

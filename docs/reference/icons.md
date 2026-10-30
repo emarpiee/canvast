@@ -127,7 +127,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `folder-search` | Show in file manager: a library item's file in the system's file manager (desktop app) |
 | `folder-root` | New workspace (workspace switcher) |
 | `list-x` | Take a workspace whose folder is gone off the recent list |
-| `file-archive` | Export all files as ZIP; Export the files of canvas Canvas 1 as a ZIP |
+| `file-archive` | Export all files as ZIP; Export the files of canvas Canvas 1 as a ZIP; Export folder… (Library folder menu) |
 | `file-output` | Export canvas Canvas 1; Export as archive |
 | `file-type` | By type |
 | `file-text` | Library: Copy file name |
