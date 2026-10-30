@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.51.1: a million items in the Library (2026-10-30)
+
+- **Implemented:** the desktop Library lists a page at a time from 20,000 items (`CatalogStore.pages`, `desktop/library-index.ts`, shared `src/assets/library-match.ts`); whole-library passes removed (copy-on-write undo, presence per item, sizes from the start-up walk, orphan check once, import writes what is new, fast first load, full look compared in the main process). ADR 0177, "The Library view a page at a time".
+- **Tested:** unit (`library-db.test.ts`: the index lists and counts as the view does, kept in step); desktop E2E 15/15 locally (the big-library test lists a page at a time); the browser Library specs (Chromium) unchanged; the whole quick suite on GitHub.
+- **Known failures:** none.
+- **Unverified:** the first open of a million-file workspace on a new device still peaks at about 1.4 GB (it writes everything once and looks through every file once).
+- **Committed:** main.
+- **Next bounded task:** the Hidden mode of the Library (plan agreed with the owner, outside the repo).
+
 ## v0.51.0: the desktop library in SQLite (2026-10-30)
 
 - **Implemented:** the desktop library (entries, file records, seen marks, part fingerprints, the library's own values) in SQLite through `better-sqlite3` in the main process (`desktop/library-db.ts`, IPC `canvast:lib`); the main process reads (`sync`) and writes (`write`) the part files; `DesktopCatalog`, `DesktopOriginals` and `LibraryMirror` on it (`src/storage/desktop-library.ts`); backups and ZIP exports read it, imports write it; an existing device's library moves in once; start-up writes only pending items. ADR 0177, "The library in SQLite".

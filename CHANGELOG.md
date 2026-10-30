@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.51.1 — A million items in the Library (2026-10-30)
+
+- **Changed:** in the desktop app, the Library view of a library of 20,000 items or more lists a page at a time: only the cards near the view are read, and the search, sort and counts are worked out in the app's main process. Measured with a million files on a GitHub runner: the Library shows them all about 10 s after the app opens (before: about a minute, and 1.9 GB of memory; now about 500 MB). *Similar images* is not offered for a library that big.
+- **Changed:** in the desktop app, a library of a million files is no longer read whole for an edit, a check or a file added from outside: undo keeps only what an edit changed, which files are missing is looked at for the cards drawn, and an import writes only what is new. A file put into `library/` from outside is listed in about 3 s at a million files (before: about a minute).
+- **Fixed:** a Firefox test of *Extract frame* clicked Pause while the player was still fading in.
+
 ## 0.51.0 — The desktop library in SQLite (2026-10-30)
 
 - **Changed:** the desktop app keeps the library on each device in a SQLite database (in the app's own data folder) instead of the page's storage. It reads and writes the library's files itself, only the parts that changed. Measured on a GitHub runner: a library of 300,000 files opens in about 24 s the first time on a device (56 s before) and 3 s after (9 s before); one of a million files now opens (about 2 minutes the first time, 16 s after), where before it did not open in 30 minutes. The workspace folder's files are unchanged; the first start moves what this device held of the library into the database.
