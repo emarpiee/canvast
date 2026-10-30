@@ -67,6 +67,18 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await expect(p.getByTestId("asset-favorite")).toHaveAttribute("aria-pressed", "true");
   await addTags(p, GREEN_HASH, "colour");
   await expect(card(p, HASH).getByTestId("asset-card-tags")).toHaveText("#Hands #ref");
+  // Ctrl+click adds a tag (or a file type) to the filter: either tag; again, it is taken out.
+  const tagRow = (name: string) => p.getByTestId("tag-list").getByRole("button", { name: new RegExp(`^#${name}\\b`) });
+  await tagRow("Hands").click();
+  await expect(cards(p)).toHaveCount(1);
+  await tagRow("colour").click({ modifiers: ["Control"] });
+  await expect(cards(p)).toHaveCount(2);
+  await expect(tagRow("Hands")).toHaveAttribute("aria-current", "true");
+  await expect(tagRow("colour")).toHaveAttribute("aria-current", "true");
+  await tagRow("colour").click({ modifiers: ["Control"] });
+  await expect(cards(p)).toHaveCount(1);
+  await tagRow("Hands").click({ modifiers: ["Control"] });
+  await expect(cards(p)).toHaveCount(2); // (nothing left in it: all items)
 
   // Sidebar scopes.
   await expect(side(p, /Favourites/)).toContainText("1");
@@ -285,10 +297,9 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   await expect(p.getByTestId("prompt-dialog")).toContainText("not the password");
   await p.getByTestId("prompt-input").fill("secret");
   await p.getByTestId("prompt-ok").click();
-  // Hidden mode: the same view, listing the hidden items only, with a bar and the word in the search box.
+  // Hidden mode: the same view, listing the hidden items only, with a chip in the status bar.
   const bar = p.getByTestId("hidden-mode-bar");
   await expect(bar).toBeVisible();
-  await expect(p.getByTestId("hidden-chip")).toHaveText("hidden:");
   await expect(side(p, /^All hidden items/)).toContainText("1");
   await expect(card(p, HASH)).toBeVisible();
   await expect(cards(p)).toHaveCount(1);
@@ -310,9 +321,8 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   for (const h of [HASH, GREEN_HASH]) await p.evaluate(([h, f]) => window.__canvastDebug.libraryOp("file", h, f), [h, vault] as const);
   await expect(side(p, /^All hidden items/)).toContainText("2");
   await expect(side(p, /^Vault/)).toContainText("2");
-  // Deleting the word ends it: the view as it was, with nothing hidden anywhere in it.
-  await search.focus();
-  await search.press("Backspace");
+  // Exit ends it: the view as it was, with nothing hidden anywhere in it.
+  await p.getByTestId("hidden-mode-exit").click();
   await expect(bar).toBeHidden();
   await expect(cards(p)).toHaveCount(0);
   await expect(p.getByTestId("tag-list")).not.toContainText("secretTag");

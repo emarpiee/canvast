@@ -2235,6 +2235,7 @@ test("the viewer plays audio, video and GIF with the on-canvas player's controls
   // With the focus in the player, Left and Right step the file (not to the next file), as the buttons do.
   const current = () => viewer.locator('.film-item[aria-selected="true"]').getAttribute("data-hash");
   const here = await current();
+  await time.click(); // (the player's empty space: the focus goes to the player)
   await p.keyboard.press("ArrowLeft");
   await expect(time).toHaveText(/^0:00 /);
   await p.keyboard.press("ArrowRight");
@@ -2247,7 +2248,7 @@ test("the viewer plays audio, video and GIF with the on-canvas player's controls
     await bar.getByRole("button", { name: "Pause" }).click();
     await expect(bar.getByRole("button", { name: "Play" })).toBeVisible();
     // Space plays and pauses while the focus is in the player, whichever of its buttons has it (not a click on that button).
-    await bar.getByRole("button", { name: "Step back" }).focus();
+    await time.click();
     await p.keyboard.press(" ");
     await expect(bar.getByRole("button", { name: "Pause" })).toBeVisible();
     await p.keyboard.press(" ");

@@ -113,6 +113,24 @@ export function matcher(ctx: MatchContext): (e: ListedEntry, query: Query | null
  * Whether an item is in a scope. Hidden items are listed in hidden mode only, and only they are (`hiddenMode`). `inFolders`: a folder's
  * subtree (scope `folder:`); `canvasTagged`: the items a canvas tag is on (scope `ctag:`); `similar`: the items in a look-alike group.
  */
+/** The file types and tags a quick filter holds (`ext:png|jpg&tag:cat`): each `ext:` or `tag:` key in it. */
+export function pickedKeys(scope: string): Set<string> {
+  if (!/^(ext|tag):/.test(scope)) return new Set();
+  return new Set(scope.split("&").flatMap((part) => part.slice(4).split("|").map((v) => part.slice(0, 4) + v)));
+}
+
+/** A quick filter with `key` (`ext:png`, `tag:cat`) added or taken out; "all" when nothing is left. */
+export function togglePicked(scope: string, key: string): string {
+  const keys = pickedKeys(scope);
+  if (keys.has(key)) keys.delete(key);
+  else keys.add(key);
+  const part = (k: string): string[] => {
+    const v = [...keys].filter((x) => x.startsWith(k)).map((x) => x.slice(4));
+    return v.length ? [`${k}${v.join("|")}`] : [];
+  };
+  return [...part("ext:"), ...part("tag:")].join("&") || "all";
+}
+
 export function inScope(e: ListedEntry, scope: string, sets: { inFolders?: Has | null; canvasTagged?: Has | null; similar?: Has | null } = {}, hiddenMode = false): boolean {
   const m = meta(e);
   if (m.hidden !== hiddenMode) return false;
@@ -120,8 +138,15 @@ export function inScope(e: ListedEntry, scope: string, sets: { inFolders?: Has |
   if (scope === "favorites") return m.favorite;
   if (scope === "unfiled") return m.folderIds.length === 0;
   if (scope.startsWith("folder:")) return !!sets.inFolders && m.folderIds.some((id) => sets.inFolders!.has(id));
-  if (scope.startsWith("ext:")) return chipOf(e.name, e.type).toLowerCase() === scope.slice(4);
-  if (scope.startsWith("tag:")) return m.tags.some((t) => tagIsOrUnder(t, scope.slice(4)));
+  // File types and tags, one or several (`ext:png|jpg&tag:cat|dog`): any of the types, and any of the tags.
+  if (scope.startsWith("ext:") || scope.startsWith("tag:")) {
+    for (const part of scope.split("&")) {
+      const any = part.slice(4).split("|");
+      if (part.startsWith("ext:") && !any.includes(chipOf(e.name, e.type).toLowerCase())) return false;
+      if (part.startsWith("tag:") && !m.tags.some((t) => any.some((x) => tagIsOrUnder(t, x)))) return false;
+    }
+    return true;
+  }
   if (scope.startsWith("ctag:")) return !!sets.canvasTagged?.has(e.hash);
   return true;
 }

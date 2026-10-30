@@ -24,6 +24,7 @@ export function mountPlayerControls(host: HTMLElement, settings: SettingsStore, 
   bar.setAttribute("role", "toolbar");
   bar.setAttribute("aria-label", "Media player");
   bar.dataset["testid"] = "viewer-media-bar";
+  bar.tabIndex = -1; // (a click on its empty space puts the focus in the player, so its keys are the player's)
   bar.hidden = true;
   const btn = (cmd: string, icon: string, label: string): string => `<button type="button" data-cmd="${cmd}" aria-label="${label}" title="${label}">${icon}</button>`;
   bar.innerHTML = `<div class="media-row"><input type="range" class="media-scrub" min="0" max="1" step="any" value="0" aria-label="Position"><output class="media-time">0:00 / 0:00</output></div>

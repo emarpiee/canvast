@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.52.3 — Quick filters, player focus, tooltips (2026-10-30)
+
+- **Added:** `Ctrl`+click (`⌘` on a Mac) on a file type or a tag in the Library's sidebar adds it to the filter, or takes it out: several types, several tags, or both (any of the types, and any of the tags).
+- **Changed:** the hidden mode chip in the status bar is a little taller, and the word no longer shows in the search box (the chip says it).
+- **Fixed:** a click on the viewer player's empty space now puts the focus in the player, so `Left`, `Right` and `Space` are the player's; the player fades away while one of its buttons has the focus, too.
+- **Fixed:** the search help's examples ran out of its card.
+- **Fixed:** buttons in the Library's details panel with no tooltip (New folder, Export, the bulk actions, a canvas tag to add, Show all canvases).
+
 ## 0.52.2 — Hidden mode in the status bar, player keys, GIF player (2026-10-30)
 
 - **Changed:** hidden mode is shown by a compact chip at the start of the Library's status bar (with a pin and *Exit*; on a phone, the eye and *Exit*) instead of a strip across the top.

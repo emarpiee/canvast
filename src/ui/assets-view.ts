@@ -23,7 +23,7 @@ import { LIBRARY_ROWS, searchHelpButton, wireSearchHelp } from "./search-help";
 import { ASSETS_RECENT, rememberSearch } from "../search/history";
 import { paintRecent, paintSaveToggle, saveToggleHtml, wireRecent, wireSaveToggle, type SavedStore } from "./search-recent";
 import { evalQuery, parseQuery, type Query } from "../search/query";
-import { countSide as countSideOf, inScope as inScopeOf, libraryPaging, matcher, sortListed, type LibraryQuery, type SideCounts, type SortKey, type UsageFilter } from "../assets/library-match";
+import { countSide as countSideOf, inScope as inScopeOf, libraryPaging, matcher, pickedKeys, sortListed, togglePicked, type LibraryQuery, type SideCounts, type SortKey, type UsageFilter } from "../assets/library-match";
 import { LOOK_SIZE, lookOf, similarGroups, type Look } from "../assets/look";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
@@ -183,7 +183,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     <div class="assets-place-zone drop-zone" data-testid="assets-place-zone" hidden>${ICONS.mapPin}<span></span></div>
     <div class="assets-bar" role="toolbar" aria-label="Library">
       <div class="assets-searchbox">
-        <span class="assets-hidden-chip" data-testid="hidden-chip" title="Hidden mode: delete this (Backspace in an empty search) to leave it" hidden></span>
               <input type="search" class="assets-search" data-testid="assets-search" placeholder="Search" title="Search by name, type or tag; #tag is a tag, .png a file type; width>1000, ratio:16x9, orientation:portrait, colour:red filter by what the picture is" aria-label="Search the library">
         <button type="button" class="cs-clear" aria-label="Clear the search" title="Clear the search" hidden>${ICONS.x}</button>
         ${saveToggleHtml()}
@@ -1915,8 +1914,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           : ""
       }`;
     };
+    const picked = pickedKeys(scope);
     const item = (key: string, label: string, n: number, opts: { depth?: number; icon?: string; extra?: string; cls?: string } = {}): string =>
-      `<li class="side-row ${opts.cls ?? ""}" style="--depth:${opts.depth ?? 0}"><button type="button" class="side-item${scope === key ? " is-active" : ""}" data-scope="${esc(key)}" aria-current="${scope === key}" title="${label.replace(/<[^>]*>/g, "")}">
+      `<li class="side-row ${opts.cls ?? ""}" style="--depth:${opts.depth ?? 0}"><button type="button" class="side-item${scope === key || picked.has(key) ? " is-active" : ""}" data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}" title="${label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : ""}">
         ${opts.icon ?? ""}<span class="side-label">${label}</span><span class="side-n">${n}</span></button>${opts.extra ?? ""}</li>`;
     const nameInput = (value: string, label: string): string =>
       `<li class="side-row"><input class="side-name" data-testid="folder-name-input" value="${esc(value)}" aria-label="${label}" maxlength="120"></li>`;
@@ -1967,6 +1967,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (scope === "unfiled") return "Unfiled";
       if (scope === "similar") return "Similar images";
       if (scope.startsWith("folder:")) return listing!.folders.find((f) => `folder:${f.id}` === scope)?.name ?? "Folder";
+      if (/^(ext|tag):/.test(scope) && /[|&]/.test(scope)) return [...pickedKeys(scope)].map((k) => (k.startsWith("ext:") ? `.${k.slice(4).toUpperCase()}` : `#${tagCounts.get(k.slice(4))?.label ?? k.slice(4)}`)).join(", ");
       if (scope.startsWith("ext:")) return `File type .${scope.slice(4).toUpperCase()}`;
       if (scope.startsWith("tag:")) return `#${tagCounts.get(scope.slice(4))?.label ?? scope.slice(4)}`;
       if (scope.startsWith("ctag:")) return `Canvas tag #${canvasTags.get(scope.slice(5))?.label ?? scope.slice(5)}`;
@@ -1999,7 +2000,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             ${
               capped("types", [...typeCounts]
                 .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-                .map(([k, n]) => ({ html: item(`ext:${k}`, `.${esc(k.toUpperCase())}`, n, { cls: "is-tag is-type" }).replace("<button ", `<button title="Files ending in .${esc(k)}. Search .${esc(k)} to find them" `), active: scope === `ext:${k}` }))) || `<li class="side-empty">No files yet.</li>`
+                .map(([k, n]) => ({ html: item(`ext:${k}`, `.${esc(k.toUpperCase())}`, n, { cls: "is-tag is-type" }).replace("<button ", `<button title="Files ending in .${esc(k)}. Search .${esc(k)} to find them (Ctrl+click: add to the filter)" `), active: picked.has(`ext:${k}`) }))) || `<li class="side-empty">No files yet.</li>`
             }
           </ul>`,
         )}
@@ -2011,7 +2012,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             ${
               capped("tags", [...tagCounts]
                 .sort((a, b) => a[1].label.localeCompare(b[1].label))
-                .map(([k, c]) => ({ active: scope === `tag:${k}` || (naming?.kind === "rename-tag" && naming.key === k), html:
+                .map(([k, c]) => ({ active: picked.has(`tag:${k}`) || (naming?.kind === "rename-tag" && naming.key === k), html:
                   naming?.kind === "rename-tag" && naming.key === k
                     ? nameInput(c.label, `New name for tag ${c.label}`)
                     : item(`tag:${k}`, `#${esc(c.label)}`, c.n, {
@@ -2106,10 +2107,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       ${tagsAndFolderHtml(ents, true)}
       <div class="asset-actions">
         <button type="button" class="assets-btn" data-action="rename-all" data-testid="bulk-rename" title="Rename them together: enumerate, replace text, add text, change the extension (F2)"${dis}>${ICONS.textCursorInput}<span>Rename ${n}…</span></button>
-        <button type="button" class="assets-btn" data-action="slideshow-all" data-testid="bulk-slideshow">${ICONS.presentation}<span>Slideshow of these</span></button>
-        <button type="button" class="assets-btn" data-action="export-files-all" data-testid="bulk-export-files"${placeable ? "" : " disabled"}>${ICONS.fileArchive}<span>Export ${plural(placeable, "file")} as ZIP</span></button>
-        <button type="button" class="assets-btn" data-action="export-all" data-testid="bulk-export"${placeable ? "" : " disabled"}>${ICONS.fileOutput}<span>Export ${placeable} as archive</span></button>
-        <button type="button" class="assets-btn is-danger" data-action="delete-all" data-testid="bulk-delete"${unused ? "" : " disabled"}${dis}>${ICONS.trash2}<span>Delete ${unused} unused</span></button>
+        <button type="button" class="assets-btn" data-action="slideshow-all" data-testid="bulk-slideshow" title="Play the selected items as a slideshow">${ICONS.presentation}<span>Slideshow of these</span></button>
+        <button type="button" class="assets-btn" data-action="export-files-all" data-testid="bulk-export-files" title="Save the selected items' files as a plain ZIP that any tool opens"${placeable ? "" : " disabled"}>${ICONS.fileArchive}<span>Export ${plural(placeable, "file")} as ZIP</span></button>
+        <button type="button" class="assets-btn" data-action="export-all" data-testid="bulk-export" title="Save the selected items as a .canvast archive, with their tags, notes and folders, to import into canvast"${placeable ? "" : " disabled"}>${ICONS.fileOutput}<span>Export ${placeable} as archive</span></button>
+        <button type="button" class="assets-btn is-danger" data-action="delete-all" data-testid="bulk-delete" title="Delete the selected items that are on no canvas from the library"${unused ? "" : " disabled"}${dis}>${ICONS.trash2}<span>Delete ${unused} unused</span></button>
         ${unused < n ? `<p class="asset-note">${n - unused} in use ${n - unused === 1 ? "is" : "are"} kept: remove their instances from the canvases first, or delete them everywhere.</p>
           <button type="button" class="assets-btn is-danger" data-action="delete-everywhere" data-testid="bulk-delete-everywhere"${dis}>${ICONS.trash2}<span>Delete ${n} everywhere…</span></button>` : ""}
       </div>`;
@@ -2186,7 +2187,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <section class="asset-sec asset-where">
         <h3 data-testid="asset-usage">${instances ? `Used on ${plural(places.length || (e?.canvases ?? m!.canvases), "canvas", "canvases")} <span class="asset-place-total">(${plural(instances, "time")})</span>` : "Where it is used"}</h3>
         ${instances ? `<ul class="asset-places" data-testid="asset-places">${placeRows}</ul>
-          ${places.length > placesShown.length || placesAll ? `<button type="button" class="assets-btn asset-places-more" data-action="places-all" data-testid="asset-places-more" aria-expanded="${placesAll}">${placesAll ? "Show fewer" : `Show all ${places.length} canvases`}</button>` : ""}` : `<p class="asset-note">Not used on any canvas.</p>`}
+          ${places.length > placesShown.length || placesAll ? `<button type="button" class="assets-btn asset-places-more" data-action="places-all" data-testid="asset-places-more" aria-expanded="${placesAll}" title="${placesAll ? "List only the first canvases" : "List every canvas it is on"}">${placesAll ? "Show fewer" : `Show all ${places.length} canvases`}</button>` : ""}` : `<p class="asset-note">Not used on any canvas.</p>`}
       </section>
       <div class="asset-actions">
         ${e ? `<button type="button" class="assets-btn" data-action="rename" data-testid="asset-rename" title="Rename it, or change its extension (F2)"${ro}>${ICONS.textCursorInput}<span>Rename</span></button>` : ""}
@@ -2197,7 +2198,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           : fileActionsOf(e.name, e.type).canOpen ? `<button type="button" class="assets-btn" data-action="open-tab" data-testid="asset-open-tab" title="Show it in a new browser tab">${ICONS.externalLink}<span>Open in tab</span></button>`
           : ""
         }
-        ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export">${ICONS.fileOutput}<span>Export</span></button>` : ""}
+        ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export" title="Save it as a .canvast archive, with its tags, notes and folder, to import into canvast">${ICONS.fileOutput}<span>Export</span></button>` : ""}
         ${e ? `<button type="button" class="assets-btn is-danger" data-action="${instances > 0 ? "delete-everywhere" : "delete"}" data-testid="asset-delete" title="${instances > 0 ? "Delete it from the library and from every canvas it is on" : "Delete it from the library"}"${ro}>${ICONS.trash2}<span>Delete…</span></button>` : ""}
       </div>
       <details class="asset-more" data-testid="asset-metadata" data-metadata${detailsOpen ? " open" : ""}><summary>Details</summary>
@@ -2278,7 +2279,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         </div>
         <h3 class="asset-sub">${bulk ? "Folder of these" : "Folder"}</h3>
         ${sorted.length ? `<ul class="asset-folders" data-testid="${bulk ? "bulk-folders" : "asset-folders"}">${[radio("", "No folder", ents.filter((e) => meta(e).folderIds.length === 0).length), ...sorted.map((f: AssetFolder) => radio(f.id, esc(folderPath(folders, f.id).join(" › ")), ents.filter((e) => meta(e).folderIds[0] === f.id).length))].join("")}</ul>` : ""}
-        <button type="button" class="assets-btn" data-action="new-folder-into" data-testid="${bulk ? "bulk-new-folder" : "asset-new-folder"}"${dis}>${ICONS.folderPlus}<span>New folder${bulk ? ` for these ${n}` : ""}…</span></button>
+        <button type="button" class="assets-btn" data-action="new-folder-into" data-testid="${bulk ? "bulk-new-folder" : "asset-new-folder"}" title="${bulk ? "Make a folder and move the selected items into it" : "Make a folder and move it into it"}"${dis}>${ICONS.folderPlus}<span>New folder${bulk ? ` for these ${n}` : ""}…</span></button>
       </section>`;
   };
 
@@ -2294,7 +2295,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         return extra.length
           ? `<section class="asset-sec"><h3>Tags used on canvases</h3>
               <p class="asset-note">Added to this picture on a canvas, not in the library. Each says which canvas it is on; choose one to add it to the library tags.</p>
-              <ul class="asset-ctags" data-testid="asset-canvas-tags">${extra.map((t) => `<li><button type="button" class="tag-chip is-suggest" data-action="adopt-tag" data-tag="${esc(t.tag)}" aria-label="Add the tag ${esc(t.tag)} to this asset"${dis}>+ #${esc(t.tag)}</button><span class="tag-where" title="${esc(t.canvases.map(crumbOf).join("; "))}">on ${esc(t.canvases.slice(0, 2).map(crumbOf).join(", "))}${t.canvases.length > 2 ? ` and ${t.canvases.length - 2} more` : ""}</span></li>`).join("")}</ul>
+              <ul class="asset-ctags" data-testid="asset-canvas-tags">${extra.map((t) => `<li><button type="button" class="tag-chip is-suggest" data-action="adopt-tag" data-tag="${esc(t.tag)}" aria-label="Add the tag ${esc(t.tag)} to this asset" title="Add the tag ${esc(t.tag)} to this item"${dis}>+ #${esc(t.tag)}</button><span class="tag-where" title="${esc(t.canvases.map(crumbOf).join("; "))}">on ${esc(t.canvases.slice(0, 2).map(crumbOf).join(", "))}${t.canvases.length > 2 ? ` and ${t.canvases.length - 2} more` : ""}</span></li>`).join("")}</ul>
             </section>`
           : "";
       })()}`;
@@ -3271,8 +3272,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     if (b.dataset["scope"]) {
       // Choosing the one already chosen lets go of it (back to all assets).
-      const next = b.dataset["scope"];
-      if (next === scope && next !== "all") {
+      let next = b.dataset["scope"];
+      // Ctrl (or ⌘) on a file type or a tag adds it to the filter, or takes it out: several types, several tags, or both.
+      if ((e.ctrlKey || e.metaKey) && /^(ext|tag):/.test(next)) next = togglePicked(scope, next);
+      else if (next === scope && next !== "all") {
         scope = "all";
         sideMenu = null;
         render();
@@ -3763,13 +3766,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   // ---- hidden mode: the same view over the hidden items. It begins with the word and the password, and ends with Exit, the word
   // deleted, locking, or leaving the library; the view is then as it was before, and no hidden item's picture is kept.
-  const hiddenChip = root.querySelector<HTMLElement>(".assets-hidden-chip")!;
   const hiddenBar = root.querySelector<HTMLElement>(".assets-hidden-bar")!;
   const stayBtn = hiddenBar.querySelector<HTMLButtonElement>('[data-action="hidden-stay"]')!;
   const paintHiddenMode = (): void => {
-    hiddenChip.hidden = hiddenBar.hidden = !hiddenMode;
+    hiddenBar.hidden = !hiddenMode;
     stayBtn.setAttribute("aria-pressed", String(settings.get("library.hiddenStay")));
-    hiddenChip.textContent = settings.get("library.hiddenWord").trim();
     root.classList.toggle("is-hidden-mode", hiddenMode);
   };
   const leaveSelection = (): void => {
@@ -3868,7 +3869,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     else if (e.key === "Backspace" && !search.value && way !== "all") {
       setWay("all"); // nothing left to delete: back to searching everything
       searchChanged();
-    } else if (e.key === "Backspace" && !search.value && hiddenMode) exitHidden(); // (the word deleted: hidden mode ends)
+    }
   });
   pop.querySelector(".cs-modes")!.addEventListener("click", (e) => {
     const t = (e.target as HTMLElement).closest<HTMLElement>("[data-m]");
