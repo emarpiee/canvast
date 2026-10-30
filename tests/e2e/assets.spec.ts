@@ -1692,6 +1692,7 @@ test("search the canvas: / by file name, # by tag, @ by bookmark; Enter goes the
   expect((await selection()).length).toBe(0);
   await p.keyboard.press("Control+f");
   await box.fill("/.png");
+  await expect(results.getByRole("option")).toHaveCount(2); // (pressed before the results are listed, it selected nothing)
   await p.keyboard.press("Shift+Enter");
   expect((await selection()).length).toBe(2);
   // Keywords: what kind an item is, beside the words of the way chosen.
