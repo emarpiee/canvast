@@ -7,10 +7,10 @@
 // it; one rename, until it is written. The folder is made again only when it does not hold N items; it is removed at the end unless
 // --keep. Never point --dir inside a synced folder.
 import { _electron as electron } from "@playwright/test";
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { makeWorkspace } from "./lib/bench-workspace.mjs";
 
 const args = process.argv.slice(2);
 const N = Number(args[0]);
@@ -31,27 +31,7 @@ const note = (what, value) => (results.push([what, value]), console.log(`${what}
 const marker = join(dir, ".bench-items");
 if (!existsSync(marker) || Number(String(statSync(marker).size)) !== N) {
   const t = performance.now();
-  rmSync(dir, { recursive: true, force: true });
-  const folders = [];
-  const parts = new Map();
-  for (let i = 0; i < N; i++) {
-    const f = Math.floor(i / PER_FOLDER);
-    const folderId = `f${String(f).padStart(5, "0")}`;
-    const folderDir = `bench_${String(f).padStart(5, "0")}`;
-    if (i % PER_FOLDER === 0) {
-      folders.push({ id: folderId, name: folderDir, parentId: null });
-      mkdirSync(join(dir, "library", folderDir), { recursive: true });
-    }
-    const name = `b${String(i).padStart(7, "0")}.png`;
-    const bytes = Buffer.from(`canvast bench item ${i}\n`);
-    writeFileSync(join(dir, "library", folderDir, name), bytes);
-    const hash = createHash("sha256").update(bytes).digest("hex");
-    const item = { hash, file: `library/${folderDir}/${name}`, name, type: "image/png", size: bytes.length, pixelW: 1, pixelH: 1, importedAt: 1_700_000_000_000 + i, tags: [], favorite: false, folderId, note: "", fields: [], state: "active" };
-    (parts.get(hash[0]) ?? parts.set(hash[0], []).get(hash[0])).push(item);
-  }
-  mkdirSync(join(dir, ".canvast/library"), { recursive: true });
-  for (const [k, list] of parts) writeFileSync(join(dir, `.canvast/library/items-${k}.json`), `{"format":"canvast-library-items","version":2,\n"items":[\n${list.map((i) => JSON.stringify(i)).join(",\n")}\n]}\n`);
-  writeFileSync(join(dir, ".canvast/library/index.json"), `${JSON.stringify({ format: "canvast-library", version: 2, folders, parts: [...parts.keys()].sort() })}\n`);
+  makeWorkspace(dir, N, { perFolder: PER_FOLDER });
   writeFileSync(marker, "x".repeat(N));
   note(`made ${N.toLocaleString()} files`, ms(t));
 }

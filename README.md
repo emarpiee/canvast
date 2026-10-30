@@ -1040,6 +1040,7 @@ The build is deterministic: the same source produces the same `canvast.html`, an
 | `npm run test:status` | List test builds with their result and how far each is behind the source |
 | `npm run bench` | Scale and tile-cache benchmarks |
 | `node scripts/bench-library.mjs <N> --dir <folder>` | The desktop app on a workspace folder of N library files (made in `--dir`, outside any synced folder): first and second open, a file put in from outside, one rename |
+| `node scripts/stress-hidden.mjs --dir <folder>` | Hidden items under load and crashes, in the desktop app: 10,000 items hidden, locked, opened, shown and hidden again, decrypted by the outside tool (times, CPU, peak memory, every file checked by SHA-256); then rounds where the app is killed at a random moment during a hide, show, move or lock, each checked for lost or damaged files. The `Stress hidden` workflow runs it on GitHub |
 | `npm run check:offline` | Fail if the built file references anything outside itself |
 | `npm run check:tokens` | Fail on a hard-coded colour, size, space or radius in the CSS |
 | `npm run check:storage` | Fail if code outside the storage implementation uses IndexedDB instead of the storage interfaces |

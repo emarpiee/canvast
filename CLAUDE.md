@@ -15,7 +15,7 @@ This file is for coding agents working in the repo; it applies to this code only
 | Specs a change reaches (`npm run test:snap -- <files or -g>`), one group at most, at most 2 workers | 💻 local |
 | Unit tests, typecheck, `check:*`, benchmarks of at most ~200k items | 💻 local |
 | `test:affected` with more than one group, `test:all`, `test:full` | ☁️ GitHub only (the `Tests` workflow; ask before pushing `main`, or push a branch) |
-| Library benchmarks of more than ~200k items, SQLite benches | ☁️ GitHub only (`Bench library`, `Bench SQLite`; `gh workflow run … --ref <branch>`) |
+| Library benchmarks of more than ~200k items, SQLite benches, hidden-items stress runs | ☁️ GitHub only (`Bench library`, `Bench SQLite`, `Stress hidden`; `gh workflow run … --ref <branch>`) |
 
 Check free memory before any local run longer than a few minutes, and run only one at a time.
 

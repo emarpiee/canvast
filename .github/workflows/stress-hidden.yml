@@ -1,0 +1,42 @@
+# Hidden items under load and under crashes (scripts/stress-hidden.mjs), in the desktop app on GitHub's machine: too long for a
+# workstation in use. Run by hand (Run workflow); the tables land in the run's summary, and the run fails when an item was lost or damaged.
+name: Stress hidden
+
+on:
+  workflow_dispatch:
+    inputs:
+      items:
+        description: Hidden items in the scale part
+        default: "10000"
+      rounds:
+        description: Crash rounds (the app killed at a random moment)
+        default: "30"
+      seed:
+        description: Seed (empty for a new one; a failed run's seed runs it again)
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y xvfb
+      - run: npx playwright install --with-deps chromium
+      # (a test snapshot holds the desktop build the run opens)
+      - run: xvfb-run -a npm run test:snap -- --project=desktop tests/e2e/desktop.spec.ts -g sandboxed
+        env:
+          ELECTRON_DISABLE_SANDBOX: "1"
+      - run: set -o pipefail; xvfb-run -a node scripts/stress-hidden.mjs --items ${{ inputs.items }} --rounds ${{ inputs.rounds }} ${{ inputs.seed && format('--seed {0}', inputs.seed) || '' }} --dir "$RUNNER_TEMP/stress" | tee stress.txt
+        env:
+          ELECTRON_DISABLE_SANDBOX: "1"
+      - if: always()
+        run: grep -E '^(\||seed|✅|❌|[0-9]+ of)' stress.txt >> "$GITHUB_STEP_SUMMARY" || true
