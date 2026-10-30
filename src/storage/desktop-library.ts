@@ -13,7 +13,7 @@ import { formatTag, formatTags, renamedTag, tagIsOrUnder } from "../doc/tags";
 import type { LibraryCalls, LibraryOp } from "./desktop-bridge";
 import { externalFolder } from "./external-folder";
 import { done, idbGet, req } from "./idb";
-import type { CatalogStore, OriginalStore } from "./store";
+import type { CatalogStore, LibraryPages, OriginalStore } from "./store";
 
 /** The library calls, with every change made one after another (a read, then its write, never interleaved with another's). */
 export class DesktopLibrary {
@@ -222,6 +222,15 @@ export class DesktopCatalog implements CatalogStore {
       folders: visibleFolders(folders).sort((a, b) => a.name.localeCompare(b.name)),
     };
   }
+
+  readonly pages: LibraryPages = {
+    query: (q) => this.lib.calls.query(q),
+    counts: () => this.lib.calls.counts(),
+    fieldKeys: () => this.lib.calls.fieldKeys(),
+    listed: (hashes) => this.lib.calls.listed(hashes),
+    folders: () => this.lib.folders(),
+    usage: () => this.usage(),
+  };
 
   /** How many stored instances use each item, and on which canvases (keys only). */
   private async usage(): Promise<Map<string, { instances: number; canvases: Set<string> }>> {

@@ -2,6 +2,7 @@ import type { DesktopCatalog, DesktopLibrary } from "../storage/desktop-library"
 import { externalFolder } from "../storage/external-folder";
 import { importTesting } from "../storage/archive";
 import { libraryTesting } from "../storage/library-mirror";
+import { libraryPaging } from "../assets/library-match";
 import type { IdbStorage } from "../storage/idb-storage";
 import { beginProgress } from "./progress";
 import type { Progress } from "./progress";
@@ -247,6 +248,8 @@ export interface DebugHook {
   importTesting(o: Partial<typeof importTesting>): void;
   /** The desktop build's library writes: `compatMax` 0 makes any library write only what changed (as a big one does). */
   libraryTesting(o: Partial<typeof libraryTesting>): void;
+  /** From how many items the desktop Library lists a page at a time (tests: a few). */
+  libraryPaging(from: number): void;
   /** The originals listed as written ahead by an import that has not finished. */
   importStaged(): Promise<string[]>;
   /** Use a private browser directory (OPFS) as the library folder, as the picker would. */
@@ -711,6 +714,7 @@ export function installDebugHook(
     folderState: () => externalFolder.state,
     importTesting: (o) => void Object.assign(importTesting, o),
     libraryTesting: (o) => void Object.assign(libraryTesting, o),
+    libraryPaging: (from) => void (libraryPaging.from = from),
     importStaged: async () => {
       const tx = (session.storage as IdbStorage).db.transaction("meta", "readonly");
       const r = tx.objectStore("meta").get("importStaged");

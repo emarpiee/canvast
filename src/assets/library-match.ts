@@ -12,12 +12,36 @@ import { tagIsOrUnder } from "../doc/tags";
 import { evalQuery } from "../search/query";
 import type { Query } from "../search/query";
 
+/**
+ * From how many items the desktop app's Library lists a page at a time (`CatalogStore.pages`); below it, the whole library is in the
+ * page, as in the browser (every feature works over it, Similar images too). Tests lower it.
+ */
+export const libraryPaging = { from: 20_000 };
+
 export type Way = "all" | "name" | "tag";
 type Has = { has(hash: string): boolean };
 export type UsageFilter = "all" | "used" | "unused";
 export type SortKey = "newest" | "name" | "size" | "uses" | "pixels" | "type" | "tags" | "folder" | "favourite" | "width" | "height" | "canvases";
 /** A listed item: its entry, how it is used, whether its file is there. */
 export type ListedEntry = CatalogEntry & Usage & { present: boolean };
+
+/** What the view lists: its scope, search, usage filter and sort, and what only the page knows (where items are used, canvas tags). */
+export interface LibraryQuery {
+  scope: string;
+  text: string;
+  way: Way;
+  usage: UsageFilter;
+  sort: SortKey;
+  reversed: boolean;
+  /** Items placed on canvases: instances, canvases, those canvases' ids. */
+  used: Record<string, [number, number, string[]]>;
+  /** Each canvas's name and its board's, lower case (the `on:` keyword). */
+  canvasNames: Record<string, string[]>;
+  /** Scope `folder:`: the folder and those under it. */
+  inFolders?: string[];
+  /** Scope `ctag:`: the items the canvas tag is on. */
+  canvasTagged?: string[];
+}
 
 /** What a keyword reads besides the entry: the canvases' names, files' lengths and pictures' looks (unknown where not given). */
 export interface MatchContext {

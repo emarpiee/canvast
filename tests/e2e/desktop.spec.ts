@@ -450,6 +450,21 @@ test("a big library (past the size library.json is kept for) writes only what ch
   ({ app, page } = await launch(ws, "device-b"));
   try {
     await expect.poll(listing, { timeout: 15_000 }).toEqual([["Pic 0.png", false], ["Pic 1.png", false], ...["Renamed One.png", "Pic 3.png", "Pic 4.png", "Pic 5.png"].map((n) => [n, true])].sort());
+    // Listed a page at a time (as if past 20,000 items: the library never comes to the page whole): the same cards, missing ones marked,
+    // the same search, and an item picked shows its details; a rename shows on its card.
+    await page.evaluate(() => window.__canvastDebug.libraryPaging(1));
+    await page.getByTestId("view-assets").click();
+    await expect(page.getByTestId("assets-count")).toHaveText("6 items");
+    const names = () => page.locator('[data-testid="asset-card"] .asset-name').allTextContents().then((n) => n.sort());
+    await expect.poll(names).toEqual(["Pic 0.png", "Pic 1.png", "Pic 3.png", "Pic 4.png", "Pic 5.png", "Renamed One.png"]);
+    await expect(page.locator('[data-testid="asset-card"].is-missing')).toHaveCount(2);
+    await page.getByTestId("assets-search").fill("renamed");
+    await expect(page.getByTestId("assets-count")).toHaveText("1 of 6 items");
+    await page.getByTestId("asset-card").first().click();
+    await expect(page.getByTestId("asset-inspector")).toContainText("Renamed One.png");
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("rename", h, "Again.png"), createHash("sha256").update(pics[2]!).digest("hex"));
+    await page.getByTestId("assets-search").fill("");
+    await expect.poll(names).toEqual(["Again.png", "Pic 0.png", "Pic 1.png", "Pic 3.png", "Pic 4.png", "Pic 5.png"]);
   } finally {
     await app.close();
   }

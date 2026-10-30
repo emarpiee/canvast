@@ -13,6 +13,7 @@ import type { FilesLayout, FilesZipResult } from "./files-zip";
 import type { MoveReport } from "./folder-move";
 import type { AssetFolder, AssetLocation, CatalogEntry, CatalogListing, GcReport, MetaChange, MetaSnapshot, PasswordKind, ThumbRecord } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
+import type { LibraryQuery } from "../assets/library-match";
 import type { DeleteMode } from "./desktop-bridge";
 
 export interface WorkspaceTreeRecords {
@@ -99,8 +100,25 @@ export interface BackupStore {
   recordBackup(rec: BackupRecord): Promise<void>;
 }
 
+/**
+ * The desktop app's Library view lists from the library's own storage a page at a time (a library of a million items never comes to
+ * the page whole): what a scope, search and sort list, in order, the sidebar's counts, the items drawn.
+ */
+export interface LibraryPages {
+  query(q: LibraryQuery): Promise<{ hashes: string; ratios: Float32Array; total: number; bytes: number }>;
+  counts(): Promise<{ hidden: number; shown: number; favourites: number; unfiled: number; tags: Array<[string, string, number]>; types: Array<[string, number]>; folders: Array<[string, number]> }>;
+  fieldKeys(): Promise<string[]>;
+  /** Some items' entries, with whether each one's file is there. */
+  listed(hashes: readonly string[]): Promise<Array<CatalogEntry & { present: boolean }>>;
+  folders(): Promise<AssetFolder[]>;
+  /** Where items are placed: instances and canvases of each item used. */
+  usage(): Promise<Map<string, { instances: number; canvases: Set<string> }>>;
+}
+
 /** The library's entries: names, tags, folders, notes and fields, thumbnails, the password locks, usage and garbage collection (ADR 0007). */
 export interface CatalogStore {
+  /** The desktop app: the Library view lists a page at a time (absent: it lists from `list()`). */
+  readonly pages?: LibraryPages;
   list(): Promise<CatalogListing>;
   /** The listing again only when something changed since `prev` (null when nothing did). */
   relist(prev: CatalogListing): Promise<CatalogListing | null>;

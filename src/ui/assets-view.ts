@@ -23,12 +23,13 @@ import { LIBRARY_ROWS, searchHelpButton, wireSearchHelp } from "./search-help";
 import { ASSETS_RECENT, rememberSearch } from "../search/history";
 import { paintRecent, paintSaveToggle, saveToggleHtml, wireRecent, wireSaveToggle, type SavedStore } from "./search-recent";
 import { evalQuery, parseQuery, type Query } from "../search/query";
-import { countSide as countSideOf, inScope as inScopeOf, matcher, sortListed, type SideCounts, type SortKey, type UsageFilter } from "../assets/library-match";
+import { countSide as countSideOf, inScope as inScopeOf, libraryPaging, matcher, sortListed, type LibraryQuery, type SideCounts, type SortKey, type UsageFilter } from "../assets/library-match";
 import { LOOK_SIZE, lookOf, similarGroups, type Look } from "../assets/look";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
-import type { AssetField, AssetFolder, CatalogListing } from "../assets/asset-catalog";
-import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, folderPath, folderSubtree, meta } from "../assets/asset-catalog";
+import type { AssetField, AssetFolder, CatalogEntry, CatalogListing } from "../assets/asset-catalog";
+import type { LibraryPages } from "../storage/store";
+import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, folderPath, folderSubtree, meta, usageOf, visibleFolders } from "../assets/asset-catalog";
 import { THUMB_PX, makeThumb } from "../assets/thumb";
 import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
@@ -287,12 +288,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const count = root.querySelector<HTMLElement>(".assets-count")!;
   const total = root.querySelector<HTMLElement>(".assets-total")!;
   const pickedOut = root.querySelector<HTMLElement>(".assets-picked")!;
-  /** The listing whose total size the status bar shows (worked out again only for a new one). */
-  let totalOf: CatalogListing | null = null;
+  /** The listing (or the page-at-a-time list) whose total size the status bar shows (worked out again only for a new one). */
+  let totalOf: unknown = null;
   /** The status bar: how many are picked and their size. */
   const showPicked = (): void => {
     pickedOut.hidden = picked.size === 0;
     if (!picked.size) return;
+    // (listed a page at a time, a big selection says how many only: its sizes would be fetched first)
+    if (pagesNow() && picked.size > 5000) return void (pickedOut.textContent = `${picked.size} selected`);
+    if (pagesNow()) want(picked);
     const bytes = [...picked].reduce((n, h) => n + (entryOf(h)?.size ?? 0), 0);
     pickedOut.textContent = `${picked.size} selected, ${fmtBytes(bytes)}`;
   };
@@ -448,6 +452,46 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let visible = false;
   applyUi();
   let listing: CatalogListing | null = null;
+  // ---- the desktop app lists a page at a time (`CatalogStore.pages`): the library is never in the page whole. `listing.entries` is
+  // then empty; what is listed is the last query's order, and an item's details are fetched when it is drawn (or acted on).
+  type Listed = CatalogListing["entries"][number];
+  let paged: { key: string; hashes: string; ratios: Float32Array; total: number; bytes: number } | null = null;
+  let pagedCounts: Awaited<ReturnType<LibraryPages["counts"]>> | null = null;
+  let pagedFieldKeys: string[] = [];
+  let usageMap = new Map<string, { instances: number; canvases: Set<string> }>();
+  const pagedCache = new Map<string, Listed>();
+  /** Whether this library is listed a page at a time: a big one, in the desktop app (decided at each read of the library). */
+  let pagedMode = false;
+  const pagesNow = (): LibraryPages | null => (pagedMode ? (session.catalog?.pages ?? null) : null);
+  const withUsage = (e: CatalogEntry & { present: boolean }): Listed => {
+    const u = usageMap.get(e.hash);
+    return { ...e, instances: u?.instances ?? 0, canvases: u?.canvases.size ?? 0, canvasIds: u ? [...u.canvases] : [] };
+  };
+  /** Fetch the details of these items (the ones not fetched yet), then draw again what shows them. */
+  let wanted = new Set<string>();
+  let wantTimer = 0;
+  const want = (hashes: Iterable<string>): void => {
+    for (const h of hashes) if (!pagedCache.has(h)) wanted.add(h);
+    if (wanted.size && !wantTimer) wantTimer = window.setTimeout(() => void fetchWanted(), 0);
+  };
+  const fetchWanted = async (): Promise<void> => {
+    wantTimer = 0;
+    const pages = pagesNow();
+    const ask = [...wanted];
+    wanted = new Set();
+    if (!pages || !ask.length) return;
+    for (let at = 0; at < ask.length; at += 2000) for (const e of await pages.listed(ask.slice(at, at + 2000))) pagedCache.set(e.hash, withUsage(e));
+    windowGrid(true);
+    windowFilm(true);
+    showPicked();
+    if (selected && ask.includes(selected)) renderInspector();
+  };
+  /** The details of these items, fetched first where needed (before acting on many picked ones). */
+  const ensure = async (hashes: readonly string[]): Promise<void> => {
+    const pages = pagesNow();
+    const ask = pages ? hashes.filter((h) => !pagedCache.has(h)) : [];
+    for (let at = 0; at < ask.length; at += 2000) for (const e of await pages!.listed(ask.slice(at, at + 2000))) pagedCache.set(e.hash, withUsage(e));
+  };
   /** The asset the details describe (the last one picked), and every asset picked: a click picks one, Ctrl or Cmd adds or removes, Shift takes a range, a checkbox adds or removes. */
   let selected: string | null = null;
   const picked = new Set<string>();
@@ -605,7 +649,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let wantsDurations = false;
   let readingDurations = false;
   const readDurations = async (): Promise<void> => {
-    if (readingDurations || !listing) return;
+    if (readingDurations || !listing || pagesNow()) return; // (not over a whole library listed a page at a time)
     readingDurations = true;
     const todo: string[] = [];
     for (const e of listing.entries) {
@@ -649,9 +693,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     );
   };
   const dropStaleThumbs = (): void => {
-    const live = new Set(listing?.entries.map((e) => e.hash));
+    const live = pagesNow() ? null : new Set(listing?.entries.map((e) => e.hash)); // (listed a page at a time: only failed ones are made again)
     for (const [hash, job] of thumbs) {
-      if (live.has(hash) && !job.failed) continue;
+      if ((!live || live.has(hash)) && !job.failed) continue;
       thumbs.delete(hash);
       thumbUrls.delete(hash);
       void job.p.then((url) => URL.revokeObjectURL(url), () => undefined);
@@ -685,12 +729,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideUrl = null;
   };
   /** The assets the viewer steps through, in order, with where each one is (worked out once per list, not on every step). */
-  let viewMemo: { rows: CatalogListing["entries"]; set: Set<string> | null; list: CatalogListing["entries"]; at: Map<string, number> } | null = null;
-  const viewList = (): { list: CatalogListing["entries"]; at: Map<string, number> } => {
+  let viewMemo: { rows: string[]; set: Set<string> | null; list: string[]; at: Map<string, number> } | null = null;
+  const viewList = (): { list: string[]; at: Map<string, number> } => {
     const rows = filtered();
     if (viewMemo?.rows !== rows || viewMemo.set !== slideSet) {
-      const list = slideSet ? rows.filter((e) => slideSet!.has(e.hash)) : rows;
-      viewMemo = { rows, set: slideSet, list, at: new Map(list.map((e, i) => [e.hash, i])) };
+      const list = slideSet ? rows.filter((h) => slideSet!.has(h)) : rows;
+      viewMemo = { rows, set: slideSet, list, at: new Map(list.map((h, i) => [h, i])) };
     }
     return viewMemo;
   };
@@ -704,8 +748,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let filmRange: [number, number] = [0, 0];
   let filmPitch = 0;
   let filmItemW = 0;
-  const filmItem = (e: CatalogListing["entries"][number]): HTMLElement => {
+  const filmItem = (hash: string): HTMLElement => {
+    const e = entryOf(hash);
     const t = document.createElement("template");
+    if (!e) {
+      want([hash]); // (drawn again once its details are here)
+      t.innerHTML = `<button type="button" class="film-item thumb-slot" role="option" data-hash="${hash}" aria-label="Loading"></button>`;
+      return t.content.firstElementChild as HTMLElement;
+    }
     t.innerHTML = `<button type="button" class="film-item thumb-slot" role="option" data-hash="${e.hash}" aria-label="${esc(e.name || "Untitled")}" title="${esc(e.name || "Untitled")}">${!hasThumb(e) ? fileTile(e, false) : `<img alt="" draggable="false" data-hash="${e.hash}"${isFontFile(e) ? ' class="is-font-thumb"' : ""}>`}</button>`;
     const b = t.content.firstElementChild as HTMLElement;
     const img = b.querySelector<HTMLImageElement>("img");
@@ -742,9 +792,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const keep = new Map<string, HTMLElement>();
     const els: HTMLElement[] = [];
     for (let i = first; i < end; i++) {
-      const e = list[i]!;
-      const el = filmMounted.get(e.hash) ?? filmItem(e);
-      keep.set(e.hash, el);
+      const h = list[i]!;
+      const old = filmMounted.get(h);
+      const el = old && (old.getAttribute("aria-label") !== "Loading" || !entryOf(h)) ? old : filmItem(h);
+      keep.set(h, el);
       els.push(el);
     }
     syncChildren(filmWin, els);
@@ -1225,7 +1276,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const stepSlide = (d: number): void => {
     const { list, at } = viewList();
     const i = at.get(slideHash ?? "") ?? -1;
-    if (i >= 0 && list.length > 1) void showSlide(list[(i + d + list.length) % list.length]!.hash);
+    if (i >= 0 && list.length > 1) void showSlide(list[(i + d + list.length) % list.length]!);
   };
   // ---- slideshow: moves to the next asset after the chosen time (a video or audio file plays to its end first) and wraps round
   const progress = viewer.querySelector<HTMLElement>(".viewer-progress")!;
@@ -1327,6 +1378,35 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
 
   // ---- data
+  /**
+   * The desktop app's listing: the folders, the sidebar's counts and where items are used, not the items (`entries` stays empty: the
+   * Library lists them a page at a time). `metaOnly` keeps the usage read before. Null when a newer read began meanwhile.
+   */
+  const pagedListing = async (pages: LibraryPages, metaOnly: boolean): Promise<CatalogListing | null> => {
+    const gen = generation;
+    const [folders, counts, usage, keys] = await Promise.all([pages.folders(), pages.counts(), metaOnly ? Promise.resolve(usageMap) : pages.usage(), pages.fieldKeys()]);
+    if (gen !== generation) return null;
+    usageMap = usage;
+    pagedCounts = counts;
+    pagedFieldKeys = keys;
+    pagedCache.clear();
+    paged = null; // (listed again for what changed)
+    // The cards on the screen (and the one described) are fetched again before the list is drawn: none goes blank for a moment.
+    const onScreen = [...mounted.keys(), ...(selected ? [selected] : [])];
+    for (const e of await pages.listed(onScreen.slice(0, 2000))) pagedCache.set(e.hash, withUsage(e));
+    // What canvases use that the library does not have: their originals are missing.
+    const used = [...usage.keys()];
+    const have = new Set<string>();
+    for (let at = 0; at < used.length; at += 2000) for (const e of await pages.listed(used.slice(at, at + 2000))) (have.add(e.hash), pagedCache.set(e.hash, withUsage(e)));
+    if (gen !== generation) return null;
+    return {
+      entries: [],
+      missing: used.filter((h) => !have.has(h)).map((hash) => ({ hash, ...usageOf(usage, hash) })),
+      pendingDeletion: 0,
+      folders: visibleFolders(folders).sort((a, b) => a.name.localeCompare(b.name)),
+    };
+  };
+  // ---- data
   /** Read the library again; `metaOnly` after a change to its organization only, which keeps the usage and the canvas tags read before. */
   const refresh = async (metaOnly = false): Promise<void> => {
     if (!visible) return;
@@ -1335,18 +1415,31 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       grid.innerHTML = `<p class="assets-empty">Storage is unavailable, so there is no library in this tab.</p>`;
       return;
     }
-    const light = metaOnly && listing ? await session.catalog.relist(listing) : null;
+    const can = session.catalog.pages;
+    if (can) {
+      const c = await can.counts().catch(() => null);
+      if (gen !== generation) return;
+      const was = pagedMode;
+      pagedMode = !!c && c.hidden + c.shown >= libraryPaging.from;
+      if (was !== pagedMode) (listing = null), (paged = null), (shownRows = null), (hashesMemo = null);
+    }
+    const pages = pagesNow();
+    const light = !pages && metaOnly && listing ? await session.catalog.relist(listing) : null;
     if (gen !== generation) return;
-    if (!light) await session.persistence.flush(); // usage reflects every edit made so far
-    const l = light ?? (await session.catalog.list());
+    if (!light && !(pages && metaOnly)) await session.persistence.flush(); // usage reflects every edit made so far
+    const l = pages ? await pagedListing(pages, metaOnly) : (light ?? (await session.catalog.list()));
+    if (!l) return;
     startStep("library listed");
     if (gen !== generation) return;
     listing = l;
     dropStaleThumbs();
     if (scope.startsWith("folder:") && !l.folders.some((f) => `folder:${f.id}` === scope)) scope = "all";
-    const known = new Set([...l.entries.map((e) => e.hash), ...l.missing.map((m) => m.hash)]);
-    for (const h of [...picked]) if (!known.has(h)) picked.delete(h);
-    if (selected && !known.has(selected)) selected = [...picked].pop() ?? null;
+    if (pages && scope === "similar") scope = "all"; // (look-alikes are not grouped over a library listed a page at a time)
+    if (!pages) {
+      const known = new Set([...l.entries.map((e) => e.hash), ...l.missing.map((m) => m.hash)]);
+      for (const h of [...picked]) if (!known.has(h)) picked.delete(h);
+      if (selected && !known.has(selected)) selected = [...picked].pop() ?? null;
+    }
     if (!light) {
       places = selected && picked.size === 1 ? await session.assetPlaces(selected) : [];
       canvasTags = await session.canvasTagIndex().catch(() => canvasTags);
@@ -1362,7 +1455,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // made only when a card scrolled into view, a big library imported at once stayed blank for seconds wherever one scrolled.
   let filling = false;
   const fillThumbs = async (): Promise<void> => {
-    if (filling || !listing || !session.catalog) return;
+    if (filling || !listing || !session.catalog || pagesNow()) return; // (a library listed a page at a time: each picture as it is drawn)
     filling = true;
     const have = new Set(await session.catalog.thumbHashes().catch(() => []));
     for (const e of listing.entries) {
@@ -1405,6 +1498,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let byHash = new Map<string, CatalogListing["entries"][number]>();
   let byHashOf: CatalogListing | null = null;
   const entryOf = (hash: string): CatalogListing["entries"][number] | undefined => {
+    if (pagesNow()) return pagedCache.get(hash);
     if (byHashOf !== listing) {
       byHash = new Map(listing?.entries.map((e) => [e.hash, e]));
       byHashOf = listing;
@@ -1416,7 +1510,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const addedDate = new Intl.DateTimeFormat(undefined, { year: "numeric", month: "short", day: "numeric" });
   /** What is listed, worked out again only when the listing, the search, the scope, the sort or (for the look filters) the looks changed. */
   let filterMemo: { key: string; of: CatalogListing; tags: typeof canvasTags; wantsLooks: boolean; looksGen: number; durationsGen: number; tree: unknown; rows: CatalogListing["entries"] } | null = null;
-  const filtered = (): CatalogListing["entries"] => {
+  const filteredEntries = (): CatalogListing["entries"] => {
     if (!listing) return [];
     const memoKey = [search.value, way, usageSel.value, sortSel.value, reversed, scope].join("\u0001");
     const m = filterMemo;
@@ -1427,6 +1521,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const rows = filterNow();
     filterMemo = { key: memoKey, of: listing, tags: canvasTags, wantsLooks, looksGen, durationsGen, tree: session.tree, rows };
     return rows;
+  };
+  /** What is listed, in order (hashes): the last query's (listed a page at a time), else the filtered entries'. */
+  let hashesMemo: { of: unknown; hashes: string[] } | null = null;
+  const filtered = (): string[] => {
+    const of: unknown = pagesNow() ? paged : filteredEntries();
+    if (hashesMemo?.of !== of) hashesMemo = { of, hashes: of === paged ? (paged?.hashes.match(/.{64}/g) ?? []) : (of as CatalogListing["entries"]).map((e) => e.hash) };
+    return hashesMemo!.hashes;
   };
   let sortMemo: { of: CatalogListing; key: SortKey; reversed: boolean; rows: CatalogListing["entries"] } | null = null;
   /** Every item of the library in the order chosen, made once per library and sort. */
@@ -1466,8 +1567,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // whole): where every card goes is worked out in code (library-layout.ts), and the grid is as tall as all of them.
   type Shown = { hash: string; ar: number; html: () => string };
   let shown: Shown[] = [];
-  let shownAt = new Map<string, number>();
-  let shownRows: CatalogListing["entries"] | null = null;
+  /** Where each card is (null for a list a page at a time: looked up when asked, a million entries are not kept twice). */
+  let shownAt: Map<string, number> | null = new Map<string, number>();
+  const shownIndex = (hash: string): number | undefined => {
+    if (shownAt) return shownAt.get(hash);
+    const i = shown.findIndex((x) => x.hash === hash);
+    return i < 0 ? undefined : i;
+  };
+  let shownRows: string[] | null = null;
   let shownMissing: CatalogListing["missing"] | null = null;
   let layout: GridLayout = { boxes: [], rows: [], height: 0 };
   let layoutW = 0;
@@ -1604,7 +1711,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const relayout = (): void => {
     if (gridEmpty || !grid.clientWidth) return;
     layoutNow();
-    const i = keepAt && visible ? shownAt.get(keepAt.hash) : undefined;
+    const i = keepAt && visible ? shownIndex(keepAt.hash) : undefined;
     if (keepAt && i !== undefined) {
       const want = grid.offsetTop + layout.boxes[i]!.y - keepAt.top;
       if (Math.abs(want - scroller.scrollTop) >= 1) scroller.scrollTop = want;
@@ -1628,10 +1735,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return mounted.get(shown[i]!.hash)?.el.querySelector<HTMLElement>(".asset-card") ?? null;
   };
   const revealHash = (hash: string, block: "nearest" | "center"): HTMLElement | null => {
-    const i = shownAt.get(hash);
+    const i = shownIndex(hash);
     return i === undefined ? null : revealIndex(i, block);
   };
-  let filmOf: CatalogListing["entries"] | null = null;
+  let filmOf: string[] | null = null;
   /** Keep the filters (not the search) with the layout, and show the reset button only when one is not its default. */
   const keepFilters = (): void => {
     const f = { usage: usageSel.value, sort: sortSel.value, reversed, scope };
@@ -1640,16 +1747,60 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     ui.filters = f;
     saveUi();
   };
+  /** What the page-at-a-time list depends on: the scope, the search and how, the usage filter, the sort. */
+  const queryKey = (): string => [search.value, way, usageSel.value, sortSel.value, reversed, scope, durationsGen].join("\u0001");
+  let querying = "";
+  const requery = async (pages: LibraryPages): Promise<void> => {
+    const key = queryKey();
+    if (querying === key) return;
+    querying = key;
+    const used: LibraryQuery["used"] = {};
+    for (const [h, u] of usageMap) used[h] = [u.instances, u.canvases.size, [...u.canvases]];
+    const canvasNames: LibraryQuery["canvasNames"] = {};
+    for (const { board, canvases } of session.tree?.boards ?? []) for (const c of canvases) canvasNames[c.id] = [c.name.toLowerCase(), board.name.toLowerCase()];
+    const q: LibraryQuery = {
+      scope,
+      text: search.value,
+      way,
+      usage: usageSel.value as UsageFilter,
+      sort: sortSel.value as SortKey,
+      reversed,
+      used,
+      canvasNames,
+      ...(scope.startsWith("folder:") && listing ? { inFolders: [...folderSubtree(listing.folders, scope.slice(7))] } : {}),
+      ...(scope.startsWith("ctag:") ? { canvasTagged: [...(canvasTags.get(scope.slice(5))?.assets ?? [])] } : {}),
+    };
+    const r = await pages.query(q).catch(() => null);
+    if (querying !== key) return; // (another was asked for meanwhile)
+    querying = "";
+    if (!r) return;
+    paged = { key, ...r };
+    render();
+  };
+  /** A card listed a page at a time: drawn from its details once fetched (asked for now), a blank card until then. */
+  const pagedHtml = (hash: string): string => {
+    const e = pagedCache.get(hash);
+    if (e) return entryHtml(e);
+    want([hash]);
+    return `<div class="asset-cell" role="listitem"><button type="button" class="asset-card" data-testid="asset-card" data-hash="${hash}" aria-pressed="false" aria-label="Loading"><span class="asset-thumb thumb-slot"></span><span class="asset-info"><span class="asset-name"></span></span></button>${check(hash, "item")}</div>`;
+  };
   const render = (): void => {
     keepFilters();
     root.querySelector<HTMLElement>(".assets-searchbox .cs-clear")!.hidden = !search.value;
     if (!listing) return;
+    const pages = pagesNow();
+    // Listed a page at a time: a scope, search or sort not listed yet is asked for (drawn again when it comes); until then, the last list.
+    if (pages && paged?.key !== queryKey()) {
+      void requery(pages);
+      if (!paged) return;
+    }
     const rows = filtered();
     const usageAll = usageSel.value === "all" && !search.value.trim() && scope === "all";
-    count.textContent = `${rows.length === listing.entries.length ? "" : `${rows.length} of `}${listing.entries.length} item${listing.entries.length === 1 ? "" : "s"}`;
-    if (totalOf !== listing) {
-      totalOf = listing;
-      total.textContent = `${fmtBytes(listing.entries.reduce((n, e) => n + e.size, 0))} in all`;
+    const all = paged ? paged.total : listing.entries.length;
+    count.textContent = `${rows.length === all ? "" : `${rows.length} of `}${all} item${all === 1 ? "" : "s"}`;
+    if (totalOf !== (paged ?? listing)) {
+      totalOf = paged ?? listing;
+      total.textContent = `${fmtBytes(paged ? paged.bytes : listing.entries.reduce((n, e) => n + e.size, 0))} in all`;
     }
     showPicked();
     if (cardsOf !== listing || cardsReadOnly !== session.readOnly) {
@@ -1664,14 +1815,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       shownRows = rows;
       shownMissing = missing;
       shown = [
-        ...rows.map((e) => ({ hash: e.hash, ar: Math.max(0.4, Math.min(3, e.pixelW / Math.max(1, e.pixelH))), html: () => entryHtml(e) })),
+        ...(paged
+          ? rows.map((h, i) => ({ hash: h, ar: paged!.ratios[i]!, html: () => pagedHtml(h) }))
+          : filteredEntries().map((e) => ({ hash: e.hash, ar: Math.max(0.4, Math.min(3, e.pixelW / Math.max(1, e.pixelH))), html: () => entryHtml(e) }))),
         ...missing.map((m) => ({ hash: m.hash, ar: 1.4, html: () => missingHtml(m) })),
       ];
-      shownAt = new Map(shown.map((x, i) => [x.hash, i]));
+      shownAt = paged ? null : new Map(shown.map((x, i) => [x.hash, i]));
       layoutDirty = true;
       const empty = shown.length
         ? ""
-        : listing.entries.length
+        : all
           ? `<p class="assets-empty">Nothing in the library matches.</p>`
           : `<p class="assets-empty">The library is empty. Import files here (any type), or drop them on a canvas.</p>`;
       if (empty) {
@@ -1703,7 +1856,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** The sidebar's counts, made once per listing (not on every redraw: they go over the whole library). */
   let sideCounts: { of: CatalogListing; counts: SideCounts } | null = null;
   const countSide = (l: CatalogListing): SideCounts => {
-    if (sideCounts?.of !== l) sideCounts = { of: l, counts: countSideOf(l.entries, l.folders) };
+    if (sideCounts?.of !== l) {
+      const p = pagesNow() ? pagedCounts : null; // (listed a page at a time: counted where the library is)
+      sideCounts = {
+        of: l,
+        counts: p
+          ? { hidden: p.hidden, shown: p.shown, favourites: p.favourites, unfiled: p.unfiled, tags: new Map(p.tags.map(([k, label, n]) => [k, { label, n }])), types: new Map(p.types), folders: new Map(p.folders) }
+          : countSideOf(l.entries, l.folders),
+      };
+    }
     return sideCounts.counts;
   };
   let lastSideHtml = "";
@@ -1791,7 +1952,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           ${item("favorites", "Favourites", counts.favourites, { icon: ICONS.star })}
           ${item("unfiled", "Unfiled", counts.unfiled, { icon: ICONS.folderX })}
           ${scope === "hidden" ? item("hidden", "Hidden", hiddenCount, { icon: ICONS.eyeClosed }) : ""}
-          ${item("similar", "Similar images", similar().reduce((n, g) => n + g.length, 0), { icon: ICONS.copyCheck })}
+          ${pagesNow() ? "" : item("similar", "Similar images", similar().reduce((n, g) => n + g.length, 0), { icon: ICONS.copyCheck })}
         </ul>
         ${section(
           "folders",
@@ -1902,7 +2063,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="asset-insp-head">
         <h2>${n} selected</h2>${(() => {
           // picked items a search or filter now hides still count (and what is done here is done to them): say so, and offer to drop them
-          const shown = new Set(filtered().map((x) => x.hash));
+          const shown = new Set(filtered());
           const hidden = hashes.filter((h) => !shown.has(h)).length;
           return hidden ? `<button type="button" class="assets-btn" data-action="drop-hidden" data-testid="bulk-hidden" title="${hidden} of the selected items are not shown by the search or filter, and what is done here is done to them too. Keep only the ${n - hidden} shown.">${hidden} not shown · keep the shown</button>` : "";
         })()}
@@ -2074,7 +2235,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         some ? `<span class="tag-count" title="On ${k} of ${n}">${k}/${n}</span><button type="button" data-action="tag-all" data-tag="${esc(t)}" aria-label="Add tag ${esc(t)} to all ${n}" title="Add to all ${n}"${dis}>+</button>` : ""
       }<button type="button" data-action="untag" data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}${bulk ? ` from all ${n}` : ""}" title="Remove${bulk ? ` from all ${n}` : ""}"${dis}>×</button></span>`;
     });
-    const known = [...new Set(listing!.entries.flatMap((e) => meta(e).tags))].filter((t) => !on.has(t.toLowerCase())).sort((a, b) => a.localeCompare(b));
+    const known = (pagesNow() ? [...countSide(listing!).tags.values()].map((t) => t.label) : [...new Set(listing!.entries.flatMap((e) => meta(e).tags))]).filter((t) => !on.has(t.toLowerCase())).sort((a, b) => a.localeCompare(b));
     const folders = listing!.folders;
     const sorted = [...folders].sort((a, b) => folderPath(folders, a.id).join("/").localeCompare(folderPath(folders, b.id).join("/")));
     const radio = (id: string, label: string, k: number): string =>
@@ -2123,7 +2284,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const m = savingNotes?.hash === e.hash ? savingNotes : stored;
     const dis = session.readOnly ? " disabled" : "";
     const rows = blankField === e.hash ? [...m.fields, { key: "", value: "" }] : m.fields;
-    const keys = [...new Set(listing!.entries.flatMap((x) => meta(x).fields.map((f) => f.key)))].filter(Boolean).sort((a, b) => a.localeCompare(b));
+    const keys = pagesNow() ? pagedFieldKeys : [...new Set(listing!.entries.flatMap((x) => meta(x).fields.map((f) => f.key)))].filter(Boolean).sort((a, b) => a.localeCompare(b));
     return `
       <section class="asset-sec asset-notes" data-testid="asset-notes">
         <h3><label for="asset-note-box">Note</label></h3>
@@ -2263,7 +2424,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       }
       anchor = hash;
     } else if (how === "range" || how === "add-range") {
-      const order = [...filtered().map((e) => e.hash), ...(listing?.missing.map((m) => m.hash) ?? [])];
+      const order = [...filtered(), ...(listing?.missing.map((m) => m.hash) ?? [])];
       const a = order.indexOf(anchor ?? selected ?? hash);
       const b = order.indexOf(hash);
       if (how === "range") picked.clear();
@@ -2284,8 +2445,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   const selectAll = (): void => {
     const rows = filtered();
-    for (const e of rows) picked.add(e.hash);
-    selected = rows[rows.length - 1]?.hash ?? selected;
+    for (const h of rows) picked.add(h);
+    selected = rows[rows.length - 1] ?? selected;
     selecting = true;
     places = [];
     assetCanvasTags = [];
@@ -2348,7 +2509,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!n) return false;
     const active = document.activeElement as HTMLElement | null;
     const focusedHash = active && grid.contains(active) ? active.closest<HTMLElement>(".asset-cell")?.querySelector<HTMLElement>(".asset-card")?.dataset["hash"] : undefined;
-    const cur = [focusedHash, cursor, selected].map((h) => (h ? shownAt.get(h) : undefined)).find((i) => i !== undefined);
+    const cur = [focusedHash, cursor, selected].map((h) => (h ? shownIndex(h) : undefined)).find((i) => i !== undefined);
     const list = ui.layout === "list";
     let next: number;
     if (cur === undefined) next = e.key === "ArrowUp" || e.key === "ArrowLeft" || e.key === "End" ? n - 1 : 0;
@@ -2376,6 +2537,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!b || b.disabled || !selected) return;
     const hash = selected;
     const group = [...picked];
+    // (listed a page at a time: the details of picked items not drawn yet are fetched first, then the button does what it does)
+    if (pagesNow() && [hash, ...group].some((h) => !pagedCache.has(h))) return void ensure([hash, ...group]).then(() => b.isConnected && b.click());
     const action = b.dataset["action"];
     /** What the panel is about: every picked asset, or the one shown. */
     const pickedGroup = (): string[] => (picked.size > 1 ? group : [hash]);
@@ -2407,8 +2570,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void runExport(session, { kind: "assets", hashes: group.filter((h) => entryOf(h)?.present === true) });
         break;
       case "slideshow-all": {
-        const order = filtered().filter((e) => picked.has(e.hash));
-        if (order[0]) startShow(order[0].hash, new Set(order.map((e) => e.hash)));
+        const order = filtered().filter((h) => picked.has(h));
+        if (order[0]) startShow(order[0], new Set(order));
         break;
       }
       case "delete-all": {
@@ -2493,7 +2656,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       }
       case "drop-hidden": {
-        const shown = new Set(filtered().map((x) => x.hash));
+        const shown = new Set(filtered());
         for (const h of [...picked]) if (!shown.has(h)) picked.delete(h);
         if (selected && !picked.has(selected)) selected = [...picked].pop() ?? null;
         markPicked();
@@ -2519,7 +2682,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         void renameAssetsDialog([hash]);
         break;
       case "rename-all":
-        void renameAssetsDialog(filtered().filter((x) => picked.has(x.hash)).map((x) => x.hash));
+        void renameAssetsDialog(filtered().filter((h) => picked.has(h)));
         break;
       case "open-tab":
         void openOriginalInTab(assets, hash);
@@ -3196,7 +3359,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       void select(null);
       e.stopPropagation();
     } else if (e.key === "F2" && !(e.target as HTMLElement).closest(TYPING) && (picked.size || selected)) {
-      void renameAssetsDialog(picked.size ? filtered().filter((x) => picked.has(x.hash)).map((x) => x.hash) : [selected!]);
+      void renameAssetsDialog(picked.size ? filtered().filter((h) => picked.has(h)) : [selected!]);
       e.preventDefault();
     } else if ((e.key === "i" || e.key === "I") && !(e.target as HTMLElement).closest(TYPING) && !e.ctrlKey && !e.metaKey && !e.altKey) {
       toggleDetails();
@@ -3273,7 +3436,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const MIME_EXT: Record<string, string> = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif", "image/svg+xml": ".svg", "image/bmp": ".bmp", "image/avif": ".avif" };
   /** Copy the first picture alone, or the names as text (what is not a picture goes as its name). */
   const copyItems = async (hashes: readonly string[], what: "picture" | "name" = "picture"): Promise<void> => {
-    const ents = hashes.flatMap((h) => listing?.entries.filter((x) => x.hash === h && x.present) ?? []);
+    await ensure(hashes);
+    const ents = hashes.flatMap((h) => (entryOf(h)?.present ? [entryOf(h)!] : []));
     if (!ents.length) return;
     const first = what === "picture" ? ents.find((e) => e.type.startsWith("image/")) : undefined;
     const names = ents.map((e) => e.name || "image").join("\n");
@@ -3304,7 +3468,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   document.addEventListener("copy", (e) => {
     if (!visible || viewer.hidden !== true || !(picked.size || selected) || (e.target as HTMLElement | null)?.closest?.(TYPING)) return;
     e.preventDefault();
-    void copyItems(picked.size ? filtered().filter((x) => picked.has(x.hash)).map((x) => x.hash) : [selected!]);
+    void copyItems(picked.size ? filtered().filter((h) => picked.has(h)) : [selected!]);
   });
   const clipboardGroup = (hashes: readonly string[]): MenuItem[] => [
     ...(hashes.length
@@ -3473,9 +3637,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   root.querySelector<HTMLElement>('.assets-bar [data-action="slideshow"]')!.addEventListener("click", () => {
     const list = filtered();
     if (!list.length) return;
-    const group = picked.size > 1 ? list.filter((e) => picked.has(e.hash)) : list;
-    const first = group.find((e) => e.hash === selected) ?? group[0]!;
-    startShow(first.hash, picked.size > 1 ? new Set(group.map((e) => e.hash)) : undefined);
+    const group = picked.size > 1 ? list.filter((h) => picked.has(h)) : list;
+    const first = group.find((h) => h === selected) ?? group[0]!;
+    startShow(first, picked.size > 1 ? new Set(group) : undefined);
   });
   resetFiltersBtn.addEventListener("click", () => {
     usageSel.value = NO_FILTERS.usage;
@@ -3536,6 +3700,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let suggestSources: SuggestSources = { tags: [], types: [] };
   mountSuggest(pop.querySelector<HTMLElement>(".search-suggest")!, search, () => {
     if (suggestFor === listing && listing) return suggestSources;
+    if (pagesNow() && listing) {
+      const c = countSide(listing); // (listed a page at a time: the counts of what is not hidden)
+      suggestFor = listing;
+      return (suggestSources = { tags: [...c.tags.values()], types: [...c.types].map(([ext, n]) => ({ ext, n })) });
+    }
     const tags = new Map<string, { label: string; n: number }>();
     const types = new Map<string, number>();
     for (const e of listing?.entries ?? []) {
@@ -3668,7 +3837,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!shown.length || gridEmpty) return;
     const top = scroller.scrollTop - grid.offsetTop;
     const vh = scroller.clientHeight;
-    let i = selected ? shownAt.get(selected) : undefined;
+    let i = selected ? shownIndex(selected) : undefined;
     const box = i === undefined ? undefined : layout.boxes[i];
     if (!box || box.y + box.h <= top || box.y >= top + vh) {
       const y = top + vh / 3;
@@ -3777,7 +3946,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       scope = "all";
       paintSearchUi();
       await refresh();
-      const known = new Set(listing?.entries.map((e) => e.hash));
+      await ensure(hashes);
+      const known = new Set(pagesNow() ? hashes.filter((h) => entryOf(h)?.state === "active") : listing?.entries.map((e) => e.hash));
       const have = hashes.filter((h) => known.has(h));
       picked.clear();
       for (const h of have) picked.add(h);
@@ -3786,7 +3956,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       places = selected && picked.size === 1 ? await session.assetPlaces(selected) : [];
       // The names go into the search (by name), so the rest of the library is filtered out and these are what is listed; with a very long
       // selection the search would be unreadable, so then the whole library stays listed with these picked.
-      const names = [...new Set((listing?.entries ?? []).filter((e) => picked.has(e.hash)).map((e) => e.name.replace(/"/g, "").trim()).filter(Boolean))];
+      const names = [...new Set([...picked].flatMap((h) => (entryOf(h) ? [entryOf(h)!.name.replace(/"/g, "").trim()] : [])).filter(Boolean))];
       if (names.length > 0 && names.length <= REVEAL_NAMES_MAX) {
         search.value = names.map((n) => `"${n}"`).join(" OR ");
         setWay("name");
