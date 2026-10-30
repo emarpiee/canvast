@@ -15,7 +15,7 @@ async function launch(workspace: string, device = "userdata"): Promise<{ app: El
   const app = await electron.launch({
     args: [join(buildDir(), "desktop"), `--workspace=${workspace}`, `--user-data-dir=${workspace}-${device}`],
     // (an export outside the workspace goes to `<workspace>-exports`, standing for the folder chosen in the system's dialog)
-    env: { ...process.env, CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug", CANVAST_EXPORT_DIR: `${workspace}-exports` },
+    env: { ...process.env, CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug", CANVAST_EXPORT_DIR: `${workspace}-exports`, CANVAST_NO_OPEN: "1" },
   });
   const page = await app.firstWindow();
   const requests: string[] = [];
@@ -1008,6 +1008,16 @@ test("a hidden item's picture is not read while locked, so after a restart its c
     await page.getByTestId("choose-ok").click(); // (the first way: a folder, keeping its folders)
     await expect.poll(() => existsSync(join(`${ws}-exports`, "Private", "p1.png"))).toBe(true);
     expect(readFileSync(join(`${ws}-exports`, "Private", "p1.png")).equals(pic(1))).toBe(true);
+    // Open in default app, for a hidden item: after asking (once), a readable copy in the app's own temporary folder; locked, it is gone.
+    const tmp = await app.evaluate(({ app }) => app.getPath("temp"));
+    const copies = () => readdirSync(tmp).filter((d) => d.startsWith("canvast-opened-")).flatMap((d) => readdirSync(join(tmp, d)).flatMap((x) => readdirSync(join(tmp, d, x)).map((f) => join(tmp, d, x, f))));
+    await page.locator(`[data-testid="asset-card"][data-hash="${hash}"]`).click();
+    await page.getByTestId("asset-open-app").click();
+    await page.getByTestId("confirm-ok").click();
+    await expect.poll(() => copies().filter((f) => f.endsWith("p1.png")).length).toBe(1);
+    expect(readFileSync(copies().find((f) => f.endsWith("p1.png"))!).equals(pic(1))).toBe(true);
+    await page.evaluate(() => window.__canvastDebug.hiddenOp("lock"));
+    await expect.poll(() => copies().filter((f) => f.endsWith("p1.png")).length).toBe(0);
   } finally {
     await app.close();
   }

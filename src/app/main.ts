@@ -494,6 +494,7 @@ async function start(): Promise<void> {
   storage?.hidden?.subscribe(() => {
     if (storage.hidden!.isOpen()) return assets.retryAll();
     forgetHiddenPassword();
+    void desktopBridge()?.dropOpened(); // (readable copies of hidden items opened in other apps)
     void assets.dropLocked().then(() => {
       tiles.clear();
       invalidate();

@@ -2101,11 +2101,15 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .assets-searchbox:focus-within .assets-search-pop { display: block; }
 .assets-search-pop .cs-modes { padding-top: var(--sp-4); }
 .assets-search-pop .cs-recent { border-top: 1px solid var(--hud-border); border-bottom: 0; }
-/* Hidden mode: a strip across the library in the accent colour (the view looks the same otherwise), and the word in the search box. */
-.assets-hidden-bar { display: flex; align-items: center; gap: var(--sp-4); margin: 0 calc(var(--bar-h) + var(--near) + var(--edge)) var(--near) calc(var(--nav-w, 0px) + var(--near)); padding: var(--sp-2) var(--sp-4); color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: var(--r-md); }
+/* Hidden mode: a compact chip at the start of the status bar, in the accent colour (the view looks the same otherwise), and the word in the search box. */
+.assets-hidden-bar { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-1) 0 var(--sp-3); color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: var(--r-pill); white-space: nowrap; }
 .assets-hidden-bar[hidden] { display: none; }
-.assets-hidden-bar > span { flex: 1; min-width: 0; }
-.assets-hidden-bar .assets-btn { color: var(--hud-accent); background: var(--hud-accent-fg); border-color: transparent; }
+.assets-hidden-bar > svg { width: var(--icon-sm); height: var(--icon-sm); flex: none; }
+.assets-hidden-bar button { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-2); font: inherit; font-size: var(--text-sm); color: inherit; background: none; border: 0; border-radius: var(--r-pill); cursor: pointer; }
+.assets-hidden-bar button:hover, .assets-hidden-bar button[aria-pressed="true"] { background: color-mix(in oklch, var(--hud-accent-fg) 22%, transparent); }
+.assets-hidden-bar button svg { width: var(--icon-sm); height: var(--icon-sm); }
+@media (max-width: 640px) { .assets-hidden-label, .assets-hidden-bar [data-action="hidden-stay"] { display: none; } }
+@media (max-width: 640px) { #assets-view .assets-statusbar > .hud-readout:has(.assets-hidden-bar:not([hidden])) { flex-wrap: nowrap; column-gap: var(--sp-4); } }
 .assets-hidden-chip { flex: none; padding: var(--sp-1) var(--sp-3); font-size: var(--text-sm); color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: var(--r-pill); }
 .assets-hidden-chip[hidden] { display: none; }
 

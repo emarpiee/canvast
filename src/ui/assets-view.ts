@@ -215,7 +215,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <input type="file" multiple hidden data-testid="assets-import-input">
       <input type="file" multiple hidden webkitdirectory data-testid="assets-import-folder-input">
     </div>
-    <div class="assets-hidden-bar" data-testid="hidden-mode-bar" role="status" hidden>${ICONS.eyeClosed}<span>Hidden mode: only hidden items are listed, and what you do here is done to them.</span><button type="button" class="assets-btn" data-action="exit-hidden" data-testid="hidden-mode-exit">Exit hidden mode</button></div>
     <div class="assets-columns" role="dialog" aria-label="List columns" data-testid="columns-panel" hidden></div>
     <p class="assets-status" role="status" data-testid="assets-status"></p>
     <div class="assets-body">
@@ -259,6 +258,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     </div>
     <footer class="hud-bottom assets-statusbar" data-testid="assets-statusbar">
       <div class="hud-readout assets-readout" aria-live="off">
+        <span class="assets-hidden-bar" data-testid="hidden-mode-bar" role="status" title="Hidden mode: only hidden items are listed, and what you do here is done to them" hidden>${ICONS.eyeClosed}<span class="assets-hidden-label">Hidden mode</span><button type="button" data-action="hidden-stay" data-testid="hidden-mode-stay" aria-pressed="false" aria-label="Stay in hidden mode when leaving the library" title="Stay in hidden mode when leaving the library (also in Settings > Privacy)">${ICONS.pin}</button><button type="button" data-action="exit-hidden" data-testid="hidden-mode-exit" aria-label="Exit hidden mode" title="Exit hidden mode">Exit</button></span>
         <span class="assets-count" data-testid="assets-count"></span>
         <span class="assets-picked" data-testid="assets-picked" hidden></span>
         <span class="assets-total" data-testid="assets-total"></span>
@@ -504,6 +504,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let generation = 0;
   /** Sidebar scope: "all", "favorites", "unfiled", "folder:<id>" or "tag:<lowercased tag>". */
   let scope = ui.filters.scope === "hidden" ? "all" : ui.filters.scope; // (the filters are kept with the library's layout: a restart opens the library as it was left)
+  /** Whether opening a hidden item in the system's app was confirmed this session (a readable copy is written for it). */
+  let openCopyAsked = false;
   /** Hidden mode (the word that opens the hidden items, then their password): the same view, listing the hidden items only. */
   let hiddenMode = false;
   /** The view as it was before hidden mode, put back when it ends. */
@@ -1220,8 +1222,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       armShow();
       return;
     }
-    if (rec.type === "image/gif" && (rec.frames ?? 0) > 1) {
-      // An animated GIF plays frame by frame, with the same controls (it loops until the slideshow moves on).
+    if (rec.type === "image/gif" && (rec.frames === undefined || rec.frames > 1)) {
+      // An animated GIF plays frame by frame, with the same controls (it loops until the slideshow moves on). One whose frames were
+      // never counted (imported before they were, or taken from the workspace folder) is read here, and shown still if it has one.
       slideImg.hidden = true;
       slideGif.hidden = false;
       try {
@@ -1235,6 +1238,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         return;
       }
       if (token !== slideToken) return;
+      if (gifEng.len() < 1) {
+        unloadMedia();
+        slideImg.hidden = false;
+        slideImg.src = slideUrl;
+        armShow();
+        return;
+      }
       eng = gifEng;
       controls.show(gifEng, "gif", true);
       gifEng.play();
@@ -1952,7 +1962,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     };
     const addBtn = (attr: string, label: string, extra = ""): string => (ro ? "" : `<button type="button" class="side-add" ${attr} aria-label="${label}" title="${label}"${extra}>${ICONS.folderPlus}</button>`);
     const scopeName = ((): string => {
-      if (scope === "all") return "All items";
+      if (scope === "all") return hiddenMode ? "All hidden items" : "All items";
       if (scope === "favorites") return "Favourites";
       if (scope === "unfiled") return "Unfiled";
       if (scope === "similar") return "Similar images";
@@ -2183,7 +2193,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         ${e?.present ? `<button type="button" class="assets-btn" data-action="download" data-testid="asset-download" title="Save a copy of the file">${ICONS.download}<span>Download</span></button>` : ""}
         ${
           !e?.present ? ""
-          : desktopBridge() ? (meta(e).hidden ? "" : `<button type="button" class="assets-btn" data-action="open-app" data-testid="asset-open-app" title="Open it in the app your system uses for this kind of file">${ICONS.externalLink}<span>Open in default app</span></button><button type="button" class="assets-btn" data-action="show-file" data-testid="asset-show-file" title="Show its file in your system's file manager, selected in its folder">${ICONS.folderSearch}<span>Show in file manager</span></button>`)
+          : desktopBridge() ? (meta(e).hidden ? (session.storage?.hidden?.isOpen() ? `<button type="button" class="assets-btn" data-action="open-app" data-testid="asset-open-app" title="Open a readable copy in the app your system uses for this kind of file (deleted when the hidden items are locked or the app closes)">${ICONS.externalLink}<span>Open in default app</span></button>` : "") : `<button type="button" class="assets-btn" data-action="open-app" data-testid="asset-open-app" title="Open it in the app your system uses for this kind of file">${ICONS.externalLink}<span>Open in default app</span></button><button type="button" class="assets-btn" data-action="show-file" data-testid="asset-show-file" title="Show its file in your system's file manager, selected in its folder">${ICONS.folderSearch}<span>Show in file manager</span></button>`)
           : fileActionsOf(e.name, e.type).canOpen ? `<button type="button" class="assets-btn" data-action="open-tab" data-testid="asset-open-tab" title="Show it in a new browser tab">${ICONS.externalLink}<span>Open in tab</span></button>`
           : ""
         }
@@ -2709,8 +2719,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "open-app":
         // The desktop app: the item's file in the workspace folder, in the system's app for it (a file canvast cannot play or show, too).
         void (async () => {
-          const file = await session.storage?.originals.fileOf(hash).catch(() => null);
-          const problem = file ? await desktopBridge()!.openFile(file) : "its file is not in the workspace folder yet; try again in a moment";
+          const e = entryOf(hash);
+          let problem: string;
+          if (e && meta(e).hidden) {
+            // A hidden item's file is encrypted: a readable copy goes to the app's own temporary folder, after asking once per session.
+            if (!openCopyAsked && !(await confirmDialog({ title: "Open a hidden item", lines: ["A readable copy of it is written to this app's own temporary folder, readable by your user only, for the other app to open.", "It is deleted when the hidden items are locked or canvast closes. The other app may keep copies of its own (recent files, previews)."], confirmLabel: "Open it", danger: false }))) return;
+            openCopyAsked = true;
+            const rec = await session.storage?.originals.get(hash).catch(() => null);
+            problem = rec ? await desktopBridge()!.openCopy(e.name, new Uint8Array(await rec.blob.arrayBuffer())) : "it could not be read (are the hidden items locked?)";
+          } else {
+            const file = await session.storage?.originals.fileOf(hash).catch(() => null);
+            problem = file ? await desktopBridge()!.openFile(file) : "its file is not in the workspace folder yet; try again in a moment";
+          }
           if (problem && visible) status.textContent = `Could not open it: ${problem}.`;
         })();
         break;
@@ -3745,8 +3765,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // deleted, locking, or leaving the library; the view is then as it was before, and no hidden item's picture is kept.
   const hiddenChip = root.querySelector<HTMLElement>(".assets-hidden-chip")!;
   const hiddenBar = root.querySelector<HTMLElement>(".assets-hidden-bar")!;
+  const stayBtn = hiddenBar.querySelector<HTMLButtonElement>('[data-action="hidden-stay"]')!;
   const paintHiddenMode = (): void => {
     hiddenChip.hidden = hiddenBar.hidden = !hiddenMode;
+    stayBtn.setAttribute("aria-pressed", String(settings.get("library.hiddenStay")));
     hiddenChip.textContent = settings.get("library.hiddenWord").trim();
     root.classList.toggle("is-hidden-mode", hiddenMode);
   };
@@ -3797,6 +3819,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     void refresh().then(() => was && visible && (scroller.scrollTop = was.top));
   };
   hiddenBar.querySelector('[data-action="exit-hidden"]')!.addEventListener("click", exitHidden);
+  stayBtn.addEventListener("click", () => {
+    settings.set("library.hiddenStay", !settings.get("library.hiddenStay"));
+    paintHiddenMode();
+  });
   setWay("all");
   let suggestFor: CatalogListing | null = null;
   let suggestSources: SuggestSources = { tags: [], types: [] };
@@ -4076,7 +4102,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     },
     hide() {
       visible = false;
-      exitHidden(); // (leaving the library ends hidden mode)
+      if (!settings.get("library.hiddenStay")) exitHidden(); // (leaving the library ends hidden mode, unless it is to stay)
       // The viewer stays as it is for when the library is opened again (after placing an asset, say); only sound and the show stop.
       eng?.pause();
       stopShow();

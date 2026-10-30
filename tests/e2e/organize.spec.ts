@@ -292,6 +292,16 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   await expect(side(p, /^All hidden items/)).toContainText("1");
   await expect(card(p, HASH)).toBeVisible();
   await expect(cards(p)).toHaveCount(1);
+  // The pin in its status bar chip keeps hidden mode on when the library is left (Settings > Privacy has it too); unpinned, it ends.
+  const stay = p.getByTestId("hidden-mode-stay");
+  await stay.click();
+  await expect(stay).toHaveAttribute("aria-pressed", "true");
+  await p.getByTestId("view-canvas").click();
+  await p.getByTestId("view-assets").click();
+  await expect(bar).toBeVisible();
+  await expect(cards(p)).toHaveCount(1);
+  await stay.click();
+  await expect(stay).toHaveAttribute("aria-pressed", "false");
   // Tags and folders work here as anywhere: a folder made here is hidden, and a shown item filed into it is hidden with it.
   await addTags(p, HASH, "secretTag");
   await expect(p.getByTestId("tag-list")).toContainText("#secretTag");

@@ -9,8 +9,8 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } from "electron";
 import { execFile } from "node:child_process";
 import { createHash, randomBytes, randomUUID, scrypt } from "node:crypto";
-import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, statSync, watch, writeFileSync } from "node:fs";
-import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, utimes } from "node:fs/promises";
+import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, watch, writeFileSync } from "node:fs";
+import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, utimes, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { BOARDS_DIR, isSafeRelativePath } from "../src/storage/workspace-names";
 import { readItem } from "../src/storage/library-mirror";
@@ -276,6 +276,11 @@ async function walkFiles(dir: string, at: string): Promise<Array<{ path: string;
   return out;
 }
 
+/** Where hidden items opened in the system's app get their readable copies (see `canvast:openCopy`); emptied at start, lock and quit. */
+const OPENED_DIR = join(app.getPath("temp"), `canvast-opened-${createHash("sha256").update(app.getPath("userData")).digest("hex").slice(0, 12)}`);
+const dropOpened = (): Promise<void> => rm(OPENED_DIR, { recursive: true, force: true });
+void dropOpened(); // (left by a crash)
+
 async function writeAtomic(full: string, bytes: Uint8Array, durable = true): Promise<void> {
   await mkdir(dirname(full), { recursive: true });
   const tmp = `${full}.tmp-${process.pid}-${Date.now().toString(36)}`;
@@ -436,6 +441,21 @@ function installFileCalls(win: BrowserWindow, root: string): void {
     );
   });
   // A file of the workspace opened in the system's default app for its kind (one canvast cannot show, or to edit it elsewhere).
+  // A hidden item's readable copy, for the system's app: in this app's own temporary folder (mode 700, a file 600), never in the
+  // workspace; deleted on lock (the page asks), when the app quits, and at the next start for any a crash left.
+  ipcMain.handle("canvast:openCopy", async (e, name: unknown, bytes: unknown) => {
+    own(e);
+    if (typeof name !== "string" || !(bytes instanceof Uint8Array)) throw new Error("not a file to open");
+    const dir = join(OPENED_DIR, randomUUID());
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    const file = join(dir, basename(name).replace(/[\u0000-\u001f/\\]/g, "_").replace(/^\.+/, "") || "file");
+    await writeFile(file, bytes, { mode: 0o600 });
+    return process.env["CANVAST_NO_OPEN"] === "1" ? "" : shell.openPath(file); // (tests: the copy is made, no app is started)
+  });
+  ipcMain.handle("canvast:dropOpened", (e) => {
+    own(e);
+    return dropOpened();
+  });
   ipcMain.handle("canvast:openFile", async (e, rel: string) => {
     own(e);
     return shell.openPath(await inside(root, rel));
@@ -978,6 +998,7 @@ app.on("web-contents-created", (_e, contents) => {
 });
 
 app.on("window-all-closed", () => app.quit());
+app.on("will-quit", () => void rmSync(OPENED_DIR, { recursive: true, force: true }));
 
 void app.whenReady().then(async () => {
   if (!existsSync(HTML)) {

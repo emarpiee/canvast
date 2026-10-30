@@ -55,12 +55,14 @@ export function decodedMbFor(gb: number | undefined): "128" | "256" | "384" {
 }
 
 /** The privacy settings that stay out of a backup unless the person chooses to include them when exporting. */
-export const PRIVACY_KEYS: readonly string[] = ["library.hiddenWord", "library.hiddenRemember"];
+export const PRIVACY_KEYS: readonly string[] = ["library.hiddenWord", "library.hiddenRemember", "library.hiddenStay"];
 
 export const SETTINGS = {
   "dev.tools": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "restart" } as Def<boolean>,
   "library.hiddenWord": { scope: "device", default: "hidden:", validate: text(40), effect: "immediate" } as Def<string>,
   "library.hiddenRemember": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  /** Hidden mode stays on when the library is left (it still ends with Exit, the word deleted, locking, or closing the app). */
+  "library.hiddenStay": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   /** The desktop build (ADR 0177): where a file the app deletes from the workspace folder goes. */
   "storage.deleteTo": { scope: "device", default: "trash", validate: oneOf("trash", "system", "erase"), effect: "immediate" } as Def<"trash" | "system" | "erase">,
   // The desktop app: a file deleted from the library leaves the folder at once, even while undo on the open canvas could still bring an instance back.

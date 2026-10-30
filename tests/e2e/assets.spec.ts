@@ -2232,11 +2232,25 @@ test("the viewer plays audio, video and GIF with the on-canvas player's controls
   await expect(viewer.locator("video")).not.toHaveAttribute("controls", /.*/); // the browser's own bar is not used
   await bar.getByRole("button", { name: "Step forward" }).click();
   await expect(time).not.toHaveText(/^0:00 /); // it stepped on (the audio step setting is 1 s; Firefox reads the length a little differently)
+  // With the focus in the player, Left and Right step the file (not to the next file), as the buttons do.
+  const current = () => viewer.locator('.film-item[aria-selected="true"]').getAttribute("data-hash");
+  const here = await current();
+  await p.keyboard.press("ArrowLeft");
+  await expect(time).toHaveText(/^0:00 /);
+  await p.keyboard.press("ArrowRight");
+  await expect(time).not.toHaveText(/^0:00 /);
+  expect(await current()).toBe(here);
   if (test.info().project.name !== "firefox") {
     // (Firefox's playback of a generated tone is not steady enough to assert on here; the engine is the canvas player's, tested there.)
     await play.click();
     await expect(bar.getByRole("button", { name: "Pause" })).toBeVisible();
     await bar.getByRole("button", { name: "Pause" }).click();
+    await expect(bar.getByRole("button", { name: "Play" })).toBeVisible();
+    // Space plays and pauses while the focus is in the player, whichever of its buttons has it (not a click on that button).
+    await bar.getByRole("button", { name: "Step back" }).focus();
+    await p.keyboard.press(" ");
+    await expect(bar.getByRole("button", { name: "Pause" })).toBeVisible();
+    await p.keyboard.press(" ");
     await expect(bar.getByRole("button", { name: "Play" })).toBeVisible();
   }
   // A video file: the picture is shown and the same bar steps it (3 s default, clipped to its length).
@@ -2289,6 +2303,30 @@ test("the viewer plays audio, video and GIF with the on-canvas player's controls
   await expect(time).toHaveText("Frame 1 / 3");
   await bar.getByRole("button", { name: "Step forward" }).click();
   await expect(time).toHaveText("Frame 2 / 3");
+  // A GIF whose frames were never counted (imported before they were, or taken from a workspace folder) still gets the player.
+  await p.keyboard.press("Escape");
+  await p.evaluate(() => new Promise<void>((done, fail) => {
+    const r = indexedDB.open("canvast");
+    r.onerror = () => fail(r.error);
+    r.onsuccess = () => {
+      const tx = r.result.transaction("assets", "readwrite");
+      tx.objectStore("assets").openCursor().onsuccess = (e) => {
+        const c = (e.target as IDBRequest<IDBCursorWithValue | null>).result;
+        if (!c) return;
+        const rec = c.value as { type: string; frames?: number };
+        if (rec.type === "image/gif") (delete rec.frames, c.update(rec));
+        c.continue();
+      };
+      tx.oncomplete = () => done();
+      tx.onerror = () => fail(tx.error);
+    };
+  }));
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await toAssets(p);
+  await openOn("anim.gif");
+  await expect(bar).toBeVisible();
+  await expect(time).toHaveText(/^Frame \d \/ 3$/);
   // A picture has no player bar.
   await p.keyboard.press("Escape");
   expect(app.consoleErrors).toEqual([]);

@@ -244,6 +244,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
         ? [{ key: "library.hiddenNamesOff", label: "Keep hidden items' names off this device while locked", help: "On: when the Hidden items are locked (and when the app starts), this device's own copy of their names, tags and notes, and of hidden folders' names, is cleared; the encrypted files keep them, and opening the Hidden items brings them back. Off (the default): this device keeps them, so the Hidden list opens at once.", control: { kind: "toggle" } } as Row]
         : []),
       { key: "library.hiddenRemember", label: "Remember the Hidden password until the tab closes", help: "Off (the default): hidden mode asks for the password each time it begins. On: after the password is given once, hidden mode begins without it until this tab is closed or reloaded. Hidden mode itself always ends when you leave the library. Exporting hidden items always asks.", control: { kind: "toggle" } },
+      { key: "library.hiddenStay", label: "Stay in hidden mode when leaving the library", help: "Off (the default): hidden mode ends when you leave the library. On: it stays on until you exit it (Exit in the status bar, or deleting the word), the hidden items are locked, or the app closes. The pin in hidden mode's status bar sets this too.", control: { kind: "toggle" } },
     ],
   },
   { id: "about", label: "About and diagnostics" },

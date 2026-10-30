@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.52.2 — Hidden mode in the status bar, player keys, GIF player (2026-10-30)
+
+- **Changed:** hidden mode is shown by a compact chip at the start of the Library's status bar (with a pin and *Exit*; on a phone, the eye and *Exit*) instead of a strip across the top.
+- **Added:** *Stay in hidden mode when leaving the library* (the chip's pin, and Settings > Privacy): hidden mode then ends only with Exit, the word deleted, locking, or closing the app.
+- **Added:** in the desktop app, *Open in default app* for a hidden item (in hidden mode): after asking once per session, a readable copy in the app's own temporary folder (readable by your user only) is opened, and deleted when the hidden items are locked, when the app closes, or at the next start.
+- **Changed:** in the viewer, while the focus is in the video, audio or GIF player (also once it has faded), `Left` and `Right` step the file and `Space` plays or pauses it, instead of going to another file or pressing the focused button.
+- **Fixed:** a GIF whose frames were never counted (imported before they were, or taken from a workspace folder) had no player in the viewer.
+
 ## 0.52.1 — Export folder; hidden thumbnails encrypted (2026-10-30)
 
 - **Added:** *Export folder…* (a library folder's ⋯ menu): its files and its subfolders', as a ZIP or, in the desktop app, as a folder where you choose outside the workspace, keeping its folders or all together; each file written to a folder is read back and checked. In hidden mode it exports the hidden items, readable, after asking.

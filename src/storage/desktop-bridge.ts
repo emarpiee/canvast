@@ -91,6 +91,13 @@ export interface DesktopBridge {
   sizes(paths: string[]): Promise<Array<number | null>>;
   /** Open a file of the workspace folder in the system's default app for its kind. An error in plain words, or "" when it opened. */
   openFile(path: string): Promise<string>;
+  /**
+   * A hidden item opened in the system's app: its readable copy written into this app's own temporary folder (readable by this user
+   * only) and opened there (the answer as `openFile`'s). `dropOpened` deletes every such copy: when the hidden items are locked, and
+   * when the app closes (the next start deletes any a crash left).
+   */
+  openCopy(name: string, bytes: Uint8Array): Promise<string>;
+  dropOpened(): Promise<void>;
   /** Show a file of the workspace folder in the system's file manager (its folder opened, the file selected). */
   showFile(path: string): Promise<void>;
   /** Wait until the files written with `durable: false` are really on the disk (one request for the whole disk where it can). */

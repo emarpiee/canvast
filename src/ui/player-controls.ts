@@ -42,6 +42,7 @@ export function mountPlayerControls(host: HTMLElement, settings: SettingsStore, 
   let loop = false;
   const video = (): HTMLVideoElement | null => (eng && eng.el instanceof HTMLVideoElement ? eng.el : null);
 
+  const step = (dir: -1 | 1): void => eng?.step(dir, settings.get(kind === "gif" ? "media.step.gif" : kind === "audio" ? "media.step.audio" : "media.step.video"), loop);
   const refresh = (): void => {
     if (!eng) return;
     const len = eng.len();
@@ -80,7 +81,7 @@ export function mountPlayerControls(host: HTMLElement, settings: SettingsStore, 
       if (eng.playing()) eng.pause();
       else eng.play();
     } else if (cmd === "back" || cmd === "fwd") {
-      eng.step(cmd === "back" ? -1 : 1, settings.get(kind === "gif" ? "media.step.gif" : kind === "audio" ? "media.step.audio" : "media.step.video"), loop);
+      step(cmd === "back" ? -1 : 1);
     } else if (cmd === "extract") {
       hooks.extract();
     } else if (cmd === "repeat") {
@@ -92,10 +93,21 @@ export function mountPlayerControls(host: HTMLElement, settings: SettingsStore, 
     }
     refresh();
   });
-  // Keys on the bar are the bar's (the viewer's arrow keys step the asset, a space plays or pauses the slideshow).
+  // Keys on the bar are the bar's (the viewer's arrow keys step the asset, a space plays or pauses the slideshow): a slider keeps its
+  // own arrows, and while the focus is anywhere in the player (also once it has faded away) Left and Right step the file back and
+  // forward and Space plays or pauses it (not the button that has the focus).
+  const PLAYER_KEYS = ["ArrowLeft", "ArrowRight", " "];
   bar.addEventListener("keydown", (e) => {
-    if ((e.target as HTMLElement).matches("input[type=range]")) e.stopPropagation();
+    if ((e.target as HTMLElement).matches("input[type=range]") && e.key !== " ") return void e.stopPropagation();
+    if (!PLAYER_KEYS.includes(e.key) || e.altKey || e.ctrlKey || e.metaKey || !eng) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.key === " ") {
+      if (!e.repeat) void (eng.playing() ? eng.pause() : eng.play());
+    } else step(e.key === "ArrowLeft" ? -1 : 1);
+    refresh();
   });
+  bar.addEventListener("keyup", (e) => e.key === " " && e.preventDefault()); // (a button would take the space as a click on key up)
   // The bar never starts a pan or a click on the picture under it.
   for (const type of ["pointerdown", "dblclick", "click"]) bar.addEventListener(type, (e) => e.stopPropagation());
 
