@@ -37,13 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
-## Unreleased: custom thumbnails (2026-10-30)
+## v0.52.3: custom thumbnails (2026-10-30)
 
 - **Implemented:** `CatalogEntry.thumb` / `MetaChange.thumb` in both builds and the library parts; `CustomThumbStore` (browser: `meta` keys; desktop: `.canvast/thumbnails/`, hidden sealed in `.hidden/thumbnails/`); the details panel's thumbnail dialog (Thumbnails, library, upload, automatic, delete) and the bulk button; cards, preview, filmstrip, viewer and canvas file cards (`AssetLibrary.customPicture`); thumbnails follow hide and unhide; archives carry normal ones (`thumbnails/<hash>.webp`, manifest `thumbnails`, still version 7); the decrypt tool writes hidden ones.
 - **Tested:** `organize.spec.ts` custom thumbnails and the archive round trip (Chromium); desktop custom thumbnails test (files, sealing, unsealing, decrypt tool) and the hidden tests; canvas file card checked by a screenshot.
 - **Known failures:** none known.
 - **Unverified:** hidden custom thumbnails in backups (left out: an item that uses one shows its own picture after import); Firefox for the new test; GitHub's whole suite.
-- **Committed:** main (not pushed). Version not bumped (asked).
+- **Committed:** main, released as v0.52.3.
 - **Next bounded task:** owner review.
 
 ## v0.52.0 to v0.52.3: hidden mode, Export folder (2026-10-30)
