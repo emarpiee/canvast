@@ -14,6 +14,7 @@ import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, sta
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { BOARDS_DIR, isSafeRelativePath } from "../src/storage/workspace-names";
 import { readItem } from "../src/storage/library-mirror";
+import { SEAL_OVERHEAD, isHiddenFile } from "../src/storage/hidden-vault";
 import type { LibraryItem } from "../src/storage/library-mirror";
 import { Library, openLibraryDb } from "./library-db";
 import type { LibraryOp } from "../src/storage/desktop-bridge";
@@ -569,6 +570,20 @@ function installFileCalls(win: BrowserWindow, root: string): void {
       }
       case "holds":
         return typeof args[0] === "string" && l.holds(args[0]);
+      case "absent": {
+        // Which active items' files are not there (or not of their size), looked at here: the sizes of the start-up walk, else each file.
+        const rows = l.db.prepare("SELECT e.hash, r.file, json_extract(r.json, '$.size') FROM entries e LEFT JOIN recs r ON r.hash = e.hash WHERE e.state = 'active'").raw().all() as Array<[string, string | null, number | null]>;
+        const out: string[] = [];
+        for (let i = 0; i < rows.length; i += 2000) {
+          await Promise.all(rows.slice(i, i + 2000).map(async ([hash, file, size]) => {
+            if (!file || size === null || !isSafeRelativePath(file) || !(file.startsWith("library/") || /^\.hidden\/[^/]+$/.test(file))) return void out.push(hash);
+            let got = walkedSizes.get(file);
+            if (got === undefined) got = await lstat(join(root, ...file.split("/"))).then((st) => (st.isFile() ? st.size : -1), () => -1);
+            if (isHiddenFile(file) ? got < size + SEAL_OVERHEAD : got !== size) out.push(hash);
+          }));
+        }
+        return out;
+      }
       case "orphans":
         return l.orphansText();
       case "pending":

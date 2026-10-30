@@ -207,17 +207,17 @@ export class DesktopCatalog implements CatalogStore {
   }
 
   async list(): Promise<CatalogListing> {
-    const [folders, entries, stubs] = await Promise.all([this.lib.folders(), this.lib.entries(), this.lib.recs()]);
+    // (which files are there is looked at in the main process: the records of a million files never come here)
+    const [folders, entries, absent] = await Promise.all([this.lib.folders(), this.lib.entries(), this.lib.calls.absent()]);
     const usage = await this.usage();
     // (originals whose bytes the page's storage still holds: an import's, not written out yet)
     const held = new Set((await req(this.db.transaction("assets", "readonly").objectStore("assets").getAllKeys())) as string[]);
-    const have = await externalFolder.hasMany(stubs.filter((s) => s.ext));
-    const present = new Set(held);
-    stubs.filter((s) => s.ext).forEach((s, k) => have[k] && present.add(s.hash));
+    const gone = new Set(absent);
+    const present = (h: string): boolean => held.has(h) || !gone.has(h);
     const known = new Set(entries.map((e) => e.hash));
     return {
-      entries: entries.filter((e) => e.state === "active").map((e) => ({ ...e, ...usageOf(usage, e.hash), present: present.has(e.hash) })),
-      missing: [...usage.keys()].filter((h) => !present.has(h) && !known.has(h)).map((hash) => ({ hash, ...usageOf(usage, hash) })),
+      entries: entries.filter((e) => e.state === "active").map((e) => ({ ...e, ...usageOf(usage, e.hash), present: present(e.hash) })),
+      missing: [...usage.keys()].filter((h) => !held.has(h) && !known.has(h)).map((hash) => ({ hash, ...usageOf(usage, hash) })),
       pendingDeletion: entries.filter((e) => e.state === "deleted").length,
       folders: visibleFolders(folders).sort((a, b) => a.name.localeCompare(b.name)),
     };

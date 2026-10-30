@@ -47,6 +47,8 @@ export interface LibraryCalls {
   unnamed(): Promise<Array<{ path: string; size: number }>>;
   /** Whether a record names a file under this folder of the workspace. */
   holds(dir: string): Promise<boolean>;
+  /** The active items whose file is not in the workspace folder (or not of its size): looked at in the main process. */
+  absent(): Promise<string[]>;
   /** The records with no entry, as JSON array text. */
   orphans(): Promise<string>;
   /** The items changed here since they were last written to (or read from) the folder. */
