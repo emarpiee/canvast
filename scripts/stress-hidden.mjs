@@ -92,11 +92,14 @@ async function kill(app) {
 /** Run `fn` while sampling the app's CPU and memory (every process): its time, CPU seconds and peak memory. */
 async function measured(app, fn) {
   let cpu = 0, peak = 0, last = performance.now();
+  /** The peak of each kind of process (main, page, GPU...), in MB: which one holds the memory. */
+  const byType = {};
   const sample = async () => {
-    const metrics = await app.evaluate(({ app }) => app.getAppMetrics().map((m) => [m.cpu.percentCPUUsage, m.memory.workingSetSize])).catch(() => []);
+    const metrics = await app.evaluate(({ app }) => app.getAppMetrics().map((m) => [m.cpu.percentCPUUsage, m.memory.workingSetSize, m.type])).catch(() => []);
     const now = performance.now();
     cpu += (metrics.reduce((a, [p]) => a + p, 0) / 100) * ((now - last) / 1000);
     peak = Math.max(peak, metrics.reduce((a, [, kb]) => a + kb, 0) / 1024);
+    for (const [, kb, type] of metrics) byType[type] = Math.max(byType[type] ?? 0, Math.round(kb / 1024));
     last = now;
   };
   await sample();
@@ -114,7 +117,7 @@ async function measured(app, fn) {
     on = false;
     await loop;
   }
-  return { time: performance.now() - t, cpu, peak };
+  return { time: performance.now() - t, cpu, peak, byType };
 }
 
 // ---- what is on disk ----
@@ -156,7 +159,7 @@ async function onDisk(ws) {
 const rows = [];
 const note = (what, m) => {
   rows.push([what, secs(m.time), `${m.cpu.toFixed(1)} s`, `${Math.round(m.peak)} MB`]);
-  console.log(`${what}: ${secs(m.time)}, CPU ${m.cpu.toFixed(1)} s, peak ${Math.round(m.peak)} MB`);
+  console.log(`${what}: ${secs(m.time)}, CPU ${m.cpu.toFixed(1)} s, peak ${Math.round(m.peak)} MB (${Object.entries(m.byType).map(([k, v]) => `${k} ${v}`).join(", ")})`);
 };
 let failed = false;
 console.log(`seed ${SEED}`);
