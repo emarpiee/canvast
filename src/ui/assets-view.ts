@@ -23,7 +23,7 @@ import { LIBRARY_ROWS, searchHelpButton, wireSearchHelp } from "./search-help";
 import { ASSETS_RECENT, rememberSearch } from "../search/history";
 import { paintRecent, paintSaveToggle, saveToggleHtml, wireRecent, wireSaveToggle, type SavedStore } from "./search-recent";
 import { evalQuery, parseQuery, type Query } from "../search/query";
-import { parseFilter, type Extra, type Filter } from "../assets/filters";
+import { inScope as inScopeOf, matcher, sortListed, type SortKey, type UsageFilter } from "../assets/library-match";
 import { LOOK_SIZE, lookOf, similarGroups, type Look } from "../assets/look";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
@@ -144,8 +144,7 @@ const DEFAULT_HIDDEN: readonly ColumnId[] = ["added", "folder", "favourite", "wi
 const trackOf = (c: (typeof COLUMNS)[number]): string => (c.grow ? `minmax(${c.min}px, ${c.grow}fr)` : `${c.min}px`);
 
 
-type UsageFilter = "all" | "used" | "unused";
-type SortKey = "newest" | "name" | "size" | "uses" | "pixels" | "type" | "tags" | "folder" | "favourite" | "width" | "height" | "canvases";
+
 /** The order a column header sorts by (a click), and whether that order is high to low or A to Z, newest first and so on when not reversed. */
 const SORT_OF: Record<ColumnId, { key: SortKey; desc: boolean }> = {
   name: { key: "name", desc: false },
@@ -590,11 +589,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     };
     for (let i = 0; i < Math.min(3, todo.length); i++) void worker();
   };
-  const filterCache = new Map<string, Filter | null>();
-  const filterOf = (w: string): Filter | null => {
-    if (!filterCache.has(w)) filterCache.set(w, parseFilter(w));
-    return filterCache.get(w)!;
-  };
   let wantsLooks = false;
   // ---- what the library keywords read besides the entry: canvas names (on:) and lengths of media files (duration>), the latter read on demand
   let namesMemo: { of: unknown; names: Map<string, string[]> } | null = null;
@@ -624,16 +618,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     durationsGen++;
     render();
   };
-  const extraOf = (e: CatalogListing["entries"][number], m: ReturnType<typeof meta>): Extra => ({
-    hidden: m.hidden,
-    favorite: m.favorite,
-    tags: m.tags.length,
-    folders: m.folderIds.length && listing ? folderPath(listing.folders, m.folderIds[0]!).map((n) => n.toLowerCase()) : [],
-    note: m.note.toLowerCase(),
-    fields: m.fields.map((f) => ({ key: f.key.toLowerCase(), value: f.value.toLowerCase() })),
-    on: () => canvasNamesOf(e.canvasIds),
-    duration: () => durations.get(e.hash),
-  });
   /** The groups of look-alikes among the pictures read so far. */
   let similarMemo: { of: CatalogListing | null; gen: number; groups: string[][] } | null = null;
   const similar = (): string[][] => {
@@ -1397,42 +1381,25 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
    * The search (ADR 0069, 0071): a word matches the name, type, start of the hash or a tag (All), only the name (Name) or only the tags (Tag);
    * `#tag` is an exact tag and `.png` an exact file type, in every way. AND, OR, XOR, NOT and brackets combine words. Then the usage filter.
    */
-  /** An item's name and tags in lower case, made once per listed item (not on every keystroke for every item). */
-  const lowered = new WeakMap<object, { m: ReturnType<typeof meta>; tags: string[]; name: string }>();
-  const lowerOf = (e: CatalogListing["entries"][number]): { m: ReturnType<typeof meta>; tags: string[]; name: string } => {
-    let l = lowered.get(e);
-    if (!l) {
-      const m = meta(e);
-      l = { m, tags: m.tags.map((t) => t.toLowerCase()), name: e.name.toLowerCase() };
-      lowered.set(e, l);
-    }
-    return l;
-  };
+  /** The search's matcher, made once per listing (it keeps each item's lower-case forms). */
+  let matchMemo: { of: CatalogListing | null; fn: ReturnType<typeof matcher> } | null = null;
   const matchesQuery = (e: CatalogListing["entries"][number], query: Query | null, usage: UsageFilter, how: Way = way): boolean => {
-    const { m, tags, name } = lowerOf(e);
-    let notes: string | null = null; // the note and the fields, lowercased only when a word gets that far
-    const words_ok = evalQuery(query, ({ text: w }) => {
-      if (w.startsWith("#")) return tags.some((t) => tagIsOrUnder(t, w.slice(1))); // a tag and the tags nested under it
-      // `.png` is the file type: a word that starts with a dot matches files with that extension (a lone dot: files that have one).
-      if (w.startsWith(".")) return w.length > 1 ? chipOf(e.name, e.type).toLowerCase() === w.slice(1) : extOf(e.name) !== "";
-      const f = filterOf(w);
-      if (f) {
-        const verdict = f.test(e, looks.get(e.hash), extraOf(e, m));
-        if (verdict === "unknown") {
-          if (f.needsLook) wantsLooks = true;
-          if (f.needsDuration) wantsDurations = true;
-          return false;
-        }
-        return verdict;
-      }
-      const inTags = tags.some((t) => t.includes(w));
-      if (how === "tag") return inTags;
-      if (how === "name") return name.includes(w);
-      if (name.includes(w) || e.type.toLowerCase().includes(w) || e.hash.startsWith(w) || inTags) return true;
-      notes ??= [m.note, ...m.fields.flatMap((f) => [f.key, f.value])].join("\n").toLowerCase();
-      return notes.includes(w);
-    });
-    return words_ok && (usage === "all" || (usage === "used" ? e.instances > 0 : e.instances === 0));
+    if (matchMemo?.of !== listing) {
+      matchMemo = {
+        of: listing,
+        fn: matcher({
+          folders: listing?.folders ?? [],
+          canvasNames: canvasNamesOf,
+          duration: (h) => durations.get(h),
+          look: (h) => looks.get(h),
+          unknown: (f) => {
+            if (f.needsLook) wantsLooks = true;
+            if (f.needsDuration) wantsDurations = true;
+          },
+        }),
+      };
+    }
+    return matchMemo.fn(e, query, usage, how);
   };
   /** The listing by hash (looked up instead of searched for each time). */
   let byHash = new Map<string, CatalogListing["entries"][number]>();
@@ -1466,33 +1433,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const sortedAll = (): CatalogListing["entries"] => {
     const key = sortSel.value as SortKey;
     if (sortMemo && sortMemo.of === listing && sortMemo.key === key && sortMemo.reversed === reversed) return sortMemo.rows;
-    const rows = [...listing!.entries];
-    // Text sorts compare a key made once per item (a folder path or the joined tags, made in every comparison, made sorting slow).
-    const textKey: Partial<Record<SortKey, (e: (typeof rows)[number]) => string>> = {
-      type: (e) => chipOf(e.name, e.type),
-      tags: (e) => meta(e).tags.join(" "),
-      folder: (e) => (meta(e).folderIds[0] ? folderPath(listing!.folders, meta(e).folderIds[0]!).join(" › ") : ""),
-    };
-    const keyOf = textKey[key];
-    const keys = keyOf ? new Map(rows.map((e) => [e, keyOf(e)])) : null;
-    const byKey = (a: (typeof rows)[number], b: (typeof rows)[number]): number => collator.compare(keys!.get(a)!, keys!.get(b)!);
-    const byName = (a: (typeof rows)[number], b: (typeof rows)[number]): number => collator.compare(a.name, b.name);
-    const cmp: Record<SortKey, (a: (typeof rows)[number], b: (typeof rows)[number]) => number> = {
-      newest: (a, b) => b.importedAt - a.importedAt,
-      name: byName,
-      size: (a, b) => b.size - a.size,
-      uses: (a, b) => b.instances - a.instances,
-      pixels: (a, b) => b.pixelW * b.pixelH - a.pixelW * a.pixelH,
-      type: byKey,
-      tags: (a, b) => byKey(a, b) || byName(a, b),
-      folder: (a, b) => byKey(a, b) || byName(a, b),
-      favourite: (a, b) => Number(meta(b).favorite) - Number(meta(a).favorite),
-      width: (a, b) => b.pixelW - a.pixelW,
-      height: (a, b) => b.pixelH - a.pixelH,
-      canvases: (a, b) => b.canvases - a.canvases,
-    };
-    const flip = reversed ? -1 : 1;
-    const sorted = rows.sort((a, b) => flip * cmp[key](a, b) || (a.hash < b.hash ? -1 : 1));
+    const sorted = sortListed([...listing!.entries], key, reversed, listing!.folders, collator);
     sortMemo = { of: listing!, key, reversed, rows: sorted };
     return sorted;
   };
@@ -1506,19 +1447,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const group = new Map<string, number>();
     if (scope === "similar") similar().forEach((g, i) => g.forEach((h) => group.set(h, i)));
     const inFolders = scope.startsWith("folder:") ? folderSubtree(listing.folders, scope.slice(7)) : null;
-    const inScope = (e: CatalogListing["entries"][number]): boolean => {
-      const m = meta(e);
-      if (scope === "hidden") return m.hidden;
-      if (m.hidden) return false; // hidden items show in the Hidden scope only, whatever is searched
-      if (scope === "similar") return group.has(e.hash);
-      if (scope === "favorites") return m.favorite;
-      if (scope === "unfiled") return m.folderIds.length === 0;
-      if (inFolders) return m.folderIds.some((id) => inFolders.has(id));
-      if (scope.startsWith("ext:")) return chipOf(e.name, e.type).toLowerCase() === scope.slice(4);
-      if (scope.startsWith("tag:")) return m.tags.some((t) => tagIsOrUnder(t, scope.slice(4)));
-      if (scope.startsWith("ctag:")) return canvasTags.get(scope.slice(5))?.assets.has(e.hash) ?? false;
-      return true;
-    };
+    const sets = { inFolders, canvasTagged: scope.startsWith("ctag:") ? (canvasTags.get(scope.slice(5))?.assets ?? null) : null, similar: group };
+    const inScope = (e: CatalogListing["entries"][number]): boolean => inScopeOf(e, scope, sets);
     // The library sorted once for this sort (kept until the library or the sort changes); a search or a filter only keeps rows of it, in
     // that order: sorting again on every keystroke cost most of the time with tens of thousands of items.
     const base = scope === "similar" ? listing.entries : sortedAll();
