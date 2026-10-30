@@ -214,13 +214,20 @@ console.log(`seed ${SEED}`);
   const back = new Set(filesUnder(join(ws, "library")).map((f) => sha(readFileSync(f))));
   if (!some.every((h) => back.has(h))) (failed = true), console.error(`FAILED: not every shown item is readable in library/ (${back.size} of ${SHOWN})`);
   // Held or only not collected yet: the page's live heap a while after that (what the next major collection keeps).
-  const live = async () => (await new Promise((r) => setTimeout(r, 10_000)), s.page.evaluate(() => Math.round(performance.memory.usedJSHeapSize / 2 ** 20)));
-  console.log(`  page heap in use 10 s after showing them: ${await live()} MB`);
+  const live = async () => {
+    await new Promise((r) => setTimeout(r, 10_000));
+    const before = await s.page.evaluate(() => Math.round(performance.memory.usedJSHeapSize / 2 ** 20));
+    const cdp = await s.page.context().newCDPSession(s.page);
+    await cdp.send("HeapProfiler.collectGarbage");
+    await cdp.detach();
+    return `${before} MB, ${await s.page.evaluate(() => Math.round(performance.memory.usedJSHeapSize / 2 ** 20))} MB after a full collection`;
+  };
+  console.log(`  page heap in use 10 s after showing them: ${await live()}`);
   note(`hide them again one at a time`, await measured(s.app, async () => {
     for (const h of some) await s.lib("hide", h, "1");
     await s.flush();
   }));
-  console.log(`  page heap in use 10 s after hiding them again: ${await live()} MB`);
+  console.log(`  page heap in use 10 s after hiding them again: ${await live()}`);
   await s.app.close();
   const t = performance.now();
   const disk = await onDisk(ws);
