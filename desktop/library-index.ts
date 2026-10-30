@@ -39,6 +39,8 @@ export interface QueryResult {
   bytes: number;
 }
 
+const NONE: string[] = [];
+
 export class LibraryIndex {
   private items: Map<string, ListedEntry> | null = null;
   /** Changes since the sorted lists were made. */
@@ -63,8 +65,12 @@ export class LibraryIndex {
     if (this.items) return this.items;
     const items = new Map<string, ListedEntry>();
     for (const [json] of this.lib.db.prepare("SELECT json FROM entries WHERE state = 'active'").raw().iterate() as IterableIterator<[string]>) {
-      const e = JSON.parse(json) as CatalogEntry;
-      items.set(e.hash, { ...e, instances: 0, canvases: 0, canvasIds: [], present: true });
+      const e = JSON.parse(json) as ListedEntry; // (the parsed entry itself takes the listing's fields: a million are not copied)
+      e.instances = 0;
+      e.canvases = 0;
+      e.canvasIds = NONE;
+      e.present = true;
+      items.set(e.hash, e);
     }
     this.version++;
     return (this.items = items);

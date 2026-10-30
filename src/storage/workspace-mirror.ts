@@ -554,9 +554,12 @@ export class WorkspaceMirror {
         const hid = await this.lib.scanHidden(hiddenTouched);
         if (hid || scanned) {
           onChange();
-          // (files taken in where they lie: the library is written whole, as a full look would; relinked ones: only theirs)
+          // (relinked ones: only theirs; files taken in where they lie: what is unwritten, all of a small library)
           if (!hid && some && !some.imported) this.library(some.changed);
-          else this.library();
+          else {
+            const w = await this.lib.pendingWrite();
+            this.library(w === true || hid ? undefined : [...(w || []), ...(some?.changed ?? [])]);
+          }
         }
       })
       .catch((e: unknown) => this.onError?.(`The workspace folder could not be looked through: ${(e as Error).message}.`));

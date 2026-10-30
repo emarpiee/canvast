@@ -405,7 +405,11 @@ export class DesktopCatalog implements CatalogStore {
     return this.lib.serial(async () => {
       const ops: LibraryOp[] = [];
       const known = new Set<string>();
-      for (const r of JSON.parse(await this.lib.calls.orphans()) as AssetRecord[]) (known.add(r.hash), ops.push(putEntry(entryFromRecord(r))));
+      // Records with no entry: the library saves the two together, so only one moved in from the page's storage can lack it (looked at once).
+      if (!(await this.lib.calls.meta("orphansChecked"))) {
+        for (const r of JSON.parse(await this.lib.calls.orphans()) as AssetRecord[]) (known.add(r.hash), ops.push(putEntry(entryFromRecord(r))));
+        ops.push({ t: "meta", k: "orphansChecked", v: 1 });
+      }
       const tx = this.db.transaction("assets", "readonly");
       const held = (await req(tx.objectStore("assets").getAllKeys())) as string[];
       for (const k of (await this.lib.rows(held)).entries.keys()) known.add(k);

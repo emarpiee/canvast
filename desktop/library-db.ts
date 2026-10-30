@@ -254,8 +254,17 @@ export class Library {
       return !!e && seen(JSON.stringify(itemOf(e, this.rec(hash)))) !== (was ?? "");
     };
     /** `mark`: an item given here (a sync tool's copy, an older `library.json`, the sealed index), not read from a part: the parts do not have it yet. */
+    // (into an empty library, as on a new device: nothing is there to compare with, so nothing is looked up item by item)
+    const fresh = !this.db.prepare("SELECT 1 FROM entries LIMIT 1").get();
     const take = (it: LibraryItem, mark = false): void => {
       const v = seen(JSON.stringify(it));
+      if (fresh && !mark) {
+        this.one({ t: "entry", hash: it.hash, v: entryOf(it, undefined) }, false);
+        this.one({ t: "seen", hash: it.hash, v }, false);
+        if (it.file) this.one({ t: "rec", hash: it.hash, v: { hash: it.hash, type: it.type, size: it.size, name: it.name, pixelW: it.pixelW, pixelH: it.pixelH, importedAt: it.importedAt, ...(it.card ? { card: true } : {}), ...(it.duration !== undefined ? { duration: it.duration } : {}), ...(it.frames !== undefined ? { frames: it.frames } : {}), ext: 1, file: it.file } as unknown as AssetRecord }, false);
+        took = true;
+        return;
+      }
       const was = this.seenOf(it.hash);
       if (was === v) return; // (nothing new from the folder)
       if (changedHere(it.hash, was)) return; // changed here too: this device's stays

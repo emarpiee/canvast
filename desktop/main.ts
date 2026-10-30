@@ -515,6 +515,17 @@ function installFileCalls(win: BrowserWindow, root: string): void {
   // The active items whose file is not there, kept until a file or a record changes.
   let absentCache: Set<string> | null = null;
   walkedListeners.push(() => (absentCache = null));
+  /** Whether each of these items' file is there (and of its size): looked at for them alone. */
+  const presentOf = async (rows: Array<[string, string | null, number | null]>): Promise<Set<string>> => {
+    const out = new Set<string>();
+    await Promise.all(rows.map(async ([hash, file, size]) => {
+      if (!file || size === null || !isSafeRelativePath(file) || !(file.startsWith("library/") || /^\.hidden\/[^/]+$/.test(file))) return;
+      let got = walkedSizes.get(file);
+      if (got === undefined) got = await lstat(join(root, ...file.split("/"))).then((st) => (st.isFile() ? st.size : -1), () => -1);
+      if (isHiddenFile(file) ? got >= size + SEAL_OVERHEAD : got === size) out.add(hash);
+    }));
+    return out;
+  };
   const absentNow = async (l: Library): Promise<Set<string>> => {
     if (absentCache) return absentCache;
     const rows = l.db.prepare("SELECT e.hash, r.file, json_extract(r.json, '$.size') FROM entries e LEFT JOIN recs r ON r.hash = e.hash WHERE e.state = 'active'").raw().all() as Array<[string, string | null, number | null]>;
@@ -600,16 +611,20 @@ function installFileCalls(win: BrowserWindow, root: string): void {
       case "absent":
         // Which active items' files are not there (or not of their size), looked at here: the sizes of the start-up walk, else each file.
         return [...(await absentNow(l))];
-      case "query":
-        return index!.query(args[0] as LibraryQuery, await absentNow(l));
+      case "query": {
+        // (which files are missing is looked at over the whole library only for a search that asks for them)
+        const q = args[0] as LibraryQuery;
+        return index!.query(q, /missing/i.test(q.text) ? await absentNow(l) : new Set());
+      }
       case "counts":
         return index!.counts();
       case "fieldKeys":
         return index!.fieldKeys();
       case "listed": {
-        // Some items for the view to draw: their entries, and whether each one's file is there.
-        const gone = await absentNow(l);
-        return l.get(hashes(args[0])).flatMap(([h, e]) => (e ? [{ ...e, present: !gone.has(h) }] : []));
+        // Some items for the view to draw: their entries, and whether each one's file is there (looked at for them alone).
+        const rows = l.get(hashes(args[0]));
+        const here = await presentOf(rows.map(([h, , r]) => [h, r?.ext && r.file ? r.file : null, r?.size ?? null]));
+        return rows.flatMap(([h, e]) => (e ? [{ ...e, present: here.has(h) }] : []));
       }
       case "orphans":
         return l.orphansText();
