@@ -145,8 +145,12 @@ export class Library {
     if (ops.some((o) => o.t === "meta" && o.k === "hiddenBlanked")) this.db.pragma("wal_checkpoint(TRUNCATE)");
   }
 
+  /** Told of each change made (the view's lists and the missing files follow it). */
+  readonly listeners: Array<(op: LibraryOp) => void> = [];
+
   /** One change; `mark`: made here (the page's), so the folder does not have it yet (`changed`, until written). */
   private one(op: LibraryOp, mark = true): void {
+    for (const fn of this.listeners) fn(op);
     const s = this.s;
     if (mark && (op.t === "entry" || op.t === "rec")) s.mark.run(op.hash);
     if (op.t === "entry") {

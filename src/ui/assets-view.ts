@@ -23,7 +23,7 @@ import { LIBRARY_ROWS, searchHelpButton, wireSearchHelp } from "./search-help";
 import { ASSETS_RECENT, rememberSearch } from "../search/history";
 import { paintRecent, paintSaveToggle, saveToggleHtml, wireRecent, wireSaveToggle, type SavedStore } from "./search-recent";
 import { evalQuery, parseQuery, type Query } from "../search/query";
-import { inScope as inScopeOf, matcher, sortListed, type SortKey, type UsageFilter } from "../assets/library-match";
+import { countSide as countSideOf, inScope as inScopeOf, matcher, sortListed, type SideCounts, type SortKey, type UsageFilter } from "../assets/library-match";
 import { LOOK_SIZE, lookOf, similarGroups, type Look } from "../assets/look";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
@@ -1701,41 +1701,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
 
   /** The sidebar's counts, made once per listing (not on every redraw: they go over the whole library). */
-  type SideCounts = { of: CatalogListing; hidden: number; shown: number; favourites: number; unfiled: number; tags: Map<string, { label: string; n: number }>; types: Map<string, number>; folders: Map<string, number> };
-  let sideCounts: SideCounts | null = null;
+  let sideCounts: { of: CatalogListing; counts: SideCounts } | null = null;
   const countSide = (l: CatalogListing): SideCounts => {
-    if (sideCounts?.of === l) return sideCounts;
-    const c: SideCounts = { of: l, hidden: 0, shown: 0, favourites: 0, unfiled: 0, tags: new Map(), types: new Map(), folders: new Map() };
-    const parentOf = new Map(l.folders.map((f) => [f.id, f.parentId]));
-    for (const e of l.entries) {
-      const m = meta(e);
-      if (m.hidden) {
-        c.hidden++;
-        continue; // (what is hidden is in no count, tag list or file type list but its own scope)
-      }
-      c.shown++;
-      if (m.favorite) c.favourites++;
-      if (!m.folderIds.length) c.unfiled++;
-      for (const t of m.tags) {
-        const k = t.toLowerCase();
-        const tc = c.tags.get(k);
-        if (tc) tc.n++;
-        else c.tags.set(k, { label: t, n: 1 });
-      }
-      // The file types in the workspace: one chip per extension, with how many files have it.
-      const k = chipOf(e.name, e.type).toLowerCase();
-      c.types.set(k, (c.types.get(k) ?? 0) + 1);
-      // A folder counts what is in it and in the folders under it, each item once.
-      const under = new Set<string>();
-      for (let id of m.folderIds) {
-        for (let guard = 0; id && !under.has(id) && guard < 1000; guard++) {
-          under.add(id);
-          id = parentOf.get(id) ?? "";
-        }
-      }
-      for (const id of under) c.folders.set(id, (c.folders.get(id) ?? 0) + 1);
-    }
-    return (sideCounts = c);
+    if (sideCounts?.of !== l) sideCounts = { of: l, counts: countSideOf(l.entries, l.folders) };
+    return sideCounts.counts;
   };
   let lastSideHtml = "";
   const renderSide = (): void => {

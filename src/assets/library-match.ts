@@ -130,3 +130,47 @@ export function sortListed<T extends ListedEntry>(rows: T[], key: SortKey, rever
   const flip = reversed ? -1 : 1;
   return rows.sort((a, b) => flip * cmp[key](a, b) || (a.hash < b.hash ? -1 : 1));
 }
+
+/** The sidebar's counts: hidden and shown items, favourites, unfiled, each tag (by its lower-case form), file type and folder (with its subfolders). */
+export interface SideCounts {
+  hidden: number;
+  shown: number;
+  favourites: number;
+  unfiled: number;
+  tags: Map<string, { label: string; n: number }>;
+  types: Map<string, number>;
+  folders: Map<string, number>;
+}
+export function countSide(entries: Iterable<CatalogEntry>, folders: readonly AssetFolder[]): SideCounts {
+  const c: SideCounts = { hidden: 0, shown: 0, favourites: 0, unfiled: 0, tags: new Map(), types: new Map(), folders: new Map() };
+  const parentOf = new Map(folders.map((f) => [f.id, f.parentId]));
+  for (const e of entries) {
+    const m = meta(e);
+    if (m.hidden) {
+      c.hidden++;
+      continue; // (what is hidden is in no count, tag list or file type list but its own scope)
+    }
+    c.shown++;
+    if (m.favorite) c.favourites++;
+    if (!m.folderIds.length) c.unfiled++;
+    for (const t of m.tags) {
+      const k = t.toLowerCase();
+      const tc = c.tags.get(k);
+      if (tc) tc.n++;
+      else c.tags.set(k, { label: t, n: 1 });
+    }
+    // The file types in the workspace: one chip per extension, with how many files have it.
+    const k = chipOf(e.name, e.type).toLowerCase();
+    c.types.set(k, (c.types.get(k) ?? 0) + 1);
+    // A folder counts what is in it and in the folders under it, each item once.
+    const under = new Set<string>();
+    for (let id of m.folderIds) {
+      for (let guard = 0; id && !under.has(id) && guard < 1000; guard++) {
+        under.add(id);
+        id = parentOf.get(id) ?? "";
+      }
+    }
+    for (const id of under) c.folders.set(id, (c.folders.get(id) ?? 0) + 1);
+  }
+  return c;
+}

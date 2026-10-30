@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Library, openLibraryDb } from "../../desktop/library-db";
+import { LibraryIndex } from "../../desktop/library-index";
 import { libraryPartText } from "../../src/storage/library-mirror";
 import type { LibraryItem } from "../../src/storage/library-mirror";
 
@@ -70,5 +71,22 @@ describe("library database (desktop)", () => {
     expect(disk.has(".canvast/library.json")).toBe(false);
     const keys = JSON.parse(disk.get(".canvast/library/index.json")!).parts as string[];
     expect(lib.sync(keys, (k) => files.read(`.canvast/library/items-${k}.json`), [], true).took).toBe(false);
+  });
+
+  it("lists for the Library view as the browser does: scope, search, sort; kept in step with each change", () => {
+    const lib = new Library(openLibraryDb(":memory:"));
+    const index = new LibraryIndex(lib);
+    const f = folder([item(1, { name: "b.png", tags: ["Cat"] }), item(2, { name: "a.png", favorite: true }), item(3, { name: "c.jpg", hidden: true })]);
+    lib.sync(f.keys, f.read, [], true);
+    const q = { scope: "all", text: "", way: "all" as const, usage: "all" as const, sort: "name" as const, reversed: false, used: {}, canvasNames: {} };
+    const list = (over = {}) => index.query({ ...q, ...over }, new Set()).hashes.match(/.{64}/g) ?? [];
+    expect(list()).toEqual([item(2).hash, item(1).hash]); // (hidden: only in the Hidden scope)
+    expect(list({ text: "#cat" })).toEqual([item(1).hash]);
+    expect(list({ scope: "favorites" })).toEqual([item(2).hash]);
+    expect(list({ scope: "hidden" })).toEqual([item(3).hash]);
+    expect(index.query(q, new Set()).total).toBe(3);
+    lib.apply([{ t: "entry", hash: item(1).hash, v: { ...lib.entry(item(1).hash)!, name: "0.png" } }]);
+    expect(list()).toEqual([item(1).hash, item(2).hash]);
+    expect(index.counts().tags).toEqual([["cat", "Cat", 1]]);
   });
 });

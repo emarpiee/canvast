@@ -17,6 +17,8 @@ import { readItem } from "../src/storage/library-mirror";
 import { SEAL_OVERHEAD, isHiddenFile } from "../src/storage/hidden-vault";
 import type { LibraryItem } from "../src/storage/library-mirror";
 import { Library, openLibraryDb } from "./library-db";
+import { LibraryIndex } from "./library-index";
+import type { LibraryQuery } from "./library-index";
 import type { LibraryOp } from "../src/storage/desktop-bridge";
 import { pathToFileURL } from "node:url";
 
@@ -314,7 +316,10 @@ async function emptyOldTrash(root: string, days: number): Promise<number> {
  * files is not looked at twice to show which are there. One window, one workspace, per process.
  */
 const walkedSizes = new Map<string, number>();
+/** Told when a file of the workspace changed (what was known of which files are there is made again). */
+const walkedListeners: Array<() => void> = [];
 function forgetWalked(rel: string): void {
+  for (const fn of walkedListeners) fn();
   if (!walkedSizes.size) return;
   walkedSizes.delete(rel);
   if (!/\.[^/]+$/.test(rel)) for (const p of walkedSizes.keys()) if (p.startsWith(`${rel}/`)) walkedSizes.delete(p); // (a folder)
@@ -475,6 +480,7 @@ function installFileCalls(win: BrowserWindow, root: string): void {
     const walked = await walkFiles(join(root, "library"), "library");
     walkedSizes.clear();
     for (const f of walked) walkedSizes.set(f.path, f.size);
+    for (const fn of walkedListeners) fn();
     look = new Map(walked.map((f) => [f.path, `${f.size}:${Math.round(f.mtimeMs)}`]));
     let before: Record<string, string> | null = null;
     try {
@@ -496,11 +502,32 @@ function installFileCalls(win: BrowserWindow, root: string): void {
   });
   // The library (desktop/library-db.ts): this workspace's SQLite file in the app's own data, opened on first use.
   let lib: Library | null = null;
+  let index: LibraryIndex | null = null;
   const library = (): Library => {
     if (lib) return lib;
     const dir = join(app.getPath("userData"), "library-db");
     mkdirSync(dir, { recursive: true });
-    return (lib = new Library(openLibraryDb(join(dir, `${createHash("sha256").update(root).digest("hex").slice(0, 24)}.sqlite`))));
+    lib = new Library(openLibraryDb(join(dir, `${createHash("sha256").update(root).digest("hex").slice(0, 24)}.sqlite`)));
+    index = new LibraryIndex(lib);
+    lib.listeners.push((op) => void ((op.t === "rec" || op.t === "entry") && (absentCache = null)));
+    return lib;
+  };
+  // The active items whose file is not there, kept until a file or a record changes.
+  let absentCache: Set<string> | null = null;
+  walkedListeners.push(() => (absentCache = null));
+  const absentNow = async (l: Library): Promise<Set<string>> => {
+    if (absentCache) return absentCache;
+    const rows = l.db.prepare("SELECT e.hash, r.file, json_extract(r.json, '$.size') FROM entries e LEFT JOIN recs r ON r.hash = e.hash WHERE e.state = 'active'").raw().all() as Array<[string, string | null, number | null]>;
+    const out = new Set<string>();
+    for (let i = 0; i < rows.length; i += 2000) {
+      await Promise.all(rows.slice(i, i + 2000).map(async ([hash, file, size]) => {
+        if (!file || size === null || !isSafeRelativePath(file) || !(file.startsWith("library/") || /^\.hidden\/[^/]+$/.test(file))) return void out.add(hash);
+        let got = walkedSizes.get(file);
+        if (got === undefined) got = await lstat(join(root, ...file.split("/"))).then((st) => (st.isFile() ? st.size : -1), () => -1);
+        if (isHiddenFile(file) ? got < size + SEAL_OVERHEAD : got !== size) out.add(hash);
+      }));
+    }
+    return (absentCache = out);
   };
   const HASH = /^[0-9a-f]{64}$/;
   const hashes = (a: unknown): string[] => (Array.isArray(a) ? a.filter((h): h is string => typeof h === "string" && HASH.test(h)) : []);
@@ -570,19 +597,19 @@ function installFileCalls(win: BrowserWindow, root: string): void {
       }
       case "holds":
         return typeof args[0] === "string" && l.holds(args[0]);
-      case "absent": {
+      case "absent":
         // Which active items' files are not there (or not of their size), looked at here: the sizes of the start-up walk, else each file.
-        const rows = l.db.prepare("SELECT e.hash, r.file, json_extract(r.json, '$.size') FROM entries e LEFT JOIN recs r ON r.hash = e.hash WHERE e.state = 'active'").raw().all() as Array<[string, string | null, number | null]>;
-        const out: string[] = [];
-        for (let i = 0; i < rows.length; i += 2000) {
-          await Promise.all(rows.slice(i, i + 2000).map(async ([hash, file, size]) => {
-            if (!file || size === null || !isSafeRelativePath(file) || !(file.startsWith("library/") || /^\.hidden\/[^/]+$/.test(file))) return void out.push(hash);
-            let got = walkedSizes.get(file);
-            if (got === undefined) got = await lstat(join(root, ...file.split("/"))).then((st) => (st.isFile() ? st.size : -1), () => -1);
-            if (isHiddenFile(file) ? got < size + SEAL_OVERHEAD : got !== size) out.push(hash);
-          }));
-        }
-        return out;
+        return [...(await absentNow(l))];
+      case "query":
+        return index!.query(args[0] as LibraryQuery, await absentNow(l));
+      case "counts":
+        return index!.counts();
+      case "fieldKeys":
+        return index!.fieldKeys();
+      case "listed": {
+        // Some items for the view to draw: their entries, and whether each one's file is there.
+        const gone = await absentNow(l);
+        return l.get(hashes(args[0])).flatMap(([h, e]) => (e ? [{ ...e, present: !gone.has(h) }] : []));
       }
       case "orphans":
         return l.orphansText();
@@ -592,6 +619,8 @@ function installFileCalls(win: BrowserWindow, root: string): void {
         return l.parts();
       }
       case "reset":
+        index?.reset();
+        absentCache = null;
         return void l.db.exec("DELETE FROM entries; DELETE FROM recs; DELETE FROM seen; DELETE FROM parts; DELETE FROM meta; DELETE FROM changed;");
       default:
         throw new Error("not a library call");
