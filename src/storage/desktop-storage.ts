@@ -76,9 +76,10 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   const lib = new DesktopLibrary(raw.lib);
   await moveIdbLibrary(storage.db, lib);
   const desktopCatalog = new DesktopCatalog(storage.db, lib);
-  const hidden = new HiddenVault(bridge, async () => (await desktopCatalog.hiddenHashes()).size);
+  const hidden = new HiddenVault(bridge, async () => (await desktopCatalog.pages.counts()).hidden); // (counted in the main process)
+  desktopCatalog.vault = hidden;
   const mirror = new WorkspaceMirror(storage.db, lib, storage.workspace, bridge, deviceId(), hidden, deleteTo);
-  // Hidden originals are sealed files: read through the key, in memory (none while locked); their thumbnails are never stored.
+  // Hidden originals are sealed files: read through the key, in memory (none while locked); their thumbnails are stored encrypted.
   externalFolder.unseal = {
     open: async (blob) => {
       const bytes = await hidden.open(new Uint8Array(await blob.arrayBuffer()));

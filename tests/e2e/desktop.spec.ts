@@ -945,7 +945,7 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
   }
 });
 
-test("a hidden item's picture is not read while locked, so after a restart its card shows once its list is opened", async () => {
+test("a hidden item's picture is not read while locked, so after a restart its card shows in hidden mode; its thumbnail is kept encrypted", async () => {
   const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
   const pic = (k: number) => makePng(600, 400, (x, y) => [(x * k) % 256, y % 256, 120, 255]); // (bigger than a thumbnail: one is made)
   let { app, page } = await launch(ws);
@@ -971,6 +971,22 @@ test("a hidden item's picture is not read while locked, so after a restart its c
     await page.getByTestId("prompt-input").fill("pw");
     await page.getByTestId("prompt-ok").click();
     const img = page.locator(`[data-testid="asset-card"][data-hash="${hash}"] img`);
+    await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth)).toBeGreaterThan(0);
+    // Its thumbnail is stored encrypted with the hidden items' key: nothing of the picture is readable in the app's storage.
+    const stored = () =>
+      page.evaluate((h) => new Promise<{ sealed: string | null; head: string } | null>((res) => {
+        const r = indexedDB.open("canvast");
+        r.onsuccess = () => {
+          const g = r.result.transaction("thumbs").objectStore("thumbs").get(h);
+          g.onsuccess = () => void (g.result ? (g.result.blob as Blob).slice(0, 12).text().then((head) => res({ sealed: g.result.sealed ?? null, head })) : res(null));
+        };
+      }), hash);
+    await expect.poll(() => stored().then((t) => t?.sealed ?? null)).toMatch(/^image\//);
+    expect((await stored())!.head).not.toMatch(/RIFF|PNG|JFIF|WEBP/);
+    // Out of hidden mode and in again: the card is drawn from that thumbnail, opened with the key.
+    await page.getByTestId("hidden-mode-exit").click();
+    await page.getByTestId("assets-search").fill("hidden:");
+    if (await page.getByTestId("prompt-input").isVisible({ timeout: 2000 }).catch(() => false)) (await page.getByTestId("prompt-input").fill("pw"), await page.getByTestId("prompt-ok").click());
     await expect.poll(() => img.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth)).toBeGreaterThan(0);
   } finally {
     await app.close();

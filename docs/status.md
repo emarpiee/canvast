@@ -39,12 +39,12 @@ Unverified / Committed / Next bounded task**.
 
 ## v0.52.0: hidden mode (2026-10-30)
 
-- **Implemented:** hidden mode of the Library view (one flag through `inScope`, `countSide`, the desktop index's query and counts; `hiddenModeFolders`, `listedFolders`); *Unhide folder* (`CatalogStore.showFolder`, both builds); filing into a hidden folder hides; folders made in hidden folders or hidden mode are hidden; counts and totals of the mode's items only; desktop hide and show write only marked items (`WorkspaceMirror.libraryMarked`); a folder hidden while locked is kept on unlock; stale temporary files swept at start-up; `scripts/stress-hidden.mjs` and the `Stress hidden` workflow.
+- **Implemented:** hidden mode of the Library view (one flag through `inScope`, `countSide`, the desktop index's query and counts; `hiddenModeFolders`, `listedFolders`); *Unhide folder* (`CatalogStore.showFolder`, both builds); filing into a hidden folder hides; folders made in hidden folders or hidden mode are hidden; counts and totals of the mode's items only; desktop hide and show write only marked items (`WorkspaceMirror.libraryMarked`); a folder hidden while locked is kept on unlock; stale temporary files swept at start-up; hidden thumbnails stored encrypted (`DesktopCatalog.vault`), so looks come from them too; hidden items counted in the main process; `scripts/stress-hidden.mjs` and the `Stress hidden` workflow.
 - **Tested:** unit (`library-db.test.ts`: hidden mode lists and counts); E2E `organize.spec.ts` hiding test (Chromium and Firefox: hidden mode, tags and folders in it, Backspace and Exit, Unhide folder, remembered password); desktop E2E hidden tests 3/3 (Unhide folder and filing into a hidden folder on disk). Baseline stress run on GitHub (10,000 items, 30 kill rounds): nothing lost or damaged; one temporary file left (fixed); unhiding 1,000 one at a time peaked at 4.2 GB (each wrote the whole library; now only what changed).
 - **Known failures:** none known.
 - **Unverified:** the stress run after these changes; the README screenshot of hidden mode is the old Hidden list (retake with `scripts/showcase/shots-privacy.mjs`).
 - **Committed:** main.
-- **Next bounded task:** hidden thumbnails and looks encrypted (plan H7), then exporting chosen folders (H4) and the outside tool's folder tree (H5).
+- **Next bounded task:** exporting chosen folders (H4), then the outside tool's folder tree (H5).
 
 ## v0.51.1: a million items in the Library (2026-10-30)
 

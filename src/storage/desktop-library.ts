@@ -100,8 +100,11 @@ interface JournalSnapshot extends MetaSnapshot {
 const putFolders = (folders: AssetFolder[]): LibraryOp => ({ t: "meta", k: FOLDERS_KEY, v: folders });
 
 export class DesktopCatalog implements CatalogStore {
-  /** False: a hidden item is encrypted, its thumbnail is made in memory only, never stored (ADR 0177). */
-  keepHiddenThumbs = false;
+  /**
+   * The hidden items' key: a hidden item's thumbnail is stored encrypted with it (made once, never readable on disk), and read only
+   * while it is open (ADR 0177).
+   */
+  vault: { isOpen(): boolean; seal(bytes: Uint8Array<ArrayBuffer>, item: object): Promise<Uint8Array<ArrayBuffer>>; open(sealed: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer> | null> } | null = null;
 
   constructor(
     readonly db: IDBDatabase,
@@ -119,7 +122,11 @@ export class DesktopCatalog implements CatalogStore {
 
   async thumb(hash: string): Promise<ThumbRecord | undefined> {
     const tx = this.db.transaction("thumbs", "readonly");
-    return req(tx.objectStore("thumbs").get(hash) as IDBRequest<ThumbRecord | undefined>);
+    const rec = await req(tx.objectStore("thumbs").get(hash) as IDBRequest<(ThumbRecord & { sealed?: string }) | undefined>);
+    if (rec?.sealed === undefined) return rec;
+    // (a hidden item's: opened with the key, or none while it is locked)
+    const bytes = this.vault?.isOpen() ? await this.vault.open(new Uint8Array(await rec.blob.arrayBuffer())).catch(() => null) : null;
+    return bytes ? { hash: rec.hash, w: rec.w, h: rec.h, blob: new Blob([bytes], { type: rec.sealed }) } : undefined;
   }
 
   /** (`AssetCatalog.healThumbs`: thumbnails of types that do not always decode, dropped once.) */
@@ -185,9 +192,14 @@ export class DesktopCatalog implements CatalogStore {
   async putThumb(rec: ThumbRecord): Promise<void> {
     // Not for an item erased in the meantime: nothing would ever remove it.
     const e = await this.lib.entry(rec.hash);
-    if (!e || (!this.keepHiddenThumbs && e.hidden)) return;
+    if (!e) return;
+    let put: ThumbRecord & { sealed?: string } = rec;
+    if (e.hidden) {
+      if (!this.vault?.isOpen()) return;
+      put = { ...rec, blob: new Blob([await this.vault.seal(new Uint8Array(await rec.blob.arrayBuffer()), {})]), sealed: rec.blob.type };
+    }
     const tx = this.db.transaction("thumbs", "readwrite");
-    tx.objectStore("thumbs").put(rec);
+    tx.objectStore("thumbs").put(put);
     await done(tx);
   }
 
