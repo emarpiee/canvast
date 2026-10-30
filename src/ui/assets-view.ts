@@ -30,7 +30,7 @@ import { duplicateNotice } from "../assets/asset-library";
 import type { AssetField, AssetFolder, CatalogEntry, CatalogListing } from "../assets/asset-catalog";
 import type { LibraryPages } from "../storage/store";
 import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, folderPath, folderSubtree, hiddenModeFolders, meta, usageOf, visibleFolders } from "../assets/asset-catalog";
-import { THUMB_PX, makeThumb } from "../assets/thumb";
+import { THUMB_PX, makeThumb, shrinkPicture } from "../assets/thumb";
 import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
 import { clearRect, MENU_GAP, openMoreMenu } from "./more-menu";
@@ -41,6 +41,7 @@ import { asPng, writeSystemClipboard } from "../app/system-clipboard";
 import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
 import { runExport, runExportFiles, runExportFolder } from "./archive-ui";
+import { openLibraryPicker } from "./library-picker";
 import { hasAlpha } from "./alpha";
 import { VIEW_GROUNDS, type ViewGround } from "../storage/workspace-repo";
 import type { Engine } from "./media-player";
@@ -503,6 +504,98 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let generation = 0;
   /** Sidebar scope: "all", "favorites", "unfiled", "folder:<id>" or "tag:<lowercased tag>". */
   let scope = ui.filters.scope === "hidden" ? "all" : ui.filters.scope; // (the filters are kept with the library's layout: a restart opens the library as it was left)
+  /**
+   * Custom thumbnail of `hashes` (their own category: uploaded once, chosen again from Thumbnails; or a picture of the library; or their
+   * own again). Normal mode sees and makes normal ones only; hidden mode sees both, and what it uploads is kept as a hidden one.
+   */
+  const chooseThumbnail = async (anchor: HTMLElement, hashes: readonly string[]): Promise<void> => {
+    const store = session.storage?.customThumbs;
+    if (!hashes.length || !store) return;
+    const how = await chooseDialog({
+      title: hashes.length === 1 ? "Custom thumbnail" : `Custom thumbnail of ${hashes.length} items`,
+      lines: ["What the Library shows for it instead of its own picture (also for a file with no preview). Uploaded thumbnails are kept in their own place, not in the library."],
+      choices: [
+        { value: "existing", label: "Thumbnails", help: "One uploaded before (any item's)." },
+        { value: "library", label: "A picture of the library", help: "Its thumbnail stands for this item." },
+        { value: "upload", label: "Upload a picture", help: "Kept small (512 px) as a custom thumbnail." },
+        { value: "auto", label: "Automatic", help: "Its own picture again." },
+        { value: "delete", label: "Delete a custom thumbnail…", help: "Items that use it show their own picture again." },
+      ],
+      confirmLabel: "Choose",
+    });
+    if (!how) return;
+    let thumb: string | null = null;
+    if (how === "existing" || how === "delete") {
+      const all = await thumbChoices();
+      const picked = await openLibraryPicker(anchor, all);
+      if (!picked) return;
+      if (how === "delete") return void deleteThumbnail(picked);
+      thumb = picked;
+    } else if (how === "library") {
+      const pics = (await session.catalog!.list().catch(() => null))?.entries.filter((e) => e.type.startsWith("image/") && !e.card && e.present && (hiddenMode || !meta(e).hidden)) ?? [];
+      thumb = await openLibraryPicker(anchor, pics.sort((a, b) => b.importedAt - a.importedAt).map((e) => ({ hash: e.hash, name: e.name, thumb: async () => (await session.catalog?.thumb(e.hash).catch(() => undefined))?.blob })));
+      if (!thumb) return;
+    } else if (how === "upload") {
+      const file = await new Promise<File | null>((ok) => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/*";
+        input.addEventListener("change", () => ok(input.files?.[0] ?? null));
+        input.addEventListener("cancel", () => ok(null));
+        input.click();
+      });
+      if (!file) return;
+      try {
+        thumb = await (hiddenMode ? store.putHidden(await shrinkPicture(file)) : store.put(await shrinkPicture(file)));
+      } catch (e) {
+        status.textContent = `That picture could not be used: ${(e as Error).message}.`;
+        return;
+      }
+    }
+    if (await session.organize((c) => c.updateMetaEach(hashes.map((h) => ({ hash: h, change: { thumb } }))), "Thumbnail")) redrawCards(hashes);
+  };
+  /** Their file cards on canvases are made again (with the custom thumbnail, or without it). */
+  const redrawCards = (hashes: readonly string[]): void => {
+    for (const h of hashes) assets.forget(h);
+    assets.retryAll();
+  };
+  /** The custom thumbnails the mode may use, each with how many listed items use it. */
+  const thumbChoices = async (): Promise<Array<{ hash: string; name: string; thumb(): Promise<Blob | undefined> }>> => {
+    const store = session.storage!.customThumbs;
+    const normal = await store.list();
+    const hidden = hiddenMode ? (await store.listHidden()).filter((h) => !normal.includes(h)) : [];
+    const hashes = [...normal, ...hidden];
+    const uses = new Map<string, number>();
+    for (const e of (await session.catalog!.list().catch(() => null))?.entries ?? []) {
+      const t = meta(e).thumb;
+      if (t && meta(e).hidden === hiddenMode) uses.set(t, (uses.get(t) ?? 0) + 1);
+    }
+    return hashes.map((h, i) => ({ hash: h, name: `${hidden.includes(h) ? "Hidden thumbnail" : "Thumbnail"} ${i + 1} · used by ${plural(uses.get(h) ?? 0, "item")}`, thumb: async () => (await store.get(h)) ?? (await store.getHidden(h)) ?? undefined }));
+  };
+  /**
+   * After hiding or showing items: an uploaded thumbnail of theirs follows them. Hidden: sealed, when no shown item uses it (it would
+   * stay readable for those). Shown again: a hidden one becomes normal.
+   */
+  const moveThumbs = async (hashes: readonly string[], hidden: boolean): Promise<void> => {
+    const store = session.storage?.customThumbs;
+    const list = (await session.catalog?.list().catch(() => null))?.entries ?? [];
+    if (!store) return;
+    const byHash = new Map(list.map((e) => [e.hash, e]));
+    for (const t of new Set(hashes.flatMap((h) => (byHash.get(h) && meta(byHash.get(h)!).thumb ? [meta(byHash.get(h)!).thumb!] : [])))) {
+      if (hidden && !list.some((e) => !meta(e).hidden && meta(e).thumb === t)) await store.toHidden(t).catch(() => undefined);
+      else if (!hidden) await store.toNormal(t).catch(() => undefined);
+    }
+  };
+  const deleteThumbnail = async (hash: string): Promise<void> => {
+    const store = session.storage!.customThumbs;
+    const users = ((await session.catalog!.list().catch(() => null))?.entries ?? []).filter((e) => meta(e).thumb === hash && meta(e).hidden === hiddenMode);
+    if (!(await confirmDialog({ title: "Delete this custom thumbnail?", lines: [users.length ? `${plural(users.length, "item")} use it; ${users.length === 1 ? "it shows" : "they show"} its own picture again.` : "No item uses it."], confirmLabel: "Delete" }))) return;
+    // (items that still name it show their own picture: a hidden one is cleared in hidden mode, so nothing outside says it had one)
+    if (users.length && (await session.organize((c) => c.updateMetaEach(users.map((e) => ({ hash: e.hash, change: { thumb: null } }))), "Thumbnail"))) redrawCards(users.map((e) => e.hash));
+    await store.remove(hash);
+    if (hiddenMode) await store.removeHidden(hash);
+    refreshSoon(true);
+  };
   /** Whether opening a hidden item in the system's app was confirmed this session (a readable copy is written for it). */
   let openCopyAsked = false;
   /** Hidden mode (the word that opens the hidden items, then their password): the same view, listing the hidden items only. */
@@ -525,7 +618,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let naming: { kind: "new"; parent: string | null } | { kind: "rename-tag"; key: string; label: string } | { kind: "rename-ctag"; key: string; label: string } | { kind: "rename"; id: string } | null = null;
   const scroller = root.querySelector<HTMLElement>(".assets-scroll")!;
   /** A thumbnail being read or made: who still wants it (a card that scrolled away does not), and whether it is for the screen or the background. */
-  type ThumbJob = { p: Promise<string>; wants: Array<() => boolean>; urgent: boolean; failed?: boolean };
+  type ThumbJob = { p: Promise<string>; wants: Array<() => boolean>; urgent: boolean; failed?: boolean; custom: string | null };
   const thumbs = new Map<string, ThumbJob>();
   const thumbUrls = new Map<string, string>(); // the ones already loaded, oldest first: a redrawn grid shows them at once instead of blank cards
   /** A file the browser cannot show gets no picture at all (ADR 0089): a fixed tile with the file icon, the extension and one general message. */
@@ -558,8 +651,20 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       had.urgent ||= urgent;
       return had.p;
     }
-    const job = { wants: [wanted], urgent } as ThumbJob;
+    const custom = (entryOf(hash) && meta(entryOf(hash)!).thumb) || null;
+    const job = { wants: [wanted], urgent, custom } as ThumbJob;
     job.p = (async () => {
+      // A custom thumbnail: a library item's thumbnail, or an uploaded one (their own category); its own when neither is found.
+      // Outside hidden mode nothing hidden stands for an item: not a hidden library item, not a hidden custom thumbnail.
+      if (custom) {
+        const target = entryOf(custom);
+        const store = session.storage?.customThumbs;
+        const b =
+          (target && (hiddenMode || !meta(target).hidden) ? (await session.catalog?.thumb(custom).catch(() => undefined))?.blob : undefined) ??
+          (await store?.get(custom).catch(() => null)) ??
+          (hiddenMode ? await store?.getHidden(custom).catch(() => null) : null);
+        if (b) return URL.createObjectURL(b);
+      }
       // A thumbnail stored earlier: the original is not read at all (and a lost original keeps its face).
       const stored = await session.catalog?.thumb(hash).catch(() => undefined);
       // A card that scrolled away while this was read gets no address (making one for each of thousands of passing cards was slow).
@@ -706,7 +811,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const dropStaleThumbs = (): void => {
     const live = pagesNow() ? null : new Set(listing?.entries.map((e) => e.hash)); // (listed a page at a time: only failed ones are made again)
     for (const [hash, job] of thumbs) {
-      if ((!live || live.has(hash)) && !job.failed) continue;
+      if ((!live || live.has(hash)) && !job.failed && job.custom === ((entryOf(hash) && meta(entryOf(hash)!).thumb) || null)) continue;
       thumbs.delete(hash);
       thumbUrls.delete(hash);
       void job.p.then((url) => URL.revokeObjectURL(url), () => undefined);
@@ -767,7 +872,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       t.innerHTML = `<button type="button" class="film-item thumb-slot" role="option" data-hash="${hash}" aria-label="Loading"></button>`;
       return t.content.firstElementChild as HTMLElement;
     }
-    t.innerHTML = `<button type="button" class="film-item thumb-slot" role="option" data-hash="${e.hash}" aria-label="${esc(e.name || "Untitled")}" title="${esc(e.name || "Untitled")}">${!hasThumb(e) ? fileTile(e, false) : `<img alt="" draggable="false" data-hash="${e.hash}"${isFontFile(e) ? ' class="is-font-thumb"' : ""}>`}</button>`;
+    t.innerHTML = `<button type="button" class="film-item thumb-slot" role="option" data-hash="${e.hash}" aria-label="${esc(e.name || "Untitled")}" title="${esc(e.name || "Untitled")}">${!hasThumb(e) && !meta(e).thumb ? fileTile(e, false) : `<img alt="" draggable="false" data-hash="${e.hash}"${isFontFile(e) ? ' class="is-font-thumb"' : ""}>`}</button>`;
     const b = t.content.firstElementChild as HTMLElement;
     const img = b.querySelector<HTMLImageElement>("img");
     if (img) loadThumb(img);
@@ -1178,6 +1283,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       slideTile.hidden = false;
       slideCaption.textContent = `${e.name || "Untitled"}, ${fmtBytes(e.size)}`;
       void showFont(slideTile.querySelector<HTMLElement>(".font-sample")!, hash, async () => rec.blob);
+      armShow();
+      return;
+    }
+    if (isCard(rec) && e && meta(e).thumb) {
+      // Not something the browser can show, with a custom thumbnail: that picture, and what it is.
+      slideTile.hidden = true;
+      slideImg.hidden = false;
+      slideImg.src = await thumbFor(hash).catch(() => "");
+      slideCaption.textContent = `${label}. No preview for this kind of file: this is its custom thumbnail.`;
+      slideCaption.classList.add("is-note");
       armShow();
       return;
     }
@@ -1622,7 +1737,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const html = `<div class="asset-cell" role="listitem">
         <button type="button" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}" draggable="${session.readOnly ? "false" : "true"}"
           aria-pressed="false" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}">
-        <span class="asset-thumb thumb-slot">${!hasThumb(e) ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}${isFontFile(e) ? " is-font-thumb" : ""}" data-hash="${e.hash}"><span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>`}</span>
+        <span class="asset-thumb thumb-slot">${!hasThumb(e) && !meta(e).thumb ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}${isFontFile(e) ? " is-font-thumb" : ""}" data-hash="${e.hash}"><span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>`}</span>
         ${e.present ? "" : `<span class="asset-missing-label">File missing</span>`}
         <span class="asset-info">
           <span class="asset-name">${esc(name)}</span>
@@ -2107,6 +2222,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       ${tagsAndFolderHtml(ents, true)}
       <div class="asset-actions">
         <button type="button" class="assets-btn" data-action="rename-all" data-testid="bulk-rename" title="Rename them together: enumerate, replace text, add text, change the extension (F2)"${dis}>${ICONS.textCursorInput}<span>Rename ${n}…</span></button>
+        ${session.readOnly ? "" : `<button type="button" class="assets-btn" data-action="thumb-all" data-testid="bulk-thumb" aria-haspopup="dialog" title="Give the selected items one custom thumbnail, or their own pictures again">${ICONS.fileImage}<span>Thumbnail…</span></button>`}
         <button type="button" class="assets-btn" data-action="slideshow-all" data-testid="bulk-slideshow" title="Play the selected items as a slideshow">${ICONS.presentation}<span>Slideshow of these</span></button>
         <button type="button" class="assets-btn" data-action="export-files-all" data-testid="bulk-export-files" title="Save the selected items' files as a plain ZIP that any tool opens"${placeable ? "" : " disabled"}>${ICONS.fileArchive}<span>Export ${plural(placeable, "file")} as ZIP</span></button>
         <button type="button" class="assets-btn" data-action="export-all" data-testid="bulk-export" title="Save the selected items as a .canvast archive, with their tags, notes and folders, to import into canvast"${placeable ? "" : " disabled"}>${ICONS.fileOutput}<span>Export ${placeable} as archive</span></button>
@@ -2166,7 +2282,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="asset-insp-head">
         <h2 title="${esc(e ? e.name || "Untitled" : "Missing original")}">${esc(e ? e.name || "Untitled" : "Missing original")}</h2>
       </div>
-      ${e ? `<button type="button" class="asset-preview thumb-slot" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open in the viewer (double-click a card, or Enter)">${isFontFile(e) ? fontSampleHtml(e.name, false) : isCard(e) ? fileTile(e) : `<img alt="Preview of ${esc(e.name)}" draggable="false" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}">`}</button>` : ""}
+      ${e ? `<div class="asset-preview-box"><button type="button" class="asset-preview thumb-slot" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open in the viewer (double-click a card, or Enter)">${isFontFile(e) && !meta(e).thumb ? fontSampleHtml(e.name, false) : isCard(e) && !meta(e).thumb ? fileTile(e) : `<img alt="Preview of ${esc(e.name)}" draggable="false" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}">`}</button>${session.readOnly ? "" : `<button type="button" class="asset-thumb-btn" data-action="thumb" data-testid="asset-thumb" aria-haspopup="dialog" aria-label="Custom thumbnail" title="Custom thumbnail: one you uploaded before, a picture of the library, a new one, or its own again">${ICONS.fileImage}</button>`}</div>` : ""}
       ${
         e
           ? `<div class="asset-quick">
@@ -2640,6 +2756,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "hide-all": {
         const on = b.getAttribute("aria-pressed") !== "true";
         void readyForHidden(session, on).then((ready) => void (ready && session.organize((c) => c.updateMetaEach(group.map((h) => ({ hash: h, change: { hidden: on } }))), on ? "Hidden" : "Not hidden").then((ok) => {
+          if (ok) void moveThumbs(group, on);
           if (ok) void select(null); // (they leave the list, hidden or shown: nothing stays picked)
         })));
         break;
@@ -2647,6 +2764,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "hide": {
         const on = b.getAttribute("aria-pressed") !== "true";
         void readyForHidden(session, on).then((ready) => void (ready && session.organize((c) => c.updateMeta(hash, { hidden: on }), on ? "Hidden" : "Not hidden").then((ok) => {
+          if (ok) void moveThumbs([hash], on);
           if (ok) void select(null);
         })));
         break;
@@ -2716,6 +2834,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       case "open-tab":
         void openOriginalInTab(assets, hash);
+        break;
+      case "thumb":
+      case "thumb-all":
+        void chooseThumbnail(b, action === "thumb-all" ? pickedGroup() : [hash]);
         break;
       case "open-app":
         // The desktop app: the item's file in the workspace folder, in the system's app for it (a file canvast cannot play or show, too).

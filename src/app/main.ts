@@ -724,6 +724,15 @@ async function start(): Promise<void> {
   };
 
   const session = new Session(storage, doc, view, editor, assets);
+  // A file card on a canvas shows its custom thumbnail (a shown library item's, or an uploaded normal one): never a hidden one.
+  assets.customPicture = async (hash) => {
+    const e = await session.catalog?.entry(hash);
+    const t = e && !meta(e).hidden ? meta(e).thumb : null;
+    if (!t) return null;
+    const target = await session.catalog?.entry(t);
+    const own = target && !meta(target).hidden ? (await session.catalog?.thumb(t).catch(() => undefined))?.blob : undefined;
+    return own ?? (await storage?.customThumbs.get(t).catch(() => null)) ?? null;
+  };
   // (desktop only: the browser has no trash to send a file to, so the setting does nothing there even when a backup brought it)
   session.deleteAtOnce = () => !!desktopBridge() && settings.get("storage.deleteAtOnce");
   // The desktop build: before its window closes, the last edits reach the workspace folder (ADR 0177).

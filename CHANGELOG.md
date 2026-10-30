@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased — Custom thumbnails (2026-10-30)
+
+- **Added:** custom thumbnails: any library item (also a file with no preview) can show another picture in the Library and on its file card on a canvas: one uploaded before (their own category, *Thumbnails*, never library items), a picture of the library, a new upload (kept small), or its own again. In the desktop app uploaded ones are files of `.canvast/thumbnails/`. Backups carry them.
+- **Added:** hidden custom thumbnails: one uploaded in hidden mode is seen only there (sealed with the hidden items' key in `.hidden/thumbnails/` in the desktop app); hiding an item takes its uploaded thumbnail with it, showing it again makes it normal; `hidden-items.mjs decrypt` writes them to `thumbnails/`.
+
 ## 0.52.3 — Quick filters, player focus, tooltips (2026-10-30)
 
 - **Added:** `Ctrl`+click (`⌘` on a Mac) on a file type or a tag in the Library's sidebar adds it to the filter, or takes it out: several types, several tags, or both (any of the types, and any of the tags).

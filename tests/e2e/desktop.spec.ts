@@ -1160,3 +1160,50 @@ test("while the app runs it follows the folder: a canvas file renamed by hand, a
     await a.app.close();
   }
 });
+
+test("custom thumbnails in the workspace folder: an uploaded one in .canvast/thumbnails/, sealed into .hidden/thumbnails/ when its item is hidden, readable again when it is shown", async () => {
+  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const { app, page } = await launch(ws);
+  try {
+    await page.getByTestId("import-input").setInputFiles({ name: "notes.xyz", mimeType: "application/octet-stream", buffer: Buffer.from("not a picture") });
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(1);
+    const hash = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries[0]!.hash));
+    expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"))).ok).toBe(true);
+    await page.getByTestId("view-assets").click();
+    await page.locator(`[data-testid="asset-card"][data-hash="${hash}"]`).click();
+    const [chooser] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      (async () => {
+        await page.getByTestId("asset-thumb").click();
+        await page.getByRole("radio", { name: /Upload a picture/ }).check();
+        await page.getByTestId("choose-ok").click();
+      })(),
+    ]);
+    await chooser.setFiles({ name: "cover.png", mimeType: "image/png", buffer: makePng(40, 30, () => [200, 40, 40, 255]) });
+    const inDir = (d: string) => (existsSync(join(ws, d)) ? readdirSync(join(ws, d)) : []);
+    await expect.poll(() => inDir(".canvast/thumbnails").length).toBe(1);
+    expect(inDir(".canvast/thumbnails")[0]).toMatch(/^[0-9a-f]{64}\.webp$/);
+    const thumbName = inDir(".canvast/thumbnails")[0]!;
+    const webp = readFileSync(join(ws, ".canvast/thumbnails", thumbName));
+    // Hidden: the thumbnail goes with it, sealed; nothing readable of it is left.
+    await page.getByTestId("asset-hide").click();
+    await expect.poll(() => inDir(".hidden/thumbnails").length).toBe(1);
+    expect(inDir(".canvast/thumbnails")).toEqual([]);
+    expect(readFileSync(join(ws, ".hidden/thumbnails", inDir(".hidden/thumbnails")[0]!)).includes(webp.subarray(12, 40))).toBe(false);
+    // Outside the app, the tool writes it out with the hidden items (thumbnails/<hash>.webp).
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    const { decryptHidden } = (await import(join(process.cwd(), "scripts/hidden-items.mjs"))) as { decryptHidden: (ws: string, out: string, pw: string) => Promise<number> };
+    await decryptHidden(ws, `${ws}-out`, "pw");
+    expect(readFileSync(join(`${ws}-out`, "thumbnails", thumbName)).equals(webp)).toBe(true);
+    // Shown again (from hidden mode): readable again.
+    await page.getByTestId("assets-search").fill("hidden:");
+    await page.getByTestId("prompt-input").fill("pw");
+    await page.getByTestId("prompt-ok").click();
+    await page.locator(`[data-testid="asset-card"][data-hash="${hash}"]`).click();
+    await page.getByTestId("asset-hide").click();
+    await expect.poll(() => inDir(".canvast/thumbnails").length).toBe(1);
+    expect(inDir(".hidden/thumbnails")).toEqual([]);
+  } finally {
+    await app.close();
+  }
+});

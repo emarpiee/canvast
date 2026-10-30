@@ -58,6 +58,8 @@ export const sealedHooks: {
   /** Put sealed files and their key into the workspace folder; how many were new. */
   write: ((files: ReadonlyArray<{ hash: string; data: Blob }>, key: string | null) => Promise<number>) | null;
 } = { key: null, write: null };
+/** Where a backup reads custom thumbnails and an import keeps them (set by the storage that is open; normal ones only, see `CustomThumbStore`). */
+export const thumbHooks: { get: ((hash: string) => Promise<Blob | null>) | null; put: ((blob: Blob) => Promise<string>) | null } = { get: null, put: null };
 export const ARCHIVE_EXTENSION = ".canvast";
 
 /** Where a long job is: the stage in words and how far (done of total). The caller turns it into a progress notice. */
@@ -165,6 +167,8 @@ interface ManifestAsset {
   folders?: string[][];
   note?: string;
   fields?: AssetField[];
+  /** Its custom thumbnail's SHA-256: an item of the archive, or one of its `thumbnails`. */
+  thumb?: string;
 }
 
 /** An asset's organization as carried in an archive. */
@@ -175,6 +179,7 @@ export interface AssetOrganization {
   folders: string[][];
   note: string;
   fields: AssetField[];
+  thumb: string | null;
 }
 
 export interface Manifest {
@@ -204,6 +209,8 @@ export interface Manifest {
   sealed?: Array<{ hash: string; file: string }>;
   /** The key file of the sealed items (version 7). */
   hiddenKey?: string;
+  /** Custom thumbnails the items use (their SHA-256), each as `thumbnails/<hash>.webp`. Older versions of the app pass them by. */
+  thumbnails?: string[];
   /** Brush presets (version 6), written by builds that had the Painting view: no longer read. */
   brushes?: unknown[];
   /** Paintings (versions 5 and 6), written by builds that had the Painting view: no longer read. */
@@ -353,7 +360,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     const file = `assets/${hash}`;
     const known = noBytes || (since !== undefined && r.importedAt <= since); // already in an earlier file of the chain: its list entry, not its bytes
     const entry = await libraryIn(tx, snap).entry(hash);
-    const m = entry ? meta(entry) : { tags: [], favorite: false, hidden: false, folderIds: [], note: "", fields: [] };
+    const m = entry ? meta(entry) : { tags: [], favorite: false, hidden: false, folderIds: [], note: "", fields: [], thumb: null };
     folders ??= await libraryIn(tx, snap).folders();
     const allFolders = folders;
     assets.push({
@@ -372,6 +379,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       folders: m.folderIds.map((id) => folderPath(allFolders, id)).filter((p) => p.length > 0),
       ...(m.note ? { note: m.note } : {}),
       ...(m.fields.length ? { fields: m.fields } : {}),
+      ...(m.thumb ? { thumb: m.thumb } : {}),
     });
     if (!known) {
       const input: ZipInput = { name: file, data: r.blob };
@@ -397,6 +405,15 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     ...(typeof workspaceLock === "string" ? { workspaceLock } : {}),
     ...(sealed.length ? { sealed, hiddenKey: "hidden-key.json" } : {}),
   };
+  // The custom thumbnails its items use that are not items of it (uploaded ones), as files of their own (read after the database).
+  const thumbnails: string[] = [];
+  for (const t of new Set(assets.flatMap((a) => (a.thumb && !assets.some((x) => x.hash === a.thumb) ? [a.thumb] : [])))) {
+    const blob = await thumbHooks.get?.(t).catch(() => null);
+    if (!blob) continue;
+    assetBlobs.push({ name: `thumbnails/${t}.webp`, data: blob });
+    thumbnails.push(t);
+  }
+  if (thumbnails.length) manifest.thumbnails = thumbnails;
   const keyText = sealed.length ? await sealedHooks.key!() : null;
   if (sealed.length && !keyText) throw new ArchiveError("the hidden items' key file could not be read, so their sealed files would not open from the backup");
   for (const s of sealedReads) {
@@ -479,6 +496,8 @@ export interface ImportPlan {
   incrementalOnly: boolean;
   /** Hidden items sealed by the desktop build (version 7), as they are, and their key file: put into the workspace folder there. */
   sealed: Array<{ hash: string; data: Blob }>;
+  /** Custom thumbnails whose bytes matched their hash (kept by the import with `thumbHooks`). */
+  thumbnails: Blob[];
   hiddenKey: string | null;
 }
 
@@ -660,6 +679,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
     incrementalOnly: parts.length === 1 && sinceOf(latest) !== null,
     sealed: [],
     hiddenKey: null,
+    thumbnails: [],
   };
   // where a canvas is: in the newest file that has its content
   const canvasAt = (id: string): { entries: Map<string, ZipEntry>; file: string } | null => {
@@ -790,6 +810,20 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
       if (text && readVault(text)) plan.hiddenKey = text;
     }
   }
+  const thumbsSeen = new Set<string>();
+  for (const part of parts) {
+    for (const t of Array.isArray(part.m["thumbnails"]) ? (part.m["thumbnails"] as unknown[]) : []) {
+      if (typeof t !== "string" || !HASH_RE.test(t) || thumbsSeen.has(t)) continue;
+      const e = part.entries.get(`thumbnails/${t}.webp`);
+      const data = e && e.size <= 20 * 2 ** 20 ? e.data.slice(0, e.size, "image/webp") : null;
+      if (!data || (await sha256Hex(await data.arrayBuffer())) !== t) {
+        problems.push("A custom thumbnail is missing or damaged in the archive and was skipped: its items show their own pictures.");
+        continue;
+      }
+      thumbsSeen.add(t);
+      plan.thumbnails.push(data);
+    }
+  }
   if (plan.sealed.length && (!plan.hiddenKey || !sealedHooks.write)) {
     const n = plan.sealed.length;
     problems.push(!sealedHooks.write ? `${plural(n, "hidden item")} ${were(n)} encrypted by the desktop app and ${n === 1 ? "is" : "are"} left out here: import this backup in the desktop app, where the Hidden items' password opens ${n === 1 ? "it" : "them"}.` : `${plural(n, "hidden item")} came without ${n === 1 ? "its" : "their"} key file and ${were(n)} skipped.`);
@@ -811,7 +845,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
 
 /** Validate an asset's optional organization fields; anything invalid is reported and dropped. */
 function readOrganization(a: Record<string, unknown>, label: string, problems: string[]): AssetOrganization | null {
-  if (["tags", "favorite", "hidden", "folders", "note", "fields"].every((k) => a[k] === undefined)) return null;
+  if (["tags", "favorite", "hidden", "folders", "note", "fields", "thumb"].every((k) => a[k] === undefined)) return null;
   let tags: string[] = [];
   try {
     tags = normalizeTags(Array.isArray(a["tags"]) ? a["tags"].filter((t): t is string => typeof t === "string") : []);
@@ -839,7 +873,7 @@ function readOrganization(a: Record<string, unknown>, label: string, problems: s
   } catch (e) {
     problems.push(`The fields of “${label}” were invalid (${(e as Error).message}) and were not imported.`);
   }
-  return { tags, favorite: a["favorite"] === true, hidden: a["hidden"] === true, folders, note, fields };
+  return { tags, favorite: a["favorite"] === true, hidden: a["hidden"] === true, folders, note, fields, thumb: typeof a["thumb"] === "string" && HASH_RE.test(a["thumb"]) ? a["thumb"] : null };
 }
 
 /** Originals are written at most this many bytes per transaction, before the canvases (ADR 0176). */
@@ -945,6 +979,7 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
     const result = await applyRest(db, workspaceId, targetBoardId, plan, staged, snap, libOps);
     if (lib) await moveToLibrary(db, lib, libOps);
     if (plan.sealed.length && sealedHooks.write) await sealedHooks.write(plan.sealed, plan.hiddenKey);
+    for (const t of plan.thumbnails) await thumbHooks.put?.(t).catch(() => undefined);
     return result;
   } catch (e) {
     await sweepImportStaging(db).catch(() => undefined);
@@ -1019,6 +1054,7 @@ async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: st
         const fields = [...m.fields, ...org.fields.filter((f) => !m.fields.some((x) => x.key === f.key && x.value === f.value))].slice(0, MAX_FIELDS);
         entry = { ...entry, tags: normalizeTags([...m.tags, ...org.tags]), favorite: m.favorite || org.favorite, hidden: m.hidden || org.hidden, folderIds: ids };
         if (m.note || org.note) entry.note = m.note || org.note;
+        if (!m.thumb && org.thumb) entry.thumb = org.thumb; // (a custom thumbnail here is kept)
         if (fields.length) entry.fields = fields;
       }
       if (entry !== e) (snap ? libOps.push({ t: "entry", hash: entry.hash, v: entry }) : tx.objectStore("assetCatalog").put(entry));

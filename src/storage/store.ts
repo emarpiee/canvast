@@ -260,12 +260,35 @@ export interface FolderSync {
   checkFiles(onStep: (done: number, total: number) => void, quick?: boolean): Promise<{ checked: number; missing: string[]; damaged: string[] }>;
 }
 
+/**
+ * Custom thumbnails uploaded for items (their own category, never library items): small pictures, each stored once by its SHA-256.
+ * The desktop build keeps them in `.canvast/thumbnails/`, the browser build in its database.
+ */
+export interface CustomThumbStore {
+  /** Keep a picture (already made small); its SHA-256. */
+  put(blob: Blob): Promise<string>;
+  get(hash: string): Promise<Blob | null>;
+  list(): Promise<string[]>;
+  remove(hash: string): Promise<void>;
+  /**
+   * Hidden custom thumbnails (made in hidden mode, or of an item hidden since): never seen outside hidden mode. The desktop build seals
+   * them with the hidden items' key (`.hidden/thumbnails/`), so they need it open. `toHidden` / `toNormal` move one between the two.
+   */
+  putHidden(blob: Blob): Promise<string>;
+  getHidden(hash: string): Promise<Blob | null>;
+  listHidden(): Promise<string[]>;
+  removeHidden(hash: string): Promise<void>;
+  toHidden(hash: string): Promise<void>;
+  toNormal(hash: string): Promise<void>;
+}
+
 /** One opened storage: what a session works on. */
 export interface Storage {
   readonly workspace: WorkspaceStore;
   readonly backups: BackupStore;
   readonly catalog: CatalogStore;
   readonly originals: OriginalStore;
+  readonly customThumbs: CustomThumbStore;
   /** The library folder (ADR 0159): only the browser build has one (in the desktop build the workspace is a folder). */
   readonly libraryFolder: LibraryFolderStore | null;
   /** The desktop build's changes from outside the app; null in the browser build. */

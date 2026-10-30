@@ -1,11 +1,12 @@
 /** The browser build's storage: the workspace, its backups and the library in IndexedDB (ADR 0006–0008, 0176, 0177). */
 import type { ExportScope, ImportPlan, LibraryStore, OriginalWriter, ProgressFn } from "./archive";
-import { applyImport, buildArchive, hiddenInScope, sweepImportStaging } from "./archive";
+import { applyImport, buildArchive, hiddenInScope, sweepImportStaging, thumbHooks } from "./archive";
 import type { FilesLayout } from "./files-zip";
 import { buildFilesZip, planFiles } from "./files-zip";
 import { done, idbGet, openDb, req } from "./idb";
 import type { OpenOptions } from "./idb";
-import type { BackupRecord, BackupStore, LibraryFolderStore, OriginalStore, Storage } from "./store";
+import type { BackupRecord, BackupStore, CustomThumbStore, LibraryFolderStore, OriginalStore, Storage } from "./store";
+import { sha256Hex } from "../assets/sha256";
 import { WorkspaceRepo } from "./workspace-repo";
 import type { CatalogEntry, ThumbRecord } from "../assets/asset-catalog";
 import { AssetCatalog, entryFromRecord } from "../assets/asset-catalog";
@@ -31,6 +32,9 @@ export async function openBrowserStorage(opts: OpenOptions): Promise<IdbStorage>
 
 export function idbStorage(db: IDBDatabase): IdbStorage {
   const catalog = new AssetCatalog(db);
+  const customThumbs = idbCustomThumbs(db);
+  thumbHooks.get = (h) => customThumbs.get(h);
+  thumbHooks.put = (b) => customThumbs.put(b);
   return {
     db,
     workspace: new WorkspaceRepo(db),
@@ -38,12 +42,54 @@ export function idbStorage(db: IDBDatabase): IdbStorage {
     catalog,
     originals: new IdbOriginals(db, catalog),
     libraryFolder: idbLibraryFolder(db),
+    customThumbs,
     workspaceFolder: null,
     hidden: null,
     folderSync: null,
     resetAll: (onBlocked) => resetAllData({ db, ...(onBlocked ? { onBlocked } : {}) }),
     flush: async () => undefined,
     folderWriting: null,
+  };
+}
+
+/** Custom thumbnails in the database's `meta` store, as `customThumb:<hash>` (see `CustomThumbStore`). */
+function idbCustomThumbs(db: IDBDatabase): CustomThumbStore {
+  // (hidden ones under their own key: the browser build gates hidden items with the password, it does not encrypt them)
+  const NORMAL = "customThumb:", HIDDEN = "customThumbHidden:";
+  const put = async (key: string, blob: Blob): Promise<string> => {
+    const hash = await sha256Hex(await blob.arrayBuffer());
+    const tx = db.transaction("meta", "readwrite");
+    tx.objectStore("meta").put(blob, key + hash);
+    await done(tx);
+    return hash;
+  };
+  const get = async (key: string, hash: string): Promise<Blob | null> => ((await idbGet<Blob>(db, "meta", key + hash)) as Blob | undefined) ?? null;
+  const list = async (key: string): Promise<string[]> => {
+    const keys = (await req(db.transaction("meta", "readonly").objectStore("meta").getAllKeys())) as IDBValidKey[];
+    return keys.flatMap((k) => (typeof k === "string" && k.startsWith(key) ? [k.slice(key.length)] : []));
+  };
+  const remove = async (key: string, hash: string): Promise<void> => {
+    const tx = db.transaction("meta", "readwrite");
+    tx.objectStore("meta").delete(key + hash);
+    await done(tx);
+  };
+  const move = async (from: string, to: string, hash: string): Promise<void> => {
+    const b = await get(from, hash);
+    if (!b) return;
+    await put(to, b);
+    await remove(from, hash);
+  };
+  return {
+    put: (b) => put(NORMAL, b),
+    get: (h) => get(NORMAL, h),
+    list: () => list(NORMAL),
+    remove: (h) => remove(NORMAL, h),
+    putHidden: (b) => put(HIDDEN, b),
+    getHidden: (h) => get(HIDDEN, h),
+    listHidden: () => list(HIDDEN),
+    removeHidden: (h) => remove(HIDDEN, h),
+    toHidden: (h) => move(NORMAL, HIDDEN, h),
+    toNormal: (h) => move(HIDDEN, NORMAL, h),
   };
 }
 

@@ -52,6 +52,8 @@ export interface CatalogEntry {
   note?: string;
   /** Fields the user names (a link, a source, an author...), in their order. Absent when there are none. */
   fields?: AssetField[];
+  /** A custom thumbnail: the SHA-256 of a library item or of an uploaded custom thumbnail (`CustomThumbStore`) shown instead of its own. */
+  thumb?: string | null;
 }
 
 /** A user-named field of an asset: any key, any value, both plain text. */
@@ -109,8 +111,8 @@ export function hiddenModeFolders(folders: readonly AssetFolder[], holding: Iter
 }
 
 /** Organization fields of an entry, with defaults for entries that predate them. */
-export function meta(e: CatalogEntry): { tags: string[]; favorite: boolean; hidden: boolean; folderIds: string[]; note: string; fields: AssetField[] } {
-  return { tags: e.tags ?? [], favorite: e.favorite ?? false, hidden: e.hidden ?? false, folderIds: (e.folderIds ?? []).slice(0, 1), note: e.note ?? "", fields: e.fields ?? [] };
+export function meta(e: CatalogEntry): { tags: string[]; favorite: boolean; hidden: boolean; folderIds: string[]; note: string; fields: AssetField[]; thumb: string | null } {
+  return { tags: e.tags ?? [], favorite: e.favorite ?? false, hidden: e.hidden ?? false, folderIds: (e.folderIds ?? []).slice(0, 1), note: e.note ?? "", fields: e.fields ?? [], thumb: e.thumb ?? null };
 }
 
 export class CatalogInputError extends Error {}
@@ -271,6 +273,8 @@ export interface MetaChange {
   addFolders?: readonly string[];
   removeFolders?: readonly string[];
   clearFolder?: boolean;
+  /** A custom thumbnail's SHA-256 (see `CatalogEntry.thumb`); null: its own again. */
+  thumb?: string | null;
 }
 
 /** The two passwords: of the Hidden items, and of the whole workspace (asked when the app opens). */
@@ -480,6 +484,7 @@ export class AssetCatalog implements CatalogStore {
         const m = meta(e);
         const next: CatalogEntry = { ...e, ...m };
         if (change.favorite !== undefined) next.favorite = change.favorite;
+        if (change.thumb !== undefined) next.thumb = change.thumb;
         if (change.hidden !== undefined) next.hidden = change.hidden;
         // Shown again from a hidden folder: that folder and the ones above it are shown again too (their other items stay hidden).
         if (change.hidden === false && m.folderIds.length) {

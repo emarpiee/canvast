@@ -99,3 +99,15 @@ export async function makeFileCard(chip: string): Promise<ImageBitmap> {
   x.fillText(FILE_CARD_NOTE, W / 2, 232);
   return createImageBitmap(c);
 }
+
+/** A file card made of a custom thumbnail (a library item's): the picture filling the card's shape, cut to fit. */
+export async function cardFromPicture(blob: Blob): Promise<ImageBitmap> {
+  const bmp = await createImageBitmap(blob);
+  const c = document.createElement("canvas");
+  c.width = FILE_CARD_W;
+  c.height = FILE_CARD_H;
+  const k = Math.max(FILE_CARD_W / bmp.width, FILE_CARD_H / bmp.height);
+  c.getContext("2d")!.drawImage(bmp, (FILE_CARD_W - bmp.width * k) / 2, (FILE_CARD_H - bmp.height * k) / 2, bmp.width * k, bmp.height * k);
+  bmp.close();
+  return createImageBitmap(c);
+}

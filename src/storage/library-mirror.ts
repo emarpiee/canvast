@@ -68,6 +68,7 @@ export interface LibraryItem {
   folderId: string | null;
   note: string;
   fields: AssetField[];
+  thumb?: string;
   state: "active" | "deleted";
 }
 
@@ -140,6 +141,7 @@ export function itemOf(e: CatalogEntry, rec: AssetRecord | undefined): LibraryIt
     folderId: m.folderIds[0] ?? null,
     note: m.note,
     fields: m.fields,
+    ...(m.thumb ? { thumb: m.thumb } : {}),
     state: e.state,
   };
 }
@@ -172,6 +174,7 @@ export function readItem(a: unknown): LibraryItem | null {
       folderId: typeof r.folderId === "string" ? r.folderId : null,
       note: normalizeNote(typeof r.note === "string" ? r.note : ""),
       fields: normalizeFields(fields),
+      ...(typeof r.thumb === "string" && HASH_RE.test(r.thumb) ? { thumb: r.thumb } : {}),
       state: r.state === "deleted" ? "deleted" : "active",
     };
   } catch {
@@ -211,6 +214,7 @@ export function entryOf(it: LibraryItem, prev: CatalogEntry | undefined): Catalo
     folderIds: it.folderId ? [it.folderId] : [],
     ...(it.note ? { note: it.note } : {}),
     ...(it.fields.length ? { fields: it.fields } : {}),
+    ...(it.thumb ? { thumb: it.thumb } : {}),
   };
 }
 

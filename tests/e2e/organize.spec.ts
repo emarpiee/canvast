@@ -523,14 +523,31 @@ test("tags, favourites, folders, notes and fields travel in archives and merge o
   await p.keyboard.type("https://example.com");
   await p.keyboard.press("Enter");
   await expect(p.getByRole("textbox", { name: "Value of link" })).toBeVisible();
+  // An uploaded custom thumbnail travels too, as a file of its own.
+  const [chooser] = await Promise.all([
+    p.waitForEvent("filechooser"),
+    (async () => {
+      await p.getByTestId("asset-thumb").click();
+      await p.getByRole("radio", { name: /Upload a picture/ }).check();
+      await p.getByTestId("choose-ok").click();
+    })(),
+  ]);
+  await chooser.setFiles({ name: "cover.png", mimeType: "image/png", buffer: makePng(40, 30, () => [200, 40, 40, 255]) });
+  await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.thumb ?? null), HASH)).toMatch(/^[0-9a-f]{64}$/);
+  const thumb = await p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)!.thumb!), HASH);
 
   await p.getByTestId("view-canvas").click();
   await p.getByTestId("save-status").click();
   const [dl] = await Promise.all([p.waitForEvent("download"), p.getByTestId("set-export-full").click()]);
   const bytes = await readFile((await dl.path())!);
-  const man = JSON.parse(await (await readZip(new Blob([new Uint8Array(bytes)]))).get("manifest.json")!.data.text()) as {
-    assets: Array<{ hash: string; tags: string[]; favorite: boolean; folders: string[][]; note?: string; fields?: unknown[] }>;
+  const zip = await readZip(new Blob([new Uint8Array(bytes)]));
+  const man = JSON.parse(await zip.get("manifest.json")!.data.text()) as {
+    assets: Array<{ hash: string; tags: string[]; favorite: boolean; folders: string[][]; note?: string; fields?: unknown[]; thumb?: string }>;
+    thumbnails?: string[];
   };
+  expect(man.assets.find((a) => a.hash === HASH)?.thumb).toBe(thumb);
+  expect(man.thumbnails).toEqual([thumb]);
+  expect(zip.has(`thumbnails/${thumb}.webp`)).toBe(true);
   expect(man.assets.find((a) => a.hash === HASH)).toMatchObject({ tags: ["Hands"], favorite: true, folders: [["Refs", "Hands"]], note: "From the life class", fields: [{ key: "link", value: "https://example.com" }] });
   expect(man.assets.find((a) => a.hash === GREEN_HASH)).toMatchObject({ tags: [], favorite: false, folders: [] });
 
@@ -555,6 +572,11 @@ test("tags, favourites, folders, notes and fields travel in archives and merge o
   await expect(q.getByTestId("asset-folders").getByLabel("Refs › Hands")).toBeChecked();
   await expect(q.getByTestId("asset-note")).toHaveValue("From the life class");
   await expect(q.getByTestId("asset-fields").locator(".asset-field")).toHaveCount(1);
+  expect(await q.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.thumb ?? null), HASH)).toBe(thumb);
+  await q.getByTestId("asset-thumb").click();
+  await q.getByRole("radio", { name: /^Thumbnails/ }).check();
+  await q.getByTestId("choose-ok").click();
+  await expect(q.locator(".lib-item")).toHaveCount(1); // (the picture came with it)
   await context.close();
 });
 
@@ -990,5 +1012,63 @@ test("Delete everywhere: an item in use on two canvases goes from both and from 
   await p.keyboard.press("Control+z");
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "image").length)).toBe(1);
   await expect.poll(active).toBe("active");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("custom thumbnails: a picture of the library, an uploaded one (its own category, not a library item), chosen again, back to automatic; kept over a reload; hidden mode's own are not seen outside it", async ({ app }) => {
+  const p = app.page;
+  await libraryWithTwo(p);
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "notes.xyz", mimeType: "application/octet-stream", buffer: Buffer.from("not a picture") });
+  await expect(cards(p)).toHaveCount(3);
+  const file = p.locator('[data-testid="asset-card"][aria-label^="notes.xyz"]');
+  const fileHash = (await file.getAttribute("data-hash"))!;
+  const choose = async (way: RegExp): Promise<void> => {
+    await p.getByTestId("asset-thumb").click();
+    await p.getByRole("radio", { name: way }).check();
+    await p.getByTestId("choose-ok").click();
+  };
+  await pick(p, fileHash);
+  await expect(file.locator("img")).toHaveCount(0); // (a file with no preview: its tile)
+  // A picture of the library stands for it.
+  await choose(/A picture of the library/);
+  await p.locator(`.lib-item[data-hash="${GREEN_HASH}"]`).click();
+  await expect(file.locator("img")).toHaveCount(1);
+  // An uploaded one: kept small in its own place, never a library item.
+  const [chooser] = await Promise.all([p.waitForEvent("filechooser"), choose(/Upload a picture/)]);
+  await chooser.setFiles({ name: "cover.png", mimeType: "image/png", buffer: makePng(40, 30, () => [200, 40, 40, 255]) });
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(3);
+  await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.thumb ?? null), fileHash)).toMatch(/^[0-9a-f]{64}$/);
+  const uploaded = await p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)!.thumb!), fileHash);
+  // Chosen again for another item, from Thumbnails.
+  await pick(p, HASH);
+  await choose(/^Thumbnails/);
+  await expect(p.locator(".lib-item")).toHaveCount(1);
+  await expect(p.locator(".lib-item")).toHaveAttribute("aria-label", /used by 1 item/);
+  await p.locator(".lib-item").click();
+  await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.thumb ?? null), HASH)).toBe(uploaded);
+  // Kept over a reload; Automatic gives it its own picture again.
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await expect(file.locator("img")).toHaveCount(1);
+  await pick(p, fileHash);
+  await choose(/^Automatic/);
+  await expect(file.locator("img")).toHaveCount(0);
+  // Hidden mode uploads a hidden one: listed there, never outside it.
+  await pick(p, GREEN_HASH);
+  await p.getByTestId("asset-hide").click();
+  await p.getByTestId("assets-search").fill("hidden:");
+  await pick(p, GREEN_HASH);
+  const [hiddenChooser] = await Promise.all([p.waitForEvent("filechooser"), choose(/Upload a picture/)]);
+  await hiddenChooser.setFiles({ name: "secret.png", mimeType: "image/png", buffer: makePng(20, 20, () => [10, 10, 200, 255]) });
+  await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.thumb ?? null), GREEN_HASH)).not.toBe(null);
+  await choose(/^Thumbnails/);
+  await expect(p.locator(".lib-item")).toHaveCount(2);
+  await p.keyboard.press("Escape");
+  await p.getByTestId("hidden-mode-exit").click();
+  await pick(p, fileHash);
+  await choose(/^Thumbnails/);
+  await expect(p.locator(".lib-item")).toHaveCount(1); // (the hidden one is not seen here)
+  await p.keyboard.press("Escape");
   expect(app.consoleErrors).toEqual([]);
 });

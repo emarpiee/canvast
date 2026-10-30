@@ -7,7 +7,7 @@ import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { GifFrames } from "./gif";
 import { probeMp4 } from "./mp4-probe";
 import { makeFileCardFrom } from "./adapters";
-import { FILE_CARD_H, FILE_CARD_W, makeCard } from "./card";
+import { FILE_CARD_H, FILE_CARD_W, cardFromPicture, makeCard } from "./card";
 import { describeFile, isCard, isMediaType } from "./file-kind";
 
 /**
@@ -370,6 +370,9 @@ export class AssetLibrary {
     this.onReady();
   }
 
+  /** An item's custom thumbnail, for its file card on a canvas (null: none, or one that must not show here). Set by the app. */
+  customPicture: ((hash: string) => Promise<Blob | null>) | null = null;
+
   /** Drop the decoded copy of an erased original (after garbage collection). */
   forget(hash: string): void {
     for (const k of [...this.decoded.keys()]) {
@@ -469,7 +472,18 @@ export class AssetLibrary {
     if (!this.decoded.has(key)) {
       const ms = key.includes("#") ? Number(key.slice(key.indexOf("#") + 1)) : 0;
       let img: CanvasImageSource & { width: number; height: number };
-      const card = async (): Promise<ImageBitmap> => makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, new Uint8Array(await rec.blob.arrayBuffer()));
+      const card = async (): Promise<ImageBitmap> => {
+        // A custom thumbnail stands for a file card on a canvas too (never a hidden one: see `customPicture`).
+        const own = await this.customPicture?.(rec.hash).catch(() => null);
+        if (own) {
+          try {
+            return await cardFromPicture(own);
+          } catch {
+            // (a picture that does not decode: the file's own card)
+          }
+        }
+        return makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, new Uint8Array(await rec.blob.arrayBuffer()));
+      };
       try {
         img = isCard(rec) ? await card() : await decode(rec.blob, ms);
       } catch (e) {

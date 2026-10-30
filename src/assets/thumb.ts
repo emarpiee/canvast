@@ -83,3 +83,16 @@ async function makeFontThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
     if (face) document.fonts.delete(face);
   }
 }
+
+/** A custom thumbnail's picture as kept (`CustomThumbStore`): at most 512 px on its longer side, WebP (PNG where it cannot be encoded). */
+export async function shrinkPicture(blob: Blob, max = 512): Promise<Blob> {
+  const bmp = await createImageBitmap(blob);
+  const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.round(bmp.width * k));
+  c.height = Math.max(1, Math.round(bmp.height * k));
+  c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+  bmp.close();
+  const out = await new Promise<Blob | null>((ok) => c.toBlob(ok, "image/webp", 0.85));
+  return out ?? (await new Promise<Blob>((ok, fail) => c.toBlob((b) => (b ? ok(b) : fail(new Error("the picture could not be made"))), "image/png")));
+}

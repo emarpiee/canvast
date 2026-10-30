@@ -11,13 +11,14 @@ import { externalFolder } from "./external-folder";
 import { openBrowserStorage } from "./idb-storage";
 import { DesktopCatalog, DesktopLibrary, DesktopOriginals, moveIdbLibrary } from "./desktop-library";
 import type { IdbBackups, IdbStorage } from "./idb-storage";
-import type { FolderSync, FolderWriting, OpenHooks } from "./store";
+import type { CustomThumbStore, FolderSync, FolderWriting, OpenHooks } from "./store";
+import { sha256Hex } from "../assets/sha256";
 import { LIBRARY_DIR, LIBRARY_JSON } from "./library-mirror";
 import { WORKSPACE_FILE, WorkspaceMirror, watched } from "./workspace-mirror";
 import { BOARDS_DIR, WORKSPACE_NAMING } from "./workspace-names";
 import { HIDDEN_JSON, HiddenVault, isHiddenCopy } from "./hidden-store";
 import { useScrypt } from "./hidden-vault";
-import { sealedHooks } from "./archive";
+import { sealedHooks, thumbHooks } from "./archive";
 import { resetAllData } from "./reset";
 
 
@@ -212,7 +213,65 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     await lib.calls.reset();
     await resetAllData({ db: storage.db, keepSettings: true, ...(onBlocked ? { onBlocked } : {}) });
   };
-  return { ...storage, resetAll, workspace, backups, catalog, originals, libraryFolder: null, workspaceFolder: ws.path, hidden, folderSync, folderWriting, flush: () => mirror.flush() };
+  // Custom thumbnails as files of `.canvast/thumbnails/`, named by their SHA-256; hidden ones sealed with the hidden items' key in
+  // `.hidden/thumbnails/` (a folder of its own: never taken for a hidden item), each named by the SHA-256 of `thumb:` and its hash, so
+  // a name says nothing of the picture (ADR 0177).
+  const THUMBS = ".canvast/thumbnails", HIDDEN_THUMBS = ".hidden/thumbnails";
+  const HEX = /^[0-9a-f]{64}$/;
+  const normalPath = (h: string): string => `${THUMBS}/${h}.webp`;
+  const hiddenPath = async (h: string): Promise<string> => `${HIDDEN_THUMBS}/${await sha256Hex(new TextEncoder().encode(`thumb:${h}`).buffer as ArrayBuffer)}.bin`;
+  const asBlob = (b: Uint8Array): Blob => new Blob([b as Uint8Array<ArrayBuffer>], { type: "image/webp" });
+  const putNormal = async (bytes: Uint8Array<ArrayBuffer>): Promise<string> => {
+    const hash = await sha256Hex(bytes.buffer);
+    await bridge.write(normalPath(hash), bytes);
+    return hash;
+  };
+  const putSealed = async (bytes: Uint8Array<ArrayBuffer>): Promise<string> => {
+    if (!hidden.isOpen()) throw new Error("the hidden items are locked");
+    const hash = await sha256Hex(bytes.buffer);
+    await bridge.write(await hiddenPath(hash), await hidden.seal(bytes, { kind: "thumbnail", hash }));
+    return hash;
+  };
+  const getNormal = async (h: string): Promise<Uint8Array<ArrayBuffer> | null> => (HEX.test(h) ? ((await bridge.read(normalPath(h))) as Uint8Array<ArrayBuffer> | null) : null);
+  const getSealed = async (h: string): Promise<Uint8Array<ArrayBuffer> | null> => {
+    if (!HEX.test(h) || !hidden.isOpen()) return null;
+    const sealed = await bridge.read(await hiddenPath(h));
+    return sealed ? hidden.open(sealed as Uint8Array<ArrayBuffer>) : null;
+  };
+  const customThumbs: CustomThumbStore = {
+    put: async (blob) => putNormal(new Uint8Array(await blob.arrayBuffer())),
+    get: async (h) => ((b) => (b ? asBlob(b) : null))(await getNormal(h)),
+    list: async () => (await bridge.list(THUMBS)).flatMap((n) => (/^[0-9a-f]{64}\.webp$/.test(n) ? [n.slice(0, 64)] : [])),
+    remove: (h) => bridge.remove(normalPath(h), "erase"),
+    putHidden: async (blob) => putSealed(new Uint8Array(await blob.arrayBuffer())),
+    getHidden: async (h) => ((b) => (b ? asBlob(b) : null))(await getSealed(h)),
+    async listHidden() {
+      if (!hidden.isOpen()) return [];
+      const out: string[] = [];
+      for (const n of await bridge.list(HIDDEN_THUMBS)) {
+        const opened = await hidden.openItem((await bridge.read(`${HIDDEN_THUMBS}/${n}`)) as Uint8Array<ArrayBuffer>).catch(() => null);
+        const h = opened?.item?.["hash"];
+        if (typeof h === "string" && HEX.test(h)) out.push(h);
+      }
+      return out;
+    },
+    removeHidden: async (h) => bridge.remove(await hiddenPath(h), "erase"),
+    async toHidden(h) {
+      const b = await getNormal(h);
+      if (!b) return;
+      await putSealed(b);
+      await bridge.remove(normalPath(h), "erase");
+    },
+    async toNormal(h) {
+      const b = await getSealed(h);
+      if (!b) return;
+      await putNormal(b);
+      await bridge.remove(await hiddenPath(h), "erase");
+    },
+  };
+  thumbHooks.get = (h) => customThumbs.get(h);
+  thumbHooks.put = (b) => customThumbs.put(b);
+  return { ...storage, resetAll, workspace, backups, catalog, originals, customThumbs, libraryFolder: null, workspaceFolder: ws.path, hidden, folderSync, folderWriting, flush: () => mirror.flush() };
 }
 
 /** This device's id in the workspace folder (`.canvast/devices/<id>.json`), made once and kept. */

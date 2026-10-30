@@ -2052,6 +2052,11 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .panel-foot > .layers-opacity:last-child { padding-bottom: var(--sp-4); }
 
 /* The search help card (ADR 0069): a small button beside a search box and the operators it explains. */
+/* The details panel's preview, with its custom thumbnail button in the corner. */
+.asset-preview-box { position: relative; }
+.asset-thumb-btn { position: absolute; top: var(--sp-3); right: var(--sp-3); display: inline-flex; align-items: center; justify-content: center; width: var(--icon-xl); height: var(--icon-xl); padding: 0; color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); cursor: pointer; opacity: 0.85; }
+.asset-thumb-btn:hover, .asset-thumb-btn:focus-visible { opacity: 1; background: var(--hud-hover); }
+.asset-thumb-btn svg { width: var(--icon-md); height: var(--icon-md); }
 .search-help-btn { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--icon-xl); height: var(--icon-xl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-pill); cursor: pointer; }
 .search-help-btn:hover, .search-help-btn[aria-expanded="true"] { color: var(--hud-fg); background: var(--hud-hover); }
 .search-help-btn svg { width: var(--icon-md); height: var(--icon-md); }

@@ -3,7 +3,8 @@
 //   node scripts/hidden-items.mjs decrypt <workspace folder> <output folder> [--flat]
 //       writes every hidden item's file into the output folder under its name in the library, in the library folders it was in (each
 //       file's own encrypted header names them: the tree comes back from the files alone), with hidden-items.json (their names, tags,
-//       notes and fields, and where each was written) at the top. --flat: every file at the top, as before. Nothing in the workspace is changed. Copies of hidden.json beside it (a sync tool's, when
+//       notes and fields, and where each was written) at the top, and hidden custom thumbnails in thumbnails/<hash>.webp (an item's
+//       `thumb` names its own). --flat: every file at the top, as before. Nothing in the workspace is changed. Copies of hidden.json beside it (a sync tool's, when
 //       two devices wrote it at once) are read too, each with the same password, and a sealed file in .hidden/ that no entry names (its
 //       entry lost, or a sync tool's copy) is written as recovered-<hash>.<ext> when the password opens it. With hidden.json lost, the
 //       spare of its key (.canvast/keys/hidden.json) opens the files, all as recovered-<hash>.<ext>.
@@ -227,6 +228,15 @@ export async function decryptHidden(workspace, out, password, { flat = false } =
     const name = place(out, mine ? folderOf(own, flat) : "", mine ? own.name : `recovered-${hash.slice(0, 12)}.${extOfBytes(bytes)}`, bytes, taken);
     written.push(own?.hash === hash ? { ...own, file: `.hidden/${n}`, hidden: true, writtenAs: name } : { hash, name, file: `.hidden/${n}`, size: bytes.length, recovered: true, writtenAs: name });
     hashes.add(hash);
+  }
+  // Hidden custom thumbnails (`.hidden/thumbnails/`): each as thumbnails/<hash>.webp, which an item's `thumb` names.
+  const thumbDir = join(workspace, ".hidden", "thumbnails");
+  for (const n of existsSync(thumbDir) ? readdirSync(thumbDir).filter((x) => x.endsWith(".bin")).sort() : []) {
+    const opened = await tryOpen(new Uint8Array(readFileSync(join(thumbDir, n))));
+    const h = opened?.item?.kind === "thumbnail" && typeof opened.item.hash === "string" && /^[0-9a-f]{64}$/.test(opened.item.hash) ? opened.item.hash : null;
+    if (!h) continue;
+    mkdirSync(join(out, "thumbnails"), { recursive: true });
+    writeFileSync(join(out, "thumbnails", `${h}.webp`), opened.bytes);
   }
   writeFileSync(join(out, freeName(out, "hidden-items.json", taken)), JSON.stringify(written, null, 1));
   return written.length;

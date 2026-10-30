@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## Unreleased: custom thumbnails (2026-10-30)
+
+- **Implemented:** `CatalogEntry.thumb` / `MetaChange.thumb` in both builds and the library parts; `CustomThumbStore` (browser: `meta` keys; desktop: `.canvast/thumbnails/`, hidden sealed in `.hidden/thumbnails/`); the details panel's thumbnail dialog (Thumbnails, library, upload, automatic, delete) and the bulk button; cards, preview, filmstrip, viewer and canvas file cards (`AssetLibrary.customPicture`); thumbnails follow hide and unhide; archives carry normal ones (`thumbnails/<hash>.webp`, manifest `thumbnails`, still version 7); the decrypt tool writes hidden ones.
+- **Tested:** `organize.spec.ts` custom thumbnails and the archive round trip (Chromium); desktop custom thumbnails test (files, sealing, unsealing, decrypt tool) and the hidden tests; canvas file card checked by a screenshot.
+- **Known failures:** none known.
+- **Unverified:** hidden custom thumbnails in backups (left out: an item that uses one shows its own picture after import); Firefox for the new test; GitHub's whole suite.
+- **Committed:** main (not pushed). Version not bumped (asked).
+- **Next bounded task:** owner review.
+
 ## v0.52.0 to v0.52.3: hidden mode, Export folder (2026-10-30)
 
 - **Implemented:** hidden mode of the Library view (one flag through `inScope`, `countSide`, the desktop index's query and counts; `hiddenModeFolders`, `listedFolders`); *Unhide folder* (`CatalogStore.showFolder`, both builds); filing into a hidden folder hides; folders made in hidden folders or hidden mode are hidden; counts and totals of the mode's items only; desktop hide and show write only marked items (`WorkspaceMirror.libraryMarked`); a folder hidden while locked is kept on unlock; stale temporary files swept at start-up; hidden thumbnails stored encrypted (`DesktopCatalog.vault`), so looks come from them too; hidden items counted in the main process; v0.52.2: hidden mode chip in the status bar and the stay pin (`library.hiddenStay`), hidden items opened in the system app through a temporary copy (`canvast:openCopy`, deleted on lock, quit and start), player keys in the viewer, uncounted GIFs get the player; v0.52.3: quick filters of several types and tags (`togglePicked`, `ext:a|b&tag:c`), the player focusable, tooltips; `hidden-items.mjs decrypt` rebuilds the folder tree from each file's header (`--flat`); *Export folder…* (`planFiles`, `runExportFolder`, the desktop `canvast:export` channel writing only under a folder chosen outside the workspace, each file read back and hashed); `scripts/stress-hidden.mjs` and the `Stress hidden` workflow.
