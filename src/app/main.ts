@@ -799,6 +799,7 @@ async function start(): Promise<void> {
   const syncHidden = async (): Promise<void> => {
     const hidden = await session.catalog?.hiddenHashes().catch(() => null);
     if (hidden && assets.setHidden(hidden)) {
+      assetNames.clear();
       tiles.clear();
       invalidate();
     }
@@ -811,6 +812,7 @@ async function start(): Promise<void> {
     const on = settings.get("library.hiddenRemember") && hiddenRemembered() && (storage?.hidden ? storage.hidden.isOpen() : true);
     if (on === assets.revealing) return;
     assets.reveal(on);
+    assetNames.clear();
     tiles.clear();
     invalidate();
   };
@@ -830,7 +832,12 @@ async function start(): Promise<void> {
   };
   storage?.hidden?.subscribe(syncReveal);
   settings.subscribe((key) => key === "library.hiddenRemember" && syncReveal());
-  const assetNames = new AssetNames(async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "");
+  // A hidden item drawn as a padlock is named "Hidden item" on canvases (its label, the Layers panel): its name is shown only with its picture.
+  const assetNames = new AssetNames(async (hash) => {
+    const e = await session.catalog?.entry(hash).catch(() => undefined);
+    if (!e) return "";
+    return e.hidden && !assets.revealing ? `Hidden item${/\.[A-Za-z0-9]{1,8}$/.exec(e.name)?.[0] ?? ""}` : e.name;
+  });
   assetNames.subscribe(() => invalidate());
   if (storage) {
     try {

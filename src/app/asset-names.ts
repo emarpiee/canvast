@@ -27,6 +27,13 @@ export class AssetNames {
     for (const fn of this.listeners) fn();
   }
 
+  /** Every name looked up again (a hidden item locked or opened: its name is shown or not). */
+  clear(): void {
+    this.names.clear();
+    this.asked.clear();
+    for (const fn of this.listeners) fn();
+  }
+
   get(hash: string): string | undefined {
     const n = this.names.get(hash);
     if (n === undefined && !this.asked.has(hash)) {

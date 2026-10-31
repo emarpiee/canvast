@@ -1110,7 +1110,7 @@ test("custom thumbnails: a picture of the library, an uploaded one (its own cate
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("a hidden picture shown on the canvas (its password remembered) never reaches a bookmark's picture", async ({ app }) => {
+test("a hidden picture shown on the canvas (its password remembered) never reaches a bookmark's picture; a padlock is not named", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("import-input").setInputFiles({ name: "red.png", mimeType: "image/png", buffer: makePng(300, 300, () => [230, 20, 20, 255]) });
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
@@ -1137,6 +1137,8 @@ test("a hidden picture shown on the canvas (its password remembered) never reach
   await p.getByTestId("hidden-mode-exit").click();
   await p.getByTestId("view-canvas").click();
   await expect.poll(red).toBe(true);
+  const label = () => p.evaluate(() => window.__canvastDebug.itemLabels().map((l) => l.text).join());
+  await expect.poll(label).toBe("red.png"); // (shown with its picture)
   // A bookmark's picture is kept in the canvas file: drawn with the padlock, never the picture.
   await p.getByRole("button", { name: "Bookmarks panel", exact: true }).click();
   await p.getByRole("button", { name: "Add bookmark" }).click();
@@ -1156,4 +1158,11 @@ test("a hidden picture shown on the canvas (its password remembered) never reach
   });
   expect(reds, "no red of the hidden picture in the bookmark's picture").toBe(0);
   await expect.poll(red, "the screen shows it again").toBe(true);
+  // Remembering turned off: a padlock again, and its name is not shown with it.
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: /Privacy/ }).click();
+  await p.locator('[data-row="library.hiddenRemember"] input').uncheck();
+  await p.getByTestId("view-canvas").click();
+  await expect.poll(red).toBe(false);
+  await expect.poll(label).toBe("Hidden item.png");
 });
