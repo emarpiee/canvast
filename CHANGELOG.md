@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Changed:** the viewer's video and GIF player fades away also while the pointer rests on it, and keys (step, play and pause) no longer bring it back: only a move of the mouse, a click or a touch does.
 - **Fixed:** in the viewer's details panel the custom thumbnail button sat over the Place on canvas button (the preview it belongs to is not shown there): it now has its own place at the right.
 - **Fixed:** in a narrow window (the phone layout) the gallery viewer kept an empty band at the top, room for the tabs it hides: the picture now uses it.
 - **Fixed:** a workspace folder renamed onto the path of another opened before on this device (one since deleted) showed that one's library: this device's copy of the library and its start-up look were kept by path. They are now kept per folder (by its id), like the rest of the app's copy; the one of the old folder at that path is removed.

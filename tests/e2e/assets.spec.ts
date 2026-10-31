@@ -2382,12 +2382,27 @@ test("Extract frame follows Settings > Media and playback: name template and sty
   await p.mouse.move(5, 5);
   await expect(viewer).toHaveClass(/is-idle/, { timeout: 1500 });
   await expect.poll(() => player.evaluate((el) => getComputedStyle(el).opacity)).toBe("0");
+  // Keys leave it faded (the step keys, play and pause): only the mouse or a touch brings it back.
+  await p.keyboard.press("Space");
+  await p.waitForTimeout(200);
+  await expect(viewer).toHaveClass(/is-idle/);
+  await p.keyboard.press("Space"); // (playing again)
+  // Resting on the player, it fades too.
+  const pb = (await player.boundingBox())!;
+  await p.mouse.move(pb.x + pb.width / 2, pb.y + pb.height / 2, { steps: 3 });
+  await expect(viewer).not.toHaveClass(/is-idle/);
+  await expect(viewer).toHaveClass(/is-idle/, { timeout: 1500 });
+  await expect.poll(() => player.evaluate((el) => getComputedStyle(el).opacity)).toBe("0");
   await p.mouse.move(400, 300);
   await expect(viewer).not.toHaveClass(/is-idle/);
   // Paused, it fades the same way. (Clicked once the player is back in full: a click on it while it is still fading in can be missed.)
+  // (it fades even under the pointer now: given longer for the click, then the short time again)
+  await p.evaluate(() => window.__canvastDebug.setSetting("assets.playerHideSeconds", 5));
+  await p.mouse.move(420, 320);
   await expect.poll(() => player.evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
   await playBtn.click();
   await expect(playBtn).toHaveAttribute("aria-label", "Play");
+  await p.evaluate(() => window.__canvastDebug.setSetting("assets.playerHideSeconds", 0.5));
   await p.mouse.move(5, 5);
   await expect(viewer).toHaveClass(/is-idle/, { timeout: 1500 });
   await p.mouse.move(400, 300);

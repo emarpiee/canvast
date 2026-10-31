@@ -1017,16 +1017,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     session.editor.changed();
   };
   // The player floats over the picture: while the pointer rests it fades away after Settings > Media and playback (Hide the player),
-  // playing or paused; any move, touch or key brings it back (it stays while the pointer is on it).
+  // playing or paused, also with the pointer resting on it; only a move of the mouse, a click or a touch brings it back. Keys (step,
+  // play and pause, seek) leave it as it is.
   let idleTimer = 0;
   const wake = (): void => {
     viewer.classList.remove("is-idle");
     clearTimeout(idleTimer);
     idleTimer = window.setTimeout(() => eng && viewer.classList.add("is-idle"), settings.get("assets.playerHideSeconds") * 1000);
   };
-  for (const type of ["pointermove", "pointerdown", "keydown"]) viewer.addEventListener(type, wake, true);
-  controls.el.addEventListener("input", wake);
-  for (const type of ["pause", "ended"]) slideMedia.addEventListener(type, wake); // (a stop shows it for a moment)
+  for (const type of ["pointermove", "pointerdown"]) viewer.addEventListener(type, wake, true);
   /** What a loaded file needs of the object the canvas player takes: where to start, and whether to loop. */
   const playOf = (repeat: boolean): ImageObject => ({ media: { t: 0, repeat } }) as unknown as ImageObject;
   const zoomPct = viewer.querySelector<HTMLElement>(".viewer-zoom-pct")!;
