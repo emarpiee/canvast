@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Added:** the Library's context menu in the viewer: a right click (or a long touch) on the picture, or on a picture of the filmstrip, offers that item's actions.
 - **Changed:** shorter button words where they were cut off or long: the details panel's **Place** (its tooltip says where), **Save stop colour** in the gradient editor, **Protect it** in Settings > Storage.
 - **Changed:** a video or sound the app cannot play (HEVC / H.265 video, for one) is no longer called *missing or damaged* in the viewer: it says its format cannot be played here and how to open it elsewhere.
 - **Fixed:** a hidden picture drawn as a padlock on a canvas showed its real name in its label and in the Layers panel; it is named *Hidden item* there until its picture is shown.

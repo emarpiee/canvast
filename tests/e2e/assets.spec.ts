@@ -2689,6 +2689,12 @@ test("library Copy puts the picture on the system clipboard and Copy file name i
   await p.locator('[data-testid="asset-card"][aria-label^="photo.jpg"]').click({ button: "right" });
   await p.getByRole("menu", { name: "Library actions" }).getByRole("menuitem", { name: "Copy file name" }).click();
   await expect.poll(() => p.evaluate(() => navigator.clipboard.readText())).toBe("photo.jpg");
+  // In the viewer: the same menu, for the item it shows.
+  await p.locator('[data-testid="asset-card"][aria-label^="snap-shot.png"]').dblclick();
+  await expect(p.getByTestId("slide-view")).toBeVisible();
+  await p.getByTestId("slide-view").locator(".viewer-stage").click({ button: "right", position: { x: 40, y: 200 } });
+  await p.getByRole("menu", { name: "Item actions" }).getByRole("menuitem", { name: "Copy file name" }).click();
+  await expect.poll(() => p.evaluate(() => navigator.clipboard.readText())).toBe("snap-shot.png");
   expect(app.consoleErrors).toEqual([]);
 });
 

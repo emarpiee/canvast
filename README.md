@@ -383,6 +383,7 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
   | On something on the canvas | The commands for it. On a picture, *Rename* renames its file in the library (a layer with a name of its own takes the new name) |
   | On empty canvas | The canvas commands. A long touch first lists what is under the finger |
   | On a library item | Its details-panel actions, plus *Copy*, *Copy file name* and *Paste* |
+  | In the viewer (the picture, or a picture of the filmstrip) | The same as on a library item, for the one shown (or that picture of the filmstrip) |
   | On empty library ground | *Select everything*, *Paste*, the imports, *New folder*, *Slideshow* and the details panel |
   | In Settings | A setting's reset; a shortcut's key actions |
 

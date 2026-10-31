@@ -3765,6 +3765,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return groupedMenu([g[0]!, clipboardGroup(picked.size ? [...picked] : hash ? [hash] : []), g[1]!, g[2]!]);
     },
   });
+  // The viewer: the same menu for the item it shows (a right click, or a long touch on a phone), from the picture or the filmstrip.
+  bindContextMenu(viewer, {
+    label: "Item actions",
+    active: () => visible && !viewer.hidden && !!slideHash,
+    build: async ({ target }) => {
+      const hash = target.closest<HTMLElement>(".film-item")?.dataset["hash"] ?? slideHash;
+      if (!hash) return [];
+      if (!picked.has(hash) || picked.size > 1) await select(hash); // (the menu is about the item on show)
+      const g = panelGroups();
+      return groupedMenu([g[0]!, clipboardGroup([hash]), g[1]!, g[2]!]);
+    },
+  });
   // ---- the list's columns: drag a header onto another to move it
   let dragCol: ColumnId | null = null;
   // A click on a header sorts by it; another click reverses it, as in a table.
