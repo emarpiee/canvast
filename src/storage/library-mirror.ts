@@ -34,8 +34,10 @@ export const LIBRARY_INDEX = `${LIBRARY_DIR}/index.json`;
 export const LIBRARY_PART_FORMAT = "canvast-library-items";
 export const partPath = (key: string): string => `${LIBRARY_DIR}/items-${key}.json`;
 /** The part an item is in: the first two hex digits of its hash (256 parts; version 2 of the index had 16, by one digit, still read). */
-export const partKey = (hash: string): string => hash.slice(0, 2);
-export const PART_KEY_RE = /^[0-9a-f]{1,2}$/;
+export const partKey = (hash: string, split = 2): string => hash.slice(0, split);
+export const PART_KEY_RE = /^[0-9a-f]{1,3}$/;
+/** The library's meta of how many characters of a hash name a part (see `Library.split`), as the index says it (`split`). */
+export const PART_SPLIT = "partSplit";
 /** This device's record of what it last wrote or read of each part, kept per part (meta `libraryPart:<key>`): one save writes only its parts'. */
 const PART_STATE = "libraryPart:";
 /** Up to this many items, `library.json` (the single file of earlier versions) is still written, so an older app keeps working on the workspace. */
@@ -82,9 +84,11 @@ export interface LibraryJson {
 
 /** `.canvast/library/index.json`. */
 export interface LibraryIndex {
+  /** Characters of an item's hash that name its part (version 4): 1 or 3; 2 when absent. */
+  split?: 1 | 2 | 3;
   format: typeof LIBRARY_JSON_FORMAT;
   /** 3: 256 parts by two hex digits (0.50.56); 2: 16 by one (still read). An older app reads neither of 3's, and never erases for it. */
-  version: 2 | 3;
+  version: 2 | 3 | 4;
   folders: AssetFolder[];
   /** The parts there are (`0` … `f`): a part not named has no items. */
   parts: string[];
@@ -389,7 +393,12 @@ export class LibraryMirror {
     } catch {
       index = null; // damaged: written again from the app's storage
     }
-    const hasParts = !!index && index.format === LIBRARY_JSON_FORMAT && (index.version === 2 || index.version === 3) && Array.isArray(index.parts);
+    const hasParts = !!index && index.format === LIBRARY_JSON_FORMAT && (index.version === 2 || index.version === 3 || index.version === 4) && Array.isArray(index.parts);
+    // How the workspace splits its library into parts (Settings > Storage): every device writes it the same way.
+    if (hasParts) {
+      const split = index!.version === 4 && (index!.split === 1 || index!.split === 3) ? index!.split : 2;
+      if (((await this.lib.calls.meta(PART_SPLIT)) ?? 2) !== split) await this.lib.serial(() => this.lib.apply([{ t: "meta", k: PART_SPLIT, v: split }]));
+    }
     // The index or a part it lists not there (`.canvast/library/` deleted, whole or in part): never read as items erased; this device's
     // copy writes them all back with the next write.
     if (!index && (await this.lib.entries("active")).length) this.partsMissing = true;
@@ -1347,6 +1356,20 @@ export class LibraryMirror {
     // is not in it yet, and stays this device's until it is, instead of being dropped when the key opens an older index)
     this.state = { folders: canonFolders(sealing ? folders : shown) };
     await this.setMeta(STATE_KEY, this.state);
+  }
+  /** The workspace's split of its library into parts (Settings > Storage): 16, 256 or 4,096 parts. */
+  async partSplit(): Promise<1 | 2 | 3> {
+    const v = await this.lib.calls.meta(PART_SPLIT);
+    return v === 1 || v === 3 ? v : 2;
+  }
+  /** How many items the library has (not deleted). */
+  async itemCount(): Promise<number> {
+    return (await this.lib.entries("active")).length;
+  }
+  /** Split it another way: every part is written again (and the old ones removed) with the next write, which this asks for. */
+  async setPartSplit(split: 1 | 2 | 3): Promise<void> {
+    await this.lib.serial(() => this.lib.apply([{ t: "meta", k: PART_SPLIT, v: split }]));
+    this.partsMissing = true;
   }
   /** The library's index or a part of it was not in the folder when it was read: the next write writes them all (see `rereadMain`). */
   partsMissing = false;

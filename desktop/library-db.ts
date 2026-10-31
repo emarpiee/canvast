@@ -12,7 +12,7 @@ import type { AssetRecord } from "../src/assets/asset-library";
 import type { LibraryItem } from "../src/storage/library-mirror";
 import type { LibraryOp } from "../src/storage/desktop-bridge";
 export type { LibraryOp };
-import { LIBRARY_INDEX, LIBRARY_JSON, LIBRARY_JSON_FORMAT, entryOf, itemOf, libraryJsonText, libraryPartText, partKey, partPath, readItem, seen } from "../src/storage/library-mirror";
+import { LIBRARY_INDEX, LIBRARY_JSON, LIBRARY_JSON_FORMAT, PART_SPLIT, entryOf, itemOf, libraryJsonText, libraryPartText, partKey, partPath, readItem, seen } from "../src/storage/library-mirror";
 import { isHiddenFile } from "../src/storage/hidden-vault";
 
 export type LibraryDb = InstanceType<typeof Database>;
@@ -83,6 +83,12 @@ export class Library {
   seenOf(hash: string): string | undefined {
     return this.s.seen.get(hash)?.v;
   }
+  /** How many characters of an item's hash name its part: 1 (16 parts), 2 (256, the default) or 3 (4,096): the workspace's, from its index. */
+  split(): 1 | 2 | 3 {
+    const v = this.meta(PART_SPLIT);
+    return v === 1 || v === 3 ? v : 2;
+  }
+
   meta(k: string): unknown {
     const r = this.s.meta.get(k);
     return r ? JSON.parse(r.v) : undefined;
@@ -181,7 +187,8 @@ export class Library {
   async writeParts(only: readonly string[] | null, compatMax: number, files: PartFiles, blank = false): Promise<WriteResult> {
     const rowsIn = this.db.prepare<[string, string], { entry: string; rec: string | null }>("SELECT e.json AS entry, r.json AS rec FROM entries e LEFT JOIN recs r ON r.hash = e.hash WHERE e.hash >= ? AND e.hash < ? ORDER BY e.hash");
     const fps = this.parts();
-    const keys = only ? [...new Set(only.map(partKey))] : [...new Set([...(this.db.prepare("SELECT DISTINCT substr(hash, 1, 2) AS k FROM entries").raw().all() as string[][]).map((r) => r[0]!), ...Object.keys(fps)])];
+    const n = this.split();
+    const keys = only ? [...new Set(only.map((h) => partKey(h, n)))] : [...new Set([...(this.db.prepare("SELECT DISTINCT substr(hash, 1, ?) AS k FROM entries").raw().all(n) as string[][]).map((r) => r[0]!), ...Object.keys(fps)])];
     const sealedOut: LibraryItem[] = [];
     const drop: string[] = [];
     const seenOps: LibraryOp[] = [];
@@ -199,8 +206,8 @@ export class Library {
         if (this.seenOf(i.hash) !== v) seenOps.push({ t: "seen", hash: i.hash, v });
         written.push(i.hash);
       }
-      if (key.length === 1) {
-        if (fps[key]) (drop.push(key), partOps.push({ t: "part", k: key, v: null })); // (a part of the 16 of version 2: written again as parts of 256)
+      if (key.length !== n) {
+        if (fps[key]) (drop.push(key), partOps.push({ t: "part", k: key, v: null })); // (a part of another split: its items are in this split's parts)
         continue;
       }
       if (open.length) {
@@ -219,7 +226,9 @@ export class Library {
     })();
     const folders = (this.meta(FOLDERS_KEY) as AssetFolder[] | undefined) ?? [];
     const shown = visibleFolders(folders);
-    const indexText = `${JSON.stringify({ format: LIBRARY_JSON_FORMAT, version: 3, folders: shown, parts: Object.keys(this.parts()).sort() })}\n`;
+    // (split in 256, version 3 as before; another split is version 4, which an app of before 0.52.4 does not read as parts: it would
+    // take items it cannot read for erased)
+    const indexText = `${JSON.stringify({ format: LIBRARY_JSON_FORMAT, version: n === 2 ? 3 : 4, ...(n === 2 ? {} : { split: n }), folders: shown, parts: Object.keys(this.parts()).sort() })}\n`;
     if (files.read(LIBRARY_INDEX)?.toString("utf8") !== indexText) await files.write(LIBRARY_INDEX, indexText);
     for (const k of drop) await files.remove(partPath(k)); // (after the index stopped naming it)
     const count = (this.db.prepare("SELECT count(*) AS n FROM entries e LEFT JOIN recs r ON r.hash = e.hash WHERE r.file IS NULL OR r.file NOT LIKE '.hidden/%'").get() as { n: number }).n;
@@ -319,7 +328,7 @@ export class Library {
       if (!deletions || !whole) return;
       const candidates = all ? (this.db.prepare("SELECT hash, v FROM seen").all() as Array<{ hash: string; v: string }>) : [...[...looked, ...gone].flatMap((k) => inRange.all(k, `${k}z`)), ...sealed.all()];
       for (const c of candidates) {
-        if (present.has(c.hash) || unchanged.has(c.hash.slice(0, 2)) || unchanged.has(c.hash.slice(0, 1))) continue;
+        if (present.has(c.hash) || unchanged.has(c.hash.slice(0, 3)) || unchanged.has(c.hash.slice(0, 2)) || unchanged.has(c.hash.slice(0, 1))) continue;
         if (changedHere(c.hash, c.v)) continue; // changed here: kept
         const e = this.entry(c.hash);
         if (e?.state === "active") this.one({ t: "entry", hash: c.hash, v: { ...e, state: "deleted", deletedAt: Date.now() } }, false);

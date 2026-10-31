@@ -258,6 +258,13 @@ export interface FolderSync {
    * `quick`: only each file's presence and size are looked at (no reading), which a big library does in seconds.
    */
   checkFiles(onStep: (done: number, total: number) => void, quick?: boolean): Promise<{ checked: number; missing: string[]; damaged: string[] }>;
+  /**
+   * How the workspace splits its library's files (`.canvast/library/items-…json`): by 1, 2 or 3 characters of an item's hash (16, 256 or
+   * 4,096 parts), and how many items it has. Kept in the workspace's index, so every device writes it the same way.
+   */
+  partSplit(): Promise<{ split: 1 | 2 | 3; items: number }>;
+  /** Split it another way: every part is written again once (and the old ones removed). */
+  setPartSplit(split: 1 | 2 | 3): Promise<void>;
 }
 
 /**

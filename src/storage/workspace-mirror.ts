@@ -582,6 +582,14 @@ export class WorkspaceMirror {
       .catch((e: unknown) => this.onError?.(`The library of the workspace folder could not be read: ${(e as Error).message}.`));
     return this.running;
   }
+  /** The split of the library's files, and how many items it has (see FolderSync.partSplit). */
+  async partSplit(): Promise<{ split: 1 | 2 | 3; items: number }> {
+    return { split: await this.lib.partSplit(), items: (await this.lib.itemCount()) };
+  }
+  setPartSplit(split: 1 | 2 | 3): Promise<void> {
+    this.running = this.running.then(() => this.lib.setPartSplit(split)).then(() => this.library());
+    return this.running;
+  }
   /** Check the library files' contents (see FolderSync.checkFiles). */
   checkFiles(onStep: (done: number, total: number) => void, quick = false): ReturnType<LibraryMirror["checkFiles"]> {
     return this.lib.checkFiles(onStep, quick);

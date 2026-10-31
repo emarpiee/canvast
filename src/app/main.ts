@@ -1928,6 +1928,24 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       return (host: HTMLElement) => (draw ??= mountLibraryFolderCard(host, session))();
     })(),
     persist: async () => void (await navigator.storage?.persist?.().catch(() => false)),
+    ...(storage?.folderSync
+      ? {
+          librarySplit: {
+            get: () => storage.folderSync!.partSplit(),
+            set: async (split: 1 | 2 | 3) => {
+              const files = 16 ** split;
+              const sure = await confirmDialog({
+                title: `Split the library into ${files.toLocaleString()} files?`,
+                lines: ["Every file of .canvast/library/ is written again once (a sync tool uploads them all once), and the old ones are removed. Nothing in the library changes.", "Update the app on every device that opens this workspace first: versions before 0.52.4 read only 256 files."],
+                confirmLabel: "Split it",
+                danger: false,
+              });
+              if (sure) await storage.folderSync!.setPartSplit(split);
+              return sure;
+            },
+          },
+        }
+      : {}),
     password: async (kind, action) => {
       const what = kind === "workspace" ? "workspace" : "Hidden items";
       const state = async (note = "", only = false): Promise<{ has: boolean; text: string }> => {

@@ -1445,3 +1445,47 @@ test("the library's files in .canvast/library/ deleted by hand: nothing is taken
     await app.close();
   }
 });
+
+test("the library's files split another way (Settings > Storage, Library files): 16 or 4,096 parts, read back the same, kept by the workspace", async () => {
+  const ws = tempDir("canvast-ws-");
+  const pics = [1, 2, 3, 4, 5].map((k) => makePng(k + 1, 3, () => [k * 40, 120, 60, 255]));
+  let { app, page } = await launch(ws);
+  const parts = () => readdirSync(join(ws, ".canvast/library")).filter((n) => n.startsWith("items-")).map((n) => n.slice(6, -5));
+  const index = () => JSON.parse(readFileSync(join(ws, ".canvast/library/index.json"), "utf8")) as { version: number; split?: number; parts: string[] };
+  const listing = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, e.state]).sort()));
+  const choose = async (split: string): Promise<void> => {
+    await page.getByTestId("view-settings").click();
+    await page.getByRole("tab", { name: /Storage/ }).click();
+    await page.getByTestId("set-library-split").selectOption(split);
+    await page.getByTestId("confirm-ok").click();
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+  };
+  let before: unknown;
+  try {
+    await page.getByTestId("import-input").setInputFiles(pics.map((buffer, k) => ({ name: `P${k}.png`, mimeType: "image/png", buffer })));
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(5);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    before = await listing();
+    expect(parts().every((k) => k.length === 2)).toBe(true);
+    await choose("1");
+    await expect.poll(() => parts().every((k) => k.length === 1)).toBe(true);
+    expect(index()).toMatchObject({ version: 4, split: 1 });
+    expect(index().parts.sort()).toEqual(parts().sort());
+    expect(await listing()).toEqual(before);
+  } finally {
+    await app.close();
+  }
+  // Started again: the workspace keeps its split, nothing is taken as erased; then 4,096.
+  ({ app, page } = await launch(ws));
+  try {
+    await expect.poll(listing).toEqual(before);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    expect(parts().every((k) => k.length === 1)).toBe(true);
+    await choose("3");
+    await expect.poll(() => parts().every((k) => k.length === 3)).toBe(true);
+    expect(index()).toMatchObject({ version: 4, split: 3 });
+    expect(await listing()).toEqual(before);
+  } finally {
+    await app.close();
+  }
+});

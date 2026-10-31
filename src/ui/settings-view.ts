@@ -7,6 +7,7 @@ import { SETTINGS } from "../settings/settings";
 import { FIXED_SHORTCUTS } from "../settings/shortcuts";
 import { KEY_COMMANDS, type Keymap, type KeyCommand, comboOfEvent, displayCombo, judge } from "../settings/keymap";
 import { esc } from "./format";
+import { plural } from "../doc/plural";
 import { bindContextMenu } from "./context-menu";
 import type { MenuItem } from "./more-menu";
 import { syncScroll } from "./bar";
@@ -316,6 +317,8 @@ export interface BackupHooks {
   reset(): Promise<void>;
   /** A password (of the Hidden items or of the whole workspace): whether there is one, and change it (null removes it). Resolves with a sentence to show. */
   password(kind: "hidden" | "workspace", action: "status" | "set" | "remove"): Promise<{ has: boolean; text: string }>;
+  /** The desktop app: how the workspace splits its library's files (16, 256 or 4,096), and splitting them another way (asks first). */
+  librarySplit?: { get(): Promise<{ split: 1 | 2 | 3; items: number }>; set(split: 1 | 2 | 3): Promise<boolean> };
 }
 
 const pwCard = (kind: "hidden" | "workspace", title: string, help: string): string => `<div class="set-info set-card" data-pw-card="${kind}"><h3>${esc(title)}</h3>
@@ -359,7 +362,9 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
             ? `<div class="set-info set-card" data-folder-card><h3>Workspace folder</h3><div data-folder-host></div>
              <p class="set-help">Your boards, canvases and library are files in this folder: back it up, sync it or copy it like any folder.</p>
              <div class="storage-actions"><button type="button" data-switch-workspace data-testid="set-switch-workspace" aria-haspopup="menu">${ICONS.arrowLeftRight}<span>Switch workspace…</span></button></div>
-             ${rowHtml(DELETE_TO_ROW)}${rowHtml(TRASH_DAYS_ROW)}${rowHtml(DELETE_AT_ONCE_ROW)}</div>
+             ${rowHtml(DELETE_TO_ROW)}${rowHtml(TRASH_DAYS_ROW)}${rowHtml(DELETE_AT_ONCE_ROW)}
+             <div class="set-row" data-row="library-split"><label for="set-library-split"><span class="set-label" id="set-library-split-l">Library files</span><span class="set-help" id="set-library-split-h">How .canvast/library/ splits the library's names, tags, folders and notes into files. More files: each is smaller, so a sync tool uploads less for each edit. Changing it writes them all again once. Update the app on every device first: versions before 0.52.4 read only 256. <span data-library-split-size></span></span></label>
+              <div class="set-control"><select id="set-library-split" data-library-split data-testid="set-library-split" aria-labelledby="set-library-split-l" aria-describedby="set-library-split-h"><option value="1">16 files</option><option value="2">256 files</option><option value="3">4,096 files</option></select></div><span class="set-scope" title="Where this setting is kept">This workspace</span></div></div>
            <div class="set-info set-card" data-storage><h3>Working copy</h3><p>The app also keeps a working copy of the workspace on this device, so every change is safe at once; the folder follows a moment after editing pauses.</p>
              <dl><dt>Used</dt><dd data-used>…</dd></dl></div>`
             : `<div class="set-info set-card" data-storage><h3>Space</h3><p>Your canvases are kept in this browser's storage, on this device, unless you keep the files in a library folder (next card).</p>
@@ -537,6 +542,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
       saving();
       const host = root.querySelector<HTMLElement>("[data-folder-host]");
       if (host) void backup.folder(host);
+      void fillSplit();
       const last = await backup.last();
       set("[data-last-backup]", last ? `Last backup: ${new Date(last.at).toLocaleString()} (${last.kind === "incremental" ? "incremental" : "full"}), ${last.fileName}, ${mb(last.bytes)}.` : "No backup made yet.");
       const ro = backup.readOnly();
@@ -574,6 +580,20 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     const a = b.dataset["backupAction"];
     if (a === "import") root.querySelector<HTMLInputElement>("[data-testid=set-import-input]")!.click();
     else void (a === "full" ? backup.exportFull() : a === "changes" ? backup.exportChanges() : backup.exportFiles()).then(() => storage());
+  });
+  /** The Library files row: the workspace's split, and about how big one file is for this library. */
+  const fillSplit = async (): Promise<void> => {
+    const select = root.querySelector<HTMLSelectElement>("[data-library-split]");
+    const info = await backup?.librarySplit?.get().catch(() => null);
+    if (!select || !info) return;
+    select.value = String(info.split);
+    const per = Math.ceil(info.items / 16 ** info.split) * 280; // (bytes of an item's line, typical)
+    const size = root.querySelector<HTMLElement>("[data-library-split-size]");
+    if (size) size.textContent = `This library: ${plural(info.items, "item")}, about ${per < 1024 ? `${per} bytes` : per < 2 ** 20 ? `${Math.round(per / 1024)} KB` : `${(per / 2 ** 20).toFixed(1)} MB`} a file.`;
+  };
+  root.addEventListener("change", (e) => {
+    const split = (e.target as HTMLElement).closest<HTMLSelectElement>("[data-library-split]");
+    if (split && backup?.librarySplit) void backup.librarySplit.set(Number(split.value) as 1 | 2 | 3).then(() => fillSplit());
   });
   root.addEventListener("change", (e) => {
     const input = e.target as HTMLInputElement;
