@@ -574,7 +574,7 @@ test("tags, favourites, folders, notes and fields travel in archives and merge o
   await expect(q.getByTestId("asset-fields").locator(".asset-field")).toHaveCount(1);
   expect(await q.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.thumb ?? null), HASH)).toBe(thumb);
   await q.getByTestId("asset-thumb").click();
-  await q.getByRole("radio", { name: /^Thumbnails/ }).check();
+  await q.getByRole("radio", { name: /^Uploaded thumbnails/ }).check();
   await q.getByTestId("choose-ok").click();
   await expect(q.locator(".lib-item")).toHaveCount(1); // (the picture came with it)
   await context.close();
@@ -1030,7 +1030,7 @@ test("custom thumbnails: a picture of the library, an uploaded one (its own cate
   await pick(p, fileHash);
   await expect(file.locator("img")).toHaveCount(0); // (a file with no preview: its tile)
   // A picture of the library stands for it.
-  await choose(/A picture of the library/);
+  await choose(/From the library/);
   await p.locator(`.lib-item[data-hash="${GREEN_HASH}"]`).click();
   await expect(file.locator("img")).toHaveCount(1);
   // An uploaded one: kept small in its own place, never a library item.
@@ -1044,7 +1044,7 @@ test("custom thumbnails: a picture of the library, an uploaded one (its own cate
   await expect.poll(() => cardImg.getAttribute("src")).toBeTruthy();
   const before = await cardImg.getAttribute("src");
   await pick(p, HASH);
-  await choose(/^Thumbnails/);
+  await choose(/^Uploaded thumbnails/);
   await expect(p.locator(".lib-item")).toHaveCount(1);
   await expect(p.locator(".lib-item")).toHaveAttribute("aria-label", /used by 1 item/);
   await p.locator(".lib-item").click();
@@ -1064,8 +1064,24 @@ test("custom thumbnails: a picture of the library, an uploaded one (its own cate
   await p.getByTestId("view-assets").click();
   await expect(file.locator("img")).toHaveCount(1);
   await pick(p, fileHash);
-  await choose(/^Automatic/);
+  await choose(/^Original/);
   await expect(file.locator("img")).toHaveCount(0);
+  // A picture pasted while the dialog is open (Ctrl+V) is taken as an upload, and not imported into the library. (Firefox gives no
+  // file to a paste event made by a script: the step is Chromium's.)
+  const firefox = p.context().browser()?.browserType().name() === "firefox";
+  if (!firefox) {
+  await p.getByTestId("asset-thumb").click();
+  await expect(p.getByTestId("choose-dialog")).toContainText("Choose a thumbnail");
+  await p.evaluate(async (bytes) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([new Uint8Array(bytes)], "copied.png", { type: "image/png" }));
+    document.querySelector("dialog")!.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, Array.from(makePng(16, 12, () => [20, 160, 200, 255])));
+  await expect(p.getByTestId("choose-dialog")).toHaveCount(0);
+  await expect(file.locator("img")).toHaveCount(1);
+  expect(await p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(3);
+  }
+  const uploads = firefox ? 1 : 2;
   // Hidden mode uploads a hidden one: listed there, never outside it.
   await pick(p, GREEN_HASH);
   await p.getByTestId("asset-hide").click();
@@ -1074,13 +1090,13 @@ test("custom thumbnails: a picture of the library, an uploaded one (its own cate
   const [hiddenChooser] = await Promise.all([p.waitForEvent("filechooser"), choose(/Upload a picture/)]);
   await hiddenChooser.setFiles({ name: "secret.png", mimeType: "image/png", buffer: makePng(20, 20, () => [10, 10, 200, 255]) });
   await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.thumb ?? null), GREEN_HASH)).not.toBe(null);
-  await choose(/^Thumbnails/);
-  await expect(p.locator(".lib-item")).toHaveCount(2);
+  await choose(/^Uploaded thumbnails/);
+  await expect(p.locator(".lib-item")).toHaveCount(uploads + 1);
   await p.keyboard.press("Escape");
   await p.getByTestId("hidden-mode-exit").click();
   await pick(p, fileHash);
-  await choose(/^Thumbnails/);
-  await expect(p.locator(".lib-item")).toHaveCount(1); // (the hidden one is not seen here)
+  await choose(/^Uploaded thumbnails/);
+  await expect(p.locator(".lib-item")).toHaveCount(uploads); // (the hidden one is not seen here)
   await p.keyboard.press("Escape");
   expect(app.consoleErrors).toEqual([]);
 });

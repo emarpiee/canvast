@@ -513,21 +513,45 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const chooseThumbnail = async (anchor: HTMLElement, hashes: readonly string[]): Promise<void> => {
     const store = session.storage?.customThumbs;
     if (!hashes.length || !store) return;
+    // A picture pasted while the dialog is open (Ctrl+V) is taken at once, as an upload.
+    let pasted: File | null = null;
+    const onPaste = (e: ClipboardEvent): void => {
+      const file = [...(e.clipboardData?.files ?? [])].find((f) => f.type.startsWith("image/"));
+      if (!file) return;
+      e.preventDefault();
+      e.stopPropagation(); // (not also imported into the library, as a paste elsewhere is)
+      pasted = file;
+      document.querySelector<HTMLDialogElement>('dialog[data-testid="choose-dialog"]')?.close();
+    };
+    document.addEventListener("paste", onPaste, true);
     const how = await chooseDialog({
-      title: hashes.length === 1 ? "Custom thumbnail" : `Custom thumbnail of ${hashes.length} items`,
-      lines: ["What the Library shows for it instead of its own picture (also for a file with no preview). Uploaded thumbnails are kept in their own place, not in the library."],
+      title: hashes.length === 1 ? "Choose a thumbnail" : `Choose a thumbnail for ${hashes.length} items`,
+      lines: [`The picture shown for ${hashes.length === 1 ? "this item" : "them"} in the Library and on canvases, instead of ${hashes.length === 1 ? "its" : "their"} own (also for a file with no preview). You can also paste a picture now (Ctrl+V).`],
       choices: [
-        { value: "existing", label: "Thumbnails", help: "One uploaded before (any item's)." },
-        { value: "library", label: "A picture of the library", help: "Its thumbnail stands for this item." },
-        { value: "upload", label: "Upload a picture", help: "Kept small (512 px) as a custom thumbnail." },
-        { value: "auto", label: "Automatic", help: "Its own picture again." },
-        { value: "delete", label: "Delete a custom thumbnail…", help: "Items that use it show their own picture again." },
+        { value: "existing", label: "Uploaded thumbnails", help: "Reuse a picture you uploaded or pasted before." },
+        { value: "library", label: "From the library", help: "Use the picture of another item." },
+        { value: "upload", label: "Upload a picture", help: "Pick one from your computer. It is saved small, not added to the library." },
+        { value: "paste", label: "Paste a picture", help: "Use the picture you copied." },
+        { value: "auto", label: "Original", help: `Show ${hashes.length === 1 ? "the item's" : "the items'"} own picture again.` },
+        { value: "delete", label: "Delete an uploaded thumbnail…", help: "Items that use it show their own picture again." },
       ],
       confirmLabel: "Choose",
-    });
-    if (!how) return;
+    }).finally(() => document.removeEventListener("paste", onPaste, true));
+    if (!how && !pasted) return;
     let thumb: string | null = null;
-    if (how === "existing" || how === "delete") {
+    /** An uploaded or pasted picture, kept small as a custom thumbnail (a hidden one in hidden mode). */
+    const keep = async (file: Blob): Promise<boolean> => {
+      try {
+        thumb = await (hiddenMode ? store.putHidden(await shrinkPicture(file)) : store.put(await shrinkPicture(file)));
+        return true;
+      } catch (e) {
+        status.textContent = `That picture could not be used: ${(e as Error).message}.`;
+        return false;
+      }
+    };
+    if (pasted) {
+      if (!(await keep(pasted))) return;
+    } else if (how === "existing" || how === "delete") {
       const all = await thumbChoices();
       const picked = await openLibraryPicker(anchor, all);
       if (!picked) return;
@@ -546,13 +570,23 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         input.addEventListener("cancel", () => ok(null));
         input.click();
       });
-      if (!file) return;
+      if (!file || !(await keep(file))) return;
+    } else if (how === "paste") {
+      let picture: Blob | null = null;
       try {
-        thumb = await (hiddenMode ? store.putHidden(await shrinkPicture(file)) : store.put(await shrinkPicture(file)));
-      } catch (e) {
-        status.textContent = `That picture could not be used: ${(e as Error).message}.`;
+        for (const item of await navigator.clipboard.read()) {
+          const type = item.types.find((t) => t.startsWith("image/"));
+          if (type) (picture = await item.getType(type));
+          if (picture) break;
+        }
+      } catch {
+        picture = null;
+      }
+      if (!picture) {
+        status.textContent = "There is no picture to paste: copy one first.";
         return;
       }
+      if (!(await keep(picture))) return;
     }
     if (await session.organize((c) => c.updateMetaEach(hashes.map((h) => ({ hash: h, change: { thumb } }))), "Thumbnail")) redrawCards(hashes);
   };
@@ -560,12 +594,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const redrawCards = (hashes: readonly string[]): void => {
     for (const h of hashes) {
       assets.forget(h);
-      const job = thumbs.get(h);
-      const url = thumbUrls.get(h);
+      // shortcut: the old picture's address is not let go (another element may still show it: a revoked one fails to load); one small
+      // thumbnail per change of a custom thumbnail, until the page closes. Revoke once nothing on screen uses it, if changes become frequent.
       thumbs.delete(h);
       thumbUrls.delete(h);
-      if (url) URL.revokeObjectURL(url);
-      if (job) void job.p.then((u) => u !== url && URL.revokeObjectURL(u), () => undefined);
       // (a card on the screen keeps its picture until asked again: its markup is the same)
       for (const img of root.querySelectorAll<HTMLImageElement>(`.asset-thumb img[data-hash="${h}"], .film-item img[data-hash="${h}"]`)) {
         img.classList.remove("is-loaded", "is-broken");

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Added:** a custom thumbnail can be pasted: **Paste a picture** in the thumbnail dialog, or `Ctrl`+`V` while it is open (kept small like an upload, never imported into the library).
+- **Changed:** the thumbnail dialog says what each choice does in plain words (*Choose a thumbnail*: Uploaded thumbnails, From the library, Upload a picture, Paste a picture, Original).
 - **Changed:** the viewer's video and GIF player fades away also while the pointer rests on it, and keys (step, play and pause) no longer bring it back: only a move of the mouse, a click or a touch does.
 - **Fixed:** in the viewer's details panel the custom thumbnail button sat over the Place on canvas button (the preview it belongs to is not shown there): it now has its own place at the right.
 - **Fixed:** in a narrow window (the phone layout) the gallery viewer kept an empty band at the top, room for the tabs it hides: the picture now uses it.
