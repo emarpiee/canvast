@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.52.5 — Thumbnails let go safely (2026-11-01)
 
 - **Fixed:** a thumbnail's picture could be let go while the Library still showed it (after hidden mode ended, or a custom thumbnail changed), which failed to load it and logged an error; it is now let go only once nothing shows it.
 
