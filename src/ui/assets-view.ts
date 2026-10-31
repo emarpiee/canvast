@@ -556,9 +556,22 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     if (await session.organize((c) => c.updateMetaEach(hashes.map((h) => ({ hash: h, change: { thumb } }))), "Thumbnail")) redrawCards(hashes);
   };
-  /** Their file cards on canvases are made again (with the custom thumbnail, or without it). */
+  /** Their pictures are made again (with the custom thumbnail, or without it): the Library's cards and filmstrip, and their file cards on canvases. */
   const redrawCards = (hashes: readonly string[]): void => {
-    for (const h of hashes) assets.forget(h);
+    for (const h of hashes) {
+      assets.forget(h);
+      const job = thumbs.get(h);
+      const url = thumbUrls.get(h);
+      thumbs.delete(h);
+      thumbUrls.delete(h);
+      if (url) URL.revokeObjectURL(url);
+      if (job) void job.p.then((u) => u !== url && URL.revokeObjectURL(u), () => undefined);
+      // (a card on the screen keeps its picture until asked again: its markup is the same)
+      for (const img of root.querySelectorAll<HTMLImageElement>(`.asset-thumb img[data-hash="${h}"], .film-item img[data-hash="${h}"]`)) {
+        img.classList.remove("is-loaded", "is-broken");
+        loadThumb(img);
+      }
+    }
     assets.retryAll();
   };
   /** The custom thumbnails the mode may use, each with how many listed items use it. */

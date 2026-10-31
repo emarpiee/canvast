@@ -1039,13 +1039,17 @@ test("custom thumbnails: a picture of the library, an uploaded one (its own cate
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(3);
   await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.thumb ?? null), fileHash)).toMatch(/^[0-9a-f]{64}$/);
   const uploaded = await p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)!.thumb!), fileHash);
-  // Chosen again for another item, from Thumbnails.
+  // Chosen again for another item, from Thumbnails: its card shows it at once (no reload).
+  const cardImg = p.locator(`[data-testid="asset-card"][data-hash="${HASH}"] img`);
+  await expect.poll(() => cardImg.getAttribute("src")).toBeTruthy();
+  const before = await cardImg.getAttribute("src");
   await pick(p, HASH);
   await choose(/^Thumbnails/);
   await expect(p.locator(".lib-item")).toHaveCount(1);
   await expect(p.locator(".lib-item")).toHaveAttribute("aria-label", /used by 1 item/);
   await p.locator(".lib-item").click();
   await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.thumb ?? null), HASH)).toBe(uploaded);
+  await expect.poll(() => cardImg.getAttribute("src")).not.toBe(before);
   // Kept over a reload; Automatic gives it its own picture again.
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");

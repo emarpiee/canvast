@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Fixed:** a custom thumbnail chosen for an item showed in the viewer and the details at once, but its card in the grid or list kept the old picture until the app was started again.
 - **Fixed:** after giving the Hidden password (and after a start or a Rebuild), the Library kept showing "Hidden item" names, or no hidden items, until it was closed and opened: it is now listed again once the hidden items have been read.
 - **Fixed:** a readable folder put in `.hidden/` from a file manager was left readable: its files are now encrypted like a file put there, its folders become hidden library folders of their names, and the emptied readable folders are removed.
 - **Added:** importing into the Library a file it already has under another name offers to rename it to the imported name, with the old and new names listed first (in hidden mode for hidden items only); importing the originals again brings back names that were cut short. Undo puts the old names back.
