@@ -55,6 +55,9 @@ import linkSvg from "lucide-static/icons/link.svg";
 import unlinkSvg from "lucide-static/icons/unlink.svg";
 import shrinkSvg from "lucide-static/icons/shrink.svg";
 import cropSvg from "lucide-static/icons/crop.svg";
+import flipHorizontalSvg from "lucide-static/icons/flip-horizontal-2.svg";
+import flipVerticalSvg from "lucide-static/icons/flip-vertical-2.svg";
+import resetFlipSvg from "lucide-static/icons/refresh-ccw-dot.svg";
 import scanFrameSvg from "lucide-static/icons/scan.svg";
 import squareDashedSvg from "lucide-static/icons/square-dashed.svg";
 import squareDashedXSvg from "lucide-static/icons/square-dashed-x.svg";
@@ -597,6 +600,9 @@ export const ICONS = {
   unlink: clean(unlinkSvg),
   shrink: clean(shrinkSvg),
   crop: clean(cropSvg),
+  flipHorizontal: clean(flipHorizontalSvg),
+  flipVertical: clean(flipVerticalSvg),
+  resetFlip: clean(resetFlipSvg),
   sheetTool: clean(scanFrameSvg),
   sheetSelection: clean(squareDashedSvg),
   releaseSheet: clean(squareDashedXSvg),

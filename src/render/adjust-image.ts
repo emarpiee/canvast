@@ -4,7 +4,8 @@
  * is a 3 x 3 unsharp mask; grain is the same noise on every draw (it is fixed to the pixel, not to the time).
  */
 import type { Adjust } from "../doc/adjust";
-import { adjustKey, isLayerColourNeutral, layersOf, prepare } from "../doc/adjust";
+import type { ImageObject } from "../doc/model";
+import { adjustKey, cropOf, isLayerColourNeutral, layersOf, prepare } from "../doc/adjust";
 import type { RasterSource } from "./draw-objects";
 
 /** Beyond this many pixels a source is drawn as it is: adjusting it would stall a frame (it is only so large when zoomed far in, where pixels are drawn one by one and adjusted one by one). */
@@ -114,15 +115,24 @@ export function adjustedSource(src: RasterSource, a: Adjust): { img: CanvasImage
   return { img: c, f: w / src.pixelW };
 }
 
-/** A picture as a PNG with its crop and adjustments baked in, at the size of its source pixels (null: it could not be made). */
-export async function renderedPicture(blob: Blob, crop: { x: number; y: number; w: number; h: number }, a: Adjust | undefined): Promise<Blob | null> {
+/** A picture as a PNG with its crop, flip and adjustments baked in, at the size of its source pixels (null: it could not be made). */
+export async function renderedPicture(blob: Blob, o: Pick<ImageObject, "pixelW" | "pixelH" | "crop" | "adjust" | "flipX" | "flipY">): Promise<Blob | null> {
   const bmp = await createImageBitmap(blob).catch(() => null);
   if (!bmp) return null;
+  const crop = cropOf(o), a = o.adjust;
   try {
     const c = document.createElement("canvas");
     c.width = crop.w;
     c.height = crop.h;
-    const ok = a ? adjustInto(c, (g) => g.drawImage(bmp, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h), a) : (c.getContext("2d")?.drawImage(bmp, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h), true);
+    const draw = (g: CanvasRenderingContext2D): void => {
+      g.save(); // (composed with whatever placing the adjustments do)
+      g.translate(o.flipX ? crop.w : 0, o.flipY ? crop.h : 0);
+      g.scale(o.flipX ? -1 : 1, o.flipY ? -1 : 1);
+      g.drawImage(bmp, crop.x, crop.y, crop.w, crop.h, 0, 0, crop.w, crop.h);
+      g.restore();
+    };
+    const g0 = c.getContext("2d");
+    const ok = a ? adjustInto(c, draw, a) : !!g0 && (draw(g0), true);
     return ok ? await new Promise<Blob | null>((res) => c.toBlob(res, "image/png")) : null;
   } finally {
     bmp.close();

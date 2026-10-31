@@ -7,7 +7,7 @@ import { makeWebm } from "./video";
 /**
  * Pictures on the canvas (ADR 0118): crop, and non-destructive adjustments. Real input; assertions read the stored objects and pixels.
  */
-type Pic = { id: string; kind: string; w: number; h: number; crop?: { x: number; y: number; w: number; h: number }; adjust?: Record<string, number> };
+type Pic = { id: string; kind: string; w: number; h: number; crop?: { x: number; y: number; w: number; h: number }; flipX?: true; flipY?: true; adjust?: Record<string, number> };
 const objs = async (app: App): Promise<Pic[]> => (await app.page.evaluate(() => window.__canvastDebug.objects())) as unknown as Pic[];
 const boxOf = async (app: App, id: string) => (await app.page.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
 const px = (app: App, x: number, y: number) => app.page.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
@@ -75,6 +75,57 @@ test("crop: the picture's handles move its window, what stays does not move, pul
   const bw = await boxOf(app, pic.id);
   expect(bw.maxX - bw.minX).toBeCloseTo(b0.maxX - b0.minX, 0);
   expect(bw.minX).toBeCloseTo(b0.minX, 0);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("flip: the picture is mirrored in its box, crop cuts the side that is seen, Reset flip is there only while it is flipped; one undo each, exact when magnified", async ({ app }) => {
+  const p = app.page;
+  const pic = await place(app); // red grows to the right (x * 2), green downward (y * 3)
+  await p.keyboard.press("v");
+  const b0 = await boxOf(app, pic.id);
+  const midY = Math.round((b0.minY + b0.maxY) / 2);
+  // (a tenth of the way in: clear of the side handles)
+  const left = [Math.round(b0.minX + (b0.maxX - b0.minX) * 0.1), midY] as const, top = [Math.round((b0.minX + b0.maxX) / 2), Math.round(b0.minY + (b0.maxY - b0.minY) * 0.1)] as const;
+  await p.mouse.click(Math.round((b0.minX + b0.maxX) / 2), midY);
+  const reset = p.getByRole("button", { name: "Reset flip" });
+  await expect(reset).toBeHidden();
+  expect((await px(app, ...left))[0], "not flipped: dark red on the left").toBeLessThan(60);
+  await p.getByRole("button", { name: "Flip horizontally" }).click();
+  await expect(p.getByRole("button", { name: "Flip horizontally" })).toHaveAttribute("aria-pressed", "true");
+  await app.frame();
+  expect((await px(app, ...left))[0], "flipped: the right side's red is on the left").toBeGreaterThan(180);
+  expect((await objs(app)).find((o) => o.id === pic.id)!.flipX).toBe(true);
+  const b1 = await boxOf(app, pic.id);
+  expect([b1.minX, b1.maxX], "in the same box").toEqual([b0.minX, b0.maxX]);
+  await p.getByRole("button", { name: "Flip vertically" }).click();
+  await app.frame();
+  expect((await px(app, ...top))[1], "and the bottom's green is at the top").toBeGreaterThan(180);
+  await expect(reset).toBeVisible();
+  // crop cuts what is seen on the side dragged: here the source's left (dark) side, from the right
+  await p.getByRole("button", { name: "Crop the picture" }).click();
+  await app.drag({ x: Math.round(b0.maxX), y: midY }, { x: Math.round(b0.maxX) - 40, y: midY }, 6);
+  const c = (await objs(app)).find((o) => o.id === pic.id)!;
+  expect(c.crop!.x, "the source's left is cut").toBeGreaterThan(0);
+  expect(c.crop!.x + c.crop!.w).toBe(120);
+  expect((await boxOf(app, pic.id)).minX, "the left side seen stays put").toBeCloseTo(b0.minX, 0);
+  await p.keyboard.press("Enter");
+  await p.keyboard.press("Control+z");
+  // magnified until each source pixel is drawn as a rectangle: still the mirrored one
+  await p.mouse.move(...left);
+  for (let i = 0; i < 40 && (await boxOf(app, pic.id)).maxX - (await boxOf(app, pic.id)).minX < 120 * 80; i++) await p.mouse.wheel(0, -400);
+  await app.frame();
+  expect((await px(app, ...left))[0], "magnified: still the right side's red").toBeGreaterThan(180);
+  await p.keyboard.press("Home");
+  await app.frame();
+  const b2 = await boxOf(app, pic.id);
+  await p.mouse.click(Math.round((b2.minX + b2.maxX) / 2), Math.round((b2.minY + b2.maxY) / 2));
+  await reset.click();
+  let now = (await objs(app)).find((o) => o.id === pic.id)!;
+  expect([now.flipX, now.flipY], "Reset flip: the right way round").toEqual([undefined, undefined]);
+  await expect(reset).toBeHidden();
+  await p.keyboard.press("Control+z");
+  now = (await objs(app)).find((o) => o.id === pic.id)!;
+  expect([now.flipX, now.flipY], "one undo brings both back").toEqual([true, true]);
   expect(app.consoleErrors).toEqual([]);
 });
 

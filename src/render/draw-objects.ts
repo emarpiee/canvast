@@ -548,17 +548,26 @@ export function drawImageObject(
       const k = src.scale ?? 1; // a reduced copy has fewer pixels: scale the source window to it
       ctx.imageSmoothingEnabled = pxPerSrc < 2;
       ctx.imageSmoothingQuality = "high";
-      const sx0 = k * (crop.x + (localX(cl) * crop.w) / o.w);
-      const sy0 = k * (crop.y + (localY(ct) * crop.h) / o.h);
-      const sx1 = k * (crop.x + (localX(cr) * crop.w) / o.w);
-      const sy1 = k * (crop.y + (localY(cb) * crop.h) / o.h);
+      // A flipped picture: the screen is mirrored about its box, and the mirror image of the visible part is drawn.
+      const [dl, dr] = o.flipX ? [l + r - cr, l + r - cl] : [cl, cr];
+      const [dt, db] = o.flipY ? [t + b - cb, t + b - ct] : [ct, cb];
+      if (o.flipX || o.flipY) {
+        ctx.save();
+        ctx.translate(o.flipX ? l + r : 0, o.flipY ? t + b : 0);
+        ctx.scale(o.flipX ? -1 : 1, o.flipY ? -1 : 1);
+      }
+      const sx0 = k * (crop.x + (localX(dl) * crop.w) / o.w);
+      const sy0 = k * (crop.y + (localY(dt) * crop.h) / o.h);
+      const sx1 = k * (crop.x + (localX(dr) * crop.w) / o.w);
+      const sy1 = k * (crop.y + (localY(db) * crop.h) / o.h);
       // A video or a GIF is adjusted as its player on the canvas is (an SVG filter, every adjustment); a still, pixel by pixel.
       const filter = o.media ? playingFilter(o.adjust) : "";
       if (filter) ctx.filter = filter;
       const adj = isNeutral(o.adjust) || o.media ? null : adjustedSource(src, o.adjust!);
       const f = adj?.f ?? 1; // (the adjusted copy may be smaller than the source while a slider is dragged)
-      ctx.drawImage(adj?.img ?? src.source, sx0 * f, sy0 * f, (sx1 - sx0) * f, (sy1 - sy0) * f, cl, ct, cr - cl, cb - ct);
+      ctx.drawImage(adj?.img ?? src.source, sx0 * f, sy0 * f, (sx1 - sx0) * f, (sy1 - sy0) * f, dl, dt, dr - dl, db - dt);
       if (filter) ctx.filter = "none";
+      if (o.flipX || o.flipY) ctx.restore();
       return;
     }
     // Each source pixel covers many screen pixels: draw the few visible ones as
@@ -575,7 +584,8 @@ export function drawImageObject(
     const w = x1 - x0;
     const h = y1 - y0;
     if (w <= 0 || h <= 0) return;
-    const data = src.readPixels(crop.x + x0, crop.y + y0, w, h);
+    // (flipped: shown pixel i is the source's crop.w - 1 - i, so the window read is mirrored and so is the index into it)
+    const data = src.readPixels(crop.x + (o.flipX ? crop.w - x1 : x0), crop.y + (o.flipY ? crop.h - y1 : y0), w, h);
     const adj = isNeutral(o.adjust) || o.media ? null : o.adjust!;
     const snap = (v: number): number => Math.round(v * dpr) / dpr;
     // Pixel edge i lies at the rational local x = i·w/pixelW. Project it as
@@ -597,7 +607,7 @@ export function drawImageObject(
         const left = edgeX(x0 + i);
         const right = edgeX(x0 + i + 1);
         if (right <= left) continue;
-        const k = (j * w + i) * 4;
+        const k = ((o.flipY ? h - 1 - j : j) * w + (o.flipX ? w - 1 - i : i)) * 4;
         const a = data[k + 3]!;
         if (a === 0) continue;
         if (adj) {

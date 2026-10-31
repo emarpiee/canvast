@@ -231,6 +231,12 @@ function axisRuns(t: TermSum, count: number, size: number, ctr: number, unit: nu
   return runs.filter((r) => r.index >= 0 && r.index < count && r.hi > -half && r.lo < half && r.hi > r.lo);
 }
 
+/** The source pixel shown at column `i`, row `j` of a picture's window (a flipped picture shows its window mirrored). */
+const sourcePixel = (o: ImageObject, cr: { x: number; y: number; w: number; h: number }, i: number, j: number): { i: number; j: number } => ({
+  i: o.flipX ? cr.x + cr.w - 1 - i : cr.x + i,
+  j: o.flipY ? cr.y + cr.h - 1 - j : cr.y + j,
+});
+
 const imageSampler: CoarseSampler<ImageObject> = {
   classify(o, { lx, ly, m, vp, info, terms }) {
     const cr = cropOf(o); // (a crop shows a window of the source pixels)
@@ -241,7 +247,7 @@ const imageSampler: CoarseSampler<ImageObject> = {
     const i = Math.floor(u);
     const j = Math.floor(v);
     const away = lx >= m && lx <= o.w - m && ly >= m && ly <= o.h - m && u - i >= mu && i + 1 - u >= mu && v - j >= mv && j + 1 - v >= mv;
-    if (away) return { rects: [{ x0: 0, y0: 0, x1: vp.width, y1: vp.height, i: i + cr.x, j: j + cr.y }] };
+    if (away) return { rects: [{ x0: 0, y0: 0, x1: vp.width, y1: vp.height, ...sourcePixel(o, cr, i, j) }] };
     // A pixel boundary (or the image's own edge) is within the view: place it from exact term sums of the centre.
     const t = terms();
     if (!t) return "exact";
@@ -259,8 +265,7 @@ const imageSampler: CoarseSampler<ImageObject> = {
           x1: vp.width / 2 + Math.min(xr.hi, hx),
           y0: vp.height / 2 + Math.max(yr.lo, -hy),
           y1: vp.height / 2 + Math.min(yr.hi, hy),
-          i: xr.index + cr.x,
-          j: yr.index + cr.y,
+          ...sourcePixel(o, cr, xr.index, yr.index),
         });
       }
     }
@@ -270,7 +275,7 @@ const imageSampler: CoarseSampler<ImageObject> = {
     const cr = cropOf(o);
     const i = Math.min(cr.w - 1, Math.max(0, Math.floor((lx * cr.w) / o.w)));
     const j = Math.min(cr.h - 1, Math.max(0, Math.floor((ly * cr.h) / o.h)));
-    return { rects: [{ x0: 0, y0: 0, x1: vp.width, y1: vp.height, i: i + cr.x, j: j + cr.y }] };
+    return { rects: [{ x0: 0, y0: 0, x1: vp.width, y1: vp.height, ...sourcePixel(o, cr, i, j) }] };
   },
 };
 

@@ -72,7 +72,7 @@
 | **Drawing** | Pressure pens, shapes, Bézier paths, node editing, vector networks, boolean shapes, fills (gradients, pictures, repeated objects with variation), outlines, 39 pattern generators, SVG in and out. [Drawing](#drawing) |
 | **Colour** | One OKHSL / OKHSV / OKLCH colour picker for everything, gradients, palettes (`.gpl`, `.ase`, `.aco`, `.ggr`) and linked styles. [Colour and styles](#colour-and-styles) |
 | **Text** | Rich text stored as Markdown, imported fonts (variable fonts too), text on a path, notes, sharp letters at any zoom. [Text](#text) |
-| **Pictures and media** | Pixel-exact pictures, non-destructive adjustments and shadows, crop and masks; video, audio and GIFs play on the canvas. [Pictures, video, audio and other files](#pictures-video-audio-and-other-files) |
+| **Pictures and media** | Pixel-exact pictures, non-destructive adjustments and shadows, crop, flip and masks; video, audio and GIFs play on the canvas. [Pictures, video, audio and other files](#pictures-video-audio-and-other-files) |
 | **Organizing** | Layers, groups, sheets that clip, masks, snapping, align and arrange, tags, Reveal for things under others. [Organizing](#organizing) |
 | **Library** | Every imported file once, with folders, tags, favourites, notes and fields, similar-image search, a viewer and safe deletion. [The Library](#the-library) |
 | **Privacy** | Hidden items and passwords; in the desktop app hidden files are encrypted, and can be decrypted outside the app. [Privacy and security](#privacy-and-security) |
@@ -330,7 +330,7 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
 
 - **Pictures** are placed one source pixel to one screen pixel. Zooming in shows real pixels; nothing is invented and the file is never altered.
 - **Adjustments** are non-destructive stacks you can reorder, hide and copy between pictures, video, GIFs, shapes, pen strokes and texts: exposure, contrast, highlights, shadows, temperature, tint, saturation, vibrance, red/green/blue, levels, curves, gradient map, blur, sharpen and grain.
-- **Crop**, rounded corners and an outline work on pictures, video and GIFs. A picture can be masked by a shape, by opacity or by brightness, or by a brush mask painted with the Pen.
+- **Crop**, **Flip horizontally** and **Flip vertically** (mirrored in the same box; **Reset flip** turns it back), rounded corners and an outline work on pictures, video and GIFs. On a flipped picture, crop cuts the side you drag. A picture can be masked by a shape, by opacity or by brightness, or by a brush mask painted with the Pen.
 - **Drop shadow and inner shadow** (Adjust panel), for pictures, shapes, strokes and texts: opacity, across, down, blur, spread and a colour each.
   - A new shadow starts soft and a little below. Each group of adjustments has a *Reset* button.
   - Offset and blur are shares of the object's own size (an offset of 100 is a tenth of it), so a shadow looks the same at any zoom.
@@ -339,7 +339,7 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
   - A blur is a share of the object's size, so it does not change with zoom (far inside an object it stays at most about 330 px wide).
   - Exporting a selection leaves room for a blur or a drop shadow.
   - An exported SVG carries them as a filter on the shape, and making the SVG into shapes again brings them back. A vector PDF draws such a shape as a picture instead (see Limitations).
-- **Make a new picture** bakes the crop and adjustments into a new library item; **Copy as picture** puts the result on the clipboard. **Copy** and **Paste adjustments** move a whole stack between items. **Make vector copy** turns an SVG picture into editable shapes in its place, at its size, turn and layer (one undo step; the file stays in the library). **Show in library** opens the Library with the file selected.
+- **Make a new picture** bakes the crop, flip and adjustments into a new library item; **Copy as picture** puts the result on the clipboard. **Copy** and **Paste adjustments** move a whole stack between items. **Make vector copy** turns an SVG picture into editable shapes in its place, at its size, turn and layer (one undo step; the file stays in the library). **Show in library** opens the Library with the file selected.
 - **Media player:** videos, audio and animated GIFs play on the canvas with a player right under the item. It has play and pause, a seek bar, step back and forward (seconds for video and audio, frames for GIFs), repeat, playback speed, volume, a waveform for audio, and a start and end to play only part of a file. The paused frame is saved. Playback continues when the item scrolls out of view.
 - **Extract frame** turns the current frame of a video or GIF into a picture in the library (PNG, WebP or JPEG). Settings name it, file it in a folder and tag it, optionally placing it on the canvas.
 - **File details:** EXIF, colour profile and codec information are shown. STL and OBJ 3D models and PDFs are kept as cards with a preview; any other file is kept as a card with its extension and can be downloaded again.
@@ -483,7 +483,7 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 | You copy | The PNG is |
 | --- | --- |
 | Shapes | The shapes as drawn (their SVG text is a separate command, *Copy the selection as SVG*, in the right-click menu) |
-| A picture | One PNG at full size, as it looks with its crop and adjustments |
+| A picture | One PNG at full size, as it looks with its crop, flip and adjustments |
 | A GIF or video | The frame it shows |
 | A shape with a picture or objects fill, or anything mixed | It as drawn, at most 1024 px on the long side |
 

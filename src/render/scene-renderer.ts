@@ -859,6 +859,9 @@ export function drawCropGhost(ctx: CanvasRenderingContext2D, po: ProjectedObject
   ctx.fillRect(0, 0, vp.width, vp.height);
   if ([x, y, w, h].every(Number.isFinite) && w < 1e5 && h < 1e5) {
     ctx.globalAlpha = 0.55;
+    // (a flipped picture: the whole source mirrored about the window's centre, as the window itself is drawn)
+    ctx.translate(o.flipX ? l + r : 0, o.flipY ? t + b : 0);
+    ctx.scale(o.flipX ? -1 : 1, o.flipY ? -1 : 1);
     ctx.drawImage(src.source, x, y, w, h);
   }
   ctx.restore();

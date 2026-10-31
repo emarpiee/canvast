@@ -74,6 +74,7 @@ describe("classifyCoarse (objects far coarser than the camera)", () => {
     const img = image(100, 50, 10, 5); // 10 × 10 units per source pixel
     const one = (r: ReturnType<typeof classifyCoarse>): [number, number] | string => (typeof r === "string" ? r : r.rects!.length === 1 ? [r.rects![0]!.i, r.rects![0]!.j] : "many");
     expect(one(classifyCoarse(img, at(35, 12), INFO, VP))).toEqual([3, 1]);
+    expect(one(classifyCoarse({ ...img, flipX: true, flipY: true }, at(35, 12), INFO, VP)), "flipped: the mirrored pixel").toEqual([6, 3]);
     expect(classifyCoarse(img, at(100.5, 12), INFO, VP)).toBe("miss");
     expect(classifyCoarse(img, at(100, 12), INFO, VP)).toBe("exact");
     expect(classifyCoarse(img, at(30, 12), INFO, VP)).toBe("exact");

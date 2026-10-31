@@ -161,6 +161,9 @@ export interface ImageObject extends ObjectBase {
   readonly media?: MediaState;
   /** The window of the source pixels it shows (ADR 0118), whole pixels; absent = all of them. `w` and `h` (above) are the size of this window as shown. */
   readonly crop?: Crop;
+  /** Mirrored left to right (`flipX`) or top to bottom (`flipY`) inside its box, about the box's centre; absent = not. */
+  readonly flipX?: true;
+  readonly flipY?: true;
   /**
    * Rounded corners and an outline, as a shape has them (ADR 0148): the same fields, the same controls. `radius`: local units, one value or one
    * for each corner (top left, top right, bottom right, bottom left); absent = square. `stroke` is a colour or a gradient (placed on the picture's
@@ -563,6 +566,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     positive(o.h, "h");
     if (int(o.pixelW, "pixelW") < 1 || int(o.pixelH, "pixelH") < 1) throw new InvalidObjectError("bad pixel size");
     if (o.crop !== undefined && !(Number.isInteger(o.crop.x) && Number.isInteger(o.crop.y) && Number.isInteger(o.crop.w) && Number.isInteger(o.crop.h) && o.crop.x >= 0 && o.crop.y >= 0 && o.crop.w >= 1 && o.crop.h >= 1 && o.crop.x + o.crop.w <= o.pixelW && o.crop.y + o.crop.h <= o.pixelH)) throw new InvalidObjectError("bad crop");
+    if ((o.flipX !== undefined && o.flipX !== true) || (o.flipY !== undefined && o.flipY !== true)) throw new InvalidObjectError("bad flip");
     if (o.radius !== undefined) {
       const rs = typeof o.radius === "number" ? [o.radius] : o.radius;
       if (!Array.isArray(rs) || (typeof o.radius !== "number" && rs.length !== 4) || !rs.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0)) throw new InvalidObjectError("bad radius");
@@ -740,6 +744,8 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       pixelH: s["pixelH"] as number,
       ...(s["media"] !== undefined ? { media: s["media"] as MediaState } : {}),
       ...(s["crop"] !== undefined ? { crop: s["crop"] as Crop } : {}),
+      ...(s["flipX"] === true ? { flipX: true as const } : {}),
+      ...(s["flipY"] === true ? { flipY: true as const } : {}),
       ...(s["radius"] !== undefined ? { radius: s["radius"] as number | number[] } : {}),
       ...(s["stroke"] !== undefined ? { stroke: s["stroke"] as string } : {}),
       ...(s["width"] !== undefined ? { width: s["width"] as number } : {}),

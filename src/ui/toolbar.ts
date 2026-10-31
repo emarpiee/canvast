@@ -77,6 +77,10 @@ export interface ToolbarActions {
   croppable(): boolean;
   cropped(): boolean;
   uncrop(): void;
+  /** Flip the picked pictures (stills, video, GIF) in their boxes, and back. */
+  selectedFlip(): { x: boolean; y: boolean } | null;
+  flip(axis: "x" | "y"): void;
+  unflip(): void;
   selectedAdjust(): { adjust: Adjust; stills: boolean; count: number } | null;
   /** The saved adjustments, and saving the numbers as one (ADR 0120). */
   adjustStyles(): { save(name: string, a: Adjust): Promise<void>; gradients(): Array<{ name: string; stops: readonly GradientStop[] }> };
@@ -255,6 +259,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
           <select data-pin-v aria-label="Pin vertically: how it follows the sheet's height"><option value="top">Top</option><option value="bottom">Bottom</option><option value="both">Top and bottom</option><option value="center">Middle</option><option value="scale">Scale</option></select></label>
         <button type="button" data-kind="picture" data-crop hidden aria-pressed="false" aria-label="Crop the picture" title="Crop: drag a side or a corner of the picture; drag outward to bring back what was cut. Enter or Escape finishes.">${ICONS.crop}</button>
         <button type="button" data-kind="picture" data-uncrop hidden aria-label="Show the whole picture" title="Show the whole picture again (the crop is removed)">${ICONS.fullscreen}</button>
+        <button type="button" data-kind="picture" data-flip="x" hidden aria-pressed="false" aria-label="Flip horizontally" title="Flip horizontally: mirror the picture left to right in its box">${ICONS.flipHorizontal}</button>
+        <button type="button" data-kind="picture" data-flip="y" hidden aria-pressed="false" aria-label="Flip vertically" title="Flip vertically: mirror the picture top to bottom in its box">${ICONS.flipVertical}</button>
+        <button type="button" data-kind="picture" data-unflip hidden aria-label="Reset flip" title="Reset flip: show the picture the right way round again">${ICONS.resetFlip}</button>
         <button type="button" data-kind="picture shape stroke text" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture, shape or text: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
         <button type="button" data-kind="picture shape stroke text" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the selected pictures">${ICONS.listRestart}</button>
         <span class="tb-count" data-kind="any" data-on-sheet hidden title="Where it is on its sheet, in per cent of the sheet: X and Y from its top-left corner, W and H of its width and height">On sheet
@@ -603,6 +610,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     editor.changed();
   });
   root.querySelector<HTMLElement>("[data-uncrop]")!.addEventListener("click", () => actions.uncrop());
+  for (const b of root.querySelectorAll<HTMLElement>("[data-flip]")) b.addEventListener("click", () => actions.flip(b.dataset["flip"] as "x" | "y"));
+  root.querySelector<HTMLElement>("[data-unflip]")!.addEventListener("click", () => actions.unflip());
   root.querySelector<HTMLElement>("[data-adjust-reset]")!.addEventListener("click", () => actions.commitAdjust({}, "Reset adjustments"));
   root.querySelector<HTMLElement>("[data-adjust]")!.addEventListener("click", () => {
     if (!actions.selectedAdjust() && !editor.adjustOpen) return;
@@ -950,6 +959,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     crop.classList.toggle("is-applied", cropped);
     crop.setAttribute("aria-label", cropped ? "Crop the picture (cropped)" : "Crop the picture");
     root.querySelector<HTMLElement>("[data-uncrop]")!.hidden = !(pick && still && actions.cropped());
+    const flip = pick && still ? actions.selectedFlip() : null;
+    for (const b of root.querySelectorAll<HTMLElement>("[data-flip]")) {
+      b.hidden = !flip;
+      b.setAttribute("aria-pressed", String(!!flip?.[b.dataset["flip"] as "x" | "y"]));
+    }
+    root.querySelector<HTMLElement>("[data-unflip]")!.hidden = !(flip && (flip.x || flip.y));
     const adj = pick && still ? actions.selectedAdjust() : null;
     const adjustBtn = root.querySelector<HTMLElement>("[data-adjust]")!;
     adjustBtn.hidden = !adj;

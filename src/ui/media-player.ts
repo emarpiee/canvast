@@ -396,11 +396,10 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
       el.style.width = `${fullW}px`;
       el.style.height = `${fullH}px`;
       el.style.clipPath = c ? `inset(${offY}px ${fullW - offX - w}px ${fullH - offY - h}px ${offX}px)` : "";
-      if (o.rot) {
-        const pv = pivotOf(o);
-        el.style.transformOrigin = `${pv.x * ppu + offX}px ${pv.y * ppu + offY}px`;
-        el.style.transform = `rotate(${radiansFromAngle(o.rot)}rad)`;
-      } else el.style.transform = "";
+      // Turned and flipped about the window's centre (the clip is mirrored with the picture, so the window stays where it is).
+      const pv = pivotOf(o);
+      el.style.transformOrigin = `${pv.x * ppu + offX}px ${pv.y * ppu + offY}px`;
+      el.style.transform = `${o.rot ? `rotate(${radiansFromAngle(o.rot)}rad)` : ""}${o.flipX || o.flipY ? ` scale(${o.flipX ? -1 : 1}, ${o.flipY ? -1 : 1})` : ""}`;
     }
     if (p !== sel) return;
     bar.style.display = transforming(o.id) ? "none" : ""; // the bar would stay behind a moving instance

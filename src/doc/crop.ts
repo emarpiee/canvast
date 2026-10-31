@@ -10,9 +10,11 @@ import type { Crop } from "./adjust";
 /**
  * Move the four edges of the picture's window by the given amounts in local units (positive cuts in, negative brings back what was
  * cut), rounded to whole source pixels and held inside the source and to at least one pixel. The scale (source pixels per local unit)
- * does not change.
+ * does not change. The edges are the ones seen: on a flipped picture the left edge is the source's right one.
  */
 export function cropEdges(o: ImageObject, left: number, top: number, right: number, bottom: number): ImageObject {
+  if (o.flipX) [left, right] = [right, left];
+  if (o.flipY) [top, bottom] = [bottom, top];
   const c = cropOf(o);
   const sx = c.w / o.w, sy = c.h / o.h; // source pixels per local unit
   let x0 = Math.round(c.x + left * sx);
@@ -33,15 +35,20 @@ export function cropEdges(o: ImageObject, left: number, top: number, right: numb
     w: crop.w / sx,
     h: crop.h / sy,
     anchor: {
-      x: D.add(o.anchor.x, D.shift(D.fromNumber((x0 - c.x) / sx), o.unit)),
-      y: D.add(o.anchor.y, D.shift(D.fromNumber((y0 - c.y) / sy), o.unit)),
+      x: D.add(o.anchor.x, D.shift(D.fromNumber((o.flipX ? c.x + c.w - x1 : x0 - c.x) / sx), o.unit)),
+      y: D.add(o.anchor.y, D.shift(D.fromNumber((o.flipY ? c.y + c.h - y1 : y0 - c.y) / sy), o.unit)),
     },
   };
 }
 
 /** The picture with all of its source showing again, at the same scale and place. */
 export function uncrop(o: ImageObject): ImageObject {
-  const c = cropOf(o);
-  const sx = c.w / o.w, sy = c.h / o.h;
-  return cropEdges(o, -c.x / sx, -c.y / sy, -(o.pixelW - c.x - c.w) / sx, -(o.pixelH - c.y - c.h) / sy);
+  return cropEdges(o, -Infinity, -Infinity, -Infinity, -Infinity); // (every edge pulled out as far as the source goes)
+}
+
+/** The picture mirrored left to right (`x`) or top to bottom, in the same box. */
+export function flipped(o: ImageObject, axis: "x" | "y"): ImageObject {
+  const key = axis === "x" ? "flipX" : "flipY";
+  const { [key]: was, ...rest } = o;
+  return was ? rest : { ...rest, [key]: true };
 }

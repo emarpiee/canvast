@@ -25,7 +25,7 @@ import { ancestorsOf, descendantsOf, isContainer, isMaskSheet, rootsOf } from ".
 import { DEFAULT_CONSTRAINT, constraintOf } from "../doc/constraints";
 import { cleanAdjust, cropOf, isNeutral, reachFraction } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
-import { cropEdges, uncrop } from "../doc/crop";
+import { cropEdges, flipped, uncrop } from "../doc/crop";
 import { renderedPicture, setAdjustPreviewing } from "../render/adjust-image";
 import { DEFAULT_INK, newInk } from "../render/ink";
 import type { Constraint } from "../doc/constraints";
@@ -2475,6 +2475,30 @@ export function uncropPicture(doc: DocumentStore, editor: EditorState): void {
   editor.changed();
 }
 
+/** Which way the picked pictures are flipped: `x` / `y` when every one is (null: no picture is picked). */
+export function selectedFlip(doc: DocumentStore, editor: EditorState): { x: boolean; y: boolean } | null {
+  const ps = pictures(doc, editor);
+  return ps.length ? { x: ps.every((o) => o.flipX), y: ps.every((o) => o.flipY) } : null;
+}
+
+/** Mirror the picked pictures left to right (`x`) or top to bottom in their boxes, or back when every one already is: one undo step. */
+export function flipPictures(doc: DocumentStore, editor: EditorState, axis: "x" | "y"): void {
+  const ps = pictures(doc, editor);
+  if (!ps.length || editor.blockEdit()) return;
+  const key = axis === "x" ? "flipX" : "flipY";
+  const on = !ps.every((o) => o[key]);
+  doc.commit(doc.transaction(axis === "x" ? "Flip horizontally" : "Flip vertically", ps.filter((o) => !!o[key] !== on).map((o) => flipped(o, axis))));
+  editor.changed();
+}
+
+/** Show the picked pictures the right way round again: one undo step. */
+export function unflipPictures(doc: DocumentStore, editor: EditorState): void {
+  const ps = pictures(doc, editor).filter((o) => o.flipX || o.flipY);
+  if (!ps.length || editor.blockEdit()) return;
+  doc.commit(doc.transaction("Reset flip", ps.map((o) => { const { flipX: _x, flipY: _y, ...rest } = o; return rest; })));
+  editor.changed();
+}
+
 /** What can be adjusted: pictures (stills, video, GIF), and shapes, pen strokes and texts (adjusted as they look once drawn). */
 const adjustables = (doc: DocumentStore, editor: EditorState): CanvasObject[] =>
   selected(doc, editor).filter((o) => !o.locked && (o.kind === "path" || o.kind === "stroke" || o.kind === "text" || (o.kind === "image" && o.media?.kind !== "audio")));
@@ -2552,7 +2576,7 @@ export function pasteAdjustments(doc: DocumentStore, editor: EditorState): void 
 export async function renderedStill(doc: DocumentStore, editor: EditorState, assets: AssetLibrary): Promise<Blob | null> {
   const o = croppablePicture(doc, editor) ?? pictures(doc, editor).find((p) => !p.media);
   const rec = o && (await assets.record(o.assetId).catch(() => undefined));
-  return o && rec ? await renderedPicture(rec.blob, cropOf(o), o.adjust) : null;
+  return o && rec ? await renderedPicture(rec.blob, o) : null;
 }
 
 /** The picked still as a PNG with its crop and adjustments baked in, on the system clipboard. */
@@ -2588,14 +2612,13 @@ export async function bakePicture(
   const o = pictures(doc, editor).find((p) => !p.media);
   if (!o || editor.blockEdit()) return;
   const rec = await assets.record(o.assetId).catch(() => undefined);
-  const c = cropOf(o);
-  const png = rec ? await renderedPicture(rec.blob, c, o.adjust) : null;
+  const png = rec ? await renderedPicture(rec.blob, o) : null;
   if (!rec || !png) {
     editor.message = "Could not make the picture.";
     return editor.changed();
   }
   const record = await store({ png, label: "Edited", sourceName: rec.name, sourceHash: o.assetId, kind: "edit" });
-  const { crop: _c, adjust: _a, groups: _g, hidden: _h, locked: _l, parent: _p, ...rest } = o;
+  const { crop: _c, flipX: _fx, flipY: _fy, adjust: _a, groups: _g, hidden: _h, locked: _l, parent: _p, ...rest } = o;
   const copy: ImageObject = { ...rest, id: newObjectId(), assetId: record.hash, pixelW: record.pixelW, pixelH: record.pixelH, z: doc.topZ() + 1 };
   const placed = translate(copy, D.shift(D.fromNumber(o.w * 1.05), o.unit), D.ZERO) as ImageObject;
   doc.commit(doc.transaction("Make a new picture of it as it looks", [placed]));

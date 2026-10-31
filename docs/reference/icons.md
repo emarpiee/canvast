@@ -178,6 +178,9 @@ One icon per function: two buttons that do different things never share an icon,
 | `scissors-line-dashed` | Clip content of a sheet (Layers) |
 | `crop` | Crop the picture |
 | `fullscreen` | Show the whole picture (remove the crop) |
+| `flip-horizontal-2` | Flip the picture horizontally |
+| `flip-vertical-2` | Flip the picture vertically |
+| `refresh-ccw-dot` | Reset flip (the picture the right way round) |
 | `sliders-vertical` | Adjust the picture (the Properties bar), and the Adjust panel button of the panels bar: both open the Adjust panel |
 | `shrink` | Fit the sheet to what is on it |
 | `link` | Attach the picked objects to another object |

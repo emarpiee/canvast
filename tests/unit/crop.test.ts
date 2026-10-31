@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as D from "../../src/core/dyadic";
-import { cropEdges, uncrop } from "../../src/doc/crop";
+import { cropEdges, flipped, uncrop } from "../../src/doc/crop";
 import type { ImageObject } from "../../src/doc/model";
 import { deserializeObject, newObjectId, serializeObject } from "../../src/doc/model";
 
@@ -38,5 +38,16 @@ describe("cropping a picture (ADR 0118)", () => {
     expect(at(u)[1]).toBeCloseTo(20, 9);
     expect((deserializeObject(serializeObject(c)) as ImageObject).crop).toEqual(c.crop);
     expect(() => deserializeObject({ ...serializeObject(c), crop: { x: 0, y: 0, w: 401, h: 1 } })).toThrow();
+  });
+  it("on a flipped picture cuts the edge that is seen there (the source's other side), and flipping is saved and undone", () => {
+    const f = flipped(img(), "x");
+    const c = cropEdges(f, 50, 10, 0, 0); // the left side seen = the source's right
+    expect(c.crop).toEqual({ x: 0, y: 20, w: 300, h: 180 });
+    expect(at(c)).toEqual([60, 30]);
+    expect(at(uncrop(c))).toEqual([10, 20]);
+    expect(flipped(flipped(c, "y"), "y")).toEqual(c);
+    expect(flipped(f, "x").flipX).toBeUndefined();
+    expect((deserializeObject(serializeObject(f)) as ImageObject).flipX).toBe(true);
+    expect((deserializeObject({ ...serializeObject(img()), flipY: "yes" }) as ImageObject).flipY).toBeUndefined();
   });
 });
