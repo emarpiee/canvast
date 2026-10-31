@@ -1050,6 +1050,14 @@ test("custom thumbnails: a picture of the library, an uploaded one (its own cate
   await p.locator(".lib-item").click();
   await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.thumb ?? null), HASH)).toBe(uploaded);
   await expect.poll(() => cardImg.getAttribute("src")).not.toBe(before);
+  // In the viewer (no preview in its details) the button stands on its own row, never over Place on canvas.
+  await p.locator(`[data-testid="asset-card"][data-hash="${HASH}"]`).dblclick();
+  await expect(p.getByTestId("slide-view")).toBeVisible();
+  if (!(await p.getByTestId("asset-place").isVisible())) await p.locator(".viewer-details").click();
+  await expect(p.getByTestId("asset-thumb")).toBeVisible();
+  const [tb, pb] = [(await p.getByTestId("asset-thumb").boundingBox())!, (await p.getByTestId("asset-place").locator("xpath=..").boundingBox())!];
+  expect(tb.y + tb.height <= pb.y || tb.x + tb.width <= pb.x || pb.x + pb.width <= tb.x, "not over Place on canvas").toBe(true);
+  await p.keyboard.press("Escape");
   // Kept over a reload; Automatic gives it its own picture again.
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");

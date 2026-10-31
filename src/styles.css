@@ -2053,6 +2053,9 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 /* The search help card (ADR 0069): a small button beside a search box and the operators it explains. */
 /* The details panel's preview, with its custom thumbnail button in the corner. */
 .asset-preview-box { position: relative; }
+/* In the viewer the preview is not shown (the viewer is the picture): the button stands on its own, at the right, instead of over the next row. */
+.assets-body.is-viewing .asset-preview-box { display: flex; justify-content: flex-end; }
+.assets-body.is-viewing .asset-thumb-btn { position: static; }
 .asset-thumb-btn { position: absolute; top: var(--sp-3); right: var(--sp-3); display: inline-flex; align-items: center; justify-content: center; width: var(--icon-xl); height: var(--icon-xl); padding: 0; color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); cursor: pointer; opacity: 0.85; }
 .asset-thumb-btn:hover, .asset-thumb-btn:focus-visible { opacity: 1; background: var(--hud-hover); }
 .asset-thumb-btn svg { width: var(--icon-md); height: var(--icon-md); }
