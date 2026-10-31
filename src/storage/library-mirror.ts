@@ -221,7 +221,16 @@ export function entryOf(it: LibraryItem, prev: CatalogEntry | undefined): Catalo
 
 /** A part's text: one item per line, as in `library.json`. */
 export function libraryPartText(items: readonly LibraryItem[]): string {
-  return `{"format":"${LIBRARY_PART_FORMAT}","version":2,\n"items":[${items.length ? "\n" : ""}${items.map((i) => JSON.stringify(i)).join(",\n")}${items.length ? "\n" : ""}]}\n`;
+  return `{"format":"${LIBRARY_PART_FORMAT}","version":2,\n"items":[${items.length ? "\n" : ""}${items.map(leanLine).join(",\n")}${items.length ? "\n" : ""}]}\n`;
+}
+
+/**
+ * An item's line, without the values that only say "nothing" (no tags, not a favourite, in no folder, no note, no fields, not deleted):
+ * about a quarter shorter, and read back the same (`readItem` gives each its empty value).
+ */
+export function leanLine(i: LibraryItem): string {
+  const { tags, favorite, folderId, note, fields, state, ...rest } = i;
+  return JSON.stringify({ ...rest, ...(tags.length ? { tags } : {}), ...(favorite ? { favorite } : {}), ...(folderId ? { folderId } : {}), ...(note ? { note } : {}), ...(fields.length ? { fields } : {}), ...(state !== "active" ? { state } : {}) });
 }
 
 /** `library.json`'s text: one item per line, so a sync tool or a diff shows what changed. */

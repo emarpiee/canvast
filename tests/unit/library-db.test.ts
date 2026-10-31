@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Library, openLibraryDb } from "../../desktop/library-db";
 import { togglePicked } from "../../src/assets/library-match";
 import { LibraryIndex } from "../../desktop/library-index";
-import { libraryPartText } from "../../src/storage/library-mirror";
+import { leanLine, libraryPartText, readItem } from "../../src/storage/library-mirror";
 import type { LibraryItem } from "../../src/storage/library-mirror";
 
 const item = (n: number, over: Partial<LibraryItem> = {}): LibraryItem => ({
@@ -102,5 +102,15 @@ describe("library database (desktop)", () => {
     lib.apply([{ t: "entry", hash: item(1).hash, v: { ...lib.entry(item(1).hash)!, name: "0.png" } }]);
     expect(list()).toEqual([item(1).hash, item(2).hash]);
     expect(index.counts().tags).toEqual([["cat", "Cat", 1]]);
+  });
+});
+
+describe("an item's line in a part", () => {
+  it("leaves out what only says nothing, and reads back the same", () => {
+    const plain = item(1);
+    const full = item(2, { tags: ["ref"], favorite: true, folderId: "f1", note: "a note", fields: [{ key: "k", value: "v" }], state: "deleted" });
+    expect(leanLine(plain)).not.toMatch(/"tags"|"favorite"|"folderId"|"note"|"fields"|"state"/);
+    expect(leanLine(plain).length).toBeLessThan(JSON.stringify(plain).length * 0.85);
+    for (const i of [plain, full]) expect(readItem(JSON.parse(leanLine(i)))).toEqual(readItem(JSON.parse(JSON.stringify(i))));
   });
 });

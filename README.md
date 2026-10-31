@@ -666,10 +666,10 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 
   | Items in the library | Parts | Items per part | Size of a part | All parts |
   | --- | --- | --- | --- | --- |
-  | 3,000 | 256 | ~12 | ~4 KB | ~1 MB |
-  | 100,000 | 256 | ~390 | ~140 KB | ~36 MB |
-  | 1,000,000 | 256 | ~3,900 | ~1.4 MB | ~360 MB |
-  | 10,000,000 | 256 | ~39,000 | ~14 MB | ~3.6 GB |
+  | 3,000 | 256 | ~12 | ~3 KB | ~0.8 MB |
+  | 100,000 | 256 | ~390 | ~105 KB | ~28 MB |
+  | 1,000,000 | 256 | ~3,900 | ~1.1 MB | ~275 MB |
+  | 10,000,000 | 256 | ~39,000 | ~11 MB | ~2.8 GB |
 
   So with a sync tool, an edit uploads one part: a few KB for most libraries, about a megabyte past a million items. A library of up to 10,000 items also has a copy of all of it in `.canvast/library.json` (for older versions of the app).
 - **If `.canvast/library/` is deleted** (all of it, or some parts): your files are not in it (they are in `library/` and `.hidden/`), and hidden items keep their own list (`.canvast/hidden.json`). A missing index or part is never taken to mean its items were deleted. Any device that still has its copy of the library (its database, above) writes every missing part back the next time it saves, with the names, tags, folders, notes and fields; a library of up to 10,000 items is also read back from `.canvast/library.json`. Only if the folder is gone **and** no device has its copy (a new computer, say) are the tags, notes, fields and favourites of the shown items lost: their files come back from `library/` (named and filed by where they are), hidden items come back whole. A `.canvast` backup (Settings > Storage) keeps all of it.
@@ -986,7 +986,7 @@ canvast has no network API, by design: it never opens a connection. Other progra
 | `.canvast/boards/<board>/<canvas>.cvst` | `canvast-canvas`, version 1 | One canvas as JSON: a header (`format`, `version`, `id`, `revision`, `savedAt`, `savedBy`) and the same canvas data a backup holds |
 | `.canvast/workspace.json` | `canvast-workspace` | The boards and canvases (names, order, ids), styles, and the workspace password's kept form (a salted PBKDF2 hash; the Hidden password's is not written there); `deleted`: the ids of canvases and boards deleted lately, so another device deletes only those |
 | `.canvast/library/index.json` | `canvast-library`, version 3 | The library folders (`folders`) and the parts there are (`parts`: `00` to `ff`). Version 2 (before 0.50.56) had 16 parts, `0` to `f`, and is still read |
-| `.canvast/library/items-<xx>.json` | `canvast-library-items`, version 2 | The items whose hash starts with `xx`, one per line: `hash` (SHA-256), `file` (its path under `library/`), `name`, `type`, `size`, `pixelW`, `pixelH`, `importedAt`, `tags`, `favorite`, `folderId`, `note`, `fields`, `state` |
+| `.canvast/library/items-<xx>.json` | `canvast-library-items`, version 2 | The items whose hash starts with `xx`, one per line: `hash` (SHA-256), `file` (its path under `library/`), `name`, `type`, `size`, `pixelW`, `pixelH`, `importedAt`, `tags`, `favorite`, `folderId`, `note`, `fields`, `state`. A value that only says nothing (no tags, not a favourite, in no folder, no note, no fields, `active`) is left out of the line, about a quarter shorter; a reader takes it as that empty value |
 | `.canvast/library.json` | `canvast-library`, version 1 | The same library in one file (`folders`, `items`), kept for older versions of the app while the library has up to 10,000 items. The app's own copy says `"copyOf": ".canvast/library"`; one without it was written by an older version and what it changed is taken |
 | `.canvast/devices/<id>.json` | `canvast-device`, version 1 | One device's open canvas and camera per canvas |
 | `.canvast/hidden.json`, `.hidden/*.bin` | `canvast-hidden`, version 1 | The encrypted hidden items: see [Hidden items: the file format](#hidden-items-the-file-format) |
