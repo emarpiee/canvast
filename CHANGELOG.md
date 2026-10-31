@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Changed:** hidden files stand on their own, as with rclone's crypt: each is named by its own name, encrypted, in its encrypted folders, and holds only its content. Tags, notes, fields and favourites are only in the encrypted index, so changing them, renaming, moving or filing an item never encrypts or uploads its file again; only new content does. A hidden file renamed or moved outside the app is found again by its content and takes its new name and folder. Files hidden before are renamed into place (not encrypted again) when the Hidden items are opened; backups keep each file's place. The decrypt tool gives every name and folder back from `.hidden/` and the key alone.
 - **Changed:** hidden items' files are kept in folders inside `.hidden/` that follow their library folders, each folder's name encrypted, instead of all in one folder. Renaming or moving a folder, or filing an item elsewhere, renames on disk and never encrypts again (a sync tool sees a rename); files hidden before are moved into their folders the next time the Hidden items are opened. The outside tool (`scripts/hidden-items.mjs decrypt`) writes the tree the folders say.
 - **Added:** with *Remember the Hidden password* on and the password given, hidden pictures placed on canvases show on the screen instead of a padlock. Exports, copies, pattern fills, baked pictures, screenshots and bookmark pictures still draw the padlock.
 - **Added:** search keywords `is:thumbed` (items with a custom thumbnail) and `is:unthumbed`.

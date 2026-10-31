@@ -299,12 +299,19 @@ export async function openFile(key: CryptoKey, sealed: Uint8Array<ArrayBuffer>):
  * person's own folder put there is told apart by this, and so is `thumbnails/`); one starting with `0` names a long name kept in its `.name`.
  */
 export const SEALED_DIR_RE = /^0?[a-z2-7]{26,}$/;
-const DIRS = "(?:(?:0?[a-z2-7]{26,})\\/)*";
-/** A hidden item's file: `.hidden/<encrypted folder>/…/<32 random hex>.bin` (its library folder's path, see `sealName`), or at the top. */
-export const HIDDEN_FILE_RE = new RegExp(`^\\.hidden\\/${DIRS}[0-9a-f]{32}\\.bin$`);
+const SEG = "0?[a-z2-7]{26,}";
+const DIRS = `(?:${SEG}\\/)*`;
+/**
+ * A hidden item's file: `.hidden/<encrypted folder>/…/<encrypted name>` (its library folder's path and its own name, see `sealName`),
+ * or, sealed before names were kept so, `<32 random hex>.bin` (renamed when it is next placed). A long name's `<name>.name` beside it is not one.
+ */
+export const HIDDEN_FILE_RE = new RegExp(`^\\.hidden\\/${DIRS}(?:${SEG}|[0-9a-f]{32}\\.bin)$`);
 export const isHiddenFile = (file: string | null | undefined): boolean => !!file && HIDDEN_FILE_RE.test(file);
-/** A sealed file under another name: a sync tool's copy of one (`<32 hex> (1).bin`, `<32 hex>.sync-conflict-….bin`…). Never sealed again. */
-export const SEALED_COPY_RE = new RegExp(`^\\.hidden\\/${DIRS}[0-9a-f]{32}[^/]*\\.bin$`, "i");
+/** A sealed file under another name too: a sync tool's copy of one (`… (1)`, `….sync-conflict-…`). Never sealed again. */
+export const SEALED_COPY_RE = new RegExp(`^\\.hidden\\/${DIRS}(?!.*\\.name$)(?:${SEG}|[0-9a-f]{32})[^/]*$`, "i");
+
+/** A long name's `.name` in `.hidden/`, beside its file (`<name>.name`) or in its folder (`<folder>/.name`): the app's own, never an item. */
+export const SEALED_NAME_RE = new RegExp(`^\\.hidden\\/${DIRS}(?:${SEG})?\\.name$`);
 
 /** A new name for a hidden file: random, so it says nothing about the item; in `dir` (its folders in `.hidden/`, or `.hidden` itself). */
 export function hiddenFileName(dir = ".hidden"): string {

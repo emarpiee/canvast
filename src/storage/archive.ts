@@ -17,7 +17,7 @@ import type { StyleItem } from "../assets/styles";
 import { cleanStyles } from "../assets/styles";
 import { done, req } from "./idb";
 import type { LibraryOp } from "./desktop-bridge";
-import { isFileV2, isHiddenFile, readVault } from "./hidden-vault";
+import { SEALED_NAME_RE, isFileV2, isHiddenFile, readVault } from "./hidden-vault";
 import type { Bookmark } from "./bookmarks";
 import { readBookmarks } from "./bookmarks";
 import type { BoardRecord, CanvasRecord, FrameStoreRecord, ObjectRecord, StoredView, WorkspaceRecord } from "./workspace-repo";
@@ -56,7 +56,7 @@ export const sealedHooks: {
   /** The vault's key, as its spare is written (no index), or null when there is none. */
   key: (() => Promise<string | null>) | null;
   /** Put sealed files and their key into the workspace folder; how many were new. */
-  write: ((files: ReadonlyArray<{ hash: string; data: Blob }>, key: string | null) => Promise<number>) | null;
+  write: ((files: ReadonlyArray<{ hash: string; data: Blob; at?: string }>, key: string | null, names?: ReadonlyArray<{ at: string; data: Blob }>) => Promise<number>) | null;
 } = { key: null, write: null };
 /** Where a backup reads custom thumbnails and an import keeps them (set by the storage that is open; normal ones only, see `CustomThumbStore`). */
 export const thumbHooks: {
@@ -213,7 +213,9 @@ export interface Manifest {
   /** The same for the password of the whole workspace. */
   workspaceLock?: string;
   /** Hidden items sealed as they are in the desktop build (version 7): only their content hash and file; their item is inside the file. */
-  sealed?: Array<{ hash: string; file: string }>;
+  sealed?: Array<{ hash: string; file: string; at?: string }>;
+  /** The sealed files' place in `.hidden/` says their names and folders; a long name's `.name` beside it, as it is (`at`: its place). */
+  sealedNames?: Array<{ at: string; file: string }>;
   /** The key file of the sealed items (version 7). */
   hiddenKey?: string;
   /** Custom thumbnails the items use (their SHA-256), each as `thumbnails/<hash>.webp`. Older versions of the app pass them by. */
@@ -339,7 +341,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   const workspaceLock = scope.kind === "workspace" && scope.withPrivacy && !noBytes ? await req(tx.objectStore("meta").get("workspaceLock") as IDBRequest<unknown>) : undefined;
   const assets: ManifestAsset[] = [];
   const assetBlobs: ZipInput[] = [];
-  const sealed: Array<{ hash: string; file: string }> = [];
+  const sealed: Array<{ hash: string; file: string; at?: string }> = [];
   /** The custom thumbnails of the sealed items (their item is inside their file, so the list does not name them). */
   const sealedThumbs = new Set<string>();
   const sealedReads: Array<{ input: ZipInput; file: string }> = [];
@@ -360,7 +362,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       const t = (await libraryIn(tx, snap).entry(hash))?.thumb;
       if (t) sealedThumbs.add(t);
       const input: ZipInput = { name: `sealed/${hash}.bin`, data: new Blob([]) };
-      sealed.push({ hash, file: input.name });
+      sealed.push({ hash, file: input.name, at: r.file! }); // (its place: encrypted folder and file names, nothing readable)
       assetBlobs.push(input);
       sealedReads.push({ input, file: r.file! });
       continue;
@@ -445,11 +447,23 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   if (sealedThumbnails.length) manifest.sealedThumbnails = sealedThumbnails;
   const keyText = sealed.length ? await sealedHooks.key!() : null;
   if (sealed.length && !keyText) throw new ArchiveError("the hidden items' key file could not be read, so their sealed files would not open from the backup");
+  const sealedNames: Array<{ at: string; file: string }> = [];
   for (const s of sealedReads) {
     const blob = await externalFolder.readRaw(s.file);
     if (!blob) throw new ArchiveError("a hidden item's sealed file is missing from the workspace folder");
     s.input.data = blob;
+    // A long name, of the file or of a folder of it, is kept beside it in `.name`: it goes too.
+    const parts = s.file.split("/");
+    for (const at of [`${s.file}.name`, ...parts.slice(2, -1).map((_, i) => `${parts.slice(0, i + 2).join("/")}/.name`)]) {
+      if (sealedNames.some((n) => n.at === at)) continue;
+      const name = await externalFolder.readRaw(at).catch(() => null);
+      if (!name) continue;
+      const file = `sealed-names/${sealedNames.length}.bin`;
+      assetBlobs.push({ name: file, data: name });
+      sealedNames.push({ at, file });
+    }
   }
+  if (sealedNames.length) manifest.sealedNames = sealedNames;
   if (keyText) assetBlobs.push({ name: "hidden-key.json", data: new Blob([keyText], { type: "application/json" }) });
   // Originals kept in the library folder are read now, after the last read of the database (the manifest's styles) (ADR 0159). A backup that
   // cannot hold one says so and stops: it never leaves an original out.
@@ -524,7 +538,8 @@ export interface ImportPlan {
   /** This one file is an incremental backup on its own: what did not change is in the files before it, which were not added. */
   incrementalOnly: boolean;
   /** Hidden items sealed by the desktop build (version 7), as they are, and their key file: put into the workspace folder there. */
-  sealed: Array<{ hash: string; data: Blob }>;
+  sealed: Array<{ hash: string; data: Blob; at?: string }>;
+  sealedNames: Array<{ at: string; data: Blob }>;
   /** Custom thumbnails whose bytes matched their hash (kept by the import with `thumbHooks`). */
   thumbnails: Blob[];
   /** Hidden custom thumbnails as they are sealed, by their file's name (put back only with the sealed items). */
@@ -712,6 +727,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
     hiddenKey: null,
     thumbnails: [],
     sealedThumbnails: [],
+    sealedNames: [],
   };
   // where a canvas is: in the newest file that has its content
   const canvasAt = (id: string): { entries: Map<string, ZipEntry>; file: string } | null => {
@@ -834,7 +850,12 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
         continue;
       }
       sealedSeen.add(s["hash"]);
-      plan.sealed.push({ hash: s["hash"], data: e.data.slice(0, e.size) });
+      plan.sealed.push({ hash: s["hash"], data: e.data.slice(0, e.size), ...(typeof s["at"] === "string" && isHiddenFile(s["at"]) ? { at: s["at"] } : {}) });
+    }
+    for (const n of Array.isArray(pm["sealedNames"]) ? (pm["sealedNames"] as unknown[]) : []) {
+      if (!isObj(n) || typeof n["at"] !== "string" || !SEALED_NAME_RE.test(n["at"]) || typeof n["file"] !== "string" || plan.sealedNames.some((x) => x.at === n["at"])) continue;
+      const e = parts[i]!.entries.get(n["file"]);
+      if (e && e.size < 4096) plan.sealedNames.push({ at: n["at"], data: e.data.slice(0, e.size) });
     }
     if (plan.hiddenKey === null && typeof pm["hiddenKey"] === "string") {
       const ke = parts[i]!.entries.get(pm["hiddenKey"]);
@@ -1018,7 +1039,7 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
     const result = await applyRest(db, workspaceId, targetBoardId, plan, staged, snap, libOps);
     if (lib) await moveToLibrary(db, lib, libOps);
     if (plan.sealed.length && sealedHooks.write) {
-      await sealedHooks.write(plan.sealed, plan.hiddenKey);
+      await sealedHooks.write(plan.sealed, plan.hiddenKey, plan.sealedNames);
       for (const t of plan.sealedThumbnails) await thumbHooks.putSealed?.(t.name, t.data).catch(() => undefined);
     }
     for (const t of plan.thumbnails) await thumbHooks.put?.(t).catch(() => undefined);

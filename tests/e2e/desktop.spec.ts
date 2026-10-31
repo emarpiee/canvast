@@ -24,6 +24,8 @@ async function launch(workspace: string, device = "userdata"): Promise<{ app: El
   return { app, page, requests };
 }
 
+/** A hidden item's file: in its encrypted folders, named by its encrypted name (or a random `.bin` one of before, until it is placed). */
+const SEALED_FILE = /^\.hidden\/(?:0?[a-z2-7]{26,}\/)*(?:0?[a-z2-7]{26,}|[0-9a-f]{32}\.bin)$/;
 /** Where the boards are, inside the app's own folder. */
 const B = ".canvast/boards/";
 /** The workspace's files without the app's own bookkeeping (its boards included). */
@@ -736,7 +738,7 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     const sealed = files(ws).filter((f) => f.startsWith(".hidden/"));
     expect(sealed).toHaveLength(1);
     sealed0 = sealed[0]!;
-    expect(sealed[0]).toMatch(/^\.hidden\/[a-z2-7]{26,}\/[0-9a-f]{32}\.bin$/); // (in its folder, whose name is encrypted)
+    expect(sealed[0]).toMatch(/^\.hidden\/[a-z2-7]{26,}\/[a-z2-7]{26,}$/); // (in its folder, named by its name, both encrypted)
     // The password is stretched with scrypt (version 2 of the vault, 128 MiB), done natively in the main process.
     expect(JSON.parse(readFileSync(join(ws, ".canvast/hidden.json"), "utf8"))).toMatchObject({ version: 2, kdf: { name: "scrypt", N: 131072, r: 8, p: 1 } });
     // No cheaper form of the same password beside it in a synced file (the browser's PBKDF2 gate stays on this device).
@@ -796,7 +798,10 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     await flush();
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.pictureLocked(h), hash)).toBe(false);
     // (back into its folder, which this device knew only from the sealed list, and which shows again)
-    expect(files(ws).filter((f) => (f.startsWith("library/") || f.startsWith(".hidden/")) && f !== outsideFile)).toEqual(["library/secret_folder/secret_plan.png"]);
+    // (the one sealed by the tool outside the app was renamed under its own encrypted name: it is the one file left in .hidden/)
+    expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual(["library/secret_folder/secret_plan.png"]);
+    expect(files(ws).filter((f) => f.startsWith(".hidden/") && !f.startsWith(".hidden/thumbnails/"))).toHaveLength(1);
+    void outsideFile;
     expect(readFileSync(join(ws, "library/secret_folder/secret_plan.png")).equals(secret)).toBe(true);
     expect(await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.folders.map((f) => f.name)))).toEqual(["Secret Folder"]);
     // Locked again: hiding (its folder, here) waits for the key (the readable file stays until the password is given).
@@ -817,7 +822,7 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     await expect(page.getByTestId("prompt-dialog")).toContainText("Dropped Secret.png", { timeout: 15_000 });
     await page.getByTestId("prompt-input").fill("pw2");
     await page.getByTestId("prompt-ok").click();
-    await expect.poll(() => files(ws).filter((f) => f.startsWith(".hidden/") && !/^\.hidden\/(?:0?[a-z2-7]{26,}\/)*[0-9a-f]{32}\.bin$/.test(f)), { timeout: 15_000 }).toEqual([]);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(".hidden/") && !SEALED_FILE.test(f)), { timeout: 15_000 }).toEqual([]);
     expect(files(ws).filter((f) => f.startsWith(".hidden/"))).toHaveLength(3);
     expect(files(ws).some((f) => readFileSync(join(ws, f)).includes(dropped.subarray(0, 24)))).toBe(false);
     await expect.poll(listing).toContainEqual(["Dropped Secret.png", true, true]);
@@ -897,8 +902,8 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
     // The copy of hidden.json was joined and erased; the copy of Alpha's file erased; Gamma's renamed back to a hidden file's name, not sealed again.
     await expect.poll(() => files(ws).filter((f) => f.startsWith(".canvast/hidden")), { timeout: 15_000 }).toEqual([".canvast/hidden.json"]);
     expect(sealedNames()).toHaveLength(3);
-    for (const f of sealedNames()) expect(f).toMatch(/^\.hidden\/(?:0?[a-z2-7]{26,}\/)*[0-9a-f]{32}\.bin$/);
-    expect(sealedNames()).toContain(betaFile);
+    for (const f of sealedNames()) expect(f).toMatch(SEALED_FILE);
+    expect(sealedNames().filter((f) => f.endsWith(".bin"))).toEqual([]); // (each renamed under its own encrypted name, not sealed again)
     expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), sha(gamma))).toEqual(Array.from(gamma));
   } finally {
     await app.close();
@@ -906,8 +911,8 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
   // The tool reads the joined index: all three come out under their names.
   expect(await decryptHidden(ws, `${ws}-out`, "pw")).toBe(3);
   expect(readFileSync(join(`${ws}-out`, basename(`${ws}-gamma.png`))).equals(gamma)).toBe(true);
-  // A file sealed before 0.50.53 (version 1: the bytes only): Alpha's, sealed that way again with the same key. It still opens, and the
-  // app seals it again as a file that stands on its own once the password is given (below).
+  // A file sealed before 0.50.53 (version 1: the bytes only): Alpha's, sealed that way again with the same key. It still opens, and
+  // stays as it is (below).
   const vault = JSON.parse(readFileSync(json, "utf8")) as { kdf: { N: number; r: number; p: number; salt: string }; key: string };
   const kek = await crypto.subtle.importKey("raw", new Uint8Array(scryptSync("pw", Buffer.from(vault.kdf.salt, "base64"), 32, { N: vault.kdf.N, r: vault.kdf.r, p: vault.kdf.p, maxmem: 2 ** 28 })), "AES-KW", false, ["unwrapKey"]);
   const dataKey = await crypto.subtle.unwrapKey("raw", new Uint8Array(Buffer.from(vault.key, "base64")), kek, "AES-KW", { name: "AES-GCM", length: 256 }, false, ["encrypt"]);
@@ -920,15 +925,16 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
   expect(existsSync(join(ws, ".canvast/keys/hidden.json"))).toBe(true);
   rmSync(json);
   expect(await decryptHidden(ws, `${ws}-out2`, "pw")).toBe(3);
-  expect(readdirSync(`${ws}-out2`).sort()).toEqual([basename(`${ws}-beta.png`), basename(`${ws}-gamma.png`), "hidden-items.json", `recovered-${sha(alpha).slice(0, 12)}.png`].sort());
+  // (version 1 holds no name, but its own file name, encrypted, says it: no "recovered-…" one)
+  expect(readdirSync(`${ws}-out2`).sort()).toEqual([basename(`${ws}-beta.png`), basename(`${ws}-gamma.png`), "hidden-items.json", "Alpha.png"].sort());
   ({ app, page } = await launch(ws));
   try {
     await expect.poll(() => hid("check", "x").then((r) => r.state)).toBe("locked");
     expect(await hid("check", "pw")).toEqual({ ok: true, state: "open" });
     await expect.poll(() => existsSync(json), { timeout: 15_000 }).toBe(true);
     expect(await listing()).toEqual([["Alpha.png", true, true], [basename(`${ws}-beta.png`), true, true], [basename(`${ws}-gamma.png`), true, true]].sort());
-    // Alpha's version 1 file is sealed again as version 2, with its item, and opens the same.
-    await expect.poll(() => readFileSync(join(ws, alphaFile)).subarray(0, 8).toString("latin1"), { timeout: 15_000 }).toBe("CVSTHID2");
+    // Alpha's version 1 file is left as it is (its content did not change: never encrypted again), and opens the same.
+    expect(readFileSync(join(ws, alphaFile)).subarray(0, 8).toString("latin1")).not.toBe("CVSTHID2");
     expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), sha(alpha))).toEqual(Array.from(alpha));
     // Hiding five at once: the busy screen says it is encrypting them, and how far it is.
     await page.evaluate(() => {
@@ -943,11 +949,14 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     expect(await page.evaluate(() => (window as { seen?: string }).seen)).toMatch(/Encrypting hidden items[\s\S]*Encrypting \d of 5 files/);
     expect(sealedNames()).toHaveLength(8);
-    // Renamed here: its file is sealed again, so the name inside it is the new one (the tool, with no index, gives it that name).
-    const betaBefore = readFileSync(join(ws, betaFile));
+    // Renamed here: only its file is renamed (its encrypted name), never encrypted again: the same bytes under one new name (the tool,
+    // with no index, gives it the new name).
+    const contents = () => sealedNames().map((f) => sha(readFileSync(join(ws, f)))).sort();
+    const [namesBefore, contentsBefore] = [sealedNames(), contents()];
     await page.evaluate((h) => window.__canvastDebug.libraryOp("rename", h, "Beta Renamed.png"), sha(beta));
     await page.evaluate(() => window.__canvastDebug.flushStorage());
-    await expect.poll(() => readFileSync(join(ws, betaFile)).equals(betaBefore), { timeout: 15_000 }).toBe(false);
+    await expect.poll(() => sealedNames().filter((f) => !namesBefore.includes(f)).length, { timeout: 15_000 }).toBe(1);
+    expect(contents()).toEqual(contentsBefore);
     expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), sha(beta))).toEqual(Array.from(beta));
     // Settings > Privacy, hidden items' names off this device while locked: locking clears them from its cache (the files keep them);
     // opening brings them back from the sealed index.
@@ -990,7 +999,7 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
   // A workspace whose sealed files came before their hidden.json: no new key is made (it would be a second one).
   const ws2 = mkdtempSync(join(tmpdir(), "canvast-ws-"));
   mkdirSync(join(ws2, ".hidden"));
-  writeFileSync(join(ws2, alphaFile), readFileSync(join(ws, betaFile)));
+  writeFileSync(join(ws2, alphaFile), readFileSync(join(ws, sealedNames()[0]!))); // (any sealed file)
   ({ app, page } = await launch(ws2));
   try {
     expect(await hid("set", "other")).toEqual({ ok: false, state: "none" });
@@ -1317,6 +1326,8 @@ test("hidden items' files are kept in their library folders inside .hidden/, the
   const sealed = () => files(ws).filter((f) => f.startsWith(".hidden/") && !f.startsWith(".hidden/thumbnails/"));
   type Tool = { decryptHidden: (ws: string, out: string, pw: string) => Promise<number> };
   const { decryptHidden } = (await import(join(process.cwd(), "scripts/hidden-items.mjs"))) as Tool;
+  let studySeg = "";
+  let studyAt = "";
   try {
     await page.getByTestId("import-input").setInputFiles({ name: "Study.png", mimeType: "image/png", buffer: art });
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(1);
@@ -1329,8 +1340,9 @@ test("hidden items' files are kept in their library folders inside .hidden/, the
     // In its folders, each name encrypted: nothing of "Hidden Art" or "Items" is readable in a path.
     const [first] = sealed();
     expect(sealed()).toHaveLength(1);
-    expect(first).toMatch(/^\.hidden\/[a-z2-7]{26,}\/[a-z2-7]{26,}\/[0-9a-f]{32}\.bin$/);
-    expect(first).not.toMatch(/art|items/i);
+    expect(first).toMatch(/^\.hidden\/[a-z2-7]{26,}\/[a-z2-7]{26,}\/[a-z2-7]{26,}$/);
+    expect(first).not.toMatch(/art|items|study/i);
+    studySeg = first!.split("/").pop()!; // ("Study.png", encrypted)
     const bytes = readFileSync(join(ws, first!));
     // The folder renamed: only its folder is renamed; the file is the same bytes (a sync tool sees a rename).
     await lib("renameFolder", "fi", "Pieces");
@@ -1341,17 +1353,53 @@ test("hidden items' files are kept in their library folders inside .hidden/, the
     expect(renamed.split("/").pop()).toBe(first!.split("/").pop());
     expect(readFileSync(join(ws, renamed)).equals(bytes)).toBe(true);
     expect(existsSync(join(ws, ...first!.split("/").slice(0, 3)))).toBe(false); // (the old folder is gone)
-    // Outside the app, the tool writes the tree the folders say (the file's own header still names the old one).
+    // Outside the app, the tool writes the tree and the names the folders and files say (nothing but its hash is inside the file).
     expect(await decryptHidden(ws, `${ws}-out`, "pw")).toBe(1);
     expect(readFileSync(join(`${ws}-out`, "Hidden Art", "Pieces", "Study.png")).equals(art)).toBe(true);
     // Filed in the parent folder: the file moves up, the emptied folder goes.
     await lib("file", hash, "fa");
     await flush();
-    await expect.poll(() => sealed()[0]).toMatch(/^\.hidden\/[a-z2-7]{26,}\/[0-9a-f]{32}\.bin$/);
+    await expect.poll(() => sealed()[0]).toMatch(/^\.hidden\/[a-z2-7]{26,}\/[a-z2-7]{26,}$/);
     expect(readFileSync(join(ws, sealed()[0]!)).equals(bytes)).toBe(true);
     expect(existsSync(join(ws, ...renamed.split("/").slice(0, 3)))).toBe(false);
-    expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toEqual(Array.from(art));
+    // Renamed: only its file is renamed. A note: only the sealed index changes, never the file (a sync tool uploads nothing big).
+    const before = sealed()[0]!;
+    await lib("rename", hash, "Study Final.png");
+    await flush();
+    await expect.poll(() => sealed()[0]).not.toBe(before);
+    expect(readFileSync(join(ws, sealed()[0]!)).equals(bytes)).toBe(true);
+    const at = sealed()[0]!;
+    studyAt = at;
+    const mtime = statSync(join(ws, at)).mtimeMs;
+    await lib("note", hash, "a note about it");
+    await flush();
+    expect([sealed()[0], statSync(join(ws, at)).mtimeMs]).toEqual([at, mtime]);
+    // A name too long to encrypt into a file name: a short one, with the name sealed in a `.name` beside it; the tool reads it back.
+    const longName = `${"Long reference sheet ".repeat(9)}.png`;
+    const other = makePng(2, 2, () => [10, 200, 200, 255]);
+    await page.getByTestId("import-input").setInputFiles({ name: longName, mimeType: "image/png", buffer: other });
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(2);
+    await lib("hide", createHash("sha256").update(other).digest("hex"), "1");
+    await flush();
+    const longFile = sealed().find((f) => /\/0[a-z2-7]+$/.test(f));
+    expect(longFile, "a short name for it").toBeTruthy();
+    expect(existsSync(join(ws, `${longFile}.name`))).toBe(true);
+    expect(await decryptHidden(ws, `${ws}-long`, "pw")).toBe(2);
+    expect(readFileSync(join(`${ws}-long`, longName)).equals(other)).toBe(true);
   } finally {
     await app.close();
+  }
+  // Renamed and moved outside the app (a file manager, a sync tool): to the top, under another (encrypted) name it had before. Found
+  // by the hash inside it; its name and folder are taken from its place.
+  const elsewhere = `.hidden/${studySeg}`;
+  renameSync(join(ws, studyAt), join(ws, elsewhere));
+  const again = await launch(ws);
+  try {
+    expect((await again.page.evaluate(() => window.__canvastDebug.hiddenOp("check", "pw"))).ok).toBe(true);
+    const item = () => again.page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => { const e = l.entries.find((x) => x.hash === h); return e ? [e.name, e.folderIds?.length ?? 0, e.present] : null; }), hash);
+    await expect.poll(item, { timeout: 40_000 }).toEqual(["Study.png", 0, true]);
+    expect(await again.page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toEqual(Array.from(art));
+  } finally {
+    await again.app.close();
   }
 });

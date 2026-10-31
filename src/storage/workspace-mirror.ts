@@ -128,7 +128,6 @@ export class WorkspaceMirror {
         .then(async () => {
           await this.lib.reread();
           await this.lib.scanHidden(); // (readable files in `.hidden/` waited for the key)
-          await this.lib.upgradeSealed(); // (files sealed before 0.50.53 get their item, and stand on their own)
           await this.lib.placeAllHidden(); // (each in its library folder's place of .hidden/: moved, not sealed again)
         })
         .catch(() => undefined)

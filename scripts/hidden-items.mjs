@@ -29,9 +29,9 @@ const HIDDEN_JSON = ".canvast/hidden.json";
 const KEY_SPARE = ".canvast/keys/hidden.json";
 /** A folder of .hidden/: a library folder's name, encrypted (base32; `0…` keeps a long name in its `.name`). */
 const SEALED_DIR_RE = /^0?[a-z2-7]{26,}$/;
-const HIDDEN_FILE_RE = /^\.hidden\/(?:(?:0?[a-z2-7]{26,})\/)*[0-9a-f]{32}\.bin$/;
-/** A sealed file under any name a sync tool gives a copy of one. */
-const SEALED_COPY_RE = /^[0-9a-f]{32}[^/]*\.bin$/i;
+const HIDDEN_FILE_RE = /^\.hidden\/(?:(?:0?[a-z2-7]{26,})\/)*(?:0?[a-z2-7]{26,}|[0-9a-f]{32}\.bin)$/;
+/** A sealed file (its encrypted name, or a random one of before) under any name a sync tool gives a copy of one; not a long name's `.name`. */
+const SEALED_COPY_RE = /^(?!.*\.name$)(?:0?[a-z2-7]{26,}|[0-9a-f]{32})[^/]*$/i;
 /** Every sealed file of .hidden/, in its folders too (not the custom thumbnails' own folder): paths relative to the workspace. */
 function sealedFiles(workspace) {
   const out = [];
@@ -260,6 +260,22 @@ export async function decryptHidden(workspace, out, password, { flat = false } =
     }
     return names;
   };
+  /** A sealed file's name, as its own (encrypted) file name says it (a long one from its `.name`), or null (a random one, of before). */
+  const fileName = async (file) => {
+    const seg = file.slice(file.lastIndexOf("/") + 1);
+    if (!SEALED_DIR_RE.test(seg)) return null;
+    for (const v of vaults) {
+      try {
+        const name = seg.startsWith("0")
+          ? existsSync(join(workspace, `${file}.name`)) ? new TextDecoder().decode((await openFile(v.key, new Uint8Array(readFileSync(join(workspace, `${file}.name`))))).bytes) : null
+          : await openName(v.names, seg);
+        if (name) return name;
+      } catch {
+        // another key
+      }
+    }
+    return null;
+  };
   /** Where a file goes: its folders in .hidden/ (they are what the app keeps up to date), else its header's, or the top (`flat`). */
   const whereOf = async (file, item) => {
     if (flat) return "";
@@ -281,7 +297,7 @@ export async function decryptHidden(workspace, out, password, { flat = false } =
         console.warn(`does not open: ${item.file} (${item.name})`);
         continue;
       }
-      const name = place(out, await whereOf(item.file, opened.item), item.name, opened.bytes, taken);
+      const name = place(out, await whereOf(item.file, opened.item), (await fileName(item.file)) ?? item.name, opened.bytes, taken);
       written.push({ ...item, writtenAs: name });
       hashes.add(item.hash);
       files.add(item.file);
@@ -299,9 +315,10 @@ export async function decryptHidden(workspace, out, password, { flat = false } =
     const hash = createHash("sha256").update(bytes).digest("hex");
     if (hashes.has(hash)) continue;
     // A version 2 file says what it was (its name, folder, tags…); one of version 1 is named by its content.
+    const named = await fileName(n);
     const mine = own?.hash === hash && typeof own.name === "string";
-    const name = place(out, mine ? await whereOf(n, own) : flat ? "" : ((await dirFolders(n)) ?? []).map((p) => safePart(p, "Folder")).join("/"), mine ? own.name : `recovered-${hash.slice(0, 12)}.${extOfBytes(bytes)}`, bytes, taken);
-    written.push(own?.hash === hash ? { ...own, file: n, hidden: true, writtenAs: name } : { hash, name, file: n, size: bytes.length, recovered: true, writtenAs: name });
+    const name = place(out, await whereOf(n, mine ? own : null), named ?? (mine ? own.name : `recovered-${hash.slice(0, 12)}.${extOfBytes(bytes)}`), bytes, taken);
+    written.push(mine ? { ...own, ...(named ? { name: named } : {}), file: n, hidden: true, writtenAs: name } : { hash, name: named ?? name, file: n, size: bytes.length, ...(named ? {} : { recovered: true }), writtenAs: name });
     hashes.add(hash);
   }
   // Hidden custom thumbnails (`.hidden/thumbnails/`): each as thumbnails/<hash>.webp, which an item's `thumb` names.

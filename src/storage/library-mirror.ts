@@ -16,7 +16,7 @@ import type { DesktopLibrary } from "./desktop-library";
 import { externalFolder } from "./external-folder";
 import type { HiddenVault } from "./hidden-store";
 import { RECOVERED_PREFIX } from "./hidden-store";
-import { FILE_MAGIC, SEALED_COPY_RE, SEALED_DIR_RE, hiddenFileName, isHiddenFile, nameKeys, openName, sealName } from "./hidden-vault";
+import { FILE_MAGIC, SEALED_COPY_RE, SEALED_DIR_RE, SEALED_NAME_RE, hiddenFileName, isHiddenFile, nameKeys, openName, sealName } from "./hidden-vault";
 import type { NameKeys } from "./hidden-vault";
 import { sha256Hex } from "../assets/sha256";
 import { done, idbGet, req } from "./idb";
@@ -580,14 +580,6 @@ export class LibraryMirror {
     // (the folders changed, a rename or a move of one: every hidden item may have a new place, not only the ones read)
     const foldersChanged = canonFolders(folders) !== (this.state.folders || "[]");
     await this.placeHidden(foldersChanged ? (await this.lib.entries("hidden")).map((e) => e.hash) : active.filter((e) => meta(e).hidden).map((e) => e.hash));
-    // A sealed item this device changed since the library was last written (its name, folder, tags…): its file is sealed again with it.
-    // (Not while any is blank: a blank is not a change.)
-    for (const e of (await this.anyBlank()) ? [] : active) {
-      const rec = recs.get(e.hash);
-      const was = read.seen.get(e.hash);
-      if (meta(e).hidden && rec?.ext && isHiddenFile(rec.file) && was !== undefined && seen(JSON.stringify(itemOf(e, rec))) !== was) this.resealed.add(e.hash);
-    }
-    if (this.resealed.size && this.vault.dataKey) await this.upgradeSealed([...this.resealed]);
     if (total) this.onProgress?.(total, 0);
     // Library folders are real folders, even empty; the places a move or a rename emptied are removed.
     const wanted = new Set<string>();
@@ -714,7 +706,7 @@ export class LibraryMirror {
    */
   async scanHidden(tellAgain = false): Promise<boolean> {
     // (folders inside too: a folder put there becomes a hidden library folder of its name; the hidden thumbnails' own folder is not items)
-    const all = (await this.bridge.tree(".hidden")).map((f) => f.path).filter((p) => !p.includes(".tmp-") && !p.startsWith(".hidden/thumbnails/"));
+    const all = (await this.bridge.tree(".hidden")).map((f) => f.path).filter((p) => !p.includes(".tmp-") && !p.startsWith(".hidden/thumbnails/") && !SEALED_NAME_RE.test(p));
     let plain = all.filter((p) => !SEALED_COPY_RE.test(p));
     const sealed = all.filter((p) => SEALED_COPY_RE.test(p));
     if (!this.vault.dataKey) {
@@ -806,19 +798,29 @@ export class LibraryMirror {
         await this.bridge.rename(p, at);
       }
       this.unnamedSince.delete(p);
+      // Its name and folders, from its place (a file renamed or moved outside the app, by a file manager or a sync tool, says them there).
+      const own = await this.placeOf(at);
       if (rec) {
-        await this.setFile(hash, (r) => r.ext === 1, at); // (its item's file was lost: this is it)
+        await this.setFile(hash, (r) => r.ext === 1, at); // (its item's file was lost, or moved outside the app: this is it)
+        if (own.name) {
+          const folderId = own.folders.length ? await this.hiddenFolderFor(own.folders) : null;
+          await this.lib.serial(async () => {
+            const e = await this.lib.entry(hash);
+            if (e) await this.lib.apply([{ t: "entry", hash, v: { ...e, name: own.name!, folderIds: folderId ? [folderId] : [] } satisfies CatalogEntry }]);
+          });
+        }
         changed = true;
         continue;
       }
-      // A file that stands on its own (version 2) says what it was: its name, folder and the rest come back with it. One of version 1
-      // does not: it is named by its content.
-      const item = opened.item && opened.item["hash"] === hash ? readItem({ ...opened.item, file: null }) : null;
-      const path = Array.isArray(opened.item?.["folderPath"]) ? (opened.item["folderPath"] as unknown[]).filter((n): n is string => typeof n === "string" && !!n.trim()) : [];
-      const folderId = item && path.length ? await this.folderFor(`library/${path.map((n) => safeBase(n)).join("/")}`) : null;
+      // A file that stands on its own says what it was by its place (its name, folders); one sealed before names were kept so, by what
+      // its header holds (version 2: its name, folder, tags…); one of version 1 by nothing: it is named by its content.
+      const item = opened.item && opened.item["hash"] === hash ? readItem({ name: "x", ...opened.item, file: null }) : null;
+      const path = own.name ? own.folders : Array.isArray(opened.item?.["folderPath"]) ? (opened.item["folderPath"] as unknown[]).filter((n): n is string => typeof n === "string" && !!n.trim()) : [];
+      const folderId = path.length ? await this.hiddenFolderFor(path) : null;
+      const headerName = item && typeof opened.item?.["name"] === "string" ? item.name : null;
       found.push({
         path: at,
-        name: item?.name ?? `${RECOVERED_PREFIX}${hash.slice(0, 12)}.${extOfBytes(plain)}`,
+        name: own.name ?? headerName ?? `${RECOVERED_PREFIX}${hash.slice(0, 12)}.${extOfBytes(plain)}`,
         folderId,
         hidden: true,
         ...(item ? { meta: { tags: item.tags, favorite: item.favorite, note: item.note, fields: item.fields } } : {}),
@@ -841,13 +843,20 @@ export class LibraryMirror {
    * Sealed hidden files a backup brought (and their key file): each put into `.hidden/` under a new name unless the library has its item,
    * to be taken in from what it holds once the Hidden items are opened (at once if they are open). How many were put.
    */
-  async importSealed(files: ReadonlyArray<{ hash: string; data: Blob }>, key: string | null): Promise<number> {
+  async importSealed(files: ReadonlyArray<{ hash: string; data: Blob; at?: string }>, key: string | null, names: ReadonlyArray<{ at: string; data: Blob }> = []): Promise<number> {
     if (key) await this.vault.adoptKey(key);
     const written: string[] = [];
+    // Each where it was (its encrypted folders and name say what it is), with the long names' `.name` beside them; a place taken: a random name.
+    for (const n of names) {
+      if (await this.bridge.exists(n.at)) continue;
+      await this.bridge.makeFolder(parentOf(n.at));
+      await this.bridge.write(n.at, new Uint8Array(await n.data.arrayBuffer()));
+    }
     for (const f of files) {
       const rec = await this.recOf(f.hash);
       if (rec && (!rec.ext || (rec.file && (await this.bridge.exists(rec.file))))) continue; // (the library has it)
-      const at = hiddenFileName();
+      const at = f.at && isHiddenFile(f.at) && !(await this.bridge.exists(f.at)) ? f.at : hiddenFileName();
+      if (at !== ".hidden" && parentOf(at) !== ".hidden") await this.bridge.makeFolder(parentOf(at));
       await this.bridge.write(at, new Uint8Array(await f.data.arrayBuffer()), { durable: false });
       written.push(at);
     }
@@ -945,8 +954,33 @@ export class LibraryMirror {
   }
 
   /**
-   * Sealed files not in their folder of `.hidden/` (the item was filed elsewhere, its folder renamed or moved, or it was sealed before
-   * folders were kept there): moved, never sealed again, so a sync tool sees a rename. With the key open and the names there.
+   * Where a hidden item's file belongs: its folder of `.hidden/` (`hiddenDir`), named by its own name encrypted (`sealName`; a long one
+   * beside its `<name>.name`, sealed), as a sync tool for encrypted files does: the files and folders stand on their own. Another file
+   * there under that name: `-2`, `-3`… before its extension, as in `library/`. Its file itself is free to keep its place.
+   * Before the key or the names are there: a random name at the top.
+   */
+  private async hiddenPath(hash: string): Promise<string> {
+    const keys = await this.nameKeysNow();
+    const e = await this.lib.entry(hash);
+    if (!keys || !e || (await this.anyBlank())) return hiddenFileName();
+    const dir = await this.hiddenDir(hash);
+    const own = (await this.recOf(hash))?.file ?? null;
+    const dot = e.name.lastIndexOf(".");
+    const [stem, ext] = dot > 0 ? [e.name.slice(0, dot), e.name.slice(dot)] : [e.name, ""];
+    for (let n = 1; n < 10_000; n++) {
+      const name = n === 1 ? e.name : `${stem}-${n}${ext}`;
+      const { seg, long } = await sealName(keys, name);
+      const path = `${dir}/${seg}`;
+      if (path !== own && (await this.bridge.exists(path))) continue;
+      if (long && !(await this.bridge.exists(`${path}.name`))) await this.bridge.write(`${path}.name`, await this.vault.seal(new TextEncoder().encode(name.normalize("NFC")), { kind: "fileName" }));
+      return path;
+    }
+    return hiddenFileName(dir);
+  }
+
+  /**
+   * Sealed files not where their folder and name say (filed elsewhere, renamed, their folder renamed or moved, or sealed before names
+   * and folders were kept so): moved, never sealed again, so a sync tool sees a rename. With the key open and the names there.
    */
   /** Every hidden item's file put in its folder of `.hidden/` (when the key opens: the files sealed before folders were kept there). */
   async placeAllHidden(): Promise<void> {
@@ -960,19 +994,35 @@ export class LibraryMirror {
       const rec = recs.get(hash);
       if (!rec?.ext || !isHiddenFile(rec.file)) continue;
       const from = rec.file!;
-      const dir = await this.hiddenDir(hash);
-      if (parentOf(from) === dir) continue;
-      let to = `${dir}/${from.slice(from.lastIndexOf("/") + 1)}`;
-      if (await this.bridge.exists(to)) to = hiddenFileName(dir);
+      const to = await this.hiddenPath(hash);
+      if (to === from) continue;
       await this.setMeta(MOVING_KEY, { hash, from, to } satisfies Moving);
       await this.bridge.rename(from, to);
       await this.setFile(hash, (r) => r.ext === 1 && r.file === from, to);
       await this.setMeta(MOVING_KEY, null);
+      if (await this.bridge.exists(`${from}.name`)) await this.bridge.erase(`${from}.name`); // (a long name's: the new one has its own)
       await this.pruneHidden(from);
       moved.add(hash);
     }
     // (the sealed index names the files: written again for them, with the parts)
     if (moved.size) await this.writeJson(moved);
+  }
+
+  /** A hidden file's name and library folders, as its place in `.hidden/` says them (null name: a random one, sealed before names were kept so). */
+  private async placeOf(file: string): Promise<{ name: string | null; folders: string[] }> {
+    const keys = await this.nameKeysNow();
+    const seg = file.slice(file.lastIndexOf("/") + 1);
+    let name: string | null = null;
+    if (keys && SEALED_DIR_RE.test(seg)) {
+      if (!seg.startsWith("0")) name = await openName(keys, seg);
+      else {
+        const sealed = await this.bridge.read(`${file}.name`);
+        const opened = sealed && (await this.vault.openItem(sealed as Uint8Array<ArrayBuffer>).catch(() => null));
+        name = opened ? new TextDecoder().decode(opened.bytes) : null;
+      }
+    }
+    const dir = parentOf(file);
+    return { name, folders: dir === ".hidden" ? [] : await this.dirNames(dir) };
   }
 
   /** The library folder names a folder of `.hidden/` stands for: its encrypted ones opened (a long one from its `.name`), a person's own as they are. */
@@ -1180,12 +1230,13 @@ export class LibraryMirror {
       failed.push(`“${rec.name}” is larger than ${MAX_IMPORT_BYTES / 2 ** 20} MiB, too big to encrypt`);
       return;
     }
-    const name = hiddenFileName(await this.hiddenDir(hash));
+    const name = await this.hiddenPath(hash);
     try {
       const bytes = rec.ext ? await this.bridge.read(rec.file ?? "") : new Uint8Array(await rec.blob.arrayBuffer());
       if (!bytes || (await sha256Hex((bytes as Uint8Array<ArrayBuffer>).slice().buffer)) !== hash) throw new Error("the file is not what the library says");
       await this.setMeta(MOVING_KEY, { hash, from: rec.ext ? rec.file! : "", to: name } satisfies Moving);
-      await this.bridge.write(name, await this.vault.seal(bytes as Uint8Array<ArrayBuffer>, await this.sealedItem(hash)));
+      // (only its content's hash inside: its name and folders are its path; tags, notes… are in the sealed index, so a change of them never writes the file)
+      await this.bridge.write(name, await this.vault.seal(bytes as Uint8Array<ArrayBuffer>, { hash }));
       const back = await this.bridge.read(name);
       const opened = back && (await this.vault.open(back as Uint8Array<ArrayBuffer>));
       if (!opened || (await sha256Hex(opened.buffer)) !== hash) {
@@ -1202,76 +1253,6 @@ export class LibraryMirror {
       failed.push((e as Error).message);
     }
   }
-
-  /**
-   * What a hidden file holds of its item, sealed in its header so the file stands on its own: the item as the library keeps it
-   * (without its file), and its library folder as a path of names (folder ids are only this workspace's).
-   */
-  private async sealedItem(hash: string): Promise<Record<string, unknown>> {
-    const e = await this.lib.entry(hash);
-    const rec = await this.recOf(hash);
-    const folders = await this.lib.folders();
-    if (!e) return { hash };
-    const { file: _file, ...item } = itemOf(e, rec);
-    return { ...item, folderPath: item.folderId ? folderPath(folders, item.folderId) : [] };
-  }
-
-  /**
-   * Hidden files sealed before 0.50.53 (version 1: the bytes only) sealed again as files that stand on their own (version 2, with
-   * their item), each read back and opened to prove it; also one whose item this device changed since it was sealed (its name, folder,
-   * tags…), so a file never says less than the library. While the key is open; shown as encrypting.
-   */
-  async upgradeSealed(only?: readonly string[]): Promise<void> {
-    if (!this.vault.dataKey) return;
-    const { entries, recs } = only ? { entries: [] as CatalogEntry[], recs: new Map<string, AssetRecord>() } : await this.read();
-    if (only) {
-      const rows = await this.lib.rows(only);
-      for (const hash of only) {
-        const e = rows.entries.get(hash);
-        const rec = rows.recs.get(hash);
-        if (e && rec) (entries.push(e), recs.set(hash, rec));
-      }
-    }
-    const todo: string[] = [];
-    for (const e of entries) {
-      const rec = recs.get(e.hash);
-      if (!meta(e).hidden || !rec?.ext || !isHiddenFile(rec.file)) continue;
-      const head = await this.bridge.head(rec.file!);
-      const changed = this.resealed.has(e.hash);
-      if (head !== null && (!head.startsWith(FILE_MAGIC) || changed)) todo.push(e.hash);
-    }
-    let done = 0;
-    for (const hash of todo) {
-      const rec = recs.get(hash)!;
-      try {
-        const sealed = await this.bridge.read(rec.file!);
-        const opened = sealed && (await this.vault.openItem(sealed as Uint8Array<ArrayBuffer>));
-        const plain = opened ? opened.bytes : null;
-        if (!plain || (await sha256Hex(plain.buffer)) !== hash) continue;
-        const want = await this.sealedItem(hash);
-        // Only its folder changed (a move): its place in `.hidden/` says that, so the file is not written again (a big one would be
-        // uploaded again by a sync tool for nothing).
-        const { folderPath: _a, folderId: _b, ...was } = (opened!.item ?? {}) as Record<string, unknown>;
-        const { folderPath: _c, folderId: _d, ...now } = want;
-        if (opened!.item && JSON.stringify(was) === JSON.stringify(now)) {
-          this.resealed.delete(hash);
-          continue;
-        }
-        await this.bridge.write(rec.file!, await this.vault.seal(plain, want));
-        const back = await this.bridge.read(rec.file!);
-        const again = back && (await this.vault.open(back as Uint8Array<ArrayBuffer>));
-        if (!again || (await sha256Hex(again.buffer)) !== hash) throw new Error("a hidden file did not open back the same");
-        this.resealed.delete(hash);
-      } catch (e) {
-        this.onNotice?.(`A hidden file could not be encrypted again in the new format (${(e as Error).message}). It is tried again later; it still opens as it is.`);
-      } finally {
-        this.onProgress?.(++done, todo.length, true);
-      }
-    }
-    if (todo.length) this.onProgress?.(todo.length, 0, true);
-  }
-  /** Hidden items this device changed since their file was sealed: sealed again with what they are now. */
-  private readonly resealed = new Set<string>();
 
   /** The first free `<dir>/<base>[-n].<ext>`, claimed (a new original being imported at the same time never takes it). */
   private async freeTarget(dir: string, base: string, ext: string, taken: Set<string>): Promise<string> {
