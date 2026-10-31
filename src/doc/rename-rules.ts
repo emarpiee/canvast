@@ -12,7 +12,25 @@ export type RenameRule =
 
 export type RenameMode = RenameRule["mode"];
 
-export const MAX_NAME = 200;
+/** Longest name an item can have (only its file's name on disk is shorter: `cutBytes`). */
+export const MAX_NAME = 1000;
+
+/** Longest file name kept on disk, in UTF-8 bytes: under every system's 255-byte limit, with room for a `-99` or ` (99)`. */
+export const MAX_FILE_BYTES = 240;
+
+/** `s` cut to at most `max` UTF-8 bytes, never inside a character. */
+export function cutBytes(s: string, max: number): string {
+  const enc = new TextEncoder();
+  if (enc.encode(s).length <= max) return s;
+  let out = "";
+  let n = 0;
+  for (const ch of s) {
+    n += enc.encode(ch).length;
+    if (n > max) break;
+    out += ch;
+  }
+  return out;
+}
 
 /** A name and its extension (with the dot). An extension is up to eight letters or digits after the last dot of a name that has something before it. */
 export function splitName(name: string): { stem: string; ext: string } {

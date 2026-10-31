@@ -4,11 +4,12 @@
  * The name shown in the app stays what was typed; only the file's name is made safe.
  */
 import { extOf } from "../assets/file-kind";
+import { MAX_FILE_BYTES, cutBytes } from "../doc/rename-rules";
 import type { FolderNaming } from "./external-folder";
 import { isHiddenFile } from "./hidden-vault";
 
-/** Longest file base kept (well under every system's 255-byte limit, with room for `-99` and an extension). */
-export const MAX_BASE = 100;
+/** Longest file base kept, in UTF-8 bytes (with room for `-99` and an extension of up to eight: the whole name under 255 bytes). */
+export const MAX_BASE = MAX_FILE_BYTES - 10;
 
 /** Names Windows reserves for devices, with or without an extension. */
 const RESERVED = /^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])$/i;
@@ -26,7 +27,8 @@ export function safeBase(name: string): string {
     .replace(/_+/g, "_")
     .replace(/\.{2,}/g, ".")
     .replace(/^[-_.]+|[-_.]+$/g, "");
-  if (s.length > MAX_BASE) s = s.slice(0, MAX_BASE).replace(/[-_.]+$/, "");
+  const cut = cutBytes(s, MAX_BASE);
+  if (cut !== s) s = cut.replace(/[-_.]+$/, "");
   if (!s) s = "file";
   if (RESERVED.test(s)) s = `${s}_file`;
   return s;

@@ -106,7 +106,11 @@ describe("library folder", () => {
     expect(safeBase("  ..hidden  ")).toBe("hidden");
     expect(safeBase("CON")).toBe("con_file");
     expect(safeBase("???")).toBe("file");
-    expect(safeBase("x".repeat(300)).length).toBe(100);
+    // A long name is cut in UTF-8 bytes, never inside a character, with room for `-99` and an extension under 255 bytes.
+    expect(safeBase("x".repeat(300)).length).toBe(230);
+    const jp = safeBase("日".repeat(200));
+    expect(new TextEncoder().encode(jp).length).toBeLessThanOrEqual(230);
+    expect(jp).toBe("日".repeat(76));
     const taken = new Set(["library/images/ref.png", "library/images/ref-2.png"]);
     expect(await libraryPath("Ref.PNG", "image/png", async (p) => taken.has(p))).toBe("library/images/ref-3.png");
     expect(await libraryPath("Inter Regular", "font/woff2", async () => false)).toBe("library/fonts/inter_regular.woff2");

@@ -1,5 +1,5 @@
 import { scrubNumbers } from "../colour-picker/scrub";
-import { applyRule, ruleProblem, splitName } from "../doc/rename-rules";
+import { MAX_NAME, applyRule, ruleProblem, splitName } from "../doc/rename-rules";
 import type { RenameMode, RenameRule } from "../doc/rename-rules";
 import { esc } from "./format";
 
@@ -48,12 +48,12 @@ export function openBatchRename(items: readonly RenameItem[], opts: RenameOption
     <h2 id="rn-title">${one ? "Rename" : `Rename ${items.length} ${esc(noun)}`}</h2>
     ${
       one
-        ? `<label class="rn-field"><span>New name</span><span class="rn-name"><input type="text" class="rn-input" data-rn="one" value="${esc(oneExt ? one0.stem : items[0]!.name)}" aria-label="New name" maxlength="200" autocomplete="off" spellcheck="false">${oneExt ? `<span class="rn-ext" data-rn="ext-fixed">${esc(one0.ext)}</span>` : ""}</span></label>
+        ? `<label class="rn-field"><span>New name</span><span class="rn-name"><input type="text" class="rn-input" data-rn="one" value="${esc(oneExt ? one0.stem : items[0]!.name)}" aria-label="New name" maxlength="${MAX_NAME}" autocomplete="off" spellcheck="false">${oneExt ? `<span class="rn-ext" data-rn="ext-fixed">${esc(one0.ext)}</span>` : ""}</span></label>
            ${oneExt ? `<button type="button" class="rn-link" data-rn="full">Change the extension too</button>` : ""}`
         : `<div class="rn-row"><label for="rn-mode">How to rename:</label>
              <select id="rn-mode" data-rn="mode">${modes.map(([m, l]) => `<option value="${m}">${esc(l)}</option>`).join("")}</select></div>
            <div class="rn-fields" data-for="enumerate">
-             <label class="rn-field"><span>Rename the ${items.length} selected ${esc(noun)} to</span><input type="text" class="rn-input" data-rn="pattern" value="New name #" aria-label="Name pattern" maxlength="200" autocomplete="off" spellcheck="false"></label>
+             <label class="rn-field"><span>Rename the ${items.length} selected ${esc(noun)} to</span><input type="text" class="rn-input" data-rn="pattern" value="New name #" aria-label="Name pattern" maxlength="${MAX_NAME}" autocomplete="off" spellcheck="false"></label>
              <label class="rn-inline"><span># is replaced by ascending numbers, starting with</span><input type="number" class="rn-num" data-rn="start" value="1" min="0" step="1" aria-label="First number"></label>
            </div>
            <div class="rn-fields" data-for="replace" hidden>

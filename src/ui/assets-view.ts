@@ -29,7 +29,7 @@ import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
 import type { AssetField, AssetFolder, CatalogEntry, CatalogListing } from "../assets/asset-catalog";
 import type { LibraryPages } from "../storage/store";
-import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, folderPath, folderSubtree, hiddenModeFolders, meta, usageOf, visibleFolders } from "../assets/asset-catalog";
+import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT, folderPath, folderSubtree, hiddenModeFolders, meta, usageOf, visibleFolders } from "../assets/asset-catalog";
 import { THUMB_PX, makeThumb, shrinkPicture } from "../assets/thumb";
 import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
@@ -2390,7 +2390,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <h3>${bulk ? "Tags of these" : "Tags"}</h3>
         <div class="tag-chips" data-testid="${bulk ? "bulk-tags" : "asset-tags"}">
           ${chips.join("")}
-          <input class="tag-input${bulk ? " bulk-tag-input" : ""}" data-testid="${bulk ? "bulk-tag-input" : "asset-tag-input"}" list="tag-suggest" placeholder="${bulk ? `Add a tag to all ${n}` : "Add a tag"}" aria-label="${bulk ? "Add a tag to all selected" : "Add a tag"}" title="Type a tag (or several, with commas) and press Enter" maxlength="64"${dis}>
+          <input class="tag-input${bulk ? " bulk-tag-input" : ""}" data-testid="${bulk ? "bulk-tag-input" : "asset-tag-input"}" list="tag-suggest" placeholder="${bulk ? `Add a tag to all ${n}` : "Add a tag"}" aria-label="${bulk ? "Add a tag to all selected" : "Add a tag"}" title="Type a tag (or several, with commas) and press Enter" maxlength="${MAX_TAG_TEXT}"${dis}>
           <datalist id="tag-suggest">${known.map((t) => `<option value="${esc(t)}"></option>`).join("")}</datalist>
         </div>
         <h3 class="asset-sub">${bulk ? "Folder of these" : "Folder"}</h3>

@@ -17,6 +17,10 @@ describe("plain ZIP of the original files", () => {
     expect(safeName("日本語 ファイル.jpg", "x")).toBe("日本語 ファイル.jpg");
     expect(safeName("..  ", "fallback")).toBe("fallback");
     expect(safeName(".hidden", "x")).toBe("hidden");
+    // A long one is cut before its extension, under the 255-byte limit.
+    const long = safeName(`${"Long name ".repeat(40)}.jpg`, "x");
+    expect(long.endsWith(".jpg")).toBe(true);
+    expect(new TextEncoder().encode(long).length).toBeLessThanOrEqual(240);
   });
 
   it("numbers names that collide in one folder, without regard to case, and not across folders", () => {

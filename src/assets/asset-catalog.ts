@@ -118,6 +118,8 @@ export function meta(e: CatalogEntry): { tags: string[]; favorite: boolean; hidd
 export class CatalogInputError extends Error {}
 
 const MAX_TAGS = 100;
+/** Longest text typed or pasted into a tag box at once: several tags with commas. */
+export const MAX_TAG_TEXT = 5_000;
 const MAX_FOLDER_NAME = 120;
 export const MAX_NOTE = 20_000;
 export const MAX_FIELDS = 50;
