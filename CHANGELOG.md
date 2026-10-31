@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Added:** with *Remember the Hidden password* on and the password given, hidden pictures placed on canvases show on the screen instead of a padlock. Exports, copies, pattern fills, baked pictures, screenshots and bookmark pictures still draw the padlock.
 - **Added:** search keywords `is:thumbed` (items with a custom thumbnail) and `is:unthumbed`.
 - **Fixed:** counts that read wrong for one: the library picker said *Search 1 pictures* (now *Search the picture*; none: *No pictures in the library*), and the same for a saved ZIP of pictures, a palette's colours, the layers filter, a bookmark's Update, an adjustment's layers and the workspace folder's file counts.
 - **Added:** backups carry hidden items' custom thumbnails, still encrypted as they are in `.hidden/thumbnails/` (nothing readable of them, not even their hash); importing in the desktop app puts them back.

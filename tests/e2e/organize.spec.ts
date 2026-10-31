@@ -368,12 +368,20 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   await p.getByTestId("prompt-input").fill("secret");
   await p.getByTestId("prompt-ok").click();
   await expect(side(p, /^All hidden items/)).toContainText("1");
+  // Remembered: its pictures on canvases show (the screen only; files and copies keep the padlock).
+  await expect.poll(locked).toBe(false);
   await p.getByTestId("view-canvas").click();
   await p.getByTestId("view-assets").click();
   await expect(bar).toBeHidden();
   await search.fill("hidden:");
   await expect(side(p, /^All hidden items/)).toContainText("1");
   await expect(p.getByTestId("prompt-dialog")).toHaveCount(0);
+  // Remembering turned off: a padlock again at once.
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: /Privacy/ }).click();
+  await p.locator('[data-row="library.hiddenRemember"] input').uncheck();
+  await expect.poll(locked).toBe(true);
+  await p.locator('[data-row="library.hiddenRemember"] input').check();
 
   // The password and these settings stay out of a backup unless the person includes them when asked.
   const backup = async (include: boolean): Promise<{ hiddenLock?: string; settings?: Record<string, unknown> }> => {
@@ -397,7 +405,7 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   const withIt = await backup(true);
   expect(withIt.hiddenLock).toMatch(/^pbkdf2\$/);
   expect(withIt.settings?.["library.hiddenRemember"]).toBe(true);
-  expect(await locked()).toBe(true); // (the list open and the password given: still a padlock)
+  expect(await locked()).toBe(false); // (the password given again with remembering on: shown on the screen)
 
   // Shown again (from hidden mode, begun without the password now): its pictures are drawn again.
   await p.getByTestId("view-assets").click();
@@ -1100,4 +1108,52 @@ test("custom thumbnails: a picture of the library, an uploaded one (its own cate
   await expect(p.locator(".lib-item")).toHaveCount(uploads); // (the hidden one is not seen here)
   await p.keyboard.press("Escape");
   expect(app.consoleErrors).toEqual([]);
+});
+
+test("a hidden picture shown on the canvas (its password remembered) never reaches a bookmark's picture", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("import-input").setInputFiles({ name: "red.png", mimeType: "image/png", buffer: makePng(300, 300, () => [230, 20, 20, 255]) });
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
+  const hash = await p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries[0]!.hash));
+  const red = () => p.evaluate(() => window.__canvastDebug.pixelAt(innerWidth / 2, innerHeight / 2)).then(([r, g]) => r > 180 && g < 80);
+  await expect.poll(red).toBe(true);
+  // Hidden, with a password remembered and given: the screen shows it.
+  await p.getByTestId("view-assets").click();
+  await pick(p, hash);
+  await p.getByTestId("asset-hide").click();
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: /Privacy/ }).click();
+  await p.getByTestId("hidden-pw-set").click();
+  for (let i = 0; i < 2; i++) {
+    await p.getByTestId("prompt-input").fill("pw");
+    await p.getByTestId("prompt-ok").click();
+  }
+  await expect(p.locator('[data-pw-card="hidden"] [data-pw-state]')).toContainText(/The password was set|A password is set/);
+  await p.locator('[data-row="library.hiddenRemember"] input').check();
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-search").fill("hidden:");
+  await p.getByTestId("prompt-input").fill("pw");
+  await p.getByTestId("prompt-ok").click();
+  await p.getByTestId("hidden-mode-exit").click();
+  await p.getByTestId("view-canvas").click();
+  await expect.poll(red).toBe(true);
+  // A bookmark's picture is kept in the canvas file: drawn with the padlock, never the picture.
+  await p.getByRole("button", { name: "Bookmarks panel", exact: true }).click();
+  await p.getByRole("button", { name: "Add bookmark" }).click();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.bookmarkThumbs()[0] ?? "")).toMatch(/^data:image\/jpeg/);
+  const reds = await p.evaluate(async () => {
+    const img = new Image();
+    img.src = window.__canvastDebug.bookmarkThumbs()[0]!;
+    await img.decode();
+    const c = document.createElement("canvas");
+    [c.width, c.height] = [img.width, img.height];
+    const x = c.getContext("2d")!;
+    x.drawImage(img, 0, 0);
+    const d = x.getImageData(0, 0, c.width, c.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i]! > 180 && d[i + 1]! < 80 && d[i + 2]! < 80) n++;
+    return n;
+  });
+  expect(reds, "no red of the hidden picture in the bookmark's picture").toBe(0);
+  await expect.poll(red, "the screen shows it again").toBe(true);
 });

@@ -41,7 +41,7 @@ import { syncScroll } from "../ui/bar";
 import { parseHex, rgbToOklch } from "../colour-picker/colour";
 import { canvasItems, mountContextMenu } from "../ui/context-menu";
 import { openBatchRename } from "../ui/batch-rename";
-import { askCurrentPassword, askPassword, forgetHiddenPassword } from "../ui/hidden-access";
+import { askCurrentPassword, askPassword, forgetHiddenPassword, hiddenRemembered, onHiddenRemembered } from "../ui/hidden-access";
 import { typeOfName } from "../storage/workspace-names";
 import { openLockScreen } from "../ui/lock-screen";
 import { writeSystemClipboard } from "./system-clipboard";
@@ -544,7 +544,9 @@ async function start(): Promise<void> {
     canvasesChanged: (ids) => session.outsideChanged(ids),
   });
   assets.setBudget(Number(settings.get("cache.decodedMb")) * 2 ** 20);
-  const textureHost = createTextureHost({ doc, index, assets, theme: () => theme, editor });
+  /** The library for what makes a file or a copy: hidden items always a padlock there (see `syncReveal`). */
+  const filesAssets = assets.forFiles();
+  const textureHost = createTextureHost({ doc, index, assets: filesAssets, theme: () => theme, editor });
   setTextureHost(textureHost); // (texture fills, ADR 0154)
   // A gesture on a source of an objects fill (moving, turning, resizing, recolouring it): the fill follows at each step, not on release.
   let livePreview: EditorState["preview"] | null = null;
@@ -799,6 +801,32 @@ async function start(): Promise<void> {
     }
   };
   session.subscribeAssets((_meta, usageOnly) => void (usageOnly || syncHidden()));
+  // Hidden items' pictures on the canvas (the screen only): while Settings > Privacy remembers the Hidden password and it was given
+  // here (and, in the desktop app, their key is open). What makes a file uses `filesAssets`, and a capture of the screen is drawn with
+  // padlocks first (`padlocked`), so nothing readable of them leaves the app.
+  const syncReveal = (): void => {
+    const on = settings.get("library.hiddenRemember") && hiddenRemembered() && (storage?.hidden ? storage.hidden.isOpen() : true);
+    if (on === assets.revealing) return;
+    assets.reveal(on);
+    tiles.clear();
+    invalidate();
+  };
+  onHiddenRemembered(syncReveal);
+  /** Run a capture of the screen with hidden items drawn as padlocks (the tiles are drawn again before and after). */
+  const padlocked = <T>(capture: () => T): T => {
+    if (!assets.revealing) return capture();
+    assets.revealing = false;
+    tiles.clear();
+    try {
+      return capture();
+    } finally {
+      assets.revealing = true;
+      tiles.clear();
+      invalidate();
+    }
+  };
+  storage?.hidden?.subscribe(syncReveal);
+  settings.subscribe((key) => key === "library.hiddenRemember" && syncReveal());
   const assetNames = new AssetNames(async (hash) => (await session.catalog?.entry(hash).catch(() => undefined))?.name ?? "");
   assetNames.subscribe(() => invalidate());
   if (storage) {
@@ -993,7 +1021,7 @@ async function start(): Promise<void> {
     if (key === "panel.autoFold" || key === "panel.keep") dock.apply();
   });
   const bookmarkTour = mountTour(document.body, view, bookmarkList, settings);
-  mountBookmarksPanel(side, editor, bookmarkList, () => captureThumb(canvas), () => bookmarkTour.start(), { update: (ids) => void refreshThumbs(ids) }, () => void bookmarkPicked());
+  mountBookmarksPanel(side, editor, bookmarkList, () => (assets.revealing ? padlocked(() => (renderNow(), captureThumb(canvas))) : captureThumb(canvas)), () => bookmarkTour.start(), { update: (ids) => void refreshThumbs(ids) }, () => void bookmarkPicked());
   mountMediaPlayer(host, view, doc, editor, assets, settings, { setMedia: (id, patch, label) => setMedia(doc, editor, id, patch, label), extract: (id, png, label) => void extractFrame(doc, editor, assets, id, png, label, (shot) => storeFrame(assets, session, settings, shot)), repaint: (id) => { tiles.invalidate(new Set([id])); invalidate(); } });
   mountLayersPanel(side, editor, doc, {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
@@ -1231,8 +1259,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     copyAdjust: () => void copyAdjustments(doc, editor),
     pasteAdjust: () => pasteAdjustments(doc, editor),
     canPasteAdjust: () => canPasteAdjustments(),
-    copyRendered: () => void copyRenderedPicture(doc, editor, assets),
-    bake: () => void bakePicture(doc, editor, assets, (shot) => storeFrame(assets, session, settings, shot)),
+    copyRendered: () => void copyRenderedPicture(doc, editor, filesAssets),
+    bake: () => void bakePicture(doc, editor, filesAssets, (shot) => storeFrame(assets, session, settings, shot)),
     selectedShape: () => {
       const o = selectedShape(doc, editor);
       return o ? { shape: o.shape, sides: o.sides, tips: o.tips, inner: o.inner } : null;
@@ -1272,7 +1300,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     }
     openExportDialog({
       targets,
-      render: (t, w, h, bg) => renderExport({ doc, index, assets, theme }, t, w, h, bg),
+      render: (t, w, h, bg) => renderExport({ doc, index, assets: filesAssets, theme }, t, w, h, bg),
       svg: (t, size) => svgOfTarget(doc, t, size),
       svgWarning: (ts) => svgWarningOfTargets(ts),
       pdfVector: (t, wPt, hPt) => pdfVectorOfTarget(doc, t, wPt, hPt),
@@ -1317,11 +1345,13 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     };
     try {
       // A clean frame: the pattern as chosen, no selection outlines, and a background or not.
-      renderNow({ pattern: cfg.pattern, overlays: false, transparent: cfg.transparent });
       let pic = document.createElement("canvas");
-      pic.width = canvas.width;
-      pic.height = canvas.height;
-      pic.getContext("2d")!.drawImage(canvas, 0, 0);
+      padlocked(() => {
+        renderNow({ pattern: cfg.pattern, overlays: false, transparent: cfg.transparent });
+        pic.width = canvas.width;
+        pic.height = canvas.height;
+        pic.getContext("2d")!.drawImage(canvas, 0, 0);
+      });
       invalidate(); // the screen goes back to normal (selection outlines and all)
       const vp = view.viewport;
       const visible = visibleObjects(doc, index, null, view.frameCamera, vp);
@@ -1445,6 +1475,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     const list = ids ? bookmarkList.items.filter((b) => ids.includes(b.id)) : bookmarkList.items;
     if (thumbsRunning || !list.length || appView !== "canvas") return;
     thumbsRunning = true;
+    const revealed = assets.revealing; // (the bookmarks' pictures are kept in the canvas files: drawn with padlocks)
+    if (revealed) (assets.revealing = false), tiles.clear();
     try {
       await updateThumbs({
         bookmarks: list,
@@ -1467,6 +1499,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       });
     } finally {
       thumbsRunning = false;
+      if (revealed) (assets.revealing = true), tiles.clear(), invalidate(), syncReveal();
     }
   };
   editor.subscribe(() => {
@@ -1630,8 +1663,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       },
       copyAdjust: () => void copyAdjustments(doc, editor),
       pasteAdjust: () => pasteAdjustments(doc, editor),
-      copyRendered: () => void copyRenderedPicture(doc, editor, assets),
-      bake: () => void bakePicture(doc, editor, assets, (shot) => storeFrame(assets, session, settings, shot)),
+      copyRendered: () => void copyRenderedPicture(doc, editor, filesAssets),
+      bake: () => void bakePicture(doc, editor, filesAssets, (shot) => storeFrame(assets, session, settings, shot)),
       svgPicture: () => {
         const ids = [...editor.selection];
         const o = ids.length === 1 ? doc.get(ids[0]!) : undefined;
@@ -2248,9 +2281,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     if (text === null) return;
     const { w, h } = copySize(t, t.original ? Math.min(4096, Math.max(t.original.w, t.original.h)) : 1024);
     // one still picture goes as it looks with its crop and adjustments at full size; a GIF or video as the frame shown; the rest as drawn
-    const still = t.original ? renderedStill(doc, editor, assets) : Promise.resolve(null);
+    const still = t.original ? renderedStill(doc, editor, filesAssets) : Promise.resolve(null);
     const png = still
-      .then((b) => b ?? renderExport({ doc, index, assets, theme }, t, w, h, "transparent").then((c) => new Promise<Blob>((ok, no) => c.toBlob((x) => (x ? ok(x) : no(new Error("no picture"))), "image/png"))))
+      .then((b) => b ?? renderExport({ doc, index, assets: filesAssets, theme }, t, w, h, "transparent").then((c) => new Promise<Blob>((ok, no) => c.toBlob((x) => (x ? ok(x) : no(new Error("no picture"))), "image/png"))))
       .then((b) => (markCopiedPicture(), b));
     // (the words go beside the picture only for copied texts: otherwise a program that takes text would paste the SVG or a count and not the picture)
     await writeSystemClipboard({ image: png, text, withText: withText && !isPlaceholderText(text) });

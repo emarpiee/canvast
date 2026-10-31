@@ -138,3 +138,19 @@ describe("library organization (ADR 0011)", () => {
     expect(meta(old)).toEqual({ tags: [], favorite: false, folderIds: [], hidden: false, note: "", fields: [], thumb: null });
   });
 });
+
+describe("hidden items on the canvas", async () => {
+  const { AssetLibrary } = await import("../../src/assets/asset-library");
+  it("are a padlock unless revealed on the screen, and always one in what makes files", () => {
+    const lib = new AssetLibrary(null, () => undefined);
+    const h = "a".repeat(64);
+    lib.setHidden(new Set([h]));
+    const files = lib.forFiles();
+    expect([lib.isLocked(h), files.isLocked(h)]).toEqual([true, true]);
+    lib.reveal(true);
+    expect([lib.isLocked(h), files.isLocked(h), files.get(h)]).toEqual([false, true, null]);
+    expect(files.isLocked("b".repeat(64))).toBe(false); // (an item that is not hidden: as the library says)
+    lib.reveal(false);
+    expect(lib.isLocked(h)).toBe(true);
+  });
+});

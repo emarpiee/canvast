@@ -174,8 +174,13 @@ export class AssetLibrary {
   private readonly missing = new Set<string>();
   /** Of the missing: hidden items' encrypted files while the Hidden items are locked (drawn with a padlock). */
   private readonly locked = new Set<string>();
-  /** Library items that are hidden: their pictures are never read or drawn on a canvas, whatever the password state (a padlock instead). */
+  /**
+   * Library items that are hidden: drawn on a canvas as a padlock, unless `revealing` (the screen only: the Hidden password remembered
+   * and open). What makes files (exports, copies, pattern fills, baked pictures) uses `forFiles()`, which never shows them.
+   */
   private hidden = new Set<string>();
+  /** Hidden items' pictures are drawn on the screen (see `hidden`). */
+  revealing = false;
   /** Originals the browser could not decode at a reduced size. */
   private readonly noReduced = new Set<string>();
   private readonly memoryOnly = new Map<string, AssetRecord>();
@@ -401,7 +406,31 @@ export class AssetLibrary {
   }
 
   isLocked(hash: string): boolean {
-    return this.locked.has(hash) || this.hidden.has(hash.split("#")[0]!.replace(SMALL_KEY, ""));
+    return this.locked.has(hash) || (!this.revealing && this.hidden.has(hash.split("#")[0]!.replace(SMALL_KEY, "")));
+  }
+
+  /** Show hidden items' pictures on the screen, or not (their decoded pictures leave memory when not). */
+  reveal(on: boolean): void {
+    if (on === this.revealing) return;
+    this.revealing = on;
+    if (!on) for (const h of this.hidden) this.forget(h);
+    this.onReady();
+  }
+
+  /**
+   * The same library for what makes a file or a copy (exports, the clipboard, pattern fills, baked pictures): hidden items are a padlock
+   * there whatever is shown on the screen, so nothing readable of them leaves the app.
+   */
+  forFiles(): AssetLibrary {
+    const hidden = (h: string): boolean => this.hidden.has(h.split("#")[0]!.replace(SMALL_KEY, ""));
+    return new Proxy(this, {
+      get: (t, k) => {
+        if (k === "get") return (h: string, ...rest: [number?, number?]) => (hidden(h) ? null : t.get(h, ...rest));
+        if (k === "isLocked") return (h: string) => hidden(h) || t.isLocked(h);
+        const v = Reflect.get(t, k, t) as unknown;
+        return typeof v === "function" ? (v as (...a: unknown[]) => unknown).bind(t) : v;
+      },
+    });
   }
 
   /** Whether this original is a hidden item's (its picture is not shown outside the library). */
@@ -443,7 +472,7 @@ export class AssetLibrary {
    */
   get(hash: string, shownPx = Infinity, edge = 0): RasterSource | null {
     const now = performance.now();
-    if (this.hidden.has(hash.split("#")[0]!)) return null;
+    if (!this.revealing && this.hidden.has(hash.split("#")[0]!)) return null;
     const small = edge > SMALL_EDGE && shownPx <= SMALL_EDGE / 2 && !this.noReduced.has(hash);
     const full = this.decoded.get(hash);
     const reduced = this.decoded.get(hash + SMALL_KEY);

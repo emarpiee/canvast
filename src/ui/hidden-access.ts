@@ -9,11 +9,20 @@ import { plural } from "../doc/plural";
  * and when changing or removing it). These are gates, not encryption: the data is stored as it is. With no password set, nothing is asked.
  */
 let rememberedHere = false;
+const rememberedFns = new Set<() => void>();
+const setRemembered = (on: boolean): void => {
+  if (on === rememberedHere) return;
+  rememberedHere = on;
+  for (const fn of rememberedFns) fn();
+};
+/** Whether the Hidden password was given and is remembered in this tab (Settings > Privacy), and to be told when that changes. */
+export const hiddenRemembered = (): boolean => rememberedHere;
+export const onHiddenRemembered = (fn: () => void): void => void rememberedFns.add(fn);
 const verifiedAt: Record<PasswordKind, number> = { hidden: -Infinity, workspace: -Infinity };
 
 /** Forget the Hidden list's password given in this tab (the password was changed or removed, or remembering was turned off). */
 export function forgetHiddenPassword(): void {
-  rememberedHere = false;
+  setRemembered(false);
 }
 
 /**
@@ -22,13 +31,13 @@ export function forgetHiddenPassword(): void {
  */
 export async function askPassword(session: Session, kind: PasswordKind, why: string, remember = false): Promise<boolean> {
   if (kind === "hidden") {
-    if (!remember) rememberedHere = false;
+    if (!remember) setRemembered(false);
     if (remember && rememberedHere) return true;
   }
   if (!(await session.hasPassword(kind))) return true;
   const typed = await askCurrentPassword(session, kind, why);
   if (typed === null) return false;
-  if (kind === "hidden") rememberedHere = remember;
+  if (kind === "hidden") setRemembered(remember);
   return true;
 }
 

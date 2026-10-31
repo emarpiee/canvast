@@ -726,7 +726,7 @@ For a workspace that is shown in a public place, an item of the Library can be *
 **Hiding**
 
 - A hidden item is left out of *All items*, every folder, tag and file type, the counts and totals, searches and their suggestions, *Similar images*, and the pickers that list the library (a texture fill's picture, the fonts).
-- Where it is already placed on a canvas, its picture shows a padlock at once (with or without a password) until it is shown again; its name stays in the Layers panel. A hidden video or sound does not play.
+- Where it is already placed on a canvas, its picture shows a padlock at once (with or without a password) until it is shown again; its name stays in the Layers panel. A hidden video or sound does not play. With *Remember the Hidden password* on (Settings > Privacy), once the password is given its picture shows on the canvas until the tab or app closes, the hidden items are locked, or remembering is turned off. That is the screen only: exports, copies, pattern fills, baked pictures, screenshots and bookmark pictures still draw the padlock, so nothing readable of it leaves the app.
 - Hiding does not move, delete or change the file. In hidden mode, the same button shows the item again.
 - **Hide folder** (a library folder's ⋯ menu) hides the folder, its subfolders and every item in them. An item filed into a hidden folder later is hidden with it, and a folder made inside one is hidden too. Showing one item again shows its folder (and the ones above it) again; its other items stay hidden. In the desktop app a hidden folder's name is kept only encrypted, and its real folder leaves `library/`.
 
@@ -780,7 +780,7 @@ Whether an item is hidden is data of the item, so it travels in any export that 
 - Each encrypted file stands on its own: inside it, encrypted too, are its name, library folder, tags, note and fields, so a `.hidden/` file copied anywhere comes back whole with the key file and the password, even with the index lost. A change to a hidden item here (its name, folder, tags…) seals its file again.
 - Hiding several files at once shows *Encrypting N of M files* from five files on.
 - If the app stops while a file is being encrypted, the next start checks the encrypted file opens before the readable one is deleted (otherwise the readable one stays, and is encrypted again).
-- A hidden picture placed on a canvas always shows a padlock. Another device on the same folder learns of hidden items only when the password is given there.
+- A hidden picture placed on a canvas shows a padlock (on the screen, its picture while the password is remembered, see above). Another device on the same folder learns of hidden items only when the password is given there.
 - Showing an item again decrypts it back to its place in `library/`.
 - The format is documented below, and the files can be decrypted outside the app.
 
