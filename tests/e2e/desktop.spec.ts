@@ -477,6 +477,8 @@ test("a backup exported from Settings and imported into a workspace folder: writ
   const secret = makePng(2, 5, () => [220, 20, 90, 255]);
   let { app, page } = await launch(src);
   let backup: string;
+  let thumbFile = "";
+  let thumbBytes = Buffer.alloc(0);
   try {
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.session().tree?.length ?? 0)).toBe(1);
     const t = await page.evaluate(() => window.__canvastDebug.session().tree!);
@@ -490,7 +492,23 @@ test("a backup exported from Settings and imported into a workspace folder: writ
     await page.getByTestId("view-assets").click();
     await page.getByTestId("assets-import-input").setInputFiles({ name: "Secret Plan.png", mimeType: "image/png", buffer: secret });
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(2);
-    await page.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), createHash("sha256").update(secret).digest("hex"));
+    // With an uploaded custom thumbnail, hidden with it (sealed in .hidden/thumbnails/): it goes in the backup as it is sealed.
+    await page.locator(`[data-testid="asset-card"][data-hash="${createHash("sha256").update(secret).digest("hex")}"]`).click();
+    const [chooser] = await Promise.all([
+      page.waitForEvent("filechooser"),
+      (async () => {
+        await page.getByTestId("asset-thumb").click();
+        await page.getByRole("radio", { name: /Upload a picture/ }).check();
+        await page.getByTestId("choose-ok").click();
+      })(),
+    ]);
+    await chooser.setFiles({ name: "cover.png", mimeType: "image/png", buffer: makePng(40, 30, () => [200, 40, 40, 255]) });
+    await expect.poll(() => (existsSync(join(src, ".canvast/thumbnails")) ? readdirSync(join(src, ".canvast/thumbnails")).length : 0)).toBe(1);
+    await page.getByTestId("asset-hide").click();
+    const sealedThumb = () => (existsSync(join(src, ".hidden/thumbnails")) ? readdirSync(join(src, ".hidden/thumbnails")) : []);
+    await expect.poll(sealedThumb).toHaveLength(1);
+    thumbFile = sealedThumb()[0]!;
+    thumbBytes = readFileSync(join(src, ".hidden/thumbnails", thumbFile));
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     await page.getByTestId("view-canvas").click();
     const zip = await exportBackup(app, page, `${src}-backup.canvast`, async () => {
@@ -501,6 +519,7 @@ test("a backup exported from Settings and imported into a workspace folder: writ
       await page.getByTestId("choose-ok").click(); // (the passwords and privacy settings: left out, the first choice)
     });
     expect([zip.includes("sealed/"), zip.includes("hidden-key.json"), /secret/i.test(zip.toString("latin1")), zip.includes(secret.subarray(0, 24))]).toEqual([true, true, false, false]);
+    expect(zip.includes(`sealed-thumbnails/${thumbFile.replace(/\.bin$/, "")}.bin`)).toBe(true);
     backup = zip.toString("base64");
   } finally {
     await app.close();
@@ -519,7 +538,8 @@ test("a backup exported from Settings and imported into a workspace folder: writ
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     expect(visible(ws).filter((f) => !f.startsWith(".hidden/"))).toEqual([`${B}board_1/canvas_1.cvst`, `${B}studies/hands.cvst`, "library/plants/green_leaf.png"]);
     // The hidden item's file is in .hidden/ as it was sealed, with its key: the item shows once the Hidden items are opened (below).
-    expect(files(ws).filter((f) => f.startsWith(".hidden/"))).toHaveLength(1);
+    expect(files(ws).filter((f) => f.startsWith(".hidden/") && !f.startsWith(".hidden/thumbnails/"))).toHaveLength(1);
+    expect(readFileSync(join(ws, ".hidden/thumbnails", thumbFile)).equals(thumbBytes)).toBe(true); // (its custom thumbnail, as it was sealed)
     expect(existsSync(join(ws, ".canvast/hidden.json"))).toBe(true);
     expect(readFileSync(join(ws, "library/plants/green_leaf.png")).equals(green)).toBe(true);
     const canvas = JSON.parse(readFileSync(join(ws, `${B}studies/hands.cvst`), "utf8"));

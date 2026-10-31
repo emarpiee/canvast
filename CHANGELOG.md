@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Added:** backups carry hidden items' custom thumbnails, still encrypted as they are in `.hidden/thumbnails/` (nothing readable of them, not even their hash); importing in the desktop app puts them back.
 - **Added:** a custom thumbnail can be pasted: **Paste a picture** in the thumbnail dialog, or `Ctrl`+`V` while it is open (kept small like an upload, never imported into the library).
 - **Changed:** the thumbnail dialog says what each choice does in plain words (*Choose a thumbnail*: Uploaded thumbnails, From the library, Upload a picture, Paste a picture, Original).
 - **Changed:** the viewer's video and GIF player fades away also while the pointer rests on it, and keys (step, play and pause) no longer bring it back: only a move of the mouse, a click or a touch does.

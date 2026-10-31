@@ -59,7 +59,14 @@ export const sealedHooks: {
   write: ((files: ReadonlyArray<{ hash: string; data: Blob }>, key: string | null) => Promise<number>) | null;
 } = { key: null, write: null };
 /** Where a backup reads custom thumbnails and an import keeps them (set by the storage that is open; normal ones only, see `CustomThumbStore`). */
-export const thumbHooks: { get: ((hash: string) => Promise<Blob | null>) | null; put: ((blob: Blob) => Promise<string>) | null } = { get: null, put: null };
+export const thumbHooks: {
+  get: ((hash: string) => Promise<Blob | null>) | null;
+  put: ((blob: Blob) => Promise<string>) | null;
+  /** A hidden custom thumbnail's sealed file as it is (desktop build): its name in `.hidden/thumbnails/` (which says nothing of the picture) and bytes. */
+  getSealed?: ((hash: string) => Promise<{ name: string; data: Blob } | null>) | null;
+  /** Put a sealed thumbnail file back in `.hidden/thumbnails/` under its name (desktop build). */
+  putSealed?: ((name: string, data: Blob) => Promise<void>) | null;
+} = { get: null, put: null };
 export const ARCHIVE_EXTENSION = ".canvast";
 
 /** Where a long job is: the stage in words and how far (done of total). The caller turns it into a progress notice. */
@@ -211,6 +218,8 @@ export interface Manifest {
   hiddenKey?: string;
   /** Custom thumbnails the items use (their SHA-256), each as `thumbnails/<hash>.webp`. Older versions of the app pass them by. */
   thumbnails?: string[];
+  /** Hidden custom thumbnails of the sealed items, as they are sealed (desktop build): each `sealed-thumbnails/<name>.bin` by its file's name. */
+  sealedThumbnails?: string[];
   /** Brush presets (version 6), written by builds that had the Painting view: no longer read. */
   brushes?: unknown[];
   /** Paintings (versions 5 and 6), written by builds that had the Painting view: no longer read. */
@@ -331,6 +340,8 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   const assets: ManifestAsset[] = [];
   const assetBlobs: ZipInput[] = [];
   const sealed: Array<{ hash: string; file: string }> = [];
+  /** The custom thumbnails of the sealed items (their item is inside their file, so the list does not name them). */
+  const sealedThumbs = new Set<string>();
   const sealedReads: Array<{ input: ZipInput; file: string }> = [];
   const missingAssets: string[] = [];
   const kept: Array<{ input: ZipInput; hash: string; size: number; type: string; file: string | undefined }> = [];
@@ -346,6 +357,8 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     // A hidden item sealed in the workspace folder goes as it is: its file holds its name and the rest, so the list says nothing of it.
     if (r.ext && isHiddenFile(r.file) && sealedHooks.key) {
       if (noBytes || (since !== undefined && r.importedAt <= since)) continue;
+      const t = (await libraryIn(tx, snap).entry(hash))?.thumb;
+      if (t) sealedThumbs.add(t);
       const input: ZipInput = { name: `sealed/${hash}.bin`, data: new Blob([]) };
       sealed.push({ hash, file: input.name });
       assetBlobs.push(input);
@@ -413,7 +426,23 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     assetBlobs.push({ name: `thumbnails/${t}.webp`, data: blob });
     thumbnails.push(t);
   }
+  // The sealed items' custom thumbnails: a normal one as above; a hidden one as its sealed file (nothing readable of it goes).
+  const sealedThumbnails: string[] = [];
+  for (const t of sealedThumbs) {
+    if (thumbnails.includes(t) || assets.some((x) => x.hash === t)) continue;
+    const normal = await thumbHooks.get?.(t).catch(() => null);
+    if (normal) {
+      assetBlobs.push({ name: `thumbnails/${t}.webp`, data: normal });
+      thumbnails.push(t);
+      continue;
+    }
+    const sealedThumb = await thumbHooks.getSealed?.(t).catch(() => null);
+    if (!sealedThumb || sealedThumbnails.includes(sealedThumb.name)) continue;
+    assetBlobs.push({ name: `sealed-thumbnails/${sealedThumb.name}.bin`, data: sealedThumb.data });
+    sealedThumbnails.push(sealedThumb.name);
+  }
   if (thumbnails.length) manifest.thumbnails = thumbnails;
+  if (sealedThumbnails.length) manifest.sealedThumbnails = sealedThumbnails;
   const keyText = sealed.length ? await sealedHooks.key!() : null;
   if (sealed.length && !keyText) throw new ArchiveError("the hidden items' key file could not be read, so their sealed files would not open from the backup");
   for (const s of sealedReads) {
@@ -498,6 +527,8 @@ export interface ImportPlan {
   sealed: Array<{ hash: string; data: Blob }>;
   /** Custom thumbnails whose bytes matched their hash (kept by the import with `thumbHooks`). */
   thumbnails: Blob[];
+  /** Hidden custom thumbnails as they are sealed, by their file's name (put back only with the sealed items). */
+  sealedThumbnails: Array<{ name: string; data: Blob }>;
   hiddenKey: string | null;
 }
 
@@ -680,6 +711,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
     sealed: [],
     hiddenKey: null,
     thumbnails: [],
+    sealedThumbnails: [],
   };
   // where a canvas is: in the newest file that has its content
   const canvasAt = (id: string): { entries: Map<string, ZipEntry>; file: string } | null => {
@@ -822,6 +854,13 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
       }
       thumbsSeen.add(t);
       plan.thumbnails.push(data);
+    }
+  }
+  for (const part of parts) {
+    for (const n of Array.isArray(part.m["sealedThumbnails"]) ? (part.m["sealedThumbnails"] as unknown[]) : []) {
+      if (typeof n !== "string" || !HASH_RE.test(n) || plan.sealedThumbnails.some((x) => x.name === n)) continue;
+      const e = part.entries.get(`sealed-thumbnails/${n}.bin`);
+      if (e && e.size <= 21 * 2 ** 20) plan.sealedThumbnails.push({ name: n, data: e.data.slice(0, e.size) });
     }
   }
   if (plan.sealed.length && (!plan.hiddenKey || !sealedHooks.write)) {
@@ -978,7 +1017,10 @@ export async function applyImport(db: IDBDatabase, workspaceId: string, targetBo
     const libOps: LibraryOp[] = [];
     const result = await applyRest(db, workspaceId, targetBoardId, plan, staged, snap, libOps);
     if (lib) await moveToLibrary(db, lib, libOps);
-    if (plan.sealed.length && sealedHooks.write) await sealedHooks.write(plan.sealed, plan.hiddenKey);
+    if (plan.sealed.length && sealedHooks.write) {
+      await sealedHooks.write(plan.sealed, plan.hiddenKey);
+      for (const t of plan.sealedThumbnails) await thumbHooks.putSealed?.(t.name, t.data).catch(() => undefined);
+    }
     for (const t of plan.thumbnails) await thumbHooks.put?.(t).catch(() => undefined);
     return result;
   } catch (e) {

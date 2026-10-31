@@ -272,6 +272,17 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   };
   thumbHooks.get = (h) => customThumbs.get(h);
   thumbHooks.put = (b) => customThumbs.put(b);
+  thumbHooks.getSealed = async (h) => {
+    if (!HEX.test(h)) return null;
+    const path = await hiddenPath(h);
+    const bytes = await bridge.read(path);
+    return bytes ? { name: path.slice(HIDDEN_THUMBS.length + 1, -4), data: new Blob([bytes as Uint8Array<ArrayBuffer>]) } : null;
+  };
+  // (as it came: sealed, opened only with the key; one already there is kept)
+  thumbHooks.putSealed = async (name, data) => {
+    const path = `${HIDDEN_THUMBS}/${name}.bin`;
+    if (HEX.test(name) && !(await bridge.exists(path))) await bridge.write(path, new Uint8Array(await data.arrayBuffer()));
+  };
   return { ...storage, resetAll, workspace, backups, catalog, originals, customThumbs, libraryFolder: null, workspaceFolder: ws.path, hidden, folderSync, folderWriting, flush: () => mirror.flush() };
 }
 
