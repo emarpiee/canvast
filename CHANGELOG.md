@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Fixed:** a workspace folder renamed onto the path of another opened before on this device (one since deleted) showed that one's library: this device's copy of the library and its start-up look were kept by path. They are now kept per folder (by its id), like the rest of the app's copy; the one of the old folder at that path is removed.
 - **Fixed:** a custom thumbnail chosen for an item showed in the viewer and the details at once, but its card in the grid or list kept the old picture until the app was started again.
 - **Fixed:** after giving the Hidden password (and after a start or a Rebuild), the Library kept showing "Hidden item" names, or no hidden items, until it was closed and opened: it is now listed again once the hidden items have been read.
 - **Fixed:** a readable folder put in `.hidden/` from a file manager was left readable: its files are now encrypted like a file put there, its folders become hidden library folders of their names, and the emptied readable folders are removed.

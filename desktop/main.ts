@@ -9,7 +9,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } from "electron";
 import { execFile } from "node:child_process";
 import { createHash, randomBytes, randomUUID, scrypt } from "node:crypto";
-import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, watch, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, watch, writeFileSync } from "node:fs";
 import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, utimes, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { BOARDS_DIR, isSafeRelativePath } from "../src/storage/workspace-names";
@@ -347,7 +347,26 @@ function forgetWalked(rel: string): void {
 }
 
 /** The file calls of the bridge, each answering only this window's page and only inside its workspace folder. */
-function installFileCalls(win: BrowserWindow, root: string): void {
+/** The name of this device's caches of a workspace folder in the app's own data (library database, start-up look): by its partition, so per folder, not per path. */
+const cacheKey = (partition: string): string => createHash("sha256").update(partition).digest("hex").slice(0, 24);
+
+/**
+ * Caches kept by path before 0.52.4 (`<sha256 of the path>`): moved to the folder's own name when the folder at that path is the one
+ * that made them, else removed (a folder renamed onto the path of one opened before must never read that one's library).
+ */
+function moveCaches(root: string, partition: string, same: boolean): void {
+  const old = createHash("sha256").update(root).digest("hex").slice(0, 24);
+  const now = cacheKey(partition);
+  const data = app.getPath("userData");
+  for (const [dir, ext] of [["library-db", ".sqlite"], ["library-db", ".sqlite-wal"], ["library-db", ".sqlite-shm"], ["library-looks", ".json"]] as const) {
+    const from = join(data, dir, `${old}${ext}`);
+    if (!existsSync(from)) continue;
+    if (same && !existsSync(join(data, dir, `${now}${ext}`))) renameSync(from, join(data, dir, `${now}${ext}`));
+    else rmSync(from, { force: true });
+  }
+}
+
+function installFileCalls(win: BrowserWindow, root: string, partition: string): void {
   const own = (e: Electron.IpcMainInvokeEvent): void => {
     if (e.sender !== win.webContents) throw new Error("not this window");
   };
@@ -540,7 +559,7 @@ function installFileCalls(win: BrowserWindow, root: string): void {
   // workspace in the app's own folder), so a big library is not looked through file by file in the page. Null the first time (the
   // page then looks at everything). The look is kept only once the page says it has taken what changed (`libraryLookDone`).
   let look: Map<string, string> | null = null;
-  const lookFile = join(app.getPath("userData"), "library-looks", `${createHash("sha256").update(root).digest("hex").slice(0, 24)}.json`);
+  const lookFile = join(app.getPath("userData"), "library-looks", `${cacheKey(partition)}.json`);
   ipcMain.handle("canvast:libraryChanges", async (e) => {
     own(e);
     await Promise.all([sweepTemps(join(root, ".canvast")), sweepTemps(join(root, ".hidden"))]);
@@ -574,7 +593,7 @@ function installFileCalls(win: BrowserWindow, root: string): void {
     if (lib) return lib;
     const dir = join(app.getPath("userData"), "library-db");
     mkdirSync(dir, { recursive: true });
-    lib = new Library(openLibraryDb(join(dir, `${createHash("sha256").update(root).digest("hex").slice(0, 24)}.sqlite`)));
+    lib = new Library(openLibraryDb(join(dir, `${cacheKey(partition)}.sqlite`)));
     index = new LibraryIndex(lib);
     lib.listeners.push((op) => void ((op.t === "rec" || op.t === "entry") && (absentCache = null)));
     return lib;
@@ -871,8 +890,12 @@ async function partitionOf(workspace: string): Promise<string> {
   const onDisk = (p: string): boolean => existsSync(join(app.getPath("userData"), "Partitions", p.slice("persist:".length)));
   const inUse = (p: string): boolean => Object.entries(known).some(([path, k]) => path !== workspace && k.partition === p);
   for (const p of new Set([known[workspace]?.partition, legacy])) {
-    if (p && p !== partition && onDisk(p) && !inUse(p)) await session.fromPartition(p).clearStorageData().catch(() => undefined);
+    if (p && p !== partition && !inUse(p)) {
+      if (onDisk(p)) await session.fromPartition(p).clearStorageData().catch(() => undefined);
+      for (const f of [`library-db/${cacheKey(p)}.sqlite`, `library-db/${cacheKey(p)}.sqlite-wal`, `library-db/${cacheKey(p)}.sqlite-shm`, `library-looks/${cacheKey(p)}.json`]) rmSync(join(app.getPath("userData"), f), { force: true });
+    }
   }
+  moveCaches(await realpath(workspace), partition, known[workspace]?.partition === partition || (!known[workspace] && partition === legacy));
   known[workspace] = { id, partition };
   mkdirSync(app.getPath("userData"), { recursive: true });
   writeFileSync(partitionsFile(), JSON.stringify(known, null, 2));
@@ -916,7 +939,7 @@ async function openWindow(workspace: string): Promise<void> {
   });
   // The page asks which workspace it is in; only this window's own page is answered.
   ipcMain.handle("canvast:workspace", (e) => (e.sender === win.webContents ? { path: workspace, name: basename(workspace) } : null));
-  installFileCalls(win, await realpath(workspace));
+  installFileCalls(win, await realpath(workspace), partition);
   watchFolder(win, await realpath(workspace));
   // Closing waits (up to 15 s) for the page to write what is not in the folder yet (ADR 0177: files follow edits by a moment).
   // While files are still being written the page may hold the close to ask first, and keep the window open.

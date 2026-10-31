@@ -1238,3 +1238,51 @@ test("custom thumbnails in the workspace folder: an uploaded one in .canvast/thu
     await app.close();
   }
 });
+
+test("a workspace folder renamed onto the path of another opened before reads none of that one's cache: its own library, its hidden items, nothing of the other written", async () => {
+  const base = mkdtempSync(join(tmpdir(), "canvast-ren-"));
+  const [a, b] = [join(base, "main"), join(base, "other")];
+  mkdirSync(a);
+  mkdirSync(b);
+  const mine = makePng(3, 2, () => [220, 30, 30, 255]);
+  const secret = makePng(2, 2, () => [30, 220, 30, 255]);
+  const theirs = makePng(2, 3, () => [30, 30, 220, 255]);
+  const sha = (x: Buffer) => createHash("sha256").update(x).digest("hex");
+  const names = (page: Page) => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, !!e.hidden]).sort()));
+  // The other workspace, opened here once with an item of its own (this device's cache of it is kept by the app), then deleted.
+  let { app, page } = await launch(b, "device");
+  try {
+    await page.getByTestId("import-input").setInputFiles({ name: "Theirs.png", mimeType: "image/png", buffer: theirs });
+    await expect.poll(() => names(page)).toEqual([["Theirs.png", false]]);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+  } finally {
+    await app.close();
+  }
+  rmSync(b, { recursive: true });
+  ({ app, page } = await launch(a, "device-a"));
+  try {
+    await page.getByTestId("import-input").setInputFiles([{ name: "Mine.png", mimeType: "image/png", buffer: mine }, { name: "Secret.png", mimeType: "image/png", buffer: secret }]);
+    await expect.poll(() => names(page)).toHaveLength(2);
+    await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"));
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), sha(secret));
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+  } finally {
+    await app.close();
+  }
+  // The main workspace renamed to the deleted one's name, and opened on the device that knew the other.
+  renameSync(a, b);
+  renameSync(`${a}-device-a`, `${b}-device-a`); // (not used: the device of the other is)
+  ({ app, page } = await launch(b, "device"));
+  try {
+    // (read again from the folder, as on a new device: the hidden item comes from its sealed index once the password is given)
+    await expect.poll(() => names(page), { timeout: 15_000 }).toEqual([["Mine.png", false]]);
+    expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("check", "pw"))).ok).toBe(true);
+    await expect.poll(() => names(page), { timeout: 15_000 }).toEqual([["Mine.png", false], ["Secret.png", true]]);
+    expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), sha(secret))).toEqual(Array.from(secret));
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    // Nothing of the other was written into it.
+    expect(files(b).some((f) => readFileSync(join(b, f)).toString("latin1").includes(sha(theirs)))).toBe(false);
+  } finally {
+    await app.close();
+  }
+});
