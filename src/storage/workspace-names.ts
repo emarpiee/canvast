@@ -153,8 +153,8 @@ export function isSafeRelativePath(path: string): boolean {
 /** Originals as `library/<kind>/<name>.<ext>`; the library index in the app's own `.canvast/` folder. */
 export const WORKSPACE_NAMING: FolderNaming = {
   fileFor: (_hash, name, type, taken) => libraryPath(name, type, taken),
-  // (a readable file someone put in `.hidden/` is taken where it lies, then sealed: never copied readable anywhere else)
-  valid: (_hash, file) => (isSafeRelativePath(file) && (file.startsWith("library/") || /^\.hidden\/[^/]+$/.test(file))) || isHiddenFile(file),
+  // (a readable file someone put in `.hidden/`, or in a folder there, is taken where it lies, then sealed: never copied readable anywhere else)
+  valid: (_hash, file) => (isSafeRelativePath(file) && (file.startsWith("library/") || (file.startsWith(".hidden/") && !file.startsWith(".hidden/thumbnails/")))) || isHiddenFile(file),
   indexFile: ".canvast/library-index.canvast",
 };
 

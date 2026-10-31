@@ -801,6 +801,15 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     expect(files(ws).filter((f) => f.startsWith(".hidden/"))).toHaveLength(3);
     expect(files(ws).some((f) => readFileSync(join(ws, f)).includes(dropped.subarray(0, 24)))).toBe(false);
     await expect.poll(listing).toContainEqual(["Dropped Secret.png", true, true]);
+    // A readable folder put there (with a folder inside): its files sealed, its folders hidden library folders of their names, no folder left.
+    const nested = makePng(3, 3, () => [200, 20, 90, 255]);
+    mkdirSync(join(ws, ".hidden", "Art Folder", "Items"), { recursive: true });
+    writeFileSync(join(ws, ".hidden", "Art Folder", "Items", "Nested Secret.png"), nested);
+    await expect.poll(listing, { timeout: 15_000 }).toContainEqual(["Nested Secret.png", true, true]);
+    await flush();
+    await expect.poll(() => existsSync(join(ws, ".hidden", "Art Folder")), { timeout: 15_000 }).toBe(false);
+    expect(files(ws).some((f) => readFileSync(join(ws, f)).includes(nested.subarray(0, 24)))).toBe(false);
+    expect(await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => (l.hiddenFolders ?? []).map((f) => f.name).sort()))).toEqual(expect.arrayContaining(["Art Folder", "Items"]));
     // Unhide folder: the folder and what is in it opened back into library/; a shown item filed into a hidden folder is sealed with it.
     await lib("showFolder", "sf1");
     await flush();

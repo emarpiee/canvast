@@ -709,7 +709,8 @@ export class LibraryMirror {
    * are never sealed again, whatever their name: those no item names are taken back (see `recoverSealed`). Whether anything was taken.
    */
   async scanHidden(tellAgain = false): Promise<boolean> {
-    const all = (await this.bridge.list(".hidden")).map((n) => `.hidden/${n}`).filter((p) => !p.includes(".tmp-"));
+    // (folders inside too: a folder put there becomes a hidden library folder of its name; the hidden thumbnails' own folder is not items)
+    const all = (await this.bridge.tree(".hidden")).map((f) => f.path).filter((p) => !p.includes(".tmp-") && !p.startsWith(".hidden/thumbnails/"));
     let plain = all.filter((p) => !SEALED_COPY_RE.test(p));
     const sealed = all.filter((p) => SEALED_COPY_RE.test(p));
     if (!this.vault.dataKey) {
@@ -730,14 +731,19 @@ export class LibraryMirror {
     plain = plain.filter((_, i) => !opens[i]);
     let took = sealed.length ? await this.recoverSealed(sealed) : false;
     if (!plain.length || !this.importFiles) return took;
-    await this.importFiles(plain.map((path) => ({ path, name: path.slice(8), folderId: null, hidden: true, read: async () => {
+    const folderIds = new Map<string, string | null>();
+    for (const path of plain) {
+      const dir = parentOf(path);
+      if (!folderIds.has(dir)) folderIds.set(dir, dir === ".hidden" ? null : await this.hiddenFolderFor(dir.split("/").slice(1)));
+    }
+    await this.importFiles(plain.map((path) => ({ path, name: path.slice(path.lastIndexOf("/") + 1), folderId: folderIds.get(parentOf(path)) ?? null, hidden: true, read: async () => {
       const bytes = await this.bridge.read(path);
       return bytes && new Blob([bytes as Uint8Array<ArrayBuffer>]);
     } })));
     for (const path of plain) {
       const hash = await this.bridge.hash(path);
       const rec = hash ? await this.recOf(hash) : undefined;
-      if (rec && rec.file !== path) await this.bridge.erase(path); // (a copy: the item has the bytes, and is hidden now)
+      if (rec && rec.file !== path) (await this.bridge.erase(path), await this.pruneHidden(path)); // (a copy: the item has the bytes, and is hidden now)
     }
     took = true;
     return took;
@@ -899,6 +905,31 @@ export class LibraryMirror {
       }
       if (made) await this.setMeta(FOLDERS_KEY, folders);
       return parent;
+    });
+  }
+
+  /** The folders in `.hidden/` a sealed or erased file left empty are removed: their names are readable. */
+  private async pruneHidden(file: string): Promise<void> {
+    for (let d = parentOf(file); d.startsWith(".hidden/"); d = parentOf(d)) if (!(await this.bridge.removeEmptyFolder(d))) break;
+  }
+
+  /** The library folder of a folder put in `.hidden/` (`parts`: its names from the top), made hidden when missing (with its parents). */
+  private async hiddenFolderFor(parts: readonly string[]): Promise<string> {
+    return this.lib.serial(async () => {
+      const folders = await this.lib.folders();
+      let parent: string | null = null;
+      let made = false;
+      for (const name of parts) {
+        let f = folders.find((g) => g.parentId === parent && g.name.toLowerCase() === name.toLowerCase());
+        if (!f) {
+          f = { id: Array.from(crypto.getRandomValues(new Uint8Array(16)), (x) => x.toString(16).padStart(2, "0")).join(""), name, parentId: parent, hidden: true };
+          folders.push(f);
+          made = true;
+        }
+        parent = f.id;
+      }
+      if (made) await this.setMeta(FOLDERS_KEY, folders);
+      return parent!;
     });
   }
 
@@ -1070,7 +1101,7 @@ export class LibraryMirror {
         throw new Error("the sealed file did not open back the same");
       }
       await this.setFile(hash, (r) => (rec.ext ? r.ext === 1 && r.file === rec.file : !r.ext), name);
-      if (rec.ext && rec.file) await this.bridge.erase(rec.file);
+      if (rec.ext && rec.file) (await this.bridge.erase(rec.file), await this.pruneHidden(rec.file));
       const tx = this.db.transaction("thumbs", "readwrite");
       tx.objectStore("thumbs").delete(hash);
       await done(tx);
