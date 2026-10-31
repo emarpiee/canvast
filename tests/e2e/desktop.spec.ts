@@ -26,6 +26,18 @@ async function launch(workspace: string, device = "userdata"): Promise<{ app: El
 
 /** A hidden item's file: in its encrypted folders, named by its encrypted name (or a random `.bin` one of before, until it is placed). */
 const SEALED_FILE = /^\.hidden\/(?:0?[a-z2-7]{26,}\/)*(?:0?[a-z2-7]{26,}|[0-9a-f]{32}\.bin)$/;
+/** Temporary folders of these tests (`tempDir`), removed with everything named after them (`<dir>-userdata`, `<dir>-out`…) when the file ends. */
+const made: string[] = [];
+const tempDir = (prefix: string): string => {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  made.push(dir);
+  return dir;
+};
+test.afterAll(() => {
+  for (const dir of made) {
+    for (const n of readdirSync(tmpdir())) if (n === basename(dir) || n.startsWith(`${basename(dir)}-`)) rmSync(join(tmpdir(), n), { recursive: true, force: true });
+  }
+});
 /** Where the boards are, inside the app's own folder. */
 const B = ".canvast/boards/";
 /** The workspace's files without the app's own bookkeeping (its boards included). */
@@ -50,8 +62,8 @@ async function exportBackup(app: ElectronApplication, page: Page, to: string, as
 }
 
 test("the desktop page is sandboxed: no Node, no path outside the workspace folder, nothing from the network", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
-  const outside = mkdtempSync(join(tmpdir(), "canvast-out-"));
+  const ws = tempDir("canvast-ws-");
+  const outside = tempDir("canvast-out-");
   symlinkSync(outside, join(ws, "link-out")); // a link inside the workspace that leads out of it
   const { app, page, requests } = await launch(ws);
   try {
@@ -83,7 +95,7 @@ test("the desktop page is sandboxed: no Node, no path outside the workspace fold
 });
 
 test("library files are readable files under library/: the same bytes once, -2 on a name clash, read back after a restart", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
   const red = makePng(3, 2, () => [220, 30, 30, 255]);
   const blue = makePng(3, 2, () => [30, 30, 220, 255]);
   let { app, page } = await launch(ws);
@@ -121,7 +133,7 @@ test("library files are readable files under library/: the same bytes once, -2 o
 });
 
 test("boards are folders of .canvast/boards/ and canvases .cvst files: safe names, -2 on a clash, renames move them, a deleted canvas goes to .trash, closing writes the last change", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
   let { app, page } = await launch(ws);
   const tree = () => page.evaluate(() => window.__canvastDebug.session().tree!);
   const op = (...a: Parameters<typeof window.__canvastDebug.workspaceOp>) => page.evaluate((a) => window.__canvastDebug.workspaceOp(...a), a);
@@ -189,7 +201,7 @@ test("boards are folders of .canvast/boards/ and canvases .cvst files: safe name
 });
 
 test("the folder is the truth: a new device opens the whole workspace, another device's change is read at start-up, edits on both sides keep both", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
   // What each canvas holds in the app's storage (the stored objects, not the tree's cached counts).
   const counts = (p: Page) =>
     p.evaluate(async () => {
@@ -311,7 +323,7 @@ test("the folder is the truth: a new device opens the whole workspace, another d
 });
 
 test("library folders are real folders: filing or renaming an item moves its file, undo moves it back, library.json brings the library to a new device", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
   const red = makePng(3, 2, () => [220, 30, 30, 255]);
   const blue = makePng(3, 2, () => [30, 30, 220, 255]);
   let { app, page } = await launch(ws);
@@ -412,7 +424,7 @@ test("library folders are real folders: filing or renaming an item moves its fil
 });
 
 test("a big library (past the size library.json is kept for) writes only what changed: a rename rewrites its item's part, nothing else", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
   let { app, page } = await launch(ws);
   const parts = () => new Map(files(ws).filter((f) => /^\.canvast\/library\/items-[0-9a-f]{2}\.json$/.test(f)).map((f) => [f, readFileSync(join(ws, f), "utf8")]));
   const listing = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, e.present]).sort()));
@@ -474,7 +486,7 @@ test("a big library (past the size library.json is kept for) writes only what ch
 });
 
 test("a backup exported from Settings and imported into a workspace folder: written as folders and files; Rebuild from the folder reads it all again", async () => {
-  const src = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const src = tempDir("canvast-ws-");
   const green = makePng(3, 2, () => [30, 200, 30, 255]);
   const secret = makePng(2, 5, () => [220, 20, 90, 255]);
   let { app, page } = await launch(src);
@@ -527,7 +539,7 @@ test("a backup exported from Settings and imported into a workspace folder: writ
     await app.close();
   }
 
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
   ({ app, page } = await launch(ws));
   try {
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.session().tree?.length ?? 0)).toBe(1);
@@ -588,7 +600,7 @@ test("a backup exported from Settings and imported into a workspace folder: writ
 });
 
 test("a backup of many files: the busy screen shows how far its files are written into the folder, then the app starts again on them", async () => {
-  const src = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const src = tempDir("canvast-ws-");
   let { app, page } = await launch(src);
   let backup: Buffer;
   try {
@@ -600,7 +612,7 @@ test("a backup of many files: the busy screen shows how far its files are writte
   } finally {
     await app.close();
   }
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
   ({ app, page } = await launch(ws));
   try {
     // (this workspace has a password, given when it was opened)
@@ -640,8 +652,8 @@ test("a backup of many files: the busy screen shows how far its files are writte
 });
 
 test("switching workspace from the app: the recent ones (a gone one left out), the open one written before the switch, and clearing the list", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
-  const other = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
+  const other = tempDir("canvast-ws-");
   const gone = join(tmpdir(), "canvast-ws-gone-never-made");
   mkdirSync(`${ws}-userdata`, { recursive: true });
   const recent = join(`${ws}-userdata`, "workspaces.json");
@@ -679,7 +691,7 @@ test("switching workspace from the app: the recent ones (a gone one left out), t
 });
 
 test("a workspace with a password, moved and renamed, still asks for it when opened from its new place", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
   let { app, page } = await launch(ws);
   try {
     await page.getByTestId("view-settings").click();
@@ -708,7 +720,7 @@ test("a workspace with a password, moved and renamed, still asks for it when ope
 });
 
 test("hidden items are encrypted: sealed into .hidden/ with nothing readable left, opened only with the password, shown back into library/, the same key under a new password", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
   const secret = makePng(3, 2, () => [200, 40, 160, 255]);
   // Every file of the workspace, as text: no trace of the hidden item's name or its picture may be in any of them.
   const traces = () => files(ws).filter((f) => { const b = readFileSync(join(ws, f)); return /secret/i.test(b.toString("latin1")) || b.includes(secret.subarray(0, 24)); });
@@ -852,7 +864,7 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
 });
 
 test("hidden items and sync tools: a conflict copy of hidden.json is joined, a lost entry's file comes back, a copied sealed file is not sealed twice, no second key", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
   const alpha = makePng(3, 2, () => [200, 40, 160, 255]);
   const beta = makePng(2, 2, () => [20, 200, 60, 255]);
   const gamma = makePng(4, 1, () => [30, 30, 220, 255]);
@@ -997,7 +1009,7 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
   expect(await decryptHidden(ws, `${ws}-out3`, "pw")).toBe(8);
   expect(readFileSync(join(`${ws}-out3`, "Beta Renamed.png")).equals(beta)).toBe(true);
   // A workspace whose sealed files came before their hidden.json: no new key is made (it would be a second one).
-  const ws2 = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws2 = tempDir("canvast-ws-");
   mkdirSync(join(ws2, ".hidden"));
   writeFileSync(join(ws2, alphaFile), readFileSync(join(ws, sealedNames()[0]!))); // (any sealed file)
   ({ app, page } = await launch(ws2));
@@ -1010,7 +1022,7 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
 });
 
 test("a hidden item's picture is not read while locked, so after a restart its card shows in hidden mode; its thumbnail is kept encrypted", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
   const pic = (k: number) => makePng(600, 400, (x, y) => [(x * k) % 256, y % 256, 120, 255]); // (bigger than a thumbnail: one is made)
   let { app, page } = await launch(ws);
   const listing = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length));
@@ -1084,7 +1096,7 @@ test("a hidden item's picture is not read while locked, so after a restart its c
 });
 
 test("library files changed outside the app: a renamed or moved file is found by its content, a new one is imported where it lies, a deleted one shows as missing", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
   const red = makePng(3, 2, () => [220, 30, 30, 255]);
   const blue = makePng(3, 2, () => [30, 30, 220, 255]);
   let { app, page } = await launch(ws);
@@ -1159,7 +1171,7 @@ test("library files changed outside the app: a renamed or moved file is found by
 });
 
 test("while the app runs it follows the folder: a canvas file renamed by hand, a file dropped into library/, another device's edits (loaded again) and both sides' edits (a conflict copy)", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
   const a = await launch(ws, "device-a");
   let b: Awaited<ReturnType<typeof launch>> | null = null;
   let shade = 0;
@@ -1222,7 +1234,7 @@ test("while the app runs it follows the folder: a canvas file renamed by hand, a
 });
 
 test("custom thumbnails in the workspace folder: an uploaded one in .canvast/thumbnails/, sealed into .hidden/thumbnails/ when its item is hidden, readable again when it is shown", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
   const { app, page } = await launch(ws);
   try {
     await page.getByTestId("import-input").setInputFiles({ name: "notes.xyz", mimeType: "application/octet-stream", buffer: Buffer.from("not a picture") });
@@ -1269,7 +1281,7 @@ test("custom thumbnails in the workspace folder: an uploaded one in .canvast/thu
 });
 
 test("a workspace folder renamed onto the path of another opened before reads none of that one's cache: its own library, its hidden items, nothing of the other written", async () => {
-  const base = mkdtempSync(join(tmpdir(), "canvast-ren-"));
+  const base = tempDir("canvast-ren-");
   const [a, b] = [join(base, "main"), join(base, "other")];
   mkdirSync(a);
   mkdirSync(b);
@@ -1317,7 +1329,7 @@ test("a workspace folder renamed onto the path of another opened before reads no
 });
 
 test("hidden items' files are kept in their library folders inside .hidden/, the folders' names encrypted: a rename or a move renames, never encrypts again", async () => {
-  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const ws = tempDir("canvast-ws-");
   const art = makePng(3, 3, () => [120, 30, 200, 255]);
   const hash = createHash("sha256").update(art).digest("hex");
   const { app, page } = await launch(ws);
