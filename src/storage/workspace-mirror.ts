@@ -130,10 +130,13 @@ export class WorkspaceMirror {
           await this.lib.scanHidden(); // (readable files in `.hidden/` waited for the key)
           await this.lib.upgradeSealed(); // (files sealed before 0.50.53 get their item, and stand on their own)
         })
-        .catch(() => undefined);
+        .catch(() => undefined)
+        .then(() => this.onOpened?.()); // (the names filled in, the hidden items read: the Library lists them again)
       this.library();
     });
   }
+  /** The hidden items were opened and read from their sealed index (set by the app: the Library lists them again). */
+  onOpened: (() => void) | null = null;
 
   /**
    * At start-up, before anything is shown: the folder and the app's storage are brought together (ADR 0177, "Saving and

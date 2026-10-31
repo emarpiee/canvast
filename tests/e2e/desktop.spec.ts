@@ -952,8 +952,13 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
     ({ app, page } = await launch(ws));
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(8);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
-    expect((await hid("check", "pw")).ok).toBe(true);
+    // Opened from the Library's hidden mode: the cards show the real names without the Library being opened again.
+    await page.getByTestId("view-assets").click();
+    await page.getByTestId("assets-search").fill("hidden:");
+    await page.getByTestId("prompt-input").fill("pw");
+    await page.getByTestId("prompt-ok").click();
     await expect.poll(names, { timeout: 15_000 }).toEqual(before);
+    await expect.poll(() => page.locator("[data-testid=asset-card] .asset-name").allTextContents().then((t) => t.sort()), { timeout: 15_000 }).toEqual(before);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     expect(bytes()).toBe(sealedBefore);
   } finally {
