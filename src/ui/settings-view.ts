@@ -368,7 +368,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
            <div class="set-info set-card" data-storage><h3>Working copy</h3><p>The app also keeps a working copy of the workspace on this device, so every change is safe at once; the folder follows a moment after editing pauses.</p>
              <dl><dt>Used</dt><dd data-used>…</dd></dl></div>`
             : `<div class="set-info set-card" data-storage><h3>Space</h3><p>Your canvases are kept in this browser's storage, on this device, unless you keep the files in a library folder (next card).</p>
-             <dl><dt>Used</dt><dd data-used>…</dd><dt>Available</dt><dd data-quota>…</dd><dt>Protected from clearing</dt><dd><span data-persisted>…</span> <button type="button" data-persist hidden>Ask the browser to keep it</button></dd></dl>
+             <dl><dt>Used</dt><dd data-used>…</dd><dt>Available</dt><dd data-quota>…</dd><dt>Protected from clearing</dt><dd><span data-persisted>…</span> <button type="button" data-persist hidden title="Ask the browser to keep this storage when it clears space">Protect it</button></dd></dl>
              <p><strong>Browser storage is not a backup.</strong> Clearing site data, or the browser's own clean-up, removes it. Keep a copy (Backup, below).</p></div>
            <div class="set-info set-card" data-folder-card><h3>Library folder</h3><div data-folder-host></div></div>`) +
           `<div class="set-info set-card" data-saving><h3>Saving</h3>
