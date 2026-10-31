@@ -1822,8 +1822,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
   .assets-body:has(.asset-inspector:not([hidden])):not(.no-details):not(.is-viewing) .sheet-grip { position: fixed; z-index: 9; left: 0; right: 0; bottom: calc(var(--sheet-h, 58vh) - 14px); }
   .assets-body.is-viewing .asset-inspector { display: none; }
   .assets-body.is-viewing .viewer { position: absolute; inset: 0; top: 0; }
-  #assets-view:has(.assets-body.is-viewing) { padding-top: calc(var(--edge) + var(--ctl) + 2 * var(--pad) + var(--sp-4)); }
-  /* The viewer takes the screen under the tabs: the library bar steps aside, its controls wrap in two rows. */
+  /* The viewer takes the whole screen (the tabs are not shown while viewing): the library bar steps aside, its controls wrap in two rows. */
   #assets-view:has(.assets-body.is-viewing) .assets-bar { display: none; }
   /* The previews stay, as a row of their own above the controls, and the controls are centred under them. */
   .viewer-bar { flex-wrap: wrap; justify-content: center; gap: var(--sp-2) var(--sp-4); padding: var(--sp-3) var(--sp-4) calc(var(--sp-3) + env(safe-area-inset-bottom, 0px)); }

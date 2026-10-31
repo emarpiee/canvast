@@ -1238,6 +1238,11 @@ test("gallery viewer: the view tabs, the workspace menu and the Settings button 
   await expect(details).toHaveCSS("opacity", "1");
   await pointerAt(400);
   await expect(back).toHaveCSS("opacity", "0");
+  // A narrow window (the phone layout): the viewer starts at the top, no room is kept for the tabs it hides.
+  const size = p.viewportSize()!;
+  await p.setViewportSize({ width: 547, height: 1000 });
+  await expect.poll(async () => (await viewer.boundingBox())!.y, "no empty band above the picture").toBeLessThan(2);
+  await p.setViewportSize(size);
   await p.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
   for (const el of away) await expect(el, "back when it closes").toBeVisible();
