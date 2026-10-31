@@ -117,7 +117,7 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
       openMoreMenu(
         t.closest<HTMLElement>("[data-thumbs]")!,
         [
-          { label: `Update all ${list.items.length} pictures`, icon: ICONS.refresh, aria: "Update the pictures of all bookmarks", run: () => thumbs.update() },
+          { label: list.items.length === 1 ? "Update the picture" : `Update all ${list.items.length} pictures`, icon: ICONS.refresh, aria: "Update the pictures of all bookmarks", run: () => thumbs.update() },
           { label: missing.length ? `Fill in the ${missing.length} missing` : "None are missing", icon: ICONS.imagePlus, disabled: missing.length === 0, aria: "Fill in the missing bookmark pictures", run: () => thumbs.update(missing.map((b) => b.id)) },
         ],
         "Update the bookmark pictures",

@@ -746,7 +746,7 @@ async function start(): Promise<void> {
       const close = await confirmDialog({
         title: "Files are still being written",
         lines: [
-          `${writing.done} of ${writing.total} files are in the workspace folder so far.`,
+          `${writing.done} of ${plural(writing.total, "file")} ${writing.done === 1 ? "is" : "are"} in the workspace folder so far.`,
           "Closing now stops it: your work is safe in the app, and the rest are written the next time you open this workspace. Keep the app open until it ends to have every file in the folder.",
         ],
         confirmLabel: "Close anyway",
@@ -776,7 +776,7 @@ async function start(): Promise<void> {
     busy ??= encrypting
       ? openBusyScreen("Encrypting hidden items", ["Each file is encrypted into .hidden/, read back to prove it, and only then is the readable one deleted. Keep the app open until it ends."])
       : openBusyScreen("Writing the workspace to its folder", ["The files are copied into the workspace folder, so other programs and devices see them. Keep the app open until it ends."]);
-    busy.update(done / total, `${encrypting ? "Encrypting" : "Writing"} ${done} of ${total} files`);
+    busy.update(done / total, `${encrypting ? "Encrypting" : "Writing"} ${done} of ${plural(total, "file")}`);
   });
   // Objects that follow a saved colour or gradient (ADR 0157) are brought in step when the style changes and when a canvas is opened: one undo
   // step while there is history; right after opening there is none, so the change is quiet.
@@ -2025,7 +2025,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   /** Settings of the two checks of the library's files (desktop): the full one reads every file, the quick one looks at sizes. */
   const checkLibraryFiles = (quick: boolean): void => {
     const p = busyProgress(editor, quick ? "Checking the library file sizes" : "Checking the library files", [quick ? "Each file is looked for and its size compared with the library's. Nothing is read." : "Each file is read and compared with what the library knows of it. Hidden items are left out."]);
-    void storage!.folderSync!.checkFiles((done, total) => p.update(done / total, `${done} of ${total} files`), quick).then(
+    void storage!.folderSync!.checkFiles((done, total) => p.update(done / total, `${done} of ${plural(total, "file")}`), quick).then(
       (r) => {
         const list = (names: string[]) => names.slice(0, 5).map((n) => `“${n}”`).join(", ") + (names.length > 5 ? ` and ${names.length - 5} more` : "");
         const found = [r.damaged.length ? `${r.damaged.length} changed or damaged (${list(r.damaged)})` : "", r.missing.length ? `${r.missing.length} missing (${list(r.missing)})` : ""].filter(Boolean).join("; ");

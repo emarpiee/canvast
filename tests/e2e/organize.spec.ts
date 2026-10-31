@@ -1046,6 +1046,7 @@ test("custom thumbnails: a picture of the library, an uploaded one (its own cate
   await pick(p, HASH);
   await choose(/^Uploaded thumbnails/);
   await expect(p.locator(".lib-item")).toHaveCount(1);
+  await expect(p.locator("[data-lib-search]")).toHaveAttribute("placeholder", "Search the picture"); // (one: not "1 pictures")
   await expect(p.locator(".lib-item")).toHaveAttribute("aria-label", /used by 1 item/);
   await p.locator(".lib-item").click();
   await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.thumb ?? null), HASH)).toBe(uploaded);

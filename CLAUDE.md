@@ -54,6 +54,8 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 - **Group tools in menus, do not add a row of icons (ADR 0151).** A family of tools on the Actions bar (`ui/context-bar.ts`) is one button that opens `openMoreMenu(anchor, items, label, { keepOpen: true, refresh })`: an icon, a label and a hint per item, placed off the picked things, closing only on Escape or a press outside. List only what applies to the pick and hide the button when nothing does. The button carries `aria-haspopup="menu"` (it gets the corner mark from CSS). Reuse this menu for any new group; E2E chooses in it with `chooseInMenu` / `alignWith` / `boolWith` / `maskWith` / `pathWith` in `tests/e2e/harness.ts`.
 - The dev panel (`.hud-dev`, `#debug` only) must end before x = 370: tests start drags at x 378 to 380.
 
+- **Counts read right for one and many (ADR 0086).** Every number shown with a noun goes through `plural()` / `be()` / `were()` (`src/doc/plural.ts`) or a one-or-many branch: never `${n} items` alone, never "item(s)". This covers titles, buttons, placeholders, notices, status lines and undo labels.
+
 - **Layers.** Floating elements use the `--z-*` tokens in `:root` (ADR 0096), never a number: `--z-item` and `--z-item-bar`/`--z-item-pop` for what belongs to a canvas item (a player's picture and bar, the selection bar), `--z-edge` for the bars and panels on the edges, which are always above anything on the canvas.
 
 - **Panels (ADR 0156).** A floating panel is built with `panelHtml` (`src/ui/panel.ts`): optional header, optional strip under it, a scrolling body, optional footer. Leave out the parts it does not need; do not write layout CSS for them.

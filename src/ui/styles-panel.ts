@@ -1,4 +1,5 @@
 import type { Adjust } from "../doc/adjust";
+import { plural } from "../doc/plural";
 import type { EditorState } from "../app/editor-state";
 import type { StyleItem, StyleLibrary, PaletteData, PatternData } from "../assets/styles";
 import { styleThumbSvg } from "./pattern-thumb";
@@ -229,7 +230,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     if (!made) return deps.notify("Nothing to make a palette from.");
     opened.add(made.id);
     then?.(made);
-    deps.notify(`Made the palette “${made.name}” (${list.length} colours).`);
+    deps.notify(`Made the palette “${made.name}” (${plural(list.length, "colour")}).`);
   };
 
   // ---- Export and import (GIMP files) -----------------------------------------------------------------------------------------

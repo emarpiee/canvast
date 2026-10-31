@@ -20,7 +20,7 @@ export function openLibraryPicker(anchor: HTMLElement, items: readonly LibraryPi
     pop.className = "lib-pick";
     pop.setAttribute("role", "dialog");
     pop.setAttribute("aria-label", "Choose a picture from the library");
-    pop.innerHTML = `<input type="search" data-lib-search placeholder="Search ${items.length} pictures" aria-label="Search the pictures of the library by name" autocomplete="off"><div class="lib-grid" data-lib-grid></div><p class="op-note" data-lib-empty hidden></p>`;
+    pop.innerHTML = `<input type="search" data-lib-search placeholder="${items.length ? `Search ${items.length === 1 ? "the picture" : `the ${items.length} pictures`}` : "No pictures in the library"}" aria-label="Search the pictures of the library by name" autocomplete="off"><div class="lib-grid" data-lib-grid></div><p class="op-note" data-lib-empty hidden></p>`;
     const grid = pop.querySelector<HTMLElement>("[data-lib-grid]")!;
     const empty = pop.querySelector<HTMLElement>("[data-lib-empty]")!;
     const urls: string[] = [];

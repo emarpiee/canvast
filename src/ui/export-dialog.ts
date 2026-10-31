@@ -4,6 +4,7 @@
  * a story, the picture's own pixels …), or type a width or a height; the preview shows the shape with its measures, and the file is
  * made at exactly that size. PNG, WebP and JPEG; SVG too when everything is vector.
  */
+import { plural } from "../doc/plural";
 import { forgetCopiedPicture } from "../app/actions";
 import { writeSystemClipboard } from "../app/system-clipboard";
 import { scrubNumbers } from "../colour-picker/scrub";
@@ -485,7 +486,7 @@ export function openExportDialog(deps: ExportDeps): void {
           } else {
             const zip = await writeZip(files.map((f) => ({ name: f.name, data: f.blob })));
             save(zip, `${base()}.zip`);
-            note.textContent = `Saved “${base()}.zip”: ${files.length} pictures, ${size(zip)}.`;
+            note.textContent = `Saved “${base()}.zip”: ${plural(files.length, "picture")}, ${size(zip)}.`;
           }
         } else {
           for (const f of files) await deps.toLibrary(new File([f.blob], f.name, { type: f.mime }), ts);
