@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Fixed:** with hidden items' names off this device while locked (Settings > Privacy), every start and unlock encrypted all hidden files again (new bytes, so a sync tool uploaded them all again): the names blanked while locked were taken as a change. Hidden files are now written again only when their item really changed.
+
 ## 0.52.3 — Custom thumbnails, quick filters, player focus (2026-10-30)
 
 - **Added:** custom thumbnails: any library item (also a file with no preview) can show another picture in the Library and on its file card on a canvas: one uploaded before (their own category, *Thumbnails*, never library items), a picture of the library, a new upload (kept small), or its own again. In the desktop app uploaded ones are files of `.canvast/thumbnails/`. Backups carry them.

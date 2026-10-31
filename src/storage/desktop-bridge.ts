@@ -42,7 +42,7 @@ export interface LibraryCalls {
    * Write the part files (of `only`'s items, or all), `index.json` and, small enough, `library.json`, in the main process. The hidden
    * items among them whose files are sealed (for the sealed index), and `library.json`'s text ("-": none, the library is too big).
    */
-  write(only: readonly string[] | null, compatMax: number): Promise<{ sealed: unknown[]; compat: string }>;
+  write(only: readonly string[] | null, compatMax: number, blank?: boolean): Promise<{ sealed: unknown[]; compat: string }>;
   /** The files of `library/` no record names (a file put there from outside), with their sizes. */
   unnamed(): Promise<Array<{ path: string; size: number }>>;
   /** Whether a record names a file under this folder of the workspace. */

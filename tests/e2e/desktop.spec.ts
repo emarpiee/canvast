@@ -928,8 +928,25 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
     await page.evaluate(() => window.__canvastDebug.setSetting("library.hiddenNamesOff", true));
     await page.evaluate(() => window.__canvastDebug.hiddenOp("lock"));
     await expect.poll(names, { timeout: 15_000 }).toEqual(before.map((n) => `Hidden item.${n.split(".").pop()}`).sort());
+    // A write while blank, then opening: no sealed file is written again (new bytes a sync tool would upload again each start).
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    const bytes = () => sha(Buffer.concat(sealedNames().map((n) => readFileSync(join(ws, n)))));
+    const sealedBefore = bytes();
     expect((await hid("check", "pw")).ok).toBe(true);
     await expect.poll(names, { timeout: 15_000 }).toEqual(before);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    expect(bytes()).toBe(sealedBefore);
+    // The same across a restart: started locked (names blank), then opened.
+    await page.evaluate(() => window.__canvastDebug.hiddenOp("lock"));
+    await expect.poll(names, { timeout: 15_000 }).not.toEqual(before);
+    await app.close();
+    ({ app, page } = await launch(ws));
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(8);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    expect((await hid("check", "pw")).ok).toBe(true);
+    await expect.poll(names, { timeout: 15_000 }).toEqual(before);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    expect(bytes()).toBe(sealedBefore);
   } finally {
     await app.close();
   }

@@ -1198,7 +1198,8 @@ export class LibraryMirror {
    * them, the index, `library.json` for a small library. Then the sealed index from the hidden items (with the key open).
    */
   private async writeJson(only?: ReadonlySet<string>): Promise<void> {
-    const r = await this.lib.serial(() => this.lib.calls.write(only ? [...only] : null, libraryTesting.compatMax));
+    const blank = await this.anyBlank();
+    const r = await this.lib.serial(() => this.lib.calls.write(only ? [...only] : null, libraryTesting.compatMax, blank));
     this.lastText = r.compat;
     const sealed = (r.sealed as LibraryItem[]).sort((a, b) => (a.hash < b.hash ? -1 : 1));
     if (only) {
@@ -1209,7 +1210,7 @@ export class LibraryMirror {
     const shown = visibleFolders(folders);
     const index = JSON.stringify([...this.hiddenItems.values()].sort((a, b) => (a.hash < b.hash ? -1 : 1)));
     const sealedFolders = JSON.stringify(folders.filter((f) => !shown.includes(f)));
-    const sealing = !!this.vault.dataKey && !(await this.anyBlank());
+    const sealing = !!this.vault.dataKey && !blank;
     if (sealing && (index !== this.lastIndex || sealedFolders !== this.lastFolders || this.vault.indexWaiting) && (index !== "[]" || sealedFolders !== "[]" || (await this.vault.state()) !== "none")) await this.vault.writeIndex(index, sealedFolders);
     if (this.vault.dataKey) (this.lastIndex = index), (this.lastFolders = sealedFolders);
     // (the folders are now what the files say: with the hidden ones only when the sealed index was written; a folder hidden while locked

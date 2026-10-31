@@ -178,7 +178,7 @@ export class Library {
    * items whose files are sealed are in no part (they go in the sealed index). Up to `compatMax` items, `library.json` (the single
    * file of earlier versions) is written too, for an older app on another device; past it, it goes.
    */
-  async writeParts(only: readonly string[] | null, compatMax: number, files: PartFiles): Promise<WriteResult> {
+  async writeParts(only: readonly string[] | null, compatMax: number, files: PartFiles, blank = false): Promise<WriteResult> {
     const rowsIn = this.db.prepare<[string, string], { entry: string; rec: string | null }>("SELECT e.json AS entry, r.json AS rec FROM entries e LEFT JOIN recs r ON r.hash = e.hash WHERE e.hash >= ? AND e.hash < ? ORDER BY e.hash");
     const fps = this.parts();
     const keys = only ? [...new Set(only.map(partKey))] : [...new Set([...(this.db.prepare("SELECT DISTINCT substr(hash, 1, 2) AS k FROM entries").raw().all() as string[][]).map((r) => r[0]!), ...Object.keys(fps)])];
@@ -192,6 +192,9 @@ export class Library {
       const open = items.filter((i) => !isHiddenFile(i.file));
       for (const i of items) {
         if (isHiddenFile(i.file)) sealedOut.push(i);
+        // (names blanked while locked: a sealed item's mark stays what was last sealed, or the real names, back on unlock, read as a change
+        // here and every hidden file is sealed again, new bytes a sync tool uploads again)
+        if (blank && isHiddenFile(i.file)) continue;
         const v = seen(JSON.stringify(i));
         if (this.seenOf(i.hash) !== v) seenOps.push({ t: "seen", hash: i.hash, v });
         written.push(i.hash);

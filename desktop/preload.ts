@@ -28,7 +28,7 @@ const bridge: DesktopBridge = {
     get: (hashes) => ipcRenderer.invoke("canvast:lib", "get", hashes),
     entries: (which) => ipcRenderer.invoke("canvast:lib", "entries", which ?? "all"),
     recs: (which) => ipcRenderer.invoke("canvast:lib", "recs", which ?? "all"),
-    write: (only, compatMax) => ipcRenderer.invoke("canvast:lib", "write", only, compatMax),
+    write: (only, compatMax, blank) => ipcRenderer.invoke("canvast:lib", "write", only, compatMax, blank === true),
     byFile: (file) => ipcRenderer.invoke("canvast:lib", "byFile", file),
     meta: (key) => ipcRenderer.invoke("canvast:lib", "meta", key),
     apply: (ops) => ipcRenderer.invoke("canvast:lib", "apply", ops),

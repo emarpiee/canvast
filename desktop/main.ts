@@ -666,7 +666,7 @@ function installFileCalls(win: BrowserWindow, root: string): void {
           },
           write: (rel, text) => writeAtomic(at(rel), Buffer.from(text)),
           remove: (rel) => unlink(at(rel)).catch(() => undefined),
-        });
+        }, args[2] === true);
       }
       case "unnamed": {
         // (library/ walked here: the files no record names, with their sizes; a million known files never cross to the page)
