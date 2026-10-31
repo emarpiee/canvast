@@ -96,6 +96,9 @@ describe("library keywords", () => {
     expect(t("is:used")).toBe(true);
     expect(t("is:unused")).toBe(false);
     expect(t("is:untagged")).toBe(true);
+    expect(t("is:thumbed")).toBe(false);
+    expect(t("is:thumbed", item, { ...extra, thumbed: true })).toBe(true);
+    expect(t("is:unthumbed")).toBe(true);
     expect(t("is:filed")).toBe(true);
     expect(t("is:missing", { present: false })).toBe(true);
     expect(parseFilter("is:nonsense")).toBeNull();

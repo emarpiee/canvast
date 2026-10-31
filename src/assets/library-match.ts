@@ -76,6 +76,7 @@ export function matcher(ctx: MatchContext): (e: ListedEntry, query: Query | null
     hidden: m.hidden,
     favorite: m.favorite,
     tags: m.tags.length,
+    thumbed: !!m.thumb,
     folders: m.folderIds.length ? folderPath(ctx.folders, m.folderIds[0]!).map((n) => n.toLowerCase()) : [],
     note: m.note.toLowerCase(),
     fields: m.fields.map((f) => ({ key: f.key.toLowerCase(), value: f.value.toLowerCase() })),

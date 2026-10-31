@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Added:** search keywords `is:thumbed` (items with a custom thumbnail) and `is:unthumbed`.
 - **Fixed:** counts that read wrong for one: the library picker said *Search 1 pictures* (now *Search the picture*; none: *No pictures in the library*), and the same for a saved ZIP of pictures, a palette's colours, the layers filter, a bookmark's Update, an adjustment's layers and the workspace folder's file counts.
 - **Added:** backups carry hidden items' custom thumbnails, still encrypted as they are in `.hidden/thumbnails/` (nothing readable of them, not even their hash); importing in the desktop app puts them back.
 - **Added:** a custom thumbnail can be pasted: **Paste a picture** in the thumbnail dialog, or `Ctrl`+`V` while it is open (kept small like an upload, never imported into the library).
