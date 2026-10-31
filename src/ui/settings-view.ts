@@ -321,6 +321,15 @@ export interface BackupHooks {
   librarySplit?: { get(): Promise<{ split: 1 | 2 | 3; items: number }>; set(split: 1 | 2 | 3): Promise<boolean> };
 }
 
+/** The desktop app: what it keeps on this computer, outside the workspace folder, and what to do for full privacy. */
+const DEVICE_DATA_CARD = `<div class="set-info set-card" data-device-data><h3>What stays on this computer</h3>
+             <p class="set-help">Outside the workspace folder, in the app's data folder (~/.config/canvast on Linux, %APPDATA%\\canvast on Windows, ~/Library/Application Support/canvast on a Mac):</p>
+             <ul class="set-list"><li><strong>A working copy of each workspace</strong> (Partitions, library-db, library-looks): its boards, canvases and library, so the app opens fast. Hidden items' pictures and thumbnails there are encrypted; their names, tags and notes are readable there unless <em>Keep hidden items' names off this device while locked</em> is on.</li>
+             <li><strong>The list of recent workspaces</strong> (workspaces.json, partitions.json): their folders' paths.</li>
+             <li><strong>Hidden items opened in another app</strong>: readable copies in the system's temporary folder (canvast-opened-…), deleted when the hidden items are locked, when the app closes, and at the next start.</li></ul>
+             <p class="set-help">Working copies of workspaces this computer no longer opens are removed after a month. For full privacy:</p>
+             <ul class="set-list"><li>Turn on <em>Keep hidden items' names off this device while locked</em> (above).</li><li>Leave <em>Remember the Hidden password</em> off.</li><li>Lock the hidden items (command palette: Lock hidden items) before you leave the computer; closing the app locks them.</li><li>Avoid <em>Open in default app</em> for hidden items: the other app may keep its own copy, thumbnail or recent-files entry.</li><li>Use your system's disk encryption: the working copy and the temporary folder are on this disk.</li><li>A backup keeps hidden items encrypted; a ZIP of files or an exported folder does not.</li></ul></div>`;
+
 const pwCard = (kind: "hidden" | "workspace", title: string, help: string): string => `<div class="set-info set-card" data-pw-card="${kind}"><h3>${esc(title)}</h3>
              <p class="set-help">${esc(help)}</p>
              <p data-pw-state role="status">…</p>
@@ -346,7 +355,8 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
         (t.id === "privacy"
           ? (DESKTOP
               ? pwCard("workspace", "Password for the workspace", "Asked when the app opens: nothing of the workspace is shown until it is given. It keeps people at your screen out; it does not encrypt your data, so someone who can open the workspace folder, or an exported file, is not stopped. It cannot be recovered: to change or remove it you enter the old one.") +
-                pwCard("hidden", "Password for the Hidden items", "Hidden items are encrypted with it in the workspace folder: their files, names, tags and notes cannot be read without it. It is asked before the Hidden items open and before an export that includes them (an exported file is not encrypted). It cannot be recovered: if it is lost, so are the hidden items. It cannot be removed while items are hidden.")
+                pwCard("hidden", "Password for the Hidden items", "Hidden items are encrypted with it in the workspace folder: their files, names, tags and notes cannot be read without it. It is asked before the Hidden items open and before an export that includes them (an exported file is not encrypted). It cannot be recovered: if it is lost, so are the hidden items. It cannot be removed while items are hidden.") +
+                DEVICE_DATA_CARD
               : pwCard("workspace", "Password for the workspace", "Asked when the app opens: nothing of the workspace is read or shown until it is given. It keeps people at your screen out; it does not encrypt your data, so someone with access to this browser's storage or to an exported file is not stopped. It cannot be recovered: to change or remove it you enter the old one.") +
                 pwCard("hidden", "Password for the Hidden items", "A password asked before the Hidden items open and before an export that includes them. The same limits apply: it does not encrypt the files. It cannot be recovered either."))
           : t.id === "develop"

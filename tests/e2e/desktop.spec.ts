@@ -1489,3 +1489,27 @@ test("the library's files split another way (Settings > Storage, Library files):
     await app.close();
   }
 });
+
+test("working copies no workspace names any more, untouched for a month, are removed at start-up; the open one's are kept", async () => {
+  const ws = tempDir("canvast-ws-");
+  const data = `${ws}-userdata`;
+  const old = new Date(Date.now() - 40 * 24 * 3600_000);
+  mkdirSync(join(data, "Partitions", "ws-0123456789abcdef01234567"), { recursive: true });
+  writeFileSync(join(data, "Partitions", "ws-0123456789abcdef01234567", "x"), "old");
+  mkdirSync(join(data, "library-db"), { recursive: true });
+  writeFileSync(join(data, "library-db", "0123456789abcdef01234567.sqlite"), "old");
+  mkdirSync(join(data, "Partitions", "ws-fresh00000000000000000000"), { recursive: true }); // (recent: kept, it may be in use)
+  utimesSync(join(data, "Partitions", "ws-0123456789abcdef01234567"), old, old);
+  utimesSync(join(data, "library-db", "0123456789abcdef01234567.sqlite"), old, old);
+  const { app, page } = await launch(ws);
+  try {
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await expect.poll(() => existsSync(join(data, "Partitions", "ws-0123456789abcdef01234567")), { timeout: 15_000 }).toBe(false);
+    expect(existsSync(join(data, "library-db", "0123456789abcdef01234567.sqlite"))).toBe(false);
+    expect(existsSync(join(data, "Partitions", "ws-fresh00000000000000000000"))).toBe(true);
+    const own = (JSON.parse(readFileSync(join(data, "partitions.json"), "utf8")) as Record<string, { partition: string }>)[ws]!.partition.slice("persist:".length);
+    expect(existsSync(join(data, "Partitions", own))).toBe(true);
+  } finally {
+    await app.close();
+  }
+});

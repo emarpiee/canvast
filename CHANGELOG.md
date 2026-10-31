@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Added:** Settings > Privacy says what the desktop app keeps on this computer (working copies, recent workspaces, readable copies of hidden items opened elsewhere) and lists what to do for full privacy; the README too, with what removing the app leaves.
+- **Added:** working copies of workspaces this computer no longer opens (the folder deleted, renamed or moved) are removed at start-up once a month old.
 - **Added:** the Library's context menu in the viewer: a right click (or a long touch) on the picture, or on a picture of the filmstrip, offers that item's actions.
 - **Changed:** shorter button words where they were cut off or long: the details panel's **Place** (its tooltip says where), **Save stop colour** in the gradient editor, **Protect it** in Settings > Storage.
 - **Changed:** a video or sound the app cannot play (HEVC / H.265 video, for one) is no longer called *missing or damaged* in the viewer: it says its format cannot be played here and how to open it elsewhere.

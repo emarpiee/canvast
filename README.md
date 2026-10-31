@@ -141,7 +141,19 @@ Your workspace folder is never touched by an update.
 
 ### Uninstalling
 
-Remove the app the way you installed it (`sudo apt remove canvast`, `sudo dnf remove canvast`, or delete the AppImage or the unpacked folder). Your workspace folders stay where they are. The app's own working copy and settings on this device are in `~/.config/canvast/`; delete that folder too to remove everything. For the browser version, delete the file and clear the site data of `file://` pages in the browser (for the online copy, the site data of `emarpiee.github.io`); this deletes the work kept there, so export a backup first.
+Remove the app the way you installed it (`sudo apt remove canvast`, `sudo dnf remove canvast`, or delete the AppImage or the unpacked folder). Your workspace folders stay where they are. The app's own working copy and settings on this device are in `~/.config/canvast/` (`%APPDATA%\canvast` on Windows, `~/Library/Application Support/canvast` on a Mac); removing the app never deletes it, so delete that folder too to remove everything. An AppImage also may leave an entry in your launcher if an AppImage manager added one. Readable copies of hidden items opened in another app (`canvast-opened-…` in the temporary folder) are deleted when the app closes; a crash leaves them until the next start, or until the system clears its temporary folder. The app removes, by itself, the working copies of workspaces it no longer opens once they are a month old. For the browser version, delete the file and clear the site data of `file://` pages in the browser (for the online copy, the site data of `emarpiee.github.io`); this deletes the work kept there, so export a backup first.
+
+### What the desktop app keeps on this computer
+
+Outside your workspace folders, in the app's data folder (above):
+
+| What | Where | Holds |
+| --- | --- | --- |
+| A working copy of each workspace | `Partitions/`, `library-db/`, `library-looks/` | Boards, canvases and the library, so the app opens fast. Hidden items' pictures and thumbnails are encrypted there; their names, tags and notes are readable there unless *Keep hidden items' names off this device while locked* is on (Settings > Privacy) |
+| Recent workspaces | `workspaces.json`, `partitions.json` | Their folders' paths |
+| Hidden items opened in another app | the system's temporary folder, `canvast-opened-…` | Readable copies, deleted when the hidden items are locked, when the app closes, and at the next start |
+
+**For full privacy:** turn on *Keep hidden items' names off this device while locked*; leave *Remember the Hidden password* off; lock the hidden items before leaving the computer (closing the app locks them); avoid *Open in default app* for hidden items (the other app may keep its own copy or recent-files entry); use your system's disk encryption; and remember that a backup keeps hidden items encrypted while a ZIP of files or an exported folder does not. Settings > Privacy shows the same list.
 
 ### Building from source
 

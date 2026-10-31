@@ -1035,4 +1035,31 @@ void app.whenReady().then(async () => {
   if (!(await holdWorkspace(workspace))) return app.quit();
   remember(workspace);
   await openWindow(workspace);
+  void sweepOldCaches().catch(() => undefined);
 });
+
+/** Working copies older than this, of no workspace this device records, are removed at start-up (see `sweepOldCaches`). */
+const OLD_CACHE_MS = 30 * 24 * 3600_000;
+
+/**
+ * The working copies (storage partitions) and their library database and start-up look that no workspace on this device names any
+ * more (a folder deleted, renamed or moved, or a copy of an older version), untouched for a month: removed. They are caches of
+ * folders: what a workspace holds is in its folder, and a working copy is made again from it when it is opened.
+ */
+async function sweepOldCaches(): Promise<void> {
+  const data = app.getPath("userData");
+  const known = new Set(Object.values(readPartitions()).map((k) => k.partition.slice("persist:".length)));
+  const keys = new Set([...known].map((p) => cacheKey(`persist:${p}`)));
+  const old = async (path: string): Promise<boolean> => Date.now() - (await stat(path).then((st) => st.mtimeMs, () => Date.now())) > OLD_CACHE_MS;
+  for (const name of await readdir(join(data, "Partitions")).catch(() => [] as string[])) {
+    if (!name.startsWith("ws-") || known.has(name) || !(await old(join(data, "Partitions", name)))) continue;
+    await rm(join(data, "Partitions", name), { recursive: true, force: true });
+  }
+  for (const dir of ["library-db", "library-looks"]) {
+    for (const name of await readdir(join(data, dir)).catch(() => [] as string[])) {
+      const key = name.replace(/\.(sqlite(-wal|-shm)?|json)$/, "");
+      if (keys.has(key) || !(await old(join(data, dir, name)))) continue;
+      await rm(join(data, dir, name), { force: true });
+    }
+  }
+}
