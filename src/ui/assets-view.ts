@@ -594,10 +594,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const redrawCards = (hashes: readonly string[]): void => {
     for (const h of hashes) {
       assets.forget(h);
-      // shortcut: the old picture's address is not let go (another element may still show it: a revoked one fails to load); one small
-      // thumbnail per change of a custom thumbnail, until the page closes. Revoke once nothing on screen uses it, if changes become frequent.
+      const job = thumbs.get(h);
+      const url = thumbUrls.get(h);
       thumbs.delete(h);
       thumbUrls.delete(h);
+      if (url) revokeUnused(url); // (once no picture shows it any more)
+      if (job) void job.p.then((u) => u !== url && revokeUnused(u), () => undefined);
       // (a card on the screen keeps its picture until asked again: its markup is the same)
       for (const img of root.querySelectorAll<HTMLImageElement>(`.asset-thumb img[data-hash="${h}"], .film-item img[data-hash="${h}"]`)) {
         img.classList.remove("is-loaded", "is-broken");
@@ -745,6 +747,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     thumbs.set(hash, job);
     return job.p;
   };
+  /**
+   * Let a thumbnail's address go once no picture of the page shows it any more (a picture given a revoked one fails to load, and says so
+   * in the console); looked at again a moment later while one does.
+   */
+  const revokeUnused = (url: string): void => {
+    const check = (): void => {
+      if ([...document.images].some((i) => i.src === url)) window.setTimeout(check, 2000);
+      else URL.revokeObjectURL(url);
+    };
+    window.setTimeout(check, 0);
+  };
   /** Keep the addresses of the thumbnails seen most recently; older ones not on screen are let go (a long session would keep them all). */
   const keepThumbUrl = (hash: string, url: string): void => {
     thumbUrls.delete(hash);
@@ -755,7 +768,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (mounted.has(h) || filmMounted.has(h) || h === selected || h === slideHash || looking.has(h)) continue;
       thumbUrls.delete(h);
       thumbs.delete(h);
-      URL.revokeObjectURL(u);
+      revokeUnused(u);
     }
   };
   // ---- what pictures look like (ADR 0114): read from the thumbnails, a few at a time, kept in memory
@@ -861,7 +874,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if ((!live || live.has(hash)) && !job.failed && job.custom === ((entryOf(hash) && meta(entryOf(hash)!).thumb) || null)) continue;
       thumbs.delete(hash);
       thumbUrls.delete(hash);
-      void job.p.then((url) => URL.revokeObjectURL(url), () => undefined);
+      void job.p.then(revokeUnused, () => undefined);
       // A card kept on the screen with no picture asks again.
       const img = job.failed ? mounted.get(hash)?.el.querySelector<HTMLImageElement>("img.is-broken") : null;
       if (img) {
@@ -4012,7 +4025,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       thumbs.delete(h);
       thumbUrls.delete(h);
       looks.delete(h);
-      if (job) void job.p.then((url) => URL.revokeObjectURL(url), () => undefined);
+      if (job) void job.p.then(revokeUnused, () => undefined);
     }
     looksGen++;
     pagedCache.clear();

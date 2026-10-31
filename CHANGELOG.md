@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Fixed:** a thumbnail's picture could be let go while the Library still showed it (after hidden mode ended, or a custom thumbnail changed), which failed to load it and logged an error; it is now let go only once nothing shows it.
+
 ## 0.52.4 — Hidden files stand on their own, long names, library files (2026-11-01)
 
 - **Added:** Settings > Privacy says what the desktop app keeps on this computer (working copies, recent workspaces, readable copies of hidden items opened elsewhere) and lists what to do for full privacy; the README too, with what removing the app leaves.
