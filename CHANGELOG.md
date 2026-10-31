@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Changed:** a video or sound the app cannot play (HEVC / H.265 video, for one) is no longer called *missing or damaged* in the viewer: it says its format cannot be played here and how to open it elsewhere.
 - **Fixed:** a hidden picture drawn as a padlock on a canvas showed its real name in its label and in the Layers panel; it is named *Hidden item* there until its picture is shown.
 - **Fixed:** after giving the Hidden password, the Library showed "Hidden folder" and blank names for a few seconds (until the hidden files were checked and put in place); it now lists the real names at once. Files hidden before this version are renamed into their encrypted folders and names with a progress screen (*Updating hidden items*), once; later openings check only what changed.
 - **Added:** **Library files** (Settings > Storage): split the library's files into 16, 256 (the default) or 4,096, for the whole workspace, with about how big one file is for this library. More files are smaller, so a sync tool uploads less for each edit. Changing it writes them all again once; update the app on every device first.

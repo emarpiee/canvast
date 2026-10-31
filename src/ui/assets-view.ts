@@ -1313,11 +1313,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       slideVec.hidden = false;
       slideImg.classList.add("is-vector");
     }
-    const thumbnail = async (): Promise<void> => {
+    const thumbnail = async (why = "The file is missing or damaged"): Promise<void> => {
       vector = false;
       slideVec.hidden = true;
       slideImg.classList.remove("is-vector");
-      slideCaption.textContent = `${label}. The file is missing or damaged; showing its thumbnail.`;
+      slideCaption.textContent = `${label}. ${why}; showing its thumbnail.`;
       slideCaption.classList.add("is-note");
       slideImg.src = await thumbFor(hash).catch(() => "");
     };
@@ -1371,7 +1371,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         if (token !== slideToken) return;
         unloadMedia();
         slideImg.hidden = false;
-        void thumbnail();
+        // (the file is there, read whole: its format is one this app cannot play, as HEVC (H.265) video in most builds)
+        void thumbnail(`This ${isVideo ? "video" : "sound"}'s format cannot be played in this app (HEVC / H.265 video, for one). ${desktopBridge() ? "Open in default app (in its details) plays it in your system's app" : "Download it to play it in another app"}`);
         return;
       }
       if (token !== slideToken) return;
