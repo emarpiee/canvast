@@ -161,6 +161,13 @@ test("one original is shared by instances on several boards and canvases; usage 
   await expect(p.getByTestId("assets-status")).toHaveText("“blocks.png” is already in your library: no second copy is stored.");
   await expect(p.getByTestId("asset-card")).toHaveCount(1);
   expect(await stored(p)).toEqual([HASH]);
+  // Under another name: its new name is offered (a name cut short before comes back from the original), and Undo puts the old one back.
+  await expect(p.getByTestId("confirm-dialog")).toContainText("Use the new name?");
+  await expect(p.getByTestId("confirm-dialog")).toContainText("copy.pngwas blocks.png");
+  await p.getByTestId("confirm-ok").click();
+  await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.name), HASH)).toBe("copy.png");
+  await p.keyboard.press("Control+z");
+  await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.name), HASH)).toBe("blocks.png");
 
   // Used on many canvases: the first five are listed, a button shows all of them (and fewer again); the confirmation names three.
   for (let n = 2; n <= 6; n++) {

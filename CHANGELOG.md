@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Added:** importing into the Library a file it already has under another name offers to rename it to the imported name, with the old and new names listed first (in hidden mode for hidden items only); importing the originals again brings back names that were cut short. Undo puts the old names back.
 - **Fixed:** long file names: an item's name can be up to 1,000 characters (it was cut at 200), and its file in the workspace folder keeps up to about 230 letters of it (it was cut at 100); exported files (Files ZIP, Export folder) keep their extension when a long name is cut (it was cut at 120 letters, extension and all).
 - **Fixed:** pasting a long list of tags with commas into a tag box kept only the first 64 letters of it.
 - **Fixed:** with hidden items' names off this device while locked (Settings > Privacy), every start and unlock encrypted all hidden files again (new bytes, so a sync tool uploaded them all again): the names blanked while locked were taken as a change. Hidden files are now written again only when their item really changed.

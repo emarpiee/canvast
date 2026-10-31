@@ -84,6 +84,8 @@ export interface AssetsView {
 /** How wide the library panel (left) and the details panel (right) can be made on a wide screen, in pixels. */
 /** The most names "View in the library" puts in the search; a longer selection is picked in the whole list instead. */
 const REVEAL_NAMES_MAX = 20;
+/** How many renames the offer of new names lists (it says how many there are in all). */
+const NEW_NAMES_SHOWN = 50;
 /** How long typing in the search box pauses before the results are drawn again. */
 const SEARCH_PAUSE_MS = 250;
 /**
@@ -3512,6 +3514,36 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
 
   /** Rename one or many assets with the shared rename dialog (ADR 0085); names keep the order given. */
+  /**
+   * Files imported again that the library already holds under another name (the same bytes): offered their new names, listed first (a
+   * name cut short earlier comes back from the original). Only items of the mode shown: hidden ones in hidden mode, none of them outside it.
+   */
+  const offerNewNames = async (incoming: ReadonlyArray<{ hash: string; name: string }>): Promise<void> => {
+    if (session.readOnly || !session.catalog || !incoming.length) return;
+    const changes: Array<{ hash: string; name: string; was: string }> = [];
+    const done = new Set<string>();
+    for (const c of incoming) {
+      const e = done.has(c.hash) ? undefined : await session.catalog.entry(c.hash).catch(() => undefined);
+      const name = cleanFileName(c.name);
+      if (!e || e.state !== "active" || meta(e).hidden !== hiddenMode || !name || e.name === name) continue;
+      done.add(c.hash);
+      changes.push({ hash: c.hash, name, was: e.name });
+    }
+    if (!changes.length) return;
+    const shown = changes.slice(0, NEW_NAMES_SHOWN);
+    const ok = await confirmDialog({
+      title: changes.length === 1 ? "Use the new name?" : `Use the ${changes.length} new names?`,
+      lines: [`${changes.length === 1 ? "This file is" : `${changes.length} of the files are`} already in the library under another name. Rename ${changes.length === 1 ? "it" : "them"} to the name${changes.length === 1 ? "" : "s"} you imported? Nothing is stored twice; Undo puts the old names back.`],
+      list: { title: changes.length > shown.length ? `The first ${shown.length}` : changes.length === 1 ? "The file" : "The files", items: shown.map((c) => ({ name: c.name, text: `was ${c.was}` })) },
+      confirmLabel: changes.length === 1 ? "Rename" : "Rename all",
+      danger: false,
+    });
+    if (!ok) return;
+    const n = await session.renameAssets(changes);
+    session.editor.message = `Renamed ${plural(n, "item")} to the imported names.`;
+    session.editor.changed();
+    await refresh(true);
+  };
   const renameAssetsDialog = async (hashes: readonly string[]): Promise<void> => {
     if (session.readOnly) return;
     const items = hashes.flatMap((h) => {
@@ -4236,6 +4268,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (session.editor.blockEdit()) return;
       let n = 0;
       const seen: Array<{ name: string; duplicate: "present" | "restored" }> = [];
+      const renamed: Array<{ hash: string; name: string }> = [];
       let done = 0;
       const progress = beginProgress(session.editor, "import", files.length > 1 ? "Importing files" : "Importing");
       for (const f of files) {
@@ -4244,6 +4277,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         try {
           const { record, duplicate } = await assets.importFileDetailed(f, false); // nothing is placed, so a big batch keeps no decoded pictures
           if (duplicate) seen.push({ name: record.name || f.name, duplicate });
+          if (duplicate && f.name) renamed.push({ hash: record.hash, name: f.name });
           n++;
         } catch (e) {
           session.editor.message = `Could not import ${f.name || "file"}: ${(e as Error).message}`;
@@ -4257,6 +4291,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         session.editor.changed();
       }
       await refresh();
+      await offerNewNames(renamed);
     },
   };
   return view;
