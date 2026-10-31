@@ -101,7 +101,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   sealedHooks.key = () => hidden.keyText();
   sealedHooks.write = (files, key) => mirror.importSealed(files, key);
   await mirror.adoptLocks().catch(() => undefined); // (before the app asks for the workspace password)
-  const writingFns = new Set<(done: number, total: number, encrypting?: boolean) => void>();
+  const writingFns = new Set<(done: number, total: number, encrypting?: boolean | "placing") => void>();
   let writingNow: { done: number; total: number } | null = null;
   mirror.onProgress = (done, total, encrypting) => {
     writingNow = total ? { done, total } : null;

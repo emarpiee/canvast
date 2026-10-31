@@ -283,7 +283,7 @@ export class LibraryMirror {
   /** Told when an item could not be moved or written, in plain words. */
   onNotice: ((text: string) => void) | null = null;
   /** Told how far a write of files is (files written or moved of all it has to), after each one; `total` 0 when it ended. */
-  onProgress: ((done: number, total: number, encrypting?: boolean) => void) | null = null;
+  onProgress: ((done: number, total: number, encrypting?: boolean | "placing") => void) | null = null;
 
   constructor(
     private readonly db: IDBDatabase,
@@ -523,6 +523,8 @@ export class LibraryMirror {
     await this.finishMove();
     // Some items changed, in a library too big for `library.json`: only they are read, placed and written (with their parts).
     const some = only && this.lastText === "-" ? only : undefined;
+    // (what changed since the last write, before this one marks it written: the hidden ones among them may need a new place)
+    const changedNow = new Set([...(await this.lib.calls.pending()), ...(only ?? [])]);
     const read = some ? await this.readSome(some) : await this.read();
     const { entries, recs, folders } = read;
     const folderOk = new Set(folders.map((f) => f.id));
@@ -603,7 +605,8 @@ export class LibraryMirror {
     }
     // (the folders changed, a rename or a move of one: every hidden item may have a new place, not only the ones read)
     const foldersChanged = canonFolders(folders) !== (this.state.folders || "[]");
-    await this.placeHidden(foldersChanged ? (await this.lib.entries("hidden")).map((e) => e.hash) : active.filter((e) => meta(e).hidden).map((e) => e.hash));
+    // (else only those changed since the last write: a rename, a move; every other one is in its place already)
+    await this.placeHidden(foldersChanged ? (await this.lib.entries("hidden")).map((e) => e.hash) : active.filter((e) => meta(e).hidden && changedNow.has(e.hash)).map((e) => e.hash));
     if (total) this.onProgress?.(total, 0);
     // Library folders are real folders, even empty; the places a move or a rename emptied are removed.
     const wanted = new Set<string>();
@@ -1008,13 +1011,18 @@ export class LibraryMirror {
    */
   /** Every hidden item's file put in its folder of `.hidden/` (when the key opens: the files sealed before folders were kept there). */
   async placeAllHidden(): Promise<void> {
-    await this.placeHidden((await this.lib.entries("hidden")).map((e) => e.hash));
+    // (only those with a random name of before: one changed while locked is placed by the write after opening, which has it pending)
+    const legacy = (await this.lib.recs("sealed")).filter((r) => r.file && /[0-9a-f]{32}\.bin$/.test(r.file)).map((r) => r.hash);
+    await this.placeHidden(legacy, true);
   }
-  async placeHidden(hashes: readonly string[]): Promise<void> {
+  async placeHidden(hashes: readonly string[], shown = false): Promise<void> {
     if (!(await this.nameKeysNow()) || (await this.anyBlank()) || !hashes.length) return;
     const recs = (await this.lib.rows([...hashes])).recs;
     const moved = new Set<string>();
+    let done = 0;
     for (const hash of hashes) {
+      // (shown: the busy screen says how far it is, past a few files; see main)
+      if (shown) this.onProgress?.(++done, hashes.length, "placing");
       const rec = recs.get(hash);
       if (!rec?.ext || !isHiddenFile(rec.file)) continue;
       const from = rec.file!;
@@ -1028,6 +1036,7 @@ export class LibraryMirror {
       await this.pruneHidden(from);
       moved.add(hash);
     }
+    if (shown) this.onProgress?.(hashes.length, 0, "placing");
     // (the sealed index names the files: written again for them, with the parts)
     if (moved.size) await this.writeJson(moved);
   }

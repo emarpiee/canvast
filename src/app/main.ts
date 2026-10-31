@@ -770,15 +770,18 @@ async function start(): Promise<void> {
       busy = null;
       return;
     }
-    const doing = encrypting ? "Encrypting hidden files" : "Writing the files into the workspace folder";
+    const doing = encrypting === "placing" ? "Renaming hidden files into their encrypted folders" : encrypting ? "Encrypting hidden files" : "Writing the files into the workspace folder";
     const shown = currentBusy();
     if (shown && shown !== busy) return shown.update(done / total, `${doing}: ${done} of ${total}`); // (a task's own screen, as an import's: one bar)
     // (Encrypting reads each file back and opens it to prove it, so a few already take a while: shown from BUSY_SEALS on.)
-    if (!busy && total < (encrypting ? BUSY_SEALS : BUSY_FILES)) return;
-    busy ??= encrypting
-      ? openBusyScreen("Encrypting hidden items", ["Each file is encrypted into .hidden/, read back to prove it, and only then is the readable one deleted. Keep the app open until it ends."])
-      : openBusyScreen("Writing the workspace to its folder", ["The files are copied into the workspace folder, so other programs and devices see them. Keep the app open until it ends."]);
-    busy.update(done / total, `${encrypting ? "Encrypting" : "Writing"} ${done} of ${plural(total, "file")}`);
+    if (!busy && total < (encrypting === true ? BUSY_SEALS : BUSY_FILES)) return;
+    busy ??=
+      encrypting === "placing"
+        ? openBusyScreen("Updating hidden items", ["Hidden files are renamed into encrypted folders and names, once, after this update. Nothing is encrypted again, so your sync tool sees renames. Keep the app open until it ends."])
+        : encrypting
+          ? openBusyScreen("Encrypting hidden items", ["Each file is encrypted into .hidden/, read back to prove it, and only then is the readable one deleted. Keep the app open until it ends."])
+          : openBusyScreen("Writing the workspace to its folder", ["The files are copied into the workspace folder, so other programs and devices see them. Keep the app open until it ends."]);
+    busy.update(done / total, `${encrypting === "placing" ? "Renaming" : encrypting ? "Encrypting" : "Writing"} ${done} of ${plural(total, "file")}`);
   });
   // Objects that follow a saved colour or gradient (ADR 0157) are brought in step when the style changes and when a canvas is opened: one undo
   // step while there is history; right after opening there is none, so the change is quiet.

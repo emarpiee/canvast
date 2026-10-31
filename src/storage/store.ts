@@ -314,8 +314,8 @@ export interface Storage {
 
 /** How far the files being written into the workspace folder are: `done` of `total` after each file; `total` 0 when it ended. */
 export interface FolderWriting {
-  /** `encrypting`: the file just done was a hidden item's, encrypted into `.hidden/`. */
-  subscribe(fn: (done: number, total: number, encrypting?: boolean) => void): () => void;
+  /** `encrypting`: the file just done was a hidden item's, encrypted into `.hidden/` (true), or put in its place there ("placing"). */
+  subscribe(fn: (done: number, total: number, encrypting?: boolean | "placing") => void): () => void;
   /** The write going on now, if any. */
   now(): { done: number; total: number } | null;
 }

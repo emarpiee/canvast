@@ -127,11 +127,12 @@ export class WorkspaceMirror {
       this.running = this.running
         .then(async () => {
           await this.lib.reread();
+          this.onOpened?.(); // (the names filled in, the hidden items read: the Library lists them at once)
           await this.lib.scanHidden(); // (readable files in `.hidden/` waited for the key)
-          await this.lib.placeAllHidden(); // (each in its library folder's place of .hidden/: moved, not sealed again)
+          await this.lib.placeAllHidden(); // (files sealed before names were kept so, renamed into their places: not sealed again)
         })
         .catch(() => undefined)
-        .then(() => this.onOpened?.()); // (the names filled in, the hidden items read: the Library lists them again)
+        .then(() => this.onOpened?.()); // (and again once those are in place)
       this.library();
     });
   }
