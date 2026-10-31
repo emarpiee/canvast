@@ -294,13 +294,84 @@ export async function openFile(key: CryptoKey, sealed: Uint8Array<ArrayBuffer>):
   return { bytes: out, item: h.item };
 }
 
-/** A hidden item's file: `.hidden/<32 random hex>.bin`. */
-export const HIDDEN_FILE_RE = /^\.hidden\/[0-9a-f]{32}\.bin$/;
+/**
+ * A folder of `.hidden/`: the name of a library folder, encrypted (`sealName`): base32 letters and digits only, never shorter than 26 (a
+ * person's own folder put there is told apart by this, and so is `thumbnails/`); one starting with `0` names a long name kept in its `.name`.
+ */
+export const SEALED_DIR_RE = /^0?[a-z2-7]{26,}$/;
+const DIRS = "(?:(?:0?[a-z2-7]{26,})\\/)*";
+/** A hidden item's file: `.hidden/<encrypted folder>/…/<32 random hex>.bin` (its library folder's path, see `sealName`), or at the top. */
+export const HIDDEN_FILE_RE = new RegExp(`^\\.hidden\\/${DIRS}[0-9a-f]{32}\\.bin$`);
 export const isHiddenFile = (file: string | null | undefined): boolean => !!file && HIDDEN_FILE_RE.test(file);
 /** A sealed file under another name: a sync tool's copy of one (`<32 hex> (1).bin`, `<32 hex>.sync-conflict-….bin`…). Never sealed again. */
-export const SEALED_COPY_RE = /^\.hidden\/[0-9a-f]{32}[^/]*\.bin$/i;
+export const SEALED_COPY_RE = new RegExp(`^\\.hidden\\/${DIRS}[0-9a-f]{32}[^/]*\\.bin$`, "i");
 
-/** A new name for a hidden file: random, so it says nothing about the item. */
-export function hiddenFileName(): string {
-  return `.hidden/${Array.from(crypto.getRandomValues(new Uint8Array(16)), (x) => x.toString(16).padStart(2, "0")).join("")}.bin`;
+/** A new name for a hidden file: random, so it says nothing about the item; in `dir` (its folders in `.hidden/`, or `.hidden` itself). */
+export function hiddenFileName(dir = ".hidden"): string {
+  return `${dir}/${Array.from(crypto.getRandomValues(new Uint8Array(16)), (x) => x.toString(16).padStart(2, "0")).join("")}.bin`;
+}
+
+/** The keys of folder names, made from the data key (which cannot be read out): a fixed text sealed with it, then HKDF. */
+export interface NameKeys {
+  readonly mac: CryptoKey;
+  readonly enc: CryptoKey;
+}
+export async function nameKeys(key: CryptoKey): Promise<NameKeys> {
+  // (one fixed text under one fixed IV: the same seed each time, and nothing else is ever sealed under that IV with this text)
+  const seed = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: new Uint8Array(12) }, key, enc.encode("canvast hidden folder names v1"))).slice(0, 32);
+  const base = await crypto.subtle.importKey("raw", seed, "HKDF", false, ["deriveKey"]);
+  const derive = <T extends AlgorithmIdentifier | HmacKeyGenParams | AesKeyGenParams>(info: string, alg: T, uses: KeyUsage[]): Promise<CryptoKey> =>
+    crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: enc.encode(info) }, base, alg, false, uses);
+  return { mac: await derive("mac", { name: "HMAC", hash: "SHA-256", length: 256 }, ["sign"]), enc: await derive("enc", { name: "AES-CTR", length: 256 }, ["encrypt", "decrypt"]) };
+}
+
+const B32 = "abcdefghijklmnopqrstuvwxyz234567";
+function base32(b: Uint8Array): string {
+  let out = "";
+  let bits = 0;
+  let v = 0;
+  for (const x of b) {
+    v = (v << 8) | x;
+    bits += 8;
+    while (bits >= 5) out += B32[(v >>> (bits -= 5)) & 31];
+  }
+  return bits ? out + B32[(v << (5 - bits)) & 31] : out;
+}
+function unbase32(s: string): Uint8Array<ArrayBuffer> | null {
+  const out: number[] = [];
+  let bits = 0;
+  let v = 0;
+  for (const c of s) {
+    const i = B32.indexOf(c);
+    if (i < 0) return null;
+    v = ((v << 5) | i) & 0xffff;
+    bits += 5;
+    if (bits >= 8) out.push((v >>> (bits -= 8)) & 255);
+  }
+  return new Uint8Array(out);
+}
+/** Longest folder of `.hidden/` (a name of more than about 140 bytes is kept in its `.name` instead). */
+const MAX_SEG = 240;
+
+/**
+ * A library folder's name as a folder of `.hidden/`: deterministic (one name, one folder, so a move or a rename is a rename of that folder),
+ * a synthetic IV (the name's HMAC) and the name under AES-CTR with it, in base32; a name too long for that: `0` and its HMAC (`long`).
+ */
+export async function sealName(keys: NameKeys, name: string): Promise<{ seg: string; long: boolean }> {
+  const text = enc.encode(name.normalize("NFC"));
+  const iv = new Uint8Array(await crypto.subtle.sign("HMAC", keys.mac, text));
+  const seg = base32(new Uint8Array([...iv.slice(0, 16), ...new Uint8Array(await crypto.subtle.encrypt({ name: "AES-CTR", counter: iv.slice(0, 16), length: 64 }, keys.enc, text))]));
+  return seg.length <= MAX_SEG ? { seg, long: false } : { seg: `0${base32(iv.slice(0, 20))}`, long: true };
+}
+
+/** The name a folder of `.hidden/` stands for, or null (another key, damaged, or a long one: its `.name` says it). */
+export async function openName(keys: NameKeys, seg: string): Promise<string | null> {
+  if (!SEALED_DIR_RE.test(seg) || seg.startsWith("0")) return null;
+  const b = unbase32(seg);
+  if (!b || b.length < 17) return null;
+  const iv = b.slice(0, 16);
+  const text = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-CTR", counter: iv, length: 64 }, keys.enc, b.slice(16)));
+  const check = new Uint8Array(await crypto.subtle.sign("HMAC", keys.mac, text)).slice(0, 16);
+  if (check.some((x, i) => x !== iv[i])) return null;
+  return new TextDecoder().decode(text);
 }

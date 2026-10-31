@@ -27,9 +27,55 @@ const b64 = (b) => Buffer.from(b).toString("base64");
 const HIDDEN_JSON = ".canvast/hidden.json";
 /** The spare of the vault's key (no index), kept beside it by the app. */
 const KEY_SPARE = ".canvast/keys/hidden.json";
-const HIDDEN_FILE_RE = /^\.hidden\/[0-9a-f]{32}\.bin$/;
+/** A folder of .hidden/: a library folder's name, encrypted (base32; `0…` keeps a long name in its `.name`). */
+const SEALED_DIR_RE = /^0?[a-z2-7]{26,}$/;
+const HIDDEN_FILE_RE = /^\.hidden\/(?:(?:0?[a-z2-7]{26,})\/)*[0-9a-f]{32}\.bin$/;
 /** A sealed file under any name a sync tool gives a copy of one. */
 const SEALED_COPY_RE = /^[0-9a-f]{32}[^/]*\.bin$/i;
+/** Every sealed file of .hidden/, in its folders too (not the custom thumbnails' own folder): paths relative to the workspace. */
+function sealedFiles(workspace) {
+  const out = [];
+  const walk = (rel) => {
+    for (const d of readdirSync(join(workspace, ...rel.split("/")), { withFileTypes: true })) {
+      if (d.name.startsWith(".")) continue;
+      if (d.isDirectory() && SEALED_DIR_RE.test(d.name)) walk(`${rel}/${d.name}`);
+      else if (d.isFile() && SEALED_COPY_RE.test(d.name)) out.push(`${rel}/${d.name}`);
+    }
+  };
+  if (existsSync(join(workspace, ".hidden"))) walk(".hidden");
+  return out.sort();
+}
+
+// Folder names in .hidden/ (as the app makes them): keys from the data key (a fixed text sealed under a fixed IV, then HKDF), a synthetic
+// IV (the name's HMAC) and AES-CTR, in base32.
+async function nameKeys(key) {
+  const seed = new Uint8Array(await subtle.encrypt({ name: "AES-GCM", iv: new Uint8Array(12) }, key, new TextEncoder().encode("canvast hidden folder names v1"))).slice(0, 32);
+  const base = await subtle.importKey("raw", seed, "HKDF", false, ["deriveKey"]);
+  const derive = (info, alg, uses) => subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: new Uint8Array(0), info: new TextEncoder().encode(info) }, base, alg, false, uses);
+  return { mac: await derive("mac", { name: "HMAC", hash: "SHA-256", length: 256 }, ["sign"]), enc: await derive("enc", { name: "AES-CTR", length: 256 }, ["encrypt", "decrypt"]) };
+}
+const B32 = "abcdefghijklmnopqrstuvwxyz234567";
+function unbase32(s) {
+  const out = [];
+  let bits = 0, v = 0;
+  for (const c of s) {
+    const i = B32.indexOf(c);
+    if (i < 0) return null;
+    v = ((v << 5) | i) & 0xffff;
+    bits += 5;
+    if (bits >= 8) out.push((v >>> (bits -= 8)) & 255);
+  }
+  return new Uint8Array(out);
+}
+/** The name a folder of .hidden/ stands for with these keys, or null. */
+async function openName(keys, seg) {
+  const b = !seg.startsWith("0") && unbase32(seg);
+  if (!b || b.length < 17) return null;
+  const iv = b.slice(0, 16);
+  const text = new Uint8Array(await subtle.decrypt({ name: "AES-CTR", counter: iv, length: 64 }, keys.enc, b.slice(16)));
+  const check = new Uint8Array(await subtle.sign("HMAC", keys.mac, text)).slice(0, 16);
+  return check.every((x, i) => x === iv[i]) ? new TextDecoder().decode(text) : null;
+}
 /** Copies of hidden.json beside it (`hidden (1).json`, `hidden.sync-conflict-….json`, or the app's own when hidden.json held another key). */
 const hiddenCopies = (workspace) => {
   const dir = join(workspace, ".canvast");
@@ -190,6 +236,36 @@ export async function decryptHidden(workspace, out, password, { flat = false } =
     }
     return null;
   };
+  for (const v of vaults) v.names = await nameKeys(v.key);
+  /** The library folders a sealed file's place in .hidden/ says (each folder's name opened; a long one from its `.name`), or null when it says none. */
+  const dirFolders = async (file) => {
+    const parts = file.split("/").slice(1, -1);
+    if (!parts.length) return null;
+    const names = [];
+    for (let i = 0; i < parts.length; i++) {
+      let name = null;
+      for (const v of vaults) {
+        if (parts[i].startsWith("0")) {
+          const at = join(workspace, ".hidden", ...parts.slice(0, i + 1), ".name");
+          try {
+            name = existsSync(at) ? new TextDecoder().decode((await openFile(v.key, new Uint8Array(readFileSync(at)))).bytes) : null;
+          } catch {
+            name = null;
+          }
+        } else name = await openName(v.names, parts[i]);
+        if (name) break;
+      }
+      if (!name) return null;
+      names.push(name);
+    }
+    return names;
+  };
+  /** Where a file goes: its folders in .hidden/ (they are what the app keeps up to date), else its header's, or the top (`flat`). */
+  const whereOf = async (file, item) => {
+    if (flat) return "";
+    const names = await dirFolders(file);
+    return names ? names.map((p) => safePart(p, "Folder")).join("/") : folderOf(item, false);
+  };
   mkdirSync(out, { recursive: true });
   const taken = new Set(), written = [], hashes = new Set(), files = new Set();
   for (const v of vaults) {
@@ -205,19 +281,18 @@ export async function decryptHidden(workspace, out, password, { flat = false } =
         console.warn(`does not open: ${item.file} (${item.name})`);
         continue;
       }
-      const name = place(out, folderOf(opened.item, flat), item.name, opened.bytes, taken);
+      const name = place(out, await whereOf(item.file, opened.item), item.name, opened.bytes, taken);
       written.push({ ...item, writtenAs: name });
       hashes.add(item.hash);
       files.add(item.file);
     }
   }
   // Sealed files no entry names: their entries were lost (or each is a sync tool's copy of one written above, then skipped by its content).
-  const dir = join(workspace, ".hidden");
-  for (const n of existsSync(dir) ? readdirSync(dir).filter((n) => SEALED_COPY_RE.test(n)).sort() : []) {
-    if (files.has(`.hidden/${n}`)) continue;
-    const opened = await tryOpen(new Uint8Array(readFileSync(join(dir, n))));
+  for (const n of sealedFiles(workspace)) {
+    if (files.has(n)) continue;
+    const opened = await tryOpen(new Uint8Array(readFileSync(join(workspace, ...n.split("/")))));
     if (!opened) {
-      console.warn(`does not open with this password: .hidden/${n}`);
+      console.warn(`does not open with this password: ${n}`);
       continue;
     }
     const { bytes, item: own } = opened;
@@ -225,8 +300,8 @@ export async function decryptHidden(workspace, out, password, { flat = false } =
     if (hashes.has(hash)) continue;
     // A version 2 file says what it was (its name, folder, tags…); one of version 1 is named by its content.
     const mine = own?.hash === hash && typeof own.name === "string";
-    const name = place(out, mine ? folderOf(own, flat) : "", mine ? own.name : `recovered-${hash.slice(0, 12)}.${extOfBytes(bytes)}`, bytes, taken);
-    written.push(own?.hash === hash ? { ...own, file: `.hidden/${n}`, hidden: true, writtenAs: name } : { hash, name, file: `.hidden/${n}`, size: bytes.length, recovered: true, writtenAs: name });
+    const name = place(out, mine ? await whereOf(n, own) : flat ? "" : ((await dirFolders(n)) ?? []).map((p) => safePart(p, "Folder")).join("/"), mine ? own.name : `recovered-${hash.slice(0, 12)}.${extOfBytes(bytes)}`, bytes, taken);
+    written.push(own?.hash === hash ? { ...own, file: n, hidden: true, writtenAs: name } : { hash, name, file: n, size: bytes.length, recovered: true, writtenAs: name });
     hashes.add(hash);
   }
   // Hidden custom thumbnails (`.hidden/thumbnails/`): each as thumbnails/<hash>.webp, which an item's `thumb` names.

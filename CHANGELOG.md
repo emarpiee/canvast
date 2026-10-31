@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- **Changed:** hidden items' files are kept in folders inside `.hidden/` that follow their library folders, each folder's name encrypted, instead of all in one folder. Renaming or moving a folder, or filing an item elsewhere, renames on disk and never encrypts again (a sync tool sees a rename); files hidden before are moved into their folders the next time the Hidden items are opened. The outside tool (`scripts/hidden-items.mjs decrypt`) writes the tree the folders say.
 - **Added:** with *Remember the Hidden password* on and the password given, hidden pictures placed on canvases show on the screen instead of a padlock. Exports, copies, pattern fills, baked pictures, screenshots and bookmark pictures still draw the padlock.
 - **Added:** search keywords `is:thumbed` (items with a custom thumbnail) and `is:unthumbed`.
 - **Fixed:** counts that read wrong for one: the library picker said *Search 1 pictures* (now *Search the picture*; none: *No pictures in the library*), and the same for a saved ZIP of pictures, a palette's colours, the layers filter, a bookmark's Update, an adjustment's layers and the workspace folder's file counts.

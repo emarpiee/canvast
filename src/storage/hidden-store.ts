@@ -140,7 +140,7 @@ export class HiddenVault implements HiddenStore {
     if (!record) {
       // Sealed files, or a copy of hidden.json, with no hidden.json: another device set the password and its hidden.json is still on
       // its way. A key made now would be a second one, and the files of one of them would never open on the other device.
-      if ((await this.copies()).length || (await this.bridge.list(".hidden")).some((n) => SEALED_COPY_RE.test(`.hidden/${n}`)))
+      if ((await this.copies()).length || (await this.bridge.tree(".hidden")).some((f) => SEALED_COPY_RE.test(f.path)))
         throw new Error("The workspace folder has hidden items encrypted on another device, but not their password file (.canvast/hidden.json) yet: your sync tool may still be bringing it. Wait until it is there, then open the Hidden items with that device's password.");
       const made = await createVault(password);
       await this.save(made.record);
@@ -305,8 +305,8 @@ export class HiddenVault implements HiddenStore {
 
   /** Seal each file of `.hidden/` that only `other` opens again with this key, read back to prove it. Whether all were. */
   private async sealAgain(other: CryptoKey): Promise<boolean> {
-    for (const name of await this.bridge.list(".hidden")) {
-      const path = `.hidden/${name}`;
+    // (in their folders too; the folders' names, sealed with the other key, are moved by the next write to this key's names)
+    for (const { path } of await this.bridge.tree(".hidden")) {
       if (!SEALED_COPY_RE.test(path)) continue;
       const bytes = (await this.bridge.read(path)) as Uint8Array<ArrayBuffer> | null;
       if (!bytes || !this.key || (await openFile(this.key, bytes))) continue;

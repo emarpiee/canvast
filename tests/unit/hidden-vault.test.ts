@@ -2,7 +2,7 @@ import { scryptSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { DesktopBridge } from "../../src/storage/desktop-bridge";
 import { HIDDEN_JSON, HIDDEN_KEY_SPARE, HiddenVault } from "../../src/storage/hidden-store";
-import { SCRYPT_DEFAULT, SEAL_OVERHEAD, SEALED_COPY_RE, createVault, isFileV2, needsUpgrade, openFile, sealFile, useScrypt, hiddenFileName, holdsKey, openBytes, openText, openVault, readVault, rewrapVault, sameKey, sealBytes, sealText } from "../../src/storage/hidden-vault";
+import { SCRYPT_DEFAULT, SEAL_OVERHEAD, SEALED_COPY_RE, SEALED_DIR_RE, isHiddenFile, nameKeys, openName, sealName, createVault, isFileV2, needsUpgrade, openFile, sealFile, useScrypt, hiddenFileName, holdsKey, openBytes, openText, openVault, readVault, rewrapVault, sameKey, sealBytes, sealText } from "../../src/storage/hidden-vault";
 
 const FAST = { name: "PBKDF2", iterations: 100_000 } as const; // (a version 1 vault, at the lowest a record may say)
 // scrypt as the desktop app's main process does it (Node's native one), with the same parameters.
@@ -134,5 +134,28 @@ describe("hidden vault", () => {
     expect(await openFile(key, await sealBytes(key, bytes(9)))).toEqual({ bytes: bytes(9), item: null });
     // Nothing of the item or the bytes is readable in the file.
     expect(new TextDecoder().decode(sealed)).not.toContain("Plan");
+  });
+});
+
+describe("folders of .hidden/ (encrypted library folder names)", () => {
+  it("a name gives one folder, opened back only with its key; a long one is kept apart; the paths are told from a person's own", async () => {
+    const { key } = await createVault("pw", { name: "pbkdf2", iterations: 1000 } as never);
+    const other = (await createVault("pw2", { name: "pbkdf2", iterations: 1000 } as never)).key;
+    const k = await nameKeys(key);
+    const a = await sealName(k, "Hidden Art Folder");
+    expect(a.long).toBe(false);
+    expect(a.seg).toMatch(SEALED_DIR_RE);
+    expect((await sealName(await nameKeys(key), "Hidden Art Folder")).seg).toBe(a.seg); // (the same each time: a rename is one rename)
+    expect((await sealName(k, "Hidden Art Items")).seg).not.toBe(a.seg);
+    expect(await openName(k, a.seg)).toBe("Hidden Art Folder");
+    expect(await openName(await nameKeys(other), a.seg)).toBeNull();
+    expect(await openName(k, (await sealName(k, "日本語 フォルダ")).seg)).toBe("日本語 フォルダ");
+    const long = await sealName(k, "x".repeat(200));
+    expect([long.long, long.seg.startsWith("0"), long.seg.length <= 240]).toEqual([true, true, true]);
+    expect(await openName(k, long.seg)).toBeNull(); // (its .name says it)
+    const hex = "0123456789abcdef".repeat(2);
+    expect([isHiddenFile(`.hidden/${hex}.bin`), isHiddenFile(`.hidden/${a.seg}/${hex}.bin`), isHiddenFile(`.hidden/${a.seg}/${long.seg}/${hex}.bin`)]).toEqual([true, true, true]);
+    expect([isHiddenFile(`.hidden/My Folder/${hex}.bin`), isHiddenFile(`.hidden/thumbnails/${hex}.bin`), SEALED_DIR_RE.test("thumbnails")]).toEqual([false, false, false]);
+    expect(SEALED_COPY_RE.test(`.hidden/${a.seg}/${hex} (1).bin`)).toBe(true);
   });
 });

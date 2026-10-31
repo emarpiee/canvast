@@ -736,7 +736,7 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     const sealed = files(ws).filter((f) => f.startsWith(".hidden/"));
     expect(sealed).toHaveLength(1);
     sealed0 = sealed[0]!;
-    expect(sealed[0]).toMatch(/^\.hidden\/[0-9a-f]{32}\.bin$/);
+    expect(sealed[0]).toMatch(/^\.hidden\/[a-z2-7]{26,}\/[0-9a-f]{32}\.bin$/); // (in its folder, whose name is encrypted)
     // The password is stretched with scrypt (version 2 of the vault, 128 MiB), done natively in the main process.
     expect(JSON.parse(readFileSync(join(ws, ".canvast/hidden.json"), "utf8"))).toMatchObject({ version: 2, kdf: { name: "scrypt", N: 131072, r: 8, p: 1 } });
     // No cheaper form of the same password beside it in a synced file (the browser's PBKDF2 gate stays on this device).
@@ -817,7 +817,7 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     await expect(page.getByTestId("prompt-dialog")).toContainText("Dropped Secret.png", { timeout: 15_000 });
     await page.getByTestId("prompt-input").fill("pw2");
     await page.getByTestId("prompt-ok").click();
-    await expect.poll(() => files(ws).filter((f) => f.startsWith(".hidden/") && !/^\.hidden\/[0-9a-f]{32}\.bin$/.test(f)), { timeout: 15_000 }).toEqual([]);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(".hidden/") && !/^\.hidden\/(?:0?[a-z2-7]{26,}\/)*[0-9a-f]{32}\.bin$/.test(f)), { timeout: 15_000 }).toEqual([]);
     expect(files(ws).filter((f) => f.startsWith(".hidden/"))).toHaveLength(3);
     expect(files(ws).some((f) => readFileSync(join(ws, f)).includes(dropped.subarray(0, 24)))).toBe(false);
     await expect.poll(listing).toContainEqual(["Dropped Secret.png", true, true]);
@@ -897,7 +897,7 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
     // The copy of hidden.json was joined and erased; the copy of Alpha's file erased; Gamma's renamed back to a hidden file's name, not sealed again.
     await expect.poll(() => files(ws).filter((f) => f.startsWith(".canvast/hidden")), { timeout: 15_000 }).toEqual([".canvast/hidden.json"]);
     expect(sealedNames()).toHaveLength(3);
-    for (const f of sealedNames()) expect(f).toMatch(/^\.hidden\/[0-9a-f]{32}\.bin$/);
+    for (const f of sealedNames()) expect(f).toMatch(/^\.hidden\/(?:0?[a-z2-7]{26,}\/)*[0-9a-f]{32}\.bin$/);
     expect(sealedNames()).toContain(betaFile);
     expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), sha(gamma))).toEqual(Array.from(gamma));
   } finally {
@@ -1302,6 +1302,55 @@ test("a workspace folder renamed onto the path of another opened before reads no
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     // Nothing of the other was written into it.
     expect(files(b).some((f) => readFileSync(join(b, f)).toString("latin1").includes(sha(theirs)))).toBe(false);
+  } finally {
+    await app.close();
+  }
+});
+
+test("hidden items' files are kept in their library folders inside .hidden/, the folders' names encrypted: a rename or a move renames, never encrypts again", async () => {
+  const ws = mkdtempSync(join(tmpdir(), "canvast-ws-"));
+  const art = makePng(3, 3, () => [120, 30, 200, 255]);
+  const hash = createHash("sha256").update(art).digest("hex");
+  const { app, page } = await launch(ws);
+  const lib = (...a: Parameters<typeof window.__canvastDebug.libraryOp>) => page.evaluate((a) => window.__canvastDebug.libraryOp(...a), a);
+  const flush = () => page.evaluate(() => window.__canvastDebug.flushStorage());
+  const sealed = () => files(ws).filter((f) => f.startsWith(".hidden/") && !f.startsWith(".hidden/thumbnails/"));
+  type Tool = { decryptHidden: (ws: string, out: string, pw: string) => Promise<number> };
+  const { decryptHidden } = (await import(join(process.cwd(), "scripts/hidden-items.mjs"))) as Tool;
+  try {
+    await page.getByTestId("import-input").setInputFiles({ name: "Study.png", mimeType: "image/png", buffer: art });
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(1);
+    expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"))).ok).toBe(true);
+    await lib("createFolder", "fa", "Hidden Art");
+    await lib("createFolder", "fi", "Items", "fa");
+    await lib("file", hash, "fi");
+    await lib("hide", hash, "1");
+    await flush();
+    // In its folders, each name encrypted: nothing of "Hidden Art" or "Items" is readable in a path.
+    const [first] = sealed();
+    expect(sealed()).toHaveLength(1);
+    expect(first).toMatch(/^\.hidden\/[a-z2-7]{26,}\/[a-z2-7]{26,}\/[0-9a-f]{32}\.bin$/);
+    expect(first).not.toMatch(/art|items/i);
+    const bytes = readFileSync(join(ws, first!));
+    // The folder renamed: only its folder is renamed; the file is the same bytes (a sync tool sees a rename).
+    await lib("renameFolder", "fi", "Pieces");
+    await flush();
+    await expect.poll(() => sealed()[0]).not.toBe(first);
+    const renamed = sealed()[0]!;
+    expect(renamed.split("/")[1]).toBe(first!.split("/")[1]);
+    expect(renamed.split("/").pop()).toBe(first!.split("/").pop());
+    expect(readFileSync(join(ws, renamed)).equals(bytes)).toBe(true);
+    expect(existsSync(join(ws, ...first!.split("/").slice(0, 3)))).toBe(false); // (the old folder is gone)
+    // Outside the app, the tool writes the tree the folders say (the file's own header still names the old one).
+    expect(await decryptHidden(ws, `${ws}-out`, "pw")).toBe(1);
+    expect(readFileSync(join(`${ws}-out`, "Hidden Art", "Pieces", "Study.png")).equals(art)).toBe(true);
+    // Filed in the parent folder: the file moves up, the emptied folder goes.
+    await lib("file", hash, "fa");
+    await flush();
+    await expect.poll(() => sealed()[0]).toMatch(/^\.hidden\/[a-z2-7]{26,}\/[0-9a-f]{32}\.bin$/);
+    expect(readFileSync(join(ws, sealed()[0]!)).equals(bytes)).toBe(true);
+    expect(existsSync(join(ws, ...renamed.split("/").slice(0, 3)))).toBe(false);
+    expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toEqual(Array.from(art));
   } finally {
     await app.close();
   }

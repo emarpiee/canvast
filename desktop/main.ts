@@ -605,7 +605,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
   const presentOf = async (rows: Array<[string, string | null, number | null]>): Promise<Set<string>> => {
     const out = new Set<string>();
     await Promise.all(rows.map(async ([hash, file, size]) => {
-      if (!file || size === null || !isSafeRelativePath(file) || !(file.startsWith("library/") || /^\.hidden\/[^/]+$/.test(file))) return;
+      if (!file || size === null || !isSafeRelativePath(file) || !(file.startsWith("library/") || isHiddenFile(file))) return;
       let got = walkedSizes.get(file);
       if (got === undefined) got = await lstat(join(root, ...file.split("/"))).then((st) => (st.isFile() ? st.size : -1), () => -1);
       if (isHiddenFile(file) ? got >= size + SEAL_OVERHEAD : got === size) out.add(hash);
@@ -618,7 +618,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     const out = new Set<string>();
     for (let i = 0; i < rows.length; i += 2000) {
       await Promise.all(rows.slice(i, i + 2000).map(async ([hash, file, size]) => {
-        if (!file || size === null || !isSafeRelativePath(file) || !(file.startsWith("library/") || /^\.hidden\/[^/]+$/.test(file))) return void out.add(hash);
+        if (!file || size === null || !isSafeRelativePath(file) || !(file.startsWith("library/") || isHiddenFile(file))) return void out.add(hash);
         let got = walkedSizes.get(file);
         if (got === undefined) got = await lstat(join(root, ...file.split("/"))).then((st) => (st.isFile() ? st.size : -1), () => -1);
         if (isHiddenFile(file) ? got < size + SEAL_OVERHEAD : got !== size) out.add(hash);

@@ -179,7 +179,7 @@ console.log(`seed ${SEED}`);
     await s.flush();
   }));
   const left = filesUnder(join(ws, "library")).length;
-  const bins = readdirSync(join(ws, ".hidden")).filter((n) => /^[0-9a-f]{32}\.bin$/.test(n)).length;
+  const bins = filesUnder(join(ws, ".hidden")).filter((f) => /(^|[\\/])[0-9a-f]{32}\.bin$/.test(f)).length; // (in their encrypted folders)
   console.log(`  library/ files left: ${left}; sealed files: ${bins}`);
   if (left || bins !== N) (failed = true), console.error(`FAILED: expected 0 readable and ${N} sealed files`);
   note("lock", await measured(s.app, () => s.hid("lock")));
