@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.52.4 — Hidden files stand on their own, long names, library files (2026-11-01)
 
 - **Added:** Settings > Privacy says what the desktop app keeps on this computer (working copies, recent workspaces, readable copies of hidden items opened elsewhere) and lists what to do for full privacy; the README too, with what removing the app leaves.
 - **Added:** working copies of workspaces this computer no longer opens (the folder deleted, renamed or moved) are removed at start-up once a month old.

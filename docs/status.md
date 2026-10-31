@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.52.4: hidden files stand on their own, long names, library files (2026-11-01)
+
+- **Implemented:** hidden files in the rclone-crypt style (encrypted folder and file names, `sealName`/`openName`, content and hash only inside, metadata only in the sealed index, never sealed again but for new content; outside renames relinked by hash; backups keep places and long names); names off while locked no longer reseal on unlock; long names (1,000 in the app, 230 bytes on disk) and the re-import offer of new names; folders dropped in `.hidden/` encrypted; the Library relists after unlock, start and Rebuild; caches per folder partition (`cacheKey`), old ones swept after a month; deleted library parts written back; lean part lines; the Library files split setting (index version 4); hidden pictures on canvases while remembered (`AssetLibrary.reveal`, `forFiles`, `padlocked` captures) and *Hidden item* names while padlocked; custom thumbnails: live in the grid, paste, plain dialog, `is:thumbed`, hidden ones in backups; viewer: player fade rules, context menu, phone band, unplayable formats said plainly; plural fixes and the counting rule; privacy card in Settings.
+- **Tested:** desktop spec 21/21 locally (new: rename onto a path, library parts deleted, split, hidden folders and names, old caches); unit 607; changed browser specs in Chromium and Firefox; GitHub CI and Tests green on d14a0a6.
+- **Known failures:** none known.
+- **Unverified:** migration of a big real hidden library by hand (owner testing); a long-touch menu on a real phone.
+- **Committed:** main, released as v0.52.4.
+- **Next bounded task:** the owner's next task list.
+
 ## v0.52.3: custom thumbnails (2026-10-30)
 
 - **Implemented:** `CatalogEntry.thumb` / `MetaChange.thumb` in both builds and the library parts; `CustomThumbStore` (browser: `meta` keys; desktop: `.canvast/thumbnails/`, hidden sealed in `.hidden/thumbnails/`); the details panel's thumbnail dialog (Thumbnails, library, upload, automatic, delete) and the bulk button; cards, preview, filmstrip, viewer and canvas file cards (`AssetLibrary.customPicture`); thumbnails follow hide and unhide; archives carry normal ones (`thumbnails/<hash>.webp`, manifest `thumbnails`, still version 7); the decrypt tool writes hidden ones.
