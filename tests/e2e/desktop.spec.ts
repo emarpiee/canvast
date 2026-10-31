@@ -1415,3 +1415,33 @@ test("hidden items' files are kept in their library folders inside .hidden/, the
     await again.app.close();
   }
 });
+
+test("the library's files in .canvast/library/ deleted by hand: nothing is taken as erased, and this device's copy writes them all back", async () => {
+  const ws = tempDir("canvast-ws-");
+  const pics = [1, 2, 3].map((k) => makePng(k + 1, 2, () => [k * 60, 40, 90, 255]));
+  let { app, page } = await launch(ws);
+  const parts = () => (existsSync(join(ws, ".canvast/library")) ? readdirSync(join(ws, ".canvast/library")).sort() : []);
+  let before: string[] = [];
+  try {
+    await page.getByTestId("import-input").setInputFiles(pics.map((buffer, k) => ({ name: `Pic ${k}.png`, mimeType: "image/png", buffer })));
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(3);
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("note", h, "kept note"), createHash("sha256").update(pics[0]!).digest("hex"));
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    before = parts();
+    expect(before).toContain("index.json");
+  } finally {
+    await app.close();
+  }
+  rmSync(join(ws, ".canvast/library"), { recursive: true });
+  rmSync(join(ws, ".canvast/library.json"), { force: true }); // (the copy a small library also has: gone too, the worst case)
+  ({ app, page } = await launch(ws));
+  try {
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await expect.poll(parts, { timeout: 15_000 }).toEqual(before);
+    const listing = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, e.state, e.note ?? ""]).sort()));
+    expect(listing).toEqual([["Pic 0.png", "active", "kept note"], ["Pic 1.png", "active", ""], ["Pic 2.png", "active", ""]]);
+    expect(parts().filter((n) => n.startsWith("items-")).map((n) => readFileSync(join(ws, ".canvast/library", n), "utf8")).join("")).toContain("kept note");
+  } finally {
+    await app.close();
+  }
+});

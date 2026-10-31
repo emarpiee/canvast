@@ -55,7 +55,7 @@ describe("library database (desktop)", () => {
   it("writes the parts from here: only changed ones, then the index; what it wrote reads back as nothing new", async () => {
     const lib = new Library(openLibraryDb(":memory:"));
     const disk = new Map<string, string>();
-    const files = { read: (p: string) => (disk.has(p) ? Buffer.from(disk.get(p)!) : null), write: async (p: string, t: string) => void disk.set(p, t), remove: async (p: string) => void disk.delete(p) };
+    const files = { read: (p: string) => (disk.has(p) ? Buffer.from(disk.get(p)!) : null), exists: (p: string) => disk.has(p), write: async (p: string, t: string) => void disk.set(p, t), remove: async (p: string) => void disk.delete(p) };
     const f = folder([item(1), item(2)]);
     for (const k of f.keys) disk.set(`.canvast/library/items-${k}.json`, f.read(k)!.toString());
     lib.sync(f.keys, f.read, [], true);
@@ -68,6 +68,10 @@ describe("library database (desktop)", () => {
     const writes: string[] = [];
     const w = await lib.writeParts([item(2).hash], 1, { ...files, write: async (p, t) => void (writes.push(p), disk.set(p, t)) });
     expect(writes).toEqual([".canvast/library/items-02.json"]);
+    // A part deleted by hand (or the whole folder): written back by the next whole write, though nothing in it changed here.
+    disk.delete(".canvast/library/items-01.json");
+    await lib.writeParts(null, 1, files);
+    expect(disk.get(".canvast/library/items-01.json")).toBe(f.read("01")!.toString());
     expect(w.compat).toBe("-");
     expect(disk.has(".canvast/library.json")).toBe(false);
     const keys = JSON.parse(disk.get(".canvast/library/index.json")!).parts as string[];

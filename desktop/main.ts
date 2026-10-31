@@ -683,6 +683,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
               return null;
             }
           },
+          exists: (rel) => existsSync(at(rel)),
           write: (rel, text) => writeAtomic(at(rel), Buffer.from(text)),
           remove: (rel) => unlink(at(rel)).catch(() => undefined),
         }, args[2] === true);

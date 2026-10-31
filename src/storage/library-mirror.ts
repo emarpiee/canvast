@@ -381,11 +381,16 @@ export class LibraryMirror {
       index = null; // damaged: written again from the app's storage
     }
     const hasParts = !!index && index.format === LIBRARY_JSON_FORMAT && (index.version === 2 || index.version === 3) && Array.isArray(index.parts);
+    // The index or a part it lists not there (`.canvast/library/` deleted, whole or in part): never read as items erased; this device's
+    // copy writes them all back with the next write.
+    if (!index && (await this.lib.entries("active")).length) this.partsMissing = true;
     if (index && hasParts) {
       const keys = index.parts!.filter((k): k is string => typeof k === "string" && PART_KEY_RE.test(k));
       const hidden = await hiddenItems();
       // (While the hidden items are locked, an item missing from the library may have been hidden elsewhere, not erased.)
-      took = (await this.lib.serial(() => this.lib.calls.sync(keys, hidden, hiddenWhole && vault !== "locked"))).took;
+      const r = await this.lib.serial(() => this.lib.calls.sync(keys, hidden, hiddenWhole && vault !== "locked"));
+      took = r.took;
+      if (!r.whole) this.partsMissing = true;
       if (await this.adoptFolders(withHidden(index.folders))) took = true;
     }
     // `library.json`: read when it is the only form (a workspace of an earlier version), or when an older app changed it since.
@@ -481,6 +486,7 @@ export class LibraryMirror {
    * items changed here since they were last written (a stop before the write), or nothing.
    */
   async pendingWrite(): Promise<true | Set<string> | false> {
+    if (this.partsMissing) return true;
     if (this.lastText !== "-" || canonFolders(await this.lib.folders()) !== (this.state.folders || "[]")) return true;
     const p = await this.lib.calls.pending();
     return p.length > 50_000 ? true : p.length ? new Set(p) : false;
@@ -1314,6 +1320,7 @@ export class LibraryMirror {
   private async writeJson(only?: ReadonlySet<string>): Promise<void> {
     const blank = await this.anyBlank();
     const r = await this.lib.serial(() => this.lib.calls.write(only ? [...only] : null, libraryTesting.compatMax, blank));
+    if (!only) this.partsMissing = false;
     this.lastText = r.compat;
     const sealed = (r.sealed as LibraryItem[]).sort((a, b) => (a.hash < b.hash ? -1 : 1));
     if (only) {
@@ -1332,6 +1339,8 @@ export class LibraryMirror {
     this.state = { folders: canonFolders(sealing ? folders : shown) };
     await this.setMeta(STATE_KEY, this.state);
   }
+  /** The library's index or a part of it was not in the folder when it was read: the next write writes them all (see `rereadMain`). */
+  partsMissing = false;
   /** The hidden items sealed, as last written. */
   private hiddenItems = new Map<string, LibraryItem>();
 }

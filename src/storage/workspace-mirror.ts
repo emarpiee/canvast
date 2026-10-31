@@ -574,7 +574,7 @@ export class WorkspaceMirror {
       .then(async () => {
         const took = await this.lib.reread();
         if (took) onChange();
-        if (!took && !this.vault.indexWaiting) return;
+        if (!took && !this.vault.indexWaiting && !this.lib.partsMissing) return;
         // (only what the folder does not have yet; copies of the hidden index read into it are erased once it is written)
         const w = await this.lib.pendingWrite();
         this.library(w === true ? undefined : [...(w || [])]);

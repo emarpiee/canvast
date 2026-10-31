@@ -206,7 +206,8 @@ export class Library {
       if (open.length) {
         const text = libraryPartText(open);
         const fp = createHash("sha256").update(text).digest("hex");
-        if (fps[key] !== fp) await files.write(partPath(key), text);
+        // (also when its file is not there: deleted by hand, or the whole folder; this device's copy writes it back)
+        if (fps[key] !== fp || !files.exists(partPath(key))) await files.write(partPath(key), text);
         partOps.push({ t: "part", k: key, v: fp });
       } else if (fps[key]) (drop.push(key), partOps.push({ t: "part", k: key, v: null }));
     }
@@ -333,6 +334,7 @@ export class Library {
 /** The files `writeParts` reads and writes (paths relative to the workspace folder; written whole, never half). */
 export interface PartFiles {
   read(path: string): Buffer | null;
+  exists(path: string): boolean;
   write(path: string, text: string): Promise<void>;
   remove(path: string): Promise<void>;
 }
