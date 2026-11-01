@@ -3,6 +3,7 @@ import { startStep } from "./startup-log";
 import { plural } from "../doc/plural";
 import { deserializeFrameCamera, fromLocal, levelsBetween } from "../core/frames";
 import type { AssetLibrary } from "../assets/asset-library";
+import { withGifFrames } from "../assets/asset-library";
 import { beginProgress } from "./progress";
 import type { MetaSnapshot, PasswordKind } from "../assets/asset-catalog";
 import { AssetInUseError, CatalogInputError, normalizeTags } from "../assets/asset-catalog";
@@ -494,7 +495,7 @@ export class Session {
       return null;
     }
     const tags = withTags ? ((await this.catalog?.entry(hash).catch(() => undefined))?.tags ?? []) : [];
-    return placeImage(rec, this.doc, this.view, 0, "Place item", tags).id;
+    return placeImage(await withGifFrames(rec), this.doc, this.view, 0, "Place item", tags).id;
   }
 
   /**
@@ -525,7 +526,7 @@ export class Session {
     for (const [i, h] of hashes.entries()) {
       progress?.update(i / hashes.length, `${i + 1} of ${hashes.length}`);
       const rec = await this.assets.record(h);
-      if (rec) recs.push(rec);
+      if (rec) recs.push(await withGifFrames(rec));
     }
     progress?.done();
     if (recs.length < hashes.length) this.tell(`${hashes.length - recs.length} of the files are missing and were not placed.`);

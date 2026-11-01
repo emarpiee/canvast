@@ -48,6 +48,12 @@ import { ZipError, readZip, verifyEntry, writeZip } from "./zip";
 export const ARCHIVE_FORMAT = "canvast-archive";
 export const ARCHIVE_VERSION = 7;
 
+/** A video's or GIF's length and a GIF's frame count from an archive's item (a GIF without its frame count would be placed as a still). */
+const playing = (a: Record<string, unknown>): { duration?: number; frames?: number } => ({
+  ...(typeof a["duration"] === "number" && Number.isFinite(a["duration"]) && a["duration"] >= 0 ? { duration: a["duration"] } : {}),
+  ...(Number.isInteger(a["frames"]) && (a["frames"] as number) > 1 ? { frames: a["frames"] as number } : {}),
+});
+
 /**
  * The desktop build's hidden items in a backup (version 7): each hidden file as it is sealed in `.hidden/` (it holds its own item), and
  * the key file; nothing readable of them is in the backup. Set by the desktop build; null in the browser, which cannot open them.
@@ -387,6 +393,8 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       pixelH: r.pixelH,
       importedAt: r.importedAt,
       ...(r.card ? { card: true } : {}),
+      ...(r.duration !== undefined ? { duration: r.duration } : {}),
+      ...(r.frames !== undefined ? { frames: r.frames } : {}),
       ...(known ? {} : { file }),
       tags: m.tags,
       favorite: m.favorite,
@@ -805,6 +813,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
         blob: new Blob([]),
         importedAt: typeof a["importedAt"] === "number" ? a["importedAt"] : Date.now(),
         ...(a["card"] === true ? { card: true } : {}),
+        ...playing(a),
         ext: 1,
         file: f.file,
       });
@@ -832,6 +841,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
       blob: e.data.slice(0, e.size, type),
       importedAt: typeof a["importedAt"] === "number" ? a["importedAt"] : Date.now(),
       ...(a["card"] === true ? { card: true } : {}),
+      ...playing(a),
     });
     const org = readOrganization(a, label, problems);
     if (org) plan.organization.set(hash, org);

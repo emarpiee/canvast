@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { APP_URL, expect, openActions, rowAction, test } from "./harness";
 import { blockyFixture, makePng } from "./png";
+import { encodeGif } from "./gif";
 import { readZip, writeZip } from "../../src/storage/zip";
 
 /**
@@ -215,6 +216,32 @@ test("a workspace backup round-trips to another browser profile exactly", async 
   ].sort());
   expect(other.page.isClosed()).toBe(false);
   await other.context.close();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a GIF keeps its player through a backup: the backup carries its frame count, and one from an older backup without it is still placed as a GIF", async ({ app, browser }) => {
+  const p = app.page;
+  const gif = Buffer.from(encodeGif(16, 16, [[255, 0, 0], [0, 255, 0], [0, 0, 255]], [0, 1, 2].map((c) => ({ w: 16, h: 16, pixels: Array(256).fill(c) }))));
+  await p.getByTestId("import-input").setInputFiles({ name: "anim.gif", mimeType: "image/gif", buffer: gif });
+  await expect.poll(async () => (await objects(p)).length).toBe(1);
+  await saved(p);
+  await openPanel(p);
+  const file = await download(p, () => p.getByTestId("set-export-full").click());
+  const z = await readZip(new Blob([new Uint8Array(file.bytes)]));
+  const man = JSON.parse(await z.get("manifest.json")!.data.text()) as { assets: Array<Record<string, unknown>> };
+  expect(man.assets[0]!["frames"], "the backup carries the frame count").toBe(3);
+  // A backup made before it did: the frame count and length taken out.
+  for (const a of man.assets) delete a["frames"], delete a["duration"];
+  const old = Buffer.from(await (await writeZip([...z.values()].map((e) => ({ name: e.name, data: e.name === "manifest.json" ? new Blob([JSON.stringify(man)]) : e.data })))).arrayBuffer());
+  const { context, page: q } = await freshProfile(browser);
+  await importArchive(q, "old.canvast", old);
+  const before = (await objects(q)).length;
+  await q.getByRole("tab", { name: "Library" }).click();
+  await q.getByTestId("asset-card").first().click();
+  await q.getByTestId("asset-place").click();
+  await expect.poll(async () => (await objects(q)).length).toBe(before + 1);
+  expect((await objects(q)).at(-1)!["media"], "placed as a GIF, with its player").toEqual({ kind: "gif", t: 0, repeat: false });
+  await context.close();
   expect(app.consoleErrors).toEqual([]);
 });
 

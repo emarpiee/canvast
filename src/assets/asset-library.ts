@@ -168,6 +168,20 @@ function makeSource(img: CanvasImageSource & { width: number; height: number }, 
   };
 }
 
+/**
+ * The record with its GIF's frame count, counted from the file when the record lacks it (items brought in by a backup made before
+ * backups carried it): without it an animated GIF would be placed as a still, with no player.
+ */
+export async function withGifFrames(rec: AssetRecord): Promise<AssetRecord> {
+  if (rec.type !== "image/gif" || rec.card || rec.frames !== undefined) return rec;
+  try {
+    const g = new GifFrames(new Uint8Array(await rec.blob.arrayBuffer()));
+    return g.count > 1 ? { ...rec, frames: g.count, duration: g.duration } : rec;
+  } catch {
+    return rec; // (a still)
+  }
+}
+
 export class AssetLibrary {
   private readonly decoded = new Map<string, Decoded>();
   private readonly pending = new Set<string>();
