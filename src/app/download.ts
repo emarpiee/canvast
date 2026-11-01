@@ -6,7 +6,7 @@
 import type { DocumentStore } from "../doc/document-store";
 import type { ImageObject } from "../doc/model";
 import { cropOf, isNeutral } from "../doc/adjust";
-import { renderedPicture } from "../render/adjust-image";
+import { bakedPicture } from "./watermark-bake";
 import type { AssetLibrary } from "../assets/asset-library";
 import type { SettingsStore } from "../settings/settings";
 import { writeZip } from "../storage/zip";
@@ -55,13 +55,13 @@ export async function downloadSelection(doc: DocumentStore, editor: EditorState,
       done.add(o.assetId); // (one original, however many times it is on the canvas)
       entries.push({ name: free(taken, base), data: rec.blob });
     }
-    const changed = !!o.crop || !!o.flipX || !!o.flipY || !isNeutral(o.adjust);
+    const changed = !!o.crop || !!o.flipX || !!o.flipY || !!o.watermark || !isNeutral(o.adjust);
     if (!changed) continue;
     if (o.media || rec.card) {
       if (!isNeutral(o.adjust)) unbaked++;
       continue;
     }
-    const png = await renderedPicture(rec.blob, o);
+    const png = await bakedPicture(o, rec.blob, assets);
     if (!png) continue;
     const enc = await encodePicture(png, settings.get("edit.format"), settings.get("edit.quality"));
     entries.push({ name: free(taken, `${safeName(editedName(session, settings, rec.name), "picture")}.${enc.ext}`), data: enc.blob });

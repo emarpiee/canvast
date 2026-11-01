@@ -7,7 +7,7 @@ import { makeWebm } from "./video";
 /**
  * Pictures on the canvas (ADR 0118): crop, and non-destructive adjustments. Real input; assertions read the stored objects and pixels.
  */
-type Pic = { id: string; kind: string; w: number; h: number; crop?: { x: number; y: number; w: number; h: number }; flipX?: true; flipY?: true; adjust?: Record<string, number> };
+type Pic = { id: string; kind: string; w: number; h: number; crop?: { x: number; y: number; w: number; h: number }; flipX?: true; flipY?: true; watermark?: { x: number; y: number; size: number; opacity: number }; assetId?: string; adjust?: Record<string, number> };
 const objs = async (app: App): Promise<Pic[]> => (await app.page.evaluate(() => window.__canvastDebug.objects())) as unknown as Pic[];
 const boxOf = async (app: App, id: string) => (await app.page.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
 const px = (app: App, x: number, y: number) => app.page.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
@@ -126,6 +126,60 @@ test("flip: the picture is mirrored in its box, crop cuts the side that is seen,
   await p.keyboard.press("Control+z");
   now = (await objs(app)).find((o) => o.id === pic.id)!;
   expect([now.flipX, now.flipY], "one undo brings both back").toEqual([true, true]);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("visible watermark: a picture over the picture, placed by dragging, cut to its box, see-through, kept over a reload, made permanent in one undo step", async ({ app }) => {
+  const p = app.page;
+  const pic = await place(app);
+  await p.keyboard.press("v");
+  const b0 = await boxOf(app, pic.id);
+  const mid = [Math.round((b0.minX + b0.maxX) / 2), Math.round((b0.minY + b0.maxY) / 2)] as const;
+  const w0 = (b0.maxX - b0.minX) / 4; // (half the watermark's width: it is half the picture's)
+  const outside = [Math.round(b0.maxX + w0 / 2), mid[1]] as const;
+  const bg = await px(app, ...outside); // (the canvas there, before)
+  await p.mouse.click(...mid);
+  const white = (c: number[]): boolean => c[0]! > 245 && c[1]! > 245 && c[2]! > 245;
+  expect(white(await px(app, ...mid))).toBe(false);
+  await p.getByRole("button", { name: "Watermark", exact: true }).click();
+  const panel = p.getByTestId("watermark-panel");
+  await panel.getByTestId("watermark-logo-input").setInputFiles({ name: "logo.png", mimeType: "image/png", buffer: makePng(20, 20, () => [255, 255, 255, 255]) });
+  await expect.poll(async () => (await objs(app)).find((o) => o.id === pic.id)!.watermark?.opacity).toBe(0.5);
+  await expect(panel.getByRole("button", { name: "Place on the picture" })).toHaveAttribute("aria-pressed", "true"); // (straight into placing it)
+  await panel.locator('[data-wm-num="opacity"]').fill("100");
+  await panel.locator('[data-wm-num="opacity"]').press("Enter");
+  await expect.poll(async () => (await objs(app)).find((o) => o.id === pic.id)!.watermark?.opacity).toBe(1);
+  await app.frame();
+  expect(white(await px(app, ...mid)), "in the middle, half the picture's width").toBe(true);
+  // dragged by its middle (a press inside it moves it, not the picture): half of it now hangs past the right side, and is cut there
+  await app.drag({ x: mid[0], y: mid[1] }, { x: Math.round(b0.maxX), y: mid[1] }, 6);
+  const wm = (await objs(app)).find((o) => o.id === pic.id)!.watermark!;
+  expect(wm.x).toBeCloseTo(1, 1);
+  expect((await boxOf(app, pic.id)).minX, "the picture did not move").toBeCloseTo(b0.minX, 0);
+  await app.frame();
+  expect(white(await px(app, Math.round(b0.maxX - w0 / 2), mid[1])), "on the picture").toBe(true);
+  await p.keyboard.press("Enter"); // (done placing: its box and handles go)
+  await app.frame();
+  expect(await px(app, ...outside), "past its side: cut").toEqual(bg);
+  expect(white(await px(app, ...mid))).toBe(false);
+  // kept over a reload
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await expect.poll(async () => (await objs(app)).find((o) => o.id === pic.id)?.watermark?.x).toBeCloseTo(wm.x, 6);
+  // made permanent: a new file in the library is shown in its place, with the watermark in its pixels; one undo brings it back
+  await p.keyboard.press("v");
+  await p.mouse.click(...mid);
+  if (!(await panel.isVisible())) await p.getByRole("button", { name: /^Watermark/ }).click();
+  await panel.getByRole("button", { name: "Make permanent" }).click();
+  await expect.poll(async () => (await objs(app)).find((o) => o.id === pic.id)!.assetId).not.toBe(pic.assetId);
+  const baked = (await objs(app)).find((o) => o.id === pic.id)!;
+  expect(baked.watermark).toBeUndefined();
+  await p.mouse.click(60, 650);
+  await expect.poll(async () => white(await px(app, Math.round(b0.maxX - w0 / 2), mid[1])), "the watermark is in the new file").toBe(true);
+  await p.keyboard.press("Control+z");
+  const back = (await objs(app)).find((o) => o.id === pic.id)!;
+  expect([back.assetId, back.watermark?.x !== undefined]).toEqual([pic.assetId, true]);
   expect(app.consoleErrors).toEqual([]);
 });
 

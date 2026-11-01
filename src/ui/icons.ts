@@ -58,6 +58,11 @@ import cropSvg from "lucide-static/icons/crop.svg";
 import flipHorizontalSvg from "lucide-static/icons/flip-horizontal-2.svg";
 import flipVerticalSvg from "lucide-static/icons/flip-vertical-2.svg";
 import resetFlipSvg from "lucide-static/icons/refresh-ccw-dot.svg";
+import watermarkSvg from "lucide-static/icons/copyright.svg";
+import watermarkTextSvg from "lucide-static/icons/letter-text.svg";
+import watermarkFileSvg from "lucide-static/icons/paperclip.svg";
+import watermarkPlaceSvg from "lucide-static/icons/move.svg";
+import watermarkBakeSvg from "lucide-static/icons/anvil.svg";
 import scanFrameSvg from "lucide-static/icons/scan.svg";
 import squareDashedSvg from "lucide-static/icons/square-dashed.svg";
 import squareDashedXSvg from "lucide-static/icons/square-dashed-x.svg";
@@ -603,6 +608,11 @@ export const ICONS = {
   flipHorizontal: clean(flipHorizontalSvg),
   flipVertical: clean(flipVerticalSvg),
   resetFlip: clean(resetFlipSvg),
+  watermark: clean(watermarkSvg),
+  watermarkText: clean(watermarkTextSvg),
+  watermarkFile: clean(watermarkFileSvg),
+  watermarkPlace: clean(watermarkPlaceSvg),
+  watermarkBake: clean(watermarkBakeSvg),
   sheetTool: clean(scanFrameSvg),
   sheetSelection: clean(squareDashedSvg),
   releaseSheet: clean(squareDashedXSvg),

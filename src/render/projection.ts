@@ -149,6 +149,8 @@ export interface ProjectedObject {
   clip?: readonly ProjectedObject[] | undefined;
   /** The objects of the mask that cuts this one (ADR 0144), each as projected on its own; absent when it has none or the mask is empty. */
   maskPos?: readonly ProjectedObject[] | undefined;
+  /** A picture's watermark (doc/watermark.ts), drawn right after it under its id: not picked, outlined or labelled on its own. `logo`: the data of a picture one. */
+  wm?: { readonly logo?: string } | undefined;
 }
 
 export interface RotatedView {

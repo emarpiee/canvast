@@ -81,6 +81,8 @@ export interface ToolbarActions {
   selectedFlip(): { x: boolean; y: boolean } | null;
   flip(axis: "x" | "y"): void;
   unflip(): void;
+  /** The watermark of the picked stills (null: no still is picked). */
+  selectedWatermark(): { wm: unknown; count: number; id: string } | null;
   selectedAdjust(): { adjust: Adjust; stills: boolean; count: number } | null;
   /** The saved adjustments, and saving the numbers as one (ADR 0120). */
   adjustStyles(): { save(name: string, a: Adjust): Promise<void>; gradients(): Array<{ name: string; stops: readonly GradientStop[] }> };
@@ -262,6 +264,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-kind="picture" data-flip="x" hidden aria-pressed="false" aria-label="Flip horizontally" title="Flip horizontally: mirror the picture left to right in its box">${ICONS.flipHorizontal}</button>
         <button type="button" data-kind="picture" data-flip="y" hidden aria-pressed="false" aria-label="Flip vertically" title="Flip vertically: mirror the picture top to bottom in its box">${ICONS.flipVertical}</button>
         <button type="button" data-kind="picture" data-unflip hidden aria-label="Reset flip" title="Reset flip: show the picture the right way round again">${ICONS.resetFlip}</button>
+        <button type="button" data-kind="picture" data-watermark hidden aria-pressed="false" aria-label="Watermark" title="Watermark: a text or a small picture over the selected pictures, placed anywhere, see-through">${ICONS.watermark}</button>
         <button type="button" data-kind="picture shape stroke text" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture, shape or text: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
         <button type="button" data-kind="picture shape stroke text" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the selected pictures">${ICONS.listRestart}</button>
         <span class="tb-count" data-kind="any" data-on-sheet hidden title="Where it is on its sheet, in per cent of the sheet: X and Y from its top-left corner, W and H of its width and height">On sheet
@@ -612,6 +615,11 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   root.querySelector<HTMLElement>("[data-uncrop]")!.addEventListener("click", () => actions.uncrop());
   for (const b of root.querySelectorAll<HTMLElement>("[data-flip]")) b.addEventListener("click", () => actions.flip(b.dataset["flip"] as "x" | "y"));
   root.querySelector<HTMLElement>("[data-unflip]")!.addEventListener("click", () => actions.unflip());
+  root.querySelector<HTMLElement>("[data-watermark]")!.addEventListener("click", () => {
+    editor.watermarkOpen = !editor.watermarkOpen; // the Watermark panel (ui/watermark-panel.ts)
+    if (!editor.watermarkOpen) editor.watermarkId = null;
+    editor.changed();
+  });
   root.querySelector<HTMLElement>("[data-adjust-reset]")!.addEventListener("click", () => actions.commitAdjust({}, "Reset adjustments"));
   root.querySelector<HTMLElement>("[data-adjust]")!.addEventListener("click", () => {
     if (!actions.selectedAdjust() && !editor.adjustOpen) return;
@@ -965,6 +973,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       b.setAttribute("aria-pressed", String(!!flip?.[b.dataset["flip"] as "x" | "y"]));
     }
     root.querySelector<HTMLElement>("[data-unflip]")!.hidden = !(flip && (flip.x || flip.y));
+    const wmBtn = root.querySelector<HTMLElement>("[data-watermark]")!;
+    const wmSel = pick && still ? actions.selectedWatermark() : null;
+    wmBtn.hidden = !wmSel;
+    wmBtn.setAttribute("aria-pressed", String(editor.watermarkOpen));
+    wmBtn.classList.toggle("is-applied", !!wmSel?.wm);
+    wmBtn.setAttribute("aria-label", wmSel?.wm ? "Watermark (has one)" : "Watermark");
     const adj = pick && still ? actions.selectedAdjust() : null;
     const adjustBtn = root.querySelector<HTMLElement>("[data-adjust]")!;
     adjustBtn.hidden = !adj;

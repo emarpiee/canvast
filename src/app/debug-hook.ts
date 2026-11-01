@@ -560,11 +560,11 @@ export function installDebugHook(
     },
     decodedStats: () => ({ ...session.assets!.stats(), maxRunning: session.assets!.maxRunning }),
     selectionFrame: () => {
-      const sel = selectedFrame(visibleObjects(doc, deps.index, null, view.frameCamera, view.viewport), editor, view.viewport);
+      const sel = selectedFrame(visibleObjects(doc, deps.index, null, view.frameCamera, view.viewport).filter((p) => !p.wm), editor, view.viewport);
       return sel ? { angle: sel.frame.angle, corners: sel.frame.corners.map(([x, y]) => [x, y] as [number, number]) } : null;
     },
     cornerDots: () => {
-      const po = visibleObjects(doc, deps.index, null, view.frameCamera, view.viewport).find((p) => editor.selection.has(p.obj.id));
+      const po = visibleObjects(doc, deps.index, null, view.frameCamera, view.viewport).find((p) => editor.selection.has(p.obj.id) && !p.wm);
       const h = po && shapeHandles(po, editor.cornersOpen === po.obj.id, editor);
       return h?.main ? { main: [h.main.x, h.main.y], corners: h.corners.map((d) => [d.x, d.y] as [number, number]), count: h.count ? ([h.count.x, h.count.y] as [number, number]) : null, countCentre: h.count ? ([h.count.cx, h.count.cy] as [number, number]) : null } : null;
     },

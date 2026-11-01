@@ -26,6 +26,9 @@ import { DEFAULT_CONSTRAINT, constraintOf } from "../doc/constraints";
 import { cleanAdjust, cropOf, isNeutral, reachFraction } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
 import { cropEdges, flipped, uncrop } from "../doc/crop";
+import { bakedPicture } from "./watermark-bake";
+import type { Watermark } from "../doc/watermark";
+import { plural } from "../doc/plural";
 import { renderedPicture, setAdjustPreviewing } from "../render/adjust-image";
 import { DEFAULT_INK, newInk } from "../render/ink";
 import type { Constraint } from "../doc/constraints";
@@ -2499,6 +2502,73 @@ export function unflipPictures(doc: DocumentStore, editor: EditorState): void {
   editor.changed();
 }
 
+// ---- visible watermarks (doc/watermark.ts) ------------------------------------------------------------------------------------------
+
+/** The picked still pictures (a watermark goes on stills: a playing video or GIF is shown over the canvas, and would hide it). */
+const stills = (doc: DocumentStore, editor: EditorState): ImageObject[] => pictures(doc, editor).filter((o) => !o.media);
+
+/** The watermark the panel shows (the first picked still's), and how many stills are picked (null: none is). */
+export function selectedWatermark(doc: DocumentStore, editor: EditorState): { wm: Watermark | null; count: number; id: ObjectId } | null {
+  const ps = stills(doc, editor);
+  return ps.length ? { wm: ps.find((o) => o.watermark)?.watermark ?? null, count: ps.length, id: ps[0]!.id } : null;
+}
+
+const withWatermark = (o: ImageObject, wm: Watermark | null): ImageObject => {
+  const { watermark: _w, ...rest } = o;
+  return wm ? { ...rest, watermark: wm } : rest;
+};
+
+/** Show `wm` on every picked still while a control is being dragged (nothing is stored). */
+export function previewWatermark(doc: DocumentStore, editor: EditorState, wm: Watermark): void {
+  const ps = stills(doc, editor);
+  if (!ps.length || editor.blockEdit()) return;
+  editor.preview = { kind: "replace", ids: ps.map((o) => o.id), objs: new Map(ps.map((o) => [o.id, withWatermark(o, wm)])) };
+  editor.changed();
+}
+
+/** Put `wm` on every picked still (the same place on each, as a part of its box), or take theirs off (null): one undo step. */
+export function commitWatermark(doc: DocumentStore, editor: EditorState, wm: Watermark | null, label: string): void {
+  editor.preview = { kind: "none" };
+  const ps = stills(doc, editor);
+  if (!ps.length || editor.blockEdit()) return editor.changed();
+  const next = ps.filter((o) => JSON.stringify(o.watermark ?? null) !== JSON.stringify(wm)).map((o) => withWatermark(o, wm));
+  if (next.length) doc.commit(doc.transaction(next.length === 1 ? label : `${label} (${plural(next.length, "picture")})`, next));
+  editor.changed();
+}
+
+/**
+ * Make the watermarks of the picked stills part of their pictures: each is drawn as it looks (crop, flip, adjustments and watermark) into a
+ * new library picture, which the instance then shows in place of its file (the file itself is kept). One undo step.
+ */
+export async function makeWatermarkPermanent(
+  doc: DocumentStore,
+  editor: EditorState,
+  assets: AssetLibrary,
+  store: (shot: { png: Blob; label: string; sourceName: string; sourceHash: string; kind?: "edit" }) => Promise<AssetRecord>,
+): Promise<void> {
+  const ps = stills(doc, editor).filter((o) => o.watermark);
+  if (!ps.length || editor.blockEdit()) return;
+  const next: ImageObject[] = [];
+  for (const o of ps) {
+    const rec = await assets.record(o.assetId).catch(() => undefined);
+    const png = rec ? await bakedPicture(o, rec.blob, assets) : null;
+    if (!rec || !png) continue;
+    const record = await store({ png, label: "Watermarked", sourceName: rec.name, sourceHash: o.assetId, kind: "edit" });
+    const now = doc.get(o.id);
+    if (now?.kind !== "image") continue; // (deleted meanwhile)
+    const { crop: _c, flipX: _fx, flipY: _fy, adjust: _a, watermark: _w, styles: _s, ...rest } = now;
+    next.push({ ...rest, assetId: record.hash, pixelW: record.pixelW, pixelH: record.pixelH });
+  }
+  if (!next.length) {
+    editor.message = "Could not make the watermark permanent.";
+    return editor.changed();
+  }
+  doc.commit(doc.transaction(next.length === 1 ? "Make watermark permanent" : `Make watermarks permanent (${plural(next.length, "picture")})`, next));
+  editor.watermarkId = null;
+  editor.message = next.length === 1 ? "The watermark is now part of the picture (a new file in the library; the original is kept)." : `The watermarks are now part of ${plural(next.length, "picture")} (new files in the library; the originals are kept).`;
+  editor.changed();
+}
+
 /** What can be adjusted: pictures (stills, video, GIF), and shapes, pen strokes and texts (adjusted as they look once drawn). */
 const adjustables = (doc: DocumentStore, editor: EditorState): CanvasObject[] =>
   selected(doc, editor).filter((o) => !o.locked && (o.kind === "path" || o.kind === "stroke" || o.kind === "text" || (o.kind === "image" && o.media?.kind !== "audio")));
@@ -2576,7 +2646,7 @@ export function pasteAdjustments(doc: DocumentStore, editor: EditorState): void 
 export async function renderedStill(doc: DocumentStore, editor: EditorState, assets: AssetLibrary): Promise<Blob | null> {
   const o = croppablePicture(doc, editor) ?? pictures(doc, editor).find((p) => !p.media);
   const rec = o && (await assets.record(o.assetId).catch(() => undefined));
-  return o && rec ? await renderedPicture(rec.blob, o) : null;
+  return o && rec ? await bakedPicture(o, rec.blob, assets) : null;
 }
 
 /** The picked still as a PNG with its crop and adjustments baked in, on the system clipboard. */
@@ -2612,13 +2682,13 @@ export async function bakePicture(
   const o = pictures(doc, editor).find((p) => !p.media);
   if (!o || editor.blockEdit()) return;
   const rec = await assets.record(o.assetId).catch(() => undefined);
-  const png = rec ? await renderedPicture(rec.blob, o) : null;
+  const png = rec ? await bakedPicture(o, rec.blob, assets) : null;
   if (!rec || !png) {
     editor.message = "Could not make the picture.";
     return editor.changed();
   }
   const record = await store({ png, label: "Edited", sourceName: rec.name, sourceHash: o.assetId, kind: "edit" });
-  const { crop: _c, flipX: _fx, flipY: _fy, adjust: _a, groups: _g, hidden: _h, locked: _l, parent: _p, ...rest } = o;
+  const { crop: _c, flipX: _fx, flipY: _fy, watermark: _wm, adjust: _a, groups: _g, hidden: _h, locked: _l, parent: _p, ...rest } = o;
   const copy: ImageObject = { ...rest, id: newObjectId(), assetId: record.hash, pixelW: record.pixelW, pixelH: record.pixelH, z: doc.topZ() + 1 };
   const placed = translate(copy, D.shift(D.fromNumber(o.w * 1.05), o.unit), D.ZERO) as ImageObject;
   doc.commit(doc.transaction("Make a new picture of it as it looks", [placed]));

@@ -24,6 +24,7 @@ import type { ItemLabel } from "./item-label";
 import { cropOf, hasShadow, isNeutral } from "../doc/adjust";
 import { drawAdjusted } from "./adjust-shape";
 import { itemCorners, rotateHandleAt, selectionFrame } from "./selection-frame";
+import { watermarkFrame } from "./watermark-frame";
 
 export interface SceneTheme {
   selection: string;
@@ -130,7 +131,11 @@ export function drawObjects(
       c.rotate(Math.atan2(t.s, t.c));
       c.translate(-t.vvp.width / 2, -t.vvp.height / 2);
       if (po.obj.kind === "text") drawText(c, t.inner, t.vvp, dpr);
-      else if (po.obj.kind === "image") {
+      else if (po.obj.kind === "image" && po.wm?.logo) {
+        const src = assets.inline(rasterKey(po.obj), po.wm.logo);
+        if (!src) pending = true;
+        drawImageObject(c, t.inner, t.vvp, dpr, src, "transparent", 0.5);
+      } else if (po.obj.kind === "image") {
         const shown = shownEdge(t.inner);
         const edge = po.obj.media ? 0 : Math.max(po.obj.pixelW, po.obj.pixelH);
         const key = rasterKey(po.obj);
@@ -149,6 +154,10 @@ export function drawObjects(
     else if (po.obj.kind === "path") {
       drawPath(c, po, vp);
       if (takeTexturePending()) pending = true; // (a texture fill whose picture was not decoded yet)
+    } else if (po.wm?.logo) {
+      const src = assets.inline(rasterKey(po.obj), po.wm.logo); // (a watermark's picture: its data is kept on the watermark)
+      if (!src) pending = true;
+      drawImageObject(c, po, vp, dpr, src, "transparent");
     } else {
       const shown = shownEdge(po);
       const edge = po.obj.media ? 0 : Math.max(po.obj.pixelW, po.obj.pixelH);
@@ -765,6 +774,33 @@ function drawSelection(
     }
     editor.drawnHandles = handles;
     const cropping = editor.cropId !== null && editor.selection.size === 1 && editor.selection.has(editor.cropId);
+    const marked = editor.watermarkId !== null && editor.selection.size === 1 ? visible.find((po) => po.obj.id === editor.watermarkId && !po.wm) : undefined;
+    const wf = marked?.obj.kind === "image" ? watermarkFrame(marked.obj, itemCorners(marked)) : null;
+    if (wf) {
+      // Placing a watermark: the picture keeps only its outline; the watermark's box has the handles (corners size it, the round one turns it).
+      editor.drawnHandles = [];
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath();
+      wf.corners.forEach((c, i) => (i ? ctx.lineTo(c[0], c[1]) : ctx.moveTo(c[0], c[1])));
+      ctx.closePath();
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(wf.top[0], wf.top[1]);
+      ctx.lineTo(wf.turn[0], wf.turn[1]);
+      ctx.stroke();
+      for (const [x, y] of wf.corners) {
+        const h = HANDLE_SIZE_PX;
+        ctx.fillRect(x - h / 2, y - h / 2, h, h);
+        ctx.strokeRect(x - h / 2, y - h / 2, h, h);
+      }
+      ctx.beginPath();
+      dot(ctx, theme, wf.turn[0], wf.turn[1], HANDLE_SIZE_PX / 2 + 1);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
     if (cropping) drawCropBrackets(ctx, frame.corners, theme);
     else
       for (const [x, y] of handles) {
