@@ -17,7 +17,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { pasteCssPaint, copiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedWatermark, previewWatermark, commitWatermark, makeWatermarkPermanent, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
+import { pasteCssPaint, copiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -99,7 +99,6 @@ import { mountStylesPanel } from "../ui/styles-panel";
 import { linkedUpdates } from "./style-sync";
 import { PanelDock } from "../ui/panel-dock";
 import { mountAdjustPanel } from "../ui/adjust-panel";
-import { mountWatermarkPanel } from "../ui/watermark-panel";
 import { mountPatternPanel } from "../ui/pattern-panel";
 import { makePattern, makePatternEach, newPatternSession, patternTargetLabel, patternTargets, foundPattern } from "./pattern";
 import { cleanValues, generatorById } from "../gen";
@@ -131,8 +130,6 @@ import { createTextureHooks } from "./texture-actions";
 import { hasShadow, needsNeighbours } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
 import { downloadSelection, pickedFiles } from "./download";
-import { bakeTheme, bakedPicture } from "./watermark-bake";
-import { hideInPicture, hideInText, pickedText, readMarkedText, readPicture } from "./invisible-mark-actions";
 import { mountCommandPalette } from "../ui/command-palette";
 import { CommandRegistry } from "../commands/registry";
 import { Macros } from "../commands/macros";
@@ -418,7 +415,6 @@ async function start(): Promise<void> {
   applyZen();
   applyThemeAttribute();
   let theme = readTheme(document.documentElement);
-  bakeTheme.current = theme;
   setCanvasInk(theme.ink);
   let dpr = window.devicePixelRatio || 1;
   // Adaptive quality (ADR 0028): slow frames lower the canvas resolution and make zoom previews more eager.
@@ -670,21 +666,21 @@ async function start(): Promise<void> {
     // Selection outlines need the visible selected objects; query only when something is selected.
     // Inside a boolean group (ADR 0103) its members are drawn as outlines over its result, and are what can be selected.
     // The names above the items (ADR 0108, 0125): only looked for when the canvas has an item that can carry one.
-    const labelList = labelIds.size && settings.get("ui.names") !== "off" ? (visible ??= visibleObjects(doc, index, editor, fc, vp)).filter((po) => !po.wm) : [];
+    const labelList = labelIds.size && settings.get("ui.names") !== "off" ? (visible ??= visibleObjects(doc, index, editor, fc, vp)) : [];
     labels = itemLabels(labelList, editor.selection, vp, (h) => assetNames.get(h), settings.get("ui.names"));
     const members = editor.entered.length ? visibleObjects(doc, index, editor, fc, vp, undefined, { entered: editor.entered, mode: "members" }) : [];
     const selected = editor.selection.size
-      ? [...(visible ?? visibleObjects(doc, index, editor, fc, vp)).filter((po) => editor.selection.has(po.obj.id) && !po.wm), ...members.filter((po) => editor.selection.has(po.obj.id))]
+      ? [...(visible ?? visibleObjects(doc, index, editor, fc, vp)).filter((po) => editor.selection.has(po.obj.id)), ...members.filter((po) => editor.selection.has(po.obj.id))]
       : [];
     const cropping = editor.cropId ? selected.find((po) => po.obj.id === editor.cropId && po.obj.kind === "image") : undefined;
     if (cropping && (!shot || shot.overlays)) drawCropGhost(ctx, cropping, assets.get(rasterKey(cropping.obj as ImageObject)), vp);
     if (!shot || shot.overlays) drawOverlays(ctx, selected, editor, fc, vp, theme, members, labels);
     if ((editor.revealAt || editor.revealIds) && (!shot || shot.overlays)) {
-      const all = (visible ??= visibleObjects(doc, index, editor, fc, vp)).filter((po) => !po.wm);
+      const all = (visible ??= visibleObjects(doc, index, editor, fc, vp));
       if (editor.revealIds) drawRevealOutlines(ctx, all.filter((po) => editor.revealIds!.has(po.obj.id)), theme, true);
     }
     if (editor.revealAt && (!shot || shot.overlays)) {
-      const all = (visible ??= visibleObjects(doc, index, editor, fc, vp)).filter((po) => !po.wm);
+      const all = (visible ??= visibleObjects(doc, index, editor, fc, vp));
       const name = (po: ProjectedObject): string => po.obj.name ?? itemName(po.obj, (h) => assetNames.get(h)) ?? (po.obj.kind === "path" ? ({ rect: "Rectangle", ellipse: "Ellipse", polygon: "Polygon", star: "Star", line: "Line" } as Record<string, string>)[po.obj.shape ?? ""] ?? "Path" : po.obj.kind === "stroke" ? "Stroke" : po.obj.kind === "text" ? "Text" : "Item");
       const hits = revealHits(all, editor.revealAt.x, editor.revealAt.y);
       const dim = dimHits(all, hiddenInView(doc, fc, vp), editor.revealAt.x, editor.revealAt.y);
@@ -911,7 +907,6 @@ async function start(): Promise<void> {
   new ResizeObserver(resize).observe(host);
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
     theme = readTheme(document.documentElement);
-    bakeTheme.current = theme;
     setCanvasInk(theme.ink);
     tiles.clear();
     invalidate();
@@ -1155,29 +1150,6 @@ async function start(): Promise<void> {
     adjustStyles: adjustStylesApi,
   });
   dock.add(panelEl("adjust-panel"), { id: "adjust", title: "Adjust", side: "right" });
-  mountWatermarkPanel(side, editor, {
-    selectedWatermark: () => selectedWatermark(doc, editor),
-    previewWatermark: (wm) => previewWatermark(doc, editor, wm),
-    commitWatermark: (wm, label) => commitWatermark(doc, editor, wm, label),
-    makePermanent: () => void makeWatermarkPermanent(doc, editor, filesAssets, (shot) => storeFrame(assets, session, settings, shot)),
-    markTarget: () => (pickedText(doc, editor) ? "text" : (() => { const ids = [...editor.selection]; const o = ids.length === 1 ? doc.get(ids[0]!) : undefined; return o?.kind === "image" && !o.media && !o.locked ? "picture" : null; })()),
-    hideInPicture: async (opts) => {
-      const o = doc.get([...editor.selection][0] ?? "");
-      return o?.kind === "image" ? hideInPicture(doc, editor, filesAssets, o, opts, (shot) => storeFrame(assets, session, settings, shot)) : null;
-    },
-    hideInText: (words, password) => hideInText(doc, editor, words, password),
-    readSelected: async (password, progress) => {
-      const t = pickedText(doc, editor);
-      if (t) return readMarkedText(t.md, password);
-      const o = doc.get([...editor.selection][0] ?? "");
-      const rec = o?.kind === "image" ? await filesAssets.record(o.assetId).catch(() => undefined) : undefined;
-      const png = o?.kind === "image" && rec ? await bakedPicture(o, rec.blob, filesAssets) : null;
-      return png ? readPicture(png, password, progress) : { found: "no" as const };
-    },
-    readFile: (file, password, progress) => readPicture(file, password, progress),
-    readPasted: (text, password) => readMarkedText(text, password),
-  });
-  dock.add(panelEl("watermark-panel"), { id: "watermark", title: "Watermark", side: "right" });
   const patternSession = newPatternSession();
   const patternPanel = mountPatternPanel(side, editor, {
     make: (g, values, seed) => (makePatternEach(doc, editor, view, g, values, seed) === null ? makePattern(doc, editor, view, patternSession, g, values, seed) : false),
@@ -1293,7 +1265,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     selectedFlip: () => selectedFlip(doc, editor),
     flip: (axis) => flipPictures(doc, editor, axis),
     unflip: () => unflipPictures(doc, editor),
-    selectedWatermark: () => selectedWatermark(doc, editor),
     selectedAdjust: () => selectedAdjust(doc, editor),
     adjustStyles: adjustStylesApi,
     previewAdjust: (a) => previewAdjust(doc, editor, a),
@@ -1546,8 +1517,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   };
   editor.subscribe(() => {
     if (editor.cropId && !(editor.selection.size === 1 && editor.selection.has(editor.cropId))) editor.cropId = null; // (cropping ends when the picture is let go)
-    if (editor.markAreaFor && !(editor.selection.size === 1 && editor.selection.has(editor.markAreaFor))) editor.markArea = editor.markAreaFor = null; // (the part chosen goes with the picture let go)
-    if (editor.watermarkId && !(editor.selection.size === 1 && editor.selection.has(editor.watermarkId) && (doc.get(editor.watermarkId) as ImageObject | undefined)?.watermark)) editor.watermarkId = null; // (and placing a watermark, or when it is taken off)
     document.body.classList.toggle("is-cropping", editor.cropId !== null); // (the floating bars and panels step aside, ADR 0118)
   });
   mountHud(document.getElementById("hud")!, view, stats, debug, {
@@ -2190,7 +2159,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "View", title: "Take a screenshot", words: "picture capture", enabled: () => onCanvas, run: () => void takeScreenshot() },
       { group: "View", title: "Play the bookmarks as a tour", words: "present", enabled: () => onCanvas && bookmarkList.items.length > 0, run: () => bookmarkTour.start() },
       { group: "Panel", title: "Adjust", words: "toggle show hide adjustments picture exposure contrast", enabled: () => onCanvas, run: () => { editor.adjustOpen = !editor.adjustOpen; editor.changed(); } },
-      { group: "Panel", title: "Watermark", words: "toggle show hide watermark copyright logo text picture mark", enabled: () => onCanvas, run: () => { editor.watermarkOpen = !editor.watermarkOpen; if (!editor.watermarkOpen) editor.watermarkId = null; editor.changed(); } },
       { group: "Panel", title: "Layers", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.layersOpen = !editor.layersOpen; editor.changed(); } },
       { group: "View", title: "Bookmark the selected things", words: "save view selection", enabled: () => onCanvas && editor.selection.size > 0, run: bookmarkPicked },
       { group: "Panel", title: "Bookmarks", words: "toggle show hide", enabled: () => onCanvas, run: () => { editor.bookmarksOpen = !editor.bookmarksOpen; editor.changed(); } },

@@ -181,13 +181,6 @@ One icon per function: two buttons that do different things never share an icon,
 | `flip-horizontal-2` | Flip the picture horizontally |
 | `flip-vertical-2` | Flip the picture vertically |
 | `refresh-ccw-dot` | Reset flip (the picture the right way round) |
-| `copyright` | Watermark: the Properties bar button and the panel |
-| `letter-text` | Watermark panel: add a text watermark |
-| `paperclip` | Watermark panel: choose a picture file for the watermark |
-| `move` | Watermark panel: place the watermark on the picture (its handles) |
-| `anvil` | Watermark panel: make the watermark permanent (part of the picture) |
-| `shield-check` | Watermark panel: hide an invisible watermark (a marked copy, or in a text) |
-| `search-check` | Watermark panel: read an invisible watermark |
 | `sliders-vertical` | Adjust the picture (the Properties bar), and the Adjust panel button of the panels bar: both open the Adjust panel |
 | `shrink` | Fit the sheet to what is on it |
 | `link` | Attach the picked objects to another object |

@@ -35,7 +35,6 @@ export function toolHint(editor: EditorState, doc: DocumentStore): string | null
     case "node":
       return paths.length === 1 ? "Drag a node or a handle · click a line to add a node · Alt-click a node: smooth or corner · Delete removes it · Enter or Esc to finish" : "Click a shape to edit its nodes";
     case "select": {
-      if (editor.watermarkId) return "Watermark: drag it to move it, a corner to size it, the round handle to turn it (Shift: steps of 15°) · Enter or Esc finishes";
       if (editor.cropId) return "Crop: drag a side or a corner of the picture; drag outward to bring back what was cut · Enter or Esc finishes";
       if (editor.attachMode) return "Click the object to attach the selected ones to · they will follow it when it moves · Esc cancels";
       const inside = editor.entered.length ? editor.entered[editor.entered.length - 1]! : null;

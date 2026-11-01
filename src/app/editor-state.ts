@@ -141,8 +141,6 @@ export class EditorState {
   adjustOpen = false;
   /** The Pattern panel (ui/pattern-panel.ts, ADR 0162) is shown. */
   patternOpen = false;
-  /** The Watermark panel is shown (ui/watermark-panel.ts). */
-  watermarkOpen = false;
   /** Groups the user has entered (ids, outermost first): clicks select inside them (doc/groups.ts). */
   entered: string[] = [];
   /** Object eraser (ADR 0022): brush diameter (CSS px) and whether a swipe takes a whole group or only the members it touches. */
@@ -200,11 +198,6 @@ export class EditorState {
   maskEdit: { groups: readonly [string, string]; ink: string } | null = null;
   /** The picture whose crop is being changed (ADR 0118): its box handles move its window instead of its size. */
   cropId: ObjectId | null = null;
-  /** The picture whose watermark is being placed (doc/watermark.ts): its handles move, size and turn the watermark, not the picture. */
-  watermarkId: ObjectId | null = null;
-  /** The part of a picture an invisible watermark goes in (Watermark panel), as fractions of its box, on the picture `markAreaFor`; dragged on the canvas. Null: all of it. */
-  markArea: { x: number; y: number; w: number; h: number } | null = null;
-  markAreaFor: ObjectId | null = null;
   shapeDraft: DraftShape | null = null;
   pathDraft: DraftPath | null = null;
   /** The node being edited (Edit nodes tool): sub-path and node index of the one selected path. */

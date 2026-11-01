@@ -11,7 +11,6 @@ import { cellFrame, coverObject, projectEntry, projectObject } from "./projectio
 import { approxCoarse, classifyCoarse } from "./coarse";
 import { ancestorsOf } from "../doc/containers";
 import { maskMembers } from "../doc/masks";
-import { watermarkClip, watermarkObject } from "../doc/watermark";
 import type { FrameCamera as FC } from "../core/frames";
 
 /** How see-through a moving selection looks, and the largest selection that gets it (above that, drawing it one by one would slow the drag). */
@@ -192,32 +191,7 @@ export function visibleObjects(
     stats.cellsProbed = cellsProbed;
     stats.candidates = candidates;
   }
-  const drawn = withMasks(doc, fc, vp, withClips(doc, fc, vp, out), (o) => (editor && previewIds.has(o.id) ? editor.previewed(o) : o));
-  return bool?.mode === "pick" || bool?.mode === "members" ? drawn : withWatermarks(doc, fc, vp, drawn);
-}
-
-/**
- * Put each picture's watermark (doc/watermark.ts) right after it: its stand-in text or picture, cut to the picture's box (and to whatever
- * cuts the picture). Not when the view is inside one of its pixels (`cover`): a stand-in has no pixels of its own to show there.
- */
-function withWatermarks(doc: DocumentStore, fc: FC, vp: Viewport, list: ProjectedObject[]): ProjectedObject[] {
-  if (!list.some((po) => po.obj.kind === "image" && po.obj.watermark)) return list;
-  const out: ProjectedObject[] = [];
-  for (const po of list) {
-    out.push(po);
-    const o = po.obj;
-    if (o.kind !== "image" || !o.watermark || po.wm) continue;
-    const cam = cameraIn(fc, o.frame ?? doc.space.world);
-    const m = cam && watermarkObject(o);
-    const mp = m && projectObject(m, cam, vp, { keepTiny: true });
-    if (!mp || mp.cover) continue;
-    const box = projectObject(watermarkClip(o), cam, vp, { keepTiny: true });
-    const clip = [...(po.clip ?? []), ...(box && !box.cover ? [box] : [])];
-    if (clip.length) mp.clip = clip;
-    mp.wm = { ...(o.watermark.logo ? { logo: o.watermark.logo.src } : {}) };
-    out.push(mp);
-  }
-  return out;
+  return withMasks(doc, fc, vp, withClips(doc, fc, vp, out), (o) => (editor && previewIds.has(o.id) ? editor.previewed(o) : o));
 }
 
 /**

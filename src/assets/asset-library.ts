@@ -389,30 +389,6 @@ export class AssetLibrary {
     this.onReady();
   }
 
-  private readonly inlined = new Map<string, RasterSource | null>();
-
-  /**
-   * A picture kept as data on an object (a watermark's logo, doc/watermark.ts), decoded once and kept (they are small and few); null until
-   * it is decoded, then the canvas is drawn again.
-   */
-  inline(key: string, dataUrl: string): RasterSource | null {
-    if (this.inlined.has(key)) return this.inlined.get(key)!;
-    this.inlined.set(key, null);
-    let bytes: Uint8Array<ArrayBuffer>;
-    try {
-      bytes = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(",") + 1)), (ch) => ch.charCodeAt(0));
-    } catch {
-      return null; // (not base64: nothing is drawn)
-    }
-    void createImageBitmap(new Blob([bytes], { type: "image/png" }))
-      .then((bmp) => {
-        this.inlined.set(key, makeSource(bmp));
-        this.onReady();
-      })
-      .catch(() => undefined); // (a damaged logo: nothing is drawn)
-    return null;
-  }
-
   /** An item's custom thumbnail, for its file card on a canvas (null: none, or one that must not show here). Set by the app. */
   customPicture: ((hash: string) => Promise<Blob | null>) | null = null;
 
