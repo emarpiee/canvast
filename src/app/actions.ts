@@ -2688,10 +2688,15 @@ export async function bakePicture(
     return editor.changed();
   }
   const record = await store({ png, label: "Edited", sourceName: rec.name, sourceHash: o.assetId, kind: "edit" });
+  placeBeside(doc, editor, o, record, "Make a new picture of it as it looks");
+}
+
+/** A new instance of `record` (a picture made from `o` as it looks) just right of `o`, at its size and turn, selected: one undo step. */
+export function placeBeside(doc: DocumentStore, editor: EditorState, o: ImageObject, record: Pick<AssetRecord, "hash" | "pixelW" | "pixelH">, label: string): void {
   const { crop: _c, flipX: _fx, flipY: _fy, watermark: _wm, adjust: _a, groups: _g, hidden: _h, locked: _l, parent: _p, ...rest } = o;
   const copy: ImageObject = { ...rest, id: newObjectId(), assetId: record.hash, pixelW: record.pixelW, pixelH: record.pixelH, z: doc.topZ() + 1 };
   const placed = translate(copy, D.shift(D.fromNumber(o.w * 1.05), o.unit), D.ZERO) as ImageObject;
-  doc.commit(doc.transaction("Make a new picture of it as it looks", [placed]));
+  doc.commit(doc.transaction(label, [placed]));
   editor.select([placed.id]);
   editor.changed();
 }

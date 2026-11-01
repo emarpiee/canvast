@@ -24,7 +24,7 @@ import type { ItemLabel } from "./item-label";
 import { cropOf, hasShadow, isNeutral } from "../doc/adjust";
 import { drawAdjusted } from "./adjust-shape";
 import { itemCorners, rotateHandleAt, selectionFrame } from "./selection-frame";
-import { watermarkFrame } from "./watermark-frame";
+import { areaFrame, watermarkFrame } from "./watermark-frame";
 
 export interface SceneTheme {
   selection: string;
@@ -776,6 +776,25 @@ function drawSelection(
     const cropping = editor.cropId !== null && editor.selection.size === 1 && editor.selection.has(editor.cropId);
     const marked = editor.watermarkId !== null && editor.selection.size === 1 ? visible.find((po) => po.obj.id === editor.watermarkId && !po.wm) : undefined;
     const wf = marked?.obj.kind === "image" ? watermarkFrame(marked.obj, itemCorners(marked)) : null;
+    const area = editor.markArea && editor.markAreaFor !== null && editor.selection.size === 1 ? visible.find((po) => po.obj.id === editor.markAreaFor && !po.wm) : undefined;
+    const af = area?.obj.kind === "image" ? areaFrame(area.obj, itemCorners(area), editor.markArea!) : null;
+    if (af) {
+      // The part an invisible watermark goes in: a dashed box with a handle at each corner, drawn over the picture's own outline.
+      ctx.setLineDash([2, 3]);
+      ctx.beginPath();
+      af.corners.forEach((c, i) => (i ? ctx.lineTo(c[0], c[1]) : ctx.moveTo(c[0], c[1])));
+      ctx.closePath();
+      ctx.stroke();
+      ctx.setLineDash([]);
+      editor.drawnHandles = [];
+      for (const [x, y] of af.corners) {
+        const h = HANDLE_SIZE_PX;
+        ctx.fillRect(x - h / 2, y - h / 2, h, h);
+        ctx.strokeRect(x - h / 2, y - h / 2, h, h);
+      }
+      ctx.restore();
+      return;
+    }
     if (wf) {
       // Placing a watermark: the picture keeps only its outline; the watermark's box has the handles (corners size it, the round one turns it).
       editor.drawnHandles = [];

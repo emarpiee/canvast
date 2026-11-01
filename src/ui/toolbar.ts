@@ -264,7 +264,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-kind="picture" data-flip="x" hidden aria-pressed="false" aria-label="Flip horizontally" title="Flip horizontally: mirror the picture left to right in its box">${ICONS.flipHorizontal}</button>
         <button type="button" data-kind="picture" data-flip="y" hidden aria-pressed="false" aria-label="Flip vertically" title="Flip vertically: mirror the picture top to bottom in its box">${ICONS.flipVertical}</button>
         <button type="button" data-kind="picture" data-unflip hidden aria-label="Reset flip" title="Reset flip: show the picture the right way round again">${ICONS.resetFlip}</button>
-        <button type="button" data-kind="picture" data-watermark hidden aria-pressed="false" aria-label="Watermark" title="Watermark: a text or a small picture over the selected pictures, placed anywhere, see-through">${ICONS.watermark}</button>
+        <button type="button" data-kind="picture text" data-watermark hidden aria-pressed="false" aria-label="Watermark" title="Watermark: a text or a small picture over the selected pictures, placed anywhere, see-through; or an invisible one hidden in a picture or a text, and read back">${ICONS.watermark}</button>
         <button type="button" data-kind="picture shape stroke text" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture, shape or text: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
         <button type="button" data-kind="picture shape stroke text" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the selected pictures">${ICONS.listRestart}</button>
         <span class="tb-count" data-kind="any" data-on-sheet hidden title="Where it is on its sheet, in per cent of the sheet: X and Y from its top-left corner, W and H of its width and height">On sheet
@@ -975,7 +975,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-unflip]")!.hidden = !(flip && (flip.x || flip.y));
     const wmBtn = root.querySelector<HTMLElement>("[data-watermark]")!;
     const wmSel = pick && still ? actions.selectedWatermark() : null;
-    wmBtn.hidden = !wmSel;
+    wmBtn.hidden = !wmSel && !(pick && still && editor.selection.size === 1 && txt);
     wmBtn.setAttribute("aria-pressed", String(editor.watermarkOpen));
     wmBtn.classList.toggle("is-applied", !!wmSel?.wm);
     wmBtn.setAttribute("aria-label", wmSel?.wm ? "Watermark (has one)" : "Watermark");

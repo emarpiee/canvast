@@ -131,7 +131,8 @@ import { createTextureHooks } from "./texture-actions";
 import { hasShadow, needsNeighbours } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
 import { downloadSelection, pickedFiles } from "./download";
-import { bakeTheme } from "./watermark-bake";
+import { bakeTheme, bakedPicture } from "./watermark-bake";
+import { hideInPicture, hideInText, pickedText, readMarkedText, readPicture } from "./invisible-mark-actions";
 import { mountCommandPalette } from "../ui/command-palette";
 import { CommandRegistry } from "../commands/registry";
 import { Macros } from "../commands/macros";
@@ -1159,6 +1160,22 @@ async function start(): Promise<void> {
     previewWatermark: (wm) => previewWatermark(doc, editor, wm),
     commitWatermark: (wm, label) => commitWatermark(doc, editor, wm, label),
     makePermanent: () => void makeWatermarkPermanent(doc, editor, filesAssets, (shot) => storeFrame(assets, session, settings, shot)),
+    markTarget: () => (pickedText(doc, editor) ? "text" : (() => { const ids = [...editor.selection]; const o = ids.length === 1 ? doc.get(ids[0]!) : undefined; return o?.kind === "image" && !o.media && !o.locked ? "picture" : null; })()),
+    hideInPicture: async (opts) => {
+      const o = doc.get([...editor.selection][0] ?? "");
+      return o?.kind === "image" ? hideInPicture(doc, editor, filesAssets, o, opts, (shot) => storeFrame(assets, session, settings, shot)) : null;
+    },
+    hideInText: (words, password) => hideInText(doc, editor, words, password),
+    readSelected: async (password, progress) => {
+      const t = pickedText(doc, editor);
+      if (t) return readMarkedText(t.md, password);
+      const o = doc.get([...editor.selection][0] ?? "");
+      const rec = o?.kind === "image" ? await filesAssets.record(o.assetId).catch(() => undefined) : undefined;
+      const png = o?.kind === "image" && rec ? await bakedPicture(o, rec.blob, filesAssets) : null;
+      return png ? readPicture(png, password, progress) : { found: "no" as const };
+    },
+    readFile: (file, password, progress) => readPicture(file, password, progress),
+    readPasted: (text, password) => readMarkedText(text, password),
   });
   dock.add(panelEl("watermark-panel"), { id: "watermark", title: "Watermark", side: "right" });
   const patternSession = newPatternSession();
@@ -1529,6 +1546,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   };
   editor.subscribe(() => {
     if (editor.cropId && !(editor.selection.size === 1 && editor.selection.has(editor.cropId))) editor.cropId = null; // (cropping ends when the picture is let go)
+    if (editor.markAreaFor && !(editor.selection.size === 1 && editor.selection.has(editor.markAreaFor))) editor.markArea = editor.markAreaFor = null; // (the part chosen goes with the picture let go)
     if (editor.watermarkId && !(editor.selection.size === 1 && editor.selection.has(editor.watermarkId) && (doc.get(editor.watermarkId) as ImageObject | undefined)?.watermark)) editor.watermarkId = null; // (and placing a watermark, or when it is taken off)
     document.body.classList.toggle("is-cropping", editor.cropId !== null); // (the floating bars and panels step aside, ADR 0118)
   });

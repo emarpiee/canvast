@@ -63,6 +63,8 @@ import watermarkTextSvg from "lucide-static/icons/letter-text.svg";
 import watermarkFileSvg from "lucide-static/icons/paperclip.svg";
 import watermarkPlaceSvg from "lucide-static/icons/move.svg";
 import watermarkBakeSvg from "lucide-static/icons/anvil.svg";
+import watermarkHideSvg from "lucide-static/icons/shield-check.svg";
+import watermarkReadSvg from "lucide-static/icons/search-check.svg";
 import scanFrameSvg from "lucide-static/icons/scan.svg";
 import squareDashedSvg from "lucide-static/icons/square-dashed.svg";
 import squareDashedXSvg from "lucide-static/icons/square-dashed-x.svg";
@@ -613,6 +615,8 @@ export const ICONS = {
   watermarkFile: clean(watermarkFileSvg),
   watermarkPlace: clean(watermarkPlaceSvg),
   watermarkBake: clean(watermarkBakeSvg),
+  watermarkHide: clean(watermarkHideSvg),
+  watermarkRead: clean(watermarkReadSvg),
   sheetTool: clean(scanFrameSvg),
   sheetSelection: clean(squareDashedSvg),
   releaseSheet: clean(squareDashedXSvg),

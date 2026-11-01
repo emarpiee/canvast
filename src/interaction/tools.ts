@@ -39,7 +39,7 @@ import { cutStroke } from "../doc/stroke-cut";
 import { planSheetScale } from "../doc/constraints";
 import { cropEdges } from "../doc/crop";
 import { placed, watermarkBox } from "../doc/watermark";
-import { insidePoly, watermarkFrame } from "../render/watermark-frame";
+import { areaFrame, insidePoly, watermarkFrame } from "../render/watermark-frame";
 import { itemCorners } from "../render/selection-frame";
 import { itemLabelAt } from "../render/item-label";
 import type { ItemLabel } from "../render/item-label";
@@ -249,6 +249,8 @@ type Gesture =
   /** Cropping the picked picture (ADR 0118): a side or corner of its box moves its window of the source. */
   | { kind: "crop"; pointerId: number; base: ImageObject; sides: { l: boolean; r: boolean; t: boolean; b: boolean }; start: ScreenPoint; ppu: number }
   /** Placing the picked picture's watermark (doc/watermark.ts): moved, sized from its centre or turned; `ex`, `ey`: screen px per local unit. */
+  /** Dragging the part of a picture an invisible watermark goes in (`editor.markArea`): moved, or sized from a corner, the opposite one fixed. */
+  | { kind: "markarea"; pointerId: number; corner: number; base: { x: number; y: number; w: number; h: number }; start: ScreenPoint; ex: readonly [number, number]; ey: readonly [number, number]; origin: readonly [number, number]; o: ImageObject }
   | { kind: "wmark"; pointerId: number; mode: "move" | "size" | "turn"; base: ImageObject; start: ScreenPoint; centre: readonly [number, number]; ex: readonly [number, number]; ey: readonly [number, number] }
   | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean; click?: CanvasObject | null; exact?: boolean }
   | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; startScreen: ScreenPoint; ids: ObjectId[]; snap: SnapContext | null }
@@ -1297,6 +1299,20 @@ export function attachTools(
       }
     }
     const vis = visible();
+    // The part of a picture for an invisible watermark: its corners size it, inside it moves it; elsewhere on the picture nothing happens.
+    if (editor.markArea && editor.markAreaFor && editor.selection.size === 1 && editor.selection.has(editor.markAreaFor)) {
+      const pic = doc.get(editor.markAreaFor);
+      const po = pic?.kind === "image" ? vis.find((q) => q.obj.id === pic.id) : undefined;
+      const af = pic?.kind === "image" && po ? areaFrame(pic, itemCorners(po), editor.markArea) : null;
+      if (pic?.kind === "image" && po && af) {
+        const corner = af.corners.findIndex((p) => Math.abs(s.x - p[0]) <= HANDLE_SIZE_PX && Math.abs(s.y - p[1]) <= HANDLE_SIZE_PX);
+        if (corner >= 0 || insidePoly([s.x, s.y], af.corners)) {
+          g = { kind: "markarea", pointerId: e.pointerId, corner, base: { ...editor.markArea }, start: s, ex: af.ex, ey: af.ey, origin: af.origin, o: pic };
+          return;
+        }
+        if (insidePoly([s.x, s.y], itemCorners(po))) return;
+      }
+    }
     // Placing a watermark: its own handles and box take the press; elsewhere on the picture nothing happens, off it the press goes on as usual.
     if (editor.watermarkId && editor.selection.size === 1 && editor.selection.has(editor.watermarkId) && !editor.blockEdit()) {
       const pic = doc.get(editor.watermarkId);
@@ -2082,6 +2098,30 @@ export function attachTools(
       case "node":
         updateNode(s, keys(e).alt);
         break;
+      case "markarea": {
+        const { o, base: b, origin, ex, ey } = g;
+        // a screen point as fractions of the picture's box
+        const frac = (p: { x: number; y: number }): [number, number] => {
+          const d = [p.x - origin[0], p.y - origin[1]] as const;
+          const l2x = ex[0] ** 2 + ex[1] ** 2 || 1, l2y = ey[0] ** 2 + ey[1] ** 2 || 1;
+          return [(d[0] * ex[0] + d[1] * ex[1]) / l2x / o.w, (d[0] * ey[0] + d[1] * ey[1]) / l2y / o.h];
+        };
+        const clamp = (v: number): number => Math.min(1, Math.max(0, v));
+        if (g.corner < 0) {
+          const [u0, v0] = frac(g.start), [u1, v1] = frac(s);
+          const x = Math.min(1 - b.w, Math.max(0, b.x + u1 - u0)), y = Math.min(1 - b.h, Math.max(0, b.y + v1 - v0));
+          editor.markArea = { ...b, x, y };
+        } else {
+          // the corner opposite the one dragged stays where it is
+          const fx = g.corner === 0 || g.corner === 3 ? b.x + b.w : b.x, fy = g.corner < 2 ? b.y + b.h : b.y;
+          const [u, v] = frac(s).map(clamp) as [number, number];
+          const min = 0.02;
+          const x0 = Math.min(fx, u), x1 = Math.max(fx, u), y0 = Math.min(fy, v), y1 = Math.max(fy, v);
+          editor.markArea = { x: x0, y: y0, w: Math.max(min, x1 - x0), h: Math.max(min, y1 - y0) };
+        }
+        editor.changed();
+        break;
+      }
       case "wmark": {
         const o = g.base, wm = o.watermark!, b = watermarkBox(o);
         let { cx, cy, w, angle } = { cx: b.cx, cy: b.cy, w: b.w, angle: b.angle };
@@ -2248,6 +2288,8 @@ export function attachTools(
         else commitPaint(doc, editor, { [g.which]: p[g.which] as Gradient });
         break;
       }
+      case "markarea":
+        break; // (kept on the editor as it is dragged: nothing to store)
       case "crop":
       case "wmark": {
         const p = editor.preview;

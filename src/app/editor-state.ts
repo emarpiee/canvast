@@ -202,6 +202,9 @@ export class EditorState {
   cropId: ObjectId | null = null;
   /** The picture whose watermark is being placed (doc/watermark.ts): its handles move, size and turn the watermark, not the picture. */
   watermarkId: ObjectId | null = null;
+  /** The part of a picture an invisible watermark goes in (Watermark panel), as fractions of its box, on the picture `markAreaFor`; dragged on the canvas. Null: all of it. */
+  markArea: { x: number; y: number; w: number; h: number } | null = null;
+  markAreaFor: ObjectId | null = null;
   shapeDraft: DraftShape | null = null;
   pathDraft: DraftPath | null = null;
   /** The node being edited (Edit nodes tool): sub-path and node index of the one selected path. */

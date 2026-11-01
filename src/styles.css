@@ -824,6 +824,14 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .wm-line { display: flex; align-items: center; gap: var(--sp-5); font: var(--font-meta); color: var(--hud-muted); }
 .wm-colour, .wm-check { display: inline-flex; align-items: center; gap: var(--sp-3); }
 .wm-colour input { width: var(--field-h); height: var(--field-h); padding: 0; background: none; border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.wm-field { box-sizing: border-box; width: 100%; text-align: left; }
+select.wm-field { grid-column: 2 / -1; height: var(--field-h); padding: 0 var(--sp-3); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.wm-bits { image-rendering: pixelated; }
+.wm-result:empty { display: none; }
+.wm-result { display: grid; gap: var(--sp-3); }
+.wm-result p { margin: 0; }
+.wm-found { margin: 0; padding: var(--sp-3); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border-radius: var(--r-sm); user-select: text; overflow-wrap: anywhere; }
+.wm-change { width: 100%; height: auto; border-radius: var(--r-sm); }
 .wm-logo { width: var(--thumb-sm); height: var(--thumb-sm); object-fit: contain; background: var(--hud-hover); border-radius: var(--r-sm); }
 .adj-foot { display: grid; gap: var(--sp-3); padding: var(--sp-4) var(--sp-6) var(--sp-3); }
 .panel-sub .adj-layers { padding: var(--sp-4) var(--sp-6) var(--sp-3); border-bottom: 1px solid var(--hud-border); }

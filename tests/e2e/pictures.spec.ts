@@ -183,6 +183,85 @@ test("visible watermark: a picture over the picture, placed by dragging, cut to 
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("invisible watermark: a marked copy is made beside the picture, read back with its password (and not without), and still read after a JPEG save, a resize and a crop", async ({ app }) => {
+  test.setTimeout(90_000);
+  const p = app.page;
+  // a picture with detail (a mark hides in it)
+  const pic = await place(app, "photo.png", makePng(640, 480, (x, y) => [(x * 7 + y * 13) % 200 + 30, (x * x + y * 3) % 180 + 40, (y * y + x * 5) % 160 + 50, 255]));
+  await p.keyboard.press("v");
+  const b = await boxOf(app, pic.id);
+  await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+  await p.getByRole("button", { name: /^Watermark/ }).click();
+  const panel = p.getByTestId("watermark-panel");
+  await panel.getByRole("tab", { name: "Invisible" }).click();
+  await panel.getByLabel(/^Text to hide/).fill("© Ana 2026");
+  await panel.getByLabel("Password (optional)").fill("pw");
+  await panel.getByRole("button", { name: "Make a marked copy" }).click();
+  await expect(panel.getByTestId("watermark-hide-result")).toContainText("dB PSNR", { timeout: 20_000 });
+  const copy = (await objs(app)).at(-1)!;
+  expect(copy.id).not.toBe(pic.id);
+  // read: the copy is selected; without the password it is known to be there, with it it is read
+  await panel.getByRole("tab", { name: "Read" }).click();
+  await panel.getByRole("button", { name: "Read the selected picture" }).click();
+  await expect(panel.getByTestId("watermark-read-result")).toContainText("needs its password", { timeout: 30_000 });
+  await panel.getByLabel("Password to read with").fill("pw");
+  await panel.getByRole("button", { name: "Read the selected picture" }).click();
+  await expect(panel.getByTestId("watermark-found")).toHaveText("© Ana 2026", { timeout: 30_000 });
+  // the copy's file saved as a JPEG at 75 %, made 80 % as big, 13 px cut off its left: still read
+  const bytes = await p.evaluate(async (hash) => {
+    const raw = await window.__canvastDebug.originalBytes(hash);
+    const bmp = await createImageBitmap(new Blob([new Uint8Array(raw!)]));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * 0.8) - 13;
+    c.height = Math.round(bmp.height * 0.8);
+    c.getContext("2d")!.drawImage(bmp, -13, 0, bmp.width * 0.8, bmp.height * 0.8);
+    const jpg = await new Promise<Blob>((r) => c.toBlob((x) => r(x!), "image/jpeg", 0.75));
+    return [...new Uint8Array(await jpg.arrayBuffer())];
+  }, (copy as unknown as { assetId: string }).assetId);
+  await panel.getByTestId("watermark-read-input").setInputFiles({ name: "copy.jpg", mimeType: "image/jpeg", buffer: Buffer.from(bytes) });
+  await expect(panel.getByTestId("watermark-found")).toHaveText("© Ana 2026", { timeout: 60_000 });
+  await expect(panel.getByTestId("watermark-read-result")).toContainText("resized");
+  // the picture it was made from has none
+  await p.mouse.click(Math.round(b.minX + 5), Math.round(b.minY + 5));
+  await panel.getByRole("button", { name: "Read the selected picture" }).click();
+  await expect(panel.getByTestId("watermark-read-result")).toContainText("No watermark found", { timeout: 60_000 });
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("invisible watermark in a text: hidden between its words without changing how it looks, one undo step, read back from the text and from a pasted copy", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("t");
+  await p.mouse.click(400, 250);
+  await expect(p.getByTestId("text-editor")).toBeFocused();
+  await p.keyboard.type("Made by Ana in the spring");
+  await p.keyboard.press("Escape");
+  await app.frame();
+  const t = (await objs(app)).find((o) => o.kind === "text")!;
+  const before = await boxOf(app, t.id);
+  await p.keyboard.press("v");
+  await p.mouse.click(Math.round((before.minX + before.maxX) / 2), Math.round((before.minY + before.maxY) / 2));
+  await p.getByRole("button", { name: /^Watermark/ }).click();
+  const panel = p.getByTestId("watermark-panel");
+  await panel.getByRole("tab", { name: "Invisible" }).click();
+  await panel.getByLabel(/^Text to hide/).fill("© Ana");
+  await panel.getByRole("button", { name: "Hide it in the text" }).click();
+  await expect(panel.getByTestId("watermark-hide-result")).toContainText("Hidden in the text");
+  const md = ((await objs(app)).find((o) => o.id === t.id) as unknown as { md: string }).md;
+  expect(md.replace(/[\u200b\u200c\u200d\u2060]/g, "")).toBe("Made by Ana in the spring");
+  const after = await boxOf(app, t.id);
+  expect([after.maxX - after.minX, after.maxY - after.minY], "it looks the same").toEqual([before.maxX - before.minX, before.maxY - before.minY]);
+  await panel.getByRole("tab", { name: "Read" }).click();
+  await panel.getByRole("button", { name: "Read the selected text" }).click();
+  await expect(panel.getByTestId("watermark-found")).toHaveText("© Ana");
+  await panel.getByLabel("Text to read a watermark in").fill(`quoted: ${md}`);
+  await panel.getByRole("button", { name: "Read the pasted text" }).click();
+  await expect(panel.getByTestId("watermark-found")).toHaveText("© Ana");
+  await p.mouse.click(60, 650); // (keys typed in the panel's fields do not reach the canvas)
+  await p.keyboard.press("Control+z");
+  expect(((await objs(app)).find((o) => o.id === t.id) as unknown as { md: string }).md).toBe("Made by Ana in the spring");
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("adjustments: kept on the picture, drawn live, one undo step, copied to another, reset", async ({ app }) => {
   const p = app.page;
   const a = await place(app, "a.png");

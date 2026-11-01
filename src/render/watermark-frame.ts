@@ -55,3 +55,13 @@ export function insidePoly(p: Pt, poly: readonly Pt[]): boolean {
   }
   return true;
 }
+
+/** The screen corners of a part of a picture given as fractions of its box (top left, top right, bottom right, bottom left), and its axes. */
+export function areaFrame(o: ImageObject, picture: readonly Pt[], a: { x: number; y: number; w: number; h: number }): { corners: Pt[]; ex: Pt; ey: Pt; origin: Pt } | null {
+  if (picture.length < 4) return null;
+  const [c0, c1, , c3] = picture as [Pt, Pt, Pt, Pt];
+  const ex: Pt = [(c1[0] - c0[0]) / o.w, (c1[1] - c0[1]) / o.w];
+  const ey: Pt = [(c3[0] - c0[0]) / o.h, (c3[1] - c0[1]) / o.h];
+  const at = (u: number, v: number): Pt => [c0[0] + ex[0] * u * o.w + ey[0] * v * o.h, c0[1] + ex[1] * u * o.w + ey[1] * v * o.h];
+  return { corners: [at(a.x, a.y), at(a.x + a.w, a.y), at(a.x + a.w, a.y + a.h), at(a.x, a.y + a.h)], ex, ey, origin: c0 };
+}
