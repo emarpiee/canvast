@@ -6,6 +6,8 @@
 import type { AssetLibrary, AssetRecord } from "../assets/asset-library";
 import type { MarkContent, Pixels, Strength } from "../doc/invisible-mark";
 import { findFrame, frameOf, hideFrame, logoBits, markKey, minPart, openFrame } from "../doc/invisible-mark";
+import { findPilot, hidePilot, undoPilot } from "../doc/fourier-mark";
+import { hideLsb, lsbBytes, lsbCapacity, readLsb } from "../doc/lsb-mark";
 import type { DocumentStore } from "../doc/document-store";
 import type { ImageObject, TextObject } from "../doc/model";
 import { markText, readText } from "../doc/text-mark";
@@ -53,13 +55,22 @@ export function logoPicture(bits: Uint8Array): string {
   return c.toDataURL("image/png");
 }
 
-export interface HideOptions {
-  readonly content: MarkContent;
-  readonly password: string;
-  readonly strength: Strength;
-  /** The part of the picture to hide it in, as fractions of its box (default: all of it). */
-  readonly region?: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
-}
+/** The ways a mark is hidden in a picture: in 8 × 8 blocks (sturdy, a text or a logo); the same with a Fourier template (found after any turn or size); in the lowest bits (a long text other tools read, lost when the picture changes). */
+export type MarkMethod = "blocks" | "fourier" | "lsb";
+
+export type HideOptions =
+  | {
+      readonly method: "blocks";
+      readonly content: MarkContent;
+      readonly password: string;
+      readonly strength: Strength;
+      /** The part of the picture to hide it in, as fractions of its box (default: all of it). */
+      readonly region?: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
+    }
+  | { readonly method: "fourier"; readonly content: MarkContent; readonly password: string; readonly strength: Strength }
+  | { readonly method: "lsb"; readonly text: string; readonly password: string };
+
+export type HideResult = { psnr: number; change: string } | { tooSmall: { w: number; h: number; min: number } } | { tooLong: { capacity: number } } | { seeThrough: true } | null;
 
 /**
  * Hide the mark in a copy of `o` as it looks (crop, flip, adjustments, visible watermark), placed beside it. Returns how visible the change
@@ -72,29 +83,47 @@ export async function hideInPicture(
   assets: AssetLibrary,
   o: ImageObject,
   opts: HideOptions,
-  store: (shot: { png: Blob; label: string; sourceName: string; sourceHash: string; kind?: "edit" }) => Promise<AssetRecord>,
-): Promise<{ psnr: number; change: string } | { tooSmall: { w: number; h: number; min: number } } | null> {
+  store: (shot: { png: Blob; label: string; sourceName: string; sourceHash: string; kind?: "edit"; keepPng?: true }) => Promise<AssetRecord>,
+): Promise<HideResult> {
   const rec = await assets.record(o.assetId).catch(() => undefined);
   const png = rec ? await bakedPicture(o, rec.blob, assets) : null;
   const p = png ? await pixelsOf(png) : null;
   if (!rec || !p) return null;
   const before = p.data.slice();
-  const r = opts.region;
-  const region = r ? { x0: Math.round(r.x * p.width), y0: Math.round(r.y * p.height), x1: Math.round((r.x + r.w) * p.width), y1: Math.round((r.y + r.h) * p.height) } : undefined;
-  // (a part too small to hold two tiles each way could not be told from the rest when it is read)
-  const min = minPart(opts.content);
-  if (region && (region.x1 - region.x0 < min || region.y1 - region.y0 < min)) return { tooSmall: { w: region.x1 - region.x0, h: region.y1 - region.y0, min } };
-  const key = await markKey(opts.password);
-  const frame = await frameOf(opts.content, key);
-  const psnr = hideFrame(p, frame, opts.strength, region);
+  let psnr: number;
+  if (opts.method === "lsb") {
+    const bytes = await lsbBytes(opts.text, opts.password ? await markKey(opts.password) : null);
+    if (bytes.length > lsbCapacity(p)) return { tooLong: { capacity: lsbCapacity(p) - 1 } };
+    if (!hideLsb(p, bytes)) return { seeThrough: true };
+    psnr = changePsnr(before, p.data);
+  } else if (opts.method === "fourier") {
+    // the blocks over the whole picture, then the template that tells a reader how a copy was turned and resized
+    hideFrame(p, await frameOf(opts.content, await markKey(opts.password)), opts.strength);
+    hidePilot(p);
+    psnr = changePsnr(before, p.data);
+  } else {
+    const r = opts.region;
+    const region = r ? { x0: Math.round(r.x * p.width), y0: Math.round(r.y * p.height), x1: Math.round((r.x + r.w) * p.width), y1: Math.round((r.y + r.h) * p.height) } : undefined;
+    // (a part too small to hold two tiles each way could not be told from the rest when it is read)
+    const min = minPart(opts.content);
+    if (region && (region.x1 - region.x0 < min || region.y1 - region.y0 < min)) return { tooSmall: { w: region.x1 - region.x0, h: region.y1 - region.y0, min } };
+    psnr = hideFrame(p, await frameOf(opts.content, await markKey(opts.password)), opts.strength, region);
+  }
   const g = p.canvas.getContext("2d")!;
   g.setTransform(1, 0, 0, 1, 0, 0);
   g.putImageData(new ImageData(p.data as Uint8ClampedArray<ArrayBuffer>, p.width, p.height), 0, 0); // (the pixels read from this canvas, changed in place)
   const out = await new Promise<Blob | null>((res) => p.canvas.toBlob(res, "image/png"));
   if (!out) return null;
-  const record = await store({ png: out, label: "Invisible watermark", sourceName: rec.name, sourceHash: o.assetId, kind: "edit" });
+  const record = await store({ png: out, label: "Invisible watermark", sourceName: rec.name, sourceHash: o.assetId, kind: "edit", ...(opts.method === "lsb" ? { keepPng: true as const } : {}) });
   placeBeside(doc, editor, o, record, "Hide a watermark in a copy");
   return { psnr, change: changePicture(before, p.data, p.width, p.height) };
+}
+
+/** The PSNR in dB of the change between two sets of RGBA pixels (Infinity: none). */
+function changePsnr(a: Uint8ClampedArray, b: Uint8ClampedArray): number {
+  let sq = 0, n = 0;
+  for (let i = 0; i < a.length; i += 4) for (let c = 0; c < 3; c++, n++) sq += (a[i + c]! - b[i + c]!) ** 2;
+  return sq ? 10 * Math.log10((255 * 255 * n) / sq) : Infinity;
 }
 
 /** The change made to a picture, 20 times stronger, grey where nothing changed, at most 256 px on its longer side. */
@@ -129,6 +158,28 @@ const READ_MAX = 3000;
 export async function readPicture(blob: Blob, password: string, progress: (done: number, total: number) => void): Promise<ReadResult> {
   const probe = await createImageBitmap(blob).catch(() => null);
   if (!probe) return { found: "no" };
+  const key = await markKey(password);
+  // The lowest bits (exact, so only the picture as it is), then the Fourier ring (it finds any turn and size itself), then the blocks.
+  const own = await pixelsOf(blob);
+  if (own) {
+    const lsb = await readLsb(own, key);
+    if (lsb === "locked") return { found: "locked", agree: 1 };
+    if (lsb !== null) return { found: "yes", content: { kind: "text", text: lsb }, agree: 1, how: "in the lowest bits (LSB)" };
+    // The Fourier template: how the copy was turned and resized; turned and resized back (both ways round: the spectrum cannot tell a
+    // half turn), the blocks are read.
+    const pilot = findPilot(own);
+    if (pilot) {
+      for (const turn of [pilot.turn, pilot.turn + Math.PI]) {
+        const f = findFrame(undoPilot(own, turn, pilot.scale));
+        if (!f) continue;
+        const content = await openFrame(f, key);
+        if (!content) return { found: "locked", agree: f.agree };
+        const deg = Math.abs(Math.round(((((turn * 180) / Math.PI) % 360) + 540) % 360) - 180);
+        const how = ["with its Fourier template", deg ? `turned ${deg}°` : "", Math.abs(pilot.scale - 1) > 0.02 ? `resized to ${Math.round(pilot.scale * 100)}%` : ""].filter(Boolean).join(", ");
+        return { found: "yes", content, agree: f.agree, how };
+      }
+    }
+  }
   const fit = Math.min(1, READ_MAX / Math.max(probe.width, probe.height));
   probe.close();
   const tries = [0, 1, 2, 3].flatMap((q) => SCALES.map((s) => ({ q, s })));
@@ -140,7 +191,7 @@ export async function readPicture(blob: Blob, password: string, progress: (done:
     const f = p && findFrame(p);
     if (!f) continue;
     progress(tries.length, tries.length);
-    const content = await openFrame(f, await markKey(password));
+    const content = await openFrame(f, key);
     if (!content) return { found: "locked", agree: f.agree };
     const how = [t.s !== 1 ? `resized to ${Math.round(t.s * 100)}%` : "", t.q ? `turned ${t.q * 90}°` : ""].filter(Boolean).join(", ");
     return { found: "yes", content, agree: f.agree, how };

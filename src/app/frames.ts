@@ -29,6 +29,8 @@ export interface FrameShot {
   sourceHash: string;
   /** "edit": a picture made by Make a new picture (ADR 0118), which has its own format, folder, name and tags; else an extracted frame. */
   kind?: "edit";
+  /** Kept as the PNG it is, whatever format the settings say (a picture whose exact pixels carry something: an LSB watermark). */
+  keepPng?: true;
 }
 
 /** Make the frame's file (in the chosen format and name), import it, and file it in the chosen folder with the chosen tags. */
@@ -70,7 +72,7 @@ export async function storeFrame(assets: AssetLibrary, session: Session, setting
   const c = edit
     ? { format: settings.get("edit.format"), quality: settings.get("edit.quality"), name: settings.get("edit.name"), style: settings.get("edit.nameStyle"), folder: settings.get("edit.folder"), own: settings.get("edit.tagEdited") ? "edited-picture" : "", source: settings.get("edit.tagSource"), inherit: settings.get("edit.tagInherit"), custom: settings.get("edit.tagsCustom"), fallback: "picture" }
     : { format: settings.get("frame.format"), quality: settings.get("frame.quality"), name: settings.get("frame.name"), style: settings.get("frame.nameStyle"), folder: settings.get("frame.folder"), own: settings.get("frame.tagFrame") ? "extracted-frame" : "", source: settings.get("frame.tagSource"), inherit: settings.get("frame.tagInherit"), custom: settings.get("frame.tagsCustom"), fallback: "frame" };
-  const { blob, mime, ext } = await encodePicture(shot.png, c.format, c.quality);
+  const { blob, mime, ext } = await encodePicture(shot.png, shot.keepPng ? "png" : c.format, c.quality);
   const stem = shot.sourceName.replace(/\.[^.]*$/, "") || c.fallback;
   const tree = session.tree;
   const cur = session.current;

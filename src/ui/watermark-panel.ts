@@ -5,9 +5,10 @@ import { plural } from "../doc/plural";
 import { ICONS } from "./icons";
 import { panelHtml } from "./panel";
 import { esc } from "./format";
-import type { HideOptions, ReadResult } from "../app/invisible-mark-actions";
+import type { HideOptions, HideResult, MarkMethod, ReadResult } from "../app/invisible-mark-actions";
+import { MAX_LSB_TEXT } from "../doc/lsb-mark";
 import { logoFromFile, logoPicture } from "../app/invisible-mark-actions";
-import { MAX_MARK_TEXT_BYTES, STEPS } from "../doc/invisible-mark";
+import { MAX_MARK_TEXT_BYTES } from "../doc/invisible-mark";
 import type { Strength } from "../doc/invisible-mark";
 
 /**
@@ -21,7 +22,7 @@ export interface WatermarkPanelActions {
   makePermanent(): void;
   /** What an invisible watermark would go in: the one picked picture (a still), the one picked text, or nothing. */
   markTarget(): "picture" | "text" | null;
-  hideInPicture(opts: HideOptions): Promise<{ psnr: number; change: string } | { tooSmall: { w: number; h: number; min: number } } | null>;
+  hideInPicture(opts: HideOptions): Promise<HideResult>;
   hideInText(words: string, password: string): Promise<boolean>;
   /** Read the picked picture or text. */
   readSelected(password: string, progress: (done: number, total: number) => void): Promise<ReadResult>;
@@ -84,7 +85,7 @@ export function mountWatermarkPanel(host: HTMLElement, editor: EditorState, acti
   let scheduled = false;
   let tab: Tab = "visible";
   /** What the Invisible tab holds while it is filled in (kept when the tab or the selection changes). */
-  const mark = { kind: "text" as "text" | "logo", text: "", logo: null as { bits: Uint8Array; preview: string } | null, password: "", strength: "normal" as Strength, part: false, busy: false, result: "" };
+  const mark = { method: "blocks" as MarkMethod, kind: "text" as "text" | "logo", text: "", long: "", logo: null as { bits: Uint8Array; preview: string } | null, password: "", strength: "normal" as Strength, part: false, busy: false, result: "" };
   const reading = { password: "", busy: false, result: "" };
 
   const row = (label: string, name: string, min: number, max: number, step: number, unit: string): string =>
@@ -145,22 +146,43 @@ export function mountWatermarkPanel(host: HTMLElement, editor: EditorState, acti
   /** The bytes a text takes (the limit of a mark is in bytes: a letter outside English may take two or more). */
   const bytes = (t: string): number => new TextEncoder().encode(t).length;
 
+  /** Each way of hiding it in a picture: its name, and what it holds and survives (shown under the choice). */
+  const METHODS: ReadonlyArray<[MarkMethod, string, string]> = [
+    ["blocks", "Sturdy", `A text of up to ${MAX_MARK_TEXT_BYTES} bytes or a logo. Survives JPEG, cropping, resizing and quarter turns.`],
+    ["fourier", "Any angle", `Like Sturdy, with a faint Fourier pattern added over the whole picture that lets a copy turned by any angle or resized to any size be read.`],
+    ["lsb", "LSB", "A long text that other LSB tools can read too. Lost if the picture is saved as JPEG, resized or edited (it is kept as PNG)."],
+  ];
+  const STRENGTHS: Record<Strength, string> = { light: "Light: hardest to see", normal: "Normal", strong: "Strong: lasts the most" };
+
   const renderInvisible = (): void => {
     const target = actions.markTarget();
-    const key = `invisible|${target}|${mark.kind}|${mark.busy}|${mark.result}|${!!mark.logo}|${mark.part}`;
+    const picture = target === "picture";
+    const m = picture ? mark.method : "text";
+    const key = `invisible|${target}|${m}|${mark.kind}|${mark.busy}|${mark.result}|${!!mark.logo}|${mark.part}`;
     if (key !== shownKey) {
       shownKey = key;
-      const picture = target === "picture";
+      const field = (label: string, input: string): string => `<label class="wm-text"><span class="adj-label">${label}</span>${input}</label>`;
+      const password = field("Password (optional)", `<input type="password" class="adj-num wm-field" data-im-pass autocomplete="new-password" aria-label="Password (optional)" placeholder="${m === "lsb" ? "None: any LSB tool shows the text" : "None: anyone with canvast can read it"}">`);
+      const strength = `<label class="adj-row"><span class="adj-label">Strength</span><select class="wm-field" data-im-strength aria-label="Strength">${(Object.keys(STRENGTHS) as Strength[]).map((k) => `<option value="${k}"${k === mark.strength ? " selected" : ""}>${STRENGTHS[k]}</option>`).join("")}</select></label>`;
+      // Only the fields the chosen way uses.
+      const fields =
+        m === "text"
+          ? field(`Text <span data-im-count></span>`, `<input type="text" class="adj-num wm-field" data-im-text aria-label="Text to hide (at most ${MAX_MARK_TEXT_BYTES} bytes)" placeholder="© Your name 2026">`) + password
+          : m === "lsb"
+              ? field(`Text <span data-im-count></span>`, `<textarea rows="3" class="wm-field" data-im-long maxlength="${MAX_LSB_TEXT}" aria-label="Text to hide"></textarea>`) + password
+              : `<div class="styles-target" role="radiogroup" aria-label="What to hide"><span>Hide</span><button type="button" role="radio" data-im-kind="text" aria-checked="${mark.kind === "text"}">A text</button><button type="button" role="radio" data-im-kind="logo" aria-checked="${mark.kind === "logo"}">A logo</button></div>
+                 ${mark.kind === "text"
+                   ? field(`Text <span data-im-count></span>`, `<input type="text" class="adj-num wm-field" data-im-text aria-label="Text to hide (at most ${MAX_MARK_TEXT_BYTES} bytes)" placeholder="© Your name 2026">`)
+                   : `<div class="wm-line">${mark.logo ? `<img class="wm-logo wm-bits" src="${mark.logo.preview}" alt="The logo to hide, 32 by 32 dots">` : ""}<button type="button" class="styles-make" data-im-logo>${ICONS.watermarkFile}<span>${mark.logo ? "Another picture…" : "Choose a picture…"}</span></button></div>`}
+                 ${strength}${password}
+                 ${m === "blocks" ? `<label class="wm-check"><input type="checkbox" data-im-part${mark.part ? " checked" : ""}> Only a part of the picture (drag it on the canvas)</label>` : ""}`;
       body.innerHTML = !target
         ? `<p class="adj-empty">Select one picture or one text. A picture gets a copy beside it with the mark in its pixels; a text gets the mark between its words. Neither is seen.</p>`
-        : `<p class="adj-note">${picture ? "Hidden in the picture's pixels, in a copy beside it (this one is not changed). It stays through saving as JPEG, cropping and some resizing." : "Hidden between the words as characters that are not seen. It goes with the text when it is copied, unless the app it is pasted into takes them out."}</p>
-           ${picture ? `<div class="styles-target" role="radiogroup" aria-label="What to hide"><span>Hide</span><button type="button" role="radio" data-im-kind="text" aria-checked="${mark.kind === "text"}">A text</button><button type="button" role="radio" data-im-kind="logo" aria-checked="${mark.kind === "logo"}">A logo</button></div>` : ""}
-           ${!picture || mark.kind === "text"
-             ? `<label class="wm-text"><span class="adj-label">Text <span data-im-count></span></span><input type="text" class="adj-num wm-field" data-im-text aria-label="Text to hide (at most ${MAX_MARK_TEXT_BYTES} bytes)" placeholder="© Your name 2026"></label>`
-             : `<div class="wm-line">${mark.logo ? `<img class="wm-logo wm-bits" src="${mark.logo.preview}" alt="The logo to hide, 32 by 32 dots">` : ""}<button type="button" class="styles-make" data-im-logo>${ICONS.watermarkFile}<span>${mark.logo ? "Another picture…" : "Choose a picture…"}</span></button></div><p class="adj-note">Made 32 × 32 dots, black and white.</p>`}
-           <label class="wm-text"><span class="adj-label">Password (optional)</span><input type="password" class="adj-num wm-field" data-im-pass autocomplete="new-password" aria-label="Password (optional)" placeholder="None: anyone with canvast can read it"></label>
-           ${picture ? `<label class="adj-row"><span class="adj-label">Strength</span><select class="wm-field" data-im-strength aria-label="Strength">${(Object.keys(STEPS) as Strength[]).map((k) => `<option value="${k}"${k === mark.strength ? " selected" : ""}>${{ light: "Light: hardest to see", normal: "Normal", strong: "Strong: lasts the most" }[k]}</option>`).join("")}</select></label>
-             <label class="wm-check"><input type="checkbox" data-im-part${mark.part ? " checked" : ""}> Only a part of the picture (drag it on the canvas)</label>` : ""}
+        : `${picture
+            ? `<div class="styles-target" role="radiogroup" aria-label="How to hide it">${METHODS.map(([id, label]) => `<button type="button" role="radio" data-im-method="${id}" aria-checked="${id === mark.method}">${label}</button>`).join("")}</div>
+               <p class="adj-note">${METHODS.find(([id]) => id === mark.method)![2]} A copy beside the picture gets it; this one is not changed.</p>`
+            : `<p class="adj-note">Hidden between the words as characters that are not seen. It goes with the text when it is copied, unless the app it is pasted into takes them out.</p>`}
+           ${fields}
            <div class="wm-actions"><button type="button" class="styles-make" data-im-hide${mark.busy ? " disabled" : ""}>${ICONS.watermarkHide}<span>${mark.busy ? "Hiding…" : picture ? "Make a marked copy" : "Hide it in the text"}</span></button></div>
            <div class="wm-result" data-testid="watermark-hide-result" role="status">${mark.result}</div>`;
     }
@@ -169,17 +191,24 @@ export function mountWatermarkPanel(host: HTMLElement, editor: EditorState, acti
       if (el && document.activeElement !== el && el.value !== v) el.value = v;
     };
     set("[data-im-text]", mark.text);
+    set("[data-im-long]", mark.long);
     set("[data-im-pass]", mark.password);
-    const count = panel.querySelector<HTMLElement>("[data-im-count]");
-    if (count) count.textContent = `${bytes(mark.text)} / ${MAX_MARK_TEXT_BYTES}`;
-    // The part of the picture: shown on the canvas while this tab is open and it is asked for.
-    const sel = target === "picture" ? actions.selectedWatermark() : null;
-    const want = mark.part && sel ? sel.id : null;
+    showCount();
+    // The part of the picture: shown on the canvas while this tab is open, the sturdy way chosen and a part asked for.
+    const sel = picture ? actions.selectedWatermark() : null;
+    const want = mark.part && m === "blocks" && sel ? sel.id : null;
     if (editor.markAreaFor !== want) {
       editor.markAreaFor = want;
       editor.markArea = want ? (editor.markArea ?? { x: 0.25, y: 0.25, w: 0.5, h: 0.5 }) : null;
       editor.changed();
     }
+  };
+
+  /** How much of the field's room the typed text takes. */
+  const showCount = (): void => {
+    const count = panel.querySelector<HTMLElement>("[data-im-count]");
+    if (!count) return;
+    count.textContent = panel.querySelector("[data-im-long]") ? `${mark.long.length.toLocaleString()} / ${MAX_LSB_TEXT.toLocaleString()}` : `${bytes(mark.text)} / ${MAX_MARK_TEXT_BYTES} bytes`;
   };
 
   const shownResult = (r: ReadResult): string =>
@@ -255,6 +284,12 @@ export function mountWatermarkPanel(host: HTMLElement, editor: EditorState, acti
       if (tab !== "invisible") editor.markArea = editor.markAreaFor = null;
       return editor.changed();
     }
+    const method = t.closest<HTMLElement>("[data-im-method]")?.dataset["imMethod"] as MarkMethod | undefined;
+    if (method) {
+      mark.method = method;
+      mark.result = "";
+      return render();
+    }
     const kind = t.closest<HTMLElement>("[data-im-kind]")?.dataset["imKind"] as "text" | "logo" | undefined;
     if (kind) {
       mark.kind = kind;
@@ -263,16 +298,18 @@ export function mountWatermarkPanel(host: HTMLElement, editor: EditorState, acti
     if (t.closest("[data-im-logo]")) return markLogo.click();
     if (t.closest("[data-im-hide]")) {
       const target = actions.markTarget();
-      const text = mark.text.trim();
       if (!target) return;
-      if ((target === "text" || mark.kind === "text") && (!text || bytes(text) > MAX_MARK_TEXT_BYTES)) {
-        mark.result = `<p class="adj-note">${text ? `That is more than ${MAX_MARK_TEXT_BYTES} bytes: make it shorter.` : "Type the text to hide."}</p>`;
-        return render();
-      }
-      if (target === "picture" && mark.kind === "logo" && !mark.logo) {
-        mark.result = `<p class="adj-note">Choose a picture for the logo.</p>`;
-        return render();
-      }
+      const m = target === "text" ? "text" : mark.method;
+      const say = (html: string): void => {
+        mark.result = `<p class="adj-note">${html}</p>`;
+        render();
+      };
+      const text = mark.text.trim(), long = mark.long;
+      // (what each way needs, checked before anything is made)
+      const sturdy = m === "blocks" || m === "fourier";
+      if ((m === "text" || (sturdy && mark.kind === "text")) && (!text || bytes(text) > MAX_MARK_TEXT_BYTES)) return say(text ? `That is more than ${MAX_MARK_TEXT_BYTES} bytes: make it shorter.` : "Type the text to hide.");
+      if (sturdy && mark.kind === "logo" && !mark.logo) return say("Choose a picture for the logo.");
+      if (m === "lsb" && !long.trim()) return say("Type the text to hide.");
       mark.busy = true;
       mark.result = "";
       render();
@@ -281,14 +318,32 @@ export function mountWatermarkPanel(host: HTMLElement, editor: EditorState, acti
         mark.result = html;
         render();
       };
-      if (target === "text") {
+      if (m === "text") {
         void actions.hideInText(text, mark.password).then((ok) => done(ok ? `<p class="adj-note">Hidden in the text. Read it back in the Read tab, or after copying the text anywhere.</p>` : `<p class="adj-note">It could not be hidden.</p>`));
         return;
       }
       const content = mark.kind === "logo" ? { kind: "logo" as const, bits: mark.logo!.bits } : { kind: "text" as const, text };
+      const opts: HideOptions =
+        m === "fourier"
+          ? { method: "fourier", content, password: mark.password, strength: mark.strength }
+          : m === "lsb"
+            ? { method: "lsb", text: long, password: mark.password }
+            : { method: "blocks", content, password: mark.password, strength: mark.strength, ...(editor.markArea ? { region: { ...editor.markArea } } : {}) };
       void actions
-        .hideInPicture({ content, password: mark.password, strength: mark.strength, ...(editor.markArea ? { region: { ...editor.markArea } } : {}) })
-        .then((r) => done(r && "tooSmall" in r ? `<p class="adj-note">The part chosen (${r.tooSmall.w} × ${r.tooSmall.h} pixels of the picture) is too small to hold ${mark.kind === "logo" ? "a logo" : "this text"} well enough to be found: make it at least ${r.tooSmall.min} × ${r.tooSmall.min}${mark.kind === "text" ? ", or the text shorter" : ""}.</p>` : r ? `<p class="adj-note">The marked copy is beside it, selected. It differs from the picture by ${r.psnr === Infinity ? "nothing" : `${r.psnr.toFixed(1)} dB PSNR (above 40 is not seen)`}. The change, 20 times stronger:</p><img class="wm-change" src="${r.change}" alt="The change made, 20 times stronger">` : `<p class="adj-note">The marked copy could not be made.</p>`))
+        .hideInPicture(opts)
+        .then((r) =>
+          done(
+            !r
+              ? `<p class="adj-note">The marked copy could not be made.</p>`
+              : "tooSmall" in r
+                ? `<p class="adj-note">The part chosen (${r.tooSmall.w} × ${r.tooSmall.h} pixels of the picture) is too small to hold ${mark.kind === "logo" ? "a logo" : "this text"} well enough to be found: make it at least ${r.tooSmall.min} × ${r.tooSmall.min}${mark.kind === "text" ? ", or the text shorter" : ""}.</p>`
+                : "tooLong" in r
+                  ? `<p class="adj-note">This picture holds at most ${r.tooLong.capacity.toLocaleString()} bytes this way${mark.password ? " (a password makes the text about a third longer)" : ""}: make the text shorter.</p>`
+                  : "seeThrough" in r
+                    ? `<p class="adj-note">LSB needs a picture without see-through parts (their colours are not kept exactly). Use Sturdy or Any angle for this one.</p>`
+                    : `<p class="adj-note">The marked copy is beside it, selected. It differs from the picture by ${r.psnr === Infinity ? "nothing" : `${r.psnr.toFixed(1)} dB PSNR (above 40 is not seen)`}. The change, 20 times stronger:</p><img class="wm-change" src="${r.change}" alt="The change made, 20 times stronger">`,
+          ),
+        )
         .catch(() => done(`<p class="adj-note">The marked copy could not be made.</p>`));
       return;
     }
@@ -346,11 +401,10 @@ export function mountWatermarkPanel(host: HTMLElement, editor: EditorState, acti
   });
   panel.addEventListener("input", (e) => {
     const t = e.target as HTMLInputElement;
-    if (t.matches("[data-im-text]")) {
-      mark.text = t.value;
-      const count = panel.querySelector<HTMLElement>("[data-im-count]");
-      if (count) count.textContent = `${bytes(t.value)} / ${MAX_MARK_TEXT_BYTES}`;
-      return;
+    if (t.matches("[data-im-text], [data-im-long]")) {
+      if (t.matches("[data-im-text]")) mark.text = t.value;
+      else mark.long = t.value;
+      return showCount();
     }
     if (t.matches("[data-im-pass]")) return void (mark.password = t.value);
     if (t.matches("[data-rd-pass]")) return void (reading.password = t.value);
@@ -371,7 +425,7 @@ export function mountWatermarkPanel(host: HTMLElement, editor: EditorState, acti
       mark.part = t.checked;
       return render();
     }
-    if (t.matches("[data-im-text], [data-im-pass], [data-rd-pass], [data-rd-text]")) return;
+    if (t.matches("[data-im-text], [data-im-long], [data-im-pass], [data-rd-pass], [data-rd-text]")) return;
     const wm = current();
     if (!wm) return;
     const name = t.dataset["wmRange"] ?? t.dataset["wmNum"];

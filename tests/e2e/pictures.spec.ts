@@ -243,6 +243,82 @@ test("invisible watermark: a marked copy is made beside the picture, read back w
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("invisible watermark, other ways: each shows only its own options; Any angle is read after a turn, a resize and a JPEG save (its Fourier template); LSB is kept as PNG with the text in its lowest bits as other tools read it", async ({ app }) => {
+  test.setTimeout(90_000);
+  const p = app.page;
+  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "edit.format": "jpeg" }))); // (edited pictures as JPEG: an LSB copy must stay PNG)
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  // (smooth shapes with grain, like a photo: a picture made of sharp repeating patterns has strong waves of its own in its spectrum)
+  const pic = await place(app, "photo.png", makePng(900, 640, (x, y) => [128 + 70 * Math.sin(x / 37 + Math.sin(y / 53) * 2) + ((x * 7919 + y * 104729) % 23) - 11, 120 + 60 * Math.cos(y / 41 + x / 97) + ((x * 104723 + y * 7907) % 19) - 9, 110 + 50 * Math.sin((x + 2 * y) / 61) + ((x * 31 + y * 17) % 13) - 6, 255]));
+  await p.keyboard.press("v");
+  const b = await boxOf(app, pic.id);
+  const select = () => p.mouse.click(Math.round(b.minX + 5), Math.round(b.minY + 5));
+  await select();
+  await p.getByRole("button", { name: /^Watermark/ }).click();
+  const panel = p.getByTestId("watermark-panel");
+  await panel.getByRole("tab", { name: "Invisible" }).click();
+  const options = async () => ({ strength: await panel.locator("[data-im-strength]").isVisible(), part: await panel.locator("[data-im-part]").isVisible(), logo: await panel.getByRole("radio", { name: "A logo" }).isVisible() });
+  await expect.poll(options, { message: "Sturdy: all of them" }).toEqual({ strength: true, part: true, logo: true });
+  await panel.getByRole("radio", { name: "Any angle" }).click();
+  await expect.poll(options, { message: "Any angle: a strength and a logo, no part" }).toEqual({ strength: true, part: false, logo: true });
+  await panel.getByLabel(/^Text to hide/).fill("© Ana 2026");
+  await panel.getByRole("button", { name: "Make a marked copy" }).click();
+  await expect(panel.getByTestId("watermark-hide-result")).toContainText("dB PSNR", { timeout: 20_000 });
+  const fourier = (await objs(app)).at(-1)! as unknown as { assetId: string };
+  // its file turned 15 degrees, made 80 % as big and saved as JPEG: still read
+  const turned = await p.evaluate(async (hash) => {
+    const bmp = await createImageBitmap(new Blob([new Uint8Array((await window.__canvastDebug.originalBytes(hash))!)]));
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * 0.8);
+    c.height = Math.round(bmp.height * 0.8);
+    const g = c.getContext("2d")!;
+    g.translate(c.width / 2, c.height / 2);
+    g.rotate((15 * Math.PI) / 180);
+    g.drawImage(bmp, (-bmp.width * 0.8) / 2, (-bmp.height * 0.8) / 2, bmp.width * 0.8, bmp.height * 0.8);
+    return [...new Uint8Array(await (await new Promise<Blob>((r) => c.toBlob((x) => r(x!), "image/jpeg", 0.85))).arrayBuffer())];
+  }, fourier.assetId);
+  await panel.getByRole("tab", { name: "Read" }).click();
+  await panel.getByTestId("watermark-read-input").setInputFiles({ name: "turned.jpg", mimeType: "image/jpeg", buffer: Buffer.from(turned) });
+  await expect(panel.getByTestId("watermark-found")).toHaveText("© Ana 2026", { timeout: 60_000 });
+  await expect(panel.getByTestId("watermark-read-result")).toContainText("turned 15°");
+  // LSB: no strength, no part
+  await select();
+  await panel.getByRole("tab", { name: "Invisible" }).click();
+  await panel.getByRole("radio", { name: "LSB" }).click();
+  await expect.poll(options, { message: "LSB: neither" }).toEqual({ strength: false, part: false, logo: false });
+  await panel.getByLabel("Text to hide").fill("Made by Ana, 2026. All rights reserved.");
+  await panel.getByRole("button", { name: "Make a marked copy" }).click();
+  await expect(panel.getByTestId("watermark-hide-result")).toContainText("dB PSNR", { timeout: 20_000 });
+  const lsb = (await objs(app)).at(-1)! as unknown as { assetId: string };
+  // the file is a PNG, and its lowest bits are the words as a plain LSB tool reads them (red, green, blue, top left first, ended by a zero)
+  const plain = await p.evaluate(async (hash) => {
+    const raw = new Uint8Array((await window.__canvastDebug.originalBytes(hash))!);
+    const png = raw[1] === 0x50 && raw[2] === 0x4e && raw[3] === 0x47;
+    const bmp = await createImageBitmap(new Blob([raw]));
+    const c = document.createElement("canvas");
+    c.width = bmp.width;
+    c.height = bmp.height;
+    const g = c.getContext("2d")!;
+    g.drawImage(bmp, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    const out: number[] = [];
+    for (let n = 0; n < 200; n++) {
+      let v = 0;
+      for (let j = 0; j < 8; j++) { const k = n * 8 + j; v = (v << 1) | (d[Math.floor(k / 3) * 4 + (k % 3)]! & 1); }
+      if (!v) break;
+      out.push(v);
+    }
+    return { png, text: new TextDecoder().decode(new Uint8Array(out)) };
+  }, lsb.assetId);
+  expect(plain).toEqual({ png: true, text: "Made by Ana, 2026. All rights reserved." });
+  await panel.getByRole("tab", { name: "Read" }).click();
+  await panel.getByRole("button", { name: "Read the selected picture" }).click();
+  await expect(panel.getByTestId("watermark-found")).toHaveText("Made by Ana, 2026. All rights reserved.");
+  await expect(panel.getByTestId("watermark-read-result")).toContainText("LSB");
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("invisible watermark in a text: hidden between its words without changing how it looks, one undo step, read back from the text and from a pasted copy", async ({ app }) => {
   const p = app.page;
   await p.keyboard.press("t");

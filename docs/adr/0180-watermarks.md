@@ -28,10 +28,18 @@ The owner wanted to mark pictures as theirs: a visible text or logo placed freel
 - The app tries 9 scales and 4 quarter turns.
 - The result is a new library picture beside the original (the owner's choice).
 
+**Three ways for a picture (2026-11-01, the owner asked for Fourier and LSB too; the panel shows only the chosen way's options):**
+
+- **Any angle** = the blocks plus a Fourier template (`src/doc/fourier-mark.ts`): four waves at 0.07 cycles per pixel, at 12°, 61°, 98° and 143°, 1.6 grey levels each, written with dither. The reader searches turns and radii for where the weakest of the four stands out most, refines each peak to a fraction of a step (1024 window), turns and resizes the copy back (both half-turn senses) and reads the blocks.
+- First tried: a code of 6 characters on one, then two, rings of 64 waves (on/off keying). It was dropped: on real pictures JPEG removed the faint waves, a narrow picture could not hold 64 slots apart, and retrying uncertain bits let wrong codes through a 12-bit CRC.
+- **LSB** (`src/doc/lsb-mark.ts`): UTF-8 and a zero byte in the lowest bits of red, green and blue, top left first, highest bit first (what common LSB tools read). With a password: `canvast-locked:` and base64 of the AES-CTR text. Always stored as PNG (`keepPng`), refused for see-through pictures.
+- Read tries LSB, then the template, then the blocks at 9 scales and 4 quarter turns.
+
 **Invisible in a text** (`src/doc/text-mark.ts`): the same encrypted payload, as zero-width characters (U+200B, U+200C, U+200D and U+2060, two bits each) after a sync run, spread after the spaces.
 
 ## Consequences
 
+- Measured on real pictures with Any angle: a 1018 × 700 painting is read after a 15° turn at 80% (JPEG 85), a 37° turn at 130% and a JPEG 75 save; a 1049 × 619 drawing after all of those but the 15° turn at 80%; a 348 × 967 page only unturned.
 - Measured, a 640 × 480 picture at Normal is read after an 80% or 50% resize and back. It is also read after a JPEG save at 75% combined with an 80% resize and a 13 px crop (E2E). A 320 × 240 picture needs Strong for that.
 - Not survived: free rotation, heavy downscaling with recompression, screenshots of a scaled view, deliberate removal. A text mark is lost to apps that strip zero-width characters.
 - The no-password key is the same in every copy of the app, so such a mark proves nothing on its own.
