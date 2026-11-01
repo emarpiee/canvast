@@ -21,7 +21,7 @@ export interface WatermarkPanelActions {
   makePermanent(): void;
   /** What an invisible watermark would go in: the one picked picture (a still), the one picked text, or nothing. */
   markTarget(): "picture" | "text" | null;
-  hideInPicture(opts: HideOptions): Promise<{ psnr: number; change: string } | null>;
+  hideInPicture(opts: HideOptions): Promise<{ psnr: number; change: string } | { tooSmall: { w: number; h: number; min: number } } | null>;
   hideInText(words: string, password: string): Promise<boolean>;
   /** Read the picked picture or text. */
   readSelected(password: string, progress: (done: number, total: number) => void): Promise<ReadResult>;
@@ -288,7 +288,7 @@ export function mountWatermarkPanel(host: HTMLElement, editor: EditorState, acti
       const content = mark.kind === "logo" ? { kind: "logo" as const, bits: mark.logo!.bits } : { kind: "text" as const, text };
       void actions
         .hideInPicture({ content, password: mark.password, strength: mark.strength, ...(editor.markArea ? { region: { ...editor.markArea } } : {}) })
-        .then((r) => done(r ? `<p class="adj-note">The marked copy is beside it, selected. It differs from the picture by ${r.psnr === Infinity ? "nothing" : `${r.psnr.toFixed(1)} dB PSNR (above 40 is not seen)`}. The change, 20 times stronger:</p><img class="wm-change" src="${r.change}" alt="The change made, 20 times stronger">` : `<p class="adj-note">The marked copy could not be made.</p>`))
+        .then((r) => done(r && "tooSmall" in r ? `<p class="adj-note">The part chosen (${r.tooSmall.w} × ${r.tooSmall.h} pixels of the picture) is too small to hold ${mark.kind === "logo" ? "a logo" : "this text"} well enough to be found: make it at least ${r.tooSmall.min} × ${r.tooSmall.min}${mark.kind === "text" ? ", or the text shorter" : ""}.</p>` : r ? `<p class="adj-note">The marked copy is beside it, selected. It differs from the picture by ${r.psnr === Infinity ? "nothing" : `${r.psnr.toFixed(1)} dB PSNR (above 40 is not seen)`}. The change, 20 times stronger:</p><img class="wm-change" src="${r.change}" alt="The change made, 20 times stronger">` : `<p class="adj-note">The marked copy could not be made.</p>`))
         .catch(() => done(`<p class="adj-note">The marked copy could not be made.</p>`));
       return;
     }

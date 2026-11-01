@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Pixels } from "../../src/doc/invisible-mark";
-import { findFrame, frameOf, hideFrame, logoBits, markKey, openFrame } from "../../src/doc/invisible-mark";
+import { findFrame, frameOf, hideFrame, logoBits, markKey, minPart, openFrame } from "../../src/doc/invisible-mark";
 
 /** A picture with some texture (a mark hides in detail), the same every run. */
 function photo(w: number, h: number, seed = 1): Pixels {
@@ -36,6 +36,14 @@ describe("invisible watermark", () => {
     expect(found!.agree).toBeGreaterThan(0.8);
     expect(await openFrame(found!, key)).toEqual({ kind: "text", text: "© Ana 2026 ✓" });
     expect(await openFrame(found!, await markKey(""))).toBeNull();
+  });
+  it("a text hidden in only a part of the picture (two tiles each way) is read back, the rest of the picture not drowning it", async () => {
+    const key = await markKey("");
+    const content = { kind: "text" as const, text: "© Ana Santos, all rights reserved 2026" };
+    const side = minPart(content);
+    const p = photo(1000, 700, 6);
+    hideFrame(p, await frameOf(content, key), "normal", { x0: 300, y0: 150, x1: 300 + side, y1: 150 + side });
+    expect(await openFrame(findFrame(p)!, key)).toEqual(content);
   });
   it("a logo is hidden in a part of the picture and read back; a picture without a mark gives nothing", async () => {
     const key = await markKey("");

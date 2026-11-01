@@ -216,8 +216,8 @@ export interface FoundFrame extends Frame {
 
 /**
  * The 8-pixel grid offsets most likely to be the mark's, best first. On the mark's grid, blocks a whole tile apart carry the same bit, so
- * their votes agree: for each offset and tile size, the votes of the blocks of a central window are summed by their place in the tile, and
- * how much the copies' votes go together (their products, against the votes' own squares) says how well they agree. That needs no tile start.
+ * their votes agree: for each offset and tile size, the markedness of the blocks of a central window (how well each agrees with the blocks a
+ * tile away) is taken, and its best tenth says how well the copies agree there. That needs no tile start.
  */
 function gridOffsets(y: Float32Array, w: number, h: number): Array<{ ox: number; oy: number }> {
   const span = Math.min(GRID_WINDOW, Math.floor((w - 7) / 8)), spanY = Math.min(GRID_WINDOW, Math.floor((h - 7) / 8));
@@ -233,16 +233,12 @@ function gridOffsets(y: Float32Array, w: number, h: number): Array<{ ox: number;
         softs[by * span + bx] = px + 8 <= w && py + 8 <= h ? soft(coef(y, w, px, py, BASIS[0]!) - coef(y, w, px, py, BASIS[1]!)) : 0;
         n++;
       }
-      // (Σ over places of (sum² − Σ squares) is twice the sum of the products of the copies' votes: about 0 for votes that do not go together)
-      let sq = 0;
-      for (const v of softs) sq += v * v;
-      let agree = 0;
+      // (the best tenth of the map: a mark in only a part of the window stands out as much as one over all of it)
+      let agree = -Infinity;
       for (const T of new Set(FRAMES.map((f) => f.tile))) {
-        const cell = new Float32Array(T * T);
-        for (let by = 0; by < spanY; by++) for (let bx = 0; bx < span; bx++) cell[(by % T) * T + (bx % T)]! += softs[by * span + bx]!;
-        let sum = 0;
-        for (const c of cell) sum += c * c;
-        agree = Math.max(agree, sq ? (sum - sq) / sq : 0);
+        const m = markedness(softs, span, spanY, T).sort();
+        const top = m.subarray(Math.floor(m.length * 0.9));
+        agree = Math.max(agree, top.reduce((a, b) => a + b, 0) / Math.max(1, top.length));
       }
       if (n) scored.push({ ox, oy, agree });
     }
@@ -279,9 +275,12 @@ function framesAt(y: Float32Array, w: number, h: number, ox: number, oy: number)
     const T = f.tile, bits = frameBits(f);
     if (nx * ny < bits) continue; // (too small to hold one frame)
     const order = tileOrder(T, bits);
+    // Each block's vote counted by how marked it looks (a mark in a part of the picture); then, if that finds nothing, every vote alike (a
+    // small picture marked all over holds too few copies for the map).
+    for (const weight of [markedness(softs, nx, ny, T).map(weightOf), null]) {
     // The blocks summed by their place in the tile (their block numbers modulo the tile): a tile start only renumbers these.
     const cell = new Float32Array(T * T);
-    for (let by = 0; by < ny; by++) for (let bx = 0; bx < nx; bx++) cell[(by % T) * T + (bx % T)]! += softs[by * nx + bx]!;
+    for (let by = 0; by < ny; by++) for (let bx = 0; bx < nx; bx++) cell[(by % T) * T + (bx % T)]! += softs[by * nx + bx]! * (weight ? weight[by * nx + bx]! : 1);
     const votes = new Float32Array(bits);
     const frame = new Uint8Array(bits / 8);
     for (let py = 0; py < T; py++) {
@@ -300,9 +299,53 @@ function framesAt(y: Float32Array, w: number, h: number, ox: number, oy: number)
       }
     }
     if (best) return best;
+    }
   }
   return best;
 }
+
+/** The least size (pixels a side) of a part of a picture that holds `content` well enough to be found: two tiles each way. */
+export function minPart(content: MarkContent): number {
+  const t = content.kind === "text" ? new TextEncoder().encode(content.text).length : 0;
+  const f = FRAMES.find((x) => x.kind === content.kind && (content.kind === "logo" || x.bytes - 3 >= t)) ?? FRAMES[FRAMES.length - 1]!;
+  return 2 * f.tile * 8;
+}
+
+/**
+ * How much each block looks marked (about 1 in a marked part, about 0 elsewhere). In a marked part, blocks a tile apart carry the same bit,
+ * so their votes agree; elsewhere they are unrelated. The agreement with the four blocks a tile away, averaged over the blocks around (a few
+ * blocks each way), makes a map that is high over the marked part, so a mark in only a part of the picture is not drowned by the rest.
+ */
+function markedness(softs: Float32Array, nx: number, ny: number, T: number): Float32Array {
+  const agree = new Float32Array(nx * ny);
+  for (let by = 0; by < ny; by++) for (let bx = 0; bx < nx; bx++) {
+    let sum = 0, n = 0;
+    for (const [dx, dy] of [[T, 0], [-T, 0], [0, T], [0, -T]] as const) {
+      const x = bx + dx, y = by + dy;
+      if (x < 0 || y < 0 || x >= nx || y >= ny) continue;
+      sum += softs[by * nx + bx]! * softs[y * nx + x]!;
+      n++;
+    }
+    agree[by * nx + bx] = n ? sum / n : 0;
+  }
+  // the average over a square of blocks, from a summed table
+  const R = MARKED_RADIUS, W = nx + 1;
+  const table = new Float64Array(W * (ny + 1));
+  for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) table[(y + 1) * W + x + 1] = agree[y * nx + x]! + table[y * W + x + 1]! + table[(y + 1) * W + x]! - table[y * W + x]!;
+  const out = new Float32Array(nx * ny);
+  for (let y = 0; y < ny; y++) for (let x = 0; x < nx; x++) {
+    const x0 = Math.max(0, x - R), x1 = Math.min(nx, x + R + 1), y0 = Math.max(0, y - R), y1 = Math.min(ny, y + R + 1);
+    const avg = (table[y1 * W + x1]! - table[y0 * W + x1]! - table[y1 * W + x0]! + table[y0 * W + x0]!) / ((x1 - x0) * (y1 - y0));
+    out[y * nx + x] = avg;
+  }
+  return out;
+}
+
+/** A block's weight from its markedness: nothing for the faint agreement of unmarked blocks, all of it from about half agreement up. */
+const weightOf = (m: number): number => Math.max(0, Math.min(1, (m - 0.12) / 0.3));
+
+/** How many blocks each way the markedness is averaged over. */
+const MARKED_RADIUS = 3;
 
 /** The share of blocks whose own bit agrees with the frame found (0.5: chance, 1: every one). */
 function agreement(softs: Float32Array, nx: number, ny: number, T: number, px: number, py: number, order: Uint16Array, frame: Uint8Array): number {

@@ -23,7 +23,8 @@ The owner wanted to mark pictures as theirs: a visible text or logo placed freel
 - Lattice QIM was tried first. It read cleanly but failed after an 80% resize and back, because it breaks when the coefficients shrink.
 - A frame holds a check word, the payload encrypted with AES-CTR (key from PBKDF2 of the password, or of an empty one), a CRC-32 and 16 Reed–Solomon bytes. Texts take frames of 16, 32 or 64 bytes, so a short text has a small tile and many copies; a logo is 32 × 32 bits.
 - The frame's bits fill a tile of blocks repeated across the picture, or across the part chosen. Every copy votes.
-- Reading looks for the 8-pixel grid where blocks a tile apart vote alike, tries every tile start (Reed–Solomon, then the CRC, accepts one), then decrypts. A frame found but not opened means "it needs its password".
+- A mark in only a part of the picture: each block's vote is weighted by how well it agrees with the blocks a tile away (averaged over its neighbours), so the unmarked rest does not drown it; plain votes are tried next, for a small picture marked all over. A part must hold two tiles each way.
+- Reading looks for the 8-pixel grid where blocks a tile apart vote alike most (the best tenth of that map), tries every tile start (Reed–Solomon, then the CRC, accepts one), then decrypts. A frame found but not opened means "it needs its password".
 - The app tries 9 scales and 4 quarter turns.
 - The result is a new library picture beside the original (the owner's choice).
 

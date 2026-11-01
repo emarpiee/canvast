@@ -225,6 +225,21 @@ test("invisible watermark: a marked copy is made beside the picture, read back w
   await p.mouse.click(Math.round(b.minX + 5), Math.round(b.minY + 5));
   await panel.getByRole("button", { name: "Read the selected picture" }).click();
   await expect(panel.getByTestId("watermark-read-result")).toContainText("No watermark found", { timeout: 60_000 });
+  // only a part of it: the part starts at the middle half, too small for the text; dragged bigger by its corner on the canvas, it holds
+  await panel.getByRole("tab", { name: "Invisible" }).click();
+  await panel.getByLabel(/Only a part of the picture/).check();
+  await panel.getByRole("button", { name: "Make a marked copy" }).click();
+  await expect(panel.getByTestId("watermark-hide-result")).toContainText("too small");
+  const at = (u: number, v: number) => ({ x: Math.round(b.minX + (b.maxX - b.minX) * u), y: Math.round(b.minY + (b.maxY - b.minY) * v) });
+  await app.drag(at(0.75, 0.75), at(0.97, 0.97), 6);
+  await app.drag(at(0.25, 0.25), at(0.15, 0.1), 6);
+  const before = (await objs(app)).length;
+  await panel.getByRole("button", { name: "Make a marked copy" }).click();
+  await expect(panel.getByTestId("watermark-hide-result")).toContainText("dB PSNR", { timeout: 20_000 });
+  expect((await objs(app)).length).toBe(before + 1);
+  await panel.getByRole("tab", { name: "Read" }).click();
+  await panel.getByRole("button", { name: "Read the selected picture" }).click();
+  await expect(panel.getByTestId("watermark-found")).toHaveText("© Ana 2026", { timeout: 60_000 });
   expect(app.consoleErrors).toEqual([]);
 });
 

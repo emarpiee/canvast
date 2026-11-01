@@ -5,7 +5,7 @@
  */
 import type { AssetLibrary, AssetRecord } from "../assets/asset-library";
 import type { MarkContent, Pixels, Strength } from "../doc/invisible-mark";
-import { findFrame, frameOf, hideFrame, logoBits, markKey, openFrame } from "../doc/invisible-mark";
+import { findFrame, frameOf, hideFrame, logoBits, markKey, minPart, openFrame } from "../doc/invisible-mark";
 import type { DocumentStore } from "../doc/document-store";
 import type { ImageObject, TextObject } from "../doc/model";
 import { markText, readText } from "../doc/text-mark";
@@ -63,7 +63,8 @@ export interface HideOptions {
 
 /**
  * Hide the mark in a copy of `o` as it looks (crop, flip, adjustments, visible watermark), placed beside it. Returns how visible the change
- * is (PSNR in dB) and a picture of the change, made 20 times stronger; null when it could not be made.
+ * is (PSNR in dB) and a picture of the change, made 20 times stronger; the least size when the part chosen is too small; null when it could
+ * not be made.
  */
 export async function hideInPicture(
   doc: DocumentStore,
@@ -72,7 +73,7 @@ export async function hideInPicture(
   o: ImageObject,
   opts: HideOptions,
   store: (shot: { png: Blob; label: string; sourceName: string; sourceHash: string; kind?: "edit" }) => Promise<AssetRecord>,
-): Promise<{ psnr: number; change: string } | null> {
+): Promise<{ psnr: number; change: string } | { tooSmall: { w: number; h: number; min: number } } | null> {
   const rec = await assets.record(o.assetId).catch(() => undefined);
   const png = rec ? await bakedPicture(o, rec.blob, assets) : null;
   const p = png ? await pixelsOf(png) : null;
@@ -80,6 +81,9 @@ export async function hideInPicture(
   const before = p.data.slice();
   const r = opts.region;
   const region = r ? { x0: Math.round(r.x * p.width), y0: Math.round(r.y * p.height), x1: Math.round((r.x + r.w) * p.width), y1: Math.round((r.y + r.h) * p.height) } : undefined;
+  // (a part too small to hold two tiles each way could not be told from the rest when it is read)
+  const min = minPart(opts.content);
+  if (region && (region.x1 - region.x0 < min || region.y1 - region.y0 < min)) return { tooSmall: { w: region.x1 - region.x0, h: region.y1 - region.y0, min } };
   const key = await markKey(opts.password);
   const frame = await frameOf(opts.content, key);
   const psnr = hideFrame(p, frame, opts.strength, region);
