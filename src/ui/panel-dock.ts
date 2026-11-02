@@ -14,6 +14,8 @@ export type DockSide = "left" | "right" | "float";
 
 export const MIN_WIDTH = 240;
 export const MAX_WIDTH = 480;
+/** The widest any panel can be saved at (a panel's own `maxWidth` keeps it within that). */
+const WIDEST = 1600;
 const DEFAULT_WIDTH = 268;
 /** How close to the edge of the view (px) a dragged panel must be to dock there. */
 const ZONE_PX = 96;
@@ -28,6 +30,9 @@ export interface DockSpec {
   /** Where it is the first time. */
   side: DockSide;
   width?: number;
+  /** Its own width, also in a stack (the stack's other panels keep theirs), up to `maxWidth`: a wide panel (the note editor). */
+  ownWidth?: boolean;
+  maxWidth?: number;
 }
 
 interface PanelState {
@@ -95,7 +100,7 @@ export class PanelDock {
       if (typeof raw.swl === "number") this.sideW.left = clamp(raw.swl, MIN_WIDTH, MAX_WIDTH);
       if (typeof raw.swr === "number") this.sideW.right = clamp(raw.swr, MIN_WIDTH, MAX_WIDTH);
       for (const [id, p] of Object.entries(raw.panels ?? {})) {
-        if (p && (p.s === "left" || p.s === "right" || p.s === "float")) this.state.set(id, { s: p.s, w: clamp(Number(p.w) || 268, MIN_WIDTH, MAX_WIDTH), x: Number(p.x) || 0, y: Number(p.y) || 0, c: p.c === true });
+        if (p && (p.s === "left" || p.s === "right" || p.s === "float")) this.state.set(id, { s: p.s, w: clamp(Number(p.w) || 268, MIN_WIDTH, WIDEST), x: Number(p.x) || 0, y: Number(p.y) || 0, c: p.c === true });
       }
       if (Array.isArray(raw.order)) this.order = (raw.order as unknown[]).filter((x): x is string => typeof x === "string");
     } catch {
@@ -120,7 +125,9 @@ export class PanelDock {
     box.append(el, grip);
     const item: Item = { spec, el, box };
     this.items.set(spec.id, item);
-    if (!this.state.has(spec.id)) this.state.set(spec.id, { s: spec.side, w: clamp(spec.width ?? this.sideW[spec.side === "right" ? "right" : "left"], MIN_WIDTH, MAX_WIDTH), x: 80, y: 120, c: false });
+    const max = spec.maxWidth ?? MAX_WIDTH;
+    if (!this.state.has(spec.id)) this.state.set(spec.id, { s: spec.side, w: clamp(spec.width ?? this.sideW[spec.side === "right" ? "right" : "left"], MIN_WIDTH, max), x: 80, y: 120, c: false });
+    else this.state.get(spec.id)!.w = clamp(this.state.get(spec.id)!.w, MIN_WIDTH, max);
     if (!this.order.includes(spec.id)) this.order.push(spec.id);
     box.hidden = el.hidden;
     new MutationObserver(() => {
@@ -190,7 +197,7 @@ export class PanelDock {
     s.s = side;
     s.c = false;
     if (side === "float") {
-      if (from !== "float") s.w = this.sideW[from];
+      if (from !== "float" && !this.items.get(id)?.spec.ownWidth) s.w = this.sideW[from];
       const r = this.items.get(id)?.box.getBoundingClientRect();
       if (r && r.width) {
         s.x = r.left - 24;
@@ -249,7 +256,7 @@ export class PanelDock {
       want.get(side === "left" ? this.left : side === "right" ? this.right : this.layer)!.push(it.box);
       it.box.dataset["side"] = side;
       it.box.toggleAttribute("data-folded", s.c);
-      const w = side === "float" ? s.w : this.sideW[side];
+      const w = side === "float" || it.spec.ownWidth ? s.w : this.sideW[side];
       it.box.style.width = `${w}px`;
       if (side === "float") {
         it.box.style.left = `${clamp(s.x, 96 - w, window.innerWidth - 96)}px`;
@@ -294,7 +301,7 @@ export class PanelDock {
         dragging = true;
         item.box.classList.add("is-dragging");
         const from = this.effective(s);
-        if (from !== "float") s.w = this.sideW[from]; // lifted out of its stack: it keeps the width it had
+        if (from !== "float" && !item.spec.ownWidth) s.w = this.sideW[from]; // lifted out of its stack: it keeps the width it had
         s.s = "float";
       }
       s.x = m.clientX - grab.x;
@@ -335,12 +342,13 @@ export class PanelDock {
     e.stopPropagation();
     const s = this.state.get(item.spec.id)!;
     const side = this.effective(s);
-    const startX = e.clientX, startW = side === "float" ? s.w : this.sideW[side];
+    const own = side === "float" || !!item.spec.ownWidth;
+    const startX = e.clientX, startW = own ? s.w : this.sideW[side];
     const grows = side === "right" ? -1 : 1; // the grip is on the edge towards the canvas
     item.box.classList.add("is-resizing");
     const move = (m: PointerEvent): void => {
-      const w = clamp(startW + grows * (m.clientX - startX), MIN_WIDTH, MAX_WIDTH);
-      if (side === "float") s.w = w;
+      const w = clamp(startW + grows * (m.clientX - startX), MIN_WIDTH, item.spec.maxWidth ?? MAX_WIDTH);
+      if (own) s.w = w;
       else this.sideW[side] = w; // the stacked panels of this side share one width
       this.layout();
     };

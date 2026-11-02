@@ -15,19 +15,18 @@ export interface NotePanelDeps extends NoteDeps {
 }
 
 /**
- * The note panel on a canvas (a double-click on a note's card, or Edit note in its Actions bar): the notes editor in a large panel over
- * the canvas, the same editor and the same saving as in the library (`OpenNote`). Closing asks about unsaved changes; the canvas stays
- * where it was, and the card shows the saved version at once (it follows the new version, as every placement does).
+ * The note panel on a canvas (a double-click on a note's card, Edit note in its Actions bar, a new note of the Note tool): a panel of
+ * the dock (`el`, ADR 0123), so it floats, docks to a side and is resized like the others, and the canvas stays usable beside it. Inside,
+ * the same editor and saving as in the library (`OpenNote`). Closing asks about unsaved changes; the card on the canvas shows the saved
+ * version at once (it follows the new version, as every placement does).
  */
-export function mountNotePanel(deps: NotePanelDeps): { open(hash: string): Promise<boolean> } {
-  let dlg: HTMLDialogElement | null = null;
+export function mountNotePanel(el: HTMLElement, deps: NotePanelDeps): { open(hash: string): Promise<boolean>; readonly hash: string | null } {
   let note: OpenNote | null = null;
   const shut = (): void => {
     note?.close(true);
     note = null;
-    dlg?.close();
-    dlg?.remove();
-    dlg = null;
+    el.hidden = true;
+    el.replaceChildren();
   };
   const leave = async (): Promise<boolean> => {
     if (note && !(await note.leave())) return false;
@@ -50,6 +49,7 @@ export function mountNotePanel(deps: NotePanelDeps): { open(hash: string): Promi
   const open = async (hash: string): Promise<boolean> => {
     const rec = await deps.assets.record(hash).catch(() => undefined);
     if (!rec || !noteKindOf(rec.name)) return false;
+    if (note?.hash === hash) return (el.hidden = false), true; // (already open here)
     // (a hidden note's card is a padlock: it opens only while the hidden items show)
     const e = await deps.session.catalog?.entry(hash).catch(() => undefined);
     if (e?.hidden && !deps.assets.revealing) {
@@ -58,28 +58,23 @@ export function mountNotePanel(deps: NotePanelDeps): { open(hash: string): Promi
       return true;
     }
     if (!(await leave())) return true;
-    const d = document.createElement("dialog");
-    d.className = "note-panel";
-    d.dataset["testid"] = "note-panel";
-    d.setAttribute("aria-label", `Note: ${rec.name}`);
-    d.innerHTML = panelHtml({ title: esc(rec.name), body: `<div class="viewer-note" data-testid="note-editor"><div></div></div>` });
-    document.body.append(d);
-    dlg = d;
-    d.showModal();
-    // Esc and the ✕ close it, asking first about unsaved changes (a menu of the editor that is open takes Esc first).
-    d.addEventListener("cancel", (e) => {
-      e.preventDefault();
-      if (!document.querySelector(".sun-editor .se-dropdown[style*='block'], .sun-editor .se-modal-area[style*='block']")) void leave();
-    });
-    d.querySelector("[data-close]")!.addEventListener("click", () => void leave());
+    el.innerHTML = panelHtml({ title: esc(rec.name), body: `<div class="viewer-note" data-testid="note-editor"><div></div></div>` });
+    el.setAttribute("aria-label", `Note: ${rec.name}`);
+    el.querySelector("[data-close]")!.addEventListener("click", () => void leave());
+    el.hidden = false;
     try {
-      note = await OpenNote.open(d.querySelector<HTMLElement>(".viewer-note > div")!, hash, rec.name, rec.blob, deps, place);
-    } catch (e) {
+      note = await OpenNote.open(el.querySelector<HTMLElement>(".viewer-note > div")!, hash, rec.name, rec.blob, deps, place);
+    } catch (err) {
       shut();
-      deps.session.editor.message = `The notes editor could not open “${rec.name}”: ${(e as Error).message}.`;
+      deps.session.editor.message = `The notes editor could not open “${rec.name}”: ${(err as Error).message}.`;
       deps.session.editor.changed();
     }
     return true;
   };
-  return { open };
+  return {
+    open,
+    get hash() {
+      return note?.hash ?? null;
+    },
+  };
 }

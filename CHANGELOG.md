@@ -31,6 +31,7 @@
 - **Removed:** Space no longer starts or pauses the library's slideshow (its button does; Space is the player's).
 - **Changed:** library cards have no checkbox any more (a selected card shows its border). **Select several** in a card's menu (a long touch on a touch screen) makes each tap or click add or remove an item.
 - **Added:** Settings > Notes, **Preview length**: how much of a long note its card on a canvas shows (Short, Medium, Long by default, Whole note).
+- **Fixed:** the note panel on a canvas was a modal dialog, so the editor's own dialogs and menus (Insert image, the link dialog, the library chooser) could not be clicked: it is a panel of the dock now (floats, docks, resizes; the canvas stays usable). Saving twice in a row (Ctrl+S held) asked about another app; closing right after a save asked about unsaved changes.
 - **Added:** the note panel on a canvas: double-click a note's card (or Edit note in its Actions bar) to edit it there, with the same editor and saving as the library (one shared `OpenNote`).
 - **Added:** pasting a web address or a `[[link]]` over selected words in a note makes them the link; the selection toolbar has the link button.
 - **Fixed:** switching a note to Markdown view (or Code view) and back without a change there lost its picture sizes and spacing.

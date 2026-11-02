@@ -1012,7 +1012,12 @@ async function start(): Promise<void> {
   });
   // The note panel (note-panel.ts): made once the library view is, which it imports through.
   let notePanel: { open(hash: string): Promise<boolean> } = { open: async () => false };
-  const notePanelReady = (d: NotePanelDeps): void => void (notePanel = mountNotePanel(d));
+  // (a panel of the dock: floating at first, as wide as a page, its own width also when docked)
+  const notePanelEl = document.createElement("section");
+  notePanelEl.className = "note-dock";
+  notePanelEl.dataset["testid"] = "note-panel";
+  notePanelEl.hidden = true;
+  const notePanelReady = (d: NotePanelDeps): void => void (notePanel = mountNotePanel(notePanelEl, d));
   attachTools(canvas, view, doc, index, editor, { editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h) => void notePanel.open(h), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
     navigate: (dir) =>
       void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus", (o, unit) => {
@@ -1177,6 +1182,8 @@ async function start(): Promise<void> {
   // Every floating panel lives in the dock (ADR 0123): stacked on a side, or floating, folded by its title bar.
   const panelEl = (testid: string): HTMLElement => side.querySelector<HTMLElement>(`[data-testid="${testid}"]`)!;
   dock.add(panelEl("layers-panel"), { id: "layers", title: "Layers", side: "right" });
+  side.append(notePanelEl);
+  dock.add(notePanelEl, { id: "note", title: "Note", side: "float", width: 760, ownWidth: true, maxWidth: 1400 });
   dock.add(panelEl("bookmarks-panel"), { id: "bookmarks", title: "Bookmarks", side: "left" });
   dock.add(panelEl("styles-panel"), { id: "styles", title: "Styles", side: "left" });
   dock.add(panelEl("tags-panel"), { id: "tags", title: "Tags", side: "left" });

@@ -56,6 +56,18 @@ test("a markdown note opens in the notes editor with its library links, saves in
   expect(saved).toContain("# Plan for today");
   expect(saved).toContain("- [x] a task");
   expect(saved).toContain("![cat](Pictures/cat.png)");
+  // Ctrl+S pressed fast, again and again: one save, not a question about another app (it is the same save).
+  await page(p).locator("h1").click();
+  await p.keyboard.press("End");
+  await p.keyboard.type("!");
+  for (let i = 0; i < 3; i++) await p.keyboard.press("Control+s");
+  await expect.poll(async () => (await downloaded(p)).includes("# Plan for today!")).toBe(true);
+  await expect(p.getByTestId("confirm-dialog")).toHaveCount(0);
+  await page(p).locator("h1").click();
+  await p.keyboard.press("End");
+  await p.keyboard.press("Backspace");
+  await p.keyboard.press("Control+s");
+  await expect.poll(async () => (await downloaded(p)).includes("# Plan for today\n")).toBe(true);
 
   // Insert ▸ Template: the built-in ones, then the library's notes tagged `template`, at the cursor.
   await page(p).locator("p").first().click();
@@ -273,6 +285,7 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   const p = app.page;
   const NOTE = "# On the canvas\n\nFirst words.\n";
   await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "pic.png", mimeType: "image/png", buffer: makePng(60, 40, () => [200, 60, 40, 255]) });
   await p.getByTestId("assets-import-input").setInputFiles({ name: "board note.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) });
   await card(p, hashOf(NOTE)).click();
   await p.getByTestId("asset-place").click();
@@ -291,10 +304,29 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   await expect(p.getByTestId("assets-status").or(p.locator(".notice")).first()).toBeAttached();
   // Saved: the card on the canvas is the new version (its item followed it).
   await expect.poll(placed).not.toEqual([hashOf(NOTE)]);
+  // The editor's own dialogs work in the panel (nothing over them takes the clicks): a picture from the library, a link.
+  await panel.locator('.se-toolbar button[data-command="image"]').filter({ visible: true }).click();
+  await p.locator(".__se__gallery").filter({ visible: true }).click();
+  await p.locator(".lib-pick.is-centred").getByRole("button", { name: "pic.png" }).click();
+  await p.locator(".se-modal").filter({ visible: true }).getByRole("button", { name: "Submit" }).click();
+  await expect(panel.locator(".sun-editor-editable").first().locator("img")).toHaveCount(1);
+  await panel.locator(".sun-editor-editable p").first().click();
+  await panel.locator('.se-toolbar button[data-command="link"]').filter({ visible: true }).click();
+  const linkDialog = p.locator(".se-modal").filter({ visible: true });
+  await linkDialog.locator("input").filter({ visible: true }).first().fill("https://example.com/canvas");
+  await linkDialog.getByRole("button", { name: "Submit" }).click();
+  await expect(panel.locator(".sun-editor-editable").first().locator('a[href="https://example.com/canvas"]')).toHaveCount(1);
+  await p.keyboard.press("Control+s");
+  // (the picture's size is formatting markdown cannot keep: asked, saved as plain markdown)
+  await p.getByTestId("choose-dialog").getByLabel("Save as plain markdown").check();
+  await p.getByTestId("choose-dialog").getByRole("button", { name: "Save" }).click();
   await panel.locator("[data-close]").click();
-  await expect(panel).toHaveCount(0);
+  await expect(panel).toBeHidden();
   // Edit note, in the Actions bar of the selected card, opens it too.
   await p.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await p.locator('[data-ctx="editnote"]').filter({ visible: true }).click();
   await expect(p.getByTestId("note-panel").locator(".sun-editor-editable p").first()).toContainText("More words.");
+  // The canvas stays usable while the panel is open (it is a panel, not a dialog): the canvas takes a click beside it.
+  await p.mouse.click(box.x + 20, box.y + box.height - 20);
+  await expect(p.getByTestId("note-panel")).toBeVisible();
 });

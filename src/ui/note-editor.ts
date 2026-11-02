@@ -380,6 +380,8 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     },
   } as SunEditor.InitOptions);
 
+  /** The note as it was opened or last saved: what "unsaved changes" compare with. */
+  let savedHtml = editor.$.html.get();
   // Ctrl+S saves at once: the editor's own shortcut waits until its history takes the last keys (some 400 ms after typing stops).
   const keys = (e: KeyboardEvent): void => {
     if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.code !== "KeyS") return;
@@ -485,8 +487,9 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       .replace(/&nbsp;|\u00a0/g, " "); // (a space the editor keeps from collapsing is a space)
   };
   return {
+    // (edited since it was saved: a change the editor reports late, as its history taking the last keys, is no edit when the note is as saved)
     get dirty() {
-      return dirty;
+      return dirty && editor.$.html.get() !== savedHtml;
     },
     asText(kind) {
       const out = output();
@@ -502,7 +505,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       return { text, keepsAll: held(textHtml(text)) === held(now) };
     },
     asRich: (title) => richNoteFile(title, output().replace(/href="canvast-wiki:([^"]+)"/g, (m, t: string) => { const p = wikiPath.get(decodeURIComponent(t)); return p ? `href="${p}"` : m; })),
-    saved: () => void (dirty = false),
+    saved: () => void ((dirty = false), (savedHtml = editor.$.html.get())),
     destroy() {
       el.removeEventListener("keydown", keys, true);
       el.removeEventListener("click", tick, true);

@@ -265,12 +265,19 @@ export class OpenNote {
     this.editor!.saved();
     session.editor.message = `Saved as the rich text note “${name}”. “${this.name}” is as it was.`;
     session.editor.changed();
-    if (show) await this.place.show(hash);
+    // (shown once this save has ended: showing it leaves this note, which waits for a save on its way)
+    if (show) setTimeout(() => void this.place.show(hash));
     return true;
   }
 
+  /** A save on its way: pressed again meanwhile (Ctrl+S held, pressed fast), it is the same save, not a second one. */
+  private pending: Promise<boolean> | null = null;
   /** Save: a markdown or text note asks first when part of its formatting would be lost. Whether it was saved. */
-  async save(): Promise<boolean> {
+  save(): Promise<boolean> {
+    this.pending ??= this.saveNow().finally(() => (this.pending = null));
+    return this.pending;
+  }
+  private async saveNow(): Promise<boolean> {
     const editor = this.editor;
     if (!editor || this.deps.session.editor.blockEdit()) return false;
     if (this.kind === "rich") return this.write(editor.asRich(titleOf(this.name)));
@@ -291,6 +298,7 @@ export class OpenNote {
 
   /** Before the note is left (another item, Back, Esc, the window closed): its changes are saved or let go, or it stays open. Whether to go on. */
   async leave(): Promise<boolean> {
+    if (this.pending) await this.pending.catch(() => false); // (a save on its way ends first: what it saved is no unsaved change)
     if (!this.dirty) return true;
     const how = await chooseDialog({
       title: "Unsaved changes",
