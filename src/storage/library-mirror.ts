@@ -122,7 +122,8 @@ const SETTLE_MS = 1500;
 
 const usable = (path: string): boolean => {
   const name = path.slice(path.lastIndexOf("/") + 1);
-  return !name.startsWith(".") && !/\.tmp-|\.(tmp|part|partial|crdownload|download|!sync|sync-conflict)$/i.test(name) && !/^(thumbs\.db|desktop\.ini)$/i.test(name);
+  // (nothing in a dot-folder either: another app's own, as Obsidian's .obsidian/, is never taken into the library)
+  return !path.split("/").some((part) => part.startsWith(".")) && !/\.tmp-|\.(tmp|part|partial|crdownload|download|!sync|sync-conflict)$/i.test(name) && !/^(thumbs\.db|desktop\.ini)$/i.test(name);
 };
 const parentOf = (path: string): string => path.slice(0, path.lastIndexOf("/"));
 /** A file's own extension (`library/images/x.png` → `png`), or "" when it has none. */

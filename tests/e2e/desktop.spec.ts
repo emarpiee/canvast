@@ -1279,9 +1279,12 @@ test("while the app runs it follows the folder: a canvas file renamed by hand, a
     // By hand, in the file manager (in the app's own folder, but someone may still): the canvas file renamed, a picture dropped into a new folder of library/.
     renameSync(join(ws, `${B}sketches/characters.cvst`), join(ws, `${B}sketches/Heroes.cvst`));
     mkdirSync(join(ws, "library/drops"));
+    mkdirSync(join(ws, "library/.obsidian")); // (another app's own folder: never taken into the library)
+    writeFileSync(join(ws, "library/.obsidian/app.json"), "{}");
     writeFileSync(join(ws, "library/drops/New One.png"), makePng(2, 2, () => [5, 200, 5, 255]));
     await expect.poll(() => tree(a.page), { timeout: 10_000 }).toEqual([["Sketches", ["Heroes"]]]);
     await expect.poll(() => a.page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.name === "New One.png").map((e) => l.folders.find((f) => f.id === e.folderIds?.[0])?.name))), { timeout: 10_000 }).toEqual(["drops"]);
+    expect(await a.page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.name === "app.json").length))).toBe(0);
     await a.page.evaluate(() => window.__canvastDebug.flushStorage());
     expect(files(ws).filter((f) => f.endsWith(".cvst"))).toEqual([`${B}sketches/heroes.cvst`]);
 

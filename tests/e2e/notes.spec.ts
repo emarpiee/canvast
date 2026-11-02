@@ -66,6 +66,7 @@ test("a markdown note opens in the notes editor with its library links, saves in
     await p.locator(".se-dropdown").filter({ visible: true }).getByRole("button", { name }).click();
     await expect(page(p).locator("h2", { hasText: heading })).toHaveCount(1);
   }
+  await expect(page(p)).toContainText(/Date: \d{4}-\d\d-\d\d/); // ({{date}} in a template is filled in)
 
   // Centred: markdown cannot hold it, so saving asks; a rich text note is made beside it and opened, the markdown file as it was.
   await page(p).locator("h1").click();
@@ -186,6 +187,10 @@ test("[[links]] between notes: shown as links, Ctrl+click opens the note, [[ off
   await p.keyboard.type(" Also [[Bri");
   await p.locator(".se-autocomplete-item, .se-select-item").filter({ visible: true, hasText: "Brief" }).first().click();
   await expect(page(p).locator('a[href="canvast-wiki:Brief"]')).toHaveCount(2);
+  // Resting the pointer on a link shows the preview of what it points at.
+  await link.hover();
+  await expect(p.locator(".note-link-peek img")).toBeVisible();
+  await p.mouse.move(5, 400);
   await p.keyboard.press("Control+s");
   await expect(p.getByTestId("assets-status")).toContainText("Saved “Plan.md”");
   expect(await downloaded(p)).toMatch(/See \[\[Brief\|the brief\]\]\. Also \[\[Brief\]\]/);
@@ -198,4 +203,12 @@ test("[[links]] between notes: shown as links, Ctrl+click opens the note, [[ off
   await p.evaluate(() => window.__canvastDebug.assetListing().then((l) => window.__canvastDebug.libraryOp("rename", l.entries.find((e) => e.name === "Brief.md")!.hash, "Overview.md")));
   await p.getByTestId("asset-backlinks").getByRole("button", { name: "Plan.md" }).click();
   await expect.poll(async () => (await downloaded(p)).match(/\[\[[^\]]+\]\]/g)).toEqual(["[[Overview|the brief]]", "[[Overview]]"]);
+  // [[ offers the canvases too: Ctrl+click opens one.
+  await page(p).locator("p").first().click();
+  await p.keyboard.press("End");
+  await p.keyboard.type(" [[canvas:Can");
+  await p.locator(".se-autocomplete-item, .se-select-item").filter({ visible: true, hasText: "Canvas 1" }).first().click();
+  await page(p).locator('a[href="canvast-wiki:canvas%3ACanvas%201"]').click({ modifiers: ["ControlOrMeta"] });
+  await p.getByTestId("choose-dialog").getByRole("button", { name: "Go on" }).click(); // (Save them)
+  await expect(p.locator(".asset-inspector")).toBeHidden();
 });

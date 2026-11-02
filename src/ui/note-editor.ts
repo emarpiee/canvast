@@ -40,6 +40,8 @@ export interface NoteHost {
   findWiki(target: string): Promise<NoteItem | null>;
   /** Ctrl+click on a link in the note: open what it points at (a note, a file of the library). `link`: as written in the file. */
   open(link: string): void;
+  /** A small picture of what a link points at (its library preview), for a look while the pointer rests on it. */
+  peek(link: string): Promise<Blob | null>;
   /** The notes of the library tagged `template`: offered in Insert ▸ Template after the built-in ones. */
   templates(): Promise<Array<{ name: string; kind: NoteKind; text: string; dir: string[] }>>;
   /** The editor's Save button (and Ctrl+S): whether it was saved. */
@@ -65,11 +67,21 @@ const INSERT_TOOLS = ["hr", "codeBlock", "anchor", "|", "audio", "drawing", "fil
 
 /** Templates every note has (Insert ▸ Template, at the cursor); the library's notes tagged `template` come after them. */
 const TEMPLATES = [
-  { name: "Meeting notes", html: "<h2>Meeting notes</h2><p><strong>Date:</strong> </p><p><strong>Attendees:</strong> </p><h3>Notes</h3><ul><li></li></ul><h3>Action items</h3><ul><li><input type=\"checkbox\"> </li></ul>" },
+  { name: "Meeting notes", html: "<h2>Meeting notes</h2><p><strong>Date:</strong> {{date}}</p><p><strong>Attendees:</strong> </p><h3>Notes</h3><ul><li></li></ul><h3>Action items</h3><ul><li><input type=\"checkbox\"> </li></ul>" },
   { name: "To-do list", html: "<h2>To do</h2><ul><li><input type=\"checkbox\"> </li><li><input type=\"checkbox\"> </li><li><input type=\"checkbox\"> </li></ul>" },
-  { name: "Journal entry", html: "<h2>Journal</h2><p><em>Date:</em> </p><h3>What happened</h3><p></p><h3>What I learned</h3><p></p>" },
+  { name: "Journal entry", html: "<h2>Journal {{date}}</h2><p><em>Written at</em> {{time}}</p><h3>What happened</h3><p></p><h3>What I learned</h3><p></p>" },
   { name: "Reference sheet", html: "<h2>Reference</h2><p><strong>Subject:</strong> </p><p><strong>Source:</strong> </p><h3>Observations</h3><ul><li></li></ul>" },
 ];
+/** A template's `{{date}}` (2026-11-03), `{{time}}` (14:05) and `{{title}}` (the note's name) filled in. */
+function fillTemplate(html: string, title: string): string {
+  const now = new Date();
+  const two = (n: number): string => String(n).padStart(2, "0");
+  const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+  return html.replace(/\{\{\s*(date|time|title)\s*\}\}/gi, (_m, k: string) =>
+    k.toLowerCase() === "date" ? `${now.getFullYear()}-${two(now.getMonth() + 1)}-${two(now.getDate())}` : k.toLowerCase() === "time" ? `${two(now.getHours())}:${two(now.getMinutes())}` : esc(title),
+  );
+}
+
 /** Layouts (Insert ▸ Layout): one takes the place of the whole note (Ctrl+Z brings the note back). Markdown cannot hold them: a note with one is saved as a rich text note. */
 const col = (flex: number, text: string): string => `<div style="flex:${flex}"><p>${text}</p></div>`;
 const LAYOUTS = [
@@ -195,7 +207,7 @@ const localFiles = (files: unknown): File[] | null => {
  * Open a note in the notes editor (SunEditor) inside `el`. Its links to library items are shown from the library (pictures, videos,
  * sounds, files) and written back as they were, or, for what is added, as a path relative to the note; files added go into the library.
  */
-export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; text: string; style: NoteStyle; host: NoteHost }): Promise<NoteEditor> {
+export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; text: string; style: NoteStyle; host: NoteHost; /** The note's name (no extension), for {{title}}. */ title: string }): Promise<NoteEditor> {
   const { host } = opts;
   /** Each address shown in the note for a library item → the link written in the file for it. */
   const links = new Map<string, string>();
@@ -285,7 +297,8 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     ],
     font: { items: fonts },
     fileUpload: { uploadUrl: "canvast:library" }, // (never sent: files are taken by onFileUploadBefore)
-    template: { items: [...TEMPLATES, ...templates] },
+    // ({{date}}, {{time}} and {{title}} in a template are filled in: today, now, this note's name)
+    template: { items: [...TEMPLATES, ...templates].map((t) => ({ ...t, html: fillTemplate(t.html, opts.title) })) },
     autocomplete: {
       limitSize: 8,
       triggers: {
@@ -339,6 +352,36 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     host.open(links.get(href) ?? href);
   };
   el.addEventListener("click", follow, true);
+  // The pointer resting on a link: a small card with the preview of what it points at (a note's page, a picture), like a tooltip.
+  let peekTimer = 0;
+  let peekCard: HTMLElement | null = null;
+  const unpeek = (): void => {
+    clearTimeout(peekTimer);
+    peekCard?.remove();
+    peekCard = null;
+  };
+  const peekOver = (e: MouseEvent): void => {
+    const a = (e.target as HTMLElement).closest?.("a[href]");
+    if (!a || !a.closest(".sun-editor-editable")) return;
+    unpeek();
+    peekTimer = window.setTimeout(() => {
+      const href = a.getAttribute("href")!;
+      void host.peek(links.get(href) ?? href).then((blob) => {
+        if (!blob || !a.isConnected || !a.matches(":hover")) return;
+        const url = URL.createObjectURL(blob);
+        const r = a.getBoundingClientRect();
+        peekCard = document.createElement("div");
+        peekCard.className = "note-link-peek";
+        peekCard.style.left = `${Math.round(r.left)}px`;
+        peekCard.style.top = `${Math.round(r.bottom + 6)}px`;
+        peekCard.innerHTML = `<img alt="" src="${url}">`;
+        peekCard.querySelector("img")!.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
+        document.body.append(peekCard);
+      });
+    }, 350);
+  };
+  el.addEventListener("mouseover", peekOver);
+  el.addEventListener("mouseout", unpeek);
   const tick = (e: MouseEvent): void => {
     const box = e.target as HTMLInputElement;
     if (box.type !== "checkbox" || !box.closest(".sun-editor-editable")) return;
@@ -376,12 +419,22 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     box.innerHTML = twin.$.html.get();
     for (const b of box.content.querySelectorAll("input[type=checkbox]")) b.removeAttribute("disabled"); // (markdown read back marks them so)
     for (const n of box.content.querySelectorAll("*")) {
-      const attrs = [...n.attributes].map((a) => [a.name, a.value] as const).sort(([a], [b]) => (a < b ? -1 : 1));
+      const same = (v: string): string => {
+        try {
+          return decodeURIComponent(v); // (an address written with %3A or with : is the same address)
+        } catch {
+          return v;
+        }
+      };
+      const attrs = [...n.attributes].map((a) => [a.name, a.name === "href" || a.name === "src" ? same(a.value) : a.value] as const).sort(([a], [b]) => (a < b ? -1 : 1));
       for (const [k] of attrs) n.removeAttribute(k);
-      for (const [k, v] of attrs) n.setAttribute(k, v);
+      for (const [k, v] of attrs) if (v !== "" || (k !== "class" && k !== "style")) n.setAttribute(k, v); // (an empty class or style is none)
     }
     // (the editor's caret placeholders, and spaces at a block's end, which markdown does not keep, are no part of the note's formatting)
-    return box.innerHTML.replace(/[\u200B\uFEFF]/g, "").replace(/(?:&nbsp;|\u00a0|\s)+(<\/(?:p|h[1-6]|li|td|th|div|blockquote)>)/g, "$1");
+    return box.innerHTML
+      .replace(/[\u200B\uFEFF]/g, "")
+      .replace(/(?:&nbsp;|\u00a0|\s)+(<\/(?:p|h[1-6]|li|td|th|div|blockquote)>)/g, "$1")
+      .replace(/&nbsp;|\u00a0/g, " "); // (a space the editor keeps from collapsing is a space)
   };
   return {
     get dirty() {
@@ -406,6 +459,9 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       el.removeEventListener("keydown", keys, true);
       el.removeEventListener("click", tick, true);
       el.removeEventListener("click", follow, true);
+      el.removeEventListener("mouseover", peekOver);
+      el.removeEventListener("mouseout", unpeek);
+      unpeek();
       editor.destroy();
       twin?.destroy();
       for (const url of links.keys()) URL.revokeObjectURL(url);

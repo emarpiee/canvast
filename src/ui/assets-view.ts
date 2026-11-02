@@ -992,14 +992,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const keyOf = (x: CatalogEntry): string => (noteKindOf(x.name) === "md" ? x.name.replace(/\.(md|markdown)$/i, "") : x.name);
         const count = new Map<string, number>();
         for (const x of all) count.set(keyOf(x).toLowerCase(), (count.get(keyOf(x).toLowerCase()) ?? 0) + 1);
-        return Promise.all(
-          all.filter((x) => x.hash !== hash).map(async (x) => {
+        const canvases = (session.tree?.boards ?? []).flatMap(({ board, canvases }) => canvases.map((c) => ({ key: `canvas:${c.name}`, name: c.name, hash: board.id })));
+        return Promise.all([
+          ...canvases,
+          ...all.filter((x) => x.hash !== hash).map(async (x) => {
             const key = keyOf(x);
             if ((count.get(key.toLowerCase()) ?? 0) < 2) return { key, name: key, hash: x.hash };
             const path = (await libraryPath(x.hash, x)).slice(0, -1);
             return { key: [...path, key].join("/"), name: key, hash: x.hash };
           }),
-        );
+        ]);
+      },
+      async peek(link) {
+        const target = link.startsWith(WIKI) ? null : linkTarget(link, dir);
+        const found = link.startsWith(WIKI) ? await host.findWiki(decodeURIComponent(link.slice(WIKI.length))) : target ? await host.find(target) : null;
+        return found ? ((await session.catalog?.thumb(found.hash).catch(() => undefined))?.blob ?? null) : null;
       },
       tags: async () => [...new Set(all.flatMap((x) => x.tags ?? []))].sort((a, b) => a.localeCompare(b)),
       async findWiki(target) {
@@ -1013,6 +1020,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         return item(named[0]!);
       },
       open(link) {
+        // `[[canvas:Name]]`: that canvas, opened
+        const canvas = link.startsWith(`${WIKI}canvas%3A`) ? decodeURIComponent(link.slice(WIKI.length)).slice(7).trim().toLowerCase() : null;
+        if (canvas !== null) {
+          const c = (session.tree?.boards ?? []).flatMap((b) => b.canvases).find((x) => x.name.toLowerCase() === canvas);
+          if (!c) return void ((session.editor.message = "No canvas has that name."), session.editor.changed());
+          void leaveNote().then(async (ok) => ok && (await session.openCanvas(c.id), showCanvas()));
+          return;
+        }
         void (async () => {
           const target = link.startsWith(WIKI) ? null : linkTarget(link, dir);
           const found = link.startsWith(WIKI) ? await host.findWiki(decodeURIComponent(link.slice(WIKI.length))) : target ? await host.find(target) : null;
@@ -1048,7 +1063,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideCaption.textContent = "";
     let editor: NoteEditor;
     try {
-      editor = await mountNoteEditor(box, { kind, text, style: settings.get("notes.style"), host });
+      editor = await mountNoteEditor(box, { kind, text, style: settings.get("notes.style"), host, title: name.replace(/\.(note\.html|md|markdown|txt)$/i, "") });
     } catch (e) {
       noteBox.hidden = true;
       viewer.classList.remove("is-note");
