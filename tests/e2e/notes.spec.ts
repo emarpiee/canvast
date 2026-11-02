@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./harness";
@@ -37,6 +38,7 @@ test("a markdown note opens in the notes editor with its library links, saves in
   // Opened: its words, its task box, and its picture shown from the library (the link names it by its path).
   await expect(page(p).locator("h1")).toHaveText("Plan");
   await expect(page(p).locator('input[type="checkbox"]')).toHaveCount(1);
+  await expect(page(p).locator("li", { has: p.locator('input[type="checkbox"]') })).toHaveCSS("list-style-type", "none"); // (its box is its mark)
   await expect(page(p).locator("img")).toHaveAttribute("src", /^blob:/);
 
   // Written to and saved (Ctrl+S): the same item, its file rewritten as markdown with its links as they were.
@@ -93,11 +95,31 @@ test("a markdown note opens in the notes editor with its library links, saves in
   await expect(p.getByTestId("slide-view")).toBeHidden();
 });
 
-test("New note makes a markdown note in the open folder and opens it to write in", async ({ app }) => {
+test("New note makes a markdown note in the open folder and opens it to write in; a table goes in, and a font of the library is used by its name", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "SpaceGrotesk.ttf", mimeType: "font/ttf", buffer: readFileSync("scripts/showcase/fonts/SpaceGrotesk_400Regular.ttf") });
   await p.getByTestId("assets-import-menu").click();
   await p.getByRole("menuitem", { name: /New note/ }).click();
   await expect(page(p).locator("h1")).toHaveText(/^Note \d{4}-\d\d-\d\d \d{6}$/);
-  await expect(p.getByTestId("asset-card")).toHaveCount(1);
+  await expect(p.getByTestId("asset-card")).toHaveCount(2);
+
+  // A table from the size picker, shown.
+  await page(p).locator("h1").click();
+  await p.keyboard.press("Control+End");
+  await p.keyboard.press("Enter");
+  await note(p).locator('.se-toolbar button[data-command="table"]').filter({ visible: true }).click();
+  await p.locator(".se-table-size-picker").filter({ visible: true }).click({ position: { x: 30, y: 30 } });
+  await expect(page(p).locator("table")).toBeVisible();
+
+  // The library's font, chosen in the font list by its family name: the words are set in it.
+  await page(p).locator("h1").first().selectText();
+  await note(p).locator('.se-toolbar button[data-command="font"]').filter({ visible: true }).click();
+  const list = p.locator(".se-list-font-family button").filter({ visible: true });
+  const names = (await list.allTextContents()).filter((n) => n !== "Default" && n !== "Inter");
+  expect(names.length, "the library's font is in the list").toBe(1);
+  await list.filter({ hasText: names[0] }).click();
+  const used = await page(p).locator("h1 span").first().evaluate((s) => getComputedStyle(s).fontFamily);
+  expect(used.replace(/"/g, "")).toBe(names[0]);
+  expect(await p.evaluate((f) => document.fonts.check(`16px "${f}"`), names[0])).toBe(true);
 });

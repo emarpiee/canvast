@@ -29,8 +29,8 @@ export interface NoteHost {
   choose(kind: AttachKind | "any"): Promise<NoteItem | null>;
   /** Files dropped, pasted or uploaded into the note: put in the library first. */
   importFiles(files: File[]): Promise<NoteItem[]>;
-  /** The fonts of the library, loaded: their name and the CSS family the page draws them with. */
-  fonts(): Promise<Array<{ name: string; family: string }>>;
+  /** The fonts of the library, loaded, by their family names (the page knows them by those names too). */
+  fonts(): Promise<string[]>;
   /** The notes of the library tagged `template`: offered in Insert ▸ Template after the built-in ones. */
   templates(): Promise<Array<{ name: string; kind: NoteKind; text: string; dir: string[] }>>;
   /** The editor's Save button (and Ctrl+S): whether it was saved. */
@@ -218,7 +218,6 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   const value = await shown(opts.kind, opts.text, host.dir);
   const templates = await Promise.all((await host.templates()).map(async (t) => ({ name: t.name, html: await shown(t.kind, t.text, t.dir) })));
   const fonts = await host.fonts();
-  const cssName = (name: string): string => (/^[A-Za-z][\w -]*$/.test(name) ? name : `"${name.replace(/"/g, "")}"`);
   const choose = async (kind: AttachKind | "any"): Promise<HTMLElement | null> => {
     const item = await host.choose(kind);
     return item && targetFor(item);
@@ -247,7 +246,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       ...[align, anchor, audio, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileUpload, font, fontColor, fontSize, hr, image, layout, lineHeight, link, list, list_bulleted, list_numbered, pageNavigator, paragraphStyle, slashCommand, table, template, textStyle, video],
       ...[imageGallery, videoGallery, audioGallery, fileGallery, fileBrowser].map((g) => libraryGallery(g as GalleryClass, choose)),
     ],
-    font: { items: [...new Set(fonts.map((f) => `${cssName(f.name)}, ${f.family}`))] },
+    font: { items: fonts },
     fileUpload: { uploadUrl: "canvast:library" }, // (never sent: files are taken by onFileUploadBefore)
     template: { items: [...TEMPLATES, ...templates] },
     layout: { items: LAYOUTS },

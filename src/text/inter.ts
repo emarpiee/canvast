@@ -22,5 +22,6 @@ export function installTextFont(onReady: () => void): void {
   });
   const face = new FontFace(BUNDLED_FAMILY, bytes);
   document.fonts.add(face);
+  void new FontFace("Inter", bytes).load().then((g) => document.fonts.add(g), () => undefined); // (by its own name too: the notes editor's font list)
   face.load().then(onReady, () => undefined);
 }

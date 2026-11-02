@@ -1385,6 +1385,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .sun-editor.se-theme-canvast .se-list-inner :is(h1, h2, h3, h4, h5, h6, p, blockquote, pre) { font-family: var(--font-ui); } /* (the paragraph styles' previews) */
 /* (the editor writes white on its accent: the app's text on accent, in each state, the dialogs' own rule too) */
 .sun-editor.se-theme-canvast .se-btn-primary, .sun-editor.se-theme-canvast .se-btn-primary:is(:hover, :focus), .sun-editor.se-theme-canvast .se-modal-area .se-modal-inner .se-modal-content .se-btn-primary { color: var(--hud-accent-fg); }
+.sun-editor-editable.se-theme-canvast li:has(> input[type="checkbox"]:first-child) { list-style: none; margin-left: calc(-1 * var(--sp-8)); } /* (a task: its box is its mark) */
 /* A note open in the viewer: the notes editor fills the stage; the picture's own tools are not shown. */
 .viewer-note { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .viewer-note > div, .viewer-note .se-container { flex: 1; min-height: 0; display: flex; flex-direction: column; }

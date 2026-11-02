@@ -49,10 +49,13 @@ export class FontLoader {
       const wght = font.axes.find((a) => a.tag === "wght");
       let face = false;
       try {
-        const f = new FontFace(family, sfnt as BufferSource, { weight: wght ? `${wght.min} ${wght.max}` : String(names.weight), style: names.italic ? "italic" : "normal" });
+        const how = { weight: wght ? `${wght.min} ${wght.max}` : String(names.weight), style: names.italic ? "italic" : "normal" };
+        const f = new FontFace(family, sfnt as BufferSource, how);
         document.fonts.add(f);
         await f.load();
         face = true;
+        // Also by its own name, for what names fonts by name (the notes editor, whose rich notes keep a name other apps know).
+        if (names.family) void new FontFace(names.family, sfnt as BufferSource, how).load().then((g) => document.fonts.add(g), () => undefined);
       } catch {
         // the browser refused the file: letters are drawn from the outlines we read instead
       }

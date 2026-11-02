@@ -46,7 +46,7 @@ import { mountNoteEditor } from "./note-editor";
 import type { AttachKind, NoteEditor, NoteHost, NoteItem } from "./note-editor";
 import { RICH_NOTE_SUFFIX, noteKindOf, richNameOf } from "../notes/note-file";
 import type { NoteKind } from "../notes/note-file";
-import { familyFor, fontFor } from "../text/fonts";
+import { fontFor } from "../text/fonts";
 import { hasAlpha } from "./alpha";
 import { VIEW_GROUNDS, type ViewGround } from "../storage/workspace-repo";
 import type { Engine } from "./media-player";
@@ -956,8 +956,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       },
       importFiles: take,
       async fonts() {
-        const list = (await fonts()).filter((f) => !f.unusable);
-        return [{ name: "Inter", family: familyFor() }, ...list.map((f) => ({ name: fontFor(f.hash).names.family || f.name, family: familyFor(f.hash) }))];
+        const list = (await fonts()).filter((f) => !f.unusable && fontFor(f.hash).names.family);
+        return [...new Set(["Inter", ...list.map((f) => fontFor(f.hash).names.family)])];
       },
       async templates() {
         const tagged = all.filter((x) => x.hash !== hash && noteKindOf(x.name) && meta(x).tags.some((t) => t.toLowerCase() === TEMPLATE_TAG));
