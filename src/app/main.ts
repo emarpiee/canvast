@@ -1,5 +1,6 @@
 import { externalFolder } from "../storage/external-folder";
 import { askHiddenPassword } from "../ui/hidden-access";
+import { noteKindOf } from "../notes/note-file";
 import { ViewState } from "./view-state";
 import { fileInLibrary } from "./library-filing";
 import { storeFrame } from "./frames";
@@ -524,6 +525,7 @@ async function start(): Promise<void> {
           if (f.hidden) await storage.catalog.updateMeta(record.hash, { hidden: true });
           if (f.meta) await storage.catalog.updateMeta(record.hash, { addTags: f.meta.tags, favorite: f.meta.favorite, note: f.meta.note, fields: f.meta.fields });
           // (an item's file saved again by the program it is worked on in: what was placed of it follows the new version)
+          if (!f.follows && noteKindOf(f.name)) await session.adoptNoteProps(record.hash); // (a note's YAML: its tags, note and fields)
           if (f.follows) {
             await session.followAsset(f.follows, record.hash, { w: record.pixelW, h: record.pixelH });
             if (!f.savedInApp) followed.push(f.name);

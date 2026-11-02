@@ -3,6 +3,7 @@ import { align, anchor, audio, audioGallery, backgroundColor, blockquote, blockS
 import type { SunEditor } from "suneditor/types";
 import { linkTarget, relativeLink, richNoteBody, richNoteFile, textHtml } from "../notes/note-file";
 import type { NoteKind, NoteStyle } from "../notes/note-file";
+import { splitFrontmatter } from "../notes/frontmatter";
 
 
 /** What a note's attachments can be: what the library chooser lists for each of the editor's buttons. */
@@ -213,7 +214,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
    * from; a template's links from another folder are written again from this note's (the app's own links stay as they are).
    */
   const shown = async (kind: NoteKind, text: string, dir: readonly string[]): Promise<string> => {
-    const html = kind === "md" ? helper.markdown.markdownToHtml(text, "P") : kind === "txt" ? textHtml(text) : richNoteBody(text);
+    const html = kind === "md" ? helper.markdown.markdownToHtml(splitFrontmatter(text).body, "P") : kind === "txt" ? textHtml(text) : richNoteBody(text); // (properties: in the details panel)
     const page = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
     const here = dir.join("/") === host.dir.join("/");
     for (const box of page.body.querySelectorAll("input[type=checkbox]")) box.removeAttribute("disabled"); // (task boxes are ticked in the note)

@@ -1,4 +1,5 @@
 import { noteKindOf, richNoteBody, textHtml } from "./note-file";
+import { splitFrontmatter } from "./frontmatter";
 
 // The picture of a note (its library thumbnail and its card on a canvas): the top of its page, as the notes editor lays it out, drawn
 // through an SVG image (`foreignObject`), which runs nothing and loads nothing. Fixed paper colours, like every file card: it is stored.
@@ -23,7 +24,7 @@ li:has(>input[type=checkbox]:first-child){list-style:none;margin-left:-1.2em}a{c
 async function pageHtml(name: string, text: string): Promise<string> {
   const kind = noteKindOf(name);
   const { markdownHtml } = await import("./note-markdown"); // (loaded when a preview is made: the editor needs a page, not the unit tests' Node)
-  const html = kind === "md" ? markdownHtml(text) : kind === "rich" ? richNoteBody(text) : textHtml(text);
+  const html = kind === "md" ? markdownHtml(splitFrontmatter(text).body) : kind === "rich" ? richNoteBody(text) : textHtml(text);
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
   for (const n of doc.body.querySelectorAll("script, style, iframe, object, embed, link, meta, video, audio")) n.remove();
   for (const img of doc.body.querySelectorAll("img")) {

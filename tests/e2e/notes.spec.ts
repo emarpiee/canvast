@@ -128,3 +128,30 @@ test("New note makes a markdown note in the open folder and opens it to write in
   expect(used.replace(/"/g, "")).toBe(names[0]);
   expect(await p.evaluate((f) => document.fonts.check(`16px "${f}"`), names[0])).toBe(true);
 });
+
+test("a note's properties (YAML, as Obsidian writes them) are its item's tags, note and fields, both ways", async ({ app }) => {
+  const p = app.page;
+  const NOTE = "---\ntags:\n  - design\nauthor: Ana\ndescription: The cover plan\nnested:\n  a: 1\n---\n# Cover\n\nText.\n";
+  const entry = () => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.name === "cover.md").map((e) => ({ tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] }))[0]));
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "cover.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) });
+  // Read in: its tags, its note (description) and its fields (the nested map is kept in the file, not shown).
+  await expect.poll(entry).toEqual({ tags: ["design"], note: "The cover plan", fields: [{ key: "author", value: "Ana" }] });
+  // The editor shows the note without its properties.
+  await p.getByTestId("asset-card").first().dblclick();
+  await expect(page(p).locator("h1")).toHaveText("Cover");
+  await expect(page(p)).not.toContainText("author");
+  // A tag added in the details goes into the file's YAML (a new version: the same item, its name and place).
+  await p.getByTestId("asset-tag-input").fill("print");
+  await p.getByTestId("asset-tag-input").press("Enter");
+  await expect.poll(async () => (await downloaded(p)).includes("  - print")).toBe(true);
+  // Saved from the editor: the text changes, the properties stay.
+  await page(p).locator("h1").click();
+  await p.keyboard.press("End");
+  await p.keyboard.type(" art");
+  await p.keyboard.press("Control+s");
+  await expect(p.getByTestId("assets-status")).toContainText("Saved “cover.md”");
+  const file = await downloaded(p);
+  expect(file).toMatch(/^---\ntags:\n  - design\n  - print\nauthor: Ana\ndescription: The cover plan\nnested:\n  a: 1\n---\n# Cover art/);
+  await expect.poll(entry).toEqual({ tags: ["design", "print"], note: "The cover plan", fields: [{ key: "author", value: "Ana" }] });
+});

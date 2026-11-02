@@ -44,7 +44,8 @@ import { runExport, runExportFiles, runExportFolder } from "./archive-ui";
 import { openLibraryPicker } from "./library-picker";
 import { mountNoteEditor } from "./note-editor";
 import type { AttachKind, NoteEditor, NoteHost, NoteItem } from "./note-editor";
-import { RICH_NOTE_SUFFIX, noteKindOf, richNameOf } from "../notes/note-file";
+import { RICH_NOTE_SUFFIX, noteKindOf, richNameOf, richNoteBody } from "../notes/note-file";
+import { splitFrontmatter, underProps, withFileMeta } from "../notes/frontmatter";
 import type { NoteKind } from "../notes/note-file";
 import { fontFor } from "../text/fonts";
 import { hasAlpha } from "./alpha";
@@ -907,7 +908,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   noteBox.dataset["testid"] = "note-editor";
   noteBox.hidden = true;
   viewer.querySelector(".viewer-stage")!.append(noteBox);
-  let note: { hash: string; kind: NoteKind; name: string; type: string; editor: NoteEditor } | null = null;
+  /** The note open in the editor; `base`: its words as the editor read them (to tell whether its file was changed elsewhere since). */
+  let note: { hash: string; kind: NoteKind; name: string; type: string; editor: NoteEditor; base: string } | null = null;
+  /** A note file's words: without its properties (they are the library's too) and, for a rich text note, without its head. */
+  const wordsOf = (kind: NoteKind, file: string): string => (kind === "md" ? splitFrontmatter(file).body : kind === "rich" ? richNoteBody(file) : file).trim();
   /** A note is being saved: its item gets a new hash, so the old one going is not the note being deleted. */
   let noteSaving = false;
   /** Where an item is in the library, as folders and a file name: its file's path in the workspace folder when it has one, else its library folder and name. */
@@ -997,14 +1001,22 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return;
     }
     if (token !== slideToken) return editor.destroy();
-    note = { hash, kind, name, type: blob.type || "text/plain", editor };
+    note = { hash, kind, name, type: blob.type || "text/plain", editor, base: wordsOf(kind, text) };
   };
   const writeNote = async (n: NonNullable<typeof note>, text: string): Promise<boolean> => {
     noteSaving = true;
     try {
+      // (the editor holds the note without its properties: the item's, as they are now, go back into the file)
+      const e = await session.catalog?.entry(n.hash).catch(() => undefined);
+      const now = (await (await assets.record(n.hash).catch(() => undefined))?.blob.text()) ?? "";
+      // Its words were changed elsewhere since it was opened (in another app): replacing them is asked first.
+      if (now && wordsOf(n.kind, now) !== n.base && !(await confirmDialog({ title: "Changed in another app", lines: [`“${n.name}” was changed outside canvast since you opened it here.`, "Saving puts your version in its place, and the other changes are lost. Cancel, then close the note without saving and open it again to see the other version."], confirmLabel: "Save mine" }))) return false;
+      if (n.kind === "md") text = underProps(now, text); // (what it keeps as written, in its order)
+      if (e && n.kind !== "txt") text = withFileMeta(n.kind, text, { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] });
       const hash = await session.saveVersion(n.hash, new File([text], n.name, { type: n.type }));
       if (!hash) return false;
       n.editor.saved();
+      n.base = wordsOf(n.kind, text);
       if (note === n) {
         n.hash = slideHash = selected = anchor = hash;
         picked.clear();
@@ -1021,7 +1033,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** The note's formatting does not fit its markdown or text file: kept in a rich text note beside it (the file stays as it was), opened then. */
   const saveRichCopy = async (n: NonNullable<typeof note>, open = true): Promise<boolean> => {
     const name = richNameOf(n.name);
-    const [hash] = await view.importFiles([new File([n.editor.asRich(name.slice(0, -RICH_NOTE_SUFFIX.length))], name, { type: "text/html" })]);
+    const e = entryOf(n.hash);
+    const rich = withFileMeta("rich", n.editor.asRich(name.slice(0, -RICH_NOTE_SUFFIX.length)), { tags: e?.tags ?? [], note: e?.note ?? "", fields: e?.fields ?? [] }); // (its properties go with it)
+    const [hash] = await view.importFiles([new File([rich], name, { type: "text/html" })]);
     if (!hash) return false;
     const folder = entryOf(n.hash)?.folderIds?.[0];
     if (folder) await session.organize((c) => c.updateMeta(hash, { addFolders: [folder] }), "File a note");
@@ -1083,6 +1097,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     n.editor.destroy();
     noteBox.replaceChildren();
   };
+  // A new version of the open note (its properties written by a library change, the file saved elsewhere): the editor keeps it open.
+  session.onVersion((from, to) => {
+    if (note?.hash !== from) return;
+    note.hash = to;
+    if (slideHash === from) slideHash = to;
+    if (selected === from) selected = anchor = to;
+    if (picked.delete(from)) picked.add(to);
+  });
   // (the browser build: leaving the page with a note's changes unsaved asks first; the desktop app asks in its own close, main.ts)
   if (!desktopBridge()) window.addEventListener("beforeunload", (e) => void (note?.editor.dirty && e.preventDefault()));
   const pos = viewer.querySelector<HTMLElement>(".viewer-pos")!;
@@ -4562,6 +4584,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         try {
           const { record, duplicate } = await assets.importFileDetailed(f, false); // nothing is placed, so a big batch keeps no decoded pictures
           hashes.push(record.hash);
+          if (noteKindOf(record.name || f.name || "")) await session.adoptNoteProps(record.hash); // (its YAML: its tags, note and fields)
           if (duplicate) seen.push({ name: record.name || f.name, duplicate });
           if (duplicate && f.name) renamed.push({ hash: record.hash, name: f.name });
           n++;

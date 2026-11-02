@@ -1,4 +1,9 @@
 import { sha256Hex } from "../assets/sha256";
+import { NO_META, fileMeta, sameMeta, withFileMeta } from "../notes/frontmatter";
+import type { NoteMeta } from "../notes/frontmatter";
+import { noteKindOf } from "../notes/note-file";
+import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT } from "../assets/asset-catalog";
+import type { MetaChange } from "../assets/asset-catalog";
 import { HOME, deserializeCamera, fitRect, zoomLevel } from "../core/camera";
 import { startStep } from "./startup-log";
 import { plural } from "../doc/plural";
@@ -359,9 +364,10 @@ export class Session {
   async organize(op: (c: CatalogStore) => Promise<unknown>, label = "Library change"): Promise<boolean> {
     if (!this.guardWrite() || !this.catalog) return false;
     let before: MetaSnapshot;
+    const touched = new Set<string>();
     try {
       before = await this.catalog.snapshotMeta();
-      await op(this.catalog);
+      await op(this.touching(touched));
     } catch (e) {
       this.tell(e instanceof CatalogInputError ? e.message[0]!.toUpperCase() + e.message.slice(1) + "." : `Could not save: ${(e as Error).message}`);
       return false;
@@ -371,7 +377,81 @@ export class Session {
     this.libRedo = [];
     this.post({ kind: "assets" });
     this.emitAssets(true);
+    void this.writeNoteProps(touched);
     return true;
+  }
+
+  /** The catalog as an organizing step sees it, noting the items it changes ("*": any, a tag renamed or deleted everywhere). */
+  private touching(seen: Set<string>): CatalogStore {
+    const c = this.catalog!;
+    return new Proxy(c, {
+      get(target, key, recv) {
+        const v = Reflect.get(target, key, recv) as unknown;
+        if (typeof v !== "function") return v;
+        if (key === "updateMeta") return (h: string, ch: MetaChange) => (seen.add(h), c.updateMeta(h, ch));
+        if (key === "updateMetaEach") return (chs: ReadonlyArray<{ hash: string; change: MetaChange }>) => (chs.forEach((x) => seen.add(x.hash)), c.updateMetaEach(chs));
+        if (key === "renameTag" || key === "deleteTag" || key === "restoreMeta") seen.add("*");
+        return (v as (...a: unknown[]) => unknown).bind(target);
+      },
+    });
+  }
+
+  /**
+   * Notes whose item's tags, note or fields changed in the library get them written into their file (a markdown note's YAML, a rich
+   * text note's `<meta>`), as a new version saved like an edit: the file and the library say the same. `*`: every note checks.
+   */
+  private async writeNoteProps(hashes: ReadonlySet<string>): Promise<void> {
+    if (!this.catalog || !hashes.size) return;
+    const all = hashes.has("*") ? ((await this.catalog.list().catch(() => null))?.entries ?? []).filter((e) => noteKindOf(e.name)).map((e) => e.hash) : [...hashes];
+    for (const hash of all) {
+      try {
+        const e = await this.catalog.entry(hash);
+        const kind = e ? noteKindOf(e.name) : null;
+        if (!e || !kind || kind === "txt") continue;
+        const rec = await this.assets?.record(hash);
+        if (!rec) continue;
+        const text = await rec.blob.text();
+        const item: NoteMeta = { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] };
+        if (sameMeta(fileMeta(kind, text) ?? NO_META, item)) continue;
+        await this.saveVersion(hash, new File([withFileMeta(kind, text, item)], e.name, { type: rec.type }));
+      } catch (err) {
+        console.warn(`canvast: the properties of a note could not be written into its file: ${(err as Error).message}`);
+      }
+    }
+  }
+
+  /**
+   * A note file's properties become its item's tags, note and fields (the file wins). Run when a note comes in (an import, a new
+   * version saved here or elsewhere). A note without properties leaves its item as it is (its tags go into the file at their next change).
+   */
+  async adoptNoteProps(hash: string): Promise<void> {
+    const e = await this.catalog?.entry(hash).catch(() => undefined);
+    const kind = e ? noteKindOf(e.name) : null;
+    if (!e || !kind || kind === "txt" || !this.catalog) return;
+    const text = await (await this.assets?.record(hash).catch(() => undefined))?.blob.text();
+    const meta = text === undefined ? null : fileMeta(kind, text);
+    if (!meta || sameMeta(meta, { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] })) return;
+    const clip = (s: string, n: number): string => s.slice(0, n);
+    const want = meta.tags.map((t) => clip(t, MAX_TAG_TEXT));
+    try {
+      await this.catalog.updateMeta(hash, {
+        removeTags: (e.tags ?? []).filter((t) => !want.some((w) => w.toLowerCase() === t.toLowerCase())),
+        addTags: want,
+        note: clip(meta.note, MAX_NOTE),
+        fields: meta.fields.filter((f) => f.key.trim()).map((f) => ({ key: clip(f.key, MAX_FIELD_KEY), value: clip(f.value, MAX_FIELD_VALUE) })),
+      });
+    } catch (err) {
+      this.tell(`The properties of “${e.name}” could not be read into the library: ${(err as Error).message}`);
+      return;
+    }
+    this.post({ kind: "assets" });
+    this.emitAssets(true);
+  }
+
+  /** Told when an item gets a new version (a note saved, a file changed outside the app): its old hash and its new one. */
+  private readonly versionFns = new Set<(from: string, to: string) => void>();
+  onVersion(fn: (from: string, to: string) => void): void {
+    this.versionFns.add(fn);
   }
 
   /** The library's own undo (tags, favourites, folders, names): a snapshot before each change, put back by Ctrl+Z in the Library. */
@@ -388,6 +468,7 @@ export class Session {
       const now = await this.catalog.snapshotMeta();
       await this.catalog.restoreMeta(step.snap);
       (redo ? this.libUndo : this.libRedo).push({ label: step.label, snap: now });
+      void this.writeNoteProps(new Set(["*"]));
     } catch (e) {
       this.tell(`Could not ${redo ? "redo" : "undo"}: ${(e as Error).message}`);
       return null;
@@ -578,7 +659,10 @@ export class Session {
    * is gone from the folder.
    */
   async followAsset(from: string, to: string, size: { w: number; h: number }): Promise<void> {
-    if (!this.repo || from === to) return;
+    if (from === to) return;
+    for (const fn of this.versionFns) fn(from, to);
+    await this.adoptNoteProps(to);
+    if (!this.repo) return;
     await this.persistence.flush();
     const here = [...this.doc.all()].filter((o) => (o as { assetId?: string }).assetId === from);
     if (here.length) {

@@ -1233,14 +1233,23 @@ test("a note saved in the notes editor is written over its own file (same name, 
     expect(readFileSync(join(ws, file), "utf8")).toContain("# Todo today");
     expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual([file]);
     await expect(page.getByTestId("asset-card")).toHaveCount(1);
+    // Its properties written in another app (as Obsidian does): read into its item, its tags and fields.
+    await page.waitForTimeout(2000); // (a save a moment after the app's own writes)
+    writeFileSync(join(ws, file), "---\ntags: [plans]\nowner: Ana\n---\n# Todo today\n\nAdded elsewhere.\n");
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, e.tags ?? [], e.fields ?? []]))), { timeout: 15_000 }).toEqual([["todo.md", ["plans"], [{ key: "owner", value: "Ana" }]]]);
+    await page.getByTestId("note-editor").locator(".sun-editor-editable h1").first().click();
+    await page.keyboard.press("End");
     // Closing the window with changes not saved asks first; Save them saves, then the window closes.
     await page.keyboard.type(" and tomorrow");
     const closed = app.waitForEvent("close");
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.close());
     await expect(page.getByTestId("choose-dialog")).toContainText("has changes that are not saved");
     await page.getByTestId("choose-dialog").getByRole("button", { name: "Go on" }).click(); // (Save them is chosen first)
+    // Its words were changed in the other app since it was opened here: replacing them is asked first.
+    await expect(page.getByTestId("confirm-dialog")).toContainText("was changed outside canvast since you opened it");
+    await page.getByTestId("confirm-ok").click();
     await closed;
-    expect(readFileSync(join(ws, file), "utf8")).toContain("# Todo today and tomorrow");
+    expect(readFileSync(join(ws, file), "utf8")).toMatch(/^---\ntags:\n  - plans\nowner: Ana\n---\n# Todo today and tomorrow/); // (its properties kept)
   } finally {
     await app.close().catch(() => undefined);
   }
