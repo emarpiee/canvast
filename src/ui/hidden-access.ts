@@ -15,9 +15,17 @@ const setRemembered = (on: boolean): void => {
   rememberedHere = on;
   for (const fn of rememberedFns) fn();
 };
-/** Whether the Hidden password was given and is remembered in this tab (Settings > Privacy), and to be told when that changes. */
+/** Whether the Hidden password was given and is remembered in this tab (Settings > Privacy), and to be told when that changes (or hidden mode does). */
 export const hiddenRemembered = (): boolean => rememberedHere;
 export const onHiddenRemembered = (fn: () => void): void => void rememberedFns.add(fn);
+/** The library's hidden mode is on (its password given). Outside the library only while Settings > Privacy keeps it on there. */
+let modeHere = false;
+export const hiddenModeOn = (): boolean => modeHere;
+export function setHiddenMode(on: boolean): void {
+  if (on === modeHere) return;
+  modeHere = on;
+  for (const fn of rememberedFns) fn();
+}
 const verifiedAt: Record<PasswordKind, number> = { hidden: -Infinity, workspace: -Infinity };
 
 /** Forget the Hidden list's password given in this tab (the password was changed or removed, or remembering was turned off). */

@@ -381,7 +381,26 @@ test("hiding: a hidden item is in no list until the word is typed (and the passw
   await p.getByRole("tab", { name: /Privacy/ }).click();
   await p.locator('[data-row="library.hiddenRemember"] input').uncheck();
   await expect.poll(locked).toBe(true);
+  // Stay in hidden mode (remembering off): while hidden mode stays on outside the library, its pictures show on canvases; Exit locks them.
+  await p.getByTestId("view-assets").click();
+  await search.fill("hidden:");
+  await p.getByTestId("prompt-input").fill("secret");
+  await p.getByTestId("prompt-ok").click();
+  await p.getByTestId("hidden-mode-stay").click();
+  await p.getByTestId("view-canvas").click();
+  await expect.poll(locked).toBe(false);
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("hidden-mode-exit").click();
+  await expect.poll(locked).toBe(true);
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: /Privacy/ }).click();
+  await p.locator('[data-row="library.hiddenStay"] input').uncheck();
   await p.locator('[data-row="library.hiddenRemember"] input').check();
+  await p.getByTestId("view-assets").click(); // (the password given again, now remembered)
+  await search.fill("hidden:");
+  await p.getByTestId("prompt-input").fill("secret");
+  await p.getByTestId("prompt-ok").click();
+  await expect(side(p, /^All hidden items/)).toContainText("1");
 
   // The password and these settings stay out of a backup unless the person includes them when asked.
   const backup = async (include: boolean): Promise<{ hiddenLock?: string; settings?: Record<string, unknown> }> => {

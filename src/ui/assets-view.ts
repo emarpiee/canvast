@@ -9,7 +9,7 @@ import type { MetaRow } from "../assets/metadata";
 import type { Session, AssetPlace } from "../app/session";
 import { plural } from "../doc/plural";
 import { openBatchRename } from "./batch-rename";
-import { askHiddenPassword, readyForHidden } from "./hidden-access";
+import { askHiddenPassword, readyForHidden, setHiddenMode } from "./hidden-access";
 import { tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { mountSuggest } from "./search-suggest";
 import type { SuggestSources } from "../search/suggest";
@@ -4203,6 +4203,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const enterHidden = (): void => {
     if (!hiddenMode) beforeHidden = { scope, search: search.value, way, top: scroller.scrollTop };
     hiddenMode = true;
+    setHiddenMode(true);
     scope = "all";
     sideMenu = null;
     search.value = "";
@@ -4228,6 +4229,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     looksGen++;
     pagedCache.clear();
     hiddenMode = false;
+    setHiddenMode(false);
     const was = beforeHidden;
     beforeHidden = null;
     leaveSelection();

@@ -41,7 +41,7 @@ import { syncScroll } from "../ui/bar";
 import { parseHex, rgbToOklch } from "../colour-picker/colour";
 import { canvasItems, mountContextMenu } from "../ui/context-menu";
 import { openBatchRename } from "../ui/batch-rename";
-import { askCurrentPassword, askPassword, forgetHiddenPassword, hiddenRemembered, onHiddenRemembered } from "../ui/hidden-access";
+import { askCurrentPassword, askPassword, forgetHiddenPassword, hiddenModeOn, hiddenRemembered, onHiddenRemembered } from "../ui/hidden-access";
 import { typeOfName } from "../storage/workspace-names";
 import { openLockScreen } from "../ui/lock-screen";
 import { writeSystemClipboard } from "./system-clipboard";
@@ -822,10 +822,10 @@ async function start(): Promise<void> {
   };
   session.subscribeAssets((_meta, usageOnly) => void (usageOnly || syncHidden()));
   // Hidden items' pictures on the canvas (the screen only): while Settings > Privacy remembers the Hidden password and it was given
-  // here (and, in the desktop app, their key is open). What makes a file uses `filesAssets`, and a capture of the screen is drawn with
+  // here, or while hidden mode is on outside the library (Stay in hidden mode); and, in the desktop app, while their key is open. What makes a file uses `filesAssets`, and a capture of the screen is drawn with
   // padlocks first (`padlocked`), so nothing readable of them leaves the app.
   const syncReveal = (): void => {
-    const on = settings.get("library.hiddenRemember") && hiddenRemembered() && (storage?.hidden ? storage.hidden.isOpen() : true);
+    const on = ((settings.get("library.hiddenRemember") && hiddenRemembered()) || hiddenModeOn()) && (storage?.hidden ? storage.hidden.isOpen() : true);
     if (on === assets.revealing) return;
     assets.reveal(on);
     assetNames.clear();
