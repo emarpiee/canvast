@@ -27,6 +27,8 @@ test("a markdown note opens in the notes editor with its library links, saves in
     { name: "plan.md", mimeType: "text/markdown", buffer: Buffer.from(MD) },
     { name: "Sketch log.md", mimeType: "text/markdown", buffer: Buffer.from(TEMPLATE) },
   ]);
+  // Its card on a canvas is its whole page at twice its size: 1200 px wide, as tall as the note (here the shortest, 4:3).
+  await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).map((e) => [e.pixelW, e.pixelH])[0]), hashOf(MD))).toEqual([1200, 900]);
   // A note's card shows its page (its preview, the same picture as its card on a canvas), not the plain file tile.
   await expect.poll(() => card(p, hashOf(MD)).locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   // A note tagged `template` is offered as a template in every other note.

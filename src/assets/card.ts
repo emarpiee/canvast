@@ -101,13 +101,13 @@ export async function makeFileCard(chip: string): Promise<ImageBitmap> {
 }
 
 /** A file card made of a custom thumbnail (a library item's): the picture filling the card's shape, cut to fit. */
-export async function cardFromPicture(blob: Blob): Promise<ImageBitmap> {
+export async function cardFromPicture(blob: Blob, size = { w: FILE_CARD_W, h: FILE_CARD_H }): Promise<ImageBitmap> {
   const bmp = await createImageBitmap(blob);
   const c = document.createElement("canvas");
-  c.width = FILE_CARD_W;
-  c.height = FILE_CARD_H;
-  const k = Math.max(FILE_CARD_W / bmp.width, FILE_CARD_H / bmp.height);
-  c.getContext("2d")!.drawImage(bmp, (FILE_CARD_W - bmp.width * k) / 2, (FILE_CARD_H - bmp.height * k) / 2, bmp.width * k, bmp.height * k);
+  c.width = size.w;
+  c.height = size.h;
+  const k = Math.max(size.w / bmp.width, size.h / bmp.height);
+  c.getContext("2d")!.drawImage(bmp, (size.w - bmp.width * k) / 2, (size.h - bmp.height * k) / 2, bmp.width * k, bmp.height * k);
   bmp.close();
   return createImageBitmap(c);
 }

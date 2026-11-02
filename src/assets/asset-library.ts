@@ -264,7 +264,7 @@ export class AssetLibrary {
     const asCard = async (): Promise<void> => {
       carded = true;
       img = await makeFileCardFrom(file.name ?? "", describeFile(file.name ?? "", type).chip, new Uint8Array(bytes));
-      size = { w: FILE_CARD_W, h: FILE_CARD_H };
+      size = { w: img.width, h: img.height }; // (400 × 300, but a note's page is as tall as the note)
       duration = undefined;
     };
     if (!isMediaType(type)) await asCard();
@@ -520,12 +520,12 @@ export class AssetLibrary {
         const own = await this.customPicture?.(rec.hash).catch(() => null);
         if (own) {
           try {
-            return await cardFromPicture(own);
+            return await cardFromPicture(own, { w: rec.pixelW, h: rec.pixelH });
           } catch {
             // (a picture that does not decode: the file's own card)
           }
         }
-        return makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, new Uint8Array(await rec.blob.arrayBuffer()));
+        return makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, new Uint8Array(await rec.blob.arrayBuffer()), { w: rec.pixelW, h: rec.pixelH });
       };
       try {
         img = isCard(rec) ? await card() : await decode(rec.blob, ms);
