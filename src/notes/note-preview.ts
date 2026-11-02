@@ -1,4 +1,3 @@
-import { helper } from "suneditor";
 import { noteKindOf, richNoteBody, textHtml } from "./note-file";
 
 // The picture of a note (its library thumbnail and its card on a canvas): the top of its page, as the notes editor lays it out, drawn
@@ -18,9 +17,10 @@ table{border-collapse:collapse}td,th{border:1px solid oklch(0.82 0.01 250);paddi
 a{color:oklch(0.5 0.1 200)}.pic{display:inline-block;padding:.7em 1.1em;border-radius:4px;background:oklch(0.9 0.005 250);color:oklch(0.48 0.01 250);font-size:.85em}`;
 
 /** The note's text as HTML that can be drawn in an image: no pictures (they could not load there), no scripts or frames. */
-function pageHtml(name: string, text: string): string {
+async function pageHtml(name: string, text: string): Promise<string> {
   const kind = noteKindOf(name);
-  const html = kind === "md" ? helper.markdown.markdownToHtml(text, "P") : kind === "rich" ? richNoteBody(text) : textHtml(text);
+  const { markdownHtml } = await import("./note-markdown"); // (loaded when a preview is made: the editor needs a page, not the unit tests' Node)
+  const html = kind === "md" ? markdownHtml(text) : kind === "rich" ? richNoteBody(text) : textHtml(text);
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
   for (const n of doc.body.querySelectorAll("script, style, iframe, object, embed, link, meta, video, audio")) n.remove();
   for (const img of doc.body.querySelectorAll("img")) {
@@ -36,7 +36,7 @@ function pageHtml(name: string, text: string): string {
 export async function notePicture(name: string, text: string, w: number, h: number): Promise<HTMLCanvasElement> {
   const lw = Math.round(w * LAYOUT);
   const lh = Math.round(h * LAYOUT);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${lw} ${lh}"><foreignObject width="${lw}" height="${lh}"><div xmlns="http://www.w3.org/1999/xhtml" class="page" style="width:${lw}px;height:${lh}px"><style>${CSS}</style>${pageHtml(name, text)}</div></foreignObject></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${lw} ${lh}"><foreignObject width="${lw}" height="${lh}"><div xmlns="http://www.w3.org/1999/xhtml" class="page" style="width:${lw}px;height:${lh}px"><style>${CSS}</style>${await pageHtml(name, text)}</div></foreignObject></svg>`;
   const img = new Image();
   img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   await img.decode();
