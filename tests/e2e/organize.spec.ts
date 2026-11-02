@@ -1064,6 +1064,7 @@ test("custom thumbnails: a picture of the library, an uploaded one (its own cate
   await expect(p.getByTestId("slide-view")).toBeVisible();
   if (!(await p.getByTestId("asset-place").isVisible())) await p.locator(".viewer-details").click();
   await expect(p.getByTestId("asset-thumb")).toBeVisible();
+  await expect(p.getByTestId("asset-place")).toBeVisible(); // (the details panel may still be opening: measured once both are there)
   const [tb, pb] = [(await p.getByTestId("asset-thumb").boundingBox())!, (await p.getByTestId("asset-place").locator("xpath=..").boundingBox())!];
   expect(tb.y + tb.height <= pb.y || tb.x + tb.width <= pb.x || pb.x + pb.width <= tb.x, "not over Place on canvas").toBe(true);
   await p.keyboard.press("Escape");
