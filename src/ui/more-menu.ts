@@ -66,9 +66,13 @@ export function placeMenu(menu: HTMLElement, anchor: HTMLElement): void {
   const w = menu.offsetWidth;
   const h = menu.offsetHeight;
   const gap = 8;
-  const left0 = Math.max(gap, Math.min(window.innerWidth - w - gap, r.right - w));
-  let top = c.bottom + MENU_GAP;
-  if (top + h > window.innerHeight - gap) top = Math.max(gap, c.top - MENU_GAP - h);
+  // (under a button, right edges aligned; at a point (a context menu), its left edge there, or its right edge when there is no room)
+  const point = anchor.dataset["atPoint"] !== undefined;
+  const at = point ? (r.left + w + gap <= window.innerWidth ? r.left : r.left - w) : r.right - w;
+  const left0 = Math.max(gap, Math.min(window.innerWidth - w - gap, at));
+  const space = point ? 2 : MENU_GAP;
+  let top = c.bottom + space;
+  if (top + h > window.innerHeight - gap) top = Math.max(gap, c.top - space - h);
   let left = left0;
   const avoid = avoidBox();
   if (avoid) {

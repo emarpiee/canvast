@@ -19,7 +19,6 @@ const ICON: Record<string, string> = {
   "Save the selection to the library as SVG": ICONS.save, "Delete the selection": ICONS.trash, "Select everything": ICONS.selectAll, "Show all hidden": ICONS.eye, "Unlock all": ICONS.lockKeyholeOpen,
   "Fit everything in view": ICONS.frame, "Return to the origin": ICONS.house, "Export… (choose a size)": ICONS.exportMenu, "Copy the selection as SVG": ICONS.fileCode,
 };
-const MENU_W = 240;
 const LONG_PRESS_MS = 500;
 const LONG_PRESS_SLOP_PX = 10;
 
@@ -48,7 +47,8 @@ let anchorEl: HTMLElement | null = null;
 export function showContextMenu(clientX: number, clientY: number, items: readonly MenuItem[], label: string): void {
   if (!items.length) return;
   const anchor = document.createElement("div");
-  anchor.style.cssText = `position:fixed;left:${clientX}px;top:${clientY}px;width:${MENU_W}px;height:0;pointer-events:none`;
+  anchor.style.cssText = `position:fixed;left:${clientX}px;top:${clientY}px;width:0;height:0;pointer-events:none`;
+  anchor.dataset["atPoint"] = ""; // (the menu opens from the point, its corner there)
   anchor.setAttribute("aria-hidden", "true");
   anchorEl?.remove(); // (one anchor at a time: the one of the last menu is replaced)
   document.body.appendChild(anchor);

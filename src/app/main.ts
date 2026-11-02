@@ -1649,7 +1649,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   // Menus and pickers keep off the selected items.
   setMenuAvoid(() => {
     const b = editor.selectionBoxOnScreen;
-    if (!b || editor.selection.size === 0) return null;
+    if (!b || editor.selection.size === 0 || appView !== "canvas") return null; // (the canvas's selection is not on the screen in another view)
     const xs = b.frame.corners.map((c) => c[0]);
     const ys = b.frame.corners.map((c) => c[1]);
     return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };

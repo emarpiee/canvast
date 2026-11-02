@@ -388,7 +388,7 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
   - When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways.
 - **Panels** (Layers, Bookmarks, Tags, Styles, Adjust, Pattern) float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back.
 - **Command palette** (`Ctrl/⌘+K`) runs any command by name, takes a value where one is needed (`@kind` narrows the list), and records and replays **macros**.
-- **Context menus** open with a right click, the menu key, or a long press on a touch screen, and list what fits where you are:
+- **Context menus** open with a right click, the menu key, or a long press on a touch screen, at the pointer (to its left when there is no room), and list what fits where you are:
 
   | Where | What it offers |
   | --- | --- |

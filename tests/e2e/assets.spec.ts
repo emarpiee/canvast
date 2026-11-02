@@ -2680,7 +2680,13 @@ test("library Copy puts the picture on the system clipboard and Copy file name i
     return [...new Uint8Array(await b.arrayBuffer())];
   });
   await p.getByTestId("assets-import-input").setInputFiles({ name: "photo.jpg", mimeType: "image/jpeg", buffer: Buffer.from(jpg) });
-  await p.locator('[data-testid="asset-card"][aria-label^="photo.jpg"]').click({ button: "right" });
+  // A context menu opens at the pointer: its corner within a few pixels of the click.
+  const cb = (await p.locator('[data-testid="asset-card"][aria-label^="photo.jpg"]').boundingBox())!;
+  await p.mouse.click(cb.x + 20, cb.y + 20, { button: "right" });
+  const mb = (await p.getByRole("menu", { name: "Library actions" }).boundingBox())!;
+  expect(Math.abs(mb.x - (cb.x + 20)), "its left edge at the pointer").toBeLessThanOrEqual(2);
+  expect(mb.y - (cb.y + 20), "just under the pointer").toBeGreaterThanOrEqual(0);
+  expect(mb.y - (cb.y + 20), "just under the pointer").toBeLessThanOrEqual(8);
   await p.getByRole("menu", { name: "Library actions" }).getByRole("menuitem", { name: "Copy", exact: true }).click();
   await expect(p.getByTestId("toast")).toContainText("Copied “photo.jpg”");
   expect(await p.evaluate(async () => [...(await navigator.clipboard.read())[0]!.types])).toEqual(["image/png"]); // (the picture alone: a name beside it would be pasted instead of it)
