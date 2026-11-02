@@ -753,6 +753,11 @@ async function start(): Promise<void> {
   let opened = false; // (the workspace is open: past the lock screen, its session started)
   desktopBridge()?.onClosing(async () => {
     if (!opened) return; // (still locked or starting: nothing was changed, so nothing waits to be written)
+    // A note open with changes not saved: Save them, Don't save, or Cancel (the window stays).
+    if (assetsView.noteDirty()) {
+      await desktopBridge()!.holdClose();
+      if (!(await assetsView.leaveNote())) return false;
+    }
     const writing = storage?.folderWriting?.now();
     if (writing && writing.total >= BUSY_FILES) {
       await desktopBridge()!.holdClose();

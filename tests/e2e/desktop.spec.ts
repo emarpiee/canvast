@@ -1233,8 +1233,16 @@ test("a note saved in the notes editor is written over its own file (same name, 
     expect(readFileSync(join(ws, file), "utf8")).toContain("# Todo today");
     expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual([file]);
     await expect(page.getByTestId("asset-card")).toHaveCount(1);
+    // Closing the window with changes not saved asks first; Save them saves, then the window closes.
+    await page.keyboard.type(" and tomorrow");
+    const closed = app.waitForEvent("close");
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.close());
+    await expect(page.getByTestId("choose-dialog")).toContainText("has changes that are not saved");
+    await page.getByTestId("choose-dialog").getByRole("button", { name: "Go on" }).click(); // (Save them is chosen first)
+    await closed;
+    expect(readFileSync(join(ws, file), "utf8")).toContain("# Todo today and tomorrow");
   } finally {
-    await app.close();
+    await app.close().catch(() => undefined);
   }
 });
 

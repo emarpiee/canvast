@@ -108,6 +108,8 @@ test("New note makes a markdown note in the open folder and opens it to write in
   await page(p).locator("h1").click();
   await p.keyboard.press("Control+End");
   await p.keyboard.press("Enter");
+  await expect(note(p).locator('.se-toolbar button[data-command="font"] .se-txt')).toHaveText("Default"); // (not the page's list of font names)
+  for (const gone of ["print", "newDocument", "pageBreak", "pageNavigator"]) await expect(note(p).locator(`[data-command="${gone}"]`), `no ${gone} in a note`).toHaveCount(0);
   await note(p).locator('.se-toolbar button[data-command="table"]').filter({ visible: true }).click();
   await p.locator(".se-table-size-picker").filter({ visible: true }).click({ position: { x: 30, y: 30 } });
   await expect(page(p).locator("table")).toBeVisible();
@@ -118,7 +120,7 @@ test("New note makes a markdown note in the open folder and opens it to write in
   const list = p.locator(".se-list-font-family button").filter({ visible: true });
   const names = (await list.allTextContents()).filter((n) => n !== "Default" && n !== "Inter");
   expect(names.length, "the library's font is in the list").toBe(1);
-  await list.filter({ hasText: names[0] }).click();
+  await list.filter({ hasText: names[0]! }).click();
   const used = await page(p).locator("h1 span").first().evaluate((s) => getComputedStyle(s).fontFamily);
   expect(used.replace(/"/g, "")).toBe(names[0]);
   expect(await p.evaluate((f) => document.fonts.check(`16px "${f}"`), names[0])).toBe(true);

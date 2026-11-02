@@ -11,6 +11,8 @@
 - **Added:** previews of notes: a note's library card and its card on a canvas show the top of its page instead of the plain file tile.
 - **Fixed:** a picture inserted into a note through the Insert image dialog did not show (the viewer's own picture styles hid it); the dialogs' Submit button had white text on the dark theme's light accent.
 - **Fixed:** in notes, a task showed a bullet beside its box; a table did not show; a font of the library did not apply (it is now listed and set by its family name, which the app also gives the font).
+- **Added:** closing the desktop app's window with a note's changes unsaved asks first (Save them, Don't save, Cancel).
+- **Changed:** a note's toolbar has no New document (it emptied the note), Print or page buttons; the font list says Default when words have no font of their own.
 - **Added:** **New note** in the library's Import menu: a markdown note in the open folder, opened to write in.
 - **Changed:** the library chooser (texture fill pictures, custom thumbnails) is one shared panel that can also open in the middle of the page, list any kind of item, import files from this device, and shows the first 300 matches of a big library (search narrows it).
 

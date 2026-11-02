@@ -1,5 +1,5 @@
 import suneditor, { helper } from "suneditor";
-import { align, anchor, audio, audioGallery, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, pageNavigator, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
+import { align, anchor, audio, audioGallery, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
 import type { SunEditor } from "suneditor/types";
 import { linkTarget, relativeLink, richNoteBody, richNoteFile, textHtml } from "../notes/note-file";
 import type { NoteKind, NoteStyle } from "../notes/note-file";
@@ -68,9 +68,10 @@ const LAYOUTS = [
   { name: "Three columns", html: `<div style="display:flex;gap:1em">${col(1, "Left")}${col(1, "Middle")}${col(1, "Right")}</div>` },
   { name: "Sidebar and main", html: `<div style="display:flex;gap:1em">${col(1, "Sidebar")}${col(3, "Main")}</div>` },
 ];
-const FILE_TOOLS = ["newDocument", "save", "|", "selectAll", "copy", "|", "print"];
+// (not New document, which empties the open note, Print, or the page buttons: no use for a note in the library)
+const FILE_TOOLS = ["save", "|", "selectAll", "copy"];
 const VIEW_TOOLS = ["showBlocks", "markdownView", "preview"];
-const fullButtons = (pages: boolean): SunEditor.UI.ButtonList => [
+const FULL_BUTTONS: SunEditor.UI.ButtonList = [
   ["undo", "redo"],
   "|",
   ["blockStyle", "font", "fontSize"],
@@ -85,7 +86,6 @@ const fullButtons = (pages: boolean): SunEditor.UI.ButtonList => [
   "|",
   ["link", "image", "table", "video"],
   [":Insert-text.Insert ▾", ...INSERT_TOOLS],
-  ...(pages ? ["|", ["pageBreak", "pageNavigator", "pageUp", "pageDown"]] : []),
   ["-right", ":File-text.File ▾", ...FILE_TOOLS],
   ["-right", ":View-text.View ▾", ...VIEW_TOOLS],
   ["-right", "codeView", "fullScreen"],
@@ -97,11 +97,11 @@ const line = (tag: string) => ($: SunEditor.Deps): void => void $.format.setLine
 function presetOptions(style: NoteStyle): SunEditor.InitOptions {
   switch (style) {
     case "document":
-      return { type: "document:header,page", buttonList: fullButtons(true), subToolbar: { mode: "balloon", buttonList: SUB_BUTTONS } };
+      return { type: "document:header,page", buttonList: FULL_BUTTONS, subToolbar: { mode: "balloon", buttonList: SUB_BUTTONS } };
     case "classic":
-      return { buttonList: fullButtons(false), subToolbar: { mode: "balloon", buttonList: SUB_BUTTONS } };
+      return { buttonList: FULL_BUTTONS, subToolbar: { mode: "balloon", buttonList: SUB_BUTTONS } };
     case "bottom":
-      return { mode: "classic:bottom", statusbar: false, buttonList: fullButtons(false), subToolbar: { mode: "balloon", buttonList: SUB_BUTTONS } };
+      return { mode: "classic:bottom", statusbar: false, buttonList: FULL_BUTTONS, subToolbar: { mode: "balloon", buttonList: SUB_BUTTONS } };
     case "balloon":
       return { mode: "balloon", buttonList: [["bold", "italic", "underline", "strike"], "|", ["fontColor", "backgroundColor"], "|", ["removeFormat"], "|", ["link"]] };
     case "notion":
@@ -160,6 +160,20 @@ function libraryGallery<T extends GalleryClass>(base: T, choose: (kind: AttachKi
       });
     }
   };
+}
+
+/** The font list's button says Default (not the page's own list of font names) when the words have no font of their own. */
+class NoteFont extends font {
+  override active(element: HTMLElement | null, target: HTMLElement): boolean | void {
+    const shown = super.active(element, target);
+    if (!element && this.$.store.get("hasFocus")) {
+      const label = this.$.lang["default"] ?? "Default";
+      target.querySelector(".se-txt")!.textContent = label;
+      const tip = target.parentNode?.querySelector(".se-tooltip-text");
+      if (tip) tip.textContent = `${this.$.lang["font"]} (${label})`;
+    }
+    return shown;
+  }
 }
 
 /** Is this an upload of files from the device (and not an address, which goes in as it is)? */
@@ -243,7 +257,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   const content: SunEditor.InitOptions = {
     // (not math, embeds or PDF export: they need a server or another library)
     plugins: [
-      ...[align, anchor, audio, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileUpload, font, fontColor, fontSize, hr, image, layout, lineHeight, link, list, list_bulleted, list_numbered, pageNavigator, paragraphStyle, slashCommand, table, template, textStyle, video],
+      ...[align, anchor, audio, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileUpload, NoteFont, fontColor, fontSize, hr, image, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video],
       ...[imageGallery, videoGallery, audioGallery, fileGallery, fileBrowser].map((g) => libraryGallery(g as GalleryClass, choose)),
     ],
     font: { items: fonts },

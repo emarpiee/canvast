@@ -75,6 +75,10 @@ import type { SettingsStore } from "../settings/settings";
  * be in any number of folders without being copied.
  */
 export interface AssetsView {
+  /** A note open with changes not saved: asks to save them or let them go. False: the person chose to stay (Cancel). */
+  leaveNote(): Promise<boolean>;
+  /** A note is open with changes not saved. */
+  noteDirty(): boolean;
   show(): void;
   hide(): void;
   /** Put the cursor in the library's search box (closing the viewer if it is open). */
@@ -1079,7 +1083,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     n.editor.destroy();
     noteBox.replaceChildren();
   };
-  // (the browser build: leaving the page with a note's changes unsaved asks first)
+  // (the browser build: leaving the page with a note's changes unsaved asks first; the desktop app asks in its own close, main.ts)
   if (!desktopBridge()) window.addEventListener("beforeunload", (e) => void (note?.editor.dirty && e.preventDefault()));
   const pos = viewer.querySelector<HTMLElement>(".viewer-pos")!;
   let slideHash: string | null = null;
@@ -4539,6 +4543,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       root.hidden = true;
       syncViewing();
     },
+    leaveNote: () => leaveNote(),
+    noteDirty: () => !!note?.editor.dirty,
     async importFiles(files) {
       const hashes: string[] = [];
       if (session.editor.blockEdit()) return hashes;
