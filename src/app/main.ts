@@ -2,6 +2,9 @@ import { externalFolder } from "../storage/external-folder";
 import { askHiddenPassword } from "../ui/hidden-access";
 import { noteKindOf } from "../notes/note-file";
 import { setNoteCardLength, setNotePictures } from "../notes/note-preview";
+import { anyNoteDirty, leaveAllNotes } from "../ui/note-session";
+import { mountNotePanel } from "../ui/note-panel";
+import type { NotePanelDeps } from "../ui/note-panel";
 import { ViewState } from "./view-state";
 import { fileInLibrary } from "./library-filing";
 import { storeFrame } from "./frames";
@@ -769,9 +772,9 @@ async function start(): Promise<void> {
   desktopBridge()?.onClosing(async () => {
     if (!opened) return; // (still locked or starting: nothing was changed, so nothing waits to be written)
     // A note open with changes not saved: Save them, Don't save, or Cancel (the window stays).
-    if (assetsView.noteDirty()) {
+    if (anyNoteDirty()) {
       await desktopBridge()!.holdClose();
-      if (!(await assetsView.leaveNote())) return false;
+      if (!(await leaveAllNotes())) return false;
     }
     const writing = storage?.folderWriting?.now();
     if (writing && writing.total >= BUSY_FILES) {
@@ -1007,7 +1010,10 @@ async function start(): Promise<void> {
       return isCoarse(fc, o.frame ?? doc.space.world) || !!(oc && projectObject(o, oc, view.viewport, { keepTiny: true }));
     },
   });
-  attachTools(canvas, view, doc, index, editor, { editText: (t, at, box) => textEditor.open(t, at, box), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
+  // The note panel (note-panel.ts): made once the library view is, which it imports through.
+  let notePanel: { open(hash: string): Promise<boolean> } = { open: async () => false };
+  const notePanelReady = (d: NotePanelDeps): void => void (notePanel = mountNotePanel(d));
+  attachTools(canvas, view, doc, index, editor, { editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h) => void notePanel.open(h), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
     navigate: (dir) =>
       void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus", (o, unit) => {
         // the name the Layers list shows: a group's own, else the item's
@@ -1615,7 +1621,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     }
     editor.changed();
   };
-  const fileKinds = new Map<string, { card: boolean; open: boolean; svg: boolean }>();
+  const fileKinds = new Map<string, { card: boolean; open: boolean; svg: boolean; note: boolean }>();
   // The selection action bar follows the selection box (updated after each drawn frame).
   // Menus and pickers keep off the selected items.
   setMenuAvoid(() => {
@@ -1691,15 +1697,15 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         const o = ids.length === 1 ? doc.get(ids[0]!) : undefined;
         if (o?.kind !== "image") return null;
         if (!fileKinds.has(o.assetId)) {
-          fileKinds.set(o.assetId, { card: false, open: false, svg: false });
+          fileKinds.set(o.assetId, { card: false, open: false, svg: false, note: false });
           void session.catalog?.entry(o.assetId).then((e) => {
             if (!e) return;
-            fileKinds.set(o.assetId, { card: isCard(e), open: desktopBridge() ? !meta(e).hidden : fileActionsOf(e.name, e.type).canOpen, svg: e.type === "image/svg+xml" });
+            fileKinds.set(o.assetId, { card: isCard(e), open: desktopBridge() ? !meta(e).hidden : fileActionsOf(e.name, e.type).canOpen, svg: e.type === "image/svg+xml", note: !!noteKindOf(e.name) });
             contextBar.update();
           });
         }
         const k = fileKinds.get(o.assetId)!;
-        return k.card ? { hash: o.assetId, open: k.open } : null;
+        return k.card ? { hash: o.assetId, open: k.open, note: k.note } : null;
       },
       pictureTools: () => {
         const sa = selectedAdjust(doc, editor);
@@ -1715,7 +1721,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         if (o?.kind !== "image") return false;
         void session.catalog?.entry(o.assetId).then((e) => {
           if (e && !fileKinds.get(o.assetId)?.svg && e.type === "image/svg+xml") {
-            fileKinds.set(o.assetId, { card: isCard(e), open: fileActionsOf(e.name, e.type).canOpen, svg: true });
+            fileKinds.set(o.assetId, { card: isCard(e), open: fileActionsOf(e.name, e.type).canOpen, svg: true, note: false });
             contextBar.update();
           }
         });
@@ -1737,6 +1743,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       exportPicture: () => openExport(),
       canDownload: () => pickedFiles(doc, editor).length > 0,
       downloadFile: () => void downloadSelection(doc, editor, assets, session, settings),
+      editNote: () => {
+        const o = doc.get([...editor.selection][0] ?? "");
+        if (o?.kind === "image") void notePanel.open(o.assetId);
+      },
       openFile: () => {
         const o = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "image");
         if (o?.kind !== "image") return;
@@ -1867,6 +1877,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   markTab("canvas");
   markNav("canvas");
   const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings, libraryFonts);
+  // A note's card on a canvas opens in the note panel (a double-click, Edit note): the same editor and saving as in the library.
+  notePanelReady({ session, assets, settings, fonts: libraryFonts, importFiles: (files) => assetsView.importFiles(files), showInLibrary: (h) => (setView("assets"), void assetsView.reveal([h])), hidden: hiddenModeOn });
   // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)
   window.addEventListener("keydown", (e) => {
     if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;

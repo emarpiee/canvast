@@ -31,7 +31,9 @@ export interface ContextActions {
   /** What the selection can be reset from. */
   resettable(): { turned: boolean; stretched: boolean; bakeable: boolean };
   /** The one selected item is a file the app cannot show (kept as a card): its asset, and whether a tab can open it (ADR 0078). */
-  fileSelection(): { hash: string; open: boolean } | null;
+  fileSelection(): { hash: string; open: boolean; note: boolean } | null;
+  /** The note selected on the canvas, opened in the note panel. */
+  editNote(): void;
   /** Any file of the library is picked: its original can be downloaded (several as a ZIP; ADR 0119). */
   canDownload(): boolean;
   /** Put the picked objects on a sheet; take a picked sheet away, keeping what is on it (ADR 0108). */
@@ -158,6 +160,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     group("Items", btn("library", ICONS.library, "View in the library"), btn("duplicate", ICONS.copy, "Duplicate"), btn("group", ICONS.group, "Group"), btn("ungroup", ICONS.ungroup, "Ungroup"), btn("tag", ICONS.tag, "Tag the selection")) +
     group("Files",
       btn("exportmenu", ICONS.exportMenu, "Export and copy out: save as a picture or SVG, download the file, copy the Markdown of a text", 'aria-haspopup="menu" aria-expanded="false"'),
+      btn("editnote", ICONS.filePenLine, "Edit note (or double-click it)"),
       btn("open", ICONS.externalLink, desktopBridge() ? "Open in default app" : "Open in a new tab"),
       btn("copyadj", ICONS.clipboardList, "Copy the adjustments of the picture"),
       btn("pasteadj", ICONS.clipboardPaste, "Paste the copied adjustments on the selected pictures"),
@@ -313,6 +316,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "tag": actions.tag(); break;
       case "library": actions.showInLibrary(); break;
       case "open": actions.openFile(); break;
+      case "editnote": actions.editNote(); break;
       case "attach": actions.attach(); break;
       case "detach": actions.detach(); break;
       case "vectorise": actions.vectorise(); break;
@@ -404,6 +408,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("library").hidden = !actions.hasLibraryItems();
     const file = actions.fileSelection();
     q("open").hidden = !file?.open;
+    q("editnote").hidden = !file?.note;
     q("attach").hidden = false;
     q("attach").setAttribute("aria-pressed", String(editor.attachMode));
     q("detach").hidden = !actions.canDetach();

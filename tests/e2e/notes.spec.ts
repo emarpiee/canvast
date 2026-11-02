@@ -91,6 +91,23 @@ test("a markdown note opens in the notes editor with its library links, saves in
   await p.locator(".se-modal").filter({ visible: true }).getByRole("button", { name: "Submit" }).click();
   await expect(page(p).locator("img")).toHaveCount(2);
   for (const img of await page(p).locator("img").all()) expect((await img.boundingBox())?.width, "every picture shows (none hidden by the viewer's own styles)").toBeGreaterThan(0);
+  // Markdown view and back, the note unchanged there: the picture keeps its size (it is not read again from markdown, which has none).
+  const sized = await page(p).locator("img").last().getAttribute("width");
+  await note(p).locator('[data-command="markdownView"]').first().evaluate((b: HTMLElement) => b.click());
+  await note(p).locator('[data-command="markdownView"]').first().evaluate((b: HTMLElement) => b.click());
+  expect(await page(p).locator("img").last().getAttribute("width")).toBe(sized);
+  // A web address pasted over words makes those words the link. (Chromium only: Firefox does not let a test make a paste with its data.)
+  if (test.info().project.name !== "firefox") await page(p).locator("p").first().evaluate((el) => {
+    const r = document.createRange();
+    r.setStart(el.firstChild!, 0);
+    r.setEnd(el.firstChild!, 4); // (its first four letters)
+    getSelection()!.removeAllRanges();
+    getSelection()!.addRange(r);
+    const dt = new DataTransfer();
+    dt.setData("text/plain", "https://example.com/brief");
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  });
+  if (test.info().project.name !== "firefox") await expect(page(p).locator('a[href="https://example.com/brief"]')).toHaveText(/^\S{4}$/); // (the four letters chosen)
 
   // Leaving with changes asks first: Don't save lets them go.
   await p.getByTestId("slide-view").locator('[data-act="close"]').click();
@@ -188,6 +205,7 @@ test("[[links]] between notes: shown as links, Ctrl+click opens the note, [[ off
   await p.keyboard.type(" Also [[Bri");
   const list = (await p.locator(".se-select-menu").filter({ visible: true }).boundingBox())!;
   expect(list.x >= 0 && list.x + list.width <= (p.viewportSize()?.width ?? 1280), "the [[ list is inside the window").toBe(true);
+  for (const row of await p.locator(".se-select-menu .se-select-item").filter({ visible: true }).all()) expect((await row.boundingBox())!.x + (await row.boundingBox())!.width, "each row inside the list's box").toBeLessThanOrEqual(list.x + list.width + 1);
   await p.locator(".se-autocomplete-item, .se-select-item").filter({ visible: true, hasText: "Brief" }).first().click();
   await expect(page(p).locator('a[href="canvast-wiki:Brief"]')).toHaveCount(2);
   // Resting the pointer on a link shows the preview of what it points at.
@@ -249,4 +267,34 @@ test("a note's preview shows the pictures it links to (and an Obsidian ![[embed]
   const LONG = `# Long\n\n${"A line of the note.\n\n".repeat(200)}`;
   await p.getByTestId("assets-import-input").setInputFiles({ name: "long.md", mimeType: "text/markdown", buffer: Buffer.from(LONG) });
   await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).map((e) => [e.pixelW, e.pixelH])[0]), hashOf(LONG))).toEqual([1200, 1800]);
+});
+
+test("a note on a canvas opens in the note panel (a double-click, or Edit note): the same editor, saved in place, the card follows", async ({ app }) => {
+  const p = app.page;
+  const NOTE = "# On the canvas\n\nFirst words.\n";
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "board note.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) });
+  await card(p, hashOf(NOTE)).click();
+  await p.getByTestId("asset-place").click();
+  await p.getByTestId("view-canvas").click();
+  const placed = () => p.evaluate(() => (window.__canvastDebug.objects() as unknown as Array<{ assetId?: string }>).map((o) => o.assetId));
+  await expect.poll(placed).toEqual([hashOf(NOTE)]);
+  // A double-click on its card opens the panel, with the note in the notes editor.
+  const box = (await p.locator("canvas").first().boundingBox())!;
+  await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
+  const panel = p.getByTestId("note-panel");
+  await expect(panel.locator(".sun-editor-editable h1").first()).toHaveText("On the canvas");
+  await panel.locator(".sun-editor-editable p").first().click();
+  await p.keyboard.press("End");
+  await p.keyboard.type(" More words.");
+  await p.keyboard.press("Control+s");
+  await expect(p.getByTestId("assets-status").or(p.locator(".notice")).first()).toBeAttached();
+  // Saved: the card on the canvas is the new version (its item followed it).
+  await expect.poll(placed).not.toEqual([hashOf(NOTE)]);
+  await panel.locator("[data-close]").click();
+  await expect(panel).toHaveCount(0);
+  // Edit note, in the Actions bar of the selected card, opens it too.
+  await p.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await p.locator('[data-ctx="editnote"]').filter({ visible: true }).click();
+  await expect(p.getByTestId("note-panel").locator(".sun-editor-editable p").first()).toContainText("More words.");
 });

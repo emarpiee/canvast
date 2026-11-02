@@ -309,6 +309,8 @@ const MIN_TEXT_BOX_PX = 24;
 export interface ToolHooks {
   /** Open the text editor on `target`, or on a new text object at `at` (a click: as wide as its words; a box dragged out: `box.widthPx` wide, `at` its top-left corner). */
   editText(target: TextObject | null, at: WorldPoint, box?: { widthPx: number }): void;
+  /** A double-click on a picture or file card (a note's card opens the note to edit). */
+  openItem?(assetId: string): void;
   /** The tool a plain key picks (rebindable in Settings, ADR 0049). */
   toolForKey(key: string): Tool | undefined;
   /** The direction a plain key steps in (W A S D at first; Settings > Shortcuts), if any (ADR 0058, 0072). */
@@ -2361,6 +2363,7 @@ export function attachTools(
       editor.setTool("node");
       return;
     }
+    if (hit?.kind === "image") hooks.openItem?.(hit.assetId);
     const t = textAt(s);
     if (t) hooks.editText(t, world(s));
   };

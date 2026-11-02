@@ -1381,7 +1381,8 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
   --se-doc-background: var(--theme-bg); --se-doc-info-page-font-color: var(--hud-accent-fg); --se-doc-info-page-background-color: var(--hud-muted); --se-doc-info-font-color: var(--hud-muted); --se-doc-info-active-color: var(--hud-accent); --se-loading-color: var(--hud-accent);
 }
 /* The [[ and # lists: as wide as their names (up to a readable width), never wider than the window. */
-.sun-editor.se-theme-canvast .se-controller .se-select-menu { width: max-content; max-width: min(28rem, calc(100vw - var(--sp-8))); }
+.sun-editor.se-theme-canvast .se-controller .se-select-menu { width: max-content; max-width: min(28rem, calc(100vw - var(--sp-8))); overflow: hidden; }
+.sun-editor.se-theme-canvast .se-controller .se-select-menu ul { min-width: 0; } /* (the list keeps to the box: a long name ends in …) */
 .sun-editor.se-theme-canvast .se-autocomplete-item { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sun-editor.se-theme-canvast .se-list-inner :is(h1, h2, h3, h4, h5, h6, p, blockquote, pre) { font-family: var(--font-ui); } /* (the paragraph styles' previews) */
 /* (the editor writes white on its accent: the app's text on accent, in each state, the dialogs' own rule too) */
@@ -1390,6 +1391,11 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 /* The preview of what a link in a note points at, while the pointer rests on it. */
 .note-link-peek { position: fixed; z-index: var(--z-pop); padding: var(--sp-2); background: var(--paper); border: 1px solid var(--hud-border); border-radius: var(--r-md); box-shadow: var(--hud-lift); pointer-events: none; }
 .note-link-peek img { display: block; max-width: calc(var(--action-w) * 1.4); max-height: calc(var(--action-w) * 1.2); border-radius: var(--r-sm); }
+/* The note panel on a canvas: the notes editor over the dimmed canvas (a modal dialog), the same as in the library's viewer. */
+.note-panel { width: min(70rem, calc(100vw - var(--sp-12))); height: calc(100dvh - var(--sp-13)); max-width: none; max-height: none; padding: 0; display: flex; flex-direction: column; overflow: hidden; color: var(--hud-fg); background: var(--paper); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); }
+.note-panel:not([open]) { display: none; }
+.note-panel::backdrop { background: var(--hud-scrim); }
+.note-panel > .panel-body { flex: 1; min-height: 0; display: flex; padding: 0; overflow: hidden; }
 /* A note open in the viewer: the notes editor fills the stage; the picture's own tools are not shown. */
 .viewer-note { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .viewer-note > div, .viewer-note .se-container { flex: 1; min-height: 0; display: flex; flex-direction: column; }

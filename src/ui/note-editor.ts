@@ -111,7 +111,7 @@ const FULL_BUTTONS: SunEditor.UI.ButtonList = [
   ["-right", ":View-text.View ▾", ...VIEW_TOOLS],
   ["-right", "codeView", "fullScreen"],
 ];
-const SUB_BUTTONS = [["bold", "italic", "underline", "strike", "subscript", "superscript"], "|", ["fontColor", "backgroundColor"]];
+const SUB_BUTTONS = [["bold", "italic", "underline", "strike", "subscript", "superscript"], "|", ["fontColor", "backgroundColor"], "|", ["link"]];
 const hIcon = (n: number): string => `<svg width="17" height="17" viewBox="0 0 24 24"><text x="1" y="18" font-size="15" font-weight="700" fill="currentColor">H${n}</text></svg>`;
 const line = (tag: string) => ($: SunEditor.Deps): void => void $.format.setLine(document.createElement(tag));
 
@@ -301,6 +301,21 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   };
 
   let dirty = false;
+  /**
+   * The Markdown and Code views show the note as text and, coming back, read it again from that text: markdown keeps no picture sizes,
+   * spacing or styles. Left without a change to that text, the note comes back as it was, not read again.
+   */
+  const views: Record<"markdown" | "code", { html: string; text: string; dirty: boolean } | null> = { markdown: null, code: null };
+  const viewToggled = (which: "markdown" | "code") => ({ frameContext, is }: { frameContext: SunEditor.FrameContext; is: boolean }): void => {
+    const area = frameContext.get(which) as HTMLTextAreaElement | undefined;
+    if (!area) return;
+    if (is) return void (views[which] = { html: editor.$.html.get(), text: area.value, dirty });
+    const was = views[which];
+    views[which] = null;
+    if (!was || area.value !== was.text) return;
+    editor.$.html.set(was.html);
+    dirty = was.dirty;
+  };
   const holder = document.createElement("div");
   el.append(holder);
   /** What the editor holds and how it cleans it (the same for the hidden one that compares notes). */
@@ -339,6 +354,22 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     events: {
       // A floating panel of the editor (the [[ and # lists, a picture's tools) is kept inside the window.
       onShowController: ({ info }: { info: { form?: HTMLElement | null; inWrapper?: boolean } }) => void (info.form && !info.inWrapper && requestAnimationFrame(() => keepInView(info.form!))),
+      // A web address or a [[link]] pasted over words (in one line): those words become the link, nothing else is pasted.
+      onPaste: async ({ $, event }: { $: SunEditor.Deps; event: Event }) => {
+        const text = (event as ClipboardEvent).clipboardData?.getData("text/plain").trim() ?? "";
+        const sel = window.getSelection();
+        const words = sel && !sel.isCollapsed ? sel.toString() : "";
+        const wiki = /^\[\[([^[\]|\n]+)\]\]$/.exec(text);
+        const url = /^(https?:\/\/|mailto:)\S+$/i.test(text) ? text : null;
+        if (!words.trim() || /\n/.test(words) || (!wiki && !url)) return undefined;
+        const a = wiki ? wikiLink(wiki[1]!.trim(), words) : Object.assign(document.createElement("a"), { href: url!, textContent: words });
+        if (!$.html.insertNode(a, { skipCharCount: false })) return undefined;
+        $.selection.setRange(a.firstChild!, words.length, a.firstChild!, words.length);
+        dirty = true;
+        return false;
+      },
+      onToggleMarkdownView: viewToggled("markdown"),
+      onToggleCodeView: viewToggled("code"),
       onChange: () => void (dirty = true),
       onInput: () => void (dirty = true),
       onSave: async () => (await host.save()) || false,
