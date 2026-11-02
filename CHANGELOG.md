@@ -58,6 +58,12 @@
 - **Fixed:** a long note's preview faded out to white on the dark look.
 - **Fixed:** the Note panel was not as wide as its place in the dock (an empty strip beside the editor when it was made narrow) and its header was unlike the other panels': it is now a panel like the others. A long name is cut with "…" (the whole name on hover).
 - **Changed:** the library's reset-filters button is coloured while a filter is on.
+- **Fixed:** a hidden note open in the Note panel stayed open, readable and editable, after hidden mode ended (Stay in hidden mode, then Exit): it now closes with its changes saved as soon as hidden items are no longer shown.
+- **Added:** Settings > Notes > Note editor on a canvas: Panel (the dock's) or Window (centred over the canvas).
+- **Added:** Settings > Notes > Preview width on canvases: Narrow, Medium or Wide pages on notes' cards.
+- **Fixed:** in the notes editor, a click in the font size field lost the chosen words, so a typed size changed nothing.
+- **Fixed:** a note saved with its words made big and then small again kept the tall card of the big version (two versions alike in length and start shared one measured page).
+- **Fixed:** the Note panel's toolbar showed scrollbars everywhere (the panels' list style reached it); a press on its header folded it away (an editor never folds now); it was blurring the canvas behind it on every frame (it is an opaque page again).
 
 ## 0.52.6 — Library files worked on elsewhere, Flip (2026-11-02)
 

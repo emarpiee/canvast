@@ -758,7 +758,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .layers-blend { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4) 0; font-size: var(--text-sm); }
 .layers-blend select { flex: 1; min-width: 0; text-transform: capitalize; }
 .layer-rename { flex: 1; min-width: 0; font: inherit; }
-.layers-panel ul { list-style: none; margin: 0; padding: var(--sp-2); overflow-y: auto; }
+.layers-panel ul:not(:where(.viewer-note *)) { list-style: none; margin: 0; padding: var(--sp-2); overflow-y: auto; }
 .layer { display: flex; align-items: center; gap: var(--sp-2); min-height: 28px; padding: 0 var(--sp-1) 0 calc(var(--sp-1) + var(--depth, 0) * var(--sp-7)); border-radius: var(--r-sm); cursor: default; }
 .layer:hover { background: var(--hud-hover); }
 .layer.is-selected { background: var(--hud-accent); color: var(--hud-accent-fg); }
@@ -1392,7 +1392,11 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .note-link-peek { position: fixed; z-index: var(--z-pop); padding: var(--sp-2); background: var(--paper); border: 1px solid var(--hud-border); border-radius: var(--r-md); box-shadow: var(--hud-lift); pointer-events: none; }
 .note-link-peek img { display: block; max-width: calc(var(--action-w) * 1.4); max-height: calc(var(--action-w) * 1.2); border-radius: var(--r-sm); }
 /* The note panel on a canvas: a panel of the dock with the notes editor (the same as in the library's viewer); its height can be dragged. */
-.note-dock { height: min(78dvh, 56rem); min-height: 20rem; resize: vertical; overflow: hidden; }
+.note-dock { height: min(78dvh, 56rem); min-height: 20rem; resize: vertical; overflow: hidden; background: var(--paper); backdrop-filter: none; } /* (a page: opaque, so nothing behind it is blurred again on every frame of the canvas) */
+/* The Note window (Settings > Notes > Note editor on a canvas: Window): the same panel, centred over a scrim. */
+.note-window { position: fixed; inset: 0; z-index: var(--z-edge); display: grid; place-items: center; background: var(--hud-scrim); }
+.note-window:has(> .note-dock[hidden]) { display: none; }
+.note-window > .note-dock { width: min(60rem, calc(100vw - var(--sp-8))); max-height: calc(100dvh - var(--sp-8)); box-shadow: var(--hud-lift); }
 .note-dock > .panel-body { flex: 1; min-height: 0; display: flex; padding: 0; overflow: hidden; }
 /* A note open in the viewer: the notes editor fills the stage; the picture's own tools are not shown. */
 .viewer-note { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }

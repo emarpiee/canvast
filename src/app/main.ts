@@ -1,7 +1,7 @@
 import { externalFolder } from "../storage/external-folder";
 import { askHiddenPassword } from "../ui/hidden-access";
 import { noteKindOf } from "../notes/note-file";
-import { setNoteCardLength, setNoteLook, setNotePictures } from "../notes/note-preview";
+import { setNoteCardLength, setNoteLook, setNotePageWidth, setNotePictures } from "../notes/note-preview";
 import { anyNoteDirty, leaveAllNotes } from "../ui/note-session";
 import { mountNotePanel } from "../ui/note-panel";
 import type { NotePanelDeps } from "../ui/note-panel";
@@ -520,6 +520,8 @@ async function start(): Promise<void> {
   // How much of a long note its card shows (Settings > Notes), for the cards made from now on.
   setNoteCardLength(settings.get("notes.cardLength"));
   settings.subscribe((key) => key === "notes.cardLength" && setNoteCardLength(settings.get("notes.cardLength")));
+  setNotePageWidth(settings.get("notes.pageWidth"));
+  settings.subscribe((key) => key === "notes.pageWidth" && setNotePageWidth(settings.get("notes.pageWidth")));
   // Notes' previews on light or dark paper (Settings > Notes > Preview look; Auto follows the app's theme): a change draws their cards again.
   const darkNow = (): boolean => (settings.get("ui.theme") === "system" ? matchMedia("(prefers-color-scheme: dark)").matches : settings.get("ui.theme") === "dark");
   const noteLookNow = () => (settings.get("notes.look") === "auto" ? (darkNow() ? "dark" : "light") : settings.get("notes.look") as "light" | "dark");
@@ -854,9 +856,12 @@ async function start(): Promise<void> {
   // Hidden items' pictures on the canvas (the screen only): while Settings > Privacy remembers the Hidden password and it was given
   // here, or while hidden mode is on outside the library (Stay in hidden mode); and, in the desktop app, while their key is open. What makes a file uses `filesAssets`, and a capture of the screen is drawn with
   // padlocks first (`padlocked`), so nothing readable of them leaves the app.
+  // The note panel (note-panel.ts): made once the library view is, which it imports through.
+  let notePanel: { open(hash: string): Promise<boolean>; close(): Promise<boolean>; closeHidden(): void } = { open: async () => false, close: async () => true, closeHidden: () => undefined };
   const syncReveal = (): void => {
     const on = ((settings.get("library.hiddenRemember") && hiddenRemembered()) || hiddenModeOn()) && (storage?.hidden ? storage.hidden.isOpen() : true);
     if (on === assets.revealing) return;
+    if (!on) notePanel.closeHidden(); // (nothing hidden stays open on a canvas once hidden items are no longer shown)
     assets.reveal(on);
     assetNames.clear();
     tiles.clear();
@@ -1022,14 +1027,23 @@ async function start(): Promise<void> {
       return isCoarse(fc, o.frame ?? doc.space.world) || !!(oc && projectObject(o, oc, view.viewport, { keepTiny: true }));
     },
   });
-  // The note panel (note-panel.ts): made once the library view is, which it imports through.
-  let notePanel: { open(hash: string): Promise<boolean> } = { open: async () => false };
   // (a panel of the dock: floating at first, as wide as a page, its own width also when docked)
   const notePanelEl = document.createElement("section");
   notePanelEl.className = "layers-panel note-dock"; // (a dock panel like the others: their look, header and width)
   notePanelEl.dataset["testid"] = "note-panel";
   notePanelEl.hidden = true;
-  const notePanelReady = (d: NotePanelDeps): void => void (notePanel = mountNotePanel(notePanelEl, d));
+  // The other host (Settings > Notes > Note editor on a canvas: Window): the same panel, centred over a scrim; a press on the scrim closes it.
+  const noteWindow = document.createElement("div");
+  noteWindow.className = "note-window";
+  const noteWindowEl = document.createElement("section");
+  noteWindowEl.className = "layers-panel note-dock";
+  noteWindowEl.dataset["testid"] = "note-window";
+  noteWindowEl.setAttribute("role", "dialog");
+  noteWindowEl.hidden = true;
+  noteWindow.append(noteWindowEl);
+  document.body.append(noteWindow);
+  noteWindow.addEventListener("pointerdown", (e) => void (e.target === noteWindow && notePanel.close()));
+  const notePanelReady = (d: NotePanelDeps): void => void (notePanel = mountNotePanel({ panel: notePanelEl, window: noteWindowEl }, d, () => settings.get("notes.panelMode")));
   let newNoteAt: (at: ScreenPoint, widthPx?: number) => Promise<void> = async () => undefined;
   let makeNoteFiles: () => Promise<void> = async () => undefined;
   attachTools(canvas, view, doc, index, editor, { editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h) => void notePanel.open(h), newNote: (at, w) => void newNoteAt(at, w), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
@@ -1197,7 +1211,7 @@ async function start(): Promise<void> {
   const panelEl = (testid: string): HTMLElement => side.querySelector<HTMLElement>(`[data-testid="${testid}"]`)!;
   dock.add(panelEl("layers-panel"), { id: "layers", title: "Layers", side: "right" });
   side.append(notePanelEl);
-  dock.add(notePanelEl, { id: "note", title: "Note", side: "float", width: 760, ownWidth: true, maxWidth: 1400 });
+  dock.add(notePanelEl, { id: "note", title: "Note", side: "float", width: 760, ownWidth: true, maxWidth: 1400, noFold: true });
   dock.add(panelEl("bookmarks-panel"), { id: "bookmarks", title: "Bookmarks", side: "left" });
   dock.add(panelEl("styles-panel"), { id: "styles", title: "Styles", side: "left" });
   dock.add(panelEl("tags-panel"), { id: "tags", title: "Tags", side: "left" });

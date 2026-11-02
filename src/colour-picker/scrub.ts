@@ -16,7 +16,7 @@ export function niceStep(span: number): number {
 }
 
 export function scrubNumbers(root: HTMLElement, hint = "Drag the field left or right to change it", opts: { units?: string } = {}): void {
-  let drag: { label: HTMLElement; input: HTMLInputElement; start: number; unit: string; x: number; moved: boolean; id: number } | null = null;
+  let drag: { label: HTMLElement; input: HTMLInputElement; start: number; unit: string; x: number; moved: boolean; id: number; native?: boolean } | null = null;
   const numberOf = (label: HTMLElement): HTMLInputElement | null => {
     const c = (label as HTMLLabelElement).control; // the wrapped field, or the one `for` names
     return c instanceof HTMLInputElement && c.type === "number" ? c : null;
@@ -46,9 +46,9 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the field left or r
       const m = /^\s*(\d*\.?\d+)\s*([a-z%]*)\s*$/i.exec(t.value);
       if (!m || e.button !== 0 || t.disabled || t.readOnly || document.activeElement === t) return; // (no number yet, or being typed in)
       if (!t.title) t.title = hint;
-      drag = { label: t, input: t, start: Number(m[1]), unit: m[2]!, x: e.clientX, moved: false, id: e.pointerId };
+      // (the press is let through: the other program's own press keeps what it needs, e.g. the words chosen in an editor while a size is typed)
+      drag = { label: t, input: t, start: Number(m[1]), unit: m[2]!, x: e.clientX, moved: false, id: e.pointerId, native: true };
       t.setPointerCapture(e.pointerId);
-      e.preventDefault();
       return;
     }
     // Only the field scrubs (a press on its name is just a label: it focuses the field).
@@ -97,6 +97,7 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the field left or r
     drag = null;
     if (d.label.hasPointerCapture(e.pointerId)) d.label.releasePointerCapture(e.pointerId);
     if (!d.moved) {
+      if (d.native) return; // (focused by its own press: typed in)
       d.input.focus();
       d.input.select();
       return;

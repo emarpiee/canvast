@@ -297,6 +297,19 @@ test("a note's preview shows the pictures it links to (and an Obsidian ![[embed]
   const LONG = `# Long\n\n${"A line of the note.\n\n".repeat(200)}`;
   await p.getByTestId("assets-import-input").setInputFiles({ name: "long.md", mimeType: "text/markdown", buffer: Buffer.from(LONG) });
   await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).map((e) => [e.pixelW, e.pixelH])[0]), hashOf(LONG))).toEqual([1200, 1800]);
+  // Two versions alike in length and start (a size changed back) each get a card of their own height (the second took the first's).
+  const sized = (px: number) => `<p><span style="font-size: ${px}px;">${"Words that wrap when they are big. ".repeat(6)}</span></p>`;
+  await p.getByTestId("assets-import-input").setInputFiles([{ name: "big.note.html", mimeType: "text/html", buffer: Buffer.from(sized(66)) }, { name: "small.note.html", mimeType: "text/html", buffer: Buffer.from(sized(16)) }]);
+  const tall = (h: string) => p.evaluate((x) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === x)?.pixelH), h);
+  await expect.poll(() => tall(hashOf(sized(16)))).toBe(900);
+  expect(await tall(hashOf(sized(66)))).toBeGreaterThan(900);
+  // Preview width: Wide lays a new note's page out wider.
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Notes", exact: true }).click();
+  await p.locator('[data-row="notes.pageWidth"] select').selectOption("wide");
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "wide.md", mimeType: "text/markdown", buffer: Buffer.from("# Wide\n") });
+  await expect.poll(() => p.evaluate((x) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === x)?.pixelW), hashOf("# Wide\n"))).toBe(1800);
   // A long note fades out into its own paper: dark on the dark look (it faded to white).
   const bottom = () =>
     card(p, hashOf(LONG))
@@ -334,6 +347,10 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   const widths = () => panel.evaluate((el) => [Math.round(el.getBoundingClientRect().width), Math.round(el.closest(".dock-item")!.getBoundingClientRect().width), Math.round(el.querySelector(".sun-editor")!.getBoundingClientRect().width)]);
   await expect.poll(async () => { const [a, b] = await widths(); return a === b; }).toBe(true);
   expect(await panel.evaluate((el) => el.classList.contains("layers-panel"))).toBe(true);
+  // An editor never folds (a press on its header is no fold), and the panels' list rules stay out of its toolbar (no scrollbars there).
+  await panel.locator(".panel-head h2").click();
+  await expect(panel.locator(".sun-editor-editable h1").first()).toBeVisible();
+  expect(await panel.evaluate((el) => [...el.querySelectorAll(".se-toolbar ul")].filter((u) => getComputedStyle(u).overflowY === "auto").length)).toBe(0);
   await panel.locator(".sun-editor-editable p").first().click();
   await p.keyboard.press("End");
   await p.keyboard.type(" More words.");
@@ -352,6 +369,12 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   await p.mouse.up();
   await expect(size).toHaveValue("26px");
   await expect(panel.locator('.sun-editor-editable span[style*="font-size: 26px"]').first()).toHaveText("First");
+  // A size typed in the field: the words stay chosen while it is clicked and typed in, and take it.
+  await panel.locator(".sun-editor-editable p").first().dblclick({ position: { x: 8, y: 8 } });
+  await size.click();
+  await size.fill("30px");
+  await size.press("Enter");
+  await expect(panel.locator('.sun-editor-editable span[style*="font-size: 30px"]').first()).toHaveText("First");
   // The editor's own dialogs work in the panel (nothing over them takes the clicks): a picture from the library, a link.
   await panel.locator('.se-toolbar button[data-command="image"]').filter({ visible: true }).click();
   await p.locator(".__se__gallery").filter({ visible: true }).click();
@@ -439,5 +462,72 @@ test("the Note tool (M) makes a note file in the Notes folder, places its card a
   await p.getByTestId("assets-side").getByRole("button", { name: /^Notes/ }).click();
   await expect(p.getByTestId("asset-card")).toHaveCount(2);
   await expect(card(p, made.assetId!)).toContainText("Buy paper");
+  // Settings > Notes > Note editor on a canvas: Window opens it centred over the canvas; a press beside it closes it.
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Notes", exact: true }).click();
+  await p.locator('[data-row="notes.panelMode"] select').selectOption("window");
+  await p.getByTestId("view-canvas").click();
+  const mb = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), made.id))!.box;
+  await p.mouse.dblclick(Math.round((mb.minX + mb.maxX) / 2), Math.round((mb.minY + mb.maxY) / 2));
+  const win = p.getByTestId("note-window");
+  await expect(win.locator(".sun-editor-editable p").first()).toContainText("Buy paper");
+  await expect(p.getByTestId("note-panel")).toBeHidden();
+  await p.mouse.click(4, 300);
+  await expect(win).toBeHidden();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a hidden note open in the Note panel closes when hidden items are no longer shown (Exit hidden mode), its changes kept", async ({ app }) => {
+  const p = app.page;
+  // Hidden mode: the word in the search, and the password when it is asked (it is not while the hidden items are still open).
+  const enter = async (): Promise<void> => {
+    await p.getByTestId("assets-search").fill("hidden:");
+    await expect(p.getByTestId("hidden-mode-bar").or(p.getByTestId("prompt-input")).filter({ visible: true })).toHaveCount(1);
+    if (await p.getByTestId("prompt-input").isVisible()) {
+      await p.getByTestId("prompt-input").fill("secret");
+      await p.getByTestId("prompt-ok").click();
+    }
+    await expect(p.getByTestId("hidden-mode-bar")).toBeVisible();
+  };
+  const NOTE = "# Secret plan\n\nFirst words.\n";
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "secret.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) });
+  await card(p, hashOf(NOTE)).click();
+  await p.getByTestId("asset-place").click();
+  await p.getByTestId("view-assets").click();
+  await card(p, hashOf(NOTE)).click();
+  await p.getByTestId("asset-hide").click();
+  // A password; hidden mode, kept on outside the library (Stay), with remembering the password off.
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: /Privacy/ }).click();
+  await p.getByTestId("hidden-pw-set").click();
+  for (let i = 0; i < 2; i++) {
+    await p.getByTestId("prompt-input").fill("secret");
+    await p.getByTestId("prompt-ok").click();
+  }
+  await p.getByTestId("view-assets").click();
+  await enter();
+  await p.getByTestId("hidden-mode-stay").click();
+  // On the canvas it opens in the Note panel and is edited, not saved.
+  await p.getByTestId("view-canvas").click();
+  const box = (await p.locator("canvas").first().boundingBox())!;
+  await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
+  const panel = p.getByTestId("note-panel");
+  await expect(panel.locator(".sun-editor-editable h1").first()).toHaveText("Secret plan");
+  await panel.locator(".sun-editor-editable p").first().click();
+  await p.keyboard.press("End");
+  await p.keyboard.type(" More.");
+  // Exit hidden mode in the library: the panel is gone (it would let a hidden note be read and written with hidden items locked).
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("hidden-mode-exit").click();
+  await p.getByTestId("view-canvas").click();
+  await expect(panel).toBeHidden();
+  // Its changes were saved as it closed: shown again (hidden mode), it has them.
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-search").fill(""); // (the search as it was before hidden mode: the word)
+  await enter();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.name === "secret.md").length))).toBe(1);
+  await p.locator('[data-testid="asset-card"]').first().dblclick();
+  await expect(page(p).locator("p").first()).toContainText("More.");
   expect(app.consoleErrors).toEqual([]);
 });

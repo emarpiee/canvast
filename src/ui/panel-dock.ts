@@ -33,6 +33,8 @@ export interface DockSpec {
   /** Its own width, also in a stack (the stack's other panels keep theirs), up to `maxWidth`: a wide panel (the note editor). */
   ownWidth?: boolean;
   maxWidth?: number;
+  /** Never folded to its title bar (an editor: a press on its header, or another panel used, would hide what is being written). */
+  noFold?: boolean;
 }
 
 interface PanelState {
@@ -173,7 +175,7 @@ export class PanelDock {
           .filter((it) => !it.el.hidden && this.effective(this.state.get(it.spec.id)!) === side)
           .sort((a, b) => this.order.indexOf(b.spec.id) - this.order.indexOf(a.spec.id));
         stacked.forEach((it, i) => {
-          if (i >= n) this.state.get(it.spec.id)!.c = true;
+          if (i >= n && !it.spec.noFold) this.state.get(it.spec.id)!.c = true;
         });
       }
     }
@@ -255,7 +257,7 @@ export class PanelDock {
       const side = this.effective(s);
       want.get(side === "left" ? this.left : side === "right" ? this.right : this.layer)!.push(it.box);
       it.box.dataset["side"] = side;
-      it.box.toggleAttribute("data-folded", s.c);
+      it.box.toggleAttribute("data-folded", s.c && !it.spec.noFold); // (a fold remembered from before it could not be folded is let go)
       const w = side === "float" || it.spec.ownWidth ? s.w : this.sideW[side];
       it.box.style.width = `${w}px`;
       if (side === "float") {
@@ -318,7 +320,7 @@ export class PanelDock {
       for (const z of this.zones) z.hidden = true;
       if (!dragging) {
         // a press: fold or unfold; unfolded counts as used
-        s.c = !s.c;
+        s.c = item.spec.noFold ? false : !s.c;
         if (!s.c) this.order = [...this.order.filter((x) => x !== id), id];
         this.settle();
         this.save();

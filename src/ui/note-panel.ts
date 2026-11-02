@@ -22,11 +22,19 @@ export interface NotePanelDeps extends NoteDeps {
  * the same editor and saving as in the library (`OpenNote`). Closing asks about unsaved changes; the card on the canvas shows the saved
  * version at once (it follows the new version, as every placement does).
  */
-export function mountNotePanel(el: HTMLElement, deps: NotePanelDeps): { open(hash: string): Promise<boolean>; readonly hash: string | null } {
+export function mountNotePanel(
+  hosts: { panel: HTMLElement; window: HTMLElement },
+  deps: NotePanelDeps,
+  /** Where a note opens (Settings > Notes): the dock's panel, or the window centred over the canvas. */
+  mode: () => "panel" | "window",
+): { open(hash: string): Promise<boolean>; close(): Promise<boolean>; closeHidden(): void; readonly hash: string | null } {
+  let el = hosts.panel; // (the host of the note open now)
   let note: OpenNote | null = null;
+  let hiddenOpen = false; // (the note open is a hidden item)
   const shut = (): void => {
     note?.close(true);
     note = null;
+    hiddenOpen = false;
     el.hidden = true;
     el.replaceChildren();
   };
@@ -61,6 +69,8 @@ export function mountNotePanel(el: HTMLElement, deps: NotePanelDeps): { open(has
       return true;
     }
     if (!(await leave())) return true;
+    el = hosts[mode()];
+    hiddenOpen = !!e?.hidden;
     const name0 = (await deps.session.catalog?.entry(hash).catch(() => undefined))?.name ?? rec.name;
     const tools = deps.session.readOnly ? "" : `<button type="button" class="layer-btn" data-rename aria-label="Rename this note" title="Rename this note (F2)">${ICONS.textCursorInput}</button>`;
     el.innerHTML = panelHtml({ title: esc(name0), tools, body: `<div class="viewer-note" data-testid="note-editor"><div></div></div>` });
@@ -94,11 +104,15 @@ export function mountNotePanel(el: HTMLElement, deps: NotePanelDeps): { open(has
     deps.session.editor.message = `Renamed to “${n.name}”.`;
     deps.session.editor.changed();
   };
-  el.addEventListener("keydown", (e) => {
-    if (e.key === "F2" && !e.ctrlKey && !e.altKey && !e.metaKey) (e.preventDefault(), void rename());
-  });
+  for (const host of [hosts.panel, hosts.window])
+    host.addEventListener("keydown", (e) => {
+      if (e.key === "F2" && !e.ctrlKey && !e.altKey && !e.metaKey) (e.preventDefault(), void rename());
+    });
   return {
     open,
+    close: leave,
+    // Hidden items are no longer shown (hidden mode ended, the hidden items locked): a hidden note open here closes, its changes saved (OpenNote.close).
+    closeHidden: () => void (hiddenOpen && shut()),
     get hash() {
       return note?.hash ?? null;
     },
