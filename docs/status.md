@@ -37,7 +37,7 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
-## Unreleased: notes editor (2026-11-02)
+## v0.52.7: notes editor (2026-11-03)
 
 - **Implemented:** `ui/note-editor.ts` mounts SunEditor 3.4.1 (npm, bundled; CSS bundled by `scripts/build.mjs`) with the demo's presets (Settings `notes.style`); markdown in and out with SunEditor's own `helper.markdown` / `helper.converter`, loss checked by comparing the note with its markdown read back in a hidden editor of the same options (attributes in one order); library links (`notes/note-file.ts`: relative paths, `canvast:<hash>`) shown from blob URLs and written back as they were. Gallery plugins are subclassed so their buttons open the shared `openLibraryPicker` (now centred mode, kind label, Import, 300-cell cap); upload hooks import into the library first. Saving: `session.saveVersion` (desktop: `FolderSync.saveFile` writes over the item's file and follows it, `savedInApp`; elsewhere a new item takes the old one's place and the old is deleted). Offline: only the plugins used are bundled; the remaining SunEditor URL strings are text or blocked by the CSP.
 - **Implemented (2):** templates (built-in, plus notes tagged `template`, their links re-pointed from the note's folder), layouts (SunEditor's plugin: it replaces the whole note), task boxes ticked by a click (`checked` attribute, one undo step). Manual save kept by the owner's choice (autosave declined 2026-11-02).
@@ -48,8 +48,12 @@ Unverified / Committed / Next bounded task**.
 - **Implemented (5):** `notes/note-preview.ts` draws a note's page through an SVG `foreignObject` image (nothing runs or loads; no taint: thumbnails save in Chromium and Firefox), used by `makeFileCardFrom` (canvas card, 400 × 300) and `makeThumb` (library); `hasThumb` counts notes. Viewer media rules skip the note's content (`:not(:where(.viewer-note *))`, no specificity change). Primary button text is `--hud-accent-fg` in every state.
 - **Implemented (6):** desktop close: `onClosing` holds the close and asks through `AssetsView.leaveNote` (Cancel keeps the window); toolbar without newDocument, print and the page buttons; `NoteFont` (a subclass of the font plugin) shows Default. Fonts are also registered under their family names (font-loader, Inter), which the editor lists.
 - **Unverified:** layouts beyond SunEditor's own plugin (no test inserts one); the dark theme by eye on a real screen; hidden notes saved on the desktop (new version made, not written in place); very large libraries in the chooser; Notion-like and Balloon styles beyond opening.
-- **Committed:** main, not pushed, not released (version not bumped yet).
-- **Next bounded task:** the owner's review of the editor; then bump and release.
+- **Implemented (7):** the owner's 17-item pass (2026-11-03): the Note panel on a canvas (a dock panel, or a window: `notes.panelMode`), rename from its header, `.note.html` one extension, saves not undo steps (`DocumentStore.remap`), the Note tool makes note files (Notes folder, Make note files), notes kind folder, Preview look, width and length, paste kept in fields, scrubbed sizes, context menus at the pointer, `kind:note`, the filtered chip, desktop atomic writes with their own temporary file, hidden notes closed when hidden items stop showing.
+- **Tested:** notes and dock specs 30/30 in Chromium and Firefox; library specs 73/73 (Chromium); desktop spec tests for notes and writes; unit 622.
+- **Known failures:** `notes.spec` "a markdown note opens" failed once in Firefox (a save-then-download poll), 3/3 on rerun.
+- **Unverified:** dragging a picture's size in the editor's image dialog; where the owner's lag came from (the panel's backdrop blur removed).
+- **Committed:** main, pushed as v0.52.7, not released (the owner: no release).
+- **Next bounded task:** the owner's review.
 
 ## v0.52.6: library files worked on elsewhere, Flip (2026-11-02)
 
