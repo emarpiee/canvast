@@ -3,7 +3,7 @@ import { parseCanvasFilter, type CanvasContext } from "../../src/search/canvas-f
 import type { CanvasObject } from "../../src/doc/model";
 
 describe("canvas search keywords", () => {
-  const ctx: CanvasContext = { sheetName: (id) => (id === "s1" ? "page one" : undefined), onScreen: (o) => o.id !== "far" };
+  const ctx: CanvasContext = { sheetName: (id) => (id === "s1" ? "page one" : undefined), onScreen: (o) => o.id !== "far", assetName: (h) => (h === "n" ? "Plan.note.html" : "cat.png") };
   const base = { id: "a", opacity: 1, attachmentTargetId: null } as const;
   const shape = { ...base, kind: "path", fill: "#e11d1d", stroke: { type: "linear", x0: 0, y0: 0, x1: 1, y1: 0, stops: [{ o: 0, c: "#2563eb" }, { o: 1, c: "#ffffff" }] }, parent: "s1", groups: ["g"], groupNames: { g: "Heads" }, locked: true } as unknown as CanvasObject;
   const text = { ...base, id: "far", kind: "text", color: "#111111" } as unknown as CanvasObject;
@@ -13,6 +13,8 @@ describe("canvas search keywords", () => {
     expect(t("kind:shape", shape)).toBe(true);
     expect(t("kind:video", video)).toBe(true);
     expect(t("kind:picture", video)).toBe(false);
+    expect(t("kind:note", { ...base, kind: "image", assetId: "n" } as unknown as CanvasObject)).toBe(true);
+    expect(t("kind:note", { ...base, kind: "image", assetId: "p" } as unknown as CanvasObject)).toBe(false);
     expect(t("group:head", shape)).toBe(true);
     expect(t("in:page", shape)).toBe(true);
     expect(t("in:page", text)).toBe(false);

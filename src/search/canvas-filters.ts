@@ -1,17 +1,20 @@
 /**
- * Search words that only the canvas search understands, beside names, `#tag` and `.png`: `kind:text` (picture, video, gif, audio, text,
+ * Search words that only the canvas search understands, beside names, `#tag` and `.png`: `kind:text` (picture, video, gif, audio, note, text,
  * stroke, shape, sheet), `group:name` (in a group of that name), `in:name` (on a sheet of that name), `fill:red` and `stroke:#2563eb` (the
  * colour of the fill or the outline, a gradient matching by any of its stops), and `is:locked|masked|offscreen|tagged|named|rotated`.
  */
 import { colourMatches } from "../assets/look";
 import type { CanvasObject } from "../doc/model";
 import type { Paint } from "../doc/paint";
+import { noteKindOf } from "../notes/note-file";
 
 export interface CanvasContext {
   /** The name of a sheet (by id), lower case; undefined when there is none. */
   sheetName(id: string): string | undefined;
   /** Whether the object is in the view now. */
   onScreen(o: CanvasObject): boolean;
+  /** A placed file's name in the library (by its hash), when known. */
+  assetName?(hash: string): string | undefined;
 }
 
 export type CanvasFilter = (o: CanvasObject, ctx: CanvasContext) => boolean;
@@ -66,6 +69,7 @@ export function parseCanvasFilter(w: string): CanvasFilter | null {
   const v = m[2]!;
   switch (m[1]) {
     case "kind": {
+      if (v === "note" || v === "notes") return (o, ctx) => o.kind === "image" && !!noteKindOf(ctx.assetName?.(o.assetId) ?? "");
       const k = KINDS[v];
       return k ? (o) => canvasKindOf(o) === k : null;
     }

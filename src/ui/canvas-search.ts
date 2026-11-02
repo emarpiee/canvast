@@ -93,6 +93,7 @@ export function mountCanvasSearch(host: HTMLElement, deps: SearchDeps): { open(p
       return s ? labelOf(s).text.toLowerCase() : undefined;
     },
     onScreen: (o) => deps.onScreen(o),
+    assetName: (h) => names.get(h),
   };
   /** A keyword (`kind:text`, `fill:red`...) decides alone; any other word goes to `word`. */
   const term = (o: CanvasObject, text: string, word: (w: string) => boolean): boolean => {

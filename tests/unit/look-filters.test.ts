@@ -105,6 +105,11 @@ describe("library keywords", () => {
     expect(t("kind:video")).toBe(true);
     expect(t("kind:font", { name: "a.ttf", type: "font/ttf", card: true })).toBe(true);
     expect(t("kind:file", { name: "a.zip", type: "application/zip", card: true })).toBe(true);
+    expect(t("kind:note", { name: "Plan.md", type: "text/markdown", card: true })).toBe(true);
+    expect(t("kind:note", { name: "Plan.note.html", type: "text/html", card: true })).toBe(true);
+    expect(t("kind:note", { name: "a.pdf", type: "application/pdf", card: true })).toBe(false);
+    expect(t("kind:document", { name: "a.pdf", type: "application/pdf", card: true })).toBe(true);
+    expect(t("kind:3d", { name: "head.glb", type: "model/gltf-binary", card: true })).toBe(true);
     expect(t("uses>2")).toBe(true);
     expect(t("uses:0")).toBe(false);
     expect(t("canvases<2")).toBe(false);

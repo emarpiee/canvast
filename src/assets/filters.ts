@@ -10,6 +10,7 @@
  */
 import type { Look } from "./look";
 import { colourMatches } from "./look";
+import { kindFolder } from "../storage/workspace-names";
 
 export interface Subject {
   readonly pixelW: number;
@@ -103,6 +104,8 @@ export const kindOf = (s: Subject): "picture" | "video" | "audio" | "gif" | "fon
   return "file";
 };
 const KINDS: Record<string, ReturnType<typeof kindOf>> = { picture: "picture", pictures: "picture", image: "picture", images: "picture", video: "video", videos: "video", audio: "audio", sound: "audio", gif: "gif", gifs: "gif", font: "font", fonts: "font", file: "file", files: "file", card: "file" };
+/** Kinds by what the file is: the kind folders of a workspace folder (notes, vectors, documents...). */
+const FILE_KINDS: Record<string, string> = { note: "notes", notes: "notes", vector: "vectors", vectors: "vectors", document: "documents", documents: "documents", archive: "archives", archives: "archives", "3d": "3d", model: "3d", models: "3d", preset: "presets", presets: "presets", icon: "icons", icons: "icons", art: "art_sources" };
 
 const DAY = 86_400_000;
 /** The span of days a date word names, [start, end) in local time, or null. */
@@ -158,10 +161,12 @@ function libraryKeyword(w: string, now: number): Filter | null {
     const f = IS[is[1]!];
     return f ? plain(f) : null;
   }
-  const kind = /^kind:([a-z]+)$/.exec(w);
+  const kind = /^kind:([a-z0-9]+)$/.exec(w);
   if (kind) {
     const k = KINDS[kind[1]!];
-    return k ? { needsLook: false, test: (s) => kindOf(s) === k } : null;
+    if (k) return { needsLook: false, test: (s) => kindOf(s) === k };
+    const f = FILE_KINDS[kind[1]!];
+    return f ? { needsLook: false, test: (s) => kindFolder(s.type ?? "", s.name ?? "") === f } : null;
   }
   const text = /^(on|folder|note|field):(.+)$/.exec(w);
   if (text) {
