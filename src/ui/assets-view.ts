@@ -512,6 +512,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let anchor: string | null = null;
   /** Picking several: once a checkbox, Ctrl, Shift or Ctrl+A started it, a tap adds or removes (a plain mouse click picks one alone). */
   let selecting = false;
+  /** Select several (a card's menu): every tap or click adds a card or takes it away, until nothing is selected or Esc. */
+  let severalOn = false;
   let places: AssetPlace[] = [];
   let generation = 0;
   /** Sidebar scope: "all", "favorites", "unfiled", "folder:<id>" or "tag:<lowercased tag>". */
@@ -2081,7 +2083,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let cardHtml = new WeakMap<object, string>();
   let cardsOf: CatalogListing | null = null;
   let cardsReadOnly = false;
-  const check = (hash: string, name: string): string => `<input type="checkbox" class="asset-check" data-hash="${hash}" aria-label="Select ${esc(name)}">`;
   const entryHtml = (e: CatalogListing["entries"][number]): string => {
     const cached = cardHtml.get(e);
     if (cached) return cached;
@@ -2107,7 +2108,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           ${meta(e).tags.length ? `<span class="asset-tags" data-testid="asset-card-tags">${meta(e).tags.map((t) => `<span class="tag-pill">#${esc(t)}</span>`).join(" ")}</span>` : `<span class="asset-tags"></span>`}
         </span>
       </button>
-      ${check(e.hash, name)}
       </div>`;
     cardHtml.set(e, html);
     return html;
@@ -2124,15 +2124,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                 <span class="asset-tags"></span>
               </span>
             </button>
-            ${check(m.hash, "missing original")}
           </div>`;
   /** Show whether a drawn card is picked. */
   const markCell = (el: HTMLElement): void => {
     const card = el.querySelector<HTMLElement>(".asset-card")!;
     const on = picked.has(card.dataset["hash"]!);
     card.setAttribute("aria-pressed", String(on));
-    const box = el.querySelector<HTMLInputElement>(".asset-check");
-    if (box) box.checked = on;
   };
   const makeCell = (html: string): HTMLElement => {
     const t = document.createElement("template");
@@ -2165,7 +2162,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!force && a === gridRange[0] && b === gridRange[1]) return;
     gridRange = [a, b];
     const ae = document.activeElement as HTMLElement | null;
-    const focused = ae && grid.contains(ae) ? { el: ae, hash: ae.dataset["hash"], box: ae.classList.contains("asset-check") } : null;
+    const focused = ae && grid.contains(ae) ? { el: ae, hash: ae.dataset["hash"] } : null;
     const els: HTMLElement[] = [];
     const keep = new Map<string, { el: HTMLElement; html: string }>();
     const made: HTMLElement[] = [];
@@ -2197,7 +2194,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (img) loadThumb(img);
     }
     // A card drawn again (its tags changed, say) keeps the keyboard.
-    if (focused?.hash && !focused.el.isConnected) mounted.get(focused.hash)?.el.querySelector<HTMLElement>(focused.box ? ".asset-check" : ".asset-card")?.focus({ preventScroll: true });
+    if (focused?.hash && !focused.el.isConnected) mounted.get(focused.hash)?.el.querySelector<HTMLElement>(".asset-card")?.focus({ preventScroll: true });
   };
   /** Lay the grid out again (its width, the thumbnail size or the cards changed), keeping the remembered card where it was on the screen. */
   const relayout = (): void => {
@@ -2275,7 +2272,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const e = pagedCache.get(hash);
     if (e) return entryHtml(e);
     want([hash]);
-    return `<div class="asset-cell" role="listitem"><button type="button" class="asset-card" data-testid="asset-card" data-hash="${hash}" aria-pressed="false" aria-label="Loading"><span class="asset-thumb thumb-slot"></span><span class="asset-info"><span class="asset-name"></span></span></button>${check(hash, "item")}</div>`;
+    return `<div class="asset-cell" role="listitem"><button type="button" class="asset-card" data-testid="asset-card" data-hash="${hash}" aria-pressed="false" aria-label="Loading"><span class="asset-thumb thumb-slot"></span><span class="asset-info"><span class="asset-name"></span></span></button></div>`;
   };
   const render = (): void => {
     keepFilters();
@@ -2938,6 +2935,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       anchor = hash;
     }
     selecting = picked.size > 0 && (how !== "one" || selecting);
+    if (!picked.size) severalOn = false;
     if (how === "one" && picked.size <= 1) selecting = false;
     places = selected && picked.size === 1 ? await session.assetPlaces(selected) : [];
     assetCanvasTags = selected && picked.size === 1 ? await session.canvasTagsOfAsset(selected).catch(() => []) : [];
@@ -2958,15 +2956,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // ---- events
   grid.addEventListener("click", (e) => {
     const t = e.target as HTMLElement;
-    // The checkbox adds or removes one asset: the way to pick several without a keyboard.
-    const box = t.closest<HTMLInputElement>(".asset-check");
-    if (box) return void select(box.dataset["hash"]!, "toggle");
     const card = t.closest<HTMLElement>(".asset-card");
     if (!card) return;
     const hash = card.dataset["hash"]!;
     if (e.shiftKey) void select(hash, e.ctrlKey || e.metaKey ? "add-range" : "range");
-    // (picking several: a tap adds or removes, as on a phone; a plain click with a mouse picks that one alone, Ctrl or the checkbox add or remove)
-    else if (e.ctrlKey || e.metaKey || (selecting && (e as PointerEvent).pointerType === "touch")) void select(hash, "toggle");
+    // (picking several: once begun (Select several in a card's menu, Ctrl, Shift, Ctrl+A), a tap adds or removes, as on a phone; a plain
+    // click with a mouse picks that one alone, Ctrl adds or removes)
+    else if (e.ctrlKey || e.metaKey || (selecting && (e as PointerEvent).pointerType === "touch") || severalOn) void select(hash, "toggle");
     else {
       // A click picks it and shows its details; the viewer opens from a double-click or from the picture in the details.
       if (ui.details && e.detail <= 1) autoShown = false;
@@ -2995,7 +2991,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   grid.addEventListener("pointerup", (e) => {
     if (e.pointerType !== "touch") return;
     const card = (e.target as HTMLElement).closest<HTMLElement>(".asset-card");
-    if (!card || (e.target as HTMLElement).closest(".asset-check")) return;
+    if (!card) return;
     const hash = card.dataset["hash"]!;
     if (lastTap && lastTap.hash === hash && e.timeStamp - lastTap.at < 450) {
       lastTap = null;
@@ -3963,7 +3959,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       cursor = null;
       if (!(selected || picked.size)) return;
       void select(null);
-      selecting = false;
+      selecting = severalOn = false;
     } else if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
       selectAll();
       e.preventDefault();
@@ -4074,7 +4070,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const hash = card.dataset["hash"];
       if (hash && !picked.has(hash)) await select(hash); // (a card outside the pick is picked alone; one inside it keeps the whole pick)
       const g = panelGroups();
-      return groupedMenu([g[0]!, clipboardGroup(picked.size ? [...picked] : hash ? [hash] : []), g[1]!, g[2]!]);
+      // Select several: from now on a tap (or a click) adds a card or takes it away, the way to pick several on a touch screen.
+      const several: MenuItem = { id: "select-several", label: "Select several", icon: ICONS.squareCheckBig, run: () => {
+          selecting = severalOn = true;
+          markPicked();
+          session.editor.message = "Selecting several: tap or click items to add or remove them. Esc ends it.";
+          session.editor.changed();
+        } };
+      return groupedMenu([[...(severalOn ? [] : [several]), ...g[0]!], clipboardGroup(picked.size ? [...picked] : hash ? [hash] : []), g[1]!, g[2]!]);
     },
   });
   // The viewer: the same menu for the item it shows (a right click, or a long touch on a phone), from the picture or the filmstrip.

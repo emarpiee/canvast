@@ -29,6 +29,7 @@
 - **Fixed:** the `[[` and `#` lists were as wide as the page in full screen and cut in a small window: they are as wide as their names, never wider than the window, and show each name once.
 - **Fixed:** a file card's picture (a note's page) is made in the computer's memory like a decoded picture's, not on the GPU, which made panning over a few notes slow.
 - **Removed:** Space no longer starts or pauses the library's slideshow (its button does; Space is the player's).
+- **Changed:** library cards have no checkbox any more (a selected card shows its border). **Select several** in a card's menu (a long touch on a touch screen) makes each tap or click add or remove an item.
 - **Added:** **New note** in the library's Import menu: a markdown note in the open folder, opened to write in.
 - **Changed:** the library chooser (texture fill pictures, custom thumbnails) is one shared panel that can also open in the middle of the page, list any kind of item, import files from this device, and shows the first 300 matches of a big library (search narrows it).
 

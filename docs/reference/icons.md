@@ -264,3 +264,4 @@ One icon per function: two buttons that do different things never share an icon,
 | `library-big` | Settings tab Library (the library viewer) |
 | `notebook-text` | Settings tab Notes (the notes editor) |
 | `folder-down` | Settings tab Saving to the library (frames, edited pictures, exports, patterns, shapes) |
+| `square-check-big` | Select several: from then on a tap or a click adds or removes items (a card's menu in the library; the way to pick several on a touch screen) |

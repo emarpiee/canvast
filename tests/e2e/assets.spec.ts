@@ -996,7 +996,7 @@ test("viewer: opens from a card, steps through the library with a filmstrip, and
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("picking several: Ctrl and Shift click, checkboxes, select all, and bulk actions on the picked assets (ADR 0054)", async ({ app }) => {
+test("picking several: Ctrl and Shift click, Select several (no checkboxes), select all, and bulk actions on the picked assets (ADR 0054)", async ({ app }) => {
   const p = app.page;
   await toAssets(p);
   for (let i = 0; i < 5; i++) {
@@ -1011,9 +1011,8 @@ test("picking several: Ctrl and Shift click, checkboxes, select all, and bulk ac
   await expect(picked()).toHaveCount(1);
   await expect(viewer).toBeHidden();
   await expect(p.getByTestId("asset-inspector")).toBeVisible();
-  // One picked item shows its details only: the other cards keep their checkboxes hidden until a second one is picked.
-  await expect(p.locator(".assets-grid.has-picks")).toHaveCount(0);
-  await expect(cards.nth(1).locator("xpath=..").locator(".asset-check")).toHaveCSS("opacity", "0");
+  // No checkboxes on the cards: a picked card is shown by its border.
+  await expect(p.locator(".asset-check")).toHaveCount(0);
   await cards.nth(2).click({ modifiers: ["Control"] });
   await expect(picked()).toHaveCount(2);
   await cards.nth(0).click({ modifiers: ["Control"] });
@@ -1028,20 +1027,18 @@ test("picking several: Ctrl and Shift click, checkboxes, select all, and bulk ac
   await expect(viewer).toBeHidden();
   await p.keyboard.press("Escape");
   await expect(picked()).toHaveCount(0);
-  // Checkboxes do the same without a keyboard: one tap adds, another removes.
-  await p.getByRole("checkbox", { name: /^Select ref-3\.png/ }).check();
-  await p.getByRole("checkbox", { name: /^Select ref-1\.png/ }).check();
+  // Without a keyboard: Select several in a card's menu (a long touch on a phone, a right click), then each tap or click adds or removes.
+  const named = (name: string) => p.locator(`[data-testid="asset-card"][aria-label^="${name}"]`);
+  await named("ref-3.png").click({ button: "right" });
+  await p.getByRole("menu", { name: "Library actions" }).getByRole("menuitem", { name: "Select several" }).click();
+  await named("ref-1.png").click();
   await expect(picked()).toHaveCount(2);
   const details = p.getByTestId("asset-inspector");
   await expect(details.locator("h2")).toHaveText("2 selected");
-  await p.getByRole("checkbox", { name: /^Select ref-1\.png/ }).uncheck();
+  await named("ref-1.png").click();
   await expect(details.locator("h2")).toContainText("ref-3.png");
-  // The checkbox of a picked card is always shown, whether or not the pointer is on it.
-  await p.mouse.move(5, 5);
-  await expect(p.getByRole("checkbox", { name: /^Select ref-3\.png/ })).toBeVisible();
-  expect(await p.getByRole("checkbox", { name: /^Select ref-3\.png/ }).evaluate((e) => getComputedStyle(e).opacity)).toBe("1");
   // Select all, then act on all of them: favourite, tag, folder, and delete the unused.
-  await p.getByRole("checkbox", { name: /^Select ref-3\.png/ }).focus();
+  await named("ref-3.png").focus();
   await p.keyboard.press("Control+a");
   await expect(details.locator("h2")).toHaveText("5 selected");
   await p.getByTestId("bulk-favorite").click();
@@ -1059,7 +1056,7 @@ test("picking several: Ctrl and Shift click, checkboxes, select all, and bulk ac
   await expect(cards).toHaveCount(5);
   // Delete: nothing is used, so all go; the summary says so.
   await p.getByTestId("assets-side").getByRole("button", { name: /^All items/ }).click();
-  await p.getByRole("checkbox", { name: /^Select ref-3\.png/ }).focus();
+  await named("ref-3.png").focus();
   await p.keyboard.press("Control+a");
   await p.getByTestId("bulk-delete").click();
   await p.getByTestId("confirm-ok").click();
@@ -1125,9 +1122,9 @@ test("slideshow: plays through the library on a timer, wraps, pauses with its bu
   await p.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
   // A selection of two plays only those two.
-  const checks = p.getByRole("checkbox", { name: /^Select / });
-  await checks.nth(0).check();
-  await checks.nth(2).check();
+  const all = p.getByTestId("asset-card");
+  await all.nth(0).click();
+  await all.nth(2).click({ modifiers: ["ControlOrMeta"] });
   await p.getByTestId("bulk-slideshow").click();
   await expect(viewer).toBeVisible();
   await expect(viewer.locator(".viewer-pos")).toHaveText("1 of 2");

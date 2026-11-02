@@ -458,7 +458,8 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 - **Selecting and the details panel**
   - A click selects an item. The details panel opens and closes with its button (or `I`) and shows what is selected (for several: their tags and folder together). A click never moves the grid under the pointer.
   - When the grid is laid out again (the panel toggled, the window or thumbnails resized), the selected item stays where it is on the screen.
-  - `Ctrl+A` selects all shown; a plain click then selects one alone. `Ctrl`+click adds or removes (on a touch screen, a tap does).
+  - `Ctrl+A` selects all shown; a plain click then selects one alone. `Ctrl`+click adds or removes, `Shift`+click takes a range. A selected item shows a coloured border (no checkboxes).
+  - **Select several** (a card's menu: right click, or a long touch on a phone or tablet): from then on each tap or click adds an item or takes it away, until nothing is selected or `Esc`. The way to pick several without a keyboard.
   - Selected items hidden by a search or filter are counted in the panel, with a button to keep only the shown ones.
   - The *Details* fold (the file's own metadata) stays open or closed as you left it.
 - **Drag items onto the sidebar:** onto a folder to move them into it, onto *Unfiled* to take them out of their folders, onto a tag to tag them, onto *Favourites* to mark them; a selected item carries the whole select.

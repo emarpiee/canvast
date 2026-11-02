@@ -207,6 +207,7 @@ import bookmarkPlus from "lucide-static/icons/bookmark-plus.svg";
 import paletteSvg from "lucide-static/icons/palette.svg";
 import fileUpSvg from "lucide-static/icons/file-up.svg";
 import notebookPenSvg from "lucide-static/icons/notebook-pen.svg";
+import squareCheckBigSvg from "lucide-static/icons/square-check-big.svg";
 import paintBucketSvg from "lucide-static/icons/paint-bucket.svg";
 import alignMenuSvg from "lucide-static/icons/align-horizontal-space-around.svg";
 import arrangeMenuSvg from "lucide-static/icons/layout-dashboard.svg";
@@ -487,6 +488,7 @@ export const ICONS = {
   palette: clean(paletteSvg),
   fileUp: clean(fileUpSvg),
   notebookPen: clean(notebookPenSvg),
+  squareCheckBig: clean(squareCheckBigSvg),
   pipette: clean(pipetteSvg),
   listChecks: clean(listChecksSvg),
   pathMenu: clean(pathMenuSvg),
