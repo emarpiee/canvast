@@ -127,8 +127,9 @@ export async function notePicture(name: string, text: string, w: number, h: numb
   x.drawImage(img, 0, 0, w, h);
   if ((await noteCardSize(name, text, hash)).h / CARD_SCALE <= lh) return c; // (the whole note is in it)
   const fade = x.createLinearGradient(0, h * 0.82, 0, h);
-  fade.addColorStop(0, "oklch(0.985 0.004 95 / 0)");
-  fade.addColorStop(1, "oklch(0.985 0.004 95)");
+  const paper = look === "dark" ? "oklch(0.23 0.01 250" : "oklch(0.985 0.004 95"; // (the page's own colour, .page / .page.dark)
+  fade.addColorStop(0, `${paper} / 0)`);
+  fade.addColorStop(1, `${paper})`);
   x.fillStyle = fade;
   x.fillRect(0, h * 0.82, w, h * 0.18);
   return c;

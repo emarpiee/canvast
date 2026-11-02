@@ -54,6 +54,10 @@
 - **Fixed:** desktop app: several saves of one file at the same moment (moving hidden items, which rewrites their list) could fail with a "could not write" notice: two of them used the same temporary file. Nothing was damaged: a file is only replaced once its new copy is complete.
 - **Fixed:** desktop app started from a terminal that was closed since: a crash dialog "write EPIPE" (its log went to a broken pipe).
 - **Added:** Settings > Notes > New note name (a pattern with {board}, {canvas}, {yyyy}, {hhmmss}… as for screenshots) and Note card width (how wide a click of the Note tool makes a card).
+- **Added:** Settings > Notes > Editor style on a canvas: the Note panel's editor has a style of its own (Document at first, as in the library).
+- **Fixed:** a long note's preview faded out to white on the dark look.
+- **Fixed:** the Note panel was not as wide as its place in the dock (an empty strip beside the editor when it was made narrow) and its header was unlike the other panels': it is now a panel like the others. A long name is cut with "…" (the whole name on hover).
+- **Changed:** the library's reset-filters button is coloured while a filter is on.
 
 ## 0.52.6 — Library files worked on elsewhere, Flip (2026-11-02)
 

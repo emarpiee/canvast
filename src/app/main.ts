@@ -1026,7 +1026,7 @@ async function start(): Promise<void> {
   let notePanel: { open(hash: string): Promise<boolean> } = { open: async () => false };
   // (a panel of the dock: floating at first, as wide as a page, its own width also when docked)
   const notePanelEl = document.createElement("section");
-  notePanelEl.className = "note-dock";
+  notePanelEl.className = "layers-panel note-dock"; // (a dock panel like the others: their look, header and width)
   notePanelEl.dataset["testid"] = "note-panel";
   notePanelEl.hidden = true;
   const notePanelReady = (d: NotePanelDeps): void => void (notePanel = mountNotePanel(notePanelEl, d));

@@ -36,6 +36,7 @@ export function mountNotePanel(el: HTMLElement, deps: NotePanelDeps): { open(has
     return true;
   };
   const place: NotePlace = {
+    styleKey: "notes.panelStyle",
     importFiles: (files) => deps.importFiles(files),
     // A link to another note opens it here; to anything else, in the library.
     show: async (hash) => {
@@ -64,6 +65,7 @@ export function mountNotePanel(el: HTMLElement, deps: NotePanelDeps): { open(has
     const tools = deps.session.readOnly ? "" : `<button type="button" class="layer-btn" data-rename aria-label="Rename this note" title="Rename this note (F2)">${ICONS.textCursorInput}</button>`;
     el.innerHTML = panelHtml({ title: esc(name0), tools, body: `<div class="viewer-note" data-testid="note-editor"><div></div></div>` });
     el.setAttribute("aria-label", `Note: ${name0}`);
+    el.querySelector(".panel-head h2")?.setAttribute("title", name0);
     el.querySelector("[data-close]")!.addEventListener("click", () => void leave());
     el.querySelector("[data-rename]")?.addEventListener("click", () => void rename());
     el.hidden = false;
@@ -86,6 +88,7 @@ export function mountNotePanel(el: HTMLElement, deps: NotePanelDeps): { open(has
     if (note !== n) return;
     n.name = result[0]!.name;
     el.querySelector(".panel-head h2")!.textContent = n.name;
+    el.querySelector(".panel-head h2")!.setAttribute("title", n.name);
     for (const a of ["aria-label", "title"]) el.querySelector("[data-close]")?.setAttribute(a, `Hide the ${n.name} panel`);
     el.setAttribute("aria-label", `Note: ${n.name}`);
     deps.session.editor.message = `Renamed to “${n.name}”.`;

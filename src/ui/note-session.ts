@@ -20,6 +20,8 @@ import type { AttachKind, NoteEditor, NoteHost, NoteItem } from "./note-editor";
 
 /** What the place showing a note does for it. */
 export interface NotePlace {
+  /** The setting of the editor's style here (the library's when absent; the Note panel on a canvas has its own). */
+  styleKey?: "notes.style" | "notes.panelStyle";
   /** Files into the library: their hashes. */
   importFiles(files: File[]): Promise<string[]>;
   /** Show another item (a link followed, a rich text note just made). */
@@ -76,7 +78,7 @@ export class OpenNote {
     const text = await blob.text();
     const note = new OpenNote(hash, kind, name, blob.type || "text/plain", null, wordsOf(kind, text), deps, place);
     const host = await note.host();
-    note.editor = await mountNoteEditor(el, { kind, text, style: deps.settings.get("notes.style"), host, title: titleOf(name) });
+    note.editor = await mountNoteEditor(el, { kind, text, style: deps.settings.get(place.styleKey ?? "notes.style"), host, title: titleOf(name) });
     open.add(note);
     if (!followed.has(deps.session)) {
       followed.add(deps.session);

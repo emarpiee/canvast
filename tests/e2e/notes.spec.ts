@@ -297,6 +297,21 @@ test("a note's preview shows the pictures it links to (and an Obsidian ![[embed]
   const LONG = `# Long\n\n${"A line of the note.\n\n".repeat(200)}`;
   await p.getByTestId("assets-import-input").setInputFiles({ name: "long.md", mimeType: "text/markdown", buffer: Buffer.from(LONG) });
   await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).map((e) => [e.pixelW, e.pixelH])[0]), hashOf(LONG))).toEqual([1200, 1800]);
+  // A long note fades out into its own paper: dark on the dark look (it faded to white).
+  const bottom = () =>
+    card(p, hashOf(LONG))
+      .locator("img")
+      .evaluate((img: HTMLImageElement) => {
+        if (!img.complete || !img.naturalWidth) return -1;
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth;
+        c.height = img.naturalHeight;
+        const g = c.getContext("2d")!;
+        g.drawImage(img, 0, 0);
+        return g.getImageData(4, c.height - 2, 1, 1).data[0]!;
+      });
+  await expect.poll(bottom, { timeout: 10_000 }).toBeGreaterThanOrEqual(0);
+  expect(await bottom()).toBeLessThan(80);
 });
 
 test("a note on a canvas opens in the note panel (a double-click, or Edit note): the same editor, saved in place, the card follows, renamed, undo never returns an old version", async ({ app }) => {
@@ -315,6 +330,10 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
   const panel = p.getByTestId("note-panel");
   await expect(panel.locator(".sun-editor-editable h1").first()).toHaveText("On the canvas");
+  // A dock panel like the others: as wide as its place in the dock whatever it holds, its header the same as theirs.
+  const widths = () => panel.evaluate((el) => [Math.round(el.getBoundingClientRect().width), Math.round(el.closest(".dock-item")!.getBoundingClientRect().width), Math.round(el.querySelector(".sun-editor")!.getBoundingClientRect().width)]);
+  await expect.poll(async () => { const [a, b] = await widths(); return a === b; }).toBe(true);
+  expect(await panel.evaluate((el) => el.classList.contains("layers-panel"))).toBe(true);
   await panel.locator(".sun-editor-editable p").first().click();
   await p.keyboard.press("End");
   await p.keyboard.type(" More words.");

@@ -216,7 +216,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <option value="pixels">Most pixels</option><option value="type">Type A–Z</option><option value="tags">Tags A–Z</option><option value="folder">Folder A–Z</option><option value="favourite">Favourites first</option><option value="width">Widest first</option><option value="height">Tallest first</option><option value="canvases">On most canvases</option>
       </select>
       <button type="button" class="assets-btn is-icon" data-action="sort-dir" data-testid="assets-sort-dir" aria-pressed="false">${ICONS.arrowUpDown}</button>
-      <button type="button" class="assets-btn is-icon" data-action="reset-filters" data-testid="assets-reset-filters" aria-label="Reset all filters" title="Reset all filters: All items, Newest first, the whole library" hidden>${ICONS.funnelX}</button>
+      <button type="button" class="assets-btn is-icon is-primary" data-action="reset-filters" data-testid="assets-reset-filters" aria-label="Reset all filters" title="Reset all filters: All items, Newest first, the whole library" hidden>${ICONS.funnelX}</button>
       <span class="assets-sep" role="separator"></span>
       <span class="split assets-import"><button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.arrowDownToLine}<span>Import</span></button><button type="button" class="assets-btn is-icon" data-action="import-menu" data-testid="assets-import-menu" aria-haspopup="menu" aria-label="Files or a folder" title="Bring in files, or a folder">${ICONS.chevronDown}</button></span>
       <span class="assets-sep" role="separator"></span>
