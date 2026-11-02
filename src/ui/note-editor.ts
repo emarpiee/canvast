@@ -1,3 +1,4 @@
+import { scrubNumbers } from "../colour-picker/scrub";
 import suneditor, { helper } from "suneditor";
 import { align, anchor, audio, audioGallery, autocomplete, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
 import type { SunEditor } from "suneditor/types";
@@ -443,6 +444,17 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     editor.$.history.push(false);
   };
   el.addEventListener("click", tick, true);
+  // Drag a size or the font size left or right to change it, as every number of the app (SunEditor's are text, to take a unit). A dragged
+  // size keeps the picture's proportion as a typed one does (it is worked out on keyup); a dragged font size is applied on release.
+  scrubNumbers(el, undefined, { units: "._se_size_x, ._se_size_y, .__se__font_size" });
+  el.addEventListener("input", (e) => {
+    const t = e.target as HTMLElement;
+    if (!e.isTrusted && t.matches("._se_size_x, ._se_size_y")) t.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true }));
+  });
+  el.addEventListener("change", (e) => {
+    const t = e.target as HTMLInputElement;
+    if (!e.isTrusted && t.matches(".__se__font_size")) (editor.$.plugins as Record<string, { toolbarInputChange?(a: object): void }>)["fontSize"]?.toolbarInputChange?.({ target: t, value: t.value.trim(), event: e });
+  });
 
   /** The editor's HTML with the library's addresses back to the links written in the file. */
   const output = (): string => {

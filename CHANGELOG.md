@@ -47,6 +47,7 @@
 - **Changed:** in the desktop app's workspace folder, notes in no library folder (md, markdown, txt, note.html) are kept in `library/notes/` instead of `library/documents/` (they move there by themselves).
 - **Added:** Settings > Notes > Preview look: notes' previews (their cards on canvases and in the library, the hover preview of a link) on light or dark paper; Auto, the default, follows the app's theme.
 - **Fixed:** pasting into a text field or a dialog (a name, a link, a search) while the clipboard held a file also imported that file into the library and placed it on the canvas.
+- **Added:** in the notes editor, the font size and the width and height of a picture or video change by dragging the field left or right, as every number field of the app.
 
 ## 0.52.6 — Library files worked on elsewhere, Flip (2026-11-02)
 

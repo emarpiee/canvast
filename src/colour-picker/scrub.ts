@@ -4,6 +4,8 @@
  * undo step). A press on the field that does not move goes into it (to type); a press on its name is only a label click, which focuses the field.
  * Shift snaps the value to round steps worked out from the range (`niceStep`: 100 has steps of 5, 255 of 10), so a round number is easy to land on;
  * a field with no range moves ten times faster instead.
+ * `units`: text fields (matched by this selector, no label needed) whose value is a number with a unit ("16px", "50%") scrub the same way,
+ * keeping the unit and never going below 0 (another program's fields, which are text to take a unit).
  */
 /** A round step (1, 2 or 5 times a power of ten) that divides `span` into about twenty: 100 gives 5, 255 gives 10, 5 gives 0.2. */
 export function niceStep(span: number): number {
@@ -13,8 +15,8 @@ export function niceStep(span: number): number {
   return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * pow;
 }
 
-export function scrubNumbers(root: HTMLElement, hint = "Drag the field left or right to change it"): void {
-  let drag: { label: HTMLElement; input: HTMLInputElement; start: number; x: number; moved: boolean; id: number } | null = null;
+export function scrubNumbers(root: HTMLElement, hint = "Drag the field left or right to change it", opts: { units?: string } = {}): void {
+  let drag: { label: HTMLElement; input: HTMLInputElement; start: number; unit: string; x: number; moved: boolean; id: number } | null = null;
   const numberOf = (label: HTMLElement): HTMLInputElement | null => {
     const c = (label as HTMLLabelElement).control; // the wrapped field, or the one `for` names
     return c instanceof HTMLInputElement && c.type === "number" ? c : null;
@@ -40,6 +42,15 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the field left or r
   };
   root.addEventListener("pointerdown", (e) => {
     const t = e.target as HTMLElement;
+    if (opts.units && t instanceof HTMLInputElement && t.matches(opts.units)) {
+      const m = /^\s*(\d*\.?\d+)\s*([a-z%]*)\s*$/i.exec(t.value);
+      if (!m || e.button !== 0 || t.disabled || t.readOnly || document.activeElement === t) return; // (no number yet, or being typed in)
+      if (!t.title) t.title = hint;
+      drag = { label: t, input: t, start: Number(m[1]), unit: m[2]!, x: e.clientX, moved: false, id: e.pointerId };
+      t.setPointerCapture(e.pointerId);
+      e.preventDefault();
+      return;
+    }
     // Only the field scrubs (a press on its name is just a label: it focuses the field).
     if (!(t instanceof HTMLInputElement)) return; // (the field scrubs, under a finger too; its name is only a label, so a bar that scrolls sideways scrolls from it)
     const own = t.labels?.[0] ?? t.closest<HTMLElement>("label");
@@ -49,7 +60,7 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the field left or r
     if (input.disabled || input.readOnly) return;
     // The field itself scrubs too, until it is being typed in: a press that does not move goes into it (see `end`).
     if (t.tagName === "INPUT" && document.activeElement === input) return;
-    drag = { label, input, start: parseFloat(input.value) || 0, x: e.clientX, moved: false, id: e.pointerId };
+    drag = { label, input, start: parseFloat(input.value) || 0, unit: "", x: e.clientX, moved: false, id: e.pointerId };
     label.setPointerCapture(e.pointerId);
     e.preventDefault();
   });
@@ -59,7 +70,7 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the field left or r
     if (!drag.moved && Math.abs(dx) < 3) return;
     drag.moved = true;
     const i = drag.input;
-    const min = i.min === "" ? -Infinity : Number(i.min);
+    const min = i.min === "" ? (drag.unit || i.type === "text" ? 0 : -Infinity) : Number(i.min);
     const max = i.max === "" ? Infinity : Number(i.max);
     let st = step(i);
     const world = Number(i.dataset["scrubStep"]); // (a value in world units: one dragged pixel moves it by what a screen pixel is, at any depth)
@@ -76,8 +87,8 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the field left or r
     v = Math.min(max, Math.max(min, v));
     const decimals = snap ? (String(Number(snap.toPrecision(6))).split(".")[1] ?? "").length : perScreenPx ? Math.max(0, Math.ceil(-Math.log10(st)) + 2) : (String(st).split(".")[1] ?? "").length;
     const text = v.toFixed(Math.min(decimals + (step(i) ? 0 : perScreenPx ? 0 : 2), perScreenPx ? 20 : 6));
-    if (text === i.value) return;
-    i.value = String(Number(text));
+    if (String(Number(text)) + drag.unit === i.value) return;
+    i.value = String(Number(text)) + drag.unit;
     i.dispatchEvent(new Event("input", { bubbles: true }));
   });
   const end = (e: PointerEvent, cancelled: boolean): void => {
@@ -90,7 +101,7 @@ export function scrubNumbers(root: HTMLElement, hint = "Drag the field left or r
       d.input.select();
       return;
     }
-    if (cancelled) d.input.value = String(d.start);
+    if (cancelled) d.input.value = String(d.start) + d.unit;
     d.input.dispatchEvent(new Event("change", { bubbles: true }));
   };
   root.addEventListener("pointerup", (e) => end(e, false));

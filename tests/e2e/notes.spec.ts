@@ -322,6 +322,17 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   await expect(p.getByTestId("assets-status").or(p.locator(".notice")).first()).toBeAttached();
   // Saved: the card on the canvas is the new version (its item followed it).
   await expect.poll(placed).not.toEqual([hashOf(NOTE)]);
+  // The font size is dragged left or right like every number of the app: a word chosen and the field dragged right is set larger.
+  await panel.locator(".sun-editor-editable p").first().dblclick({ position: { x: 8, y: 8 } });
+  const size = panel.locator(".__se__font_size").filter({ visible: true });
+  await expect(size).toHaveValue("16px");
+  const sb = (await size.boundingBox())!;
+  await p.mouse.move(sb.x + sb.width / 2, sb.y + sb.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(sb.x + sb.width / 2 + 20, sb.y + sb.height / 2, { steps: 4 });
+  await p.mouse.up();
+  await expect(size).toHaveValue("26px");
+  await expect(panel.locator('.sun-editor-editable span[style*="font-size: 26px"]').first()).toHaveText("First");
   // The editor's own dialogs work in the panel (nothing over them takes the clicks): a picture from the library, a link.
   await panel.locator('.se-toolbar button[data-command="image"]').filter({ visible: true }).click();
   await p.locator(".__se__gallery").filter({ visible: true }).click();
