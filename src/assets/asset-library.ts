@@ -1,6 +1,7 @@
 import type { RasterSource } from "../render/draw-objects";
 import { plural } from "../doc/plural";
 import { sha256Hex } from "./sha256";
+import { noteKindOf } from "../notes/note-file";
 import type { OriginalStore } from "../storage/store";
 import { makeThumb } from "./thumb";
 import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
@@ -354,7 +355,7 @@ export class AssetLibrary {
     this.thumbQueue = this.thumbQueue
       .then(async () => {
         const t = await makeThumb(record);
-        if (t) await store.putThumb(t);
+        if (t && !noteKindOf(record.name)) await store.putThumb(t); // (a note's follows the preview look: made when shown)
       })
       .catch(() => undefined); // derived data: made again when the library is viewed
   }

@@ -45,6 +45,7 @@
 - **Added:** Make note files (Actions bar): texts on a card become notes in the library, their cards in the same place, as wide, at the same stacking.
 - **Added:** Settings > Notes > Notes folder: where new notes are filed (the Note tool, and New note in the library when no folder is open).
 - **Changed:** in the desktop app's workspace folder, notes in no library folder (md, markdown, txt, note.html) are kept in `library/notes/` instead of `library/documents/` (they move there by themselves).
+- **Added:** Settings > Notes > Preview look: notes' previews (their cards on canvases and in the library, the hover preview of a link) on light or dark paper; Auto, the default, follows the app's theme.
 
 ## 0.52.6 — Library files worked on elsewhere, Flip (2026-11-02)
 

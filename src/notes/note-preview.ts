@@ -3,7 +3,7 @@ import { cardContext } from "../assets/card";
 import { splitFrontmatter } from "./frontmatter";
 
 // The picture of a note (its library thumbnail and its card on a canvas): the top of its page, as the notes editor lays it out, drawn
-// through an SVG image (`foreignObject`), which runs nothing and loads nothing. Fixed paper colours, like every file card: it is stored.
+// through an SVG image (`foreignObject`), which runs nothing and loads nothing. Light or dark paper (`setNoteLook`): cards are drawn in memory, never stored.
 // Its pictures, videos and sounds are found by the app (`setNotePictures`) and drawn into it as data (a video by its picture, with a
 // ▶; a sound by its waveform, with a ♪). shortcut: library fonts are not (its text is in the system's sans-serif), embed them likewise if wanted.
 
@@ -22,7 +22,13 @@ p,ul,ol,blockquote,pre,table,figure{margin:0 0 .6em}ul,ol{padding-left:1.4em}
 blockquote{border-left:3px solid oklch(0.82 0.01 250);padding-left:.8em;color:oklch(0.45 0.01 250)}
 pre,code{font-family:ui-monospace,monospace;background:oklch(0.94 0.005 250);border-radius:4px}pre{padding:.5em .7em;white-space:pre-wrap}
 table{border-collapse:collapse}td,th{border:1px solid oklch(0.82 0.01 250);padding:.2em .45em}hr{border:0;border-top:1px solid oklch(0.82 0.01 250)}
-li:has(>input[type=checkbox]:first-child){list-style:none;margin-left:-1.2em}.media{position:relative;display:inline-block;max-width:100%}.media img{display:block;max-width:100%;height:auto;border-radius:4px}.is-video::after,.is-audio::after{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:2.4em;height:2.4em;border-radius:50%;background:oklch(0.2 0 0 / .6);color:#fff;font-size:1.4em;line-height:2.4em;text-align:center}.is-video::after{content:"▶"}.is-audio::after{content:"♪"}a{color:oklch(0.5 0.1 200)}.pic{display:inline-block;padding:.7em 1.1em;border-radius:4px;background:oklch(0.9 0.005 250);color:oklch(0.48 0.01 250);font-size:.85em}`;
+li:has(>input[type=checkbox]:first-child){list-style:none;margin-left:-1.2em}.media{position:relative;display:inline-block;max-width:100%}.media img{display:block;max-width:100%;height:auto;border-radius:4px}.is-video::after,.is-audio::after{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:2.4em;height:2.4em;border-radius:50%;background:oklch(0.2 0 0 / .6);color:#fff;font-size:1.4em;line-height:2.4em;text-align:center}.is-video::after{content:"▶"}.is-audio::after{content:"♪"}a{color:oklch(0.5 0.1 200)}.pic{display:inline-block;padding:.7em 1.1em;border-radius:4px;background:oklch(0.9 0.005 250);color:oklch(0.48 0.01 250);font-size:.85em}
+.page.dark{background:oklch(0.23 0.01 250);color:oklch(0.9 0.005 250)}.dark blockquote{border-left-color:oklch(0.42 0.01 250);color:oklch(0.72 0.01 250)}.dark pre,.dark code{background:oklch(0.3 0.01 250)}.dark td,.dark th{border-color:oklch(0.4 0.01 250)}.dark a{color:oklch(0.76 0.1 200)}.dark .pic{background:oklch(0.32 0.01 250);color:oklch(0.75 0.01 250)}`;
+/** Light or dark paper (Settings > Notes > Preview look); a change is drawn by whoever shows the cards. */
+export type NoteLook = "light" | "dark";
+let look: NoteLook = "light";
+/** Whether the look changed. */
+export const setNoteLook = (l: NoteLook): boolean => (l === look ? false : ((look = l), true));
 
 /** What a link in a note shows: a picture (a picture item's own file, else its library thumbnail) and the item's type. */
 export type NotePictureSource = (noteHash: string, link: string) => Promise<{ blob: Blob; type: string } | null>;
@@ -97,7 +103,7 @@ export async function noteCardSize(name: string, text: string, hash?: string): P
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:-10000px;top:0;visibility:hidden";
   const root = host.attachShadow({ mode: "open" });
-  root.innerHTML = `<style>${CSS}</style><div class="page" style="width:${PAGE_W}px">${await pageHtml(name, text, hash)}</div>`;
+  root.innerHTML = `<style>${CSS}</style><div class="page${look === "dark" ? " dark" : ""}" style="width:${PAGE_W}px">${await pageHtml(name, text, hash)}</div>`;
   document.body.append(host);
   const h = (root.lastElementChild as HTMLElement).scrollHeight;
   host.remove();
@@ -110,7 +116,7 @@ export async function notePicture(name: string, text: string, w: number, h: numb
   const lw = PAGE_W;
   const lh = Math.round(h / k);
   const html = await pageHtml(name, text, hash);
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${lw} ${lh}"><foreignObject width="${lw}" height="${lh}"><div xmlns="http://www.w3.org/1999/xhtml" class="page" style="width:${lw}px;height:${lh}px"><style>${CSS}</style>${html}</div></foreignObject></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${lw} ${lh}"><foreignObject width="${lw}" height="${lh}"><div xmlns="http://www.w3.org/1999/xhtml" class="page${look === "dark" ? " dark" : ""}" style="width:${lw}px;height:${lh}px"><style>${CSS}</style>${html}</div></foreignObject></svg>`;
   const img = new Image();
   img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
   await img.decode();

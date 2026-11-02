@@ -85,6 +85,8 @@ export interface AssetsView {
   reveal(hashes: readonly string[]): Promise<void>;
   /** Import files into the library only (no placement): the hashes of those taken in (or already there). */
   importFiles(files: File[]): Promise<string[]>;
+  /** Draw the notes' cards again (the preview look changed). */
+  redrawNotes(): void;
 }
 
 /** The columns of the list layout: each can be shown or hidden and moved (Name always shows). */
@@ -724,7 +726,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         if (b) return URL.createObjectURL(b);
       }
       // A thumbnail stored earlier: the original is not read at all (and a lost original keeps its face).
-      const stored = await session.catalog?.thumb(hash).catch(() => undefined);
+      const note = !!noteKindOf(entryOf(hash)?.name ?? ""); // (a note's is made when shown: it follows the preview look)
+      const stored = note ? undefined : await session.catalog?.thumb(hash).catch(() => undefined);
       // A card that scrolled away while this was read gets no address (making one for each of thousands of passing cards was slow).
       if (!job.wants.some((f) => f())) throw new ThumbSkipped();
       if (stored) return URL.createObjectURL(stored.blob);
@@ -737,7 +740,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         if (!rec) throw new Error("missing");
         const made = await makeThumb(rec);
         if (made) {
-          void session.catalog?.putThumb(made).catch(() => undefined);
+          if (!noteKindOf(rec.name)) void session.catalog?.putThumb(made).catch(() => undefined);
           return URL.createObjectURL(made.blob);
         }
         return URL.createObjectURL(rec.blob);
@@ -4447,6 +4450,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       stopShow();
       root.hidden = true;
       syncViewing();
+    },
+    redrawNotes() {
+      redrawCards((listing?.entries ?? []).filter((e) => noteKindOf(e.name)).map((e) => e.hash));
     },
     async importFiles(files) {
       const hashes: string[] = [];

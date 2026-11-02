@@ -1,7 +1,7 @@
 import { externalFolder } from "../storage/external-folder";
 import { askHiddenPassword } from "../ui/hidden-access";
 import { noteKindOf } from "../notes/note-file";
-import { setNoteCardLength, setNotePictures } from "../notes/note-preview";
+import { setNoteCardLength, setNoteLook, setNotePictures } from "../notes/note-preview";
 import { anyNoteDirty, leaveAllNotes } from "../ui/note-session";
 import { mountNotePanel } from "../ui/note-panel";
 import type { NotePanelDeps } from "../ui/note-panel";
@@ -520,6 +520,14 @@ async function start(): Promise<void> {
   // How much of a long note its card shows (Settings > Notes), for the cards made from now on.
   setNoteCardLength(settings.get("notes.cardLength"));
   settings.subscribe((key) => key === "notes.cardLength" && setNoteCardLength(settings.get("notes.cardLength")));
+  // Notes' previews on light or dark paper (Settings > Notes > Preview look; Auto follows the app's theme): a change draws their cards again.
+  const darkNow = (): boolean => (settings.get("ui.theme") === "system" ? matchMedia("(prefers-color-scheme: dark)").matches : settings.get("ui.theme") === "dark");
+  const noteLookNow = () => (settings.get("notes.look") === "auto" ? (darkNow() ? "dark" : "light") : settings.get("notes.look") as "light" | "dark");
+  setNoteLook(noteLookNow());
+  let redrawNoteCards = (): void => undefined; // (set once the canvas and the library are there)
+  const applyNoteLook = (): void => void (setNoteLook(noteLookNow()) && redrawNoteCards());
+  settings.subscribe((key) => (key === "notes.look" || key === "ui.theme") && applyNoteLook());
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyNoteLook);
   // A note's preview (its card, its thumbnail) shows the pictures, videos and sounds it links to: a picture's own file, else the
   // item's library thumbnail (a video's picture, a sound's waveform). Never a hidden item's (a preview is kept as a thumbnail).
   setNotePictures(async (noteHash, link) => {
@@ -1929,6 +1937,12 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     doc.commit(doc.transaction(next.length === 1 ? "Make a note file" : `Make ${plural(next.length, "note file")}`, next));
     editor.message = next.length === 1 ? "The note is a note file in the library now: double-click its card to edit it." : `${plural(next.length, "note")} ${be(next.length)} note files in the library now.`;
     editor.changed();
+  };
+  redrawNoteCards = () => {
+    for (const [h, n] of assetNames.map) if (noteKindOf(n)) assets.forget(h);
+    tiles.clear();
+    invalidate();
+    assetsView.redrawNotes();
   };
   notePanelReady({ session, assets, settings, fonts: libraryFonts, importFiles: (files) => assetsView.importFiles(files), showInLibrary: (h) => (setView("assets"), void assetsView.reveal([h])), hidden: hiddenModeOn });
   // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)

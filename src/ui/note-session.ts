@@ -145,7 +145,7 @@ export class OpenNote {
         const list = all.filter((x) => fits(kind, x)).sort((a, b) => b.importedAt - a.importedAt);
         const chosen = await openLibraryPicker(
           null,
-          list.map((x) => ({ hash: x.hash, name: x.name, ...(x.type.startsWith("image/") && !x.card ? {} : { chip: chipOf(x.name, x.type) }), thumb: async () => (await session.catalog?.thumb(x.hash).catch(() => undefined))?.blob })),
+          list.map((x) => ({ hash: x.hash, name: x.name, ...(x.type.startsWith("image/") && !x.card ? {} : { chip: chipOf(x.name, x.type) }), thumb: () => session.thumbBlob(x.hash) })),
           { noun: NOUNS[kind], importFiles: { accept: kind === "file" || kind === "any" ? "" : `${kind}/*`, run: async (files) => (await take(files)).map((i) => i.hash) } },
         );
         const x = chosen ? all.find((y) => y.hash === chosen) : undefined;
@@ -175,7 +175,7 @@ export class OpenNote {
       async peek(link) {
         const target = link.startsWith(WIKI) ? null : linkTarget(link, dir);
         const found = link.startsWith(WIKI) ? await host.findWiki(decodeURIComponent(link.slice(WIKI.length))) : target ? await host.find(target) : null;
-        return found ? ((await session.catalog?.thumb(found.hash).catch(() => undefined))?.blob ?? null) : null;
+        return found ? ((await session.thumbBlob(found.hash)) ?? null) : null;
       },
       tags: async () => [...new Set(all.flatMap((x) => x.tags ?? []))].sort((a, b) => a.localeCompare(b)),
       async findWiki(target) {

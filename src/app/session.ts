@@ -1,6 +1,7 @@
 import { sha256Hex } from "../assets/sha256";
 import { NO_META, fileInlineTags, fileMeta, sameMeta, withFileMeta } from "../notes/frontmatter";
 import type { NoteMeta } from "../notes/frontmatter";
+import { makeThumb } from "../assets/thumb";
 import { WIKI, linkTarget, noteKindOf, noteLinks, relativeLink, relinkNote, wikiTarget } from "../notes/note-file";
 import type { NoteKind } from "../notes/note-file";
 import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT, folderPath } from "../assets/asset-catalog";
@@ -803,6 +804,16 @@ export class Session {
     } catch (e) {
       this.tell(`Could not point the other canvases at the new version: ${(e as Error).message}`);
     }
+  }
+
+  /** An item's thumbnail picture: a note's page made now (it follows the preview look, so it is never stored), else the stored one. */
+  async thumbBlob(hash: string): Promise<Blob | undefined> {
+    const e = await this.catalog?.entry(hash).catch(() => undefined);
+    if (e && noteKindOf(e.name)) {
+      const rec = await this.assets?.record(hash).catch(() => undefined);
+      return rec ? (await makeThumb(rec))?.blob : undefined;
+    }
+    return (await this.catalog?.thumb(hash).catch(() => undefined))?.blob;
   }
 
   /**

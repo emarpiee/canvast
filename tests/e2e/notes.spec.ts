@@ -246,7 +246,7 @@ test("[[links]] between notes: shown as links, Ctrl+click opens the note, [[ off
   await expect(p.locator(".asset-inspector")).toBeHidden();
 });
 
-test("a note's preview shows the pictures it links to (and an Obsidian ![[embed]])", async ({ app }) => {
+test("a note's preview shows the pictures it links to (and an Obsidian ![[embed]]), on the paper of the Preview look", async ({ app }) => {
   const p = app.page;
   const PIC = makePng(300, 180, (x) => [220, 40 + (x % 60), 30, 255]);
   const NOTE = "# Moodboard\n\n![](pic.png)\n\n![[pic.png]]\n";
@@ -271,6 +271,24 @@ test("a note's preview shows the pictures it links to (and an Obsidian ![[embed]
         return n;
       });
   await expect.poll(reds, { timeout: 10_000 }).toBeGreaterThan(500);
+  // Settings > Notes, Preview look: Dark draws its preview on dark paper at once (Auto, the default, follows the app's theme).
+  const corner = () =>
+    card(p, hashOf(NOTE))
+      .locator("img")
+      .evaluate((img: HTMLImageElement) => {
+        if (!img.complete || !img.naturalWidth) return -1;
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth;
+        c.height = img.naturalHeight;
+        const g = c.getContext("2d")!;
+        g.drawImage(img, 0, 0);
+        return g.getImageData(4, 4, 1, 1).data[0]!;
+      });
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Notes", exact: true }).click();
+  await p.locator('[data-row="notes.look"] select').selectOption("dark");
+  await p.getByTestId("view-assets").click();
+  await expect.poll(corner, { timeout: 10_000 }).toBeLessThan(80);
   // Settings > Notes, Preview length: Short makes a long note's card about a screen long (900 CSS px, drawn at twice that).
   await p.getByTestId("view-settings").click();
   await p.getByRole("tab", { name: "Notes", exact: true }).click();
