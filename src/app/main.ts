@@ -2399,19 +2399,21 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   canvas.addEventListener("pointerdown", trackPointer);
   canvas.addEventListener("pointerleave", () => { editor.pointerAt = null; });
   window.addEventListener("paste", (e) => {
+    // A paste into a field, an editor (the notes editor takes a picture in itself), a dialog or a menu is theirs: nothing is imported or placed.
+    if (e.defaultPrevented || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog, [popover], .note-dock") || document.querySelector("dialog:modal")) return;
     const files = [...(e.clipboardData?.files ?? [])];
     // What canvast copied comes back as the objects, even though the clipboard also holds its picture and SVG for other apps.
     const own = e.clipboardData?.getData("text/plain") ?? "";
-    if (!typing(e.target) && appView === "canvas" && !textEditor.isOpen && (!files.length || own !== "" || (files.length === 1 && isCopiedPicture())) && pasteObjects(doc, editor, view, own || null)) {
+    if (appView === "canvas" && !textEditor.isOpen && (!files.length || own !== "" || (files.length === 1 && isCopiedPicture())) && pasteObjects(doc, editor, view, own || null)) {
       e.preventDefault();
       return;
     }
     if (files.length) {
       e.preventDefault();
       receive(files);
-    } else if (!typing(e.target) && appView === "canvas" && !textEditor.isOpen && /^\s*(<\?xml[^>]*>\s*)?<svg[\s>]/i.test(e.clipboardData?.getData("text/plain") ?? "") && importSvg(doc, editor, view, e.clipboardData!.getData("text/plain"))) e.preventDefault();
-    else if (!typing(e.target) && appView === "canvas" && !textEditor.isOpen && pasteCssPaint(doc, editor, e.clipboardData?.getData("text/plain") ?? "")) e.preventDefault();
-    else if (!typing(e.target) && appView === "canvas" && !textEditor.isOpen && pasteObjects(doc, editor, view, e.clipboardData?.getData("text/plain") ?? null)) e.preventDefault();
+    } else if (appView === "canvas" && !textEditor.isOpen && /^\s*(<\?xml[^>]*>\s*)?<svg[\s>]/i.test(e.clipboardData?.getData("text/plain") ?? "") && importSvg(doc, editor, view, e.clipboardData!.getData("text/plain"))) e.preventDefault();
+    else if (appView === "canvas" && !textEditor.isOpen && pasteCssPaint(doc, editor, e.clipboardData?.getData("text/plain") ?? "")) e.preventDefault();
+    else if (appView === "canvas" && !textEditor.isOpen && pasteObjects(doc, editor, view, e.clipboardData?.getData("text/plain") ?? null)) e.preventDefault();
   });
   // A picture of the copied things (PNG: one still at full size with its crop and adjustments, else at most 1024 px) next to the text (alone when the text would only say "N objects"), for other apps; the text stays what copySelection set,
   // which is how a paste here knows the objects are still ours. Best effort: a browser without the clipboard picture API keeps the text.

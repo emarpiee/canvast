@@ -518,7 +518,7 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 - `Ctrl/⌘+X` puts the text only (the shape is gone before a picture could be drawn).
 - Browsers cannot put files (audio, PDF) on the clipboard, so those stay in canvast.
 
-**Pasting back in canvast** brings the objects back exactly as they were (links, masks, crop, adjustments, exact positions), as long as nothing else was copied in between. Shapes and texts come back even from another tab; a picture or GIF only while this window keeps the focus (after switching windows it comes back as a new picture; see Limitations). Anything copied in another app is imported as usual: an SVG as shapes, an image as a picture.
+**Pasting back in canvast** brings the objects back exactly as they were (links, masks, crop, adjustments, exact positions), as long as nothing else was copied in between. Shapes and texts come back even from another tab; a picture or GIF only while this window keeps the focus (after switching windows it comes back as a new picture; see Limitations). Anything copied in another app is imported as usual: an SVG as shapes, an image as a picture. A paste into a text field, the notes editor, a dialog or a menu stays there: nothing is imported or placed.
 
 **What you export is what you see.**
 

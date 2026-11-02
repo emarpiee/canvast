@@ -46,6 +46,7 @@
 - **Added:** Settings > Notes > Notes folder: where new notes are filed (the Note tool, and New note in the library when no folder is open).
 - **Changed:** in the desktop app's workspace folder, notes in no library folder (md, markdown, txt, note.html) are kept in `library/notes/` instead of `library/documents/` (they move there by themselves).
 - **Added:** Settings > Notes > Preview look: notes' previews (their cards on canvases and in the library, the hover preview of a link) on light or dark paper; Auto, the default, follows the app's theme.
+- **Fixed:** pasting into a text field or a dialog (a name, a link, a search) while the clipboard held a file also imported that file into the library and placed it on the canvas.
 
 ## 0.52.6 — Library files worked on elsewhere, Flip (2026-11-02)
 

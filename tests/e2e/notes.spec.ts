@@ -350,6 +350,16 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   // Renamed from the panel's header with the library's dialog: the extension stays as it was.
   await p.getByTestId("note-panel").locator("[data-rename]").click();
   await expect(p.locator('[data-rn="ext-fixed"]')).toHaveText(".md");
+  // A paste into a field (or a dialog) is the field's: a copied file on the clipboard is not also imported and placed. (Chromium only: Firefox does not let a test make a paste with its data.)
+  if (test.info().project.name !== "firefox") {
+    await p.locator('[data-rn="one"]').evaluate((el, bytes) => {
+      const dt = new DataTransfer();
+      dt.items.add(new File([new Uint8Array(bytes)], "pasted.png", { type: "image/png" }));
+      el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    }, [...makePng(30, 20, () => [20, 160, 60, 255])]);
+    await p.waitForTimeout(1000); // (a wrong import would place it by now)
+    expect(await placed()).toHaveLength(1);
+  }
   await p.locator('[data-rn="one"]').fill("plan");
   await p.getByTestId("rename-ok").click();
   await expect(p.getByTestId("note-panel").locator(".panel-head h2")).toHaveText("plan.md");
