@@ -38,3 +38,21 @@ describe("[[links]] between notes", () => {
     expect(wikiTarget("Projects/Plan.md#Goals")).toEqual({ name: "plan", dirs: ["projects"] });
   });
 });
+
+import { noteLinks, relinkNote } from "../../src/notes/note-file";
+
+describe("a note's links to other items", () => {
+  const md = "See [[Plan]], [[Projects/Plan|the plan]], ![[cat.png]] and [[Plan#Goals]].\n![c](../Pictures/cat.png) [b](Brief.md) `[[Plan]]`\n<img src=\"../Pictures/cat.png\">\n";
+  it("are found, wherever they are written", () => {
+    expect(noteLinks("md", md)).toEqual({ wiki: ["Plan", "Projects/Plan", "cat.png", "Plan"], paths: ["../Pictures/cat.png", "Brief.md", "../Pictures/cat.png"] });
+    expect(noteLinks("rich", '<a href="Brief.md">b</a><img src="../a&amp;b.png">')).toEqual({ wiki: [], paths: ["Brief.md", "../a&b.png"] });
+  });
+  it("are written again when the item is renamed or moved, nothing else", () => {
+    expect(relinkNote("md", md, { oldWiki: "plan", newWiki: "Roadmap", oldPath: "", newPath: "" })).toBe(
+      "See [[Roadmap]], [[Roadmap|the plan]], ![[cat.png]] and [[Roadmap#Goals]].\n![c](../Pictures/cat.png) [b](Brief.md) `[[Plan]]`\n<img src=\"../Pictures/cat.png\">\n",
+    );
+    const moved = relinkNote("md", md, { oldWiki: null, newWiki: "", oldPath: "../Pictures/cat.png", newPath: "../Art/cat.png" });
+    expect(noteLinks("md", moved).paths).toEqual(["../Art/cat.png", "Brief.md", "../Art/cat.png"]);
+    expect(relinkNote("rich", '<a href="Brief.md">', { oldWiki: "brief", newWiki: "X", oldPath: "Brief.md", newPath: "Docs/Brief.md" })).toBe('<a href="Docs/Brief.md">');
+  });
+});

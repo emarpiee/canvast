@@ -184,7 +184,13 @@ test("[[links]] between notes: shown as links, Ctrl+click opens the note, [[ off
   await p.keyboard.press("Control+s");
   await expect(p.getByTestId("assets-status")).toContainText("Saved “Plan.md”");
   expect(await downloaded(p)).toMatch(/See \[\[Brief\|the brief\]\]\. Also \[\[Brief\]\]/);
-  // Ctrl+click opens the note it points at.
+  // Ctrl+click opens the note it points at; its details list the notes that link to it.
   await page(p).locator("a", { hasText: "the brief" }).click({ modifiers: ["ControlOrMeta"] });
   await expect(page(p).locator("h1")).toHaveText("Brief");
+  if (!(await p.getByTestId("asset-download").isVisible())) await p.locator(".viewer-details").click();
+  await expect(p.getByTestId("asset-backlinks")).toContainText("Plan.md");
+  // Renamed: the links to it follow ([[Brief]] was its name alone).
+  await p.evaluate(() => window.__canvastDebug.assetListing().then((l) => window.__canvastDebug.libraryOp("rename", l.entries.find((e) => e.name === "Brief.md")!.hash, "Overview.md")));
+  await p.getByTestId("asset-backlinks").getByRole("button", { name: "Plan.md" }).click();
+  await expect.poll(async () => (await downloaded(p)).match(/\[\[[^\]]+\]\]/g)).toEqual(["[[Overview|the brief]]", "[[Overview]]"]);
 });

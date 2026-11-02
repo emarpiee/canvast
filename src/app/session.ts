@@ -1,8 +1,10 @@
 import { sha256Hex } from "../assets/sha256";
 import { NO_META, fileInlineTags, fileMeta, sameMeta, withFileMeta } from "../notes/frontmatter";
 import type { NoteMeta } from "../notes/frontmatter";
-import { noteKindOf } from "../notes/note-file";
-import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT } from "../assets/asset-catalog";
+import { linkTarget, noteKindOf, noteLinks, relativeLink, relinkNote, wikiTarget } from "../notes/note-file";
+import type { NoteKind } from "../notes/note-file";
+import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT, folderPath } from "../assets/asset-catalog";
+import type { AssetFolder, CatalogEntry } from "../assets/asset-catalog";
 import type { MetaChange } from "../assets/asset-catalog";
 import { HOME, deserializeCamera, fitRect, zoomLevel } from "../core/camera";
 import { startStep } from "./startup-log";
@@ -365,9 +367,10 @@ export class Session {
     if (!this.guardWrite() || !this.catalog) return false;
     let before: MetaSnapshot;
     const touched = new Set<string>();
+    const moved = new Map<string, { name: string; path: string[] }>();
     try {
       before = await this.catalog.snapshotMeta();
-      await op(this.touching(touched));
+      await op(this.touching(touched, moved));
     } catch (e) {
       this.tell(e instanceof CatalogInputError ? e.message[0]!.toUpperCase() + e.message.slice(1) + "." : `Could not save: ${(e as Error).message}`);
       return false;
@@ -377,19 +380,34 @@ export class Session {
     this.libRedo = [];
     this.post({ kind: "assets" });
     this.emitAssets(true);
-    void this.writeNoteProps(touched);
+    void this.writeNoteProps(touched).then(() => (moved.size ? this.relink(moved) : undefined));
     return true;
   }
 
   /** The catalog as an organizing step sees it, noting the items it changes ("*": any, a tag renamed or deleted everywhere). */
-  private touching(seen: Set<string>): CatalogStore {
+  private touching(seen: Set<string>, moved: Map<string, { name: string; path: string[] }>): CatalogStore {
     const c = this.catalog!;
+    // (an item renamed or put in another folder: its name and place before, so the links to it in notes can follow it)
+    const before = async (hashes: readonly string[]): Promise<void> => {
+      const folders = (await c.list()).folders;
+      for (const h of hashes) {
+        const e = moved.has(h) ? null : await c.entry(h);
+        if (e) moved.set(h, { name: e.name, path: await this.itemPath(e, folders) });
+      }
+    };
+    const moves = (ch: MetaChange): boolean => !!(ch.addFolders?.length || ch.removeFolders?.length || ch.clearFolder);
     return new Proxy(c, {
       get(target, key, recv) {
         const v = Reflect.get(target, key, recv) as unknown;
         if (typeof v !== "function") return v;
-        if (key === "updateMeta") return (h: string, ch: MetaChange) => (seen.add(h), c.updateMeta(h, ch));
-        if (key === "updateMetaEach") return (chs: ReadonlyArray<{ hash: string; change: MetaChange }>) => (chs.forEach((x) => seen.add(x.hash)), c.updateMetaEach(chs));
+        if (key === "updateMeta") return async (h: string, ch: MetaChange) => (seen.add(h), moves(ch) && (await before([h])), c.updateMeta(h, ch));
+        if (key === "updateMetaEach")
+          return async (chs: ReadonlyArray<{ hash: string; change: MetaChange }>) => {
+            chs.forEach((x) => seen.add(x.hash));
+            await before(chs.filter((x) => moves(x.change)).map((x) => x.hash));
+            return c.updateMetaEach(chs);
+          };
+        if (key === "renameAssets") return async (chs: ReadonlyArray<{ hash: string; name: string }>) => (await before(chs.map((x) => x.hash)), c.renameAssets(chs));
         if (key === "renameTag" || key === "deleteTag" || key === "restoreMeta") seen.add("*");
         return (v as (...a: unknown[]) => unknown).bind(target);
       },
@@ -450,6 +468,97 @@ export class Session {
     }
     this.post({ kind: "assets" });
     this.emitAssets(true);
+  }
+
+  /** Where an item is in the library, as folders and a file name: its file's path in the workspace folder when it has one, else its library folder and name. */
+  async itemPath(e: Pick<CatalogEntry, "hash" | "name" | "folderIds">, folders: readonly AssetFolder[]): Promise<string[]> {
+    const file = await this.storage?.originals.fileOf(e.hash).catch(() => null);
+    if (file) return file.replace(/^library\//, "").split("/");
+    const folder = e.folderIds?.[0];
+    return [...(folder ? folderPath(folders, folder) : []), e.name || e.hash];
+  }
+
+  /** What each note (by its hash: a version's words never change) links to, as written. */
+  private readonly noteLinkCache = new Map<string, { wiki: string[]; paths: string[] }>();
+  private async linksOf(e: CatalogEntry, kind: NoteKind): Promise<{ wiki: string[]; paths: string[] }> {
+    let l = this.noteLinkCache.get(e.hash);
+    if (!l) {
+      const text = await (await this.assets?.record(e.hash).catch(() => undefined))?.blob.text();
+      l = text === undefined ? { wiki: [], paths: [] } : noteLinks(kind, text);
+      this.noteLinkCache.set(e.hash, l);
+    }
+    return l;
+  }
+  /** The name a `[[link]]` names an item by: a markdown note without `.md`, any other file by its whole name (lower case). */
+  private static wikiKey = (name: string): string => name.toLowerCase().replace(/\.(md|markdown)$/, "");
+
+  /** The notes that link to an item (`[[its name]]`, a path to it, `canvast:<its hash>`). Hidden notes only when `hidden`. */
+  async backlinks(hash: string, hidden = false): Promise<CatalogEntry[]> {
+    const listing = await this.catalog?.list().catch(() => null);
+    const target = listing?.entries.find((x) => x.hash === hash);
+    if (!listing || !target) return [];
+    const where = (await this.itemPath(target, listing.folders)).join("/");
+    const key = Session.wikiKey(target.name);
+    const out: CatalogEntry[] = [];
+    for (const e of listing.entries) {
+      const kind = noteKindOf(e.name);
+      if (!kind || kind === "txt" || e.hash === hash || !e.present || (!hidden && e.hidden)) continue;
+      const links = await this.linksOf(e, kind);
+      if (!links.wiki.length && !links.paths.length) continue;
+      const dir = (await this.itemPath(e, listing.folders)).slice(0, -1);
+      const hit =
+        links.wiki.some((w) => wikiTarget(w).name === key || w.toLowerCase() === target.name.toLowerCase()) ||
+        links.paths.some((p) => {
+          const t = linkTarget(p, dir);
+          return !!t && ("hash" in t ? t.hash === hash : t.path.join("/") === where);
+        });
+      if (hit) out.push(e);
+    }
+    return out;
+  }
+
+  /**
+   * Items were renamed or put in other folders: the notes' links to them follow (`[[old name]]` when that name was theirs alone, a path
+   * to their old place), and a note that moved has its own paths written from its new place. Each changed note is saved as a new version.
+   */
+  private async relink(moved: ReadonlyMap<string, { name: string; path: string[] }>): Promise<void> {
+    await this.storage?.flush().catch(() => undefined); // (the desktop app's files in their new places first)
+    const listing = await this.catalog?.list().catch(() => null);
+    if (!listing) return;
+    const now = new Map(listing.entries.map((e) => [e.hash, e]));
+    const pathNow = new Map<string, string[]>();
+    for (const h of moved.keys()) if (now.has(h)) pathNow.set(h, await this.itemPath(now.get(h)!, listing.folders));
+    for (const e of listing.entries) {
+      const kind = noteKindOf(e.name);
+      if (!kind || kind === "txt" || !e.present) continue;
+      const links = await this.linksOf(e, kind);
+      if (!links.wiki.length && !links.paths.length) continue;
+      const rec = await this.assets?.record(e.hash).catch(() => undefined);
+      if (!rec) continue;
+      const text = await rec.blob.text();
+      const dirNow = (pathNow.get(e.hash) ?? (await this.itemPath(e, listing.folders))).slice(0, -1);
+      const dirThen = moved.get(e.hash)?.path.slice(0, -1) ?? dirNow;
+      let out = text;
+      for (const [h, then] of moved) {
+        const cur = now.get(h);
+        const to = pathNow.get(h);
+        if (!cur || !to) continue;
+        const oldKey = Session.wikiKey(then.name);
+        const alone = !listing.entries.some((x) => x.hash !== h && Session.wikiKey(x.name) === oldKey);
+        const named = then.name !== cur.name && alone;
+        out = relinkNote(kind, out, { oldWiki: named ? oldKey : null, newWiki: noteKindOf(cur.name) === "md" ? cur.name.replace(/\.(md|markdown)$/i, "") : cur.name, oldPath: relativeLink(dirThen, then.path), newPath: relativeLink(dirNow, to) });
+      }
+      // (a note that moved: its paths to items that stayed are written from its new folder)
+      if (dirThen.join("/") !== dirNow.join("/")) {
+        for (const p of links.paths) {
+          const t = linkTarget(p, dirThen);
+          if (!t || "hash" in t) continue;
+          const stayed = listing.entries.find((x) => !moved.has(x.hash) && x.name === t.path[t.path.length - 1]);
+          if (stayed) out = relinkNote(kind, out, { oldWiki: null, newWiki: "", oldPath: p, newPath: relativeLink(dirNow, await this.itemPath(stayed, listing.folders)) });
+        }
+      }
+      if (out !== text) await this.saveVersion(e.hash, new File([out], e.name, { type: rec.type }));
+    }
   }
 
   /** Told when an item gets a new version (a note saved, a file changed outside the app): its old hash and its new one. */

@@ -915,11 +915,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** A note is being saved: its item gets a new hash, so the old one going is not the note being deleted. */
   let noteSaving = false;
   /** Where an item is in the library, as folders and a file name: its file's path in the workspace folder when it has one, else its library folder and name. */
-  const libraryPath = async (hash: string, e: CatalogEntry | undefined = entryOf(hash)): Promise<string[]> => {
-    const file = await session.storage?.originals.fileOf(hash).catch(() => null);
-    if (file) return file.replace(/^library\//, "").split("/");
-    const folder = e?.folderIds?.[0];
-    return [...(folder ? folderPath(allFolders, folder) : []), e?.name || hash];
+  const libraryPath = (hash: string, e: CatalogEntry | undefined = entryOf(hash)): Promise<string[]> => session.itemPath({ hash, name: e?.name ?? "", folderIds: e?.folderIds ?? [] }, allFolders);
+  /** The notes that link to the item described (Linked from, in its details): each opens in the viewer. */
+  const fillBacklinks = async (hash: string): Promise<void> => {
+    const notes = await session.backlinks(hash, hiddenMode).catch(() => []);
+    const sec = inspector.querySelector<HTMLElement>('[data-testid="asset-backlinks"]');
+    if (!sec || selected !== hash) return;
+    sec.hidden = !notes.length;
+    sec.querySelector("ul")!.innerHTML = notes.map((n) => `<li><button type="button" class="asset-place-name assets-link" data-action="open-linked" data-hash="${n.hash}" title="Open “${esc(n.name)}”">${esc(n.name)}</button></li>`).join("");
   };
   /** A note with this tag is a template: offered in Insert ▸ Template of every note. */
   const TEMPLATE_TAG = "template";
@@ -2619,6 +2622,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       ${m ? `<p class="asset-warn" data-testid="asset-missing-help">Instances use a file that is not stored. Import the same file again to restore all ${instances} of them.</p>` : ""}
       ${e ? organizeHtml(e) : ""}
       ${e ? notesHtml(e) : ""}
+      <section class="asset-sec" data-testid="asset-backlinks" hidden><h3>Linked from</h3><ul class="asset-places"></ul></section>
       <section class="asset-sec asset-where">
         <h3 data-testid="asset-usage">${instances ? `Used on ${plural(places.length || (e?.canvases ?? m!.canvases), "canvas", "canvases")} <span class="asset-place-total">(${plural(instances, "time")})</span>` : "Where it is used"}</h3>
         ${instances ? `<ul class="asset-places" data-testid="asset-places">${placeRows}</ul>
@@ -2644,6 +2648,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         </dl>
       </details>`;
     if (e?.present && !isCard(e)) void fillMetadata(e.hash, e.type);
+    if (e) void fillBacklinks(e.hash);
     const prev = inspector.querySelector<HTMLImageElement>(".asset-preview img");
     if (prev) loadThumb(prev);
     const sample = inspector.querySelector<HTMLElement>(".asset-preview .font-sample");
@@ -3150,6 +3155,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         break;
       case "rename-all":
         void renameAssetsDialog(filtered().filter((h) => picked.has(h)));
+        break;
+      case "open-linked":
+        void showSlide(b.dataset["hash"]!);
         break;
       case "open-tab":
         void openOriginalInTab(assets, hash);

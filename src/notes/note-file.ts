@@ -129,3 +129,37 @@ export function wikiTarget(target: string): { name: string; dirs: string[] } {
   const parts = target.split("#")[0]!.split("/").filter(Boolean).map((p) => p.toLowerCase());
   return { name: (parts.pop() ?? "").replace(/\.(md|markdown|txt|note\.html)$/, ""), dirs: parts };
 }
+
+/** The links a note's words hold: `[[targets]]` (embeds too) and paths or `canvast:` links as written (pictures, files, other notes). */
+export function noteLinks(kind: NoteKind, text: string): { wiki: string[]; paths: string[] } {
+  const wiki: string[] = [];
+  const paths: string[] = [];
+  if (kind === "md") {
+    outsideCode(text, (s) => {
+      for (const m of s.matchAll(/!?\[\[([^\[\]|\n#]+?)(?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?\]\]/g)) wiki.push(m[1]!.trim());
+      for (const m of s.matchAll(/\]\(<?([^)\s>]+)>?(?:\s+"[^"]*")?\)/g)) if (!m[1]!.startsWith(WIKI)) paths.push(m[1]!);
+      for (const m of s.matchAll(/\s(?:src|href)="([^"]+)"/g)) paths.push(m[1]!);
+      return s;
+    });
+  } else if (kind === "rich") for (const m of text.matchAll(/\s(?:src|href)="([^"]+)"/g)) paths.push(m[1]!.replace(/&amp;/g, "&"));
+  return { wiki, paths };
+}
+
+/**
+ * A note's words with its links to an item that was renamed or moved written again: `[[old name]]` (when that name was the item's
+ * alone) becomes `[[new name]]` (a shown text kept), and a path written to its old place becomes the path to the new one.
+ */
+export function relinkNote(kind: NoteKind, text: string, change: { oldWiki: string | null; newWiki: string; oldPath: string; newPath: string }): string {
+  let out = text;
+  if (kind === "md" && change.oldWiki) {
+    const old = change.oldWiki.toLowerCase();
+    out = outsideCode(out, (s) =>
+      s.replace(/(!?)\[\[([^\[\]|\n#]+?)((?:#[^\[\]|\n]*)?(?:\|[^\[\]\n]*)?)\]\]/g, (m, bang: string, t: string, rest: string) => (wikiTarget(t).name === old || t.trim().toLowerCase() === old ? `${bang}[[${change.newWiki}${rest}]]` : m)),
+    );
+  }
+  if (change.oldPath && change.oldPath !== change.newPath) {
+    const esc = change.oldPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out = out.replace(new RegExp(`(\\]\\(<?|\\s(?:src|href)=")${esc}(?=[)>"\\s#?])`, "g"), `$1${change.newPath}`);
+  }
+  return out;
+}

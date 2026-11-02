@@ -19,6 +19,7 @@
 - **Added:** a note's properties: its YAML block (as Obsidian writes it) is its item's tags, note (`description`) and fields, read in on import and from saves elsewhere, and written back when they change in the library; rich text notes keep them as `<meta>`. Saving a note whose words were changed in another app since it was opened asks first.
 - **Added:** links between notes as Obsidian writes them (`[[Plan]]`, `[[Plan|text]]`, `[[Folder/Plan]]`): `[[` offers the library's notes and files, Ctrl+click opens what a link points at.
 - **Added:** `#tags` written in a markdown note's words are its item's tags (as Obsidian reads them); `#` offers the library's tags.
+- **Added:** Linked from in an item's details (the notes linking to it), and links in notes that follow an item renamed or moved in the library.
 - **Added:** **New note** in the library's Import menu: a markdown note in the open folder, opened to write in.
 - **Changed:** the library chooser (texture fill pictures, custom thumbnails) is one shared panel that can also open in the middle of the page, list any kind of item, import files from this device, and shows the first 300 matches of a big library (search narrows it).
 
