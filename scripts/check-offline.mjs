@@ -29,6 +29,9 @@ const KNOWN = [
   /^https:\/\/github\.com\/emarpiee\/canvast$/, // canvast's own licence notice: where its source is
   /^https:\/\/fsf\.org\/$/, // the GNU GPL text
   /^https:\/\/www\.gnu\.org\/licenses\/(why-not-lgpl\.html)?$/, // the GNU GPL text
+  // The notes editor (SunEditor): the text of its messages and credits, and the address it makes of a Vimeo link pasted as a video
+  // (an iframe, which the page's Content-Security-Policy never loads: default-src 'none').
+  /^https:\/\/(katex\.org\/docs\/supported\.html|www\.mathjax\.org\/|suneditor\.com\/troubleshooting#\w+|github\.com\/JiHong88\/suneditor\/blob\/master\/guide\/external-libraries\.md|lucide\.dev|tabler\.io\/icons|player\.vimeo\.com\/video\/)$/,
 ];
 for (const m of html.matchAll(/(?:https?|wss?):\/\/[^\s"'`)<>]+/gi)) {
   if (!KNOWN.some((re) => re.test(m[0]))) problems.push(`unknown URL string (look at it, then add it to KNOWN if it is only text): ${m[0]}`);

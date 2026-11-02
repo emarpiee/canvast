@@ -233,6 +233,8 @@ export interface FolderFile {
   hash?: () => Promise<string | null>;
   /** The item this file was (its content changed outside the app): the new version takes its place everywhere (any kind of file). */
   follows?: string;
+  /** That new version was saved in the app (a note), not by another program. */
+  savedInApp?: boolean;
   /** What a sealed file said of its item (its tags, note…), given back to it. */
   meta?: { tags: string[]; favorite: boolean; note: string; fields: Array<{ key: string; value: string }> };
   read(): Promise<Blob | null>;
@@ -269,6 +271,11 @@ export interface FolderSync {
   partSplit(): Promise<{ split: 1 | 2 | 3; items: number }>;
   /** Split it another way: every part is written again once (and the old ones removed). */
   setPartSplit(split: 1 | 2 | 3): Promise<void>;
+  /**
+   * A new version of an item's file made in the app (a note): written over its file in `library/` and followed as a save from another
+   * program is (the item keeps its name, folder and place). False when the item has no readable file there (a hidden one).
+   */
+  saveFile(hash: string, bytes: Uint8Array): Promise<boolean>;
 }
 
 /**

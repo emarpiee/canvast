@@ -1,3 +1,4 @@
+import { NOTE_STYLES } from "../notes/note-file";
 import { DOCK_PANEL_IDS } from "../settings/panels";
 import type { SettingKey, SettingValue, SettingsStore } from "../settings/settings";
 import { openColourPopover } from "./colour-popover";
@@ -58,6 +59,7 @@ const CARD_STARTS: Partial<Record<SettingKey, string>> = {
   "eraser.diameterPx": "Eraser",
   "assets.edgeWidth": "The library viewer",
   "media.volume": "Players",
+  "notes.style": "Notes",
   "frame.format": "Extracted frames",
   "edit.format": "Edited pictures",
   "export.folder": "Exported pictures",
@@ -130,6 +132,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "assets.edgeWidth", label: "Viewer edges", help: "Click this much of the viewer's left or right side to go to the previous or next item (invisible). 0 turns it off.", control: { kind: "range", min: 0, max: 40, step: 1, unit: "%" } },
       { key: "assets.playerHideSeconds", label: "Hide the player", help: "Seconds the viewer's video and GIF player stays after the pointer stops moving, playing or paused; it comes back with any move.", control: { kind: "range", min: 0.5, max: 10, step: 0.5, unit: "s", live: true } },
       { key: "assets.slideSeconds", label: "Slideshow", help: "Seconds each item stays in the library slideshow (a video or audio file plays to its end first).", control: { kind: "range", min: 1, max: 60, step: 1, unit: "s", live: true } },
+      { key: "notes.style", label: "Editor style", help: "How the notes editor looks when a note (a markdown, text or rich text note) is opened in the library: Document shows pages with every tool; Classic and Bottom keep the toolbar above or below; Inline and Balloon show it only while writing or when words are selected; Notion-like adds a handle beside each block and a / menu. A note already open changes when it is opened again.", control: { kind: "select", options: NOTE_STYLES } },
       { key: "media.volume", label: "Starting volume", help: "Where each player starts. A player's own volume slider changes only that player.", control: { kind: "range", min: 0, max: 100, step: 1, unit: "%" } },
       { key: "media.step.video", label: "Video step", help: "Seconds the step buttons move a video.", control: { kind: "range", min: 0.5, max: 60, step: 0.5, unit: "s" } },
       { key: "media.step.audio", label: "Audio step", help: "Seconds the step buttons move an audio file.", control: { kind: "range", min: 0.5, max: 60, step: 0.5, unit: "s" } },

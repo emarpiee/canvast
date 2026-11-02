@@ -42,6 +42,11 @@ import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
 import { runExport, runExportFiles, runExportFolder } from "./archive-ui";
 import { openLibraryPicker } from "./library-picker";
+import { mountNoteEditor } from "./note-editor";
+import type { AttachKind, NoteEditor, NoteHost, NoteItem } from "./note-editor";
+import { RICH_NOTE_SUFFIX, noteKindOf, richNameOf } from "../notes/note-file";
+import type { NoteKind } from "../notes/note-file";
+import { familyFor, fontFor } from "../text/fonts";
 import { hasAlpha } from "./alpha";
 import { VIEW_GROUNDS, type ViewGround } from "../storage/workspace-repo";
 import type { Engine } from "./media-player";
@@ -76,8 +81,8 @@ export interface AssetsView {
   focusSearch(): void;
   /** Show these originals: leave the viewer, clear the search and filters, pick them and scroll to the first (ADR 0077). */
   reveal(hashes: readonly string[]): Promise<void>;
-  /** Import files into the library only (no placement). */
-  importFiles(files: File[]): Promise<void>;
+  /** Import files into the library only (no placement): the hashes of those taken in (or already there). */
+  importFiles(files: File[]): Promise<string[]>;
 }
 
 /** The columns of the list layout: each can be shown or hidden and moved (Name always shows). */
@@ -181,7 +186,7 @@ const NO_FILTERS = { usage: "all", sort: "newest", reversed: false, scope: "all"
 /** The widest a list column can be made by dragging its header's edge. */
 const COL_W_MAX = 900;
 
-export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore): AssetsView {
+export function mountAssetsView(root: HTMLElement, session: Session, assets: AssetLibrary, showCanvas: () => void, notices: { subscribe(fn: (text: string) => void): void }, settings: SettingsStore, /** The fonts of the library, loaded (the notes editor's font list). */ fonts: () => Promise<Array<{ hash: string; name: string; unusable: string }>> = async () => []): AssetsView {
   root.innerHTML = `
     <div class="assets-place-zone drop-zone" data-testid="assets-place-zone" hidden>${ICONS.mapPin}<span></span></div>
     <div class="assets-bar" role="toolbar" aria-label="Library">
@@ -892,6 +897,179 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   slideTile.className = "viewer-tile";
   slideTile.hidden = true;
   slideImg.after(slideTile);
+  // ---- notes: a markdown, plain text or rich text note opens in the notes editor in place of a picture (its links shown from the library)
+  const noteBox = document.createElement("div");
+  noteBox.className = "viewer-note";
+  noteBox.dataset["testid"] = "note-editor";
+  noteBox.hidden = true;
+  viewer.querySelector(".viewer-stage")!.append(noteBox);
+  let note: { hash: string; kind: NoteKind; name: string; type: string; editor: NoteEditor } | null = null;
+  /** A note is being saved: its item gets a new hash, so the old one going is not the note being deleted. */
+  let noteSaving = false;
+  const darkTheme = (): boolean => (document.documentElement.dataset["theme"] ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark";
+  /** Where an item is in the library, as folders and a file name: its file's path in the workspace folder when it has one, else its library folder and name. */
+  const libraryPath = async (hash: string, e: CatalogEntry | undefined = entryOf(hash)): Promise<string[]> => {
+    const file = await session.storage?.originals.fileOf(hash).catch(() => null);
+    if (file) return file.replace(/^library\//, "").split("/");
+    const folder = e?.folderIds?.[0];
+    return [...(folder ? folderPath(allFolders, folder) : []), e?.name || hash];
+  };
+  const NOUNS: Record<AttachKind | "any", readonly [string, string]> = { image: ["picture", "pictures"], video: ["video", "videos"], audio: ["sound", "sounds"], file: ["file", "files"], any: ["item", "items"] };
+  const noteHost = async (hash: string): Promise<NoteHost> => {
+    const all: CatalogEntry[] = ((await session.catalog?.list().catch(() => null))?.entries ?? []).filter((x) => x.present && (hiddenMode || !meta(x).hidden));
+    const item = (x: CatalogEntry): NoteItem => ({ hash: x.hash, name: x.name, type: x.type });
+    const fits = (kind: AttachKind | "any", x: CatalogEntry): boolean => kind === "any" || kind === "file" || (x.type.startsWith(`${kind}/`) && !x.card);
+    const take = async (files: File[]): Promise<NoteItem[]> => {
+      const got: NoteItem[] = [];
+      for (const h of await view.importFiles(files)) {
+        const x = await session.catalog?.entry(h).catch(() => undefined);
+        if (!x) continue;
+        if (!all.some((y) => y.hash === h)) all.push(x);
+        got.push(item(x));
+      }
+      return got;
+    };
+    return {
+      dir: (await libraryPath(hash)).slice(0, -1),
+      async find(t) {
+        if ("hash" in t) {
+          const x = all.find((y) => y.hash === t.hash);
+          return x ? item(x) : null;
+        }
+        const want = t.path.join("/");
+        const named = all.filter((x) => x.name === t.path[t.path.length - 1]);
+        for (const x of named) if ((await libraryPath(x.hash, x)).join("/") === want) return item(x);
+        return named.length === 1 ? item(named[0]!) : null; // (moved since: the one item of that name)
+      },
+      blob: async (h) => (await assets.record(h).catch(() => undefined))?.blob ?? null,
+      pathOf: (h) => libraryPath(h, all.find((x) => x.hash === h)),
+      async choose(kind) {
+        const list = all.filter((x) => fits(kind, x)).sort((a, b) => b.importedAt - a.importedAt);
+        const chosen = await openLibraryPicker(
+          null,
+          list.map((x) => ({ hash: x.hash, name: x.name, ...(x.type.startsWith("image/") && !x.card ? {} : { chip: chipOf(x.name, x.type) }), thumb: async () => (await session.catalog?.thumb(x.hash).catch(() => undefined))?.blob })),
+          { noun: NOUNS[kind], importFiles: { accept: kind === "file" || kind === "any" ? "" : `${kind}/*`, run: async (files) => (await take(files)).map((i) => i.hash) } },
+        );
+        const x = chosen ? all.find((y) => y.hash === chosen) : undefined;
+        return x ? item(x) : null;
+      },
+      importFiles: take,
+      async fonts() {
+        const list = (await fonts()).filter((f) => !f.unusable);
+        return [{ name: "Inter", family: familyFor() }, ...list.map((f) => ({ name: fontFor(f.hash).names.family || f.name, family: familyFor(f.hash) }))];
+      },
+      save: () => saveNote(),
+    };
+  };
+  const openNote = async (hash: string, kind: NoteKind, name: string, blob: Blob, token: number): Promise<void> => {
+    const [text, host] = await Promise.all([blob.text(), noteHost(hash)]);
+    if (token !== slideToken) return;
+    slideImg.hidden = true;
+    viewer.classList.add("is-note");
+    const box = document.createElement("div");
+    noteBox.replaceChildren(box);
+    noteBox.hidden = false;
+    slideCaption.textContent = "";
+    let editor: NoteEditor;
+    try {
+      editor = await mountNoteEditor(box, { kind, text, style: settings.get("notes.style"), dark: darkTheme(), host });
+    } catch (e) {
+      noteBox.hidden = true;
+      viewer.classList.remove("is-note");
+      slideImg.hidden = false;
+      slideCaption.textContent = `${name}. The notes editor could not open it: ${(e as Error).message}.`;
+      slideCaption.classList.add("is-note");
+      return;
+    }
+    if (token !== slideToken) return editor.destroy();
+    note = { hash, kind, name, type: blob.type || "text/plain", editor };
+  };
+  const writeNote = async (n: NonNullable<typeof note>, text: string): Promise<boolean> => {
+    noteSaving = true;
+    try {
+      const hash = await session.saveVersion(n.hash, new File([text], n.name, { type: n.type }));
+      if (!hash) return false;
+      n.editor.saved();
+      if (note === n) {
+        n.hash = slideHash = selected = anchor = hash;
+        picked.clear();
+        picked.add(hash);
+      }
+      session.editor.message = `Saved “${n.name}”.`;
+      session.editor.changed();
+      await refresh();
+      return true;
+    } finally {
+      noteSaving = false;
+    }
+  };
+  /** The note's formatting does not fit its markdown or text file: kept in a rich text note beside it (the file stays as it was), opened then. */
+  const saveRichCopy = async (n: NonNullable<typeof note>, open = true): Promise<boolean> => {
+    const name = richNameOf(n.name);
+    const [hash] = await view.importFiles([new File([n.editor.asRich(name.slice(0, -RICH_NOTE_SUFFIX.length))], name, { type: "text/html" })]);
+    if (!hash) return false;
+    const folder = entryOf(n.hash)?.folderIds?.[0];
+    if (folder) await session.organize((c) => c.updateMeta(hash, { addFolders: [folder] }), "File a note");
+    n.editor.saved();
+    session.editor.message = `Saved as the rich text note “${name}”. “${n.name}” is as it was.`;
+    session.editor.changed();
+    if (open) await showSlide(hash);
+    return true;
+  };
+  /** Save the open note: a markdown or text note asks first when part of its formatting would be lost. Whether it was saved. */
+  const saveNote = async (): Promise<boolean> => {
+    const n = note;
+    if (!n || session.editor.blockEdit()) return false;
+    if (n.kind === "rich") return writeNote(n, n.editor.asRich(n.name.slice(0, -RICH_NOTE_SUFFIX.length)));
+    const { text, keepsAll } = n.editor.asText(n.kind);
+    if (keepsAll) return writeNote(n, text);
+    const plain = n.kind === "md" ? "markdown" : "plain text";
+    const how = await chooseDialog({
+      title: "Save the note",
+      lines: [`Part of the formatting of “${n.name}” cannot be kept in a ${plain} file: fonts, sizes, colours, alignment or the page layout.`],
+      choices: [
+        { value: "rich", label: "Save as a rich text note", help: `Keeps everything, in a new file “${richNameOf(n.name)}”. “${n.name}” stays as it was.` },
+        { value: "text", label: `Save as plain ${plain}`, help: n.kind === "md" ? "Keeps the text, headings, lists, links, tables and pictures; the rest of the formatting is dropped." : "Keeps the words only." },
+      ],
+      confirmLabel: "Save",
+    });
+    return how === "rich" ? saveRichCopy(n) : how === "text" ? writeNote(n, text) : false;
+  };
+  /** Before the note is left (another item, Back, Esc): its changes are saved or let go, or it stays open. Whether to go on. */
+  const leaveNote = async (): Promise<boolean> => {
+    if (!note?.editor.dirty) return true;
+    const how = await chooseDialog({
+      title: "Unsaved changes",
+      lines: [`“${note.name}” has changes that are not saved.`],
+      choices: [
+        { value: "save", label: "Save them", help: "Then go on." },
+        { value: "drop", label: "Don't save", help: "The note stays as it was last saved." },
+      ],
+      confirmLabel: "Go on",
+    });
+    if (how === "drop") note?.editor.saved();
+    return how === "save" ? saveNote() : how === "drop";
+  };
+  /**
+   * Close the note. Changes still unsaved (the viewer closed by something else than the person: the library shown elsewhere) are saved
+   * without losing anything: as its own file when that keeps all, else as a rich text note beside it.
+   */
+  const unloadNote = (): void => {
+    const n = note;
+    if (!n) return;
+    note = null;
+    viewer.classList.remove("is-note");
+    noteBox.hidden = true;
+    if (n.editor.dirty && entryOf(n.hash)) {
+      const kept = n.kind === "rich" ? null : n.editor.asText(n.kind);
+      if (!kept || kept.keepsAll) void writeNote(n, kept ? kept.text : n.editor.asRich(n.name.slice(0, -RICH_NOTE_SUFFIX.length)));
+      else void saveRichCopy(n, false);
+    }
+    n.editor.destroy();
+    noteBox.replaceChildren();
+  };
+  // (the browser build: leaving the page with a note's changes unsaved asks first)
+  if (!desktopBridge()) window.addEventListener("beforeunload", (e) => void (note?.editor.dirty && e.preventDefault()));
   const pos = viewer.querySelector<HTMLElement>(".viewer-pos")!;
   let slideHash: string | null = null;
   /** The assets the viewer steps through: the whole library list, or only what was picked when the slideshow started from a selection. */
@@ -1271,7 +1449,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   const showSlide = async (hash: string): Promise<void> => {
     const e = entryOf(hash);
-    if (!e) return;
+    if (!e || !(await leaveNote())) return;
     const token = ++slideToken;
     const opening = viewer.hidden;
     resetZoom();
@@ -1308,6 +1486,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideImg.style.maxHeight = `${e.pixelH * 3}px`;
     freeSlideUrl();
     unloadMedia();
+    unloadNote();
     vector = false;
     slideVec.hidden = true;
     slideImg.classList.remove("is-vector");
@@ -1335,6 +1514,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       slideImg.src = await thumbFor(hash).catch(() => "");
     };
     if (!rec) return void (await thumbnail());
+    const kind = noteKindOf(rec.name);
+    if (kind) return void (await openNote(hash, kind, rec.name, rec.blob, token));
     if (isFontFile(rec)) {
       // A font: its sample, in its own letters, at several sizes.
       slideImg.hidden = true;
@@ -1451,6 +1632,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideImg.onerror = null;
     slideImg.removeAttribute("src");
     unloadMedia();
+    unloadNote();
     freeSlideUrl();
     filmWin.replaceChildren();
     filmMounted.clear();
@@ -1539,7 +1721,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const act = t.closest<HTMLElement>("[data-act]")?.dataset["act"];
     if (act === "prev") stepSlide(-1);
     else if (act === "next") stepSlide(1);
-    else if (act === "close") closeSlide();
+    else if (act === "close") void leaveNote().then((ok) => ok && closeSlide());
     else if (act === "ground") {
       const now = session.viewGround;
       void session.setViewGround(VIEW_GROUNDS[(VIEW_GROUNDS.indexOf(now) + 1) % VIEW_GROUNDS.length]!);
@@ -1553,9 +1735,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
   viewer.addEventListener("keydown", (e) => {
     const typing = (e.target as HTMLElement).closest(TYPING);
+    if (note && (e.target as HTMLElement).closest(".viewer-note")) return; // (a note's keys are the editor's: Back closes it)
     if (e.key === "Escape") {
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
-      else closeSlide();
+      else void leaveNote().then((ok) => ok && closeSlide());
     } else if (typing) return;
     else if (e.key === "ArrowLeft") stepSlide(-1);
     else if (e.key === "ArrowRight") stepSlide(1);
@@ -2049,7 +2232,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     renderSide();
     renderInspector();
     if (slideHash && !viewer.hidden) {
-      if (!entryOf(slideHash)) closeSlide(); // the open asset was deleted
+      if (!entryOf(slideHash) && !noteSaving) closeSlide(); // the open asset was deleted (a note being saved gets a new hash)
       else if (viewList().list !== filmOf) renderFilm();
     }
     importBtn.disabled = session.readOnly;
@@ -2355,7 +2538,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="asset-facts">
         ${e ? `<span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>${!isCard(e) ? `<span>${e.pixelW} × ${e.pixelH} px</span>` : ""}<span>${fmtBytes(e.size)}</span>` : ""}
       </div>
-      ${e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>No preview for this file</h3><p class="asset-note">${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as a card. ${esc(d.todo)}</p></section>`; })() : ""}
+      ${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays ${noteKindOf(e.name) === "rich" ? "a rich text note (HTML) that other apps open too" : "plain text other apps read"}.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>No preview for this file</h3><p class="asset-note">${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as a card. ${esc(d.todo)}</p></section>`; })() : ""}
       ${e && !e.present ? `<p class="asset-warn">The file is missing from storage. Import the same file again to restore it everywhere.</p>` : ""}
       ${m ? `<p class="asset-warn" data-testid="asset-missing-help">Instances use a file that is not stored. Import the same file again to restore all ${instances} of them.</p>` : ""}
       ${e ? organizeHtml(e) : ""}
@@ -4237,8 +4420,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     openMoreMenu(importMenu, [
       { label: "Import files", icon: ICONS.arrowDownToLine, hint: "Pictures, video, audio and other files", run: () => fileInput.click() },
       { label: "A folder", icon: ICONS.folderInput, hint: "Every file in it, put in library folders of the same names", run: () => folderInput.click() },
+      { label: "New note", icon: ICONS.notebookPen, hint: "A markdown note in the open folder, opened to write in", run: () => void newNote() },
     ], "Import"),
   );
+  /** A new markdown note (its first line says when it was made, so no two are the same file), in the folder open in the sidebar. */
+  const newNote = async (): Promise<void> => {
+    const now = new Date();
+    const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${now.toTimeString().slice(0, 8).replace(/:/g, "")}`;
+    const [hash] = await view.importFiles([new File([`# Note ${stamp}\n\n`], `Note ${stamp}.md`, { type: "text/markdown" })]);
+    if (!hash) return;
+    if (scope.startsWith("folder:")) await session.organize((c) => c.updateMeta(hash, { addFolders: [scope.slice(7)] }), "File a note");
+    await refresh();
+    await showSlide(hash);
+  };
   folderInput.addEventListener("change", () => {
     const files = filesOfPicker(folderInput.files);
     folderInput.value = "";
@@ -4335,7 +4529,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       syncViewing();
     },
     async importFiles(files) {
-      if (session.editor.blockEdit()) return;
+      const hashes: string[] = [];
+      if (session.editor.blockEdit()) return hashes;
       let n = 0;
       const seen: Array<{ name: string; duplicate: "present" | "restored" }> = [];
       const renamed: Array<{ hash: string; name: string }> = [];
@@ -4346,6 +4541,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         done++;
         try {
           const { record, duplicate } = await assets.importFileDetailed(f, false); // nothing is placed, so a big batch keeps no decoded pictures
+          hashes.push(record.hash);
           if (duplicate) seen.push({ name: record.name || f.name, duplicate });
           if (duplicate && f.name) renamed.push({ hash: record.hash, name: f.name });
           n++;
@@ -4362,6 +4558,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       }
       await refresh();
       await offerNewNames(renamed);
+      return hashes;
     },
   };
   return view;

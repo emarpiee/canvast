@@ -1,3 +1,4 @@
+import { sha256Hex } from "../assets/sha256";
 import { HOME, deserializeCamera, fitRect, zoomLevel } from "../core/camera";
 import { startStep } from "./startup-log";
 import { plural } from "../doc/plural";
@@ -590,6 +591,35 @@ export class Session {
       for (const id of other.canvases) this.post({ kind: "commit", canvasId: id, revision: -1 });
     } catch (e) {
       this.tell(`Could not point the other canvases at the new version: ${(e as Error).message}`);
+    }
+  }
+
+  /**
+   * Save a new version of a library item's file made in the app (a note): it takes the item's place everywhere (its name, folder, tags,
+   * notes, and what was placed of it on the canvases). The desktop build writes it over the item's file; elsewhere the new version becomes
+   * an item of its own and the old one is deleted. The new version's hash, or null when it was not saved (with a message).
+   */
+  async saveVersion(old: string, file: File): Promise<string | null> {
+    if (!this.guardWrite() || !this.catalog || !this.assets) return null;
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const hash = await sha256Hex(bytes.buffer);
+      if (hash === old) return old;
+      await this.persistence.flush();
+      if (await this.storage?.folderSync?.saveFile(old, bytes)) return hash;
+      const e = await this.catalog.entry(old);
+      const { record } = await this.assets.importFileDetailed(file, false);
+      if (e) await this.catalog.updateMeta(record.hash, { addFolders: e.folderIds?.slice(0, 1) ?? [], addTags: e.tags ?? [], favorite: !!e.favorite, hidden: !!e.hidden, note: e.note ?? "", fields: e.fields ?? [], ...(e.thumb ? { thumb: e.thumb } : {}) });
+      await this.followAsset(old, record.hash, { w: record.pixelW, h: record.pixelH });
+      await this.catalog.markDeleted(old);
+      this.gcPending = true;
+      await this.collectGarbage();
+      this.post({ kind: "assets" });
+      this.emitAssets();
+      return record.hash;
+    } catch (e) {
+      this.tell(`Not saved: ${(e as Error).message}`);
+      return null;
     }
   }
 

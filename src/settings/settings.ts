@@ -13,6 +13,7 @@
  * Instance-specific state (a video's pause position, an image's adjustments)
  * is not a setting: it lives in the object itself.
  */
+import type { NoteStyle } from "../notes/note-file";
 import { DOCK_PANEL_IDS } from "./panels";
 import { paintFromText } from "../doc/paint";
 import { validSaved } from "../search/saved";
@@ -144,6 +145,7 @@ export const SETTINGS = {
   "ui.background": { scope: "device", default: "", validate: (v: unknown) => (typeof v === "string" && (v === "" || /^#[0-9a-f]{6}$/.test(v)) ? v : undefined), effect: "immediate" } as Def<string>,
   "ui.corners": { scope: "device", default: "round", validate: oneOf("round", "sharp"), effect: "immediate" } as Def<"round" | "sharp">,
   "ui.density": { scope: "device", default: "compact", validate: oneOf("comfortable", "compact", "dense"), effect: "immediate" } as Def<"comfortable" | "compact" | "dense">,
+  "notes.style": { scope: "device", default: "document", validate: oneOf("document", "classic", "bottom", "inline", "balloon", "notion"), effect: "immediate" } as Def<NoteStyle>,
   "assets.edgeWidth": { scope: "device", default: 15, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 40 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "assets.playerHideSeconds": { scope: "device", default: 1.5, validate: (v: unknown) => (typeof v === "number" && v >= 0.5 && v <= 10 ? v : undefined), effect: "immediate" } as Def<number>,
   "assets.slideSeconds": { scope: "device", default: 5, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 120 ? (v as number) : undefined), effect: "immediate" } as Def<number>,

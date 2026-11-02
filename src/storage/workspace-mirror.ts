@@ -569,6 +569,21 @@ export class WorkspaceMirror {
       .catch((e: unknown) => this.onError?.(`The workspace folder could not be looked through: ${(e as Error).message}.`));
     return this.running;
   }
+  /** A new version of an item's file made in the app, written over it and followed (on the write queue). Whether it was. */
+  saveItemFile(hash: string, bytes: Uint8Array, onChange: () => void): Promise<boolean> {
+    const saved = Promise.all([this.running, this.ready]).then(async () => {
+      const path = await this.lib.fileOf(hash);
+      if (!path) return false;
+      await this.bridge.write(path, bytes);
+      if (!(await this.lib.followChanged([path], true))) return false;
+      onChange();
+      const w = await this.lib.pendingWrite();
+      this.library(w === true ? undefined : [...(w || [])]);
+      return true;
+    });
+    this.running = saved.then(() => undefined, () => undefined);
+    return saved;
+  }
   /** `library.json` or the hidden index changed (another device, through a sync tool): read again (on the write queue). */
   rereadLibrary(onChange: () => void): Promise<void> {
     this.running = Promise.all([this.running, this.ready])

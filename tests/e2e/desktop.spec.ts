@@ -1214,6 +1214,30 @@ test("an item's file saved again outside the app, of any kind (a painting in its
   }
 });
 
+test("a note saved in the notes editor is written over its own file (same name, same place) and its item follows it", async () => {
+  const ws = tempDir("canvast-ws-");
+  const { app, page } = await launch(ws);
+  try {
+    await page.getByTestId("view-assets").click();
+    await page.getByTestId("assets-import-input").setInputFiles({ name: "todo.md", mimeType: "text/markdown", buffer: Buffer.from("# Todo\n") });
+    await expect(page.getByTestId("asset-card")).toHaveCount(1);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    const file = files(ws).find((f) => f.startsWith("library/") && f.endsWith(".md"))!;
+    await page.getByTestId("asset-card").dblclick();
+    await page.getByTestId("note-editor").locator(".sun-editor-editable h1").first().click();
+    await page.keyboard.press("End");
+    await page.keyboard.type(" today");
+    await page.keyboard.press("Control+s");
+    await expect(page.getByTestId("assets-status")).toContainText("Saved “todo.md”");
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    expect(readFileSync(join(ws, file), "utf8")).toContain("# Todo today");
+    expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual([file]);
+    await expect(page.getByTestId("asset-card")).toHaveCount(1);
+  } finally {
+    await app.close();
+  }
+});
+
 test("while the app runs it follows the folder: a canvas file renamed by hand, a file dropped into library/, another device's edits (loaded again) and both sides' edits (a conflict copy)", async () => {
   const ws = tempDir("canvast-ws-");
   const a = await launch(ws, "device-a");

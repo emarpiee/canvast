@@ -526,7 +526,7 @@ async function start(): Promise<void> {
           // (an item's file saved again by the program it is worked on in: what was placed of it follows the new version)
           if (f.follows) {
             await session.followAsset(f.follows, record.hash, { w: record.pixelW, h: record.pixelH });
-            followed.push(f.name);
+            if (!f.savedInApp) followed.push(f.name);
             continue;
           }
           n++;
@@ -1846,7 +1846,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView);
   markTab("canvas");
   markNav("canvas");
-  const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings);
+  const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings, libraryFonts);
   // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)
   window.addEventListener("keydown", (e) => {
     if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;

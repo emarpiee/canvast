@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Notes editor
+
+- **Added:** markdown (`.md`, `.markdown`), plain text (`.txt`) and rich text notes (`.note.html`) open in the library's viewer in a notes editor (SunEditor), in the style chosen in Settings (Document by default; Classic, Bottom, Inline, Balloon, Notion-like). `Ctrl+S` saves the note's own file in place (the same file in the desktop app's `library/`), keeping its name, folder, tags, note and fields; unsaved changes are asked about before the note is left.
+- **Added:** when a markdown or text note holds formatting its file cannot keep, saving asks whether to save it as a rich text note beside it (`name.note.html`, nothing lost; the markdown file stays as it was) or as plain markdown.
+- **Added:** a note's pictures, video, sound and files come from the library: the editor's gallery buttons open the library chooser, and a file uploaded, dropped or pasted into a note goes into the library first. Links are written relative to the note (`../Pictures/cat.png`); `canvast:<hash>` links are read and kept too. The font list is the library's fonts.
+- **Added:** **New note** in the library's Import menu: a markdown note in the open folder, opened to write in.
+- **Changed:** the library chooser (texture fill pictures, custom thumbnails) is one shared panel that can also open in the middle of the page, list any kind of item, import files from this device, and shows the first 300 matches of a big library (search narrows it).
+
 ## 0.52.6 — Library files worked on elsewhere, Flip (2026-11-02)
 
 - **Fixed:** a library file saved again by the program it is worked on in (a painting, a scene, any kind of file) showed as missing or damaged although it was there, and deleting its item removed that newer file for good. The item now follows the file: the new version takes its place with the item's name, folder, tags, note, fields and favourite, and its pictures and cards on every canvas show it, whether it was saved while the app ran or while it was closed. A file that no longer holds an item's content is never removed with the item.

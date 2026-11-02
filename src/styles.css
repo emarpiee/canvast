@@ -45,6 +45,7 @@
   --z-item-pop: 7;
   --z-edge: 10;
   --z-pop: 60; /* menus and popovers opened from a button: above the edge bars, the panels and the Settings view */
+  --z-over-editor: 2147483647; /* what the notes editor opens (the library chooser): above its own menus and its full screen */
   /* Animation (Settings > Performance): every duration and curve here, so one setting changes them all. --anim-speed and --anim-move are set by the settings (none: the durations below are made 0 by the rule at the end of this block). */
   --anim-speed: 1;
   --anim-move: 1;
@@ -1354,6 +1355,14 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 
 /* The slideshow: a thin bar runs across the top of the picture for the time each slide stays. */
 .viewer-stage { position: relative; }
+/* A note open in the viewer: the notes editor fills the stage; the picture's own tools are not shown. */
+.viewer-note { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.viewer-note > div, .viewer-note .se-container { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.viewer-note .sun-editor { flex: 1; min-height: 0; } /* (block, set by the editor itself) */
+.viewer-note .se-container { height: 100%; }
+.viewer-note .se-wrapper { flex: 1; min-height: 0; }
+.viewer.is-note .viewer-stage { display: flex; padding-top: calc(var(--sp-6) + var(--ctl) + var(--sp-4)); } /* (under the viewer's Back and Details buttons) */
+.viewer.is-note figure, .viewer.is-note .viewer-edge, .viewer.is-note .viewer-ground, .viewer.is-note .viewer-zoom { display: none; }
 .viewer-progress { position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--hud-accent); transform-origin: left; transform: scaleX(0); z-index: 1; }
 .viewer-progress[hidden] { display: none; }
 .viewer-progress.is-running { animation: show-run var(--ms, 5000ms) linear forwards; }
@@ -2835,6 +2844,11 @@ dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height
 .lib-thumb { display: block; aspect-ratio: 1; overflow: hidden; background: var(--hud-hover); border-radius: var(--r-xs); }
 .lib-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .lib-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--hud-muted); }
+.lib-pick.is-centred { inset: 0; z-index: var(--z-over-editor); width: min(40rem, calc(100vw - var(--sp-8))); height: fit-content; margin: auto; }
+.lib-head { display: flex; gap: var(--sp-3); }
+.lib-head input { flex: 1; min-width: 0; }
+.lib-thumb:has(.lib-chip) { display: grid; place-items: center; }
+.lib-chip { font: var(--font-meta); color: var(--hud-muted); }
 .tex-source .is-first { color: var(--hud-accent-fg); background: var(--hud-accent); }
 
 /* Levels: the black and white points on one line and the gamma under them, each a label and a number, the numbers in the one column on the right (as every number of the panel);

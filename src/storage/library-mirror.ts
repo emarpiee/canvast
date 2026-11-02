@@ -703,7 +703,14 @@ export class LibraryMirror {
    * canvas follow it (`importFiles` does that, told by `follows`), and the old item goes. A file still being written (its size not yet
    * still) waits for the next look. Whether any was taken.
    */
-  async followChanged(paths: readonly string[]): Promise<boolean> {
+  /** The readable file of an item in `library/` (not a hidden item's), or null. */
+  async fileOf(hash: string): Promise<string | null> {
+    const rec = await this.lib.rec(hash);
+    return rec?.ext && rec.file?.startsWith("library/") && !isHiddenFile(rec.file) ? rec.file : null;
+  }
+
+  /** `inApp`: the files were just written by the app itself (a note saved), so they are taken at once, not after they settle. */
+  async followChanged(paths: readonly string[], inApp = false): Promise<boolean> {
     const found: FolderFile[] = [];
     const olds: string[] = [];
     for (const path of paths) {
@@ -715,9 +722,11 @@ export class LibraryMirror {
       if (size === null || size === undefined) continue;
       const hash = await this.bridge.hash(path);
       if (!hash || hash === old) continue; // (the same content: nothing changed)
-      await new Promise((r) => setTimeout(r, SETTLE_MS));
-      const [again] = await this.bridge.sizes([path]);
-      if (again !== size || (await this.bridge.hash(path)) !== hash) continue; // (still being saved: the watcher says it again)
+      if (!inApp) {
+        await new Promise((r) => setTimeout(r, SETTLE_MS));
+        const [again] = await this.bridge.sizes([path]);
+        if (again !== size || (await this.bridge.hash(path)) !== hash) continue; // (still being saved: the watcher says it again)
+      }
       const e = await this.lib.entry(old);
       await this.lib.serial(async () => {
         const cur = await this.lib.rec(old);
@@ -738,6 +747,7 @@ export class LibraryMirror {
           return bytes && new Blob([bytes as Uint8Array<ArrayBuffer>]);
         },
         follows: old,
+        ...(inApp ? { savedInApp: true } : {}),
         ...(e ? { meta: { tags: e.tags ?? [], favorite: !!e.favorite, note: e.note ?? "", fields: e.fields ?? [] } } : {}),
       });
     }

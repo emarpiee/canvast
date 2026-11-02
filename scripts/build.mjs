@@ -30,17 +30,27 @@ const result = await build({
 });
 
 const script = result.outputFiles[0].text.replace(/<\/script/gi, "<\\/script").replace(/<!--/g, "<\\!--");
-const styles = await readFile(resolve(root, "src/styles.css"), "utf8");
+// The notes editor's own styles (SunEditor: its interface, its contents and its dark theme), bundled with their @imports.
+const editorCss = await build({
+  stdin: { contents: ['css/editor', 'css/contents', 'src/themes/dark.css'].map((p) => `@import "suneditor/${p}";`).join("\n"), resolveDir: root, loader: "css" },
+  bundle: true,
+  minify: true,
+  write: false,
+  logLevel: "warning",
+});
+const styles = `${editorCss.outputFiles[0].text}\n${await readFile(resolve(root, "src/styles.css"), "utf8")}`;
 const template = await readFile(resolve(root, "src/index.html"), "utf8");
 // Third-party notices travel inside the single file (Lucide icons are ISC, Inter is OFL-1.1).
 const pkgOf = async (name) => JSON.parse(await readFile(resolve(root, "node_modules", name, "package.json"), "utf8"));
 const licence = async (path) => (await readFile(resolve(root, "node_modules", path), "utf8")).replace(/--/g, "- -").trim();
 const lucide = await pkgOf("lucide-static");
 const inter = await pkgOf("@expo-google-fonts/inter");
+const sun = await pkgOf("suneditor");
 const own = (await readFile(resolve(root, "LICENSE"), "utf8")).replace(/--/g, "- -").trim(); // (canvast's own licence, the GNU GPL v3, travels in the file too)
 const notices =
   `<!--\ncanvast, copyright (C) 2026 emarpiee. Free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. Source: https://github.com/emarpiee/canvast\n\n${own}\n-->\n<!--\nThird-party notices\n\nLucide icons (lucide-static ${lucide.version})\n${await licence("lucide-static/LICENSE")}\n\n` +
-  `Inter Regular font (@expo-google-fonts/inter ${inter.version}, Inter_400Regular.ttf, unmodified)\n${await licence("@expo-google-fonts/inter/LICENSE_FONT")}\n-->\n`;
+  `Inter Regular font (@expo-google-fonts/inter ${inter.version}, Inter_400Regular.ttf, unmodified)\n${await licence("@expo-google-fonts/inter/LICENSE_FONT")}\n\n` +
+  `SunEditor (suneditor ${sun.version}, the notes editor)\n${await licence("suneditor/LICENSE.txt")}\n-->\n`;
 const html = template
   .replaceAll("__CANVAST_VERSION__", pkg.version)
   .replace("/*__CANVAST_STYLES__*/", () => styles)

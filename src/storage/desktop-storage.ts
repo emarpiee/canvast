@@ -11,7 +11,7 @@ import { externalFolder } from "./external-folder";
 import { openBrowserStorage } from "./idb-storage";
 import { DesktopCatalog, DesktopLibrary, DesktopOriginals, moveIdbLibrary } from "./desktop-library";
 import type { IdbBackups, IdbStorage } from "./idb-storage";
-import type { CustomThumbStore, FolderSync, FolderWriting, OpenHooks } from "./store";
+import type { CustomThumbStore, FolderHandlers, FolderSync, FolderWriting, OpenHooks } from "./store";
 import { sha256Hex } from "../assets/sha256";
 import { LIBRARY_DIR, LIBRARY_JSON } from "./library-mirror";
 import { WORKSPACE_FILE, WorkspaceMirror, watched } from "./workspace-mirror";
@@ -152,11 +152,14 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   });
   const backups = watched(storage.backups, { applyImport: () => mirror.everything(), recordBackup: () => mirror.device() });
   const library = (): void => mirror.library();
+  let folderOn: FolderHandlers | null = null;
   const folderSync: FolderSync = {
     checkFiles: (onStep, quick) => mirror.checkFiles(onStep, quick),
     partSplit: () => mirror.partSplit(),
     setPartSplit: (split) => mirror.setPartSplit(split),
+    saveFile: (hash, bytes) => mirror.saveItemFile(hash, bytes, () => folderOn?.libraryChanged()),
     start(on) {
+      folderOn = on;
       mirror.importFiles = (files) => on.importFiles(files);
       mirror.askHiddenKey = (names) => on.hiddenNeedsKey(names);
       mirror.scanHiddenLater = () => void mirror.rescan(() => on.libraryChanged());
