@@ -1,7 +1,7 @@
 import { externalFolder } from "../storage/external-folder";
 import { askHiddenPassword } from "../ui/hidden-access";
 import { noteKindOf } from "../notes/note-file";
-import { setNotePictures } from "../notes/note-preview";
+import { setNoteCardLength, setNotePictures } from "../notes/note-preview";
 import { ViewState } from "./view-state";
 import { fileInLibrary } from "./library-filing";
 import { storeFrame } from "./frames";
@@ -510,6 +510,9 @@ async function start(): Promise<void> {
     });
   }
   assets.onNotice = (text) => { editor.message = text; editor.changed(); };
+  // How much of a long note its card shows (Settings > Notes), for the cards made from now on.
+  setNoteCardLength(settings.get("notes.cardLength"));
+  settings.subscribe((key) => key === "notes.cardLength" && setNoteCardLength(settings.get("notes.cardLength")));
   // A note's preview (its card, its thumbnail) shows the pictures, videos and sounds it links to: a picture's own file, else the
   // item's library thumbnail (a video's picture, a sound's waveform). Never a hidden item's (a preview is kept as a thumbnail).
   setNotePictures(async (noteHash, link) => {

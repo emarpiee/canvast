@@ -9,9 +9,12 @@ import { splitFrontmatter } from "./frontmatter";
 
 /** A note's page is laid out this wide (CSS px), whatever the size of its picture. */
 const PAGE_W = 600;
-/** A note's card on a canvas: its page drawn at twice its size (sharp when zoomed in), as tall as the note up to this many CSS px. */
+/** A note's card on a canvas: its page drawn at twice its size (sharp when zoomed in), as tall as the note up to `cardMaxH` CSS px. */
 const CARD_SCALE = 2;
-const CARD_MAX_H = 1800;
+/** How much of a long note its card shows (Settings > Notes, Preview length): page heights in CSS px. */
+export const NOTE_CARD_LENGTHS = { short: 900, medium: 1800, long: 4000, whole: 8000 } as const;
+let cardMaxH: number = NOTE_CARD_LENGTHS.long;
+export const setNoteCardLength = (length: keyof typeof NOTE_CARD_LENGTHS): void => void (cardMaxH = NOTE_CARD_LENGTHS[length]);
 const CSS = `
 .page{box-sizing:border-box;overflow:hidden;padding:26px 30px;background:oklch(0.985 0.004 95);color:oklch(0.27 0.01 250);font:15px/1.45 system-ui,sans-serif;word-wrap:break-word}
 h1,h2,h3,h4,h5,h6{margin:.2em 0 .45em;line-height:1.2}h1{font-size:1.9em}h2{font-size:1.5em}h3{font-size:1.25em}h4,h5,h6{font-size:1.05em}
@@ -88,7 +91,7 @@ async function makePageHtml(name: string, text: string, hash?: string): Promise<
 
 /**
  * The size of a new card for a note (its picture on a canvas): the whole page at `CARD_SCALE`, as tall as the note (at least 4:3,
- * at most `CARD_MAX_H`; a longer note fades out at the bottom).
+ * at most `cardMaxH`; a longer note fades out at the bottom).
  */
 export async function noteCardSize(name: string, text: string, hash?: string): Promise<{ w: number; h: number }> {
   const host = document.createElement("div");
@@ -98,7 +101,7 @@ export async function noteCardSize(name: string, text: string, hash?: string): P
   document.body.append(host);
   const h = (root.lastElementChild as HTMLElement).scrollHeight;
   host.remove();
-  return { w: PAGE_W * CARD_SCALE, h: Math.round(Math.min(CARD_MAX_H, Math.max((PAGE_W * 3) / 4, h)) * CARD_SCALE) };
+  return { w: PAGE_W * CARD_SCALE, h: Math.round(Math.min(cardMaxH, Math.max((PAGE_W * 3) / 4, h)) * CARD_SCALE) };
 }
 
 /** The top of a note's page, `w` × `h` pixels (laid out `PAGE_W` wide); when the note goes on below, it fades out at the bottom. */

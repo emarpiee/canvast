@@ -241,4 +241,12 @@ test("a note's preview shows the pictures it links to (and an Obsidian ![[embed]
         return n;
       });
   await expect.poll(reds, { timeout: 10_000 }).toBeGreaterThan(500);
+  // Settings > Notes, Preview length: Short makes a long note's card about a screen long (900 CSS px, drawn at twice that).
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Notes", exact: true }).click();
+  await p.locator('[data-row="notes.cardLength"] select').selectOption("short");
+  await p.getByTestId("view-assets").click();
+  const LONG = `# Long\n\n${"A line of the note.\n\n".repeat(200)}`;
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "long.md", mimeType: "text/markdown", buffer: Buffer.from(LONG) });
+  await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).map((e) => [e.pixelW, e.pixelH])[0]), hashOf(LONG))).toEqual([1200, 1800]);
 });

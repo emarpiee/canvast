@@ -131,6 +131,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
     label: "Notes",
     rows: [
       { key: "notes.style", label: "Editor style", help: "How the notes editor looks when a note (a markdown, text or rich text note) is opened in the library: Document shows pages with every tool; Classic and Bottom keep the toolbar above or below; Balloon shows it only over selected words; Notion-like adds a handle beside each block and a / menu. A note already open changes when it is opened again.", control: { kind: "select", options: NOTE_STYLES } },
+      { key: "notes.cardLength", label: "Preview length on canvases", help: "How much of a long note its card on a canvas shows: Short, about a screen; Medium, about three; Long, about seven; Whole note, up to about fourteen. A longer note fades out at the bottom. Notes imported or saved from now on: one placed before keeps its card until it is saved again.", control: { kind: "select", options: [["short", "Short"], ["medium", "Medium"], ["long", "Long"], ["whole", "Whole note"]] } },
     ],
   },
   {
