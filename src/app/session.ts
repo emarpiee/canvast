@@ -1,7 +1,7 @@
 import { sha256Hex } from "../assets/sha256";
 import { NO_META, fileInlineTags, fileMeta, sameMeta, withFileMeta } from "../notes/frontmatter";
 import type { NoteMeta } from "../notes/frontmatter";
-import { linkTarget, noteKindOf, noteLinks, relativeLink, relinkNote, wikiTarget } from "../notes/note-file";
+import { WIKI, linkTarget, noteKindOf, noteLinks, relativeLink, relinkNote, wikiTarget } from "../notes/note-file";
 import type { NoteKind } from "../notes/note-file";
 import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT, folderPath } from "../assets/asset-catalog";
 import type { AssetFolder, CatalogEntry } from "../assets/asset-catalog";
@@ -559,6 +559,23 @@ export class Session {
       }
       if (out !== text) await this.saveVersion(e.hash, new File([out], e.name, { type: rec.type }));
     }
+  }
+
+  /** The item a link in a note points at (a path from the note's folder, `canvast:<hash>`, a `[[name]]`), or null. */
+  async linkedItem(noteHash: string, link: string): Promise<CatalogEntry | null> {
+    const listing = await this.catalog?.list().catch(() => null);
+    const note = listing?.entries.find((e) => e.hash === noteHash);
+    if (!listing || !note) return null;
+    if (link.startsWith(WIKI)) {
+      const t = wikiTarget(decodeURIComponent(link.slice(WIKI.length)));
+      return listing.entries.find((e) => e.name.toLowerCase() === t.name || Session.wikiKey(e.name) === t.name) ?? null;
+    }
+    const t = linkTarget(link, (await this.itemPath(note, listing.folders)).slice(0, -1));
+    if (!t) return null;
+    if ("hash" in t) return listing.entries.find((e) => e.hash === t.hash) ?? null;
+    const named = listing.entries.filter((e) => e.name === t.path[t.path.length - 1]);
+    for (const e of named) if ((await this.itemPath(e, listing.folders)).join("/") === t.path.join("/")) return e;
+    return named.length === 1 ? named[0]! : null; // (moved since: the one item of that name)
   }
 
   /** Told when an item gets a new version (a note saved, a file changed outside the app): its old hash and its new one. */

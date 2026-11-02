@@ -215,3 +215,30 @@ test("[[links]] between notes: shown as links, Ctrl+click opens the note, [[ off
   await p.getByTestId("choose-dialog").getByRole("button", { name: "Go on" }).click(); // (Save them)
   await expect(p.locator(".asset-inspector")).toBeHidden();
 });
+
+test("a note's preview shows the pictures it links to (and an Obsidian ![[embed]])", async ({ app }) => {
+  const p = app.page;
+  const PIC = makePng(300, 180, (x) => [220, 40 + (x % 60), 30, 255]);
+  const NOTE = "# Moodboard\n\n![](pic.png)\n\n![[pic.png]]\n";
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "pic.png", mimeType: "image/png", buffer: PIC });
+  await expect(p.getByTestId("asset-card")).toHaveCount(1);
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "board.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) });
+  // Its library preview has the picture in it: many red pixels (the page itself is near white and grey).
+  const reds = () =>
+    card(p, hashOf(NOTE))
+      .locator("img")
+      .evaluate((img: HTMLImageElement) => {
+        if (!img.complete || !img.naturalWidth) return 0;
+        const c = document.createElement("canvas");
+        c.width = img.naturalWidth;
+        c.height = img.naturalHeight;
+        const g = c.getContext("2d")!;
+        g.drawImage(img, 0, 0);
+        const d = g.getImageData(0, 0, c.width, c.height).data;
+        let n = 0;
+        for (let i = 0; i < d.length; i += 4) if (d[i]! > 150 && d[i + 2]! < 90) n++;
+        return n;
+      });
+  await expect.poll(reds, { timeout: 10_000 }).toBeGreaterThan(500);
+});

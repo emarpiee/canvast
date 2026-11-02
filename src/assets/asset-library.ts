@@ -510,23 +510,26 @@ export class AssetLibrary {
     return this.missing.has(hash);
   }
 
+  /** The picture of a file shown as a card, at `size` (its own, or a reduced copy's): a custom thumbnail, or the file's own card (a note's page). */
+  private async cardOf(rec: AssetRecord, size = { w: rec.pixelW, h: rec.pixelH }): Promise<ImageBitmap> {
+    // A custom thumbnail stands for a file card on a canvas too (never a hidden one: see `customPicture`).
+    const own = await this.customPicture?.(rec.hash).catch(() => null);
+    if (own) {
+      try {
+        return await cardFromPicture(own, size);
+      } catch {
+        // (a picture that does not decode: the file's own card)
+      }
+    }
+    return makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, new Uint8Array(await rec.blob.arrayBuffer()), size, rec.hash);
+  }
+
   /** `key` is the hash, or `hash#ms` for the picture of a video at a time (doc/model.ts rasterKey). */
   private async ensureDecoded(rec: AssetRecord, key = rec.hash): Promise<void> {
     if (!this.decoded.has(key)) {
       const ms = key.includes("#") ? Number(key.slice(key.indexOf("#") + 1)) : 0;
       let img: CanvasImageSource & { width: number; height: number };
-      const card = async (): Promise<ImageBitmap> => {
-        // A custom thumbnail stands for a file card on a canvas too (never a hidden one: see `customPicture`).
-        const own = await this.customPicture?.(rec.hash).catch(() => null);
-        if (own) {
-          try {
-            return await cardFromPicture(own, { w: rec.pixelW, h: rec.pixelH });
-          } catch {
-            // (a picture that does not decode: the file's own card)
-          }
-        }
-        return makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, new Uint8Array(await rec.blob.arrayBuffer()), { w: rec.pixelW, h: rec.pixelH });
-      };
+      const card = (): Promise<ImageBitmap> => this.cardOf(rec);
       try {
         img = isCard(rec) ? await card() : await decode(rec.blob, ms);
       } catch (e) {
@@ -615,7 +618,8 @@ export class AssetLibrary {
     const s = SMALL_EDGE / Math.max(rec.pixelW, rec.pixelH);
     let bmp: ImageBitmap;
     try {
-      bmp = await createImageBitmap(rec.blob, { resizeWidth: Math.max(1, Math.round(rec.pixelW * s)), resizeHeight: Math.max(1, Math.round(rec.pixelH * s)), resizeQuality: "medium" });
+      // A card (a long note's page) is drawn at the smaller size itself: its file is no picture to decode smaller.
+      bmp = isCard(rec) ? await this.cardOf(rec, { w: Math.max(1, Math.round(rec.pixelW * s)), h: Math.max(1, Math.round(rec.pixelH * s)) }) : await createImageBitmap(rec.blob, { resizeWidth: Math.max(1, Math.round(rec.pixelW * s)), resizeHeight: Math.max(1, Math.round(rec.pixelH * s)), resizeQuality: "medium" });
     } catch {
       this.noReduced.add(rec.hash); // this browser cannot decode at a size: use the full image from now on
       return this.ensureDecoded(rec);

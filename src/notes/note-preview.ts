@@ -1,10 +1,10 @@
-import { noteKindOf, richNoteBody, textHtml } from "./note-file";
+import { WIKI, noteKindOf, richNoteBody, textHtml } from "./note-file";
 import { splitFrontmatter } from "./frontmatter";
 
 // The picture of a note (its library thumbnail and its card on a canvas): the top of its page, as the notes editor lays it out, drawn
 // through an SVG image (`foreignObject`), which runs nothing and loads nothing. Fixed paper colours, like every file card: it is stored.
-// shortcut: library pictures and fonts in the note are not drawn (a picture shows as a grey box with its name; text in the system's
-// sans-serif); embed them as data URLs here if a preview should show them.
+// Its pictures, videos and sounds are found by the app (`setNotePictures`) and drawn into it as data (a video by its picture, with a
+// ▶; a sound by its waveform, with a ♪). shortcut: library fonts are not (its text is in the system's sans-serif), embed them likewise if wanted.
 
 /** A note's page is laid out this wide (CSS px), whatever the size of its picture. */
 const PAGE_W = 600;
@@ -18,20 +18,69 @@ p,ul,ol,blockquote,pre,table,figure{margin:0 0 .6em}ul,ol{padding-left:1.4em}
 blockquote{border-left:3px solid oklch(0.82 0.01 250);padding-left:.8em;color:oklch(0.45 0.01 250)}
 pre,code{font-family:ui-monospace,monospace;background:oklch(0.94 0.005 250);border-radius:4px}pre{padding:.5em .7em;white-space:pre-wrap}
 table{border-collapse:collapse}td,th{border:1px solid oklch(0.82 0.01 250);padding:.2em .45em}hr{border:0;border-top:1px solid oklch(0.82 0.01 250)}
-li:has(>input[type=checkbox]:first-child){list-style:none;margin-left:-1.2em}a{color:oklch(0.5 0.1 200)}.pic{display:inline-block;padding:.7em 1.1em;border-radius:4px;background:oklch(0.9 0.005 250);color:oklch(0.48 0.01 250);font-size:.85em}`;
+li:has(>input[type=checkbox]:first-child){list-style:none;margin-left:-1.2em}.media{position:relative;display:inline-block;max-width:100%}.media img{display:block;max-width:100%;height:auto;border-radius:4px}.is-video::after,.is-audio::after{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:2.4em;height:2.4em;border-radius:50%;background:oklch(0.2 0 0 / .6);color:#fff;font-size:1.4em;line-height:2.4em;text-align:center}.is-video::after{content:"▶"}.is-audio::after{content:"♪"}a{color:oklch(0.5 0.1 200)}.pic{display:inline-block;padding:.7em 1.1em;border-radius:4px;background:oklch(0.9 0.005 250);color:oklch(0.48 0.01 250);font-size:.85em}`;
 
-/** The note's text as HTML that can be drawn in an image: no pictures (they could not load there), no scripts or frames. */
-async function pageHtml(name: string, text: string): Promise<string> {
+/** What a link in a note shows: a picture (a picture item's own file, else its library thumbnail) and the item's type. */
+export type NotePictureSource = (noteHash: string, link: string) => Promise<{ blob: Blob; type: string } | null>;
+let pictures: NotePictureSource | null = null;
+/** How the app finds the pictures of a note's links (main.ts): the preview has no library of its own. */
+export const setNotePictures = (fn: NotePictureSource): void => void (pictures = fn);
+
+/** A picture as data for the page, at most the page's width (twice, for a sharp card), and its size there. */
+async function pictureData(blob: Blob): Promise<{ url: string; w: number; h: number } | null> {
+  try {
+    const bmp = await createImageBitmap(blob);
+    const k = Math.min(1, (PAGE_W * 2) / bmp.width);
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(bmp.width * k));
+    c.height = Math.max(1, Math.round(bmp.height * k));
+    c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+    const shown = Math.min(PAGE_W - 60, bmp.width);
+    const out = { url: c.toDataURL("image/webp", 0.82), w: shown, h: Math.round((shown * bmp.height) / bmp.width) };
+    bmp.close();
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+/** The last pages made (a card is measured, then drawn: its pictures are read and packed once). */
+const made = new Map<string, Promise<string>>();
+function pageHtml(name: string, text: string, hash?: string): Promise<string> {
+  const key = `${hash ?? ""}|${name}|${text.length}|${text.slice(0, 64)}`;
+  let p = made.get(key);
+  if (!p) {
+    p = makePageHtml(name, text, hash);
+    made.set(key, p);
+    if (made.size > 8) made.delete(made.keys().next().value!);
+  }
+  return p;
+}
+
+/** The note's text as HTML that can be drawn in an image: its media as pictures in data (nothing loads there), no scripts or frames. */
+async function makePageHtml(name: string, text: string, hash?: string): Promise<string> {
   const kind = noteKindOf(name);
   const { markdownHtml } = await import("./note-markdown"); // (loaded when a preview is made: the editor needs a page, not the unit tests' Node)
-  const html = kind === "md" ? markdownHtml(splitFrontmatter(text).body) : kind === "rich" ? richNoteBody(text) : textHtml(text);
+  // (Obsidian's `![[cat.png]]`: the picture it embeds)
+  const md = (t: string): string => splitFrontmatter(t).body.replace(/!\[\[([^\[\]|\n]+?)(?:\|[^\[\]\n]*)?\]\]/g, (_m, n: string) => `![${n.trim()}](${WIKI}${encodeURIComponent(n.trim())})`);
+  const html = kind === "md" ? markdownHtml(md(text)) : kind === "rich" ? richNoteBody(text) : textHtml(text);
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
   for (const n of doc.body.querySelectorAll("script, style, iframe, object, embed, link, meta, video, audio")) n.remove();
-  for (const img of doc.body.querySelectorAll("img")) {
+  for (const el of doc.body.querySelectorAll("img, video, audio")) {
+    const src = el.getAttribute("src") ?? el.querySelector("source")?.getAttribute("src") ?? "";
+    const found = hash && pictures && src ? await pictures(hash, src).catch(() => null) : null;
+    const data = found ? await pictureData(found.blob) : null;
     const box = doc.createElement("span");
     box.className = "pic";
-    box.textContent = img.getAttribute("alt") || "Picture";
-    img.replaceWith(box);
+    if (data) {
+      const img = doc.createElement("img");
+      img.setAttribute("src", data.url);
+      img.setAttribute("width", String(data.w));
+      img.setAttribute("height", String(data.h));
+      box.className = found!.type.startsWith("video/") ? "media is-video" : found!.type.startsWith("audio/") ? "media is-audio" : "media";
+      box.append(img);
+    } else box.textContent = el.getAttribute("alt") || decodeURIComponent(src.split("/").pop() ?? "") || "Picture";
+    el.replaceWith(box);
   }
   return new XMLSerializer().serializeToString(doc.body).replace(/^<body[^>]*>|<\/body>$/g, "");
 }
@@ -40,11 +89,11 @@ async function pageHtml(name: string, text: string): Promise<string> {
  * The size of a new card for a note (its picture on a canvas): the whole page at `CARD_SCALE`, as tall as the note (at least 4:3,
  * at most `CARD_MAX_H`; a longer note fades out at the bottom).
  */
-export async function noteCardSize(name: string, text: string): Promise<{ w: number; h: number }> {
+export async function noteCardSize(name: string, text: string, hash?: string): Promise<{ w: number; h: number }> {
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:-10000px;top:0;visibility:hidden";
   const root = host.attachShadow({ mode: "open" });
-  root.innerHTML = `<style>${CSS}</style><div class="page" style="width:${PAGE_W}px">${await pageHtml(name, text)}</div>`;
+  root.innerHTML = `<style>${CSS}</style><div class="page" style="width:${PAGE_W}px">${await pageHtml(name, text, hash)}</div>`;
   document.body.append(host);
   const h = (root.lastElementChild as HTMLElement).scrollHeight;
   host.remove();
@@ -52,11 +101,11 @@ export async function noteCardSize(name: string, text: string): Promise<{ w: num
 }
 
 /** The top of a note's page, `w` × `h` pixels (laid out `PAGE_W` wide); when the note goes on below, it fades out at the bottom. */
-export async function notePicture(name: string, text: string, w: number, h: number): Promise<HTMLCanvasElement> {
+export async function notePicture(name: string, text: string, w: number, h: number, hash?: string): Promise<HTMLCanvasElement> {
   const k = w / PAGE_W;
   const lw = PAGE_W;
   const lh = Math.round(h / k);
-  const html = await pageHtml(name, text);
+  const html = await pageHtml(name, text, hash);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${lw} ${lh}"><foreignObject width="${lw}" height="${lh}"><div xmlns="http://www.w3.org/1999/xhtml" class="page" style="width:${lw}px;height:${lh}px"><style>${CSS}</style>${html}</div></foreignObject></svg>`;
   const img = new Image();
   img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
@@ -66,7 +115,7 @@ export async function notePicture(name: string, text: string, w: number, h: numb
   c.height = h;
   const x = c.getContext("2d")!;
   x.drawImage(img, 0, 0, w, h);
-  if ((await noteCardSize(name, text)).h / CARD_SCALE <= lh) return c; // (the whole note is in it)
+  if ((await noteCardSize(name, text, hash)).h / CARD_SCALE <= lh) return c; // (the whole note is in it)
   const fade = x.createLinearGradient(0, h * 0.82, 0, h);
   fade.addColorStop(0, "oklch(0.985 0.004 95 / 0)");
   fade.addColorStop(1, "oklch(0.985 0.004 95)");

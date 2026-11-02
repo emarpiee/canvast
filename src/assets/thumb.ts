@@ -90,7 +90,7 @@ async function makeFontThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
 /** A note's thumbnail: the top of its page (as on its card on a canvas, 4:3). Null when it cannot be drawn. */
 async function makeNoteThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
   try {
-    const c = await notePicture(rec.name, await rec.blob.text(), THUMB_PX, Math.round((THUMB_PX * 3) / 4));
+    const c = await notePicture(rec.name, await rec.blob.text(), THUMB_PX, Math.round((THUMB_PX * 3) / 4), rec.hash);
     let blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", THUMB_QUALITY));
     if (blob?.type !== "image/webp") blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", THUMB_QUALITY));
     return blob ? { hash: rec.hash, blob, w: c.width, h: c.height } : null;

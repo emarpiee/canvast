@@ -1,6 +1,7 @@
 import { externalFolder } from "../storage/external-folder";
 import { askHiddenPassword } from "../ui/hidden-access";
 import { noteKindOf } from "../notes/note-file";
+import { setNotePictures } from "../notes/note-preview";
 import { ViewState } from "./view-state";
 import { fileInLibrary } from "./library-filing";
 import { storeFrame } from "./frames";
@@ -509,6 +510,15 @@ async function start(): Promise<void> {
     });
   }
   assets.onNotice = (text) => { editor.message = text; editor.changed(); };
+  // A note's preview (its card, its thumbnail) shows the pictures, videos and sounds it links to: a picture's own file, else the
+  // item's library thumbnail (a video's picture, a sound's waveform). Never a hidden item's (a preview is kept as a thumbnail).
+  setNotePictures(async (noteHash, link) => {
+    const e = await session.linkedItem(noteHash, link);
+    if (!e || e.hidden || !(e as { present?: boolean }).present) return null;
+    const still = e.type.startsWith("image/") && e.type !== "image/gif" && !e.card;
+    const blob = still ? (await assets.record(e.hash).catch(() => undefined))?.blob : (await session.catalog?.thumb(e.hash).catch(() => undefined))?.blob;
+    return blob ? { blob, type: e.type } : null;
+  });
   // The desktop build: files that appear in library/ outside the app are imported where they lie (ADR 0177).
   storage?.folderSync?.start({
     importFiles: async (files) => {

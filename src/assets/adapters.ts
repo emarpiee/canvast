@@ -80,12 +80,12 @@ export function pdfPages(bytes: Uint8Array): number | null {
 }
 
 /** The card of a file, with what can be drawn from its bytes: a 3D model's shape, a PDF's page count. Never fails: the plain card is the fallback. */
-export async function makeFileCardFrom(name: string, chip: string, bytes: Uint8Array, /** A stored item's size (else a new card's own). */ size?: { w: number; h: number }): Promise<ImageBitmap> {
+export async function makeFileCardFrom(name: string, chip: string, bytes: Uint8Array, /** A stored item's size (else a new card's own). */ size?: { w: number; h: number }, /** The item's hash (a note's pictures are found from it). */ hash?: string): Promise<ImageBitmap> {
   const ext = extOf(name);
   if (noteKindOf(name)) {
     // A note: its page, as big as the note when it is a new card (an older one keeps the 400 × 300 it was stored at).
     const text = new TextDecoder().decode(bytes);
-    const page = await (async () => { const s = size ?? (await noteCardSize(name, text)); return notePicture(name, text, s.w, s.h); })().catch(() => null);
+    const page = await (async () => { const s = size ?? (await noteCardSize(name, text, hash)); return notePicture(name, text, s.w, s.h, hash); })().catch(() => null);
     if (page) return createImageBitmap(page);
   }
   if (isFontFile({ type: "", name })) {

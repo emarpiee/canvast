@@ -23,6 +23,8 @@
 - **Added:** the library search finds notes by the words in them.
 - **Added:** `[[canvas:Name]]` links that open a canvas; a preview of what a link points at while the pointer rests on it; `{{date}}`, `{{time}}` and `{{title}}` in templates; files in dot-folders of `library/` (another app's own, as `.obsidian/`) are never taken in.
 - **Fixed:** the `[[` and `#` lists (and the editor's other floating panels) could open outside the window, cut off at its edge; an empty Linked from showed its heading.
+- **Added:** a note's preview (its card on a canvas, its thumbnail) shows the pictures, videos (▶), sounds (♪) and GIFs it links to, and Obsidian's `![[picture]]` embeds.
+- **Fixed:** a long note's card shown small on a canvas was drawn from its full-size picture (up to 1200 × 3600) on every frame: it now has a small copy like a picture's, drawn at that size.
 - **Added:** **New note** in the library's Import menu: a markdown note in the open folder, opened to write in.
 - **Changed:** the library chooser (texture fill pictures, custom thumbnails) is one shared panel that can also open in the middle of the page, list any kind of item, import files from this device, and shows the first 300 matches of a big library (search narrows it).
 
