@@ -1225,7 +1225,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   /**
    * Extract frame: the picture on screen now becomes a new PNG file in the library, and is placed on the open canvas too only when
-   * Settings > Media and playback says so (off by default: the library does not change a canvas by itself). The picture may not be presented yet (a seek just landed): a few tries.
+   * Settings > Saving to the library says so (off by default: the library does not change a canvas by itself). The picture may not be presented yet (a seek just landed): a few tries.
    */
   const extractFrame = async (): Promise<void> => {
     const engine = eng;
@@ -1238,7 +1238,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     if (!png || eng !== engine) return;
     const src = entryOf(at);
-    // The name, format, folder and tags come from Settings > Media and playback (ADR 0081).
+    // The name, format, folder and tags come from Settings > Saving to the library (ADR 0081).
     const record = await storeFrame(assets, session, settings, { png, label: engine.label(), sourceName: src?.name ?? "frame", sourceHash: at });
     if (!settings.get("frame.place")) {
       session.editor.message = `Frame “${record.name}” added to the library.`;
@@ -1250,7 +1250,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     session.editor.message = id ? `Frame placed on ${here ? `${here.b} › ${here.c.name}` : "the open canvas"} and added to the library.` : "The frame was added to the library; it could not be placed.";
     session.editor.changed();
   };
-  // The player floats over the picture: while the pointer rests it fades away after Settings > Media and playback (Hide the player),
+  // The player floats over the picture: while the pointer rests it fades away after Settings > Library (Hide the player),
   // playing or paused, also with the pointer resting on it; only a move of the mouse, a click or a touch brings it back. Keys (step,
   // play and pause, seek) leave it as it is.
   let idleTimer = 0;
@@ -1699,7 +1699,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     } else clearShowTimer();
   };
   const stopShow = (): void => setShowing(false);
-  // The time per slide is a setting (Settings > Media and playback); a change applies to the slide on screen.
+  // The time per slide is a setting (Settings > Library); a change applies to the slide on screen.
   settings.subscribe((key) => {
     if (key === "assets.edgeWidth") applyEdge();
     if (key === "assets.slideSeconds") armShow();

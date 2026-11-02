@@ -44,6 +44,7 @@ Unverified / Committed / Next bounded task**.
 - **Tested:** `notes.spec.ts` 2/2 in Chromium and Firefox (open with links and task list, tick a task box, built-in and library templates, save in place, rich note when formatting would be lost, library chooser from Insert, unsaved-changes question, New note); desktop spec: a note saved in the editor is written over its own file; the texture-fill and custom-thumbnail chooser tests; unit 612 (`note-file`); typecheck and every check.
 - **Known failures:** none known.
 - **Implemented (3):** SunEditor theme `canvast` in styles.css maps every `--se-*` colour, font and radius to the app's tokens (new token `--paper`, an opaque surface); the bundled dark theme is gone. The centred library chooser opens in the top layer (`popover`), above SunEditor's popover dialogs. Light and dark looked at in screenshots.
+- **Implemented (4):** the Inline editor style removed (a saved `inline` falls back to Document); Settings regrouped (tabs Notes, Library, Saving to the library; cards Colour picker, Memory; Fill gaps under Shapes); tests that open those tabs follow.
 - **Unverified:** layouts beyond SunEditor's own plugin (no test inserts one); the dark theme by eye on a real screen; hidden notes saved on the desktop (new version made, not written in place); very large libraries in the chooser; Notion-like and Balloon styles beyond opening.
 - **Committed:** main, not pushed, not released (version not bumped yet).
 - **Next bounded task:** the owner's review of the editor; then bump and release.

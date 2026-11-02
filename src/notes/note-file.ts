@@ -4,12 +4,11 @@
 export type NoteKind = "md" | "txt" | "rich";
 
 /** How the notes editor looks (Settings > Notes): SunEditor's own presets. */
-export type NoteStyle = "document" | "classic" | "bottom" | "inline" | "balloon" | "notion";
+export type NoteStyle = "document" | "classic" | "bottom" | "balloon" | "notion";
 export const NOTE_STYLES: Array<[NoteStyle, string]> = [
   ["document", "Document"],
   ["classic", "Classic"],
   ["bottom", "Bottom"],
-  ["inline", "Inline"],
   ["balloon", "Balloon"],
   ["notion", "Notion-like"],
 ];

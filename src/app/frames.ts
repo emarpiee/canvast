@@ -6,7 +6,7 @@ import { fileInLibrary } from "./library-filing";
 
 /**
  * Extracted frames (ADR 0081): the picture a video or GIF shows becomes a new library original with a name, format, folder and tags chosen in
- * Settings > Media and playback.
+ * Settings > Saving to the library.
  */
 
 /** Where in the source the frame is: a video's time as `1h02m03s` or `0m03s`, a GIF's frame as `frame12`. */

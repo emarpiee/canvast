@@ -1096,9 +1096,9 @@ test("slideshow: plays through the library on a timer, wraps, stops on Space or 
     await p.getByTestId("assets-import-input").setInputFiles({ name: `s-${i}.png`, mimeType: "image/png", buffer: makePng(8 + i, 6, () => [60 * i, 120, 200, 255]) });
   }
   await expect(p.getByTestId("asset-card")).toHaveCount(3);
-  // The time per slide is a setting (Settings > Media and playback): 2 s, the shortest the test needs.
+  // The time per slide is a setting (Settings > Library): 2 s, the shortest the test needs.
   await p.getByTestId("view-settings").click();
-  await p.locator("#settings-view").getByRole("tab", { name: "Media and playback" }).click();
+  await p.locator("#settings-view").getByRole("tab", { name: "Library", exact: true }).click();
   await p.locator("#settings-view").getByLabel("Slideshow", { exact: true }).fill("2");
   await toAssets(p);
   // From the library bar: the viewer opens on the first asset and the show starts.

@@ -102,8 +102,6 @@ function presetOptions(style: NoteStyle): SunEditor.InitOptions {
       return { buttonList: fullButtons(false), subToolbar: { mode: "balloon", buttonList: SUB_BUTTONS } };
     case "bottom":
       return { mode: "classic:bottom", statusbar: false, buttonList: fullButtons(false), subToolbar: { mode: "balloon", buttonList: SUB_BUTTONS } };
-    case "inline":
-      return { mode: "inline", buttonList: fullButtons(false) };
     case "balloon":
       return { mode: "balloon", buttonList: [["bold", "italic", "underline", "strike"], "|", ["fontColor", "backgroundColor"], "|", ["removeFormat"], "|", ["link"]] };
     case "notion":

@@ -261,3 +261,6 @@ One icon per function: two buttons that do different things never share an icon,
 | `pin` | Stay in hidden mode when leaving the library (hidden mode, status bar) |
 | `file-image` | Custom thumbnail of a library item (details panel, bulk bar) |
 | `notebook-pen` | New note: a markdown note in the open library folder, opened in the notes editor (the library's Import menu) |
+| `library-big` | Settings tab Library (the library viewer) |
+| `notebook-text` | Settings tab Notes (the notes editor) |
+| `folder-down` | Settings tab Saving to the library (frames, edited pictures, exports, patterns, shapes) |

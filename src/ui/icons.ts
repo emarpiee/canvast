@@ -3,6 +3,9 @@ import tabDrawingSvg from "lucide-static/icons/square-pen.svg";
 import tabNavigationSvg from "lucide-static/icons/compass.svg";
 import tabShortcutsSvg from "lucide-static/icons/keyboard.svg";
 import tabMediaSvg from "lucide-static/icons/circle-play.svg";
+import tabLibrarySvg from "lucide-static/icons/library-big.svg";
+import tabNotesSvg from "lucide-static/icons/notebook-text.svg";
+import tabSavingSvg from "lucide-static/icons/folder-down.svg";
 import tabAppearanceSvg from "lucide-static/icons/monitor.svg";
 import tabPanelsSvg from "lucide-static/icons/panels-top-left.svg";
 import tabPerformanceSvg from "lucide-static/icons/gauge.svg";
@@ -410,6 +413,9 @@ export const ICONS = {
   tabNavigation: clean(tabNavigationSvg),
   tabShortcuts: clean(tabShortcutsSvg),
   tabMedia: clean(tabMediaSvg),
+  tabLibrary: clean(tabLibrarySvg),
+  tabNotes: clean(tabNotesSvg),
+  tabSaving: clean(tabSavingSvg),
   tabAppearance: clean(tabAppearanceSvg),
   tabPanels: clean(tabPanelsSvg),
   tabPerformance: clean(tabPerformanceSvg),

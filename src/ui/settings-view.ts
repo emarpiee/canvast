@@ -57,9 +57,8 @@ const CARD_STARTS: Partial<Record<SettingKey, string>> = {
   "lasso.filter": "Selecting and arranging",
   "shape.initialPaint": "Shapes",
   "eraser.diameterPx": "Eraser",
-  "assets.edgeWidth": "The library viewer",
+  "colour.model": "Colour picker",
   "media.volume": "Players",
-  "notes.style": "Notes",
   "frame.format": "Extracted frames",
   "edit.format": "Edited pictures",
   "export.folder": "Exported pictures",
@@ -73,6 +72,7 @@ const CARD_STARTS: Partial<Record<SettingKey, string>> = {
   "ui.density": "Size and comfort",
   "ui.zen": "Focus",
   "quality.auto": "Drawing quality",
+  "cache.decodedMb": "Memory",
   "ui.motion": "Animation",
   "nav.travel": "Camera travel",
 };
@@ -89,10 +89,11 @@ function cardsOf(rows: readonly Row[]): Array<{ title: string; rows: Row[] }> {
 
 /** The tabs in the sidebar, in groups. */
 /** The icon of each tab (Screenshot shares the camera of the Screenshot button). */
-const TAB_ICON: Record<string, keyof typeof ICONS> = { drawing: "tabDrawing", navigation: "tabNavigation", shortcuts: "tabShortcuts", media: "tabMedia", screenshot: "camera", appearance: "tabAppearance", panels: "tabPanels", performance: "tabPerformance", storage: "tabStorage", privacy: "tabPrivacy", about: "tabAbout", develop: "tabDevelop" };
+const TAB_ICON: Record<string, keyof typeof ICONS> = { drawing: "tabDrawing", navigation: "tabNavigation", shortcuts: "tabShortcuts", media: "tabMedia", library: "tabLibrary", notes: "tabNotes", saving: "tabSaving", screenshot: "camera", appearance: "tabAppearance", panels: "tabPanels", performance: "tabPerformance", storage: "tabStorage", privacy: "tabPrivacy", about: "tabAbout", develop: "tabDevelop" };
 
 const TAB_GROUPS: ReadonlyArray<readonly [title: string, ids: readonly string[]]> = [
   ["Working", ["drawing", "navigation", "shortcuts"]],
+  ["Library", ["library", "notes", "saving"]],
   ["Media", ["media", "screenshot"]],
   ["Interface", ["appearance", "panels", "performance"]],
   ["App", ["storage", "privacy", "about", "develop"]],
@@ -107,9 +108,6 @@ export const SETTINGS_TABS: readonly Tab[] = [
     rows: [
       { key: "pen.kind", label: "Pen", help: "The pen new strokes are drawn with.", control: { kind: "select", options: [["fine", "Fine"], ["pencil", "Pencil"], ["ink", "Ink"], ["marker", "Marker"]] } },
       { key: "pen.color", label: "Pen colour", help: "Opens the colour picker. The colours you picked lately are under the picker.", control: { kind: "colour" } },
-      { key: "colour.model", label: "Colour picker model", help: "OKHSL and OKHSV keep every slider inside the colours a screen can show; OKLCH is OKLab's own lightness, chroma and hue, as CSS oklch() writes them, and stops chroma where a screen cannot show more. All three are even to the eye: the same step looks like the same change of colour.", control: { kind: "select", options: [["okhsv", "OKHSV (hue, saturation, value)"], ["okhsl", "OKHSL (hue, saturation, lightness)"], ["oklch", "OKLCH (hue, chroma, lightness)"]] } },
-      { key: "colour.view", label: "Colour picker layout", help: "Ring and box; a plane with a hue bar; sliders; or the ring with sliders under it.", control: { kind: "select", options: [["wheel", "Ring and box"], ["plane", "Plane and bar"], ["sliders", "Sliders"], ["mixer", "Ring and sliders"]] } },
-      { key: "colour.format", label: "Colour picker text", help: "How the colour is written in the picker's text field. Any of them can be typed or pasted.", control: { kind: "select", options: [["hex", "Hex (#2563eb)"], ["rgb", "RGB (rgb(37 99 235))"], ["oklch", "OKLCH (oklch(0.55 0.19 262))"]] } },
       { key: "pen.widthPx", label: "Pen width", help: "On screen, in pixels, when you draw.", control: { kind: "range", min: 0.5, max: 128, step: 0.5, unit: "px" } },
       { key: "pen.followZoom", label: "Width follows zoom", help: "Keep the pen's width in the world when you zoom, instead of on the screen.", control: { kind: "toggle" } },
       { key: "pen.stabilizer.on", label: "Stabilizer", help: "Smooth the line while you draw.", control: { kind: "toggle" } },
@@ -119,24 +117,45 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "select.alignBox", label: "Align to the selection box", help: "Align and distribute against the selection's box, not each item's own bounds.", control: { kind: "toggle" } },
       { key: "arrange.gap", label: "Space between items in a grid", help: "How far apart Arrange in a grid puts the items, as a part of the largest item. Also in the Arrange menu.", control: { kind: "select", options: [["none", "None"], ["tight", "Tight"], ["normal", "Normal"], ["wide", "Wide"], ["wider", "Wider"]] } },
       { key: "snap.enabled", label: "Snap and guides", help: "A moving selection snaps to the edges and centres of other objects.", control: { kind: "toggle" } },
-      { key: "shape.gapClosePx", label: "Fill gaps: close openings up to", help: "Fill gaps and Fill a gap also fill a place left open by a slit up to this wide on the screen (at the zoom you are at); the fill stops at the slit. 0: only places closed in all round.", control: { kind: "range", min: 0, max: 24, step: 1, unit: "px" } },
       { key: "shape.initialPaint", label: "Initial state keeps the fill and outline", help: "When you Set or Update a shape's initial state, its fill, outline and its options, opacity and blend are saved with it (the shape, its size, rotation, points, ratio, radius and smoothing always are), and Reset puts them back. Off: only the geometry is saved and Reset leaves the paint as it is. A state saved while this was off has no paint until you Update it.", control: { kind: "toggle" } },
+      { key: "shape.gapClosePx", label: "Fill gaps: close openings up to", help: "Fill gaps and Fill a gap also fill a place left open by a slit up to this wide on the screen (at the zoom you are at); the fill stops at the slit. 0: only places closed in all round.", control: { kind: "range", min: 0, max: 24, step: 1, unit: "px" } },
       { key: "eraser.diameterPx", label: "Eraser size", control: { kind: "range", min: 4, max: 128, step: 1, unit: "px" } },
       { key: "eraser.wholeGroups", label: "Eraser takes whole groups", control: { kind: "toggle" } },
+      { key: "colour.model", label: "Colour picker model", help: "OKHSL and OKHSV keep every slider inside the colours a screen can show; OKLCH is OKLab's own lightness, chroma and hue, as CSS oklch() writes them, and stops chroma where a screen cannot show more. All three are even to the eye: the same step looks like the same change of colour.", control: { kind: "select", options: [["okhsv", "OKHSV (hue, saturation, value)"], ["okhsl", "OKHSL (hue, saturation, lightness)"], ["oklch", "OKLCH (hue, chroma, lightness)"]] } },
+      { key: "colour.view", label: "Colour picker layout", help: "Ring and box; a plane with a hue bar; sliders; or the ring with sliders under it.", control: { kind: "select", options: [["wheel", "Ring and box"], ["plane", "Plane and bar"], ["sliders", "Sliders"], ["mixer", "Ring and sliders"]] } },
+      { key: "colour.format", label: "Colour picker text", help: "How the colour is written in the picker's text field. Any of them can be typed or pasted.", control: { kind: "select", options: [["hex", "Hex (#2563eb)"], ["rgb", "RGB (rgb(37 99 235))"], ["oklch", "OKLCH (oklch(0.55 0.19 262))"]] } },
+    ],
+  },
+  {
+    id: "notes",
+    label: "Notes",
+    rows: [
+      { key: "notes.style", label: "Editor style", help: "How the notes editor looks when a note (a markdown, text or rich text note) is opened in the library: Document shows pages with every tool; Classic and Bottom keep the toolbar above or below; Balloon shows it only over selected words; Notion-like adds a handle beside each block and a / menu. A note already open changes when it is opened again.", control: { kind: "select", options: NOTE_STYLES } },
+    ],
+  },
+  {
+    id: "library",
+    label: "Library",
+    rows: [
+      { key: "assets.edgeWidth", label: "Viewer edges", help: "Click this much of the viewer's left or right side to go to the previous or next item (invisible). 0 turns it off.", control: { kind: "range", min: 0, max: 40, step: 1, unit: "%" } },
+      { key: "assets.playerHideSeconds", label: "Hide the player", help: "Seconds the viewer's video and GIF player stays after the pointer stops moving, playing or paused; it comes back with any move.", control: { kind: "range", min: 0.5, max: 10, step: 0.5, unit: "s", live: true } },
+      { key: "assets.slideSeconds", label: "Slideshow", help: "Seconds each item stays in the library slideshow (a video or audio file plays to its end first).", control: { kind: "range", min: 1, max: 60, step: 1, unit: "s", live: true } },
     ],
   },
   {
     id: "media",
     label: "Media and playback",
     rows: [
-      { key: "assets.edgeWidth", label: "Viewer edges", help: "Click this much of the viewer's left or right side to go to the previous or next item (invisible). 0 turns it off.", control: { kind: "range", min: 0, max: 40, step: 1, unit: "%" } },
-      { key: "assets.playerHideSeconds", label: "Hide the player", help: "Seconds the viewer's video and GIF player stays after the pointer stops moving, playing or paused; it comes back with any move.", control: { kind: "range", min: 0.5, max: 10, step: 0.5, unit: "s", live: true } },
-      { key: "assets.slideSeconds", label: "Slideshow", help: "Seconds each item stays in the library slideshow (a video or audio file plays to its end first).", control: { kind: "range", min: 1, max: 60, step: 1, unit: "s", live: true } },
-      { key: "notes.style", label: "Editor style", help: "How the notes editor looks when a note (a markdown, text or rich text note) is opened in the library: Document shows pages with every tool; Classic and Bottom keep the toolbar above or below; Inline and Balloon show it only while writing or when words are selected; Notion-like adds a handle beside each block and a / menu. A note already open changes when it is opened again.", control: { kind: "select", options: NOTE_STYLES } },
       { key: "media.volume", label: "Starting volume", help: "Where each player starts. A player's own volume slider changes only that player.", control: { kind: "range", min: 0, max: 100, step: 1, unit: "%" } },
       { key: "media.step.video", label: "Video step", help: "Seconds the step buttons move a video.", control: { kind: "range", min: 0.5, max: 60, step: 0.5, unit: "s" } },
       { key: "media.step.audio", label: "Audio step", help: "Seconds the step buttons move an audio file.", control: { kind: "range", min: 0.5, max: 60, step: 0.5, unit: "s" } },
       { key: "media.step.gif", label: "GIF step", help: "Frames the step buttons move an animated GIF.", control: { kind: "range", min: 1, max: 100, step: 1, unit: "frames" } },
+    ],
+  },
+  {
+    id: "saving",
+    label: "Saving to the library",
+    rows: [
       { key: "frame.format", label: "Extracted frame format", help: "The picture file made by Extract frame. PNG is lossless; WebP and JPEG are smaller (JPEG has no transparency).", control: { kind: "select", options: [["png", "PNG"], ["webp", "WebP"], ["jpeg", "JPEG"]] } },
       { key: "frame.quality", label: "Extracted frame quality", help: "For WebP and JPEG.", control: { kind: "range", min: 10, max: 100, step: 1, unit: "%" } },
       { key: "frame.place", label: "Place extracted frames on the canvas", help: "When a frame is extracted in the library viewer: also put it on the open canvas (off by default). (From a player on the canvas it is always placed beside the video.)", control: { kind: "toggle" } },

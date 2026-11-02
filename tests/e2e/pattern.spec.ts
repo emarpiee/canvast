@@ -180,8 +180,8 @@ test("Saved to the library, each kind has its own folder and tags: a pattern, a 
   await expect.poll(async () => (await filed()).find((f) => f.name.endsWith(".svg"))).toMatchObject({ folder: "Shapes", tags: ["shape"] });
   // each is a setting of its own
   await p.getByTestId("view-settings").click();
-  await p.locator("#settings-view").getByRole("tab", { name: "Media and playback" }).click();
-  const panel = p.locator("#set-panel-media");
+  await p.locator("#settings-view").getByRole("tab", { name: "Saving to the library" }).click();
+  const panel = p.locator("#set-panel-saving");
   for (const [label, v] of [["Patterns: library folder", "Mine"], ["Patterns: tags", "a, b"], ["Exports: library folder", "Out"], ["Shapes: tags", "vec"]] as const) await panel.getByLabel(label, { exact: true }).fill(v);
   await p.getByTestId("view-canvas").click();
   await p.keyboard.press("Control+a"); // the shape and the pattern: it holds a pattern, so it is filed as one
