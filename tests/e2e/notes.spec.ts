@@ -31,6 +31,7 @@ test("a markdown note opens in the notes editor with its library links, saves in
   await expect.poll(() => card(p, hashOf(MD)).locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   // A note tagged `template` is offered as a template in every other note.
   await card(p, hashOf(TEMPLATE)).click();
+  await expect.poll(() => p.getByTestId("asset-preview").locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0); // (its details show its page too)
   await p.getByTestId("asset-tag-input").fill("template");
   await p.getByTestId("asset-tag-input").press("Enter");
   await card(p, hashOf(MD)).dblclick();

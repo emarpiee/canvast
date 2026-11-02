@@ -14,6 +14,7 @@
 - **Added:** closing the desktop app's window with a note's changes unsaved asks first (Save them, Don't save, Cancel).
 - **Changed:** a note's toolbar has no New document (it emptied the note), Print or page buttons; the font list says Default when words have no font of their own.
 - **Changed:** while hidden mode stays on outside the library (*Stay in hidden mode*), hidden items placed on canvases show their pictures on the screen, as with *Remember the Hidden password*; Exit, locking or closing puts the padlock back.
+- **Changed:** the custom thumbnail button sits with ★ and Hide in the details panel (it took a row of its own in the viewer); a note's details show its page too.
 - **Added:** **New note** in the library's Import menu: a markdown note in the open folder, opened to write in.
 - **Changed:** the library chooser (texture fill pictures, custom thumbnails) is one shared panel that can also open in the middle of the page, list any kind of item, import files from this device, and shows the first 300 matches of a big library (search narrows it).
 
