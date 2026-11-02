@@ -86,6 +86,9 @@ test("the desktop page is sandboxed: no Node, no path outside the workspace fold
       return out;
     });
     expect(refused).toEqual(["../escape.txt: refused", "/abs: refused", "dots: refused", "link: refused", "read link: refused"]);
+    // Many writes of one file at once (hidden.json while hidden files move) all land: each has its own temporary file.
+    expect(await page.evaluate(() => Promise.allSettled(Array.from({ length: 40 }, (_, i) => window.canvastDesktop!.write("burst.json", new Uint8Array([i])))).then((r) => r.filter((x) => x.status === "rejected").length))).toBe(0);
+    expect(readdirSync(ws).filter((n) => n.startsWith("burst.json"))).toEqual(["burst.json"]);
     expect(readdirSync(outside)).toEqual([]);
     expect(await page.evaluate(() => fetch("https://example.com/").then(() => "fetched", () => "blocked"))).toBe("blocked");
     expect(requests.filter((u) => !/^(app|data|blob):/.test(u))).toEqual([]);

@@ -18,6 +18,10 @@ import { SEAL_OVERHEAD, isHiddenFile } from "../src/storage/hidden-vault";
 import type { LibraryItem } from "../src/storage/library-mirror";
 import { Library, openLibraryDb } from "./library-db";
 import { LibraryIndex } from "./library-index";
+
+// Started from a terminal that was closed since, the app's log goes to a broken pipe: writing it fails (EPIPE), and unhandled that is a
+// crash dialog (Electron logs a refused request too). A lost log line is harmless.
+for (const out of [process.stdout, process.stderr]) out.on("error", () => undefined);
 import type { LibraryQuery } from "./library-index";
 import type { LibraryOp } from "../src/storage/desktop-bridge";
 import { pathToFileURL } from "node:url";
@@ -283,7 +287,7 @@ void dropOpened(); // (left by a crash)
 
 async function writeAtomic(full: string, bytes: Uint8Array, durable = true): Promise<void> {
   await mkdir(dirname(full), { recursive: true });
-  const tmp = `${full}.tmp-${process.pid}-${Date.now().toString(36)}`;
+  const tmp = `${full}.tmp-${randomUUID()}`; // (one of its own: two writes of a file in the same millisecond shared one, and one failed)
   const fh = await open(tmp, "w");
   try {
     await fh.writeFile(bytes);
