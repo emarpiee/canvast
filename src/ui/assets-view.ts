@@ -906,7 +906,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let note: { hash: string; kind: NoteKind; name: string; type: string; editor: NoteEditor } | null = null;
   /** A note is being saved: its item gets a new hash, so the old one going is not the note being deleted. */
   let noteSaving = false;
-  const darkTheme = (): boolean => (document.documentElement.dataset["theme"] ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark";
   /** Where an item is in the library, as folders and a file name: its file's path in the workspace folder when it has one, else its library folder and name. */
   const libraryPath = async (hash: string, e: CatalogEntry | undefined = entryOf(hash)): Promise<string[]> => {
     const file = await session.storage?.originals.fileOf(hash).catch(() => null);
@@ -984,7 +983,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideCaption.textContent = "";
     let editor: NoteEditor;
     try {
-      editor = await mountNoteEditor(box, { kind, text, style: settings.get("notes.style"), dark: darkTheme(), host });
+      editor = await mountNoteEditor(box, { kind, text, style: settings.get("notes.style"), host });
     } catch (e) {
       noteBox.hidden = true;
       viewer.classList.remove("is-note");

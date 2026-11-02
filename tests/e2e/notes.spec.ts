@@ -73,13 +73,13 @@ test("a markdown note opens in the notes editor with its library links, saves in
   expect(rich).toMatch(/<h1[^>]*text-align: ?center/);
   expect(rich).toContain('src="Pictures/cat.png"');
 
-  // Insert ▸ Image gallery is the library chooser: the picture chosen goes into the note, shown from the library.
-  const gallery = note(p).locator('button[data-command="imageGallery"]');
-  if (!(await gallery.isVisible())) await note(p).getByRole("button", { name: "Insert" }).click();
-  await gallery.click();
+  // The Insert image dialog's gallery button opens the library chooser above the dialog: the picture chosen fills its address.
+  await note(p).locator('.se-toolbar button[data-command="image"]').filter({ visible: true }).click();
+  await p.locator(".__se__gallery").filter({ visible: true }).click();
   const chooser = p.locator(".lib-pick.is-centred");
   await expect(chooser.locator(".lib-item")).toHaveCount(1); // (pictures only: not the notes)
-  await chooser.getByRole("button", { name: "cat.png" }).click();
+  await chooser.getByRole("button", { name: "cat.png" }).click(); // (a click on it: nothing covers it)
+  await p.locator(".se-modal").filter({ visible: true }).getByRole("button", { name: "Submit" }).click();
   await expect(page(p).locator("img")).toHaveCount(2);
 
   // Leaving with changes asks first: Don't save lets them go.

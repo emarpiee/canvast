@@ -102,6 +102,11 @@ export function openLibraryPicker(anchor: HTMLElement | null, items: readonly Li
     document.body.appendChild(pop);
     draw("");
     if (anchor) placeMenu(pop, anchor);
+    else {
+      // In the middle of the page, in the top layer: above what opened it (the notes editor's own dialogs are there too).
+      pop.popover = "manual";
+      pop.showPopover();
+    }
     document.addEventListener("pointerdown", outside, true);
     document.addEventListener("keydown", keys, true);
     pop.querySelector<HTMLInputElement>("[data-lib-search]")!.focus();

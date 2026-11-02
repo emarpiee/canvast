@@ -30,9 +30,9 @@ const result = await build({
 });
 
 const script = result.outputFiles[0].text.replace(/<\/script/gi, "<\\/script").replace(/<!--/g, "<\\!--");
-// The notes editor's own styles (SunEditor: its interface, its contents and its dark theme), bundled with their @imports.
+// The notes editor's own styles (SunEditor: its interface and its contents), bundled with their @imports; its colours and fonts are the app's (the `canvast` theme in styles.css).
 const editorCss = await build({
-  stdin: { contents: ['css/editor', 'css/contents', 'src/themes/dark.css'].map((p) => `@import "suneditor/${p}";`).join("\n"), resolveDir: root, loader: "css" },
+  stdin: { contents: ['css/editor', 'css/contents'].map((p) => `@import "suneditor/${p}";`).join("\n"), resolveDir: root, loader: "css" },
   bundle: true,
   minify: true,
   write: false,

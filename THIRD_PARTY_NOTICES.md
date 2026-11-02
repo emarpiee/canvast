@@ -173,7 +173,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ## SunEditor
 
-- Package: `suneditor` 3.4.1 (the notes editor: its code, its interface and contents styles, and its dark theme)
+- Package: `suneditor` 3.4.1 (the notes editor: its code and its interface and contents styles)
 - License: MIT
 
 ```

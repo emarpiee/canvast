@@ -177,7 +177,7 @@ const localFiles = (files: unknown): File[] | null => {
  * Open a note in the notes editor (SunEditor) inside `el`. Its links to library items are shown from the library (pictures, videos,
  * sounds, files) and written back as they were, or, for what is added, as a path relative to the note; files added go into the library.
  */
-export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; text: string; style: NoteStyle; dark: boolean; host: NoteHost }): Promise<NoteEditor> {
+export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; text: string; style: NoteStyle; host: NoteHost }): Promise<NoteEditor> {
   const { host } = opts;
   /** Each address shown in the note for a library item → the link written in the file for it. */
   const links = new Map<string, string>();
@@ -267,7 +267,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     value,
     width: "100%",
     height: "100%",
-    theme: opts.dark ? "dark" : "",
+    theme: "canvast", // (the app's tokens, light or dark with the app: src/styles.css)
     events: {
       onChange: () => void (dirty = true),
       onInput: () => void (dirty = true),
