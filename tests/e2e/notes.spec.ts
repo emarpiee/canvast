@@ -138,6 +138,11 @@ test("a note's properties (YAML, as Obsidian writes them) are its item's tags, n
   await p.getByTestId("assets-import-input").setInputFiles({ name: "cover.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) });
   // Read in: its tags, its note (description) and its fields (the nested map is kept in the file, not shown).
   await expect.poll(entry).toEqual({ tags: ["design"], note: "The cover plan", fields: [{ key: "author", value: "Ana" }] });
+  // The search finds a note by the words in it too ("text" is in its words only).
+  await p.getByTestId("assets-search").fill("text");
+  await expect(p.getByTestId("asset-card")).toHaveCount(1);
+  await p.getByTestId("assets-search").fill("");
+  await p.getByTestId("assets-search").press("Escape"); // (its help card closes)
   // The editor shows the note without its properties.
   await p.getByTestId("asset-card").first().dblclick();
   await expect(page(p).locator("h1")).toHaveText("Cover");

@@ -51,6 +51,8 @@ export interface MatchContext {
   canvasNames?: (ids: readonly string[]) => string[];
   duration?: (hash: string) => number | null | undefined;
   look?: (hash: string) => Look | null | undefined;
+  /** The words of a note of the library, lower case (the search finds them too), when they have been read. */
+  words?: (hash: string) => string | undefined;
   /** Told when a word needs what is not known yet (a look, a length): the item does not match until it is. */
   unknown?: (f: Filter) => void;
 }
@@ -104,7 +106,7 @@ export function matcher(ctx: MatchContext): (e: ListedEntry, query: Query | null
       if (how === "name") return name.includes(w);
       if (name.includes(w) || e.type.toLowerCase().includes(w) || e.hash.startsWith(w) || inTags) return true;
       notes ??= [m.note, ...m.fields.flatMap((f) => [f.key, f.value])].join("\n").toLowerCase();
-      return notes.includes(w);
+      return notes.includes(w) || !!ctx.words?.(e.hash)?.includes(w);
     });
     return wordsOk && (usage === "all" || (usage === "used" ? e.instances > 0 : e.instances === 0));
   };

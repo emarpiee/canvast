@@ -820,6 +820,22 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     for (let i = 0; i < Math.min(3, todo.length); i++) void worker();
   };
   let wantsLooks = false;
+  // ---- the words of the notes: the search (All) finds an item by them too; read once per version (its words never change), while searching
+  const noteWords = new Map<string, string>();
+  let readingWords = false;
+  const ensureNoteWords = (entries: readonly CatalogListing["entries"][number][]): void => {
+    const todo = readingWords ? [] : entries.filter((e) => e.present && noteKindOf(e.name) && !noteWords.has(e.hash) && meta(e).hidden === hiddenMode);
+    if (!todo.length) return;
+    readingWords = true;
+    void (async () => {
+      for (const e of todo) {
+        const text = (await (await assets.record(e.hash).catch(() => undefined))?.blob.text()) ?? "";
+        noteWords.set(e.hash, (noteKindOf(e.name) === "rich" ? (new DOMParser().parseFromString(text, "text/html").body.textContent ?? "") : text).toLowerCase());
+      }
+      readingWords = false;
+      render();
+    })();
+  };
   // ---- what the library keywords read besides the entry: canvas names (on:) and lengths of media files (duration>), the latter read on demand
   let namesMemo: { of: unknown; names: Map<string, string[]> } | null = null;
   const canvasNamesOf = (ids: readonly string[]): string[] => {
@@ -1945,6 +1961,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           canvasNames: canvasNamesOf,
           duration: (h) => durations.get(h),
           look: (h) => looks.get(h),
+          words: (h) => noteWords.get(h),
           unknown: (f) => {
             if (f.needsLook) wantsLooks = true;
             if (f.needsDuration) wantsDurations = true;
@@ -2017,6 +2034,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // (hidden items only in hidden mode: they are in no Similar group outside it, and their files may be locked)
     if (wantsDurations) void readDurations();
     if (wantsLooks) ensureLooks(listing.entries.filter((e) => !isCard(e) && meta(e).hidden === hiddenMode).map((e) => e.hash));
+    if (words && way === "all") ensureNoteWords(listing.entries);
     // Look-alikes are listed together, the biggest group first, whatever the sort (the point is to see them side by side).
     if (scope === "similar") return rows.sort((a, b) => group.get(a.hash)! - group.get(b.hash)! || collator.compare(a.name, b.name));
     return rows;
