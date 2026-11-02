@@ -1089,7 +1089,7 @@ test("the viewer is still open when you come back from placing an asset (ADR 005
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("slideshow: plays through the library on a timer, wraps, stops on Space or Esc, and plays only what was picked (ADR 0054)", async ({ app }) => {
+test("slideshow: plays through the library on a timer, wraps, pauses with its button (Space does not start it), stops on Esc, and plays only what was picked (ADR 0054)", async ({ app }) => {
   const p = app.page;
   await toAssets(p);
   for (let i = 0; i < 3; i++) {
@@ -1113,7 +1113,9 @@ test("slideshow: plays through the library on a timer, wraps, stops on Space or 
   await expect(viewer.locator(".viewer-pos")).toHaveText("2 of 3", { timeout: 6_000 });
   await expect(viewer.locator(".viewer-pos")).toHaveText("3 of 3", { timeout: 6_000 });
   await expect(viewer.locator(".viewer-pos")).toHaveText("1 of 3", { timeout: 6_000 });
-  // Space pauses it: the position holds.
+  // Its button pauses it: the position holds; Space starts nothing (it has no key of its own).
+  await viewer.locator('.viewer-bar [data-act="play"]').first().click();
+  await expect(viewer.getByRole("button", { name: "Start the slideshow" })).toHaveAttribute("aria-pressed", "false");
   await viewer.focus();
   await p.keyboard.press(" ");
   await expect(viewer.getByRole("button", { name: "Start the slideshow" })).toHaveAttribute("aria-pressed", "false");

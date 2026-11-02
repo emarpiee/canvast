@@ -197,6 +197,12 @@ class NoteFont extends font {
   }
 }
 
+/** A row of the [[ and # lists: the name, and (smaller) how a link writes it when that is not the same (a folder, `canvas:`). */
+const listRow = (name: string, key: string): string => {
+  const esc = (s: string): string => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+  return `<div class="se-autocomplete-item"><span>${esc(name)}</span>${key && key !== name ? `<span>${esc(key)}</span>` : ""}</div>`;
+};
+
 /** Move a floating panel back inside the window when it would start left of it or end right of it. */
 function keepInView(el: HTMLElement): void {
   const r = el.getBoundingClientRect();
@@ -312,9 +318,9 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       limitSize: 8,
       triggers: {
         // `[[`: a link to a note or a file of the library, written `[[name]]` in a markdown note
-        "[[": { data: linkables, onSelect: (item: { key: string; [x: string]: unknown }) => wikiLink(item.key, String(item["name"] ?? item.key)) },
+        "[[": { data: linkables, renderItem: (item: { key: string; [x: string]: unknown }) => listRow(String(item["name"] ?? item.key), item.key), onSelect: (item: { key: string; [x: string]: unknown }) => wikiLink(item.key, String(item["name"] ?? item.key)) },
         // `#`: a tag of the library, written `#tag` in the words (a markdown note's #tags are its item's tags)
-        "#": { data: tagList, searchStartLength: 1, onSelect: (item: { key: string }) => `#${item.key}` },
+        "#": { data: tagList, searchStartLength: 1, renderItem: (item: { key: string }) => listRow(`#${item.key}`, ""), onSelect: (item: { key: string }) => `#${item.key}` },
       },
     },
     layout: { items: LAYOUTS },

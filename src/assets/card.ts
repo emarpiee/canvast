@@ -7,7 +7,7 @@ export async function makeCard(w: number, h: number, codec: string): Promise<Ima
   const c = document.createElement("canvas");
   c.width = Math.max(2, Math.round(w * k));
   c.height = Math.max(2, Math.round(h * k));
-  const x = c.getContext("2d")!;
+  const x = cardContext(c);
   x.fillStyle = "oklch(0.3 0 0)";
   x.fillRect(0, 0, c.width, c.height);
   const u = Math.min(c.width, c.height);
@@ -46,6 +46,13 @@ export async function makeCard(w: number, h: number, codec: string): Promise<Ima
  * same for every kind of file. It holds nothing that can change (not the name, not the size), so renaming never makes it again, and its
  * greys are neutral so it looks right under any theme. The stored size is always 400 × 300.
  */
+/**
+ * The 2D context of a canvas a card is drawn on: in the computer's memory (`willReadFrequently`), like a decoded picture's pixels. A
+ * card drawn on a canvas the GPU holds is a bitmap the GPU holds, and reading it back (a tile drawn on the CPU, the pixel under the
+ * pointer, deep zoom) stalls each frame: a few long notes made panning slow while hundreds of pictures did not.
+ */
+export const cardContext = (c: HTMLCanvasElement): CanvasRenderingContext2D => c.getContext("2d", { willReadFrequently: true })!;
+
 export const FILE_CARD_W = 400;
 export const FILE_CARD_H = 300;
 export const FILE_CARD_NOTE = "No preview for this kind of file";
@@ -55,7 +62,7 @@ export async function makeFileCard(chip: string): Promise<ImageBitmap> {
   const c = document.createElement("canvas");
   c.width = W;
   c.height = H;
-  const x = c.getContext("2d")!;
+  const x = cardContext(c);
   x.fillStyle = "oklch(0.3 0 0)";
   x.fillRect(0, 0, W, H);
   x.strokeStyle = "oklch(1 0 0 / 0.1)";
@@ -107,7 +114,7 @@ export async function cardFromPicture(blob: Blob, size = { w: FILE_CARD_W, h: FI
   c.width = size.w;
   c.height = size.h;
   const k = Math.max(size.w / bmp.width, size.h / bmp.height);
-  c.getContext("2d")!.drawImage(bmp, (size.w - bmp.width * k) / 2, (size.h - bmp.height * k) / 2, bmp.width * k, bmp.height * k);
+  cardContext(c).drawImage(bmp, (size.w - bmp.width * k) / 2, (size.h - bmp.height * k) / 2, bmp.width * k, bmp.height * k);
   bmp.close();
   return createImageBitmap(c);
 }

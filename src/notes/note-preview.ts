@@ -1,4 +1,5 @@
 import { WIKI, noteKindOf, richNoteBody, textHtml } from "./note-file";
+import { cardContext } from "../assets/card";
 import { splitFrontmatter } from "./frontmatter";
 
 // The picture of a note (its library thumbnail and its card on a canvas): the top of its page, as the notes editor lays it out, drawn
@@ -113,7 +114,7 @@ export async function notePicture(name: string, text: string, w: number, h: numb
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
-  const x = c.getContext("2d")!;
+  const x = cardContext(c); // (in the computer's memory: see cardContext)
   x.drawImage(img, 0, 0, w, h);
   if ((await noteCardSize(name, text, hash)).h / CARD_SCALE <= lh) return c; // (the whole note is in it)
   const fade = x.createLinearGradient(0, h * 0.82, 0, h);

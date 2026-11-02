@@ -243,7 +243,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
             <div class="viewer-nav">
               <button type="button" class="vbtn" data-act="prev" aria-label="Previous" title="Previous (Left arrow)">${ICONS.chevronLeft}</button>
-              <button type="button" class="vbtn" data-act="play" aria-pressed="false" aria-label="Start the slideshow" title="Start the slideshow (Space)">${ICONS.presentation}</button>
+              <button type="button" class="vbtn" data-act="play" aria-pressed="false" aria-label="Start the slideshow" title="Start the slideshow">${ICONS.presentation}</button>
               <button type="button" class="vbtn" data-act="next" aria-label="Next" title="Next (Right arrow)">${ICONS.chevronRight}</button>
               <span class="viewer-pos"></span>
             </div>
@@ -260,7 +260,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             </div>
           </div>
           <div class="viewer-handle" hidden>
-            <button type="button" class="vbtn" data-act="play" aria-label="Pause the slideshow" title="Pause the slideshow (Space)">${ICONS.pause}</button>
+            <button type="button" class="vbtn" data-act="play" aria-label="Pause the slideshow" title="Pause the slideshow">${ICONS.pause}</button>
           </div>
         </div>
       </div>
@@ -1789,7 +1789,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     viewer.classList.toggle("is-showing", on);
     playBtn.setAttribute("aria-pressed", String(on));
     playBtn.setAttribute("aria-label", on ? "Pause the slideshow" : "Start the slideshow");
-    playBtn.title = on ? "Pause the slideshow (Space)" : "Start the slideshow (Space)";
+    playBtn.title = on ? "Pause the slideshow" : "Start the slideshow"; // (no key of its own: Space is the player's)
     playBtn.innerHTML = on ? ICONS.pause : ICONS.presentation;
     if (on) {
       if (eng === avEng) avEng.play();
@@ -1851,7 +1851,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     } else if (typing) return;
     else if (e.key === "ArrowLeft") stepSlide(-1);
     else if (e.key === "ArrowRight") stepSlide(1);
-    else if (e.key === " " && !(e.target as HTMLElement).closest("button, video")) setShowing(!showing);
     else if (e.key === "i" || e.key === "I") toggleDetails();
     else if (e.key === "f" || e.key === "F") toggleBar();
     else if (e.key === "+" || e.key === "=") zoomAt(zoom.s * 1.25, ...centre());

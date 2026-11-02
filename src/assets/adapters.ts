@@ -1,7 +1,7 @@
 import { noteCardSize, notePicture } from "../notes/note-preview";
 import { noteKindOf } from "../notes/note-file";
 import { extOf, isFontFile } from "./file-kind";
-import { FILE_CARD_H, FILE_CARD_W, makeFileCard } from "./card";
+import { FILE_CARD_H, FILE_CARD_W, cardContext, makeFileCard } from "./card";
 
 /** Triangles as a flat list of x,y,z (nine numbers each). */
 export function parseModel(bytes: Uint8Array, ext: string): Float32Array | null {
@@ -100,7 +100,7 @@ export async function makeFileCardFrom(name: string, chip: string, bytes: Uint8A
     const c = document.createElement("canvas");
     c.width = FILE_CARD_W;
     c.height = FILE_CARD_H;
-    const x = c.getContext("2d")!;
+    const x = cardContext(c);
     if (tri) {
       x.fillStyle = "oklch(0.3 0 0)";
       x.fillRect(0, 0, c.width, c.height);
@@ -134,7 +134,7 @@ async function fontCard(chip: string, bytes: Uint8Array): Promise<ImageBitmap | 
     const c = document.createElement("canvas");
     c.width = FILE_CARD_W;
     c.height = FILE_CARD_H;
-    const x = c.getContext("2d")!;
+    const x = cardContext(c);
     x.fillStyle = "oklch(0.3 0 0)";
     x.fillRect(0, 0, c.width, c.height);
     x.strokeStyle = "oklch(1 0 0 / 0.1)";

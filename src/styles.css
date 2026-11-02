@@ -1385,6 +1385,9 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
   --se-error-color: var(--hud-danger); --se-block-handle-btn-hover-bg: var(--hud-hover); --se-block-handle-btn-active-bg: color-mix(in oklch, var(--hud-accent) 16%, transparent); --se-block-hover-bg: var(--hud-hover); --se-block-hover-outline: var(--hud-border);
   --se-doc-background: var(--theme-bg); --se-doc-info-page-font-color: var(--hud-accent-fg); --se-doc-info-page-background-color: var(--hud-muted); --se-doc-info-font-color: var(--hud-muted); --se-doc-info-active-color: var(--hud-accent); --se-loading-color: var(--hud-accent);
 }
+/* The [[ and # lists: as wide as their names (up to a readable width), never wider than the window. */
+.sun-editor.se-theme-canvast .se-controller .se-select-menu { width: max-content; max-width: min(28rem, calc(100vw - var(--sp-8))); }
+.sun-editor.se-theme-canvast .se-autocomplete-item { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sun-editor.se-theme-canvast .se-list-inner :is(h1, h2, h3, h4, h5, h6, p, blockquote, pre) { font-family: var(--font-ui); } /* (the paragraph styles' previews) */
 /* (the editor writes white on its accent: the app's text on accent, in each state, the dialogs' own rule too) */
 .sun-editor.se-theme-canvast .se-btn-primary, .sun-editor.se-theme-canvast .se-btn-primary:is(:hover, :focus), .sun-editor.se-theme-canvast .se-modal-area .se-modal-inner .se-modal-content .se-btn-primary { color: var(--hud-accent-fg); }
