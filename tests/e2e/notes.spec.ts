@@ -329,4 +329,10 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   // The canvas stays usable while the panel is open (it is a panel, not a dialog): the canvas takes a click beside it.
   await p.mouse.click(box.x + 20, box.y + box.height - 20);
   await expect(p.getByTestId("note-panel")).toBeVisible();
+  // Renamed from the panel's header with the library's dialog: the extension stays as it was.
+  await p.getByTestId("note-panel").locator("[data-rename]").click();
+  await expect(p.locator('[data-rn="ext-fixed"]')).toHaveText(".md");
+  await p.locator('[data-rn="one"]').fill("plan");
+  await p.getByTestId("rename-ok").click();
+  await expect(p.getByTestId("note-panel").locator(".panel-head h2")).toHaveText("plan.md");
 });

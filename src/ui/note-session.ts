@@ -60,7 +60,8 @@ export class OpenNote {
   private constructor(
     public hash: string,
     readonly kind: NoteKind,
-    readonly name: string,
+    /** Its name when it was opened; a save takes its item's name as it is then (renamed meanwhile). */
+    public name: string,
     private readonly type: string,
     private editor: NoteEditor | null,
     /** Its words as the editor read them (to tell whether its file was changed elsewhere since). */
@@ -234,6 +235,7 @@ export class OpenNote {
       if (now && wordsOf(this.kind, now) !== this.base && !(await confirmDialog({ title: "Changed in another app", lines: [`“${this.name}” was changed outside canvast since you opened it here.`, "Saving puts your version in its place, and the other changes are lost. Cancel, then close the note without saving and open it again to see the other version."], confirmLabel: "Save mine" }))) return false;
       if (this.kind === "md") text = underProps(now, text); // (what it keeps as written, in its order)
       if (e && this.kind !== "txt") text = withFileMeta(this.kind, text, { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] });
+      if (e?.name) this.name = e.name;
       const was = this.hash;
       const hash = await session.saveVersion(was, new File([text], this.name, { type: this.type }));
       if (!hash) return false;
@@ -255,8 +257,9 @@ export class OpenNote {
   /** The note's formatting does not fit its markdown or text file: kept in a rich text note beside it (the file stays as it was). */
   private async saveRich(show = true): Promise<boolean> {
     const { session } = this.deps;
-    const name = richNameOf(this.name);
     const e = await session.catalog?.entry(this.hash).catch(() => undefined);
+    if (e?.name) this.name = e.name;
+    const name = richNameOf(this.name);
     const rich = withFileMeta("rich", this.editor!.asRich(titleOf(name)), { tags: e?.tags ?? [], note: e?.note ?? "", fields: e?.fields ?? [] }); // (its properties go with it)
     const [hash] = await this.place.importFiles([new File([rich], name, { type: "text/html" })]);
     if (!hash) return false;

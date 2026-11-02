@@ -34,7 +34,8 @@ export function cutBytes(s: string, max: number): string {
 
 /** A name and its extension (with the dot). An extension is up to eight letters or digits after the last dot of a name that has something before it. */
 export function splitName(name: string): { stem: string; ext: string } {
-  const m = /^(.+?)(\.[A-Za-z0-9]{1,8})$/.exec(name);
+  // (a rich text note's `.note.html` is one extension: the library knows a note by it, so a rename keeps it whole)
+  const m = /^(.+?)(\.note\.html|\.[A-Za-z0-9]{1,8})$/i.exec(name);
   return m ? { stem: m[1]!, ext: m[2]! } : { stem: name, ext: "" };
 }
 

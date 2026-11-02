@@ -1,5 +1,7 @@
 import { noteKindOf } from "../notes/note-file";
+import { openBatchRename } from "./batch-rename";
 import { esc } from "./format";
+import { ICONS } from "./icons";
 import { OpenNote } from "./note-session";
 import type { NoteDeps, NotePlace } from "./note-session";
 import { panelHtml } from "./panel";
@@ -58,12 +60,15 @@ export function mountNotePanel(el: HTMLElement, deps: NotePanelDeps): { open(has
       return true;
     }
     if (!(await leave())) return true;
-    el.innerHTML = panelHtml({ title: esc(rec.name), body: `<div class="viewer-note" data-testid="note-editor"><div></div></div>` });
-    el.setAttribute("aria-label", `Note: ${rec.name}`);
+    const name0 = (await deps.session.catalog?.entry(hash).catch(() => undefined))?.name ?? rec.name;
+    const tools = deps.session.readOnly ? "" : `<button type="button" class="layer-btn" data-rename aria-label="Rename this note" title="Rename this note (F2)">${ICONS.textCursorInput}</button>`;
+    el.innerHTML = panelHtml({ title: esc(name0), tools, body: `<div class="viewer-note" data-testid="note-editor"><div></div></div>` });
+    el.setAttribute("aria-label", `Note: ${name0}`);
     el.querySelector("[data-close]")!.addEventListener("click", () => void leave());
+    el.querySelector("[data-rename]")?.addEventListener("click", () => void rename());
     el.hidden = false;
     try {
-      note = await OpenNote.open(el.querySelector<HTMLElement>(".viewer-note > div")!, hash, rec.name, rec.blob, deps, place);
+      note = await OpenNote.open(el.querySelector<HTMLElement>(".viewer-note > div")!, hash, name0, rec.blob, deps, place);
     } catch (err) {
       shut();
       deps.session.editor.message = `The notes editor could not open “${rec.name}”: ${(err as Error).message}.`;
@@ -71,6 +76,24 @@ export function mountNotePanel(el: HTMLElement, deps: NotePanelDeps): { open(has
     }
     return true;
   };
+  /** The library's own rename dialog (one item: the name without its extension; `.note.html` stays whole), from the header. */
+  const rename = async (): Promise<void> => {
+    const n = note;
+    if (!n || deps.session.readOnly) return;
+    const name = (await deps.session.catalog?.entry(n.hash).catch(() => undefined))?.name ?? n.name;
+    const result = await openBatchRename([{ id: n.hash, name }], { noun: "note" });
+    if (!result || !(await deps.session.renameAssets([{ hash: n.hash, name: result[0]!.name }]))) return;
+    if (note !== n) return;
+    n.name = result[0]!.name;
+    el.querySelector(".panel-head h2")!.textContent = n.name;
+    for (const a of ["aria-label", "title"]) el.querySelector("[data-close]")?.setAttribute(a, `Hide the ${n.name} panel`);
+    el.setAttribute("aria-label", `Note: ${n.name}`);
+    deps.session.editor.message = `Renamed to “${n.name}”.`;
+    deps.session.editor.changed();
+  };
+  el.addEventListener("keydown", (e) => {
+    if (e.key === "F2" && !e.ctrlKey && !e.altKey && !e.metaKey) (e.preventDefault(), void rename());
+  });
   return {
     open,
     get hash() {

@@ -42,3 +42,12 @@ describe("batch rename rules (ADR 0085)", () => {
     expect(ruleProblem({ mode: "enumerate", pattern: "#", start: -1, keepExt: true })).not.toBeNull();
   });
 });
+
+describe("a rich text note's extension", () => {
+  it("is .note.html, whole", () => {
+    expect(splitName("Plan.note.html")).toEqual({ stem: "Plan", ext: ".note.html" });
+    expect(splitName("Plan.v2.note.HTML")).toEqual({ stem: "Plan.v2", ext: ".note.HTML" });
+    expect(splitName("page.html")).toEqual({ stem: "page", ext: ".html" });
+    expect(splitName("a.b.png")).toEqual({ stem: "a.b", ext: ".png" });
+  });
+});
