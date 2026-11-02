@@ -17,6 +17,7 @@
 - **Changed:** the custom thumbnail button sits with ★ and Hide in the details panel (it took a row of its own in the viewer); a note's details show its page too.
 - **Fixed:** a long note's card on a canvas was cut to 4:3 and blurry when zoomed in: a note's card is now its whole page (up to a limit), at twice its size.
 - **Added:** a note's properties: its YAML block (as Obsidian writes it) is its item's tags, note (`description`) and fields, read in on import and from saves elsewhere, and written back when they change in the library; rich text notes keep them as `<meta>`. Saving a note whose words were changed in another app since it was opened asks first.
+- **Added:** links between notes as Obsidian writes them (`[[Plan]]`, `[[Plan|text]]`, `[[Folder/Plan]]`): `[[` offers the library's notes and files, Ctrl+click opens what a link points at.
 - **Added:** **New note** in the library's Import menu: a markdown note in the open folder, opened to write in.
 - **Changed:** the library chooser (texture fill pictures, custom thumbnails) is one shared panel that can also open in the middle of the page, list any kind of item, import files from this device, and shows the first 300 matches of a big library (search narrows it).
 

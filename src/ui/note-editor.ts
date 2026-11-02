@@ -1,7 +1,7 @@
 import suneditor, { helper } from "suneditor";
-import { align, anchor, audio, audioGallery, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
+import { align, anchor, audio, audioGallery, autocomplete, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
 import type { SunEditor } from "suneditor/types";
-import { linkTarget, relativeLink, richNoteBody, richNoteFile, textHtml } from "../notes/note-file";
+import { WIKI, linkTarget, linksToWiki, relativeLink, richNoteBody, richNoteFile, textHtml, wikiToLinks } from "../notes/note-file";
 import type { NoteKind, NoteStyle } from "../notes/note-file";
 import { splitFrontmatter } from "../notes/frontmatter";
 
@@ -32,6 +32,12 @@ export interface NoteHost {
   importFiles(files: File[]): Promise<NoteItem[]>;
   /** The fonts of the library, loaded, by their family names (the page knows them by those names too). */
   fonts(): Promise<string[]>;
+  /** What `[[` offers: the library's notes and files, by the name a link names them with (`key`), and the name shown (`name`). */
+  linkables(): Promise<Array<{ key: string; name: string; hash: string }>>;
+  /** The item a `[[target]]` link names, or null. */
+  findWiki(target: string): Promise<NoteItem | null>;
+  /** Ctrl+click on a link in the note: open what it points at (a note, a file of the library). `link`: as written in the file. */
+  open(link: string): void;
   /** The notes of the library tagged `template`: offered in Insert ▸ Template after the built-in ones. */
   templates(): Promise<Array<{ name: string; kind: NoteKind; text: string; dir: string[] }>>;
   /** The editor's Save button (and Ctrl+S): whether it was saved. */
@@ -214,7 +220,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
    * from; a template's links from another folder are written again from this note's (the app's own links stay as they are).
    */
   const shown = async (kind: NoteKind, text: string, dir: readonly string[]): Promise<string> => {
-    const html = kind === "md" ? helper.markdown.markdownToHtml(splitFrontmatter(text).body, "P") : kind === "txt" ? textHtml(text) : richNoteBody(text); // (properties: in the details panel)
+    const html = kind === "md" ? helper.markdown.markdownToHtml(wikiToLinks(splitFrontmatter(text).body), "P") : kind === "txt" ? textHtml(text) : richNoteBody(text); // (properties: in the details panel)
     const page = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
     const here = dir.join("/") === host.dir.join("/");
     for (const box of page.body.querySelectorAll("input[type=checkbox]")) box.removeAttribute("disabled"); // (task boxes are ticked in the note)
@@ -230,7 +236,20 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     );
     return page.body.innerHTML;
   };
+  /** A link to a note or file, as the editor holds it (a markdown note writes it `[[key]]`); its path is found for a rich text note. */
+  const wikiPath = new Map<string, string>();
+  const knowPath = (target: string): void =>
+    void host.findWiki(target).then(async (item) => item && wikiPath.set(target, relativeLink(host.dir, await host.pathOf(item.hash))));
+  const wikiLink = (target: string, shownText: string): HTMLAnchorElement => {
+    const a = document.createElement("a");
+    a.href = `${WIKI}${encodeURIComponent(target)}`;
+    a.textContent = shownText;
+    knowPath(target);
+    return a;
+  };
   const value = await shown(opts.kind, opts.text, host.dir);
+  for (const m of value.matchAll(/href="canvast-wiki:([^"]+)"/g)) knowPath(decodeURIComponent(m[1]!));
+  const linkables = (await host.linkables()).map((l) => ({ key: l.key, name: l.name }));
   const templates = await Promise.all((await host.templates()).map(async (t) => ({ name: t.name, html: await shown(t.kind, t.text, t.dir) })));
   const fonts = await host.fonts();
   const choose = async (kind: AttachKind | "any"): Promise<HTMLElement | null> => {
@@ -258,15 +277,22 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   const content: SunEditor.InitOptions = {
     // (not math, embeds or PDF export: they need a server or another library)
     plugins: [
-      ...[align, anchor, audio, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileUpload, NoteFont, fontColor, fontSize, hr, image, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video],
+      ...[align, anchor, audio, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileUpload, NoteFont, fontColor, fontSize, hr, image, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video, autocomplete],
       ...[imageGallery, videoGallery, audioGallery, fileGallery, fileBrowser].map((g) => libraryGallery(g as GalleryClass, choose)),
     ],
     font: { items: fonts },
     fileUpload: { uploadUrl: "canvast:library" }, // (never sent: files are taken by onFileUploadBefore)
     template: { items: [...TEMPLATES, ...templates] },
+    autocomplete: {
+      limitSize: 8,
+      triggers: {
+        // `[[`: a link to a note or a file of the library, written `[[name]]` in a markdown note
+        "[[": { data: linkables, onSelect: (item: { key: string; [x: string]: unknown }) => wikiLink(item.key, String(item["name"] ?? item.key)) },
+      },
+    },
     layout: { items: LAYOUTS },
     // Kept through the editor's cleaning: the app's own links, and markdown's task lists.
-    allowedURLProtocols: ["canvast"],
+    allowedURLProtocols: ["canvast", "canvast-wiki"],
     elementWhitelist: "input",
     attributeWhitelist: { input: "type|checked|disabled" },
   };
@@ -298,6 +324,16 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   };
   el.addEventListener("keydown", keys, true);
   // A task box is ticked with a click: its `checked` attribute is what the file keeps (`- [x]`), one step of undo.
+  // Ctrl+click (⌘ on a Mac) on a link opens what it points at; a plain click puts the cursor in it, to edit.
+  const follow = (e: MouseEvent): void => {
+    const a = (e.target as HTMLElement).closest?.("a[href]");
+    if (!a || !(e.ctrlKey || e.metaKey) || !a.closest(".sun-editor-editable")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const href = a.getAttribute("href")!;
+    host.open(links.get(href) ?? href);
+  };
+  el.addEventListener("click", follow, true);
   const tick = (e: MouseEvent): void => {
     const box = e.target as HTMLInputElement;
     if (box.type !== "checkbox" || !box.closest(".sun-editor-editable")) return;
@@ -339,7 +375,8 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       for (const [k] of attrs) n.removeAttribute(k);
       for (const [k, v] of attrs) n.setAttribute(k, v);
     }
-    return box.innerHTML;
+    // (the editor's caret placeholders, and spaces at a block's end, which markdown does not keep, are no part of the note's formatting)
+    return box.innerHTML.replace(/[\u200B\uFEFF]/g, "").replace(/(?:&nbsp;|\u00a0|\s)+(<\/(?:p|h[1-6]|li|td|th|div|blockquote)>)/g, "$1");
   };
   return {
     get dirty() {
@@ -350,7 +387,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       const now = editor.$.html.get();
       if (kind === "md") {
         // Markdown keeps it all when the note, written as markdown and read back, is the same note (an alignment, a font size… would go).
-        return { text: toMarkdown(out), keepsAll: held(helper.markdown.markdownToHtml(toMarkdown(now), "P")) === held(now) };
+        return { text: linksToWiki(toMarkdown(out)).replace(/[\u200B\uFEFF]/g, ""), keepsAll: held(helper.markdown.markdownToHtml(toMarkdown(now), "P")) === held(now) };
       }
       const box = document.createElement("div");
       box.innerHTML = out;
@@ -358,11 +395,12 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       const text = lines.join("\n");
       return { text, keepsAll: held(textHtml(text)) === held(now) };
     },
-    asRich: (title) => richNoteFile(title, output()),
+    asRich: (title) => richNoteFile(title, output().replace(/href="canvast-wiki:([^"]+)"/g, (m, t: string) => { const p = wikiPath.get(decodeURIComponent(t)); return p ? `href="${p}"` : m; })),
     saved: () => void (dirty = false),
     destroy() {
       el.removeEventListener("keydown", keys, true);
       el.removeEventListener("click", tick, true);
+      el.removeEventListener("click", follow, true);
       editor.destroy();
       twin?.destroy();
       for (const url of links.keys()) URL.revokeObjectURL(url);

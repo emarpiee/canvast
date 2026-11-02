@@ -44,7 +44,7 @@ import { runExport, runExportFiles, runExportFolder } from "./archive-ui";
 import { openLibraryPicker } from "./library-picker";
 import { mountNoteEditor } from "./note-editor";
 import type { AttachKind, NoteEditor, NoteHost, NoteItem } from "./note-editor";
-import { RICH_NOTE_SUFFIX, noteKindOf, richNameOf, richNoteBody } from "../notes/note-file";
+import { RICH_NOTE_SUFFIX, WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget } from "../notes/note-file";
 import { splitFrontmatter, underProps, withFileMeta } from "../notes/frontmatter";
 import type { NoteKind } from "../notes/note-file";
 import { fontFor } from "../text/fonts";
@@ -938,8 +938,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       }
       return got;
     };
-    return {
-      dir: (await libraryPath(hash)).slice(0, -1),
+    const dir = (await libraryPath(hash)).slice(0, -1);
+    const host: NoteHost = {
+      dir,
       async find(t) {
         if ("hash" in t) {
           const x = all.find((y) => y.hash === t.hash);
@@ -967,6 +968,41 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const list = (await fonts()).filter((f) => !f.unusable && fontFor(f.hash).names.family);
         return [...new Set(["Inter", ...list.map((f) => fontFor(f.hash).names.family)])];
       },
+      async linkables() {
+        // A note by its name without `.md`, any other file by its whole name; a name two items share gets its folders in front.
+        const keyOf = (x: CatalogEntry): string => (noteKindOf(x.name) === "md" ? x.name.replace(/\.(md|markdown)$/i, "") : x.name);
+        const count = new Map<string, number>();
+        for (const x of all) count.set(keyOf(x).toLowerCase(), (count.get(keyOf(x).toLowerCase()) ?? 0) + 1);
+        return Promise.all(
+          all.filter((x) => x.hash !== hash).map(async (x) => {
+            const key = keyOf(x);
+            if ((count.get(key.toLowerCase()) ?? 0) < 2) return { key, name: key, hash: x.hash };
+            const path = (await libraryPath(x.hash, x)).slice(0, -1);
+            return { key: [...path, key].join("/"), name: key, hash: x.hash };
+          }),
+        );
+      },
+      async findWiki(target) {
+        const t = wikiTarget(target);
+        const named = all.filter((x) => x.name.toLowerCase() === t.name || x.name.toLowerCase().replace(/\.(md|markdown|txt|note\.html)$/, "") === t.name);
+        if (named.length < 2 || !t.dirs.length) return named[0] ? item(named[0]) : null;
+        for (const x of named) {
+          const dirs = (await libraryPath(x.hash, x)).slice(0, -1).map((d) => d.toLowerCase());
+          if (t.dirs.every((d, i) => dirs[dirs.length - t.dirs.length + i] === d)) return item(x);
+        }
+        return item(named[0]!);
+      },
+      open(link) {
+        void (async () => {
+          const target = link.startsWith(WIKI) ? null : linkTarget(link, dir);
+          const found = link.startsWith(WIKI) ? await host.findWiki(decodeURIComponent(link.slice(WIKI.length))) : target ? await host.find(target) : null;
+          if (found) await showSlide(found.hash);
+          else {
+            session.editor.message = /^[a-z][a-z0-9+.-]*:/i.test(link) && !link.startsWith(WIKI) ? "Links to the web are not opened from a note (canvast does not go online)." : "That link points at nothing in the library.";
+            session.editor.changed();
+          }
+        })();
+      },
       async templates() {
         const tagged = all.filter((x) => x.hash !== hash && noteKindOf(x.name) && meta(x).tags.some((t) => t.toLowerCase() === TEMPLATE_TAG));
         const read = await Promise.all(
@@ -979,6 +1015,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       },
       save: () => saveNote(),
     };
+    return host;
   };
   const openNote = async (hash: string, kind: NoteKind, name: string, blob: Blob, token: number): Promise<void> => {
     const [text, host] = await Promise.all([blob.text(), noteHost(hash)]);

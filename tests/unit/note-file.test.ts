@@ -25,3 +25,16 @@ describe("note files", () => {
     expect(richNoteBody("<p>no page</p>")).toBe("<p>no page</p>");
   });
 });
+
+import { linksToWiki, wikiTarget, wikiToLinks } from "../../src/notes/note-file";
+
+describe("[[links]] between notes", () => {
+  it("become editor links and come back as written, never in code or embeds", () => {
+    const md = "See [[Plan]] and [[Projects/Brief|the brief]], ![[cat.png]], `[[not a link]]`.\n\n```\n[[code]]\n```\n";
+    const shown = wikiToLinks(md);
+    expect(shown).toBe("See [Plan](canvast-wiki:Plan) and [the brief](canvast-wiki:Projects%2FBrief), ![[cat.png]], `[[not a link]]`.\n\n```\n[[code]]\n```\n");
+    expect(linksToWiki(shown)).toBe(md);
+    expect(linksToWiki("[Brief](canvast-wiki:Projects%2FBrief)")).toBe("[[Projects/Brief]]");
+    expect(wikiTarget("Projects/Plan.md#Goals")).toEqual({ name: "plan", dirs: ["projects"] });
+  });
+});

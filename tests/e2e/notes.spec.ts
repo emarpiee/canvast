@@ -15,6 +15,7 @@ const card = (p: Page, hash: string) => p.locator(`[data-testid="asset-card"][da
 const note = (p: Page) => p.getByTestId("note-editor");
 const page = (p: Page) => note(p).locator(".sun-editor-editable").first();
 const downloaded = async (p: Page): Promise<string> => {
+  if (!(await p.getByTestId("asset-download").isVisible())) await p.locator(".viewer-details").click(); // (the details panel, if it is closed)
   const [dl] = await Promise.all([p.waitForEvent("download"), p.getByTestId("asset-download").click()]);
   return readFile((await dl.path())!, "utf8");
 };
@@ -154,4 +155,29 @@ test("a note's properties (YAML, as Obsidian writes them) are its item's tags, n
   const file = await downloaded(p);
   expect(file).toMatch(/^---\ntags:\n  - design\n  - print\nauthor: Ana\ndescription: The cover plan\nnested:\n  a: 1\n---\n# Cover art/);
   await expect.poll(entry).toEqual({ tags: ["design", "print"], note: "The cover plan", fields: [{ key: "author", value: "Ana" }] });
+});
+
+test("[[links]] between notes: shown as links, Ctrl+click opens the note, [[ offers the library's notes, saved as Obsidian writes them", async ({ app }) => {
+  const p = app.page;
+  const PLAN = "# Plan\n\nSee [[Brief|the brief]].\n";
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles([
+    { name: "Plan.md", mimeType: "text/markdown", buffer: Buffer.from(PLAN) },
+    { name: "Brief.md", mimeType: "text/markdown", buffer: Buffer.from("# Brief\n") },
+  ]);
+  await card(p, hashOf(PLAN)).dblclick();
+  const link = page(p).locator("a", { hasText: "the brief" });
+  await expect(link).toHaveAttribute("href", "canvast-wiki:Brief");
+  // Typed: [[ offers the notes of the library; the one chosen goes in as a link.
+  await page(p).locator("p").first().click();
+  await p.keyboard.press("End");
+  await p.keyboard.type(" Also [[Bri");
+  await p.locator(".se-autocomplete-item, .se-select-item").filter({ visible: true, hasText: "Brief" }).first().click();
+  await expect(page(p).locator('a[href="canvast-wiki:Brief"]')).toHaveCount(2);
+  await p.keyboard.press("Control+s");
+  await expect(p.getByTestId("assets-status")).toContainText("Saved “Plan.md”");
+  expect(await downloaded(p)).toMatch(/See \[\[Brief\|the brief\]\]\. Also \[\[Brief\]\]/);
+  // Ctrl+click opens the note it points at.
+  await page(p).locator("a", { hasText: "the brief" }).click({ modifiers: ["ControlOrMeta"] });
+  await expect(page(p).locator("h1")).toHaveText("Brief");
 });

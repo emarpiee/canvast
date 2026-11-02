@@ -89,3 +89,43 @@ export function richNoteBody(file: string): string {
   const m = /<body[^>]*>([\s\S]*)<\/body>/i.exec(file);
   return (m ? m[1]! : file).trim();
 }
+
+// Links between notes as Obsidian writes them: `[[Plan]]`, `[[Plan|shown text]]`, `[[Projects/Plan]]` when two notes share a name.
+// In the editor they are ordinary links to `canvast-wiki:<target>`; the markdown file keeps the `[[…]]`. (`![[…]]`, an embed, is left alone.)
+export const WIKI = "canvast-wiki:";
+
+/** `text` with `fn` run on the parts outside code (fenced blocks and inline code are left as they are). */
+function outsideCode(text: string, fn: (part: string) => string): string {
+  return text
+    .split(/(^```[\s\S]*?^```[^\n]*$|^~~~[\s\S]*?^~~~[^\n]*$)/m)
+    .map((block, i) => (i % 2 ? block : block.split(/(`+[^`\n]*?`+)/).map((s, j) => (j % 2 ? s : fn(s))).join("")))
+    .join("");
+}
+
+/** A markdown note's `[[…]]` links as markdown links the editor shows (`[shown](canvast-wiki:target)`). */
+export const wikiToLinks = (md: string): string =>
+  outsideCode(md, (s) =>
+    s.replace(/(?<!!)\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]+?))?\]\]/g, (_m, target: string, alias?: string) => {
+      const t = target.trim();
+      return `[${(alias ?? t.split("/").pop()!).replace(/[[\]]/g, "")}](${WIKI}${encodeURIComponent(t)})`;
+    }),
+  );
+
+/** The editor's links to notes back as `[[target]]` (or `[[target|shown]]` when the text shown is not the note's name). */
+export const linksToWiki = (md: string): string =>
+  md.replace(/\[([^\]\n]*)\]\(canvast-wiki:([^)\s]+)\)/g, (_m, shown: string, enc: string) => {
+    let t = enc;
+    try {
+      t = decodeURIComponent(enc);
+    } catch {
+      /* (written as it is) */
+    }
+    const text = shown.replace(/\\([[\]\\*_`])/g, "$1");
+    return text && text !== t.split("/").pop() ? `[[${t}|${text}]]` : `[[${t}]]`;
+  });
+
+/** A link target's name and folders: `Projects/Plan` → name `plan` (no `.md`), folders `projects`, lower case. */
+export function wikiTarget(target: string): { name: string; dirs: string[] } {
+  const parts = target.split("#")[0]!.split("/").filter(Boolean).map((p) => p.toLowerCase());
+  return { name: (parts.pop() ?? "").replace(/\.(md|markdown|txt|note\.html)$/, ""), dirs: parts };
+}
