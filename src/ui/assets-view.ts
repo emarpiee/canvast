@@ -914,6 +914,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const folder = e?.folderIds?.[0];
     return [...(folder ? folderPath(allFolders, folder) : []), e?.name || hash];
   };
+  /** A note with this tag is a template: offered in Insert ▸ Template of every note. */
+  const TEMPLATE_TAG = "template";
   const NOUNS: Record<AttachKind | "any", readonly [string, string]> = { image: ["picture", "pictures"], video: ["video", "videos"], audio: ["sound", "sounds"], file: ["file", "files"], any: ["item", "items"] };
   const noteHost = async (hash: string): Promise<NoteHost> => {
     const all: CatalogEntry[] = ((await session.catalog?.list().catch(() => null))?.entries ?? []).filter((x) => x.present && (hiddenMode || !meta(x).hidden));
@@ -957,6 +959,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       async fonts() {
         const list = (await fonts()).filter((f) => !f.unusable);
         return [{ name: "Inter", family: familyFor() }, ...list.map((f) => ({ name: fontFor(f.hash).names.family || f.name, family: familyFor(f.hash) }))];
+      },
+      async templates() {
+        const tagged = all.filter((x) => x.hash !== hash && noteKindOf(x.name) && meta(x).tags.some((t) => t.toLowerCase() === TEMPLATE_TAG));
+        const read = await Promise.all(
+          tagged.map(async (x) => {
+            const blob = (await assets.record(x.hash).catch(() => undefined))?.blob;
+            return blob ? { name: x.name.replace(/\.(note\.html|md|markdown|txt)$/i, ""), kind: noteKindOf(x.name)!, text: await blob.text(), dir: (await libraryPath(x.hash, x)).slice(0, -1) } : null;
+          }),
+        );
+        return read.filter((t) => t !== null).sort((a, b) => a.name.localeCompare(b.name));
       },
       save: () => saveNote(),
     };
@@ -2538,7 +2550,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="asset-facts">
         ${e ? `<span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>${!isCard(e) ? `<span>${e.pixelW} × ${e.pixelH} px</span>` : ""}<span>${fmtBytes(e.size)}</span>` : ""}
       </div>
-      ${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays ${noteKindOf(e.name) === "rich" ? "a rich text note (HTML) that other apps open too" : "plain text other apps read"}.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>No preview for this file</h3><p class="asset-note">${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as a card. ${esc(d.todo)}</p></section>`; })() : ""}
+      ${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays ${noteKindOf(e.name) === "rich" ? "a rich text note (HTML) that other apps open too" : "plain text other apps read"}. Tag it <em>template</em> to offer it in Insert ▸ Template of every note.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>No preview for this file</h3><p class="asset-note">${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as a card. ${esc(d.todo)}</p></section>`; })() : ""}
       ${e && !e.present ? `<p class="asset-warn">The file is missing from storage. Import the same file again to restore it everywhere.</p>` : ""}
       ${m ? `<p class="asset-warn" data-testid="asset-missing-help">Instances use a file that is not stored. Import the same file again to restore all ${instances} of them.</p>` : ""}
       ${e ? organizeHtml(e) : ""}

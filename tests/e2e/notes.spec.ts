@@ -7,6 +7,7 @@ import { makePng } from "./png";
 /** The notes editor (SunEditor) in the library viewer: markdown, plain text and rich text notes, their links to library items. */
 
 const CAT = makePng(4, 4, () => [200, 120, 40, 255]);
+const TEMPLATE = "## Sketch log\n\nFrom the library.\n";
 const MD = "# Plan\n\nSome **bold** words.\n\n- [ ] a task\n\n![cat](Pictures/cat.png)\n";
 const hashOf = (b: Buffer | string): string => createHash("sha256").update(b).digest("hex");
 const card = (p: Page, hash: string) => p.locator(`[data-testid="asset-card"][data-hash="${hash}"]`);
@@ -23,7 +24,12 @@ test("a markdown note opens in the notes editor with its library links, saves in
   await p.getByTestId("assets-import-input").setInputFiles([
     { name: "cat.png", mimeType: "image/png", buffer: CAT },
     { name: "plan.md", mimeType: "text/markdown", buffer: Buffer.from(MD) },
+    { name: "Sketch log.md", mimeType: "text/markdown", buffer: Buffer.from(TEMPLATE) },
   ]);
+  // A note tagged `template` is offered as a template in every other note.
+  await card(p, hashOf(TEMPLATE)).click();
+  await p.getByTestId("asset-tag-input").fill("template");
+  await p.getByTestId("asset-tag-input").press("Enter");
   await card(p, hashOf(MD)).dblclick();
 
   // Opened: its words, its task box, and its picture shown from the library (the link names it by its path).
@@ -35,12 +41,23 @@ test("a markdown note opens in the notes editor with its library links, saves in
   await page(p).locator("h1").click();
   await p.keyboard.press("End");
   await p.keyboard.type(" for today");
+  await page(p).locator('input[type="checkbox"]').click(); // (a task box is ticked in the note)
   await p.keyboard.press("Control+s");
   await expect(p.getByTestId("assets-status")).toContainText("Saved “plan.md”");
   const saved = await downloaded(p);
   expect(saved).toContain("# Plan for today");
-  expect(saved).toContain("- [ ] a task");
+  expect(saved).toContain("- [x] a task");
   expect(saved).toContain("![cat](Pictures/cat.png)");
+
+  // Insert ▸ Template: the built-in ones, then the library's notes tagged `template`, at the cursor.
+  await page(p).locator("p").first().click();
+  for (const [name, heading] of [["Meeting notes", "Meeting notes"], ["Sketch log", "Sketch log"]] as const) {
+    const tpl = note(p).locator('button[data-command="template"]');
+    if (!(await tpl.isVisible())) await note(p).getByRole("button", { name: "Insert" }).click(); // (the Insert row stays open once opened)
+    await tpl.click();
+    await p.locator(".se-dropdown").filter({ visible: true }).getByRole("button", { name }).click();
+    await expect(page(p).locator("h2", { hasText: heading })).toHaveCount(1);
+  }
 
   // Centred: markdown cannot hold it, so saving asks; a rich text note is made beside it and opened, the markdown file as it was.
   await page(p).locator("h1").click();
@@ -57,8 +74,9 @@ test("a markdown note opens in the notes editor with its library links, saves in
   expect(rich).toContain('src="Pictures/cat.png"');
 
   // Insert ▸ Image gallery is the library chooser: the picture chosen goes into the note, shown from the library.
-  await note(p).getByRole("button", { name: "Insert" }).click();
-  await note(p).locator('button[data-command="imageGallery"]').filter({ visible: true }).click();
+  const gallery = note(p).locator('button[data-command="imageGallery"]');
+  if (!(await gallery.isVisible())) await note(p).getByRole("button", { name: "Insert" }).click();
+  await gallery.click();
   const chooser = p.locator(".lib-pick.is-centred");
   await expect(chooser.locator(".lib-item")).toHaveCount(1); // (pictures only: not the notes)
   await chooser.getByRole("button", { name: "cat.png" }).click();

@@ -1,5 +1,5 @@
 import suneditor, { helper } from "suneditor";
-import { align, anchor, audio, audioGallery, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, lineHeight, link, list, list_bulleted, list_numbered, pageNavigator, paragraphStyle, slashCommand, table, textStyle, video, videoGallery } from "suneditor/plugins";
+import { align, anchor, audio, audioGallery, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, pageNavigator, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
 import type { SunEditor } from "suneditor/types";
 import { linkTarget, relativeLink, richNoteBody, richNoteFile } from "../notes/note-file";
 import type { NoteKind, NoteStyle } from "../notes/note-file";
@@ -31,6 +31,8 @@ export interface NoteHost {
   importFiles(files: File[]): Promise<NoteItem[]>;
   /** The fonts of the library, loaded: their name and the CSS family the page draws them with. */
   fonts(): Promise<Array<{ name: string; family: string }>>;
+  /** The notes of the library tagged `template`: offered in Insert ▸ Template after the built-in ones. */
+  templates(): Promise<Array<{ name: string; kind: NoteKind; text: string; dir: string[] }>>;
   /** The editor's Save button (and Ctrl+S): whether it was saved. */
   save(): Promise<boolean>;
 }
@@ -46,11 +48,26 @@ export interface NoteEditor {
   destroy(): void;
 }
 
-// SunEditor's demo presets (suneditor.com), without what needs a server or a library this app does not have (math, embeds, PDF export, templates).
+// SunEditor's demo presets (suneditor.com), without what needs a server or another library (math, embeds, PDF export).
 const GALLERIES = ["imageGallery", "videoGallery", "audioGallery", "fileGallery", "fileBrowser"];
 const TEXT_TOOLS = ["subscript", "superscript", "|", "textStyle", "copyFormat", "removeFormat"];
 const PARAGRAPH_TOOLS = ["outdent", "indent", "lineHeight", "|", "blockquote", "paragraphStyle"];
-const INSERT_TOOLS = ["hr", "codeBlock", "anchor", "|", "audio", "drawing", "fileUpload", "|", ...GALLERIES];
+const INSERT_TOOLS = ["hr", "codeBlock", "anchor", "|", "audio", "drawing", "fileUpload", "|", "template", "layout", "|", ...GALLERIES];
+
+/** Templates every note has (Insert ▸ Template, at the cursor); the library's notes tagged `template` come after them. */
+const TEMPLATES = [
+  { name: "Meeting notes", html: "<h2>Meeting notes</h2><p><strong>Date:</strong> </p><p><strong>Attendees:</strong> </p><h3>Notes</h3><ul><li></li></ul><h3>Action items</h3><ul><li><input type=\"checkbox\"> </li></ul>" },
+  { name: "To-do list", html: "<h2>To do</h2><ul><li><input type=\"checkbox\"> </li><li><input type=\"checkbox\"> </li><li><input type=\"checkbox\"> </li></ul>" },
+  { name: "Journal entry", html: "<h2>Journal</h2><p><em>Date:</em> </p><h3>What happened</h3><p></p><h3>What I learned</h3><p></p>" },
+  { name: "Reference sheet", html: "<h2>Reference</h2><p><strong>Subject:</strong> </p><p><strong>Source:</strong> </p><h3>Observations</h3><ul><li></li></ul>" },
+];
+/** Layouts (Insert ▸ Layout): one takes the place of the whole note (Ctrl+Z brings the note back). Markdown cannot hold them: a note with one is saved as a rich text note. */
+const col = (flex: number, text: string): string => `<div style="flex:${flex}"><p>${text}</p></div>`;
+const LAYOUTS = [
+  { name: "Two columns", html: `<div style="display:flex;gap:1em">${col(1, "Left")}${col(1, "Right")}</div>` },
+  { name: "Three columns", html: `<div style="display:flex;gap:1em">${col(1, "Left")}${col(1, "Middle")}${col(1, "Right")}</div>` },
+  { name: "Sidebar and main", html: `<div style="display:flex;gap:1em">${col(1, "Sidebar")}${col(3, "Main")}</div>` },
+];
 const FILE_TOOLS = ["newDocument", "save", "|", "selectAll", "copy", "|", "print"];
 const VIEW_TOOLS = ["showBlocks", "markdownView", "preview"];
 const fullButtons = (pages: boolean): SunEditor.UI.ButtonList => [
@@ -182,19 +199,29 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     return t;
   };
 
-  // The file's text as HTML, its links to library items shown from the library.
-  const html = opts.kind === "md" ? helper.markdown.markdownToHtml(opts.text, "P") : opts.kind === "txt" ? textHtml(opts.text) : richNoteBody(opts.text);
-  const page = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
-  await Promise.all(
-    [...page.body.querySelectorAll<HTMLElement>("[src], [href]")].map(async (n) => {
-      const attr = n.hasAttribute("src") ? "src" : "href";
-      const link = n.getAttribute(attr)!;
-      const target = linkTarget(link, host.dir);
-      const item = target && (await host.find(target));
-      const url = item && (await urlOf(item, link));
-      if (url) n.setAttribute(attr, url);
-    }),
-  );
+  /**
+   * A note file's text as the editor's HTML, its links to library items shown from the library. `dir`: the folder of the file it comes
+   * from; a template's links from another folder are written again from this note's (the app's own links stay as they are).
+   */
+  const shown = async (kind: NoteKind, text: string, dir: readonly string[]): Promise<string> => {
+    const html = kind === "md" ? helper.markdown.markdownToHtml(text, "P") : kind === "txt" ? textHtml(text) : richNoteBody(text);
+    const page = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
+    const here = dir.join("/") === host.dir.join("/");
+    for (const box of page.body.querySelectorAll("input[type=checkbox]")) box.removeAttribute("disabled"); // (task boxes are ticked in the note)
+    await Promise.all(
+      [...page.body.querySelectorAll<HTMLElement>("[src], [href]")].map(async (n) => {
+        const attr = n.hasAttribute("src") ? "src" : "href";
+        const link = n.getAttribute(attr)!;
+        const target = linkTarget(link, dir);
+        const item = target && (await host.find(target));
+        const url = item && (await urlOf(item, here || "hash" in target ? link : undefined));
+        if (url) n.setAttribute(attr, url);
+      }),
+    );
+    return page.body.innerHTML;
+  };
+  const value = await shown(opts.kind, opts.text, host.dir);
+  const templates = await Promise.all((await host.templates()).map(async (t) => ({ name: t.name, html: await shown(t.kind, t.text, t.dir) })));
   const fonts = await host.fonts();
   const cssName = (name: string): string => (/^[A-Za-z][\w -]*$/.test(name) ? name : `"${name.replace(/"/g, "")}"`);
   const choose = async (kind: AttachKind | "any"): Promise<HTMLElement | null> => {
@@ -220,13 +247,15 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   el.append(holder);
   /** What the editor holds and how it cleans it (the same for the hidden one that compares notes). */
   const content: SunEditor.InitOptions = {
-    // (not math, embeds, PDF export, templates or layouts: they need a server or a library this app does not have)
+    // (not math, embeds or PDF export: they need a server or another library)
     plugins: [
-      ...[align, anchor, audio, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileUpload, font, fontColor, fontSize, hr, image, lineHeight, link, list, list_bulleted, list_numbered, pageNavigator, paragraphStyle, slashCommand, table, textStyle, video],
+      ...[align, anchor, audio, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileUpload, font, fontColor, fontSize, hr, image, layout, lineHeight, link, list, list_bulleted, list_numbered, pageNavigator, paragraphStyle, slashCommand, table, template, textStyle, video],
       ...[imageGallery, videoGallery, audioGallery, fileGallery, fileBrowser].map((g) => libraryGallery(g as GalleryClass, choose)),
     ],
     font: { items: [...new Set(fonts.map((f) => `${cssName(f.name)}, ${f.family}`))] },
     fileUpload: { uploadUrl: "canvast:library" }, // (never sent: files are taken by onFileUploadBefore)
+    template: { items: [...TEMPLATES, ...templates] },
+    layout: { items: LAYOUTS },
     // Kept through the editor's cleaning: the app's own links, and markdown's task lists.
     allowedURLProtocols: ["canvast"],
     elementWhitelist: "input",
@@ -235,7 +264,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   const editor = suneditor.create(holder, {
     ...presetOptions(opts.style),
     ...content,
-    value: page.body.innerHTML,
+    value,
     width: "100%",
     height: "100%",
     theme: opts.dark ? "dark" : "",
@@ -259,6 +288,18 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     void host.save();
   };
   el.addEventListener("keydown", keys, true);
+  // A task box is ticked with a click: its `checked` attribute is what the file keeps (`- [x]`), one step of undo.
+  const tick = (e: MouseEvent): void => {
+    const box = e.target as HTMLInputElement;
+    if (box.type !== "checkbox" || !box.closest(".sun-editor-editable")) return;
+    e.preventDefault();
+    const on = !box.hasAttribute("checked");
+    box.toggleAttribute("checked", on);
+    setTimeout(() => (box.checked = on)); // (after the click's own default is undone)
+    dirty = true;
+    editor.$.history.push(false);
+  };
+  el.addEventListener("click", tick, true);
 
   /** The editor's HTML with the library's addresses back to the links written in the file. */
   const output = (): string => {
@@ -283,6 +324,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     // (attributes in one order: the editor writes a picture's in the order it set them)
     const box = document.createElement("template");
     box.innerHTML = twin.$.html.get();
+    for (const b of box.content.querySelectorAll("input[type=checkbox]")) b.removeAttribute("disabled"); // (markdown read back marks them so)
     for (const n of box.content.querySelectorAll("*")) {
       const attrs = [...n.attributes].map((a) => [a.name, a.value] as const).sort(([a], [b]) => (a < b ? -1 : 1));
       for (const [k] of attrs) n.removeAttribute(k);
@@ -311,6 +353,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     saved: () => void (dirty = false),
     destroy() {
       el.removeEventListener("keydown", keys, true);
+      el.removeEventListener("click", tick, true);
       editor.destroy();
       twin?.destroy();
       for (const url of links.keys()) URL.revokeObjectURL(url);
