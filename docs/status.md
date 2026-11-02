@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.52.6: library files worked on elsewhere, Flip (2026-11-02)
+
+- **Implemented:** an item whose file was saved again outside the app follows it (`LibraryMirror.followChanged`, from the folder watch and the start-up scan's `absent` list; the old record lets go of the file first, the new version is imported in place with the item's metadata, `Session.followAsset` and `retargetAssetInstances` point every canvas at it, the old item goes). `ExternalFolder.remove` removes a file only when its SHA-256 is still the original's. A file the app wrote counts as its own for 1.5 s. Flip horizontally and vertically (`flipX`, `flipY`) with Reset flip, crop and bakes flip-aware. A GIF from a backup is placed with its player (`frames` and `duration` in archives; counted at placing when missing).
+- **Tested:** desktop spec 22/22 (an item's file saved again while running, at the same size and while closed); unit 610 (a changed file is never removed); flip, crop and GIF-from-backup specs in Chromium and Firefox.
+- **Known failures:** none known.
+- **Unverified:** following a file in the browser build's library folder (it has no watch: such an item shows as missing there, and its file is not removed).
+- **Committed:** main, released as v0.52.6.
+- **Next bounded task:** the owner's next task list.
+
 ## v0.52.5: thumbnails let go safely (2026-11-01)
 
 - **Implemented:** a thumbnail's address is revoked only once no picture of the page shows it (`revokeUnused` in the Library view): a revoked one failed to load and logged an error (seen once on GitHub after hidden mode ended).

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.52.6 — Library files worked on elsewhere, Flip (2026-11-02)
+
+- **Fixed:** a library file saved again by the program it is worked on in (a painting, a scene, any kind of file) showed as missing or damaged although it was there, and deleting its item removed that newer file for good. The item now follows the file: the new version takes its place with the item's name, folder, tags, note, fields and favourite, and its pictures and cards on every canvas show it, whether it was saved while the app ran or while it was closed. A file that no longer holds an item's content is never removed with the item.
+- **Fixed:** an animated GIF brought in by a backup was placed as a still picture, with no player; backups now keep a GIF's frame count and a video's length, and a GIF without its count is counted when it is placed.
+- **Added:** **Flip horizontally** and **Flip vertically** beside Crop, with **Reset flip**, for pictures, video and GIFs: mirrored in the same box. On a flipped picture crop cuts the side you drag; Make a new picture, Copy as picture and Download include the flip.
+
 ## 0.52.5 — Thumbnails let go safely (2026-11-01)
 
 - **Fixed:** a thumbnail's picture could be let go while the Library still showed it (after hidden mode ended, or a custom thumbnail changed), which failed to load it and logged an error; it is now let go only once nothing shows it.
