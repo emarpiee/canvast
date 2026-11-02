@@ -40,6 +40,7 @@
 - **Changed:** the library chooser (texture fill pictures, custom thumbnails) is one shared panel that can also open in the middle of the page, list any kind of item, import files from this device, and shows the first 300 matches of a big library (search narrows it).
 - **Added:** rename a note from the Note panel's header (or F2), with the library's rename dialog; a save after a rename keeps the new name.
 - **Fixed:** renaming a rich text note offered `name.note` as its name with `.html` as the extension, so `.note` could be dropped by accident: `.note.html` is one extension in the rename dialog and batch rename.
+- **Fixed:** after a note was saved (or a library file changed outside the app), undo on the canvas brought back the old version, or an earlier step could no longer be undone: the new version now replaces the old one in the undo history too.
 
 ## 0.52.6 — Library files worked on elsewhere, Flip (2026-11-02)
 

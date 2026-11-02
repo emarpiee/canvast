@@ -785,8 +785,8 @@ export class Session {
 
   /**
    * A library file was changed outside the app (saved again by the program it is worked on in, of any kind) and is the asset `to` now:
-   * every instance of `from`, on this canvas and the others, uses `to` (`size`: its pixels). Not an undo step of its own: the old content
-   * is gone from the folder.
+   * every instance of `from`, on this canvas and the others, uses `to` (`size`: its pixels), and so do the open canvas's undo and redo
+   * steps. Not an undo step of its own: the old content is gone.
    */
   async followAsset(from: string, to: string, size: { w: number; h: number }): Promise<void> {
     if (from === to) return;
@@ -794,12 +794,9 @@ export class Session {
     await this.adoptNoteProps(to);
     if (!this.repo) return;
     await this.persistence.flush();
-    const here = [...this.doc.all()].filter((o) => (o as { assetId?: string }).assetId === from);
-    if (here.length) {
-      const next = here.map((o) => deserializeObject(retargeted(serializeObject(o) as unknown as Record<string, unknown>, to, size) as unknown as SerializedObject, this.doc.space));
-      this.doc.commit(this.doc.transaction("Follow a file changed outside the app", next));
-      await this.persistence.flush();
-    }
+    // (in the undo history too: an undo never brings back the old version, and no step finds its object changed under it)
+    this.doc.remap((o) => ((o as { assetId?: string }).assetId === from ? deserializeObject(retargeted(serializeObject(o) as unknown as Record<string, unknown>, to, size) as unknown as SerializedObject, this.doc.space) : o));
+    await this.persistence.flush();
     try {
       const other = await this.repo.retargetAssetInstances(from, to, size, this.current?.canvasId ?? null);
       for (const id of other.canvases) this.post({ kind: "commit", canvasId: id, revision: -1 });

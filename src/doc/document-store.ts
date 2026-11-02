@@ -121,6 +121,29 @@ export class DocumentStore {
     this.emit("do", new Set(after.keys()));
   }
 
+  /**
+   * Change objects without a step to undo, in the history too (a library item replaced by its new version): `fn` gives an object's new
+   * state, or the same object. Every state the undo and redo steps hold is changed alike (the same state to the same new one), so the steps
+   * still find the objects as they left them and never bring the old version back.
+   */
+  remap(fn: (o: CanvasObject) => CanvasObject): void {
+    const memo = new Map<CanvasObject, CanvasObject>();
+    const map = (o: CanvasObject): CanvasObject => {
+      let n = memo.get(o);
+      if (!n) memo.set(o, (n = fn(o)));
+      if (n !== o) validateObject(n);
+      return n;
+    };
+    const changed = new Set<ObjectId>();
+    for (const [id, o] of this.objects) {
+      const n = map(o);
+      if (n !== o) (this.objects.set(id, n), changed.add(id));
+    }
+    for (const tx of [...this.undoStack, ...this.redoStack])
+      for (const m of [tx.before, tx.after] as Map<ObjectId, CanvasObject | null>[]) for (const [id, o] of m) if (o) m.set(id, map(o));
+    if (changed.size) this.emit("do", changed);
+  }
+
   undo(): Transaction | null {
     const tx = this.undoStack.pop();
     if (!tx) return null;

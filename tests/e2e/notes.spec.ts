@@ -281,7 +281,7 @@ test("a note's preview shows the pictures it links to (and an Obsidian ![[embed]
   await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).map((e) => [e.pixelW, e.pixelH])[0]), hashOf(LONG))).toEqual([1200, 1800]);
 });
 
-test("a note on a canvas opens in the note panel (a double-click, or Edit note): the same editor, saved in place, the card follows", async ({ app }) => {
+test("a note on a canvas opens in the note panel (a double-click, or Edit note): the same editor, saved in place, the card follows, renamed, undo never returns an old version", async ({ app }) => {
   const p = app.page;
   const NOTE = "# On the canvas\n\nFirst words.\n";
   await p.getByTestId("view-assets").click();
@@ -335,4 +335,11 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   await p.locator('[data-rn="one"]').fill("plan");
   await p.getByTestId("rename-ok").click();
   await expect(p.getByTestId("note-panel").locator(".panel-head h2")).toHaveText("plan.md");
+  // The saves are no steps of the canvas's undo: Undo takes back the placing (never back to the old version), Redo places the saved note.
+  const saved = await placed();
+  await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // (the keys go to the canvas, not the editor)
+  await p.keyboard.press("Control+z");
+  await expect.poll(placed).toEqual([]);
+  await p.keyboard.press("Control+Shift+z");
+  await expect.poll(placed).toEqual(saved);
 });

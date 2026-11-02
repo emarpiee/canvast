@@ -205,3 +205,22 @@ describe("objects in frames (ADR 0014)", () => {
     expect([...again.all()].map((o) => JSON.stringify(serializeWorld(o))).sort()).toEqual(saved.map((s) => JSON.stringify(s)).sort());
   });
 });
+
+describe("a library item replaced by its new version", () => {
+  it("is followed in the undo history too: undo and redo never bring the old version back", () => {
+    const doc = new DocumentStore();
+    const card = image();
+    doc.commit(doc.transaction("Place", [card]));
+    doc.commit(doc.transaction("Move", [{ ...card, w: 900 }]));
+    const NEW = "b".repeat(64);
+    doc.remap((o) => (o.kind === "image" && o.assetId === card.assetId ? { ...o, assetId: NEW } : o));
+    expect(doc.canUndo).toBe(true);
+    doc.undo();
+    expect((doc.get(card.id) as ImageObject)).toMatchObject({ assetId: NEW, w: 800 });
+    doc.undo();
+    expect(doc.get(card.id)).toBeUndefined();
+    doc.redo();
+    doc.redo();
+    expect((doc.get(card.id) as ImageObject)).toMatchObject({ assetId: NEW, w: 900 });
+  });
+});
