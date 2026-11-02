@@ -8,6 +8,8 @@
 - **Added:** templates (Insert ▸ Template): four built in, and any note tagged `template` (an existing note or one written for it); layouts (Insert ▸ Layout: two or three columns, sidebar and main). Task list boxes can be ticked (`- [x]`). Saving is manual (`Ctrl+S`).
 - **Added:** the notes editor wears the app's look (its font, colours, corners, light or dark theme), and the library chooser opened from one of its dialogs (Insert image's gallery button) shows above that dialog.
 - **Changed:** Settings are regrouped: new tabs **Notes** (the editor's style), **Library** (the viewer's edges, player and slideshow) and **Saving to the library** (extracted frames, edited pictures, exports, patterns, shapes), leaving **Media and playback** with the players; the colour picker has its own card in Drawing and selection, *Fill gaps* moved to Shapes, and *Memory for pictures* has its own card in Performance.
+- **Added:** previews of notes: a note's library card and its card on a canvas show the top of its page instead of the plain file tile.
+- **Fixed:** a picture inserted into a note through the Insert image dialog did not show (the viewer's own picture styles hid it); the dialogs' Submit button had white text on the dark theme's light accent.
 - **Added:** **New note** in the library's Import menu: a markdown note in the open folder, opened to write in.
 - **Changed:** the library chooser (texture fill pictures, custom thumbnails) is one shared panel that can also open in the middle of the page, list any kind of item, import files from this device, and shows the first 300 matches of a big library (search narrows it).
 

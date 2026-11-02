@@ -1162,7 +1162,7 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 .asset-card { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; overflow: hidden; content-visibility: auto; color: inherit; text-align: left; background: var(--hud-hover); border: 0; border-radius: var(--r-md); cursor: pointer; }
 .asset-thumb { position: absolute; inset: 0; display: block; }
 .asset-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.asset-thumb img.is-pixelated, .viewer img.is-pixelated { image-rendering: pixelated; }
+.asset-thumb img.is-pixelated, .viewer img.is-pixelated:not(:where(.viewer-note *)) { image-rendering: pixelated; }
 .asset-thumb img.is-broken { display: none; }
 /* A thumbnail's place, the same everywhere (cards, list rows, the details picture, the filmstrip): until its picture has loaded the
    picture is out of sight (never the browser's broken-picture mark) and the place shimmers; one that cannot be shown leaves it plain. */
@@ -1274,14 +1274,14 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--r-lg); background: var(--media-bg); color: var(--media-fg); outline: none; }
 .viewer[hidden] { display: none; }
 .viewer-stage { flex: 1; min-height: 0; display: flex; overflow: auto; padding: var(--sp-8); }
-.viewer figure { margin: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; gap: var(--sp-5); }
+.viewer figure:not(:where(.viewer-note *)) { margin: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; gap: var(--sp-5); }
 /* Fit: the picture fills the stage (a small original is scaled up, crisp); 100% shows it at its own size. */
-.viewer img, .viewer video { display: block; flex: 1; width: 100%; min-height: 0; object-fit: contain; }
-.viewer img[hidden], .viewer video[hidden] { display: none; }
+.viewer img:not(:where(.viewer-note *)), .viewer video:not(:where(.viewer-note *)) { display: block; flex: 1; width: 100%; min-height: 0; object-fit: contain; }
+.viewer img[hidden]:not(:where(.viewer-note *)), .viewer video[hidden]:not(:where(.viewer-note *)) { display: none; }
 .viewer.is-actual .viewer-stage { display: block; }
-.viewer.is-actual figure { width: max-content; height: max-content; align-items: flex-start; margin: auto; }
-.viewer.is-actual img { flex: none; width: auto; max-width: none; max-height: none; }
-.viewer figcaption { flex: none; font-size: var(--text-sm); color: var(--media-muted); text-align: center; }
+.viewer.is-actual figure:not(:where(.viewer-note *)) { width: max-content; height: max-content; align-items: flex-start; margin: auto; }
+.viewer.is-actual img:not(:where(.viewer-note *)) { flex: none; width: auto; max-width: none; max-height: none; }
+.viewer figcaption:not(:where(.viewer-note *)) { flex: none; font-size: var(--text-sm); color: var(--media-muted); text-align: center; }
 .viewer-bar { flex: none; display: flex; align-items: center; gap: calc(var(--near) * 2); padding: var(--near) var(--edge); background: var(--media-bar); border-top: 1px solid var(--white-a10); }
 .viewer.no-bar .viewer-bar { display: none; }
 .viewer-nav, .viewer-tools { display: flex; align-items: center; gap: var(--sp-2); flex: none; }
@@ -1383,7 +1383,8 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
   --se-doc-background: var(--theme-bg); --se-doc-info-page-font-color: var(--hud-accent-fg); --se-doc-info-page-background-color: var(--hud-muted); --se-doc-info-font-color: var(--hud-muted); --se-doc-info-active-color: var(--hud-accent); --se-loading-color: var(--hud-accent);
 }
 .sun-editor.se-theme-canvast .se-list-inner :is(h1, h2, h3, h4, h5, h6, p, blockquote, pre) { font-family: var(--font-ui); } /* (the paragraph styles' previews) */
-.sun-editor.se-theme-canvast .se-btn-primary { color: var(--hud-accent-fg); } /* (the editor writes white on its accent) */
+/* (the editor writes white on its accent: the app's text on accent, in each state, the dialogs' own rule too) */
+.sun-editor.se-theme-canvast .se-btn-primary, .sun-editor.se-theme-canvast .se-btn-primary:is(:hover, :focus), .sun-editor.se-theme-canvast .se-modal-area .se-modal-inner .se-modal-content .se-btn-primary { color: var(--hud-accent-fg); }
 /* A note open in the viewer: the notes editor fills the stage; the picture's own tools are not shown. */
 .viewer-note { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
 .viewer-note > div, .viewer-note .se-container { flex: 1; min-height: 0; display: flex; flex-direction: column; }
@@ -1391,7 +1392,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer-note .se-container { height: 100%; }
 .viewer-note .se-wrapper { flex: 1; min-height: 0; }
 .viewer.is-note .viewer-stage { display: flex; padding-top: calc(var(--sp-6) + var(--ctl) + var(--sp-4)); } /* (under the viewer's Back and Details buttons) */
-.viewer.is-note figure, .viewer.is-note .viewer-edge, .viewer.is-note .viewer-ground, .viewer.is-note .viewer-zoom { display: none; }
+.viewer.is-note .viewer-stage > figure:not(:where(.viewer-note *)), .viewer.is-note .viewer-edge, .viewer.is-note .viewer-ground, .viewer.is-note .viewer-zoom { display: none; }
 .viewer-progress { position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--hud-accent); transform-origin: left; transform: scaleX(0); z-index: 1; }
 .viewer-progress[hidden] { display: none; }
 .viewer-progress.is-running { animation: show-run var(--ms, 5000ms) linear forwards; }
@@ -1453,7 +1454,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .assets-grid.has-picks .asset-check, .asset-check:checked, .asset-card:focus-visible ~ .asset-check { opacity: 1; }
 /* A touch screen, or any device that does not report a hover: the checkbox is always there. */
 @media (pointer: coarse), (hover: none), (hover: on-demand), (max-width: 640px) { .asset-check { opacity: 1 !important; } }
-.asset-thumb img, .film-item img, .asset-preview img, .viewer img { -webkit-user-drag: none; user-select: none; }
+.asset-thumb img, .film-item img, .asset-preview img, .viewer img:not(:where(.viewer-note *)) { -webkit-user-drag: none; user-select: none; }
 .assets-list-head { display: none; }
 
 /* List mode: a row per asset (picture, name, pixels, type and size, usage, tags), the same cards with a different layout. */
@@ -1478,8 +1479,8 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 #assets-view.is-viewing.no-controls .assets-bar { display: none; }
 .viewer-quick { display: none; }
 .assets-body.no-details .viewer-quick { display: contents; }
-.viewer img, .viewer video { cursor: zoom-in; }
-.viewer.is-actual img { cursor: zoom-out; }
+.viewer img:not(:where(.viewer-note *)), .viewer video:not(:where(.viewer-note *)) { cursor: zoom-in; }
+.viewer.is-actual img:not(:where(.viewer-note *)) { cursor: zoom-out; }
 
 /* The Arrange menu: its items are plain rows, not toolbar buttons (the toolbar's fixed control height made a long label overlap the next one). */
 
@@ -1562,11 +1563,11 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 /* Viewer, third pass: the picture is centred in the stage whatever its size, and the caption is always in the same place (bottom centre, over the stage). */
 .viewer-stage { position: relative; display: block; padding: 0; overflow: hidden; }
 .viewer.is-actual .viewer-stage { overflow: auto; }
-.viewer figure { position: absolute; inset: 0; margin: 0; width: auto; height: auto; display: block; }
-.viewer figure img, .viewer figure video { position: absolute; inset: 16px 16px var(--viewer-bottom); margin: auto; width: 100%; height: 100%; flex: none; object-fit: contain; }
-.viewer figcaption { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: var(--sp-3) var(--sp-6); font-size: var(--text-sm); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--media-fg); background: var(--media-caption-bg); border-radius: var(--r-pill); }
-.viewer.is-actual figure { position: static; width: max-content; height: max-content; margin: auto; }
-.viewer.is-actual figure img { position: static; inset: auto; width: auto; height: auto; max-width: none !important; max-height: none !important; margin: 0; }
+.viewer figure:not(:where(.viewer-note *)) { position: absolute; inset: 0; margin: 0; width: auto; height: auto; display: block; }
+.viewer figure img:not(:where(.viewer-note *)), .viewer figure video:not(:where(.viewer-note *)) { position: absolute; inset: 16px 16px var(--viewer-bottom); margin: auto; width: 100%; height: 100%; flex: none; object-fit: contain; }
+.viewer figcaption:not(:where(.viewer-note *)) { position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%); max-width: calc(100% - 32px); padding: var(--sp-3) var(--sp-6); font-size: var(--text-sm); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--media-fg); background: var(--media-caption-bg); border-radius: var(--r-pill); }
+.viewer.is-actual figure:not(:where(.viewer-note *)) { position: static; width: max-content; height: max-content; margin: auto; }
+.viewer.is-actual figure img:not(:where(.viewer-note *)) { position: static; inset: auto; width: auto; height: auto; max-width: none !important; max-height: none !important; margin: 0; }
 
 /* Hover and selection rings are drawn inside the card (an outline, above the picture), so the cards at the edges are not clipped by the scroll area. */
 /* The rings sit on a layer above the picture (an outline or inset shadow on the card itself is painted under its image). */
@@ -1603,7 +1604,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .cols-move button svg { width: 16px; height: 16px; }
 .cols-move button:hover:not(:disabled) { background: var(--hud-hover); }
 .cols-move button:disabled { opacity: 0.3; cursor: default; }
-.viewer img.is-file { image-rendering: auto; max-width: min(800px, 90%) !important; max-height: min(600px, 80%) !important; }
+.viewer img.is-file:not(:where(.viewer-note *)) { image-rendering: auto; max-width: min(800px, 90%) !important; max-height: min(600px, 80%) !important; }
 
 /* Viewer zoom: a small control over the picture (the wheel, a pinch, a drag and the keys do the work); the picture is moved with a transform. */
 .viewer-zoom { position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; align-items: center; gap: var(--sp-1); padding: var(--sp-2); background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); backdrop-filter: blur(8px); }
@@ -1613,8 +1614,8 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .viewer-zoom .viewer-zoom-pct { min-width: calc(var(--ctl) * 1.7); }
 .viewer.no-bar .viewer-zoom { opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
 .viewer.no-bar .viewer-zoom:hover, .viewer.no-bar .viewer-zoom:focus-within { opacity: 1; }
-.viewer figure img, .viewer figure video { cursor: grab; transition: none; will-change: transform; touch-action: none; }
-.viewer.is-zoomed figure img { cursor: grab; }
+.viewer figure img:not(:where(.viewer-note *)), .viewer figure video:not(:where(.viewer-note *)) { cursor: grab; transition: none; will-change: transform; touch-action: none; }
+.viewer.is-zoomed figure img:not(:where(.viewer-note *)) { cursor: grab; }
 .viewer-stage { touch-action: none; overflow: hidden; }
 .viewer.is-actual .viewer-stage { overflow: hidden; }
 
@@ -1769,8 +1770,8 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 }
 .viewer { background: var(--v-stage); color: var(--v-fg); }
 .viewer-bar { background: var(--v-bar); border-top-color: var(--v-line); }
-.viewer-pos, .viewer figcaption { color: var(--v-muted); }
-.viewer figcaption { background: var(--v-pill); }
+.viewer-pos, .viewer figcaption:not(:where(.viewer-note *)) { color: var(--v-muted); }
+.viewer figcaption:not(:where(.viewer-note *)) { background: var(--v-pill); }
 .vbtn:hover:not(:disabled) { background: var(--v-hover); }
 .viewer-interval { background: var(--v-hover); }
 .film-item { background: var(--v-hover); }
@@ -1878,10 +1879,10 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 /* The picture uses the whole stage, with the same margin on every side; with the controls hidden the stage, and so the picture, grows. */
 .viewer { --edge-w: 15; --viewer-bottom: var(--sp-8); }
 .viewer-stage .viewer-edge { -webkit-tap-highlight-color: transparent; }
-.viewer figcaption:not(.is-note) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; background: none; }
+.viewer figcaption:not(.is-note):not(:where(.viewer-note *)) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; background: none; }
 
 /* ---- Viewer: zoom control in the bar, the picture centred on every side; adjustable details on small screens ---- */
-.viewer figure img, .viewer figure video, .viewer-checker { inset: 16px 16px var(--viewer-bottom); }
+.viewer figure img:not(:where(.viewer-note *)), .viewer figure video:not(:where(.viewer-note *)), .viewer-checker { inset: 16px 16px var(--viewer-bottom); }
 .viewer-zoom { position: static; display: inline-flex; flex: none; padding: var(--sp-1); background: var(--v-hover); border: 0; backdrop-filter: none; }
 .viewer.no-bar .viewer-zoom { opacity: 1; }
 .viewer-edge { bottom: 0; }
@@ -1928,7 +1929,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .assets-body.is-list .assets-list-head, .assets-body.is-list .assets-grid { min-width: var(--list-min, 0); }
 
 /* ---- Viewer on a phone: the picture is centred (the inset is inside its box, not added to it), the bar is two tidy rows ---- */
-.viewer figure img, .viewer figure video { width: calc(100% - 32px); height: calc(100% - 16px - var(--viewer-bottom)); }
+.viewer figure img:not(:where(.viewer-note *)), .viewer figure video:not(:where(.viewer-note *)) { width: calc(100% - 32px); height: calc(100% - 16px - var(--viewer-bottom)); }
 @media (max-width: 640px) {
   .viewer-bar { display: grid; grid-template-columns: 1fr; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5) calc(var(--sp-4) + env(safe-area-inset-bottom, 0px)); }
   .viewer-film { grid-row: 1; }
@@ -1942,14 +1943,14 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 }
 
 /* ---- Viewer: the on-canvas player's controls over the picture (ADR 0064); the GIF canvas is placed like the picture ---- */
-.viewer figure canvas.viewer-gif { position: absolute; inset: 16px 16px var(--viewer-bottom); margin: auto; width: calc(100% - 32px); height: calc(100% - 16px - var(--viewer-bottom)); object-fit: contain; cursor: grab; will-change: transform; touch-action: none; }
-.viewer figure canvas.viewer-gif[hidden] { display: none; }
-.viewer figure canvas.viewer-vec { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.viewer figure canvas.viewer-vec[hidden] { display: none; }
-.viewer img.is-vector { opacity: 0; pointer-events: none; }
+.viewer figure canvas.viewer-gif:not(:where(.viewer-note *)) { position: absolute; inset: 16px 16px var(--viewer-bottom); margin: auto; width: calc(100% - 32px); height: calc(100% - 16px - var(--viewer-bottom)); object-fit: contain; cursor: grab; will-change: transform; touch-action: none; }
+.viewer figure canvas.viewer-gif[hidden]:not(:where(.viewer-note *)) { display: none; }
+.viewer figure canvas.viewer-vec:not(:where(.viewer-note *)) { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.viewer figure canvas.viewer-vec[hidden]:not(:where(.viewer-note *)) { display: none; }
+.viewer img.is-vector:not(:where(.viewer-note *)) { opacity: 0; pointer-events: none; }
 /* zoomed in, a drag pans: the hand says so */
-.viewer.is-zoomed .viewer-stage, .viewer.is-zoomed img, .viewer.is-zoomed video, .viewer.is-zoomed canvas.viewer-gif { cursor: grab; }
-.viewer.is-grabbing .viewer-stage, .viewer.is-grabbing figure img, .viewer.is-grabbing figure video, .viewer.is-grabbing figure canvas.viewer-gif { cursor: grabbing; }
+.viewer.is-zoomed .viewer-stage, .viewer.is-zoomed img:not(:where(.viewer-note *)), .viewer.is-zoomed video:not(:where(.viewer-note *)), .viewer.is-zoomed canvas.viewer-gif:not(:where(.viewer-note *)) { cursor: grab; }
+.viewer.is-grabbing .viewer-stage, .viewer.is-grabbing figure img:not(:where(.viewer-note *)), .viewer.is-grabbing figure video:not(:where(.viewer-note *)), .viewer.is-grabbing figure canvas.viewer-gif:not(:where(.viewer-note *)) { cursor: grabbing; }
 /* A video's or GIF's player floats over the bottom of the picture (the picture keeps its size); while the pointer rests, playing or
    paused, it fades away (after Settings > Library, Hide the player) until the pointer moves. */
 .viewer-media-bar { position: absolute; left: 50%; bottom: calc(var(--viewer-bottom) + var(--sp-4)); top: auto; transform: translateX(-50%); z-index: 3; width: min(560px, calc(100% - 24px)); background: var(--v-pill); color: var(--v-fg); border: 1px solid var(--v-line); backdrop-filter: blur(10px); transition: opacity var(--dur-base); }

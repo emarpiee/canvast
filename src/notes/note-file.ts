@@ -75,6 +75,9 @@ export function linkTarget(link: string, noteDir: readonly string[]): { hash: st
   return path && { path };
 }
 
+/** A plain text file as the editor's HTML: a paragraph a line. */
+export const textHtml = (text: string): string => text.split(/\r?\n/).map((l) => `<p>${l.replace(/[&<>]/g, (c) => `&#${c.charCodeAt(0)};`) || "<br>"}</p>`).join("");
+
 /** A whole HTML file for a rich text note: its title and the editor's HTML as its body. */
 export function richNoteFile(title: string, body: string): string {
   const t = title.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);

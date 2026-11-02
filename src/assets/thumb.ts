@@ -1,3 +1,5 @@
+import { notePicture } from "../notes/note-preview";
+import { noteKindOf } from "../notes/note-file";
 import type { AssetRecord } from "./asset-library";
 import type { ThumbRecord } from "./asset-catalog";
 import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
@@ -18,6 +20,7 @@ const THUMB_QUALITY = 0.6;
 export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
   // A file shown as a card has no stored picture: the library draws a fixed tile for it (ADR 0089), so there is nothing to make.
   if (isFontFile(rec)) return makeFontThumb(rec);
+  if (noteKindOf(rec.name)) return makeNoteThumb(rec);
   if (isCard(rec)) return null;
   try {
     const k = Math.min(1, THUMB_PX / Math.max(rec.pixelW, rec.pixelH));
@@ -81,6 +84,18 @@ async function makeFontThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
     return null;
   } finally {
     if (face) document.fonts.delete(face);
+  }
+}
+
+/** A note's thumbnail: the top of its page (as on its card on a canvas, 4:3). Null when it cannot be drawn. */
+async function makeNoteThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
+  try {
+    const c = await notePicture(rec.name, await rec.blob.text(), THUMB_PX, Math.round((THUMB_PX * 3) / 4));
+    let blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", THUMB_QUALITY));
+    if (blob?.type !== "image/webp") blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", THUMB_QUALITY));
+    return blob ? { hash: rec.hash, blob, w: c.width, h: c.height } : null;
+  } catch {
+    return null;
   }
 }
 

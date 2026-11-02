@@ -26,6 +26,8 @@ test("a markdown note opens in the notes editor with its library links, saves in
     { name: "plan.md", mimeType: "text/markdown", buffer: Buffer.from(MD) },
     { name: "Sketch log.md", mimeType: "text/markdown", buffer: Buffer.from(TEMPLATE) },
   ]);
+  // A note's card shows its page (its preview, the same picture as its card on a canvas), not the plain file tile.
+  await expect.poll(() => card(p, hashOf(MD)).locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   // A note tagged `template` is offered as a template in every other note.
   await card(p, hashOf(TEMPLATE)).click();
   await p.getByTestId("asset-tag-input").fill("template");
@@ -81,6 +83,7 @@ test("a markdown note opens in the notes editor with its library links, saves in
   await chooser.getByRole("button", { name: "cat.png" }).click(); // (a click on it: nothing covers it)
   await p.locator(".se-modal").filter({ visible: true }).getByRole("button", { name: "Submit" }).click();
   await expect(page(p).locator("img")).toHaveCount(2);
+  for (const img of await page(p).locator("img").all()) expect((await img.boundingBox())?.width, "every picture shows (none hidden by the viewer's own styles)").toBeGreaterThan(0);
 
   // Leaving with changes asks first: Don't save lets them go.
   await p.getByTestId("slide-view").locator('[data-act="close"]').click();

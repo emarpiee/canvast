@@ -1,7 +1,7 @@
 import suneditor, { helper } from "suneditor";
 import { align, anchor, audio, audioGallery, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, pageNavigator, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
 import type { SunEditor } from "suneditor/types";
-import { linkTarget, relativeLink, richNoteBody, richNoteFile } from "../notes/note-file";
+import { linkTarget, relativeLink, richNoteBody, richNoteFile, textHtml } from "../notes/note-file";
 import type { NoteKind, NoteStyle } from "../notes/note-file";
 
 
@@ -161,9 +161,6 @@ function libraryGallery<T extends GalleryClass>(base: T, choose: (kind: AttachKi
     }
   };
 }
-
-/** A plain text file as the editor's HTML: a paragraph a line. */
-const textHtml = (text: string): string => text.split(/\r?\n/).map((l) => `<p>${l.replace(/[&<>]/g, (c) => `&#${c.charCodeAt(0)};`) || "<br>"}</p>`).join("");
 
 /** Is this an upload of files from the device (and not an address, which goes in as it is)? */
 const localFiles = (files: unknown): File[] | null => {

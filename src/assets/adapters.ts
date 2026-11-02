@@ -1,3 +1,5 @@
+import { notePicture } from "../notes/note-preview";
+import { noteKindOf } from "../notes/note-file";
 import { extOf, isFontFile } from "./file-kind";
 import { FILE_CARD_H, FILE_CARD_W, makeFileCard } from "./card";
 
@@ -80,6 +82,10 @@ export function pdfPages(bytes: Uint8Array): number | null {
 /** The card of a file, with what can be drawn from its bytes: a 3D model's shape, a PDF's page count. Never fails: the plain card is the fallback. */
 export async function makeFileCardFrom(name: string, chip: string, bytes: Uint8Array): Promise<ImageBitmap> {
   const ext = extOf(name);
+  if (noteKindOf(name)) {
+    const page = await notePicture(name, new TextDecoder().decode(bytes), FILE_CARD_W, FILE_CARD_H).catch(() => null);
+    if (page) return createImageBitmap(page);
+  }
   if (isFontFile({ type: "", name })) {
     const sample = await fontCard(chip, bytes).catch(() => null);
     if (sample) return sample;

@@ -1,3 +1,4 @@
+import { noteKindOf } from "../notes/note-file";
 /**
  * Any file can go in the library (ADR 0078). What the browser can show is shown (pictures, video, audio, GIF); every other file, and any
  * picture, video or sound the browser cannot read, is kept as it is and shown as a card with its extension, its name and what it is, with
@@ -13,8 +14,8 @@ export const isCard = (x: { type: string; card?: boolean }): boolean => !isMedia
 /** A font file (shown by its letters: a thumbnail of "Aa" in that font). */
 export const isFontFile = (x: { type: string; name: string }): boolean => /^font\//.test(x.type) || /^(TTF|OTF|WOFF2?|TTC)$/.test(extOf(x.name));
 
-/** A file card with a thumbnail of its own (a font's letters), else a card shows the file tile. */
-export const hasThumb = (x: { type: string; name: string; card?: boolean }): boolean => !isCard(x) || isFontFile(x);
+/** A file card with a thumbnail of its own (a font's letters, a note's page), else a card shows the file tile. */
+export const hasThumb = (x: { type: string; name: string; card?: boolean }): boolean => !isCard(x) || isFontFile(x) || noteKindOf(x.name) !== null;
 
 /** The extension of a file name, upper case and at most eight letters or digits; "" when there is none. */
 export function extOf(name: string): string {
