@@ -233,6 +233,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="col-grip" data-grip="side" data-testid="side-grip" role="separator" aria-orientation="vertical" aria-label="Resize the library panel" title="Drag to resize the library panel (double-click to reset)" tabindex="0"></div>
       <div class="assets-main">
         <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map((c) => `<span data-col="${c.id}" draggable="true" role="columnheader" aria-sort="none" title="Click to sort by ${c.label.toLowerCase()}; drag to move this column">${c.label}<i class="col-sort" aria-hidden="true"></i><i class="col-resize" data-resize="${c.id}" title="Drag to resize this column (double-click: its usual width)" aria-hidden="true"></i></span>`).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
+        <div class="assets-filtered" data-testid="assets-filtered" role="status" hidden>${ICONS.funnelX}<span class="assets-filtered-text"></span><button type="button" data-action="show-all" data-testid="assets-show-all">Show all items</button></div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
           <button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.arrowLeft}</button>
           <button type="button" class="vbtn viewer-hide" data-act="bar" aria-label="Hide the controls" title="Hide the controls (F)">${ICONS.chevronsDown}</button>
@@ -319,6 +320,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const sortSel = root.querySelector<HTMLSelectElement>('[data-testid="assets-sort"]')!;
   const sortDirBtn = root.querySelector<HTMLButtonElement>('[data-testid="assets-sort-dir"]')!;
   const resetFiltersBtn = root.querySelector<HTMLButtonElement>('[data-testid="assets-reset-filters"]')!;
+  const filteredChip = root.querySelector<HTMLElement>('[data-testid="assets-filtered"]')!;
+  const filteredText = filteredChip.querySelector<HTMLElement>(".assets-filtered-text")!;
   /** Sort order reversed from its usual one (newest, A to Z, largest and most used first). */
   let reversed = false;
   const SORT_LABEL: Record<SortKey, [usual: string, reversed: string]> = {
@@ -2030,6 +2033,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return i === undefined ? null : revealIndex(i, block);
   };
   let filmOf: string[] | null = null;
+  /** What the side panel shows now, in words (its title). */
+  const scopeNameOf = (tagCounts?: ReadonlyMap<string, { label: string }>): string => {
+    if (scope === "all") return hiddenMode ? "All hidden items" : "All items";
+    if (scope === "favorites") return "Favourites";
+    if (scope === "unfiled") return "Unfiled";
+    if (scope === "similar") return "Similar images";
+    if (scope.startsWith("folder:")) return listing!.folders.find((f) => `folder:${f.id}` === scope)?.name ?? "Folder";
+    if (/^(ext|tag):/.test(scope) && /[|&]/.test(scope)) return [...pickedKeys(scope)].map((k) => (k.startsWith("ext:") ? `.${k.slice(4).toUpperCase()}` : `#${tagCounts?.get(k.slice(4))?.label ?? k.slice(4)}`)).join(", ");
+    if (scope.startsWith("ext:")) return `File type .${scope.slice(4).toUpperCase()}`;
+    if (scope.startsWith("tag:")) return `#${tagCounts?.get(scope.slice(4))?.label ?? scope.slice(4)}`;
+    if (scope.startsWith("ctag:")) return `Canvas tag #${canvasTags.get(scope.slice(5))?.label ?? scope.slice(5)}`;
+    return "Library";
+  };
   /** Keep the filters (not the search) with the layout, and show the reset button only when one is not its default. */
   const keepFilters = (): void => {
     const f = { usage: usageSel.value, sort: sortSel.value, reversed, scope: beforeHidden?.scope ?? scope }; // (hidden mode's scope is not kept)
@@ -2096,6 +2112,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     const all = totalOf.n;
     count.textContent = `${rows.length === all ? "" : `${rows.length} of `}${all} item${all === 1 ? "" : "s"}`;
+    // What hides items is said over the grid, with a way back to all of them (a filter left on looked like lost files).
+    const why = [usageSel.value !== "all" ? usageSel.selectedOptions[0]?.text ?? "" : "", scope !== "all" ? scopeNameOf() : "", search.value.trim() ? `“${search.value.trim()}”` : ""].filter(Boolean);
+    filteredChip.hidden = !why.length || rows.length >= all;
+    if (!filteredChip.hidden) filteredText.textContent = `Showing ${rows.length} of ${plural(all, "item")}: ${why.join(" · ")}`;
     showPicked();
     if (cardsOf !== listing || cardsReadOnly !== session.readOnly) {
       cardHtml = new WeakMap();
@@ -2228,18 +2248,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return `${shown.map((r) => r.html).join("")}<li class="side-row side-show-row"><button type="button" class="side-show-all" data-show-all="${id}" data-testid="side-show-all" aria-expanded="${open}">${open ? "Show fewer" : `Show ${rows.length - shown.length} more`}</button></li>`;
     };
     const addBtn = (attr: string, label: string, extra = ""): string => (ro ? "" : `<button type="button" class="side-add" ${attr} aria-label="${label}" title="${label}"${extra}>${ICONS.folderPlus}</button>`);
-    const scopeName = ((): string => {
-      if (scope === "all") return hiddenMode ? "All hidden items" : "All items";
-      if (scope === "favorites") return "Favourites";
-      if (scope === "unfiled") return "Unfiled";
-      if (scope === "similar") return "Similar images";
-      if (scope.startsWith("folder:")) return listing!.folders.find((f) => `folder:${f.id}` === scope)?.name ?? "Folder";
-      if (/^(ext|tag):/.test(scope) && /[|&]/.test(scope)) return [...pickedKeys(scope)].map((k) => (k.startsWith("ext:") ? `.${k.slice(4).toUpperCase()}` : `#${tagCounts.get(k.slice(4))?.label ?? k.slice(4)}`)).join(", ");
-      if (scope.startsWith("ext:")) return `File type .${scope.slice(4).toUpperCase()}`;
-      if (scope.startsWith("tag:")) return `#${tagCounts.get(scope.slice(4))?.label ?? scope.slice(4)}`;
-      if (scope.startsWith("ctag:")) return `Canvas tag #${canvasTags.get(scope.slice(5))?.label ?? scope.slice(5)}`;
-      return "Library";
-    })();
+    const scopeName = scopeNameOf(tagCounts);
     side.dataset["open"] = String(sideOpen);
     const html = `
       <button type="button" class="side-collapse" data-side-toggle aria-expanded="${sideOpen}">${ICONS.panelLeft}<span class="side-label">Library: ${esc(scopeName)}</span>${sideOpen ? ICONS.chevronUp : ICONS.chevronDown}</button>
@@ -4028,6 +4037,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const group = picked.size > 1 ? list.filter((h) => picked.has(h)) : list;
     const first = group.find((h) => h === selected) ?? group[0]!;
     startShow(first, picked.size > 1 ? new Set(group) : undefined);
+  });
+  filteredChip.querySelector("button")!.addEventListener("click", () => {
+    search.value = "";
+    paintSearchUi();
+    resetFiltersBtn.click();
   });
   resetFiltersBtn.addEventListener("click", () => {
     usageSel.value = NO_FILTERS.usage;

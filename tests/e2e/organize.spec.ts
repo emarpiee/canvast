@@ -703,7 +703,7 @@ test("the workspace menu exports the whole workspace as a backup or as plain fil
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("the library's filters are kept over a reload, and one button resets them all", async ({ app }) => {
+test("the library's filters are kept over a reload, are said over the grid, and one button resets them all", async ({ app }) => {
   const p = app.page;
   await libraryWithTwo(p);
   const reset = p.getByTestId("assets-reset-filters");
@@ -720,12 +720,16 @@ test("the library's filters are kept over a reload, and one button resets them a
   await expect(p.getByTestId("assets-sort")).toHaveValue("name");
   await expect(p.getByTestId("assets-sort-dir")).toHaveAttribute("aria-pressed", "true");
   await expect(side(p, /^Favourites/)).toHaveAttribute("aria-current", "true");
-  await reset.click();
+  // What hides items is said over the grid (a filter left on is not taken for lost files), with a way back: Show all items resets them.
+  await expect(p.getByTestId("assets-filtered")).toContainText("Showing 0 of 2 items: Unused · Favourites");
+  await expect(reset).toBeVisible();
+  await p.getByTestId("assets-show-all").click();
   await expect(p.getByTestId("assets-usage")).toHaveValue("all");
   await expect(p.getByTestId("assets-sort")).toHaveValue("newest");
   await expect(p.getByTestId("assets-sort-dir")).toHaveAttribute("aria-pressed", "false");
   await expect(side(p, /^All items/)).toHaveAttribute("aria-current", "true");
   await expect(reset).toBeHidden();
+  await expect(p.getByTestId("assets-filtered")).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });
 

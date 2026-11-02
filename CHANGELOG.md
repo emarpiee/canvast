@@ -50,6 +50,7 @@
 - **Added:** in the notes editor, the font size and the width and height of a picture or video change by dragging the field left or right, as every number field of the app.
 - **Fixed:** a context menu could open far from the pointer: a narrow one opened to its right, and in the library one kept off the canvas's selected items, which are not on the screen there. It now opens at the pointer.
 - **Added:** `kind:note` in the library and canvas searches, and in the library `kind:vector`, `kind:document`, `kind:archive`, `kind:3d`, `kind:preset`, `kind:icon` and `kind:art`.
+- **Added:** while a search or a filter hides items in the library, a chip over the grid says what and how many are shown, with Show all items (a filter left on looked like lost files).
 
 ## 0.52.6 — Library files worked on elsewhere, Flip (2026-11-02)
 

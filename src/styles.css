@@ -2143,12 +2143,16 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .assets-search-pop .cs-modes { padding-top: var(--sp-4); }
 .assets-search-pop .cs-recent { border-top: 1px solid var(--hud-border); border-bottom: 0; }
 /* Hidden mode: a compact chip at the start of the status bar, in the accent colour (the view looks the same otherwise), and the word in the search box. */
-.assets-hidden-bar { display: inline-flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-4); color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: var(--r-pill); white-space: nowrap; }
+:is(.assets-hidden-bar, .assets-filtered) { display: inline-flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-1) var(--sp-1) var(--sp-4); color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: var(--r-pill); white-space: nowrap; }
 .assets-hidden-bar[hidden] { display: none; }
-.assets-hidden-bar > svg { width: var(--icon-sm); height: var(--icon-sm); flex: none; }
-.assets-hidden-bar button { display: inline-flex; align-items: center; gap: var(--sp-1); padding: var(--sp-1) var(--sp-3); font: inherit; font-size: var(--text-sm); color: inherit; background: none; border: 0; border-radius: var(--r-pill); cursor: pointer; }
-.assets-hidden-bar button:hover, .assets-hidden-bar button[aria-pressed="true"] { background: color-mix(in oklch, var(--hud-accent-fg) 22%, transparent); }
-.assets-hidden-bar button svg { width: var(--icon-sm); height: var(--icon-sm); }
+/* The filters that hide items, said over the bottom of the grid (the same chip as hidden mode's). */
+.assets-filtered { position: absolute; left: 50%; bottom: var(--sp-4); transform: translateX(-50%); max-width: calc(100% - var(--sp-8)); }
+.assets-filtered[hidden] { display: none; }
+.assets-filtered-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+:is(.assets-hidden-bar, .assets-filtered) > svg { width: var(--icon-sm); height: var(--icon-sm); flex: none; }
+:is(.assets-hidden-bar, .assets-filtered) button { display: inline-flex; align-items: center; gap: var(--sp-1); padding: var(--sp-1) var(--sp-3); font: inherit; font-size: var(--text-sm); color: inherit; background: none; border: 0; border-radius: var(--r-pill); cursor: pointer; }
+:is(.assets-hidden-bar, .assets-filtered) button:hover, .assets-hidden-bar button[aria-pressed="true"] { background: color-mix(in oklch, var(--hud-accent-fg) 22%, transparent); }
+:is(.assets-hidden-bar, .assets-filtered) button svg { width: var(--icon-sm); height: var(--icon-sm); }
 @media (max-width: 640px) { .assets-hidden-label, .assets-hidden-bar [data-action="hidden-stay"] { display: none; } }
 @media (max-width: 640px) { #assets-view .assets-statusbar > .hud-readout:has(.assets-hidden-bar:not([hidden])) { flex-wrap: nowrap; column-gap: var(--sp-4); } }
 
