@@ -386,10 +386,17 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
 test("the Note tool (M) makes a note file in the Notes folder, places its card and opens it; Make note files turns a text on a card into one", async ({ app }) => {
   const p = app.page;
   const objs = () => p.evaluate(() => window.__canvastDebug.objects() as unknown as Array<{ id: string; kind: string; assetId?: string; z: number }>);
+  // Its name is the pattern of Settings > Notes > New note name.
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Notes", exact: true }).click();
+  await p.locator('[data-row="notes.name"] input').fill("Idea {yyyy}");
+  await p.locator('[data-row="notes.name"] input').press("Tab");
+  await p.getByTestId("view-canvas").click();
   await p.keyboard.press("m");
   await p.mouse.click(420, 260);
   const panel = p.getByTestId("note-panel");
-  await expect(panel.locator(".sun-editor-editable h1").first()).toContainText("Note ");
+  await expect(panel.locator(".sun-editor-editable h1").first()).toHaveText(/^Idea \d{4}$/);
+  await expect(panel.locator(".panel-head h2")).toHaveText(/^Idea \d{4}\.md$/);
   await expect.poll(async () => (await objs()).map((o) => o.kind)).toEqual(["image"]);
   // A text on a card (made before notes were files) becomes a note: the same place and stacking, its words in the file.
   await panel.locator("[data-close]").click();

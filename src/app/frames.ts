@@ -54,14 +54,22 @@ export async function encodePicture(png: Blob, format: "png" | "webp" | "jpeg", 
   }
 }
 
-/** The name an edited picture gets (Settings > Edited pictures), without its extension: from the original's name. */
-export function editedName(session: Session, settings: SettingsStore, sourceName: string): string {
-  const stem = sourceName.replace(/\.[^.]*$/, "") || "picture";
+/** The words of a name pattern that say where the app is now (the workspace, board and canvas open), at this moment. */
+function placeParts(session: Session): { workspace: string; board: string; canvas: string; at: Date } {
   const tree = session.tree;
   const cur = session.current;
   const board = tree?.boards.find((b) => b.board.id === cur?.boardId);
   const canvas = board?.canvases.find((b) => b.id === cur?.canvasId);
-  return shotFileName(settings.get("edit.name"), { workspace: tree?.workspace.displayName ?? "workspace", board: board?.board.name ?? "board", canvas: canvas?.name ?? "canvas", at: new Date(), extra: { name: stem, position: "" } }, settings.get("edit.nameStyle"));
+  return { workspace: tree?.workspace.displayName ?? "workspace", board: board?.board.name ?? "board", canvas: canvas?.name ?? "canvas", at: new Date() };
+}
+
+/** The name a new note gets (Settings > Notes > New note name), without its extension. */
+export const newNoteName = (session: Session, settings: SettingsStore): string => shotFileName(settings.get("notes.name"), placeParts(session), "keep");
+
+/** The name an edited picture gets (Settings > Edited pictures), without its extension: from the original's name. */
+export function editedName(session: Session, settings: SettingsStore, sourceName: string): string {
+  const stem = sourceName.replace(/\.[^.]*$/, "") || "picture";
+  return shotFileName(settings.get("edit.name"), { ...placeParts(session), extra: { name: stem, position: "" } }, settings.get("edit.nameStyle"));
 }
 
 export async function storeFrame(assets: AssetLibrary, session: Session, settings: SettingsStore, shot: FrameShot): Promise<AssetRecord> {
@@ -72,12 +80,8 @@ export async function storeFrame(assets: AssetLibrary, session: Session, setting
     : { format: settings.get("frame.format"), quality: settings.get("frame.quality"), name: settings.get("frame.name"), style: settings.get("frame.nameStyle"), folder: settings.get("frame.folder"), own: settings.get("frame.tagFrame") ? "extracted-frame" : "", source: settings.get("frame.tagSource"), inherit: settings.get("frame.tagInherit"), custom: settings.get("frame.tagsCustom"), fallback: "frame" };
   const { blob, mime, ext } = await encodePicture(shot.png, c.format, c.quality);
   const stem = shot.sourceName.replace(/\.[^.]*$/, "") || c.fallback;
-  const tree = session.tree;
-  const cur = session.current;
-  const board = tree?.boards.find((b) => b.board.id === cur?.boardId);
-  const canvas = board?.canvases.find((b) => b.id === cur?.canvasId);
   const position = edit ? "" : framePosition(shot.label);
-  const file = `${shotFileName(c.name, { workspace: tree?.workspace.displayName ?? "workspace", board: board?.board.name ?? "board", canvas: canvas?.name ?? "canvas", at: new Date(), extra: { name: stem, position } }, c.style)}.${ext}`;
+  const file = `${shotFileName(c.name, { ...placeParts(session), extra: { name: stem, position } }, c.style)}.${ext}`;
   const { record } = await assets.importFileDetailed(new File([blob], file, { type: mime }), true);
   const tags: string[] = [];
   if (c.own) tags.push(c.own);

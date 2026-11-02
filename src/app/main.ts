@@ -9,7 +9,7 @@ import { ViewState } from "./view-state";
 import { newNoteFile } from "../notes/note-file";
 import { cleanFileName } from "../doc/rename-rules";
 import { fileInLibrary } from "./library-filing";
-import { storeFrame } from "./frames";
+import { newNoteName, storeFrame } from "./frames";
 import { newObjectId, rasterKey } from "../doc/model";
 import type { CanvasObject, ImageObject, TextObject } from "../doc/model";
 import type { ScreenPoint } from "../core/camera";
@@ -1030,8 +1030,6 @@ async function start(): Promise<void> {
   notePanelEl.dataset["testid"] = "note-panel";
   notePanelEl.hidden = true;
   const notePanelReady = (d: NotePanelDeps): void => void (notePanel = mountNotePanel(notePanelEl, d));
-  /** A card's width on the screen when the Note tool is clicked (a box dragged sets its own). */
-  const NOTE_CARD_PX = 320;
   let newNoteAt: (at: ScreenPoint, widthPx?: number) => Promise<void> = async () => undefined;
   let makeNoteFiles: () => Promise<void> = async () => undefined;
   attachTools(canvas, view, doc, index, editor, { editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h) => void notePanel.open(h), newNote: (at, w) => void newNoteAt(at, w), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
@@ -1911,9 +1909,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     return rec;
   };
   // The Note tool (M): a new markdown note, its card placed where the canvas was clicked (as wide as a box dragged), opened in the note panel.
-  newNoteAt = async (at, widthPx = NOTE_CARD_PX) => {
+  newNoteAt = async (at, widthPx = settings.get("notes.cardWidth")) => {
     if (editor.blockEdit() || !session.catalog) return;
-    const rec = await storeNote(newNoteFile());
+    const rec = await storeNote(newNoteFile(newNoteName(session, settings)));
     if (!rec) return;
     const o = imageAt(rec, doc, view, at.x, at.y, widthPx, (widthPx * rec.pixelH) / rec.pixelW, doc.topZ() + 1);
     doc.commit(doc.transaction("New note", [o]));

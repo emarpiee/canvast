@@ -146,6 +146,8 @@ export const SETTINGS = {
   "ui.corners": { scope: "device", default: "round", validate: oneOf("round", "sharp"), effect: "immediate" } as Def<"round" | "sharp">,
   "ui.density": { scope: "device", default: "compact", validate: oneOf("comfortable", "compact", "dense"), effect: "immediate" } as Def<"comfortable" | "compact" | "dense">,
   "notes.cardLength": { scope: "device", default: "long", validate: oneOf("short", "medium", "long", "whole"), effect: "immediate" } as Def<"short" | "medium" | "long" | "whole">,
+  "notes.name": { scope: "device", default: "Note {yyyy}-{mm}-{dd} {hhmmss}", validate: text(120), effect: "immediate" } as Def<string>,
+  "notes.cardWidth": { scope: "device", default: 320, validate: range(120, 1200), effect: "immediate" } as Def<number>,
   "notes.folder": { scope: "device", default: "Notes", validate: text(60), effect: "immediate" } as Def<string>,
   "notes.look": { scope: "device", default: "auto", validate: oneOf("auto", "light", "dark"), effect: "immediate" } as Def<"auto" | "light" | "dark">,
   "notes.style": { scope: "device", default: "document", validate: oneOf("document", "classic", "bottom", "balloon", "notion"), effect: "immediate" } as Def<NoteStyle>,

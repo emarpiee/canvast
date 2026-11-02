@@ -15,7 +15,7 @@ import { tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { mountSuggest } from "./search-suggest";
 import type { SuggestSources } from "../search/suggest";
 import { itemsIn, justifiedLayout, listLayout, nearestInRow, rowOf, squaresLayout, type GridLayout } from "./library-layout";
-import { storeFrame } from "../app/frames";
+import { newNoteName, storeFrame } from "../app/frames";
 import { chipOf, describeFile, extOf, hasThumb, isCard, isFontFile } from "../assets/file-kind";
 import { FILE_CARD_NOTE } from "../assets/card";
 import { fontSampleHtml, showFont } from "./font-specimen";
@@ -4362,7 +4362,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   );
   /** A new markdown note (its first line says when it was made, so no two are the same file), in the folder open in the sidebar. */
   const newNote = async (): Promise<void> => {
-    const [hash] = await view.importFiles([newNoteFile()]);
+    const [hash] = await view.importFiles([newNoteFile(newNoteName(session, settings))]);
     if (!hash) return;
     // (in the open folder; else in the Notes folder of Settings > Notes)
     if (scope.startsWith("folder:")) await session.organize((c) => c.updateMeta(hash, { addFolders: [scope.slice(7)] }), "File a note");

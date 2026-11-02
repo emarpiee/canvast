@@ -53,6 +53,7 @@
 - **Added:** while a search or a filter hides items in the library, a chip over the grid says what and how many are shown, with Show all items (a filter left on looked like lost files).
 - **Fixed:** desktop app: several saves of one file at the same moment (moving hidden items, which rewrites their list) could fail with a "could not write" notice: two of them used the same temporary file. Nothing was damaged: a file is only replaced once its new copy is complete.
 - **Fixed:** desktop app started from a terminal that was closed since: a crash dialog "write EPIPE" (its log went to a broken pipe).
+- **Added:** Settings > Notes > New note name (a pattern with {board}, {canvas}, {yyyy}, {hhmmss}… as for screenshots) and Note card width (how wide a click of the Note tool makes a card).
 
 ## 0.52.6 — Library files worked on elsewhere, Flip (2026-11-02)
 

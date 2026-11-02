@@ -26,11 +26,8 @@ export function noteKindOf(name: string): NoteKind | null {
 }
 
 /** The name of the rich text note made from a note (`plan.md` → `plan.note.html`). */
-/** A new markdown note, named by the time it was made (`Note 2026-11-03 101500.md`), its title the same. */
-export function newNoteFile(now = new Date()): File {
-  const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${now.toTimeString().slice(0, 8).replace(/:/g, "")}`;
-  return new File([`# Note ${stamp}\n\n`], `Note ${stamp}.md`, { type: "text/markdown" });
-}
+/** A new markdown note named `name` (Settings > Notes > New note name), its title the same. */
+export const newNoteFile = (name: string): File => new File([`# ${name}\n\n`], `${name}.md`, { type: "text/markdown" });
 
 export const richNameOf = (name: string): string => `${name.replace(/\.(md|markdown|txt)$/i, "")}${RICH_NOTE_SUFFIX}`;
 
