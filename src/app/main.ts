@@ -512,6 +512,7 @@ async function start(): Promise<void> {
   storage?.folderSync?.start({
     importFiles: async (files) => {
       let n = 0;
+      const followed: string[] = [];
       for (const f of files) {
         try {
           // Too big to read into the page: taken in from its hash alone, as a card.
@@ -522,10 +523,20 @@ async function start(): Promise<void> {
           if (f.folderId) await storage.catalog.updateMeta(record.hash, { addFolders: [f.folderId] });
           if (f.hidden) await storage.catalog.updateMeta(record.hash, { hidden: true });
           if (f.meta) await storage.catalog.updateMeta(record.hash, { addTags: f.meta.tags, favorite: f.meta.favorite, note: f.meta.note, fields: f.meta.fields });
+          // (an item's file saved again by the program it is worked on in: what was placed of it follows the new version)
+          if (f.follows) {
+            await session.followAsset(f.follows, record.hash, { w: record.pixelW, h: record.pixelH });
+            followed.push(f.name);
+            continue;
+          }
           n++;
         } catch (e) {
           console.warn(`canvast: ${f.path} could not be taken into the library: ${(e as Error).message}`); // (left where it is)
         }
+      }
+      if (followed.length) {
+        editor.message = followed.length === 1 ? `“${followed[0]}” was changed outside the app: the library and the canvases show the new version.` : `${plural(followed.length, "file")} were changed outside the app: the library and the canvases show the new versions.`;
+        editor.changed();
       }
       if (!n) return;
       editor.message = `${n === 1 ? "A new file" : `${n} new files`} in the workspace folder ${n === 1 ? "was" : "were"} added to the library.`;

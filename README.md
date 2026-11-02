@@ -707,8 +707,9 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 | A canvas file or board folder renamed in `.canvast/boards/` | Renames the canvas or board (its files then take their safe names) |
 | A canvas file moved into another board's folder | Moves the canvas to that board |
 | A file in `library/` renamed or moved | Finds it again by its content; the item takes its new folder and name |
+| A file in `library/` saved again by the program it is worked on in (a painting, a scene, a document: any kind of file) | Follows it: the item becomes the new version where it lies, keeping its name, folder, tags, note, fields and favourite, and every picture or card of it on any canvas shows the new version. A file still being saved (its size not yet still) is taken a moment later. The file is never written over or removed by this |
 | A new file in `library/` | Imports it where it lies, into the library folder of its folder (made if needed) |
-| A file deleted from `library/` | Shows the item as missing |
+| A file deleted from `library/` | Shows the item as missing. Deleting such an item, or any item, removes its file only when the file still holds what the item does: a file that changed (someone's newer work) is left where it is |
 | A file still being written (temporary, partial download) | Leaves it alone |
 | A canvas file that does not read whole (damaged, or still arriving) | Opens the workspace anyway, keeps showing this device's copy of that canvas, says so once, and reads the file again when it changes. It never writes over that file: delete it, or put a good copy back, to have this device's version written again |
 | The library's files (`.canvast/library/`) on a device with no copy yet | Takes the library from them; a device with no copy at all opens the whole workspace from the folder |

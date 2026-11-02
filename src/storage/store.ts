@@ -70,6 +70,8 @@ export interface WorkspaceStore {
   tagsOfAssetInstances(hash: string): Promise<Array<{ canvasId: string; tags: string[] }>>;
   changeObjectTag(key: string, target: string | null, skip: string | null): Promise<{ canvases: string[]; objects: number }>;
   removeAssetInstances(hashes: readonly string[], skip: string | null): Promise<{ canvases: string[]; objects: number }>;
+  /** Point every instance of library asset `from` at `to` (its file changed outside the app and became `to`), on every canvas but `skip`; `size`: `to`'s pixels. */
+  retargetAssetInstances(from: string, to: string, size: { w: number; h: number }, skip: string | null): Promise<{ canvases: string[]; objects: number }>;
   formatStoredTags(): Promise<void>;
 }
 
@@ -229,6 +231,8 @@ export interface FolderFile {
   /** Its size, and its SHA-256 read in the main process (desktop): one too big to read into the page is taken in from these alone. */
   size?: number;
   hash?: () => Promise<string | null>;
+  /** The item this file was (its content changed outside the app): the new version takes its place everywhere (any kind of file). */
+  follows?: string;
   /** What a sealed file said of its item (its tags, note…), given back to it. */
   meta?: { tags: string[]; favorite: boolean; note: string; fields: Array<{ key: string; value: string }> };
   read(): Promise<Blob | null>;

@@ -8,7 +8,9 @@ import { beginProgress } from "./progress";
 import type { MetaSnapshot, PasswordKind } from "../assets/asset-catalog";
 import { AssetInUseError, CatalogInputError, normalizeTags } from "../assets/asset-catalog";
 import { StyleLibrary } from "../assets/styles";
-import { assetOf, newObjectId } from "../doc/model";
+import { assetOf, deserializeObject, newObjectId, serializeObject } from "../doc/model";
+import type { SerializedObject } from "../doc/model";
+import { retargeted } from "../storage/workspace-repo";
 import type { GcReport } from "../assets/asset-catalog";
 import type { ObjectId, TextObject } from "../doc/model";
 import { expressObjectIn } from "../doc/model";
@@ -567,6 +569,28 @@ export class Session {
       return 0;
     }
     return this.deleteAssets(hashes);
+  }
+
+  /**
+   * A library file was changed outside the app (saved again by the program it is worked on in, of any kind) and is the asset `to` now:
+   * every instance of `from`, on this canvas and the others, uses `to` (`size`: its pixels). Not an undo step of its own: the old content
+   * is gone from the folder.
+   */
+  async followAsset(from: string, to: string, size: { w: number; h: number }): Promise<void> {
+    if (!this.repo || from === to) return;
+    await this.persistence.flush();
+    const here = [...this.doc.all()].filter((o) => (o as { assetId?: string }).assetId === from);
+    if (here.length) {
+      const next = here.map((o) => deserializeObject(retargeted(serializeObject(o) as unknown as Record<string, unknown>, to, size) as unknown as SerializedObject, this.doc.space));
+      this.doc.commit(this.doc.transaction("Follow a file changed outside the app", next));
+      await this.persistence.flush();
+    }
+    try {
+      const other = await this.repo.retargetAssetInstances(from, to, size, this.current?.canvasId ?? null);
+      for (const id of other.canvases) this.post({ kind: "commit", canvasId: id, revision: -1 });
+    } catch (e) {
+      this.tell(`Could not point the other canvases at the new version: ${(e as Error).message}`);
+    }
   }
 
   /**

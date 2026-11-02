@@ -46,8 +46,12 @@ export function bridgeDir(bridge: DesktopBridge, name: string, deleteTo: () => D
     },
     removeEntry: (path) => bridge.remove(path, deleteTo()),
     sizes: (paths) => bridge.sizes(paths),
+    hashOf: (path) => bridge.hash(path),
   };
 }
+
+/** How long after the app writes a file a change of it is taken for the app's own. */
+const OWN_FILE_MS = 1500;
 
 export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): Promise<IdbStorage> {
   // What the app itself writes, moves or deletes is noted for a few seconds, so its own changes are not taken for outside ones.
@@ -127,6 +131,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     saveBookmarks: (_r, id) => mirror.canvas(id),
     changeObjectTag: canvases,
     removeAssetInstances: canvases,
+    retargetAssetInstances: canvases,
     formatStoredTags: () => mirror.everything(),
     saveCamera: () => mirror.device(),
     setCurrent: () => mirror.device(),
@@ -175,7 +180,9 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
         // Library paths the app itself just wrote (or a folder holding one) are not looked through again: that costs a listing of
         // the whole library. Canvas and index files are always compared, by their headers and contents, which is cheap: another
         // device may write the same file a moment after this one did.
-        const ownWrite = (p: string): boolean => [...recent.keys()].some((r) => r === p || r.startsWith(`${p}/`));
+        // A file the app wrote counts as its own only for a moment (its watch event comes at once): a program saving it again right
+        // after (an item's file being worked on) is an outside change; a late event of the app's own write changes nothing (same content).
+        const ownWrite = (p: string): boolean => [...recent].some(([r, t]) => (r === p && now - t < OWN_FILE_MS) || r.startsWith(`${p}/`));
         // (the library is listed again after any outside change in it: a file put back in its own place changes no item, but it is there again)
         const hiddenTouched = paths.some((p) => p.startsWith(".hidden/") && !isHiddenFile(p) && !ownWrite(p));
         const outside = paths.filter((p) => (p === "library" || p.startsWith("library/")) && !ownWrite(p));

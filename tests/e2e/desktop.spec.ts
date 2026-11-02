@@ -461,10 +461,11 @@ test("a big library (past the size library.json is kept for) writes only what ch
   } finally {
     await app.close();
   }
-  // Another device reads the whole library from the parts (the two files changed above: missing, as their sizes are not the items').
+  // Another device reads the whole library from the parts: the file saved again above is followed (its item is the new version, as an
+  // item's file changed outside the app always is), the one removed is missing.
   ({ app, page } = await launch(ws, "device-b"));
   try {
-    await expect.poll(listing, { timeout: 15_000 }).toEqual([["Pic 0.png", false], ["Pic 1.png", false], ...["Renamed One.png", "Pic 3.png", "Pic 4.png", "Pic 5.png"].map((n) => [n, true])].sort());
+    await expect.poll(listing, { timeout: 15_000 }).toEqual([["Pic 0.png", true], ["Pic 1.png", false], ...["Renamed One.png", "Pic 3.png", "Pic 4.png", "Pic 5.png"].map((n) => [n, true])].sort());
     // Listed a page at a time (as if past 20,000 items: the library never comes to the page whole): the same cards, missing ones marked,
     // the same search, and an item picked shows its details; a rename shows on its card.
     await page.evaluate(() => window.__canvastDebug.libraryPaging(1));
@@ -472,7 +473,7 @@ test("a big library (past the size library.json is kept for) writes only what ch
     await expect(page.getByTestId("assets-count")).toHaveText("6 items");
     const names = () => page.locator('[data-testid="asset-card"] .asset-name').allTextContents().then((n) => n.sort());
     await expect.poll(names).toEqual(["Pic 0.png", "Pic 1.png", "Pic 3.png", "Pic 4.png", "Pic 5.png", "Renamed One.png"]);
-    await expect(page.locator('[data-testid="asset-card"].is-missing')).toHaveCount(2);
+    await expect(page.locator('[data-testid="asset-card"].is-missing')).toHaveCount(1);
     await page.getByTestId("assets-search").fill("renamed");
     await expect(page.getByTestId("assets-count")).toHaveText("1 of 6 items");
     await page.getByTestId("asset-card").first().click();
@@ -1165,6 +1166,49 @@ test("library files changed outside the app: a renamed or moved file is found by
       ["while_closed.png", "poses", true, 0],
     ]);
     expect(readdirSync(join(`${ws}-userdata`, "library-looks"))).toHaveLength(1);
+  } finally {
+    await app.close();
+  }
+});
+
+test("an item's file saved again outside the app, of any kind (a painting in its own program): the item and its pictures on the canvas follow the new version, its note kept, nothing shown as missing", async () => {
+  const ws = tempDir("canvast-ws-");
+  const bytes = (n: number, seed: number): Buffer => Buffer.from(Array.from({ length: n }, (_, i) => (i * 31 + seed * 7) % 251));
+  let { app, page } = await launch(ws);
+  const listing = () =>
+    page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => ({ name: e.name, hash: e.hash, present: e.present, instances: e.instances, note: e.note ?? "" }))));
+  const placed = () => page.evaluate(() => (window.__canvastDebug.objects() as unknown as Array<{ assetId?: string }>).map((o) => o.assetId));
+  let file = "";
+  try {
+    await page.getByTestId("import-input").setInputFiles({ name: "Study.kra", mimeType: "application/octet-stream", buffer: bytes(4000, 1) });
+    await expect.poll(async () => (await listing()).length).toBe(1);
+    const [first] = await listing();
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("note", h, "keep me"), first!.hash);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    file = files(ws).find((f) => f.startsWith("library/") && f.endsWith(".kra"))!;
+    expect(file).toBeTruthy();
+    // Saved again by its program while the app runs (a new size): the same item follows it, on the canvas too.
+    await page.waitForTimeout(2000); // (a save a moment after the app's own writes, not in the same batch of the folder's changes)
+    writeFileSync(join(ws, file), bytes(5200, 2));
+    await expect.poll(async () => (await listing()).map((e) => [e.name, e.present, e.instances, e.note, e.hash !== first!.hash]), { timeout: 15_000 }).toEqual([["Study.kra", true, 1, "keep me", true]]);
+    const [second] = await listing();
+    expect(await placed()).toEqual([second!.hash]);
+    // Saved again at the same size: told apart by its content.
+    await page.waitForTimeout(2000);
+    writeFileSync(join(ws, file), bytes(5200, 3));
+    await expect.poll(async () => (await listing()).map((e) => [e.present, e.hash !== second!.hash]), { timeout: 15_000 }).toEqual([[true, true]]);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+  } finally {
+    await app.close();
+  }
+  // Saved again while the app is closed: followed at the next start.
+  writeFileSync(join(ws, file), bytes(6100, 4));
+  ({ app, page } = await launch(ws));
+  try {
+    await expect.poll(async () => (await listing()).map((e) => [e.name, e.present, e.instances, e.note]), { timeout: 15_000 }).toEqual([["Study.kra", true, 1, "keep me"]]);
+    const [third] = await listing();
+    expect(await placed()).toEqual([third!.hash]);
+    expect(readFileSync(join(ws, file)).length, "the file is the one saved, untouched").toBe(6100);
   } finally {
     await app.close();
   }

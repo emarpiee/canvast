@@ -59,6 +59,14 @@ describe("library folder", () => {
     await externalFolder.remove(hash); // already gone: no error
   });
 
+  it("never removes a file that no longer holds its original (saved again outside the app): it is someone's work now", async () => {
+    const hash = await hashOf();
+    await externalFolder.write(hash, new Blob([bytes]));
+    dir.files.set(hash, new Blob([new Uint8Array([1, 2, 3, 4])])); // (changed by another program)
+    await externalFolder.remove(hash);
+    expect(dir.files.has(hash)).toBe(true);
+  });
+
   it("names a file by its hash and its own extension (from its name, else its type, else bin) and keeps to those names", async () => {
     const h = "a".repeat(64);
     expect(folderFileName(h, "Photo.PNG", "image/png")).toBe(`${h}.png`);

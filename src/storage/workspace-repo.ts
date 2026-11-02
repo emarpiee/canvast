@@ -477,6 +477,40 @@ export class WorkspaceRepo implements WorkspaceStore {
    * Returns the canvases touched and how many objects changed.
    */
   /**
+   * Point every instance of library asset `from` at `to`, on every canvas but `skip`: its file was changed outside the app (saved again by
+   * the program it is worked on in) and is `to` now. A picture keeps its place and width and takes the new file's shape; a crop of the old
+   * pixels goes. A text using it as its font takes the new font file. One transaction; returns the canvases touched and how many objects.
+   */
+  async retargetAssetInstances(from: string, to: string, size: { w: number; h: number }, skip: string | null): Promise<{ canvases: string[]; objects: number }> {
+    const tx = this.db.transaction(["objects", "canvases"], "readwrite", { durability: "strict" });
+    const committed = done(tx);
+    try {
+      const store = tx.objectStore("objects");
+      const touched = new Set<string>();
+      let n = 0;
+      for (const rec of await req(store.index("assetId").getAll(from) as IDBRequest<ObjectRecord[]>)) {
+        if (rec.canvasId === skip) continue;
+        store.put({ ...rec, data: retargeted(rec.data as SerializedObject & Record<string, unknown>, to, size) } satisfies ObjectRecord);
+        touched.add(rec.canvasId);
+        n++;
+      }
+      for (const id of touched) {
+        const canvas = await req(tx.objectStore("canvases").get(id) as IDBRequest<CanvasRecord | undefined>);
+        if (canvas) tx.objectStore("canvases").put({ ...canvas, revision: canvas.revision + 1, updatedAt: Date.now() } satisfies CanvasRecord);
+      }
+      await committed;
+      return { canvases: [...touched], objects: n };
+    } catch (e) {
+      try {
+        tx.abort();
+      } catch {
+        // already finished
+      }
+      throw e;
+    }
+  }
+
+  /**
    * Take library assets out of every canvas but `skip` (Delete everywhere): their pictures, players and cards are removed; a text that uses
    * one as its font keeps its words in the default font. One transaction; returns the canvases touched and how many objects changed.
    */
@@ -655,4 +689,16 @@ export class WorkspaceRepo implements WorkspaceStore {
     tx.objectStore("canvasViews").put(camera, canvasId);
     await done(tx);
   }
+}
+
+/**
+ * A stored object pointed at library asset `to` (with `size` pixels) instead of the one it used: a picture keeps its place and width and
+ * takes the new shape (a crop of the old pixels goes); a text keeps its words in the new font file.
+ */
+export function retargeted<T extends Record<string, unknown>>(data: T, to: string, size: { w: number; h: number }): T {
+  if (data["kind"] !== "image") return { ...data, assetId: to };
+  const { crop: _c, ...rest } = data as Record<string, unknown>;
+  const same = data["pixelW"] === size.w && data["pixelH"] === size.h;
+  const w = data["w"] as number;
+  return { ...(same ? data : rest), assetId: to, pixelW: size.w, pixelH: size.h, ...(same ? {} : { h: (w * size.h) / size.w }) } as unknown as T;
 }

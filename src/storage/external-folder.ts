@@ -22,6 +22,8 @@ export interface Dir {
   keys?(): AsyncIterable<string>;
   /** The size of each file, or null when it is not there, in one look (the desktop build's workspace folder): no bytes are read. */
   sizes?(names: string[]): Promise<Array<number | null>>;
+  /** A file's SHA-256 without reading it into the page (the desktop build's workspace folder), or null when it is not there. */
+  hashOf?(name: string): Promise<string | null>;
   queryPermission?(o: { mode: "readwrite" }): Promise<PermissionState>;
   requestPermission?(o: { mode: "readwrite" }): Promise<PermissionState>;
 }
@@ -340,14 +342,25 @@ class ExternalFolder {
     if ((await this.readLibraryFile())?.size !== blob.size) throw new FolderError("the library index written to the folder did not read back the same");
   }
 
-  /** Remove the file of an erased original. Nothing to do when it is not there. */
+  /**
+   * Remove the file of an erased original. Nothing to do when it is not there, or when it no longer holds the original: a file changed
+   * or replaced outside the app (by another program, a sync tool) is someone's work now, never the app's to remove.
+   */
   async remove(hash: string, file = hash): Promise<void> {
     if (!this.dir || this.status !== "ready" || !this.naming.valid(hash, file)) return;
     try {
+      if (!isHiddenFile(file) && !(await this.holds(hash, file))) return;
       await this.dir.removeEntry(file);
     } catch {
       // already gone, or no permission: the file is only left over, never needed
     }
+  }
+
+  /** Whether `file` still holds the original `hash` (its content's SHA-256; a sealed hidden file is the app's own, and not looked into). */
+  private async holds(hash: string, file: string): Promise<boolean> {
+    if (this.dir?.hashOf) return (await this.dir.hashOf(file)) === hash;
+    const f = await (await this.dir!.getFileHandle(file)).getFile();
+    return (await sha256Hex(await f.arrayBuffer())) === hash;
   }
 }
 

@@ -117,6 +117,9 @@ interface LibraryRead {
   folders: AssetFolder[];
 }
 /** A file worth looking at: not hidden, not a file being written (the app's own temporary files, a sync tool's or a browser's partial ones). */
+/** How long a changed file's size must stay still before it is taken (a program may still be saving it). */
+const SETTLE_MS = 1500;
+
 const usable = (path: string): boolean => {
   const name = path.slice(path.lastIndexOf("/") + 1);
   return !name.startsWith(".") && !/\.tmp-|\.(tmp|part|partial|crdownload|download|!sync|sync-conflict)$/i.test(name) && !/^(thumbs\.db|desktop\.ini)$/i.test(name);
@@ -660,8 +663,13 @@ export class LibraryMirror {
     const sizes = await this.bridge.sizes(lib);
     const changed: string[] = [];
     const found: FolderFile[] = [];
+    const follow: string[] = [];
     for (const [k, path] of lib.entries()) {
-      if ((await this.lib.calls.byFile(path)) !== null) continue; // an item's own file (gone: its item shows as missing)
+      const owner = await this.lib.calls.byFile(path);
+      if (owner !== null) {
+        if (sizes[k] !== null) follow.push(path); // an item's own file, maybe saved again by the program it is worked on in (gone: it shows as missing)
+        continue;
+      }
       // No file, and no item's: a folder. One the library has files in changed (its files are said one by one); another came (what is
       // in it was not said one by one) or went: all is looked through.
       if (sizes[k] === null) {
@@ -684,7 +692,63 @@ export class LibraryMirror {
       } });
     }
     if (found.length && this.importFiles) await this.importFiles(found);
-    return { changed, imported: found.length > 0 };
+    const followed = await this.followChanged(follow);
+    return { changed, imported: found.length > 0 || followed };
+  }
+
+  /**
+   * Item files that were changed outside the app (saved again by the program they are worked on in: a painting, a 3D scene, any kind of
+   * file): each becomes the item's new version where it lies. The old record lets go of the file first (so nothing ever erases the newer
+   * file as the old item's), the file is imported with the item's name, folder, tags, note, fields and favourite, its instances on every
+   * canvas follow it (`importFiles` does that, told by `follows`), and the old item goes. A file still being written (its size not yet
+   * still) waits for the next look. Whether any was taken.
+   */
+  async followChanged(paths: readonly string[]): Promise<boolean> {
+    const found: FolderFile[] = [];
+    const olds: string[] = [];
+    for (const path of paths) {
+      if (!path.startsWith("library/") || isHiddenFile(path)) continue;
+      const old = await this.lib.calls.byFile(path);
+      const rec = old ? await this.lib.rec(old) : undefined;
+      if (!old || !rec?.ext || rec.file !== path) continue;
+      const [size] = await this.bridge.sizes([path]);
+      if (size === null || size === undefined) continue;
+      const hash = await this.bridge.hash(path);
+      if (!hash || hash === old) continue; // (the same content: nothing changed)
+      await new Promise((r) => setTimeout(r, SETTLE_MS));
+      const [again] = await this.bridge.sizes([path]);
+      if (again !== size || (await this.bridge.hash(path)) !== hash) continue; // (still being saved: the watcher says it again)
+      const e = await this.lib.entry(old);
+      await this.lib.serial(async () => {
+        const cur = await this.lib.rec(old);
+        if (cur?.ext && cur.file === path) {
+          const { file: _f, ...rest } = cur;
+          await this.lib.apply([{ t: "rec", hash: old, v: rest as AssetRecord }]);
+        }
+      });
+      olds.push(old);
+      found.push({
+        path,
+        name: e?.name || path.slice(path.lastIndexOf("/") + 1),
+        folderId: e?.folderIds?.[0] ?? (await this.folderFor(parentOf(path))),
+        size,
+        hash: async () => hash,
+        read: async () => {
+          const bytes = await this.bridge.read(path);
+          return bytes && new Blob([bytes as Uint8Array<ArrayBuffer>]);
+        },
+        follows: old,
+        ...(e ? { meta: { tags: e.tags ?? [], favorite: !!e.favorite, note: e.note ?? "", fields: e.fields ?? [] } } : {}),
+      });
+    }
+    if (!found.length || !this.importFiles) return false;
+    await this.importFiles(found);
+    // The old items go (their files are the new versions now: nothing of theirs is erased).
+    await this.lib.serial(() => this.lib.apply(olds.flatMap((h): LibraryOp[] => [{ t: "entry", hash: h, v: null }, { t: "rec", hash: h, v: null }, { t: "seen", hash: h, v: null }])));
+    const tx = this.db.transaction(["assets", "thumbs"], "readwrite");
+    for (const h of olds) (tx.objectStore("assets").delete(h), tx.objectStore("thumbs").delete(h));
+    await done(tx);
+    return true;
   }
 
   /**
@@ -694,9 +758,19 @@ export class LibraryMirror {
    * folder of its folder. A copy of a file the library has is left alone. Whether anything changed.
    */
   async scan(): Promise<boolean> {
+    // Items whose file is there but not of their size: saved again outside the app while it was closed (or unwatched).
+    const absent = await this.lib.calls.absent();
+    const changedFiles: string[] = [];
+    if (absent.length) {
+      const rows = await this.lib.calls.get(absent);
+      const files = rows.flatMap(([, , r]) => (r?.ext && r.file && r.file.startsWith("library/") ? [r.file] : []));
+      const sizes = files.length ? await this.bridge.sizes(files) : [];
+      files.forEach((f, i) => void (sizes[i] !== null && changedFiles.push(f)));
+    }
+    const followed = changedFiles.length ? await this.followChanged(changedFiles) : false;
     // (the main process walks library/ and leaves out every file an item names: only the others come here, not the whole library)
     const fresh = (await this.lib.calls.unnamed()).filter((f) => usable(f.path) && !externalFolder.claimed(f.path));
-    if (!fresh.length) return false;
+    if (!fresh.length) return followed;
     const relinked = new Set<string>();
     const found2: FolderFile[] = [];
     let changed = false;
@@ -722,7 +796,7 @@ export class LibraryMirror {
       await this.importFiles(found2);
       changed = true;
     }
-    return changed;
+    return changed || followed;
   }
 
   /**
