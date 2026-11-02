@@ -311,6 +311,8 @@ export interface ToolHooks {
   editText(target: TextObject | null, at: WorldPoint, box?: { widthPx: number }): void;
   /** A double-click on a picture or file card (a note's card opens the note to edit). */
   openItem?(assetId: string): void;
+  /** The Note tool: a new note file placed here (`at` on the screen, the card `widthPx` wide when a box was dragged), opened to write in. */
+  newNote?(at: ScreenPoint, widthPx?: number): void;
   /** The tool a plain key picks (rebindable in Settings, ADR 0049). */
   toolForKey(key: string): Tool | undefined;
   /** The direction a plain key steps in (W A S D at first; Settings > Shortcuts), if any (ADR 0058, 0072). */
@@ -2303,7 +2305,10 @@ export function attachTools(
         // Opened after the pointer is released, so the editor keeps the focus.
         editor.shapeDraft = null;
         if (cancelled || editor.blockEdit()) break;
-        if (g.moved && Math.abs(s.x - g.start.x) >= MIN_TEXT_BOX_PX) hooks.editText(null, world({ x: Math.min(s.x, g.start.x), y: Math.min(s.y, g.start.y) }), { widthPx: Math.abs(s.x - g.start.x) });
+        if (editor.tool === "note") {
+          const wide = g.moved && Math.abs(s.x - g.start.x) >= MIN_TEXT_BOX_PX;
+          hooks.newNote?.({ x: wide ? Math.min(s.x, g.start.x) : g.start.x, y: wide ? Math.min(s.y, g.start.y) : g.start.y }, wide ? Math.abs(s.x - g.start.x) : undefined);
+        } else if (g.moved && Math.abs(s.x - g.start.x) >= MIN_TEXT_BOX_PX) hooks.editText(null, world({ x: Math.min(s.x, g.start.x), y: Math.min(s.y, g.start.y) }), { widthPx: Math.abs(s.x - g.start.x) });
         else hooks.editText(textAt(g.start), world(g.start));
         break;
     }

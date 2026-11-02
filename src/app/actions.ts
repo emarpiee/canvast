@@ -591,7 +591,7 @@ function mediaKindOf(rec: Pick<AssetRecord, "type" | "frames">): MediaState["kin
 }
 
 /** The image object for `rec` with its top-left corner at screen (x, y) and a size of wPx by hPx CSS px. */
-function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type" | "frames">, doc: DocumentStore, view: ViewState, x: number, y: number, wPx: number, hPx: number, z: number): ImageObject {
+export function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type" | "frames">, doc: DocumentStore, view: ViewState, x: number, y: number, wPx: number, hPx: number, z: number): ImageObject {
   const cam = view.camera;
   const f = 2 ** cam.zf; // local unit = 2^-zi world = f CSS px
   const c = screenToWorld(cam, view.viewport, { x, y });

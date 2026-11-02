@@ -1,3 +1,4 @@
+import { fileInLibrary } from "../app/library-filing";
 import { beginProgress } from "../app/progress";
 import { searchHelpLineHtml, searchKeysHtml, searchWaysHtml } from "./search-parts";
 import { boardFilterHtml, boardFilterState, wireBoardFilter } from "./board-filter";
@@ -44,7 +45,7 @@ import { runExport, runExportFiles, runExportFolder } from "./archive-ui";
 import { openLibraryPicker } from "./library-picker";
 import { OpenNote } from "./note-session";
 import type { NoteDeps, NotePlace } from "./note-session";
-import { RICH_NOTE_SUFFIX, WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget } from "../notes/note-file";
+import { RICH_NOTE_SUFFIX, WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget, newNoteFile } from "../notes/note-file";
 import { splitFrontmatter, underProps, withFileMeta } from "../notes/frontmatter";
 import type { NoteKind } from "../notes/note-file";
 import { fontFor } from "../text/fonts";
@@ -4339,16 +4340,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     openMoreMenu(importMenu, [
       { label: "Import files", icon: ICONS.arrowDownToLine, hint: "Pictures, video, audio and other files", run: () => fileInput.click() },
       { label: "A folder", icon: ICONS.folderInput, hint: "Every file in it, put in library folders of the same names", run: () => folderInput.click() },
-      { label: "New note", icon: ICONS.notebookPen, hint: "A markdown note in the open folder, opened to write in", run: () => void newNote() },
+      { label: "New note", icon: ICONS.notebookPen, hint: "A markdown note in the open folder (else the Notes folder), opened to write in", run: () => void newNote() },
     ], "Import"),
   );
   /** A new markdown note (its first line says when it was made, so no two are the same file), in the folder open in the sidebar. */
   const newNote = async (): Promise<void> => {
-    const now = new Date();
-    const stamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${now.toTimeString().slice(0, 8).replace(/:/g, "")}`;
-    const [hash] = await view.importFiles([new File([`# Note ${stamp}\n\n`], `Note ${stamp}.md`, { type: "text/markdown" })]);
+    const [hash] = await view.importFiles([newNoteFile()]);
     if (!hash) return;
+    // (in the open folder; else in the Notes folder of Settings > Notes)
     if (scope.startsWith("folder:")) await session.organize((c) => c.updateMeta(hash, { addFolders: [scope.slice(7)] }), "File a note");
+    else await fileInLibrary(session, hash, settings.get("notes.folder"), []);
     await refresh();
     await showSlide(hash);
   };

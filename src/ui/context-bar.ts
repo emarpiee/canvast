@@ -34,6 +34,9 @@ export interface ContextActions {
   fileSelection(): { hash: string; open: boolean; note: boolean } | null;
   /** The note selected on the canvas, opened in the note panel. */
   editNote(): void;
+  /** Texts on a card are selected (made by the Note tool before notes were files). */
+  canMakeNoteFiles(): boolean;
+  makeNoteFiles(): void;
   /** Any file of the library is picked: its original can be downloaded (several as a ZIP; ADR 0119). */
   canDownload(): boolean;
   /** Put the picked objects on a sheet; take a picked sheet away, keeping what is on it (ADR 0108). */
@@ -161,6 +164,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     group("Files",
       btn("exportmenu", ICONS.exportMenu, "Export and copy out: save as a picture or SVG, download the file, copy the Markdown of a text", 'aria-haspopup="menu" aria-expanded="false"'),
       btn("editnote", ICONS.filePenLine, "Edit note (or double-click it)"),
+      btn("makenote", ICONS.fileInput, "Make note files: the texts on a card become notes in the library, edited in the note panel"),
       btn("open", ICONS.externalLink, desktopBridge() ? "Open in default app" : "Open in a new tab"),
       btn("copyadj", ICONS.clipboardList, "Copy the adjustments of the picture"),
       btn("pasteadj", ICONS.clipboardPaste, "Paste the copied adjustments on the selected pictures"),
@@ -317,6 +321,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "library": actions.showInLibrary(); break;
       case "open": actions.openFile(); break;
       case "editnote": actions.editNote(); break;
+      case "makenote": actions.makeNoteFiles(); break;
       case "attach": actions.attach(); break;
       case "detach": actions.detach(); break;
       case "vectorise": actions.vectorise(); break;
@@ -409,6 +414,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     const file = actions.fileSelection();
     q("open").hidden = !file?.open;
     q("editnote").hidden = !file?.note;
+    q("makenote").hidden = !actions.canMakeNoteFiles();
     q("attach").hidden = false;
     q("attach").setAttribute("aria-pressed", String(editor.attachMode));
     q("detach").hidden = !actions.canDetach();

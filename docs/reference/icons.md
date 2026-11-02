@@ -10,7 +10,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `expand` | Scale contents with the sheet (the sheet's size field) |
 | `chart-spline` | Simplify the picked paths: fewer nodes, the same shape (Actions bar) |
 | `pencil-ruler` | Turn the picked pen strokes into editable paths (Actions bar) |
-| `sticky-note` | Note tool (a text on a card) |
+| `sticky-note` | Note tool (a new note file, its card placed where clicked) |
 | `stamp` | Outline stroke: make the line a shape (Actions bar) |
 | `feather` | Taper: make the line a shape thin at both ends (Actions bar) |
 | `venetian-mask` | Clipping mask: the top shape cuts what else is picked (Actions bar) |
@@ -266,3 +266,4 @@ One icon per function: two buttons that do different things never share an icon,
 | `folder-down` | Settings tab Saving to the library (frames, edited pictures, exports, patterns, shapes) |
 | `square-check-big` | Select several: from then on a tap or a click adds or removes items (a card's menu in the library; the way to pick several on a touch screen) |
 | `file-pen-line` | Edit note: the note selected on a canvas, opened in the note panel (Actions bar) |
+| `file-input` | Make note files: texts on a card become notes in the library (Actions bar) |

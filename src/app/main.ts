@@ -6,10 +6,14 @@ import { anyNoteDirty, leaveAllNotes } from "../ui/note-session";
 import { mountNotePanel } from "../ui/note-panel";
 import type { NotePanelDeps } from "../ui/note-panel";
 import { ViewState } from "./view-state";
+import { newNoteFile } from "../notes/note-file";
+import { cleanFileName } from "../doc/rename-rules";
 import { fileInLibrary } from "./library-filing";
 import { storeFrame } from "./frames";
 import { newObjectId, rasterKey } from "../doc/model";
-import type { CanvasObject, ImageObject } from "../doc/model";
+import type { CanvasObject, ImageObject, TextObject } from "../doc/model";
+import type { ScreenPoint } from "../core/camera";
+import type { AssetRecord } from "../assets/asset-library";
 import type { Gradient, GradientStop } from "../doc/paint";
 import type { PathObject } from "../doc/model";
 import type { JoinChoice } from "../doc/stroke-look";
@@ -22,7 +26,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { pasteCssPaint, copiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
+import { imageAt, pasteCssPaint, copiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -70,7 +74,7 @@ import { onStartStep, startStep } from "./startup-log";
 import { mountLibraryFolderCard } from "../ui/library-folder-card";
 import { confirmReset } from "../ui/reset-dialog";
 import { beginProgress } from "./progress";
-import { plural } from "../doc/plural";
+import { be, plural } from "../doc/plural";
 import { installAutoIndex } from "../storage/auto-index";
 import { fmtBytes } from "../ui/format";
 import { runSaveLibraryFile } from "../ui/archive-ui";
@@ -123,7 +127,7 @@ import { copyText, mountTextEditor } from "../ui/text-editor";
 import { FontLoader, whyNotFont } from "./font-loader";
 import { onFontsChange } from "../text/fonts";
 import { describeFile } from "../assets/file-kind";
-import { NOTE_CARD, NOTE_INK, styleOf, toolLook } from "../text/text-style";
+import { styleOf, toolLook } from "../text/text-style";
 import { installTextFont } from "../text/inter";
 import { descendantsOf, isContainer } from "../doc/containers";
 import { CameraHistory } from "./camera-history";
@@ -1018,7 +1022,11 @@ async function start(): Promise<void> {
   notePanelEl.dataset["testid"] = "note-panel";
   notePanelEl.hidden = true;
   const notePanelReady = (d: NotePanelDeps): void => void (notePanel = mountNotePanel(notePanelEl, d));
-  attachTools(canvas, view, doc, index, editor, { editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h) => void notePanel.open(h), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
+  /** A card's width on the screen when the Note tool is clicked (a box dragged sets its own). */
+  const NOTE_CARD_PX = 320;
+  let newNoteAt: (at: ScreenPoint, widthPx?: number) => Promise<void> = async () => undefined;
+  let makeNoteFiles: () => Promise<void> = async () => undefined;
+  attachTools(canvas, view, doc, index, editor, { editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h) => void notePanel.open(h), newNote: (at, w) => void newNoteAt(at, w), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
     navigate: (dir) =>
       void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus", (o, unit) => {
         // the name the Layers list shows: a group's own, else the item's
@@ -1288,11 +1296,11 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       await fontLoader.ensure(record.hash);
       return record.hash;
     },
-    selectedTextStyle: () => (textEditor.isOpen ? textEditor.look() : editor.tool === "text" ? toolLook(editor.textLook, newInk(editor.penColor)) : editor.tool === "note" ? toolLook({ color: NOTE_INK, ...editor.textLook, card: editor.textLook.card ?? NOTE_CARD }, newInk(editor.penColor)) : selectedTextStyle(doc, editor, textPpu)),
+    selectedTextStyle: () => (textEditor.isOpen ? textEditor.look() : editor.tool === "text" ? toolLook(editor.textLook, newInk(editor.penColor)) : selectedTextStyle(doc, editor, textPpu)),
     setTextStyle: (look, final = true) => {
-      if (editor.tool === "text" || editor.tool === "note") editor.textLook = { ...editor.textLook, ...look };
+      if (editor.tool === "text") editor.textLook = { ...editor.textLook, ...look };
       if (textEditor.isOpen) textEditor.restyle(look);
-      else if (editor.tool !== "text" && editor.tool !== "note") setTextStyle(doc, editor, look, textPpu, final);
+      else if (editor.tool !== "text") setTextStyle(doc, editor, look, textPpu, final);
       else editor.changed();
     },
     setPin: (patch) => setPin(doc, editor, patch as { h?: "left"; v?: "top" }),
@@ -1750,6 +1758,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       exportPicture: () => openExport(),
       canDownload: () => pickedFiles(doc, editor).length > 0,
       downloadFile: () => void downloadSelection(doc, editor, assets, session, settings),
+      canMakeNoteFiles: () => [...editor.selection].some((id) => { const o = doc.get(id); return o?.kind === "text" && !!o.card; }),
+      makeNoteFiles: () => void makeNoteFiles(),
       editNote: () => {
         const o = doc.get([...editor.selection][0] ?? "");
         if (o?.kind === "image") void notePanel.open(o.assetId);
@@ -1885,6 +1895,41 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   markNav("canvas");
   const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings, libraryFonts);
   // A note's card on a canvas opens in the note panel (a double-click, Edit note): the same editor and saving as in the library.
+  /** Into the library as a note, filed in the Notes folder (Settings > Notes): its record, or undefined. */
+  const storeNote = async (file: File): Promise<AssetRecord | undefined> => {
+    const [hash] = await assetsView.importFiles([file]);
+    const rec = hash ? await assets.record(hash).catch(() => undefined) : undefined;
+    if (rec) await fileInLibrary(session, rec.hash, settings.get("notes.folder"), []);
+    return rec;
+  };
+  // The Note tool (M): a new markdown note, its card placed where the canvas was clicked (as wide as a box dragged), opened in the note panel.
+  newNoteAt = async (at, widthPx = NOTE_CARD_PX) => {
+    if (editor.blockEdit() || !session.catalog) return;
+    const rec = await storeNote(newNoteFile());
+    if (!rec) return;
+    const o = imageAt(rec, doc, view, at.x, at.y, widthPx, (widthPx * rec.pixelH) / rec.pixelW, doc.topZ() + 1);
+    doc.commit(doc.transaction("New note", [o]));
+    editor.select([o.id]);
+    editor.changed();
+    void notePanel.open(rec.hash);
+  };
+  // Make note files: texts on a card (what the Note tool made before notes were files) become notes in the library, their cards in the same place, as wide.
+  makeNoteFiles = async () => {
+    const texts = [...editor.selection].map((id) => doc.get(id)).filter((o): o is TextObject => o?.kind === "text" && !!o.card);
+    if (!texts.length || editor.blockEdit() || !session.catalog) return;
+    const next: ImageObject[] = [];
+    for (const t of texts) {
+      const title = t.md.split("\n").find((l) => l.trim())?.replace(/^[#>*\-\s]+/, "").trim().slice(0, 60);
+      const rec = await storeNote(new File([t.md.endsWith("\n") ? t.md : `${t.md}\n`], `${cleanFileName(title || "Note") || "Note"}.md`, { type: "text/markdown" }));
+      if (!rec || doc.get(t.id) !== t) continue; // (changed meanwhile: left as it is)
+      const { id, frame, anchor, unit, z, opacity, attachmentTargetId, rot, constraint, parent, groups, name, groupNames, blend, tags } = t;
+      next.push({ ...{ id, frame, anchor, unit, z, opacity, attachmentTargetId, rot, constraint, parent, groups, name, groupNames, blend, tags }, kind: "image", assetId: rec.hash, w: t.w, h: (t.w * rec.pixelH) / rec.pixelW, pixelW: rec.pixelW, pixelH: rec.pixelH } as ImageObject);
+    }
+    if (!next.length) return;
+    doc.commit(doc.transaction(next.length === 1 ? "Make a note file" : `Make ${plural(next.length, "note file")}`, next));
+    editor.message = next.length === 1 ? "The note is a note file in the library now: double-click its card to edit it." : `${plural(next.length, "note")} ${be(next.length)} note files in the library now.`;
+    editor.changed();
+  };
   notePanelReady({ session, assets, settings, fonts: libraryFonts, importFiles: (files) => assetsView.importFiles(files), showInLibrary: (h) => (setView("assets"), void assetsView.reveal([h])), hidden: hiddenModeOn });
   // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)
   window.addEventListener("keydown", (e) => {

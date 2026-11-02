@@ -59,8 +59,6 @@ export const NOTE_COLOURS: ReadonlyArray<{ fill: string; name: string }> = [
   { fill: "#ffffff", name: "White" },
 ];
 export const NOTE_CARD = { fill: NOTE_COLOURS[0]!.fill, pad: 0.6, radius: 0.3 } as const;
-/** The ink a note is written in until another is chosen (the card is light whatever the theme). */
-export const NOTE_INK = "#1f2329";
 
 /** Size of a new text, in screen px. */
 export const NEW_TEXT_PX = 16;

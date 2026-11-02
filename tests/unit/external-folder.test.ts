@@ -133,9 +133,11 @@ describe("library folder", () => {
     expect(await kindOf("Head.glb", "model/gltf-binary")).toBe("3d");
     expect(await kindOf("Refs.zip", "application/zip")).toBe("archives");
     expect(await kindOf("Photo.JPG", "image/jpeg")).toBe("images");
-    expect(await kindOf("Notes.md", "text/markdown")).toBe("documents");
+    expect(await kindOf("Notes.md", "text/markdown")).toBe("notes");
+    expect(await kindOf("Plan.note.html", "text/html")).toBe("notes");
+    expect(await kindOf("Paper.pdf", "application/pdf")).toBe("documents");
     expect(await kindOf("data.bin", "")).toBe("other");
-    expect(await libraryPath("notes.txt", "text/plain", async () => false)).toBe("library/documents/notes.txt");
+    expect(await libraryPath("notes.txt", "text/plain", async () => false)).toBe("library/notes/notes.txt");
     for (const bad of ["", "/etc/passwd", "library/../x", "library//x", "library/./x", "a\\b", "a\0b"]) expect(isSafeRelativePath(bad)).toBe(false);
 
     const hash = await hashOf();

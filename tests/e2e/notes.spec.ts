@@ -343,3 +343,36 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   await p.keyboard.press("Control+Shift+z");
   await expect.poll(placed).toEqual(saved);
 });
+
+test("the Note tool (M) makes a note file in the Notes folder, places its card and opens it; Make note files turns a text on a card into one", async ({ app }) => {
+  const p = app.page;
+  const objs = () => p.evaluate(() => window.__canvastDebug.objects() as unknown as Array<{ id: string; kind: string; assetId?: string; z: number }>);
+  await p.keyboard.press("m");
+  await p.mouse.click(420, 260);
+  const panel = p.getByTestId("note-panel");
+  await expect(panel.locator(".sun-editor-editable h1").first()).toContainText("Note ");
+  await expect.poll(async () => (await objs()).map((o) => o.kind)).toEqual(["image"]);
+  // A text on a card (made before notes were files) becomes a note: the same place and stacking, its words in the file.
+  await panel.locator("[data-close]").click();
+  await p.keyboard.press("t");
+  await p.mouse.click(420, 520);
+  await p.keyboard.type("Buy paper");
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("v");
+  const text = (await objs()).find((o) => o.kind === "text")!;
+  const tb = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), text.id))!.box;
+  await p.mouse.click(Math.round((tb.minX + tb.maxX) / 2), Math.round((tb.minY + tb.maxY) / 2));
+  await p.getByRole("button", { name: "Paragraph and box options" }).click();
+  await p.locator('.colour-pop [data-card="#ffe58a"]').click();
+  await p.keyboard.press("Escape");
+  await p.locator('[data-ctx="makenote"]').filter({ visible: true }).click();
+  await expect.poll(async () => (await objs()).find((o) => o.id === text.id)?.kind).toBe("image");
+  const made = (await objs()).find((o) => o.id === text.id)!;
+  expect(made.z).toBe(text.z);
+  // Both are in the Notes folder of the library; the converted one is named by its words.
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-side").getByRole("button", { name: /^Notes/ }).click();
+  await expect(p.getByTestId("asset-card")).toHaveCount(2);
+  await expect(card(p, made.assetId!)).toContainText("Buy paper");
+  expect(app.consoleErrors).toEqual([]);
+});

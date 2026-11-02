@@ -15,7 +15,7 @@ import { normalizeUnit } from "../doc/edit-ops";
 import type { Block, BlockType, Span } from "../text/markdown";
 import { MAX_MARKDOWN_LENGTH, isLinkUrl, linkUrlOf, parse, serialize } from "../text/markdown";
 import { layoutOf } from "../text/layout";
-import { NEW_TEXT_PX, NOTE_CARD, NOTE_INK, fitWidth, lookOf, withLook } from "../text/text-style";
+import { NEW_TEXT_PX, fitWidth, lookOf, withLook } from "../text/text-style";
 import type { TextLook } from "../text/text-style";
 import { BUNDLED_FONT_NAME, FALLBACK_FAMILY, faceStyleOf, familyFor, hashOfFamily } from "../text/fonts";
 import { ICONS } from "./icons";
@@ -244,8 +244,7 @@ export function mountTextEditor(
     } else {
       const f = 2 ** cam.zf;
       const unit = -cam.zi;
-      // The Note tool makes a text with a card (and dark ink on it) unless the look says otherwise.
-      const look = editor.tool === "note" ? { color: NOTE_INK, ...editor.textLook, card: editor.textLook.card ?? NOTE_CARD } : editor.textLook;
+      const look = editor.textLook;
       const size = (look.sizePx ?? NEW_TEXT_PX) / f;
       const pad = look.card?.pad ?? 0;
       // A click: the point is the middle of the first line (inside the card's space). A drag: the top-left corner of the box that was drawn.

@@ -927,7 +927,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       ["tips", shp?.shape === "star", String(shp?.tips ?? 0)],
       ["inner", shp?.shape === "star", String(shp ? Math.round(shp.inner * 100) : 0)],
     ];
-    const txt = (pick && still) || editor.editingText || editor.tool === "text" || editor.tool === "note" ? actions.selectedTextStyle() : null;
+    const txt = (pick && still) || editor.editingText || editor.tool === "text" ? actions.selectedTextStyle() : null;
     for (const w of root.querySelectorAll<HTMLElement>("[data-text-wrap]")) w.hidden = !txt;
     if (txt) {
       wantFonts(txt.assetId ?? "");

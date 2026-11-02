@@ -146,6 +146,7 @@ export const SETTINGS = {
   "ui.corners": { scope: "device", default: "round", validate: oneOf("round", "sharp"), effect: "immediate" } as Def<"round" | "sharp">,
   "ui.density": { scope: "device", default: "compact", validate: oneOf("comfortable", "compact", "dense"), effect: "immediate" } as Def<"comfortable" | "compact" | "dense">,
   "notes.cardLength": { scope: "device", default: "long", validate: oneOf("short", "medium", "long", "whole"), effect: "immediate" } as Def<"short" | "medium" | "long" | "whole">,
+  "notes.folder": { scope: "device", default: "Notes", validate: text(60), effect: "immediate" } as Def<string>,
   "notes.style": { scope: "device", default: "document", validate: oneOf("document", "classic", "bottom", "balloon", "notion"), effect: "immediate" } as Def<NoteStyle>,
   "assets.edgeWidth": { scope: "device", default: 15, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 40 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "assets.playerHideSeconds": { scope: "device", default: 1.5, validate: (v: unknown) => (typeof v === "number" && v >= 0.5 && v <= 10 ? v : undefined), effect: "immediate" } as Def<number>,

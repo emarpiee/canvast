@@ -36,6 +36,7 @@ export function safeBase(name: string): string {
 
 /** The folder of `library/` for an original that is in no library folder, by its kind. */
 export function kindFolder(type: string, name: string): string {
+  if (/\.note\.html$/i.test(name)) return "notes";
   const byExt = KIND_OF_EXT[extOf(name).toLowerCase()];
   if (byExt) return byExt;
   if (/^image\//.test(type)) return "images";
@@ -55,7 +56,8 @@ const KIND_EXTS: Record<string, readonly string[]> = {
   "3d": ["obj", "fbx", "glb", "gltf", "stl", "blend", "usdz", "usd", "3mf", "ply", "dae", "3ds"],
   archives: ["zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "zst"],
   fonts: ["ttf", "otf", "woff", "woff2", "ttc"],
-  documents: ["pdf", "txt", "md", "doc", "docx", "odt", "rtf", "csv", "xls", "xlsx", "ods", "ppt", "pptx", "odp", "epub", "html", "htm", "json"],
+  notes: ["md", "markdown", "txt"],
+  documents: ["pdf", "doc", "docx", "odt", "rtf", "csv", "xls", "xlsx", "ods", "ppt", "pptx", "odp", "epub", "html", "htm", "json"],
 };
 const KIND_OF_EXT: Record<string, string> = Object.fromEntries(Object.entries(KIND_EXTS).flatMap(([k, exts]) => exts.map((e) => [e, k])));
 
@@ -92,7 +94,7 @@ export function extOfBytes(b: Uint8Array): string {
 }
 
 /** The kind folders of `library/` (an item in no library folder is in one of these). */
-export const KIND_FOLDERS: ReadonlySet<string> = new Set(["images", "vectors", "icons", "art_sources", "presets", "3d", "video", "audio", "fonts", "documents", "archives", "other"]);
+export const KIND_FOLDERS: ReadonlySet<string> = new Set(["images", "vectors", "icons", "art_sources", "presets", "3d", "video", "audio", "fonts", "notes", "documents", "archives", "other"]);
 
 /** A file's extension for its name and type: its own, else one from the type, else "bin". */
 export function fileExt(name: string, type: string): string {
