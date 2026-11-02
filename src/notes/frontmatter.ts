@@ -214,13 +214,39 @@ export function withRichMeta(file: string, meta: NoteMeta): string {
 /** No tags, no note, no fields. */
 export const NO_META: NoteMeta = { tags: [], note: "", fields: [] };
 
-/** A note file's properties (markdown: its YAML; rich text: its head's `<meta>`), or null when it has none (and for plain text). */
-export function fileMeta(kind: "md" | "txt" | "rich", text: string): NoteMeta | null {
-  if (kind === "rich") return richMeta(text);
-  if (kind !== "md") return null;
-  const { props } = splitFrontmatter(text);
-  return props ? metaOfProps(props) : null;
+/**
+ * The `#tags` written in a markdown note's words, as Obsidian reads them: `#` then letters, digits, `_`, `-` or `/`, at least one
+ * not a digit, not glued to a word or a `/` before it (a heading's `# `, `#123`, an address's `/#part` are none). Not in code.
+ */
+export function inlineTags(body: string): string[] {
+  const out: string[] = [];
+  const text = body.replace(/^```[\s\S]*?^```.*$|^~~~[\s\S]*?^~~~.*$/gm, "").replace(/`+[^`\n]*?`+/g, "");
+  for (const m of text.matchAll(/(?<![\p{L}\p{N}_&/#\\])#([\p{L}\p{N}_\-/]+)/gu)) {
+    const t = m[1]!.replace(/[/-]+$/, "");
+    if (t && /[^\d]/.test(t) && !out.some((x) => x.toLowerCase() === t.toLowerCase())) out.push(t);
+  }
+  return out;
 }
+
+/**
+ * A note file's properties (markdown: its YAML, and the `#tags` in its words; rich text: its head's `<meta>`), or null when it has no
+ * YAML (and for plain text). `inline`: a markdown note's `#tags`, also without YAML.
+ */
+export function fileMeta(kind: "md" | "txt" | "rich", text: string): (NoteMeta & { inline: string[] }) | null {
+  if (kind === "rich") {
+    const m = richMeta(text);
+    return m && { ...m, inline: [] };
+  }
+  if (kind !== "md") return null;
+  const { props, body } = splitFrontmatter(text);
+  const inline = inlineTags(body);
+  if (!props) return null;
+  const meta = metaOfProps(props);
+  return { ...meta, tags: [...meta.tags, ...inline.filter((t) => !meta.tags.some((x) => x.toLowerCase() === t.toLowerCase()))], inline };
+}
+
+/** A markdown note's `#tags` (also when it has no YAML). */
+export const fileInlineTags = (kind: "md" | "txt" | "rich", text: string): string[] => (kind === "md" ? inlineTags(splitFrontmatter(text).body) : []);
 
 /** A markdown note's new text (from the editor, without properties) under the properties its file has now. */
 export function underProps(file: string, body: string): string {
@@ -232,5 +258,7 @@ export function withFileMeta(kind: "md" | "txt" | "rich", text: string, meta: No
   if (kind === "rich") return withRichMeta(text, meta);
   if (kind !== "md") return text;
   const { props, body } = splitFrontmatter(text);
-  return withFrontmatter(body, propsOfMeta(props ?? [], meta));
+  // (the tags written as #tags in its words stay there: the YAML lists the others)
+  const inline = inlineTags(body).map((t) => t.toLowerCase());
+  return withFrontmatter(body, propsOfMeta(props ?? [], { ...meta, tags: meta.tags.filter((t) => !inline.includes(t.toLowerCase())) }));
 }

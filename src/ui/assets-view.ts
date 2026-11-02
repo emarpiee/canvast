@@ -982,6 +982,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           }),
         );
       },
+      tags: async () => [...new Set(all.flatMap((x) => x.tags ?? []))].sort((a, b) => a.localeCompare(b)),
       async findWiki(target) {
         const t = wikiTarget(target);
         const named = all.filter((x) => x.name.toLowerCase() === t.name || x.name.toLowerCase().replace(/\.(md|markdown|txt|note\.html)$/, "") === t.name);

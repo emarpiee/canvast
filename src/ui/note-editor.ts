@@ -34,6 +34,8 @@ export interface NoteHost {
   fonts(): Promise<string[]>;
   /** What `[[` offers: the library's notes and files, by the name a link names them with (`key`), and the name shown (`name`). */
   linkables(): Promise<Array<{ key: string; name: string; hash: string }>>;
+  /** The library's tags, for `#` (a tag written in a note is one of its item's tags). */
+  tags(): Promise<string[]>;
   /** The item a `[[target]]` link names, or null. */
   findWiki(target: string): Promise<NoteItem | null>;
   /** Ctrl+click on a link in the note: open what it points at (a note, a file of the library). `link`: as written in the file. */
@@ -250,6 +252,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   const value = await shown(opts.kind, opts.text, host.dir);
   for (const m of value.matchAll(/href="canvast-wiki:([^"]+)"/g)) knowPath(decodeURIComponent(m[1]!));
   const linkables = (await host.linkables()).map((l) => ({ key: l.key, name: l.name }));
+  const tagList = (await host.tags()).map((t) => ({ key: t.replace(/\s+/g, "-") }));
   const templates = await Promise.all((await host.templates()).map(async (t) => ({ name: t.name, html: await shown(t.kind, t.text, t.dir) })));
   const fonts = await host.fonts();
   const choose = async (kind: AttachKind | "any"): Promise<HTMLElement | null> => {
@@ -288,6 +291,8 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       triggers: {
         // `[[`: a link to a note or a file of the library, written `[[name]]` in a markdown note
         "[[": { data: linkables, onSelect: (item: { key: string; [x: string]: unknown }) => wikiLink(item.key, String(item["name"] ?? item.key)) },
+        // `#`: a tag of the library, written `#tag` in the words (a markdown note's #tags are its item's tags)
+        "#": { data: tagList, searchStartLength: 1, onSelect: (item: { key: string }) => `#${item.key}` },
       },
     },
     layout: { items: LAYOUTS },

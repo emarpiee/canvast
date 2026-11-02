@@ -150,11 +150,18 @@ test("a note's properties (YAML, as Obsidian writes them) are its item's tags, n
   await page(p).locator("h1").click();
   await p.keyboard.press("End");
   await p.keyboard.type(" art");
+  // #tags in the words: typed, or chosen from the library's tags (# offers them); they are the item's tags too.
+  await page(p).locator("p").first().click();
+  await p.keyboard.press("End");
+  await p.keyboard.type(" #urgent and #des");
+  await p.locator(".se-autocomplete-item, .se-select-item").filter({ visible: true, hasText: "design" }).first().click();
   await p.keyboard.press("Control+s");
   await expect(p.getByTestId("assets-status")).toContainText("Saved “cover.md”");
   const file = await downloaded(p);
-  expect(file).toMatch(/^---\ntags:\n  - design\n  - print\nauthor: Ana\ndescription: The cover plan\nnested:\n  a: 1\n---\n# Cover art/);
-  await expect.poll(entry).toEqual({ tags: ["design", "print"], note: "The cover plan", fields: [{ key: "author", value: "Ana" }] });
+  // (the YAML lists the tags not written in the words)
+  expect(file).toMatch(/^---\ntags:\n  - print\nauthor: Ana\ndescription: The cover plan\nnested:\n  a: 1\n---\n# Cover art/);
+  expect(file).toMatch(/Text\. #urgent and #design/);
+  await expect.poll(async () => (await entry())?.tags.sort()).toEqual(["design", "print", "urgent"]);
 });
 
 test("[[links]] between notes: shown as links, Ctrl+click opens the note, [[ offers the library's notes, saved as Obsidian writes them", async ({ app }) => {

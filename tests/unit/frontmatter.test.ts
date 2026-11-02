@@ -78,6 +78,20 @@ describe("rich text notes' properties", () => {
     expect(richMeta(withRichMeta(out, { tags: [], note: "", fields: [] }))).toBeNull();
     expect(fileMeta("txt", "tags: x")).toBeNull();
     expect(withFileMeta("txt", "plain", meta)).toBe("plain");
-    expect(fileMeta("md", withFileMeta("md", "# T\n", meta))).toEqual(meta);
+    expect(fileMeta("md", withFileMeta("md", "# T\n", meta))).toEqual({ ...meta, inline: [] });
+  });
+});
+
+describe("#tags in a note's words", () => {
+  it("are read as Obsidian reads them, and stay in the words when the YAML is written", async () => {
+    const { inlineTags, fileMeta, withFileMeta, splitFrontmatter } = await import("../../src/notes/frontmatter");
+    const body = "# Heading\n\nA #design note, #todo/later, #2026 not, issue#3 not, http://x.y/#part not, `#code` not.\n\n```\n#fenced\n```\n#Design again, #café-é.\n";
+    expect(inlineTags(body)).toEqual(["design", "todo/later", "café-é"]);
+    const file = `---\ntags: [print]\n---\n${body}`;
+    expect(fileMeta("md", file)!.tags).toEqual(["print", "design", "todo/later", "café-é"]);
+    expect(fileMeta("md", body)).toBeNull(); // (no YAML: its #tags are only added, see the session)
+    // The item's tags written back: those in the words stay there only.
+    const out = withFileMeta("md", file, { tags: ["print", "design", "todo/later", "café-é", "new"], note: "", fields: [] });
+    expect(splitFrontmatter(out).props).toEqual([{ key: "tags", value: ["print", "new"] }]);
   });
 });

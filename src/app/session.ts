@@ -1,5 +1,5 @@
 import { sha256Hex } from "../assets/sha256";
-import { NO_META, fileMeta, sameMeta, withFileMeta } from "../notes/frontmatter";
+import { NO_META, fileInlineTags, fileMeta, sameMeta, withFileMeta } from "../notes/frontmatter";
 import type { NoteMeta } from "../notes/frontmatter";
 import { noteKindOf } from "../notes/note-file";
 import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT } from "../assets/asset-catalog";
@@ -429,7 +429,11 @@ export class Session {
     const kind = e ? noteKindOf(e.name) : null;
     if (!e || !kind || kind === "txt" || !this.catalog) return;
     const text = await (await this.assets?.record(hash).catch(() => undefined))?.blob.text();
-    const meta = text === undefined ? null : fileMeta(kind, text);
+    const found = text === undefined ? null : fileMeta(kind, text);
+    // No YAML: only its #tags are added (the tags it has in the library stay; they go into the file at their next change).
+    const inline = text === undefined ? [] : fileInlineTags(kind, text);
+    const missing = inline.filter((t) => !(e.tags ?? []).some((x) => x.toLowerCase() === t.toLowerCase()));
+    const meta = found ?? (missing.length ? { tags: [...(e.tags ?? []), ...missing], note: e.note ?? "", fields: e.fields ?? [] } : null);
     if (!meta || sameMeta(meta, { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] })) return;
     const clip = (s: string, n: number): string => s.slice(0, n);
     const want = meta.tags.map((t) => clip(t, MAX_TAG_TEXT));
