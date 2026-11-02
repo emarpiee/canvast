@@ -1228,6 +1228,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-place-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .asset-place-n { flex: none; color: var(--hud-muted); font-variant-numeric: tabular-nums; }
 .asset-place-total { color: var(--hud-muted); font-weight: var(--weight-regular); }
+.asset-sec[hidden] { display: none; } /* (a section with nothing to say: Linked from) */
 .assets-link { padding: 0; color: var(--hud-accent); text-align: left; background: none; border: 0; cursor: pointer; } /* (a name that opens what it names: Linked from) */
 .assets-link:hover, .assets-link:focus-visible { text-decoration: underline; }
 .asset-places-more { width: 100%; justify-content: center; margin-top: var(--sp-3); }

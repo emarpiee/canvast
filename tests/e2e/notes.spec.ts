@@ -108,6 +108,7 @@ test("New note makes a markdown note in the open folder and opens it to write in
   await p.getByRole("menuitem", { name: /New note/ }).click();
   await expect(page(p).locator("h1")).toHaveText(/^Note \d{4}-\d\d-\d\d \d{6}$/);
   await expect(p.getByTestId("asset-card")).toHaveCount(2);
+  await expect(p.getByTestId("asset-backlinks")).toBeHidden(); // (nothing links to it: no Linked from)
 
   // A table from the size picker, shown.
   await page(p).locator("h1").click();
@@ -185,6 +186,8 @@ test("[[links]] between notes: shown as links, Ctrl+click opens the note, [[ off
   await page(p).locator("p").first().click();
   await p.keyboard.press("End");
   await p.keyboard.type(" Also [[Bri");
+  const list = (await p.locator(".se-select-menu").filter({ visible: true }).boundingBox())!;
+  expect(list.x >= 0 && list.x + list.width <= (p.viewportSize()?.width ?? 1280), "the [[ list is inside the window").toBe(true);
   await p.locator(".se-autocomplete-item, .se-select-item").filter({ visible: true, hasText: "Brief" }).first().click();
   await expect(page(p).locator('a[href="canvast-wiki:Brief"]')).toHaveCount(2);
   // Resting the pointer on a link shows the preview of what it points at.

@@ -197,6 +197,15 @@ class NoteFont extends font {
   }
 }
 
+/** Move a floating panel back inside the window when it would start left of it or end right of it. */
+function keepInView(el: HTMLElement): void {
+  const r = el.getBoundingClientRect();
+  const room = document.documentElement.clientWidth;
+  const gap = 8;
+  const shift = r.left < gap ? gap - r.left : r.right > room - gap ? Math.max(gap - r.left, room - gap - r.right) : 0;
+  if (shift) el.style.left = `${(parseFloat(el.style.left) || 0) + shift}px`;
+}
+
 /** Is this an upload of files from the device (and not an address, which goes in as it is)? */
 const localFiles = (files: unknown): File[] | null => {
   const list = files instanceof FileList || Array.isArray(files) ? [...files] : [];
@@ -322,6 +331,8 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     height: "100%",
     theme: "canvast", // (the app's tokens, light or dark with the app: src/styles.css)
     events: {
+      // A floating panel of the editor (the [[ and # lists, a picture's tools) is kept inside the window.
+      onShowController: ({ info }: { info: { form?: HTMLElement | null; inWrapper?: boolean } }) => void (info.form && !info.inWrapper && requestAnimationFrame(() => keepInView(info.form!))),
       onChange: () => void (dirty = true),
       onInput: () => void (dirty = true),
       onSave: async () => (await host.save()) || false,

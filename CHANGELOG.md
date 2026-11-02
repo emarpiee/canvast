@@ -22,6 +22,7 @@
 - **Added:** Linked from in an item's details (the notes linking to it), and links in notes that follow an item renamed or moved in the library.
 - **Added:** the library search finds notes by the words in them.
 - **Added:** `[[canvas:Name]]` links that open a canvas; a preview of what a link points at while the pointer rests on it; `{{date}}`, `{{time}}` and `{{title}}` in templates; files in dot-folders of `library/` (another app's own, as `.obsidian/`) are never taken in.
+- **Fixed:** the `[[` and `#` lists (and the editor's other floating panels) could open outside the window, cut off at its edge; an empty Linked from showed its heading.
 - **Added:** **New note** in the library's Import menu: a markdown note in the open folder, opened to write in.
 - **Changed:** the library chooser (texture fill pictures, custom thumbnails) is one shared panel that can also open in the middle of the page, list any kind of item, import files from this device, and shows the first 300 matches of a big library (search narrows it).
 
