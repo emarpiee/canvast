@@ -25,6 +25,7 @@
 - **Fixed:** the `[[` and `#` lists (and the editor's other floating panels) could open outside the window, cut off at its edge; an empty Linked from showed its heading.
 - **Added:** a note's preview (its card on a canvas, its thumbnail) shows the pictures, videos (▶), sounds (♪) and GIFs it links to, and Obsidian's `![[picture]]` embeds.
 - **Fixed:** a long note's card shown small on a canvas was drawn from its full-size picture (up to 1200 × 3600) on every frame: it now has a small copy like a picture's, drawn at that size.
+- **Fixed:** panning slowed down with a few big pictures (long notes' pages, big photos) shown at a middle size, a few hundred pixels: they were drawn from all their pixels. A 1024 px copy now serves them (8× less to draw; the 512 px copy still serves small ones).
 - **Added:** **New note** in the library's Import menu: a markdown note in the open folder, opened to write in.
 - **Changed:** the library chooser (texture fill pictures, custom thumbnails) is one shared panel that can also open in the middle of the page, list any kind of item, import files from this device, and shows the first 300 matches of a big library (search narrows it).
 

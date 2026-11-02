@@ -24,3 +24,12 @@ A button in the navigation controls shows a continuous FPS readout (`app/fps-met
 ## Not in this slice
 
 A stored (persisted) thumbnail, a virtualized Assets grid and progressive tile loading (Phase 4, the thumbnails plan (removed 2026-10-29; see ADR 0034)), and arranging an existing selection in a grid with a chosen order (the arrange plan, removed 2026-10-29, Phase 5; it reuses `gridLayout`).
+
+## Update (2026-11-03): a middle copy
+
+An image shown up to 512 CSS px on its longer side (above 256, where the 512 px copy serves) was drawn from all its pixels: a few
+long notes' pages (1200 × 3600) or big photos at a middle zoom made each frame upload tens of megabytes, and panning stuttered
+while drawing itself took about a millisecond. A second reduced copy, 1024 px on its longer side (`MID_EDGE`), serves that range;
+the copies are keyed `@small` (512) and `@small1024`, and the full image is read only for an image shown bigger. Six 2000 × 1200
+pictures shown at about 400 px: 15 MB of decoded pixels instead of 57.6 MB (frames.spec).
+

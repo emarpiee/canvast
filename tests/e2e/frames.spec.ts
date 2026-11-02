@@ -1387,6 +1387,16 @@ test("a batch import is laid out in a grid in one undo step, and big images draw
     await expect.poll(() => p.evaluate(([a, c]) => window.__canvastDebug.pixelAt(a!, c!).join(","), [x, y]), { timeout: 10_000 }).toBe(colours[i]!.join(","));
   }
   await expect.poll(async () => (await stats()).bytes, { timeout: 15_000 }).toBeLessThanOrEqual(12 * MB);
+  // Shown at a middle size (a few hundred px): each from its 1024 px copy (2.5 MB), not from all its pixels (six would be 57 MB).
+  await p.evaluate((b) => window.__canvastDebug.setDecodedBudget(b), 64 * MB);
+  await p.keyboard.press("-");
+  const shown = await boxOf(app, ids[0]!);
+  expect(shown!.maxX - shown!.minX, "a middle size").toBeGreaterThan(256);
+  for (let i = 0; i < 6; i++) {
+    const b = (await boxOf(app, ids[i]!))!;
+    await expect.poll(() => p.evaluate(([a, c]) => window.__canvastDebug.pixelAt(a!, c!).join(","), [Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2)]), { timeout: 10_000 }).toBe(colours[i]!.join(","));
+  }
+  await expect.poll(async () => (await stats()).bytes, { timeout: 15_000 }).toBeLessThanOrEqual(16 * MB);
   // One undo step takes the whole batch away.
   await p.keyboard.press("Control+z");
   expect(await p.evaluate(() => window.__canvastDebug.objects().length)).toBe(0);

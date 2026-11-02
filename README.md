@@ -959,6 +959,7 @@ Rendering is CPU-first **Canvas 2D**.
 - **Spatial index:** a multi-scale index (levels × `BigInt` cells) with no world bounds returns the visible objects. Off-screen content costs almost nothing, even when it is 2^5000 away.
 - **Level of detail:** content far below a pixel is skipped or summarized; identical opaque strokes are drawn in one call.
 - **Raster tile cache** for committed objects keeps panning and drawing over dense scenes near 2–3 ms per frame, and a bounded **zoom preview** keeps zooming responsive (the levels one out and one in are prepared while the view rests, the outer one first; zooming out past what is prepared, the edge is drawn exactly).
+- **Pictures at their shown size:** a big picture (a photo, a long note's page) is drawn from a 512 px copy when it is small on the screen and from a 1024 px copy at a middle size; all its pixels are read only when it is shown big. Each copy is made once, then kept while memory allows.
 - **Deep zoom into any kind of object:** every kind has a sampler so its colour never disappears when the view is inside it.
 - **Text** uses the browser's glyphs normally and the font's exact outlines past about 2,000 px per letter.
 

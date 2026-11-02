@@ -88,6 +88,10 @@ interface Decoded extends RasterSource {
 export const DEFAULT_DECODED_BUDGET = 384 * 2 ** 20;
 /** Key suffix of the reduced copy of an image in the decoded cache. */
 const SMALL_KEY = "@small";
+/** Key of a reduced copy whose longer side is `edge` (512: "@small", 1024: "@small1024"). */
+const reducedKey = (edge: number): string => (edge === SMALL_EDGE ? SMALL_KEY : `${SMALL_KEY}${edge}`);
+/** The hash a decoded cache key is of (without a video's time or a reduced copy's mark). */
+const baseOf = (k: string): string => k.split("#")[0]!.replace(/@small\d*$/, "");
 /**
  * Images are decoded at most this many at a time. Hundreds of images asking at once (a big batch placed on the canvas)
  * would otherwise decode in parallel, each briefly holding its full pixels: gigabytes for a few seconds (ADR 0030).
@@ -135,6 +139,11 @@ async function decode(blob: Blob, at = 0): Promise<CanvasImageSource & { width: 
  * is faster. Only images whose longer side is above SMALL_EDGE have one (ADR 0030).
  */
 export const SMALL_EDGE = 512;
+/**
+ * A second, middle copy (ADR 0030): an image shown up to half of MID_EDGE CSS px (a long note's page, a big photo at a middle zoom)
+ * is drawn from a copy of this longer side, not from all its pixels: drawing a few of those is what made panning slow.
+ */
+export const MID_EDGE = 1024;
 
 function makeSource(img: CanvasImageSource & { width: number; height: number }, fullW = img.width): Decoded {
   let scratch: HTMLCanvasElement | null = null;
@@ -201,7 +210,7 @@ export class AssetLibrary {
   private budget = DEFAULT_DECODED_BUDGET;
   private running = 0;
   maxRunning = 0;
-  private readonly queue = new Map<string, { hash: string; small: boolean; wanted: number }>();
+  private readonly queue = new Map<string, { hash: string; edge: number; wanted: number }>();
   private lastEvictCheck = 0;
 
   constructor(
@@ -395,7 +404,7 @@ export class AssetLibrary {
   /** Drop the decoded copy of an erased original (after garbage collection). */
   forget(hash: string): void {
     for (const k of [...this.decoded.keys()]) {
-      if (k === hash || k.startsWith(hash + "#") || k === hash + SMALL_KEY) {
+      if (k === hash || k.startsWith(hash + "#") || baseOf(k) === hash) {
         this.decoded.get(k)?.release();
         this.decoded.delete(k);
       }
@@ -414,13 +423,13 @@ export class AssetLibrary {
   /** The hidden items were locked: their decoded pictures leave memory, and draw as locked. */
   async dropLocked(): Promise<void> {
     if (!this.store) return;
-    const bases = new Set([...this.decoded.keys()].map((k) => k.split("#")[0]!.replace(SMALL_KEY, "")));
+    const bases = new Set([...this.decoded.keys()].map((k) => baseOf(k)));
     for (const h of bases) if (await this.store.locked(h)) this.forget(h);
     this.onReady();
   }
 
   isLocked(hash: string): boolean {
-    return this.locked.has(hash) || (!this.revealing && this.hidden.has(hash.split("#")[0]!.replace(SMALL_KEY, "")));
+    return this.locked.has(hash) || (!this.revealing && this.hidden.has(baseOf(hash)));
   }
 
   /** Show hidden items' pictures on the screen, or not (their decoded pictures leave memory when not). */
@@ -436,7 +445,7 @@ export class AssetLibrary {
    * there whatever is shown on the screen, so nothing readable of them leaves the app.
    */
   forFiles(): AssetLibrary {
-    const hidden = (h: string): boolean => this.hidden.has(h.split("#")[0]!.replace(SMALL_KEY, ""));
+    const hidden = (h: string): boolean => this.hidden.has(baseOf(h));
     return new Proxy(this, {
       get: (t, k) => {
         if (k === "get") return (h: string, ...rest: [number?, number?]) => (hidden(h) ? null : t.get(h, ...rest));
@@ -487,23 +496,31 @@ export class AssetLibrary {
   get(hash: string, shownPx = Infinity, edge = 0): RasterSource | null {
     const now = performance.now();
     if (!this.revealing && this.hidden.has(hash.split("#")[0]!)) return null;
-    const small = edge > SMALL_EDGE && shownPx <= SMALL_EDGE / 2 && !this.noReduced.has(hash);
-    const full = this.decoded.get(hash);
-    const reduced = this.decoded.get(hash + SMALL_KEY);
-    const pick = small ? (reduced ?? full) : (full ?? reduced);
+    const level = this.levelOf(hash, shownPx, edge);
+    const wanted = this.decoded.get(level ? hash + reducedKey(level) : hash);
+    // (while the copy wanted is not ready, another serves: the nearest bigger one, else any)
+    const others = [MID_EDGE, 0, SMALL_EDGE].filter((l) => l !== level).map((l) => this.decoded.get(l ? hash + reducedKey(l) : hash));
+    const pick = wanted ?? others.find(Boolean);
     if (pick) {
       pick.lastUsed = now;
       if (now - this.lastEvictCheck > 500) this.evict(now); // images that fell idle since the last load
     }
-    const wanted = small ? reduced : full;
-    if (!wanted && !this.missing.has(hash)) this.request(hash, small, now);
+    if (!wanted && !this.missing.has(hash)) this.request(hash, level, now);
     return pick ?? null;
   }
 
   /** Whether the copy `get` should serve for this size is ready (not a stopgap or a placeholder): tiles drawn before this must be redrawn. */
   wantedReady(hash: string, shownPx = Infinity, edge = 0): boolean {
-    const small = edge > SMALL_EDGE && shownPx <= SMALL_EDGE / 2 && !this.noReduced.has(hash);
-    return this.decoded.has(hash + (small ? SMALL_KEY : ""));
+    const level = this.levelOf(hash, shownPx, edge);
+    return this.decoded.has(level ? hash + reducedKey(level) : hash);
+  }
+
+  /** Which copy serves an image shown `shownPx` CSS px (its longer side; `edge` in source pixels): the 512, the 1024 or all of it (0). */
+  private levelOf(hash: string, shownPx: number, edge: number): number {
+    if (this.noReduced.has(hash)) return 0;
+    if (edge > SMALL_EDGE && shownPx <= SMALL_EDGE / 2) return SMALL_EDGE;
+    if (edge > MID_EDGE && shownPx <= MID_EDGE / 2) return MID_EDGE;
+    return 0;
   }
 
   isMissing(hash: string): boolean {
@@ -552,8 +569,8 @@ export class AssetLibrary {
   }
 
   /** Ask for a decode: queued, and run when one of the few decode slots is free (the most recently asked first). */
-  private request(hash: string, small: boolean, now: number): void {
-    const key = hash + (small ? SMALL_KEY : "");
+  private request(hash: string, edge: number, now: number): void {
+    const key = hash + (edge ? reducedKey(edge) : "");
     const q = this.queue.get(key);
     if (q) {
       q.wanted = now; // still in view: keep its place
@@ -561,7 +578,7 @@ export class AssetLibrary {
     }
     if (this.pending.has(key)) return;
     this.pending.add(key);
-    this.queue.set(key, { hash, small, wanted: now });
+    this.queue.set(key, { hash, edge, wanted: now });
     this.pump();
   }
 
@@ -584,22 +601,22 @@ export class AssetLibrary {
       this.queue.delete(bestKey);
       this.running++;
       this.maxRunning = Math.max(this.maxRunning, this.running);
-      void this.load(q.hash, q.small).finally(() => {
+      void this.load(q.hash, q.edge).finally(() => {
         this.running--;
         this.pump();
       });
     }
   }
 
-  private async load(hash: string, small = false): Promise<void> {
-    const key = hash + (small ? SMALL_KEY : "");
+  private async load(hash: string, edge = 0): Promise<void> {
+    const key = hash + (edge ? reducedKey(edge) : "");
     try {
       const rec = await this.record(hash.split("#")[0]!);
       if (!rec) {
         this.missing.add(hash);
         if (await this.store?.locked(hash.split("#")[0]!)) this.locked.add(hash);
-      } else if (small && Math.max(rec.pixelW, rec.pixelH) > SMALL_EDGE) {
-        await this.ensureReduced(rec);
+      } else if (edge && Math.max(rec.pixelW, rec.pixelH) > edge) {
+        await this.ensureReduced(rec, edge);
       } else {
         await this.ensureDecoded(rec, hash);
       }
@@ -611,11 +628,11 @@ export class AssetLibrary {
     }
   }
 
-  /** The reduced copy, decoded straight from the stored bytes at the smaller size. */
-  private async ensureReduced(rec: AssetRecord): Promise<void> {
-    const key = rec.hash + SMALL_KEY;
+  /** A reduced copy (longer side `edge`), decoded straight from the stored bytes at that size. */
+  private async ensureReduced(rec: AssetRecord, edge = SMALL_EDGE): Promise<void> {
+    const key = rec.hash + reducedKey(edge);
     if (this.decoded.has(key)) return;
-    const s = SMALL_EDGE / Math.max(rec.pixelW, rec.pixelH);
+    const s = edge / Math.max(rec.pixelW, rec.pixelH);
     let bmp: ImageBitmap;
     try {
       // A card (a long note's page) is drawn at the smaller size itself: its file is no picture to decode smaller.
