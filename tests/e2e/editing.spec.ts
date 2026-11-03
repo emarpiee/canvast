@@ -708,7 +708,7 @@ test("resize with side handles: corners and sides follow the pointer; Shift keep
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("dragging objects to an edge of the view pans it while the pointer rests there; the object stays under the pointer; off at 0%", async ({ app }) => {
+test("dragging objects to an edge of the view pans it while the pointer rests there; the objects stay in view; off at 0%", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles({ name: "o.png", mimeType: "image/png", buffer: makePng(120, 80, () => [200, 60, 40, 255]) });
@@ -732,12 +732,12 @@ test("dragging objects to an edge of the view pans it while the pointer rests th
     const moved = (await centerX()) !== c0;
     await p.mouse.up();
     const after = await box();
-    return { at: (after.minX + after.maxX) / 2, moved };
+    return { at: after.maxX, moved };
   };
   const width = await p.evaluate(() => document.querySelector("canvas")!.getBoundingClientRect().width);
   const panned = await drag(700);
   expect(panned.moved, "the view moved").toBe(true);
-  expect(Math.abs(panned.at - (width - 2)), "the object is under the pointer").toBeLessThan(4);
+  expect(panned.at, "the whole object is in view").toBeLessThanOrEqual(width + 1);
   // Off at 0%.
   await p.getByTestId("view-settings").click();
   await p.getByRole("tab", { name: "Navigation", exact: true }).click();
@@ -748,6 +748,7 @@ test("dragging objects to an edge of the view pans it while the pointer rests th
   await p.waitForTimeout(600);
   const still = await drag(500);
   expect(still.moved, "the view stayed").toBe(false);
+  expect(still.at, "off: it follows the pointer past the edge").toBeGreaterThan(width);
 });
 
 test("Alt held as a drag starts carries a copy; the original stays; F still focuses (ADR 0063)", async ({ app }) => {

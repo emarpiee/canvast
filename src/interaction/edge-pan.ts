@@ -2,8 +2,8 @@ import { panBy } from "../core/camera";
 import type { ScreenPoint } from "../core/camera";
 import type { ViewState } from "../app/view-state";
 
-// Edge panning: while something is dragged with the pointer near an edge of the view (or past it), the view moves that way by itself. The nearer the
-// edge, the faster, as in other canvas apps. Any drag worked out from world positions can use it (`EdgePan`); the speed is `edgePanStep`, pure.
+// Edge panning: while something is dragged near an edge of the view, the view moves that way by itself. The nearer the edge, the faster, as in other
+// canvas apps. Any drag worked out from world positions can use it (`EdgePan`); the speed is `edgePanStep`, pure.
 
 /** How far in from an edge of the view it starts, CSS px. */
 export const EDGE_PAN_ZONE_PX = 48;
@@ -13,18 +13,24 @@ export const EDGE_PAN_MAX_PX_S = 1400;
 const DELAY_MS = 200;
 const EASE_MS = 200;
 
-/** How much the content moves on the screen in `seconds` for a pointer at `p` (`speed`: 1 is 100%); nothing outside the zones. Each axis on its own. */
-export function edgePanStep(p: ScreenPoint, vp: { width: number; height: number }, speed: number, seconds: number): { dx: number; dy: number } {
-  const axis = (at: number, size: number): number => {
-    const near = (from: number): number => Math.min(1, Math.max(0, 1 - from / EDGE_PAN_ZONE_PX));
-    return (near(at) - near(size - at)) * EDGE_PAN_MAX_PX_S * speed * seconds; // (toward the left edge: the content moves right)
-  };
-  return { dx: axis(p.x, vp.width), dy: axis(p.y, vp.height) };
+/** A box on the screen, or the part of the view things stay in. */
+export interface EdgeBox {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+/** How much the content moves on the screen in `seconds` for what is dragged at `box` in `area` (`speed`: 1 is 100%); nothing outside the zones. Each axis on its own. */
+export function edgePanStep(box: EdgeBox, area: EdgeBox, speed: number, seconds: number): { dx: number; dy: number } {
+  const near = (from: number): number => Math.min(1, Math.max(0, 1 - from / EDGE_PAN_ZONE_PX));
+  const axis = (low: number, high: number): number => (near(low) - near(high)) * EDGE_PAN_MAX_PX_S * speed * seconds; // (toward the left edge: the content moves right)
+  return { dx: axis(box.minX - area.minX, area.maxX - box.maxX), dy: axis(box.minY - area.minY, area.maxY - box.maxY) };
 }
 
 /**
- * The view following one drag near its edges. `at` tells where the pointer is; while it is in a zone the view moves each frame even if the pointer
- * rests, and `onPan(dx, dy)` lets the drag work out its place again (false ends it). `onRest`: the view stopped moving (the pointer left the zones).
+ * The view following one drag near its edges. `at` tells where the pointer is and `where` what is dragged then, in which area; while that is in a zone
+ * the view moves each frame even if the pointer rests, and `onPan(dx, dy)` lets the drag work out its place again (false ends it). `onRest`: the view stopped moving.
  */
 export class EdgePan {
   private p: ScreenPoint | null = null;
@@ -35,6 +41,7 @@ export class EdgePan {
     private readonly view: ViewState,
     /** 1 is 100%, 0 off. */
     private readonly speed: () => number,
+    private readonly where: (p: ScreenPoint) => { box: EdgeBox; area: EdgeBox },
     private readonly onPan: (p: ScreenPoint, dx: number, dy: number) => boolean,
     private readonly onRest: () => void,
   ) {}
@@ -42,7 +49,8 @@ export class EdgePan {
   at(p: ScreenPoint): void {
     this.p = p;
     if (this.frame || !this.speed()) return;
-    const { dx, dy } = edgePanStep(p, this.view.viewport, 1, 1);
+    const { box, area } = this.where(p);
+    const { dx, dy } = edgePanStep(box, area, 1, 1);
     if (!dx && !dy) return;
     this.since = this.last = performance.now();
     this.frame = requestAnimationFrame(this.tick);
@@ -55,8 +63,9 @@ export class EdgePan {
     const seconds = Math.min(0.05, Math.max(0, (now - this.last) / 1000));
     this.last = now;
     const ease = Math.min(1, Math.max(0, (now - this.since - DELAY_MS) / EASE_MS));
-    const { dx, dy } = edgePanStep(p, this.view.viewport, this.speed() * ease, seconds);
-    const inZone = edgePanStep(p, this.view.viewport, 1, 1);
+    const { box, area } = this.where(p);
+    const { dx, dy } = edgePanStep(box, area, this.speed() * ease, seconds);
+    const inZone = edgePanStep(box, area, 1, 1);
     if (!inZone.dx && !inZone.dy) return this.onRest();
     if (dx || dy) {
       this.view.setCamera(panBy(this.view.camera, dx, dy));

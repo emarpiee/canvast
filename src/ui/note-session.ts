@@ -26,7 +26,7 @@ export interface NotePlace {
   root?(): HTMLElement | null;
   /** Files into the library: their hashes. */
   importFiles(files: File[]): Promise<string[]>;
-  /** Show another item (a link followed, a rich text note just made). */
+  /** Show another item (a link followed, a rich text note just made, this one opened again in another editor style). */
   show(hash: string): Promise<void>;
   /** A `[[canvas:Name]]` link was followed and that canvas opened: the canvas is shown. */
   showCanvas(): void;
@@ -57,6 +57,7 @@ const titleOf = (name: string): string => name.replace(/\.(note\.html|md|markdow
 /** The notes open now (the library's and the canvas's): a new version follows into them, and leaving the app asks about them. */
 const open = new Set<OpenNote>();
 const followed = new WeakSet<Session>();
+const styled = new WeakSet<SettingsStore>();
 
 /** A note open in the notes editor. */
 export class OpenNote {
@@ -83,6 +84,13 @@ export class OpenNote {
     const host = await note.host();
     note.editor = await mountNoteEditor(el, { kind, text, style: deps.settings.get(place.styleKey ?? "notes.style"), host, title: titleOf(name), root: place.root?.() ?? null });
     open.add(note);
+    // The editor's style changed: the notes open in that style show it now (changes not saved are asked about, as on any leaving).
+    if (!styled.has(deps.settings)) {
+      styled.add(deps.settings);
+      deps.settings.subscribe((key) => {
+        for (const n of [...open]) if (n.deps.settings === deps.settings && (n.place.styleKey ?? "notes.style") === key) void n.place.show(n.hash);
+      });
+    }
     if (!followed.has(deps.session)) {
       followed.add(deps.session);
       // A new version of an open note (its properties written by a library change, the file saved elsewhere): it stays open.

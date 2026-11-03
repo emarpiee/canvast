@@ -707,6 +707,23 @@ test("Settings > Notes: Save notes on close saves without asking; a note's forma
   await expect(p.getByTestId("slide-view")).toBeHidden();
   await p.getByTestId("view-settings").click();
   await p.locator('[data-set="notes.saveAs"]').selectOption("rich");
+  // The editor's style shows at once in a note open in it (the Note panel, which stays open beside Settings).
+  await p.getByTestId("view-assets").click();
+  await p.locator('[data-testid="asset-card"][title="keep.md"]').click();
+  await p.getByTestId("asset-place").click();
+  await p.getByTestId("view-canvas").click();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
+  await expect.poll(() => p.evaluate(() => (window.__canvastDebug.objects()[0] as unknown as { page?: boolean }).page)).toBe(true); // (its card fitted to its note)
+  await p.waitForTimeout(300);
+  const at = await p.evaluate(() => { const d = window.__canvastDebug; return d.objectScreen(d.objects()[0]!.id)!.box; });
+  await p.mouse.dblclick((at.minX + at.maxX) / 2, (at.minY + at.maxY) / 2);
+  const panelPage = p.getByTestId("note-panel").locator(".sun-editor-editable").first();
+  await expect(panelPage).toHaveClass(/se-type-document/);
+  await p.getByTestId("view-settings").click();
+  await p.locator('[data-set="notes.panelStyle"]').selectOption("classic");
+  await p.getByTestId("view-canvas").click();
+  await expect(p.getByTestId("note-panel").locator(".sun-editor-editable").first()).not.toHaveClass(/se-type-document/);
+  await p.getByTestId("note-panel").locator("[data-close]").click();
   await p.getByTestId("view-assets").click();
   await edit("rich.md");
   await expect.poll(names).toEqual(["keep.md", "rich.note.html"]);

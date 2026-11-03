@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.12 — Dragged objects stay in view; note styles apply at once (2026-11-04)
+
+- **Changed:** objects dragged to an edge of the view stay in view, also beside docked panels; the view pans once the objects themselves near the edge, and only toward where they are moving.
+- **Fixed:** changing the notes editor's style shows at once in the notes open in that style (it waited until the note was opened again).
+
 ## 0.53.11 — Notes: a save pressed during a save (2026-11-04)
 
 - **Fixed:** Ctrl+S pressed while a note's save was still running, with changes made since, no longer does nothing: one more save follows it.

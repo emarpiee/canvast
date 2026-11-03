@@ -24,7 +24,8 @@ import type { GradHandle } from "./path-edit";
 import type { Gradient } from "../doc/paint";
 import type { Frame } from "../core/frames";
 import { depthOf, expressExactIn } from "../core/frames";
-import { EdgePan } from "./edge-pan";
+import { EDGE_PAN_ZONE_PX, EdgePan } from "./edge-pan";
+import type { EdgeBox } from "./edge-pan";
 import { penWidthNow } from "./pen-width";
 import { ropeFor, ropeStep } from "./stabilizer";
 import { TILT_FULL_DEG, expandStroke } from "./pens";
@@ -247,7 +248,7 @@ type Gesture =
   /** Cropping the picked picture (ADR 0118): a side or corner of its box moves its window of the source. */
   | { kind: "crop"; pointerId: number; base: ImageObject; sides: { l: boolean; r: boolean; t: boolean; b: boolean }; start: ScreenPoint; ppu: number }
   | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean; click?: CanvasObject | null; exact?: boolean }
-  | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; startScreen: ScreenPoint; ids: ObjectId[]; snap: SnapContext | null }
+  | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; startScreen: ScreenPoint; ids: ObjectId[]; /** What it carries, from the pointer at the start, and how far past the view it already was. */ reach: { minX: number; minY: number; maxX: number; maxY: number; overMinX: number; overMinY: number; overMaxX: number; overMaxY: number } | null; snap: SnapContext | null }
   | { kind: "marquee"; pointerId: number; start: ScreenPoint; additive: boolean }
   | { kind: "text"; pointerId: number; start: ScreenPoint; moved: boolean }
   /** Dragging a handle of a path's gradient (ADR 0100). */
@@ -318,6 +319,8 @@ export interface ToolHooks {
   toolForKey(key: string): Tool | undefined;
   /** How fast the view moves when a drag of objects nears an edge: 1 is 100%, 0 off (Settings > Navigation). */
   edgePanSpeed?(): number;
+  /** The part of the view things are kept in while dragged (without what docked panels cover), else all of it. */
+  dragArea?(): { minX: number; minY: number; maxX: number; maxY: number };
   /** The direction a plain key steps in (W A S D at first; Settings > Shortcuts), if any (ADR 0058, 0072). */
   navForKey(key: string): NavDir | undefined;
   /** Step the selection to a neighbouring item. */
@@ -342,10 +345,44 @@ export function attachTools(
 ): () => void {
   const pan = new PanGesture(view);
   let g: Gesture = { kind: "none" };
+  /** The part of the view things are kept in while dragged: without what the docked panels cover. */
+  const viewArea = (): EdgeBox => hooks.dragArea?.() ?? { minX: 0, minY: 0, maxX: view.viewport.width, maxY: view.viewport.height };
+  /**
+   * Where a drag of objects puts them for the pointer at `p`: they stay in the view (the view pans instead, see `edgePan`), unless they did not fit or
+   * were past the edge when the drag began. Only the sides it is moving toward count for panning: a small nudge of what lies near an edge moves no view.
+   */
+  const draggedAt = (m: Extract<Gesture, { kind: "move" }>, p: ScreenPoint): { point: ScreenPoint; box: EdgeBox; area: EdgeBox } => {
+    const area = viewArea();
+    const r = m.reach;
+    if (!r || !(hooks.edgePanSpeed?.() ?? 1)) return { point: p, box: { minX: p.x, minY: p.y, maxX: p.x, maxY: p.y }, area };
+    const axis = (at: number, moved: number, lo: number, hi: number, min: number, max: number, overLo: number, overHi: number): [number, number, number] => {
+      const fits = hi - lo < max - min;
+      const c = fits ? Math.min(max + overHi - hi, Math.max(min - overLo - lo, at)) : at;
+      const low = fits ? c + lo : at;
+      const high = fits ? c + hi : at;
+      return [c, moved < 0 ? low : Math.max(low, min + EDGE_PAN_ZONE_PX), moved > 0 ? high : Math.min(high, max - EDGE_PAN_ZONE_PX)];
+    };
+    const [x, minX, maxX] = axis(p.x, p.x - m.startScreen.x, r.minX, r.maxX, area.minX, area.maxX, r.overMinX, r.overMaxX);
+    const [y, minY, maxY] = axis(p.y, p.y - m.startScreen.y, r.minY, r.maxY, area.minY, area.maxY, r.overMinY, r.overMaxY);
+    return { point: { ...p, x, y }, box: { minX, minY, maxX, maxY }, area };
+  };
+  /** What a drag carries, around the pointer at `s`: its box from the pointer, and how far past the view it already is. */
+  const reachOf = (ids: readonly ObjectId[], s: ScreenPoint): Extract<Gesture, { kind: "move" }>["reach"] => {
+    const chosen = new Set(ids);
+    const boxes = visible().filter((po) => chosen.has(po.obj.id)).map((po) => po.box);
+    if (!boxes.length) return null;
+    const minX = Math.min(...boxes.map((b) => b.minX));
+    const minY = Math.min(...boxes.map((b) => b.minY));
+    const maxX = Math.max(...boxes.map((b) => b.maxX));
+    const maxY = Math.max(...boxes.map((b) => b.maxY));
+    const a = viewArea();
+    return { minX: minX - s.x, minY: minY - s.y, maxX: maxX - s.x, maxY: maxY - s.y, overMinX: Math.max(0, a.minX - minX), overMinY: Math.max(0, a.minY - minY), overMaxX: Math.max(0, maxX - a.maxX), overMaxY: Math.max(0, maxY - a.maxY) };
+  };
   // Near an edge of the view, a drag of objects moves the view too. What is on the screen moved, so snapping (worked out in screen positions) waits until it stops.
   const edgePan = new EdgePan(
     view,
     () => hooks.edgePanSpeed?.() ?? 1,
+    (p) => (g.kind === "move" ? draggedAt(g, p) : { box: { minX: p.x, minY: p.y, maxX: p.x, maxY: p.y }, area: viewArea() }),
     (p, dx, dy) => {
       if (g.kind !== "move") return false;
       g.startScreen = { ...g.startScreen, x: g.startScreen.x + dx, y: g.startScreen.y + dy };
@@ -1472,7 +1509,7 @@ export function attachTools(
       const picked = [...editor.selection].filter((id) => doc.get(id));
       const carried = descendantsOf(doc.all(), new Set(picked.filter((id) => isContainer(doc.get(id)))));
       const ids = [...new Set([...picked, ...carried])];
-      g = { kind: "move", pointerId: gp.pointerId, frame: view.frame, startWorld: world(gp.start), startScreen: gp.start, ids, snap: editor.snap ? snapContext(ids, view.frame) : null };
+      g = { kind: "move", pointerId: gp.pointerId, frame: view.frame, startWorld: world(gp.start), startScreen: gp.start, ids, reach: reachOf(ids, gp.start), snap: editor.snap ? snapContext(ids, view.frame) : null };
       updateMove(s);
       return;
     }
@@ -1529,8 +1566,9 @@ export function attachTools(
     return ctx;
   };
 
-  const updateMove = (s: ScreenPoint): void => {
+  const updateMove = (at: ScreenPoint): void => {
     if (g.kind !== "move") return;
+    const s = draggedAt(g, at).point;
     const w = worldIn(s, g.frame);
     let dx = D.sub(w.x, g.startWorld.x);
     let dy = D.sub(w.y, g.startWorld.y);

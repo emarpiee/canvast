@@ -116,6 +116,12 @@ export class PanelDock {
   }
 
   /** Put a panel in the dock. Its `hidden` attribute says whether it is shown. */
+  /** How far the panels docked on each side reach in over the window, CSS px (what is left of the view for the canvas). */
+  covered(): { left: number; right: number } {
+    const shown = (col: HTMLElement): DOMRect[] => [...col.querySelectorAll<HTMLElement>(":scope > .dock-item")].map((b) => b.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
+    return { left: Math.max(0, ...shown(this.left).map((r) => r.right)), right: Math.max(0, ...shown(this.right).map((r) => innerWidth - r.left)) };
+  }
+
   add(el: HTMLElement, spec: DockSpec): void {
     const box = document.createElement("div");
     box.className = "dock-item";
