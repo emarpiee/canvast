@@ -807,8 +807,9 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     expect((await hid("check", "pw1")).ok).toBe(false);
     expect(await hid("check", "pw2")).toEqual({ ok: true, state: "open" });
     await expect.poll(() => listing().then((l) => l.sort())).toEqual([["Secret Plan.png", true, true], [name, true, true]].sort());
-    expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toEqual(Array.from(secret));
-    expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), createHash("sha256").update(outside).digest("hex"))).toEqual(Array.from(outside));
+    // (each file is opened from .hidden/ after the list shows it: wait for its bytes)
+    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toEqual(Array.from(secret));
+    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.originalBytes(h), createHash("sha256").update(outside).digest("hex"))).toEqual(Array.from(outside));
     // Shown again: opened back into its place in library/, the sealed file erased, its picture drawn again.
     await lib("hide", hash, "");
     await flush();
