@@ -34,6 +34,24 @@ export function safeBase(name: string): string {
   return s;
 }
 
+/**
+ * A file's name kept as written (Settings: Keep file names): only what a system forbids or a file cannot hold is changed: `<>:"/\\|?*` and control
+ * characters become `-`, dots and spaces at the ends go (a leading dot would hide the file), and a name reserved on some systems gets `_file`.
+ */
+export function keptBase(name: string): string {
+  let s = name
+    .replace(/\.[A-Za-z0-9]{1,8}$/, "")
+    .normalize("NFC")
+    // eslint-disable-next-line no-control-regex
+    .replace(/[<>:"/\\|?*\u0000-\u001f\u007f]/g, "-")
+    .replace(/^[\s.]+|[\s.]+$/g, "");
+  const cut = cutBytes(s, MAX_BASE);
+  if (cut !== s) s = cut.replace(/[\s.]+$/, "");
+  if (!s) s = "file";
+  if (RESERVED.test(s)) s = `${s}_file`;
+  return s;
+}
+
 /** The folder of `library/` for an original that is in no library folder, by its kind. */
 export function kindFolder(type: string, name: string): string {
   if (/\.note\.html$/i.test(name)) return "notes";
@@ -111,8 +129,12 @@ export function fileExt(name: string, type: string): string {
  * Every part is lower case, so two of these never differ only in case (which clashes on some systems).
  */
 export async function libraryPath(name: string, type: string, taken: (path: string) => Promise<boolean>): Promise<string> {
-  return freePath(`library/${kindFolder(type, name)}`, nameBase(name), fileExt(name, type), taken);
+  const keep = nameRules.keep();
+  return freePath(`library/${kindFolder(type, name)}`, keep ? keptBase(name) : nameBase(name), (keep && /\.([A-Za-z0-9]{1,8})$/.exec(name)?.[1]) || fileExt(name, type), taken);
 }
+
+/** Settings > Keep file names as written: a new file takes its name as written, else its tidy name. */
+export const nameRules: { keep: () => boolean } = { keep: () => false };
 
 /** A library name's safe base, without its extension. */
 export const nameBase = (name: string): string => safeBase(name.replace(/\.[A-Za-z0-9]{1,8}$/, ""));

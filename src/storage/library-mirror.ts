@@ -21,7 +21,7 @@ import type { NameKeys } from "./hidden-vault";
 import { sha256Hex } from "../assets/sha256";
 import { done, idbGet, req } from "./idb";
 import { noteKindOf } from "../notes/note-file";
-import { KIND_FOLDERS, extOfBytes, fileExt, fitsPlace, freePath, isSafeRelativePath, libraryDir, nameBase, safeBase } from "./workspace-names";
+import { KIND_FOLDERS, extOfBytes, fileExt, fitsPlace, freePath, isSafeRelativePath, keptBase, libraryDir, nameBase, safeBase } from "./workspace-names";
 import type { FolderFile } from "./store";
 
 export const LIBRARY_JSON = ".canvast/library.json";
@@ -553,9 +553,14 @@ export class LibraryMirror {
       const id = meta(e).folderIds[0];
       const dir = libraryDir(id && folderOk.has(id) ? folderPath(folders, id) : [], e.type, e.name);
       // (a sealed file's own is .bin; a note made rich text in its place, plan.md → plan.note.html, is a file of its new kind)
-      const ext = (noteKindOf(e.name) && fileExt(e.name, e.type)) || (rec.file && !sealed && extOfPath(rec.file)) || fileExt(rec.name, e.type);
-      const base = nameBase(e.name);
-      if (rec.file && fitsPlace(rec.file, dir, base, ext) && !taken.has(rec.file.toLowerCase())) taken.add(rec.file.toLowerCase());
+      const tidyExt = (noteKindOf(e.name) && fileExt(e.name, e.type)) || (rec.file && !sealed && extOfPath(rec.file)) || fileExt(rec.name, e.type);
+      const tidyBase = nameBase(e.name);
+      // (Keep file names: as the item is named, its extension too. A hidden item's is its own business. A file already tidied stays where it is: turning the setting on moves nothing.)
+      const keep = this.keepNames() && !sealed;
+      const base = keep ? keptBase(e.name) : tidyBase;
+      const ext = (keep && /\.([A-Za-z0-9]{1,8})$/.exec(e.name)?.[1]) || tidyExt;
+      const fits = !!rec.file && (fitsPlace(rec.file, dir, base, ext) || (keep && (fitsPlace(rec.file, dir, tidyBase, tidyExt) || fitsPlace(rec.file, dir, base, tidyExt))));
+      if (fits && !taken.has(rec.file!.toLowerCase())) taken.add(rec.file!.toLowerCase());
       else moves.push({ hash: e.hash, from: rec.ext ? rec.file! : null, dir, base, ext });
     }
     // A file that moves keeps its old place until it has moved, so no two items ever pass through one name.
@@ -1003,13 +1008,16 @@ export class LibraryMirror {
       const entry = e && (await this.lib.entry(hash));
       if (entry) {
         const base = to.slice(to.lastIndexOf("/") + 1);
-        const renamed = nameBase(base) !== nameBase(entry.name);
+        const renamed = this.keepNames() ? base !== entry.name : nameBase(base) !== nameBase(entry.name);
         ops.push({ t: "entry", hash, v: { ...entry, ...(renamed ? { name: base } : {}), folderIds: folderId ? [folderId] : [] } satisfies CatalogEntry });
       }
       await this.lib.apply(ops);
     });
     if (was !== undefined) this.movedOutside({ hash, name: was, path: from });
   }
+
+  /** Whether files keep the item's name as written (Settings: Keep file names), else their tidy name. */
+  keepNames: () => boolean = () => false;
 
   /** Files found renamed or moved outside the app, until someone listens (the links to them in notes follow, see `onMoved`). */
   private moves: Array<{ hash: string; name: string; path: string }> = [];
@@ -1256,6 +1264,11 @@ export class LibraryMirror {
         await this.setMeta(MOVING_KEY, null);
         taken.delete(m.from.toLowerCase());
         emptied.add(parentOf(m.from));
+        // (its name changed in its folder, the setting turned off, say: the links to it in notes follow. A move between folders comes with its own, from the library.)
+        if (parentOf(m.from) === parentOf(target)) {
+          const name = (await this.lib.entry(m.hash))?.name;
+          if (name !== undefined) this.movedOutside({ hash: m.hash, name, path: m.from });
+        }
       }
     } catch (e) {
       taken.delete(target.toLowerCase());
@@ -1302,7 +1315,7 @@ export class LibraryMirror {
     const worker = async (): Promise<void> => {
       while (next < batch.length) {
         const a = batch[next++]!;
-        const target = await this.freeTarget(libraryDir([], a.type, a.name), nameBase(a.name), fileExt(a.name, a.type), taken);
+        const target = await this.freeTarget(libraryDir([], a.type, a.name), this.keepNames() ? keptBase(a.name) : nameBase(a.name), fileExt(a.name, a.type), taken);
         try {
           await this.bridge.write(target, new Uint8Array(await a.blob.arrayBuffer()), { durable: false });
           if ((await this.bridge.hash(target)) !== a.hash) throw new Error(`${target} was not written whole`);

@@ -194,6 +194,8 @@ export interface OpenHooks {
   deleteTo?: () => DeleteMode;
   /** The desktop build: keep hidden items' names, tags and notes out of this device's cache while they are locked (Settings > Privacy). */
   hiddenNamesOff?: () => boolean;
+  /** The desktop build: files keep their items' names as written (Settings > Library), else their tidy names. */
+  keepFileNames?: () => boolean;
   /** The desktop build: days after which what is in the folder's `.trash/` is erased at start-up (0: never). */
   trashDays?: () => number;
 }

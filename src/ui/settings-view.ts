@@ -163,6 +163,9 @@ export const SETTINGS_TABS: readonly Tab[] = [
     id: "saving",
     label: "Saving to the library",
     rows: [
+      ...(DESKTOP
+        ? [{ key: "library.keepFileNames", label: "Keep file names as written", help: "On: a file in the workspace folder keeps its item's name (capitals, spaces, brackets); only characters a system forbids are replaced. Off (the default): tidy names: lowercase, an underscore between words, a dash between parts. Turning it on moves no file already there; turning it off tidies them, and the links in notes follow. Folder names stay tidy.", control: { kind: "toggle" } } as const]
+        : []),
       { key: "frame.format", label: "Extracted frame format", help: "The picture file made by Extract frame. PNG is lossless; WebP and JPEG are smaller (JPEG has no transparency).", control: { kind: "select", options: [["png", "PNG"], ["webp", "WebP"], ["jpeg", "JPEG"]] } },
       { key: "frame.quality", label: "Extracted frame quality", help: "For WebP and JPEG.", control: { kind: "range", min: 10, max: 100, step: 1, unit: "%" } },
       { key: "frame.place", label: "Place extracted frames on the canvas", help: "When a frame is extracted in the library viewer: also put it on the open canvas (off by default). (From a player on the canvas it is always placed beside the video.)", control: { kind: "toggle" } },

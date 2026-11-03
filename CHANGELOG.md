@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.8 — Keep file names (2026-11-04)
+
+- **Added:** **Keep file names as written** (desktop app, Settings > Saving to the library, off by default): a file in the workspace folder keeps its item's name, capitals, spaces and brackets, and only characters a system forbids are replaced. Turning it on moves no file already there; turning it off tidies them. Folder names stay tidy.
+- **Fixed:** the links in notes follow a file the app renames in its own folder.
+
 ## 0.53.7 — Notes follow files renamed outside (2026-11-04)
 
 - **Fixed:** a file renamed or moved outside the app keeps its place in notes: the links to it are written again, whether the app was running or closed at the time. A file whose content also changed in the same step is a new file, and its links are not followed.

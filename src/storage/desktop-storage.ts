@@ -15,7 +15,7 @@ import type { CustomThumbStore, FolderHandlers, FolderSync, FolderWriting, OpenH
 import { sha256Hex } from "../assets/sha256";
 import { LIBRARY_DIR, LIBRARY_JSON } from "./library-mirror";
 import { WORKSPACE_FILE, WorkspaceMirror, watched } from "./workspace-mirror";
-import { BOARDS_DIR, WORKSPACE_NAMING } from "./workspace-names";
+import { BOARDS_DIR, WORKSPACE_NAMING, nameRules } from "./workspace-names";
 import { HIDDEN_JSON, HiddenVault, isHiddenCopy } from "./hidden-store";
 import { useScrypt } from "./hidden-vault";
 import { sealedHooks, thumbHooks } from "./archive";
@@ -84,6 +84,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   const hidden = new HiddenVault(bridge, async () => (await desktopCatalog.pages.counts()).hidden); // (counted in the main process)
   desktopCatalog.vault = hidden;
   const mirror = new WorkspaceMirror(storage.db, lib, storage.workspace, bridge, deviceId(), hidden, deleteTo);
+  mirror.keepNames = nameRules.keep = () => !!opts.keepFileNames?.();
   // Hidden originals are sealed files: read through the key, in memory (none while locked); their thumbnails are stored encrypted.
   externalFolder.unseal = {
     open: async (blob) => {

@@ -37,6 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.8: keep file names (2026-11-04)
+
+- **Implemented:** setting `library.keepFileNames` (device), `keptBase`, `LibraryMirror.keepNames`; a file already tidied fits either way, so turning it on moves nothing.
+- **Tested:** desktop.spec new test (names kept, forbidden characters, links, restart, off tidies and links follow).
+- **Known limit:** folder names stay tidy; the setting is per device, so a second device with it off tidies the same files.
+- **Committed:** v0.53.8.
+
 ## v0.53.7: notes follow files renamed outside (2026-11-04)
 
 - **Implemented:** `LibraryMirror.onMoved`, `FolderHandlers.itemMoved`, `Session.movedOutside` (the same relink as a rename in the library).

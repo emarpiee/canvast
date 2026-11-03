@@ -1683,3 +1683,44 @@ test("a file renamed outside the app keeps its place in notes: the links follow,
   await expect.poll(() => words.locator("img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0))).toEqual([true, true]);
   await app.close();
 });
+
+test("Keep file names as written: files keep their names (only forbidden characters change), notes find them, a restart moves nothing, and turning it off tidies them with the links following", async () => {
+  const ws = tempDir("cv-keep-names-");
+  let { app, page } = await launch(ws);
+  const toggle = async (): Promise<void> => {
+    await page.getByTestId("view-settings").click();
+    await page.getByRole("tab", { name: "Saving to the library" }).click();
+    await page.locator(`[data-set="library.keepFileNames"]`).click({ force: true });
+    await page.getByTestId("view-assets").click();
+  };
+  const pics = (): string[] => files(ws).filter((f) => f.startsWith("library/images/")).map((f) => f.slice("library/images/".length));
+  const png = (seed: number): Buffer => makePng(6, 4, () => [seed, 90, 40, 255]);
+  await page.getByTestId("view-assets").click();
+  await page.getByTestId("assets-import-input").setInputFiles({ name: "Old Tidy.png", mimeType: "image/png", buffer: png(5) });
+  await expect.poll(pics).toEqual(["old_tidy.png"]);
+  await toggle();
+  const NAMES = ["Hand Study (Loomis) #2 50%.PNG", "Red-Dress-Sky Blue.png", "a:b?.png"];
+  await page.getByTestId("assets-import-input").setInputFiles(NAMES.map((name, i) => ({ name, mimeType: "image/png", buffer: png(20 + i) })));
+  await expect.poll(pics).toEqual(["Hand Study (Loomis) #2 50%.PNG", "Red-Dress-Sky Blue.png", "a-b-.png", "old_tidy.png"].sort());
+  // A note links to them; found again after a restart, nothing moved.
+  mkdirSync(join(ws, "library/notes"), { recursive: true });
+  const note = join(ws, "library/notes/n.md");
+  writeFileSync(note, "# N\n\n![a](../images/Hand%20Study%20%28Loomis%29%20%232%2050%25.PNG)\n\n![b](images/Red-Dress-Sky%20Blue.png)\n\n![c](images/a-b-.png)\n\n![d](images/old_tidy.png)\n");
+  const entry = (p: Page) => p.locator('[data-testid="asset-card"][title="n.md"]');
+  await expect(entry(page)).toBeAttached({ timeout: 15_000 });
+  const before = pics();
+  await app.close();
+  ({ app, page } = await launch(ws));
+  await page.getByTestId("view-assets").click();
+  await entry(page).dblclick();
+  const words = page.getByTestId("note-editor").locator(".sun-editor-editable").first();
+  await expect.poll(() => words.locator("img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0))).toEqual([true, true, true, true]);
+  await page.getByTestId("slide-view").locator('[data-act="close"]').click();
+  expect(pics()).toEqual(before);
+  // Off: tidied at the next write, and the links follow.
+  await toggle();
+  await page.getByTestId("assets-import-input").setInputFiles({ name: "Next One.png", mimeType: "image/png", buffer: png(40) });
+  await expect.poll(pics, { timeout: 15_000 }).toContain("red-dress-sky_blue.png");
+  await expect.poll(() => readFileSync(note, "utf8"), { timeout: 15_000 }).toContain("images/red-dress-sky_blue.png");
+  await app.close();
+});
