@@ -737,7 +737,7 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 - **A password** on the workspace is asked for wherever its folder is opened from.
 - **Each folder has its own id** (`.canvast/folder.json`): a new folder made where a deleted one was is a new, empty workspace. Nothing of the deleted one comes back, and its copy on this device is cleared.
 
-**Changes made outside the app** (by a sync tool, another device or a file manager). canvast watches the folder while it runs and catches up at start-up.
+**Changes made outside the app** (by a sync tool, another device or a file manager). canvast watches the folder while it runs and catches up at start-up. A file renamed or moved outside the app, in either case, stays the same item, and the links to it in notes are written again.
 
 | What changed | What canvast does |
 | --- | --- |

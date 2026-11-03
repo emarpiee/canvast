@@ -995,6 +995,7 @@ export class LibraryMirror {
   /** An item's file was renamed or moved outside the app: the item points at it, and takes its folder and (when renamed) its name. */
   private async relink(hash: string, e: CatalogEntry | undefined, from: string, to: string): Promise<void> {
     const folderId = await this.folderFor(parentOf(to));
+    const was = e && (await this.lib.entry(hash))?.name;
     await this.lib.serial(async () => {
       const ops: LibraryOp[] = [];
       const cur = await this.lib.rec(hash);
@@ -1007,6 +1008,20 @@ export class LibraryMirror {
       }
       await this.lib.apply(ops);
     });
+    if (was !== undefined) this.movedOutside({ hash, name: was, path: from });
+  }
+
+  /** Files found renamed or moved outside the app, until someone listens (the links to them in notes follow, see `onMoved`). */
+  private moves: Array<{ hash: string; name: string; path: string }> = [];
+  private movedOutside(m: { hash: string; name: string; path: string }): void {
+    this.moves.push(m);
+    if (this.onMovedFn) for (const x of this.moves.splice(0)) this.onMovedFn(x);
+  }
+  private onMovedFn: ((m: { hash: string; name: string; path: string }) => void) | null = null;
+  /** Told of each item whose file was renamed or moved outside the app, while it ran or while it was closed: its name and file before. */
+  set onMoved(fn: (m: { hash: string; name: string; path: string }) => void) {
+    this.onMovedFn = fn;
+    for (const x of this.moves.splice(0)) fn(x);
   }
 
   /**

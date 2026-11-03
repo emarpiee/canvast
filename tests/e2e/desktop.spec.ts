@@ -1656,3 +1656,30 @@ test("a note's pictures are found by their files: pasted ones (the disk's name n
   await expect.poll(() => files(ws).filter((f) => /out\./.test(f))).toEqual(["library/ext/out.note.html"]);
   await app.close();
 });
+
+test("a file renamed outside the app keeps its place in notes: the links follow, while the app runs and when it was closed", async () => {
+  const ws = tempDir("cv-note-rename-");
+  let { app, page } = await launch(ws);
+  const note = join(ws, "library/ext/n.md");
+  mkdirSync(join(ws, "library/ext"), { recursive: true });
+  writeFileSync(join(ws, "library/ext/pic_one.png"), makePng(6, 4, () => [70, 90, 40, 255]));
+  writeFileSync(note, "# N\n\n![a](pic_one.png)\n\n![[pic_one.png]]\n");
+  await page.getByTestId("view-assets").click();
+  await expect(page.locator('[data-testid="asset-card"][title="n.md"]')).toBeAttached({ timeout: 15_000 });
+  // While it runs (a name the disk writes its own way).
+  renameSync(join(ws, "library/ext/pic_one.png"), join(ws, "library/ext/Second Name.png"));
+  await expect.poll(() => readFileSync(note, "utf8"), { timeout: 15_000 }).toContain("![a](ext/second_name.png)");
+  expect(readFileSync(note, "utf8")).toContain("![[Second Name.png]]");
+  expect(existsSync(join(ws, "library/ext/second_name.png"))).toBe(true);
+  await app.close();
+  // While it is closed.
+  renameSync(join(ws, "library/ext/second_name.png"), join(ws, "library/ext/third.png"));
+  ({ app, page } = await launch(ws));
+  await expect.poll(() => readFileSync(note, "utf8"), { timeout: 15_000 }).toContain("![a](ext/third.png)");
+  expect(readFileSync(note, "utf8")).toContain("![[third.png]]");
+  await page.getByTestId("view-assets").click();
+  await page.locator('[data-testid="asset-card"][title="n.md"]').dblclick();
+  const words = page.getByTestId("note-editor").locator(".sun-editor-editable").first();
+  await expect.poll(() => words.locator("img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0))).toEqual([true, true]);
+  await app.close();
+});

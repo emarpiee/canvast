@@ -164,6 +164,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
       mirror.askHiddenKey = (names) => on.hiddenNeedsKey(names);
       mirror.scanHiddenLater = () => void mirror.rescan(() => on.libraryChanged());
       mirror.onOpened = () => on.libraryChanged();
+      mirror.onMoved = (m) => on.itemMoved(m);
       // Start-up: only what changed in library/ since the last look here (the whole folder the first time); the look is then kept.
       void raw
         .libraryChanges()

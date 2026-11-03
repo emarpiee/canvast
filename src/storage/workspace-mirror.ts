@@ -632,6 +632,10 @@ export class WorkspaceMirror {
     this.lib.scanLater = fn;
   }
   /** Who imports files found in `library/`. */
+  set onMoved(fn: (m: { hash: string; name: string; path: string }) => void) {
+    this.lib.onMoved = fn;
+  }
+
   set importFiles(fn: LibraryMirror["importFiles"]) {
     this.lib.importFiles = fn;
   }

@@ -244,6 +244,8 @@ export interface FolderFile {
 
 /** What the app does when the desktop build's workspace folder changes outside it (ADR 0177, "Changes from outside the app"). */
 export interface FolderHandlers {
+  /** An item's file was found renamed or moved outside the app (now, or while it was closed): its name and file before. */
+  itemMoved(moved: { hash: string; name: string; path: string }): void;
   /** Import files found in `library/` that no item has (the app can decode them). */
   importFiles(files: FolderFile[]): Promise<void>;
   /** Library items were relinked, added or changed: lists are drawn again. */

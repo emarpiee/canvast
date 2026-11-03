@@ -568,6 +568,24 @@ export class Session {
     }
   }
 
+  private outsideMoves = new Map<string, { name: string; path: string[] }>();
+  private outsideTimer = 0;
+  /** A file renamed or moved outside the app (found now, or at start-up for what happened while it was closed): the links to it in notes follow, as for a change in the library. */
+  movedOutside(m: { hash: string; name: string; path: string }): void {
+    if (!this.outsideMoves.has(m.hash)) this.outsideMoves.set(m.hash, { name: m.name, path: m.path.replace(/^library\//, "").split("/") });
+    clearTimeout(this.outsideTimer);
+    this.outsideTimer = window.setTimeout(() => this.followOutsideMoves(), 300);
+  }
+  private followOutsideMoves(): void {
+    if (!this.catalog || this.readOnly) return void (this.outsideTimer = window.setTimeout(() => this.followOutsideMoves(), 1000)); // (the app is still opening)
+    const moved = new Map(this.outsideMoves);
+    this.outsideMoves.clear();
+    void this.relink(moved).then(() => {
+      this.post({ kind: "assets" });
+      this.emitAssets();
+    });
+  }
+
   /** The item a link in a note points at (a path from the note's folder, `canvast:<hash>`, a `[[name]]`), or null. */
   async linkedItem(noteHash: string, link: string): Promise<CatalogEntry | null> {
     const listing = await this.catalog?.list().catch(() => null);

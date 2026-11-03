@@ -574,6 +574,7 @@ async function start(): Promise<void> {
       assets.retryAll(); // (a relinked file: its pictures are read again)
       session.libraryChanged();
     },
+    itemMoved: (m) => session.movedOutside(m),
     beforeCheck: () => session.persistence.flush(),
     // A readable file put in .hidden/ while the hidden items are locked: their password is asked at once, and the file is encrypted then.
     hiddenNeedsKey: (names) => {

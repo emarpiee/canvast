@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.7 — Notes follow files renamed outside (2026-11-04)
+
+- **Fixed:** a file renamed or moved outside the app keeps its place in notes: the links to it are written again, whether the app was running or closed at the time. A file whose content also changed in the same step is a new file, and its links are not followed.
+
 ## 0.53.6 — Notes: pictures in tables (2026-11-04)
 
 - **Fixed:** a picture in a markdown table cell stays in its cell: the editor took it out of the table when the note opened, and an edit of that table saved it outside.
