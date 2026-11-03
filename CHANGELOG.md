@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.11 — Notes: a save pressed during a save (2026-11-04)
+
+- **Fixed:** Ctrl+S pressed while a note's save was still running, with changes made since, no longer does nothing: one more save follows it.
+
 ## 0.53.10 — Paste under the pointer, edge panning (2026-11-04)
 
 - **Fixed:** what is pasted always lands under the pointer. Objects in another frame than the view (made at another depth), or copied on another canvas, came back where they were.

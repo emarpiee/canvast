@@ -305,12 +305,25 @@ export class OpenNote {
     }
   }
 
-  /** A save on its way: pressed again meanwhile (Ctrl+S held, pressed fast), it is the same save, not a second one. */
+  /** A save on its way: pressed again meanwhile (Ctrl+S held, pressed fast), it is the same save; with changes made since, one more follows it, once. */
   private pending: Promise<boolean> | null = null;
+  private followUp = false;
   /** Save: a markdown or text note asks first when part of its formatting would be lost. Whether it was saved. */
   save(leaving = false): Promise<boolean> {
-    this.pending ??= this.saveNow(leaving).finally(() => (this.pending = null));
-    return this.pending;
+    if (this.pending && (this.followUp || !this.dirty)) return this.pending;
+    const before = this.pending;
+    this.followUp = !!before;
+    const run: Promise<boolean> = before
+      ? before.catch(() => false).then((ok) => {
+          this.followUp = false;
+          return this.dirty ? this.saveNow(leaving) : ok;
+        })
+      : this.saveNow(leaving);
+    const mine: Promise<boolean> = run.finally(() => {
+      if (this.pending === mine) this.pending = null;
+    });
+    this.pending = mine;
+    return mine;
   }
   /** `leaving`: the note is being left, so a note made rich text is not opened again. */
   private async saveNow(leaving: boolean): Promise<boolean> {

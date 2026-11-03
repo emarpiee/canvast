@@ -37,6 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.11: a save during a save (2026-11-04)
+
+- **Implemented:** `OpenNote.save` chains one follow-up when the note changed since the running save began.
+- **Tested:** notes.spec line 23 (the Firefox failure seen on GitHub and earlier under load), repeated in Firefox.
+- **Unverified:** that this was the cause of that failure: it is the one race found by reading the code.
+- **Committed:** v0.53.11.
+
 ## v0.53.10: paste under the pointer, edge panning (2026-11-04)
 
 - **Implemented:** `buildPayload` holds objects in the view's frame; `instantiate` places them in the target's, from any frame or canvas. `interaction/edge-pan.ts` (`edgePanStep`, `EdgePan`), used by the move gesture; setting `nav.edgePan`.
