@@ -146,6 +146,8 @@ export const SETTINGS = {
   "ui.background": { scope: "device", default: "", validate: (v: unknown) => (typeof v === "string" && (v === "" || /^#[0-9a-f]{6}$/.test(v)) ? v : undefined), effect: "immediate" } as Def<string>,
   "ui.corners": { scope: "device", default: "round", validate: oneOf("round", "sharp"), effect: "immediate" } as Def<"round" | "sharp">,
   "ui.density": { scope: "device", default: "compact", validate: oneOf("comfortable", "compact", "dense"), effect: "immediate" } as Def<"comfortable" | "compact" | "dense">,
+  "notes.saveOnClose": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  "notes.saveAs": { scope: "device", default: "ask", validate: oneOf("ask", "file", "rich"), effect: "immediate" } as Def<"ask" | "file" | "rich">,
   "notes.cardShows": { scope: "device", default: "whole", validate: oneOf("part", "whole"), effect: "immediate" } as Def<"part" | "whole">,
   "notes.name": { scope: "device", default: "Note {yyyy}-{mm}-{dd} {hhmmss}", validate: text(120), effect: "immediate" } as Def<string>,
   "notes.cardWidth": { scope: "device", default: 320, validate: range(120, 1200), effect: "immediate" } as Def<number>,

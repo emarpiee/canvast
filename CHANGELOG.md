@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.9 — Notes: save on close, save as (2026-11-04)
+
+- **Added:** **Save notes on close** (Settings > Notes, off by default): leaving a note with changes saves them without asking.
+- **Added:** **When a note's formatting does not fit its file** (Settings > Notes): Ask (the default), Keep its file (`.md`, `.txt`, dropping that formatting), or Rich text (`.note.html`).
+
 ## 0.53.8 — Keep file names (2026-11-04)
 
 - **Added:** **Keep file names as written** (desktop app, Settings > Saving to the library, off by default): a file in the workspace folder keeps its item's name, capitals, spaces and brackets, and only characters a system forbids are replaced. Turning it on moves no file already there; turning it off tidies them. Folder names stay tidy.

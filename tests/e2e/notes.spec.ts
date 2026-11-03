@@ -678,6 +678,42 @@ test("a note's content pasted into another note keeps its pictures, after the fi
   expect(await p.evaluate(() => window.__canvastDebug.notesAsText()[0]!.text)).toContain("(pic.png)");
 });
 
+test("Settings > Notes: Save notes on close saves without asking; a note's formatting is kept or dropped as chosen, without asking", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Notes", exact: true }).click();
+  await p.locator('[data-set="notes.saveOnClose"]').click({ force: true });
+  await p.locator('[data-set="notes.saveAs"]').selectOption("file");
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles([{ name: "keep.md", mimeType: "text/markdown", buffer: Buffer.from("# Keep\n\nWords.\n") }, { name: "rich.md", mimeType: "text/markdown", buffer: Buffer.from("# Rich\n\nWords.\n") }]);
+  const names = () => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => e.name).sort()));
+  const edit = async (name: string): Promise<void> => {
+    await p.locator(`[data-testid="asset-card"][title="${name}"]`).dblclick();
+    await page(p).locator("h1").click();
+    await p.keyboard.press("End");
+    await p.keyboard.type("!");
+    await note(p).locator('.se-toolbar button[data-command="align"]').first().click();
+    await p.locator('.se-dropdown button[data-command="center"]').filter({ visible: true }).click();
+    await p.getByTestId("slide-view").locator('[data-act="close"]').click();
+    await expect(p.getByTestId("slide-view")).toBeHidden();
+    await expect(p.getByTestId("choose-dialog")).toHaveCount(0);
+  };
+  await edit("keep.md");
+  await expect.poll(names).toEqual(["keep.md", "rich.md"]);
+  await p.locator('[data-testid="asset-card"][title="keep.md"]').dblclick();
+  await expect(page(p).locator("h1")).toHaveText("Keep!");
+  await expect(page(p).locator("h1")).not.toHaveCSS("text-align", "center");
+  await p.getByTestId("slide-view").locator('[data-act="close"]').click();
+  await expect(p.getByTestId("slide-view")).toBeHidden();
+  await p.getByTestId("view-settings").click();
+  await p.locator('[data-set="notes.saveAs"]').selectOption("rich");
+  await p.getByTestId("view-assets").click();
+  await edit("rich.md");
+  await expect.poll(names).toEqual(["keep.md", "rich.note.html"]);
+  await p.waitForTimeout(300);
+  await expect(p.getByTestId("slide-view")).toBeHidden();
+});
+
 test("the Note tool (M) makes a note file in the Notes folder, places its card and opens it; Make note files turns a text on a card into one", async ({ app }) => {
   const p = app.page;
   const objs = () => p.evaluate(() => window.__canvastDebug.objects() as unknown as Array<{ id: string; kind: string; assetId?: string; z: number }>);

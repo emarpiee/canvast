@@ -324,6 +324,10 @@ export class OpenNote {
     const { text, keepsAll } = editor.asText(this.kind);
     const as = editor.current();
     if (keepsAll) return this.write(text, as);
+    // (Settings > Notes: answered once and for all)
+    const always = this.deps.settings.get("notes.saveAs");
+    if (always === "file") return this.write(text, as);
+    if (always === "rich") return this.saveRich(!leaving);
     const plain = this.kind === "md" ? "markdown" : "plain text";
     const how = await chooseDialog({
       title: "Save the note",
@@ -341,6 +345,7 @@ export class OpenNote {
   async leave(): Promise<boolean> {
     if (this.pending) await this.pending.catch(() => false); // (a save on its way ends first: what it saved is no unsaved change)
     if (!this.dirty) return true;
+    if (this.deps.settings.get("notes.saveOnClose")) return this.save(true); // (Settings > Notes; not saved, it stays open)
     const how = await chooseDialog({
       title: "Unsaved changes",
       lines: [`“${this.name}” has changes that are not saved.`],
