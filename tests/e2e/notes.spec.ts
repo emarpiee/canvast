@@ -723,6 +723,11 @@ test("Settings > Notes: Save notes on close saves without asking; a note's forma
   await p.locator('[data-set="notes.panelStyle"]').selectOption("classic");
   await p.getByTestId("view-canvas").click();
   await expect(p.getByTestId("note-panel").locator(".sun-editor-editable").first()).not.toHaveClass(/se-type-document/);
+  // Classic has one short row; what else there is waits behind its +.
+  const tool = p.getByTestId("note-panel").locator('.se-toolbar button[data-command="strike"]');
+  await expect(tool.first()).toBeHidden();
+  await p.getByTestId("note-panel").getByRole("button", { name: "More" }).first().click();
+  await expect(tool.filter({ visible: true })).toHaveCount(1);
   await p.getByTestId("note-panel").locator("[data-close]").click();
   await p.getByTestId("view-assets").click();
   await edit("rich.md");

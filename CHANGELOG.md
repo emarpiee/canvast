@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.13 — Notes: Classic's own toolbar (2026-11-04)
+
+- **Changed:** the notes editor's Classic and Bottom styles have one short toolbar row, as SunEditor's own Classic: undo, formats, bold, italic, underline, lists, link, picture, table; everything else behind its **+**. Document keeps the full toolbar.
+
 ## 0.53.12 — Dragged objects stay in view; note styles apply at once (2026-11-04)
 
 - **Changed:** objects dragged to an edge of the view stay in view, also beside docked panels; the view pans once the objects themselves near the edge, and only toward where they are moving.

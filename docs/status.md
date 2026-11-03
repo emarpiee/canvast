@@ -37,6 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.13: Classic's toolbar (2026-11-04)
+
+- **Implemented:** `SIMPLE_BUTTONS` for Classic and Bottom.
+- **Tested:** notes.spec settings test, chromium + firefox; screenshot compared with SunEditor's Classic demo.
+- **Unverified:** Bottom's toolbar on SunEditor's site was not seen; it takes Classic's.
+- **Committed:** v0.53.13.
+
 ## v0.53.12: dragged objects stay in view (2026-11-04)
 
 - **Implemented:** `draggedAt`/`reachOf` in tools.ts, `edgePanStep` over a box and an area, `PanelDock.covered`; note styles re-open open notes.

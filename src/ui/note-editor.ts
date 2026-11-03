@@ -124,6 +124,21 @@ const FULL_BUTTONS: SunEditor.UI.ButtonList = [
   ["-right", ":View-text.View ▾", ...VIEW_TOOLS],
   ["-right", "codeView", "fullScreen"],
 ];
+// (Classic and Bottom: one short row, as SunEditor's own Classic, with everything else behind its +)
+const SIMPLE_BUTTONS: SunEditor.UI.ButtonList = [
+  ["undo", "redo"],
+  "|",
+  ["blockStyle"],
+  "|",
+  ["bold", "italic", "underline"],
+  "|",
+  ["list"],
+  "|",
+  ["link", "image", "table"],
+  [":More-default.more_plus", "font", "fontSize", "strike", ...TEXT_TOOLS, "fontColor", "backgroundColor", "align", ...PARAGRAPH_TOOLS, "video", ...INSERT_TOOLS, ...FILE_TOOLS, ...VIEW_TOOLS, "codeView"],
+  "|",
+  ["fullScreen"],
+];
 const SUB_BUTTONS = [["bold", "italic", "underline", "strike", "subscript", "superscript"], "|", ["fontColor", "backgroundColor"], "|", ["link", "removeFormat"]];
 const hIcon = (n: number): string => `<svg width="17" height="17" viewBox="0 0 24 24"><text x="1" y="18" font-size="15" font-weight="700" fill="currentColor">H${n}</text></svg>`;
 const line = (tag: string) => ($: SunEditor.Deps): void => void $.format.setLine(document.createElement(tag));
@@ -133,9 +148,9 @@ function presetOptions(style: NoteStyle): SunEditor.InitOptions {
     case "document":
       return { type: "document:header,page", buttonList: FULL_BUTTONS, subToolbar: { mode: "balloon", buttonList: SUB_BUTTONS } };
     case "classic":
-      return { buttonList: FULL_BUTTONS, subToolbar: { mode: "balloon", buttonList: SUB_BUTTONS } };
+      return { buttonList: SIMPLE_BUTTONS, subToolbar: { mode: "balloon", buttonList: SUB_BUTTONS } };
     case "bottom":
-      return { mode: "classic:bottom", statusbar: false, buttonList: FULL_BUTTONS, subToolbar: { mode: "balloon", buttonList: SUB_BUTTONS } };
+      return { mode: "classic:bottom", statusbar: false, buttonList: SIMPLE_BUTTONS, subToolbar: { mode: "balloon", buttonList: SUB_BUTTONS } };
     case "balloon":
       return { mode: "balloon", buttonList: [["bold", "italic", "underline", "strike"], "|", ["fontColor", "backgroundColor"], "|", ["removeFormat"], "|", ["link"]] };
     case "notion":
