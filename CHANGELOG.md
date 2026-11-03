@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.53.1 — Notes fixes (2026-11-03)
+
+- **Fixed:** saving a markdown note wrote Obsidian's footnotes and embeds escaped (`[^1\]`, `![[cat.png\]\]`), which broke them in Obsidian, and dropped table column alignment: they are written as Obsidian writes them.
+- **Fixed:** saving a markdown note asked about formatting markdown cannot keep when it had none (a footnote, a table, an empty line or spaces at a line's start were taken for formatting).
+- **Changed:** **Save as a rich text note** turns the note into `name.note.html` in its place (its folder, tags, links and cards on canvases follow it) instead of leaving the markdown file beside a new one; its cards on canvases show the rich note at once.
+- **Added:** Remove format in the toolbar over selected words (it takes a size, font or colour back off words, a heading's too).
+
 ## 0.53.0 — Notes (2026-11-03)
 
 - **Fixed:** in the Note panel, a note's `##` headings were as small as the panel's own title (the dock panels' heading style reached into the note).

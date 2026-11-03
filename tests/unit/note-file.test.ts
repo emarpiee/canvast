@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { linkTarget, noteKindOf, relativeLink, richNameOf, richNoteBody, richNoteFile } from "../../src/notes/note-file";
+import { linkTarget, noteKindOf, obsidianMarkdown, relativeLink, richNameOf, richNoteBody, richNoteFile } from "../../src/notes/note-file";
 
 describe("note files", () => {
   it("knows the notes by name", () => {
@@ -54,5 +54,13 @@ describe("a note's links to other items", () => {
     const moved = relinkNote("md", md, { oldWiki: null, newWiki: "", oldPath: "../Pictures/cat.png", newPath: "../Art/cat.png" });
     expect(noteLinks("md", moved).paths).toEqual(["../Art/cat.png", "Brief.md", "../Art/cat.png"]);
     expect(relinkNote("rich", '<a href="Brief.md">', { oldWiki: "brief", newWiki: "X", oldPath: "Brief.md", newPath: "Docs/Brief.md" })).toBe('<a href="Docs/Brief.md">');
+  });
+
+  it("writes footnotes, embeds and table alignment as Obsidian does, and leaves code and links alone", () => {
+    expect(obsidianMarkdown("A [^1\\] and [^2\\].\n\n![[cat.png\\]\\]\n\n[\\^1\\]: [Gamut](https://x)")).toBe("A [^1] and [^2].\n\n![[cat.png]]\n\n[^1]: [Gamut](https://x)");
+    expect(obsidianMarkdown("not a link: [a\\](b)")).toBe("not a link: [a\\](b)");
+    expect(obsidianMarkdown("`x\\]` and\n```\ny\\]\n```\n")).toBe("`x\\]` and\n```\ny\\]\n```\n");
+    expect(obsidianMarkdown("| a | b |\n| --- | --- |\n| 1 | 2 |", [["center", "right"]])).toBe("| a | b |\n| :---: | ---: |\n| 1 | 2 |");
+    expect(obsidianMarkdown("| a |\n| --- |", [[null]])).toBe("| a |\n| --- |");
   });
 });

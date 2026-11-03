@@ -2,7 +2,7 @@ import { scrubNumbers } from "../colour-picker/scrub";
 import suneditor, { helper } from "suneditor";
 import { align, anchor, audio, audioGallery, autocomplete, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
 import type { SunEditor } from "suneditor/types";
-import { WIKI, linkTarget, linksToWiki, relativeLink, richNoteBody, richNoteFile, textHtml, wikiToLinks } from "../notes/note-file";
+import { WIKI, linkTarget, linksToWiki, obsidianMarkdown, relativeLink, richNoteBody, richNoteFile, textHtml, wikiToLinks } from "../notes/note-file";
 import type { NoteKind, NoteStyle } from "../notes/note-file";
 import { splitFrontmatter } from "../notes/frontmatter";
 
@@ -112,7 +112,7 @@ const FULL_BUTTONS: SunEditor.UI.ButtonList = [
   ["-right", ":View-text.View ▾", ...VIEW_TOOLS],
   ["-right", "codeView", "fullScreen"],
 ];
-const SUB_BUTTONS = [["bold", "italic", "underline", "strike", "subscript", "superscript"], "|", ["fontColor", "backgroundColor"], "|", ["link"]];
+const SUB_BUTTONS = [["bold", "italic", "underline", "strike", "subscript", "superscript"], "|", ["fontColor", "backgroundColor"], "|", ["link", "removeFormat"]];
 const hIcon = (n: number): string => `<svg width="17" height="17" viewBox="0 0 24 24"><text x="1" y="18" font-size="15" font-weight="700" fill="currentColor">H${n}</text></svg>`;
 const line = (tag: string) => ($: SunEditor.Deps): void => void $.format.setLine(document.createElement(tag));
 
@@ -478,7 +478,13 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     for (const [url, link] of links) out = out.split(url).join(link);
     return out;
   };
-  const toMarkdown = (h: string): string => helper.markdown.jsonToMarkdown(helper.converter.htmlToJson(h));
+  // (as Obsidian writes it: footnotes, embeds and table alignment kept, see obsidianMarkdown)
+  const toMarkdown = (h: string): string => {
+    const t = document.createElement("template");
+    t.innerHTML = h;
+    const aligns = [...t.content.querySelectorAll("table")].map((tb) => [...(tb.querySelector("tr")?.children ?? [])].map((c) => ((c as HTMLElement).style.textAlign || null) as "left" | "center" | "right" | null));
+    return obsidianMarkdown(helper.markdown.jsonToMarkdown(helper.converter.htmlToJson(h)), aligns);
+  };
   // Two notes are compared as a hidden editor of the same kind holds them (it writes pictures, tables and lists its own way).
   let twin: ReturnType<typeof suneditor.create> | null = null;
   const held = (h: string): string => {
@@ -508,7 +514,9 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     // (the editor's caret placeholders, and spaces at a block's end, which markdown does not keep, are no part of the note's formatting)
     return box.innerHTML
       .replace(/[\u200B\uFEFF]/g, "")
-      .replace(/(?:&nbsp;|\u00a0|\s)+(<\/(?:p|h[1-6]|li|td|th|div|blockquote)>)/g, "$1")
+      .replace(/(?:&nbsp;|\u00a0|\s|<br>)+(<\/(?:p|h[1-6]|li|td|th|div|blockquote)>)/g, "$1") // (nor a line break there)
+      .replace(/(<(?:p|h[1-6]|li|td|th|div|blockquote)(?: [^>]*)?>)(?:&nbsp;|\u00a0|\s|<br>)+/g, "$1") // (nor at a block's start)
+      .replace(/<p><\/p>/g, "") // (an empty paragraph: markdown keeps no empty lines)
       .replace(/&nbsp;|\u00a0/g, " "); // (a space the editor keeps from collapsing is a space)
   };
   return {

@@ -1,3 +1,4 @@
+import { openNotesAsText } from "../ui/note-session";
 import type { DesktopCatalog, DesktopLibrary } from "../storage/desktop-library";
 import { externalFolder } from "../storage/external-folder";
 import { importTesting } from "../storage/archive";
@@ -170,6 +171,8 @@ export interface DebugHook {
   /** Write what the desktop build's workspace folder does not have yet (its storage's flush). */
   flushStorage(): Promise<void>;
   /** Organize the library as its panel does, with the library's undo: a new folder (`id`, `name`, parent id or ""), file an item (`hash`, folder id or "" for none), rename an item or a folder, undo, redo. */
+  /** Each open note as markdown or text, and whether that keeps all of it (what Save asks about). */
+  notesAsText(): Array<{ name: string; text: string; keepsAll: boolean }>;
   libraryOp(op: "createFolder" | "file" | "rename" | "note" | "renameFolder" | "hide" | "hideFolder" | "showFolder" | "undo" | "redo", ...args: string[]): Promise<void>;
   /** The Hidden password as Settings and the Hidden list use it: set (or remove, with no password), check (which opens the desktop build's key), lock; the result, and the key's state after. */
   hiddenOp(op: "set" | "check" | "lock", password?: string, current?: string): Promise<{ ok: boolean; state: string }>;
@@ -501,6 +504,7 @@ export function installDebugHook(
       else if (op === "deleteCanvas") await session.deleteCanvas(a);
       else await session.moveCanvas(a, b, c);
     },
+    notesAsText: () => openNotesAsText(),
     libraryOp: async (op, a = "", b = "", c = "") => {
       if (op === "createFolder") await session.organize((cat) => cat.createFolder(b, c || null, a));
       else if (op === "file") await session.organize((cat) => cat.updateMeta(a, b ? { addFolders: [b] } : { clearFolder: true }));

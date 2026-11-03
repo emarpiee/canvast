@@ -80,7 +80,7 @@ test("a markdown note opens in the notes editor with its library links, saves in
   }
   await expect(page(p)).toContainText(/Date: \d{4}-\d\d-\d\d/); // ({{date}} in a template is filled in)
 
-  // Centred: markdown cannot hold it, so saving asks; a rich text note is made beside it and opened, the markdown file as it was.
+  // Centred: markdown cannot hold it, so saving asks; the note becomes a rich text note in its place (no markdown file left beside it).
   await page(p).locator("h1").click();
   await note(p).locator('.se-toolbar button[data-command="align"]').click();
   await p.locator('.se-dropdown button[data-command="center"]').filter({ visible: true }).click();
@@ -88,7 +88,8 @@ test("a markdown note opens in the notes editor with its library links, saves in
   const ask = p.getByTestId("choose-dialog");
   await expect(ask).toContainText("cannot be kept in a markdown file");
   await ask.getByRole("button", { name: "Save" }).click();
-  await expect(p.getByTestId("assets-status")).toContainText("Saved as the rich text note “plan.note.html”");
+  await expect(p.getByTestId("assets-status")).toContainText("“plan.md” is now the rich text note “plan.note.html”");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => e.name).filter((n) => n.startsWith("plan"))))).toEqual(["plan.note.html"]);
   await expect(page(p).locator("h1")).toHaveCSS("text-align", "center");
   const rich = await downloaded(p);
   expect(rich).toMatch(/<h1[^>]*text-align: ?center/);
@@ -377,6 +378,10 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   await size.fill("30px");
   await size.press("Enter");
   await expect(panel.locator('.sun-editor-editable span[style*="font-size: 30px"]').first()).toHaveText("First");
+  // Remove format in the toolbar over chosen words takes a size back off (a heading or words made big by accident).
+  await panel.locator(".sun-editor-editable p").first().dblclick({ position: { x: 8, y: 8 } });
+  await p.locator('.se-toolbar button[data-command="removeFormat"]').filter({ visible: true }).first().click();
+  await expect(panel.locator('.sun-editor-editable span[style*="font-size"]')).toHaveCount(0);
   // The editor's own dialogs work in the panel (nothing over them takes the clicks): a picture from the library, a link.
   await panel.locator('.se-toolbar button[data-command="image"]').filter({ visible: true }).click();
   await p.locator(".__se__gallery").filter({ visible: true }).click();
@@ -389,10 +394,8 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   await linkDialog.locator("input").filter({ visible: true }).first().fill("https://example.com/canvas");
   await linkDialog.getByRole("button", { name: "Submit" }).click();
   await expect(panel.locator(".sun-editor-editable").first().locator('a[href="https://example.com/canvas"]')).toHaveCount(1);
-  await p.keyboard.press("Control+s");
-  // (the picture's size is formatting markdown cannot keep: asked, saved as plain markdown)
-  await p.getByTestId("choose-dialog").getByLabel("Save as plain markdown").check();
-  await p.getByTestId("choose-dialog").getByRole("button", { name: "Save" }).click();
+  await p.keyboard.press("Control+s"); // (sizes taken off by Remove format: markdown keeps it all, nothing asked)
+  await expect(p.getByTestId("choose-dialog")).toBeHidden();
   await panel.locator("[data-close]").click();
   await expect(panel).toBeHidden();
   // Edit note, in the Actions bar of the selected card, opens it too.

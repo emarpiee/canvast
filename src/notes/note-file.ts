@@ -166,3 +166,32 @@ export function relinkNote(kind: NoteKind, text: string, change: { oldWiki: stri
   }
   return out;
 }
+
+/** The alignment of each column of a table, as its markdown separator row writes it. */
+export type ColumnAligns = ReadonlyArray<"left" | "center" | "right" | null>;
+
+/**
+ * SunEditor's markdown, made as Obsidian writes it: a `]` (and a `^` when a line has two) is not escaped, so footnotes (`[^1]`, `[^1]:`)
+ * and embeds or links kept as written (`![[cat.png]]`) stay what they were; a `]` before `(` stays escaped (it would make a link of the
+ * words). Code (fenced blocks, `spans`) is left as it is. `aligns`: each table's column alignment, in order (the writer drops it).
+ */
+export function obsidianMarkdown(md: string, aligns: readonly ColumnAligns[] = []): string {
+  let table = 0;
+  return md
+    .split(/(^```[^\n]*\n[\s\S]*?^```[ \t]*$)/m)
+    .map((part, i) => {
+      if (i % 2) return part; // (a fenced code block)
+      return part
+        .split(/(`[^`\n]*`)/)
+        .map((bit, j) => (j % 2 ? bit : bit.replace(/\\\](?!\()/g, "]").replace(/\\\^/g, "^")))
+        .join("")
+        .replace(/^(\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)+\|?)[ \t]*$/gm, (row) => {
+          const a = aligns[table++];
+          if (!a?.some(Boolean)) return row;
+          const cells = row.replace(/^\|/, "").replace(/\|$/, "").split("|");
+          const sep = cells.map((_c, k) => (a[k] === "center" ? ":---:" : a[k] === "right" ? "---:" : a[k] === "left" ? ":---" : "---"));
+          return `| ${sep.join(" | ")} |`;
+        });
+    })
+    .join("");
+}
