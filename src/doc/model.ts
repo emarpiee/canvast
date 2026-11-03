@@ -198,6 +198,9 @@ export const assetOf = (o: CanvasObject): string | undefined => (o.kind === "ima
 export const storedAssetOf = (d: Readonly<Record<string, unknown>>): string | undefined => (d["kind"] === "image" || d["kind"] === "text" ? (d["assetId"] as string | undefined) : d["kind"] === "path" ? textureAsset(d["fill"]) : undefined);
 
 /** Key of the decoded picture an image object draws: the poster of a video at its paused time, a GIF at its paused frame (an audio file always shows its waveform), else the asset itself. */
+/** A note's page on its card as first placed, in the card's pixels (the word size Reset size goes back to). */
+export const NOTE_PAGE_PIXEL_W = 1200;
+
 export function rasterKey(o: ImageObject): string {
   if (o.page) return `${o.assetId}#p${o.pixelW}x${o.pixelH}`; // (a note's card, drawn at its own size)
   if (!o.media || o.media.t <= 0) return o.assetId;

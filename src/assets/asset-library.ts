@@ -262,6 +262,8 @@ export class AssetLibrary {
     const existing = await this.record(hash);
     if (existing) {
       const state = this.store ? await this.store.entryState(hash) : undefined;
+      // Another note with the same words (an empty template, say) is a note of its own: one line more at its end, as an item is its bytes.
+      if (!at && state === "active" && file.name && file.name !== existing.name && noteKindOf(file.name)) return this.importFileDetailed(new File([bytes, "\n"], file.name, { type: file.type }), keepDecoded);
       const duplicate: ImportOutcome["duplicate"] = state && state !== "active" ? "restored" : "present";
       const had = this.decoded.has(hash);
       if (keepDecoded || Math.max(existing.pixelW, existing.pixelH) <= SMALL_EDGE) await this.ensureDecoded(existing);

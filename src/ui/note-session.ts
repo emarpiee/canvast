@@ -5,7 +5,7 @@ import { meta } from "../assets/asset-catalog";
 import { chipOf } from "../assets/file-kind";
 import type { SettingsStore } from "../settings/settings";
 import { desktopBridge } from "../storage/desktop-bridge";
-import { RICH_NOTE_SUFFIX, WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget } from "../notes/note-file";
+import { WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget } from "../notes/note-file";
 import type { NoteKind } from "../notes/note-file";
 import { splitFrontmatter, underProps, withFileMeta } from "../notes/frontmatter";
 import { fontFor } from "../text/fonts";
@@ -22,6 +22,8 @@ import type { AttachKind, NoteEditor, NoteHost, NoteItem } from "./note-editor";
 export interface NotePlace {
   /** The setting of the editor's style here (the library's when absent; the Note panel on a canvas has its own). */
   styleKey?: "notes.style" | "notes.panelStyle";
+  /** The whole place the note is shown in: a press inside it is at the note, so the keyboard's Undo and Save are the note's. */
+  root?(): HTMLElement | null;
   /** Files into the library: their hashes. */
   importFiles(files: File[]): Promise<string[]>;
   /** Show another item (a link followed, a rich text note just made). */
@@ -61,7 +63,8 @@ export class OpenNote {
   private saving = false;
   private constructor(
     public hash: string,
-    readonly kind: NoteKind,
+    /** Its kind now: a note saved as rich text is one from then on. */
+    public kind: NoteKind,
     /** Its name when it was opened; a save takes its item's name as it is then (renamed meanwhile). */
     public name: string,
     private readonly type: string,
@@ -78,7 +81,7 @@ export class OpenNote {
     const text = await blob.text();
     const note = new OpenNote(hash, kind, name, blob.type || "text/plain", null, wordsOf(kind, text), deps, place);
     const host = await note.host();
-    note.editor = await mountNoteEditor(el, { kind, text, style: deps.settings.get(place.styleKey ?? "notes.style"), host, title: titleOf(name) });
+    note.editor = await mountNoteEditor(el, { kind, text, style: deps.settings.get(place.styleKey ?? "notes.style"), host, title: titleOf(name), root: place.root?.() ?? null });
     open.add(note);
     if (!followed.has(deps.session)) {
       followed.add(deps.session);
@@ -134,14 +137,8 @@ export class OpenNote {
     const host: NoteHost = {
       dir,
       async find(t) {
-        if ("hash" in t) {
-          const x = all.find((y) => y.hash === t.hash);
-          return x ? item(x) : null;
-        }
-        const want = t.path.join("/");
-        const named = all.filter((x) => x.name === t.path[t.path.length - 1]);
-        for (const x of named) if ((await pathOf(x)).join("/") === want) return item(x);
-        return named.length === 1 ? item(named[0]!) : null; // (moved since: the one item of that name)
+        const x = "hash" in t ? all.find((y) => y.hash === t.hash) : await session.itemAtPath(t, all, folders);
+        return x ? item(x) : null;
       },
       blob: async (h) => (await assets.record(h).catch(() => undefined))?.blob ?? null,
       pathOf: (h) => {
@@ -229,8 +226,14 @@ export class OpenNote {
     return host;
   }
 
-  /** Write the note's file as a new version (its properties back in, asked first when its words were changed elsewhere). */
-  private async write(text: string): Promise<boolean> {
+  /** Its words were changed elsewhere since it was opened (in another app): whether replacing them is fine (asked). `now`: the file as it is now. */
+  private keepsOther(now: string): Promise<boolean> | boolean {
+    if (!now || wordsOf(this.kind, now) === this.base) return true;
+    return confirmDialog({ title: "Changed in another app", lines: [`“${this.name}” was changed outside canvast since you opened it here.`, "Saving puts your version in its place, and the other changes are lost. Cancel, then close the note without saving and open it again to see the other version."], confirmLabel: "Save mine" });
+  }
+
+  /** Write the note's file as a new version (its properties back in, asked first when its words were changed elsewhere). `as`: the editor's content that `text` was made from. */
+  private async write(text: string, as: string): Promise<boolean> {
     const { session, assets } = this.deps;
     const editor = this.editor!;
     this.saving = true;
@@ -238,15 +241,14 @@ export class OpenNote {
       // (the editor holds the note without its properties: the item's, as they are now, go back into the file)
       const e = await session.catalog?.entry(this.hash).catch(() => undefined);
       const now = (await (await assets.record(this.hash).catch(() => undefined))?.blob.text()) ?? "";
-      // Its words were changed elsewhere since it was opened (in another app): replacing them is asked first.
-      if (now && wordsOf(this.kind, now) !== this.base && !(await confirmDialog({ title: "Changed in another app", lines: [`“${this.name}” was changed outside canvast since you opened it here.`, "Saving puts your version in its place, and the other changes are lost. Cancel, then close the note without saving and open it again to see the other version."], confirmLabel: "Save mine" }))) return false;
+      if (!(await this.keepsOther(now))) return false;
       if (this.kind === "md") text = underProps(now, text); // (what it keeps as written, in its order)
       if (e && this.kind !== "txt") text = withFileMeta(this.kind, text, { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] });
       if (e?.name) this.name = e.name;
       const was = this.hash;
       const hash = await session.saveVersion(was, new File([text], this.name, { type: this.type }));
       if (!hash) return false;
-      editor.saved();
+      if (open.has(this)) editor.saved(as); // (closed meanwhile: there is no editor left to tell; what was typed while it was being saved stays a change)
       this.base = wordsOf(this.kind, text);
       if (open.has(this) && this.hash === was) {
         this.hash = hash;
@@ -266,37 +268,61 @@ export class OpenNote {
    * renamed as the library renames, so links to it follow), saved as its new version: its folder, tags and cards on canvases follow it.
    */
   private async saveRich(show = true): Promise<boolean> {
-    const { session } = this.deps;
-    const e = await session.catalog?.entry(this.hash).catch(() => undefined);
-    if (e?.name) this.name = e.name;
-    const was = this.name;
-    const name = richNameOf(this.name);
-    const rich = withFileMeta("rich", this.editor!.asRich(titleOf(name)), { tags: e?.tags ?? [], note: e?.note ?? "", fields: e?.fields ?? [] }); // (its properties go with it)
-    if (!(await session.renameAssets([{ hash: this.hash, name }]))) return false;
-    this.name = name;
-    const hash = await session.saveVersion(this.hash, new File([rich], name, { type: "text/html" }));
-    if (!hash) return false;
-    this.editor!.saved();
-    session.editor.message = `“${was}” is now the rich text note “${name}”.`;
-    session.editor.changed();
-    // (opened again as what it is now, once this save has ended: showing it leaves this note, which waits for a save on its way)
-    if (show) setTimeout(() => void this.place.show(hash));
-    return true;
+    const { session, assets } = this.deps;
+    // (read before anything is waited for: the note may be closing, and its editor gone by then)
+    const editor = this.editor!;
+    const body = editor.asRich("");
+    const as = editor.current();
+    this.saving = true;
+    try {
+      const e = await session.catalog?.entry(this.hash).catch(() => undefined);
+      if (e?.name) this.name = e.name;
+      const was = this.name;
+      if (!(await this.keepsOther((await (await assets.record(this.hash).catch(() => undefined))?.blob.text()) ?? ""))) return false;
+      // (a free name: another note may have this one already)
+      const names = new Set(((await session.catalog?.list().catch(() => null))?.entries ?? []).filter((x) => x.hash !== this.hash).map((x) => x.name.toLowerCase()));
+      const stem = richNameOf(this.name).slice(0, -".note.html".length);
+      let name = `${stem}.note.html`;
+      for (let n = 2; names.has(name.toLowerCase()); n++) name = `${stem} ${n}.note.html`;
+      const rich = withFileMeta("rich", body.replace("<title></title>", () => `<title>${titleOf(name).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`)}</title>`), { tags: e?.tags ?? [], note: e?.note ?? "", fields: e?.fields ?? [] }); // (its properties go with it)
+      if (!(await session.renameAssets([{ hash: this.hash, name }]))) return false;
+      const hash = await session.saveVersion(this.hash, new File([rich], name, { type: "text/html" }));
+      if (!hash) {
+        await session.renameAssets([{ hash: this.hash, name: was }]); // (not saved: it stays what its file is)
+        return false;
+      }
+      this.name = name;
+      this.kind = "rich";
+      this.base = wordsOf("rich", rich);
+      if (open.has(this)) editor.saved(as);
+      session.editor.message = `“${was}” is now the rich text note “${name}”.`;
+      session.editor.changed();
+      // (opened again as what it is now, once this save has ended: showing it leaves this note, which waits for a save on its way)
+      if (show) setTimeout(() => void this.place.show(hash));
+      return true;
+    } finally {
+      this.saving = false;
+    }
   }
 
   /** A save on its way: pressed again meanwhile (Ctrl+S held, pressed fast), it is the same save, not a second one. */
   private pending: Promise<boolean> | null = null;
   /** Save: a markdown or text note asks first when part of its formatting would be lost. Whether it was saved. */
-  save(): Promise<boolean> {
-    this.pending ??= this.saveNow().finally(() => (this.pending = null));
+  save(leaving = false): Promise<boolean> {
+    this.pending ??= this.saveNow(leaving).finally(() => (this.pending = null));
     return this.pending;
   }
-  private async saveNow(): Promise<boolean> {
+  /** `leaving`: the note is being left, so a note made rich text is not opened again. */
+  private async saveNow(leaving: boolean): Promise<boolean> {
     const editor = this.editor;
     if (!editor || this.deps.session.editor.blockEdit()) return false;
-    if (this.kind === "rich") return this.write(editor.asRich(titleOf(this.name)));
+    if (this.kind === "rich") {
+      const text = editor.asRich(titleOf(this.name));
+      return this.write(text, editor.current());
+    }
     const { text, keepsAll } = editor.asText(this.kind);
-    if (keepsAll) return this.write(text);
+    const as = editor.current();
+    if (keepsAll) return this.write(text, as);
     const plain = this.kind === "md" ? "markdown" : "plain text";
     const how = await chooseDialog({
       title: "Save the note",
@@ -307,7 +333,7 @@ export class OpenNote {
       ],
       confirmLabel: "Save",
     });
-    return how === "rich" ? this.saveRich() : how === "text" ? this.write(text) : false;
+    return how === "rich" ? this.saveRich(!leaving) : how === "text" ? this.write(text, as) : false;
   }
 
   /** Before the note is left (another item, Back, Esc, the window closed): its changes are saved or let go, or it stays open. Whether to go on. */
@@ -324,19 +350,19 @@ export class OpenNote {
       confirmLabel: "Go on",
     });
     if (how === "drop") this.editor?.saved();
-    return how === "save" ? this.save() : how === "drop";
+    return how === "save" ? this.save(true) : how === "drop";
   }
 
   /**
    * Close the note. Changes still unsaved (closed by something else than the person: the library shown elsewhere) are saved without
-   * losing anything: as its own file when that keeps all, else as a rich text note beside it. `stillThere`: its item is still in the library.
+   * losing anything: as its own file when that keeps all, else as a rich text note in its place. `stillThere`: its item is still in the library.
    */
   close(stillThere: boolean): void {
     const editor = this.editor;
     if (!editor || !open.delete(this)) return;
     if (editor.dirty && stillThere) {
       const kept = this.kind === "rich" ? null : editor.asText(this.kind);
-      if (!kept || kept.keepsAll) void this.write(kept ? kept.text : editor.asRich(titleOf(this.name)));
+      if (!kept || kept.keepsAll) void this.write(kept ? kept.text : editor.asRich(titleOf(this.name)), editor.current());
       else void this.saveRich(false);
     }
     editor.destroy();

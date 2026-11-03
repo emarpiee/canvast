@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { linkTarget, noteKindOf, obsidianMarkdown, relativeLink, richNameOf, richNoteBody, richNoteFile } from "../../src/notes/note-file";
+import { libraryLink, linkTarget, noteKindOf, noteLinks as linksIn, obsidianMarkdown, readableMarkdown, relativeLink, relinkNote as relink, richNameOf, richNoteBody, richNoteFile } from "../../src/notes/note-file";
 
 describe("note files", () => {
   it("knows the notes by name", () => {
@@ -12,8 +12,12 @@ describe("note files", () => {
     expect(relativeLink(["Notes", "2026"], ["Notes", "pic.png"])).toBe("../pic.png");
     expect(relativeLink([], ["pic.png"])).toBe("pic.png");
     expect(relativeLink(["a"], ["a", "a"])).toBe("a"); // (a file named like the folder it is in)
-    expect(linkTarget("../Pictures/my%20cat.png", ["Notes"])).toEqual({ path: ["Pictures", "my cat.png"] });
-    expect(linkTarget("./x/y.png?raw#top", [])).toEqual({ path: ["x", "y.png"] });
+    expect(linkTarget("../Pictures/my%20cat.png", ["Notes"])).toEqual({ path: ["Pictures", "my cat.png"], root: null });
+    expect(linkTarget("./x/y.png?raw#top", [])).toEqual({ path: ["x", "y.png"], root: ["x", "y.png"] });
+    // Read from the note's folder and from the root of the library (or of a vault one folder up), and written from the root, brackets encoded.
+    expect(linkTarget("images/cat.png", ["notes"])).toEqual({ path: ["notes", "images", "cat.png"], root: ["images", "cat.png"] });
+    expect(linkTarget("library/images/cat.png", ["notes"])).toEqual({ path: ["notes", "library", "images", "cat.png"], root: ["images", "cat.png"] });
+    expect(libraryLink(["my pics", "photo (1).png"])).toBe("my%20pics/photo%20%281%29.png");
     expect(linkTarget(`canvast:${"A".repeat(64)}`, [])).toEqual({ hash: "a".repeat(64) });
     for (const other of ["https://example.com/p.png", "#part", "/home/p.png", "../../out.png", "canvast:short", "%E0%A4%A"]) expect(linkTarget(other, ["Notes"])).toBeNull();
   });
@@ -56,7 +60,29 @@ describe("a note's links to other items", () => {
     expect(relinkNote("rich", '<a href="Brief.md">', { oldWiki: "brief", newWiki: "X", oldPath: "Brief.md", newPath: "Docs/Brief.md" })).toBe('<a href="Docs/Brief.md">');
   });
 
+  it("makes what the editor's reader misreads plain, and leaves code alone", () => {
+    expect(readableMarkdown("![a](x%20(2).png) ![b](<my cat.png>) [c](d.md \"t\")")).toBe('![a](x%20%282%29.png) ![b](my%20cat.png) [c](d.md "t")');
+    expect(readableMarkdown("|:--|--:|".replace(/^/, "| a | b |\n"))).toBe("| a | b |\n|:---|---:|");
+    expect(readableMarkdown("Title\n===\n\nPart\n---\n\n- a\n---\n")).toBe("# Title\n\n## Part\n\n- a\n---\n");
+    expect(readableMarkdown("2 * 3 * 4 and ```a``` and `b * c`\n* list")).toBe("2 \\* 3 \\* 4 and `a` and `b * c`\n* list");
+    expect(readableMarkdown("```\nT\n===\n![a](<x y>)\n```")).toBe("```\nT\n===\n![a](<x y>)\n```");
+    expect(readableMarkdown("| a | b |\n| --- | --- |\n| 1 | 2 | 3 | 4 |")).toBe("| a | b |  |  |\n| --- | --- | --- | --- |\n| 1 | 2 | 3 | 4 |");
+    // A code block holding a fence, and a fence's words after its language.
+    expect(readableMarkdown("````md\n```x\nT\n===\n```\n````")).toBe("````md\n```x\nT\n===\n```\n````");
+    expect(readableMarkdown("```c++ x\ny\n```")).toBe("```c_x2bx__x2bx__x20x_x\ny\n```");
+    expect(obsidianMarkdown("```c_x2bx__x2bx__x20x_x\ny\n```")).toBe("```c++ x\ny\n```");
+    expect(obsidianMarkdown("```md\n\uE101\uE101\uE101x\ny\n\uE101\uE101\uE101\n```")).toBe("````md\n```x\ny\n```\n````");
+    // [[links]] with brackets go there and back.
+    expect(linksToWiki(wikiToLinks("[[Foo (bar)]] and [[Foo (bar)|shown]]"))).toBe("[[Foo (bar)]] and [[Foo (bar)|shown]]");
+    // Found, and followed when the item moves, however the address was written.
+    expect(linksIn("md", "![a](x%20(2).png) ![b](<my cat.png>)").paths).toEqual(["x%20%282%29.png", "my%20cat.png"]);
+    expect(relink("md", "![a](x%20(2).png) ![b](<my cat.png>)", { oldWiki: null, newWiki: "", oldPath: "x%20%282%29.png", newPath: "n.png" })).toBe("![a](n.png) ![b](<my cat.png>)");
+    expect(relink("md", "![b](<my cat.png>)", { oldWiki: null, newWiki: "", oldPath: "my%20cat.png", newPath: "n.png" })).toBe("![b](<n.png>)");
+  });
+
   it("writes footnotes, embeds and table alignment as Obsidian does, and leaves code and links alone", () => {
+    expect(obsidianMarkdown("one\\\ntwo\n\n> [!note] Title\\\n> body\n>\n\nnext")).toBe("one\ntwo\n\n> [!note] Title\n> body\n\nnext");
+    expect(obsidianMarkdown("2 \\* 3 and [https://a.b/c](https://a.b/c) [x](https://a.b)")).toBe("2 * 3 and https://a.b/c [x](https://a.b)");
     expect(obsidianMarkdown("A [^1\\] and [^2\\].\n\n![[cat.png\\]\\]\n\n[\\^1\\]: [Gamut](https://x)")).toBe("A [^1] and [^2].\n\n![[cat.png]]\n\n[^1]: [Gamut](https://x)");
     expect(obsidianMarkdown("not a link: [a\\](b)")).toBe("not a link: [a\\](b)");
     expect(obsidianMarkdown("`x\\]` and\n```\ny\\]\n```\n")).toBe("`x\\]` and\n```\ny\\]\n```\n");

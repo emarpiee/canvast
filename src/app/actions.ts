@@ -48,7 +48,7 @@ import type { ObjectId } from "../doc/model";
 import { isMaskObject, maskMembers } from "../doc/masks";
 import { parseCssPaint } from "./css-paint";
 import { parseSvg } from "./svg-import";
-import { pivotOf } from "../doc/model";
+import { NOTE_PAGE_PIXEL_W, pivotOf } from "../doc/model";
 import { MAX_NAME_LENGTH, editSubs, inkStyle, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs, strokePoints } from "../doc/model";
 import { worldBounds } from "../doc/edit-ops";
 import { planSheetScale } from "../doc/constraints";
@@ -546,12 +546,14 @@ export function sizeResets(doc: DocumentStore, editor: EditorState, view: ViewSt
     const c = cropOf(o);
     const nw = noteWidth(o);
     const w = (nw ?? c.w) / f;
-    const h = (nw ? (nw * c.h) / c.w : c.h) / f;
+    // (a note's card: its page back to the width it was placed with, so its words are their first size; as tall as it is laid out)
+    const page = nw && o.page ? { pixelW: NOTE_PAGE_PIXEL_W } : {};
+    const h = (nw && o.page ? (nw * o.pixelH) / NOTE_PAGE_PIXEL_W : nw ? (nw * c.h) / c.w : c.h) / f;
     const k = 2 ** (o.unit - unit); // (the old size in the new unit)
-    if (Math.abs((o.w * k) / w - 1) < 0.002 && Math.abs((o.h * k) / h - 1) < 0.002) return [];
+    if (Math.abs((o.w * k) / w - 1) < 0.002 && Math.abs((o.h * k) / h - 1) < 0.002 && (!o.page || !nw || o.pixelW === NOTE_PAGE_PIXEL_W)) return [];
     // The middle stays: the old corner plus half the old size, less half the new size.
     const at = (a: D.Dyadic, old: number, now: number): D.Dyadic => D.sub(D.add(a, D.shift(D.fromNumber(old / 2), o.unit)), D.shift(D.fromNumber(now / 2), unit));
-    return [normalizeUnit({ ...o, unit, w, h, anchor: { x: at(o.anchor.x, o.w, w), y: at(o.anchor.y, o.h, h) } }) as ImageObject];
+    return [normalizeUnit({ ...o, ...page, unit, w, h, anchor: { x: at(o.anchor.x, o.w, w), y: at(o.anchor.y, o.h, h) } }) as ImageObject];
   });
 }
 

@@ -91,10 +91,21 @@ function pageScaled(o: { pixelW: number; pixelH: number }, kx: number, ky: numbe
   const step = (v: number): number => Math.max(8, Math.round(v / 8) * 8);
   return { pixelW: step((o.pixelW * kx) / u), pixelH: step((o.pixelH * ky) / u) };
 }
+/** How narrow (a column of a few words: narrower, a whole note would be a thread thousands of px tall) and how large a note's page can be laid out, card pixels. */
+const PAGE_MIN_W = 320;
+const PAGE_MIN_H = 64;
+const PAGE_MAX_EDGE = 32000;
+/** A note's card being resized: the scale kept inside the page sizes it can be laid out at. */
+function pageLimited(o: { pixelW: number; pixelH: number }, kx: number, ky: number): [number, number] {
+  const u = Math.abs(kx - 1) <= Math.abs(ky - 1) ? kx : ky;
+  const within = (k: number, px: number, min: number): number => (u * Math.min(PAGE_MAX_EDGE, Math.max(Math.min(min, px), (px * k) / u))) / px;
+  return kx === ky ? [kx, ky] : [within(kx, o.pixelW, PAGE_MIN_W), within(ky, o.pixelH, PAGE_MIN_H)];
+}
 
 export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: number, keepWidth = false, keepRadius = false): CanvasObject {
   if (!(kx > 0 && ky > 0 && Number.isFinite(kx) && Number.isFinite(ky))) throw new RangeError(`bad scale ${kx},${ky}`);
   if (o.kind === "path" && o.rot && kx !== ky) return stretchTurned(o, fixed, kx, ky, keepWidth, keepRadius);
+  if (o.kind === "image" && o.page) [kx, ky] = pageLimited(o, kx, ky);
   const anchor = {
     x: scaleCoord(o.anchor.x, fixed.x, D.fromNumber(kx), o.unit),
     y: scaleCoord(o.anchor.y, fixed.y, D.fromNumber(ky), o.unit),

@@ -12,6 +12,8 @@ import { cleanFileName } from "../doc/rename-rules";
 import { formatTag, formatTags, renamedTag, tagIsOrUnder } from "../doc/tags";
 import type { LibraryCalls, LibraryOp } from "./desktop-bridge";
 import { externalFolder } from "./external-folder";
+import { desktopBridge } from "./desktop-bridge";
+import { isSafeRelativePath } from "./workspace-names";
 import { done, idbGet, req } from "./idb";
 import type { CatalogStore, LibraryPages, OriginalStore } from "./store";
 
@@ -595,6 +597,11 @@ export class DesktopOriginals implements OriginalStore {
   async fileOf(hash: string): Promise<string | null> {
     const rec = await this.recOf(hash);
     return rec?.ext && rec.file && !isHiddenFile(rec.file) ? rec.file : null;
+  }
+
+  async hashAt(path: string): Promise<string | null> {
+    if (!path.startsWith("library/") || !isSafeRelativePath(path)) return null;
+    return (await desktopBridge()?.hash(path).catch(() => null)) ?? null;
   }
 
   async entryState(hash: string): Promise<CatalogEntry["state"] | undefined> {

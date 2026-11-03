@@ -8,6 +8,8 @@ export interface Prop {
   value: string | string[];
   /** Lines the reader did not understand, kept as they are (the key's own line first). */
   raw?: string[];
+  /** The lines as the file has them, written back while the value stays the same (quotes, `[a, b]`, a comment after the value). */
+  written?: string[];
 }
 
 const OPEN = /^---\r?\n/;
@@ -19,6 +21,9 @@ export function splitFrontmatter(text: string): { props: Prop[] | null; body: st
   const lines = text.split(/\r?\n/);
   const end = lines.indexOf("---", 1);
   if (end < 0) return { props: null, body: text };
+  // (a note that starts with a rule, no YAML: its first words are not properties)
+  const first = lines.slice(1, end).find((l) => l.trim() && !l.trimStart().startsWith("#"));
+  if (first !== undefined && !KEY.test(first)) return { props: null, body: text };
   return { props: parseProps(lines.slice(1, end)), body: lines.slice(end + 1).join("\n").replace(/^\n/, "") };
 }
 
@@ -60,7 +65,10 @@ export function parseProps(lines: readonly string[]): Prop[] {
   const props: Prop[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
-    if (!line.trim() || line.trimStart().startsWith("#")) continue;
+    if (!line.trim() || line.trimStart().startsWith("#")) {
+      props.push({ key: "", value: "", raw: [line] }); // (a comment or an empty line stays where it is)
+      continue;
+    }
     const m = KEY.exec(line);
     // Lines that belong to this key: a list's `- item`s, or anything indented (which makes it a key kept as written).
     const more: string[] = [];
@@ -74,13 +82,13 @@ export function parseProps(lines: readonly string[]): Prop[] {
     const key = unquote(m[1]!);
     const v = (m[2] ?? "").trim();
     if (!v && more.length && more.every((l) => /^\s*-\s+/.test(l) || /^\s*-$/.test(l))) {
-      props.push({ key, value: more.map((l) => unquote(l.replace(/^\s*-\s*/, ""))).filter((x) => x !== "") });
+      props.push({ key, value: more.map((l) => unquote(l.replace(/^\s*-\s*/, ""))).filter((x) => x !== ""), written: [line, ...more] });
     } else if (more.length || /^[|>&*!{]/.test(v)) {
       props.push({ key, value: "", raw: [line, ...more] });
     } else if (v.startsWith("[") && v.endsWith("]")) {
-      props.push({ key, value: flowList(v) });
+      props.push({ key, value: flowList(v), written: [line] });
     } else {
-      props.push({ key, value: unquote(/^["']/.test(v) ? v : v.replace(/\s+#.*$/, "")) }); // (a comment ends an unquoted text only)
+      props.push({ key, value: unquote(/^["']/.test(v) ? v : v.replace(/\s+#.*$/, "")), written: [line] }); // (a comment ends an unquoted text only)
     }
   }
   return props;
@@ -97,6 +105,7 @@ export function writeProps(props: readonly Prop[]): string[] {
   const out: string[] = [];
   for (const p of props) {
     if (p.raw) out.push(...p.raw);
+    else if (p.written) out.push(...p.written);
     else if (Array.isArray(p.value)) out.push(`${keyText(p.key)}:`, ...p.value.map((v) => `  - ${scalar(v)}`));
     else out.push(p.value === "" ? `${keyText(p.key)}:` : `${keyText(p.key)}: ${scalar(p.value)}`);
   }
@@ -148,14 +157,20 @@ export function propsOfMeta(prev: readonly Prop[], meta: NoteMeta): Prop[] {
     }
     const k = p.key.toLowerCase();
     if (TAG_KEYS.has(k)) {
-      if (!tagsDone && meta.tags.length) out.push({ key: p.key, value: [...meta.tags] });
+      const had = Array.isArray(p.value) ? p.value : p.value.split(/[,\s]+/).filter(Boolean);
+      const same = had.map((t) => t.replace(/^#/, "").trim()).join("\n") === meta.tags.join("\n");
+      if (!tagsDone && same) out.push(p); // (as the file writes them: nothing changed)
+      else if (!tagsDone && meta.tags.length) out.push({ key: p.key, value: [...meta.tags] });
       tagsDone = true;
     } else if (k === NOTE_KEY) {
-      if (meta.note) out.push({ key: p.key, value: meta.note });
+      if (p.value === meta.note) out.push(p);
+      else if (meta.note) out.push({ key: p.key, value: meta.note });
       noteDone = true;
     } else if (fields.has(p.key)) {
       const v = fields.get(p.key)!;
-      out.push({ key: p.key, value: Array.isArray(p.value) ? v.split(/,\s*/).filter(Boolean) : v });
+      // (unchanged, it stays as written: "Smith, John" is one item of a list, not two)
+      if ((Array.isArray(p.value) ? p.value.join(", ") : p.value) === v) out.push(p);
+      else out.push({ key: p.key, value: Array.isArray(p.value) ? v.split(/,\s*/).filter(Boolean) : v });
       fields.delete(p.key);
     }
   }
@@ -208,7 +223,7 @@ export function withRichMeta(file: string, meta: NoteMeta): string {
   const m = /(<head[^>]*>)([\s\S]*?)(<\/head>)/i.exec(file);
   if (!m) return file;
   const kept = m[2]!.replace(META, (line, name: string) => (NOT_PROPS.has(unescapeAttr(name).toLowerCase()) ? line : ""));
-  return file.replace(m[0], `${m[1]}${kept.replace(/\n?$/, "\n")}${richMetaLines(meta)}${m[3]}`);
+  return file.replace(m[0], () => `${m[1]}${kept.replace(/\n?$/, "\n")}${richMetaLines(meta)}${m[3]}`); // (a function: a `$&` in the words stays as it is)
 }
 
 /** No tags, no note, no fields. */
@@ -220,7 +235,8 @@ export const NO_META: NoteMeta = { tags: [], note: "", fields: [] };
  */
 export function inlineTags(body: string): string[] {
   const out: string[] = [];
-  const text = body.replace(/^```[\s\S]*?^```.*$|^~~~[\s\S]*?^~~~.*$/gm, "").replace(/`+[^`\n]*?`+/g, "");
+  // (a link's `#part` is no tag: `[[#Heading]]`, `[words](#part)`)
+  const text = body.replace(/^```[\s\S]*?^```.*$|^~~~[\s\S]*?^~~~.*$/gm, "").replace(/`+[^`\n]*?`+/g, "").replace(/\[\[[^\]\n]*\]\]/g, "").replace(/\]\([^)\n]*\)/g, "]");
   for (const m of text.matchAll(/(?<![\p{L}\p{N}_&/#\\])#([\p{L}\p{N}_\-/]+)/gu)) {
     const t = m[1]!.replace(/[/-]+$/, "");
     if (t && /[^\d]/.test(t) && !out.some((x) => x.toLowerCase() === t.toLowerCase())) out.push(t);
@@ -259,6 +275,8 @@ export function withFileMeta(kind: "md" | "txt" | "rich", text: string, meta: No
   if (kind !== "md") return text;
   const { props, body } = splitFrontmatter(text);
   // (the tags written as #tags in its words stay there: the YAML lists the others)
+  // (…unless the YAML lists it too: what the file has written stays)
   const inline = inlineTags(body).map((t) => t.toLowerCase());
-  return withFrontmatter(body, propsOfMeta(props ?? [], { ...meta, tags: meta.tags.filter((t) => !inline.includes(t.toLowerCase())) }));
+  const listed = metaOfProps(props ?? []).tags.map((t) => t.toLowerCase());
+  return withFrontmatter(body, propsOfMeta(props ?? [], { ...meta, tags: meta.tags.filter((t) => !inline.includes(t.toLowerCase()) || listed.includes(t.toLowerCase())) }));
 }

@@ -195,8 +195,8 @@ test("a note's properties (YAML, as Obsidian writes them) are its item's tags, n
   await p.keyboard.press("Control+s");
   await expect(p.getByTestId("assets-status")).toContainText("Saved “cover.md”");
   const file = await downloaded(p);
-  // (the YAML lists the tags not written in the words)
-  expect(file).toMatch(/^---\ntags:\n  - print\nauthor: Ana\ndescription: The cover plan\nnested:\n  a: 1\n---\n# Cover art/);
+  // (the YAML lists the tags not written in the words, and keeps one it had already)
+  expect(file).toMatch(/^---\ntags:\n  - design\n  - print\nauthor: Ana\ndescription: The cover plan\nnested:\n  a: 1\n---\n# Cover art/);
   expect(file).toMatch(/Text\. #urgent and #design/);
   await expect.poll(async () => (await entry())?.tags.sort()).toEqual(["design", "print", "urgent"]);
 });
@@ -487,6 +487,133 @@ test("a note's card lays its page out at its own size: a side handle flows the w
   await expect.poll(async () => (await cardNow()).pixelH).toBeGreaterThan(before.pixelH);
   expect((await cardNow()).pixelW).toBe(before.pixelW);
   expect(app.consoleErrors).toEqual([]);
+});
+
+test("the note keeps what is done at it: Undo and Delete with the focus off its words stay out of the canvas, nothing typed is lost, a note made rich text is one", async ({ app }) => {
+  const p = app.page;
+  const NOTE = `# Keys\n\n![pic](pic.png)\n\n${"Words on the page.\n\n".repeat(25)}`;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "pic.png", mimeType: "image/png", buffer: CAT });
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "keys.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) });
+  await card(p, hashOf(NOTE)).click();
+  await p.getByTestId("asset-place").click();
+  await p.getByTestId("view-canvas").click();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
+  const left = () => p.evaluate(async () => { const d = window.__canvastDebug; const o = d.objects()[0]; return o ? d.objectScreen(o.id)!.box.minX : null; });
+  const open = async (): Promise<void> => {
+    const b = await p.evaluate(() => { const d = window.__canvastDebug; return d.objectScreen(d.objects()[0]!.id)!.box; });
+    await p.mouse.dblclick((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
+  };
+  // A step on the canvas (the card moved), then the note open beside it.
+  const b0 = await p.evaluate(() => { const d = window.__canvastDebug; return d.objectScreen(d.objects()[0]!.id)!.box; });
+  await p.mouse.click((b0.minX + b0.maxX) / 2, (b0.minY + b0.maxY) / 2);
+  await p.keyboard.press("ArrowRight");
+  await expect.poll(left).not.toBe(b0.minX);
+  const moved = await left();
+  await open();
+  const panel = p.getByTestId("note-panel");
+  const words = panel.locator(".sun-editor-editable").first();
+  await expect(words.locator("h1")).toHaveText("Keys");
+  // The panel's header pressed, then a picture of the note selected: Undo and Redo are the note's, and Delete takes the picture, not the card.
+  await panel.locator(".panel-head h2").click();
+  await p.keyboard.press("Control+z");
+  await p.keyboard.press("Control+Shift+z");
+  expect(await left()).toBe(moved);
+  await words.locator("img").first().click({ force: true });
+  await p.keyboard.press("Control+z");
+  expect(await left()).toBe(moved);
+  await p.keyboard.press("Delete");
+  await expect(words.locator("img")).toHaveCount(0);
+  expect(await p.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
+  // A press outside: the canvas's keys are the canvas's again.
+  await p.mouse.click(5, 450);
+  await p.keyboard.press("Control+z");
+  await expect.poll(left).not.toBe(moved);
+  await p.keyboard.press("Control+Shift+z");
+  // Typed while it is being saved: still a change, so leaving asks.
+  await words.locator("h1").click();
+  await p.keyboard.press("End");
+  await p.keyboard.type("!");
+  await p.keyboard.press("Control+s");
+  await p.keyboard.type("more");
+  await expect(words.locator("h1")).toContainText("more");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.some((e) => e.name === "keys.md" && e.hash !== "")))).toBe(true);
+  await p.waitForTimeout(600); // (the save has ended)
+  await panel.locator("[data-close]").click();
+  const ask = p.getByTestId("choose-dialog");
+  await expect(ask).toContainText("has changes that are not saved");
+  // Saved as rich text on the way out (centred: markdown cannot hold it): the panel stays closed.
+  await p.keyboard.press("Escape");
+  await expect(ask).toHaveCount(0);
+  await words.locator("h1").click();
+  await panel.locator('.se-toolbar button[data-command="align"]').first().evaluate((b: HTMLElement) => b.click());
+  await p.locator('.se-dropdown button[data-command="center"]').filter({ visible: true }).click();
+  await panel.locator("[data-close]").click();
+  await ask.getByLabel("Save them").check();
+  await ask.getByRole("button", { name: "Go on" }).click();
+  await ask.getByRole("button", { name: "Save" }).click();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => e.name).filter((n) => n.startsWith("keys"))))).toEqual(["keys.note.html"]);
+  await p.waitForTimeout(300);
+  await expect(panel).toBeHidden();
+  // Opened again it is a rich text note: saved again, no question and no second suffix; the panel's title says so.
+  await open();
+  await expect(panel.locator(".panel-head h2")).toHaveText("keys.note.html");
+  await words.locator("h1").click();
+  await p.keyboard.press("End");
+  await p.keyboard.type("?");
+  await p.keyboard.press("Control+s");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => e.name).filter((n) => n.startsWith("keys"))))).toEqual(["keys.note.html"]);
+  await expect(ask).toHaveCount(0);
+});
+
+test("Markdown view: what is typed there counts as a change; what a file writes survives a save (lines, marks, code, tables, brackets)", async ({ app }) => {
+  const p = app.page;
+  const SAME = "# Same\n\nfirst line\nsecond line\n\n==marked== and <kbd>Ctrl</kbd>\n\n> [!note] Title\n> body\n\n```c++ x\nint a;\n\n  int b;\n```\n\n````md\n```x\ny\n```\n````\n\n| a | b |\n| :--- | ---: |\n| *i* **b** | 2 |\n\n[[Foo (bar)]] and [x](obsidian://open?f=1)\n";
+  const FIXED = "T\n===\n\n2 * 3 * 4 ![c](cat%20(2).png)\n\n| a |\n|:--|\n| 1 | 2 |\n";
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles([
+    { name: "cat (2).png", mimeType: "image/png", buffer: CAT },
+    { name: "same.md", mimeType: "text/markdown", buffer: Buffer.from(SAME) },
+    { name: "fixed.md", mimeType: "text/markdown", buffer: Buffer.from(FIXED) },
+    { name: "first.md", mimeType: "text/markdown", buffer: Buffer.from("one\n") },
+  ]);
+  // Two notes with one text stay two.
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "second.md", mimeType: "text/markdown", buffer: Buffer.from("one\n") });
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => /^(first|second)/.test(e.name)).length))).toBe(2);
+  const text = () => p.evaluate(() => window.__canvastDebug.notesAsText()[0]!);
+  const close = async (): Promise<void> => {
+    await p.getByTestId("slide-view").locator('[data-act="close"]').click();
+    await expect(p.getByTestId("slide-view")).toBeHidden();
+  };
+  await card(p, hashOf(SAME)).dblclick();
+  await expect(page(p).locator("h1")).toHaveText("Same");
+  expect(await text()).toMatchObject({ text: SAME, keepsAll: true });
+  await close();
+  await card(p, hashOf(FIXED)).dblclick();
+  await expect(page(p).locator("h1")).toHaveText("T");
+  await expect.poll(() => page(p).locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0); // (a name with brackets)
+  const fixed = await text();
+  expect(fixed.text).toContain("2 * 3 * 4");
+  expect(fixed.text).toContain("![c](cat%20%282%29.png)");
+  expect(fixed.text).toContain("| 1 | 2 |");
+  await close();
+  // Typed in the Markdown view, on the way out or back in the page.
+  await card(p, hashOf(SAME)).dblclick();
+  const toggle = note(p).locator('[data-command="markdownView"]').first();
+  await toggle.evaluate((b: HTMLElement) => b.click());
+  await note(p).locator("textarea.se-markdown-viewer").click();
+  await p.keyboard.press("Control+End");
+  await p.keyboard.type("typed");
+  await p.getByTestId("slide-view").locator('[data-act="close"]').click();
+  await expect(p.getByTestId("choose-dialog")).toContainText("has changes that are not saved");
+  await p.keyboard.press("Escape");
+  await expect(p.getByTestId("choose-dialog")).toHaveCount(0);
+  await toggle.evaluate((b: HTMLElement) => b.click());
+  await expect(page(p)).toContainText("typed");
+  await p.getByTestId("slide-view").locator('[data-act="close"]').click();
+  await expect(p.getByTestId("choose-dialog")).toContainText("has changes that are not saved");
+  await p.getByTestId("choose-dialog").getByLabel("Don't save").check();
+  await p.getByTestId("choose-dialog").getByRole("button", { name: "Go on" }).click();
 });
 
 test("the Note tool (M) makes a note file in the Notes folder, places its card and opens it; Make note files turns a text on a card into one", async ({ app }) => {

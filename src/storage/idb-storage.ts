@@ -187,6 +187,10 @@ export class IdbOriginals implements OriginalStore {
     return rec?.ext && rec.file && !isHiddenFile(rec.file) ? rec.file : null;
   }
 
+  async hashAt(_path: string): Promise<string | null> {
+    return null; // (no files: an item is found by its name)
+  }
+
   async entryState(hash: string): Promise<CatalogEntry["state"] | undefined> {
     return (await idbGet<CatalogEntry>(this.db, "assetCatalog", hash))?.state;
   }

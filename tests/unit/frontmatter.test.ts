@@ -42,7 +42,7 @@ describe("note properties (YAML frontmatter)", () => {
     });
     // Unchanged, it writes back to the same properties (lists as lists, the nested map and the block as they were).
     const again = withFrontmatter(body, propsOfMeta(props!, metaOfProps(props!)));
-    expect(splitFrontmatter(again).props).toEqual(props!.map((p) => (p.key === "tags" ? { ...p, value: ["design", "todo"] } : p)));
+    expect(splitFrontmatter(again).props).toEqual(props);
     expect(again).toContain("nested:\n  a: 1\n  b: 2\npoem: |\n  two\n  lines\n");
   });
 
@@ -92,6 +92,25 @@ describe("#tags in a note's words", () => {
     expect(fileMeta("md", body)).toBeNull(); // (no YAML: its #tags are only added, see the session)
     // The item's tags written back: those in the words stay there only.
     const out = withFileMeta("md", file, { tags: ["print", "design", "todo/later", "café-é", "new"], note: "", fields: [] });
-    expect(splitFrontmatter(out).props).toEqual([{ key: "tags", value: ["print", "new"] }]);
+    expect(splitFrontmatter(out).props).toMatchObject([{ key: "tags", value: ["print", "new"] }]);
+    // Not tags: a link's part. And a tag the YAML lists too stays listed there.
+    expect(inlineTags("[[#Heading]], [words](#part), [[Plan#Goals]], (#real)")).toEqual(["real"]);
+    expect(withFileMeta("md", "---\ntags: [a, b]\n---\nbody #a", { tags: ["a", "b"], note: "", fields: [] })).toBe("---\ntags: [a, b]\n---\nbody #a");
+  });
+
+  it("a save leaves the properties as the file writes them while their values stay the same", async () => {
+    const { fileMeta, withFileMeta, splitFrontmatter, withRichMeta } = await import("../../src/notes/frontmatter");
+    const save = (t: string): string => withFileMeta("md", t, fileMeta("md", t)!);
+    for (const file of [
+      '---\naliases:\n  - "Smith, John"\n  - other\n---\nbody',
+      "---\n# why this note\n\ntitle: x # a comment\n---\nbody",
+      '---\nversion: "1.0"\ndate: "2024-01-01"\naliases: []\ntags:\nstatus:\n---\nbody',
+    ]) expect(save(file)).toBe(file);
+    // A value changed is written anew; the others stay.
+    expect(withFileMeta("md", '---\na: "1"\nb: "2"\n---\nx', { tags: [], note: "", fields: [{ key: "a", value: "1" }, { key: "b", value: "3" }] })).toBe('---\na: "1"\nb: 3\n---\nx');
+    // A note that starts with a rule has no properties; its words stay its words.
+    expect(splitFrontmatter("---\n\nFirst paragraph\n\n---\n\nSecond")).toEqual({ props: null, body: "---\n\nFirst paragraph\n\n---\n\nSecond" });
+    // A `$&` in a value is that text, in a rich text note's head too.
+    expect(withRichMeta("<html><head><title>T</title></head><body>B</body></html>", { tags: [], note: "cost $& and $' end", fields: [] })).toContain('content="cost $&amp; and $\' end"');
   });
 });

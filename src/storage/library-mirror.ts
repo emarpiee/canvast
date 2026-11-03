@@ -20,6 +20,7 @@ import { FILE_MAGIC, SEALED_COPY_RE, SEALED_DIR_RE, SEALED_NAME_RE, hiddenFileNa
 import type { NameKeys } from "./hidden-vault";
 import { sha256Hex } from "../assets/sha256";
 import { done, idbGet, req } from "./idb";
+import { noteKindOf } from "../notes/note-file";
 import { KIND_FOLDERS, extOfBytes, fileExt, fitsPlace, freePath, isSafeRelativePath, libraryDir, nameBase, safeBase } from "./workspace-names";
 import type { FolderFile } from "./store";
 
@@ -551,7 +552,8 @@ export class LibraryMirror {
       if (sealed && !this.vault.dataKey) continue;
       const id = meta(e).folderIds[0];
       const dir = libraryDir(id && folderOk.has(id) ? folderPath(folders, id) : [], e.type, e.name);
-      const ext = (rec.file && !sealed && extOfPath(rec.file)) || fileExt(rec.name, e.type); // (a sealed file's own is .bin)
+      // (a sealed file's own is .bin; a note made rich text in its place, plan.md → plan.note.html, is a file of its new kind)
+      const ext = (noteKindOf(e.name) && fileExt(e.name, e.type)) || (rec.file && !sealed && extOfPath(rec.file)) || fileExt(rec.name, e.type);
       const base = nameBase(e.name);
       if (rec.file && fitsPlace(rec.file, dir, base, ext) && !taken.has(rec.file.toLowerCase())) taken.add(rec.file.toLowerCase());
       else moves.push({ hash: e.hash, from: rec.ext ? rec.file! : null, dir, base, ext });

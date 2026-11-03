@@ -1,16 +1,17 @@
-import { WIKI, noteKindOf, richNoteBody, textHtml } from "./note-file";
+import { WIKI, encodeLinkPart, noteKindOf, outsideCode, richNoteBody, textHtml } from "./note-file";
 import { cardContext } from "../assets/card";
 import { splitFrontmatter } from "./frontmatter";
+import { NOTE_PAGE_PIXEL_W } from "../doc/model";
 
 // The picture of a note (its library thumbnail and its card on a canvas): the top of its page, as the notes editor lays it out, drawn
 // through an SVG image (`foreignObject`), which runs nothing and loads nothing. Light or dark paper (`setNoteLook`): cards are drawn in memory, never stored.
 // Its pictures, videos and sounds are found by the app (`setNotePictures`) and drawn into it as data (a video by its picture, with a
 // ▶; a sound by its waveform, with a ♪). shortcut: library fonts are not (its text is in the system's sans-serif), embed them likewise if wanted.
 
-/** How wide a note's page is laid out for its thumbnail and a new card, CSS px (a card on a canvas is then laid out at its own width). */
-const PAGE_W = 600;
 /** A note's card on a canvas: its page drawn at twice its size (sharp when zoomed in). Its picture is `CARD_SCALE` × the page it lays out. */
 export const CARD_SCALE = 2;
+/** How wide a note's page is laid out for its thumbnail and a new card, CSS px (a card on a canvas is then laid out at its own width). */
+const PAGE_W = NOTE_PAGE_PIXEL_W / CARD_SCALE;
 /** A new card is as tall as the note up to this (CSS px of the page): a longer note fades out at the bottom until the card is made taller. */
 const NEW_CARD_MAX_H = 4000;
 /** The longest page a card lays out (CSS px): a card showing the whole note stops there. */
@@ -73,13 +74,15 @@ async function makePageHtml(name: string, text: string, hash?: string): Promise<
   const { markdownHtml } = await import("./note-markdown"); // (loaded when a preview is made: the editor needs a page, not the unit tests' Node)
   // (Obsidian's `![[cat.png]]`: the picture it embeds)
   const md = (t: string): string =>
-    splitFrontmatter(t)
-      .body.replace(/!\[\[([^\[\]|\n]+?)(?:\|[^\[\]\n]*)?\]\]/g, (_m, n: string) => `![${n.trim()}](${WIKI}${encodeURIComponent(n.trim())})`)
-      // (a link between notes shows its words, as in the editor: `[[Plan|shown]]` → shown, `[[Folder/Plan]]` → Folder/Plan)
-      .replace(/\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]*))?\]\]/g, (_m, n: string, shown?: string) => (shown ?? n).trim());
+    outsideCode(splitFrontmatter(t).body, (s) =>
+      s
+        .replace(/!\[\[([^\[\]|\n]+?)(?:\|[^\[\]\n]*)?\]\]/g, (_m, n: string) => `![${n.trim()}](${WIKI}${encodeLinkPart(n.trim())})`)
+        // (a link between notes shows its words, as in the editor: `[[Plan|shown]]` → shown, `[[Folder/Plan]]` → Folder/Plan)
+        .replace(/\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]*))?\]\]/g, (_m, n: string, shown?: string) => (shown ?? n).trim()),
+    );
   const html = kind === "md" ? markdownHtml(md(text)) : kind === "rich" ? richNoteBody(text) : textHtml(text);
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
-  for (const n of doc.body.querySelectorAll("script, style, iframe, object, embed, link, meta, video, audio")) n.remove();
+  for (const n of doc.body.querySelectorAll("script, style, iframe, object, embed, link, meta")) n.remove();
   for (const el of doc.body.querySelectorAll("img, video, audio")) {
     const src = el.getAttribute("src") ?? el.querySelector("source")?.getAttribute("src") ?? "";
     const found = hash && pictures && src ? await pictures(hash, src).catch(() => null) : null;

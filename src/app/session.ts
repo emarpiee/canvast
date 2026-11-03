@@ -2,7 +2,9 @@ import { sha256Hex } from "../assets/sha256";
 import { NO_META, fileInlineTags, fileMeta, sameMeta, withFileMeta } from "../notes/frontmatter";
 import type { NoteMeta } from "../notes/frontmatter";
 import { makeThumb } from "../assets/thumb";
-import { WIKI, linkTarget, noteKindOf, noteLinks, relativeLink, relinkNote, wikiTarget } from "../notes/note-file";
+import { WIKI, libraryLink, linkTarget, noteKindOf, noteLinks, relativeLink, relinkNote, wikiTarget } from "../notes/note-file";
+import type { PathTarget } from "../notes/note-file";
+import { nameBase } from "../storage/workspace-names";
 import type { NoteKind } from "../notes/note-file";
 import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT, folderPath } from "../assets/asset-catalog";
 import type { AssetFolder, CatalogEntry } from "../assets/asset-catalog";
@@ -514,7 +516,7 @@ export class Session {
         links.wiki.some((w) => wikiTarget(w).name === key || w.toLowerCase() === target.name.toLowerCase()) ||
         links.paths.some((p) => {
           const t = linkTarget(p, dir);
-          return !!t && ("hash" in t ? t.hash === hash : t.path.join("/") === where);
+          return !!t && ("hash" in t ? t.hash === hash : t.path.join("/") === where || t.root?.join("/") === where);
         });
       if (hit) out.push(e);
     }
@@ -550,15 +552,16 @@ export class Session {
         const oldKey = Session.wikiKey(then.name);
         const alone = !listing.entries.some((x) => x.hash !== h && Session.wikiKey(x.name) === oldKey);
         const named = then.name !== cur.name && alone;
-        out = relinkNote(kind, out, { oldWiki: named ? oldKey : null, newWiki: noteKindOf(cur.name) === "md" ? cur.name.replace(/\.(md|markdown)$/i, "") : cur.name, oldPath: relativeLink(dirThen, then.path), newPath: relativeLink(dirNow, to) });
+        out = relinkNote(kind, out, { oldWiki: named ? oldKey : null, newWiki: noteKindOf(cur.name) === "md" ? cur.name.replace(/\.(md|markdown)$/i, "") : cur.name, oldPath: relativeLink(dirThen, then.path), newPath: libraryLink(to) });
+        out = relinkNote(kind, out, { oldWiki: null, newWiki: "", oldPath: libraryLink(then.path), newPath: libraryLink(to) }); // (as a note writes a link now)
       }
       // (a note that moved: its paths to items that stayed are written from its new folder)
       if (dirThen.join("/") !== dirNow.join("/")) {
         for (const p of links.paths) {
           const t = linkTarget(p, dirThen);
           if (!t || "hash" in t) continue;
-          const stayed = listing.entries.find((x) => !moved.has(x.hash) && x.name === t.path[t.path.length - 1]);
-          if (stayed) out = relinkNote(kind, out, { oldWiki: null, newWiki: "", oldPath: p, newPath: relativeLink(dirNow, await this.itemPath(stayed, listing.folders)) });
+          const stayed = await this.itemAtPath(t, listing.entries, listing.folders);
+          if (stayed && !moved.has(stayed.hash)) out = relinkNote(kind, out, { oldWiki: null, newWiki: "", oldPath: p, newPath: libraryLink(await this.itemPath(stayed, listing.folders)) });
         }
       }
       if (out !== text) await this.saveVersion(e.hash, new File([out], e.name, { type: rec.type }));
@@ -577,9 +580,31 @@ export class Session {
     const t = linkTarget(link, (await this.itemPath(note, listing.folders)).slice(0, -1));
     if (!t) return null;
     if ("hash" in t) return listing.entries.find((e) => e.hash === t.hash) ?? null;
-    const named = listing.entries.filter((e) => e.name === t.path[t.path.length - 1]);
-    for (const e of named) if ((await this.itemPath(e, listing.folders)).join("/") === t.path.join("/")) return e;
-    return named.length === 1 ? named[0]! : null; // (moved since: the one item of that name)
+    return this.itemAtPath(t, listing.entries, listing.folders);
+  }
+
+  /**
+   * The item among `entries` a path in a note points at. A file's name on disk is not always the item's (`my cat.png` is `my_cat.png`, the
+   * second `image.png` is `image-2.png`), so the file at the path comes first, read from the note's folder, then from the root of the library
+   * (a copy of an item's file is that item). Then the item's own name and folders (a build without files), and last the one item of that name
+   * anywhere (moved since), which a link written elsewhere with only the file's name also finds.
+   */
+  async itemAtPath<E extends Pick<CatalogEntry, "hash" | "name" | "folderIds">>(t: PathTarget, entries: readonly E[], folders: readonly AssetFolder[]): Promise<E | null> {
+    const ways = [t.path, ...(t.root && t.root.join("/") !== t.path.join("/") ? [t.root] : [])];
+    for (const way of ways) {
+      const hash = await this.storage?.originals.hashAt(`library/${way.join("/")}`).catch(() => null);
+      const found = hash ? entries.find((e) => e.hash === hash) : undefined;
+      if (found) return found;
+    }
+    const last = t.path[t.path.length - 1]!;
+    const named = entries.filter((e) => e.name === last);
+    for (const way of ways) for (const e of named) if ((await this.itemPath(e, folders)).join("/") === way.join("/")) return e;
+    if (named.length) return named.length === 1 ? named[0]! : null;
+    // (the file's name as the disk writes it: `my_cat.png` for the item `my cat.png`)
+    const ext = (n: string): string => /\.[^.]+$/.exec(n)?.[0].toLowerCase() ?? "";
+    const safe = (n: string): string => `${nameBase(n)}${ext(n)}`;
+    const onDisk = entries.filter((e) => safe(e.name) === safe(last));
+    return onDisk.length === 1 ? onDisk[0]! : null;
   }
 
   /** Told when an item gets a new version (a note saved, a file changed outside the app): its old hash and its new one. */
@@ -827,9 +852,16 @@ export class Session {
   async saveVersion(old: string, file: File): Promise<string | null> {
     if (!this.guardWrite() || !this.catalog || !this.assets) return null;
     try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const hash = await sha256Hex(bytes.buffer);
+      let bytes = new Uint8Array(await file.arrayBuffer());
+      let hash = await sha256Hex(bytes.buffer);
       if (hash === old) return old;
+      // A note's words the same as another note's: one line more at its end keeps them two notes (an item is its bytes).
+      while (noteKindOf(file.name) && (await this.catalog.entry(hash).catch(() => undefined))?.state === "active") {
+        bytes = new Uint8Array([...bytes, 10]);
+        hash = await sha256Hex(bytes.buffer);
+        file = new File([bytes], file.name, { type: file.type });
+        if (hash === old) return old;
+      }
       await this.persistence.flush();
       if (await this.storage?.folderSync?.saveFile(old, bytes)) return hash;
       const e = await this.catalog.entry(old);

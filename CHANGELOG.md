@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.53.3 — Notes fixes: pictures, saving, keys (2026-11-03)
+
+- **Fixed:** a note's pictures no longer break when it is closed. A link is now found by the file it names on disk (`my cat.png` is the file `my_cat.png`, the second `image.png` is `image-2.png`, which the old search by the item's name missed), also on the note's card; a copy of an item's file shows that item, and `<with space.png>` and names with brackets are read.
+- **Changed:** a note writes its links from the root of the library (`images/cat.png`), with brackets encoded; links written relative to the note, or with `library/` in front, are still found.
+- **Changed:** the picture dialog shows a picture's link instead of its temporary `blob:` address, and a path typed there is found in the library.
+- **Fixed:** saving a markdown note no longer damages it: lines inside a paragraph or quote stay lines (they joined without a space), the lines of a code block too, as do `==highlight==`, `<kbd>`, a fence's words (` ```c++ x `), a code block holding a fence, tables with short separators or extra cells, the space between marked words in a cell, `[[Foo (bar)]]`, and links to other programs (`obsidian://`).
+- **Fixed:** a save keeps the properties as the file writes them while their values stay the same: comments, quotes, `[a, b]`, empty keys, a list item with a comma, and a tag listed both in the YAML and in the words.
+- **Fixed:** a note starting with a rule (`---`) and no YAML keeps its first words; `[[#Heading]]` and `[words](#part)` make no tag; a `$&` in a rich text note's properties stays as written.
+- **Fixed:** Undo, Redo, Delete and the other keys stay with the note while you are at it: with the focus off its words (its panel's header, its Undo button, a picture selected), they went on to the canvas, and Delete with a picture selected also deleted the note's card. Ctrl+S works there too.
+- **Fixed:** an image pasted or dropped into a note is stored once and goes in once (it was also stored and linked as a file), and no longer brings up the rich text question.
+- **Fixed:** text typed in the Markdown or Code view counts as a change (closing asks), and so does text typed while a save is running.
+- **Fixed:** a note closed with unsaved rich formatting (hidden items locked) keeps its text; it came back empty.
+- **Fixed:** a note made rich text in the Note panel is one from then on (a second save made `plan.note.html.note.html`), its panel says its new name, and closing the panel with that save no longer opens it again. On desktop its file is `plan.note.html` (it was `plan.note.md`). The name is a free one when another note has it; a failed save leaves the note as it was; changes made in another app are asked about here too.
+- **Fixed:** two notes with the same words stay two notes, on import and on save (in the browser, one replaced the other).
+- **Fixed:** a note's card is laid out no narrower than a short column (a thin one made a card thousands of px tall) and no larger than the app can draw, and Reset size takes its page back to the width it was placed with.
+- **Fixed:** previews show a rich text note's videos and sounds, and leave `[[x]]` in code as it is; a template's `{{time}}` is the time it goes in.
+
 ## 0.53.2 — Note cards (2026-11-03)
 
 - **Changed:** a note's card on a canvas lays its page out at its own size: a side handle flows the words to the new width (or shows more or less of the page) instead of stretching them; dragging a corner evenly zooms the card.

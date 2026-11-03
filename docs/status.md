@@ -37,6 +37,14 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.3: notes fixes (2026-11-03)
+
+- **Implemented:** `Session.itemAtPath` and `OriginalStore.hashAt` (a link found by the file at its path, both ways of reading it, then by name); `libraryLink`, `encodeLinkPart`, `readableMarkdown` (what the editor's reader misreads), `markdownHtml` with lines as `<br>`, `Prop.written`; note keys routed from the window while the person is at the note; `NoteImage`, `NoteFileUpload`; mirror names a note's file by its kind; page size limits in `scaleAbout`; `NOTE_PAGE_PIXEL_W`.
+- **Tested:** unit (note-file, frontmatter); notes.spec chromium + firefox with two new tests; desktop.spec note tests with one new test. A throwaway run over a real vault of 286 notes: 284 opened, every remaining difference in what a save writes checked by kind (spelling, no lost words).
+- **Known limit:** an indented paragraph inside a list item comes out after the item; `![[embed]]` is shown as written in the editor; video and sound dialogs still show the temporary address; 3 notes of that vault still ask the rich text question, reason not looked into.
+- **Unverified:** a real clipboard paste (tests dispatch the paste event); a rich text note's video on its card (read from the code); Firefox for the desktop paths.
+- **Committed:** v0.53.3.
+
 ## v0.53.2: note cards (2026-11-03)
 
 - **Implemented:** `ImageObject.page` (a note's card laid out at `pixelW` × `pixelH`, twice its CSS px); `rasterKey` `hash#pWxH`, read by the asset library (full card, reduced copies at the full card's layout width, another size of the card while one is drawn); `scaleAbout` scales the page along the side changed most (in steps of 8 px); `retargeted` keeps a card's size; `syncNoteCards` (`main.ts`) marks every note card and fits it with `notes.cardShows` = whole, through `doc.remap` (no undo step). Settings `notes.pageWidth` and `notes.cardLength` removed.

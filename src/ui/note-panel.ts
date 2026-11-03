@@ -45,11 +45,12 @@ export function mountNotePanel(
   };
   const place: NotePlace = {
     styleKey: "notes.panelStyle",
+    root: () => el,
     importFiles: (files) => deps.importFiles(files),
     // A link to another note opens it here; to anything else, in the library.
     show: async (hash) => {
       const rec = await deps.assets.record(hash).catch(() => undefined);
-      if (rec && noteKindOf(rec.name)) await open(hash);
+      if (rec && noteKindOf(rec.name)) await open(hash, note?.hash === hash);
       else if (await leave()) deps.showInLibrary(hash);
     },
     showCanvas: () => shut(),
@@ -57,10 +58,10 @@ export function mountNotePanel(
     refresh: async () => undefined,
     hidden: () => deps.hidden(),
   };
-  const open = async (hash: string): Promise<boolean> => {
+  const open = async (hash: string, /** Opened again: the note became another kind. */ fresh = false): Promise<boolean> => {
     const rec = await deps.assets.record(hash).catch(() => undefined);
     if (!rec || !noteKindOf(rec.name)) return false;
-    if (note?.hash === hash) return (el.hidden = false), true; // (already open here)
+    if (note?.hash === hash && !fresh) return (el.hidden = false), true; // (already open here)
     // (a hidden note's card is a padlock: it opens only while the hidden items show)
     const e = await deps.session.catalog?.entry(hash).catch(() => undefined);
     if (e?.hidden && !deps.assets.revealing) {
@@ -109,7 +110,7 @@ export function mountNotePanel(
       if (e.key === "F2" && !e.ctrlKey && !e.altKey && !e.metaKey) (e.preventDefault(), void rename());
     });
   return {
-    open,
+    open: (hash) => open(hash),
     close: leave,
     // Hidden items are no longer shown (hidden mode ended, the hidden items locked): a hidden note open here closes, its changes saved (OpenNote.close).
     closeHidden: () => void (hiddenOpen && shut()),

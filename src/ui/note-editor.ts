@@ -1,9 +1,10 @@
 import { scrubNumbers } from "../colour-picker/scrub";
 import suneditor, { helper } from "suneditor";
+import { markdownHtml } from "../notes/note-markdown";
 import { align, anchor, audio, audioGallery, autocomplete, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
 import type { SunEditor } from "suneditor/types";
-import { WIKI, linkTarget, linksToWiki, obsidianMarkdown, relativeLink, richNoteBody, richNoteFile, textHtml, wikiToLinks } from "../notes/note-file";
-import type { NoteKind, NoteStyle } from "../notes/note-file";
+import { FENCE_TICK, WIKI, libraryLink, linkTarget, linksToWiki, obsidianMarkdown, richNoteBody, richNoteFile, textHtml, wikiToLinks } from "../notes/note-file";
+import type { NoteKind, NoteStyle, PathTarget } from "../notes/note-file";
 import { splitFrontmatter } from "../notes/frontmatter";
 
 
@@ -22,7 +23,7 @@ export interface NoteHost {
   /** The folder of the note in the library (its links are relative to it). */
   dir: string[];
   /** The item a link in the note names (by its path in the library, or its hash), or null. */
-  find(target: { hash: string } | { path: string[] }): Promise<NoteItem | null>;
+  find(target: { hash: string } | PathTarget): Promise<NoteItem | null>;
   /** The item's file, to show it in the note. */
   blob(hash: string): Promise<Blob | null>;
   /** Where the item is in the library (its folders and file name), for a link to it. */
@@ -56,7 +57,10 @@ export interface NoteEditor {
   asText(kind: Exclude<NoteKind, "rich">): { text: string; keepsAll: boolean };
   /** The note as a rich text note's file. */
   asRich(title: string): string;
-  saved(): void;
+  /** The editor's content now (given to `saved`, for what was saved). */
+  current(): string;
+  /** The note was saved (`as` this content, else as it is now): what was typed since stays a change. */
+  saved(as?: string): void;
   destroy(): void;
 }
 
@@ -184,6 +188,13 @@ function libraryGallery<T extends GalleryClass>(base: T, choose: (kind: AttachKi
   };
 }
 
+// (SunEditor offers a file pasted or dropped to every plugin that takes it: a picture, video or sound is its own plugin's, not also a file's)
+class NoteFileUpload extends fileUpload {
+  override onFilePasteAndDrop(a: Parameters<fileUpload["onFilePasteAndDrop"]>[0]): void {
+    if (!/^(image|video|audio)\//.test(a.file.type)) super.onFilePasteAndDrop(a);
+  }
+}
+
 /** The font list's button says Default (not the page's own list of font names) when the words have no font of their own. */
 // (SunEditor runs the input plugins one after another, awaiting each: a note closed meanwhile (hidden items locked) has no window left to read the selection from)
 const alive = ($: { frameContext?: { get(k: string): unknown } }): boolean => !!$.frameContext?.get("_ww");
@@ -236,7 +247,7 @@ const localFiles = (files: unknown): File[] | null => {
  * Open a note in the notes editor (SunEditor) inside `el`. Its links to library items are shown from the library (pictures, videos,
  * sounds, files) and written back as they were, or, for what is added, as a path relative to the note; files added go into the library.
  */
-export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; text: string; style: NoteStyle; host: NoteHost; /** The note's name (no extension), for {{title}}. */ title: string }): Promise<NoteEditor> {
+export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; text: string; style: NoteStyle; host: NoteHost; /** The note's name (no extension), for {{title}}. */ title: string; /** The whole place it is shown in (else the library's viewer). */ root?: HTMLElement | null }): Promise<NoteEditor> {
   const { host } = opts;
   /** Each address shown in the note for a library item → the link written in the file for it. */
   const links = new Map<string, string>();
@@ -244,7 +255,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     const blob = await host.blob(item.hash);
     if (!blob) return null;
     const url = URL.createObjectURL(blob);
-    links.set(url, link ?? relativeLink(host.dir, await host.pathOf(item.hash)));
+    links.set(url, link ?? libraryLink(await host.pathOf(item.hash)));
     return url;
   };
   const targetFor = async (item: NoteItem): Promise<HTMLElement | null> => {
@@ -263,7 +274,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
    * from; a template's links from another folder are written again from this note's (the app's own links stay as they are).
    */
   const shown = async (kind: NoteKind, text: string, dir: readonly string[]): Promise<string> => {
-    const html = kind === "md" ? helper.markdown.markdownToHtml(wikiToLinks(splitFrontmatter(text).body), "P") : kind === "txt" ? textHtml(text) : richNoteBody(text); // (properties: in the details panel)
+    const html = kind === "md" ? markdownHtml(wikiToLinks(splitFrontmatter(text).body)) : kind === "txt" ? textHtml(text) : richNoteBody(text); // (properties: in the details panel)
     const page = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
     const here = dir.join("/") === host.dir.join("/");
     for (const box of page.body.querySelectorAll("input[type=checkbox]")) box.removeAttribute("disabled"); // (task boxes are ticked in the note)
@@ -282,7 +293,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   /** A link to a note or file, as the editor holds it (a markdown note writes it `[[key]]`); its path is found for a rich text note. */
   const wikiPath = new Map<string, string>();
   const knowPath = (target: string): void =>
-    void host.findWiki(target).then(async (item) => item && wikiPath.set(target, relativeLink(host.dir, await host.pathOf(item.hash))));
+    void host.findWiki(target).then(async (item) => item && wikiPath.set(target, libraryLink(await host.pathOf(item.hash))));
   const wikiLink = (target: string, shownText: string): HTMLAnchorElement => {
     const a = document.createElement("a");
     a.href = `${WIKI}${encodeURIComponent(target)}`;
@@ -290,6 +301,37 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     knowPath(target);
     return a;
   };
+  // The picture dialog shows the link the note writes (the address the editor uses lasts only while the note is open); a link typed there is found in the library.
+  const pictureLink = (url: string): string => links.get(url) ?? url;
+  class NoteImage extends image {
+    private shownLink = "";
+    override modalOn(isUpdate: boolean): void {
+      super.modalOn(isUpdate);
+      requestAnimationFrame(() => {
+        const field = this.imgUrlFile as HTMLInputElement | null;
+        if (!field) return;
+        this.shownLink = field.value = this.previewSrc.textContent = pictureLink(field.value);
+      });
+    }
+    // (the dialog's field puts a `/` before what has no web address's start)
+    override submitURL(url: string): ReturnType<image["submitURL"]> {
+      return super.submitURL(url.replace(/^\/blob:/, "blob:"));
+    }
+    override async modalAction(): Promise<boolean> {
+      const field = this.imgUrlFile as HTMLInputElement | null;
+      const typed = field?.value.trim() ?? "";
+      if (field && typed && typed !== this.shownLink) {
+        const target = linkTarget(typed, host.dir);
+        const item = target && (await host.find(target));
+        const url = item && (await urlOf(item, typed));
+        if (url) {
+          field.value = url;
+          field.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      }
+      return super.modalAction();
+    }
+  }
   const value = await shown(opts.kind, opts.text, host.dir);
   for (const m of value.matchAll(/href="canvast-wiki:([^"]+)"/g)) knowPath(decodeURIComponent(m[1]!));
   const linkables = (await host.linkables()).map((l) => ({ key: l.key, name: l.name }));
@@ -323,26 +365,36 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   const viewToggled = (which: "markdown" | "code") => ({ frameContext, is }: { frameContext: SunEditor.FrameContext; is: boolean }): void => {
     const area = frameContext.get(which) as HTMLTextAreaElement | undefined;
     if (!area) return;
-    if (is) return void (views[which] = { html: editor.$.html.get(), text: area.value, dirty });
+    if (is) return void ((views[which] = { html: editor.$.html.get(), text: area.value, dirty }), (viewArea[which] = area));
     const was = views[which];
     views[which] = null;
-    if (!was || area.value !== was.text) return;
+    viewArea[which] = null;
+    if (!was) return;
+    if (area.value !== was.text) return void (dirty = true); // (read again from what was typed there: a change of the note)
     editor.$.html.set(was.html);
     dirty = was.dirty;
   };
+  const viewArea: Record<"markdown" | "code", HTMLTextAreaElement | null> = { markdown: null, code: null };
+  /** What was typed in the Markdown or Code view and not read back yet. */
+  const typedInView = (): boolean => (["markdown", "code"] as const).some((w) => !!viewArea[w] && viewArea[w].value !== views[w]?.text);
+  /** How many times the person has changed the words (`current` notes it: what is typed while a save runs is told from what was saved). */
+  let edits = 0;
+  let editsAtCurrent = 0;
+  el.addEventListener("input", () => void edits++, true);
   const holder = document.createElement("div");
   el.append(holder);
   /** What the editor holds and how it cleans it (the same for the hidden one that compares notes). */
   const content: SunEditor.InitOptions = {
     // (not math, embeds or PDF export: they need a server or another library)
     plugins: [
-      ...[align, anchor, audio, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileUpload, NoteFont, fontColor, fontSize, hr, image, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, NoteSlash, table, template, textStyle, video, NoteAutocomplete],
+      ...[align, anchor, audio, backgroundColor, blockquote, blockStyle, codeBlock, drawing, NoteFileUpload, NoteFont, fontColor, fontSize, hr, NoteImage, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, NoteSlash, table, template, textStyle, video, NoteAutocomplete],
       ...[imageGallery, videoGallery, audioGallery, fileGallery, fileBrowser].map((g) => libraryGallery(g as GalleryClass, choose)),
     ],
     font: { items: fonts },
     fileUpload: { uploadUrl: "canvast:library" }, // (never sent: files are taken by onFileUploadBefore)
     // ({{date}}, {{time}} and {{title}} in a template are filled in: today, now, this note's name)
-    template: { items: [...TEMPLATES, ...templates].map((t) => ({ ...t, html: fillTemplate(t.html, opts.title) })) },
+    // (when it goes in: the time is the insert's, not the note's opening)
+    template: { items: [...TEMPLATES, ...templates].map((t) => ({ name: t.name, get html() { return fillTemplate(t.html, opts.title); } })) },
     autocomplete: {
       limitSize: 8,
       triggers: {
@@ -354,8 +406,9 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     },
     layout: { items: LAYOUTS },
     // Kept through the editor's cleaning: the app's own links, and markdown's task lists.
-    allowedURLProtocols: ["canvast", "canvast-wiki"],
-    elementWhitelist: "input",
+    // (and links to other programs, written as they are: a note never follows them, but it keeps them)
+    allowedURLProtocols: ["canvast", "canvast-wiki", "obsidian", "app", "file", "ftp", "tel", "zotero", "vscode", "ssh"],
+    elementWhitelist: "input|mark|kbd",
     attributeWhitelist: { input: "type|checked|disabled" },
   };
   const editor = suneditor.create(holder, {
@@ -395,16 +448,45 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   } as SunEditor.InitOptions);
 
   /** The note as it was opened or last saved: what "unsaved changes" compare with. */
-  let savedHtml = editor.$.html.get();
-  // Ctrl+S saves at once: the editor's own shortcut waits until its history takes the last keys (some 400 ms after typing stops).
-  const keys = (e: KeyboardEvent): void => {
-    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || e.code !== "KeyS") return;
-    e.preventDefault();
-    e.stopPropagation();
-    editor.$.history.push(false);
-    void host.save();
+  let savedHtml = "";
+  // The keyboard's Save and Undo while the person is at the note, wherever the focus went (a picture selected, a button of its toolbar, its header:
+  // none of them keeps it in the words). Without this they would go on to the canvas or the library behind it.
+  const root = opts.root ?? el.closest<HTMLElement>('[data-testid="slide-view"]') ?? el;
+  let atNote = !opts.root; // (the library's viewer is the whole view; a panel beside a canvas, from the first press in it)
+  const pressed = (e: PointerEvent): void => {
+    const t = e.target as Element | null;
+    atNote = !!t && (root.contains(t) || !!t.closest(".sun-editor, .se-controller, .se-modal, .se-dropdown, .lib-pick"));
   };
-  el.addEventListener("keydown", keys, true);
+  window.addEventListener("pointerdown", pressed, true);
+  const keys = (e: KeyboardEvent): void => {
+    if (!atNote || e.altKey || !root.isConnected || root.hidden || document.querySelector("dialog[open]")) return;
+    const t = e.target as HTMLElement | null;
+    const typing = !!t && (t.isContentEditable || /^(TEXTAREA|SELECT|INPUT)$/.test(t.tagName));
+    if (!(e.ctrlKey || e.metaKey)) {
+      // A key pressed with the focus off the words (a picture selected: its Delete) is the note's, not the canvas's: from the editor's page, the
+      // app's shortcuts leave it alone and the editor still gets it.
+      const page = el.querySelector(".sun-editor-editable");
+      if (typing || !e.isTrusted || !page || e.key === "Escape" || e.key === "Tab" || /^F\d+$/.test(e.key)) return;
+      e.stopImmediatePropagation();
+      e.preventDefault();
+      page.dispatchEvent(new KeyboardEvent("keydown", { key: e.key, code: e.code, shiftKey: e.shiftKey, bubbles: true, cancelable: true }));
+      return;
+    }
+    if (e.code === "KeyS" && !e.shiftKey) {
+      // Ctrl+S saves at once: the editor's own shortcut waits until its history takes the last keys (some 400 ms after typing stops).
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      editor.$.history.push(false);
+      void host.save();
+    } else if (!typing && (e.code === "KeyZ" || (e.code === "KeyY" && !e.shiftKey))) {
+      // (in the words or a field, Undo is theirs already, and the app's own shortcuts leave those alone)
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (e.code === "KeyZ" && !e.shiftKey) editor.$.history.undo();
+      else editor.$.history.redo();
+    }
+  };
+  window.addEventListener("keydown", keys, true);
   // A task box is ticked with a click: its `checked` attribute is what the file keeps (`- [x]`), one step of undo.
   // Ctrl+click (⌘ on a Mac) on a link opens what it points at; a plain click puts the cursor in it, to edit.
   const follow = (e: MouseEvent): void => {
@@ -469,12 +551,15 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     if (!e.isTrusted && t.matches(".__se__font_size")) (editor.$.plugins as Record<string, { toolbarInputChange?(a: object): void }>)["fontSize"]?.toolbarInputChange?.({ target: t, value: t.value.trim(), event: e });
   });
 
+  /** The editor's HTML without what only says what is selected now. */
+  const settled = (h: string): string => h.replace(/ ?\b(?:se-component-selected|se-figure-selected)\b/g, "").replace(/ data-se-index="[^"]*"/g, "");
+  savedHtml = settled(editor.$.html.get());
   /** The editor's HTML with the library's addresses back to the links written in the file. */
   const output = (): string => {
     const $ = editor.$;
     $.viewer.codeView(false);
     $.viewer.markdownView(false);
-    let out = $.html.get();
+    let out = settled($.html.get());
     for (const [url, link] of links) out = out.split(url).join(link);
     return out;
   };
@@ -482,6 +567,13 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   const toMarkdown = (h: string): string => {
     const t = document.createElement("template");
     t.innerHTML = h;
+    // (a code block holding a code fence: its backticks are out of the writer's sight, and its own fence made longer after, see obsidianMarkdown)
+    // (and its lines, which the writer reads from newlines, are `<br>` in the editor)
+    for (const c of t.content.querySelectorAll("pre")) {
+      c.innerHTML = c.innerHTML.replace(/<br\s*\/?>/g, "\n");
+      if (/(?:^|>|\n)`{3,}/.test(c.innerHTML)) c.innerHTML = c.innerHTML.replace(/`/g, FENCE_TICK);
+    }
+    h = t.innerHTML;
     const aligns = [...t.content.querySelectorAll("table")].map((tb) => [...(tb.querySelector("tr")?.children ?? [])].map((c) => ((c as HTMLElement).style.textAlign || null) as "left" | "center" | "right" | null));
     return obsidianMarkdown(helper.markdown.jsonToMarkdown(helper.converter.htmlToJson(h)), aligns);
   };
@@ -499,6 +591,11 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     const box = document.createElement("template");
     box.innerHTML = twin.$.html.get();
     for (const b of box.content.querySelectorAll("input[type=checkbox]")) b.removeAttribute("disabled"); // (markdown read back marks them so)
+    // (what a picture just put in carries for the editor's own use: its size as "auto" is no size of its own)
+    for (const i of box.content.querySelectorAll("img")) {
+      for (const a of [...i.attributes]) if (a.name.startsWith("data-se-") || ((a.name === "width" || a.name === "height") && (a.value === "auto" || !a.value)) || a.name === "alt" || a.name === "title") i.removeAttribute(a.name);
+    }
+    for (const c of box.content.querySelectorAll("[class*='se-component-selected'], [class*='se-figure-selected']")) c.classList.remove("se-component-selected", "se-figure-selected");
     for (const n of box.content.querySelectorAll("*")) {
       const same = (v: string): string => {
         try {
@@ -522,25 +619,39 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   return {
     // (edited since it was saved: a change the editor reports late, as its history taking the last keys, is no edit when the note is as saved)
     get dirty() {
-      return dirty && editor.$.html.get() !== savedHtml;
+      return typedInView() || (dirty && settled(editor.$.html.get()) !== savedHtml);
     },
     asText(kind) {
       const out = output();
       const now = editor.$.html.get();
       if (kind === "md") {
         // Markdown keeps it all when the note, written as markdown and read back, is the same note (an alignment, a font size… would go).
-        return { text: linksToWiki(toMarkdown(out)).replace(/[\u200B\uFEFF]/g, ""), keepsAll: held(helper.markdown.markdownToHtml(toMarkdown(now), "P")) === held(now) };
+        return { text: linksToWiki(toMarkdown(out)).replace(/[\u200B\uFEFF]/g, ""), keepsAll: held(markdownHtml(toMarkdown(now))) === held(now) };
       }
       const box = document.createElement("div");
       box.innerHTML = out;
-      const lines = [...box.children].map((b) => (b as HTMLElement).innerText ?? b.textContent ?? "");
+      // (a line break, or a list's items, are lines of the file: a `<div>` not on the page has no innerText of its own to tell them)
+      for (const br of box.querySelectorAll("br")) br.replaceWith("\n");
+      const lineOf = (b: Element): string => (b.matches("ul, ol") ? [...b.children].map(lineOf).join("\n") : (b.textContent ?? "").replace(/^\n$/, ""));
+      const lines = [...box.children].map(lineOf);
       const text = lines.join("\n");
       return { text, keepsAll: held(textHtml(text)) === held(now) };
     },
     asRich: (title) => richNoteFile(title, output().replace(/href="canvast-wiki:([^"]+)"/g, (m, t: string) => { const p = wikiPath.get(decodeURIComponent(t)); return p ? `href="${p}"` : m; })),
-    saved: () => void ((dirty = false), (savedHtml = editor.$.html.get())),
+    current() {
+      editsAtCurrent = edits;
+      return settled(editor.$.html.get());
+    },
+    saved(as) {
+      const now = settled(editor.$.html.get());
+      // (typed while it was being saved: still a change. Else the editor's own late touches, a picture's size once it has loaded, are no change.)
+      const typed = as !== undefined && edits !== editsAtCurrent;
+      savedHtml = typed ? as : now;
+      dirty = typed;
+    },
     destroy() {
-      el.removeEventListener("keydown", keys, true);
+      window.removeEventListener("keydown", keys, true);
+      window.removeEventListener("pointerdown", pressed, true);
       el.removeEventListener("click", tick, true);
       el.removeEventListener("click", follow, true);
       el.removeEventListener("mouseover", peekOver);
