@@ -70,6 +70,7 @@ export const SETTINGS = {
   "storage.deleteAtOnce": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "storage.trashDays": { scope: "device", default: "0", validate: oneOf("0", "30", "90", "365"), effect: "immediate" } as Def<"0" | "30" | "90" | "365">,
   "library.keepFileNames": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
+  "library.sortFiles": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "library.hiddenNamesOff": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "storage.autoIndex": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "ui.view": { scope: "device", default: "canvas", validate: oneOf("canvas", "assets"), effect: "restart" } as Def<"canvas" | "assets">,
@@ -214,7 +215,8 @@ export const SETTINGS = {
   "shot.tagCanvas": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shot.tagItems": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shot.copy": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
-  "nav.edgePan": { scope: "device", default: 100, validate: range(0, 300), effect: "immediate" } as Def<number>,
+  "nav.edgePanOn": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
+  "nav.edgePan": { scope: "device", default: 100, validate: range(10, 300), effect: "immediate" } as Def<number>,
   "nav.mode": { scope: "device", default: "view", validate: oneOf(...NAV_MODES), effect: "immediate" } as Def<NavMode>,
   "nav.arrive": { scope: "device", default: "focus", validate: oneOf("focus", "keep"), effect: "immediate" } as Def<"focus" | "keep">,
   // Camera travel (ADR 0163): how the view moves to a bookmark or a previous view.

@@ -574,14 +574,15 @@ export class LibraryMirror {
       // (a sealed file's own is .bin; a note made rich text in its place, plan.md → plan.note.html, is a file of its new kind)
       const tidyExt = (noteKindOf(e.name) && fileExt(e.name, e.type)) || (rec.file && !sealed && extOfPath(rec.file)) || fileExt(rec.name, e.type);
       const tidyBase = nameBase(e.name);
-      // Keep file names: a file stays as it is and where it lies: named as its item is, in its library folder under either way of writing it, or (in no
-      // folder) in the library's root or its kind's folder. A file tidied before stays too: turning the setting on moves nothing. A hidden item's is its own business.
+      // Two settings, each on its own. Keep file names: a file named as its item is stays so, and a library folder may be written either way. Sort files:
+      // a file in no folder goes in its kind's folder; else one in the library's root stays there. A file tidied before fits too: turning a setting on
+      // renames nothing that fits. A hidden item's place is its own business.
       const keep = this.keepNames() && !sealed;
       const base = keep ? keptBase(e.name) : tidyBase;
       const ext = (keep && /\.([A-Za-z0-9]{1,8})$/.exec(e.name)?.[1]) || tidyExt;
-      const keptDirs = keep ? (names.length ? [await diskDir(names, tidyDir), tidyDir] : [tidyDir, "library"]) : [];
-      const dir = rec.file && keptDirs.includes(parentOf(rec.file)) ? parentOf(rec.file) : keptDirs[0] ?? tidyDir;
-      const fits = !!rec.file && (fitsPlace(rec.file, tidyDir, tidyBase, tidyExt) || (keep && keptFits(rec.file, keptDirs, e.name)));
+      const places = sealed ? [tidyDir] : names.length ? (keep ? [await diskDir(names, tidyDir), tidyDir] : [tidyDir]) : this.sortFiles() ? [tidyDir] : [tidyDir, "library"];
+      const dir = rec.file && places.includes(parentOf(rec.file)) ? parentOf(rec.file) : places[0]!;
+      const fits = !!rec.file && (places.some((d) => fitsPlace(rec.file!, d, tidyBase, tidyExt)) || (keep && keptFits(rec.file, places, e.name)));
       if (fits && !taken.has(rec.file!.toLowerCase())) taken.add(rec.file!.toLowerCase());
       else moves.push({ hash: e.hash, from: rec.ext ? rec.file! : null, dir, base, ext });
     }
@@ -1044,6 +1045,8 @@ export class LibraryMirror {
 
   /** Whether files keep the item's name as written (Settings: Keep file names), else their tidy name. */
   keepNames: () => boolean = () => false;
+  /** Whether a file in no library folder goes in its kind's folder (Settings: Sort files by kind), else may stay in the library's root. */
+  sortFiles: () => boolean = () => false;
 
   /** Files found renamed or moved outside the app, until someone listens (the links to them in notes follow, see `onMoved`). */
   private moves: Array<{ hash: string; name: string; path: string }> = [];
@@ -1290,8 +1293,9 @@ export class LibraryMirror {
         await this.setMeta(MOVING_KEY, null);
         taken.delete(m.from.toLowerCase());
         emptied.add(parentOf(m.from));
-        // (its name changed in its folder, the setting turned off, say: the links to it in notes follow. A move between folders comes with its own, from the library.)
-        if (parentOf(m.from) === parentOf(target)) {
+        // (its name changed in its folder, a setting turned off, say, or it left the library's root for its kind's folder: the links to it in notes follow.
+        // A move between library folders comes with its own, from the library; one that also started in the root is followed twice, the second finding nothing.)
+        if (parentOf(m.from) === parentOf(target) || parentOf(m.from) === "library") {
           const name = (await this.lib.entry(m.hash))?.name;
           if (name !== undefined) this.movedOutside({ hash: m.hash, name, path: m.from });
         }

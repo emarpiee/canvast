@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.53.20 — Names and sorting are two settings; edge panning has a switch (2026-11-04)
+
+- **Added:** **Pan at the edge while dragging** (Settings > Navigation) is now a switch, on by default; off, the view stays where it is and objects can be dragged past its edge. **Edge panning speed** beside it sets how fast (it was one slider, with 0% for off).
+- **Changed:** **Keep files as they are** is now two settings (Settings > Saving to the library): **Keep file names** (on by default) only decides names, and **Sort files by kind** (new, off by default) only decides whether a file in no library folder moves into its kind's folder, keeping its name.
+- **Changed:** a change of either setting applies to the files at once, instead of at the next change in the library.
+
 ## 0.53.19 — Notes, files and paste (2026-11-04)
 
 - **Changed:** the README's Settings table, paste, saving and file place sections describe the 0.53.x settings and behaviour.

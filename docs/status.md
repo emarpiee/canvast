@@ -37,6 +37,14 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.20: names and sorting apart (2026-11-04)
+
+- **Implemented:** `library.sortFiles` beside `library.keepFileNames`; the mirror's places come from both on their own; either change asks for a whole library write; a file leaving the library's root has its links in notes followed. `nav.edgePanOn` switches edge panning.
+- **Tested:** desktop.spec Keep files test extended (sort alone, names off alone).
+- **Known failures:** none.
+- **Unverified:** the two spellings of one folder (`Exports`, `exports`) still do not merge.
+- **Committed:** v0.53.20.
+
 ## v0.53.19: README up to date (2026-11-04)
 
 - **Implemented:** README only: Settings table rows, paste under the pointer, Save notes on close, Keep files as they are, setting names.

@@ -21,7 +21,7 @@ async function launch(workspace: string, device = "userdata", /** Most of these 
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));
   await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
-  if (!keepFiles) await page.evaluate(() => window.__canvastDebug.setSetting("library.keepFileNames", false));
+  if (!keepFiles) await page.evaluate(() => (window.__canvastDebug.setSetting("library.keepFileNames", false), window.__canvastDebug.setSetting("library.sortFiles", true)));
   return { app, page, requests };
 }
 
@@ -1685,7 +1685,7 @@ test("a file renamed outside the app keeps its place in notes: the links follow,
   await app.close();
 });
 
-test("Keep files as they are (the default): names, places and folders stay, notes find them, a tag leaves the file alone; off, they are tidied and the links follow", async () => {
+test("Keep file names (the default) with Sort files by kind off: names, places and folders stay, notes find them, a tag leaves the file alone; off, they are tidied and the links follow", async () => {
   const ws = tempDir("cv-keep-names-");
   const lib = join(ws, "library");
   const png = (seed: number): Buffer => makePng(6, 4, () => [seed, 90, 40, 255]);
@@ -1724,14 +1724,22 @@ test("Keep files as they are (the default): names, places and folders stay, note
   await page.getByTestId("slide-view").locator('[data-act="close"]').click();
   expect(files(lib)).toContain("Root Pic.PNG");
   expect(files(lib)).toContain("My Refs/sub dir/deep.png");
-  // Off: tidied at the next write, and a link follows a rename in its folder.
+  // Sort files alone: what is loose goes in its kind's folder at once, its name as it is; what is filed stays; the note's link follows.
   await page.getByTestId("view-settings").click();
   await page.getByRole("tab", { name: "Saving to the library" }).click();
+  await page.locator('[data-set="library.sortFiles"]').click({ force: true });
+  await expect.poll(() => files(lib), { timeout: 15_000 }).toContain("images/Root Pic.PNG");
+  expect(files(lib)).toContain("My Refs/Red-Dress Sky Blue.png");
+  expect(files(lib)).not.toContain("Root Pic.PNG");
+  await expect.poll(() => readFileSync(join(lib, "notes/plain.md"), "utf8"), { timeout: 15_000 }).toContain("images/Root%20Pic.PNG");
+  // Names off, sorting off: tidied where it lies, and a new file by its kind.
+  await page.locator('[data-set="library.sortFiles"]').click({ force: true });
   await page.locator('[data-set="library.keepFileNames"]').click({ force: true });
+  await expect.poll(() => files(lib), { timeout: 15_000 }).toContain("my_refs/red-dress_sky_blue.png");
+  expect(files(lib)).toContain("images/root_pic.png");
   await page.getByTestId("view-assets").click();
   await page.getByTestId("assets-import-input").setInputFiles({ name: "Next One.png", mimeType: "image/png", buffer: png(40) });
-  await expect.poll(() => files(lib), { timeout: 15_000 }).toContain("my_refs/red-dress_sky_blue.png");
-  expect(files(lib)).toContain("images/next_one.png");
+  await expect.poll(() => files(lib), { timeout: 15_000 }).toContain("images/next_one.png");
   await app.close();
 });
 

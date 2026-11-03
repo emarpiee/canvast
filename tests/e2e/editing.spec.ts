@@ -708,7 +708,7 @@ test("resize with side handles: corners and sides follow the pointer; Shift keep
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("dragging objects to an edge of the view pans it while the pointer rests there; the objects stay in view; off at 0%", async ({ app }) => {
+test("dragging objects to an edge of the view pans it while the pointer rests there; the objects stay in view; its switch turns it off", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles({ name: "o.png", mimeType: "image/png", buffer: makePng(120, 80, () => [200, 60, 40, 255]) });
@@ -748,10 +748,10 @@ test("dragging objects to an edge of the view pans it while the pointer rests th
   const panned = await drag(700);
   expect(panned.moved, "the view moved").toBe(true);
   expect(panned.at, "the whole object is in view").toBeLessThanOrEqual(width + 1);
-  // Off at 0%.
+  // Off by its switch.
   await p.getByTestId("view-settings").click();
   await p.getByRole("tab", { name: "Navigation", exact: true }).click();
-  await p.locator('[data-set="nav.edgePan"]').fill("0");
+  await p.locator('[data-set="nav.edgePanOn"]').click({ force: true });
   await p.getByTestId("view-canvas").click();
   await p.keyboard.press("f"); // (the object in view again)
   await expect.poll(() => p.evaluate(() => { const d = window.__canvastDebug; return !!d.objectScreen(d.objects()[0]!.id); })).toBe(true);
