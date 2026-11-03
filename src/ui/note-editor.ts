@@ -1,6 +1,6 @@
 import { scrubNumbers } from "../colour-picker/scrub";
 import suneditor, { helper } from "suneditor";
-import { markdownHtml } from "../notes/note-markdown";
+import { markdownHtml, pastedHtml, pastedMarkdown } from "../notes/note-markdown";
 import { align, anchor, audio, audioGallery, autocomplete, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
 import type { SunEditor } from "suneditor/types";
 import { FENCE_TICK, WIKI, keepSpelling, libraryLink, linkTarget, linksToWiki, obsidianMarkdown, richNoteBody, richNoteFile, textHtml, wikiToLinks } from "../notes/note-file";
@@ -313,6 +313,10 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
    */
   const shown = async (kind: NoteKind, text: string, dir: readonly string[]): Promise<string> => {
     const html = kind === "md" ? markdownHtml(wikiToLinks(splitFrontmatter(text).body)) : kind === "txt" ? textHtml(text) : richNoteBody(text); // (properties: in the details panel)
+    return fromLibrary(html, dir);
+  };
+  /** The editor's HTML with its links to library items shown from the library. */
+  const fromLibrary = async (html: string, dir: readonly string[]): Promise<string> => {
     const page = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
     const here = dir.join("/") === host.dir.join("/");
     for (const box of page.body.querySelectorAll("input[type=checkbox]")) box.removeAttribute("disabled"); // (task boxes are ticked in the note)
@@ -496,7 +500,16 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
         const words = sel && !sel.isCollapsed ? sel.toString() : "";
         const wiki = /^\[\[([^[\]|\n]+)\]\]$/.exec(text);
         const url = /^(https?:\/\/|mailto:)\S+$/i.test(text) ? text : null;
-        if (!words.trim() || /\n/.test(words) || (!wiki && !url)) return undefined;
+        if (!words.trim() || /\n/.test(words) || (!wiki && !url)) {
+          // From Obsidian: its source, else the page it drew, read as a note's own (its pictures found in the library, a code block's lines kept).
+          if (opts.kind === "txt") return undefined;
+          const source = pastedMarkdown(text);
+          const drawn = source ? null : pastedHtml((event as ClipboardEvent).clipboardData?.getData("text/html") ?? "");
+          if (!source && !drawn) return undefined;
+          const html = await fromLibrary(source ? markdownHtml(wikiToLinks(source)) : drawn!, host.dir);
+          dirty = true;
+          return $.html.clean(html, { forceFormat: false, whitelist: null, blacklist: null });
+        }
         const a = wiki ? wikiLink(wiki[1]!.trim(), words) : Object.assign(document.createElement("a"), { href: url!, textContent: words });
         if (!$.html.insertNode(a, { skipCharCount: false })) return undefined;
         $.selection.setRange(a.firstChild!, words.length, a.firstChild!, words.length);

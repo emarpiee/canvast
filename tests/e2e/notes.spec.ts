@@ -682,6 +682,37 @@ test("a note's content pasted into another note keeps its pictures, after the fi
   expect(await p.evaluate(() => window.__canvastDebug.notesAsText()[0]!.text)).toContain("(pic.png)");
 });
 
+test("a note copied from Obsidian: its source, or the page it drew, shows its pictures and the lines of its properties", async ({ app }) => {
+  test.skip(test.info().project.name === "firefox", "Firefox does not let a test make a paste with its data");
+  const p = app.page;
+  const SOURCE = "---\ntitle: Sample\ntags:\n  - alpha\n---\n# Sample\n\n| One | Two |\n| --- | --- |\n| ![[Mix (RGB) One.png]] | text |\n";
+  const DRAWN = '<pre class="frontmatter language-yaml"><code class="language-yaml"><span class="token key">title</span>: Sample\n<span class="token key">tags</span>:\n  - alpha\n</code></pre><h1>Sample</h1><table><tbody><tr><td><span alt="Mix (RGB) One.png" src="Mix (RGB) One.png" class="internal-embed">Mix (RGB) One.png</span></td><td><img src="app://0abc/some/where/Mix%20(RGB)%20One.png?123"></td></tr></tbody></table>';
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles([{ name: "Mix (RGB) One.png", mimeType: "image/png", buffer: CAT }, { name: "to.md", mimeType: "text/markdown", buffer: Buffer.from("# To\n") }]);
+  await p.locator('[data-testid="asset-card"][title="to.md"]').dblclick();
+  await expect(page(p).locator("h1").first()).toBeVisible();
+  const paste = (plain: string, html: string) =>
+    page(p).locator("h1").last().evaluate((el, [plain, html]) => {
+      getSelection()!.collapse(el, el.childNodes.length);
+      const dt = new DataTransfer();
+      dt.setData("text/html", html!);
+      dt.setData("text/plain", plain!);
+      el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    }, [plain, html]);
+  const shows = () => page(p).locator("img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0));
+  const lines = () => page(p).locator("pre").last().evaluate((el) => el.querySelectorAll("br").length);
+  await paste(SOURCE, DRAWN);
+  await expect.poll(shows).toEqual([true]);
+  await expect(page(p).locator("td img")).toHaveCount(1);
+  expect(await lines()).toBe(2);
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.notesAsText()[0]!.text)).toContain("![[Mix (RGB) One.png]]");
+  // No source with it (Obsidian's reading view): the page it drew.
+  await paste("Sample\nOne Two", DRAWN);
+  await expect.poll(shows).toEqual([true, true, true]);
+  expect(await lines()).toBe(2);
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.notesAsText()[0]!.text.match(/!\[\[Mix \(RGB\) One\.png\]\]/g)?.length)).toBe(3); // (a name with brackets, written whole)
+});
+
 test("Settings > Notes: Save notes on close saves without asking; a note's formatting is kept or dropped as chosen, without asking", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-settings").click();

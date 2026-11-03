@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.21 — Notes copied from Obsidian (2026-11-04)
+
+- **Fixed:** a note copied from Obsidian and pasted into a note shows its pictures, also in tables, when their files are in the library: it showed only their names. Its `![[embeds]]`, `[[links]]` and footnotes are saved as Obsidian writes them.
+- **Fixed:** its properties, pasted with it, keep their lines (a `yaml` code block in the note): they ran together on one line.
+
 ## 0.53.20 — Names and sorting are two settings; edge panning has a switch (2026-11-04)
 
 - **Added:** **Pan at the edge while dragging** (Settings > Navigation) is now a switch, on by default; off, the view stays where it is and objects can be dragged past its edge. **Edge panning speed** beside it sets how fast (it was one slider, with 0% for off).
