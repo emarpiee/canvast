@@ -88,7 +88,7 @@ export const test = base.extend<{ app: App }>({
     page.on("console", (m) => {
       if (m.type() === "error") consoleErrors.push(m.text());
     });
-    page.on("pageerror", (e) => consoleErrors.push(String(e)));
+    page.on("pageerror", (e) => consoleErrors.push(String(e) + "\n" + (e.stack ?? "")));
     await page.goto(APP_URL);
     await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
     await page.evaluate(() => window.__canvastDebug.nextFrame());

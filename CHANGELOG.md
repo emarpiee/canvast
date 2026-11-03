@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.8 — Notes test fix (2026-11-03)
+
+- **Fixed:** the hidden note test opened the old version's card while the library was still swapping it for the saved one (a race in the test, not in the app); a test now records the stack of a page error, to find where an error seen only on GitHub's runners comes from.
+
 ## 0.52.7 — Notes editor (2026-11-03)
 
 - **Added:** markdown (`.md`, `.markdown`), plain text (`.txt`) and rich text notes (`.note.html`) open in the library's viewer in a notes editor (SunEditor), in the style chosen in Settings > Notes (Document by default; Classic, Bottom, Balloon, Notion-like). `Ctrl+S` saves the note's own file in place (the same file in the desktop app's `library/`), keeping its name, folder, tags, note and fields; unsaved changes are asked about before the note is left.

@@ -37,6 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.52.8: notes test fix (2026-11-03)
+
+- **Implemented:** the hidden-note test opens the saved version's own card; `tests/e2e/harness.ts` keeps page error stacks.
+- **Tested:** the hidden-note test 10/10 (chromium); notes.spec 24/24 (chromium, chromium-cpu, 3 repeats).
+- **Known failures:** on GitHub only, `TypeError: Cannot read properties of undefined (reading 'getSelection')` once in that test (likely a SunEditor timer after the editor is closed); not reproduced locally.
+- **Committed:** v0.52.8.
+
 ## v0.52.7: notes editor (2026-11-03)
 
 - **Implemented:** `ui/note-editor.ts` mounts SunEditor 3.4.1 (npm, bundled; CSS bundled by `scripts/build.mjs`) with the demo's presets (Settings `notes.style`); markdown in and out with SunEditor's own `helper.markdown` / `helper.converter`, loss checked by comparing the note with its markdown read back in a hidden editor of the same options (attributes in one order); library links (`notes/note-file.ts`: relative paths, `canvast:<hash>`) shown from blob URLs and written back as they were. Gallery plugins are subclassed so their buttons open the shared `openLibraryPicker` (now centred mode, kind label, Import, 300-cell cap); upload hooks import into the library first. Saving: `session.saveVersion` (desktop: `FolderSync.saveFile` writes over the item's file and follows it, `savedInApp`; elsewhere a new item takes the old one's place and the old is deleted). Offline: only the plugins used are bundled; the remaining SunEditor URL strings are text or blocked by the CSP.

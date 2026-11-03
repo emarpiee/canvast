@@ -526,8 +526,7 @@ test("a hidden note open in the Note panel closes when hidden items are no longe
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-search").fill(""); // (the search as it was before hidden mode: the word)
   await enter();
-  await expect.poll(() => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.name === "secret.md").length))).toBe(1);
-  await p.locator('[data-testid="asset-card"]').first().dblclick();
+  await card(p, hashOf("# Secret plan\n\nFirst words. More.\n")).dblclick(); // (the saved version's own card: the old one may still be in the list)
   await expect(page(p).locator("p").first()).toContainText("More.");
   expect(app.consoleErrors).toEqual([]);
 });
