@@ -824,6 +824,20 @@ test("Reset rotation and Reset proportions in the selection bar put a turned or 
   const b3 = await box();
   expect(Math.abs(b3.maxX - b1.maxX)).toBeLessThan(1); // one undo step puts the stretch back
   await key(app, "Control+z");
+  // Reset size: zoomed in since it was placed, it is one pixel of the file for one of the screen again, about its middle; one undo step.
+  const unresize = p.getByRole("button", { name: /Reset size/ });
+  await expect(unresize).toBeVisible();
+  await unresize.click();
+  await app.frame();
+  const b4 = await box();
+  const pw = (img as unknown as { pixelW: number; pixelH: number });
+  expect(Math.abs(b4.maxX - b4.minX - pw.pixelW), "file pixels").toBeLessThan(1);
+  expect(Math.abs(b4.maxY - b4.minY - pw.pixelH), "file pixels").toBeLessThan(1);
+  expect(Math.abs((b4.minX + b4.maxX) / 2 - (b0.minX + b0.maxX) / 2), "same middle").toBeLessThan(1);
+  await expect(unresize).toBeHidden();
+  await key(app, "Control+z");
+  await app.frame();
+  expect(Math.abs((await box()).maxX - b0.maxX)).toBeLessThan(1);
   // Turn it: drag just outside a corner.
   c = await frame();
   const corner = c[0] as [number, number]; // (the top-left one: the selection bar, longer for a picture, sits under the box)

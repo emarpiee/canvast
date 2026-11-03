@@ -26,7 +26,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { imageAt, pasteCssPaint, copiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
+import { imageAt, pasteCssPaint, copiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -1657,6 +1657,20 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     editor.changed();
   };
   const fileKinds = new Map<string, { card: boolean; open: boolean; svg: boolean; note: boolean }>();
+  // (what the library says of an asset, read once: until it is read, nothing)
+  const fileKindOf = (hash: string): { card: boolean; open: boolean; svg: boolean; note: boolean } => {
+    if (!fileKinds.has(hash)) {
+      fileKinds.set(hash, { card: false, open: false, svg: false, note: false });
+      void session.catalog?.entry(hash).then((e) => {
+        if (!e) return;
+        fileKinds.set(hash, { card: isCard(e), open: desktopBridge() ? !meta(e).hidden : fileActionsOf(e.name, e.type).canOpen, svg: e.type === "image/svg+xml", note: !!noteKindOf(e.name) });
+        contextBar.update();
+      });
+    }
+    return fileKinds.get(hash)!;
+  };
+  /** A note card's size when placed (Settings > Notes, Note card size); null for any other picture. */
+  const noteWidth = (o: ImageObject): number | null => (fileKindOf(o.assetId).note ? settings.get("notes.cardWidth") : null);
   // The selection action bar follows the selection box (updated after each drawn frame).
   // Menus and pickers keep off the selected items.
   setMenuAvoid(() => {
@@ -1722,6 +1736,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       applyRotation: () => void applyRotation(doc, editor),
       resetProportions: () => void resetProportions(doc, editor),
       resettable: () => resettable(doc, editor),
+      resetSize: () => void resetSize(doc, editor, view, noteWidth),
+      canResetSize: () => sizeResets(doc, editor, view, noteWidth).length > 0,
       tag: () => {
         editor.tagsOpen = true;
         editor.changed();
@@ -1731,15 +1747,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         const ids = [...editor.selection];
         const o = ids.length === 1 ? doc.get(ids[0]!) : undefined;
         if (o?.kind !== "image") return null;
-        if (!fileKinds.has(o.assetId)) {
-          fileKinds.set(o.assetId, { card: false, open: false, svg: false, note: false });
-          void session.catalog?.entry(o.assetId).then((e) => {
-            if (!e) return;
-            fileKinds.set(o.assetId, { card: isCard(e), open: desktopBridge() ? !meta(e).hidden : fileActionsOf(e.name, e.type).canOpen, svg: e.type === "image/svg+xml", note: !!noteKindOf(e.name) });
-            contextBar.update();
-          });
-        }
-        const k = fileKinds.get(o.assetId)!;
+        const k = fileKindOf(o.assetId);
         return k.card ? { hash: o.assetId, open: k.open, note: k.note } : null;
       },
       pictureTools: () => {

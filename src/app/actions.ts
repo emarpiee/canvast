@@ -532,6 +532,39 @@ export function resetProportions(doc: DocumentStore, editor: EditorState): numbe
   return next.length;
 }
 
+/**
+ * The selected pictures (stills, video, GIF, sound, note cards) at the size they are placed at, at the current zoom: one pixel of the file (of
+ * its crop) for one pixel of the screen, a note card `noteWidth` px wide (Settings > Notes, Note card size). The middle and the turn stay; what is
+ * already that size is left out. In the view's frame only (a picture in another frame keeps its size).
+ */
+export function sizeResets(doc: DocumentStore, editor: EditorState, view: ViewState, noteWidth: (o: ImageObject) => number | null): ImageObject[] {
+  const cam = view.camera;
+  const unit = -cam.zi;
+  const f = 2 ** cam.zf; // (CSS px per local unit at `unit`, as imageAt places)
+  return selected(doc, editor).flatMap((o): ImageObject[] => {
+    if (o.kind !== "image" || o.locked || (o.frame ?? doc.space.world) !== view.frame) return [];
+    const c = cropOf(o);
+    const nw = noteWidth(o);
+    const w = (nw ?? c.w) / f;
+    const h = (nw ? (nw * c.h) / c.w : c.h) / f;
+    const k = 2 ** (o.unit - unit); // (the old size in the new unit)
+    if (Math.abs((o.w * k) / w - 1) < 0.002 && Math.abs((o.h * k) / h - 1) < 0.002) return [];
+    // The middle stays: the old corner plus half the old size, less half the new size.
+    const at = (a: D.Dyadic, old: number, now: number): D.Dyadic => D.sub(D.add(a, D.shift(D.fromNumber(old / 2), o.unit)), D.shift(D.fromNumber(now / 2), unit));
+    return [normalizeUnit({ ...o, unit, w, h, anchor: { x: at(o.anchor.x, o.w, w), y: at(o.anchor.y, o.h, h) } }) as ImageObject];
+  });
+}
+
+/** Give the selected pictures their placed size back (`sizeResets`): one undo step. Returns how many changed. */
+export function resetSize(doc: DocumentStore, editor: EditorState, view: ViewState, noteWidth: (o: ImageObject) => number | null): number {
+  if (editor.blockEdit()) return 0;
+  const next = sizeResets(doc, editor, view, noteWidth);
+  if (!next.length) return 0;
+  doc.commit(doc.transaction(next.length === 1 ? "Reset size" : `Reset size of ${next.length} pictures`, next));
+  editor.changed();
+  return next.length;
+}
+
 /** Whether any selected item is turned, or any selected picture stretched (the selection bar shows the reset buttons then). */
 export function resettable(doc: DocumentStore, editor: EditorState): { turned: boolean; stretched: boolean; bakeable: boolean } {
   const sel = selected(doc, editor);

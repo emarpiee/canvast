@@ -474,6 +474,10 @@ test("the Note tool (M) makes a note file in the Notes folder, places its card a
   await expect(p.getByTestId("note-panel")).toBeHidden();
   await p.mouse.click(4, 300);
   await expect(win).toBeHidden();
+  // Reset size: a note card goes back to the Note card size (320 px wide), not to its picture's pixels.
+  await p.mouse.click(Math.round((mb.minX + mb.maxX) / 2), Math.round((mb.minY + mb.maxY) / 2));
+  await p.getByRole("button", { name: /Reset size/ }).click();
+  await expect.poll(async () => { const b = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), made.id))!.box; return Math.round(b.maxX - b.minX); }).toBe(320);
   expect(app.consoleErrors).toEqual([]);
 });
 

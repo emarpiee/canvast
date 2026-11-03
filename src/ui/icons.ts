@@ -276,6 +276,7 @@ import ellipsisIcon from "lucide-static/icons/ellipsis.svg";
 import columns3 from "lucide-static/icons/columns-3.svg";
 import fileIcon from "lucide-static/icons/file.svg";
 import maximize from "lucide-static/icons/maximize.svg";
+import imageUpscale from "lucide-static/icons/image-upscale.svg";
 import panelRight from "lucide-static/icons/panel-right.svg";
 import starIcon from "lucide-static/icons/star.svg";
 import trash2 from "lucide-static/icons/trash-2.svg";
@@ -528,6 +529,7 @@ export const ICONS = {
   chevronUp: clean(chevronUp),
   panelRight: clean(panelRight),
   maximize: clean(maximize),
+  imageUpscale: clean(imageUpscale),
   columns3: clean(columns3),
   fileIcon: clean(fileIcon),
   ellipsis: clean(ellipsisIcon),

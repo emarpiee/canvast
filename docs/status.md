@@ -37,6 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.52.9: Reset size, canvas counts (2026-11-03)
+
+- **Implemented:** `sizeResets` / `resetSize` (`app/actions.ts`): pictures and note cards (`notes.cardWidth`) back to their placed size at the current zoom, middle kept, view frame only; Actions bar button (`image-upscale`). The canvas lists' object count follows each commit (`session.ts` onCommitted).
+- **Tested:** editing.spec Reset rotation/proportions/size, notes.spec Note tool (note card 320 px), storage.spec boards and canvases (count after delete; failed before the fix): chromium + firefox.
+- **Unverified:** pictures in another frame than the view are left as they are.
+- **Committed:** v0.52.9.
+
 ## v0.52.8: notes test fix (2026-11-03)
 
 - **Implemented:** the hidden-note test opens the saved version's own card; `tests/e2e/harness.ts` keeps page error stacks.

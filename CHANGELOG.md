@@ -1,8 +1,12 @@
 # Changelog
 
+## 0.52.9 — Reset size (2026-11-03)
+
+- **Added:** **Reset size** in the Actions bar: the selected pictures, videos, GIFs, sounds and note cards go back to the size they are placed at, at the current zoom (one pixel of the file for one of the screen; a note card at its Note card size), about their middle, in one undo step. It shows when it would change something.
+- **Fixed:** the canvas list kept the number of objects a canvas had when the list was last read (deleting most of a canvas still showed hundreds until a reload); it follows every save now.
+
 ## 0.52.8 — Notes test fix (2026-11-03)
 
-- **Fixed:** the canvas list kept the number of objects a canvas had when the list was last read (deleting most of a canvas still showed hundreds until a reload); it follows every save now.
 - **Fixed:** the hidden note test opened the old version's card while the library was still swapping it for the saved one (a race in the test, not in the app); a test now records the stack of a page error, to find where an error seen only on GitHub's runners comes from.
 
 ## 0.52.7 — Notes editor (2026-11-03)

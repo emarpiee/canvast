@@ -267,3 +267,4 @@ One icon per function: two buttons that do different things never share an icon,
 | `square-check-big` | Select several: from then on a tap or a click adds or removes items (a card's menu in the library; the way to pick several on a touch screen) |
 | `file-pen-line` | Edit note: the note selected on a canvas, opened in the note panel (Actions bar) |
 | `file-input` | Make note files: texts on a card become notes in the library (Actions bar) |
+| `image-upscale` | Reset size: pictures and note cards back to the size they are placed at (Actions bar) |

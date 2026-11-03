@@ -28,6 +28,9 @@ export interface ContextActions {
   /** Make the current turn of the shapes their own (the new zero). */
   applyRotation(): void;
   resetProportions(): void;
+  /** Give the selected pictures and note cards the size they are placed at (at this zoom), and whether that changes any. */
+  resetSize(): void;
+  canResetSize(): boolean;
   /** What the selection can be reset from. */
   resettable(): { turned: boolean; stretched: boolean; bakeable: boolean };
   /** The one selected item is a file the app cannot show (kept as a card): its asset, and whether a tab can open it (ADR 0078). */
@@ -173,7 +176,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       btn("vectorise", ICONS.vectorPolygon, "Turn this SVG picture into editable vector shapes, in its place (the file stays in the library)")) +
     group("Regions", btn("builderdone", ICONS.check, "Done: keep the regions as they are now (Enter)"), btn("buildercancel", ICONS.x, "Cancel the Shape builder (Esc)")) +
     group("Edit shapes", btn("pathmenu", ICONS.pathMenu, "Path tools: simplify, outline stroke, taper, vector network, divide, shape builder, text to path", 'aria-haspopup="menu" aria-expanded="false"'), btn("maskmenu", ICONS.maskMenu, "Masks: make one from the top shape, or change the one selected", 'aria-haspopup="menu" aria-expanded="false"'), btn("boolmenu", ICONS.boolMenu, "Shapes: join, intersect, subtract or exclude the selected shapes, and manage the group they make", 'aria-haspopup="menu" aria-expanded="false"'), btn("sheetmenu", ICONS.sheetMenu, "Sheets: put the selected things on a sheet, release the sheet, fit it to what is on it", 'aria-haspopup="menu" aria-expanded="false"')) +
-    group("Arrange", btn("alignmenu", ICONS.alignMenu, "Align and distribute: a list of the ways to line the selected things up", 'aria-haspopup="menu" aria-expanded="false"'), btn("arrangemenu", ICONS.arrangeMenu, "Arrange in a grid: the ways to order the items, and the space between them", 'aria-haspopup="menu" aria-expanded="false"'), btn("statemenu", ICONS.stateMenu, "Initial state: save the shape as it is now, replace the saved one, or go back to it", 'aria-haspopup="menu" aria-expanded="false"'), btn("front", ICONS.bringToFront, "Bring to front"), btn("back", ICONS.sendToBack, "Send to back"), btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("baserot", ICONS.rotateCwSquare, "Apply rotation: make the current turn the shape's own, the new zero (it looks the same; its box fits it)"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
+    group("Arrange", btn("alignmenu", ICONS.alignMenu, "Align and distribute: a list of the ways to line the selected things up", 'aria-haspopup="menu" aria-expanded="false"'), btn("arrangemenu", ICONS.arrangeMenu, "Arrange in a grid: the ways to order the items, and the space between them", 'aria-haspopup="menu" aria-expanded="false"'), btn("statemenu", ICONS.stateMenu, "Initial state: save the shape as it is now, replace the saved one, or go back to it", 'aria-haspopup="menu" aria-expanded="false"'), btn("front", ICONS.bringToFront, "Bring to front"), btn("back", ICONS.sendToBack, "Send to back"), btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("baserot", ICONS.rotateCwSquare, "Apply rotation: make the current turn the shape's own, the new zero (it looks the same; its box fits it)"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)"), btn("unresize", ICONS.imageUpscale, "Reset size: as placed at this zoom (one pixel of the file for one of the screen; a note card at its Note card size)")) +
     group("Attach",
       btn("attach", ICONS.link, "Attach the selected objects to another object: they follow the object you click next when it moves", 'aria-pressed="false"'),
       btn("detach", ICONS.unlink, "Detach the selected objects: they stop following another object")) +
@@ -332,6 +335,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "unrotate": actions.resetRotation(); break;
       case "baserot": actions.applyRotation(); break;
       case "unstretch": actions.resetProportions(); break;
+      case "unresize": actions.resetSize(); break;
       case "duplicate": actions.duplicate(); break;
       case "group": actions.group(); break;
       case "ungroup": actions.ungroup(); break;
@@ -430,6 +434,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("unrotate").hidden = !reset.turned;
     q("baserot").hidden = !reset.bakeable;
     q("unstretch").hidden = !reset.stretched;
+    q("unresize").hidden = !actions.canResetSize();
     // with two or more kinds picked, the kind chosen in the Properties bar shows only its tools (All, or none chosen: everything)
     const kinds = new Set(sel.map((o) => (isContainer(o) ? "sheet" : o!.kind === "path" ? "shape" : o!.kind === "image" ? "picture" : o!.kind))); // (as the Properties bar tells them apart)
     const only = kinds.size > 1 && editor.subject && editor.subject !== "all" ? (BAR_KINDS[editor.subject] ?? null) : null;
