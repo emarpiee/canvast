@@ -3,7 +3,7 @@ import suneditor, { helper } from "suneditor";
 import { markdownHtml } from "../notes/note-markdown";
 import { align, anchor, audio, audioGallery, autocomplete, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
 import type { SunEditor } from "suneditor/types";
-import { FENCE_TICK, WIKI, libraryLink, linkTarget, linksToWiki, obsidianMarkdown, richNoteBody, richNoteFile, textHtml, wikiToLinks } from "../notes/note-file";
+import { FENCE_TICK, WIKI, keepSpelling, libraryLink, linkTarget, linksToWiki, obsidianMarkdown, richNoteBody, richNoteFile, textHtml, wikiToLinks } from "../notes/note-file";
 import type { NoteKind, NoteStyle, PathTarget } from "../notes/note-file";
 import { splitFrontmatter } from "../notes/frontmatter";
 
@@ -282,6 +282,20 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       [...page.body.querySelectorAll<HTMLElement>("[src], [href]")].map(async (n) => {
         const attr = n.hasAttribute("src") ? "src" : "href";
         const link = n.getAttribute(attr)!;
+        // An embed (`![[cat.png]]`): its picture when it is one; else it stays as written.
+        if (attr === "src" && link.startsWith(WIKI)) {
+          const name = decodeURIComponent(link.slice(WIKI.length));
+          const found = await host.findWiki(name);
+          const shownUrl = found?.type.startsWith("image/") ? await urlOf(found, link) : null;
+          if (shownUrl) {
+            n.setAttribute("src", shownUrl);
+            knowPath(name);
+          } else {
+            const alt = n.getAttribute("alt") ?? "";
+            n.replaceWith(`![[${name}${alt && alt !== name.split("/").pop() ? `|${alt}` : ""}]]`);
+          }
+          return;
+        }
         const target = linkTarget(link, dir);
         const item = target && (await host.find(target));
         const url = item && (await urlOf(item, here || "hash" in target ? link : undefined));
@@ -301,24 +315,29 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     knowPath(target);
     return a;
   };
-  // The picture dialog shows the link the note writes (the address the editor uses lasts only while the note is open); a link typed there is found in the library.
-  const pictureLink = (url: string): string => links.get(url) ?? url;
-  class NoteImage extends image {
-    private shownLink = "";
-    override modalOn(isUpdate: boolean): void {
+  // A picture's, video's or sound's dialog shows the link the note writes (the address the editor uses lasts only while the note is open); a link typed there is found in the library.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- (a mixin's base must take any arguments)
+  const linkDialog = <T extends new (...args: any[]) => any>(base: T, urlField: string): T => class extends base {
+    shownLink = "";
+    get linkField(): HTMLInputElement | null {
+      return (this as unknown as Record<string, HTMLInputElement | null>)[urlField] ?? null;
+    }
+    modalOn(isUpdate: boolean): void {
       super.modalOn(isUpdate);
       requestAnimationFrame(() => {
-        const field = this.imgUrlFile as HTMLInputElement | null;
+        const field = this.linkField;
         if (!field) return;
-        this.shownLink = field.value = this.previewSrc.textContent = pictureLink(field.value);
+        this.shownLink = field.value = links.get(field.value) ?? field.value;
+        const preview = this.previewSrc ?? this.preview;
+        if (preview) preview.textContent = field.value;
       });
     }
     // (the dialog's field puts a `/` before what has no web address's start)
-    override submitURL(url: string): ReturnType<image["submitURL"]> {
+    submitURL(url: string): unknown {
       return super.submitURL(url.replace(/^\/blob:/, "blob:"));
     }
-    override async modalAction(): Promise<boolean> {
-      const field = this.imgUrlFile as HTMLInputElement | null;
+    async modalAction(): Promise<boolean> {
+      const field = this.linkField;
       const typed = field?.value.trim() ?? "";
       if (field && typed && typed !== this.shownLink) {
         const target = linkTarget(typed, host.dir);
@@ -329,9 +348,12 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
           field.dispatchEvent(new Event("input", { bubbles: true }));
         }
       }
-      return super.modalAction();
+      return super.modalAction() as Promise<boolean>;
     }
-  }
+  };
+  const NoteImage = linkDialog(image, "imgUrlFile");
+  const NoteVideo = linkDialog(video, "videoUrlFile");
+  const NoteAudio = linkDialog(audio, "audioUrlFile");
   const value = await shown(opts.kind, opts.text, host.dir);
   for (const m of value.matchAll(/href="canvast-wiki:([^"]+)"/g)) knowPath(decodeURIComponent(m[1]!));
   const linkables = (await host.linkables()).map((l) => ({ key: l.key, name: l.name }));
@@ -387,7 +409,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   const content: SunEditor.InitOptions = {
     // (not math, embeds or PDF export: they need a server or another library)
     plugins: [
-      ...[align, anchor, audio, backgroundColor, blockquote, blockStyle, codeBlock, drawing, NoteFileUpload, NoteFont, fontColor, fontSize, hr, NoteImage, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, NoteSlash, table, template, textStyle, video, NoteAutocomplete],
+      ...[align, anchor, NoteAudio, backgroundColor, blockquote, blockStyle, codeBlock, drawing, NoteFileUpload, NoteFont, fontColor, fontSize, hr, NoteImage, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, NoteSlash, table, template, textStyle, NoteVideo, NoteAutocomplete],
       ...[imageGallery, videoGallery, audioGallery, fileGallery, fileBrowser].map((g) => libraryGallery(g as GalleryClass, choose)),
     ],
     font: { items: fonts },
@@ -554,12 +576,20 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   /** The editor's HTML without what only says what is selected now. */
   const settled = (h: string): string => h.replace(/ ?\b(?:se-component-selected|se-figure-selected)\b/g, "").replace(/ data-se-index="[^"]*"/g, "");
   savedHtml = settled(editor.$.html.get());
+  const initialHtml = savedHtml;
+  /** The file's words as they are now, and how the editor writes them: what a save does not change keeps the file's own spelling. */
+  let fileBody = opts.kind === "md" ? splitFrontmatter(opts.text).body : "";
+  let canon0: string | null = null;
+  let lastMd: { canon: string; text: string } | null = null;
   /** The editor's HTML with the library's addresses back to the links written in the file. */
   const output = (): string => {
     const $ = editor.$;
     $.viewer.codeView(false);
     $.viewer.markdownView(false);
-    let out = settled($.html.get());
+    return mapped(settled($.html.get()));
+  };
+  const mapped = (h: string): string => {
+    let out = h;
     for (const [url, link] of links) out = out.split(url).join(link);
     return out;
   };
@@ -577,6 +607,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     const aligns = [...t.content.querySelectorAll("table")].map((tb) => [...(tb.querySelector("tr")?.children ?? [])].map((c) => ((c as HTMLElement).style.textAlign || null) as "left" | "center" | "right" | null));
     return obsidianMarkdown(helper.markdown.jsonToMarkdown(helper.converter.htmlToJson(h)), aligns);
   };
+  const mdOf = (h: string): string => linksToWiki(toMarkdown(h)).replace(/[\u200B\uFEFF]/g, "");
   // Two notes are compared as a hidden editor of the same kind holds them (it writes pictures, tables and lists its own way).
   let twin: ReturnType<typeof suneditor.create> | null = null;
   const held = (h: string): string => {
@@ -613,6 +644,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       .replace(/[\u200B\uFEFF]/g, "")
       .replace(/(?:&nbsp;|\u00a0|\s|<br>)+(<\/(?:p|h[1-6]|li|td|th|div|blockquote)>)/g, "$1") // (nor a line break there)
       .replace(/(<(?:p|h[1-6]|li|td|th|div|blockquote)(?: [^>]*)?>)(?:&nbsp;|\u00a0|\s|<br>)+/g, "$1") // (nor at a block's start)
+      .replace(/(?:<br>)+((?:<\/code>)?<\/pre>)/g, "$1") // (nor a code block's last empty line)
       .replace(/<p><\/p>/g, "") // (an empty paragraph: markdown keeps no empty lines)
       .replace(/&nbsp;|\u00a0/g, " "); // (a space the editor keeps from collapsing is a space)
   };
@@ -626,7 +658,10 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       const now = editor.$.html.get();
       if (kind === "md") {
         // Markdown keeps it all when the note, written as markdown and read back, is the same note (an alignment, a font size… would go).
-        return { text: linksToWiki(toMarkdown(out)).replace(/[\u200B\uFEFF]/g, ""), keepsAll: held(markdownHtml(toMarkdown(now))) === held(now) };
+        const canon = mdOf(out);
+        canon0 ??= mdOf(mapped(initialHtml));
+        lastMd = { canon, text: keepSpelling(canon, canon0, fileBody) };
+        return { text: lastMd.text, keepsAll: held(markdownHtml(toMarkdown(now))) === held(now) };
       }
       const box = document.createElement("div");
       box.innerHTML = out;
@@ -637,7 +672,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       const text = lines.join("\n");
       return { text, keepsAll: held(textHtml(text)) === held(now) };
     },
-    asRich: (title) => richNoteFile(title, output().replace(/href="canvast-wiki:([^"]+)"/g, (m, t: string) => { const p = wikiPath.get(decodeURIComponent(t)); return p ? `href="${p}"` : m; })),
+    asRich: (title) => richNoteFile(title, output().replace(/(href|src)="canvast-wiki:([^"]+)"/g, (m, a: string, t: string) => { const p = wikiPath.get(decodeURIComponent(t)); return p ? `${a}="${p}"` : m; })),
     current() {
       editsAtCurrent = edits;
       return settled(editor.$.html.get());
@@ -648,6 +683,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       const typed = as !== undefined && edits !== editsAtCurrent;
       savedHtml = typed ? as : now;
       dirty = typed;
+      if (lastMd) ((fileBody = lastMd.text), (canon0 = lastMd.canon), (lastMd = null)); // (what the file says now)
     },
     destroy() {
       window.removeEventListener("keydown", keys, true);

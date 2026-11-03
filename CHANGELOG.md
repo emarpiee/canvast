@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.53.4 — Notes: a save changes only what was edited (2026-11-04)
+
+- **Changed:** saving a markdown note changes only the blocks that were edited: the rest stays as the file wrote it (`*` lists, `__bold__`, spacing, an underlined heading).
+- **Added:** an Obsidian `![[embed]]` of a picture shows that picture in the notes editor; the file keeps the `![[…]]`.
+- **Changed:** the video and sound dialogs show the file's link instead of a temporary `blob:` address, as the picture dialog does.
+- **Fixed:** a paragraph indented under a list item stays in that item.
+- **Fixed:** a false "rich text?" question on a table of one column with an alignment, and on a code block ending in an empty line.
+
 ## 0.53.3 — Notes fixes: pictures, saving, keys (2026-11-03)
 
 - **Fixed:** a note's pictures no longer break when it is closed. A link is now found by the file it names on disk (`my cat.png` is the file `my_cat.png`, the second `image.png` is `image-2.png`, which the old search by the item's name missed), also on the note's card; a copy of an item's file shows that item, and `<with space.png>` and names with brackets are read.

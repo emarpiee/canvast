@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { libraryLink, linkTarget, noteKindOf, noteLinks as linksIn, obsidianMarkdown, readableMarkdown, relativeLink, relinkNote as relink, richNameOf, richNoteBody, richNoteFile } from "../../src/notes/note-file";
+import { keepSpelling, libraryLink, linkTarget, noteKindOf, noteLinks as linksIn, obsidianMarkdown, readableMarkdown, relativeLink, relinkNote as relink, richNameOf, richNoteBody, richNoteFile } from "../../src/notes/note-file";
 
 describe("note files", () => {
   it("knows the notes by name", () => {
@@ -33,10 +33,10 @@ describe("note files", () => {
 import { linksToWiki, wikiTarget, wikiToLinks } from "../../src/notes/note-file";
 
 describe("[[links]] between notes", () => {
-  it("become editor links and come back as written, never in code or embeds", () => {
+  it("become editor links and come back as written, never in code; an embed as a picture", () => {
     const md = "See [[Plan]] and [[Projects/Brief|the brief]], ![[cat.png]], `[[not a link]]`.\n\n```\n[[code]]\n```\n";
     const shown = wikiToLinks(md);
-    expect(shown).toBe("See [Plan](canvast-wiki:Plan) and [the brief](canvast-wiki:Projects%2FBrief), ![[cat.png]], `[[not a link]]`.\n\n```\n[[code]]\n```\n");
+    expect(shown).toBe("See [Plan](canvast-wiki:Plan) and [the brief](canvast-wiki:Projects%2FBrief), ![cat.png](canvast-wiki:cat.png), `[[not a link]]`.\n\n```\n[[code]]\n```\n");
     expect(linksToWiki(shown)).toBe(md);
     expect(linksToWiki("[Brief](canvast-wiki:Projects%2FBrief)")).toBe("[[Projects/Brief]]");
     expect(wikiTarget("Projects/Plan.md#Goals")).toEqual({ name: "plan", dirs: ["projects"] });
@@ -58,6 +58,22 @@ describe("a note's links to other items", () => {
     const moved = relinkNote("md", md, { oldWiki: null, newWiki: "", oldPath: "../Pictures/cat.png", newPath: "../Art/cat.png" });
     expect(noteLinks("md", moved).paths).toEqual(["../Art/cat.png", "Brief.md", "../Art/cat.png"]);
     expect(relinkNote("rich", '<a href="Brief.md">', { oldWiki: "brief", newWiki: "X", oldPath: "Brief.md", newPath: "Docs/Brief.md" })).toBe('<a href="Docs/Brief.md">');
+  });
+
+  it("a save changes only what was edited: the rest keeps the file's own spelling", () => {
+    const file = "* a\n* b\n\n\n__bold__ words\n\nT\n===\n\n| x |\n|:--|\n| 1 |\n\nlast\n";
+    const canon = "- a\n- b\n\n**bold** words\n\n# T\n\n| x |\n| :--- |\n| 1 |\n\nlast\n";
+    expect(keepSpelling(canon, canon, file)).toBe(file);
+    expect(keepSpelling(canon.replace("last", "edited"), canon, file)).toBe(file.replace("last", "edited"));
+    expect(keepSpelling(canon.replace("**bold** words\n\n", ""), canon, file)).toBe("* a\n* b\n\n\nT\n===\n\n| x |\n|:--|\n| 1 |\n\nlast\n");
+    // A table of one column keeps its alignment too.
+    expect(obsidianMarkdown("| a |\n| --- |\n| 1 |", [["center"]])).toBe("| a |\n| :---: |\n| 1 |");
+    expect(keepSpelling(`new\n\n${canon}`, canon, file)).toBe(`new\n\n${file}`);
+    // One block of the file that the editor writes as two.
+    expect(keepSpelling("- a\n\n> q\n\nz\n", "- a\n\n> q\n\nb\n", "- a\n> q\n\nb\n")).toBe("- a\n> q\n\nz\n");
+    // Embeds, and back.
+    expect(linksToWiki(wikiToLinks("![[a b.png]] ![[c.png|200]]"))).toBe("![[a b.png]] ![[c.png|200]]");
+    expect(readableMarkdown("1. a\n\n   para\n2. b")).toBe("1. a<br><br>para\n2. b");
   });
 
   it("makes what the editor's reader misreads plain, and leaves code alone", () => {

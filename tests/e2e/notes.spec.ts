@@ -569,7 +569,7 @@ test("the note keeps what is done at it: Undo and Delete with the focus off its 
 test("Markdown view: what is typed there counts as a change; what a file writes survives a save (lines, marks, code, tables, brackets)", async ({ app }) => {
   const p = app.page;
   const SAME = "# Same\n\nfirst line\nsecond line\n\n==marked== and <kbd>Ctrl</kbd>\n\n> [!note] Title\n> body\n\n```c++ x\nint a;\n\n  int b;\n```\n\n````md\n```x\ny\n```\n````\n\n| a | b |\n| :--- | ---: |\n| *i* **b** | 2 |\n\n[[Foo (bar)]] and [x](obsidian://open?f=1)\n";
-  const FIXED = "T\n===\n\n2 * 3 * 4 ![c](cat%20(2).png)\n\n| a |\n|:--|\n| 1 | 2 |\n";
+  const FIXED = "T\n===\n\n* star   list\n\n2 * 3 * 4 ![c](cat%20(2).png)\n\n![[cat (2).png]]\n\n1. a\n\n   para\n\n| a |\n|:--|\n| 1 | 2 |\n";
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles([
     { name: "cat (2).png", mimeType: "image/png", buffer: CAT },
@@ -587,15 +587,25 @@ test("Markdown view: what is typed there counts as a change; what a file writes 
   };
   await card(p, hashOf(SAME)).dblclick();
   await expect(page(p).locator("h1")).toHaveText("Same");
-  expect(await text()).toMatchObject({ text: SAME, keepsAll: true });
+  expect((await text()).keepsAll).toBe(true);
+  await page(p).locator("h1").click();
+  await p.keyboard.press("End");
+  await p.keyboard.type("!");
+  await expect.poll(async () => (await text()).text).toBe(SAME.replace("# Same", "# Same!"));
+  await p.keyboard.press("Backspace");
   await close();
   await card(p, hashOf(FIXED)).dblclick();
   await expect(page(p).locator("h1")).toHaveText("T");
-  await expect.poll(() => page(p).locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0); // (a name with brackets)
-  const fixed = await text();
-  expect(fixed.text).toContain("2 * 3 * 4");
-  expect(fixed.text).toContain("![c](cat%20%282%29.png)");
-  expect(fixed.text).toContain("| 1 | 2 |");
+  await expect.poll(() => page(p).locator("img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0))).toEqual([true, true]); // (a name with brackets, an embed)
+  await expect(page(p).locator("li").filter({ hasText: "para" })).toHaveCount(1); // (a paragraph under its list item)
+  // Nothing edited: written as the file has it. One word edited: only that part changes.
+  expect((await text()).text).toBe(FIXED);
+  await page(p).locator("h1").click();
+  await p.keyboard.press("End");
+  await p.keyboard.type("!");
+  await expect.poll(async () => (await text()).text).toBe(FIXED.replace("T\n===", "# T!"));
+  await p.keyboard.press("Control+s");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === "fixed.md")?.hash))).not.toBe(hashOf(FIXED));
   await close();
   // Typed in the Markdown view, on the way out or back in the page.
   await card(p, hashOf(SAME)).dblclick();

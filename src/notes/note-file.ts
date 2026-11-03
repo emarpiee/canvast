@@ -106,7 +106,7 @@ export function richNoteBody(file: string): string {
 }
 
 // Links between notes as Obsidian writes them: `[[Plan]]`, `[[Plan|shown text]]`, `[[Projects/Plan]]` when two notes share a name.
-// In the editor they are ordinary links to `canvast-wiki:<target>`; the markdown file keeps the `[[…]]`. (`![[…]]`, an embed, is left alone.)
+// In the editor they are ordinary links to `canvast-wiki:<target>`, an embed `![[…]]` a picture from there; the markdown file keeps the `[[…]]`.
 export const WIKI = "canvast-wiki:";
 
 /** `text` with `fn` run on the parts outside fenced code blocks (`inFence`, on the blocks). A block ends with a fence at least as long as its own. */
@@ -156,8 +156,18 @@ const wholeTables = (part: string): string =>
     return rows.join("\n");
   });
 
+/** A paragraph indented under a list item stays in that item (the reader would end the list there). */
+const listParagraphs = (part: string): string => {
+  const re = /^([ \t]*(?:[-*+]|\d+\.)[ \t][^\n]*)\n[ \t]*\n[ \t]{2,}(?![-*+][ \t]|\d+\.[ \t]|`{3}|~{3})(\S[^\n]*)$/gm;
+  for (let was = ""; was !== part; ) {
+    was = part;
+    part = part.replace(re, "$1<br><br>$2");
+  }
+  return part;
+};
+
 function readablePart(part: string): string {
-  return wholeTables(part)
+  return wholeTables(listParagraphs(part))
       .replace(/^([^\s|>#\-*+\d`~][^\n]*)\n(=+|-{2,})[ \t]*$/gm, (_m, title: string, line: string) => `${line[0] === "=" ? "#" : "##"} ${title.trim()}`)
       .replace(/^(\|?[^\n|]*\|[^\n]*\n)(\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?)[ \t]*$/gm, (_m, head: string, row: string) => head + row.replace(/-+/g, "---"))
       .split(/(`+[^`\n]*?`+)/)
@@ -171,9 +181,9 @@ function readablePart(part: string): string {
 /** A markdown note's `[[…]]` links as markdown links the editor shows (`[shown](canvast-wiki:target)`). */
 export const wikiToLinks = (md: string): string =>
   outsideCode(md, (s) =>
-    s.replace(/(?<!!)\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]+?))?\]\]/g, (_m, target: string, alias?: string) => {
+    s.replace(/(!?)\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]+?))?\]\]/g, (_m, bang: string, target: string, alias?: string) => {
       const t = target.trim();
-      return `[${(alias ?? t.split("/").pop()!).replace(/[[\]]/g, "")}](${WIKI}${encodeLinkPart(t)})`;
+      return `${bang}[${(alias ?? t.split("/").pop()!).replace(/[[\]]/g, "")}](${WIKI}${encodeLinkPart(t)})`;
     }),
   );
 
@@ -266,11 +276,74 @@ export function obsidianMarkdown(md: string, aligns: readonly ColumnAligns[] = [
         .replace(/(?:^(?:> ?)+[ \t]*\n)+(?=\n)/gm, "") // (a quote's empty last lines)
         .replace(/(?:\n(?:> ?)+[ \t]*)+(?=\n*$)/, "")
         .replace(/^\|.*\|[ \t]*$/gm, (row) => row.replace(/\u00a0/g, " ")) // (the space kept between marked words in a cell)
-        .replace(/^(\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)+\|?)[ \t]*$/gm, (row) => {
+        .replace(/^(?=[^\n]*\|)(\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)*\|?)[ \t]*$/gm, (row) => {
           const a = aligns[table++];
           if (!a?.some(Boolean)) return row;
           const cells = row.replace(/^\|/, "").replace(/\|$/, "").split("|");
           const sep = cells.map((_c, k) => (a[k] === "center" ? ":---:" : a[k] === "right" ? "---:" : a[k] === "left" ? ":---" : "---"));
           return `| ${sep.join(" | ")} |`;
         }), block);
+}
+
+/** A markdown text's blocks (parted by empty lines, a code block whole), each with the empty lines after it. */
+function blocksOf(text: string): Array<{ text: string; after: string }> {
+  const out: Array<{ text: string; after: string }> = [];
+  let cur: string[] = [];
+  let fence = "";
+  const lines = text.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const f = /^[ \t]*(`{3,}|~{3,})/.exec(line)?.[1];
+    if (f && (!fence || (f[0] === fence[0] && f.length >= fence.length))) fence = fence ? "" : f;
+    if (fence || line.trim()) {
+      cur.push(line);
+      continue;
+    }
+    let after = "\n";
+    while (i + 1 < lines.length && !lines[i + 1]!.trim()) after += `${lines[++i]}\n`;
+    if (cur.length) out.push({ text: cur.join("\n"), after: `\n${after}` });
+    cur = [];
+  }
+  if (cur.length) out.push({ text: cur.join("\n"), after: "" });
+  return out;
+}
+
+/**
+ * The note as the editor writes it now, with every part not changed since `canon` (how the editor wrote `file` when it read it) in `file`'s own
+ * spelling, so that a save changes only what was edited: `*` lists, `__bold__`, spacing and the like stay as they were.
+ */
+export function keepSpelling(now: string, canon: string, file: string): string {
+  if (now.trim() === canon.trim()) return file;
+  const key = (t: string): string => t.replace(/%[0-9A-Fa-f]{2}|<[^>\n]*>/g, "").replace(/[^\p{L}\p{N}]+/gu, "");
+  const was = blocksOf(file);
+  const can = blocksOf(canon);
+  // Which of the editor's blocks are which of the file's (one may be several of the other).
+  const groups: Array<{ canon: string[]; file: string; after: string }> = [];
+  for (let i = 0, j = 0; i < was.length && j < can.length; ) {
+    const si = i;
+    const sj = j;
+    let a = key(was[i++]!.text);
+    let b = key(can[j++]!.text);
+    while (a !== b && (a.startsWith(b) || b.startsWith(a))) {
+      if (a.length < b.length && i < was.length) a += key(was[i++]!.text);
+      else if (b.length < a.length && j < can.length) b += key(can[j++]!.text);
+      else break;
+    }
+    if (a !== b) {
+      // (written differently, `[[a|a]]` for `[[a]]`: paired while as many are left on both sides, else the rest keeps the editor's spelling)
+      if (was.length - si !== can.length - sj) break;
+      i = si + 1;
+      j = sj + 1;
+    }
+    groups.push({ canon: can.slice(sj, j).map((x) => x.text), file: was.slice(si, i).map((x, k, l) => x.text + (k < l.length - 1 ? x.after : "")).join(""), after: was[i - 1]!.after });
+  }
+  const parts = blocksOf(now);
+  let out = "";
+  for (let p = 0; p < parts.length; ) {
+    const g = groups.find((x) => x.canon.every((c, k) => parts[p + k]?.text === c));
+    const last = p + (g?.canon.length ?? 1) >= parts.length;
+    out += (g ? g.file : parts[p]!.text) + (last ? "" : g?.after || "\n\n");
+    p += g?.canon.length ?? 1;
+  }
+  return `${out}${/\n$/.test(file) || !file ? "\n" : ""}`;
 }
