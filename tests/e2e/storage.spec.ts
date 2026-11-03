@@ -152,6 +152,11 @@ test("boards and canvases: create, rename, switch; each canvas keeps its own obj
   await expect(p.getByTestId("workspace-nav")).toHaveText("Board 1 › Sketches");
   expect(await objectIds(p)).toEqual(canvas2Objects);
   expect((await app.camera()).zi).toBe(5);
+  // Its count in the canvas list follows a delete at once (no reload).
+  await p.keyboard.press("Control+a");
+  await p.keyboard.press("Delete");
+  await saved(p);
+  await expect.poll(async () => (await sess(p)).tree![0]!.canvases.map((c) => [c.name, c.objectCount])).toEqual([["Canvas 1", 1], ["Sketches", 0]]);
 });
 
 test("v1 snapshot data is migrated, verified, and the legacy store is left untouched", async ({ page }) => {

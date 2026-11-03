@@ -117,6 +117,9 @@ export class Session {
     this.lease = new WriterLease();
     this.lease.subscribe(() => void this.onLease());
     this.persistence.onCommitted = (canvasId, revision) => {
+      // The canvas lists read the tree: its count follows each save (it was read when the tree was, so it went stale after deletes).
+      const rec = this.tree?.boards.flatMap((b) => b.canvases).find((c) => c.id === canvasId);
+      if (rec && canvasId === this.current?.canvasId) Object.assign(rec, { revision, objectCount: this.doc.size });
       this.post({ kind: "commit", canvasId, revision });
       this.emitAssets(false, true); // usage counts changed
       // An undo may have re-created an instance of an asset deleted from the library.
