@@ -2,7 +2,7 @@ import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
 import type { Frame, FrameSpace } from "../core/frames";
 import type { CanvasObject, SerializedObject } from "./model";
-import { deserializeObject, homeObject, newObjectId, serializeObject } from "./model";
+import { deserializeObject, expressObjectIn, homeObject, inFrame, newObjectId, serializeObject } from "./model";
 import { unionBounds } from "./edit-ops";
 
 /**
@@ -18,7 +18,7 @@ export interface ClipboardPayload {
   /** Uid of the frame of the view the copy was made in, and that view's depth (levels). */
   viewFrame: string;
   depth: number;
-  /** Centre of the objects' box in that frame (dyadic strings), or null when they are in other frames. */
+  /** Centre of the objects' box in that frame (dyadic strings); null only in a payload of an older version, when they were in other frames. */
   centre: [string, string] | null;
 }
 
@@ -26,12 +26,13 @@ export class ClipboardError extends Error {}
 
 export function buildPayload(objs: readonly CanvasObject[], viewFrame: Frame, depth: number): ClipboardPayload {
   const space = viewFrame.space;
-  const inView = objs.every((o) => (o.frame ?? space.world) === viewFrame);
-  const b = inView ? unionBounds(objs) : null;
+  // (all in the view's frame, whichever frames they live in: what is pasted is placed from the view, never from where it came)
+  const here = objs.map((o) => expressObjectIn(o, viewFrame));
+  const b = unionBounds(here);
   return {
     v: 1,
     // Hidden and locked are states of the copy's origin, not of the objects as pasted.
-    objects: objs.map((o) => {
+    objects: here.map((o) => {
       const s = serializeObject(o);
       delete s["hidden"];
       delete s["locked"];
@@ -55,19 +56,25 @@ export function parsePayload(text: string): ClipboardPayload | null {
 
 /**
  * New objects (new ids, groups renamed together) from a payload, for `space`. With a `target` (the view's frame, the
- * point to centre them on and the view's depth) they are moved there at their on-screen size when the copy was made in the
- * same frame; otherwise they come back where they were. Stacking order is kept: `z` starts above `zTop`.
+ * point to centre them on and the view's depth) they are moved there at their on-screen size, from any frame or canvas: the
+ * payload holds them in the frame of the view they were copied from. Without one they come back where they were. Stacking order is kept: `z` starts above `zTop`.
  */
 export function instantiate(p: ClipboardPayload, space: FrameSpace, zTop: number, target?: { frame: Frame; at: WorldPoint; depth: number }): { objects: CanvasObject[]; moved: boolean } {
   let objs: CanvasObject[];
   try {
-    objs = p.objects.map((s) => deserializeObject(s, space));
+    // (placed from the view: the frame they came from need not exist here, on another canvas)
+    const placed = !!target && !!p.centre;
+    objs = p.objects.map((s) => {
+      if (!placed) return deserializeObject(s, space);
+      const { frame: _from, ...rest } = s;
+      return deserializeObject(rest as typeof s, space);
+    });
   } catch (e) {
     throw new ClipboardError(`These objects belong to a space that this canvas does not have (${(e as Error).message}).`);
   }
   const groupIds = new Map<string, string>();
   const regroup = (g: string): string => groupIds.get(g) ?? (groupIds.set(g, newObjectId()), groupIds.get(g)!);
-  const sameFrame = !!target && !!p.centre && space.uidOf(target.frame) === p.viewFrame && objs.every((o) => (o.frame ?? space.world) === target.frame);
+  const sameFrame = !!target && !!p.centre;
   const k = sameFrame ? Math.round(p.depth - target!.depth) : 0;
   const centre = sameFrame ? { x: D.parse(p.centre![0]), y: D.parse(p.centre![1]) } : null;
   const ordered = [...objs].sort((a, b) => a.z - b.z);
@@ -78,12 +85,12 @@ export function instantiate(p: ClipboardPayload, space: FrameSpace, zTop: number
   const out = ordered.map((o0, i): CanvasObject => {
     const o: CanvasObject = o0.isMask && !(o0.groups ?? []).some((g) => cuts.has(g)) ? (({ isMask: _m, ...rest }) => rest as CanvasObject)(o0) : o0;
     const moved: CanvasObject = centre
-      ? {
-          ...o,
-          unit: o.unit + k,
-          ...(o.kind === "path" && o.initial ? { initial: { ...o.initial, unit: o.initial.unit + k } } : {}),
-          anchor: { x: D.add(target!.at.x, D.shift(D.sub(o.anchor.x, centre.x), k)), y: D.add(target!.at.y, D.shift(D.sub(o.anchor.y, centre.y), k)) },
-        }
+      ? inFrame(
+          o,
+          target!.frame,
+          { x: D.add(target!.at.x, D.shift(D.sub(o.anchor.x, centre.x), k)), y: D.add(target!.at.y, D.shift(D.sub(o.anchor.y, centre.y), k)) },
+          o.unit + k,
+        )
       : o;
     return homeObject({ ...moved, id: copyId.get(o.id)!, z: zTop + 1 + i, ...(o.parent !== undefined ? { parent: copyId.get(o.parent) ?? o.parent } : {}), ...(o.attachmentTargetId !== null ? { attachmentTargetId: copyId.get(o.attachmentTargetId) ?? null } : {}), ...(o.groups ? { groups: o.groups.map(regroup) } : {}), ...(o.groupNames ? { groupNames: Object.fromEntries(Object.entries(o.groupNames).map(([k, v]) => [regroup(k), v])) } : {}), ...(o.boolOps ? { boolOps: Object.fromEntries(Object.entries(o.boolOps).map(([k, v]) => [regroup(k), v])) } : {}), ...(o.mask ? { mask: { ...o.mask, by: regroup(o.mask.by) } } : {}), ...(o.gen ? { gen: { ...o.gen, gid: regroup(o.gen.gid) } } : {}), ...(o.kind === "path" && o.result !== undefined ? { result: regroup(o.result) } : {}) } as CanvasObject, space);
   });

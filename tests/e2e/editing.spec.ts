@@ -1,6 +1,7 @@
 import * as D from "../../src/core/dyadic";
 import { LIMITS, distance, expect, recordMetric, reps, setPenColour, test } from "./harness";
 import type { App } from "./harness";
+import { makePng } from "./png";
 import { blockyFixture } from "./png";
 
 /**
@@ -705,6 +706,48 @@ test("resize with side handles: corners and sides follow the pointer; Shift keep
   await drag([h4[0] - 4, h4[1]], [wb.minX - 7, h4[1]]);
   expect(Math.abs((await boxOf(img.id)).maxX - wb.minX), "the edge, not the pointer, snapped").toBeLessThan(0.6);
   expect(app.consoleErrors).toEqual([]);
+});
+
+test("dragging objects to an edge of the view pans it while the pointer rests there; the object stays under the pointer; off at 0%", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "o.png", mimeType: "image/png", buffer: makePng(120, 80, () => [200, 60, 40, 255]) });
+  await p.locator('[data-testid="asset-card"][title="o.png"]').click();
+  await p.getByTestId("asset-place").click();
+  await p.getByTestId("view-canvas").click();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
+  const box = () => p.evaluate(() => { const d = window.__canvastDebug; return d.objectScreen(d.objects()[0]!.id)!.box; });
+  const centerX = () => p.evaluate(() => window.__canvastDebug.camera().cx);
+  const drag = async (hold: number): Promise<{ at: number; moved: boolean }> => {
+    const b = await box();
+    const x = (b.minX + b.maxX) / 2;
+    const y = (b.minY + b.maxY) / 2;
+    const c0 = await centerX();
+    await p.mouse.click(x, y); // (selected)
+    await p.mouse.move(x, y);
+    await p.mouse.down();
+    const width = await p.evaluate(() => window.__canvastDebug.camera() && document.querySelector("canvas")!.getBoundingClientRect().width);
+    await p.mouse.move(width - 2, y, { steps: 6 });
+    await p.waitForTimeout(hold); // (the pointer rests)
+    const moved = (await centerX()) !== c0;
+    await p.mouse.up();
+    const after = await box();
+    return { at: (after.minX + after.maxX) / 2, moved };
+  };
+  const width = await p.evaluate(() => document.querySelector("canvas")!.getBoundingClientRect().width);
+  const panned = await drag(700);
+  expect(panned.moved, "the view moved").toBe(true);
+  expect(Math.abs(panned.at - (width - 2)), "the object is under the pointer").toBeLessThan(4);
+  // Off at 0%.
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Navigation", exact: true }).click();
+  await p.locator('[data-set="nav.edgePan"]').fill("0");
+  await p.getByTestId("view-canvas").click();
+  await p.keyboard.press("f"); // (the object in view again)
+  await expect.poll(() => p.evaluate(() => { const d = window.__canvastDebug; return !!d.objectScreen(d.objects()[0]!.id); })).toBe(true);
+  await p.waitForTimeout(600);
+  const still = await drag(500);
+  expect(still.moved, "the view stayed").toBe(false);
 });
 
 test("Alt held as a drag starts carries a copy; the original stays; F still focuses (ADR 0063)", async ({ app }) => {

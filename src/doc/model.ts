@@ -815,7 +815,7 @@ function extentLog2(o: CanvasObject): number {
   return k;
 }
 
-function inFrame(o: CanvasObject, f: Frame, anchor: WorldPoint, unit: number): CanvasObject {
+export function inFrame(o: CanvasObject, f: Frame, anchor: WorldPoint, unit: number): CanvasObject {
   const { frame: _frame, ...rest } = o;
   // (the shape saved as the initial one is in the same units as the object: it moves up or down with them)
   const kept = o.kind === "path" && o.initial ? { initial: { ...o.initial, unit: o.initial.unit + (unit - o.unit) } } : {};

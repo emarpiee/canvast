@@ -4,7 +4,7 @@ import { FrameSpace } from "../../src/core/frames";
 import { buildPayload, instantiate, parsePayload } from "../../src/doc/clipboard";
 import { groupObjects } from "../../src/doc/groups";
 import type { CanvasObject, StrokeObject } from "../../src/doc/model";
-import { newObjectId, serializeObject } from "../../src/doc/model";
+import { expressObjectIn, newObjectId, serializeObject } from "../../src/doc/model";
 import { unionBounds } from "../../src/doc/edit-ops";
 
 const stroke = (x: number, y: number, z: number, extra: Partial<StrokeObject> = {}): StrokeObject => ({
@@ -71,6 +71,21 @@ describe("clipboard (ADR 0038)", () => {
     expect(parsePayload("hello")).toBeNull();
     expect(parsePayload(JSON.stringify({ v: 1, objects: [] }))).toBeNull();
     expect(serializeObject(a)["id"]).toBe(a.id);
+  });
+
+  it("pastes under the target from any frame or canvas: objects in another frame than the view, and on a canvas that has no such frame", () => {
+    const deep = space.child(world, 40n, D.fromNumber(3), D.fromNumber(5));
+    const a: CanvasObject = { ...stroke(7, 9, 1), frame: deep };
+    const at = { x: D.fromNumber(1000), y: D.fromNumber(2000) };
+    const p = buildPayload([a], world, 4);
+    expect(p.centre).not.toBeNull();
+    for (const s of [space, new FrameSpace()]) {
+      const { objects, moved } = instantiate(parsePayload(JSON.stringify(p))!, s, 0, { frame: s.world, at, depth: 4 });
+      expect(moved).toBe(true);
+      const c = unionBounds(objects.map((o) => expressObjectIn(o, s.world))); // (a tiny object lives in a frame of its size)
+      expect(D.equals(D.shift(D.add(c!.min.x, c!.max.x), -1), at.x)).toBe(true);
+      expect(D.equals(D.shift(D.add(c!.min.y, c!.max.y), -1), at.y)).toBe(true);
+    }
   });
 
   it("comes back in place when there is no target frame match", () => {

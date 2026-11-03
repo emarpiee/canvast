@@ -1044,7 +1044,7 @@ async function start(): Promise<void> {
   const notePanelReady = (d: NotePanelDeps): void => void (notePanel = mountNotePanel({ panel: notePanelEl, window: noteWindowEl }, d, () => settings.get("notes.panelMode")));
   let newNoteAt: (at: ScreenPoint, widthPx?: number) => Promise<void> = async () => undefined;
   let makeNoteFiles: () => Promise<void> = async () => undefined;
-  attachTools(canvas, view, doc, index, editor, { editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h) => void notePanel.open(h), newNote: (at, w) => void newNoteAt(at, w), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
+  attachTools(canvas, view, doc, index, editor, { edgePanSpeed: () => settings.get("nav.edgePan") / 100, editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h) => void notePanel.open(h), newNote: (at, w) => void newNoteAt(at, w), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
     navigate: (dir) =>
       void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus", (o, unit) => {
         // the name the Layers list shows: a group's own, else the item's

@@ -37,6 +37,14 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.10: paste under the pointer, edge panning (2026-11-04)
+
+- **Implemented:** `buildPayload` holds objects in the view's frame; `instantiate` places them in the target's, from any frame or canvas. `interaction/edge-pan.ts` (`edgePanStep`, `EdgePan`), used by the move gesture; setting `nav.edgePan`.
+- **Tested:** unit (clipboard, edge pan); editing.spec new test, chromium + firefox.
+- **Known limit:** edge panning covers moving objects, not the marquee, resizing or drawing. Snapping waits until the view stops.
+- **Unverified:** the owner's own cut and paste case: paste followed the pointer in every same-frame case tried, and the frame case was found by reading the code and covered by a unit test.
+- **Committed:** v0.53.10.
+
 ## v0.53.9: notes save settings (2026-11-04)
 
 - **Implemented:** settings `notes.saveOnClose`, `notes.saveAs`, read in `OpenNote.leave` and `saveNow`.

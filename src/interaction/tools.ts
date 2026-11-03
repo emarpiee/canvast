@@ -24,6 +24,7 @@ import type { GradHandle } from "./path-edit";
 import type { Gradient } from "../doc/paint";
 import type { Frame } from "../core/frames";
 import { depthOf, expressExactIn } from "../core/frames";
+import { EdgePan } from "./edge-pan";
 import { penWidthNow } from "./pen-width";
 import { ropeFor, ropeStep } from "./stabilizer";
 import { TILT_FULL_DEG, expandStroke } from "./pens";
@@ -315,6 +316,8 @@ export interface ToolHooks {
   newNote?(at: ScreenPoint, widthPx?: number): void;
   /** The tool a plain key picks (rebindable in Settings, ADR 0049). */
   toolForKey(key: string): Tool | undefined;
+  /** How fast the view moves when a drag of objects nears an edge: 1 is 100%, 0 off (Settings > Navigation). */
+  edgePanSpeed?(): number;
   /** The direction a plain key steps in (W A S D at first; Settings > Shortcuts), if any (ADR 0058, 0072). */
   navForKey(key: string): NavDir | undefined;
   /** Step the selection to a neighbouring item. */
@@ -339,6 +342,21 @@ export function attachTools(
 ): () => void {
   const pan = new PanGesture(view);
   let g: Gesture = { kind: "none" };
+  // Near an edge of the view, a drag of objects moves the view too. What is on the screen moved, so snapping (worked out in screen positions) waits until it stops.
+  const edgePan = new EdgePan(
+    view,
+    () => hooks.edgePanSpeed?.() ?? 1,
+    (p, dx, dy) => {
+      if (g.kind !== "move") return false;
+      g.startScreen = { ...g.startScreen, x: g.startScreen.x + dx, y: g.startScreen.y + dy };
+      g.snap = null;
+      updateMove(p);
+      return true;
+    },
+    () => {
+      if (g.kind === "move" && editor.snap) g.snap = snapContext(g.ids, g.frame);
+    },
+  );
   let spaceDown = false;
   let cycleIndex = 0;
   /** Last position of every pointer that is down, for handing touches to navigation. */
@@ -2005,6 +2023,7 @@ export function attachTools(
         break;
       case "move":
         updateMove(s);
+        edgePan.at(s);
         break;
       case "marquee":
         editor.marquee = { x0: g.start.x, y0: g.start.y, x1: s.x, y1: s.y };
@@ -2181,6 +2200,7 @@ export function attachTools(
         break;
       }
       case "move":
+        edgePan.stop();
         if (!cancelled) updateMove(s);
         editor.guides = null;
         if (cancelled) editor.preview = { kind: "none" };
@@ -2525,6 +2545,7 @@ export function attachTools(
   });
   return () => {
     el.removeEventListener("pointerdown", onPointerDown);
+    edgePan.stop();
     el.removeEventListener("pointermove", onPointerMove);
     el.removeEventListener("pointerup", onPointerUp);
     el.removeEventListener("pointercancel", onPointerUp);

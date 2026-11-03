@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.10 — Paste under the pointer, edge panning (2026-11-04)
+
+- **Fixed:** what is pasted always lands under the pointer. Objects in another frame than the view (made at another depth), or copied on another canvas, came back where they were.
+- **Added:** dragging objects near an edge of the view pans it that way, faster the nearer the edge; **Pan at the edge while dragging** in Settings > Navigation sets the speed, or turns it off.
+
 ## 0.53.9 — Notes: save on close, save as (2026-11-04)
 
 - **Added:** **Save notes on close** (Settings > Notes, off by default): leaving a note with changes saves them without asking.

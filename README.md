@@ -235,7 +235,7 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
 ### Navigating
 
 - **Zoom** with the wheel, a trackpad pinch, `+` and `−`, or the on-screen buttons. The point under the pointer (or between your fingers) stays where it is.
-- **Pan** with the middle button, `Space`+drag, the Hand tool (`H`), two fingers, `Shift`+wheel or the arrow keys.
+- **Pan** with the middle button, `Space`+drag, the Hand tool (`H`), two fingers, `Shift`+wheel or the arrow keys. Dragging objects near an edge of the view pans it too; the nearer the edge, the faster (Settings > Navigation sets the speed, or turns it off).
 - **Boards and canvases:** the board and canvas menu (the name at the top left) switches between them. It and *Place on…* have a search field, *Find a board or canvas*; with more than four boards, each is folded to its name except the open one (click a name to unfold it).
 - **Return** to the origin with `0`, `Home` or the house button. *Previous view* and *Next view* walk back and forth through where you have been; the dice button takes you to a random empty place.
 - **Orientation aids:** a hierarchical grid, the axes and the position in the info bar show where you are, even very deep.
