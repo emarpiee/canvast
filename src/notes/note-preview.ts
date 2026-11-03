@@ -7,16 +7,14 @@ import { splitFrontmatter } from "./frontmatter";
 // Its pictures, videos and sounds are found by the app (`setNotePictures`) and drawn into it as data (a video by its picture, with a
 // ▶; a sound by its waveform, with a ♪). shortcut: library fonts are not (its text is in the system's sans-serif), embed them likewise if wanted.
 
-/** How wide a note's page is laid out (Settings > Notes, Preview width), CSS px, whatever the size of its picture. */
-export const NOTE_PAGE_WIDTHS = { narrow: 400, medium: 600, wide: 900 } as const;
-let PAGE_W: number = NOTE_PAGE_WIDTHS.medium;
-export const setNotePageWidth = (width: keyof typeof NOTE_PAGE_WIDTHS): void => void (PAGE_W = NOTE_PAGE_WIDTHS[width]);
-/** A note's card on a canvas: its page drawn at twice its size (sharp when zoomed in), as tall as the note up to `cardMaxH` CSS px. */
-const CARD_SCALE = 2;
-/** How much of a long note its card shows (Settings > Notes, Preview length): page heights in CSS px. */
-export const NOTE_CARD_LENGTHS = { short: 900, medium: 1800, long: 4000, whole: 8000 } as const;
-let cardMaxH: number = NOTE_CARD_LENGTHS.long;
-export const setNoteCardLength = (length: keyof typeof NOTE_CARD_LENGTHS): void => void (cardMaxH = NOTE_CARD_LENGTHS[length]);
+/** How wide a note's page is laid out for its thumbnail and a new card, CSS px (a card on a canvas is then laid out at its own width). */
+const PAGE_W = 600;
+/** A note's card on a canvas: its page drawn at twice its size (sharp when zoomed in). Its picture is `CARD_SCALE` × the page it lays out. */
+export const CARD_SCALE = 2;
+/** A new card is as tall as the note up to this (CSS px of the page): a longer note fades out at the bottom until the card is made taller. */
+const NEW_CARD_MAX_H = 4000;
+/** The longest page a card lays out (CSS px): a card showing the whole note stops there. */
+const PAGE_MAX_H = 16000;
 const CSS = `
 .page{box-sizing:border-box;overflow:hidden;padding:26px 30px;background:oklch(0.985 0.004 95);color:oklch(0.27 0.01 250);font:15px/1.45 system-ui,sans-serif;word-wrap:break-word}
 h1,h2,h3,h4,h5,h6{margin:.2em 0 .45em;line-height:1.2}h1{font-size:1.9em}h2{font-size:1.5em}h3{font-size:1.25em}h4,h5,h6{font-size:1.05em}
@@ -106,22 +104,27 @@ async function makePageHtml(name: string, text: string, hash?: string): Promise<
  * at most `cardMaxH`; a longer note fades out at the bottom).
  */
 export async function noteCardSize(name: string, text: string, hash?: string): Promise<{ w: number; h: number }> {
+  const h = await notePageHeight(name, text, PAGE_W, hash);
+  return { w: PAGE_W * CARD_SCALE, h: Math.round(Math.min(NEW_CARD_MAX_H, Math.max((PAGE_W * 3) / 4, h)) * CARD_SCALE) };
+}
+
+/** How tall a note's page is laid out `width` CSS px wide (at most `PAGE_MAX_H`): the height of a card that shows the whole note. */
+export async function notePageHeight(name: string, text: string, width: number, hash?: string): Promise<number> {
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:-10000px;top:0;visibility:hidden";
   const root = host.attachShadow({ mode: "open" });
-  root.innerHTML = `<style>${CSS}</style><div class="page${look === "dark" ? " dark" : ""}" style="width:${PAGE_W}px">${await pageHtml(name, text, hash)}</div>`;
+  root.innerHTML = `<style>${CSS}</style><div class="page${look === "dark" ? " dark" : ""}" style="width:${width}px">${await pageHtml(name, text, hash)}</div>`;
   document.body.append(host);
   const h = (root.lastElementChild as HTMLElement).scrollHeight;
   host.remove();
-  return { w: PAGE_W * CARD_SCALE, h: Math.round(Math.min(cardMaxH, Math.max((PAGE_W * 3) / 4, h)) * CARD_SCALE) };
+  return Math.min(PAGE_MAX_H, h);
 }
 
 /**
- * The top of a note's page, `w` × `h` pixels; when the note goes on below, it fades out at the bottom. A card is laid out as wide as it
- * was made (its width is a Preview width at `CARD_SCALE`: one made before the setting changed keeps its own); a thumbnail, at the setting's.
+ * The top of a note's page, `w` × `h` pixels, laid out `lw` CSS px wide (a card: its own width, `w / CARD_SCALE`, or the full card's for a
+ * smaller copy of it; a thumbnail: `PAGE_W`); when the note goes on below, it fades out at the bottom.
  */
-export async function notePicture(name: string, text: string, w: number, h: number, hash?: string): Promise<HTMLCanvasElement> {
-  const lw = (Object.values(NOTE_PAGE_WIDTHS) as number[]).includes(w / CARD_SCALE) ? w / CARD_SCALE : PAGE_W;
+export async function notePicture(name: string, text: string, w: number, h: number, hash?: string, lw = PAGE_W): Promise<HTMLCanvasElement> {
   const k = w / lw;
   const lh = Math.round(h / k);
   const html = await pageHtml(name, text, hash);
@@ -134,7 +137,7 @@ export async function notePicture(name: string, text: string, w: number, h: numb
   c.height = h;
   const x = cardContext(c); // (in the computer's memory: see cardContext)
   x.drawImage(img, 0, 0, w, h);
-  if ((await noteCardSize(name, text, hash)).h / CARD_SCALE <= lh) return c; // (the whole note is in it)
+  if ((await notePageHeight(name, text, lw, hash)) <= lh + 1) return c; // (the whole note is in it)
   const fade = x.createLinearGradient(0, h * 0.82, 0, h);
   const paper = look === "dark" ? "oklch(0.23 0.01 250" : "oklch(0.985 0.004 95"; // (the page's own colour, .page / .page.dark)
   fade.addColorStop(0, `${paper} / 0)`);

@@ -82,6 +82,16 @@ function stretchTurned(o: PathObject, fixed: WorldPoint, kx: number, ky: number,
  * may be stretched (its outline width follows the geometric mean of the two).
  * `keepWidth` (thickness lock): a stroke's shape scales but its line width does not.
  */
+/**
+ * A note's card resized: its words keep their size along the side changed least (a corner dragged evenly zooms the whole card), and its page
+ * grows or shrinks along the other, laid out again (in steps of 8 px, so a drag asks for few pictures).
+ */
+function pageScaled(o: { pixelW: number; pixelH: number }, kx: number, ky: number): { pixelW: number; pixelH: number } {
+  const u = Math.abs(kx - 1) <= Math.abs(ky - 1) ? kx : ky;
+  const step = (v: number): number => Math.max(8, Math.round(v / 8) * 8);
+  return { pixelW: step((o.pixelW * kx) / u), pixelH: step((o.pixelH * ky) / u) };
+}
+
 export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: number, keepWidth = false, keepRadius = false): CanvasObject {
   if (!(kx > 0 && ky > 0 && Number.isFinite(kx) && Number.isFinite(ky))) throw new RangeError(`bad scale ${kx},${ky}`);
   if (o.kind === "path" && o.rot && kx !== ky) return stretchTurned(o, fixed, kx, ky, keepWidth, keepRadius);
@@ -102,7 +112,7 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
     return normalizeUnit({ ...o, anchor, ...stretched(o, kx, ky, keepRadius), width: keepWidth ? o.width : o.width * Math.sqrt(kx * ky) });
   }
   const k = Math.sqrt(kx * ky); // (a picture's corners and outline scale as the whole does)
-  return normalizeUnit({ ...o, anchor, w: o.w * kx, h: o.h * ky, ...(o.kind === "image" && o.radius !== undefined ? { radius: scaleRadius(o.radius, k) } : {}), ...(o.kind === "image" && o.width !== undefined ? { width: keepWidth ? o.width : o.width * k } : {}) });
+  return normalizeUnit({ ...o, anchor, w: o.w * kx, h: o.h * ky, ...(o.kind === "image" && o.page ? pageScaled(o, kx, ky) : {}), ...(o.kind === "image" && o.radius !== undefined ? { radius: scaleRadius(o.radius, k) } : {}), ...(o.kind === "image" && o.width !== undefined ? { width: keepWidth ? o.width : o.width * k } : {}) });
 }
 
 /**

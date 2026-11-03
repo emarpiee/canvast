@@ -37,6 +37,14 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.2: note cards (2026-11-03)
+
+- **Implemented:** `ImageObject.page` (a note's card laid out at `pixelW` × `pixelH`, twice its CSS px); `rasterKey` `hash#pWxH`, read by the asset library (full card, reduced copies at the full card's layout width, another size of the card while one is drawn); `scaleAbout` scales the page along the side changed most (in steps of 8 px); `retargeted` keeps a card's size; `syncNoteCards` (`main.ts`) marks every note card and fits it with `notes.cardShows` = whole, through `doc.remap` (no undo step). Settings `notes.pageWidth` and `notes.cardLength` removed.
+- **Tested:** notes.spec new card test (side handle, even corner, Part, Whole note at once, save), chromium + firefox.
+- **Known limit:** a turned card fitted to its note grows from its top left, not its middle.
+- **Unverified:** the owner's cut short note was not reproduced from their workspace: the likely cause is a height measured once at import, which this removes; the zoom mismatch was found by reading the code.
+- **Committed:** v0.53.2.
+
 ## v0.53.1: notes fixes (2026-11-03)
 
 - **Implemented:** `obsidianMarkdown` (`notes/note-file.ts`): SunEditor's markdown with `]` and paired `^` unescaped outside code (footnotes, kept embeds) and table alignment written back; the editor's save check reads its own markdown back and ignores empty paragraphs and spaces or line breaks at a block's start or end. Rich text save renames the item to `.note.html` and saves it as its new version (cards follow). Remove format in the selection toolbar. Debug hook `notesAsText`.

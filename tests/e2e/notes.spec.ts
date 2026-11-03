@@ -290,27 +290,15 @@ test("a note's preview shows the pictures it links to (and an Obsidian ![[embed]
   await p.locator('[data-row="notes.look"] select').selectOption("dark");
   await p.getByTestId("view-assets").click();
   await expect.poll(corner, { timeout: 10_000 }).toBeLessThan(80);
-  // Settings > Notes, Preview length: Short makes a long note's card about a screen long (900 CSS px, drawn at twice that).
-  await p.getByTestId("view-settings").click();
-  await p.getByRole("tab", { name: "Notes", exact: true }).click();
-  await p.locator('[data-row="notes.cardLength"] select').selectOption("short");
-  await p.getByTestId("view-assets").click();
   const LONG = `# Long\n\n${"A line of the note.\n\n".repeat(200)}`;
   await p.getByTestId("assets-import-input").setInputFiles({ name: "long.md", mimeType: "text/markdown", buffer: Buffer.from(LONG) });
-  await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).map((e) => [e.pixelW, e.pixelH])[0]), hashOf(LONG))).toEqual([1200, 1800]);
+  await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).map((e) => [e.pixelW, e.pixelH])[0]), hashOf(LONG))).toEqual([1200, 8000]);
   // Two versions alike in length and start (a size changed back) each get a card of their own height (the second took the first's).
   const sized = (px: number) => `<p><span style="font-size: ${px}px;">${"Words that wrap when they are big. ".repeat(6)}</span></p>`;
   await p.getByTestId("assets-import-input").setInputFiles([{ name: "big.note.html", mimeType: "text/html", buffer: Buffer.from(sized(66)) }, { name: "small.note.html", mimeType: "text/html", buffer: Buffer.from(sized(16)) }]);
   const tall = (h: string) => p.evaluate((x) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === x)?.pixelH), h);
   await expect.poll(() => tall(hashOf(sized(16)))).toBe(900);
   expect(await tall(hashOf(sized(66)))).toBeGreaterThan(900);
-  // Preview width: Wide lays a new note's page out wider.
-  await p.getByTestId("view-settings").click();
-  await p.getByRole("tab", { name: "Notes", exact: true }).click();
-  await p.locator('[data-row="notes.pageWidth"] select').selectOption("wide");
-  await p.getByTestId("view-assets").click();
-  await p.getByTestId("assets-import-input").setInputFiles({ name: "wide.md", mimeType: "text/markdown", buffer: Buffer.from("# Wide\n") });
-  await expect.poll(() => p.evaluate((x) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === x)?.pixelW), hashOf("# Wide\n"))).toBe(1800);
   // A long note fades out into its own paper: dark on the dark look (it faded to white).
   const bottom = () =>
     card(p, hashOf(LONG))
@@ -330,7 +318,7 @@ test("a note's preview shows the pictures it links to (and an Obsidian ![[embed]
 
 test("a note on a canvas opens in the note panel (a double-click, or Edit note): the same editor, saved in place, the card follows, renamed, undo never returns an old version", async ({ app }) => {
   const p = app.page;
-  const NOTE = "# On the canvas\n\nFirst words.\n\n## Part two\n";
+  const NOTE = `# On the canvas\n\nFirst words.\n\n## Part two\n\n${"More of the page.\n\n".repeat(30)}`; // (long enough to cover the middle of the view, where it is pressed)
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles({ name: "pic.png", mimeType: "image/png", buffer: makePng(60, 40, () => [200, 60, 40, 255]) });
   await p.getByTestId("assets-import-input").setInputFiles({ name: "board note.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) });
@@ -430,6 +418,77 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   await expect.poll(placed).toEqual(saved);
 });
 
+test("a note's card lays its page out at its own size: a side handle flows the words, an even corner zooms, Part keeps the height set, Whole note follows the note at once", async ({ app }) => {
+  const p = app.page;
+  type Card = { assetId: string; w: number; h: number; pixelW: number; pixelH: number; page?: true };
+  const cardNow = () => p.evaluate(() => window.__canvastDebug.objects()[0] as unknown as Card);
+  const NOTE = `# Flowing\n\n${"Words that wrap at the width of the page they are laid out on. ".repeat(30)}\n`;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "flow.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) });
+  await card(p, hashOf(NOTE)).click();
+  await p.getByTestId("asset-place").click();
+  await p.getByTestId("view-canvas").click();
+  // Whole note, the default: as tall as the note, never stretched.
+  await expect.poll(async () => (await cardNow()).page).toBe(true);
+  const unstretched = (c: Card): void => expect(Math.abs(c.w / c.h / (c.pixelW / c.pixelH) - 1)).toBeLessThan(0.02);
+  const c0 = await cardNow();
+  unstretched(c0);
+  const box = (await p.locator("canvas").first().boundingBox())!;
+  await p.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  const frame = async () => (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.corners;
+  const drag = async (from: readonly number[], dx: number, dy: number): Promise<void> => {
+    await p.mouse.move(from[0]!, from[1]!);
+    await p.mouse.down();
+    await p.mouse.move(from[0]! + dx, from[1]! + dy, { steps: 6 });
+    await p.mouse.up();
+  };
+  // The right handle: a wider page, the words as big, fewer lines (Whole note: a shorter card).
+  let c = await frame();
+  await drag([c[1]![0], (c[1]![1] + c[2]![1]) / 2], 120, 0);
+  await expect.poll(async () => (await cardNow()).pixelH).toBeLessThan(c0.pixelH);
+  const c1 = await cardNow();
+  expect(c1.pixelW).toBeGreaterThan(c0.pixelW);
+  unstretched(c1);
+  expect(Math.abs(c1.w / c1.pixelW / (c0.w / c0.pixelW) - 1), "the words keep their size").toBeLessThan(0.02);
+  // A corner with Shift (even): the card zooms, its page as it was.
+  c = await frame();
+  await p.keyboard.down("Shift");
+  await drag(c[2]!, 40, 40);
+  await p.keyboard.up("Shift");
+  await expect.poll(async () => (await cardNow()).w).toBeGreaterThan(c1.w);
+  expect((await cardNow()).pixelW).toBe(c1.pixelW);
+  // Part: the bottom handle sets the height, and it stays.
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Notes", exact: true }).click();
+  await p.locator('[data-row="notes.cardShows"] select').selectOption("part");
+  await p.getByTestId("view-canvas").click();
+  c = await frame();
+  const before = await cardNow();
+  await drag([(c[2]![0] + c[3]![0]) / 2, c[2]![1]], 0, -60);
+  await expect.poll(async () => (await cardNow()).pixelH).toBeLessThan(before.pixelH);
+  const cut = await cardNow();
+  unstretched(cut);
+  await p.waitForTimeout(400);
+  expect((await cardNow()).pixelH, "not fitted again").toBe(cut.pixelH);
+  // Back to Whole note: the existing card is the whole note again at once.
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Notes", exact: true }).click();
+  await p.locator('[data-row="notes.cardShows"] select').selectOption("whole");
+  await p.getByTestId("view-canvas").click();
+  await expect.poll(async () => (await cardNow()).pixelH).toBe(before.pixelH);
+  // Saved longer: it follows the new version, as wide as it was, taller.
+  await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
+  const panel = p.getByTestId("note-panel");
+  await panel.locator(".sun-editor-editable p").first().click();
+  await p.keyboard.press("Control+End");
+  for (let i = 0; i < 6; i++) await p.keyboard.press("Enter"), await p.keyboard.type("More.");
+  await p.keyboard.press("Control+s");
+  await expect.poll(async () => (await cardNow()).assetId).not.toBe(hashOf(NOTE));
+  await expect.poll(async () => (await cardNow()).pixelH).toBeGreaterThan(before.pixelH);
+  expect((await cardNow()).pixelW).toBe(before.pixelW);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("the Note tool (M) makes a note file in the Notes folder, places its card and opens it; Make note files turns a text on a card into one", async ({ app }) => {
   const p = app.page;
   const objs = () => p.evaluate(() => window.__canvastDebug.objects() as unknown as Array<{ id: string; kind: string; assetId?: string; z: number }>);
@@ -519,8 +578,8 @@ test("a hidden note open in the Note panel closes when hidden items are no longe
   await p.getByTestId("hidden-mode-stay").click();
   // On the canvas it opens in the Note panel and is edited, not saved.
   await p.getByTestId("view-canvas").click();
-  const box = (await p.locator("canvas").first().boundingBox())!;
-  await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
+  const placedAt = await p.evaluate(async () => { const d = window.__canvastDebug; return d.objectScreen(d.objects()[0]!.id)!.box; });
+  await p.mouse.dblclick((placedAt.minX + placedAt.maxX) / 2, (placedAt.minY + placedAt.maxY) / 2);
   const panel = p.getByTestId("note-panel");
   await expect(panel.locator(".sun-editor-editable h1").first()).toHaveText("Secret plan");
   await panel.locator(".sun-editor-editable p").first().click();

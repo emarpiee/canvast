@@ -696,7 +696,7 @@ export class WorkspaceRepo implements WorkspaceStore {
  * takes the new shape (a crop of the old pixels goes); a text keeps its words in the new font file.
  */
 export function retargeted<T extends Record<string, unknown>>(data: T, to: string, size: { w: number; h: number }): T {
-  if (data["kind"] !== "image") return { ...data, assetId: to };
+  if (data["kind"] !== "image" || data["page"]) return { ...data, assetId: to }; // (a note's card keeps its own size: it lays out the new version)
   const { crop: _c, ...rest } = data as Record<string, unknown>;
   const same = data["pixelW"] === size.w && data["pixelH"] === size.h;
   const w = data["w"] as number;

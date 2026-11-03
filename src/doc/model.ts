@@ -161,6 +161,11 @@ export interface ImageObject extends ObjectBase {
   readonly media?: MediaState;
   /** The window of the source pixels it shows (ADR 0118), whole pixels; absent = all of them. `w` and `h` (above) are the size of this window as shown. */
   readonly crop?: Crop;
+  /**
+   * A note's card laid out at its own size: `pixelW` × `pixelH` is its page (twice the CSS px it is laid out in), so a change of its box's
+   * shape lays the page out again instead of stretching it. Absent: any other picture.
+   */
+  readonly page?: true;
   /** Mirrored left to right (`flipX`) or top to bottom (`flipY`) inside its box, about the box's centre; absent = not. */
   readonly flipX?: true;
   readonly flipY?: true;
@@ -194,6 +199,7 @@ export const storedAssetOf = (d: Readonly<Record<string, unknown>>): string | un
 
 /** Key of the decoded picture an image object draws: the poster of a video at its paused time, a GIF at its paused frame (an audio file always shows its waveform), else the asset itself. */
 export function rasterKey(o: ImageObject): string {
+  if (o.page) return `${o.assetId}#p${o.pixelW}x${o.pixelH}`; // (a note's card, drawn at its own size)
   if (!o.media || o.media.t <= 0) return o.assetId;
   return o.media.kind === "video" ? `${o.assetId}#${Math.round(o.media.t * 1000)}` : o.media.kind === "gif" ? `${o.assetId}#${o.media.t}` : o.assetId;
 }
@@ -567,6 +573,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (int(o.pixelW, "pixelW") < 1 || int(o.pixelH, "pixelH") < 1) throw new InvalidObjectError("bad pixel size");
     if (o.crop !== undefined && !(Number.isInteger(o.crop.x) && Number.isInteger(o.crop.y) && Number.isInteger(o.crop.w) && Number.isInteger(o.crop.h) && o.crop.x >= 0 && o.crop.y >= 0 && o.crop.w >= 1 && o.crop.h >= 1 && o.crop.x + o.crop.w <= o.pixelW && o.crop.y + o.crop.h <= o.pixelH)) throw new InvalidObjectError("bad crop");
     if ((o.flipX !== undefined && o.flipX !== true) || (o.flipY !== undefined && o.flipY !== true)) throw new InvalidObjectError("bad flip");
+    if (o.page !== undefined && o.page !== true) throw new InvalidObjectError("bad page");
     if (o.radius !== undefined) {
       const rs = typeof o.radius === "number" ? [o.radius] : o.radius;
       if (!Array.isArray(rs) || (typeof o.radius !== "number" && rs.length !== 4) || !rs.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0)) throw new InvalidObjectError("bad radius");
@@ -744,6 +751,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       pixelH: s["pixelH"] as number,
       ...(s["media"] !== undefined ? { media: s["media"] as MediaState } : {}),
       ...(s["crop"] !== undefined ? { crop: s["crop"] as Crop } : {}),
+      ...(s["page"] === true ? { page: true as const } : {}),
       ...(s["flipX"] === true ? { flipX: true as const } : {}),
       ...(s["flipY"] === true ? { flipY: true as const } : {}),
       ...(s["radius"] !== undefined ? { radius: s["radius"] as number | number[] } : {}),

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.53.2 — Note cards (2026-11-03)
+
+- **Changed:** a note's card on a canvas lays its page out at its own size: a side handle flows the words to the new width (or shows more or less of the page) instead of stretching them; dragging a corner evenly zooms the card.
+- **Changed:** **Note cards show** (Settings > Notes: Whole note by default, or Part) replaces Preview length and Preview width, and applies to existing cards at once.
+- **Fixed:** a short note's card could be cut while a longer one was not, and could keep an old height after a save or a setting change; a card's own height is now measured from its own page.
+- **Fixed:** a note's card could change size on the screen while zooming, with its selection box left as it was (a smaller copy was made at another shape).
+
 ## 0.53.1 — Notes fixes (2026-11-03)
 
 - **Fixed:** saving a markdown note wrote Obsidian's footnotes and embeds escaped (`[^1\]`, `![[cat.png\]\]`), which broke them in Obsidian, and dropped table column alignment: they are written as Obsidian writes them.

@@ -1,3 +1,4 @@
+import { CARD_SCALE } from "../notes/note-preview";
 import type { RasterSource } from "../render/draw-objects";
 import { plural } from "../doc/plural";
 import { sha256Hex } from "./sha256";
@@ -93,6 +94,11 @@ const SMALL_KEY = "@small";
 const reducedKey = (edge: number): string => (edge === SMALL_EDGE ? SMALL_KEY : `${SMALL_KEY}${edge}`);
 /** The hash a decoded cache key is of (without a video's time or a reduced copy's mark). */
 const baseOf = (k: string): string => k.split("#")[0]!.replace(/@small\d*$/, "");
+/** The size of a note's card laid out at its own size (`hash#pWxH`, doc/model.ts rasterKey), else null. */
+const pageOf = (k: string): { w: number; h: number } | null => {
+  const m = /#p(\d+)x(\d+)/.exec(k);
+  return m ? { w: +m[1]!, h: +m[2]! } : null;
+};
 /**
  * Images are decoded at most this many at a time. Hundreds of images asking at once (a big batch placed on the canvas)
  * would otherwise decode in parallel, each briefly holding its full pixels: gigabytes for a few seconds (ADR 0030).
@@ -410,8 +416,7 @@ export class AssetLibrary {
         this.decoded.delete(k);
       }
     }
-    this.missing.delete(hash);
-    this.locked.delete(hash);
+    for (const set of [this.missing, this.locked]) for (const k of [...set]) if (k === hash || k.startsWith(hash + "#")) set.delete(k);
   }
 
   /** Forget every missing hash so the next draw retries (the library folder came back, the hidden items were opened). */
@@ -501,13 +506,19 @@ export class AssetLibrary {
     const wanted = this.decoded.get(level ? hash + reducedKey(level) : hash);
     // (while the copy wanted is not ready, another serves: the nearest bigger one, else any)
     const others = [MID_EDGE, 0, SMALL_EDGE].filter((l) => l !== level).map((l) => this.decoded.get(l ? hash + reducedKey(l) : hash));
-    const pick = wanted ?? others.find(Boolean);
+    // (a note's card at a size not drawn yet, being resized: its picture at another size serves meanwhile)
+    const pick = wanted ?? others.find(Boolean) ?? (pageOf(hash) ? this.anyPage(baseOf(hash)) : undefined);
     if (pick) {
       pick.lastUsed = now;
       if (now - this.lastEvictCheck > 500) this.evict(now); // images that fell idle since the last load
     }
     if (!wanted && !this.missing.has(hash)) this.request(hash, level, now);
     return pick ?? null;
+  }
+
+  private anyPage(base: string): Decoded | undefined {
+    for (const [k, d] of this.decoded) if (baseOf(k) === base && pageOf(k)) return d;
+    return undefined;
   }
 
   /** Whether the copy `get` should serve for this size is ready (not a stopgap or a placeholder): tiles drawn before this must be redrawn. */
@@ -529,7 +540,7 @@ export class AssetLibrary {
   }
 
   /** The picture of a file shown as a card, at `size` (its own, or a reduced copy's): a custom thumbnail, or the file's own card (a note's page). */
-  private async cardOf(rec: AssetRecord, size = { w: rec.pixelW, h: rec.pixelH }): Promise<ImageBitmap> {
+  private async cardOf(rec: AssetRecord, size = { w: rec.pixelW, h: rec.pixelH }, /** A note's page width (a smaller copy keeps the full card's). */ layoutW?: number): Promise<ImageBitmap> {
     // A custom thumbnail stands for a file card on a canvas too (never a hidden one: see `customPicture`).
     const own = await this.customPicture?.(rec.hash).catch(() => null);
     if (own) {
@@ -539,7 +550,7 @@ export class AssetLibrary {
         // (a picture that does not decode: the file's own card)
       }
     }
-    return makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, new Uint8Array(await rec.blob.arrayBuffer()), size, rec.hash);
+    return makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, new Uint8Array(await rec.blob.arrayBuffer()), size, rec.hash, layoutW);
   }
 
   /** `key` is the hash, or `hash#ms` for the picture of a video at a time (doc/model.ts rasterKey). */
@@ -547,7 +558,8 @@ export class AssetLibrary {
     if (!this.decoded.has(key)) {
       const ms = key.includes("#") ? Number(key.slice(key.indexOf("#") + 1)) : 0;
       let img: CanvasImageSource & { width: number; height: number };
-      const card = (): Promise<ImageBitmap> => this.cardOf(rec);
+      const page = pageOf(key);
+      const card = (): Promise<ImageBitmap> => this.cardOf(rec, page ?? undefined);
       try {
         img = isCard(rec) ? await card() : await decode(rec.blob, ms);
       } catch (e) {
@@ -564,7 +576,7 @@ export class AssetLibrary {
         (img as Partial<ImageBitmap>).close?.(); // a player put the picture it showed here meanwhile (setPoster): that one wins
         return;
       }
-      this.decoded.set(key, makeSource(img, rec.pixelW));
+      this.decoded.set(key, makeSource(img, page?.w ?? rec.pixelW));
       this.evict();
     }
   }
@@ -616,8 +628,8 @@ export class AssetLibrary {
       if (!rec) {
         this.missing.add(hash);
         if (await this.store?.locked(hash.split("#")[0]!)) this.locked.add(hash);
-      } else if (edge && Math.max(rec.pixelW, rec.pixelH) > edge) {
-        await this.ensureReduced(rec, edge);
+      } else if (edge && Math.max(...Object.values(pageOf(hash) ?? { w: rec.pixelW, h: rec.pixelH })) > edge) {
+        await this.ensureReduced(rec, edge, hash);
       } else {
         await this.ensureDecoded(rec, hash);
       }
@@ -630,19 +642,20 @@ export class AssetLibrary {
   }
 
   /** A reduced copy (longer side `edge`), decoded straight from the stored bytes at that size. */
-  private async ensureReduced(rec: AssetRecord, edge = SMALL_EDGE): Promise<void> {
-    const key = rec.hash + reducedKey(edge);
+  private async ensureReduced(rec: AssetRecord, edge = SMALL_EDGE, of = rec.hash): Promise<void> {
+    const key = of + reducedKey(edge);
     if (this.decoded.has(key)) return;
-    const s = edge / Math.max(rec.pixelW, rec.pixelH);
+    const full = pageOf(of) ?? { w: rec.pixelW, h: rec.pixelH };
+    const s = edge / Math.max(full.w, full.h);
     let bmp: ImageBitmap;
     try {
-      // A card (a long note's page) is drawn at the smaller size itself: its file is no picture to decode smaller.
-      bmp = isCard(rec) ? await this.cardOf(rec, { w: Math.max(1, Math.round(rec.pixelW * s)), h: Math.max(1, Math.round(rec.pixelH * s)) }) : await createImageBitmap(rec.blob, { resizeWidth: Math.max(1, Math.round(rec.pixelW * s)), resizeHeight: Math.max(1, Math.round(rec.pixelH * s)), resizeQuality: "medium" });
+      // A card (a long note's page) is drawn at the smaller size itself, laid out as the full card is: its file is no picture to decode smaller.
+      bmp = isCard(rec) ? await this.cardOf(rec, { w: Math.max(1, Math.round(full.w * s)), h: Math.max(1, Math.round(full.h * s)) }, full.w / CARD_SCALE) : await createImageBitmap(rec.blob, { resizeWidth: Math.max(1, Math.round(rec.pixelW * s)), resizeHeight: Math.max(1, Math.round(rec.pixelH * s)), resizeQuality: "medium" });
     } catch {
       this.noReduced.add(rec.hash); // this browser cannot decode at a size: use the full image from now on
-      return this.ensureDecoded(rec);
+      return this.ensureDecoded(rec, of);
     }
-    this.decoded.set(key, makeSource(bmp, rec.pixelW));
+    this.decoded.set(key, makeSource(bmp, full.w));
     this.evict();
   }
 }

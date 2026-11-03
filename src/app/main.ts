@@ -1,7 +1,7 @@
 import { externalFolder } from "../storage/external-folder";
 import { askHiddenPassword } from "../ui/hidden-access";
 import { noteKindOf } from "../notes/note-file";
-import { setNoteCardLength, setNoteLook, setNotePageWidth, setNotePictures } from "../notes/note-preview";
+import { CARD_SCALE, notePageHeight, setNoteLook, setNotePictures } from "../notes/note-preview";
 import { anyNoteDirty, leaveAllNotes } from "../ui/note-session";
 import { mountNotePanel } from "../ui/note-panel";
 import type { NotePanelDeps } from "../ui/note-panel";
@@ -518,10 +518,6 @@ async function start(): Promise<void> {
   }
   assets.onNotice = (text) => { editor.message = text; editor.changed(); };
   // How much of a long note its card shows (Settings > Notes), for the cards made from now on.
-  setNoteCardLength(settings.get("notes.cardLength"));
-  settings.subscribe((key) => key === "notes.cardLength" && setNoteCardLength(settings.get("notes.cardLength")));
-  setNotePageWidth(settings.get("notes.pageWidth"));
-  settings.subscribe((key) => key === "notes.pageWidth" && setNotePageWidth(settings.get("notes.pageWidth")));
   // Notes' previews on light or dark paper (Settings > Notes > Preview look; Auto follows the app's theme): a change draws their cards again.
   const darkNow = (): boolean => (settings.get("ui.theme") === "system" ? matchMedia("(prefers-color-scheme: dark)").matches : settings.get("ui.theme") === "dark");
   const noteLookNow = () => (settings.get("notes.look") === "auto" ? (darkNow() ? "dark" : "light") : settings.get("notes.look") as "light" | "dark");
@@ -1941,6 +1937,63 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     editor.changed();
     void notePanel.open(rec.hash);
   };
+  // Note cards, whatever placed them and whenever: each is laid out at its own size (one stretched before keeps its look, on a page of that shape), and
+  // with "Whole note" as tall as its note. No undo step: `remap` keeps the undo history in step, as for a new version of a file.
+  const noteTexts = new Map<string, { name: string; text: string }>(); // (by hash, so what is read is the version's own)
+  const otherAssets = new Set<string>();
+  const pageHeights = new Map<string, number>();
+  let notesSyncing = false;
+  let notesAgain = false;
+  let notesTimer = 0;
+  const syncNoteCards = async (): Promise<void> => {
+    if (notesSyncing) return void (notesAgain = true);
+    if (session.readOnly || !session.catalog) return;
+    notesSyncing = true;
+    try {
+      const whole = settings.get("notes.cardShows") === "whole";
+      for (const o of [...doc.all()]) {
+        if (o.kind !== "image" || o.media || otherAssets.has(o.assetId)) continue;
+        if (!noteTexts.has(o.assetId)) {
+          const e = await session.catalog.entry(o.assetId).catch(() => undefined);
+          if (!e) continue; // (not listed yet, or gone: looked at again on the next pass)
+          if (!noteKindOf(e.name)) {
+            otherAssets.add(o.assetId);
+            continue;
+          }
+          const rec = await assets.record(o.assetId).catch(() => undefined);
+          if (!rec) continue; // (a hidden note while locked)
+          noteTexts.set(o.assetId, { name: e.name, text: await rec.blob.text() });
+        }
+        const key = `${o.assetId}|${o.pixelW}`;
+        if (whole && !pageHeights.has(key)) {
+          const n = noteTexts.get(o.assetId)!;
+          pageHeights.set(key, Math.max(8, Math.ceil(((await notePageHeight(n.name, n.text, o.pixelW / CARD_SCALE, o.assetId)) * CARD_SCALE) / 8) * 8));
+        }
+      }
+      let changed = false;
+      doc.remap((o) => {
+        if (o.kind !== "image" || !noteTexts.has(o.assetId)) return o;
+        const pixelH = (whole && pageHeights.get(`${o.assetId}|${o.pixelW}`)) || (o.page ? o.pixelH : Math.max(8, Math.round((o.pixelW * o.h) / o.w / 8) * 8));
+        if (o.page && pixelH === o.pixelH) return o;
+        changed = true;
+        const { crop: _crop, ...rest } = o; // shortcut: a turned card grows from its top left, not its middle; compensate if turned notes matter.
+        return { ...rest, page: true, pixelH, h: (o.w / o.pixelW) * pixelH };
+      });
+      if (changed) editor.changed();
+    } finally {
+      notesSyncing = false;
+      if (notesAgain) (notesAgain = false, wantNoteSync());
+    }
+  };
+  const wantNoteSync = (): void => {
+    clearTimeout(notesTimer);
+    notesTimer = window.setTimeout(() => void syncNoteCards(), 120);
+  };
+  doc.subscribe((_source, changed) => {
+    if (!changed || [...changed].some((id) => doc.get(id)?.kind === "image")) wantNoteSync();
+  });
+  settings.subscribe((key) => key === "notes.cardShows" && wantNoteSync());
+  wantNoteSync();
   // Make note files: texts on a card (what the Note tool made before notes were files) become notes in the library, their cards in the same place, as wide.
   makeNoteFiles = async () => {
     const texts = [...editor.selection].map((id) => doc.get(id)).filter((o): o is TextObject => o?.kind === "text" && !!o.card);
