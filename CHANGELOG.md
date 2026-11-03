@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.0 — Notes (2026-11-03)
+
+- **Fixed:** in the Note panel, a note's `##` headings were as small as the panel's own title (the dock panels' heading style reached into the note).
+- **Fixed:** a note's preview showed its links between notes as `[[Plan]]`; it shows their words, as the editor does.
+
 ## 0.52.10 — Closed note fix (2026-11-03)
 
 - **Fixed:** a note closed while its last typing was still being handled (a hidden note closing as hidden items lock) no longer throws an error from the editor's slash and autocomplete menus.

@@ -329,7 +329,7 @@ test("a note's preview shows the pictures it links to (and an Obsidian ![[embed]
 
 test("a note on a canvas opens in the note panel (a double-click, or Edit note): the same editor, saved in place, the card follows, renamed, undo never returns an old version", async ({ app }) => {
   const p = app.page;
-  const NOTE = "# On the canvas\n\nFirst words.\n";
+  const NOTE = "# On the canvas\n\nFirst words.\n\n## Part two\n";
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles({ name: "pic.png", mimeType: "image/png", buffer: makePng(60, 40, () => [200, 60, 40, 255]) });
   await p.getByTestId("assets-import-input").setInputFiles({ name: "board note.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) });
@@ -351,6 +351,8 @@ test("a note on a canvas opens in the note panel (a double-click, or Edit note):
   await panel.locator(".panel-head h2").click();
   await expect(panel.locator(".sun-editor-editable h1").first()).toBeVisible();
   expect(await panel.evaluate((el) => [...el.querySelectorAll(".se-toolbar ul")].filter((u) => getComputedStyle(u).overflowY === "auto").length)).toBe(0);
+  // nor its header rules into the note's headings (a ## heading is larger than the words)
+  expect(await panel.evaluate((el) => parseFloat(getComputedStyle(el.querySelector(".sun-editor-editable h2")!).fontSize) > parseFloat(getComputedStyle(el.querySelector(".sun-editor-editable p")!).fontSize))).toBe(true);
   await panel.locator(".sun-editor-editable p").first().click();
   await p.keyboard.press("End");
   await p.keyboard.type(" More words.");

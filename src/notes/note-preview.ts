@@ -74,7 +74,11 @@ async function makePageHtml(name: string, text: string, hash?: string): Promise<
   const kind = noteKindOf(name);
   const { markdownHtml } = await import("./note-markdown"); // (loaded when a preview is made: the editor needs a page, not the unit tests' Node)
   // (Obsidian's `![[cat.png]]`: the picture it embeds)
-  const md = (t: string): string => splitFrontmatter(t).body.replace(/!\[\[([^\[\]|\n]+?)(?:\|[^\[\]\n]*)?\]\]/g, (_m, n: string) => `![${n.trim()}](${WIKI}${encodeURIComponent(n.trim())})`);
+  const md = (t: string): string =>
+    splitFrontmatter(t)
+      .body.replace(/!\[\[([^\[\]|\n]+?)(?:\|[^\[\]\n]*)?\]\]/g, (_m, n: string) => `![${n.trim()}](${WIKI}${encodeURIComponent(n.trim())})`)
+      // (a link between notes shows its words, as in the editor: `[[Plan|shown]]` → shown, `[[Folder/Plan]]` → Folder/Plan)
+      .replace(/\[\[([^\[\]|\n]+?)(?:\|([^\[\]\n]*))?\]\]/g, (_m, n: string, shown?: string) => (shown ?? n).trim());
   const html = kind === "md" ? markdownHtml(md(text)) : kind === "rich" ? richNoteBody(text) : textHtml(text);
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
   for (const n of doc.body.querySelectorAll("script, style, iframe, object, embed, link, meta, video, audio")) n.remove();

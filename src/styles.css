@@ -751,7 +751,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .bookmark-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bookmark input { flex: 1; min-width: 0; font: inherit; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-5); border-bottom: 1px solid var(--hud-border); }
-.layers-panel h2 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--weight-semibold) var(--text-sm) var(--font-ui); }
+.layers-panel h2:not(:where(.viewer-note *)) { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: var(--weight-semibold) var(--text-sm) var(--font-ui); }
 .layers-count { opacity: 0.55; font-weight: 500; margin-left: var(--sp-2); }
 .layers-opacity { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); font-size: var(--text-sm); }
 .layers-opacity input { flex: 1; min-width: 0; }
