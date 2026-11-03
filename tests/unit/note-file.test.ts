@@ -71,6 +71,8 @@ describe("a note's links to other items", () => {
     expect(keepSpelling(`new\n\n${canon}`, canon, file)).toBe(`new\n\n${file}`);
     // One block of the file that the editor writes as two.
     expect(keepSpelling("- a\n\n> q\n\nz\n", "- a\n\n> q\n\nb\n", "- a\n> q\n\nb\n")).toBe("- a\n> q\n\nz\n");
+    // A temporary address is never kept from the file.
+    expect(keepSpelling("![a](a.png)\n", "![a](a.png)\n", "![a](blob:app://x/1)\n")).toBe("![a](a.png)\n");
     // Embeds, and back.
     expect(linksToWiki(wikiToLinks("![[a b.png]] ![[c.png|200]]"))).toBe("![[a b.png]] ![[c.png|200]]");
     expect(readableMarkdown("1. a\n\n   para\n2. b")).toBe("1. a<br><br>para\n2. b");

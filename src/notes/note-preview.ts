@@ -85,7 +85,10 @@ async function makePageHtml(name: string, text: string, hash?: string): Promise<
   for (const n of doc.body.querySelectorAll("script, style, iframe, object, embed, link, meta")) n.remove();
   for (const el of doc.body.querySelectorAll("img, video, audio")) {
     const src = el.getAttribute("src") ?? el.querySelector("source")?.getAttribute("src") ?? "";
-    const found = hash && pictures && src ? await pictures(hash, src).catch(() => null) : null;
+    // (a temporary address saved in the file by an older version: found by the name it carries)
+    const lost = src.startsWith("blob:") ? el.getAttribute("alt") : null;
+    const asked = lost ? `${WIKI}${encodeLinkPart(lost)}` : src;
+    const found = hash && pictures && asked && !(src.startsWith("blob:") && !lost) ? await pictures(hash, asked).catch(() => null) : null;
     const data = found ? await pictureData(found.blob) : null;
     const box = doc.createElement("span");
     box.className = "pic";

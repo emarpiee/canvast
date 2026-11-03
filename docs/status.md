@@ -37,6 +37,14 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.5: pasted pictures (2026-11-04)
+
+- **Implemented:** `shownItems` (temporary address to item, for this run of the app), a repair of stray `blob:` addresses on paste, on open and before a save; `keepSpelling` never keeps one from the file; previews find one by its name.
+- **Tested:** unit (note-file); notes.spec new test, chromium (Firefox cannot make such a paste in a test).
+- **Known limit:** a picture with no name, saved with a dead address from an earlier run of the app, cannot be found.
+- **Unverified:** a real clipboard copy and paste (the test dispatches the paste event).
+- **Committed:** v0.53.5.
+
 ## v0.53.4: a save changes only what was edited (2026-11-04)
 
 - **Implemented:** `keepSpelling` (the file's blocks paired with how the editor writes them; unedited blocks keep the file's text), embeds as pictures from `canvast-wiki:`, `linkDialog` for image, video and audio, `listParagraphs`.

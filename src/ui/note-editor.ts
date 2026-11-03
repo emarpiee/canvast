@@ -8,6 +8,12 @@ import type { NoteKind, NoteStyle, PathTarget } from "../notes/note-file";
 import { splitFrontmatter } from "../notes/frontmatter";
 
 
+/**
+ * Every temporary address a note has shown for a library item, in this run of the app: a note's content copied into another note carries them, and
+ * they stop working when their note closes. Kept after that, to find the item again. (The address is no secret: an item is only shown again if the note may list it.)
+ */
+const shownItems = new Map<string, { hash: string; name: string }>();
+
 /** What a note's attachments can be: what the library chooser lists for each of the editor's buttons. */
 export type AttachKind = "image" | "video" | "audio" | "file";
 
@@ -57,6 +63,8 @@ export interface NoteEditor {
   asText(kind: Exclude<NoteKind, "rich">): { text: string; keepsAll: boolean };
   /** The note as a rich text note's file. */
   asRich(title: string): string;
+  /** Pasted content found its items: wait for this before writing the note. */
+  settle(): Promise<void>;
   /** The editor's content now (given to `saved`, for what was saved). */
   current(): string;
   /** The note was saved (`as` this content, else as it is now): what was typed since stays a change. */
@@ -256,8 +264,18 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     if (!blob) return null;
     const url = URL.createObjectURL(blob);
     links.set(url, link ?? libraryLink(await host.pathOf(item.hash)));
+    shownItems.set(url, { hash: item.hash, name: item.name });
     return url;
   };
+  /**
+   * A temporary address that is not this note's (its content pasted from another note, or saved so before this was fixed): the item it showed,
+   * from what this run of the app remembers, else by the name the picture or file link carries. Null when nothing tells.
+   */
+  const itemOfAddress = async (address: string, name: string): Promise<NoteItem | null> => {
+    const known = shownItems.get(address);
+    return (known && (await host.find({ hash: known.hash }))) ?? ((known?.name ?? name) ? await host.findWiki(known?.name ?? name) : null);
+  };
+  const nameOfMedia = (n: Element): string => n.getAttribute("alt") || n.getAttribute("data-se-file-name") || n.getAttribute("download") || n.getAttribute("title") || "";
   const targetFor = async (item: NoteItem): Promise<HTMLElement | null> => {
     const url = await urlOf(item);
     if (!url) return null;
@@ -282,6 +300,13 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       [...page.body.querySelectorAll<HTMLElement>("[src], [href]")].map(async (n) => {
         const attr = n.hasAttribute("src") ? "src" : "href";
         const link = n.getAttribute(attr)!;
+        // (a note saved with another note's temporary address in it: shown from the item, and its real link written at the next save)
+        if (link.startsWith("blob:")) {
+          const lost = await itemOfAddress(link, nameOfMedia(n));
+          const again = lost && (await urlOf(lost));
+          if (again) n.setAttribute(attr, again);
+          return;
+        }
         // An embed (`![[cat.png]]`): its picture when it is one; else it stays as written.
         if (attr === "src" && link.startsWith(WIKI)) {
           const name = decodeURIComponent(link.slice(WIKI.length));
@@ -561,6 +586,24 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     editor.$.history.push(false);
   };
   el.addEventListener("click", tick, true);
+  // Content that comes in with temporary addresses that are not this note's (pasted or dropped from another note): each gets this note's own, and its real link.
+  const page = (): Element | null => el.querySelector(".sun-editor-editable");
+  let repairing: Promise<void> = Promise.resolve();
+  const repair = async (): Promise<void> => {
+    const stray = [...(page()?.querySelectorAll("[src^='blob:'], [href^='blob:']") ?? [])].filter((n) => !links.has(n.getAttribute("src") ?? n.getAttribute("href") ?? ""));
+    for (const n of stray) {
+      const attr = n.hasAttribute("src") ? "src" : "href";
+      const item = await itemOfAddress(n.getAttribute(attr)!, nameOfMedia(n));
+      const url = item && (await urlOf(item));
+      if (url) {
+        n.setAttribute(attr, url);
+        dirty = true;
+      }
+    }
+  };
+  const strays = new MutationObserver(() => void (repairing = repairing.then(repair)));
+  const watched = page();
+  if (watched) strays.observe(watched, { childList: true, subtree: true, attributes: true, attributeFilter: ["src", "href"] });
   // Drag a size or the font size left or right to change it, as every number of the app (SunEditor's are text, to take a unit). A dragged
   // size keeps the picture's proportion as a typed one does (it is worked out on keyup); a dragged font size is applied on release.
   scrubNumbers(el, undefined, { units: "._se_size_x, ._se_size_y, .__se__font_size" });
@@ -673,6 +716,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       return { text, keepsAll: held(textHtml(text)) === held(now) };
     },
     asRich: (title) => richNoteFile(title, output().replace(/(href|src)="canvast-wiki:([^"]+)"/g, (m, a: string, t: string) => { const p = wikiPath.get(decodeURIComponent(t)); return p ? `${a}="${p}"` : m; })),
+    settle: () => (repairing = repairing.then(repair)),
     current() {
       editsAtCurrent = edits;
       return settled(editor.$.html.get());
@@ -688,6 +732,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     destroy() {
       window.removeEventListener("keydown", keys, true);
       window.removeEventListener("pointerdown", pressed, true);
+      strays.disconnect();
       el.removeEventListener("click", tick, true);
       el.removeEventListener("click", follow, true);
       el.removeEventListener("mouseover", peekOver);

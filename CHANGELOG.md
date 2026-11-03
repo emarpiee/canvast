@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.5 — Notes: pasted pictures (2026-11-04)
+
+- **Fixed:** a note's content pasted into another note keeps its pictures and files. They carried the first note's temporary address, which stops working when that note closes; each now gets the new note's own, and its real link in the file. A note already saved with such an address finds its picture by the name it carries, and has its real link written at the next save.
+
 ## 0.53.4 — Notes: a save changes only what was edited (2026-11-04)
 
 - **Changed:** saving a markdown note changes only the blocks that were edited: the rest stays as the file wrote it (`*` lists, `__bold__`, spacing, an underlined heading).

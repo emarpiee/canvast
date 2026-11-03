@@ -316,6 +316,7 @@ export class OpenNote {
   private async saveNow(leaving: boolean): Promise<boolean> {
     const editor = this.editor;
     if (!editor || this.deps.session.editor.blockEdit()) return false;
+    await editor.settle();
     if (this.kind === "rich") {
       const text = editor.asRich(titleOf(this.name));
       return this.write(text, editor.current());

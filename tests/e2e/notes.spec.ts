@@ -626,6 +626,57 @@ test("Markdown view: what is typed there counts as a change; what a file writes 
   await p.getByTestId("choose-dialog").getByRole("button", { name: "Go on" }).click();
 });
 
+test("a note's content pasted into another note keeps its pictures, after the first note closes; a file saved with a dead address finds them too", async ({ app }) => {
+  test.skip(test.info().project.name === "firefox", "Firefox does not let a test make a paste with its data");
+  const p = app.page;
+  const A = "# From\n\n![pic](pic.png)\n";
+  const DEAD = "# Old save\n\n![pic.png](blob:null/00000000-0000-0000-0000-000000000000)\n";
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles([
+    { name: "pic.png", mimeType: "image/png", buffer: CAT },
+    { name: "a.md", mimeType: "text/markdown", buffer: Buffer.from(A) },
+    { name: "b.md", mimeType: "text/markdown", buffer: Buffer.from("# To\n\nWords.\n") },
+    { name: "dead.md", mimeType: "text/markdown", buffer: Buffer.from(DEAD) },
+  ]);
+  const open = async (name: string): Promise<void> => {
+    await p.locator(`[data-testid="asset-card"][title="${name}"]`).dblclick();
+    await expect(page(p).locator("h1").first()).toBeVisible();
+  };
+  const leave = async (): Promise<void> => {
+    await p.getByTestId("slide-view").locator('[data-act="close"]').click();
+    await expect(p.getByTestId("slide-view")).toBeHidden();
+  };
+  const shows = () => page(p).locator("img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0));
+  await open("a.md");
+  await expect.poll(shows).toEqual([true]);
+  const copied = await page(p).innerHTML();
+  await leave(); // (its address stops working here)
+  await open("b.md");
+  await page(p).locator("h1").evaluate((el, html) => {
+    getSelection()!.collapse(el, el.childNodes.length);
+    const dt = new DataTransfer();
+    dt.setData("text/html", html);
+    dt.setData("text/plain", "x");
+    el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }, copied);
+  await expect.poll(shows).toEqual([true]);
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.notesAsText()[0]!.text)).toContain("(pic.png)");
+  expect(await p.evaluate(() => window.__canvastDebug.notesAsText()[0]!.text)).not.toContain("blob:");
+  await p.keyboard.press("Control+s");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.some((e) => e.name === "b.md" && e.hash !== "")))).toBe(true);
+  await p.waitForTimeout(500);
+  if (await p.getByTestId("choose-dialog").count()) await p.getByTestId("choose-dialog").getByRole("button", { name: "Save" }).click();
+  await p.waitForTimeout(300);
+  await leave();
+  await open("b.md");
+  await expect.poll(shows).toEqual([true]);
+  await leave();
+  // Saved with a dead address by an older version: shown from the name it carries, its real link written at the next save.
+  await open("dead.md");
+  await expect.poll(shows).toEqual([true]);
+  expect(await p.evaluate(() => window.__canvastDebug.notesAsText()[0]!.text)).toContain("(pic.png)");
+});
+
 test("the Note tool (M) makes a note file in the Notes folder, places its card and opens it; Make note files turns a text on a card into one", async ({ app }) => {
   const p = app.page;
   const objs = () => p.evaluate(() => window.__canvastDebug.objects() as unknown as Array<{ id: string; kind: string; assetId?: string; z: number }>);

@@ -313,7 +313,9 @@ function blocksOf(text: string): Array<{ text: string; after: string }> {
  * spelling, so that a save changes only what was edited: `*` lists, `__bold__`, spacing and the like stay as they were.
  */
 export function keepSpelling(now: string, canon: string, file: string): string {
-  if (now.trim() === canon.trim()) return file;
+  // (a block holding a temporary address, saved so by an older version, is written anew: with its real link)
+  const lasting = (t: string): boolean => !t.includes("blob:");
+  if (now.trim() === canon.trim() && lasting(file)) return file;
   const key = (t: string): string => t.replace(/%[0-9A-Fa-f]{2}|<[^>\n]*>/g, "").replace(/[^\p{L}\p{N}]+/gu, "");
   const was = blocksOf(file);
   const can = blocksOf(canon);
@@ -340,7 +342,7 @@ export function keepSpelling(now: string, canon: string, file: string): string {
   const parts = blocksOf(now);
   let out = "";
   for (let p = 0; p < parts.length; ) {
-    const g = groups.find((x) => x.canon.every((c, k) => parts[p + k]?.text === c));
+    const g = groups.find((x) => lasting(x.file) && x.canon.every((c, k) => parts[p + k]?.text === c));
     const last = p + (g?.canon.length ?? 1) >= parts.length;
     out += (g ? g.file : parts[p]!.text) + (last ? "" : g?.after || "\n\n");
     p += g?.canon.length ?? 1;
