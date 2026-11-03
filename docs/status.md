@@ -37,6 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.0: notes release (2026-11-03)
+
+- **Implemented:** the notes work of 0.52.7 to 0.52.10 released together; the Note panel's headings keep their size (`.layers-panel h2` scoped out of `.viewer-note`); previews show `[[links]]` by their words. README brought up to date (Note tool, Notes row, previews, filtered chip) with every browser screenshot taken again and two of notes (`scripts/showcase/shots-notes.mjs`).
+- **Tested:** notes.spec note panel test (heading size; failed before the fix) chromium + firefox; GitHub Tests on the pushed commit before the release.
+- **Unverified:** the desktop screenshot was not taken again (needs the desktop build).
+- **Committed:** v0.53.0, released.
+
 ## v0.52.10: closed note fix (2026-11-03)
 
 - **Implemented:** `NoteSlash` / `NoteAutocomplete` (`ui/note-editor.ts`) skip `onInput` once the editor is destroyed (SunEditor awaits each input plugin in turn; the GitHub stack showed slashCommand.onInput → selection.get after destroy).
