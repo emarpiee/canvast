@@ -6,7 +6,7 @@ import type { AssetFolder, CatalogEntry, Usage } from "./asset-catalog";
 import { folderPath, meta } from "./asset-catalog";
 import { chipOf, extOf } from "./file-kind";
 import type { Extra, Filter } from "./filters";
-import { parseFilter } from "./filters";
+import { parseFilter, typedValue } from "./filters";
 import type { Look } from "./look";
 import { tagIsOrUnder } from "../doc/tags";
 import { evalQuery } from "../search/query";
@@ -21,7 +21,7 @@ export const libraryPaging = { from: 20_000 };
 export type Way = "all" | "name" | "tag";
 type Has = { has(hash: string): boolean };
 export type UsageFilter = "all" | "used" | "unused";
-export type SortKey = "newest" | "name" | "size" | "uses" | "pixels" | "type" | "tags" | "folder" | "favourite" | "width" | "height" | "canvases";
+export type SortKey = "newest" | "name" | "size" | "uses" | "pixels" | "type" | "tags" | "folder" | "favourite" | "width" | "height" | "canvases" | `prop:${string}`;
 /** A listed item: its entry, how it is used, whether its file is there. */
 export type ListedEntry = CatalogEntry & Usage & { present: boolean };
 
@@ -181,7 +181,40 @@ export function sortListed<T extends ListedEntry>(rows: T[], key: SortKey, rever
     canvases: (a, b) => b.canvases - a.canvases,
   };
   const flip = reversed ? -1 : 1;
-  return rows.sort((a, b) => flip * cmp[key](a, b) || (a.hash < b.hash ? -1 : 1));
+  if (key.startsWith("prop:")) {
+    const seen = new Map(rows.map((e) => [e, propValue(e, key.slice(5))]));
+    const typed = new Map([...seen].map(([e, v]) => [e, v === "" ? null : typedValue(v)]));
+    return rows.sort((a, b) => {
+      const x = typed.get(a)!;
+      const y = typed.get(b)!;
+      if (!x || !y) return x ? -1 : y ? 1 : byName(a, b) || (a.hash < b.hash ? -1 : 1); // (what does not have it comes last, either way)
+      const c = "n" in x && "n" in y ? x.n - y.n : "n" in x ? -1 : "n" in y ? 1 : collator.compare(x.t, y.t);
+      return flip * c || (a.hash < b.hash ? -1 : 1);
+    });
+  }
+  const by = cmp[key as Exclude<SortKey, `prop:${string}`>];
+  return rows.sort((a, b) => flip * by(a, b) || (a.hash < b.hash ? -1 : 1));
+}
+
+/** What an item's property says (`description` is its Description); empty when it has none. A name is found in capitals or not. */
+export function propValue(e: CatalogEntry, key: string): string {
+  const k = key.toLowerCase();
+  const m = meta(e);
+  if (k === "description") return m.note;
+  return m.fields.find((f) => f.key.toLowerCase() === k)?.value ?? "";
+}
+
+/** The values a property has across items, the most used first, each item of a list on its own (the details panel suggests them). */
+export function propValues(entries: Iterable<CatalogEntry>, key: string, most = 50): string[] {
+  const k = key.toLowerCase();
+  const counts = new Map<string, number>();
+  for (const e of entries) {
+    for (const f of meta(e).fields) {
+      if (f.key.toLowerCase() !== k || f.value.includes("\n")) continue;
+      for (const v of f.value.split(/,\s+/)) if (v.trim()) counts.set(v.trim(), (counts.get(v.trim()) ?? 0) + 1);
+    }
+  }
+  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, most).map(([v]) => v);
 }
 
 /**

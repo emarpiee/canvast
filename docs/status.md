@@ -37,6 +37,14 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.22: properties (2026-11-04)
+
+- **Implemented:** `property:`/`description:` keywords and `typedTest` (`filters.ts`), `prop:<key>` sort, `propValue`, `propValues` (`library-match.ts`, both builds; `fieldValues` over the desktop bridge), property columns as `prop:<key>` column ids with `--o-p<n>` order, `SavedView` per saved search in the library's UI state, a Saved searches sidebar section, `notes.cardProps` with `setShownProps` (`note-preview.ts`), `|` and `>` blocks (`frontmatter.ts`), `mergeProps`, `withPastedProps`.
+- **Tested:** unit frontmatter and look-filters tests; organize.spec properties test, notes.spec paste and card label tests (chromium); desktop.spec paged library extended; a real paste in the desktop build, reading the saved file.
+- **Known failures:** none.
+- **Unverified:** the clipboard HTML of Obsidian's reading view is written from memory, not copied from Obsidian. Labels on cards read the note's file, so a property changed only in the library does not show until it reaches the file. Undoing a paste keeps its properties for the next save.
+- **Committed:** v0.53.22.
+
 ## v0.53.21: notes copied from Obsidian (2026-11-04)
 
 - **Implemented:** `pastedMarkdown` (Obsidian's source on the clipboard, read as a note is) and `pastedHtml` (the page it drew, embeds and links made the app's own), through `onPaste`; `codeLines` and `cellPictures` shared with `markdownHtml`.

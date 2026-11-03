@@ -2397,8 +2397,8 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 .hud-readout .hud-save { padding: 0; text-align: left; }
 
 /* More properties as columns, and headers that sort (ADR 0091). */
-.asset-width, .asset-height, .asset-canvases { display: none; }
-.assets-body.is-list .asset-width, .assets-body.is-list .asset-height, .assets-body.is-list .asset-canvases { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); color: var(--hud-muted); font-variant-numeric: tabular-nums; }
+.asset-width, .asset-height, .asset-canvases, .asset-prop { display: none; }
+.assets-body.is-list .asset-width, .assets-body.is-list .asset-height, .assets-body.is-list .asset-canvases, .assets-body.is-list .asset-prop { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); color: var(--hud-muted); font-variant-numeric: tabular-nums; }
 .assets-body.is-list .asset-width, .assets-body.is-list .assets-list-head [data-col="width"] { order: var(--o-width, 11); }
 .assets-body.is-list .asset-height, .assets-body.is-list .assets-list-head [data-col="height"] { order: var(--o-height, 12); }
 .assets-body.is-list .asset-canvases, .assets-body.is-list .assets-list-head [data-col="canvases"] { order: var(--o-canvases, 13); }
@@ -2972,3 +2972,8 @@ dialog.reset-dialog h3 { margin: var(--sp-6) 0 var(--sp-3); font-size: var(--tex
 .asset-more[data-metadata] { padding: var(--sp-4) var(--sp-5); border: 1px solid var(--hud-border); border-radius: var(--r-lg); }
 .asset-more[data-metadata] h4 { margin-top: var(--sp-5); }
 .assets-import { flex: none; }
+.asset-note-label { display: block; margin-bottom: var(--sp-2); font-size: var(--text-sm); color: var(--hud-muted); }
+.asset-field textarea.field-value { resize: vertical; min-width: 0; }
+.cols-add { display: flex; gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.cols-add input { flex: 1; min-width: 0; }
+.asset-field input::-webkit-calendar-picker-indicator { display: none !important; }

@@ -1,7 +1,7 @@
 import { externalFolder } from "../storage/external-folder";
 import { askHiddenPassword } from "../ui/hidden-access";
 import { noteKindOf } from "../notes/note-file";
-import { CARD_SCALE, notePageHeight, setNoteLook, setNotePictures } from "../notes/note-preview";
+import { CARD_SCALE, notePageHeight, setNoteLook, setNotePictures, setShownProps } from "../notes/note-preview";
 import { anyNoteDirty, leaveAllNotes } from "../ui/note-session";
 import { mountNotePanel } from "../ui/note-panel";
 import type { NotePanelDeps } from "../ui/note-panel";
@@ -528,6 +528,10 @@ async function start(): Promise<void> {
   let redrawNoteCards = (): void => undefined; // (set once the canvas and the library are there)
   const applyNoteLook = (): void => void (setNoteLook(noteLookNow()) && redrawNoteCards());
   settings.subscribe((key) => (key === "notes.look" || key === "ui.theme") && applyNoteLook());
+  setShownProps(settings.get("notes.cardProps"));
+  settings.subscribe((key) => {
+    if (key === "notes.cardProps" && setShownProps(settings.get("notes.cardProps"))) redrawNoteCards();
+  });
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyNoteLook);
   // A note's preview (its card, its thumbnail) shows the pictures, videos and sounds it links to: a picture's own file, else the
   // item's library thumbnail (a video's picture, a sound's waveform). Never a hidden item's (a preview is kept as a thumbnail).
@@ -1997,7 +2001,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   doc.subscribe((_source, changed) => {
     if (!changed || [...changed].some((id) => doc.get(id)?.kind === "image")) wantNoteSync();
   });
-  settings.subscribe((key) => key === "notes.cardShows" && wantNoteSync());
+  settings.subscribe((key) => {
+    if (key === "notes.cardProps") pageHeights.clear(); // (labels take a line of the page)
+    if (key === "notes.cardShows" || key === "notes.cardProps") wantNoteSync();
+  });
   wantNoteSync();
   // Make note files: texts on a card (what the Note tool made before notes were files) become notes in the library, their cards in the same place, as wide.
   makeNoteFiles = async () => {

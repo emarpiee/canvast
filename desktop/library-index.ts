@@ -6,7 +6,7 @@
  */
 import type { AssetFolder, CatalogEntry } from "../src/assets/asset-catalog";
 import { FOLDERS_KEY } from "../src/assets/asset-catalog";
-import { countSide, inScope, matcher, sortListed } from "../src/assets/library-match";
+import { countSide, inScope, matcher, propValues, sortListed } from "../src/assets/library-match";
 import type { ListedEntry, SortKey, UsageFilter, Way } from "../src/assets/library-match";
 import { parseQuery } from "../src/search/query";
 import type { Library } from "./library-db";
@@ -128,6 +128,11 @@ export class LibraryIndex {
     const keys = new Set<string>();
     for (const e of this.all().values()) for (const f of e.fields ?? []) if (f.key) keys.add(f.key);
     return [...keys].sort((a, b) => a.localeCompare(b));
+  }
+
+  /** The values a property has, the most used first (for the inspector's suggestions). */
+  fieldValues(key: string): string[] {
+    return propValues(this.all().values(), key);
   }
 
   /** Forget everything (the database was emptied). */

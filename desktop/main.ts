@@ -711,6 +711,8 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
         return index!.counts(args[0] === true);
       case "fieldKeys":
         return index!.fieldKeys();
+      case "fieldValues":
+        return index!.fieldValues(String(args[0]));
       case "listed": {
         // Some items for the view to draw: their entries, and whether each one's file is there (looked at for them alone).
         const rows = l.get(hashes(args[0]));

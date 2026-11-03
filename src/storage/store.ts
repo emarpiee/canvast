@@ -113,6 +113,8 @@ export interface LibraryPages {
   /** The sidebar's counts; of the hidden items in hidden mode (`hidden`). */
   counts(hidden?: boolean): Promise<{ hidden: number; shown: number; favourites: number; unfiled: number; tags: Array<[string, string, number]>; types: Array<[string, number]>; folders: Array<[string, number]> }>;
   fieldKeys(): Promise<string[]>;
+  /** The values a property has across the items, the most used first. */
+  fieldValues(key: string): Promise<string[]>;
   /** Some items' entries, with whether each one's file is there. */
   listed(hashes: readonly string[]): Promise<Array<CatalogEntry & { present: boolean }>>;
   folders(): Promise<AssetFolder[]>;

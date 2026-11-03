@@ -1,6 +1,6 @@
 import { WIKI, encodeLinkPart, noteKindOf, outsideCode, richNoteBody, textHtml } from "./note-file";
 import { cardContext } from "../assets/card";
-import { splitFrontmatter } from "./frontmatter";
+import { NO_META, fileMeta, splitFrontmatter, type NoteMeta } from "./frontmatter";
 import { NOTE_PAGE_PIXEL_W } from "../doc/model";
 
 // The picture of a note (its library thumbnail and its card on a canvas): the top of its page, as the notes editor lays it out, drawn
@@ -24,12 +24,26 @@ blockquote{border-left:3px solid oklch(0.82 0.01 250);padding-left:.8em;color:ok
 pre,code{font-family:ui-monospace,monospace;background:oklch(0.94 0.005 250);border-radius:4px}pre{padding:.5em .7em;white-space:pre-wrap}
 table{border-collapse:collapse}td,th{border:1px solid oklch(0.82 0.01 250);padding:.2em .45em}hr{border:0;border-top:1px solid oklch(0.82 0.01 250)}
 li:has(>input[type=checkbox]:first-child){list-style:none;margin-left:-1.2em}.media{position:relative;display:inline-block;max-width:100%}.media img{display:block;max-width:100%;height:auto;border-radius:4px}.is-video::after,.is-audio::after{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:2.4em;height:2.4em;border-radius:50%;background:oklch(0.2 0 0 / .6);color:#fff;font-size:1.4em;line-height:2.4em;text-align:center}.is-video::after{content:"▶"}.is-audio::after{content:"♪"}a{color:oklch(0.5 0.1 200)}.pic{display:inline-block;padding:.7em 1.1em;border-radius:4px;background:oklch(0.9 0.005 250);color:oklch(0.48 0.01 250);font-size:.85em}
+.props{display:flex;flex-wrap:wrap;gap:.35em;margin:0 0 .7em}.prop{padding:.1em .6em;border-radius:1em;background:oklch(0.92 0.01 250);color:oklch(0.4 0.01 250);font-size:.8em}.dark .prop{background:oklch(0.33 0.01 250);color:oklch(0.82 0.01 250)}
 .page.dark{background:oklch(0.23 0.01 250);color:oklch(0.9 0.005 250)}.dark blockquote{border-left-color:oklch(0.42 0.01 250);color:oklch(0.72 0.01 250)}.dark pre,.dark code{background:oklch(0.3 0.01 250)}.dark td,.dark th{border-color:oklch(0.4 0.01 250)}.dark a{color:oklch(0.76 0.1 200)}.dark .pic{background:oklch(0.32 0.01 250);color:oklch(0.75 0.01 250)}`;
 /** Light or dark paper (Settings > Notes > Preview look); a change is drawn by whoever shows the cards. */
 export type NoteLook = "light" | "dark";
 let look: NoteLook = "light";
 /** Whether the look changed. */
 export const setNoteLook = (l: NoteLook): boolean => (l === look ? false : ((look = l), true));
+
+/** The properties a note's card and thumbnail show over its words (Settings > Notes > Note cards show properties), by name. */
+let shownProps: readonly string[] = [];
+/** Whether the list changed; a change is drawn by whoever shows the cards. */
+export const setShownProps = (list: string): boolean => {
+  const next = list.split(",").map((k) => k.trim().toLowerCase()).filter(Boolean);
+  if (next.join() === shownProps.join()) return false;
+  shownProps = next;
+  return true;
+};
+/** What a note's file says for a property's name: each tag, its description, or a property's value on one line. */
+const propWords = (meta: NoteMeta, key: string): string[] =>
+  key === "tags" || key === "tag" ? meta.tags : key === "description" ? (meta.note ? [meta.note.split("\n")[0]!] : []) : meta.fields.filter((f) => f.key.toLowerCase() === key && f.value).map((f) => f.value.split("\n")[0]!);
 
 /** What a link in a note shows: a picture (a picture item's own file, else its library thumbnail) and the item's type. */
 export type NotePictureSource = (noteHash: string, link: string) => Promise<{ blob: Blob; type: string } | null>;
@@ -58,7 +72,7 @@ async function pictureData(blob: Blob): Promise<{ url: string; w: number; h: num
 /** The last pages made (a card is measured, then drawn: its pictures are read and packed once). */
 const made = new Map<string, Promise<string>>();
 function pageHtml(name: string, text: string, hash?: string): Promise<string> {
-  const key = `${hash ?? ""}|${name}|${text}`; // (the whole text: two versions alike in length and start, 66px and 16px, are not one page)
+  const key = `${hash ?? ""}|${name}|${shownProps.join()}|${text}`; // (the whole text: two versions alike in length and start, 66px and 16px, are not one page)
   let p = made.get(key);
   if (!p) {
     p = makePageHtml(name, text, hash);
@@ -82,6 +96,13 @@ async function makePageHtml(name: string, text: string, hash?: string): Promise<
     );
   const html = kind === "md" ? markdownHtml(md(text)) : kind === "rich" ? richNoteBody(text) : textHtml(text);
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
+  const badges = shownProps.flatMap((k) => propWords(kind ? (fileMeta(kind, text) ?? NO_META) : NO_META, k));
+  if (badges.length) {
+    const row = doc.createElement("p");
+    row.className = "props";
+    row.append(...badges.map((b) => Object.assign(doc.createElement("span"), { className: "prop", textContent: b })));
+    doc.body.prepend(row);
+  }
   for (const n of doc.body.querySelectorAll("script, style, iframe, object, embed, link, meta")) n.remove();
   for (const el of doc.body.querySelectorAll("img, video, audio")) {
     const src = el.getAttribute("src") ?? el.querySelector("source")?.getAttribute("src") ?? "";

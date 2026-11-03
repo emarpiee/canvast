@@ -5,7 +5,7 @@ import { align, anchor, audio, audioGallery, autocomplete, backgroundColor, bloc
 import type { SunEditor } from "suneditor/types";
 import { FENCE_TICK, WIKI, keepSpelling, libraryLink, linkTarget, linksToWiki, obsidianMarkdown, richNoteBody, richNoteFile, textHtml, wikiToLinks } from "../notes/note-file";
 import type { NoteKind, NoteStyle, PathTarget } from "../notes/note-file";
-import { splitFrontmatter } from "../notes/frontmatter";
+import { splitFrontmatter, type Prop } from "../notes/frontmatter";
 
 
 /**
@@ -57,6 +57,8 @@ export interface NoteHost {
 }
 
 export interface NoteEditor {
+  /** Properties pasted into the note and not saved yet. */
+  pastedProps(): readonly Prop[];
   /** Edited since it was opened or last saved. */
   readonly dirty: boolean;
   /** The note as a markdown or plain text file, and whether that keeps everything in it (else formatting would be lost). */
@@ -428,6 +430,8 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   };
 
   let dirty = false;
+  /** Properties pasted with a note from Obsidian, until the next save puts them in the file. */
+  const pasted: Prop[] = [];
   /**
    * The Markdown and Code views show the note as text and, coming back, read it again from that text: markdown keeps no picture sizes,
    * spacing or styles. Left without a change to that text, the note comes back as it was, not read again.
@@ -503,12 +507,14 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
         if (!words.trim() || /\n/.test(words) || (!wiki && !url)) {
           // From Obsidian: its source, else the page it drew, read as a note's own (its pictures found in the library, a code block's lines kept).
           if (opts.kind === "txt") return undefined;
-          const source = pastedMarkdown(text);
+          const source = pastedMarkdown((event as ClipboardEvent).clipboardData?.getData("text/plain") ?? "");
           const drawn = source ? null : pastedHtml((event as ClipboardEvent).clipboardData?.getData("text/html") ?? "");
-          if (!source && !drawn) return undefined;
-          const html = await fromLibrary(source ? markdownHtml(wikiToLinks(source)) : drawn!, host.dir);
+          const got = source ?? drawn;
+          if (!got) return undefined;
+          pasted.push(...got.props);
           dirty = true;
-          return $.html.clean(html, { forceFormat: false, whitelist: null, blacklist: null });
+          const html = await fromLibrary(source ? markdownHtml(wikiToLinks(source.content)) : drawn!.content, host.dir);
+          return html.trim() ? $.html.clean(html, { forceFormat: false, whitelist: null, blacklist: null }) : false;
         }
         const a = wiki ? wikiLink(wiki[1]!.trim(), words) : Object.assign(document.createElement("a"), { href: url!, textContent: words });
         if (!$.html.insertNode(a, { skipCharCount: false })) return undefined;
@@ -751,11 +757,13 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     },
     asRich: (title) => richNoteFile(title, output().replace(/(href|src)="canvast-wiki:([^"]+)"/g, (m, a: string, t: string) => { const p = wikiPath.get(decodeURIComponent(t)); return p ? `${a}="${p}"` : m; })),
     settle: () => (repairing = repairing.then(repair)),
+    pastedProps: () => pasted,
     current() {
       editsAtCurrent = edits;
       return settled(editor.$.html.get());
     },
     saved(as) {
+      pasted.length = 0;
       const now = settled(editor.$.html.get());
       // (typed while it was being saved: still a change. Else the editor's own late touches, a picture's size once it has loaded, are no change.)
       const typed = as !== undefined && edits !== editsAtCurrent;

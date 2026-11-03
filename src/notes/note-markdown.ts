@@ -1,5 +1,6 @@
 import { helper } from "suneditor";
 import { WIKI, encodeLinkPart, readableMarkdown } from "./note-file";
+import { parseProps, splitFrontmatter, type Prop } from "./frontmatter";
 
 /** A code block's lines as `<br>`: the editor drops a bare newline there. Its words may be split into coloured parts, a newline alone in one. */
 function codeLines(pre: Element): void {
@@ -25,16 +26,22 @@ function cellPictures(root: ParentNode, doc: Document): void {
   }
 }
 
-/** Markdown on the clipboard that the editor would not read as it stands (Obsidian's own source: `![[embeds]]`, properties, `[[links]]` and `[^footnotes]` over lines), ready for `markdownHtml`; else null. Properties stay visible, as a code block: they are the words pasted, not this note's own. */
-export function pastedMarkdown(text: string): string | null {
+/** What is pasted from Obsidian: as this note's content, and its properties, which go in with the note's own at the next save. */
+export interface Pasted<T> {
+  content: T;
+  props: Prop[];
+}
+
+/** Markdown on the clipboard that the editor would not read as it stands (Obsidian's own source: `![[embeds]]`, properties, `[[links]]` and `[^footnotes]` over lines), ready for `markdownHtml`; else null. */
+export function pastedMarkdown(text: string): Pasted<string> | null {
   const t = text.replace(/\r\n/g, "\n");
-  const props = /^---\n([\s\S]*?)\n---(?:\n|$)/.exec(t);
+  const { props, body } = splitFrontmatter(t);
   if (!props && !/!\[\[/.test(t) && !(t.includes("\n") && /\[\[|\[\^/.test(t))) return null;
-  return props ? `\`\`\`yaml\n${props[1]}\n\`\`\`\n\n${t.slice(props[0].length)}` : t;
+  return { content: body, props: props ?? [] };
 }
 
 /** What Obsidian puts on the clipboard as HTML (a page it drew, when no source came with it), with its embeds and links as this app's own; else null. */
-export function pastedHtml(html: string): string | null {
+export function pastedHtml(html: string): Pasted<string> | null {
   if (!/internal-embed|internal-link|frontmatter|\bsrc="app:\/\//.test(html)) return null;
   const doc = new DOMParser().parseFromString(html, "text/html");
   const picture = (name: string, alt: string): HTMLImageElement => {
@@ -43,7 +50,8 @@ export function pastedHtml(html: string): string | null {
     img.setAttribute("alt", alt);
     return img;
   };
-  for (const n of doc.body.querySelectorAll(".copy-code-button")) n.remove();
+  const props = [...doc.body.querySelectorAll(".frontmatter")].flatMap((n) => parseProps((n.textContent ?? "").trim().split("\n")));
+  for (const n of doc.body.querySelectorAll(".copy-code-button, .frontmatter, .metadata-container")) n.remove();
   for (const n of doc.body.querySelectorAll(".internal-embed[src]")) {
     const name = n.getAttribute("src")!;
     n.replaceWith(picture(name, name.split("/").pop()!));
@@ -60,7 +68,7 @@ export function pastedHtml(html: string): string | null {
   for (const a of doc.body.querySelectorAll("a.internal-link[data-href]")) a.setAttribute("href", `${WIKI}${encodeLinkPart(a.getAttribute("data-href")!)}`);
   for (const pre of doc.body.querySelectorAll("pre")) codeLines(pre);
   cellPictures(doc.body, doc);
-  return doc.body.innerHTML;
+  return { content: doc.body.innerHTML, props };
 }
 
 /**

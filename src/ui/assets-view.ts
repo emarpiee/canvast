@@ -23,9 +23,10 @@ import { fontSampleHtml, showFont } from "./font-specimen";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actions";
 import { LIBRARY_ROWS, searchHelpButton, wireSearchHelp } from "./search-help";
 import { ASSETS_RECENT, rememberSearch } from "../search/history";
+import { byUse, parseSaved, sameSearch } from "../search/saved";
 import { paintRecent, paintSaveToggle, saveToggleHtml, wireRecent, wireSaveToggle, type SavedStore } from "./search-recent";
 import { evalQuery, parseQuery, type Query } from "../search/query";
-import { countSide as countSideOf, inScope as inScopeOf, libraryPaging, matcher, pickedKeys, sortListed, togglePicked, type LibraryQuery, type SideCounts, type SortKey, type UsageFilter } from "../assets/library-match";
+import { countSide as countSideOf, inScope as inScopeOf, libraryPaging, matcher, pickedKeys, propValue, propValues, sortListed, togglePicked, type LibraryQuery, type SideCounts, type SortKey, type UsageFilter } from "../assets/library-match";
 import { LOOK_SIZE, lookOf, similarGroups, type Look } from "../assets/look";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
@@ -127,7 +128,7 @@ const THUMB_MAKERS = 6;
 /** "Where it is used" lists this many canvases, then a button for the rest. */
 const PLACES_SHOWN = 5;
 /** A list of the sidebar (folders, file types, tags) shows this many rows before a "Show more" button. */
-const SIDE_SHOWN = { folders: 8, types: 8, tags: 12, ctags: 12 } as const;
+const SIDE_SHOWN = { folders: 8, types: 8, tags: 12, ctags: 12, saved: 8 } as const;
 /** How many loaded thumbnails are kept ready to show again. */
 const THUMB_URLS_KEPT = 3000;
 /** How often the library is drawn again while the looks of the pictures are being read. */
@@ -151,16 +152,21 @@ const COLUMNS = [
   { id: "height", label: "Height", min: 76, grow: 0 },
   { id: "canvases", label: "Canvases", min: 90, grow: 0 },
 ] as const;
-type ColumnId = (typeof COLUMNS)[number]["id"];
-const DEFAULT_COLUMN_ORDER: readonly ColumnId[] = COLUMNS.map((c) => c.id);
+type StaticColumn = (typeof COLUMNS)[number]["id"];
+/** A column that shows a property of the items (`prop:status`): chosen in the List columns panel, also a sort (the same words). */
+type PropColumn = `prop:${string}`;
+type ColumnId = StaticColumn | PropColumn;
+const isPropColumn = (c: string): c is PropColumn => c.startsWith("prop:");
+const colOf = (id: ColumnId): { id: ColumnId; label: string; min: number; grow: number } => (isPropColumn(id) ? { id, label: id.slice(5), min: 100, grow: 0.8 } : COLUMNS.find((c) => c.id === id)!);
+const DEFAULT_COLUMN_ORDER: readonly StaticColumn[] = COLUMNS.map((c) => c.id);
 const DEFAULT_HIDDEN: readonly ColumnId[] = ["added", "folder", "favourite", "width", "height", "canvases"];
 /** A column's track in the list's grid: a fixed width, or a share of the room left over (never narrower than its minimum). */
-const trackOf = (c: (typeof COLUMNS)[number]): string => (c.grow ? `minmax(${c.min}px, ${c.grow}fr)` : `${c.min}px`);
+const trackOf = (c: ReturnType<typeof colOf>): string => (c.grow ? `minmax(${c.min}px, ${c.grow}fr)` : `${c.min}px`);
 
 
 
 /** The order a column header sorts by (a click), and whether that order is high to low or A to Z, newest first and so on when not reversed. */
-const SORT_OF: Record<ColumnId, { key: SortKey; desc: boolean }> = {
+const SORT_OF: Record<StaticColumn, { key: SortKey; desc: boolean }> = {
   name: { key: "name", desc: false },
   pixels: { key: "pixels", desc: true },
   type: { key: "type", desc: false },
@@ -174,6 +180,18 @@ const SORT_OF: Record<ColumnId, { key: SortKey; desc: boolean }> = {
   height: { key: "height", desc: true },
   canvases: { key: "canvases", desc: true },
 };
+/** A column's head in the list. */
+const headCell = (c: { id: string; label: string }): string =>
+  `<span data-col="${esc(c.id)}" draggable="true" role="columnheader" aria-sort="none" title="Click to sort by ${esc(c.label.toLowerCase())}; drag to move this column">${esc(c.label)}<i class="col-sort" aria-hidden="true"></i><i class="col-resize" data-resize="${esc(c.id)}" title="Drag to resize this column (double-click: its usual width)" aria-hidden="true"></i></span>`;
+const sortOfCol = (id: ColumnId): { key: SortKey; desc: boolean } => (isPropColumn(id) ? { key: id, desc: false } : SORT_OF[id]);
+/** A saved search's look: it comes back with the search, so a search can be a view of the library. */
+interface SavedView {
+  layout: "grid" | "list";
+  order: ColumnId[];
+  hidden: ColumnId[];
+  sort: string;
+  reversed: boolean;
+}
 
 
 /** Fields that take typed text: shortcuts keep out of them (a checkbox or a slider is not one). */
@@ -183,7 +201,7 @@ const TYPING = 'input:not([type="checkbox"]):not([type="range"]), textarea, sele
 const DRAG_STACK = 5;
 
 /** The library sidebar's sections, in their default order (the order can be changed by dragging them). */
-const SIDE_SECTIONS = ["folders", "types", "tags", "ctags"] as const;
+const SIDE_SECTIONS = ["folders", "types", "tags", "ctags", "saved"] as const;
 /** The details panel's sections, in their default order (moved the same way). */
 const DETAIL_SECTIONS = ["file", "organize", "notes", "links", "where"] as const;
 
@@ -235,7 +253,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <nav class="assets-side" data-testid="assets-side" aria-label="Library"></nav>
       <div class="col-grip" data-grip="side" data-testid="side-grip" role="separator" aria-orientation="vertical" aria-label="Resize the library panel" title="Drag to resize the library panel (double-click to reset)" tabindex="0"></div>
       <div class="assets-main">
-        <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map((c) => `<span data-col="${c.id}" draggable="true" role="columnheader" aria-sort="none" title="Click to sort by ${c.label.toLowerCase()}; drag to move this column">${c.label}<i class="col-sort" aria-hidden="true"></i><i class="col-resize" data-resize="${c.id}" title="Drag to resize this column (double-click: its usual width)" aria-hidden="true"></i></span>`).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
+        <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map(headCell).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
         <div class="assets-filtered" data-testid="assets-filtered" role="status" hidden>${ICONS.funnelX}<span class="assets-filtered-text"></span><button type="button" data-action="show-all" data-testid="assets-show-all">Show all items</button></div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
           <button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.arrowLeft}</button>
@@ -327,7 +345,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const filteredText = filteredChip.querySelector<HTMLElement>(".assets-filtered-text")!;
   /** Sort order reversed from its usual one (newest, A to Z, largest and most used first). */
   let reversed = false;
-  const SORT_LABEL: Record<SortKey, [usual: string, reversed: string]> = {
+  const SORT_LABEL: Record<Exclude<SortKey, PropColumn>, [usual: string, reversed: string]> = {
     newest: ["Newest first", "Oldest first"],
     name: ["Name A–Z", "Name Z–A"],
     size: ["Largest first", "Smallest first"],
@@ -342,16 +360,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     canvases: ["On most canvases", "On fewest canvases"],
   };
   /** The order named in words, on the choice and on the button, so the direction is never a guess. */
+  const sortLabel = (key: string): [string, string] => (isPropColumn(key) ? [`${key.slice(5)}: low to high`, `${key.slice(5)}: high to low`] : SORT_LABEL[key as keyof typeof SORT_LABEL]);
   const showSort = (): void => {
-    for (const o of sortSel.options) o.textContent = SORT_LABEL[o.value as SortKey][reversed ? 1 : 0];
-    const now = SORT_LABEL[sortSel.value as SortKey][reversed ? 1 : 0];
-    const other = SORT_LABEL[sortSel.value as SortKey][reversed ? 0 : 1];
+    for (const o of sortSel.options) o.textContent = sortLabel(o.value)[reversed ? 1 : 0];
+    const now = sortLabel(sortSel.value)[reversed ? 1 : 0];
+    const other = sortLabel(sortSel.value)[reversed ? 0 : 1];
     sortDirBtn.setAttribute("aria-pressed", String(reversed));
     sortDirBtn.setAttribute("aria-label", `Sorted: ${now}. Reverse the order`);
     sortDirBtn.title = `Sorted: ${now}. Click for ${other}.`;
     // The list's headers show the sorted column and its direction, like a table's.
     for (const h of root.querySelectorAll<HTMLElement>(".assets-list-head [data-col]")) {
-      const o = SORT_OF[h.dataset["col"] as ColumnId];
+      const o = sortOfCol(h.dataset["col"] as ColumnId);
       const on = o.key === sortSel.value;
       const down = o.desc !== reversed;
       h.setAttribute("aria-sort", on ? (down ? "descending" : "ascending") : "none");
@@ -367,7 +386,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; expanded: string[]; sections: string[]; detailSections: string[]; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedView>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -384,7 +403,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     const known = new Set<string>(DEFAULT_COLUMN_ORDER);
     if (Array.isArray(saved.order)) {
-      const order = saved.order.filter((c, i, a) => known.has(c) && a.indexOf(c) === i);
+      const order = saved.order.filter((c, i, a) => (known.has(c) || isPropColumn(c)) && a.indexOf(c) === i);
       ui.order = [...order, ...DEFAULT_COLUMN_ORDER.filter((c) => !order.includes(c))];
     }
     if (typeof saved.sideW === "number" && saved.sideW >= SIDE_W.min && saved.sideW <= SIDE_W.max) ui.sideW = saved.sideW;
@@ -393,7 +412,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (Array.isArray(saved.closed)) ui.closed = saved.closed.filter((c) => typeof c === "string").slice(0, 8);
     if (Array.isArray(saved.expanded)) ui.expanded = saved.expanded.filter((c) => typeof c === "string").slice(0, 8);
     if (saved.colW && typeof saved.colW === "object") {
-      for (const c of COLUMNS) {
+      for (const c of ui.order.map(colOf)) {
         const w = (saved.colW as Record<string, unknown>)[c.id];
         if (typeof w === "number" && w >= c.min && w <= COL_W_MAX) ui.colW[c.id] = Math.round(w);
       }
@@ -404,6 +423,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       ui.filters = { usage: typeof f.usage === "string" ? f.usage : "all", sort: typeof f.sort === "string" ? f.sort : "newest", reversed: f.reversed === true, scope: typeof f.scope === "string" ? f.scope : "all" };
     }
     if (Array.isArray(saved.sections)) ui.sections = sectionOrder(saved.sections, SIDE_SECTIONS);
+    if (saved.views && typeof saved.views === "object") ui.views = saved.views;
     if (Array.isArray(saved.detailSections)) ui.detailSections = sectionOrder(saved.detailSections, DETAIL_SECTIONS);
     if (Array.isArray(saved.hidden)) {
       ui.hidden = saved.hidden.filter((c) => known.has(c) && c !== "name");
@@ -416,6 +436,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   }
   // (the kept filters: an option the menus do not have any more is not taken)
   if ([...usageSel.options].some((o) => o.value === ui.filters.usage)) usageSel.value = ui.filters.usage;
+  /** The sort menu's properties: those in the library, those shown as columns, and the one sorted by. */
+  const sortProps = (keys: readonly string[]): void => {
+    const wanted = [...new Set([...keys.map((k) => `prop:${k}`), ...ui.order.filter(isPropColumn), ...(isPropColumn(sortSel.value) ? [sortSel.value] : []), ...(isPropColumn(ui.filters.sort) ? [ui.filters.sort] : [])])];
+    let group = sortSel.querySelector("optgroup");
+    if (!wanted.length) return void group?.remove();
+    if (!group) {
+      group = document.createElement("optgroup");
+      group.label = "Properties";
+      sortSel.append(group);
+    }
+    const now = sortSel.value;
+    group.replaceChildren(...wanted.map((v) => Object.assign(document.createElement("option"), { value: v, textContent: sortLabel(v)[reversed ? 1 : 0] })));
+    sortSel.value = now;
+  };
+  sortProps([]);
   if ([...sortSel.options].some((o) => o.value === ui.filters.sort)) sortSel.value = ui.filters.sort;
   reversed = ui.filters.reversed;
   showSort();
@@ -445,10 +480,22 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const shown = ui.order.filter((c) => !ui.hidden.includes(c));
     ui.order.forEach((c, i) => body.style.setProperty(`--o-${c}`, String(i + 1)));
     for (const c of DEFAULT_COLUMN_ORDER) body.classList.toggle(`hide-${c}`, ui.hidden.includes(c));
+    // (a column of a property has no name in the style sheet: its head and its cells take their place from a number)
+    const props = ui.order.filter(isPropColumn);
+    for (const h of listHead.querySelectorAll<HTMLElement>('[data-col^="prop:"]')) if (!props.includes(h.dataset["col"] as PropColumn)) h.remove();
+    props.forEach((c, i) => {
+      body.style.setProperty(`--o-p${i}`, String(ui.order.indexOf(c) + 1));
+      let h = [...listHead.querySelectorAll<HTMLElement>('[data-col^="prop:"]')].find((x) => x.dataset["col"] === c);
+      if (!h) {
+        listHead.insertAdjacentHTML("beforeend", headCell(colOf(c)));
+        h = listHead.lastElementChild as HTMLElement;
+      }
+      h.style.order = `var(--o-p${i})`;
+    });
     // (a column resized by its header's edge keeps that width; the others share the room as usual)
-    body.style.setProperty("--cols", ["56px", ...shown.map((c) => (ui.colW[c] ? `${ui.colW[c]}px` : trackOf(COLUMNS.find((x) => x.id === c)!)))].join(" "));
+    body.style.setProperty("--cols", ["56px", ...shown.map((c) => (ui.colW[c] ? `${ui.colW[c]}px` : trackOf(colOf(c))))].join(" "));
     // The list never squeezes a column below its minimum: when the window is narrower it scrolls sideways instead.
-    body.style.setProperty("--list-min", `${56 + shown.reduce((n, c) => n + COLUMNS.find((x) => x.id === c)!.min, 0) + 12 * shown.length + 48}px`);
+    body.style.setProperty("--list-min", `${56 + shown.reduce((n, c) => n + colOf(c).min, 0) + 12 * shown.length + 48}px`);
     if (ui.sheetH) body.style.setProperty("--sheet-h", `${ui.sheetH}px`);
     else body.style.removeProperty("--sheet-h");
     for (const [cls, prop, w] of [["has-side-w", "--side-w", ui.sideW], ["has-insp-w", "--insp-w", ui.inspW]] as const) {
@@ -479,6 +526,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const pagedCache = new Map<string, Listed>();
   /** Whether this library is listed a page at a time: a big one, in the desktop app (decided at each read of the library). */
   let pagedMode = false;
+  /** The property names the library uses. */
+  const fieldKeysNow = (): string[] => (pagesNow() ? pagedFieldKeys : [...new Set((listing?.entries ?? []).flatMap((x) => meta(x).fields.map((f) => f.key)))].filter(Boolean).sort((a, b) => a.localeCompare(b)));
   const pagesNow = (): LibraryPages | null => (pagedMode ? (session.catalog?.pages ?? null) : null);
   const withUsage = (e: CatalogEntry & { present: boolean }): Listed => {
     const u = usageMap.get(e.hash);
@@ -1683,6 +1732,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     usageMap = usage;
     pagedCounts = counts;
     pagedFieldKeys = keys;
+    sortProps(keys);
     pagedCache.clear();
     paged = null; // (listed again for what changed)
     // The cards on the screen (and the one described) are fetched again before the list is drawn: none goes blank for a moment.
@@ -1889,6 +1939,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let cardHtml = new WeakMap<object, string>();
   let cardsOf: CatalogListing | null = null;
   let cardsReadOnly = false;
+  /** The cards are made again at the next drawing (another set of columns of properties). */
+  const cardsAgain = (): void => {
+    cardHtml = new WeakMap();
+    shownRows = null;
+  };
   const entryHtml = (e: CatalogListing["entries"][number]): string => {
     const cached = cardHtml.get(e);
     if (cached) return cached;
@@ -1909,6 +1964,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <span class="asset-width">${e.pixelW} px</span>
           <span class="asset-height">${e.pixelH} px</span>
           <span class="asset-canvases">${e.canvases}</span>
+          ${ui.order.filter(isPropColumn).map((c, i) => {
+            const v = propValue(e, c.slice(5));
+            return `<span class="asset-prop" data-testid="asset-prop" style="order: var(--o-p${i})" title="${esc(v)}">${esc(v.split("\n")[0] ?? "")}</span>`;
+          }).join("")}
           <span class="asset-added">${addedDate.format(e.importedAt)}</span>
           <span class="asset-uses" data-testid="asset-uses">${usesText(e.instances, e.canvases)}</span>
           ${meta(e).tags.length ? `<span class="asset-tags" data-testid="asset-card-tags">${meta(e).tags.map((t) => `<span class="tag-pill">#${esc(t)}</span>`).join(" ")}</span>` : `<span class="asset-tags"></span>`}
@@ -2119,6 +2178,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!filteredChip.hidden) filteredText.textContent = `Showing ${rows.length} of ${plural(all, "item")}: ${why.join(" · ")}`;
     showPicked();
     if (cardsOf !== listing || cardsReadOnly !== session.readOnly) {
+      if (!pagesNow() && cardsOf !== listing) sortProps(fieldKeysNow());
       cardHtml = new WeakMap();
       cardsOf = listing;
       cardsReadOnly = session.readOnly;
@@ -2249,6 +2309,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return `${shown.map((r) => r.html).join("")}<li class="side-row side-show-row"><button type="button" class="side-show-all" data-show-all="${id}" data-testid="side-show-all" aria-expanded="${open}">${open ? "Show fewer" : `Show ${rows.length - shown.length} more`}</button></li>`;
     };
     const addBtn = (attr: string, label: string, extra = ""): string => (ro ? "" : `<button type="button" class="side-add" ${attr} aria-label="${label}" title="${label}"${extra}>${ICONS.folderPlus}</button>`);
+    // Saved searches, one click away, each with the look it was saved with.
+    const savedRows = byUse(parseSaved(settings.get("search.saved.library")) ?? []).map((s) => ({
+      active: false,
+      html: `<li class="side-row"><button type="button" class="side-item" data-saved-search="${esc(s.q)}" data-saved-way="${s.m}" title="Search for ${esc(s.q)}">${ICONS.save}<span class="side-label">${esc(s.q)}</span></button></li>`,
+    }));
     const scopeName = scopeNameOf(tagCounts);
     side.dataset["open"] = String(sideOpen);
     const html = `
@@ -2323,6 +2388,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             }
           </ul>`,
         )}
+        ${savedRows.length ? section("saved", "Saved searches", "", `<ul class="side-list" data-testid="side-saved">${capped("saved", savedRows)}</ul>`) : ""}
       </div>`;
     // Drawn again only when something in it changed (a redraw for a pick or a look read leaves it, its scroll and its input alone).
     if (html + ui.sections.join() === lastSideHtml && side.firstElementChild) return;
@@ -2603,19 +2669,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const m = savingNotes?.hash === e.hash ? savingNotes : stored;
     const dis = session.readOnly ? " disabled" : "";
     const rows = blankField === e.hash ? [...m.fields, { key: "", value: "" }] : m.fields;
-    const keys = pagesNow() ? pagedFieldKeys : [...new Set(listing!.entries.flatMap((x) => meta(x).fields.map((f) => f.key)))].filter(Boolean).sort((a, b) => a.localeCompare(b));
+    const keys = fieldKeysNow();
     return `
       <section class="asset-sec asset-notes" data-testid="asset-notes">
-        <h3><label for="asset-note-box">Note</label></h3>
+        <h3>Properties</h3>
+        <label class="asset-note-label" for="asset-note-box">Description</label>
         <textarea id="asset-note-box" class="asset-note-box" data-prop="note" data-testid="asset-note" rows="4" maxlength="${MAX_NOTE}" placeholder="Anything about it, in plain text"${dis}>${esc(m.note)}</textarea>
         ${rows.length ? `<ul class="asset-fields" data-testid="asset-fields">${rows.map((f, i) => `<li class="asset-field">
-            <button type="button" class="field-grip" data-index="${i}" aria-label="Move the field ${esc(f.key || String(i + 1))}" title="Drag to move this field (or the Up and Down arrows)"${dis}>${ICONS.gripVertical}</button>
-            <input class="field-key" data-prop="key-${i}" list="field-key-suggest" value="${esc(f.key)}" placeholder="Name" aria-label="Name of field ${i + 1}" maxlength="${MAX_FIELD_KEY}"${dis}>
-            <input class="field-value" data-prop="value-${i}" value="${esc(f.value)}" placeholder="Value" aria-label="${f.key ? `Value of ${esc(f.key)}` : `Value of field ${i + 1}`}" maxlength="${MAX_FIELD_VALUE}"${dis}>
-            <button type="button" class="assets-btn is-icon" data-action="field-remove" data-index="${i}" aria-label="Remove the field ${esc(f.key || String(i + 1))}" title="Remove this field"${dis}>${ICONS.x}</button>
+            <button type="button" class="field-grip" data-index="${i}" aria-label="Move the property ${esc(f.key || String(i + 1))}" title="Drag to move this property (or the Up and Down arrows)"${dis}>${ICONS.gripVertical}</button>
+            <input class="field-key" data-prop="key-${i}" list="field-key-suggest" value="${esc(f.key)}" placeholder="Name" aria-label="Name of property ${i + 1}" maxlength="${MAX_FIELD_KEY}"${dis}>
+            ${f.value.includes("\n") ? `<textarea class="field-value" data-prop="value-${i}" rows="3" placeholder="Value" aria-label="${f.key ? `Value of ${esc(f.key)}` : `Value of property ${i + 1}`}" maxlength="${MAX_FIELD_VALUE}"${dis}>${esc(f.value)}</textarea>` : `<input class="field-value" data-prop="value-${i}" list="field-value-suggest" value="${esc(f.value)}" placeholder="Value" aria-label="${f.key ? `Value of ${esc(f.key)}` : `Value of property ${i + 1}`}" maxlength="${MAX_FIELD_VALUE}"${dis}>`}
+            <button type="button" class="assets-btn is-icon" data-action="field-remove" data-index="${i}" aria-label="Remove the property ${esc(f.key || String(i + 1))}" title="Remove this property"${dis}>${ICONS.x}</button>
           </li>`).join("")}</ul>` : ""}
         <datalist id="field-key-suggest">${keys.map((k) => `<option value="${esc(k)}"></option>`).join("")}</datalist>
-        <button type="button" class="assets-btn" data-action="field-add" data-testid="asset-field-add" title="Add a field with a name you choose (a link, a source, an author...)"${dis}>${ICONS.fieldAdd}<span>Add a field</span></button>
+        <datalist id="field-value-suggest" data-testid="field-value-suggest"></datalist>
+        <button type="button" class="assets-btn" data-action="field-add" data-testid="asset-field-add" title="Add a property with a name you choose (a link, a source, an author...)"${dis}>${ICONS.fieldAdd}<span>Add a property</span></button>
       </section>`;
   };
 
@@ -2632,7 +2700,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       li.querySelector<HTMLElement>(".field-grip")!.dataset["index"] = String(i);
       li.querySelector<HTMLElement>("[data-action=field-remove]")!.dataset["index"] = String(i);
     });
-    saveNotes(hash, notesNow(), "Moved a field");
+    saveNotes(hash, notesNow(), "Moved a property");
   };
   // A field is moved by dragging its grip (the order is stored), or with the Up and Down arrows on it.
   inspector.addEventListener("pointerdown", (e) => {
@@ -2683,7 +2751,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
 
   /** Store the note and the fields of the asset in the details (one write, one undo step), if they changed. */
-  const saveNotes = (hash: string, now = notesNow(), label = "Changed the note or fields"): void => {
+  const saveNotes = (hash: string, now = notesNow(), label = "Changed the properties"): void => {
     const e = entryOf(hash);
     if (!e) return;
     // a field still empty stays on screen (it is not stored)
@@ -2974,7 +3042,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "field-remove": {
         const now = notesNow();
         now.fields.splice(Number(b.dataset["index"]), 1);
-        saveNotes(hash, now, "Removed a field");
+        saveNotes(hash, now, "Removed a property");
         break;
       }
       case "adopt-tag": {
@@ -3125,6 +3193,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         // back to the field for the next tag, unless something else was clicked or pressed meanwhile (the focus is not taken from it)
         if (inputs === seq) inspector.querySelector<HTMLInputElement>(".tag-input")?.focus();
       });
+  });
+  // A property's value suggests what the others of that name say.
+  inspector.addEventListener("focusin", (e) => {
+    const box = e.target as HTMLElement;
+    if (!box.matches?.("input.field-value")) return;
+    const key = box.closest(".asset-field")?.querySelector<HTMLInputElement>(".field-key")?.value.trim();
+    const list = inspector.querySelector<HTMLDataListElement>("#field-value-suggest");
+    if (!key || !list) return;
+    const pages = pagesNow();
+    void (pages ? pages.fieldValues(key).catch(() => []) : Promise.resolve(propValues(listing?.entries ?? [], key))).then((values) => {
+      if (list.isConnected) list.replaceChildren(...values.map((v) => Object.assign(document.createElement("option"), { value: v })));
+    });
   });
   inspector.addEventListener("change", (e) => {
     const box = e.target as HTMLInputElement;
@@ -3480,6 +3560,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   side.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b) return;
+    if (b.dataset["savedSearch"] !== undefined) return useSearch(b.dataset["savedWay"] ?? "all", b.dataset["savedSearch"]);
     if (b.hasAttribute("data-side-toggle")) {
       sideOpen = !sideOpen;
       renderSide();
@@ -3897,7 +3978,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   listHead.addEventListener("click", (e) => {
     const h = (e.target as HTMLElement).closest<HTMLElement>("[data-col]");
     if (!h || (e.target as HTMLElement).closest("[data-resize]") || performance.now() - resizedAt < 300) return; // (a resize is not a sort)
-    const key = SORT_OF[h.dataset["col"] as ColumnId].key;
+    const key = sortOfCol(h.dataset["col"] as ColumnId).key;
     if (sortSel.value === key) reversed = !reversed;
     else {
       sortSel.value = key;
@@ -3950,11 +4031,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     colPop.innerHTML = `<h2>List columns</h2><p>Choose what each row shows and use the arrows to move a column. Name always shows.</p>
       <ul>${ui.order
         .map((id, i) => {
-          const c = COLUMNS.find((x) => x.id === id)!;
+          const c = colOf(id);
           return `<li><label><input type="checkbox" data-col-show="${id}"${ui.hidden.includes(id) ? "" : " checked"}${id === "name" ? " disabled" : ""}><span>${c.label}</span></label>
             <span class="cols-move"><button type="button" data-col-move="up" data-col="${id}" aria-label="Move ${c.label} earlier"${i === 0 ? " disabled" : ""}>${ICONS.chevronUp}</button><button type="button" data-col-move="down" data-col="${id}" aria-label="Move ${c.label} later"${i === last ? " disabled" : ""}>${ICONS.chevronDown}</button></span></li>`;
         })
         .join("")}</ul>
+      <div class="cols-add"><input data-col-prop data-testid="columns-add-input" list="cols-prop-suggest" placeholder="A property, such as status" aria-label="A property to show as a column"><button type="button" class="assets-btn" data-col-add data-testid="columns-add">Add</button>
+        <datalist id="cols-prop-suggest">${fieldKeysNow().filter((k) => !ui.order.includes(`prop:${k}`)).map((k) => `<option value="${esc(k)}"></option>`).join("")}</datalist></div>
       <button type="button" class="assets-btn" data-col-reset>Reset the columns</button>`;
   };
   const closeColumns = (): void => {
@@ -3974,12 +4057,34 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     colPop.querySelector<HTMLElement>("input:not(:disabled), button")?.focus();
   };
   colBtn.addEventListener("click", () => (colPop.hidden ? openColumns() : closeColumns()));
+  /** The cards were made for other columns of properties, or another sort is offered. */
+  const columnsChanged = (): void => {
+    cardsAgain();
+    sortProps(fieldKeysNow());
+    showSort();
+    render();
+  };
+  const addPropColumn = (): void => {
+    const box = colPop.querySelector<HTMLInputElement>("[data-col-prop]")!;
+    const key = box.value.trim();
+    box.value = "";
+    if (!key) return void box.focus();
+    const known = fieldKeysNow().find((k) => k.toLowerCase() === key.toLowerCase()) ?? key; // (as the library writes it)
+    if (!ui.order.includes(`prop:${known}`)) ui.order = [...ui.order, `prop:${known}`];
+    saveUi();
+    applyUi();
+    columnsChanged();
+    renderColumns();
+    colPop.querySelector<HTMLElement>("[data-col-prop]")?.focus();
+  };
   colPop.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b) return;
+    if (b.hasAttribute("data-col-add")) return addPropColumn();
     if (b.hasAttribute("data-col-reset")) {
       ui.order = [...DEFAULT_COLUMN_ORDER];
       ui.hidden = [...DEFAULT_HIDDEN];
+      columnsChanged();
     } else if (b.dataset["colMove"]) {
       const id = b.dataset["col"] as ColumnId;
       const i = ui.order.indexOf(id);
@@ -3996,14 +4101,27 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const box = e.target as HTMLInputElement;
     const id = box.dataset["colShow"] as ColumnId | undefined;
     if (!id || id === "name") return;
-    ui.hidden = box.checked ? ui.hidden.filter((c) => c !== id) : [...ui.hidden, id];
+    // (a property's column unticked is gone from the list: it is added again by its name)
+    if (isPropColumn(id)) {
+      ui.order = ui.order.filter((c) => c !== id);
+      delete ui.colW[id];
+    } else ui.hidden = box.checked ? ui.hidden.filter((c) => c !== id) : [...ui.hidden, id];
     saveUi();
     applyUi();
+    if (isPropColumn(id)) {
+      columnsChanged();
+      renderColumns();
+    }
   });
   document.addEventListener("pointerdown", (e) => {
     if (!colPop.hidden && !colPop.contains(e.target as Node) && !colBtn.contains(e.target as Node)) closeColumns();
   });
   colPop.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.target as HTMLElement).hasAttribute("data-col-prop")) {
+      e.preventDefault();
+      addPropColumn();
+      return;
+    }
     if (e.key === "Escape") {
       closeColumns();
       colBtn.focus();
@@ -4076,7 +4194,37 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     paintRecent(recentBox, ASSETS_RECENT, search.value, savedSearches);
     paintSaveToggle(saveBtn, search.value, way, savedSearches);
   };
-  wireSaveToggle(saveBtn, search, () => way, savedSearches, () => paintSearchUi());
+  const viewKey = (m: string, q: string): string => `${m}|${q.trim()}`;
+  /** Saved or unsaved: a saved search keeps the look of the library now (its layout, columns and sort), which comes back with it. */
+  const searchSavedChanged = (): void => {
+    const key = viewKey(way, search.value);
+    if ((parseSaved(savedSearches.get()) ?? []).some((s) => sameSearch(s, search.value, way))) ui.views[key] = { layout: ui.layout, order: [...ui.order], hidden: [...ui.hidden], sort: sortSel.value, reversed };
+    else delete ui.views[key];
+    saveUi();
+    paintSearchUi();
+    renderSide();
+  };
+  /** Search again, as it was saved; its look with it. */
+  const useSearch = (m: string, q: string): void => {
+    const view = ui.views[viewKey(m, q)];
+    if (view) {
+      ui.layout = view.layout;
+      ui.order = view.order.filter((c) => isPropColumn(c) || (DEFAULT_COLUMN_ORDER as readonly string[]).includes(c));
+      for (const c of DEFAULT_COLUMN_ORDER) if (!ui.order.includes(c)) ui.order.push(c);
+      ui.hidden = view.hidden;
+      sortProps([...fieldKeysNow(), ...(isPropColumn(view.sort) ? [view.sort.slice(5)] : [])]);
+      if ([...sortSel.options].some((o) => o.value === view.sort)) sortSel.value = view.sort;
+      reversed = view.reversed;
+      saveUi();
+      applyUi();
+      cardsAgain();
+      showSort();
+    }
+    setWay(m === "name" || m === "tag" ? m : "all");
+    search.value = q;
+    searchChanged();
+  };
+  wireSaveToggle(saveBtn, search, () => way, savedSearches, searchSavedChanged);
   /** A search that found something and was used (Enter, or a card chosen) goes to the recent list. */
   const rememberNow = (): void => {
     if (search.value.trim() && filtered().length) rememberSearch(ASSETS_RECENT, search.value, way);
@@ -4220,13 +4368,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     recentBox,
     ASSETS_RECENT,
     (r) => {
-      setWay(r.m === "name" || r.m === "tag" ? r.m : "all");
-      search.value = r.q;
-      searchChanged();
+      useSearch(r.m, r.q);
       search.focus();
     },
     () => {
       paintSearchUi();
+      renderSide();
       search.focus();
     },
     savedSearches,
@@ -4258,7 +4405,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     e.preventDefault();
     e.stopPropagation();
     const id = grip.dataset["resize"] as ColumnId;
-    const col = COLUMNS.find((c) => c.id === id)!;
+    const col = colOf(id);
     const startX = e.clientX;
     const startW = grip.parentElement!.getBoundingClientRect().width;
     let frame = 0;

@@ -241,6 +241,7 @@ export class DesktopCatalog implements CatalogStore {
     query: (q) => this.lib.calls.query(q),
     counts: (hidden) => this.lib.calls.counts(hidden),
     fieldKeys: () => this.lib.calls.fieldKeys(),
+    fieldValues: (key) => this.lib.calls.fieldValues(key),
     listed: (hashes) => this.lib.calls.listed(hashes),
     folders: () => this.lib.folders(),
     usage: () => this.usage(),

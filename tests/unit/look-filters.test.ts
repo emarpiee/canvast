@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { dateSpan, parseFilter, parseSeconds, type Extra } from "../../src/assets/filters";
 import { colourName, hamming, lookOf, similarGroups } from "../../src/assets/look";
+import { propValues, sortListed, type ListedEntry } from "../../src/assets/library-match";
 
 const grid = (f: (x: number, y: number) => [number, number, number, number], n = 32): Uint8ClampedArray => {
   const out = new Uint8ClampedArray(n * n * 4);
@@ -125,6 +126,34 @@ describe("library keywords", () => {
     expect(t("date>=2026-10-28")).toBe(true);
     expect(t("date<2026")).toBe(false);
     expect(dateSpan("2026-13", now)).toBeNull();
+  });
+  it("property: and description: read as field: and note: do, and compare dates, numbers and each item of a list", () => {
+    const of = (word: string, value: string, key = "x"): unknown => parseFilter(word)!.test({ pixelW: 1, pixelH: 1, size: 1 }, null, { hidden: false, favorite: false, tags: 0, folders: [], note: "about it", fields: [{ key, value }], on: () => [], duration: () => null });
+    expect(of("description:about", "")).toBe(true);
+    expect(of("property:x=web", "web")).toBe(true);
+    // Dates: after a month is after its last day; a time in it is in it.
+    expect(of("property:x>2025-01", "2025-02-01t10:00")).toBe(true);
+    expect(of("field:x>2025-01", "2025-01-31")).toBe(false);
+    expect(of("property:x>=2025-01", "2025-01-31")).toBe(true);
+    expect(of("property:x<2025", "2024-09-03t01:47")).toBe(true);
+    expect(of("property:x<2025", "2025-01-01")).toBe(false);
+    // Numbers, and what is neither is no match for them.
+    expect(of("property:x>=4", "4")).toBe(true);
+    expect(of("property:x>10", "9")).toBe(false);
+    expect(of("property:x>4", "words")).toBe(false);
+    expect(of("property:x>2025", "2024")).toBe(false);
+    expect(of("property:x>2025", "2026")).toBe(true);
+    // Words by the alphabet; any item of a list.
+    expect(of("property:x>m", "zebra")).toBe(true);
+    expect(of("property:x>=4", "1, 5")).toBe(true);
+    expect(of("property:x>=4", "1, 2")).toBe(false);
+  });
+  it("sorts by a property as what it says; what lacks it comes last, either way", () => {
+    const row = (hash: string, value?: string): ListedEntry => ({ hash, name: hash, type: "", size: 0, pixelW: 1, pixelH: 1, importedAt: 0, state: "active", present: true, instances: 0, canvases: 0, canvasIds: [], ...(value === undefined ? {} : { fields: [{ key: "Rank", value }] }) }) as unknown as ListedEntry;
+    const order = (reversed: boolean): string[] => sortListed([row("a", "10"), row("b", "9"), row("none"), row("c", "2024-01-01")], "prop:rank", reversed, [], new Intl.Collator()).map((e) => e.hash);
+    expect(order(false)).toEqual(["b", "a", "c", "none"]);
+    expect(order(true)).toEqual(["c", "a", "b", "none"]);
+    expect(propValues([row("a", "x, y"), row("b", "y"), row("c", "many\nlines")], "rank")).toEqual(["y", "x"]);
   });
   it("on:, folder:, note: and field: read the item's places and words", () => {
     expect(t("on:mood")).toBe(true);

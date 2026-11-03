@@ -1,5 +1,5 @@
 // A note's properties: the YAML block at the top of a markdown note (`---` … `---`), as Obsidian writes it. Only the part of YAML
-// Obsidian's properties use is read (a text, a number, true or false, a date, a list); anything else (a nested map, a `|` block) is
+// Obsidian's properties use is read (a text, a number, true or false, a date, a list), and `|` and `>` blocks as text; anything else (a nested map) is
 // kept exactly as written and never shown. Pure.
 
 export interface Prop {
@@ -61,6 +61,17 @@ function flowList(s: string): string[] {
   return out.map(unquote).filter((x) => x !== "");
 }
 
+/** A block's header: `|` keeps its lines, `>` folds them; `-`, `+` and an indent number may follow. */
+const BLOCK = /^([|>])(?:[+-]?\d?|\d[+-])\s*(?:#.*)?$/;
+
+/** A `|` or `>` block's text: without the indent of its first line; `>` joins lines, an empty line makes a new one. */
+function blockText(style: string, lines: readonly string[]): string {
+  const indent = /^\s*/.exec(lines.find((l) => l.trim()) ?? "")![0].length;
+  const plain = lines.map((l) => l.slice(indent).trimEnd());
+  if (style === "|") return plain.join("\n").trim();
+  return plain.join("\n").replace(/\n{2,}/g, (n) => "\u0000".repeat(n.length - 1)).replace(/\n/g, " ").replace(/\u0000/g, "\n").trim();
+}
+
 export function parseProps(lines: readonly string[]): Prop[] {
   const props: Prop[] = [];
   for (let i = 0; i < lines.length; i++) {
@@ -72,7 +83,15 @@ export function parseProps(lines: readonly string[]): Prop[] {
     const m = KEY.exec(line);
     // Lines that belong to this key: a list's `- item`s, or anything indented (which makes it a key kept as written).
     const more: string[] = [];
-    while (i + 1 < lines.length && /^\s+\S|^-\s/.test(lines[i + 1]!)) more.push(lines[++i]!);
+    // (a `|` or `>` block: its indented lines, and the empty ones between them)
+    const block = m ? BLOCK.exec((m[2] ?? "").trim()) : null;
+    if (block) {
+      for (let j = i + 1; j < lines.length && (!lines[j]!.trim() || /^\s+\S/.test(lines[j]!)); j++) {
+        if (lines[j]!.trim()) {
+          while (i + 1 <= j) more.push(lines[++i]!);
+        }
+      }
+    } else while (i + 1 < lines.length && /^\s+\S|^-\s/.test(lines[i + 1]!)) more.push(lines[++i]!);
     if (!m) {
       const last = props[props.length - 1];
       if (last?.raw) last.raw.push(line, ...more);
@@ -81,7 +100,9 @@ export function parseProps(lines: readonly string[]): Prop[] {
     }
     const key = unquote(m[1]!);
     const v = (m[2] ?? "").trim();
-    if (!v && more.length && more.every((l) => /^\s*-\s+/.test(l) || /^\s*-$/.test(l))) {
+    if (block) {
+      props.push({ key, value: blockText(block[1]!, more), written: [line, ...more] });
+    } else if (!v && more.length && more.every((l) => /^\s*-\s+/.test(l) || /^\s*-$/.test(l))) {
       props.push({ key, value: more.map((l) => unquote(l.replace(/^\s*-\s*/, ""))).filter((x) => x !== ""), written: [line, ...more] });
     } else if (more.length || /^[|>&*!{]/.test(v)) {
       props.push({ key, value: "", raw: [line, ...more] });
@@ -178,6 +199,36 @@ export function propsOfMeta(prev: readonly Prop[], meta: NoteMeta): Prop[] {
   if (!noteDone && meta.note) out.push({ key: NOTE_KEY, value: meta.note });
   for (const [key, value] of fields) out.push({ key, value });
   return out;
+}
+
+/**
+ * Properties pasted into a note, added to its own: tags are added to its tags, a key it does not have (or has empty) is added, and what it
+ * already says stays. Nested YAML pasted comes along as written.
+ */
+export function mergeProps(own: readonly Prop[], pasted: readonly Prop[]): Prop[] {
+  const out = [...own];
+  const asList = (p: Prop): string[] => (Array.isArray(p.value) ? p.value : p.value.split(/[,\s]+/).filter(Boolean)).map((t) => t.replace(/^#/, "").trim());
+  for (const p of pasted) {
+    if (!p.key) continue; // (a comment or an empty line of what was pasted)
+    const k = p.key.toLowerCase();
+    const at = out.findIndex((x) => x.key && (TAG_KEYS.has(k) ? TAG_KEYS.has(x.key.toLowerCase()) : x.key.toLowerCase() === k));
+    const mine = out[at];
+    if (!mine) out.push(p);
+    else if (!mine.raw && TAG_KEYS.has(k) && !p.raw) {
+      const had = asList(mine);
+      const add = asList(p).filter((t) => !had.some((x) => x.toLowerCase() === t.toLowerCase()));
+      if (add.length) out[at] = { key: mine.key, value: [...had, ...add] };
+    } else if (!mine.raw && !mine.value.length) out[at] = { ...p, key: mine.key };
+  }
+  return out;
+}
+
+/** A note's file with properties pasted into it added to its own (`mergeProps`). */
+export function withPastedProps(kind: "md" | "txt" | "rich", file: string, pasted: readonly Prop[]): string {
+  if (!pasted.length || kind === "txt") return file;
+  if (kind === "rich") return withRichMeta(file, metaOfProps(mergeProps(propsOfMeta([], richMeta(file) ?? NO_META), pasted)));
+  const { props, body } = splitFrontmatter(file);
+  return withFrontmatter(body, mergeProps(props ?? [], pasted));
 }
 
 /** Whether two items' tags, notes and fields are the same. */

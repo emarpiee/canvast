@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.53.22 — Properties (2026-11-04)
+
+- **Changed:** the details panel's Note and fields are **Properties**: **Description** and **Add a property**, in Obsidian's word, as they are a markdown note's YAML. `description:` and `property:` search as `note:` and `field:` do, which still work.
+- **Added:** a property as a **column** of the library's list (List columns), and as a **sort** (its head, or the Sort menu's Properties): dates by date, numbers by number, and items without it last either way.
+- **Added:** search by what a property says: `property:created>2025-01`, `property:rating>=4`; any item of a list counts.
+- **Added:** a property's value suggests what others of that name say.
+- **Added:** a saved search in the Library keeps the look it was saved with (grid or list, columns, sort), and is listed under **Saved searches** in the sidebar: one click brings both back, so it works as a view.
+- **Added:** **Note cards show properties** (Settings > Notes): chosen properties as labels at the top of a note's card and library picture.
+- **Added:** a `|` or `>` block in a note's YAML is read as text, with its lines; it stays a block in the file while unchanged.
+- **Changed:** properties pasted with a note from Obsidian join the note's own at the next save (tags are added, a missing key is added, what the note says stays) instead of coming in as a code block.
+
 ## 0.53.21 — Notes copied from Obsidian (2026-11-04)
 
 - **Fixed:** a note copied from Obsidian and pasted into a note shows its pictures, also in tables, when their files are in the library: it showed only their names. Its `![[embeds]]`, `[[links]]` and footnotes are saved as Obsidian writes them.

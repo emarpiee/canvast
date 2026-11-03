@@ -26,7 +26,7 @@ export const LIBRARY_ROWS: readonly { keys: string; does: string; example: strin
   { keys: "uses>  canvases>", does: "how often it is placed", example: "uses>2" },
   { keys: "date:  date>  date<", does: "the day it was added (2026-10, today, week, month)", example: "date:week" },
   { keys: "on:  folder:", does: "a canvas it is on, a folder it is in", example: "on:moodboard" },
-  { keys: "note:  field:", does: "its note, a field (field:source=web)", example: "field:source" },
+  { keys: "description:  property:", does: "its description, a property (property:source=web, property:created>2025-01, property:rating>=4)", example: "property:status" },
   { keys: "duration>", does: "the length of a video or sound (30s, 2m, 1:30)", example: "duration>30s" },
 ];
 

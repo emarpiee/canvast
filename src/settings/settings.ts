@@ -151,6 +151,7 @@ export const SETTINGS = {
   "notes.saveOnClose": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.saveAs": { scope: "device", default: "ask", validate: oneOf("ask", "file", "rich"), effect: "immediate" } as Def<"ask" | "file" | "rich">,
   "notes.cardShows": { scope: "device", default: "whole", validate: oneOf("part", "whole"), effect: "immediate" } as Def<"part" | "whole">,
+  "notes.cardProps": { scope: "device", default: "", validate: text(200), effect: "immediate" } as Def<string>,
   "notes.name": { scope: "device", default: "Note {yyyy}-{mm}-{dd} {hhmmss}", validate: text(120), effect: "immediate" } as Def<string>,
   "notes.cardWidth": { scope: "device", default: 320, validate: range(120, 1200), effect: "immediate" } as Def<number>,
   "notes.folder": { scope: "device", default: "Notes", validate: text(60), effect: "immediate" } as Def<string>,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { metaOfProps, propsOfMeta, splitFrontmatter, withFrontmatter } from "../../src/notes/frontmatter";
+import { mergeProps, metaOfProps, parseProps, propsOfMeta, splitFrontmatter, withFrontmatter, withPastedProps, writeProps } from "../../src/notes/frontmatter";
 
 const NOTE = `---
 title: Plan
@@ -38,6 +38,7 @@ describe("note properties (YAML frontmatter)", () => {
         { key: "rating", value: "4" },
         { key: "done", value: "true" },
         { key: "created", value: "2026-11-02" },
+        { key: "poem", value: "two\nlines" },
       ],
     });
     // Unchanged, it writes back to the same properties (lists as lists, the nested map and the block as they were).
@@ -112,5 +113,33 @@ describe("#tags in a note's words", () => {
     expect(splitFrontmatter("---\n\nFirst paragraph\n\n---\n\nSecond")).toEqual({ props: null, body: "---\n\nFirst paragraph\n\n---\n\nSecond" });
     // A `$&` in a value is that text, in a rich text note's head too.
     expect(withRichMeta("<html><head><title>T</title></head><body>B</body></html>", { tags: [], note: "cost $& and $' end", fields: [] })).toContain('content="cost $&amp; and $\' end"');
+  });
+});
+
+describe("blocks and pasted properties", () => {
+  it("reads | and > blocks as text and writes them back as they were", () => {
+    const lines = ["description: |", "  First line.", "", "  Third line.", "summary: >-", "  One", "  line.", "", "  Two.", "next: x"];
+    const props = parseProps(lines);
+    expect(props.map((p) => p.value)).toEqual(["First line.\n\nThird line.", "One line.\nTwo.", "x"]);
+    expect(writeProps(props)).toEqual(lines);
+    expect(metaOfProps(props).note).toBe("First line.\n\nThird line.");
+    // Unchanged in the library, the block stays a block.
+    expect(writeProps(propsOfMeta(props, metaOfProps(props)))).toEqual(lines);
+  });
+  it("merges: tags join, what the note says stays, empty keys fill, nested YAML comes as written", () => {
+    const own = parseProps(["status: mine", "aliases:", "tags:", "  - Own"]);
+    const pasted = parseProps(["status: theirs", "aliases:", "  - two", "tags: [own, new]", "kind: x", "deep:", "  a: 1", "# a comment"]);
+    const out = mergeProps(own, pasted);
+    const m = metaOfProps(out);
+    expect(m.tags).toEqual(["Own", "new"]);
+    expect(m.fields).toEqual([{ key: "status", value: "mine" }, { key: "aliases", value: "two" }, { key: "kind", value: "x" }]);
+    expect(writeProps(out)).toContain("  a: 1");
+    expect(writeProps(out)).not.toContain("# a comment");
+  });
+  it("puts pasted properties in a file with none, and in a rich text note's head", () => {
+    const pasted = parseProps(["kind: x"]);
+    expect(withPastedProps("md", "# Words\n", pasted)).toBe("---\nkind: x\n---\n# Words\n");
+    expect(withPastedProps("rich", "<html><head><title>t</title></head><body></body></html>", pasted)).toContain('<meta name="kind" content="x">');
+    expect(withPastedProps("txt", "words", pasted)).toBe("words");
   });
 });

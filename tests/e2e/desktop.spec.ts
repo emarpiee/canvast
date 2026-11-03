@@ -485,6 +485,24 @@ test("a big library (past the size library.json is kept for) writes only what ch
     await page.evaluate((h) => window.__canvastDebug.libraryOp("rename", h, "Again.png"), createHash("sha256").update(pics[2]!).digest("hex"));
     await page.getByTestId("assets-search").fill("");
     await expect.poll(names).toEqual(["Again.png", "Pic 0.png", "Pic 1.png", "Pic 3.png", "Pic 4.png", "Pic 5.png"]);
+    // A property: suggested and sorted by where the library is, too.
+    const setProp = async (name: string, key: string, value: string): Promise<void> => {
+      await page.locator(`[data-testid="asset-card"][title="${name}"]`).click();
+      await page.getByTestId("asset-field-add").click();
+      await page.locator(".field-key").last().fill(key);
+      await page.locator(".field-value").last().fill(value);
+      await page.locator(".field-value").last().blur();
+      await expect(page.locator(".field-value").last()).toHaveValue(value);
+    };
+    await setProp("Pic 3.png", "rank", "10");
+    await setProp("Pic 4.png", "rank", "9");
+    await page.locator('[data-testid="asset-card"][title="Pic 5.png"]').click();
+    await page.getByTestId("asset-field-add").click();
+    await page.locator(".field-key").last().fill("rank");
+    await page.locator(".field-value").last().focus();
+    await expect.poll(() => page.getByTestId("field-value-suggest").locator("option").evaluateAll((l) => l.map((o) => (o as HTMLOptionElement).value).sort())).toEqual(["10", "9"]);
+    await page.getByTestId("assets-sort").selectOption("prop:rank");
+    await expect.poll(() => page.locator('[data-testid="asset-card"] .asset-name').allTextContents().then((n) => n.slice(0, 2))).toEqual(["Pic 4.png", "Pic 3.png"]);
   } finally {
     await app.close();
   }

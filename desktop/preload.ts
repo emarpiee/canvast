@@ -40,6 +40,7 @@ const bridge: DesktopBridge = {
     query: (q) => ipcRenderer.invoke("canvast:lib", "query", q),
     counts: (hidden) => ipcRenderer.invoke("canvast:lib", "counts", hidden === true),
     fieldKeys: () => ipcRenderer.invoke("canvast:lib", "fieldKeys"),
+    fieldValues: (key: string) => ipcRenderer.invoke("canvast:lib", "fieldValues", key),
     listed: (hashes) => ipcRenderer.invoke("canvast:lib", "listed", hashes),
     unnamed: () => ipcRenderer.invoke("canvast:lib", "unnamed"),
     holds: (dir) => ipcRenderer.invoke("canvast:lib", "holds", dir),

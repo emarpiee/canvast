@@ -211,7 +211,7 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   const rows = p.getByTestId("asset-fields").locator(".asset-field");
   await p.getByTestId("asset-note").fill("Two hands\nfrom the life class");
   await p.getByTestId("asset-field-add").click(); // leaving the note stores it; the new field's name is ready to type in
-  await expect(p.getByRole("combobox", { name: "Name of field 1" })).toBeFocused();
+  await expect(p.getByRole("combobox", { name: "Name of property 1" })).toBeFocused();
   await p.keyboard.type("link");
   await p.keyboard.press("Tab");
   await p.keyboard.type("https://example.com/hands");
@@ -221,7 +221,7 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await p.keyboard.press("Tab");
   await p.keyboard.type("Ana");
   await p.keyboard.press("Enter");
-  await expect(p.getByRole("textbox", { name: "Value of author" })).toHaveValue("Ana");
+  await expect(p.getByRole("combobox", { name: "Value of author" })).toHaveValue("Ana");
   await expect(rows).toHaveCount(2);
   await searchFor("life class", 1);
   await searchFor("example.com", 1);
@@ -229,7 +229,7 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   // A field is moved by dragging its grip, or with the arrows on it; the order is stored.
   const stored = () => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => (l.entries.find((e) => e.hash === h)?.fields ?? []).map((f) => f.key)), HASH);
   const names = () => rows.locator(".field-key").evaluateAll((els) => els.map((el) => (el as HTMLInputElement).value));
-  const authorGrip = p.getByRole("button", { name: "Move the field author", exact: true });
+  const authorGrip = p.getByRole("button", { name: "Move the property author", exact: true });
   const g = (await authorGrip.boundingBox())!;
   const top = (await rows.first().boundingBox())!;
   await p.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
@@ -241,8 +241,8 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await authorGrip.focus();
   await p.keyboard.press("ArrowDown");
   await expect.poll(stored).toEqual(["link", "author"]);
-  await expect(p.getByRole("button", { name: "Move the field author", exact: true })).toBeFocused(); // (the grip keeps the keyboard)
-  await p.getByRole("button", { name: "Remove the field author" }).click();
+  await expect(p.getByRole("button", { name: "Move the property author", exact: true })).toBeFocused(); // (the grip keeps the keyboard)
+  await p.getByRole("button", { name: "Remove the property author" }).click();
   await expect(rows).toHaveCount(1);
 
   // Everything survives a reload.
@@ -254,7 +254,7 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await expect(p.getByTestId("asset-favorite")).toHaveAttribute("aria-pressed", "true");
   await expect(p.getByTestId("tag-list")).toContainText("#colour");
   await expect(p.getByTestId("asset-note")).toHaveValue("Two hands\nfrom the life class");
-  await expect(p.getByRole("textbox", { name: "Value of link" })).toHaveValue("https://example.com/hands");
+  await expect(p.getByRole("combobox", { name: "Value of link" })).toHaveValue("https://example.com/hands");
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -549,7 +549,7 @@ test("tags, favourites, folders, notes and fields travel in archives and merge o
   await p.keyboard.press("Tab");
   await p.keyboard.type("https://example.com");
   await p.keyboard.press("Enter");
-  await expect(p.getByRole("textbox", { name: "Value of link" })).toBeVisible();
+  await expect(p.getByRole("combobox", { name: "Value of link" })).toBeVisible();
   // An uploaded custom thumbnail travels too, as a file of its own.
   const [chooser] = await Promise.all([
     p.waitForEvent("filechooser"),
@@ -800,6 +800,82 @@ test("the workspace menu's ⋯ menu opens right beside its button, even though t
   await p.keyboard.press("Escape");
   await expect(menu).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
+});
+
+test("properties: a column, a sort, typed search, suggested values; a saved search brings its look back", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  const png = (c: number) => makePng(8, 8, () => [c, 90, 200, 255]);
+  await p.getByTestId("assets-import-input").setInputFiles(["a", "b", "c"].map((n, i) => ({ name: `${n}.png`, mimeType: "image/png", buffer: png(40 + i * 40) })));
+  const card = (n: string) => p.locator(`[data-testid="asset-card"][title="${n}.png"]`);
+  await expect(card("c")).toBeAttached();
+  const setProp = async (n: string, key: string, value: string): Promise<void> => {
+    await card(n).click();
+    await p.getByTestId("asset-field-add").click();
+    await p.locator(".field-key").last().fill(key);
+    await p.locator(".field-value").last().fill(value);
+    await p.locator(".field-value").last().blur();
+    await expect(p.locator(".field-value").last()).toHaveValue(value);
+  };
+  await expect(p.locator('[data-dsec="notes"] h3')).toHaveCount(0); // (none selected)
+  await card("a").click();
+  await expect(p.locator('[data-dsec="notes"] h3')).toHaveText("Properties");
+  await expect(p.locator('[data-dsec="notes"] label[for="asset-note-box"]')).toHaveText("Description");
+  await setProp("a", "created", "2024-05-01");
+  await setProp("b", "created", "2025-03-01T10:00");
+  // The name and what others of that name say are suggested.
+  await card("c").click();
+  await p.getByTestId("asset-field-add").click();
+  await p.locator(".field-key").last().fill("created");
+  await p.locator(".field-value").last().focus();
+  await expect.poll(() => p.getByTestId("field-value-suggest").locator("option").evaluateAll((l) => l.map((o) => (o as HTMLOptionElement).value).sort())).toEqual(["2024-05-01", "2025-03-01T10:00"]);
+  await p.locator(".field-value").last().fill("");
+  await p.getByRole("button", { name: /Remove the property/ }).last().click();
+  // Typed search.
+  const names = () => p.locator('[data-testid="asset-card"]').evaluateAll((l) => l.map((c) => c.getAttribute("title")));
+  const search = p.getByTestId("assets-search");
+  await search.fill("property:created>2025-01");
+  await expect.poll(names).toEqual(["b.png"]);
+  await search.fill("");
+  // A column, from the panel.
+  await p.locator('[data-layout="list"]').click();
+  await p.getByTestId("assets-columns").click();
+  await p.getByTestId("columns-add-input").fill("CREATED"); // (written as the library writes it)
+  await p.getByTestId("columns-add").click();
+  await p.keyboard.press("Escape");
+  const head = p.locator('.assets-list-head [data-col="prop:created"]');
+  await expect(head).toHaveText(/created/);
+  await expect(card("a").getByTestId("asset-prop")).toHaveText("2024-05-01");
+  await expect(card("c").getByTestId("asset-prop")).toHaveText("");
+  const headBox = (await head.boundingBox())!;
+  const cellBox = (await card("a").getByTestId("asset-prop").boundingBox())!;
+  expect(Math.abs(headBox.x - cellBox.x), "the cell is under its head").toBeLessThan(16);
+  // Its head sorts: lowest first, what has none last, either way.
+  await head.click();
+  await expect.poll(names).toEqual(["a.png", "b.png", "c.png"]);
+  await head.click();
+  await expect.poll(names).toEqual(["b.png", "a.png", "c.png"]);
+  await expect(p.getByTestId("assets-sort")).toHaveValue("prop:created");
+  // A saved search keeps this look: the grid and another sort meanwhile, and one click on it brings it back.
+  await search.fill("kind:picture");
+  await p.getByRole("button", { name: "Save this search" }).filter({ visible: true }).click();
+  await expect(p.getByTestId("side-saved").locator("button", { hasText: "kind:picture" })).toBeVisible();
+  await search.fill("");
+  await p.locator('[data-layout="grid"]').click();
+  await p.getByTestId("assets-sort").selectOption("name");
+  await p.getByTestId("side-saved").locator("button", { hasText: "kind:picture" }).click();
+  await expect(search).toHaveValue("kind:picture");
+  await expect(p.getByTestId("assets-sort")).toHaveValue("prop:created");
+  await expect(head).toBeVisible();
+  await expect.poll(names).toEqual(["b.png", "a.png", "c.png"]);
+  // Kept over a restart; unticked, it is gone.
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await expect(p.locator('.assets-list-head [data-col="prop:created"]')).toBeVisible();
+  await p.getByTestId("assets-columns").click();
+  await p.locator('[data-col-show="prop:created"]').click(); // (the panel is drawn again without it)
+  await expect(p.locator('.assets-list-head [data-col="prop:created"]')).toHaveCount(0);
 });
 
 test("the library's details panel: its sections move as the sidebar's do, and stay; a double-click on its name renames", async ({ app }) => {

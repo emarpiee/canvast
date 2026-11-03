@@ -53,6 +53,7 @@ export interface LibraryCalls {
   counts(hidden?: boolean): Promise<{ hidden: number; shown: number; favourites: number; unfiled: number; tags: Array<[string, string, number]>; types: Array<[string, number]>; folders: Array<[string, number]> }>;
   /** Every field name the items use. */
   fieldKeys(): Promise<string[]>;
+  fieldValues(key: string): Promise<string[]>;
   /** Some items' entries, with whether each one's file is there. */
   listed(hashes: readonly string[]): Promise<Array<CatalogEntry & { present: boolean }>>;
   /** The active items whose file is not in the workspace folder (or not of its size): looked at in the main process. */

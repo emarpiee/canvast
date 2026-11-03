@@ -5,8 +5,9 @@
  *
  * Keywords about the item in the library: `is:hidden|missing|favourite|used|unused|filed|unfiled|tagged|untagged|thumbed|unthumbed`, `uses>2` (times placed),
  * `canvases>1`, `date:2026-10` (the day it was added, also `date>2026-01-01`, `date:today|yesterday|week|month|year`), `on:board` (the name of
- * a canvas it is placed on), `folder:refs` (a folder of its path), `note:word`, `field:source` or `field:source=web`, `kind:picture|video|
- * audio|gif|font|file` and `duration>30s` (`1m`, `1h`, `1:30`). A duration is read from the file and may not be known yet.
+ * a canvas it is placed on), `folder:refs` (a folder of its path), `description:word` (or `note:`), `property:source`, `property:source=web` and
+ * `property:created>2025-01` or `property:rating>=4` (or `field:`), `kind:picture|video|audio|gif|font|file` and `duration>30s` (`1m`, `1h`,
+ * `1:30`). A duration is read from the file and may not be known yet.
  */
 import type { Look } from "./look";
 import { colourMatches } from "./look";
@@ -138,6 +139,39 @@ export function parseSeconds(v: string): number | null {
   return Number(m[1]) * k;
 }
 
+/** A property's value as what it says: a date (`2024-09-03`, `2024-09-03T01:47`), a number, or words. */
+export function typedValue(v: string): { n: number } | { t: string } {
+  const s = v.trim();
+  if (/^-?\d+(?:\.\d+)?$/.test(s)) return { n: Number(s) };
+  if (/^\d{4}-\d{1,2}(?:-\d{1,2})?(?:[t ]\d{1,2}:\d{2}(?::\d{2})?)?/i.test(s)) {
+    const [y, mo, d, h, mi] = s.split(/[-t: ]/i).map(Number);
+    return { n: new Date(y!, mo! - 1, d ?? 1, h ?? 0, mi ?? 0).getTime() };
+  }
+  return { t: s.toLowerCase() };
+}
+
+/** A list's items (a property written as a list is joined with commas); a text with no comma is one item. */
+const listItems = (v: string): string[] => v.split(/,\s+/);
+
+/** Whether a property's value holds for `>2025-01`, `<=4` or `>m`: a date against the span a date word names (after a month is after its last day), a number against a number, else by the alphabet. */
+function typedTest(op: ">=" | "<=" | ">" | "<", want: string, now: number): ((value: string) => boolean) | null {
+  if (!want) return null;
+  const NUMBER = /^-?\d+(?:\.\d+)?$/;
+  const span = /^\d{4}(?:-\d{1,2}(?:-\d{1,2})?)?$|^(?:today|yesterday|week|month|year)$/.test(want) ? dateSpan(want, now) : null;
+  const number = NUMBER.test(want) ? Number(want) : null;
+  return (value) => {
+    const t = typedValue(value);
+    if ("t" in t) {
+      if (span || number !== null) return false;
+      const c = t.t.localeCompare(want);
+      return op === ">" ? c > 0 : op === ">=" ? c >= 0 : op === "<" ? c < 0 : c <= 0;
+    }
+    if (NUMBER.test(value.trim())) return number !== null && compare(t.n, op, number);
+    if (!span) return false;
+    return op === ">" ? t.n >= span[1] : op === ">=" ? t.n >= span[0] : op === "<" ? t.n < span[0] : t.n < span[1];
+  };
+}
+
 const IS: Record<string, (s: Subject, x: Extra) => boolean> = {
   hidden: (_s, x) => x.hidden,
   missing: (s) => s.present === false,
@@ -168,15 +202,19 @@ function libraryKeyword(w: string, now: number): Filter | null {
     const f = FILE_KINDS[kind[1]!];
     return f ? { needsLook: false, test: (s) => kindFolder(s.type ?? "", s.name ?? "") === f } : null;
   }
-  const text = /^(on|folder|note|field):(.+)$/.exec(w);
+  const text = /^(on|folder|note|description|field|property):(.+)$/.exec(w);
   if (text) {
     const v = text[2]!;
     if (text[1] === "on") return plain((_s, x) => x.on().some((n) => n.includes(v)));
     if (text[1] === "folder") return plain((_s, x) => x.folders.some((n) => n.includes(v)));
-    if (text[1] === "note") return plain((_s, x) => x.note.includes(v));
-    const eq = v.indexOf("=");
-    const key = eq < 0 ? v : v.slice(0, eq);
-    const val = eq < 0 ? null : v.slice(eq + 1);
+    if (text[1] === "note" || text[1] === "description") return plain((_s, x) => x.note.includes(v));
+    const at = /^(.+?)(>=|<=|>|<|=)(.*)$/.exec(v);
+    const key = at ? at[1]! : v;
+    if (at && at[2] !== "=") {
+      const holds = typedTest(at[2] as ">=" | "<=" | ">" | "<", at[3]!, now);
+      return holds ? plain((_s, x) => x.fields.some((f) => f.key.includes(key) && listItems(f.value).some(holds))) : null;
+    }
+    const val = at ? at[3]! : null;
     return plain((_s, x) => x.fields.some((f) => f.key.includes(key) && (val === null || f.value.includes(val))));
   }
   const m = /^(uses|canvases|date|added|duration|length)(>=|<=|>|<|=|:)(.+)$/.exec(w);
