@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.53.19 — README brought up to date (2026-11-04)
+## 0.53.19 — Notes, files and paste (2026-11-04)
 
 - **Changed:** the README's Settings table, paste, saving and file place sections describe the 0.53.x settings and behaviour.
 
