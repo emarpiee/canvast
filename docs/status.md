@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.6: pictures in tables (2026-11-04)
+
+- **Implemented:** `markdownHtml` writes a picture in a cell as the editor's own component; `obsidianMarkdown` puts its line break back as a space.
+- **Tested:** unit (note-file); notes.spec chromium and firefox (the paste test extended, chromium only); desktop note tests.
+- **Committed:** v0.53.6.
+
 ## v0.53.5: pasted pictures (2026-11-04)
 
 - **Implemented:** `shownItems` (temporary address to item, for this run of the app), a repair of stray `blob:` addresses on paste, on open and before a save; `keepSpelling` never keeps one from the file; previews find one by its name.

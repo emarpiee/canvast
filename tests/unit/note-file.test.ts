@@ -66,6 +66,7 @@ describe("a note's links to other items", () => {
     expect(keepSpelling(canon, canon, file)).toBe(file);
     expect(keepSpelling(canon.replace("last", "edited"), canon, file)).toBe(file.replace("last", "edited"));
     expect(keepSpelling(canon.replace("**bold** words\n\n", ""), canon, file)).toBe("* a\n* b\n\n\nT\n===\n\n| x |\n|:--|\n| 1 |\n\nlast\n");
+    expect(obsidianMarkdown("| h |\n| --- |\n| ![a](p.png)&#10;&#10; text |")).toBe("| h |\n| --- |\n| ![a](p.png) text |");
     // A table of one column keeps its alignment too.
     expect(obsidianMarkdown("| a |\n| --- |\n| 1 |", [["center"]])).toBe("| a |\n| :---: |\n| 1 |");
     expect(keepSpelling(`new\n\n${canon}`, canon, file)).toBe(`new\n\n${file}`);

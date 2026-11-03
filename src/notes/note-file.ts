@@ -275,7 +275,7 @@ export function obsidianMarkdown(md: string, aligns: readonly ColumnAligns[] = [
         .join("")
         .replace(/(?:^(?:> ?)+[ \t]*\n)+(?=\n)/gm, "") // (a quote's empty last lines)
         .replace(/(?:\n(?:> ?)+[ \t]*)+(?=\n*$)/, "")
-        .replace(/^\|.*\|[ \t]*$/gm, (row) => row.replace(/\u00a0/g, " ")) // (the space kept between marked words in a cell)
+        .replace(/^\|.*\|[ \t]*$/gm, (row) => row.replace(/\u00a0/g, " ").replace(/(?:&#10;)+[ \t]*/g, " ")) // (the space kept between marked words in a cell; a picture's own line in one)
         .replace(/^(?=[^\n]*\|)(\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)*\|?)[ \t]*$/gm, (row) => {
           const a = aligns[table++];
           if (!a?.some(Boolean)) return row;

@@ -629,7 +629,7 @@ test("Markdown view: what is typed there counts as a change; what a file writes 
 test("a note's content pasted into another note keeps its pictures, after the first note closes; a file saved with a dead address finds them too", async ({ app }) => {
   test.skip(test.info().project.name === "firefox", "Firefox does not let a test make a paste with its data");
   const p = app.page;
-  const A = "# From\n\n![pic](pic.png)\n";
+  const A = "# From\n\n![pic](pic.png)\n\n| h | i |\n| --- | --- |\n| ![pic](pic.png) | z |\n";
   const DEAD = "# Old save\n\n![pic.png](blob:null/00000000-0000-0000-0000-000000000000)\n";
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles([
@@ -648,7 +648,8 @@ test("a note's content pasted into another note keeps its pictures, after the fi
   };
   const shows = () => page(p).locator("img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0));
   await open("a.md");
-  await expect.poll(shows).toEqual([true]);
+  await expect.poll(shows).toEqual([true, true]);
+  await expect(page(p).locator("td img")).toHaveCount(1); // (a picture in a table cell stays there)
   const copied = await page(p).innerHTML();
   await leave(); // (its address stops working here)
   await open("b.md");
@@ -659,8 +660,8 @@ test("a note's content pasted into another note keeps its pictures, after the fi
     dt.setData("text/plain", "x");
     el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
   }, copied);
-  await expect.poll(shows).toEqual([true]);
-  await expect.poll(() => p.evaluate(() => window.__canvastDebug.notesAsText()[0]!.text)).toContain("(pic.png)");
+  await expect.poll(shows).toEqual([true, true]);
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.notesAsText()[0]!.text)).toContain("| ![pic](pic.png) | z |");
   expect(await p.evaluate(() => window.__canvastDebug.notesAsText()[0]!.text)).not.toContain("blob:");
   await p.keyboard.press("Control+s");
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.some((e) => e.name === "b.md" && e.hash !== "")))).toBe(true);
@@ -669,7 +670,7 @@ test("a note's content pasted into another note keeps its pictures, after the fi
   await p.waitForTimeout(300);
   await leave();
   await open("b.md");
-  await expect.poll(shows).toEqual([true]);
+  await expect.poll(shows).toEqual([true, true]);
   await leave();
   // Saved with a dead address by an older version: shown from the name it carries, its real link written at the next save.
   await open("dead.md");

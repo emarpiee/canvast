@@ -34,5 +34,14 @@ export function markdownHtml(text: string): string {
     }
     n.replaceWith(...parts);
   }
+  // (a picture in a table cell as the editor's own component: bare, the editor takes it out of the table)
+  for (const img of t.content.querySelectorAll("td img, th img")) {
+    const box = document.createElement("div");
+    box.className = "se-component se-image-container __se__float-none";
+    const figure = document.createElement("figure");
+    img.replaceWith(box);
+    box.append(figure);
+    figure.append(img);
+  }
   return t.innerHTML;
 }

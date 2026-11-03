@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.6 — Notes: pictures in tables (2026-11-04)
+
+- **Fixed:** a picture in a markdown table cell stays in its cell: the editor took it out of the table when the note opened, and an edit of that table saved it outside.
+
 ## 0.53.5 — Notes: pasted pictures (2026-11-04)
 
 - **Fixed:** a note's content pasted into another note keeps its pictures and files. They carried the first note's temporary address, which stops working when that note closes; each now gets the new note's own, and its real link in the file. A note already saved with such an address finds its picture by the name it carries, and has its real link written at the next save.
