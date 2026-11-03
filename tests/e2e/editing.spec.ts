@@ -735,6 +735,16 @@ test("dragging objects to an edge of the view pans it while the pointer rests th
     return { at: after.maxX, moved };
   };
   const width = await p.evaluate(() => document.querySelector("canvas")!.getBoundingClientRect().width);
+  // Toward a panel docked on the left: past where it ends, to the edge of the view.
+  await p.getByRole("button", { name: /Bookmarks/ }).first().click();
+  await expect(p.getByTestId("bookmarks-panel").or(p.locator(".bookmarks-panel")).first()).toBeVisible();
+  const b0 = await box();
+  await p.mouse.click((b0.minX + b0.maxX) / 2, (b0.minY + b0.maxY) / 2);
+  await p.mouse.move((b0.minX + b0.maxX) / 2, (b0.minY + b0.maxY) / 2);
+  await p.mouse.down();
+  await p.mouse.move(2, (b0.minY + b0.maxY) / 2, { steps: 6 });
+  await p.mouse.up();
+  await expect.poll(async () => (await box()).minX, "as far as the view's edge").toBeLessThan(10);
   const panned = await drag(700);
   expect(panned.moved, "the view moved").toBe(true);
   expect(panned.at, "the whole object is in view").toBeLessThanOrEqual(width + 1);

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.15 — Dragging goes to the view's edge (2026-11-04)
+
+- **Fixed:** dragged objects go up to the edge of the view, under the panels: a docked panel no longer stops them where it ends.
+
 ## 0.53.14 — Notes: the / menu in every style (2026-11-04)
 
 - **Added:** the notes editor's `/` command menu in every editor style (it was only in Notion-like).

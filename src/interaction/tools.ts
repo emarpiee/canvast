@@ -319,8 +319,6 @@ export interface ToolHooks {
   toolForKey(key: string): Tool | undefined;
   /** How fast the view moves when a drag of objects nears an edge: 1 is 100%, 0 off (Settings > Navigation). */
   edgePanSpeed?(): number;
-  /** The part of the view things are kept in while dragged (without what docked panels cover), else all of it. */
-  dragArea?(): { minX: number; minY: number; maxX: number; maxY: number };
   /** The direction a plain key steps in (W A S D at first; Settings > Shortcuts), if any (ADR 0058, 0072). */
   navForKey(key: string): NavDir | undefined;
   /** Step the selection to a neighbouring item. */
@@ -345,8 +343,8 @@ export function attachTools(
 ): () => void {
   const pan = new PanGesture(view);
   let g: Gesture = { kind: "none" };
-  /** The part of the view things are kept in while dragged: without what the docked panels cover. */
-  const viewArea = (): EdgeBox => hooks.dragArea?.() ?? { minX: 0, minY: 0, maxX: view.viewport.width, maxY: view.viewport.height };
+  /** The view: what is dragged is kept in it, whatever panels float over it. */
+  const viewArea = (): EdgeBox => ({ minX: 0, minY: 0, maxX: view.viewport.width, maxY: view.viewport.height });
   /**
    * Where a drag of objects puts them for the pointer at `p`: they stay in the view (the view pans instead, see `edgePan`), unless they did not fit or
    * were past the edge when the drag began. Only the sides it is moving toward count for panning: a small nudge of what lies near an edge moves no view.

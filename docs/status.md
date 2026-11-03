@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.15: dragging goes to the view's edge (2026-11-04)
+
+- **Implemented:** the drag's area is the view; `dragArea` and `PanelDock.covered` removed.
+- **Tested:** editing.spec edge test extended with a docked panel, chromium + firefox; unit (edge pan).
+- **Committed:** v0.53.15.
+
 ## v0.53.14: the / menu everywhere (2026-11-04)
 
 - **Implemented:** `SLASH_MENU` in the options every style shares.
@@ -52,9 +58,8 @@ Unverified / Committed / Next bounded task**.
 
 ## v0.53.12: dragged objects stay in view (2026-11-04)
 
-- **Implemented:** `draggedAt`/`reachOf` in tools.ts, `edgePanStep` over a box and an area, `PanelDock.covered`; note styles re-open open notes.
+- **Implemented:** `draggedAt`/`reachOf` in tools.ts, `edgePanStep` over a box and an area; note styles re-open open notes.
 - **Tested:** unit (edge pan); editing.spec edge test, chromium + firefox; notes.spec.
-- **Known limit:** edges only look at docked side panels, not the top bars or floating panels.
 - **Committed:** v0.53.12.
 
 ## v0.53.11: a save during a save (2026-11-04)
