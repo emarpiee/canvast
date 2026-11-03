@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.18 — Paste: the middle button, and under the pointer (2026-11-04)
+
+- **Fixed:** on Linux, ending a pan with the middle button also pasted what was cut or copied (a middle click is a system paste there). Only your own paste places objects now.
+- **Fixed:** what is pasted lands under the pointer also when something floats over the canvas there, or the pointer has left the window: it went to the middle of the view, often where the object came from, until the next click.
+
 ## 0.53.17 — Files stay as they are (2026-11-04)
 
 - **Changed:** **Keep files as they are** (it was Keep file names as written) is on by default, and also covers where a file is: it stays where you put it, its folders keep their names and no extension is added. Off, files are tidied and sorted as before.

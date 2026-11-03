@@ -2466,17 +2466,23 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     e.preventDefault();
     receive(files);
   });
-  // Where the pointer is on the canvas: what is pasted lands under it (the middle of the view when it is elsewhere).
+  // Where the pointer last was over the view: what is pasted lands under it, whatever floats over the canvas there, and after the pointer has left the
+  // window (the middle of the view only before it has been over the view at all).
   const trackPointer = (e: PointerEvent): void => {
     const r = canvas.getBoundingClientRect();
-    editor.pointerAt = { x: e.clientX - r.left, y: e.clientY - r.top };
+    const x = e.clientX - r.left;
+    const y = e.clientY - r.top;
+    if (x >= 0 && y >= 0 && x <= r.width && y <= r.height) editor.pointerAt = { x, y };
   };
-  canvas.addEventListener("pointermove", trackPointer);
-  canvas.addEventListener("pointerdown", trackPointer);
-  canvas.addEventListener("pointerleave", () => { editor.pointerAt = null; });
+  window.addEventListener("pointermove", trackPointer, true);
+  window.addEventListener("pointerdown", trackPointer, true);
+  // On Linux a middle click is also a paste, of what is selected in any app: here the middle button pans, so what it ends is no paste. (In a field it stays one.)
+  let middleUpAt = -Infinity;
+  window.addEventListener("pointerup", (e) => void (e.button === 1 && (middleUpAt = performance.now())), true);
   window.addEventListener("paste", (e) => {
     // A paste into a field, an editor (the notes editor takes a picture in itself), a dialog or a menu is theirs: nothing is imported or placed.
     if (e.defaultPrevented || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog, [popover], .note-dock") || document.querySelector("dialog:modal")) return;
+    if (performance.now() - middleUpAt < 300) return void e.preventDefault();
     const files = [...(e.clipboardData?.files ?? [])];
     // What canvast copied comes back as the objects, even though the clipboard also holds its picture and SVG for other apps.
     const own = e.clipboardData?.getData("text/plain") ?? "";

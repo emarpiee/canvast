@@ -1734,3 +1734,42 @@ test("Keep files as they are (the default): names, places and folders stay, note
   expect(files(lib)).toContain("images/next_one.png");
   await app.close();
 });
+
+test("cut, a pan with the middle button (a paste on Linux) places nothing; the paste lands under the pointer", async () => {
+  const ws = tempDir("cv-middle-");
+  const { app, page } = await launch(ws);
+  await page.getByTestId("view-assets").click();
+  await page.getByTestId("assets-import-input").setInputFiles({ name: "o.png", mimeType: "image/png", buffer: makePng(120, 80, () => [70, 90, 40, 255]) });
+  await page.locator('[data-testid="asset-card"][title="o.png"]').click();
+  await page.getByTestId("asset-place").click();
+  await page.getByTestId("view-canvas").click();
+  await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
+  const box = () => page.evaluate(() => { const d = window.__canvastDebug; return d.objectScreen(d.objects().at(-1)!.id)!.box; });
+  const b = await box();
+  await page.mouse.click((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
+  await page.keyboard.press("Control+x");
+  await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(0);
+  await page.mouse.move(640, 500);
+  await page.mouse.down({ button: "middle" });
+  await page.mouse.move(300, 300, { steps: 5 });
+  await page.mouse.up({ button: "middle" });
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => window.__canvastDebug.objects().length), "the pan pasted nothing").toBe(0);
+  await page.mouse.move(900, 200, { steps: 4 });
+  await page.keyboard.press("Control+v");
+  await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
+  const a = await box();
+  expect(Math.abs((a.minX + a.maxX) / 2 - 900)).toBeLessThan(4);
+  expect(Math.abs((a.minY + a.maxY) / 2 - 200)).toBeLessThan(4);
+  // With the pointer over a bar floating on the canvas: under it too, not back in the middle of the view.
+  await page.keyboard.press("Control+x");
+  await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(0);
+  const bar = (await page.getByTestId("view-assets").boundingBox())!;
+  await page.mouse.move(bar.x + bar.width / 2, bar.y + bar.height / 2);
+  await page.keyboard.press("Control+v");
+  await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
+  const c = await box();
+  const canvasTop = (await page.locator("canvas").first().boundingBox())!;
+  expect(Math.abs((c.minX + c.maxX) / 2 - (bar.x + bar.width / 2 - canvasTop.x))).toBeLessThan(4);
+  await app.close();
+});

@@ -274,7 +274,7 @@ function readClipboard(systemText: string | null): ClipboardPayload | null {
 export const canPaste = (systemText: string | null): boolean => readClipboard(systemText) !== null;
 
 /**
- * Paste the copied objects centred under the pointer (on the middle of the view when the pointer is not on the canvas, each repeat
+ * Paste the copied objects centred under the pointer (on the middle of the view when the pointer has not been over it yet, each repeat
  * shifting them a little), at the size they had on screen when copied (as one undo step). They become the selection. Returns false if there is nothing to paste.
  */
 export function pasteObjects(doc: DocumentStore, editor: EditorState, view: ViewState, systemText: string | null = null, inPlaceOffset = true): boolean {
