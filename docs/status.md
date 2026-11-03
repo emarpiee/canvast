@@ -37,6 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.16: details panel (2026-11-04)
+
+- **Implemented:** `ui/sortable-sections.ts` (`sortableSections`, `sectionOrder`), used by the sidebar and the details panel; a double-click on the panel's name renames.
+- **Tested:** organize.spec, chromium + firefox.
+- **Known limit:** Tags and Folder move as one card; the buttons at the bottom and Details stay in place.
+- **Committed:** v0.53.16.
+
 ## v0.53.15: dragging goes to the view's edge (2026-11-04)
 
 - **Implemented:** the drag's area is the view; `dragArea` and `PanelDock.covered` removed.

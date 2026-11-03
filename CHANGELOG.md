@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.16 — Library details panel: rename, movable sections (2026-11-04)
+
+- **Added:** a double-click on the name at the top of the library's details panel renames the item.
+- **Added:** the details panel's sections can be moved as the sidebar's are: drag a section's name, or Alt+Up and Alt+Down on it. The order is kept.
+
 ## 0.53.15 — Dragging goes to the view's edge (2026-11-04)
 
 - **Fixed:** dragged objects go up to the edge of the view, under the panels: a docked panel no longer stops them where it ends.

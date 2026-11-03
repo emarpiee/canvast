@@ -1,3 +1,4 @@
+import { sectionOrder, sortableSections } from "./sortable-sections";
 import { fileInLibrary } from "../app/library-filing";
 import { beginProgress } from "../app/progress";
 import { searchHelpLineHtml, searchKeysHtml, searchWaysHtml } from "./search-parts";
@@ -183,6 +184,8 @@ const DRAG_STACK = 5;
 
 /** The library sidebar's sections, in their default order (the order can be changed by dragging them). */
 const SIDE_SECTIONS = ["folders", "types", "tags", "ctags"] as const;
+/** The details panel's sections, in their default order (moved the same way). */
+const DETAIL_SECTIONS = ["file", "organize", "notes", "links", "where"] as const;
 
 /** The library's filters as they are before any is chosen (the reset button goes back to these). */
 const NO_FILTERS = { usage: "all", sort: "newest", reversed: false, scope: "all" } as const;
@@ -364,7 +367,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; expanded: string[]; sections: string[]; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], expanded: [], sections: [...SIDE_SECTIONS], filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; expanded: string[]; sections: string[]; detailSections: string[]; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -400,10 +403,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const f = saved.filters as Partial<typeof ui.filters>;
       ui.filters = { usage: typeof f.usage === "string" ? f.usage : "all", sort: typeof f.sort === "string" ? f.sort : "newest", reversed: f.reversed === true, scope: typeof f.scope === "string" ? f.scope : "all" };
     }
-    if (Array.isArray(saved.sections)) {
-      const order = saved.sections.filter((c, i, a): c is string => (SIDE_SECTIONS as readonly string[]).includes(c as string) && a.indexOf(c) === i);
-      ui.sections = [...order, ...SIDE_SECTIONS.filter((c) => !order.includes(c))];
-    }
+    if (Array.isArray(saved.sections)) ui.sections = sectionOrder(saved.sections, SIDE_SECTIONS);
+    if (Array.isArray(saved.detailSections)) ui.detailSections = sectionOrder(saved.detailSections, DETAIL_SECTIONS);
     if (Array.isArray(saved.hidden)) {
       ui.hidden = saved.hidden.filter((c) => known.has(c) && c !== "name");
       // Columns added after these choices were saved start hidden.
@@ -2439,9 +2440,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const fav = e ? meta(e).favorite : false;
     const hid = e ? meta(e).hidden : false;
     keepDetails();
+    // (in the order they were put in: `sortableSections`)
+    const detail: Record<(typeof DETAIL_SECTIONS)[number], () => string> = {
+      file: () => `${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays ${noteKindOf(e.name) === "rich" ? "a rich text note (HTML) that other apps open too" : "plain text other apps read"}. Tag it <em>template</em> to offer it in Insert ▸ Template of every note.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>No preview for this file</h3><p class="asset-note">${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as a card. ${esc(d.todo)}</p></section>`; })() : ""}`,
+      organize: () => (e ? organizeHtml(e) : ""),
+      notes: () => (e ? notesHtml(e) : ""),
+      links: () => `<section class="asset-sec" data-testid="asset-backlinks" hidden><h3>Linked from</h3><ul class="asset-places"></ul></section>`,
+      where: () => `<section class="asset-sec asset-where">
+        <h3 data-testid="asset-usage">${instances ? `Used on ${plural(places.length || (e?.canvases ?? m!.canvases), "canvas", "canvases")} <span class="asset-place-total">(${plural(instances, "time")})</span>` : "Where it is used"}</h3>
+        ${instances ? `<ul class="asset-places" data-testid="asset-places">${placeRows}</ul>
+          ${places.length > placesShown.length || placesAll ? `<button type="button" class="assets-btn asset-places-more" data-action="places-all" data-testid="asset-places-more" aria-expanded="${placesAll}" title="${placesAll ? "List only the first canvases" : "List every canvas it is on"}">${placesAll ? "Show fewer" : `Show all ${places.length} canvases`}</button>` : ""}` : `<p class="asset-note">Not used on any canvas.</p>`}
+      </section>`,
+    };
     inspector.innerHTML = `
       <div class="asset-insp-head">
-        <h2 title="${esc(e ? e.name || "Untitled" : "Missing original")}">${esc(e ? e.name || "Untitled" : "Missing original")}</h2>
+        <h2 title="${esc(e ? `${e.name || "Untitled"} (double-click to rename)` : "Missing original")}">${esc(e ? e.name || "Untitled" : "Missing original")}</h2>
       </div>
       ${e ? `<div class="asset-preview-box"><button type="button" class="asset-preview thumb-slot" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open in the viewer (double-click a card, or Enter)">${isFontFile(e) && !meta(e).thumb ? fontSampleHtml(e.name, false) : !hasThumb(e) && !meta(e).thumb ? fileTile(e) : `<img alt="Preview of ${esc(e.name)}" draggable="false" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}">`}</button></div>` : ""}
       ${
@@ -2457,17 +2470,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="asset-facts">
         ${e ? `<span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>${!isCard(e) ? `<span>${e.pixelW} × ${e.pixelH} px</span>` : ""}<span>${fmtBytes(e.size)}</span>` : ""}
       </div>
-      ${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays ${noteKindOf(e.name) === "rich" ? "a rich text note (HTML) that other apps open too" : "plain text other apps read"}. Tag it <em>template</em> to offer it in Insert ▸ Template of every note.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>No preview for this file</h3><p class="asset-note">${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as a card. ${esc(d.todo)}</p></section>`; })() : ""}
       ${e && !e.present ? `<p class="asset-warn">The file is missing from storage. Import the same file again to restore it everywhere.</p>` : ""}
       ${m ? `<p class="asset-warn" data-testid="asset-missing-help">Instances use a file that is not stored. Import the same file again to restore all ${instances} of them.</p>` : ""}
-      ${e ? organizeHtml(e) : ""}
-      ${e ? notesHtml(e) : ""}
-      <section class="asset-sec" data-testid="asset-backlinks" hidden><h3>Linked from</h3><ul class="asset-places"></ul></section>
-      <section class="asset-sec asset-where">
-        <h3 data-testid="asset-usage">${instances ? `Used on ${plural(places.length || (e?.canvases ?? m!.canvases), "canvas", "canvases")} <span class="asset-place-total">(${plural(instances, "time")})</span>` : "Where it is used"}</h3>
-        ${instances ? `<ul class="asset-places" data-testid="asset-places">${placeRows}</ul>
-          ${places.length > placesShown.length || placesAll ? `<button type="button" class="assets-btn asset-places-more" data-action="places-all" data-testid="asset-places-more" aria-expanded="${placesAll}" title="${placesAll ? "List only the first canvases" : "List every canvas it is on"}">${placesAll ? "Show fewer" : `Show all ${places.length} canvases`}</button>` : ""}` : `<p class="asset-note">Not used on any canvas.</p>`}
-      </section>
+      ${ui.detailSections.map((id) => `<div class="asset-dsec" data-dsec="${id}">${detail[id as (typeof DETAIL_SECTIONS)[number]]()}</div>`).join("")}
       <div class="asset-actions">
         ${e ? `<button type="button" class="assets-btn" data-action="rename" data-testid="asset-rename" title="Rename it, or change its extension (F2)"${ro}>${ICONS.textCursorInput}<span>Rename</span></button>` : ""}
         ${e?.present ? `<button type="button" class="assets-btn" data-action="download" data-testid="asset-download" title="Save a copy of the file">${ICONS.download}<span>Download</span></button>` : ""}
@@ -2487,6 +2492,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <dt>Hash</dt><dd class="asset-hash" title="${selected}">${selected!.slice(0, 12)}…</dd>
         </dl>
       </details>`;
+    for (const h of inspector.querySelectorAll<HTMLElement>("[data-dsec] h3")) {
+      h.draggable = true;
+      h.tabIndex = 0;
+      h.title = "Drag to move this section (or Alt+Up and Alt+Down on its name)";
+    }
     if (e?.present && !isCard(e)) void fillMetadata(e.hash, e.type);
     if (e) void fillBacklinks(e.hash);
     const prev = inspector.querySelector<HTMLImageElement>(".asset-preview img");
@@ -2840,6 +2850,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return true;
   };
 
+  sortableSections(inspector, {
+    key: "dsec",
+    head: "h3",
+    order: () => ui.detailSections,
+    set: (order) => {
+      ui.detailSections = order;
+      saveUi();
+      renderInspector();
+    },
+    headOf: (id) => inspector.querySelector<HTMLElement>(`[data-dsec="${id}"] h3`),
+  });
+  // A double-click on its name renames it.
+  inspector.addEventListener("dblclick", (e) => {
+    if (selected && !session.readOnly && (e.target as HTMLElement).closest(".asset-insp-head h2") && entryOf(selected)) void renameAssetsDialog([selected]);
+  });
   inspector.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b || b.disabled || !selected) return;
@@ -3412,45 +3437,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     over?.classList.add("is-drop-target");
   };
   // ---- the sidebar's sections are put in another order by dragging their heads (or Alt+Up and Alt+Down on one): kept with the layout
-  const SEC_TYPE = "application/x-canvast-section";
-  let movingSec: string | null = null;
-  const moveSection = (id: string, to: number): void => {
-    const order = ui.sections.filter((s) => s !== id);
-    order.splice(Math.max(0, Math.min(order.length, to)), 0, id);
-    ui.sections = order;
-    saveUi();
-    renderSide();
-    side.querySelector<HTMLElement>(`[data-sec-toggle="${id}"]`)?.focus();
-  };
-  side.addEventListener("dragstart", (e) => {
-    const head = (e.target as HTMLElement).closest<HTMLElement>(".side-head");
-    if (!head || !e.dataTransfer) return;
-    movingSec = head.closest<HTMLElement>("[data-sec]")!.dataset["sec"]!;
-    e.dataTransfer.setData(SEC_TYPE, movingSec);
-    e.dataTransfer.effectAllowed = "move";
-    for (const s of side.querySelectorAll<HTMLElement>("[data-sec]")) if (s.dataset["sec"] !== movingSec) s.classList.add("drop-zone");
-  });
-  side.addEventListener("dragend", () => {
-    movingSec = null;
-    for (const s of side.querySelectorAll<HTMLElement>("[data-sec]")) s.classList.remove("drop-zone", "is-drop-target");
-  });
-  side.addEventListener("keydown", (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-sec-toggle]");
-    if (!b || !e.altKey || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
-    e.preventDefault();
-    const id = b.dataset["secToggle"]!;
-    moveSection(id, ui.sections.indexOf(id) + (e.key === "ArrowUp" ? -1 : 1));
+  sortableSections(side, {
+    key: "sec",
+    head: ".side-head",
+    keyHead: "[data-sec-toggle]",
+    order: () => ui.sections,
+    set: (order) => {
+      ui.sections = order;
+      saveUi();
+      renderSide();
+    },
+    headOf: (id) => side.querySelector<HTMLElement>(`[data-sec-toggle="${id}"]`),
   });
   side.addEventListener("dragover", (e) => {
-    if (movingSec && e.dataTransfer?.types.includes(SEC_TYPE)) {
-      const s = (e.target as HTMLElement).closest<HTMLElement>("[data-sec]");
-      for (const x of side.querySelectorAll<HTMLElement>("[data-sec]")) x.classList.toggle("is-drop-target", x === s && x.dataset["sec"] !== movingSec);
-      if (s && s.dataset["sec"] !== movingSec) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-      }
-      return;
-    }
     const t = dropTarget(e);
     lightDrop(t);
     if (!t) return;
@@ -3461,17 +3460,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!side.contains(e.relatedTarget as Node | null)) lightDrop(null);
   });
   side.addEventListener("drop", (e) => {
-    if (movingSec && e.dataTransfer?.types.includes(SEC_TYPE)) {
-      const s = (e.target as HTMLElement).closest<HTMLElement>("[data-sec]");
-      const id = movingSec;
-      if (!s || s.dataset["sec"] === id) return;
-      e.preventDefault();
-      // Dropped on a section's upper half: before it; on its lower half: after it.
-      const r = s.getBoundingClientRect();
-      const at = ui.sections.filter((x) => x !== id).indexOf(s.dataset["sec"]!) + (e.clientY > r.top + r.height / 2 ? 1 : 0);
-      moveSection(id, at);
-      return;
-    }
     const t = dropTarget(e);
     lightDrop(null);
     if (!t) return;

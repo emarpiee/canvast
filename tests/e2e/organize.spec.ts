@@ -802,6 +802,28 @@ test("the workspace menu's ⋯ menu opens right beside its button, even though t
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("the library's details panel: its sections move as the sidebar's do, and stay; a double-click on its name renames", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "d.png", mimeType: "image/png", buffer: makePng(8, 8, () => [40, 90, 200, 255]) });
+  await p.locator('[data-testid="asset-card"]').first().click();
+  const details = () => p.locator("[data-dsec]").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset["dsec"]));
+  await expect.poll(details).toEqual(["file", "organize", "notes", "links", "where"]);
+  await p.locator('[data-dsec="notes"] h3').focus();
+  await p.keyboard.press("Alt+ArrowUp");
+  await expect.poll(details).toEqual(["file", "notes", "organize", "links", "where"]);
+  await p.locator('[data-dsec="where"] h3').dragTo(p.locator('[data-dsec="notes"]'), { targetPosition: { x: 20, y: 4 } });
+  await expect.poll(details).toEqual(["file", "where", "notes", "organize", "links"]);
+  await p.locator(".asset-insp-head h2").dblclick();
+  await expect(p.locator("dialog[open]")).toContainText(/rename/i);
+  await p.keyboard.press("Escape");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await p.locator('[data-testid="asset-card"]').first().click();
+  await expect.poll(details).toEqual(["file", "where", "notes", "organize", "links"]);
+});
+
 test("the workspace can be renamed from the menu's whole-workspace section, and the name is kept (ADR 0079)", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("workspace-chevron").click();
