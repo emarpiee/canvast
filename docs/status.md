@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.23: property types, the limits of v0.53.22 (2026-11-04)
+
+- **Implemented:** property types (`src/notes/prop-types.ts`, setting `library.propTypes`), warnings, typed controls and file writing; saved looks in the setting, with an update button; card labels from the library; pasted properties follow the pasted words; stored on leaving a field.
+- **Tested:** unit tests (641), notes, organize and icon-audit specs in chromium (39), the types and properties tests in firefox, the desktop paged-library and file-name tests; the whole suite on GitHub after the push.
+- **Known failures:** `assets.spec` Extract frame failed once on GitHub in Firefox (the click on a fading player) and passes locally; not changed.
+- **Unverified:** mismatch wording is the app's own (Obsidian's help page does not describe one). Not tried against Obsidian itself.
+- **Committed:** v0.53.23.
+- **Next bounded task:** owner's call.
+
 ## v0.53.22: properties (2026-11-04)
 
 - **Implemented:** `property:`/`description:` keywords and `typedTest` (`filters.ts`), `prop:<key>` sort, `propValue`, `propValues` (`library-match.ts`, both builds; `fieldValues` over the desktop bridge), property columns as `prop:<key>` column ids with `--o-p<n>` order, `SavedView` per saved search in the library's UI state, a Saved searches sidebar section, `notes.cardProps` with `setShownProps` (`note-preview.ts`), `|` and `>` blocks (`frontmatter.ts`), `mergeProps`, `withPastedProps`.

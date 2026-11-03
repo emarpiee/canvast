@@ -16,6 +16,7 @@
 import type { NoteStyle } from "../notes/note-file";
 import { DOCK_PANEL_IDS } from "./panels";
 import { paintFromText } from "../doc/paint";
+import { validPropTypes } from "../notes/prop-types";
 import { validSaved } from "../search/saved";
 
 /** The ways W A S D step to the next item (interaction/item-navigation.ts), in the order Settings lists them. */
@@ -151,6 +152,7 @@ export const SETTINGS = {
   "notes.saveOnClose": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.saveAs": { scope: "device", default: "ask", validate: oneOf("ask", "file", "rich"), effect: "immediate" } as Def<"ask" | "file" | "rich">,
   "notes.cardShows": { scope: "device", default: "whole", validate: oneOf("part", "whole"), effect: "immediate" } as Def<"part" | "whole">,
+  "library.propTypes": { scope: "device", default: "{}", validate: validPropTypes, effect: "immediate" } as Def<string>,
   "notes.cardProps": { scope: "device", default: "", validate: text(200), effect: "immediate" } as Def<string>,
   "notes.name": { scope: "device", default: "Note {yyyy}-{mm}-{dd} {hhmmss}", validate: text(120), effect: "immediate" } as Def<string>,
   "notes.cardWidth": { scope: "device", default: 320, validate: range(120, 1200), effect: "immediate" } as Def<number>,

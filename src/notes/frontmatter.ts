@@ -2,6 +2,8 @@
 // Obsidian's properties use is read (a text, a number, true or false, a date, a list), and `|` and `>` blocks as text; anything else (a nested map) is
 // kept exactly as written and never shown. Pure.
 
+import { propType } from "./prop-types";
+
 export interface Prop {
   key: string;
   /** A text, or a list of texts. */
@@ -10,6 +12,8 @@ export interface Prop {
   raw?: string[];
   /** The lines as the file has them, written back while the value stays the same (quotes, `[a, b]`, a comment after the value). */
   written?: string[];
+  /** Written without quotes: a checkbox's true or false, which quoted would be a text. */
+  plain?: boolean;
 }
 
 const OPEN = /^---\r?\n/;
@@ -128,7 +132,7 @@ export function writeProps(props: readonly Prop[]): string[] {
     if (p.raw) out.push(...p.raw);
     else if (p.written) out.push(...p.written);
     else if (Array.isArray(p.value)) out.push(`${keyText(p.key)}:`, ...p.value.map((v) => `  - ${scalar(v)}`));
-    else out.push(p.value === "" ? `${keyText(p.key)}:` : `${keyText(p.key)}: ${scalar(p.value)}`);
+    else out.push(p.value === "" ? `${keyText(p.key)}:` : `${keyText(p.key)}: ${p.plain ? p.value : scalar(p.value)}`);
   }
   return out;
 }
@@ -162,6 +166,13 @@ export function metaOfProps(props: readonly Prop[]): NoteMeta {
   return meta;
 }
 
+/** A value from the item as its type writes it in the file: a list as a list, a checkbox as true or false. */
+function typedProp(key: string, value: string, wasList: boolean): Prop {
+  const type = propType(key, value);
+  if (value && (wasList || type === "list")) return { key, value: value.split(/,\s*/).filter(Boolean) };
+  return type === "checkbox" && /^(?:true|false)$/i.test(value) ? { key, value: value.toLowerCase(), plain: true } : { key, value };
+}
+
 /**
  * The note's properties after its item's tags, note and fields changed: the keys it had keep their place (and a list stays a list),
  * keys gone from the item go, new ones come last; what was kept as written stays.
@@ -191,13 +202,13 @@ export function propsOfMeta(prev: readonly Prop[], meta: NoteMeta): Prop[] {
       const v = fields.get(p.key)!;
       // (unchanged, it stays as written: "Smith, John" is one item of a list, not two)
       if ((Array.isArray(p.value) ? p.value.join(", ") : p.value) === v) out.push(p);
-      else out.push({ key: p.key, value: Array.isArray(p.value) ? v.split(/,\s*/).filter(Boolean) : v });
+      else out.push(typedProp(p.key, v, Array.isArray(p.value)));
       fields.delete(p.key);
     }
   }
   if (!tagsDone && meta.tags.length) out.push({ key: "tags", value: [...meta.tags] });
   if (!noteDone && meta.note) out.push({ key: NOTE_KEY, value: meta.note });
-  for (const [key, value] of fields) out.push({ key, value });
+  for (const [key, value] of fields) out.push(typedProp(key, value, false));
   return out;
 }
 

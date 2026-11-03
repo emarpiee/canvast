@@ -1259,8 +1259,28 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-sec > .assets-btn[data-action="new-folder-into"] { margin-top: var(--sp-3); }
 /* the note (plain text) and the fields the user names: a name and a value per row, × to remove one, "Add a field" below */
 .asset-note-box { display: block; width: 100%; min-height: calc(var(--sp-15) + var(--sp-8)); resize: vertical; box-sizing: border-box; }
-.asset-fields { list-style: none; margin: var(--sp-4) 0 0; padding: 0; display: grid; gap: var(--sp-3); }
-.asset-field { display: grid; grid-template-columns: auto minmax(0, 2fr) minmax(0, 3fr) auto; gap: var(--sp-3); align-items: center; }
+.asset-fields { list-style: none; margin: var(--sp-4) 0 0; padding: 0; display: grid; gap: var(--sp-3); container-type: inline-size; }
+.asset-field { display: grid; grid-template: auto auto / auto auto minmax(0, 2fr) minmax(0, 3fr) auto; grid-template-areas: "grip type key value remove" ". . warn warn warn"; gap: var(--sp-3); align-items: start; }
+.asset-field > .field-grip { grid-area: grip; }
+.asset-field > .field-type { grid-area: type; }
+.asset-field > .field-warn { grid-area: warn; }
+.asset-field input[type="checkbox"].field-value { justify-self: start; width: var(--icon-md); height: var(--ctl); margin: 0; }
+.field-type { display: inline-flex; align-items: center; justify-content: center; width: var(--icon-lg); height: var(--ctl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
+.field-type:hover:not(:disabled) { color: var(--hud-fg); background: var(--hud-hover); }
+.field-type:disabled { cursor: default; opacity: 0.4; }
+.field-type svg { width: var(--icon-md); height: var(--icon-md); }
+.asset-field .field-value[aria-invalid] { border-color: var(--hud-danger); outline-color: var(--hud-danger); }
+.asset-field input[type="date"], .asset-field input[type="datetime-local"] { font-size: var(--text-sm); }
+.field-warn { display: flex; gap: var(--sp-2); align-items: flex-start; margin: 0; font-size: var(--text-sm); color: var(--hud-danger); }
+.field-warn[hidden] { display: none; }
+.field-warn svg { flex: none; width: var(--icon-md); height: var(--icon-md); }
+.asset-field > .field-key { grid-area: key; }
+.asset-field > .field-value { grid-area: value; }
+.asset-field > [data-action="field-remove"] { grid-area: remove; }
+/* a narrow panel: the name has a line of its own, with the value under it, so neither is cut */
+@container (max-width: 340px) {
+  .asset-field { grid-template: auto auto auto / auto auto minmax(0, 1fr) auto; grid-template-areas: "grip type key remove" ". value value value" ". warn warn warn"; row-gap: var(--sp-1); }
+}
 /* the grip moves a field (drag it, or the Up and Down arrows on it); the row being dragged is lifted */
 .field-grip { display: inline-flex; align-items: center; justify-content: center; width: var(--icon-lg); height: var(--ctl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-sm); cursor: grab; touch-action: none; }
 .field-grip:hover { color: var(--hud-fg); background: var(--hud-hover); }
@@ -2973,7 +2993,7 @@ dialog.reset-dialog h3 { margin: var(--sp-6) 0 var(--sp-3); font-size: var(--tex
 .asset-more[data-metadata] h4 { margin-top: var(--sp-5); }
 .assets-import { flex: none; }
 .asset-note-label { display: block; margin-bottom: var(--sp-2); font-size: var(--text-sm); color: var(--hud-muted); }
-.asset-field textarea.field-value { resize: vertical; min-width: 0; }
+.asset-field textarea.field-value { resize: vertical; min-width: 0; field-sizing: content; }
 .cols-add { display: flex; gap: var(--sp-3); margin-bottom: var(--sp-4); }
 .cols-add input { flex: 1; min-width: 0; }
-.asset-field input::-webkit-calendar-picker-indicator { display: none !important; }
+.asset-field input[list]::-webkit-calendar-picker-indicator { display: none !important; }

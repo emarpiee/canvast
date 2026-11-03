@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.53.23 — Property types (2026-11-04)
+
+- **Added:** **property types**, as in Obsidian: *Text*, *List*, *Number*, *Checkbox*, *Date*, *Date & time*, chosen from a button before a property's name and kept for that name in the whole library. A name without one takes its type from its value. A checkbox is a box to tick, a date a picker.
+- **Added:** a value that does not fit its type shows a warning with what the type expects, while typed and when stored; the value itself is never changed.
+- **Added:** a saved search's **update button** in the sidebar gives it the layout, columns and sort shown now.
+- **Changed:** a saved search's look is kept with it in the settings, so it travels with the workspace backup instead of staying in this browser or device.
+- **Changed:** in a narrow details panel a property's value has its own line under its name, and a long value wraps in a box that grows; both were cut.
+- **Changed:** a list column shows a value of several lines on one line, all of it that fits.
+- **Fixed:** a card's labels (Note cards show properties) show a property that only the library has, and change as soon as it does.
+- **Fixed:** undoing or deleting what was pasted from Obsidian leaves its properties out of the next save.
+- **Fixed:** a value typed while the details panel was drawn again could be lost when leaving the box.
+- **Fixed:** a list property or a checkbox written into a note's file is a real YAML list or a bare `true`/`false`, not a quoted text.
+- **Fixed:** a property's value suggestions could be emptied by the panel being drawn again.
+
 ## 0.53.22 — Properties (2026-11-04)
 
 - **Changed:** the details panel's Note and fields are **Properties**: **Description** and **Add a property**, in Obsidian's word, as they are a markdown note's YAML. `description:` and `property:` search as `note:` and `field:` do, which still work.

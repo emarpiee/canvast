@@ -431,7 +431,15 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
 
   let dirty = false;
   /** Properties pasted with a note from Obsidian, until the next save puts them in the file. */
-  const pasted: Prop[] = [];
+  const pasted: Array<{ props: Prop[]; words: string[] }> = [];
+  const bare = (s: string): string => s.replace(/\s+/g, "");
+  const textOf = (html: string): HTMLElement => new DOMParser().parseFromString(html, "text/html").body;
+  /** The words of each block of what was pasted, to know later whether any of it is still in the note. */
+  const blocksOf = (html: string): string[] => {
+    const body = textOf(html);
+    const blocks = [...body.querySelectorAll("p, li, h1, h2, h3, h4, h5, h6, td, th, pre")].map((b) => bare(b.textContent ?? "")).filter(Boolean);
+    return blocks.length ? blocks : [bare(body.textContent ?? "")].filter(Boolean);
+  };
   /**
    * The Markdown and Code views show the note as text and, coming back, read it again from that text: markdown keeps no picture sizes,
    * spacing or styles. Left without a change to that text, the note comes back as it was, not read again.
@@ -511,9 +519,9 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
           const drawn = source ? null : pastedHtml((event as ClipboardEvent).clipboardData?.getData("text/html") ?? "");
           const got = source ?? drawn;
           if (!got) return undefined;
-          pasted.push(...got.props);
           dirty = true;
           const html = await fromLibrary(source ? markdownHtml(wikiToLinks(source.content)) : drawn!.content, host.dir);
+          if (got.props.length) pasted.push({ props: got.props, words: blocksOf(html) });
           return html.trim() ? $.html.clean(html, { forceFormat: false, whitelist: null, blacklist: null }) : false;
         }
         const a = wiki ? wikiLink(wiki[1]!.trim(), words) : Object.assign(document.createElement("a"), { href: url!, textContent: words });
@@ -757,7 +765,11 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     },
     asRich: (title) => richNoteFile(title, output().replace(/(href|src)="canvast-wiki:([^"]+)"/g, (m, a: string, t: string) => { const p = wikiPath.get(decodeURIComponent(t)); return p ? `${a}="${p}"` : m; })),
     settle: () => (repairing = repairing.then(repair)),
-    pastedProps: () => pasted,
+    pastedProps() {
+      // (undone or deleted, all of what came with them: they went too. Nothing but properties was pasted: nothing to tell by, they stay.)
+      const now = bare(textOf(editor.$.html.get()).textContent ?? "");
+      return pasted.filter((p) => !p.words.length || p.words.some((w) => now.includes(w))).flatMap((p) => p.props);
+    },
     current() {
       editsAtCurrent = edits;
       return settled(editor.$.html.get());

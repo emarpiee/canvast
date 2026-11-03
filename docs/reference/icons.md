@@ -6,7 +6,7 @@ One icon per function: two buttons that do different things never share an icon,
 | --- | --- |
 | `save` | Save: Save as a style, Save to library (the export dialog, the Actions bar, the context menu), Save from the text, Save the adjustments (nothing else carries it) |
 | `arrow-down-to-line` | Import: every import button and menu row, the Import tool of the rail, Import styles (nothing else carries it) |
-| `refresh-cw` | Update: Update from the picked picture, from the Pattern panel, to the current view, the bookmark pictures, the initial state (nothing else carries it) |
+| `refresh-cw` | Update: Update from the picked picture, from the Pattern panel, to the current view, the bookmark pictures, the initial state, a saved search to the look shown now (nothing else carries it) |
 | `expand` | Scale contents with the sheet (the sheet's size field) |
 | `chart-spline` | Simplify the picked paths: fewer nodes, the same shape (Actions bar) |
 | `pencil-ruler` | Turn the picked pen strokes into editable paths (Actions bar) |
@@ -218,6 +218,13 @@ One icon per function: two buttons that do different things never share an icon,
 | `ruler` | By size, largest first |
 | `scaling` | Pen size follows zoom |
 | `search` | Search the canvas |
+| `search-check` | A saved search in the library's sidebar |
+| `letter-text` | A property's type: Text |
+| `list` | A property's type: List |
+| `binary` | A property's type: Number |
+| `square-check` | A property's type: Checkbox |
+| `calendar` | A property's type: Date |
+| `calendar-clock` | A property's type: Date & time |
 | `send-to-back` | Send to back |
 | `settings` | Settings |
 | `shapes` | Erase whole groups |

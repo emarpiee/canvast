@@ -254,7 +254,7 @@ test("tags and favourites: edit in the inspector, filter by sidebar and search, 
   await expect(p.getByTestId("asset-favorite")).toHaveAttribute("aria-pressed", "true");
   await expect(p.getByTestId("tag-list")).toContainText("#colour");
   await expect(p.getByTestId("asset-note")).toHaveValue("Two hands\nfrom the life class");
-  await expect(p.getByRole("combobox", { name: "Value of link" })).toHaveValue("https://example.com/hands");
+  await expect(p.getByLabel("Value of link")).toHaveValue("https://example.com/hands");
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -802,6 +802,71 @@ test("the workspace menu's ⋯ menu opens right beside its button, even though t
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("a property's type belongs to its name: the value's control follows it, and a value that does not fit is kept and warned about", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  const png = (c: number) => makePng(8, 8, () => [c, 90, 200, 255]);
+  await p.getByTestId("assets-import-input").setInputFiles(["a", "b"].map((n, i) => ({ name: `${n}.png`, mimeType: "image/png", buffer: png(40 + i * 40) })));
+  const card = (n: string) => p.locator(`[data-testid="asset-card"][title="${n}.png"]`);
+  const stored = (n: string, key: string) => p.evaluate(async ([n, key]) => (await window.__canvastDebug.assetListing()).entries.find((e) => e.name === `${n}.png`)!.fields?.find((f) => f.key === key)?.value, [n, key]);
+  const add = async (n: string, key: string, value: string): Promise<void> => {
+    await card(n).click();
+    await p.getByTestId("asset-field-add").click();
+    await p.locator(".field-key").last().fill(key);
+    await p.locator(".field-value").last().fill(value);
+    await p.locator(".field-value").last().blur();
+    await expect.poll(() => stored(n, key)).toBe(value);
+  };
+  const warn = p.getByTestId("field-warn").filter({ visible: true });
+  await add("a", "rating", "4");
+  // Read from the value: a number. Typed wrong, it warns at once; stored, it is kept as typed and still warned about.
+  const box = p.getByLabel("Value of rating");
+  await box.fill("four");
+  await expect(warn).toContainText("expected a number");
+  await expect(box).toHaveAttribute("aria-invalid");
+  await box.blur();
+  await expect.poll(() => stored("a", "rating")).toBe("four");
+  await expect(p.getByLabel("Value of rating")).toHaveValue("four");
+  await expect(warn).toContainText("expected a number");
+  await p.getByLabel("Value of rating").fill("5");
+  await expect(warn).toHaveCount(0);
+  await p.getByLabel("Value of rating").blur();
+  // Chosen from its button: the type is the name's. A date's picker; another item with that name is checked too.
+  await add("b", "when", "soon");
+  await expect(warn).toHaveCount(0);
+  await p.getByRole("button", { name: /^Type of when/ }).click();
+  await p.locator('[data-id="prop-type-date"]').click();
+  await expect(warn).toContainText("expected a date");
+  await expect.poll(() => stored("b", "when")).toBe("soon");
+  await p.getByLabel("Value of when").fill("2025-02-30");
+  await expect(warn).toContainText("expected a date"); // (not on the calendar)
+  await p.getByLabel("Value of when").fill("2025-02-20");
+  await p.getByLabel("Value of when").blur();
+  await expect.poll(() => stored("b", "when")).toBe("2025-02-20");
+  await expect(p.getByLabel("Value of when")).toHaveAttribute("type", "date");
+  await add("a", "when", "2025-03-01");
+  await expect(p.getByLabel("Value of when")).toHaveAttribute("type", "date");
+  // A checkbox: a click says true, and again false.
+  await add("a", "done", "false");
+  const done = p.getByLabel("Value of done");
+  await expect(done).toHaveAttribute("type", "checkbox");
+  await done.check();
+  await expect.poll(() => stored("a", "done")).toBe("true");
+  await expect(p.getByLabel("Value of done")).toBeChecked();
+  // A date and time keeps how it was written.
+  await add("a", "created", "2024-09-03T10:30:00");
+  await expect(p.getByLabel("Value of created")).toHaveAttribute("type", "datetime-local");
+  await p.getByLabel("Value of created").focus();
+  await p.getByLabel("Value of created").blur();
+  expect(await stored("a", "created")).toBe("2024-09-03T10:30:00");
+  // Kept over a restart.
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await card("b").click();
+  await expect(p.getByLabel("Value of when")).toHaveAttribute("type", "date");
+});
+
 test("properties: a column, a sort, typed search, suggested values; a saved search brings its look back", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
@@ -829,7 +894,19 @@ test("properties: a column, a sort, typed search, suggested values; a saved sear
   await p.locator(".field-key").last().fill("created");
   await p.locator(".field-value").last().focus();
   await expect.poll(() => p.getByTestId("field-value-suggest").locator("option").evaluateAll((l) => l.map((o) => (o as HTMLOptionElement).value).sort())).toEqual(["2024-05-01", "2025-03-01T10:00"]);
-  await p.locator(".field-value").last().fill("");
+  // A long value wraps whole, stays on one line in the file, and its name is not cut in a narrow panel.
+  const LONG = "A long title that takes more than one line of the panel";
+  await p.locator(".field-value").last().fill(LONG);
+  await p.locator(".field-value").last().blur();
+  const longBox = p.locator("textarea.field-value");
+  await expect(longBox).toHaveValue(LONG);
+  await longBox.focus();
+  await p.keyboard.press("Enter");
+  await expect(longBox).not.toBeFocused();
+  await expect(longBox).toHaveValue(LONG);
+  expect(await longBox.evaluate((b) => b.scrollHeight <= b.clientHeight + 1), "the whole value shows").toBe(true);
+  await p.locator(".field-key").last().fill("cssclasses");
+  expect(await p.locator(".field-key").last().evaluate((b) => (b as HTMLInputElement).scrollWidth <= b.clientWidth), "the name shows").toBe(true);
   await p.getByRole("button", { name: /Remove the property/ }).last().click();
   // Typed search.
   const names = () => p.locator('[data-testid="asset-card"]').evaluateAll((l) => l.map((c) => c.getAttribute("title")));
@@ -868,6 +945,16 @@ test("properties: a column, a sort, typed search, suggested values; a saved sear
   await expect(p.getByTestId("assets-sort")).toHaveValue("prop:created");
   await expect(head).toBeVisible();
   await expect.poll(names).toEqual(["b.png", "a.png", "c.png"]);
+  // Its button updates it to the look now; the look is in the settings, so it comes back on a device that has only those.
+  await p.getByTestId("assets-sort").selectOption("name");
+  await p.getByTestId("side-saved").getByRole("button", { name: /^Update kind:picture/ }).click();
+  await p.evaluate(() => localStorage.removeItem("canvast.assets.ui"));
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("side-saved").locator("button", { hasText: "kind:picture" }).first().click();
+  await expect(p.getByTestId("assets-sort")).toHaveValue("name");
+  await expect(head).toBeVisible();
   // Kept over a restart; unticked, it is gone.
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
@@ -1186,8 +1273,10 @@ test("custom thumbnails: a picture of the library, an uploaded one (its own cate
   if (!(await p.getByTestId("asset-place").isVisible())) await p.locator(".viewer-details").click();
   await expect(p.getByTestId("asset-thumb")).toBeVisible();
   await expect(p.getByTestId("asset-place")).toBeVisible(); // (the details panel may still be opening: measured once both are there)
-  const [tb, pb] = [(await p.getByTestId("asset-thumb").boundingBox())!, (await p.getByTestId("asset-place").locator("xpath=..").boundingBox())!];
-  expect(tb.y + tb.height <= pb.y || tb.x + tb.width <= pb.x || pb.x + pb.width <= tb.x, "not over Place on canvas").toBe(true);
+  await expect(async () => { // (the panel may be drawn again between the two: measured until both are there)
+    const [tb, pb] = [(await p.getByTestId("asset-thumb").boundingBox())!, (await p.getByTestId("asset-place").locator("xpath=..").boundingBox())!];
+    expect(tb.y + tb.height <= pb.y || tb.x + tb.width <= pb.x || pb.x + pb.width <= tb.x, "not over Place on canvas").toBe(true);
+  }).toPass({ timeout: 5000 });
   await p.keyboard.press("Escape");
   // Kept over a reload; Automatic gives it its own picture again.
   await p.reload();

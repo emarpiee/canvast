@@ -23,7 +23,8 @@ import { fontSampleHtml, showFont } from "./font-specimen";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actions";
 import { LIBRARY_ROWS, searchHelpButton, wireSearchHelp } from "./search-help";
 import { ASSETS_RECENT, rememberSearch } from "../search/history";
-import { byUse, parseSaved, sameSearch } from "../search/saved";
+import type { SearchWay } from "../search/history";
+import { byUse, parseSaved, sameSearch, withLook, type SavedLook } from "../search/saved";
 import { paintRecent, paintSaveToggle, saveToggleHtml, wireRecent, wireSaveToggle, type SavedStore } from "./search-recent";
 import { evalQuery, parseQuery, type Query } from "../search/query";
 import { countSide as countSideOf, inScope as inScopeOf, libraryPaging, matcher, pickedKeys, propValue, propValues, sortListed, togglePicked, type LibraryQuery, type SideCounts, type SortKey, type UsageFilter } from "../assets/library-match";
@@ -49,6 +50,7 @@ import { OpenNote } from "./note-session";
 import type { NoteDeps, NotePlace } from "./note-session";
 import { RICH_NOTE_SUFFIX, WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget, newNoteFile } from "../notes/note-file";
 import { splitFrontmatter, underProps, withFileMeta } from "../notes/frontmatter";
+import { asWritten, hasPropType, pickerShows, PROP_TYPES, propType, typeWarning, withPropType, type PropType } from "../notes/prop-types";
 import type { NoteKind } from "../notes/note-file";
 import { fontFor } from "../text/fonts";
 import { hasAlpha } from "./alpha";
@@ -184,14 +186,6 @@ const SORT_OF: Record<StaticColumn, { key: SortKey; desc: boolean }> = {
 const headCell = (c: { id: string; label: string }): string =>
   `<span data-col="${esc(c.id)}" draggable="true" role="columnheader" aria-sort="none" title="Click to sort by ${esc(c.label.toLowerCase())}; drag to move this column">${esc(c.label)}<i class="col-sort" aria-hidden="true"></i><i class="col-resize" data-resize="${esc(c.id)}" title="Drag to resize this column (double-click: its usual width)" aria-hidden="true"></i></span>`;
 const sortOfCol = (id: ColumnId): { key: SortKey; desc: boolean } => (isPropColumn(id) ? { key: id, desc: false } : SORT_OF[id]);
-/** A saved search's look: it comes back with the search, so a search can be a view of the library. */
-interface SavedView {
-  layout: "grid" | "list";
-  order: ColumnId[];
-  hidden: ColumnId[];
-  sort: string;
-  reversed: boolean;
-}
 
 
 /** Fields that take typed text: shortcuts keep out of them (a checkbox or a slider is not one). */
@@ -288,6 +282,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="col-grip" data-grip="insp" data-testid="insp-grip" role="separator" aria-orientation="vertical" aria-label="Resize the details panel" title="Drag to resize the details panel (double-click to reset)" tabindex="0"></div>
       <div class="sheet-grip" data-testid="sheet-grip" role="separator" aria-orientation="horizontal" aria-label="Resize the details panel" title="Drag to resize the details (double-click to reset)" tabindex="0"><span></span></div>
       <aside class="asset-inspector" data-testid="asset-inspector" aria-label="Details" hidden></aside>
+      <datalist id="field-value-suggest" data-testid="field-value-suggest"></datalist>
     </div>
     <footer class="hud-bottom assets-statusbar" data-testid="assets-statusbar">
       <div class="hud-readout assets-readout" aria-live="off">
@@ -386,7 +381,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedView>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -1966,7 +1961,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <span class="asset-canvases">${e.canvases}</span>
           ${ui.order.filter(isPropColumn).map((c, i) => {
             const v = propValue(e, c.slice(5));
-            return `<span class="asset-prop" data-testid="asset-prop" style="order: var(--o-p${i})" title="${esc(v)}">${esc(v.split("\n")[0] ?? "")}</span>`;
+            return `<span class="asset-prop" data-testid="asset-prop" style="order: var(--o-p${i})" title="${esc(v)}">${esc(v.replace(/\s*\n\s*/g, " "))}</span>`;
           }).join("")}
           <span class="asset-added">${addedDate.format(e.importedAt)}</span>
           <span class="asset-uses" data-testid="asset-uses">${usesText(e.instances, e.canvases)}</span>
@@ -2312,7 +2307,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // Saved searches, one click away, each with the look it was saved with.
     const savedRows = byUse(parseSaved(settings.get("search.saved.library")) ?? []).map((s) => ({
       active: false,
-      html: `<li class="side-row"><button type="button" class="side-item" data-saved-search="${esc(s.q)}" data-saved-way="${s.m}" title="Search for ${esc(s.q)}">${ICONS.save}<span class="side-label">${esc(s.q)}</span></button></li>`,
+      html: `<li class="side-row"><button type="button" class="side-item" data-saved-search="${esc(s.q)}" data-saved-way="${s.m}" title="Search for ${esc(s.q)}">${ICONS.savedSearch}<span class="side-label">${esc(s.q)}</span></button><button type="button" class="side-mini" data-saved-look="${esc(s.q)}" data-saved-way="${s.m}" aria-label="Update ${esc(s.q)} to the layout, columns and sort shown now" title="Update it to the layout, columns and sort shown now"${ro ? " hidden" : ""}>${ICONS.refresh}</button></li>`,
     }));
     const scopeName = scopeNameOf(tagCounts);
     side.dataset["open"] = String(sideOpen);
@@ -2662,6 +2657,27 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** The note and fields being stored: shown until the library has them, so a redraw meanwhile never shows (and then stores) the old ones. */
   let savingNotes: { hash: string; note: string; fields: AssetField[] } | null = null;
 
+  /** A value longer than this wraps in a box that grows, instead of being cut in a line. */
+  const FIELD_LINE = 24;
+  const PROP_ICON: Record<PropType, string> = { text: ICONS.propText, list: ICONS.propList, number: ICONS.propNumber, checkbox: ICONS.propCheckbox, date: ICONS.propDate, datetime: ICONS.propDatetime };
+  /** A property's value, by its type: a checkbox, a date or a date and time picker while the value fits one; else a box that shows the value as it is. */
+  const fieldValueHtml = (f: AssetField, i: number, dis: string): string => {
+    const type = propType(f.key, f.value);
+    const bad = !!typeWarning(type, f.value);
+    const named = `data-prop="value-${i}" aria-label="${f.key ? `Value of ${esc(f.key)}` : `Value of property ${i + 1}`}"${dis}`;
+    const picker = bad ? null : type === "checkbox" ? "checkbox" : type === "date" ? "date" : type === "datetime" && (!f.value || pickerShows(f.value)) ? "datetime-local" : null;
+    if (picker === "checkbox") return `<input type="checkbox" class="field-value" data-written="${esc(f.value)}" ${named}${/^true$/i.test(f.value.trim()) ? " checked" : ""}>`;
+    if (picker) return `<input type="${picker}"${picker === "datetime-local" && f.value.length > 16 ? ' step="1"' : ""} class="field-value" data-written="${esc(f.value)}" value="${esc(f.value)}" ${named}>`;
+    const marks = `${bad ? ' aria-invalid="true"' : ""} placeholder="${type === "list" ? "Items, separated by commas" : "Value"}" maxlength="${MAX_FIELD_VALUE}"`;
+    if (f.value.includes("\n") || f.value.length > FIELD_LINE) return `<textarea class="field-value"${f.value.includes("\n") ? "" : " data-one-line"} rows="${Math.min(8, f.value.split("\n").reduce((n, l) => n + Math.max(1, Math.ceil(l.length / FIELD_LINE)), 0))}" ${named}${marks}>${esc(f.value)}</textarea>`;
+    return `<input class="field-value" list="field-value-suggest" value="${esc(f.value)}"${type === "number" ? ' inputmode="decimal"' : ""} ${named}${marks}>`;
+  };
+  /** What a value's control holds, as the file wrote it while it means the same. */
+  const fieldValueOf = (box: HTMLInputElement): string => {
+    const written = box.dataset["written"];
+    if (box.type === "checkbox") return box.checked ? asWritten(written ?? "", "true") : written ? asWritten(written, "false") : "";
+    return written === undefined ? box.value : asWritten(written, box.value);
+  };
   /** The note (plain text) and the fields the user names (a link, a source, an author...) of one asset. */
   const notesHtml = (e: CatalogListing["entries"][number]): string => {
     const stored = meta(e);
@@ -2675,14 +2691,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <h3>Properties</h3>
         <label class="asset-note-label" for="asset-note-box">Description</label>
         <textarea id="asset-note-box" class="asset-note-box" data-prop="note" data-testid="asset-note" rows="4" maxlength="${MAX_NOTE}" placeholder="Anything about it, in plain text"${dis}>${esc(m.note)}</textarea>
-        ${rows.length ? `<ul class="asset-fields" data-testid="asset-fields">${rows.map((f, i) => `<li class="asset-field">
+        ${rows.length ? `<ul class="asset-fields" data-testid="asset-fields">${rows.map((f, i) => `<li class="asset-field" data-type="${propType(f.key, f.value)}">
             <button type="button" class="field-grip" data-index="${i}" aria-label="Move the property ${esc(f.key || String(i + 1))}" title="Drag to move this property (or the Up and Down arrows)"${dis}>${ICONS.gripVertical}</button>
+            <button type="button" class="field-type" data-action="field-type" data-index="${i}" aria-haspopup="menu" aria-label="Type of ${esc(f.key || "this property")}: ${PROP_TYPES.find((t) => t.id === propType(f.key, f.value))!.label}" title="${f.key ? `Type: ${PROP_TYPES.find((t) => t.id === propType(f.key, f.value))!.label}. A type belongs to the name, for every item` : "Name it to choose its type"}"${dis || (f.key ? "" : " disabled")}>${PROP_ICON[propType(f.key, f.value)]}</button>
             <input class="field-key" data-prop="key-${i}" list="field-key-suggest" value="${esc(f.key)}" placeholder="Name" aria-label="Name of property ${i + 1}" maxlength="${MAX_FIELD_KEY}"${dis}>
-            ${f.value.includes("\n") ? `<textarea class="field-value" data-prop="value-${i}" rows="3" placeholder="Value" aria-label="${f.key ? `Value of ${esc(f.key)}` : `Value of property ${i + 1}`}" maxlength="${MAX_FIELD_VALUE}"${dis}>${esc(f.value)}</textarea>` : `<input class="field-value" data-prop="value-${i}" list="field-value-suggest" value="${esc(f.value)}" placeholder="Value" aria-label="${f.key ? `Value of ${esc(f.key)}` : `Value of property ${i + 1}`}" maxlength="${MAX_FIELD_VALUE}"${dis}>`}
+            ${fieldValueHtml(f, i, dis)}
+            <p class="field-warn" data-testid="field-warn" role="status"${typeWarning(propType(f.key, f.value), f.value) ? "" : " hidden"}>${ICONS.triangleAlert}<span>${esc(typeWarning(propType(f.key, f.value), f.value))}</span></p>
             <button type="button" class="assets-btn is-icon" data-action="field-remove" data-index="${i}" aria-label="Remove the property ${esc(f.key || String(i + 1))}" title="Remove this property"${dis}>${ICONS.x}</button>
           </li>`).join("")}</ul>` : ""}
         <datalist id="field-key-suggest">${keys.map((k) => `<option value="${esc(k)}"></option>`).join("")}</datalist>
-        <datalist id="field-value-suggest" data-testid="field-value-suggest"></datalist>
         <button type="button" class="assets-btn" data-action="field-add" data-testid="asset-field-add" title="Add a property with a name you choose (a link, a source, an author...)"${dis}>${ICONS.fieldAdd}<span>Add a property</span></button>
       </section>`;
   };
@@ -2747,8 +2764,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** The note and the fields as they are in the details now (typed but maybe not stored yet). */
   const notesNow = (): { note: string; fields: AssetField[] } => ({
     note: inspector.querySelector<HTMLTextAreaElement>(".asset-note-box")?.value ?? "",
-    fields: [...inspector.querySelectorAll<HTMLElement>(".asset-field")].map((li) => ({ key: li.querySelector<HTMLInputElement>(".field-key")!.value, value: li.querySelector<HTMLInputElement>(".field-value")!.value })),
+    fields: [...inspector.querySelectorAll<HTMLElement>(".asset-field")].map((li) => ({ key: li.querySelector<HTMLInputElement>(".field-key")!.value, value: fieldValueOf(li.querySelector<HTMLInputElement>(".field-value")!) })),
   });
+
+  /** A name's type, for every item with that name. Values stay as they are; those that do not fit say so. */
+  const pinType = (key: string, type: PropType): void => {
+    settings.set("library.propTypes", withPropType(settings.get("library.propTypes"), key, type));
+    renderInspector();
+  };
 
   /** Store the note and the fields of the asset in the details (one write, one undo step), if they changed. */
   const saveNotes = (hash: string, now = notesNow(), label = "Changed the properties"): void => {
@@ -3039,6 +3062,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         keys[keys.length - 1]?.focus();
         break;
       }
+      case "field-type": {
+        const now = notesNow().fields[Number(b.dataset["index"])];
+        if (!now?.key.trim()) break;
+        const type = propType(now.key, now.value);
+        openMoreMenu(b, PROP_TYPES.map((t) => ({ label: t.label, icon: PROP_ICON[t.id], checked: t.id === type, id: `prop-type-${t.id}`, run: () => pinType(now.key, t.id) })), "Property type");
+        break;
+      }
       case "field-remove": {
         const now = notesNow();
         now.fields.splice(Number(b.dataset["index"]), 1);
@@ -3174,6 +3204,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   for (const type of ["pointerdown", "keydown"] as const) window.addEventListener(type, () => void inputs++, { capture: true });
   inspector.addEventListener("keydown", (e) => {
     const input = e.target as HTMLInputElement;
+    if (e.key === "Enter" && !e.shiftKey && input.dataset["oneLine"] !== undefined) {
+      e.preventDefault(); // (a long value on one line stays one: Enter ends it, as in a short one)
+      input.blur();
+      return;
+    }
     if (!input.classList.contains("tag-input") || e.key !== "Enter" || !selected) return;
     e.preventDefault();
     const add = input.value.split(",");
@@ -3197,20 +3232,52 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // A property's value suggests what the others of that name say.
   inspector.addEventListener("focusin", (e) => {
     const box = e.target as HTMLElement;
-    if (!box.matches?.("input.field-value")) return;
+    if (!box.matches?.("input.field-value[list]")) return;
     const key = box.closest(".asset-field")?.querySelector<HTMLInputElement>(".field-key")?.value.trim();
-    const list = inspector.querySelector<HTMLDataListElement>("#field-value-suggest");
+    const list = root.querySelector<HTMLDataListElement>("#field-value-suggest"); // (outside the panel: a redraw of the panel keeps what it offers)
     if (!key || !list) return;
     const pages = pagesNow();
     void (pages ? pages.fieldValues(key).catch(() => []) : Promise.resolve(propValues(listing?.entries ?? [], key))).then((values) => {
-      if (list.isConnected) list.replaceChildren(...values.map((v) => Object.assign(document.createElement("option"), { value: v })));
+      if (document.activeElement === box || !box.isConnected) list.replaceChildren(...values.map((v) => Object.assign(document.createElement("option"), { value: v })));
     });
+  });
+  // A value that does not fit its type says so while it is typed.
+  inspector.addEventListener("input", (e) => {
+    const box = e.target as HTMLInputElement;
+    const li = box.closest<HTMLElement>(".asset-field");
+    if (!li || !box.classList.contains("field-value") || box.dataset["written"] !== undefined) return; // (a checkbox and a picker can only hold what fits)
+    const warn = typeWarning(li.dataset["type"] as PropType, box.value);
+    box.toggleAttribute("aria-invalid", !!warn);
+    const line = li.querySelector<HTMLElement>(".field-warn")!;
+    line.hidden = !warn;
+    line.lastElementChild!.textContent = warn;
+  });
+  /** A value of a type read from it, edited: the name keeps that type, so what is typed next is checked against it. */
+  const keepTypeOf = (box: HTMLElement): void => {
+    const li = box.closest<HTMLElement>(".asset-field");
+    const key = li?.querySelector<HTMLInputElement>(".field-key")?.value.trim();
+    const type = li?.dataset["type"] as PropType | undefined;
+    if (key && type && type !== "text" && box.classList.contains("field-value") && !hasPropType(key)) settings.set("library.propTypes", withPropType(settings.get("library.propTypes"), key, type));
+  };
+  // (a date is typed part by part, each one a change: stored only when it is left)
+  const isPicker = (box: HTMLInputElement): boolean => box.type === "date" || box.type === "datetime-local";
+  inspector.addEventListener("focusout", (e) => {
+    const box = e.target as HTMLInputElement;
+    const hash = inspector.dataset["hash"];
+    if (box.dataset?.["prop"] === undefined || !hash) return;
+    if (isPicker(box) && fieldValueOf(box) !== box.dataset["written"]) keepTypeOf(box); // (only passed through: nothing to keep)
+    // Stored when left, change event or not: a box drawn again while it was typed in holds the words but has no change to tell. (After this event: a box being taken away by a redraw is not read.)
+    window.setTimeout(() => {
+      if (box.isConnected && inspector.dataset["hash"] === hash) saveNotes(hash);
+    }, 0);
   });
   inspector.addEventListener("change", (e) => {
     const box = e.target as HTMLInputElement;
     // the note or a field: stored when it is left (or Enter in a field)
     if (box.dataset["prop"] !== undefined) {
       const hash = inspector.dataset["hash"];
+      if (isPicker(box)) return;
+      keepTypeOf(box);
       if (hash) saveNotes(hash);
       return;
     }
@@ -3560,6 +3627,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   side.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b) return;
+    if (b.dataset["savedLook"] !== undefined) return lookSaved(b.dataset["savedWay"] ?? "all", b.dataset["savedLook"]);
     if (b.dataset["savedSearch"] !== undefined) return useSearch(b.dataset["savedWay"] ?? "all", b.dataset["savedSearch"]);
     if (b.hasAttribute("data-side-toggle")) {
       sideOpen = !sideOpen;
@@ -4195,23 +4263,33 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     paintSaveToggle(saveBtn, search.value, way, savedSearches);
   };
   const viewKey = (m: string, q: string): string => `${m}|${q.trim()}`;
-  /** Saved or unsaved: a saved search keeps the look of the library now (its layout, columns and sort), which comes back with it. */
+  const savedNow = (): ReturnType<typeof byUse> => parseSaved(savedSearches.get()) ?? [];
+  /** The look of the library now (its layout, columns and sort): kept with a saved search in the settings, so it travels with it. */
+  const keepLook = (m: SearchWay, q: string): void => savedSearches.set(JSON.stringify(withLook(savedNow(), q, m, { layout: ui.layout, order: [...ui.order], hidden: [...ui.hidden], sort: sortSel.value, reversed })));
+  /** Saved or unsaved: a saved search keeps the look of the library now, which comes back with it. */
   const searchSavedChanged = (): void => {
-    const key = viewKey(way, search.value);
-    if ((parseSaved(savedSearches.get()) ?? []).some((s) => sameSearch(s, search.value, way))) ui.views[key] = { layout: ui.layout, order: [...ui.order], hidden: [...ui.hidden], sort: sortSel.value, reversed };
-    else delete ui.views[key];
+    delete ui.views[viewKey(way, search.value)]; // (a look kept on this device before looks went with the search)
+    keepLook(way, search.value.trim());
     saveUi();
     paintSearchUi();
     renderSide();
   };
+  /** A saved search takes the look shown now. */
+  const lookSaved = (m: string, q: string): void => {
+    keepLook(m as SearchWay, q);
+    delete ui.views[viewKey(m, q)];
+    saveUi();
+    session.editor.message = `“${q}” comes back with this layout, these columns and this sort now.`;
+    session.editor.changed();
+  };
   /** Search again, as it was saved; its look with it. */
   const useSearch = (m: string, q: string): void => {
-    const view = ui.views[viewKey(m, q)];
+    const view = savedNow().find((s) => sameSearch(s, q, m as SearchWay))?.look ?? ui.views[viewKey(m, q)];
     if (view) {
       ui.layout = view.layout;
-      ui.order = view.order.filter((c) => isPropColumn(c) || (DEFAULT_COLUMN_ORDER as readonly string[]).includes(c));
+      ui.order = (view.order as ColumnId[]).filter((c) => isPropColumn(c) || (DEFAULT_COLUMN_ORDER as readonly string[]).includes(c));
       for (const c of DEFAULT_COLUMN_ORDER) if (!ui.order.includes(c)) ui.order.push(c);
-      ui.hidden = view.hidden;
+      ui.hidden = view.hidden as ColumnId[];
       sortProps([...fieldKeysNow(), ...(isPropColumn(view.sort) ? [view.sort.slice(5)] : [])]);
       if ([...sortSel.options].some((o) => o.value === view.sort)) sortSel.value = view.sort;
       reversed = view.reversed;

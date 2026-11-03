@@ -162,6 +162,13 @@ import clipboardCopyIcon from "lucide-static/icons/clipboard-copy.svg";
 import layoutListIcon from "lucide-static/icons/layout-list.svg";
 import listPlusIcon from "lucide-static/icons/list-plus.svg";
 import fieldAddIcon from "lucide-static/icons/between-horizontal-end.svg";
+import savedSearchIcon from "lucide-static/icons/search-check.svg";
+import propTextIcon from "lucide-static/icons/letter-text.svg";
+import propListIcon from "lucide-static/icons/list.svg";
+import propNumberIcon from "lucide-static/icons/binary.svg";
+import propCheckboxIcon from "lucide-static/icons/square-check.svg";
+import propDateIcon from "lucide-static/icons/calendar.svg";
+import propDatetimeIcon from "lucide-static/icons/calendar-clock.svg";
 import grid2x2Icon from "lucide-static/icons/grid-2x2.svg";
 import cameraIcon from "lucide-static/icons/camera.svg";
 import tagIcon from "lucide-static/icons/tag.svg";
@@ -410,6 +417,13 @@ export const ICONS = {
   layoutList: clean(layoutListIcon),
   listPlus: clean(listPlusIcon),
   fieldAdd: clean(fieldAddIcon),
+  savedSearch: clean(savedSearchIcon),
+  propText: clean(propTextIcon),
+  propList: clean(propListIcon),
+  propNumber: clean(propNumberIcon),
+  propCheckbox: clean(propCheckboxIcon),
+  propDate: clean(propDateIcon),
+  propDatetime: clean(propDatetimeIcon),
   grid2x2: clean(grid2x2Icon),
   camera: clean(cameraIcon),
   tabDrawing: clean(tabDrawingSvg),

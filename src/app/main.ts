@@ -1,7 +1,8 @@
 import { externalFolder } from "../storage/external-folder";
 import { askHiddenPassword } from "../ui/hidden-access";
 import { noteKindOf } from "../notes/note-file";
-import { CARD_SCALE, notePageHeight, setNoteLook, setNotePictures, setShownProps } from "../notes/note-preview";
+import { setPropTypes } from "../notes/prop-types";
+import { CARD_SCALE, notePageHeight, setNoteItemMeta, setNoteLook, setNotePictures, setShownProps } from "../notes/note-preview";
 import { anyNoteDirty, leaveAllNotes } from "../ui/note-session";
 import { mountNotePanel } from "../ui/note-panel";
 import type { NotePanelDeps } from "../ui/note-panel";
@@ -533,6 +534,13 @@ async function start(): Promise<void> {
     if (key === "notes.cardProps" && setShownProps(settings.get("notes.cardProps"))) redrawNoteCards();
   });
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyNoteLook);
+  setPropTypes(settings.get("library.propTypes"));
+  settings.subscribe((key) => key === "library.propTypes" && setPropTypes(settings.get("library.propTypes")));
+  // A card's labels say what the details panel says, written into the note's file or not.
+  setNoteItemMeta(async (hash) => {
+    const e = await session.catalog?.entry(hash).catch(() => undefined);
+    return e ? { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] } : null;
+  });
   // A note's preview (its card, its thumbnail) shows the pictures, videos and sounds it links to: a picture's own file, else the
   // item's library thumbnail (a video's picture, a sound's waveform). Never a hidden item's (a preview is kept as a thumbnail).
   setNotePictures(async (noteHash, link) => {
@@ -2028,6 +2036,15 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     tiles.clear();
     invalidate();
     assetsView.redrawNotes();
+  };
+  // A property changed in the panel: the labels of the notes it touched, at once.
+  session.onMetaChanged = async (items) => {
+    if (!settings.get("notes.cardProps").trim()) return;
+    const names = items.has("*") ? [] : await Promise.all([...items].map(async (h) => (await session.catalog?.entry(h).catch(() => undefined))?.name ?? ""));
+    if (!items.has("*") && !names.some((n) => noteKindOf(n))) return;
+    pageHeights.clear();
+    redrawNoteCards();
+    wantNoteSync();
   };
   notePanelReady({ session, assets, settings, fonts: libraryFonts, importFiles: (files) => assetsView.importFiles(files), showInLibrary: (h) => (setView("assets"), void assetsView.reveal([h])), hidden: hiddenModeOn });
   // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)

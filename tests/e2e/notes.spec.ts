@@ -719,6 +719,17 @@ test("a note copied from Obsidian: its source, or the page it drew, shows its pi
   expect(field("status")).toBe("mine");
   expect(field("title")).toBe("Sample");
   for (const t of ["own", "alpha", "beta"]) expect(e.tags).toContain(t);
+  // Undone, what was pasted leaves its properties out of the next save; pasted again, they come back with it.
+  await paste("---\nundone: yes\n---\nWords pasted and undone\n", "");
+  await expect(page(p).getByText("Words pasted and undone")).toBeVisible();
+  await page(p).locator("h1").last().click();
+  await p.keyboard.press("Control+z");
+  await expect(page(p).getByText("Words pasted and undone")).toHaveCount(0);
+  await p.keyboard.type(" more");
+  await p.keyboard.press("Control+s");
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.notesAsText()[0]!.text)).toContain(" more");
+  await expect.poll(async () => (await entry()).fields?.find((f) => f.key === "status")?.value).toBe("mine");
+  expect((await entry()).fields?.find((f) => f.key === "undone")).toBeUndefined();
 });
 
 test("Note cards show properties: a card shows the note's chosen properties, at once", async ({ app }) => {
@@ -736,6 +747,18 @@ test("Note cards show properties: a card shows the note's chosen properties, at 
   await expect.poll(tall, "the label takes a line of the page").toBeGreaterThan(plain);
   await p.evaluate(() => window.__canvastDebug.setSetting("notes.cardProps", ""));
   await expect.poll(tall).toBe(plain);
+  // A property only the library has (not written into the file): the card shows it too, as soon as it changes.
+  await p.evaluate(() => window.__canvastDebug.setSetting("notes.cardProps", "reviewer"));
+  await p.waitForTimeout(400);
+  expect(await tall(), "nothing to show yet").toBe(plain);
+  await p.getByTestId("view-assets").click();
+  await p.locator('[data-testid="asset-card"][title="b.md"]').click();
+  await p.getByTestId("asset-field-add").click();
+  await p.locator(".field-key").last().fill("reviewer");
+  await p.locator(".field-value").last().fill("Ana");
+  await p.locator(".field-value").last().blur();
+  await p.getByTestId("view-canvas").click();
+  await expect.poll(tall, "its label takes a line of the page").toBeGreaterThan(plain);
 });
 
 test("Settings > Notes: Save notes on close saves without asking; a note's formatting is kept or dropped as chosen, without asking", async ({ app }) => {

@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { byUse, forget, keep, matching, MAX_SAVED, parseSaved, touch, validSaved } from "../../src/search/saved";
+import { byUse, forget, keep, matching, MAX_SAVED, parseSaved, touch, validSaved, withLook } from "../../src/search/saved";
 
 describe("saved searches", () => {
+  it("a saved search keeps its look when it is used, and a look goes in the setting's text", () => {
+    const look = { layout: "list" as const, order: ["name", "prop:status"], hidden: [], sort: "prop:status", reversed: true };
+    const l = withLook(keep([], "red", "all", 1)!, "red", "all", look);
+    expect(touch(l, "red", "all", 2)[0]!.look).toEqual(look);
+    expect(validSaved(JSON.stringify(l))).toBeTruthy();
+    expect(parseSaved(JSON.stringify([{ ...l[0], look: { layout: "x" } }]))).toBeNull();
+  });
   it("keeps one per text and way, newest use first, and refuses more than the limit", () => {
     let l = keep([], "red cat", "all", 1)!;
     l = keep(l, "red cat", "name", 2)!;

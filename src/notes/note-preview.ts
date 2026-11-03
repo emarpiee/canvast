@@ -45,6 +45,10 @@ export const setShownProps = (list: string): boolean => {
 const propWords = (meta: NoteMeta, key: string): string[] =>
   key === "tags" || key === "tag" ? meta.tags : key === "description" ? (meta.note ? [meta.note.split("\n")[0]!] : []) : meta.fields.filter((f) => f.key.toLowerCase() === key && f.value).map((f) => f.value.split("\n")[0]!);
 
+/** What the library says about an item (the details panel's properties): what a card's labels show; else the note's file. */
+let itemMeta: ((hash: string) => Promise<NoteMeta | null>) | null = null;
+export const setNoteItemMeta = (fn: (hash: string) => Promise<NoteMeta | null>): void => void (itemMeta = fn);
+
 /** What a link in a note shows: a picture (a picture item's own file, else its library thumbnail) and the item's type. */
 export type NotePictureSource = (noteHash: string, link: string) => Promise<{ blob: Blob; type: string } | null>;
 let pictures: NotePictureSource | null = null;
@@ -71,11 +75,14 @@ async function pictureData(blob: Blob): Promise<{ url: string; w: number; h: num
 
 /** The last pages made (a card is measured, then drawn: its pictures are read and packed once). */
 const made = new Map<string, Promise<string>>();
-function pageHtml(name: string, text: string, hash?: string): Promise<string> {
-  const key = `${hash ?? ""}|${name}|${shownProps.join()}|${text}`; // (the whole text: two versions alike in length and start, 66px and 16px, are not one page)
+async function pageHtml(name: string, text: string, hash?: string): Promise<string> {
+  const kind = noteKindOf(name);
+  const own = shownProps.length && hash && itemMeta ? await itemMeta(hash).catch(() => null) : null;
+  const badges = shownProps.flatMap((k) => propWords(own ?? (kind ? (fileMeta(kind, text) ?? NO_META) : NO_META), k));
+  const key = `${hash ?? ""}|${name}|${badges.join("\u0000")}|${text}`; // (the whole text: two versions alike in length and start, 66px and 16px, are not one page)
   let p = made.get(key);
   if (!p) {
-    p = makePageHtml(name, text, hash);
+    p = makePageHtml(name, text, badges, hash);
     made.set(key, p);
     if (made.size > 8) made.delete(made.keys().next().value!);
   }
@@ -83,7 +90,7 @@ function pageHtml(name: string, text: string, hash?: string): Promise<string> {
 }
 
 /** The note's text as HTML that can be drawn in an image: its media as pictures in data (nothing loads there), no scripts or frames. */
-async function makePageHtml(name: string, text: string, hash?: string): Promise<string> {
+async function makePageHtml(name: string, text: string, badges: readonly string[], hash?: string): Promise<string> {
   const kind = noteKindOf(name);
   const { markdownHtml } = await import("./note-markdown"); // (loaded when a preview is made: the editor needs a page, not the unit tests' Node)
   // (Obsidian's `![[cat.png]]`: the picture it embeds)
@@ -96,7 +103,6 @@ async function makePageHtml(name: string, text: string, hash?: string): Promise<
     );
   const html = kind === "md" ? markdownHtml(md(text)) : kind === "rich" ? richNoteBody(text) : textHtml(text);
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, "text/html");
-  const badges = shownProps.flatMap((k) => propWords(kind ? (fileMeta(kind, text) ?? NO_META) : NO_META, k));
   if (badges.length) {
     const row = doc.createElement("p");
     row.className = "props";

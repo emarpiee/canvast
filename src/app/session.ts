@@ -369,6 +369,9 @@ export class Session {
    * folders, or create, rename and delete folders. Writer only; other tabs
    * refresh. Returns false (with a message) when refused.
    */
+  /** The library's tags, description or properties of these items changed ("*": any). */
+  onMetaChanged: ((items: ReadonlySet<string>) => unknown) | null = null;
+
   async organize(op: (c: CatalogStore) => Promise<unknown>, label = "Library change"): Promise<boolean> {
     if (!this.guardWrite() || !this.catalog) return false;
     let before: MetaSnapshot;
@@ -386,6 +389,7 @@ export class Session {
     this.libRedo = [];
     this.post({ kind: "assets" });
     this.emitAssets(true);
+    this.onMetaChanged?.(touched);
     void this.writeNoteProps(touched).then(() => (moved.size ? this.relink(moved) : undefined));
     return true;
   }
@@ -657,6 +661,7 @@ export class Session {
     }
     this.post({ kind: "assets" });
     this.emitAssets(true);
+    this.onMetaChanged?.(new Set(["*"]));
     return step.label;
   }
 
