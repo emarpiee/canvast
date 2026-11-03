@@ -147,7 +147,7 @@ export function withFrontmatter(body: string, props: readonly Prop[]): string {
 export interface NoteMeta {
   tags: string[];
   note: string;
-  fields: Array<{ key: string; value: string }>;
+  fields: Array<{ key: string; value: string; items?: string[] }>;
 }
 const TAG_KEYS = new Set(["tags", "tag"]);
 const NOTE_KEY = "description";
@@ -161,14 +161,15 @@ export function metaOfProps(props: readonly Prop[]): NoteMeta {
       const list = Array.isArray(p.value) ? p.value : p.value.split(/[,\s]+/);
       for (const t of list.map((x) => x.replace(/^#/, "").trim()).filter(Boolean)) if (!meta.tags.includes(t)) meta.tags.push(t);
     } else if (k === NOTE_KEY && !Array.isArray(p.value)) meta.note = p.value;
-    else meta.fields.push({ key: p.key, value: Array.isArray(p.value) ? p.value.join(", ") : p.value });
+    else meta.fields.push(Array.isArray(p.value) ? { key: p.key, value: p.value.join(", "), items: p.value } : { key: p.key, value: p.value });
   }
   return meta;
 }
 
 /** A value from the item as its type writes it in the file: a list as a list, a checkbox as true or false. */
-function typedProp(key: string, value: string, wasList: boolean): Prop {
-  const type = propType(key, value);
+function typedProp(key: string, value: string, wasList: boolean, items?: string[]): Prop {
+  const type = propType(key, value, items);
+  if (items && type === "list") return { key, value: items };
   if (value && (wasList || type === "list")) return { key, value: value.split(/,\s*/).filter(Boolean) };
   return type === "checkbox" && /^(?:true|false)$/i.test(value) ? { key, value: value.toLowerCase(), plain: true } : { key, value };
 }
@@ -178,7 +179,7 @@ function typedProp(key: string, value: string, wasList: boolean): Prop {
  * keys gone from the item go, new ones come last; what was kept as written stays.
  */
 export function propsOfMeta(prev: readonly Prop[], meta: NoteMeta): Prop[] {
-  const fields = new Map(meta.fields.map((f) => [f.key, f.value]));
+  const fields = new Map(meta.fields.map((f) => [f.key, f]));
   const out: Prop[] = [];
   let tagsDone = false;
   let noteDone = false;
@@ -199,16 +200,17 @@ export function propsOfMeta(prev: readonly Prop[], meta: NoteMeta): Prop[] {
       else if (meta.note) out.push({ key: p.key, value: meta.note });
       noteDone = true;
     } else if (fields.has(p.key)) {
-      const v = fields.get(p.key)!;
-      // (unchanged, it stays as written: "Smith, John" is one item of a list, not two)
-      if ((Array.isArray(p.value) ? p.value.join(", ") : p.value) === v) out.push(p);
-      else out.push(typedProp(p.key, v, Array.isArray(p.value)));
+      const f = fields.get(p.key)!;
+      // (unchanged, it stays as written)
+      const same = Array.isArray(p.value) ? (f.items ? JSON.stringify(f.items) === JSON.stringify(p.value) : p.value.join(", ") === f.value) : !f.items && p.value === f.value;
+      if (same) out.push(p);
+      else out.push(typedProp(p.key, f.value, Array.isArray(p.value), f.items));
       fields.delete(p.key);
     }
   }
   if (!tagsDone && meta.tags.length) out.push({ key: "tags", value: [...meta.tags] });
   if (!noteDone && meta.note) out.push({ key: NOTE_KEY, value: meta.note });
-  for (const [key, value] of fields) out.push(typedProp(key, value, false));
+  for (const [key, f] of fields) out.push(typedProp(key, f.value, false, f.items));
   return out;
 }
 
@@ -245,7 +247,9 @@ export function withPastedProps(kind: "md" | "txt" | "rich", file: string, paste
 /** Whether two items' tags, notes and fields are the same. */
 export const sameMeta = (a: NoteMeta, b: NoteMeta): boolean => {
   const tags = (m: NoteMeta): string => [...new Set(m.tags.map((t) => t.toLowerCase()))].sort().join("\n");
-  return a.note === b.note && tags(a) === tags(b) && JSON.stringify(a.fields) === JSON.stringify(b.fields);
+  // (a rich text note's head has no lists: an item's list and its joined words are the same)
+  const fields = (m: NoteMeta): string => JSON.stringify(m.fields.map((f) => [f.key, f.value]));
+  return a.note === b.note && tags(a) === tags(b) && fields(a) === fields(b);
 };
 
 // A rich text note (`.note.html`) keeps the same properties as `<meta>` in its head: `keywords` its tags, `description` its note, any
@@ -329,6 +333,12 @@ export const fileInlineTags = (kind: "md" | "txt" | "rich", text: string): strin
 /** A markdown note's new text (from the editor, without properties) under the properties its file has now. */
 export function underProps(file: string, body: string): string {
   return withFrontmatter(body, splitFrontmatter(file).props ?? []);
+}
+
+/** The whole note as a markdown file: its words under its properties, as they are in the details panel. What is copied to take the note elsewhere. */
+export function wholeMarkdown(kind: "md" | "rich", file: string, words: string, meta: NoteMeta | null, pasted: readonly Prop[]): string {
+  const text = kind === "md" ? underProps(file, words) : withFrontmatter(words, propsOfMeta([], meta ?? NO_META));
+  return withPastedProps("md", kind === "md" && meta ? withFileMeta("md", text, meta) : text, pasted);
 }
 
 /** A note file with these properties written in (a plain text note is left as it is). */

@@ -8,7 +8,7 @@
  * As with the canvases, IndexedDB stays the one place the app's logic works on; this only follows it, a moment later.
  */
 import type { AssetField, AssetFolder, CatalogEntry } from "../assets/asset-catalog";
-import { FOLDERS_KEY, folderPath, meta, normalizeFields, normalizeNote, normalizeTags, visibleFolders } from "../assets/asset-catalog";
+import { FOLDERS_KEY, fieldParts, folderPath, meta, normalizeFields, normalizeNote, normalizeTags, visibleFolders } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
 import { MAX_IMPORT_BYTES, storedStub } from "../assets/asset-library";
 import type { DeleteMode, DesktopBridge, LibraryOp } from "./desktop-bridge";
@@ -164,7 +164,7 @@ export function readItem(a: unknown): LibraryItem | null {
   const r = a as Record<string, unknown>;
   if (typeof r.hash !== "string" || !HASH_RE.test(r.hash) || typeof r.name !== "string" || !r.name || typeof r.type !== "string" || !num(r.size) || !num(r.pixelW) || !num(r.pixelH)) return null;
   const file = typeof r.file === "string" && ((isSafeRelativePath(r.file) && r.file.startsWith("library/")) || isHiddenFile(r.file)) ? r.file : null;
-  const fields = Array.isArray(r.fields) ? (r.fields as unknown[]).filter((f): f is AssetField => !!f && typeof (f as AssetField).key === "string" && typeof (f as AssetField).value === "string").map((f) => ({ key: f.key, value: f.value })) : [];
+  const fields = Array.isArray(r.fields) ? (r.fields as unknown[]).filter((f): f is AssetField => !!f && typeof (f as AssetField).key === "string" && typeof (f as AssetField).value === "string").map(fieldParts) : [];
   try {
     return {
       hash: r.hash,
@@ -583,8 +583,10 @@ export class LibraryMirror {
       const places = sealed ? [tidyDir] : names.length ? (keep ? [await diskDir(names, tidyDir), tidyDir] : [tidyDir]) : this.sortFiles() ? [tidyDir] : [tidyDir, "library"];
       const dir = rec.file && places.includes(parentOf(rec.file)) ? parentOf(rec.file) : places[0]!;
       const fits = !!rec.file && (places.some((d) => fitsPlace(rec.file!, d, tidyBase, tidyExt)) || (keep && keptFits(rec.file, places, e.name)));
-      if (fits && !taken.has(rec.file!.toLowerCase())) taken.add(rec.file!.toLowerCase());
-      else moves.push({ hash: e.hash, from: rec.ext ? rec.file! : null, dir, base, ext });
+      if (fits && !taken.has(rec.file!.toLowerCase())) {
+        taken.add(rec.file!.toLowerCase());
+        if (keep) await this.nameFollowsFile(e.hash, rec.file!);
+      } else moves.push({ hash: e.hash, from: rec.ext ? rec.file! : null, dir, base, ext });
     }
     // A file that moves keeps its old place until it has moved, so no two items ever pass through one name.
     for (const m of moves) if (m.from) taken.add(m.from.toLowerCase());
@@ -1446,7 +1448,28 @@ export class LibraryMirror {
    * Point the stored original at its new file, when it is still what `still` says (else nothing changes). Bytes the page's storage
    * held (an import's, now written out) are let go there once the library's record names the file.
    */
-  private setFile(hash: string, still: (r: AssetRecord) => boolean, file: string): Promise<void> {
+  /**
+   * Keep file names: two items of one name in one place, and the file of the later one is `name-2`: the item takes that name, so the app says
+   * what the disk says. (Links in notes stay: `[[name]]` now names the other, as it does in any other app reading the folder.)
+   */
+  private async nameFollowsFile(hash: string, file: string): Promise<void> {
+    if (!this.keepNames() || isHiddenFile(file)) return;
+    const base = file.slice(file.lastIndexOf("/") + 1);
+    const stem = base.replace(/\.[A-Za-z0-9]{1,8}$/, "");
+    await this.lib.serial(async () => {
+      const entry = await this.lib.entry(hash);
+      if (!entry) return;
+      const kept = keptBase(entry.name);
+      if (stem.startsWith(`${kept}-`) && /^\d+$/.test(stem.slice(kept.length + 1))) await this.lib.apply([{ t: "entry", hash, v: { ...entry, name: base } }]);
+    });
+  }
+
+  private async setFile(hash: string, still: (r: AssetRecord) => boolean, file: string): Promise<void> {
+    await this.setFileRecord(hash, still, file);
+    await this.nameFollowsFile(hash, file);
+  }
+
+  private setFileRecord(hash: string, still: (r: AssetRecord) => boolean, file: string): Promise<void> {
     return this.lib.serial(async () => {
       const cur = await this.lib.rec(hash);
       if (cur) return void (still(cur) && (await this.lib.apply([{ t: "rec", hash, v: storedStub({ ...cur, ext: 1, file }) }])));

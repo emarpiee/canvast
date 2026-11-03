@@ -732,6 +732,37 @@ test("a note copied from Obsidian: its source, or the page it drew, shows its pi
   expect((await entry()).fields?.find((f) => f.key === "undone")).toBeUndefined();
 });
 
+test("copying the whole note takes its properties, as the file's YAML; a part is copied as before; Copy in the library too", async ({ app, browserName }) => {
+  test.skip(browserName === "firefox", "Firefox does not let a test give a copy its data, or read the clipboard");
+  const p = app.page;
+  const FILE = '---\ntitle: "Sample"\ncast:\n  - "Smith, John"\n---\n# Words\n\nMore words\n';
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "c.md", mimeType: "text/markdown", buffer: Buffer.from(FILE) });
+  await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await p.locator('[data-testid="asset-card"][title="c.md"]').click({ button: "right" });
+  await p.getByRole("menu", { name: "Library actions" }).getByRole("menuitem", { name: "Copy", exact: true }).click();
+  await expect.poll(() => p.evaluate(() => navigator.clipboard.readText())).toBe(FILE);
+  await p.locator('[data-testid="asset-card"][title="c.md"]').dblclick();
+  await expect(page(p).locator("h1").first()).toBeVisible();
+  const copied = () => page(p).locator("h1").first().evaluate((h) => {
+    const dt = new DataTransfer();
+    h.dispatchEvent(new ClipboardEvent("copy", { clipboardData: dt, bubbles: true, cancelable: true }));
+    return dt.getData("text/plain");
+  });
+  await page(p).locator("h1").first().click();
+  await p.keyboard.press("Control+a");
+  await expect.poll(copied).toBe(FILE);
+  // The real thing: the key, then the toolbar's button (it sits in a closed menu).
+  await p.evaluate(() => navigator.clipboard.writeText(""));
+  await p.keyboard.press("Control+c");
+  await expect.poll(() => p.evaluate(() => navigator.clipboard.readText())).toBe(FILE);
+  await p.evaluate(() => navigator.clipboard.writeText(""));
+  await p.locator('button[data-command="copy"]').first().evaluate((b: HTMLElement) => b.click());
+  await expect.poll(() => p.evaluate(() => navigator.clipboard.readText())).toBe(FILE);
+  await page(p).locator("h1").first().evaluate((h) => getSelection()!.selectAllChildren(h));
+  expect(await copied(), "a part stays the browser's").toBe("");
+});
+
 test("Note cards show properties: a card shows the note's chosen properties, at once", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();

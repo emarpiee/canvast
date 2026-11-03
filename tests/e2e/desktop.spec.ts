@@ -503,6 +503,19 @@ test("a big library (past the size library.json is kept for) writes only what ch
     await expect.poll(() => page.getByTestId("field-value-suggest").locator("option").evaluateAll((l) => l.map((o) => (o as HTMLOptionElement).value).sort())).toEqual(["10", "9"]);
     await page.getByTestId("assets-sort").selectOption("prop:rank");
     await expect.poll(() => page.locator('[data-testid="asset-card"] .asset-name').allTextContents().then((n) => n.slice(0, 2))).toEqual(["Pic 4.png", "Pic 3.png"]);
+    // A list's items stay whole: in the library's files, and read again.
+    await page.locator('[data-testid="asset-card"][title="Pic 3.png"]').click();
+    await page.getByTestId("asset-field-add").click();
+    await page.locator(".field-key").last().fill("aliases");
+    await page.locator(".field-key").last().blur();
+    await page.getByLabel("Add an item to aliases").fill("Smith, John");
+    await page.keyboard.press("Enter");
+    await expect.poll(() => readdirSync(join(ws, ".canvast", "library")).some((f) => readFileSync(join(ws, ".canvast", "library", f), "utf8").includes('"items":["Smith, John"]')), { timeout: 15000 }).toBe(true);
+    await page.reload();
+    await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+    await page.getByTestId("view-assets").click();
+    await page.locator('[data-testid="asset-card"][title="Pic 3.png"]').click();
+    await expect(page.locator(".field-item")).toHaveText(["Smith, John×"]);
   } finally {
     await app.close();
   }
@@ -1701,6 +1714,28 @@ test("a file renamed outside the app keeps its place in notes: the links follow,
   const words = page.getByTestId("note-editor").locator(".sun-editor-editable").first();
   await expect.poll(() => words.locator("img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0))).toEqual([true, true]);
   await app.close();
+});
+
+test("Keep file names: two items of one name are two names in the app too, as on the disk; a name taken in the app comes back to its file's", async () => {
+  const ws = tempDir("cv-same-name-");
+  const { app, page } = await launch(ws);
+  try {
+    await page.getByTestId("view-assets").click();
+    const pic = (name: string, seed: number) => ({ name, mimeType: "image/png", buffer: makePng(6, 4, () => [seed, 90, 40, 255]) });
+    await page.getByTestId("assets-import-input").setInputFiles([pic("image.png", 10)]);
+    await expect(page.locator('[data-testid="asset-card"][title="image.png"]')).toBeAttached();
+    await page.getByTestId("assets-import-input").setInputFiles([pic("image.png", 200)]);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/")).sort(), { timeout: 15_000 }).toEqual(["library/images/image-2.png", "library/images/image.png"]);
+    await expect(page.locator('[data-testid="asset-card"][title="image-2.png"]')).toBeAttached();
+    await expect(page.locator('[data-testid="asset-card"][title="image.png"]')).toHaveCount(1);
+    // A library from before: an item says the other's name, its file is -2.
+    const hash = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === "image-2.png")!.hash));
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("rename", h, "image.png"), hash);
+    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)!.name), hash), { timeout: 15_000 }).toBe("image-2.png");
+    expect(files(ws).filter((f) => f.startsWith("library/")).sort()).toEqual(["library/images/image-2.png", "library/images/image.png"]);
+  } finally {
+    await app.close();
+  }
 });
 
 test("Keep file names (the default) with Sort files by kind off: names, places and folders stay, notes find them, a tag leaves the file alone; off, they are tidied and the links follow", async () => {

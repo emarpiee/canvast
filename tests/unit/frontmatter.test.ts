@@ -33,7 +33,7 @@ describe("note properties (YAML frontmatter)", () => {
       note: "The plan for the cover",
       fields: [
         { key: "title", value: "Plan" },
-        { key: "aliases", value: "Plan A, Plan: B" },
+        { key: "aliases", value: "Plan A, Plan: B", items: ["Plan A", "Plan: B"] },
         { key: "author", value: "Ana" },
         { key: "rating", value: "4" },
         { key: "done", value: "true" },
@@ -132,7 +132,7 @@ describe("blocks and pasted properties", () => {
     const out = mergeProps(own, pasted);
     const m = metaOfProps(out);
     expect(m.tags).toEqual(["Own", "new"]);
-    expect(m.fields).toEqual([{ key: "status", value: "mine" }, { key: "aliases", value: "two" }, { key: "kind", value: "x" }]);
+    expect(m.fields).toEqual([{ key: "status", value: "mine" }, { key: "aliases", value: "two", items: ["two"] }, { key: "kind", value: "x" }]);
     expect(writeProps(out)).toContain("  a: 1");
     expect(writeProps(out)).not.toContain("# a comment");
   });

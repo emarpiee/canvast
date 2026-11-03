@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { withFileMeta } from "../../src/notes/frontmatter";
+import { normalizeFields } from "../../src/assets/asset-catalog";
+import { fileMeta, wholeMarkdown, withFileMeta } from "../../src/notes/frontmatter";
 import { asWritten, fitsType, guessType, parsePropTypes, pickerShows, propType, setPropTypes, typeWarning, validPropTypes, withPropType } from "../../src/notes/prop-types";
 
 describe("property types", () => {
@@ -31,6 +32,23 @@ describe("property types", () => {
     expect(asWritten("2025-01-05T10:00:30", "2025-01-05T10:00")).toBe("2025-01-05T10:00");
     expect(asWritten("True", "true")).toBe("True");
     expect(pickerShows("2025-01-05T10:00+02:00")).toBe(false);
+  });
+  it("a list's items stay whole: a comma in one is no second item, and an edit writes them as they are", () => {
+    const file = '---\ncast:\n  - "Smith, John"\n  - Ana\n---\n# T\n';
+    const m = fileMeta("md", file)!;
+    expect(m.fields).toEqual([{ key: "cast", value: "Smith, John, Ana", items: ["Smith, John", "Ana"] }]);
+    expect(propType("cast", "Smith, John, Ana", m.fields[0]!.items)).toBe("list");
+    expect(withFileMeta("md", file, m)).toBe(file);
+    const items = ["Smith, John", "Bo", "[[Link]]"];
+    expect(withFileMeta("md", file, { ...m, fields: [{ key: "cast", value: items.join(", "), items }] })).toBe('---\ncast:\n  - Smith, John\n  - Bo\n  - "[[Link]]"\n---\n# T\n');
+    expect(normalizeFields([{ key: "a", value: "x", items: [" b ", "", "c, d"] }])).toEqual([{ key: "a", value: "b, c, d", items: ["b", "c, d"] }]);
+    expect(withFileMeta("md", "---\naliases: []\n---\nx", fileMeta("md", "---\naliases: []\n---\nx")!)).toBe("---\naliases: []\n---\nx");
+  });
+  it("the whole note: properties as the panel has them over its words, as written where they are the same", () => {
+    const file = '---\nstatus: "new"\ntype: Zettel\n---\nOld words\n';
+    const meta = { tags: ["a"], note: "", fields: [{ key: "status", value: "new" }, { key: "type", value: "Zettel" }, { key: "cast", value: "Ana", items: ["Ana"] }] };
+    expect(wholeMarkdown("md", file, "# New words\n", meta, [])).toBe('---\nstatus: "new"\ntype: Zettel\ntags:\n  - a\ncast:\n  - Ana\n---\n# New words\n');
+    expect(wholeMarkdown("rich", "", "# R\n", { tags: [], note: "", fields: [{ key: "k", value: "v" }] }, [])).toBe("---\nk: v\n---\n# R\n");
   });
   it("the file: a list as a list, a checkbox unquoted, whatever else as before", () => {
     setPropTypes('{"cast":"list","done":"checkbox","word":"text"}');

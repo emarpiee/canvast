@@ -11,7 +11,7 @@ import type { AssetRecord } from "../assets/asset-library";
 import { MAX_IMPORT_BYTES } from "../assets/asset-library";
 import type { CatalogEntry } from "../assets/asset-catalog";
 import type { AssetField, AssetFolder } from "../assets/asset-catalog";
-import { MAX_FIELDS, entryFromRecord, folderPath, meta, normalizeFields, normalizeNote, normalizeTags } from "../assets/asset-catalog";
+import { MAX_FIELDS, entryFromRecord, fieldParts, folderPath, meta, normalizeFields, normalizeNote, normalizeTags } from "../assets/asset-catalog";
 import { sha256Hex } from "../assets/sha256";
 import type { StyleItem } from "../assets/styles";
 import { cleanStyles } from "../assets/styles";
@@ -939,7 +939,7 @@ function readOrganization(a: Record<string, unknown>, label: string, problems: s
   }
   let fields: AssetField[] = [];
   try {
-    fields = normalizeFields(Array.isArray(a["fields"]) ? a["fields"].filter((f): f is AssetField => isObj(f) && typeof f["key"] === "string" && typeof f["value"] === "string").map((f) => ({ key: f.key, value: f.value })) : []);
+    fields = normalizeFields(Array.isArray(a["fields"]) ? a["fields"].filter((f): f is AssetField => isObj(f) && typeof f["key"] === "string" && typeof f["value"] === "string").map(fieldParts) : []);
   } catch (e) {
     problems.push(`The fields of “${label}” were invalid (${(e as Error).message}) and were not imported.`);
   }

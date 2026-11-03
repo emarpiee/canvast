@@ -5,7 +5,7 @@ export type PropType = "text" | "list" | "number" | "checkbox" | "date" | "datet
 
 export const PROP_TYPES: ReadonlyArray<{ id: PropType; label: string; expects: string }> = [
   { id: "text", label: "Text", expects: "any text" },
-  { id: "list", label: "List", expects: "items separated by commas" },
+  { id: "list", label: "List", expects: "any items" },
   { id: "number", label: "Number", expects: "a number, such as 1977 or 3.14" },
   { id: "checkbox", label: "Checkbox", expects: "true or false" },
   { id: "date", label: "Date", expects: "a date, such as 2025-01-31" },
@@ -84,7 +84,7 @@ export const hasPropType = (key: string): boolean => {
   return k in assigned || k in BUILT_IN;
 };
 /** A property's type: its name's, else what its value reads as. */
-export function propType(key: string, value: string): PropType {
+export function propType(key: string, value: string, items?: readonly string[]): PropType {
   const k = key.trim().toLowerCase();
-  return assigned[k] ?? BUILT_IN[k] ?? guessType(value);
+  return assigned[k] ?? BUILT_IN[k] ?? (items ? "list" : guessType(value));
 }

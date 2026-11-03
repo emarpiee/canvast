@@ -49,7 +49,7 @@ import { openLibraryPicker } from "./library-picker";
 import { OpenNote } from "./note-session";
 import type { NoteDeps, NotePlace } from "./note-session";
 import { RICH_NOTE_SUFFIX, WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget, newNoteFile } from "../notes/note-file";
-import { splitFrontmatter, underProps, withFileMeta } from "../notes/frontmatter";
+import { splitFrontmatter, underProps, wholeMarkdown, withFileMeta } from "../notes/frontmatter";
 import { asWritten, hasPropType, pickerShows, PROP_TYPES, propType, typeWarning, withPropType, type PropType } from "../notes/prop-types";
 import type { NoteKind } from "../notes/note-file";
 import { fontFor } from "../text/fonts";
@@ -2480,6 +2480,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const act = document.activeElement;
     const editing = inspector.dataset["hash"] === selected && act instanceof HTMLElement && inspector.contains(act) && act.dataset["prop"] ? (act as HTMLInputElement | HTMLTextAreaElement) : null;
     const kept = editing && { prop: editing.dataset["prop"]!, value: editing.value, start: editing.selectionStart, end: editing.selectionEnd, top: editing.scrollTop };
+    const itemBox = inspector.dataset["hash"] === selected && act instanceof HTMLInputElement && act.classList.contains("field-item-input") ? { prop: act.closest<HTMLElement>(".field-list")!.dataset["prop"]!, value: act.value } : null;
     if (inspector.dataset["hash"] !== selected) blankField = null;
     inspector.dataset["hash"] = selected!;
     const instances = e?.instances ?? m!.instances;
@@ -2567,6 +2568,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const tagInput = inspector.querySelector<HTMLInputElement>(".tag-input");
     if (tagInput && draft) tagInput.value = draft;
     if (tagInput && hadFocus) tagInput.focus();
+    if (itemBox) {
+      const box = inspector.querySelector<HTMLInputElement>(`[data-prop="${itemBox.prop}"] .field-item-input`);
+      if (box) {
+        box.value = itemBox.value;
+        box.focus();
+      }
+    }
     const back = kept && inspector.querySelector<HTMLInputElement | HTMLTextAreaElement>(`[data-prop="${kept.prop}"]`);
     if (kept && back) {
       back.value = kept.value;
@@ -2660,17 +2668,32 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** A value longer than this wraps in a box that grows, instead of being cut in a line. */
   const FIELD_LINE = 24;
   const PROP_ICON: Record<PropType, string> = { text: ICONS.propText, list: ICONS.propList, number: ICONS.propNumber, checkbox: ICONS.propCheckbox, date: ICONS.propDate, datetime: ICONS.propDatetime };
+  /** One item of a list property: moved by dragging it. */
+  const itemHtml = (t: string): string => `<span class="tag-chip field-item" data-item="${esc(t)}" draggable="true"><span>${esc(t)}</span><button type="button" data-action="item-remove" aria-label="Remove the item ${esc(t)}" title="Remove this item">×</button></span>`;
   /** A property's value, by its type: a checkbox, a date or a date and time picker while the value fits one; else a box that shows the value as it is. */
   const fieldValueHtml = (f: AssetField, i: number, dis: string): string => {
-    const type = propType(f.key, f.value);
+    const type = propType(f.key, f.value, f.items);
     const bad = !!typeWarning(type, f.value);
     const named = `data-prop="value-${i}" aria-label="${f.key ? `Value of ${esc(f.key)}` : `Value of property ${i + 1}`}"${dis}`;
     const picker = bad ? null : type === "checkbox" ? "checkbox" : type === "date" ? "date" : type === "datetime" && (!f.value || pickerShows(f.value)) ? "datetime-local" : null;
+    if (type === "list") {
+      const items = f.items ?? (f.value ? f.value.split(/,\s*/).filter(Boolean) : []);
+      return `<div class="field-value field-list tag-chips" role="group" aria-label="Value of ${esc(f.key || `property ${i + 1}`)}" data-prop="value-${i}" data-raw="${esc(f.value)}" data-was="${esc(JSON.stringify(items))}"${f.items ? " data-whole" : ""}>${items.map(itemHtml).join("")}<input class="field-item-input" list="field-value-suggest" placeholder="Add an item" aria-label="Add an item to ${esc(f.key || `property ${i + 1}`)}" title="Enter adds it; Backspace in the empty box removes the last one" maxlength="${MAX_FIELD_VALUE}"${dis}></div>`;
+    }
     if (picker === "checkbox") return `<input type="checkbox" class="field-value" data-written="${esc(f.value)}" ${named}${/^true$/i.test(f.value.trim()) ? " checked" : ""}>`;
     if (picker) return `<input type="${picker}"${picker === "datetime-local" && f.value.length > 16 ? ' step="1"' : ""} class="field-value" data-written="${esc(f.value)}" value="${esc(f.value)}" ${named}>`;
-    const marks = `${bad ? ' aria-invalid="true"' : ""} placeholder="${type === "list" ? "Items, separated by commas" : "Value"}" maxlength="${MAX_FIELD_VALUE}"`;
+    const marks = `${bad ? ' aria-invalid="true"' : ""} placeholder="Value" maxlength="${MAX_FIELD_VALUE}"`;
     if (f.value.includes("\n") || f.value.length > FIELD_LINE) return `<textarea class="field-value"${f.value.includes("\n") ? "" : " data-one-line"} rows="${Math.min(8, f.value.split("\n").reduce((n, l) => n + Math.max(1, Math.ceil(l.length / FIELD_LINE)), 0))}" ${named}${marks}>${esc(f.value)}</textarea>`;
     return `<input class="field-value" list="field-value-suggest" value="${esc(f.value)}"${type === "number" ? ' inputmode="decimal"' : ""} ${named}${marks}>`;
+  };
+  /** A row of the panel as a field; a list untouched stays as it is stored. */
+  const fieldOfRow = (li: HTMLElement): AssetField => {
+    const key = li.querySelector<HTMLInputElement>(".field-key")!.value;
+    const box = li.querySelector<HTMLInputElement>(".field-value")!;
+    if (!box.classList.contains("field-list")) return { key, value: fieldValueOf(box) };
+    const items = [...box.querySelectorAll<HTMLElement>(".field-item")].map((b) => b.dataset["item"]!);
+    if (JSON.stringify(items) === box.dataset["was"]) return { key, value: box.dataset["raw"]!, ...(box.dataset["whole"] !== undefined ? { items } : {}) };
+    return { key, value: items.join(", "), items };
   };
   /** What a value's control holds, as the file wrote it while it means the same. */
   const fieldValueOf = (box: HTMLInputElement): string => {
@@ -2691,12 +2714,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <h3>Properties</h3>
         <label class="asset-note-label" for="asset-note-box">Description</label>
         <textarea id="asset-note-box" class="asset-note-box" data-prop="note" data-testid="asset-note" rows="4" maxlength="${MAX_NOTE}" placeholder="Anything about it, in plain text"${dis}>${esc(m.note)}</textarea>
-        ${rows.length ? `<ul class="asset-fields" data-testid="asset-fields">${rows.map((f, i) => `<li class="asset-field" data-type="${propType(f.key, f.value)}">
+        ${rows.length ? `<ul class="asset-fields" data-testid="asset-fields">${rows.map((f, i) => `<li class="asset-field" data-type="${propType(f.key, f.value, f.items)}">
             <button type="button" class="field-grip" data-index="${i}" aria-label="Move the property ${esc(f.key || String(i + 1))}" title="Drag to move this property (or the Up and Down arrows)"${dis}>${ICONS.gripVertical}</button>
-            <button type="button" class="field-type" data-action="field-type" data-index="${i}" aria-haspopup="menu" aria-label="Type of ${esc(f.key || "this property")}: ${PROP_TYPES.find((t) => t.id === propType(f.key, f.value))!.label}" title="${f.key ? `Type: ${PROP_TYPES.find((t) => t.id === propType(f.key, f.value))!.label}. A type belongs to the name, for every item` : "Name it to choose its type"}"${dis || (f.key ? "" : " disabled")}>${PROP_ICON[propType(f.key, f.value)]}</button>
+            <button type="button" class="field-type" data-action="field-type" data-index="${i}" aria-haspopup="menu" aria-label="Type of ${esc(f.key || "this property")}: ${PROP_TYPES.find((t) => t.id === propType(f.key, f.value, f.items))!.label}" title="${f.key ? `Type: ${PROP_TYPES.find((t) => t.id === propType(f.key, f.value, f.items))!.label}. A type belongs to the name, for every item` : "Name it to choose its type"}"${dis || (f.key ? "" : " disabled")}>${PROP_ICON[propType(f.key, f.value, f.items)]}</button>
             <input class="field-key" data-prop="key-${i}" list="field-key-suggest" value="${esc(f.key)}" placeholder="Name" aria-label="Name of property ${i + 1}" maxlength="${MAX_FIELD_KEY}"${dis}>
             ${fieldValueHtml(f, i, dis)}
-            <p class="field-warn" data-testid="field-warn" role="status"${typeWarning(propType(f.key, f.value), f.value) ? "" : " hidden"}>${ICONS.triangleAlert}<span>${esc(typeWarning(propType(f.key, f.value), f.value))}</span></p>
+            <p class="field-warn" data-testid="field-warn" role="status"${typeWarning(propType(f.key, f.value, f.items), f.value) ? "" : " hidden"}>${ICONS.triangleAlert}<span>${esc(typeWarning(propType(f.key, f.value, f.items), f.value))}</span></p>
             <button type="button" class="assets-btn is-icon" data-action="field-remove" data-index="${i}" aria-label="Remove the property ${esc(f.key || String(i + 1))}" title="Remove this property"${dis}>${ICONS.x}</button>
           </li>`).join("")}</ul>` : ""}
         <datalist id="field-key-suggest">${keys.map((k) => `<option value="${esc(k)}"></option>`).join("")}</datalist>
@@ -2764,7 +2787,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** The note and the fields as they are in the details now (typed but maybe not stored yet). */
   const notesNow = (): { note: string; fields: AssetField[] } => ({
     note: inspector.querySelector<HTMLTextAreaElement>(".asset-note-box")?.value ?? "",
-    fields: [...inspector.querySelectorAll<HTMLElement>(".asset-field")].map((li) => ({ key: li.querySelector<HTMLInputElement>(".field-key")!.value, value: fieldValueOf(li.querySelector<HTMLInputElement>(".field-value")!) })),
+    fields: [...inspector.querySelectorAll<HTMLElement>(".asset-field")].map(fieldOfRow),
   });
 
   /** A name's type, for every item with that name. Values stay as they are; those that do not fit say so. */
@@ -2781,7 +2804,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const hadBlank = blankField === hash;
     blankField = now.fields.some((f) => !f.key.trim() && !f.value.trim()) ? hash : null;
     // as the library will store them (see normalizeNote, normalizeFields)
-    const next = { hash, note: now.note.trim(), fields: now.fields.map((f) => ({ key: f.key.replace(/\s+/g, " ").trim(), value: f.value.trim() })).filter((f) => f.key || f.value) };
+    const next = { hash, note: now.note.trim(), fields: now.fields.map((f) => ({ key: f.key.replace(/\s+/g, " ").trim(), value: f.value.trim(), ...(f.items ? { items: f.items } : {}) })).filter((f) => f.key || f.value) };
     const m = savingNotes?.hash === hash ? savingNotes : meta(e);
     if (JSON.stringify([next.note, next.fields]) === JSON.stringify([m.note, m.fields])) {
       if (hadBlank !== (blankField === hash)) renderInspector(); // only the empty field went
@@ -3069,6 +3092,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         openMoreMenu(b, PROP_TYPES.map((t) => ({ label: t.label, icon: PROP_ICON[t.id], checked: t.id === type, id: `prop-type-${t.id}`, run: () => pinType(now.key, t.id) })), "Property type");
         break;
       }
+      case "item-remove": {
+        const group = b.closest<HTMLElement>(".field-list")!;
+        b.closest(".field-item")!.remove();
+        keepTypeOf(group);
+        saveNotes(hash);
+        break;
+      }
       case "field-remove": {
         const now = notesNow();
         now.fields.splice(Number(b.dataset["index"]), 1);
@@ -3204,6 +3234,20 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   for (const type of ["pointerdown", "keydown"] as const) window.addEventListener(type, () => void inputs++, { capture: true });
   inspector.addEventListener("keydown", (e) => {
     const input = e.target as HTMLInputElement;
+    if (input.classList.contains("field-item-input")) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        addItem(input);
+      } else if (e.key === "Backspace" && !input.value) {
+        const last = input.previousElementSibling;
+        const hash = inspector.dataset["hash"];
+        if (last && hash) {
+          last.remove();
+          saveNotes(hash);
+        }
+      }
+      return;
+    }
     if (e.key === "Enter" && !e.shiftKey && input.dataset["oneLine"] !== undefined) {
       e.preventDefault(); // (a long value on one line stays one: Enter ends it, as in a short one)
       input.blur();
@@ -3232,7 +3276,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // A property's value suggests what the others of that name say.
   inspector.addEventListener("focusin", (e) => {
     const box = e.target as HTMLElement;
-    if (!box.matches?.("input.field-value[list]")) return;
+    if (!box.matches?.("input[list='field-value-suggest']")) return;
     const key = box.closest(".asset-field")?.querySelector<HTMLInputElement>(".field-key")?.value.trim();
     const list = root.querySelector<HTMLDataListElement>("#field-value-suggest"); // (outside the panel: a redraw of the panel keeps what it offers)
     if (!key || !list) return;
@@ -3241,9 +3285,39 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (document.activeElement === box || !box.isConnected) list.replaceChildren(...values.map((v) => Object.assign(document.createElement("option"), { value: v })));
     });
   });
+  /** What is typed in a list's box becomes its next item. */
+  const addItem = (input: HTMLInputElement): void => {
+    const words = input.value.trim();
+    const hash = inspector.dataset["hash"];
+    input.value = "";
+    if (!words || !hash) return;
+    input.insertAdjacentHTML("beforebegin", itemHtml(words));
+    keepTypeOf(input.closest<HTMLElement>(".field-list")!);
+    saveNotes(hash);
+  };
+  // A list's items are moved by dragging them.
+  let draggedItem: HTMLElement | null = null;
+  inspector.addEventListener("dragstart", (e) => {
+    draggedItem = (e.target as HTMLElement).closest?.<HTMLElement>(".field-item") ?? null;
+    if (draggedItem) e.dataTransfer?.setData("text/plain", draggedItem.dataset["item"]!);
+  });
+  inspector.addEventListener("dragover", (e) => {
+    const over = (e.target as HTMLElement).closest?.<HTMLElement>(".field-item");
+    if (!draggedItem || !over || over === draggedItem || over.parentElement !== draggedItem.parentElement) return;
+    e.preventDefault();
+    const box = over.getBoundingClientRect();
+    over.parentElement!.insertBefore(draggedItem, e.clientX < box.left + box.width / 2 ? over : over.nextElementSibling);
+  });
+  inspector.addEventListener("dragend", () => {
+    const hash = inspector.dataset["hash"];
+    if (draggedItem && hash) saveNotes(hash);
+    draggedItem = null;
+  });
   // A value that does not fit its type says so while it is typed.
   inspector.addEventListener("input", (e) => {
     const box = e.target as HTMLInputElement;
+    // (a suggestion chosen is an item at once)
+    if (box.classList.contains("field-item-input") && !(e as InputEvent).inputType && box.value) return addItem(box);
     const li = box.closest<HTMLElement>(".asset-field");
     if (!li || !box.classList.contains("field-value") || box.dataset["written"] !== undefined) return; // (a checkbox and a picker can only hold what fits)
     const warn = typeWarning(li.dataset["type"] as PropType, box.value);
@@ -3264,6 +3338,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   inspector.addEventListener("focusout", (e) => {
     const box = e.target as HTMLInputElement;
     const hash = inspector.dataset["hash"];
+    if (box.classList?.contains("field-item-input")) return addItem(box); // (words left in a list's box are an item)
     if (box.dataset?.["prop"] === undefined || !hash) return;
     if (isPicker(box) && fieldValueOf(box) !== box.dataset["written"]) keepTypeOf(box); // (only passed through: nothing to keep)
     // Stored when left, change event or not: a box drawn again while it was typed in holds the words but has no change to tell. (After this event: a box being taken away by a redraw is not read.)
@@ -3273,6 +3348,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
   inspector.addEventListener("change", (e) => {
     const box = e.target as HTMLInputElement;
+    if (box.classList.contains("field-item-input")) return;
     // the note or a field: stored when it is left (or Enter in a field)
     if (box.dataset["prop"] !== undefined) {
       const hash = inspector.dataset["hash"];
@@ -3954,6 +4030,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     await ensure(hashes);
     const ents = hashes.flatMap((h) => (entryOf(h)?.present ? [entryOf(h)!] : []));
     if (!ents.length) return;
+    // One note: the note itself, as its file with its properties, to paste into a note elsewhere.
+    const note = what === "picture" && ents.length === 1 && noteKindOf(ents[0]!.name) === "md" ? ents[0]! : null;
+    if (note) {
+      const m = meta(note);
+      const file = await (await assets.record(note.hash).catch(() => undefined))?.blob.text();
+      if (file !== undefined) {
+        const done = await writeSystemClipboard({ text: wholeMarkdown("md", file, splitFrontmatter(file).body, { tags: m.tags, note: m.note, fields: m.fields }, []) });
+        session.editor.message = done ? `Copied the note “${note.name}”, with its properties.` : "Could not copy to the clipboard.";
+        session.editor.changed();
+        return;
+      }
+    }
     const first = what === "picture" ? ents.find((e) => e.type.startsWith("image/")) : undefined;
     const names = ents.map((e) => e.name || "image").join("\n");
     const rec = first ? await assets.record(first.hash).catch(() => undefined) : undefined;

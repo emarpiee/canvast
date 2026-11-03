@@ -444,7 +444,8 @@ export class Session {
         const text = await rec.blob.text();
         const item: NoteMeta = { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] };
         if (sameMeta(fileMeta(kind, text) ?? NO_META, item)) continue;
-        await this.saveVersion(hash, new File([withFileMeta(kind, text, item)], e.name, { type: rec.type }));
+        const written = withFileMeta(kind, text, item);
+        if (written !== text) await this.saveVersion(hash, new File([written], e.name, { type: rec.type }));
       } catch (err) {
         console.warn(`canvast: the properties of a note could not be written into its file: ${(err as Error).message}`);
       }
@@ -467,7 +468,9 @@ export class Session {
     // (not writing them into files: what the library has that the file does not say stays, or a save would take it away)
     const kept = found && !this.writeNoteFiles() ? { tags: [...new Set([...(e.tags ?? []), ...found.tags])], note: found.note || (e.note ?? ""), fields: [...(e.fields ?? []).filter((f) => !found.fields.some((x) => x.key === f.key)), ...found.fields] } : found;
     const meta = kept ?? (missing.length ? { tags: [...(e.tags ?? []), ...missing], note: e.note ?? "", fields: e.fields ?? [] } : null);
-    if (!meta || sameMeta(meta, { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] })) return;
+    // (a note's YAML has real lists: an item stored before lists were kept whole takes them)
+    const listsNew = kind === "md" && JSON.stringify(meta?.fields) !== JSON.stringify(e.fields ?? []);
+    if (!meta || (!listsNew && sameMeta(meta, { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] }))) return;
     const clip = (s: string, n: number): string => s.slice(0, n);
     const want = meta.tags.map((t) => clip(t, MAX_TAG_TEXT));
     try {
@@ -475,7 +478,7 @@ export class Session {
         removeTags: (e.tags ?? []).filter((t) => !want.some((w) => w.toLowerCase() === t.toLowerCase())),
         addTags: want,
         note: clip(meta.note, MAX_NOTE),
-        fields: meta.fields.filter((f) => f.key.trim()).map((f) => ({ key: clip(f.key, MAX_FIELD_KEY), value: clip(f.value, MAX_FIELD_VALUE) })),
+        fields: meta.fields.filter((f) => f.key.trim()).map((f) => ({ key: clip(f.key, MAX_FIELD_KEY), value: clip(f.value, MAX_FIELD_VALUE), ...(f.items && f.value.length <= MAX_FIELD_VALUE ? { items: f.items } : {}) })),
       });
     } catch (err) {
       this.tell(`The properties of “${e.name}” could not be read into the library: ${(err as Error).message}`);

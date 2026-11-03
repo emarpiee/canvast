@@ -120,7 +120,8 @@ test("an SVG keeps its real preview (not a card), and the extension chip shows o
   const card = p.getByTestId("asset-card");
   await expect(p.locator(".asset-thumb img")).toHaveJSProperty("complete", true);
   // The picture is the SVG itself: red pixels, not the dark file card.
-  const px = await p.locator(".asset-thumb img").evaluate((img: HTMLImageElement) => {
+  // (read until it is drawn: Firefox can say an image is complete before a first drawing of it shows anything)
+  const pixel = () => p.locator(".asset-thumb img").evaluate((img: HTMLImageElement) => {
     const c = document.createElement("canvas");
     c.width = 4;
     c.height = 4;
@@ -128,8 +129,8 @@ test("an SVG keeps its real preview (not a card), and the extension chip shows o
     x.drawImage(img, 0, 0, 4, 4);
     return [...x.getImageData(2, 2, 1, 1).data];
   });
-  expect(px[0]).toBeGreaterThan(150);
-  expect(px[1]).toBeLessThan(100);
+  await expect.poll(async () => (await pixel())[0]).toBeGreaterThan(150);
+  expect((await pixel())[1]).toBeLessThan(100);
   // The chip: hidden until the card is pointed at (or picked).
   const chip = card.locator(".ext-chip");
   await p.mouse.move(5, 400);

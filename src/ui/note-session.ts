@@ -7,7 +7,7 @@ import type { SettingsStore } from "../settings/settings";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget } from "../notes/note-file";
 import type { NoteKind } from "../notes/note-file";
-import { NO_META, richMeta, splitFrontmatter, underProps, withFileMeta, withPastedProps } from "../notes/frontmatter";
+import { NO_META, richMeta, splitFrontmatter, underProps, wholeMarkdown, withFileMeta, withPastedProps, type NoteMeta } from "../notes/frontmatter";
 import { fontFor } from "../text/fonts";
 import { chooseDialog, confirmDialog } from "./confirm";
 import { openLibraryPicker } from "./library-picker";
@@ -84,6 +84,7 @@ export class OpenNote {
     const host = await note.host();
     note.editor = await mountNoteEditor(el, { kind, text, style: deps.settings.get(place.styleKey ?? "notes.style"), host, title: titleOf(name), root: place.root?.() ?? null });
     open.add(note);
+    await note.readWhole();
     // The editor's style changed: the notes open in that style show it now (changes not saved are asked about, as on any leaving).
     if (!styled.has(deps.settings)) {
       styled.add(deps.settings);
@@ -230,8 +231,20 @@ export class OpenNote {
         return read.filter((t) => t !== null).sort((a, b) => a.name.localeCompare(b.name));
       },
       save: () => this.save(),
+      refreshWhole: () => this.readWhole(),
+      whole: (words, pasted) => (this.kind === "txt" ? null : wholeMarkdown(this.kind, this.fileNow, words, this.metaNow, pasted)),
     };
     return host;
+  }
+
+  /** The file and the item's properties, ready for a copy (which cannot wait for them). */
+  private fileNow = "";
+  private metaNow: NoteMeta | null = null;
+  private async readWhole(): Promise<void> {
+    const { session, assets } = this.deps;
+    const e = await session.catalog?.entry(this.hash).catch(() => undefined);
+    this.metaNow = e ? { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] } : null;
+    this.fileNow = (await (await assets.record(this.hash).catch(() => undefined))?.blob.text()) ?? this.fileNow;
   }
 
   /** Its words were changed elsewhere since it was opened (in another app): whether replacing them is fine (asked). `now`: the file as it is now. */
@@ -265,6 +278,7 @@ export class OpenNote {
         this.hash = hash;
         this.place.moved(was, hash);
       }
+      void this.readWhole();
       session.editor.message = `Saved “${this.name}”.`;
       session.editor.changed();
       await this.place.refresh();

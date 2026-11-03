@@ -853,6 +853,36 @@ test("a property's type belongs to its name: the value's control follows it, and
   await done.check();
   await expect.poll(() => stored("a", "done")).toBe("true");
   await expect(p.getByLabel("Value of done")).toBeChecked();
+  // A list: an item per Enter, a comma is part of one; the last goes with Backspace; dragged, they change places.
+  await card("a").click();
+  await p.getByTestId("asset-field-add").click();
+  await p.locator(".field-key").last().fill("aliases");
+  await p.locator(".field-key").last().blur();
+  const items = p.getByLabel("Add an item to aliases");
+  await items.fill("Smith, John");
+  await p.keyboard.press("Enter");
+  await expect(items).toBeFocused();
+  await p.keyboard.type("Ana");
+  await p.keyboard.press("Enter");
+  await p.keyboard.type("Bo");
+  await p.keyboard.press("Enter");
+  const listed = () => p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.find((e) => e.name === "a.png")!.fields?.find((f) => f.key === "aliases")?.items);
+  await expect.poll(listed).toEqual(["Smith, John", "Ana", "Bo"]);
+  await expect(p.locator(".field-item")).toHaveCount(3);
+  await p.keyboard.press("Backspace");
+  await expect.poll(listed).toEqual(["Smith, John", "Ana"]);
+  const ana = (await p.locator('.field-item[data-item="Ana"]').boundingBox())!;
+  const smith = (await p.locator('.field-item[data-item="Smith, John"]').boundingBox())!;
+  await p.mouse.move(ana.x + ana.width / 3, ana.y + ana.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(smith.x + 3, smith.y + 3, { steps: 5 });
+  await p.mouse.up();
+  await expect.poll(listed).toEqual(["Ana", "Smith, John"]);
+  await p.getByRole("button", { name: "Remove the item Ana" }).click();
+  await expect.poll(listed).toEqual(["Smith, John"]);
+  await p.getByLabel("Add an item to aliases").fill("left in the box");
+  await p.getByLabel("Add an item to aliases").blur();
+  await expect.poll(listed).toEqual(["Smith, John", "left in the box"]);
   // A date and time keeps how it was written.
   await add("a", "created", "2024-09-03T10:30:00");
   await expect(p.getByLabel("Value of created")).toHaveAttribute("type", "datetime-local");

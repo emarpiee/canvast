@@ -26,6 +26,10 @@ export interface NoteItem {
 
 /** What the notes editor needs from the library. */
 export interface NoteHost {
+  /** The whole note as a markdown file, properties and these words; null when it has none to carry. */
+  whole(words: string, pasted: readonly Prop[]): string | null;
+  /** Read again what `whole` needs: the file and the item's properties. */
+  refreshWhole(): Promise<void>;
   /** The folder of the note in the library (its links are relative to it). */
   dir: string[];
   /** The item a link in the note names (by its path in the library, or its hash), or null. */
@@ -739,7 +743,39 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       .replace(/<p><\/p>/g, "") // (an empty paragraph: markdown keeps no empty lines)
       .replace(/&nbsp;|\u00a0/g, " "); // (a space the editor keeps from collapsing is a space)
   };
-  return {
+  // Copying the whole note takes its properties along, as the markdown file it is: pasted at the top of a note elsewhere, they are properties there.
+  el.addEventListener("focusin", () => void host.refreshWhole());
+  const wholeSelected = (): boolean => {
+    const box = document.activeElement;
+    if (box instanceof HTMLTextAreaElement && el.contains(box)) return box.value.trim() !== "" && box.selectionStart === 0 && box.selectionEnd === box.value.length;
+    const sel = getSelection();
+    const area = editor.$.frameContext.get("wysiwyg") as HTMLElement;
+    if (!sel || sel.isCollapsed || !area.contains(sel.anchorNode) || !area.contains(sel.focusNode)) return false;
+    return bare(sel.toString()) === bare(area.textContent ?? "") && (bare(area.textContent ?? "") !== "" || !!area.querySelector("img, video, audio"));
+  };
+  const wholeNow = (): string | null => {
+    if (opts.kind === "txt" || !wholeSelected()) return null;
+    const words = self.asText("md").text;
+    lastMd = null; // (only a save's words become what the file says)
+    return host.whole(words, self.pastedProps());
+  };
+  el.addEventListener("copy", (e) => {
+    const whole = wholeNow();
+    if (whole === null || !e.clipboardData) return;
+    e.clipboardData.setData("text/plain", whole); // (nothing else: an app given a page too would take the page, without the properties)
+    e.preventDefault();
+    e.stopPropagation();
+  }, true);
+  // (its toolbar's Copy button, which writes the clipboard itself)
+  el.addEventListener("click", (e) => {
+    if (!(e.target as HTMLElement).closest?.('[data-command="copy"]')) return;
+    const whole = wholeNow();
+    if (whole === null) return;
+    e.preventDefault();
+    e.stopPropagation();
+    void navigator.clipboard?.writeText(whole);
+  }, true);
+  const self: NoteEditor = {
     // (edited since it was saved: a change the editor reports late, as its history taking the last keys, is no edit when the note is as saved)
     get dirty() {
       return typedInView() || (dirty && settled(editor.$.html.get()) !== savedHtml);
@@ -797,4 +833,5 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       for (const url of links.keys()) URL.revokeObjectURL(url);
     },
   };
+  return self;
 }

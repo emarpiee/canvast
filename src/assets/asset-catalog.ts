@@ -59,8 +59,14 @@ export interface CatalogEntry {
 /** A user-named field of an asset: any key, any value, both plain text. */
 export interface AssetField {
   key: string;
+  /** Its text; a list's items joined with commas, for showing and searching. */
   value: string;
+  /** A list's items, each whole (`Smith, John` is one). */
+  items?: string[];
 }
+
+/** A stored field's parts, whatever else it has. */
+export const fieldParts = (f: AssetField): AssetField => ({ key: f.key, value: f.value, ...(Array.isArray(f.items) && f.items.every((i) => typeof i === "string") ? { items: f.items } : {}) });
 
 /** A library folder. Order is by name; nesting by `parentId`. */
 export interface AssetFolder {
@@ -136,7 +142,11 @@ export function normalizeNote(note: string): string {
 /** Fields as stored: keys on one line and trimmed, values trimmed; a field with neither a key nor a value is dropped. */
 export function normalizeFields(fields: readonly AssetField[]): AssetField[] {
   const out = fields
-    .map((f) => ({ key: f.key.replace(/\s+/g, " ").trim(), value: f.value.replace(/\r\n?/g, "\n").trim() }))
+    .map((f) => {
+      const key = f.key.replace(/\s+/g, " ").trim();
+      const items = f.items?.map((i) => i.replace(/\s+/g, " ").trim()).filter(Boolean);
+      return items ? { key, value: items.join(", "), items } : { key, value: f.value.replace(/\r\n?/g, "\n").trim() };
+    })
     .filter((f) => f.key || f.value);
   if (out.length > MAX_FIELDS) throw new CatalogInputError(`an item can have at most ${MAX_FIELDS} fields`);
   if (out.some((f) => f.key.length > MAX_FIELD_KEY)) throw new CatalogInputError(`a field name can be at most ${MAX_FIELD_KEY} characters`);

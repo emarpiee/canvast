@@ -211,7 +211,7 @@ export function propValues(entries: Iterable<CatalogEntry>, key: string, most = 
   for (const e of entries) {
     for (const f of meta(e).fields) {
       if (f.key.toLowerCase() !== k || f.value.includes("\n")) continue;
-      for (const v of f.value.split(/,\s+/)) if (v.trim()) counts.set(v.trim(), (counts.get(v.trim()) ?? 0) + 1);
+      for (const v of f.items ?? f.value.split(/,\s+/)) if (v.trim()) counts.set(v.trim(), (counts.get(v.trim()) ?? 0) + 1);
     }
   }
   return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, most).map(([v]) => v);

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.53.24 — Whole notes copied with their properties; lists as lists (2026-11-04)
+
+- **Added:** copying a whole note (select all and copy in the editor, or Copy on one markdown note in the library) copies its markdown file with its properties as YAML at the top, to paste into a note in Obsidian or elsewhere.
+- **Changed:** a **List** property is a row of items, each kept whole: a comma is part of an item, Enter adds, × or Backspace removes, dragging moves. A list in a note's YAML is shown so, and is written as a list.
+- **Fixed:** with Keep file names, two items of one name in one place (two pasted `image.png`) kept that name in the app though the later file on disk is `image-2.png`: the item now takes its file's name, in a library that already has such items too.
+- **Fixed:** a list item with a comma in it (`Smith, John`) became two items when the list was edited.
+
 ## 0.53.23 — Property types (2026-11-04)
 
 - **Added:** **property types**, as in Obsidian: *Text*, *List*, *Number*, *Checkbox*, *Date*, *Date & time*, chosen from a button before a property's name and kept for that name in the whole library. A name without one takes its type from its value. A checkbox is a box to tick, a date a picker.

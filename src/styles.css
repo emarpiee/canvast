@@ -1271,6 +1271,10 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .field-type svg { width: var(--icon-md); height: var(--icon-md); }
 .asset-field .field-value[aria-invalid] { border-color: var(--hud-danger); outline-color: var(--hud-danger); }
 .asset-field input[type="date"], .asset-field input[type="datetime-local"] { font-size: var(--text-sm); }
+.field-list { padding: var(--sp-2); border: 1px solid var(--hud-border); border-radius: var(--r-sm); min-width: 0; }
+.field-item { max-width: 100%; min-width: 0; cursor: grab; }
+.field-item > span { min-width: 0; overflow-wrap: anywhere; }
+.field-item-input { flex: 1; min-width: var(--sp-15); border: 0; background: transparent; }
 .field-warn { display: flex; gap: var(--sp-2); align-items: flex-start; margin: 0; font-size: var(--text-sm); color: var(--hud-danger); }
 .field-warn[hidden] { display: none; }
 .field-warn svg { flex: none; width: var(--icon-md); height: var(--icon-md); }
