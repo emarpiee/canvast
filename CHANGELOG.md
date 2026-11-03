@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.14 — Notes: the / menu in every style (2026-11-04)
+
+- **Added:** the notes editor's `/` command menu in every editor style (it was only in Notion-like).
+- **Fixed:** the editor style's help in Settings no longer says an open note waits to be opened again.
+
 ## 0.53.13 — Notes: Classic's own toolbar (2026-11-04)
 
 - **Changed:** the notes editor's Classic and Bottom styles have one short toolbar row, as SunEditor's own Classic: undo, formats, bold, italic, underline, lists, link, picture, table; everything else behind its **+**. Document keeps the full toolbar.

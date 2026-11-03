@@ -723,6 +723,20 @@ test("Settings > Notes: Save notes on close saves without asking; a note's forma
   await p.locator('[data-set="notes.panelStyle"]').selectOption("classic");
   await p.getByTestId("view-canvas").click();
   await expect(p.getByTestId("note-panel").locator(".sun-editor-editable").first()).not.toHaveClass(/se-type-document/);
+  // The / menu is in every style: at a line's start it offers commands; inside a word it stays away.
+  const typed = p.getByTestId("note-panel").locator(".sun-editor-editable").first();
+  await typed.locator("p").first().click();
+  await p.keyboard.press("Control+End");
+  await p.keyboard.press("Enter");
+  await p.keyboard.type("/head");
+  const heading2 = p.locator(".se-cmd-row").filter({ hasText: "Heading 2" }).filter({ visible: true });
+  await expect(heading2).toHaveCount(1);
+  await heading2.click();
+  await expect(typed.locator("h2")).toHaveCount(1);
+  await p.keyboard.type("and/or");
+  await p.waitForTimeout(300);
+  await expect(p.locator(".se-cmd-row").filter({ visible: true })).toHaveCount(0);
+  await expect(typed.locator("h2")).toHaveText("and/or");
   // Classic has one short row; what else there is waits behind its +.
   const tool = p.getByTestId("note-panel").locator('.se-toolbar button[data-command="strike"]');
   await expect(tool.first()).toBeHidden();

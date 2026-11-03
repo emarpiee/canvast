@@ -143,6 +143,31 @@ const SUB_BUTTONS = [["bold", "italic", "underline", "strike", "subscript", "sup
 const hIcon = (n: number): string => `<svg width="17" height="17" viewBox="0 0 24 24"><text x="1" y="18" font-size="15" font-weight="700" fill="currentColor">H${n}</text></svg>`;
 const line = (tag: string) => ($: SunEditor.Deps): void => void $.format.setLine(document.createElement(tag));
 
+/** The `/` menu, in every editor style: `/` then words to find a command. */
+const SLASH_MENU: NonNullable<SunEditor.InitOptions["slashCommand"]> = {
+  triggerChar: "/",
+  items: [
+    { key: "text", title: "Text", icon: "text_style", keywords: ["paragraph", "p", "plain"], action: line("P") },
+    { key: "h1", title: "Heading 1", icon: hIcon(1), keywords: ["title", "big"], action: line("H1") },
+    { key: "h2", title: "Heading 2", icon: hIcon(2), keywords: ["subtitle"], action: line("H2") },
+    { key: "h3", title: "Heading 3", icon: hIcon(3), keywords: ["subheading"], action: line("H3") },
+    "list_bulleted",
+    "list_numbered",
+    { key: "quote", title: "Quote", icon: "blockquote", keywords: ["blockquote", "cite"], action: ($) => void $.format.applyBlock(document.createElement("BLOCKQUOTE")) },
+    { key: "code", title: "Code", icon: "code_block", keywords: ["pre", "snippet"], action: ($) => void $.format.setBrLine(document.createElement("PRE")) },
+    "hr",
+    "table",
+    "image",
+    "link",
+    "bold",
+    "italic",
+    "underline",
+    "strike",
+    "fontColor",
+    "backgroundColor",
+  ],
+};
+
 function presetOptions(style: NoteStyle): SunEditor.InitOptions {
   switch (style) {
     case "document":
@@ -160,29 +185,6 @@ function presetOptions(style: NoteStyle): SunEditor.InitOptions {
         blockHandle: {
           menu: ["blockStyle", "list", "blockquote", "codeBlock", "fontColor", "backgroundColor", "align", "removeFormat", { title: "Duplicate", icon: "copy", action: ($, { block }) => (block.after(block.cloneNode(true)), $.history.push(false)) }, "copy", { title: "Delete", icon: "delete", action: ($, { block }) => (block.remove(), $.history.push(false)) }],
           onPlusClick: ($, { block }) => $.plugins["slashCommand"].open(block),
-        },
-        slashCommand: {
-          triggerChar: "/",
-          items: [
-            { key: "text", title: "Text", icon: "text_style", keywords: ["paragraph", "p", "plain"], action: line("P") },
-            { key: "h1", title: "Heading 1", icon: hIcon(1), keywords: ["title", "big"], action: line("H1") },
-            { key: "h2", title: "Heading 2", icon: hIcon(2), keywords: ["subtitle"], action: line("H2") },
-            { key: "h3", title: "Heading 3", icon: hIcon(3), keywords: ["subheading"], action: line("H3") },
-            "list_bulleted",
-            "list_numbered",
-            { key: "quote", title: "Quote", icon: "blockquote", keywords: ["blockquote", "cite"], action: ($) => void $.format.applyBlock(document.createElement("BLOCKQUOTE")) },
-            { key: "code", title: "Code", icon: "code_block", keywords: ["pre", "snippet"], action: ($) => void $.format.setBrLine(document.createElement("PRE")) },
-            "hr",
-            "table",
-            "image",
-            "link",
-            "bold",
-            "italic",
-            "underline",
-            "strike",
-            "fontColor",
-            "backgroundColor",
-          ],
         },
         subToolbar: { mode: "balloon", buttonList: [["blockStyle"], "|", ["bold", "italic", "underline", "strike"], "|", ["fontColor", "backgroundColor"], "|", ["link", "removeFormat"], "|", ["align"]] },
       };
@@ -223,7 +225,10 @@ class NoteFileUpload extends fileUpload {
 const alive = ($: { frameContext?: { get(k: string): unknown } }): boolean => !!$.frameContext?.get("_ww");
 class NoteSlash extends slashCommand {
   override onInput(...a: Parameters<slashCommand["onInput"]>): ReturnType<slashCommand["onInput"]> {
-    if (alive(this.$)) return super.onInput(...a);
+    if (!alive(this.$)) return;
+    // (Firefox keeps a new line's first letter in a text of its own, and the menu reads only the text the cursor is in: `/` and `head` are then two)
+    getSelection()?.anchorNode?.parentNode?.normalize();
+    return super.onInput(...a);
   }
 }
 class NoteAutocomplete extends autocomplete {
@@ -453,6 +458,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       ...[imageGallery, videoGallery, audioGallery, fileGallery, fileBrowser].map((g) => libraryGallery(g as GalleryClass, choose)),
     ],
     font: { items: fonts },
+    slashCommand: SLASH_MENU,
     fileUpload: { uploadUrl: "canvast:library" }, // (never sent: files are taken by onFileUploadBefore)
     // ({{date}}, {{time}} and {{title}} in a template are filled in: today, now, this note's name)
     // (when it goes in: the time is the insert's, not the note's opening)
