@@ -37,6 +37,14 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.19: README up to date (2026-11-04)
+
+- **Implemented:** README only: Settings table rows, paste under the pointer, Save notes on close, Keep files as they are, setting names.
+- **Tested:** no code changed; v0.53.18 passed Tests and CI on GitHub.
+- **Known failures:** none.
+- **Unverified:** the thumbnails test failure seen once on v0.53.16 (`organize.spec.ts:1114`) was not explained; it did not recur.
+- **Committed:** v0.53.19, released with everything since v0.53.0.
+
 ## v0.53.18: middle button (2026-11-04)
 
 - **Implemented:** the window's paste ignores one that follows the middle button's release, outside fields; `editor.pointerAt` is followed from the window, anywhere over the view, and kept.

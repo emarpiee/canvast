@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.19 — README brought up to date (2026-11-04)
+
+- **Changed:** the README's Settings table, paste, saving and file place sections describe the 0.53.x settings and behaviour.
+
 ## 0.53.18 — Paste: the middle button, and under the pointer (2026-11-04)
 
 - **Fixed:** on Linux, ending a pan with the middle button also pasted what was cut or copied (a middle click is a system paste there). Only your own paste places objects now.
