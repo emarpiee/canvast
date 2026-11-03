@@ -185,6 +185,19 @@ function libraryGallery<T extends GalleryClass>(base: T, choose: (kind: AttachKi
 }
 
 /** The font list's button says Default (not the page's own list of font names) when the words have no font of their own. */
+// (SunEditor runs the input plugins one after another, awaiting each: a note closed meanwhile (hidden items locked) has no window left to read the selection from)
+const alive = ($: { frameContext?: { get(k: string): unknown } }): boolean => !!$.frameContext?.get("_ww");
+class NoteSlash extends slashCommand {
+  override onInput(...a: Parameters<slashCommand["onInput"]>): ReturnType<slashCommand["onInput"]> {
+    if (alive(this.$)) return super.onInput(...a);
+  }
+}
+class NoteAutocomplete extends autocomplete {
+  override async onInput(...a: Parameters<autocomplete["onInput"]>): Promise<void> {
+    if (alive(this.$)) await super.onInput(...a);
+  }
+}
+
 class NoteFont extends font {
   override active(element: HTMLElement | null, target: HTMLElement): boolean | void {
     const shown = super.active(element, target);
@@ -323,7 +336,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   const content: SunEditor.InitOptions = {
     // (not math, embeds or PDF export: they need a server or another library)
     plugins: [
-      ...[align, anchor, audio, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileUpload, NoteFont, fontColor, fontSize, hr, image, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video, autocomplete],
+      ...[align, anchor, audio, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileUpload, NoteFont, fontColor, fontSize, hr, image, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, NoteSlash, table, template, textStyle, video, NoteAutocomplete],
       ...[imageGallery, videoGallery, audioGallery, fileGallery, fileBrowser].map((g) => libraryGallery(g as GalleryClass, choose)),
     ],
     font: { items: fonts },

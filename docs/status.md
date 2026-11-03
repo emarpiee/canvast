@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.52.10: closed note fix (2026-11-03)
+
+- **Implemented:** `NoteSlash` / `NoteAutocomplete` (`ui/note-editor.ts`) skip `onInput` once the editor is destroyed (SunEditor awaits each input plugin in turn; the GitHub stack showed slashCommand.onInput → selection.get after destroy).
+- **Tested:** notes.spec chromium + firefox 15/16, the 16th the known Firefox save-then-download flake (3/3 on rerun). The CI-only error is not reproducible locally: GitHub's run decides.
+- **Committed:** v0.52.10.
+
 ## v0.52.9: Reset size, canvas counts (2026-11-03)
 
 - **Implemented:** `sizeResets` / `resetSize` (`app/actions.ts`): pictures and note cards (`notes.cardWidth`) back to their placed size at the current zoom, middle kept, view frame only; Actions bar button (`image-upscale`). The canvas lists' object count follows each commit (`session.ts` onCommitted).

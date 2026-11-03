@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.52.10 — Closed note fix (2026-11-03)
+
+- **Fixed:** a note closed while its last typing was still being handled (a hidden note closing as hidden items lock) no longer throws an error from the editor's slash and autocomplete menus.
+
 ## 0.52.9 — Reset size (2026-11-03)
 
 - **Added:** **Reset size** in the Actions bar: the selected pictures, videos, GIFs, sounds and note cards go back to the size they are placed at, at the current zoom (one pixel of the file for one of the screen; a note card at its Note card size), about their middle, in one undo step. It shows when it would change something.
