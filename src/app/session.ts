@@ -421,11 +421,14 @@ export class Session {
   }
 
   /**
-   * Notes whose item's tags, note or fields changed in the library get them written into their file (a markdown note's YAML, a rich
+   * (Settings > Notes: Write tags and properties into note files.) Notes whose item's tags, note or fields changed in the library get them written into their file (a markdown note's YAML, a rich
    * text note's `<meta>`), as a new version saved like an edit: the file and the library say the same. `*`: every note checks.
    */
+  /** Whether the library's tags, note and fields are written into note files (Settings > Notes). */
+  writeNoteFiles: () => boolean = () => true;
+
   private async writeNoteProps(hashes: ReadonlySet<string>): Promise<void> {
-    if (!this.catalog || !hashes.size) return;
+    if (!this.catalog || !hashes.size || !this.writeNoteFiles()) return;
     const all = hashes.has("*") ? ((await this.catalog.list().catch(() => null))?.entries ?? []).filter((e) => noteKindOf(e.name)).map((e) => e.hash) : [...hashes];
     for (const hash of all) {
       try {
@@ -457,7 +460,9 @@ export class Session {
     // No YAML: only its #tags are added (the tags it has in the library stay; they go into the file at their next change).
     const inline = text === undefined ? [] : fileInlineTags(kind, text);
     const missing = inline.filter((t) => !(e.tags ?? []).some((x) => x.toLowerCase() === t.toLowerCase()));
-    const meta = found ?? (missing.length ? { tags: [...(e.tags ?? []), ...missing], note: e.note ?? "", fields: e.fields ?? [] } : null);
+    // (not writing them into files: what the library has that the file does not say stays, or a save would take it away)
+    const kept = found && !this.writeNoteFiles() ? { tags: [...new Set([...(e.tags ?? []), ...found.tags])], note: found.note || (e.note ?? ""), fields: [...(e.fields ?? []).filter((f) => !found.fields.some((x) => x.key === f.key)), ...found.fields] } : found;
+    const meta = kept ?? (missing.length ? { tags: [...(e.tags ?? []), ...missing], note: e.note ?? "", fields: e.fields ?? [] } : null);
     if (!meta || sameMeta(meta, { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] })) return;
     const clip = (s: string, n: number): string => s.slice(0, n);
     const want = meta.tags.map((t) => clip(t, MAX_TAG_TEXT));

@@ -7,7 +7,7 @@ import type { SettingsStore } from "../settings/settings";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget } from "../notes/note-file";
 import type { NoteKind } from "../notes/note-file";
-import { splitFrontmatter, underProps, withFileMeta } from "../notes/frontmatter";
+import { NO_META, richMeta, splitFrontmatter, underProps, withFileMeta } from "../notes/frontmatter";
 import { fontFor } from "../text/fonts";
 import { chooseDialog, confirmDialog } from "./confirm";
 import { openLibraryPicker } from "./library-picker";
@@ -251,7 +251,9 @@ export class OpenNote {
       const now = (await (await assets.record(this.hash).catch(() => undefined))?.blob.text()) ?? "";
       if (!(await this.keepsOther(now))) return false;
       if (this.kind === "md") text = underProps(now, text); // (what it keeps as written, in its order)
-      if (e && this.kind !== "txt") text = withFileMeta(this.kind, text, { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] });
+      // (Settings > Notes: the item's properties go in only when asked for; else a rich text note's head stays what the file has, as a markdown note's YAML does)
+      if (e && this.kind !== "txt" && this.deps.settings.get("notes.writeProps")) text = withFileMeta(this.kind, text, { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] });
+      else if (this.kind === "rich") text = withFileMeta("rich", text, richMeta(now) ?? NO_META);
       if (e?.name) this.name = e.name;
       const was = this.hash;
       const hash = await session.saveVersion(was, new File([text], this.name, { type: this.type }));

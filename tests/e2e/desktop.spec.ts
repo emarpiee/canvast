@@ -11,7 +11,7 @@ import { makePng } from "./png";
 // fresh workspace folder, with a hidden window.
 
 /** The app on `workspace`; `device` names the app's own data folder (another one is another device with its own cache). */
-async function launch(workspace: string, device = "userdata"): Promise<{ app: ElectronApplication; page: Page; requests: string[] }> {
+async function launch(workspace: string, device = "userdata", /** Most of these tests read the tidy names on disk; the default keeps files as they are. */ keepFiles = false): Promise<{ app: ElectronApplication; page: Page; requests: string[] }> {
   const app = await electron.launch({
     args: [join(buildDir(), "desktop"), `--workspace=${workspace}`, `--user-data-dir=${workspace}-${device}`],
     // (an export outside the workspace goes to `<workspace>-exports`, standing for the folder chosen in the system's dialog)
@@ -21,6 +21,7 @@ async function launch(workspace: string, device = "userdata"): Promise<{ app: El
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));
   await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
+  if (!keepFiles) await page.evaluate(() => window.__canvastDebug.setSetting("library.keepFileNames", false));
   return { app, page, requests };
 }
 
@@ -1684,43 +1685,52 @@ test("a file renamed outside the app keeps its place in notes: the links follow,
   await app.close();
 });
 
-test("Keep file names as written: files keep their names (only forbidden characters change), notes find them, a restart moves nothing, and turning it off tidies them with the links following", async () => {
+test("Keep files as they are (the default): names, places and folders stay, notes find them, a tag leaves the file alone; off, they are tidied and the links follow", async () => {
   const ws = tempDir("cv-keep-names-");
-  let { app, page } = await launch(ws);
-  const toggle = async (): Promise<void> => {
-    await page.getByTestId("view-settings").click();
-    await page.getByRole("tab", { name: "Saving to the library" }).click();
-    await page.locator(`[data-set="library.keepFileNames"]`).click({ force: true });
-    await page.getByTestId("view-assets").click();
-  };
-  const pics = (): string[] => files(ws).filter((f) => f.startsWith("library/images/")).map((f) => f.slice("library/images/".length));
+  const lib = join(ws, "library");
   const png = (seed: number): Buffer => makePng(6, 4, () => [seed, 90, 40, 255]);
+  const put = (path: string, data: Buffer | string): void => {
+    mkdirSync(join(lib, path, ".."), { recursive: true });
+    writeFileSync(join(lib, path), data);
+  };
+  const FILES = ["My Refs/Red-Dress Sky Blue.png", "My Refs/sub dir/deep.png", "Root Pic.PNG", "noext", "plain.md"];
+  put(FILES[0]!, png(1));
+  put(FILES[1]!, png(2));
+  put(FILES[2]!, png(3));
+  put(FILES[3]!, png(4));
+  const NOTE = "just words\n\n![a](Root%20Pic.PNG)\n";
+  put(FILES[4]!, NOTE);
+  let { app, page } = await launch(ws, "userdata", true);
   await page.getByTestId("view-assets").click();
-  await page.getByTestId("assets-import-input").setInputFiles({ name: "Old Tidy.png", mimeType: "image/png", buffer: png(5) });
-  await expect.poll(pics).toEqual(["old_tidy.png"]);
-  await toggle();
-  const NAMES = ["Hand Study (Loomis) #2 50%.PNG", "Red-Dress-Sky Blue.png", "a:b?.png"];
-  await page.getByTestId("assets-import-input").setInputFiles(NAMES.map((name, i) => ({ name, mimeType: "image/png", buffer: png(20 + i) })));
-  await expect.poll(pics).toEqual(["Hand Study (Loomis) #2 50%.PNG", "Red-Dress-Sky Blue.png", "a-b-.png", "old_tidy.png"].sort());
-  // A note links to them; found again after a restart, nothing moved.
-  mkdirSync(join(ws, "library/notes"), { recursive: true });
-  const note = join(ws, "library/notes/n.md");
-  writeFileSync(note, "# N\n\n![a](../images/Hand%20Study%20%28Loomis%29%20%232%2050%25.PNG)\n\n![b](images/Red-Dress-Sky%20Blue.png)\n\n![c](images/a-b-.png)\n\n![d](images/old_tidy.png)\n");
-  const entry = (p: Page) => p.locator('[data-testid="asset-card"][title="n.md"]');
-  await expect(entry(page)).toBeAttached({ timeout: 15_000 });
-  const before = pics();
+  const card = (name: string) => page.locator(`[data-testid="asset-card"][title="${name}"]`);
+  await expect(card("plain.md")).toBeAttached({ timeout: 15_000 });
+  // A new file: named as written, in its kind's folder (only what a system forbids is replaced).
+  await page.getByTestId("assets-import-input").setInputFiles([{ name: "Hand (Loomis) #2.PNG", mimeType: "image/png", buffer: png(20) }, { name: "a:b?.png", mimeType: "image/png", buffer: png(21) }]);
+  await expect.poll(() => files(lib)).toEqual([...FILES, "images/Hand (Loomis) #2.PNG", "images/a-b-.png"].sort());
+  // A tag on a note stays in the library: the file is as it was.
+  await card("plain.md").click();
+  await page.getByTestId("asset-tag-input").fill("newtag");
+  await page.getByTestId("asset-tag-input").press("Enter");
+  await expect(card("plain.md")).toContainText("");
+  await page.waitForTimeout(800);
+  expect(readFileSync(join(lib, "plain.md"), "utf8")).toBe(NOTE);
+  // After a restart nothing moved, and the note finds its picture.
   await app.close();
-  ({ app, page } = await launch(ws));
+  ({ app, page } = await launch(ws, "userdata", true));
   await page.getByTestId("view-assets").click();
-  await entry(page).dblclick();
+  await card("plain.md").dblclick();
   const words = page.getByTestId("note-editor").locator(".sun-editor-editable").first();
-  await expect.poll(() => words.locator("img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0))).toEqual([true, true, true, true]);
+  await expect.poll(() => words.locator("img").evaluateAll((l) => l.map((i) => (i as HTMLImageElement).naturalWidth > 0))).toEqual([true]);
   await page.getByTestId("slide-view").locator('[data-act="close"]').click();
-  expect(pics()).toEqual(before);
-  // Off: tidied at the next write, and the links follow.
-  await toggle();
+  expect(files(lib)).toContain("Root Pic.PNG");
+  expect(files(lib)).toContain("My Refs/sub dir/deep.png");
+  // Off: tidied at the next write, and a link follows a rename in its folder.
+  await page.getByTestId("view-settings").click();
+  await page.getByRole("tab", { name: "Saving to the library" }).click();
+  await page.locator('[data-set="library.keepFileNames"]').click({ force: true });
+  await page.getByTestId("view-assets").click();
   await page.getByTestId("assets-import-input").setInputFiles({ name: "Next One.png", mimeType: "image/png", buffer: png(40) });
-  await expect.poll(pics, { timeout: 15_000 }).toContain("red-dress-sky_blue.png");
-  await expect.poll(() => readFileSync(note, "utf8"), { timeout: 15_000 }).toContain("images/red-dress-sky_blue.png");
+  await expect.poll(() => files(lib), { timeout: 15_000 }).toContain("my_refs/red-dress_sky_blue.png");
+  expect(files(lib)).toContain("images/next_one.png");
   await app.close();
 });

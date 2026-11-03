@@ -37,6 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.17: files stay as they are (2026-11-04)
+
+- **Implemented:** `keptFits`, `keptPart`, a library folder's place on disk found either way of writing it (`diskDir`), `library.keepFileNames` on by default; `notes.writeProps`, `Session.writeNoteFiles`; with it off, `adoptNoteProps` adds what a file says and removes nothing.
+- **Tested:** desktop.spec, notes.spec.
+- **Known limit:** with properties not written, a tag taken out of a file's YAML outside the app stays in the library. A setting per device: another device with it off tidies the same files.
+- **Committed:** v0.53.17.
+
 ## v0.53.16: details panel (2026-11-04)
 
 - **Implemented:** `ui/sortable-sections.ts` (`sortableSections`, `sectionOrder`), used by the sidebar and the details panel; a double-click on the panel's name renames.

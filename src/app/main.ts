@@ -777,6 +777,7 @@ async function start(): Promise<void> {
     return own ?? (await storage?.customThumbs.get(t).catch(() => null)) ?? null;
   };
   // (desktop only: the browser has no trash to send a file to, so the setting does nothing there even when a backup brought it)
+  session.writeNoteFiles = () => settings.get("notes.writeProps");
   session.deleteAtOnce = () => !!desktopBridge() && settings.get("storage.deleteAtOnce");
   // The desktop build: before its window closes, the last edits reach the workspace folder (ADR 0177).
   // While files are still being written into the folder (an import's), closing asks first: the rest are written at the next start.

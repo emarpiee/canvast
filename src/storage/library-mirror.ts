@@ -21,7 +21,7 @@ import type { NameKeys } from "./hidden-vault";
 import { sha256Hex } from "../assets/sha256";
 import { done, idbGet, req } from "./idb";
 import { noteKindOf } from "../notes/note-file";
-import { KIND_FOLDERS, extOfBytes, fileExt, fitsPlace, freePath, isSafeRelativePath, keptBase, libraryDir, nameBase, safeBase } from "./workspace-names";
+import { KIND_FOLDERS, MAX_LIBRARY_DIR, extOfBytes, fileExt, fitsPlace, freePath, isSafeRelativePath, keptBase, keptFits, keptPart, libraryDir, nameBase, safeBase } from "./workspace-names";
 import type { FolderFile } from "./store";
 
 export const LIBRARY_JSON = ".canvast/library.json";
@@ -540,6 +540,24 @@ export class LibraryMirror {
     const activeHashes = new Set(active.map((e) => e.hash));
     for (const r of recs.values()) if (r.ext && r.file && !activeHashes.has(r.hash)) taken.add(r.file.toLowerCase());
     const toSeal: string[] = [];
+    // Keep file names: a library folder's place on disk: as it is there, written either way; a new one as its name is written.
+    const seenDirs = new Map<string, string>();
+    const diskDir = async (names: readonly string[], tidy: string): Promise<string> => {
+      if (tidy.length > MAX_LIBRARY_DIR || !tidy.startsWith(`library/${safeBase(names[0]!)}`)) return tidy; // (too deep: under its kind)
+      let cur = "library";
+      for (const part of names) {
+        const key = `${cur}\n${part}`;
+        let next = seenDirs.get(key);
+        if (next === undefined) {
+          const kept = `${cur}/${keptPart(part)}`;
+          const safe = `${cur}/${safeBase(part)}`;
+          next = (await this.bridge.exists(kept)) || !(await this.bridge.exists(safe)) ? kept : safe;
+          seenDirs.set(key, next);
+        }
+        cur = next;
+      }
+      return cur;
+    };
     for (const e of active) {
       const rec = recs.get(e.hash);
       if (!rec || (rec.ext && !rec.file)) continue; // no original stored (or a file named by its hash, from the browser's library folder)
@@ -551,15 +569,19 @@ export class LibraryMirror {
       }
       if (sealed && !this.vault.dataKey) continue;
       const id = meta(e).folderIds[0];
-      const dir = libraryDir(id && folderOk.has(id) ? folderPath(folders, id) : [], e.type, e.name);
+      const names = id && folderOk.has(id) ? folderPath(folders, id) : [];
+      const tidyDir = libraryDir(names, e.type, e.name);
       // (a sealed file's own is .bin; a note made rich text in its place, plan.md → plan.note.html, is a file of its new kind)
       const tidyExt = (noteKindOf(e.name) && fileExt(e.name, e.type)) || (rec.file && !sealed && extOfPath(rec.file)) || fileExt(rec.name, e.type);
       const tidyBase = nameBase(e.name);
-      // (Keep file names: as the item is named, its extension too. A hidden item's is its own business. A file already tidied stays where it is: turning the setting on moves nothing.)
+      // Keep file names: a file stays as it is and where it lies: named as its item is, in its library folder under either way of writing it, or (in no
+      // folder) in the library's root or its kind's folder. A file tidied before stays too: turning the setting on moves nothing. A hidden item's is its own business.
       const keep = this.keepNames() && !sealed;
       const base = keep ? keptBase(e.name) : tidyBase;
       const ext = (keep && /\.([A-Za-z0-9]{1,8})$/.exec(e.name)?.[1]) || tidyExt;
-      const fits = !!rec.file && (fitsPlace(rec.file, dir, base, ext) || (keep && (fitsPlace(rec.file, dir, tidyBase, tidyExt) || fitsPlace(rec.file, dir, base, tidyExt))));
+      const keptDirs = keep ? (names.length ? [await diskDir(names, tidyDir), tidyDir] : [tidyDir, "library"]) : [];
+      const dir = rec.file && keptDirs.includes(parentOf(rec.file)) ? parentOf(rec.file) : keptDirs[0] ?? tidyDir;
+      const fits = !!rec.file && (fitsPlace(rec.file, tidyDir, tidyBase, tidyExt) || (keep && keptFits(rec.file, keptDirs, e.name)));
       if (fits && !taken.has(rec.file!.toLowerCase())) taken.add(rec.file!.toLowerCase());
       else moves.push({ hash: e.hash, from: rec.ext ? rec.file! : null, dir, base, ext });
     }
@@ -621,7 +643,11 @@ export class LibraryMirror {
     if (total) this.onProgress?.(total, 0);
     // Library folders are real folders, even empty; the places a move or a rename emptied are removed.
     const wanted = new Set<string>();
-    for (const f of visibleFolders(folders)) for (let d = libraryDir(folderPath(folders, f.id), "", ""); d.includes("/"); d = parentOf(d)) wanted.add(d);
+    for (const f of visibleFolders(folders)) {
+      const names = folderPath(folders, f.id);
+      const tidy = libraryDir(names, "", "");
+      for (let d = this.keepNames() ? await diskDir(names, tidy) : tidy; d.includes("/"); d = parentOf(d)) wanted.add(d);
+    }
     for (const d of wanted) await this.bridge.makeFolder(d);
     for (const d of [...emptied, ...this.dirs]) {
       for (let p = d; p.startsWith("library/") && !wanted.has(p); p = parentOf(p)) if (!(await this.bridge.removeEmptyFolder(p))) break;
@@ -1040,7 +1066,7 @@ export class LibraryMirror {
     const parts = dir.split("/").slice(1);
     return this.lib.serial(async () => {
       const folders = await this.lib.folders();
-      const match = (parent: string | null, part: string): AssetFolder | undefined => folders.find((f) => f.parentId === parent && safeBase(f.name) === part);
+      const match = (parent: string | null, part: string): AssetFolder | undefined => folders.find((f) => f.parentId === parent && safeBase(f.name) === safeBase(part)); // (on disk as written, or tidied)
       if (!parts.length || (parts.length === 1 && KIND_FOLDERS.has(parts[0]!) && !match(null, parts[0]!))) return null;
       let parent: string | null = null;
       let made = false;

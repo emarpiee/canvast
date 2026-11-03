@@ -38,9 +38,11 @@ export function safeBase(name: string): string {
  * A file's name kept as written (Settings: Keep file names): only what a system forbids or a file cannot hold is changed: `<>:"/\\|?*` and control
  * characters become `-`, dots and spaces at the ends go (a leading dot would hide the file), and a name reserved on some systems gets `_file`.
  */
-export function keptBase(name: string): string {
+export const keptBase = (name: string): string => keptPart(name.replace(/\.[A-Za-z0-9]{1,8}$/, ""));
+
+/** A folder's or file's name kept as written: see `keptBase`. */
+export function keptPart(name: string): string {
   let s = name
-    .replace(/\.[A-Za-z0-9]{1,8}$/, "")
     .normalize("NFC")
     // eslint-disable-next-line no-control-regex
     .replace(/[<>:"/\\|?*\u0000-\u001f\u007f]/g, "-")
@@ -156,7 +158,7 @@ export function fitsPlace(path: string, dir: string, base: string, ext: string):
 }
 
 /** Longest library folder path kept on disk; a deeper one files its items under their kind folder (paths stay well inside every system's limit). */
-const MAX_LIBRARY_DIR = 800;
+export const MAX_LIBRARY_DIR = 800;
 
 /**
  * The folder of `library/` an item belongs in (ADR 0177, "library.json"): the path of its library folder, each part a safe
@@ -166,6 +168,21 @@ const MAX_LIBRARY_DIR = 800;
 export function libraryDir(folderNames: readonly string[], type: string, name: string): string {
   const dir = ["library", ...folderNames.map(safeBase)].join("/");
   return folderNames.length && dir.length <= MAX_LIBRARY_DIR ? dir : `library/${kindFolder(type, name)}`;
+}
+
+/**
+ * Keep file names: whether a file already fits its item where it lies: in one of `dirs`, under the item's name as written (`-2` on a clash), with
+ * the extension the name has, or none when it has none.
+ */
+export function keptFits(path: string, dirs: readonly string[], name: string): boolean {
+  const at = path.lastIndexOf("/");
+  if (!dirs.includes(path.slice(0, at))) return false;
+  const file = path.slice(at + 1);
+  const ext = /\.[A-Za-z0-9]{1,8}$/.exec(name)?.[0] ?? "";
+  if (ext ? file.slice(-ext.length).toLowerCase() !== ext.toLowerCase() : false) return false;
+  const stem = ext ? file.slice(0, -ext.length) : file;
+  const base = keptBase(name);
+  return stem === base || (stem.startsWith(`${base}-`) && /^(?:[2-9]|[1-9]\d+)$/.test(stem.slice(base.length + 1)));
 }
 
 /** A relative path inside a workspace: `/`-separated, no empty, `.` or `..` part, no backslash or NUL, not absolute. */

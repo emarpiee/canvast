@@ -164,6 +164,10 @@ test("New note makes a markdown note in the open folder and opens it to write in
 
 test("a note's properties (YAML, as Obsidian writes them) are its item's tags, note and fields, both ways", async ({ app }) => {
   const p = app.page;
+  // (written into the file when asked for: Settings > Notes; off by default)
+  await p.getByTestId("view-settings").click();
+  await p.getByRole("tab", { name: "Notes", exact: true }).click();
+  await p.locator('[data-set="notes.writeProps"]').click({ force: true });
   const NOTE = "---\ntags:\n  - design\nauthor: Ana\ndescription: The cover plan\nnested:\n  a: 1\n---\n# Cover\n\nText.\n";
   const entry = () => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.name === "cover.md").map((e) => ({ tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] }))[0]));
   await p.getByTestId("view-assets").click();

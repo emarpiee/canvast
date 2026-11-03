@@ -69,7 +69,7 @@ export const SETTINGS = {
   // The desktop app: a file deleted from the library leaves the folder at once, even while undo on the open canvas could still bring an instance back.
   "storage.deleteAtOnce": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "storage.trashDays": { scope: "device", default: "0", validate: oneOf("0", "30", "90", "365"), effect: "immediate" } as Def<"0" | "30" | "90" | "365">,
-  "library.keepFileNames": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  "library.keepFileNames": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "library.hiddenNamesOff": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "storage.autoIndex": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "ui.view": { scope: "device", default: "canvas", validate: oneOf("canvas", "assets"), effect: "restart" } as Def<"canvas" | "assets">,
@@ -146,6 +146,7 @@ export const SETTINGS = {
   "ui.background": { scope: "device", default: "", validate: (v: unknown) => (typeof v === "string" && (v === "" || /^#[0-9a-f]{6}$/.test(v)) ? v : undefined), effect: "immediate" } as Def<string>,
   "ui.corners": { scope: "device", default: "round", validate: oneOf("round", "sharp"), effect: "immediate" } as Def<"round" | "sharp">,
   "ui.density": { scope: "device", default: "compact", validate: oneOf("comfortable", "compact", "dense"), effect: "immediate" } as Def<"comfortable" | "compact" | "dense">,
+  "notes.writeProps": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.saveOnClose": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.saveAs": { scope: "device", default: "ask", validate: oneOf("ask", "file", "rich"), effect: "immediate" } as Def<"ask" | "file" | "rich">,
   "notes.cardShows": { scope: "device", default: "whole", validate: oneOf("part", "whole"), effect: "immediate" } as Def<"part" | "whole">,

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.17 — Files stay as they are (2026-11-04)
+
+- **Changed:** **Keep files as they are** (it was Keep file names as written) is on by default, and also covers where a file is: it stays where you put it, its folders keep their names and no extension is added. Off, files are tidied and sorted as before.
+- **Added:** **Write tags and properties into note files** (Settings > Notes, off by default): a tag or property changed in the library no longer changes the note's file unless this is on. Saving a note then leaves its YAML as the file has it.
+
 ## 0.53.16 — Library details panel: rename, movable sections (2026-11-04)
 
 - **Added:** a double-click on the name at the top of the library's details panel renames the item.
