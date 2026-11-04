@@ -1366,7 +1366,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-notes > .assets-btn[data-action="field-add"] { margin-top: var(--s-4); }
 
 /* The viewer: the original large, the details beside it (they can be hidden), the controls below (they can be hidden). */
-.viewer { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--r-lg); background: var(--media-bg); color: var(--media-fg); outline: none; }
+.viewer { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; overflow: hidden; border-radius: var(--r-lg); background: var(--v-stage); color: var(--v-fg); outline: none; }
 .viewer[hidden] { display: none; }
 .viewer-stage { flex: 1; min-height: 0; display: flex; overflow: auto; padding: var(--s-8); }
 .viewer figure:not(:where(.viewer-note *)) { margin: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; gap: var(--s-6); }
@@ -1376,12 +1376,12 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer.is-actual .viewer-stage { display: block; }
 .viewer.is-actual figure:not(:where(.viewer-note *)) { width: max-content; height: max-content; align-items: flex-start; margin: auto; }
 .viewer.is-actual img:not(:where(.viewer-note *)) { flex: none; width: auto; max-width: none; max-height: none; }
-.viewer figcaption:not(:where(.viewer-note *)) { flex: none; font-size: var(--text-sm); color: var(--media-muted); text-align: center; }
-.viewer-bar { flex: none; display: flex; align-items: center; gap: calc(var(--near) * 2); padding: var(--near) var(--edge); background: var(--media-bar); border-top: 1px solid var(--white-a10); }
+.viewer figcaption:not(:where(.viewer-note *)) { flex: none; font-size: var(--text-sm); color: var(--v-muted); text-align: center; }
+.viewer-bar { flex: none; display: flex; align-items: center; gap: calc(var(--near) * 2); padding: var(--near) var(--edge); background: var(--v-bar); border-top: 1px solid var(--v-hover); }
 .viewer.no-bar .viewer-bar { display: none; }
 .viewer-nav, .viewer-tools { display: flex; align-items: center; gap: var(--s-2); flex: none; }
-.viewer-pos { min-width: calc(var(--ctl) * 2.4); padding: 0 var(--s-4); font-variant-numeric: tabular-nums; color: var(--media-muted); }
-.vbtn.viewer-back, .vbtn.viewer-details, .vbtn.viewer-hide { color: var(--media-fg); position: absolute; top: var(--sp-6); z-index: var(--z-item-bar); background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); }
+.viewer-pos { min-width: calc(var(--ctl) * 2.4); padding: 0 var(--s-4); font-variant-numeric: tabular-nums; color: var(--v-muted); }
+.vbtn.viewer-back, .vbtn.viewer-details, .vbtn.viewer-hide { color: var(--v-fg); position: absolute; top: var(--sp-6); z-index: var(--z-item-bar); background: var(--v-pill); border: 1px solid var(--v-line); border-radius: var(--r-pill); }
 .vbtn.viewer-back { left: var(--sp-6); }
 .vbtn.viewer-details { right: var(--sp-6); }
 /* Hide or show the controls (F): beside the details button, and like it, faded out with the controls hidden until the pointer is near the top */
@@ -1390,12 +1390,12 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 /* with the controls hidden the two at the top fade out, and come back when the pointer is near the top edge (the handle brings the controls back) */
 .viewer .viewer-ground { display: none; }
 .viewer.has-alpha .viewer-ground { display: inline-flex; }
-.vbtn.viewer-ground { position: absolute; right: var(--sp-6); bottom: var(--sp-6); z-index: var(--z-item-bar); color: var(--media-fg); background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); }
+.vbtn.viewer-ground { position: absolute; right: var(--sp-6); bottom: var(--sp-6); z-index: var(--z-item-bar); color: var(--v-fg); background: var(--v-pill); border: 1px solid var(--v-line); border-radius: var(--r-pill); }
 .viewer.no-bar .viewer-back, .viewer.no-bar .viewer-details, .viewer.no-bar .viewer-hide, .viewer.no-bar .viewer-ground { opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
 .viewer.no-bar.is-near-top .viewer-back, .viewer.no-bar.is-near-top .viewer-details, .viewer.no-bar.is-near-top .viewer-hide, .viewer.no-bar .viewer-hide:hover, .viewer.no-bar .viewer-hide:focus-visible, .viewer.no-bar.is-near-bottom .viewer-ground, .viewer.no-bar .viewer-ground:hover, .viewer.no-bar .viewer-back:hover, .viewer.no-bar .viewer-details:hover, .viewer.no-bar .viewer-back:focus-visible, .viewer.no-bar .viewer-details:focus-visible { opacity: 1; }
 .vbtn { display: inline-flex; align-items: center; justify-content: center; gap: var(--s-4); min-width: var(--ctl); height: var(--ctl); padding: 0 var(--s-6); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
 .vbtn svg { width: 18px; height: 18px; }
-.vbtn:hover:not(:disabled) { background: var(--white-a12); }
+.vbtn:hover:not(:disabled) { background: var(--v-hover); }
 .vbtn:disabled { opacity: 0.4; cursor: default; }
 .vbtn[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--hud-accent); }
 .vbtn[data-act="favorite"][aria-pressed="true"] svg { fill: var(--hud-star); color: var(--hud-star); }
@@ -1404,11 +1404,11 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer-film { flex: 1; min-width: 0; display: flex; gap: var(--s-4); overflow-x: auto; padding: var(--s-2) var(--s-1); scrollbar-width: thin; }
 .film-spacer { flex: none; }
 .film-win { display: contents; }
-.film-item { flex: none; width: 64px; height: 44px; padding: 0; overflow: hidden; background: var(--white-a08); border: 0; border-radius: var(--r-sm); cursor: pointer; opacity: 0.7; }
+.film-item { flex: none; width: 64px; height: 44px; padding: 0; overflow: hidden; background: var(--v-hover); border: 0; border-radius: var(--r-sm); cursor: pointer; opacity: 0.7; }
 .film-item:hover { opacity: 1; }
 .film-item.is-current { opacity: 1; box-shadow: 0 0 0 2px var(--hud-accent); }
 .film-item img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.viewer-handle { position: absolute; left: 50%; bottom: var(--sp-4); transform: translateX(-50%); display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 28px; padding: 0; color: inherit; background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); cursor: pointer; }
+.viewer-handle { position: absolute; left: 50%; bottom: var(--sp-4); transform: translateX(-50%); display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 28px; padding: 0; color: inherit; background: var(--v-pill); border: 1px solid var(--v-line); border-radius: var(--r-pill); cursor: pointer; }
 .viewer-handle[hidden] { display: none; }
 .viewer-handle svg { width: 18px; height: 18px; }
 .viewer button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
@@ -1503,7 +1503,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer-progress.is-running { animation: show-run var(--ms, 5000ms) linear forwards; }
 @keyframes show-run { to { transform: scaleX(1); } }
 @media (prefers-reduced-motion: reduce) { .viewer-progress.is-running { animation: none; transform: scaleX(1); opacity: 0.4; } }
-.viewer-interval { height: var(--ctl); padding: 0 var(--s-4); font: inherit; color: inherit; background: var(--white-a08); border: 0; border-radius: var(--r-md); }
+.viewer-interval { height: var(--ctl); padding: 0 var(--s-4); font: inherit; color: inherit; background: var(--v-hover); border: 0; border-radius: var(--r-md); }
 .viewer-interval option { color: var(--hud-fg); background: var(--hud-bg); }
 .vbtn[data-act="play"][aria-pressed="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); box-shadow: none; }
 .assets-grid { user-select: none; -webkit-user-select: none; }
@@ -1642,7 +1642,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .viewer.is-actual .viewer-stage { overflow: auto; }
 .viewer figure:not(:where(.viewer-note *)) { position: absolute; inset: 0; margin: 0; width: auto; height: auto; display: block; }
 .viewer figure img:not(:where(.viewer-note *)), .viewer figure video:not(:where(.viewer-note *)) { position: absolute; inset: 16px 16px var(--viewer-bottom); margin: auto; width: 100%; height: 100%; flex: none; object-fit: contain; }
-.viewer figcaption:not(:where(.viewer-note *)) { position: absolute; left: 50%; bottom: var(--sp-6); transform: translateX(-50%); max-width: calc(100% - 32px); padding: var(--s-4) var(--s-6); font-size: var(--text-sm); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--media-fg); background: var(--media-caption-bg); border-radius: var(--r-pill); }
+.viewer figcaption:not(:where(.viewer-note *)) { position: absolute; left: 50%; bottom: var(--sp-6); transform: translateX(-50%); max-width: calc(100% - 32px); padding: var(--s-4) var(--s-6); font-size: var(--text-sm); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--v-fg); background: var(--v-pill); border-radius: var(--r-pill); }
 .viewer.is-actual figure:not(:where(.viewer-note *)) { position: static; width: max-content; height: max-content; margin: auto; }
 .viewer.is-actual figure img:not(:where(.viewer-note *)) { position: static; inset: auto; width: auto; height: auto; max-width: none !important; max-height: none !important; margin: 0; }
 
@@ -1684,10 +1684,10 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .viewer img.is-file:not(:where(.viewer-note *)) { image-rendering: auto; max-width: min(800px, 90%) !important; max-height: min(600px, 80%) !important; }
 
 /* Viewer zoom: a small control over the picture (the wheel, a pinch, a drag and the keys do the work); the picture is moved with a transform. */
-.viewer-zoom { position: absolute; top: var(--sp-6); right: var(--sp-6); z-index: 2; display: flex; align-items: center; gap: var(--s-1); padding: var(--s-2); background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); backdrop-filter: blur(8px); }
+.viewer-zoom { position: absolute; top: var(--sp-6); right: var(--sp-6); z-index: 2; display: flex; align-items: center; gap: var(--s-1); padding: var(--s-2); background: var(--v-pill); border: 1px solid var(--v-line); border-radius: var(--r-pill); backdrop-filter: blur(8px); }
 .viewer-zoom button { display: inline-flex; align-items: center; justify-content: center; min-width: var(--ctl); height: var(--ctl); padding: 0 var(--s-4); color: inherit; font: var(--weight-medium) var(--text-sm) var(--font-ui); background: transparent; border: 0; border-radius: var(--r-pill); cursor: pointer; font-variant-numeric: tabular-nums; }
 .viewer-zoom button svg { width: 16px; height: 16px; }
-.viewer-zoom button:hover { background: var(--white-a14); }
+.viewer-zoom button:hover { background: var(--v-hover); }
 .viewer-zoom .viewer-zoom-pct { min-width: calc(var(--ctl) * 1.7); }
 .viewer.no-bar .viewer-zoom { opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
 .viewer.no-bar .viewer-zoom:hover, .viewer.no-bar .viewer-zoom:focus-within { opacity: 1; }
