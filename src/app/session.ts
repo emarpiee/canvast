@@ -1,4 +1,5 @@
 import { sha256Hex } from "../assets/sha256";
+import { stampNote } from "../notes/note-dates";
 import { NO_META, fileInlineTags, fileMeta, sameMeta, withFileMeta } from "../notes/frontmatter";
 import type { NoteMeta } from "../notes/frontmatter";
 import { makeThumb } from "../assets/thumb";
@@ -445,7 +446,7 @@ export class Session {
         const item: NoteMeta = { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] };
         if (sameMeta(fileMeta(kind, text) ?? NO_META, item)) continue;
         const written = withFileMeta(kind, text, item);
-        if (written !== text) await this.saveVersion(hash, new File([written], e.name, { type: rec.type }));
+        if (written !== text) await this.saveVersion(hash, new File([stampNote(kind, written, e.importedAt, Date.now(), e.name)], e.name, { type: rec.type }));
       } catch (err) {
         console.warn(`canvast: the properties of a note could not be written into its file: ${(err as Error).message}`);
       }

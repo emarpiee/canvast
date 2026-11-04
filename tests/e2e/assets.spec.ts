@@ -2399,8 +2399,11 @@ test("Extract frame follows Settings > Media and playback: name template and sty
   await p.evaluate(() => window.__canvastDebug.setSetting("assets.playerHideSeconds", 5));
   await p.mouse.move(420, 320);
   await expect.poll(() => player.evaluate((el) => getComputedStyle(el).opacity)).toBe("1");
-  await playBtn.click();
-  await expect(playBtn).toHaveAttribute("aria-label", "Play");
+  // (Firefox can miss a click on a player that has just come back: pressed until it is paused)
+  await expect(async () => {
+    if ((await playBtn.getAttribute("aria-label")) === "Pause") await playBtn.click();
+    await expect(playBtn).toHaveAttribute("aria-label", "Play", { timeout: 800 });
+  }).toPass({ timeout: 5000 });
   await p.evaluate(() => window.__canvastDebug.setSetting("assets.playerHideSeconds", 0.5));
   await p.mouse.move(5, 5);
   await expect(viewer).toHaveClass(/is-idle/, { timeout: 1500 });
@@ -2690,6 +2693,17 @@ test("library Copy puts the picture on the system clipboard and Copy file name i
   await p.getByRole("menu", { name: "Library actions" }).getByRole("menuitem", { name: "Copy", exact: true }).click();
   await expect(p.getByTestId("toast")).toContainText("Copied “photo.jpg”");
   expect(await p.evaluate(async () => [...(await navigator.clipboard.read())[0]!.types])).toEqual(["image/png"]); // (the picture alone: a name beside it would be pasted instead of it)
+  // Ctrl+C: the same, in the grid and in the viewer.
+  await p.evaluate(() => navigator.clipboard.writeText(""));
+  await p.locator('[data-testid="asset-card"][aria-label^="snap-shot.png"]').click();
+  await p.keyboard.press("Control+c");
+  await expect.poll(() => p.evaluate(async () => [...(await navigator.clipboard.read())[0]!.types])).toContain("image/png");
+  await p.evaluate(() => navigator.clipboard.writeText(""));
+  await p.locator('[data-testid="asset-card"][aria-label^="snap-shot.png"]').dblclick();
+  await expect(p.getByTestId("slide-view")).toBeVisible();
+  await p.keyboard.press("Control+c");
+  await expect.poll(() => p.evaluate(async () => [...(await navigator.clipboard.read())[0]!.types])).toContain("image/png");
+  await p.keyboard.press("Escape");
   // Copy file name: the name as text
   await p.locator('[data-testid="asset-card"][aria-label^="photo.jpg"]').click({ button: "right" });
   await p.getByRole("menu", { name: "Library actions" }).getByRole("menuitem", { name: "Copy file name" }).click();

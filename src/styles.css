@@ -1264,7 +1264,8 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-field > .field-grip { grid-area: grip; }
 .asset-field > .field-type { grid-area: type; }
 .asset-fields .field-key { background: transparent; border-color: transparent; font-weight: inherit; }
-.asset-fields .field-key:hover, .asset-fields .field-key:focus { border-color: var(--hud-border); }
+.asset-fields .field-key:not([readonly]):hover, .asset-fields .field-key:not([readonly]):focus { border-color: var(--hud-border); }
+.asset-fields .field-value[readonly] { color: var(--hud-muted); }
 .asset-fields [data-action="field-remove"] { height: var(--ctl); background: transparent; border-color: transparent; }
 .asset-fields [data-action="field-remove"]:hover:not(:disabled) { background: var(--hud-hover); }
 .asset-field > .field-warn { grid-area: warn; }

@@ -50,6 +50,7 @@ import { OpenNote } from "./note-session";
 import type { NoteDeps, NotePlace } from "./note-session";
 import { RICH_NOTE_SUFFIX, WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget, newNoteFile } from "../notes/note-file";
 import { splitFrontmatter, underProps, wholeMarkdown, withFileMeta } from "../notes/frontmatter";
+import { AUTO_NOTE_SETTINGS, autoDates, formatNoteDate, isAutoDate, isAutoKey, isAutoLocked, stemOf } from "../notes/note-dates";
 import { asWritten, hasPropType, pickerShows, PROP_TYPES, propType, typeWarning, withPropType, type PropType } from "../notes/prop-types";
 import type { NoteKind } from "../notes/note-file";
 import { fontFor } from "../text/fonts";
@@ -2669,7 +2670,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** One item of a list property: moved by dragging it. */
   const itemHtml = (t: string): string => `<span class="tag-chip field-item" data-item="${esc(t)}" draggable="true"><span>${esc(t)}</span><button type="button" data-action="item-remove" aria-label="Remove the item ${esc(t)}" title="Remove this item">×</button></span>`;
   /** A property's value, by its type: a checkbox, a date or a date and time picker while the value fits one; else a box that shows the value as it is. */
-  const fieldValueHtml = (f: AssetField, i: number, dis: string): string => {
+  const fieldValueHtml = (f: AssetField, i: number, dis: string, auto = false): string => {
+    if (auto) return `<input class="field-value" readonly data-prop="value-${i}" value="${esc(f.value)}" placeholder="Set at the next save" aria-label="Value of ${esc(f.key)}" title="Set automatically when the note is saved (Settings > Notes)">`;
     const type = propType(f.key, f.value, f.items);
     const bad = !!typeWarning(type, f.value);
     const named = `data-prop="value-${i}" aria-label="${f.key ? `Value of ${esc(f.key)}` : `Value of property ${i + 1}`}"${dis}`;
@@ -2699,6 +2701,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (box.type === "checkbox") return box.checked ? asWritten(written ?? "", "true") : written ? asWritten(written, "false") : "";
     return written === undefined ? box.value : asWritten(written, box.value);
   };
+  /** One property's row in the details. `missing`: an automatic one the note does not have yet (shown, not stored). */
+  const fieldRowHtml = (e: CatalogEntry, f: AssetField, i: number, dis: string, missing = false): string => {
+    const kind = noteKindOf(e.name);
+    const auto = isAutoKey(kind, f.key);
+    const locked = missing || isAutoLocked(kind, f.key);
+    return `<li class="asset-field" data-type="${auto ? "text" : propType(f.key, f.value, f.items)}"${missing ? " data-auto-missing" : ""}>
+            <button type="button" class="field-grip" data-index="${i}" aria-label="Move the property ${esc(f.key || String(i + 1))}" title="Drag to move this property (or the Up and Down arrows)"${dis || (missing ? " disabled" : "")}>${ICONS.gripVertical}</button>
+            <button type="button" class="field-type" data-action="field-type" data-index="${i}" aria-haspopup="menu" aria-label="Type of ${esc(f.key || "this property")}: ${PROP_TYPES.find((t) => t.id === propType(f.key, f.value, f.items))!.label}" title="${f.key ? `Type: ${PROP_TYPES.find((t) => t.id === propType(f.key, f.value, f.items))!.label}. A type belongs to the name, for every item` : "Name it to choose its type"}"${dis || (f.key && !auto ? "" : " disabled")}>${auto ? (isAutoDate(kind, f.key) ? PROP_ICON.datetime : PROP_ICON.text) : PROP_ICON[propType(f.key, f.value, f.items)]}</button>
+            <input class="field-key"${auto ? " readonly" : ""} data-prop="key-${i}" list="field-key-suggest" value="${esc(f.key)}" placeholder="Name" aria-label="Name of property ${i + 1}" maxlength="${MAX_FIELD_KEY}"${dis}>
+            ${fieldValueHtml(f, i, dis, locked)}
+            <p class="field-warn" data-testid="field-warn" role="status"${!auto && typeWarning(propType(f.key, f.value, f.items), f.value) ? "" : " hidden"}>${ICONS.triangleAlert}<span>${auto ? "" : esc(typeWarning(propType(f.key, f.value, f.items), f.value))}</span></p>
+            ${auto ? "" : `<button type="button" class="assets-btn is-icon" data-action="field-remove" data-index="${i}" aria-label="Remove the property ${esc(f.key || String(i + 1))}" title="Remove this property"${dis}>${ICONS.x}</button>`}
+          </li>`;
+  };
+
   /** The note (plain text) and the fields the user names (a link, a source, an author...) of one asset. */
   const notesHtml = (e: CatalogListing["entries"][number]): string => {
     const stored = meta(e);
@@ -2707,19 +2724,20 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const dis = session.readOnly ? " disabled" : "";
     const rows = blankField === e.hash ? [...m.fields, { key: "", value: "" }] : m.fields;
     const keys = fieldKeysNow();
+    const has = (k: string): boolean => m.fields.some((f) => f.key.toLowerCase() === k.toLowerCase());
+    const dates = autoDates();
+    const autoMissing: AssetField[] = !isAutoDate(noteKindOf(e.name), dates.created) ? [] : [
+      ...(has(dates.title) ? [] : [{ key: dates.title, value: dates.titleFrom === "name" ? stemOf(e.name) : "" }]),
+      ...(has(dates.created) ? [] : [{ key: dates.created, value: formatNoteDate(new Date(e.importedAt), dates.format) }]),
+      ...(has(dates.modified) ? [] : [{ key: dates.modified, value: "" }]),
+    ];
     return `
       <section class="asset-sec asset-notes" data-testid="asset-notes">
         <h3>Properties</h3>
         <label class="asset-note-label" for="asset-note-box">Description</label>
         <textarea id="asset-note-box" class="asset-note-box" data-prop="note" data-testid="asset-note" rows="4" maxlength="${MAX_NOTE}" placeholder="Anything about it, in plain text"${dis}>${esc(m.note)}</textarea>
-        ${rows.length ? `<ul class="asset-fields" data-testid="asset-fields">${rows.map((f, i) => `<li class="asset-field" data-type="${propType(f.key, f.value, f.items)}">
-            <button type="button" class="field-grip" data-index="${i}" aria-label="Move the property ${esc(f.key || String(i + 1))}" title="Drag to move this property (or the Up and Down arrows)"${dis}>${ICONS.gripVertical}</button>
-            <button type="button" class="field-type" data-action="field-type" data-index="${i}" aria-haspopup="menu" aria-label="Type of ${esc(f.key || "this property")}: ${PROP_TYPES.find((t) => t.id === propType(f.key, f.value, f.items))!.label}" title="${f.key ? `Type: ${PROP_TYPES.find((t) => t.id === propType(f.key, f.value, f.items))!.label}. A type belongs to the name, for every item` : "Name it to choose its type"}"${dis || (f.key ? "" : " disabled")}>${PROP_ICON[propType(f.key, f.value, f.items)]}</button>
-            <input class="field-key" data-prop="key-${i}" list="field-key-suggest" value="${esc(f.key)}" placeholder="Name" aria-label="Name of property ${i + 1}" maxlength="${MAX_FIELD_KEY}"${dis}>
-            ${fieldValueHtml(f, i, dis)}
-            <p class="field-warn" data-testid="field-warn" role="status"${typeWarning(propType(f.key, f.value, f.items), f.value) ? "" : " hidden"}>${ICONS.triangleAlert}<span>${esc(typeWarning(propType(f.key, f.value, f.items), f.value))}</span></p>
-            <button type="button" class="assets-btn is-icon" data-action="field-remove" data-index="${i}" aria-label="Remove the property ${esc(f.key || String(i + 1))}" title="Remove this property"${dis}>${ICONS.x}</button>
-          </li>`).join("")}</ul>` : ""}
+        ${autoMissing.length ? `<ul class="asset-fields" data-testid="asset-auto-fields">${autoMissing.map((f, i) => fieldRowHtml(e, f, i, dis, true)).join("")}</ul>` : ""}
+        ${rows.length ? `<ul class="asset-fields" data-testid="asset-fields">${rows.map((f, i) => fieldRowHtml(e, f, i, dis)).join("")}</ul>` : ""}
         <datalist id="field-key-suggest">${keys.map((k) => `<option value="${esc(k)}"></option>`).join("")}</datalist>
         <button type="button" class="assets-btn" data-action="field-add" data-testid="asset-field-add" title="Add a property with a name you choose (a link, a source, an author...)"${dis}>${ICONS.fieldAdd}<span>Add a property</span></button>
       </section>`;
@@ -2736,7 +2754,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       li.querySelector<HTMLElement>(".field-key")!.dataset["prop"] = `key-${i}`;
       li.querySelector<HTMLElement>(".field-value")!.dataset["prop"] = `value-${i}`;
       li.querySelector<HTMLElement>(".field-grip")!.dataset["index"] = String(i);
-      li.querySelector<HTMLElement>("[data-action=field-remove]")!.dataset["index"] = String(i);
+      const remove = li.querySelector<HTMLElement>("[data-action=field-remove]"); // (an automatic one has none)
+      if (remove) remove.dataset["index"] = String(i);
+      li.querySelector<HTMLElement>(".field-type")!.dataset["index"] = String(i);
     });
     saveNotes(hash, notesNow(), "Moved a property");
   };
@@ -2793,10 +2813,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** The note and the fields as they are in the details now (typed but maybe not stored yet). */
   const notesNow = (): { note: string; fields: AssetField[] } => ({
     note: inspector.querySelector<HTMLTextAreaElement>(".asset-note-box")?.value ?? "",
-    fields: [...inspector.querySelectorAll<HTMLElement>(".asset-field")].map(fieldOfRow),
+    fields: [...inspector.querySelectorAll<HTMLElement>(".asset-field:not([data-auto-missing])")].map(fieldOfRow),
   });
 
   /** A name's type, for every item with that name. Values stay as they are; those that do not fit say so. */
+  settings.subscribe((key) => AUTO_NOTE_SETTINGS.includes(key) && queueMicrotask(renderInspector));
   const pinType = (key: string, type: PropType): void => {
     settings.set("library.propTypes", withPropType(settings.get("library.propTypes"), key, type));
     renderInspector();
@@ -4078,10 +4099,26 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       say("The browser did not let canvast read the clipboard: press Ctrl+V to paste.");
     }
   };
-  document.addEventListener("copy", (e) => {
-    if (!visible || viewer.hidden !== true || !(picked.size || selected) || (e.target as HTMLElement | null)?.closest?.(TYPING)) return;
+  /** What Ctrl+C copies here: the items picked, or the one shown in the viewer. Nothing when words are selected or typed in (a note's, a box's). */
+  const copyTargets = (target: EventTarget | null): string[] => {
+    if (!visible || !(picked.size || selected) || document.querySelector("dialog[open]")) return [];
+    if ((target as HTMLElement | null)?.closest?.(`${TYPING}, [contenteditable="true"]`)) return [];
+    if (!getSelection()?.isCollapsed) return [];
+    return viewer.hidden && picked.size ? filtered().filter((h) => picked.has(h)) : selected ? [selected] : [];
+  };
+  // (the key itself as well: a page with nothing selected does not always get a copy event)
+  window.addEventListener("keydown", (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || (e.key !== "c" && e.key !== "C")) return;
+    const hashes = copyTargets(e.target);
+    if (!hashes.length) return;
     e.preventDefault();
-    void copyItems(picked.size ? filtered().filter((h) => picked.has(h)) : [selected!]);
+    void copyItems(hashes);
+  });
+  document.addEventListener("copy", (e) => {
+    const hashes = copyTargets(e.target);
+    if (!hashes.length) return;
+    e.preventDefault();
+    void copyItems(hashes);
   });
   const clipboardGroup = (hashes: readonly string[]): MenuItem[] => [
     ...(hashes.length

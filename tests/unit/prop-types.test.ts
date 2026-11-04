@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { normalizeFields } from "../../src/assets/asset-catalog";
-import { fileMeta, wholeMarkdown, withFileMeta } from "../../src/notes/frontmatter";
+import { fileMeta, parseProps, splitFrontmatter, wholeMarkdown, withFileMeta } from "../../src/notes/frontmatter";
+import { firstHeading, formatNoteDate, isAutoDate, isAutoLocked, setAutoDates, stampNote } from "../../src/notes/note-dates";
 import { asWritten, fitsType, guessType, parsePropTypes, pickerShows, propType, setPropTypes, typeWarning, validPropTypes, withPropType } from "../../src/notes/prop-types";
 
 describe("property types", () => {
@@ -55,5 +56,49 @@ describe("property types", () => {
     const out = withFileMeta("md", "# T\n", { tags: [], note: "", fields: [{ key: "cast", value: "Ana, Bo" }, { key: "done", value: "true" }, { key: "word", value: "true" }, { key: "aliases", value: "One" }] });
     expect(out).toBe('---\ncast:\n  - Ana\n  - Bo\ndone: true\nword: "true"\naliases:\n  - One\n---\n# T\n');
     setPropTypes("{}");
+  });
+});
+
+describe("automatic note dates", () => {
+  const AT = new Date(2026, 10, 4, 15, 7, 9);
+  const on = { on: true, created: "created", modified: "modified", format: "YYYY-MM-DDTHH:mm", title: "title", titleFrom: "name" as const };
+  it("formats a moment; brackets and other letters stay", () => {
+    expect(formatNoteDate(AT, "YYYY-MM-DDTHH:mm:ss")).toBe("2026-11-04T15:07:09");
+    expect(formatNoteDate(AT, "ddd D MMM YY, h:mm A [at] [home]")).toBe("Wed 4 Nov 26, 3:07 PM at home");
+  });
+  it("a title: from the file's name only when empty; from the first heading at every save, not one in code", () => {
+    setAutoDates(on);
+    const now = AT.getTime();
+    const title = (file: string): string | string[] | undefined => splitFrontmatter(stampNote("md", file, 1, now, "the-name.md")).props!.find((p) => p.key === "title")?.value;
+    expect(title("---\ntitle:\n---\n# Head\n")).toBe("the-name");
+    expect(title("---\ntitle: By hand\n---\n# Head\n")).toBe("By hand");
+    setAutoDates({ ...on, titleFrom: "h1" });
+    expect(title("---\ntitle: By hand\n---\n```\n# not this\n```\n## Nor this\n# **My** [[a|Head]] #\n")).toBe("My Head");
+    expect(title("---\ntitle: By hand\n---\nNo heading\n")).toBe("By hand");
+    expect(title("No heading\n")).toBe("the-name");
+    expect(firstHeading("rich", '<body><h1 class="x">A <b>B</b> &amp; C</h1></body>')).toBe("A B & C");
+    expect(isAutoLocked("md", "Title")).toBe(true);
+    setAutoDates({ ...on, on: false });
+  });
+  it("a note pasted with its own title and created keeps them over the note's; modified is the save's", () => {
+    setAutoDates({ ...on, titleFrom: "h1" });
+    const now = AT.getTime();
+    const pasted = parseProps(["title: Pasted", "created: 2001-01-01", "modified: 2002-02-02"]);
+    expect(stampNote("md", "---\ntitle: Mine\ncreated: 2020-01-01\nmodified: 2020-01-01\n---\n# Head\n", 1, now, "x.md", pasted)).toBe("---\ntitle: Pasted\ncreated: 2001-01-01\nmodified: 2026-11-04T15:07\n---\n# Head\n");
+    setAutoDates({ ...on, on: false });
+  });
+  it("a save updates modified in its place, keeps created, and adds what is missing", () => {
+    setAutoDates(on);
+    const now = AT.getTime();
+    expect(stampNote("md", '---\nmodified: "old"\ntitle: T\ncreated: 2000\n---\nBody\n', 1, now, "x.md")).toBe("---\nmodified: 2026-11-04T15:07\ntitle: T\ncreated: 2000\n---\nBody\n");
+    expect(stampNote("md", "Body\n", new Date(2020, 0, 2, 3, 4).getTime(), now, "My note.md")).toBe("---\ntitle: My note\ncreated: 2020-01-02T03:04\nmodified: 2026-11-04T15:07\n---\nBody\n");
+    expect(stampNote("txt", "Body", 1, now, "x.txt")).toBe("Body");
+    expect(stampNote("rich", "<html><head><title>t</title></head><body></body></html>", now, now, "x.note.html")).toContain('<meta name="modified" content="2026-11-04T15:07">');
+    setAutoDates({ ...on, on: false });
+    expect(stampNote("md", "Body\n", 1, now, "x.md")).toBe("Body\n");
+    setAutoDates({ ...on, modified: " updated " });
+    expect(isAutoDate("md", "Updated")).toBe(true);
+    expect(isAutoDate("txt", "Updated")).toBe(false);
+    setAutoDates({ ...on, on: false });
   });
 });

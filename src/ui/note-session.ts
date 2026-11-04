@@ -7,6 +7,7 @@ import type { SettingsStore } from "../settings/settings";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget } from "../notes/note-file";
 import type { NoteKind } from "../notes/note-file";
+import { stampNote } from "../notes/note-dates";
 import { NO_META, richMeta, splitFrontmatter, underProps, wholeMarkdown, withFileMeta, withPastedProps, type NoteMeta } from "../notes/frontmatter";
 import { fontFor } from "../text/fonts";
 import { chooseDialog, confirmDialog } from "./confirm";
@@ -270,6 +271,7 @@ export class OpenNote {
       text = withPastedProps(this.kind, text, editor.pastedProps());
       if (e?.name) this.name = e.name;
       const was = this.hash;
+      text = stampNote(this.kind, text, e?.importedAt, Date.now(), this.name, editor.pastedProps());
       const hash = await session.saveVersion(was, new File([text], this.name, { type: this.type }));
       if (!hash) return false;
       if (open.has(this)) editor.saved(as); // (closed meanwhile: there is no editor left to tell; what was typed while it was being saved stays a change)
@@ -311,7 +313,7 @@ export class OpenNote {
       for (let n = 2; names.has(name.toLowerCase()); n++) name = `${stem} ${n}.note.html`;
       const rich = withFileMeta("rich", body.replace("<title></title>", () => `<title>${titleOf(name).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`)}</title>`), { tags: e?.tags ?? [], note: e?.note ?? "", fields: e?.fields ?? [] }); // (its properties go with it)
       if (!(await session.renameAssets([{ hash: this.hash, name }]))) return false;
-      const hash = await session.saveVersion(this.hash, new File([rich], name, { type: "text/html" }));
+      const hash = await session.saveVersion(this.hash, new File([stampNote("rich", rich, e?.importedAt, Date.now(), name)], name, { type: "text/html" }));
       if (!hash) {
         await session.renameAssets([{ hash: this.hash, name: was }]); // (not saved: it stays what its file is)
         return false;

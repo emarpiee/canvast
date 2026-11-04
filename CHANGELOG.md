@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.53.28 — Automatic note properties; Ctrl+C in the library (2026-11-04)
+
+- **Added:** a note's **title**, **created** and **modified** properties are automatic: every save writes the modified time, the created time when there is none, and the title. In the details panel they cannot be removed, and the two times cannot be edited.
+- **Added:** Settings > Notes: **Automatic properties** (on by default), the three properties' names, a **Date and time format**, and **Title comes from**: the file's name (a title written by hand stays) or the first heading.
+- **Added:** a note pasted with its own title or created keeps them; its modified becomes the time of the save.
+- **Fixed:** Ctrl+C copies the picked items in the library's grid, and the item shown in its viewer. Words selected or being typed are copied as before.
+
 ## 0.53.27 — A dialog to rename a tag (2026-11-04)
 
 - **Added:** a double-click on a tag in the details panel renames it.

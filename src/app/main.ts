@@ -1,6 +1,7 @@
 import { externalFolder } from "../storage/external-folder";
 import { askHiddenPassword } from "../ui/hidden-access";
 import { noteKindOf } from "../notes/note-file";
+import { AUTO_NOTE_SETTINGS, setAutoDates } from "../notes/note-dates";
 import { setPropTypes } from "../notes/prop-types";
 import { CARD_SCALE, notePageHeight, setNoteItemMeta, setNoteLook, setNotePictures, setShownProps } from "../notes/note-preview";
 import { anyNoteDirty, leaveAllNotes } from "../ui/note-session";
@@ -534,6 +535,9 @@ async function start(): Promise<void> {
     if (key === "notes.cardProps" && setShownProps(settings.get("notes.cardProps"))) redrawNoteCards();
   });
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyNoteLook);
+  const autoDatesNow = (): void => setAutoDates({ on: settings.get("notes.autoDates"), created: settings.get("notes.createdKey"), modified: settings.get("notes.modifiedKey"), format: settings.get("notes.dateFormat"), title: settings.get("notes.titleKey"), titleFrom: settings.get("notes.titleFrom") });
+  autoDatesNow();
+  settings.subscribe((key) => AUTO_NOTE_SETTINGS.includes(key) && autoDatesNow());
   setPropTypes(settings.get("library.propTypes"));
   settings.subscribe((key) => key === "library.propTypes" && setPropTypes(settings.get("library.propTypes")));
   // A card's labels say what the details panel says, written into the note's file or not.

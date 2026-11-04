@@ -763,6 +763,48 @@ test("copying the whole note takes its properties, as the file's YAML; a part is
   expect(await copied(), "a part stays the browser's").toBe("");
 });
 
+test("a note's created and modified are automatic: a save writes them, under the names and in the format of the settings, and the panel does not edit them", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.setSetting("notes.autoDates", true));
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "d.md", mimeType: "text/markdown", buffer: Buffer.from("---\ncreated: 2000-01-02T03:04\nmodified: 2000-01-02T03:04\n---\n# Dated\n") });
+  await p.locator('[data-testid="asset-card"][title="d.md"]').dblclick();
+  await expect(page(p).locator("h1").first()).toBeVisible();
+  const text = () => p.evaluate(() => window.__canvastDebug.notesAsText()[0]!.text);
+  const saved = () => p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.find((x) => x.name === "d.md")!.fields ?? []);
+  await page(p).locator("h1").first().click();
+  await p.keyboard.press("End");
+  await p.keyboard.type("x");
+  await p.keyboard.press("Control+s");
+  await expect.poll(async () => (await saved()).find((f) => f.key === "modified")?.value).toMatch(/^20[2-9]\d-\d\d-\d\dT\d\d:\d\d$/);
+  expect((await saved()).find((f) => f.key === "created")?.value, "created stays").toBe("2000-01-02T03:04");
+  // In the panel: read only, no remove.
+  await expect(p.getByLabel("Value of modified")).toHaveAttribute("readonly");
+  await expect(p.getByRole("button", { name: "Remove the property modified" })).toHaveCount(0);
+  // Their own names and format: a note with none shows them, and has them after a save.
+  await p.evaluate(() => {
+    const d = window.__canvastDebug;
+    d.setSetting("notes.createdKey", "created-on");
+    d.setSetting("notes.modifiedKey", "updated");
+    d.setSetting("notes.dateFormat", "DD/MM/YYYY [at] HH:mm");
+  });
+  await expect(p.getByLabel("Value of updated")).toHaveAttribute("placeholder", "Set at the next save");
+  await page(p).locator("h1").first().click();
+  await p.keyboard.press("End");
+  await p.keyboard.type("y");
+  await p.keyboard.press("Control+s");
+  await expect.poll(async () => (await saved()).find((f) => f.key === "updated")?.value).toMatch(/^\d\d\/\d\d\/20[2-9]\d at \d\d:\d\d$/);
+  await expect.poll(async () => (await saved()).find((f) => f.key === "created-on")?.value).toMatch(/^\d\d\/\d\d\/20[2-9]\d at /);
+  expect(await text()).toContain("# Dated");
+  // The title: its file's name; set to follow the first heading, that, and read only.
+  await expect.poll(async () => (await saved()).find((f) => f.key === "title")?.value).toBe("d");
+  await p.evaluate(() => window.__canvastDebug.setSetting("notes.titleFrom", "h1"));
+  await expect(p.getByLabel("Value of title")).toHaveAttribute("readonly");
+  await page(p).locator("h1").first().click();
+  await p.keyboard.press("Control+s");
+  await expect.poll(async () => (await saved()).find((f) => f.key === "title")?.value).toMatch(/^.*Dated/);
+});
+
 test("Note cards show properties: a card shows the note's chosen properties, at once", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
