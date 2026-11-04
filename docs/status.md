@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.52: the folder tree lines up (2026-11-04)
+
+- **Implemented:** `treeSlot` in `ui/tree.ts` (folders, tags, tree chooser; the layers panel keeps its own rows); details panel: `asset-where` line and Organize in place of the radio list and New folder; open folder icon.
+- **Tested:** line-up and count position in `components.spec.ts`; folder tests moved to Organize. On GitHub.
+- **Known failures:** none.
+- **Unverified:** the look on screen is the owner's to judge.
+- **Committed:** v0.53.52.
+- **Next bounded task:** the owner's answer on a shortcut for Organize, and on the layers panel's rows.
+
 ## v0.53.51: art files past 256 MiB show their picture; tags as a tree (2026-11-04)
 
 - **Implemented:** `canvast:part` (a range of a workspace file, at most 64 MiB a call, through the existing path check), `externalFolder.parts`, `artFileOf`; the art readers take a Blob or parts; PSD merged picture read in 16 MiB windows and reduced as it is read; ZIP candidates tried in order, ZIP64; `tagsUnder` in `countSide`; the sidebar's tags through `walkTree` and `pathNodes`, with `ui.tagsInline`.

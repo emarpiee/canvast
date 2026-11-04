@@ -1259,14 +1259,10 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .tag-chip button { font: inherit; color: inherit; background: transparent; border: 0; border-radius: var(--r-dot); width: 20px; height: 20px; cursor: pointer; }
 .tag-chip button:hover:not(:disabled) { background: var(--hud-hover); }
 .tag-input { flex: 1 1 100px; min-width: 0; font: inherit; color: inherit; background: transparent; border: 0; border-bottom: 1px solid var(--hud-border); padding: var(--sp-2) var(--sp-1); }
-.asset-folders { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--sp-3); }
-.asset-folders label { display: flex; gap: var(--sp-4); align-items: center; cursor: pointer; }
 /* several picked: a tag only some have (dashed, with how many), a folder only some are in (how many) */
 .tag-chip.is-partial { background: transparent; border: 1px dashed var(--hud-border); }
-.tag-count, .folder-count { font-size: var(--text-xs); color: var(--hud-muted); }
+.tag-count { font-size: var(--text-xs); color: var(--hud-muted); }
 
-.folder-count { margin-left: auto; }
-.asset-sec > .assets-btn[data-action="new-folder-into"] { margin-top: var(--sp-3); }
 /* the note (plain text) and the fields the user names: a name and a value per row, × to remove one, "Add a field" below */
 .asset-note-box { display: block; width: 100%; min-height: calc(var(--sp-15) + var(--sp-8)); resize: vertical; box-sizing: border-box; }
 .asset-fields { list-style: none; margin: var(--sp-4) 0 0; padding: 0; display: grid; gap: var(--sp-5); container-type: inline-size; }
@@ -2323,9 +2319,6 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 .asset-ctags li { align-items: baseline; }
 .asset-ctags .tag-where { flex: 1 1 8em; }
 /* The folder: a quiet list of choices, scrolling when there are many. */
-.asset-folders { gap: var(--sp-1); max-height: 168px; overflow-y: auto; }
-.asset-folders label { min-height: var(--list-h); padding: 0 var(--sp-3); border-radius: var(--r-sm); }
-.asset-folders label:hover { background: var(--hud-hover); }
 /* Where it is used: the place, how many, and a Show button, one row each. */
 .asset-places { gap: var(--sp-2); }
 .asset-places li { align-items: center; gap: var(--sp-4); padding: var(--sp-3) 0; border-top: 1px solid var(--hud-border); }
@@ -3013,6 +3006,14 @@ dialog.reset-dialog h3 { margin: var(--sp-6) 0 var(--sp-3); font-size: var(--tex
 .side-row.tree-row .side-item { min-height: var(--tree-row-h); padding: 0 var(--sp-2); gap: var(--sp-3); }
 .side-row.tree-row .side-item svg { width: var(--icon-sm); height: var(--icon-sm); }
 .side-add + .side-add { margin-left: 0; }
+.tree-twist.is-empty { pointer-events: none; }
+.side-head > .side-sec-toggle { margin-right: auto; } /* (its buttons together at the right, however many) */
+/* A count at the row's edge, as on every row: the row's More takes its place while the row is under the pointer, not room of its own. */
+@media (hover: hover) and (min-width: 641px) {
+  .side-row.tree-row .side-more { position: absolute; right: var(--sp-2); top: 0; bottom: 0; margin: auto 0; width: var(--tree-row-h); height: var(--tree-row-h); }
+  .side-row.tree-row:has(.side-more):hover .side-n, .side-row.tree-row:has(.side-more):focus-within .side-n, .side-row.tree-row:has(.side-more[aria-expanded="true"]) .side-n { visibility: hidden; }
+}
+.asset-where { margin: 0 0 var(--sp-3); font-size: var(--text-sm); overflow-wrap: anywhere; }
 
 /* The tree chooser (ui/tree-chooser.ts). */
 dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); max-width: none; }

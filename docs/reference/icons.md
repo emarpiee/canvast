@@ -280,4 +280,5 @@ One icon per function: two buttons that do different things never share an icon,
 | `image-upscale` | Reset size: pictures and note cards back to the size they are placed at (Actions bar) |
 | `list-tree` | Show as a tree (the tree chooser, the sidebar's tags) |
 | `wrap-text` | Show in a row (the tree chooser, the sidebar's tags) |
+| `folder-open` | A folder whose subfolders are showing (library folder tree, tree chooser) |
 | `folder-tree` | Organize: move to a folder and add tags, from one list (library) |

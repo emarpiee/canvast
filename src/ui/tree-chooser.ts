@@ -1,7 +1,7 @@
 import { esc } from "./format";
 import { ICONS } from "./icons";
 import { makeModal, showModal } from "./modal";
-import { treeGuides, treeTwist, walkTree } from "./tree";
+import { treeGuides, treeSlot, walkTree } from "./tree";
 
 /** How much of the things chosen for has this choice. */
 export type ChoiceState = "on" | "off" | "some";
@@ -19,6 +19,8 @@ export interface ChoiceTab {
   title: string;
   /** A row's icon. */
   icon: string;
+  /** Its row's icon while what is under it shows. */
+  openIcon?: string;
   /** One choice only (a folder), else any number (tags). */
   one: boolean;
   noun: string;
@@ -78,10 +80,10 @@ export function openTreeChooser(opts: ChooserOptions): Promise<Map<string, Choic
     return names.join(" / ");
   };
   /** One choice: a tick or a dot, and its name. */
-  const choice = (t: ChoiceTab, n: ChoiceNode, label: string): string =>
+  const choice = (t: ChoiceTab, n: ChoiceNode, label: string, open = false): string =>
     n.group
       ? `<span class="choice-name is-group">${t.icon}<span>${esc(label)}</span></span>`
-      : `<label class="choice-name"><input type="${t.one ? "radio" : "checkbox"}" name="choice-${esc(t.id)}" data-id="${esc(n.id)}" data-some="${n.state === "some"}"${n.state === "on" ? " checked" : ""}>${t.icon}<span>${esc(label)}</span></label>`;
+      : `<label class="choice-name"><input type="${t.one ? "radio" : "checkbox"}" name="choice-${esc(t.id)}" data-id="${esc(n.id)}" data-some="${n.state === "some"}"${n.state === "on" ? " checked" : ""}>${open ? (t.openIcon ?? t.icon) : t.icon}<span>${esc(label)}</span></label>`;
   const count = (n: ChoiceNode): string => (n.n ? `<span class="layer-count">${n.n}</span>` : "");
 
   const draw = (): void => {
@@ -100,7 +102,7 @@ export function openTreeChooser(opts: ChooserOptions): Promise<Map<string, Choic
     const shut = closed.get(tab.id)!;
     const body =
       view === "tree"
-        ? `<ul class="choice-tree" role="tree">${walkTree(kids(null), (n) => kids(n.id), (n) => !!q || !shut.has(n.id), (n, at) => `<li class="tree-row choice-row" role="treeitem" style="--depth:${at.depth}">${treeGuides(at.depth, at.last, at.conts)}${at.hasKids ? treeTwist(at.open, `data-twist="${esc(n.id)}"`) : ""}${choice(tab, n, n.name)}${count(n)}</li>`)}</ul>`
+        ? `<ul class="choice-tree" role="tree">${walkTree(kids(null), (n) => kids(n.id), (n) => !!q || !shut.has(n.id), (n, at) => `<li class="tree-row choice-row" role="treeitem" style="--depth:${at.depth}">${treeGuides(at.depth, at.last, at.conts)}${treeSlot(at, `data-twist="${esc(n.id)}"`)}${choice(tab, n, n.name, at.open)}${count(n)}</li>`)}</ul>`
         : `<div class="choice-chips">${hits.filter((n) => !n.group).sort((a, b) => pathOf(all, a).localeCompare(pathOf(all, b))).map((n) => `<span class="choice-chip">${choice(tab, n, pathOf(all, n))}${count(n)}</span>`).join("")}</div>`;
     const words = search.value.trim();
     const could = words && tab.make && !all.some((n) => typed(n) === words.toLowerCase()) ? tab.make(words) : null;

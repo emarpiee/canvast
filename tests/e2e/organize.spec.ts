@@ -47,6 +47,14 @@ async function sideAct(p: Page, kind: "folder" | "tag", name: string, action: st
   await p.getByRole("menuitem", { name: action, exact: true }).click();
 }
 
+/** Move what is selected to a folder, with Organize. */
+async function fileInto(p: Page, name: string, testid = "asset-organize"): Promise<void> {
+  await p.getByTestId(testid).click();
+  await p.getByTestId("tree-chooser").getByRole("radio", { name, exact: true }).check();
+  await p.getByTestId("choice-ok").click();
+  await expect(p.getByTestId("tree-chooser")).toHaveCount(0);
+}
+
 async function newFolder(p: Page, name: string, parent?: string): Promise<void> {
   if (parent) await sideAct(p, "folder", parent, `New folder inside ${parent}`);
   else await p.getByTestId("folder-new").click();
@@ -467,15 +475,15 @@ test("folders nest, an asset is in one folder at a time, and deleting a folder n
   await newFolder(p, "Hands", "Refs");
   // One folder each: blocks go to Hands, green to Refs. Choosing another folder moves the asset, it does not add one.
   await pick(p, HASH);
-  await p.getByTestId("asset-folders").getByLabel("Refs › Hands").check();
-  await expect(p.getByTestId("asset-folders").getByRole("radio", { name: "Refs", exact: true })).not.toBeChecked();
+  await fileInto(p, "Hands");
+  await expect(p.getByTestId("asset-folder-now")).toHaveText("Refs › Hands");
   await pick(p, GREEN_HASH);
-  await p.getByTestId("asset-folders").getByRole("radio", { name: "Refs", exact: true }).check();
+  await fileInto(p, "Refs");
   await pick(p, HASH);
-  await expect(p.getByTestId("asset-folders").getByLabel("Refs › Hands")).toBeChecked();
-  await p.getByTestId("asset-folders").getByRole("radio", { name: "Refs", exact: true }).check();
-  await expect(p.getByTestId("asset-folders").getByLabel("Refs › Hands")).not.toBeChecked();
-  await p.getByTestId("asset-folders").getByLabel("Refs › Hands").check();
+  await expect(p.getByTestId("asset-folder-now")).toHaveText("Refs › Hands");
+  await fileInto(p, "Refs");
+  await expect(p.getByTestId("asset-folder-now")).toHaveText("Refs");
+  await fileInto(p, "Hands");
 
   await side(p, /^Refs/).click();
   await expect(cards(p)).toHaveCount(2); // a folder shows its subfolders too
@@ -518,7 +526,9 @@ test("folders nest, an asset is in one folder at a time, and deleting a folder n
   await expect(side(p, /^All items/)).toContainText("1");
   await side(p, /^All items/).click();
   await pick(p, GREEN_HASH);
-  await expect(p.getByTestId("asset-folders").getByLabel("Refs › Palms")).toHaveCount(0); // (not offered to file into)
+  await p.getByTestId("asset-organize").click();
+  await expect(p.getByTestId("tree-chooser").getByRole("radio", { name: "Palms" })).toHaveCount(0); // (not offered to file into)
+  await p.getByTestId("choice-cancel").click();
   await p.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, ""), HASH);
   await expect(side(p, /^Palms/)).toBeVisible();
   await expect(side(p, /^All items/)).toContainText("2");
@@ -541,8 +551,8 @@ test("tags, favourites, folders, notes and fields travel in archives and merge o
   await newFolder(p, "Hands", "Refs");
   await addTags(p, HASH, "Hands");
   await p.getByTestId("asset-favorite").click();
-  await p.getByTestId("asset-folders").getByLabel("Refs › Hands").check();
-  await expect(p.getByTestId("asset-folders").getByLabel("Refs › Hands")).toBeChecked();
+  await fileInto(p, "Hands");
+  await expect(p.getByTestId("asset-folder-now")).toHaveText("Refs › Hands");
   await p.getByTestId("asset-note").fill("From the life class");
   await p.getByTestId("asset-field-add").click();
   await p.keyboard.type("link");
@@ -596,7 +606,7 @@ test("tags, favourites, folders, notes and fields travel in archives and merge o
   await q.locator(`[data-testid="asset-card"][data-hash="${HASH}"]`).click();
   await expect(q.getByTestId("asset-favorite")).toHaveAttribute("aria-pressed", "true");
   await expect(q.getByTestId("asset-tags").locator(".tag-chip")).toHaveCount(1);
-  await expect(q.getByTestId("asset-folders").getByLabel("Refs › Hands")).toBeChecked();
+  await expect(q.getByTestId("asset-folder-now")).toHaveText("Refs › Hands");
   await expect(q.getByTestId("asset-note")).toHaveValue("From the life class");
   await expect(q.getByTestId("asset-fields").locator(".asset-field")).toHaveCount(1);
   expect(await q.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.thumb ?? null), HASH)).toBe(thumb);
@@ -673,7 +683,7 @@ test("the workspace menu exports the whole workspace as a backup or as plain fil
   await libraryWithTwo(p);
   await newFolder(p, "Refs");
   await pick(p, HASH);
-  await p.getByTestId("asset-folders").getByLabel("Refs").check();
+  await fileInto(p, "Refs");
   await p.getByTestId("view-canvas").click();
   const crumb = p.getByTestId("view-canvas");
   const zipPaths = async (choice: RegExp): Promise<string[]> => {
@@ -1147,20 +1157,20 @@ test("several picked: each tag with how many have it, removed from all or added 
   await p.getByTestId("bulk-tag-input").press("Enter");
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.catalogEntries().then((es) => es.filter((e) => (e.tags ?? []).length === 2).length))).toBe(4);
   // a new folder for these, all moved in
-  await p.getByTestId("bulk-new-folder").click();
-  await p.getByTestId("prompt-dialog").locator("input").fill("Mix");
-  await p.getByTestId("prompt-dialog").getByRole("button", { name: "Make and move" }).click();
-  await expect(p.getByTestId("bulk-folders").getByRole("radio", { name: /Mix/ })).toBeChecked();
-  // two of them out again: the four together are mixed (counts, no tick)
+  await p.getByTestId("bulk-organize").click();
+  await p.getByTestId("choice-search").fill("Mix");
+  await p.getByTestId("choice-make").click();
+  await p.getByTestId("choice-ok").click();
+  await expect(p.getByTestId("bulk-folder-now")).toHaveText("Mix");
+  // two of them out again: the four together are mixed
   await p.keyboard.press("Escape");
   await pick(p, hashes[0]!);
   await card(p, hashes[1]!).click({ modifiers: ["Shift"] });
-  await p.getByTestId("bulk-folders").getByRole("radio", { name: "No folder" }).check();
+  await fileInto(p, "No folder", "bulk-organize");
   await p.keyboard.press("Escape");
   await pick(p, hashes[0]!);
   await all();
-  await expect(p.getByTestId("bulk-folders").getByRole("radio", { name: /Mix/ })).not.toBeChecked();
-  await expect(p.getByTestId("bulk-folders")).toContainText("2 of 4");
+  await expect(p.getByTestId("bulk-folder-now")).toContainText("Mix: 2 of 4");
   expect(app.consoleErrors).toEqual([]);
 });
 

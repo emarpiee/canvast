@@ -98,13 +98,20 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await p.getByTestId("view-assets").click();
   await expect(tree.getByText("Art")).toBeVisible();
   await expect(tree.getByText("Ink")).toHaveCount(0);
+  // Every row's name starts in one line, whether it has an arrow or not, and the count ends at the row's edge.
+  await p.getByTestId("folder-new").click();
+  await name("Plain");
+  const leftOf = (t: string) => tree.getByRole("button", { name: new RegExp(`^${t}`) }).locator(".side-label").evaluate((e) => e.getBoundingClientRect().left);
+  expect(await leftOf("Art")).toBe(await leftOf("Plain"));
+  const rightGap = await tree.getByRole("button", { name: /^Plain/ }).locator(".side-n").evaluate((e) => e.closest(".side-row")!.getBoundingClientRect().right - e.getBoundingClientRect().right);
+  expect(rightGap).toBeLessThan(16);
 
   // Organize: nothing until Apply; a tag with a path is a branch of the tree
   await p.getByTestId("asset-card").first().click();
   await p.getByTestId("asset-organize").click();
   const dlg = p.getByTestId("tree-chooser");
   await expect(dlg).toBeVisible();
-  await expect(dlg.locator(".choice-row")).toHaveCount(3); // (No folder, Art, Ink)
+  await expect(dlg.locator(".choice-row")).toHaveCount(4); // (No folder, Art, Ink, Plain)
   await p.getByTestId("choice-search").fill("ink");
   await expect(dlg.locator(".choice-row")).toHaveCount(2); // (what matches and what leads to it)
   await dlg.getByRole("radio", { name: "Ink" }).check();
@@ -126,6 +133,6 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await p.getByTestId("choice-ok").click();
   await expect(dlg).toHaveCount(0);
   await expect(p.getByTestId("asset-tags")).toContainText("style/ink");
-  await expect(p.getByTestId("asset-folders").getByRole("radio", { name: /Ink/ })).toBeChecked();
+  await expect(p.getByTestId("asset-folder-now")).toHaveText("Art › Ink");
   expect(app.consoleErrors).toEqual([]);
 });

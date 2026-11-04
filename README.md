@@ -496,7 +496,7 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 - **Tags and folders of several items at once**
   - The details panel lists every tag any of them has, with how many have it (*2/4*). **×** takes a tag off all of them; **+** puts it on the rest.
   - The tag field suggests the library's tags and takes several at once, separated by commas.
-  - Each folder shows how many of them it holds (a mixed selection has none ticked); *New folder for these…* makes one and moves them into it.
+  - The details panel says which folder they are in (for a mixed selection, each with how many). **Organize…** moves them to a folder, makes a new one, and sets tags.
   - Changes to hundreds of items are one write, so they take a moment, not minutes.
 - **Properties** (the details panel of one item): every kind of file has them. A markdown note's are its YAML (see *Properties* under Notes), a rich text note's its `<meta>` tags; every other file's stay in the library, and the file itself never changes.
   - **Description:** a plain-text box (not Markdown).

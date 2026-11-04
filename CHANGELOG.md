@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.53.52 — The folder tree lines up (2026-11-04)
+
+- **Removed:** the folder list and *New folder…* from the details panel. It says which folder the items are in, and **Organize…** moves them and makes a new folder.
+- **Changed:** every row of a tree keeps room for the arrow, so icons and names line up with or without one. A count ends at the row's edge, and the row's ⋯ takes its place under the pointer.
+- **Changed:** a folder showing its subfolders has an open folder icon.
+- **Fixed:** the Collapse all button on a sidebar header is beside the other buttons, not in the middle.
+
 ## 0.53.51 — Art files past 256 MiB show their picture; tags as a tree (2026-11-04)
 
 - **Added:** an art file past 256 MiB that lies in the desktop app's `library/` shows the picture it keeps, on its card, in the viewer and on a canvas. It is read a part at a time, never whole.

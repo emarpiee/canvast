@@ -28,6 +28,9 @@ export function treeTwist(open: boolean, attrs: string): string {
   return `<button type="button" class="tree-twist" ${attrs} aria-label="${open ? "Collapse" : "Expand"}" aria-expanded="${open}">${open ? ICONS.chevronDown : ICONS.chevronRight}</button>`;
 }
 
+/** The arrow's place at the start of a row: the arrow when it has children, else the same room, empty, so that all rows line up. */
+export const treeSlot = (at: { hasKids: boolean; open: boolean }, attrs: string): string => (at.hasKids ? treeTwist(at.open, attrs) : `<span class="tree-twist is-empty" aria-hidden="true"></span>`);
+
 /** Every row of these roots and of what is open under them, in order. */
 export function walkTree<T>(roots: readonly T[], kids: (t: T) => readonly T[], isOpen: (t: T) => boolean, row: (t: T, at: TreeSpot) => string): string {
   const walk = (list: readonly T[], depth: number, conts: readonly boolean[]): string =>

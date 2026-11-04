@@ -43,7 +43,7 @@ import type { MenuItem } from "./more-menu";
 import { bindContextMenu, grouped as groupedMenu } from "./context-menu";
 import { openTreeChooser } from "./tree-chooser";
 import type { ChoiceNode, ChoiceState, ChooserView } from "./tree-chooser";
-import { pathNodes, treeGuides, treeTwist, walkTree } from "./tree";
+import { pathNodes, treeGuides, treeSlot, walkTree } from "./tree";
 import { formatTags } from "../doc/tags";
 import { cleanFileName, splitName } from "../doc/rename-rules";
 import { copyItemsAsFiles, copyItemsToClipboard, type CopyDeps } from "../app/copy-items";
@@ -2346,8 +2346,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           : item(`folder:${f.id}`, esc(f.name), subtreeCount(f.id), {
               depth: at.depth,
               cls: "tree-row",
-              before: treeGuides(at.depth, at.last, at.conts) + (at.hasKids ? treeTwist(at.open, `data-folder-twist="${esc(f.id)}"`) : ""),
-              icon: ICONS.folder,
+              before: treeGuides(at.depth, at.last, at.conts) + treeSlot(at, `data-folder-twist="${esc(f.id)}"`),
+              icon: at.open ? ICONS.folderOpen : ICONS.folder,
               extra: more("folder", f.id, f.name, [
                 { attr: "data-folder-action", value: "new", label: "New subfolder", hint: "A folder inside this one", icon: ICONS.folderPlus, aria: `New folder inside ${f.name}` },
                 { attr: "data-folder-action", value: "rename", label: "Rename", hint: "Give it a new name", icon: ICONS.textCursorInput, aria: `Rename folder ${f.name}` },
@@ -2403,7 +2403,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           depth: at.depth,
           cls: "tree-row",
           title: `#${esc(sideTagLabels.get(t.id)!)}`,
-          before: treeGuides(at.depth, at.last, at.conts) + (at.hasKids ? treeTwist(at.open, `data-tag-twist="${esc(t.id)}"`) : ""),
+          before: treeGuides(at.depth, at.last, at.conts) + treeSlot(at, `data-tag-twist="${esc(t.id)}"`),
           extra: tagMore(t.id, t.value !== null, at.hasKids),
         }),
       );
@@ -2690,8 +2690,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   /**
    * The tags and the folder of one asset or of several picked ones, the same for both: each tag on any of them, with (for several) how
-   * many have it, × to take it off all of them and + to put it on the rest; a field that suggests the library's tags; each folder with how
-   * many are in it (a mixed pick has none ticked) and New folder…, which makes one and moves them into it.
+   * many have it, × to take it off all of them and + to put it on the rest; a field that suggests the library's tags; where they are, and
+   * Organize, which moves them to a folder and makes one.
    */
   const tagsAndFolderHtml = (ents: ReadonlyArray<CatalogListing["entries"][number]>, bulk: boolean): string => {
     const n = ents.length;
@@ -2710,9 +2710,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     });
     const known = (pagesNow() ? [...countSide(listing!).tags.values()].map((t) => t.label) : [...new Set(listing!.entries.flatMap((e) => meta(e).tags))]).filter((t) => !on.has(t.toLowerCase())).sort((a, b) => a.localeCompare(b));
     const folders = listing!.folders;
-    const sorted = [...folders].sort((a, b) => folderPath(folders, a.id).join("/").localeCompare(folderPath(folders, b.id).join("/")));
-    const radio = (id: string, label: string, k: number): string =>
-      `<li><label><input type="radio" name="${bulk ? "bulk-folder" : "asset-folder"}" ${bulk ? "data-bulk-folder" : "data-folder"}="${id}"${k === n ? " checked" : ""}${dis}>${label}${bulk && k > 0 && k < n ? `<span class="folder-count">${k} of ${n}</span>` : ""}</label></li>`;
+    // (where they are: the one folder, or each with how many, the fullest first)
+    const inFolder = new Map<string, number>();
+    for (const e of ents) inFolder.set(meta(e).folderIds[0] ?? "", (inFolder.get(meta(e).folderIds[0] ?? "") ?? 0) + 1);
+    const whereName = (id: string): string => (id ? folderPath(folders, id).join(" › ") : "No folder");
+    const where = inFolder.size === 1 ? whereName([...inFolder.keys()][0]!) : [...inFolder].sort((a, b) => b[1] - a[1]).map(([id, k]) => `${whereName(id)}: ${k} of ${n}`).join(", ");
     return `
       <section class="asset-sec">
         <h3>${bulk ? "Tags of these" : "Tags"}</h3>
@@ -2722,9 +2724,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <datalist id="tag-suggest">${known.map((t) => `<option value="${esc(t)}"></option>`).join("")}</datalist>
         </div>
         <h3 class="asset-sub">${bulk ? "Folder of these" : "Folder"}</h3>
-        ${sorted.length ? `<ul class="asset-folders" data-testid="${bulk ? "bulk-folders" : "asset-folders"}">${[radio("", "No folder", ents.filter((e) => meta(e).folderIds.length === 0).length), ...sorted.map((f: AssetFolder) => radio(f.id, esc(folderPath(folders, f.id).join(" › ")), ents.filter((e) => meta(e).folderIds[0] === f.id).length))].join("")}</ul>` : ""}
+        <p class="asset-where" data-testid="${bulk ? "bulk-folder-now" : "asset-folder-now"}">${esc(where)}</p>
         <button type="button" class="assets-btn" data-action="organize" data-testid="${bulk ? "bulk-organize" : "asset-organize"}" title="Move to a folder and add tags, from one list"${dis}>${ICONS.folderTree}<span>Organize…</span></button>
-        <button type="button" class="assets-btn" data-action="new-folder-into" data-testid="${bulk ? "bulk-new-folder" : "asset-new-folder"}" title="${bulk ? "Make a folder and move the selected items into it" : "Make a folder and move it into it"}"${dis}>${ICONS.folderPlus}<span>New folder${bulk ? ` for these ${n}` : ""}…</span></button>
       </section>`;
   };
 
@@ -2761,6 +2762,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           id: "folder",
           title: "Folder",
           icon: ICONS.folder,
+          openIcon: ICONS.folderOpen,
           one: true,
           noun: "folders",
           nodes: [{ id: "", name: "No folder", parent: null, state: stateOf(ents.filter((e) => !meta(e).folderIds.length).length) }, ...folders.map(folderNode)],
@@ -3331,28 +3333,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "organize":
         void organizeItems(pickedGroup());
         break;
-      case "new-folder-into": {
-        const group = pickedGroup();
-        void promptDialog({ title: group.length > 1 ? `New folder for ${group.length} items` : "New folder", lines: ["They are moved into it."], value: "", confirmLabel: "Make and move" }).then((name) => {
-          if (!name?.trim()) return;
-          const fileIn = (named: string): void => {
-            const id = newObjectId();
-            void session.organize(async (c) => {
-              await c.createFolder(named, null, id);
-              if (hiddenMode) await c.hideFolder(id); // (a folder made in hidden mode is hidden)
-              await c.updateMetaEach(group.map((h) => ({ hash: h, change: { addFolders: [id] } })));
-            });
-          };
-          const folders = listing?.folders ?? [];
-          const same = hiddenMode ? undefined : folderClash(folders, null, name);
-          if (!same) return fileIn(name.trim());
-          void askFolderClash(same.name, name, "Move").then((way) => {
-            if (way === "merge") void session.organize((c) => c.updateMetaEach(group.map((h) => ({ hash: h, change: { addFolders: [same.id] } }))), "Moved to a folder");
-            else if (way === "separate") fileIn(freeFolderName(folders, null, name));
-          });
-        });
-        break;
-      }
       case "download":
         void downloadOriginal(assets, hash);
         break;
@@ -3559,17 +3539,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (hash) saveNotes(hash);
       return;
     }
-    const bulk = box.dataset["bulkFolder"];
-    const into = (id: string) => (id ? { addFolders: [id] } : { clearFolder: true });
-    if (bulk !== undefined) {
-      const group = [...picked];
-      void session.organize((c) => c.updateMetaEach(group.map((hash) => ({ hash, change: into(bulk) }))), "Moved to a folder");
-      return;
-    }
-    const id = box.dataset["folder"];
-    if (id === undefined || !selected) return;
-    const hash = selected;
-    void session.organize((c) => c.updateMeta(hash, into(id)), "Moved to a folder");
   });
 
   // A thumbnail shows once it has loaded (its place shimmers until then), and one that cannot be shown leaves its place plain: never the browser's broken-picture mark.
