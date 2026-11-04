@@ -2492,7 +2492,7 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 .font-sample-line { font-size: var(--text-xl); line-height: 1.25; }
 .font-sample-chars { font-size: var(--text-md); line-height: 1.35; color: var(--file-muted); }
 .asset-preview .font-sample-chars { display: none; }
-.font-sample.is-large { justify-content: flex-start; gap: var(--s-8); max-width: 100%; padding: var(--under-viewer-buttons) var(--s-14) var(--s-14); overflow: auto; }
+.font-sample.is-large { justify-content: flex-start; gap: var(--s-10); max-width: 100%; padding: var(--under-viewer-buttons) var(--s-14) var(--s-14); overflow: auto; }
 .viewer-tile { position: relative; z-index: var(--z-item); }
 .font-sample.is-large .font-sample-aa { font-size: var(--sample-aa-lg); }
 .font-sample.is-large .is-xl { font-size: var(--sample-xl); line-height: 1.1; }
@@ -2500,7 +2500,8 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 .font-sample.is-large .is-md { font-size: var(--sample-md); line-height: 1.2; }
 .font-sample.is-large .is-sm { font-size: var(--sample-sm); line-height: 1.3; }
 .font-sample.is-large .font-sample-chars { font-size: var(--sample-md); }
-.font-sample-try { flex: none; box-sizing: border-box; width: 100%; padding: var(--s-6); font: inherit; font-size: var(--sample-lg); line-height: 1.2; color: var(--file-fg); background: transparent; border: 1px dashed var(--file-muted); border-radius: var(--r-md); resize: vertical; user-select: text; }
+.font-sample-try { flex: none; box-sizing: border-box; width: 100%; margin-top: var(--s-12); padding: var(--s-10) var(--s-12); font: inherit; font-size: var(--sample-lg); line-height: 1.4; color: var(--file-fg); background: transparent; border: 1px dashed var(--file-muted); border-radius: var(--r-md); resize: vertical; user-select: text; }
+.font-sample-try:focus-visible { border-color: transparent; }
 .font-sample-try::placeholder { color: var(--file-muted); opacity: 1; }
 .viewer-tile .file-tile { width: min(400px, 100%); height: auto; max-height: 100%; aspect-ratio: 4 / 3; border-radius: var(--r-lg); }
 .viewer-tile .file-tile svg { width: var(--sp-15); height: var(--sp-15); }
