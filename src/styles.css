@@ -2028,6 +2028,8 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .assets-body.is-list .assets-list-head [data-col] { position: relative; cursor: grab; user-select: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A column's resize handle: its header's right edge (the gap to the next column). */
 .assets-body.is-list .assets-list-head .col-resize { position: absolute; top: 0; bottom: 0; right: 0; width: var(--sp-4); cursor: col-resize; touch-action: none; }
+.assets-body.is-list .assets-list-head .col-resize::after { content: ""; position: absolute; top: 50%; right: 0; width: var(--sp-1); height: var(--icon-sm); transform: translateY(-50%); border-radius: var(--r-pill); background: var(--hud-edge); } /* (always there: a place to grab has to be seen) */
+.assets-body.is-list .assets-list-head .col-resize:hover::after { background: var(--hud-accent); }
 .assets-body.is-list .assets-list-head .col-resize:hover { background: color-mix(in oklch, var(--hud-accent) 40%, transparent); }
 .assets-body.is-list .assets-list-head [data-col].is-dragging { opacity: 0.4; }
 .assets-body.is-list .assets-list-head [data-col].is-drop { box-shadow: inset 2px 0 0 var(--hud-accent); }
