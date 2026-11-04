@@ -65,7 +65,7 @@ await p.keyboard.press("Escape");
 
 // Art files: made-up ones, each a ZIP with a picture in it, as paint programs keep them
 const art = join(work, "art");
-const made = [["character_study.kra", "hero"], ["character_study.kra~", "hero"], ["contour_study.ora", "pattern"], ["planet_poster.kra", "shapes"], ["colour_grade.ora", "adjust"]];
+const made = [["character_study.kra", "hero"], ["character_study.kra~", "text"], ["contour_study.ora", "pattern"], ["planet_poster.kra", "shapes"], ["colour_grade.ora", "adjust"]];
 const files = made.map(([name, from], i) => {
   const dir = join(art, String(i));
   mkdirSync(join(dir, "Thumbnails"), { recursive: true });
@@ -78,9 +78,8 @@ const files = made.map(([name, from], i) => {
   return zip;
 });
 await p.getByTestId("assets-import-input").setInputFiles(files);
-await p.getByTestId("asset-card").nth(12).waitFor();
 await p.getByTestId("assets-search").fill("kind:art");
-await p.locator('[data-testid="asset-card"]').nth(3).waitFor();
+await p.locator('[data-testid="asset-card"][title="planet_poster.kra"]').waitFor({ timeout: 60_000 });
 await p.locator('[data-testid="asset-card"][title="character_study.kra~"]').click();
 await p.mouse.move(700, 880);
 await p.waitForTimeout(1500);

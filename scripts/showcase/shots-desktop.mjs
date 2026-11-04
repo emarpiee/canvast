@@ -49,10 +49,10 @@ await p.keyboard.press("Escape");
 await p.keyboard.press("Escape");
 
 // The Trash: two of the pictures, as deleted files are kept in the workspace folder
-mkdirSync(join(ws, ".trash"), { recursive: true });
-for (const n of ["hero", "journey"]) copyFileSync(resolve(`docs/screenshots/${n}.webp`), join(ws, ".trash", `${n}.webp`));
+mkdirSync(join(ws, ".trash", "library", "images"), { recursive: true });
+for (const n of ["hero", "journey", "shapes", "pattern"]) copyFileSync(resolve(`docs/screenshots/${n}.webp`), join(ws, ".trash", "library", "images", `${n}.webp`));
 await p.getByTestId("view-assets").click();
-await p.getByTestId("assets-side").getByRole("button", { name: /^Trash/ }).click();
+await p.locator('[data-scope="trash"]').click();
 await p.getByTestId("trash-card").first().click();
 await p.mouse.move(700, 880);
 await settle(800);
