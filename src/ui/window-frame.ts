@@ -3,7 +3,7 @@ import type { SettingsStore } from "../settings/settings";
 import { ICONS } from "./icons";
 
 /** How long the row stays after the pointer has gone, and at the start, so that it is seen once. */
-const HIDE_AFTER_MS = 500;
+const HIDE_AFTER_MS = 150;
 const SHOW_AT_START_MS = 3000;
 
 /**
@@ -37,23 +37,33 @@ export async function mountWindowFrame(settings: SettingsStore): Promise<void> {
     if (act === "minimize" || act === "maximize" || act === "close") bridge.windowAct(act);
   });
   let timer = 0;
+  let heldUntil = 0;
   const show = (): void => {
     clearTimeout(timer);
+    timer = 0;
     row.classList.add("is-shown");
   };
+  /** (a timer already running is left alone: a pointer still moving does not put the row's going off) */
   const hideSoon = (ms = HIDE_AFTER_MS): void => {
-    clearTimeout(timer);
-    timer = window.setTimeout(() => row.classList.remove("is-shown"), ms);
+    if (timer) return;
+    timer = window.setTimeout(() => {
+      timer = 0;
+      row.classList.remove("is-shown");
+    }, ms);
   };
   edge.addEventListener("pointerenter", show);
   // (a finger has no way of leaving: the row goes by itself)
-  edge.addEventListener("pointerdown", (e) => void (e.pointerType !== "mouse" && (show(), hideSoon(SHOW_AT_START_MS))));
+  edge.addEventListener("pointerdown", (e) => void (e.pointerType !== "mouse" && (show(), (heldUntil = Date.now() + SHOW_AT_START_MS), hideSoon(SHOW_AT_START_MS))));
   document.addEventListener("pointermove", (e) => {
     if (!row.classList.contains("is-shown")) return;
-    if (e.clientY <= row.getBoundingClientRect().bottom) show();
-    else if (!row.matches(":focus-within")) hideSoon();
+    if (e.clientY <= row.getBoundingClientRect().bottom) {
+      if (Date.now() >= heldUntil) show();
+    } else if (!row.matches(":focus-within") && Date.now() >= heldUntil) hideSoon();
   }, { passive: true });
+  // (the pointer gone out of the window, past the row)
+  document.documentElement.addEventListener("mouseleave", () => void (Date.now() >= heldUntil && hideSoon()));
   document.body.append(edge, row);
   show();
+  heldUntil = Date.now() + SHOW_AT_START_MS;
   hideSoon(SHOW_AT_START_MS);
 }
