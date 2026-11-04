@@ -149,7 +149,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `image-plus` | Fill in the missing bookmark pictures; New palette from the picked picture |
 | `images` | Assets view; All assets1 |
 | `infinity` | Canvas view |
-| `info` | Information shown (one icon for every level; a number 0 to 3 in the corner says how much) |
+| `info` | Information shown (one icon for every level; a number 0 to 3 in the corner says how much); a file's details in the library |
 | `lasso` | Lasso |
 | `layers` | Layers panel |
 | `layout-grid` | Thumbnails |

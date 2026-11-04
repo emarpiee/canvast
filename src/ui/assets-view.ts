@@ -2727,9 +2727,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
              </div>`
           : ""
       }
-      <div class="asset-facts">
-        ${e ? `<span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>${!isCard(e) ? `<span>${e.pixelW} × ${e.pixelH} px</span>` : ""}<span>${fmtBytes(e.size)}</span>` : ""}
-      </div>
+      <details class="asset-facts asset-more" data-testid="asset-metadata" data-metadata${detailsOpen ? " open" : ""}>
+        <summary title="The file's details">${ICONS.info}${e ? `<span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>${!isCard(e) ? `<span>${e.pixelW} × ${e.pixelH} px</span>` : ""}<span>${fmtBytes(e.size)}</span>` : "<span>Details</span>"}</summary>
+        <div data-metadata-body></div>
+        <h4>File</h4>
+        <dl>
+          ${e ? `<dt>Type</dt><dd>${esc(e.type || "Unknown")}</dd><dt>Size</dt><dd>${fmtBytes(e.size)}</dd>` : ""}
+          ${e && !isCard(e) ? `<dt>Pixels</dt><dd>${e.pixelW} × ${e.pixelH}</dd>` : ""}
+          ${e ? `<dt>Imported</dt><dd>${new Date(e.importedAt).toLocaleString()}</dd>` : ""}
+          <dt data-file-place hidden>In</dt><dd data-file-place hidden></dd>
+          <dt>Hash</dt><dd class="asset-hash">${selected}</dd>
+        </dl>
+      </details>
       ${e && !e.present ? `<p class="asset-warn">The file is missing from storage. Import the same file again to restore it everywhere.</p>` : ""}
       ${m ? `<p class="asset-warn" data-testid="asset-missing-help">Instances use a file that is not stored. Import the same file again to restore all ${instances} of them.</p>` : ""}
       ${ui.detailSections.map((id) => `<div class="asset-dsec" data-dsec="${id}">${detail[id as (typeof DETAIL_SECTIONS)[number]]()}</div>`).join("")}
@@ -2744,18 +2753,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         }
         ${e?.present ? `<button type="button" class="assets-btn" data-action="export" data-testid="asset-export" title="Save it as a .canvast archive, with its tags, notes and folder, to import into canvast">${ICONS.fileOutput}<span>Export</span></button>` : ""}
         ${e ? `<button type="button" class="assets-btn is-danger" data-action="${instances > 0 ? "delete-everywhere" : "delete"}" data-testid="asset-delete" title="${instances > 0 ? "Delete it from the library and from every canvas it is on" : "Delete it from the library"}"${ro}>${ICONS.trash2}<span>Delete…</span></button>` : ""}
-      </div>
-      <details class="asset-more" data-testid="asset-metadata" data-metadata${detailsOpen ? " open" : ""}><summary>Details</summary>
-        <div data-metadata-body></div>
-        <h4>File</h4>
-        <dl>
-          ${e ? `<dt>Type</dt><dd>${esc(e.type || "Unknown")}</dd><dt>Size</dt><dd>${fmtBytes(e.size)}</dd>` : ""}
-          ${e && !isCard(e) ? `<dt>Pixels</dt><dd>${e.pixelW} × ${e.pixelH}</dd>` : ""}
-          ${e ? `<dt>Imported</dt><dd>${new Date(e.importedAt).toLocaleString()}</dd>` : ""}
-          <dt data-file-place hidden>In</dt><dd data-file-place hidden></dd>
-          <dt>Hash</dt><dd class="asset-hash">${selected}</dd>
-        </dl>
-      </details>`;
+      </div>`;
     for (const h of inspector.querySelectorAll<HTMLElement>("[data-dsec] h3")) {
       h.draggable = true;
       h.tabIndex = 0;

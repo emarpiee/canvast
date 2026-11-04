@@ -635,7 +635,7 @@ Click to select, `Ctrl`+click to add, `Shift`+click for a range. The details pan
   - `Ctrl+A` selects all shown; a plain click then selects one alone. `Ctrl`+click adds or removes, `Shift`+click takes a range. A selected item shows a coloured border (no checkboxes).
   - **Select several** (a card's menu: right click, or a long touch on a phone or tablet): from then on each tap or click adds an item or takes it away, until nothing is selected or `Esc`. The way to pick several without a keyboard.
   - Selected items hidden by a search or filter are counted in the panel, with a button to keep only the shown ones.
-  - The *Details* fold (the file's own metadata) stays open or closed as you left it.
+  - The file's line in the details panel (its kind, pixels and size, led by the info icon) opens its metadata below, in the same card, and stays open or closed as you left it.
 - **Tags and folders of several items at once**
   - The details panel lists every tag any of them has, with how many have it (*2/4*). **×** takes a tag off all of them; **+** puts it on the rest.
   - The tag field suggests the library's tags and takes several at once, separated by commas.
