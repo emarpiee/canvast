@@ -1362,10 +1362,10 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer-pos { min-width: calc(var(--ctl) * 2.4); padding: 0 var(--sp-4); font-variant-numeric: tabular-nums; color: var(--media-muted); }
 .vbtn.viewer-back, .vbtn.viewer-details, .vbtn.viewer-hide { color: var(--media-fg); position: absolute; top: var(--sp-6); z-index: var(--z-item-bar); background: var(--media-pill); border: 1px solid var(--white-a14); border-radius: var(--r-pill); }
 .vbtn.viewer-back { left: var(--sp-6); }
-.vbtn.viewer-details { right: var(--sp-6); }
+.vbtn.viewer-details { right: calc(var(--sp-6) + var(--win-w, 0px)); }
 /* Hide or show the controls (F): beside the details button, and like it, faded out with the controls hidden until the pointer is near the top */
 .vbtn.viewer-back, .vbtn.viewer-details, .vbtn.viewer-hide { width: var(--ctl); padding: 0; }
-.vbtn.viewer-hide { right: calc(var(--sp-6) + var(--ctl) + var(--sp-4)); }
+.vbtn.viewer-hide { right: calc(var(--sp-6) + var(--win-w, 0px) + var(--ctl) + var(--sp-4)); }
 /* with the controls hidden the two at the top fade out, and come back when the pointer is near the top edge (the handle brings the controls back) */
 .viewer .viewer-ground { display: none; }
 .viewer.has-alpha .viewer-ground { display: inline-flex; }
