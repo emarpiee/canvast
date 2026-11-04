@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.59 — Pin folders to the top (2026-11-04)
+
+- **Added:** **Pin to top** in a folder's menu in the library sidebar puts it first in the Folders list, a subfolder too; remembered on this device.
+
 ## 0.53.58 — Sort folders and tags in the sidebar (2026-11-04)
 
 - **Added:** a sort button on the library sidebar's Folders (A to Z, Z to A, newest, oldest), Tags and Canvas tags (A to Z, Z to A) headers, remembered on this device.

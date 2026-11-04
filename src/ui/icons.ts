@@ -158,6 +158,8 @@ import fileInputIcon from "lucide-static/icons/file-input.svg";
 import fileOutputIcon from "lucide-static/icons/file-output.svg";
 import fileArchiveIcon from "lucide-static/icons/file-archive.svg";
 import pinIcon from "lucide-static/icons/pin.svg";
+import pinOffIcon from "lucide-static/icons/pin-off.svg";
+import folderUpIcon from "lucide-static/icons/folder-up.svg";
 import fileImageIcon from "lucide-static/icons/file-image.svg";
 import hardDriveDownloadIcon from "lucide-static/icons/hard-drive-download.svg";
 import presentationIcon from "lucide-static/icons/presentation.svg";
@@ -420,6 +422,8 @@ export const ICONS = {
   fileOutput: clean(fileOutputIcon),
   fileArchive: clean(fileArchiveIcon),
   pin: clean(pinIcon),
+  pinOff: clean(pinOffIcon),
+  folderUp: clean(folderUpIcon),
   fileImage: clean(fileImageIcon),
   hardDriveDownload: clean(hardDriveDownloadIcon),
   presentation: clean(presentationIcon),

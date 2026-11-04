@@ -432,7 +432,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; tagsInline: boolean; sideSort: Record<keyof typeof SIDE_SORTS, SideSort>; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", tagsInline: false, sideSort: { folders: "az", tag: "az", ctag: "az" }, expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; tagsInline: boolean; sideSort: Record<keyof typeof SIDE_SORTS, SideSort>; pinned: string[]; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", tagsInline: false, sideSort: { folders: "az", tag: "az", ctag: "az" }, pinned: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -459,6 +459,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (Array.isArray(saved.folded)) ui.folded = saved.folded.filter((c) => typeof c === "string").slice(0, 20000);
     if (saved.chooser === "inline") ui.chooser = "inline";
     if (saved.tagsInline === true) ui.tagsInline = true;
+    if (Array.isArray(saved.pinned)) ui.pinned = saved.pinned.filter((c) => typeof c === "string").slice(0, 2000);
     for (const id of Object.keys(SIDE_SORTS) as Array<keyof typeof SIDE_SORTS>) {
       const way = saved.sideSort?.[id];
       if (way && (SIDE_SORTS[id] as readonly SideSort[]).includes(way)) ui.sideSort[id] = way;
@@ -2382,8 +2383,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return way === "az" ? list : list.sort((a, b) => (way === "za" ? b.name.localeCompare(a.name) : way === "new" ? ageOf(b) - ageOf(a) : ageOf(a) - ageOf(b)) || a.name.localeCompare(b.name));
     };
     const findingFolders = sideFind.folders.trim() !== "";
+    // Pinned folders lead the list, a subfolder too (a search shows every folder in its place, with what leads to it).
+    const pinnedNow = new Set(findingFolders ? [] : ui.pinned);
     const foldersKept = findingFolders ? treeSearch(listing.folders, (f) => f.parentId, (f) => folderPath(listing!.folders, f.id).join("/"), sideFind.folders).keep : null;
-    const folderKids = (id: string): AssetFolder[] => folderSorted(listing!.folders.filter((f) => f.parentId === id && (!foldersKept || foldersKept.has(f.id))));
+    const folderKids = (id: string): AssetFolder[] => folderSorted(listing!.folders.filter((f) => f.parentId === id && !pinnedNow.has(f.id) && (!foldersKept || foldersKept.has(f.id))));
     /** A folder's row, then its subfolders' rows, in the app's one tree. */
     const treeOf = (root: AssetFolder): string =>
       walkTree([root], (f) => folderKids(f.id), (f) => findingFolders || !ui.folded.includes(f.id), (f, at) =>
@@ -2391,12 +2394,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           ? nameInput(f.name, `New name for folder ${f.name}`)
           : item(`folder:${f.id}`, esc(f.name), subtreeCount(f.id), {
               depth: at.depth,
-              cls: "tree-row",
+              cls: `tree-row${pinnedNow.has(f.id) ? " is-pinned" : ""}`,
               before: treeGuides(at.depth, at.last, at.conts) + treeSlot(at, `data-folder-twist="${esc(f.id)}"`),
-              icon: at.open ? ICONS.folderOpen : ICONS.folder,
+              icon: pinnedNow.has(f.id) ? ICONS.folderUp : at.open ? ICONS.folderOpen : ICONS.folder,
+              ...(pinnedNow.has(f.id) ? { title: `${esc(folderPath(listing!.folders, f.id).join(" › "))} (pinned)` } : {}),
               extra: more("folder", f.id, f.name, [
                 { attr: "data-folder-action", value: "new", label: "New subfolder", hint: "A folder inside this one", icon: ICONS.folderPlus, aria: `New folder inside ${f.name}` },
                 { attr: "data-folder-action", value: "rename", label: "Rename", hint: "Give it a new name", icon: ICONS.textCursorInput, aria: `Rename folder ${f.name}` },
+                ui.pinned.includes(f.id)
+                  ? { attr: "data-folder-action", value: "pin", label: "Unpin", hint: "Back in its place in the list", icon: ICONS.pinOff, aria: `Unpin folder ${f.name}` }
+                  : { attr: "data-folder-action", value: "pin", label: "Pin to top", hint: "First in the list, on this device", icon: ICONS.folderUp, aria: `Pin folder ${f.name}` },
                 hiddenMode
                   ? { attr: "data-folder-action", value: "show", label: "Unhide folder", hint: "And everything in it", icon: ICONS.eye, aria: `Unhide folder ${f.name} and everything in it` }
                   : { attr: "data-folder-action", value: "hide", label: "Hide folder", hint: "And everything in it", icon: ICONS.eyeClosed, aria: `Hide folder ${f.name} and everything in it` },
@@ -2513,7 +2520,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           (listing.folders.length > 1 ? sortBtn("folders") : "") + foldAll + addBtn('data-folder-action="new" data-id="" data-testid="folder-new"', "New folder"),
           `${listing.folders.length ? findBox("folders", "folders") : ""}<ul class="side-list" data-testid="folder-tree">
             ${naming?.kind === "new" && naming.parent === null ? nameInput("", "Name of the new folder") : ""}
-            ${capped("folders", folderSorted(listing.folders.filter((f) => f.parentId === null && (!foldersKept || foldersKept.has(f.id)))).map((f) => ({ html: treeOf(f), active: [scope.startsWith("folder:") ? scope.slice(7) : "", naming?.kind === "rename" ? naming.id : "", naming?.kind === "new" ? (naming.parent ?? "") : ""].some((id) => id && folderSubtree(listing!.folders, f.id).has(id)) })), findingFolders) || (naming ? "" : `<li class="side-empty">${findingFolders ? "No folders match." : "No folders yet."}</li>`)}
+            ${capped("folders", [...folderSorted(listing.folders.filter((f) => pinnedNow.has(f.id))), ...folderSorted(listing.folders.filter((f) => f.parentId === null && !pinnedNow.has(f.id) && (!foldersKept || foldersKept.has(f.id))))].map((f) => ({ html: treeOf(f), active: pinnedNow.has(f.id) || [scope.startsWith("folder:") ? scope.slice(7) : "", naming?.kind === "rename" ? naming.id : "", naming?.kind === "new" ? (naming.parent ?? "") : ""].some((id) => id && folderSubtree(listing!.folders, f.id).has(id)) })), findingFolders) || (naming ? "" : `<li class="side-empty">${findingFolders ? "No folders match." : "No folders yet."}</li>`)}
           </ul>`,
         )}
         ${section(
@@ -4080,6 +4087,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const id = b.dataset["id"] ?? "";
     const f = listing?.folders.find((x) => x.id === id);
     switch (b.dataset["folderAction"]) {
+      case "pin":
+        ui.pinned = ui.pinned.includes(id) ? ui.pinned.filter((x) => x !== id) : [...ui.pinned, id];
+        saveUi();
+        renderSide();
+        break;
       case "new":
         naming = { kind: "new", parent: id || null };
         ui.folded = ui.folded.filter((x) => x !== id); // (where the new one will show)

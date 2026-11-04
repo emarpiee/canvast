@@ -189,5 +189,27 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await p.getByTestId("view-assets").click();
   await expect(folderOrder).toHaveText(["Bee", "Plain", "Art"]);
+  // Pins: first in the list, a subfolder too, sorted among themselves; a search shows the tree as it is; Unpin puts it back.
+  const pinFolder = async (word: string, folder: string): Promise<void> => {
+    await p.getByRole("button", { name: `More actions for folder ${folder}`, exact: true }).click();
+    await p.getByRole("menuitem", { name: `${word} folder ${folder}`, exact: true }).click();
+  };
+  await pinFolder("Pin", "Art");
+  await expect(folderOrder).toHaveText(["Art", "Bee", "Plain"]);
+  await tree.getByRole("button", { name: "Expand", exact: true }).click();
+  await expect(folderOrder).toHaveText(["Art", "Ink", "Bee", "Plain"]);
+  await pinFolder("Pin", "Ink");
+  await expect(folderOrder).toHaveText(["Ink", "Art", "Bee", "Plain"]);
+  await findFolder.fill("ink");
+  await expect(folderOrder).toHaveText(["Art", "Ink"]);
+  await findFolder.fill("");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await expect(folderOrder).toHaveText(["Ink", "Art", "Bee", "Plain"]);
+  await expect(tree.locator(".is-pinned")).toHaveCount(2);
+  await pinFolder("Unpin", "Ink");
+  await pinFolder("Unpin", "Art");
+  await expect(folderOrder).toHaveText(["Bee", "Plain", "Art", "Ink"]);
   expect(app.consoleErrors).toEqual([]);
 });
