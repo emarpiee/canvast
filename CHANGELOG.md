@@ -19,7 +19,7 @@
 - **Fixed:** a linked item opens from another folder or from a part of a long library not read yet, and says so when it is gone. Linked from no longer goes away on moving between notes.
 - **Fixed:** in the notes editor, the strip with the Back and Details buttons has the note's own colour.
 - **Fixed:** a picture or other component dragged to another place in a note is one step of Undo and Redo.
-- **Fixed:** in the library's list, the rows hold every column however wide they were made, with no column cut and no empty room after the rows.
+- **Fixed:** in the library's list, the rows hold every column however wide they were made, with no column cut and no empty room after the rows The file type chip no longer covers a row's last column.
 - **Changed:** the README is in two parts, for users and for developers, with a section for each big feature, tables and pictures first and the full wording after them; new pictures of the sidebar, several items selected, art files and the Trash.
 - **Changed:** the library's list has the same thumbnail slider as the grid, in the same place, with its own size: its rows and thumbnails grow with it. The slider is longer, and the list's columns button moved to the left of the grid and list buttons so that nothing shifts.
 - **Added:** Details in the details panel show the file's type, size, pixels, time of import, place on disk and whole hash, a JPEG's channels and colour sampling, all lined up. They open from the file's line, with an info icon at its right end, in one card.

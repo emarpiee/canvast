@@ -1580,6 +1580,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .assets-body { --cols: var(--list-thumb-w, 56px) minmax(140px, 2fr) 110px 130px minmax(120px, 1.2fr) minmax(80px, 1fr); }
 .assets-body.is-list .assets-list-head { display: grid; grid-template-columns: var(--cols); gap: var(--s-6); position: sticky; top: 0; z-index: 3; padding: var(--s-2) var(--s-4) var(--s-4) var(--s-13); color: var(--hud-muted); font-size: var(--text-sm); font-weight: 600; background: var(--theme-bg); border-bottom: 1px solid var(--hud-border); margin-bottom: var(--s-2); }
 .assets-body.is-list .assets-grid { display: block; }
+.assets-body.is-list .asset-thumb .ext-chip { display: none; } /* (the Type column says it; on a row it sat over the last column) */
 .assets-body.is-list .assets-grid::after { display: none; }
 .assets-body.is-list .asset-cell { flex: none; min-width: 0; aspect-ratio: auto; height: 48px; margin-bottom: var(--s-1); padding-left: var(--s-12); }
 .assets-body.is-list .asset-card { position: static; display: grid; grid-template-columns: var(--cols); align-items: center; gap: var(--s-6); padding: var(--s-2) var(--s-4) var(--s-2) 0; background: transparent; border-radius: var(--r-md); }
