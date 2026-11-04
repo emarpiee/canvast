@@ -45,6 +45,36 @@ test("menus of the library, the sidebar, the workspace and the canvas: an icon, 
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("the sidebar's tags are a tree on /, a parent finds what is nested and counts each item once, and a row with whole names is one press away", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "b.png", mimeType: "image/png", buffer: blockyFixture() });
+  await p.getByTestId("asset-card").first().click();
+  await p.getByTestId("asset-tag-input").fill("art/ink, art/oil, ref");
+  await p.getByTestId("asset-tag-input").press("Enter");
+  const tags = p.getByTestId("tag-list");
+  const row = (name: string) => tags.getByRole("button", { name: new RegExp(`^#${name}\\b`) });
+  await expect(row("art")).toContainText("1");
+  await expect(row("ink")).toBeVisible();
+  // A parent that is only a path has no Delete: there is no such tag. A child's menu is about its whole name.
+  await p.getByRole("button", { name: "More actions for tag art", exact: true }).click();
+  await expect(p.getByRole("menuitem")).toHaveCount(1);
+  await p.keyboard.press("Escape");
+  await p.getByRole("button", { name: "More actions for tag art/ink", exact: true }).click();
+  await p.getByRole("menuitem", { name: "Rename tag art/ink", exact: true }).click();
+  await expect(p.getByTestId("prompt-input")).toHaveValue("art/ink");
+  await p.getByTestId("prompt-cancel").click();
+  await tags.getByRole("button", { name: "Collapse", exact: true }).click();
+  await expect(row("ink")).toHaveCount(0);
+  await p.getByRole("button", { name: "Show in a row", exact: true }).click();
+  await expect(tags.locator(".tag-cloud, .side-item").filter({ hasText: "#art/ink" })).toHaveCount(1);
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await expect(tags.getByRole("button", { name: /^#art\/oil/ })).toBeVisible();
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("a folder folds, stays folded after a reload, and Organize moves to a folder and sets tags, tree or row, with search, at one Apply", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();

@@ -228,11 +228,13 @@ export interface SideCounts {
   favourites: number;
   unfiled: number;
   tags: Map<string, { label: string; n: number }>;
+  /** How many items a tag finds: those with it or a tag nested under it, each once (a parent that is only a path is here too). */
+  tagsUnder: Map<string, number>;
   types: Map<string, number>;
   folders: Map<string, number>;
 }
 export function countSide(entries: Iterable<CatalogEntry>, folders: readonly AssetFolder[], hiddenMode = false): SideCounts {
-  const c: SideCounts = { hidden: 0, shown: 0, favourites: 0, unfiled: 0, tags: new Map(), types: new Map(), folders: new Map() };
+  const c: SideCounts = { hidden: 0, shown: 0, favourites: 0, unfiled: 0, tags: new Map(), tagsUnder: new Map(), types: new Map(), folders: new Map() };
   const parentOf = new Map(folders.map((f) => [f.id, f.parentId]));
   for (const e of entries) {
     const m = meta(e);
@@ -247,6 +249,9 @@ export function countSide(entries: Iterable<CatalogEntry>, folders: readonly Ass
       if (tc) tc.n++;
       else c.tags.set(k, { label: t, n: 1 });
     }
+    const paths = new Set<string>();
+    for (const t of m.tags) for (let k = t.toLowerCase(); k && !paths.has(k); k = k.slice(0, Math.max(0, k.lastIndexOf("/")))) paths.add(k);
+    for (const k of paths) c.tagsUnder.set(k, (c.tagsUnder.get(k) ?? 0) + 1);
     // The file types in the workspace: one chip per extension, with how many files have it.
     const k = chipOf(e.name, e.type).toLowerCase();
     c.types.set(k, (c.types.get(k) ?? 0) + 1);

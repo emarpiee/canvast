@@ -50,7 +50,7 @@ export interface LibraryCalls {
   /** The Library view's list: the items a scope, search and sort list, in order (hashes, 64 characters each), their picture shapes, and the library's size. */
   query(q: unknown): Promise<{ hashes: string; ratios: Float32Array; total: number; bytes: number }>;
   /** The sidebar's counts (tags as [lower case, label, count]); of the hidden items in hidden mode (`hidden`). */
-  counts(hidden?: boolean): Promise<{ hidden: number; shown: number; favourites: number; unfiled: number; tags: Array<[string, string, number]>; types: Array<[string, number]>; folders: Array<[string, number]> }>;
+  counts(hidden?: boolean): Promise<{ hidden: number; shown: number; favourites: number; unfiled: number; tags: Array<[string, string, number]>; tagsUnder: Array<[string, number]>; types: Array<[string, number]>; folders: Array<[string, number]> }>;
   /** Every field name the items use. */
   fieldKeys(hidden?: boolean): Promise<string[]>;
   fieldValues(key: string, hidden?: boolean): Promise<string[]>;
@@ -79,6 +79,8 @@ export interface DesktopBridge {
   workspace(): Promise<DesktopWorkspace | null>;
   /** A file's bytes, or null when there is no such file. */
   read(path: string): Promise<Uint8Array | null>;
+  /** The bytes of a file from one place to another (at most 64 MiB), or null when there is no such file. */
+  part(path: string, from: number, to: number): Promise<Uint8Array | null>;
   /** The first kilobyte of a file as text (a canvas file's header), or null when there is no such file. */
   head(path: string): Promise<string | null>;
   /** Whether a file is there. */

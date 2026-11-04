@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.53.51 — Art files past 256 MiB show their picture; tags as a tree (2026-11-04)
+
+- **Added:** an art file past 256 MiB that lies in the desktop app's `library/` shows the picture it keeps, on its card, in the viewer and on a canvas. It is read a part at a time, never whole.
+- **Added:** art files past 4 GiB in a ZIP-based format are read (ZIP64).
+- **Added:** the sidebar's tags are a tree on `/`, as the folders are: arrows that fold, Collapse or Expand all, remembered on this device. A button on the Tags header shows them in a row instead.
+- **Changed:** a Photoshop merged picture past 64 megapixels is no longer given up on: the viewer shows it reduced to fit, read a window at a time. Before, it fell back to the small thumbnail.
+- **Changed:** a tag's count is how many items it finds: with it or a tag nested under it, each item once.
+- **Fixed:** in a `.kra` or `.ora`, a merged picture too big to unpack no longer leaves the card with no picture when the file has a smaller one.
 ## 0.53.50 — Menu descriptions kept very short (2026-11-04)
 
 - **Changed:** every menu description is at most 44 characters, and `check:components` holds it there.

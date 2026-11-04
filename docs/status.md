@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.51: art files past 256 MiB show their picture; tags as a tree (2026-11-04)
+
+- **Implemented:** `canvast:part` (a range of a workspace file, at most 64 MiB a call, through the existing path check), `externalFolder.parts`, `artFileOf`; the art readers take a Blob or parts; PSD merged picture read in 16 MiB windows and reduced as it is read; ZIP candidates tried in order, ZIP64; `tagsUnder` in `countSide`; the sidebar's tags through `walkTree` and `pathNodes`, with `ui.tagsInline`.
+- **Tested:** unit tests for the reduction, windows, ZIP fallback and ZIP64; desktop test with a 300 MiB sparse `.kra`; library test for the tag tree. On GitHub.
+- **Known failures:** none.
+- **Unverified:** real art files past 256 MiB. A very large merged picture in the viewer is slow to encode.
+- **Committed:** v0.53.51.
+- **Next bounded task:** the owner's choice among import through the app, hiding and exports of files past 256 MiB (each still limited).
+
 ## v0.53.50: menu descriptions kept very short (2026-11-04)
 
 - **Implemented:** long descriptions shortened; `check:components` fails over 44 characters.

@@ -35,7 +35,7 @@ function psd(opts: { w: number; h: number; channels: number; depth?: number; mod
   u16(opts.rle ? 1 : 0);
   if (opts.rle) {
     for (let i = 0; i < opts.h * opts.channels; i++) u16(2);
-    for (let i = 0; i < opts.h * opts.channels; i++) parts.push(0, opts.pixels[i]!);
+    for (let i = 0; i < opts.h * opts.channels; i++) parts.push(opts.w - 1, ...opts.pixels.slice(i * opts.w, (i + 1) * opts.w));
   } else parts.push(...opts.pixels);
   return new Blob([new Uint8Array(parts)]);
 }
@@ -143,6 +143,96 @@ describe("pictures art files keep", () => {
     expect(await psdPixels(new Blob(["8BPS"]))).toBeNull();
     expect(await artPicture(new Blob(["no"]), "a.psd")).toBeNull();
   });
+  it("Photoshop: past the most pixels it is reduced as it is read, each pixel the average of what it stands for; a short file gives nothing", async () => {
+    // (4 x 3, three planes; kept at 2 x 2: scale 2, the last row of blocks only one row tall)
+    const r = [10, 30, 50, 70, 10, 30, 50, 70, 100, 100, 200, 200];
+    const pixels = [...r, ...r.map((v) => v + 1), ...r.map((v) => v + 2)];
+    const got = await psdPixels(psd({ w: 4, h: 3, channels: 3, pixels }), 3);
+    expect([got!.w, got!.h]).toEqual([2, 2]);
+    expect([...got!.rgba]).toEqual([20, 21, 22, 255, 60, 61, 62, 255, 100, 101, 102, 255, 200, 201, 202, 255]);
+    expect(await psdPixels(psd({ w: 4, h: 3, channels: 3, rle: true, pixels }), 3)).toEqual(got);
+    expect(await psdPixels(psd({ w: 4, h: 3, channels: 3, pixels: pixels.slice(0, -1) }), 3)).toBeNull();
+  });
+
+  it("a file read a part at a time, past what is held at once, gives the same; no read is bigger than a window", async () => {
+    // (made up as it is asked for: 36 MB of rows, every other one light, three times what is held at once)
+    const w = 2000;
+    const h = 6000;
+    const head = new Uint8Array(await psd({ w, h, channels: 3, pixels: [] }).arrayBuffer());
+    const dataAt = head.length;
+    const size = dataAt + w * h * 3;
+    let most = 0;
+    const file = {
+      size,
+      part: async (from: number, to: number): Promise<Uint8Array> => {
+        most = Math.max(most, to - from);
+        const out = new Uint8Array(Math.min(to, size) - from);
+        for (let i = 0; i < out.length; i++) {
+          const at = from + i;
+          out[i] = at < dataAt ? head[at]! : Math.floor(((at - dataAt) % (w * h)) / w) % 2 ? 200 : 100;
+        }
+        return out;
+      },
+    };
+    const got = await psdPixels(file, 1_000_000);
+    expect(most).toBeLessThanOrEqual(16 * 2 ** 20);
+    expect([got!.w, got!.h]).toEqual([500, 1500]);
+    expect([...got!.rgba.subarray(-4)]).toEqual([150, 150, 150, 255]); // (4 rows, of 100 and 200)
+  });
+
+  it("ZIP: one entry too big gives way to the next, and a ZIP64 file is read", async () => {
+    // (a directory that says mergedimage.png unpacks past the limit; preview.png is there too)
+    const name = new TextEncoder().encode("preview.png");
+    const big = new TextEncoder().encode("mergedimage.png");
+    const local = new Uint8Array(30 + name.length + PNG.length);
+    const lv = new DataView(local.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(26, name.length, true);
+    local.set(name, 30);
+    local.set(PNG, 30 + name.length);
+    const entry = (n: Uint8Array, usize: number, csize: number, at: number, extra = new Uint8Array(0)): Uint8Array => {
+      const e = new Uint8Array(46 + n.length + extra.length);
+      const v = new DataView(e.buffer);
+      v.setUint32(0, 0x02014b50, true);
+      v.setUint32(20, csize, true);
+      v.setUint32(24, usize, true);
+      v.setUint16(28, n.length, true);
+      v.setUint16(30, extra.length, true);
+      v.setUint32(42, at, true);
+      e.set(n, 46);
+      e.set(extra, 46 + n.length);
+      return e;
+    };
+    const dir = new Blob([entry(big, 2 ** 30, 2 ** 30, 0), entry(name, PNG.length, PNG.length, 0)] as BlobPart[]);
+    const end = (size: number, at: number): Uint8Array => {
+      const e = new Uint8Array(22);
+      const v = new DataView(e.buffer);
+      v.setUint32(0, 0x06054b50, true);
+      v.setUint32(12, size, true);
+      v.setUint32(16, at, true);
+      return e;
+    };
+    expect(await bytes(await artPicture(new Blob([local, dir, end(dir.size, local.length)] as BlobPart[]), "a.kra"))).toEqual([...PNG]);
+    // (ZIP64: the real numbers in the extra field, and a second end record that a locator points to)
+    const extra = new Uint8Array(28);
+    const xv = new DataView(extra.buffer);
+    xv.setUint16(0, 1, true);
+    xv.setUint16(2, 24, true);
+    xv.setBigUint64(4, BigInt(PNG.length), true);
+    xv.setBigUint64(12, BigInt(PNG.length), true);
+    const dir64 = new Blob([entry(name, 0xffffffff, 0xffffffff, 0xffffffff, extra)] as BlobPart[]);
+    const end64 = new Uint8Array(56);
+    const e64 = new DataView(end64.buffer);
+    e64.setUint32(0, 0x06064b50, true);
+    e64.setBigUint64(40, BigInt(dir64.size), true);
+    e64.setBigUint64(48, BigInt(local.length), true);
+    const locator = new Uint8Array(20);
+    const lo = new DataView(locator.buffer);
+    lo.setUint32(0, 0x07064b50, true);
+    lo.setBigUint64(8, BigInt(local.length + dir64.size), true);
+    expect(await bytes(await artPicture(new Blob([local, dir64, end64, locator, end(0xffffffff, 0xffffffff)] as BlobPart[]), "a.kra"))).toEqual([...PNG]);
+  });
+
   it("Clip Studio: the PNG in its database, across overflow pages; nothing for a damaged one", async () => {
     expect(await bytes(await artPicture(clip(PNG), "a.clip"))).toEqual([...PNG]);
     expect(await artPicture(new Blob(["CSFCHUNK but nothing of it"]), "a.clip")).toBeNull();

@@ -414,6 +414,23 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
       throw err;
     }
   });
+  ipcMain.handle("canvast:part", async (e, rel: string, from: unknown, to: unknown) => {
+    own(e);
+    if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || (from as number) < 0 || (to as number) < (from as number) || (to as number) - (from as number) > 64 * 2 ** 20) throw new Error("not a part of a file");
+    try {
+      const fh = await open(await inside(root, rel), "r");
+      try {
+        const buf = Buffer.alloc((to as number) - (from as number));
+        const { bytesRead } = await fh.read(buf, 0, buf.length, from as number);
+        return new Uint8Array(buf.subarray(0, bytesRead));
+      } finally {
+        await fh.close();
+      }
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT" || (err as NodeJS.ErrnoException).code === "EISDIR") return null;
+      throw err;
+    }
+  });
   ipcMain.handle("canvast:head", async (e, rel: string) => {
     own(e);
     try {

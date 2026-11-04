@@ -116,11 +116,11 @@ export class LibraryIndex {
   }
 
   /** The sidebar's counts (made again only after a change), as plain lists; of the hidden items in hidden mode (`hidden`). */
-  counts(hidden = false): { hidden: number; shown: number; favourites: number; unfiled: number; tags: Array<[string, string, number]>; types: Array<[string, number]>; folders: Array<[string, number]> } {
+  counts(hidden = false): { hidden: number; shown: number; favourites: number; unfiled: number; tags: Array<[string, string, number]>; tagsUnder: Array<[string, number]>; types: Array<[string, number]>; folders: Array<[string, number]> } {
     const items = this.all();
     if (!this.side || this.side.version !== this.version || this.side.hidden !== hidden) this.side = { version: this.version, hidden, counts: countSide(items.values(), this.folders(), hidden) };
     const c = this.side.counts;
-    return { hidden: c.hidden, shown: c.shown, favourites: c.favourites, unfiled: c.unfiled, tags: [...c.tags].map(([k, v]) => [k, v.label, v.n]), types: [...c.types], folders: [...c.folders] };
+    return { hidden: c.hidden, shown: c.shown, favourites: c.favourites, unfiled: c.unfiled, tags: [...c.tags].map(([k, v]) => [k, v.label, v.n]), tagsUnder: [...c.tagsUnder], types: [...c.types], folders: [...c.folders] };
   }
 
   /** Every field name the active items use (for the inspector's suggestions). */

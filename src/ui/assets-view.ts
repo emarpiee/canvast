@@ -17,7 +17,7 @@ import { mountSuggest } from "./search-suggest";
 import type { SuggestSources } from "../search/suggest";
 import { itemsIn, justifiedLayout, listLayout, nearestInRow, rowOf, squaresLayout, type GridLayout } from "./library-layout";
 import { newNoteName, storeFrame } from "../app/frames";
-import { artFullPicture, isArtFile } from "../assets/art-preview";
+import { artFileOf, artFullPicture, isArtFile } from "../assets/art-preview";
 import { chipOf, describeFile, extOf, hasThumb, isCard, isFontFile } from "../assets/file-kind";
 import { FILE_CARD_NOTE } from "../assets/card";
 import { fontSampleHtml, showFont } from "./font-specimen";
@@ -422,7 +422,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; tagsInline: boolean; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", tagsInline: false, expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -448,6 +448,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (Array.isArray(saved.closed)) ui.closed = saved.closed.filter((c) => typeof c === "string").slice(0, 8);
     if (Array.isArray(saved.folded)) ui.folded = saved.folded.filter((c) => typeof c === "string").slice(0, 20000);
     if (saved.chooser === "inline") ui.chooser = "inline";
+    if (saved.tagsInline === true) ui.tagsInline = true;
     if (Array.isArray(saved.expanded)) ui.expanded = saved.expanded.filter((c) => typeof c === "string").slice(0, 8);
     if (saved.colW && typeof saved.colW === "object") {
       for (const c of ui.order.map(colOf)) {
@@ -761,6 +762,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   type SideKind = "folder" | "tag" | "ctag" | "style";
   interface SideRow { attr: string; value: string; label: string; hint: string; icon: string; aria: string; danger?: boolean }
   const sideRows = new Map<string, { label: string; items: MenuItem[] }>();
+  /** The tags of the sidebar's tree as they are spelled, by key (a row shows only the last part of a path), and those with tags nested under them. */
+  const sideTagLabels = new Map<string, string>();
+  let sideTagParents: string[] = [];
   /** On a narrow screen the sidebar is a strip that opens on demand. */
   const narrow = window.matchMedia("(max-width: 900px)");
   let sideOpen = !narrow.matches;
@@ -1539,7 +1543,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       armShow();
       return;
     }
-    const art = isCard(rec) && isArtFile(rec.name) ? await artFullPicture(rec.blob, rec.name).catch(() => null) : null;
+    const art = isCard(rec) && isArtFile(rec.name) ? await artFullPicture(await artFileOf(rec), rec.name).catch(() => null) : null;
     if (token !== slideToken) return;
     if (art) {
       // An art file: the picture it keeps, and what it is. Its layers stay its program's; the size in its record is its card's, so neither limits nor names the picture.
@@ -2306,7 +2310,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       sideCounts = {
         of: l,
         counts: p
-          ? { hidden: p.hidden, shown: p.shown, favourites: p.favourites, unfiled: p.unfiled, tags: new Map(p.tags.map(([k, label, n]) => [k, { label, n }])), types: new Map(p.types), folders: new Map(p.folders) }
+          ? { hidden: p.hidden, shown: p.shown, favourites: p.favourites, unfiled: p.unfiled, tags: new Map(p.tags.map(([k, label, n]) => [k, { label, n }])), tagsUnder: new Map(p.tagsUnder), types: new Map(p.types), folders: new Map(p.folders) }
           : countSideOf(l.entries, allFolders, hiddenMode),
       };
     }
@@ -2327,8 +2331,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return `<button type="button" class="side-more" data-side-more data-kind="${kind}" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for ${kindWord[kind]} ${esc(name)}" title="More">${ICONS.ellipsis}</button>`;
     };
     const picked = pickedKeys(scope);
-    const item = (key: string, label: string, n: number, opts: { depth?: number; icon?: string; extra?: string; cls?: string; before?: string } = {}): string =>
-      `<li class="side-row ${opts.cls ?? ""}" style="--depth:${opts.depth ?? 0}">${opts.before ?? ""}<button type="button" class="side-item${(TRASH_WORD.test(search.value) ? key === "trash" : scope === key || picked.has(key)) ? " is-active" : ""}" data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}" title="${label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : ""}">
+    const item = (key: string, label: string, n: number, opts: { depth?: number; icon?: string; extra?: string; cls?: string; before?: string; title?: string } = {}): string =>
+      `<li class="side-row ${opts.cls ?? ""}" style="--depth:${opts.depth ?? 0}">${opts.before ?? ""}<button type="button" class="side-item${(TRASH_WORD.test(search.value) ? key === "trash" : scope === key || picked.has(key)) ? " is-active" : ""}" data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}" title="${opts.title ?? label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : ""}">
         ${opts.icon ?? ""}<span class="side-label">${label}</span><span class="side-n${opts.before !== undefined ? " layer-count" : ""}">${n}</span></button>${opts.extra ?? ""}</li>`;
     const nameInput = (value: string, label: string): string =>
       `<li class="side-row"><input class="side-name" data-testid="folder-name-input" value="${esc(value)}" aria-label="${label}" maxlength="120"></li>`;
@@ -2371,9 +2375,42 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return `${shown.map((r) => r.html).join("")}<li class="side-row side-show-row"><button type="button" class="side-show-all" data-show-all="${id}" data-testid="side-show-all" aria-expanded="${open}">${open ? "Show fewer" : `Show ${rows.length - shown.length} more`}</button></li>`;
     };
     const addBtn = (attr: string, label: string, extra = ""): string => (ro ? "" : `<button type="button" class="side-add" ${attr} aria-label="${label}" title="${label}"${extra}>${ICONS.folderPlus}</button>`);
-    const parents = listing.folders.filter((f) => folderKids(f.id).length);
-    const anyOpen = parents.some((f) => !ui.folded.includes(f.id));
-    const foldAll = parents.length ? `<button type="button" class="side-add" data-folders-fold aria-label="${anyOpen ? "Collapse all folders" : "Expand all folders"}" title="${anyOpen ? "Collapse all folders" : "Expand all folders"}">${anyOpen ? ICONS.chevronsDownUp : ICONS.chevronsUpDown}</button>` : "";
+    /** A header's button that folds or opens all of a tree. */
+    const foldAllBtn = (attr: string, what: string, keys: readonly string[]): string => {
+      if (!keys.length) return "";
+      const open = keys.some((k) => !ui.folded.includes(k));
+      const word = `${open ? "Collapse" : "Expand"} all ${what}`;
+      return `<button type="button" class="side-add" ${attr} aria-label="${word}" title="${word}">${open ? ICONS.chevronsDownUp : ICONS.chevronsUpDown}</button>`;
+    };
+    const foldAll = foldAllBtn("data-folders-fold", "folders", listing.folders.filter((f) => folderKids(f.id).length).map((f) => f.id));
+    // The tags: a tree on `/`, or all in a row with their whole names.
+    const tagNodes = pathNodes([...tagCounts].sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([, c]) => ({ id: c.label, name: c.label, value: c.label })));
+    const tagKids = new Map<string | null, typeof tagNodes>();
+    for (const t of tagNodes) tagKids.set(t.parent, [...(tagKids.get(t.parent) ?? []), t]);
+    sideTagLabels.clear();
+    for (const t of tagNodes) sideTagLabels.set(t.id, t.value ?? (t.parent ? `${sideTagLabels.get(t.parent)}/${t.name}` : t.name));
+    sideTagParents = tagNodes.filter((t) => tagKids.has(t.id)).map((t) => t.id);
+    const tagMore = (id: string, own: boolean, nested: boolean): string => {
+      const label = sideTagLabels.get(id)!;
+      return more("tag", id, label, [
+        { attr: "data-tag-action", value: "rename", label: "Rename", hint: nested ? "With the tags nested under it" : "On every item that has it", icon: ICONS.textCursorInput, aria: `Rename tag ${label}` },
+        ...(own ? [{ attr: "data-tag-action", value: "delete", label: "Delete", hint: nested ? "Items and nested tags stay" : "The items stay", icon: ICONS.trash2, aria: `Delete tag ${label}`, danger: true }] : []),
+      ]);
+    };
+    const tagTree = (root: (typeof tagNodes)[number]): string =>
+      walkTree([root], (t) => tagKids.get(t.id) ?? [], (t) => !ui.folded.includes(`tag:${t.id}`), (t, at) =>
+        item(`tag:${t.id}`, `#${esc(t.name)}`, counts.tagsUnder.get(t.id) ?? 0, {
+          depth: at.depth,
+          cls: "tree-row",
+          title: `#${esc(sideTagLabels.get(t.id)!)}`,
+          before: treeGuides(at.depth, at.last, at.conts) + (at.hasKids ? treeTwist(at.open, `data-tag-twist="${esc(t.id)}"`) : ""),
+          extra: tagMore(t.id, t.value !== null, at.hasKids),
+        }),
+      );
+    const tagRowsHtml = ui.tagsInline
+      ? capped("tags", tagNodes.filter((t) => t.value !== null).map((t) => ({ active: picked.has(`tag:${t.id}`), html: item(`tag:${t.id}`, `#${esc(t.value!)}`, counts.tagsUnder.get(t.id) ?? 0, { cls: "is-tag", extra: tagMore(t.id, true, tagKids.has(t.id)) }) })))
+      : capped("tags", (tagKids.get(null) ?? []).map((t) => ({ active: [...picked].some((k) => k === `tag:${t.id}` || k.startsWith(`tag:${t.id}/`)), html: tagTree(t) })));
+    const tagHead = (tagNodes.length ? `<button type="button" class="side-add" data-tags-view aria-label="${ui.tagsInline ? "Show as a tree" : "Show in a row"}" title="${ui.tagsInline ? "Show as a tree" : "Show in a row"}">${ui.tagsInline ? ICONS.listTree : ICONS.wrapText}</button>` : "") + (ui.tagsInline ? "" : foldAllBtn("data-tags-fold", "tags", sideTagParents.map((id) => `tag:${id}`)));
     // Saved searches, one click away, each with the look it was saved with.
     const savedRows = byUse(parseSaved(settings.get("search.saved.library")) ?? []).map((s) => ({
       active: false,
@@ -2415,20 +2452,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         ${section(
           "tags",
           "Tags",
-          "",
-          `<ul class="tag-cloud" data-testid="tag-list">
-            ${
-              capped("tags", [...tagCounts]
-                .sort((a, b) => a[1].label.localeCompare(b[1].label))
-                .map(([k, c]) => ({ active: picked.has(`tag:${k}`), html:
-                  item(`tag:${k}`, `#${esc(c.label)}`, c.n, {
-                        cls: "is-tag",
-                        extra: more("tag", k, c.label, [
-                          { attr: "data-tag-action", value: "rename", label: "Rename", hint: "On every item that has it", icon: ICONS.textCursorInput, aria: `Rename tag ${c.label}` },
-                          { attr: "data-tag-action", value: "delete", label: "Delete", hint: "The items stay", icon: ICONS.trash2, aria: `Delete tag ${c.label}`, danger: true },
-                        ]),
-                      }) }))) || `<li class="side-empty">No tags yet. Add them in the details.</li>`
-            }
+          tagHead,
+          `<ul class="${ui.tagsInline ? "tag-cloud" : "side-list"}" data-testid="tag-list">
+            ${tagRowsHtml || `<li class="side-empty">No tags yet. Add them in the details.</li>`}
           </ul>`,
         )}
         ${section(
@@ -3866,7 +3892,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const hashes = (JSON.parse(e.dataTransfer!.getData(DRAG_TYPE) || "[]") as string[]).filter((h) => !!entryOf(h));
     if (!hashes.length) return;
     const k = t.dataset["scope"]!;
-    const label = t.querySelector(".side-label")?.textContent?.replace(/^#/, "") ?? "";
+    const label = k.startsWith("tag:") ? (sideTagLabels.get(k.slice(4)) ?? k.slice(4)) : (t.querySelector(".side-label")?.textContent ?? "");
     const change = k.startsWith("folder:") ? { addFolders: [k.slice(7)] } : k === "unfiled" ? { clearFolder: true } : k === "favorites" ? { favorite: true } : { addTags: [label] };
     const what = k.startsWith("folder:") ? `Moved to ${label}` : k === "unfiled" ? "Taken out of their folders" : k === "favorites" ? "Added to the favourites" : `Tagged #${label}`;
     void session.organize((c) => c.updateMetaEach(hashes.map((hash) => ({ hash, change }))), `${what}: ${plural(hashes.length, "item")}`).then((ok) => {
@@ -3907,9 +3933,25 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       renderSide();
       return;
     }
-    if (b.hasAttribute("data-folders-fold")) {
-      const parents = (listing?.folders ?? []).filter((f) => listing!.folders.some((k) => k.parentId === f.id)).map((f) => f.id);
-      ui.folded = parents.some((id) => !ui.folded.includes(id)) ? parents : [];
+    if (b.dataset["tagTwist"] !== undefined) {
+      const id = `tag:${b.dataset["tagTwist"]}`;
+      ui.folded = ui.folded.includes(id) ? ui.folded.filter((x) => x !== id) : [...ui.folded, id];
+      saveUi();
+      renderSide();
+      return;
+    }
+    if (b.hasAttribute("data-folders-fold") || b.hasAttribute("data-tags-fold")) {
+      // (each tree folds on its own: what the other has folded stays)
+      const tags = b.hasAttribute("data-tags-fold");
+      const parents = tags ? sideTagParents.map((id) => `tag:${id}`) : (listing?.folders ?? []).filter((f) => listing!.folders.some((k) => k.parentId === f.id)).map((f) => f.id);
+      const others = ui.folded.filter((k) => k.startsWith("tag:") !== tags);
+      ui.folded = parents.some((id) => !ui.folded.includes(id)) ? [...others, ...parents] : others;
+      saveUi();
+      renderSide();
+      return;
+    }
+    if (b.hasAttribute("data-tags-view")) {
+      ui.tagsInline = !ui.tagsInline;
       saveUi();
       renderSide();
       return;
@@ -3921,7 +3963,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     if (b.dataset["tagAction"]) {
       const key = b.dataset["key"]!;
-      const label = [...side.querySelectorAll<HTMLElement>(`[data-scope="tag:${CSS.escape(key)}"] .side-label`)][0]?.textContent?.replace(/^#/, "") ?? key;
+      const label = sideTagLabels.get(key) ?? key;
       if (b.dataset["tagAction"] === "rename") {
         void renameTagDialog(label);
       } else {

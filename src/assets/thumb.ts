@@ -5,7 +5,7 @@ import type { ThumbRecord } from "./asset-catalog";
 import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { probeMp4 } from "./mp4-probe";
 import { makeCard } from "./card";
-import { artCardPicture, isArtFile } from "./art-preview";
+import { artCardPicture, artFileOf, isArtFile } from "./art-preview";
 import { makeFileCard } from "./card";
 import { chipOf, isCard, isFontFile } from "./file-kind";
 
@@ -72,7 +72,7 @@ export async function artTile(rec: AssetRecord): Promise<Blob | null> {
 
 /** An art file's thumbnail, from the picture it keeps; null when it has none. */
 async function makeArtThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
-  const picture = await artCardPicture(rec.blob, rec.name);
+  const picture = await artCardPicture(await artFileOf(rec), rec.name);
   if (!picture) return null;
   try {
     const bmp = await createImageBitmap(picture);

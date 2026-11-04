@@ -24,12 +24,20 @@ export interface Dir {
   sizes?(names: string[]): Promise<Array<number | null>>;
   /** A file's SHA-256 without reading it into the page (the desktop build's workspace folder), or null when it is not there. */
   hashOf?(name: string): Promise<string | null>;
+  /** Some of a file's bytes without reading the rest into the page (the desktop build's workspace folder), or null when it is not there. */
+  partOf?(name: string, from: number, to: number): Promise<Uint8Array | null>;
   queryPermission?(o: { mode: "readwrite" }): Promise<PermissionState>;
   requestPermission?(o: { mode: "readwrite" }): Promise<PermissionState>;
 }
 interface FileHandle {
   getFile(): Promise<File>;
   createWritable(): Promise<{ write(b: Blob): Promise<void>; close(): Promise<void> }>;
+}
+
+/** A file read a part at a time, for one too big to read into the page. */
+export interface FileParts {
+  readonly size: number;
+  part(from: number, to: number): Promise<Uint8Array>;
 }
 
 export class FolderError extends Error {}
@@ -259,6 +267,21 @@ class ExternalFolder {
       this.sizeOf.delete(p);
       if (this.sizeOf.size && !/\.[^/]+$/.test(p)) for (const f of this.sizeOf.keys()) if (f.startsWith(`${p}/`)) this.sizeOf.delete(f); // (a folder)
     }
+  }
+
+  /** A file too big to read into the page, for reading parts of it; null when it is not there, or sealed. */
+  async parts(hash: string, size: number, file = hash): Promise<FileParts | Blob | null> {
+    if (!this.dir || this.status !== "ready" || isHiddenFile(file) || !this.naming.valid(hash, file)) return null;
+    const dir = this.dir;
+    if (!dir.partOf) return this.readRaw(file); // (a browser's file is only read as far as it is asked)
+    return {
+      size,
+      part: async (from, to) => {
+        const got = await dir.partOf!(file, from, to);
+        if (!got) throw new FolderError(`${file} is not there`);
+        return got;
+      },
+    };
   }
 
   /** A file of the folder as it is on disk (a sealed hidden file stays sealed), or null when it is not there. */

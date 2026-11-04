@@ -9,7 +9,7 @@ import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { GifFrames } from "./gif";
 import { probeMp4 } from "./mp4-probe";
 import { makeFileCardFrom } from "./adapters";
-import { artCardPicture, isArtFile } from "./art-preview";
+import { artCardPicture, artFileOf, isArtFile } from "./art-preview";
 import { FILE_CARD_H, FILE_CARD_W, cardFromPicture, makeCard } from "./card";
 import { describeFile, isCard, isMediaType } from "./file-kind";
 
@@ -53,6 +53,15 @@ export const MAX_IMPORT_BYTES = 256 * 1024 * 1024;
 
 /** The long edge of an art file's card on a canvas. */
 const ART_CARD_EDGE = 800;
+/** A card's size for a picture, in that picture's shape; null when it does not decode. */
+const shapeOfPicture = async (picture: Blob): Promise<{ w: number; h: number } | null> => {
+  const bmp = await createImageBitmap(picture).catch(() => null);
+  if (!bmp) return null;
+  const k = ART_CARD_EDGE / Math.max(bmp.width, bmp.height);
+  const shape = { w: Math.max(1, Math.round(bmp.width * k)), h: Math.max(1, Math.round(bmp.height * k)) };
+  bmp.close();
+  return shape;
+};
 
 export class ImportError extends Error {}
 
@@ -251,7 +260,11 @@ export class AssetLibrary {
   async importLargeFound(name: string, type: string, size: number, hash: string, at: string): Promise<ImportOutcome> {
     const existing = await this.record(hash);
     if (existing) return { record: existing, duplicate: "present" };
-    const record: AssetRecord = { hash, type, size, name, pixelW: FILE_CARD_W, pixelH: FILE_CARD_H, blob: new Blob([]), importedAt: Date.now(), card: true, file: at };
+    // (an art file's card has the shape of the picture it keeps, read from its file a part at a time)
+    const parts = isArtFile(name) ? await artFileOf({ hash, size, file: at, blob: new Blob([]) }) : null;
+    const art = parts && (await artCardPicture(parts, name).catch(() => null));
+    const shape = art && (await shapeOfPicture(art));
+    const record: AssetRecord = { hash, type, size, name, pixelW: shape ? shape.w : FILE_CARD_W, pixelH: shape ? shape.h : FILE_CARD_H, blob: new Blob([]), importedAt: Date.now(), card: true, file: at };
     if (this.store) await this.save(record, true);
     else this.memoryOnly.set(hash, record);
     this.onReady();
@@ -287,11 +300,9 @@ export class AssetLibrary {
       carded = true;
       // An art file's card is the picture it keeps, in that picture's shape.
       const art = isArtFile(file.name ?? "") ? await artCardPicture(file, file.name ?? "").catch(() => null) : null;
-      const shape = art ? await createImageBitmap(art).catch(() => null) : null;
+      const shape = art && (await shapeOfPicture(art));
       if (art && shape) {
-        const k = ART_CARD_EDGE / Math.max(shape.width, shape.height);
-        size = { w: Math.max(1, Math.round(shape.width * k)), h: Math.max(1, Math.round(shape.height * k)) };
-        shape.close();
+        size = shape;
         img = await cardFromPicture(art, size);
         duration = undefined;
         return;
@@ -560,7 +571,7 @@ export class AssetLibrary {
   private async cardOf(rec: AssetRecord, size = { w: rec.pixelW, h: rec.pixelH }, /** A note's page width (a smaller copy keeps the full card's). */ layoutW?: number): Promise<ImageBitmap> {
     // A custom thumbnail stands for a file card on a canvas too (never a hidden one: see `customPicture`).
     // (and an art file's card shows the picture the file keeps)
-    const own = (await this.customPicture?.(rec.hash).catch(() => null)) ?? (isArtFile(rec.name) ? await artCardPicture(rec.blob, rec.name) : null);
+    const own = (await this.customPicture?.(rec.hash).catch(() => null)) ?? (isArtFile(rec.name) ? await artCardPicture(await artFileOf(rec), rec.name) : null);
     if (own) {
       try {
         return await cardFromPicture(own, size);

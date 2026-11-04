@@ -1,6 +1,6 @@
 import { _electron as electron, expect, test } from "@playwright/test";
 import type { ElectronApplication, Page } from "@playwright/test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
 import { createHash, scryptSync } from "node:crypto";
@@ -1199,10 +1199,34 @@ test("library files changed outside the app: a renamed or moved file is found by
   try {
     truncateSync((writeFileSync(join(ws, "library/poses/huge_scan.tif"), ""), join(ws, "library/poses/huge_scan.tif")), 300 * 2 ** 20);
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.name === "huge_scan.tif").map((e) => [e.present, e.size, !!e.card]))), { timeout: 30_000 }).toEqual([[true, 300 * 2 ** 20, true]]);
+    // An art file that big keeps its picture: read a part at a time, and the card takes its shape.
+    const png = makePng(30, 10, () => [240, 120, 0, 255]);
+    const name = Buffer.from("preview.png");
+    const local = Buffer.alloc(30 + name.length);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(name.length, 26);
+    name.copy(local, 30);
+    const entry = Buffer.alloc(46 + name.length);
+    entry.writeUInt32LE(0x02014b50, 0);
+    entry.writeUInt32LE(png.length, 20);
+    entry.writeUInt32LE(png.length, 24);
+    entry.writeUInt16LE(name.length, 28);
+    name.copy(entry, 46);
+    const end = Buffer.alloc(22);
+    end.writeUInt32LE(0x06054b50, 0);
+    end.writeUInt32LE(entry.length, 12);
+    const dirAt = 300 * 2 ** 20;
+    end.writeUInt32LE(dirAt, 16);
+    const artPath = join(ws, "library/poses/huge_art.kra");
+    writeFileSync(artPath, Buffer.concat([local, png]));
+    truncateSync(artPath, dirAt); // (the rest of the file a hole: no disk used)
+    appendFileSync(artPath, Buffer.concat([entry, end]));
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.name === "huge_art.kra").map((e) => [e.present, e.pixelW, e.pixelH]))), { timeout: 30_000 }).toEqual([[true, 800, 267]]);
   } finally {
     await app.close();
   }
   rmSync(join(ws, "library/poses/huge_scan.tif"));
+  rmSync(join(ws, "library/poses/huge_art.kra"));
   // A file put in while the app is closed: at the next start only what changed since the last look is looked at (kept in the app's own
   // folder), and the new file is found that way too.
   writeFileSync(join(ws, "library/poses/while_closed.png"), makePng(3, 3, () => [240, 120, 0, 255]));
@@ -1211,7 +1235,8 @@ test("library files changed outside the app: a renamed or moved file is found by
     await expect.poll(listing, { timeout: 15_000 }).toEqual([
       ["Loomis Hands.png", "anatomy", true, 1],
       ["Pose One.png", "poses", true, 0],
-      ["huge_scan.tif", "poses", false, 0], // (its file removed above: missing)
+      ["huge_art.kra", "poses", false, 0], // (their files removed above: missing)
+      ["huge_scan.tif", "poses", false, 0],
       ["while_closed.png", "poses", true, 0],
     ]);
     expect(readdirSync(join(`${ws}-userdata`, "library-looks"))).toHaveLength(1);
