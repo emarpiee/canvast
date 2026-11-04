@@ -17,6 +17,7 @@
 - **Changed:** *Where it is used* reads more easily: the canvas's name in full, its board quieter, a count, and an icon to go there.
 - **Changed:** buttons are rounded squares everywhere, following density and the Corners setting; round is kept for chips and dots.
 - **Fixed:** the viewer's filmstrip was empty after moving to another item with the controls hidden and bringing them back.
+- **Fixed:** a tag's ⋯ in a row of tags is the same plain dots as on a folder's row, with no white circle.
 - **Fixed:** the Library button is one button, as tall as the ∞ beside it, with no white bar around it.
 - **Fixed:** on a small window the ∞ button stretched across the top row and the Settings button covered the canvas's name; the name takes the room now, clear of the buttons. 
 - **Fixed:** the status bars of the canvas and the library have one height with room around their buttons, which are square.

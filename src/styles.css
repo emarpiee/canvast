@@ -1805,7 +1805,9 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 /* The sidebar's tag chips sit close together; the row's More button floats over the chip's count instead of taking room. */
 .tag-cloud { gap: var(--s-2) var(--s-2); }
 .tag-cloud .side-row { position: relative; display: inline-flex; }
-.tag-cloud .side-more { position: absolute; right: 2px; top: 50%; width: var(--chip-btn); height: var(--chip-btn); margin: 0; transform: translateY(-50%); background: var(--hud-bg); border-radius: var(--r-pill); }
+.tag-cloud .side-more { position: absolute; right: var(--sp-1); top: 50%; width: var(--chip-btn); height: var(--chip-btn); margin: 0; transform: translateY(-50%); background: transparent; border-radius: var(--r-pill); } /* (the same ⋯ as on a folder's row: only the dots) */
+.tag-cloud .side-row .side-more svg { width: var(--icon-sm); height: var(--icon-sm); }
+.tag-cloud .side-more:hover, .tag-cloud .side-more[aria-expanded="true"] { background: var(--hud-hover); }
 .tag-cloud .side-row:not(.is-type):hover .side-n, .tag-cloud .side-row:not(.is-type):focus-within .side-n, .tag-cloud .side-more[aria-expanded="true"] ~ .side-n { visibility: hidden; }
 @media (hover: none), (max-width: 640px) { .tag-cloud .side-row .side-item { padding-right: var(--s-12); } /* (more specific than the density paddings, which come first) */ .tag-cloud .side-more { opacity: 1; } }
 
