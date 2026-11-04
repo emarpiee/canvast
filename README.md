@@ -603,6 +603,8 @@ Every shortcut can be changed in **Settings → Shortcuts**: a single key or a c
 
 Open Settings with the gear button. Settings have a *device* scope and a *canvas* scope, can be searched, and reset individually (the undo-arrow icon at the end of a row) or together. Every group has an icon in the list on the left, and the groups are indented under their heading. Device settings travel in a workspace backup and in the library index (see Backups).
 
+Each setting says what it is on one line; **More** under it has the whole explanation, and the search box finds words in both.
+
 | Group | What it holds |
 | --- | --- |
 | Drawing and selection | Pen, colour picker model and layout, pen width and stabilizer, lasso filter, snapping, align to the selection box, grid spacing for Arrange, initial shape and paint, the distance Fill gaps closes openings by, eraser |

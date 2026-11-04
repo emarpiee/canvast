@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.35 — Settings say it in one line, all of them (2026-11-04)
+
+- **Changed:** Library files (Settings > Storage) says what it is on one line too.
+
 ## 0.53.34 — Settings say it in one line (2026-11-04)
 
 - **Changed:** every setting says what it is on one short line; the whole explanation is under its **More**, and search still finds it.
