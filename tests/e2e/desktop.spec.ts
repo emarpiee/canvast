@@ -1959,7 +1959,7 @@ test("the Trash is a state of the library: this workspace's .trash for the mode,
   }
 });
 
-test("the window frame off: no bar, and the window's buttons and what moves it are in the page; after a restart, and back", async () => {
+test("the window frame off: a row from the top edge has the window's buttons and moves it; after a restart, and back", async () => {
   const ws = tempDir("cv-frame-");
   let { app, page } = await launch(ws, "userdata", true);
   try {
@@ -1969,16 +1969,23 @@ test("the window frame off: no bar, and the window's buttons and what moves it a
     await expect(page.getByTestId("win-close")).toHaveCount(0); // (a window's frame cannot change: at the next start)
     await app.close();
     ({ app, page } = await launch(ws, "userdata", true));
-    await expect(page.locator("html")).toHaveAttribute("data-frame", "off");
+    // It shows for a moment at the start, goes, comes from the very top edge, and goes when the pointer leaves. Only then is there a drag area.
+    const row = page.getByTestId("win-row");
+    await expect(row).toHaveClass(/is-shown/);
+    await expect(page.getByTestId("win-close")).toBeVisible();
+    await expect(row).not.toHaveClass(/is-shown/, { timeout: 8_000 });
+    expect(await row.evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"))).not.toBe("drag");
+    await expect(page.getByTestId("win-close")).toBeHidden();
+    await page.mouse.move(400, 300);
+    await page.mouse.move(400, 1);
+    await expect(row).toHaveClass(/is-shown/);
     await expect(page.getByTestId("win-minimize")).toBeVisible();
     await expect(page.getByTestId("win-maximize")).toBeVisible();
     await expect(page.getByTestId("win-close")).toBeVisible();
-    const region = (sel: string) => page.locator(sel).evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"));
-    expect(await region(".win-strip")).toBe("drag");
-    expect(await region(".win-grip")).toBe("drag");
-    expect(await region("#nav")).not.toBe("drag"); // (a drag area takes every click over it: none under the top row)
-    const box = async (id: string) => (await page.getByTestId(id).boundingBox())!;
-    expect((await box("view-settings")).x + (await box("view-settings")).width).toBeLessThanOrEqual((await box("win-minimize")).x); // (the Settings button keeps clear of them)
+    expect(await row.evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"))).toBe("drag");
+    expect(await page.getByTestId("win-close").evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"))).toBe("no-drag");
+    await page.mouse.move(400, 300);
+    await expect(row).not.toHaveClass(/is-shown/);
     await page.evaluate(() => window.__canvastDebug.setSetting("ui.frame", "system"));
     await expect.poll(() => readFileSync(`${ws}-userdata/window.json`, "utf8")).toContain("system");
     await app.close();

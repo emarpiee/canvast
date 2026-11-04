@@ -1047,7 +1047,7 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 :root { --edge: 12px; --ctl: 36px; --pad: 4px; --gap: 2px; --near: 8px; --field-h: var(--sp-11); --menu-h: 34px; --list-h: var(--sp-12); } /* (--field-h: the height of an input or select in a bar; --menu-h: a row of a menu) */
 /* The thickness every floating bar has (the Properties bar, the Actions bar, the dock, the rail, the view controls, the view tabs): a control, the padding on both sides and the border. */
 :root { --bar-h: calc(var(--ctl) + 2 * var(--pad) + 2px); }
-.rail, .dock, .toolbar, .view-switch, .hud-controls, .ctx-bar, .win-controls { padding: var(--pad); gap: var(--gap); border-radius: var(--r-lg); border: 1px solid var(--hud-border); background: var(--hud-bg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); }
+.rail, .dock, .toolbar, .view-switch, .hud-controls, .ctx-bar { padding: var(--pad); gap: var(--gap); border-radius: var(--r-lg); border: 1px solid var(--hud-border); background: var(--hud-bg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); }
 .rail button, .dock button, .toolbar button, .view-switch button, .hud-controls button, .ctx-bar button, .tb-options-row button { min-width: var(--ctl); height: var(--ctl); border-radius: var(--ctl-r, var(--r-md)); }
 .rail button, .ctx-bar button { width: var(--ctl); padding: 0; }
 .rail button svg, .dock button svg, .toolbar button svg, .ctx-bar button svg, .hud-controls button svg { width: 18px; height: 18px; }
@@ -1057,26 +1057,26 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .nav-pill { height: var(--bar-h); }
 .view-switch { height: calc(var(--ctl) + 2 * var(--pad) + 2px); align-items: center; }
 #nav { left: var(--edge); top: var(--edge); gap: var(--near); }
-#toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc((var(--edge) + var(--win-w, 0px) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); } /* (the Settings button is in the corner) */
+#toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); } /* (the Settings button is in the corner) */
 /* Settings: a button of its own in the top-right corner of every view. */
-.view-settings { position: fixed; pointer-events: auto; top: var(--edge); right: calc(var(--edge) + var(--win-w, 0px)); z-index: var(--z-edge); zoom: var(--ui-scale, 1); }
+.view-settings { position: fixed; pointer-events: auto; top: var(--edge); right: var(--edge); z-index: var(--z-edge); zoom: var(--ui-scale, 1); }
 .view-settings button { display: inline-flex; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); padding: 0; box-sizing: border-box; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); cursor: pointer; }
 .view-settings button svg { width: 18px; height: 18px; }
 .view-settings button:hover { background: var(--hud-hover); }
 .view-settings button[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
-/* The window with no frame (src/ui/window-frame.ts): the buttons in the corner, what moves the window, and room kept beside them. Only the strip and the grip move it: a drag area takes every click over it, also from a menu or a button drawn over it, so none lies under the top row. */
-:root[data-frame="off"] { --win-w: calc(4 * var(--ctl) + 3 * var(--gap) + 2 * var(--pad) + 2px + var(--near)); }
-.win-strip { position: fixed; z-index: var(--z-edge); top: 0; left: 0; right: 0; height: var(--edge); -webkit-app-region: drag; }
-.win-controls { position: fixed; z-index: var(--z-pop); top: var(--edge); right: var(--edge); display: flex; -webkit-app-region: no-drag; }
-.win-controls button { display: inline-flex; align-items: center; justify-content: center; width: var(--ctl); height: var(--ctl); padding: 0; color: inherit; background: transparent; border: 0; border-radius: var(--ctl-r, var(--r-md)); cursor: pointer; }
-.win-controls button:hover { background: var(--hud-hover); }
-.win-controls button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: -2px; }
-.win-controls svg { width: var(--icon-md); height: var(--icon-md); }
-.win-grip { display: inline-flex; align-items: center; justify-content: center; width: var(--ctl); height: var(--ctl); color: var(--hud-muted); cursor: grab; -webkit-app-region: drag; }
-.win-grip svg { width: var(--icon-md); height: var(--icon-md); }
+/* The window with no frame (src/ui/window-frame.ts): a row over the top of the app, which comes from the very top edge and takes no room. Its drag area exists only while it shows. */
+.win-edge { position: fixed; z-index: var(--z-pop); top: 0; left: 0; right: 0; height: var(--sp-1); }
+@media (hover: none) { .win-edge { height: var(--sp-6); } }
+.win-row { position: fixed; z-index: var(--z-pop); top: 0; left: 0; right: 0; display: flex; align-items: center; gap: var(--gap); height: var(--bar-h); box-sizing: border-box; padding: var(--pad) var(--edge); color: var(--hud-fg); background: var(--paper); border-bottom: 1px solid var(--hud-border); box-shadow: var(--hud-lift); visibility: hidden; transform: translateY(-100%); transition: transform var(--dur-fast) var(--ease-out), visibility var(--dur-fast); }
+.win-row.is-shown { visibility: visible; transform: none; -webkit-app-region: drag; }
+.win-title { flex: 1; min-width: 0; overflow: hidden; font: var(--font-control); text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.win-row button { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--ctl); height: var(--ctl); padding: 0; color: inherit; background: transparent; border: 0; border-radius: var(--ctl-r, var(--r-md)); cursor: pointer; -webkit-app-region: no-drag; }
+.win-row button:hover { background: var(--hud-hover); }
+.win-row button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: -2px; }
+.win-row svg { width: var(--icon-md); height: var(--icon-md); }
 .view-settings button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 #toolbar > .rail { left: calc(var(--edge) / var(--ui-scale, 1)); }
-#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + var(--win-w, 0px) + var(--bar-h) + 2 * var(--near) + 2 * var(--edge)) / var(--ui-scale, 1)); }
+#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + var(--bar-h) + 2 * var(--near) + 2 * var(--edge)) / var(--ui-scale, 1)); }
 /* The Properties bar takes the room between the left cluster and the dock and no more: wider than that, its row scrolls (ADR 0128). */
 #toolbar > .toolbar { min-width: 0; }
 .tb-options-row { min-width: 0; }
@@ -1157,7 +1157,7 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 .drag-stack { position: fixed; top: calc(-1 * var(--drag-stack) * 3); left: 0; width: var(--drag-stack); height: var(--drag-stack); }
 .drag-stack img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 2px solid var(--hud-bg); border-radius: var(--r-md); box-shadow: var(--hud-lift); transform: translate(calc(var(--i) * var(--sp-2)), calc(var(--i) * var(--sp-2))) rotate(calc(var(--i) * 3deg)); }
 .drag-count { position: absolute; top: calc(-1 * var(--sp-4)); right: calc(-1 * var(--sp-4)); min-width: var(--sp-10); padding: var(--sp-1) var(--sp-3); font: var(--weight-semibold) var(--text-sm) var(--font-ui); text-align: center; color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: var(--r-pill); }
-.assets-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--near); min-height: calc(var(--ctl) + 2 * var(--pad) + 2px); padding-left: calc(var(--nav-w, 0px) + var(--near)); padding-right: calc(var(--win-w, 0px) + var(--bar-h) + var(--near) + var(--edge)); }
+.assets-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--near); min-height: calc(var(--ctl) + 2 * var(--pad) + 2px); padding-left: calc(var(--nav-w, 0px) + var(--near)); padding-right: calc(var(--bar-h) + var(--near) + var(--edge)); }
 .assets-search { flex: 1 1 220px; min-width: 0; max-width: 380px; }
 .assets-bar input[type="search"], .assets-bar select { height: var(--ctl); padding: 0 var(--sp-6); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-md); }
 .assets-bar select { padding-right: var(--sp-4); }
@@ -1880,7 +1880,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 @media (max-width: 640px) {
   :root { --row: calc(var(--ctl) + 2 * var(--pad) + 2px); }
   /* Row 1: the view tabs and the workspace menu share the width. */
-  #nav { right: calc(var(--edge) + var(--win-w, 0px) + var(--bar-h) + var(--near)); } /* (clear of the Settings button, and of the window's buttons) */
+  #nav { right: calc(var(--edge) + var(--bar-h) + var(--near)); } /* (clear of the Settings button, and of the window's buttons) */
   #workspace { flex: 1; min-width: 0; }
   #workspace .nav { display: block; }
   .nav-pill { width: 100%; max-width: none; }

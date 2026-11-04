@@ -159,7 +159,6 @@ import fileOutputIcon from "lucide-static/icons/file-output.svg";
 import fileArchiveIcon from "lucide-static/icons/file-archive.svg";
 import pinIcon from "lucide-static/icons/pin.svg";
 import anchorIcon from "lucide-static/icons/anchor.svg";
-import gripHorizontalIcon from "lucide-static/icons/grip-horizontal.svg";
 import minimize2Icon from "lucide-static/icons/minimize-2.svg";
 import maximize2Icon from "lucide-static/icons/maximize-2.svg";
 import pinOffIcon from "lucide-static/icons/pin-off.svg";
@@ -427,7 +426,6 @@ export const ICONS = {
   fileArchive: clean(fileArchiveIcon),
   pin: clean(pinIcon),
   anchor: clean(anchorIcon),
-  gripHorizontal: clean(gripHorizontalIcon),
   minimize2: clean(minimize2Icon),
   maximize2: clean(maximize2Icon),
   pinOff: clean(pinOffIcon),

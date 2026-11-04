@@ -39,10 +39,10 @@ Unverified / Committed / Next bounded task**.
 
 ## v0.54.1: the thumbnail slider in the list too (2026-11-05)
 
-- **Implemented:** `ui.listThumb`, `applyThumbSize` (row height and thumbnail from the slider); a longer slider; the columns button before the layout buttons.
+- **Implemented:** `ui.listThumb`, `applyThumbSize` (row height and thumbnail from the slider); a longer slider; the columns button before the layout buttons; `src/ui/window-frame.ts` as a row that comes from the top edge; shared status bar height.
 - **Tested:** `assets.spec.ts` extended, on GitHub.
 - **Known failures:** none.
-- **Unverified:** the look on screen.
+- **Unverified:** the look on screen; the row on a real desktop and Wayland.
 - **Committed:** v0.54.1.
 - **Next bounded task:** the README's new layout.
 
