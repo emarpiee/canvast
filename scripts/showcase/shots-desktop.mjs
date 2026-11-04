@@ -2,7 +2,7 @@
 // folder's files listed (printed, for the README's workspace folder section). Run from the repo root after `npm run desktop`'s build
 // (dist-desktop/): node scripts/showcase/shots-desktop.mjs <showcase.canvast> <outDir>
 import { _electron as electron } from "@playwright/test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -45,6 +45,19 @@ await p.mouse.move(900, 700);
 await settle(500);
 await p.screenshot({ path: `${out}/desktop.png` });
 console.log("shot desktop");
+await p.keyboard.press("Escape");
+await p.keyboard.press("Escape");
+
+// The Trash: two of the pictures, as deleted files are kept in the workspace folder
+mkdirSync(join(ws, ".trash"), { recursive: true });
+for (const n of ["hero", "journey"]) copyFileSync(resolve(`docs/screenshots/${n}.webp`), join(ws, ".trash", `${n}.webp`));
+await p.getByTestId("view-assets").click();
+await p.getByTestId("assets-side").getByRole("button", { name: /^Trash/ }).click();
+await p.getByTestId("trash-card").first().click();
+await p.mouse.move(700, 880);
+await settle(800);
+await p.screenshot({ path: `${out}/trash.png` });
+console.log("shot trash");
 await app.close();
 
 // The folder as a file manager shows it (dot-folders included), a few files per folder

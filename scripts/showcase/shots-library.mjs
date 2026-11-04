@@ -1,7 +1,8 @@
-// The README's picture of the library with its folder tree and the Organize dialog, in a fresh profile (dark, the default theme colour). Made-up folders and tags.
+// The README's pictures of the library's folder tree, the Organize dialog, several items selected and art files, in a fresh profile (dark, the default theme colour). Made-up folders and tags.
 // Run from the repo root after `npm run build`: node scripts/showcase/shots-library.mjs <showcase.canvast> <outDir>
 import { chromium } from "@playwright/test";
-import { mkdtempSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -39,4 +40,50 @@ await p.getByTestId("tree-chooser").waitFor();
 await p.waitForTimeout(500);
 await p.screenshot({ path: `${out}/organize.png` });
 console.log("shot organize");
+await p.getByTestId("choice-cancel").click();
+
+// The sidebar: a folder pinned, a search typed
+await p.getByTestId("side-find-folders").fill("s");
+await p.mouse.move(700, 880);
+await p.waitForTimeout(400);
+await p.screenshot({ path: `${out}/sidebar.png`, clip: { x: 0, y: 50, width: 480, height: 620 } });
+console.log("shot sidebar");
+await p.getByTestId("side-find-folders").fill("");
+
+// Several selected: their tags and folders together, in the details panel
+await p.keyboard.press("Escape");
+const cards = p.getByTestId("asset-card");
+await cards.nth(0).click();
+for (const n of [1, 2, 3]) await cards.nth(n).click({ modifiers: ["Control"] });
+await p.getByTestId("bulk-tag-input").fill("reference");
+await p.getByTestId("bulk-tag-input").press("Enter");
+await p.mouse.move(700, 880);
+await p.waitForTimeout(500);
+await p.screenshot({ path: `${out}/bulk.png` });
+console.log("shot bulk");
+await p.keyboard.press("Escape");
+
+// Art files: made-up ones, each a ZIP with a picture in it, as paint programs keep them
+const art = join(work, "art");
+const made = [["character_study.kra", "hero"], ["character_study.kra~", "hero"], ["contour_study.ora", "pattern"], ["planet_poster.kra", "shapes"], ["colour_grade.ora", "adjust"]];
+const files = made.map(([name, from], i) => {
+  const dir = join(art, String(i));
+  mkdirSync(join(dir, "Thumbnails"), { recursive: true });
+  execFileSync("ffmpeg", ["-v", "error", "-y", "-i", resolve(`docs/screenshots/${from}.webp`), "-vf", "scale=720:-2", join(dir, "mergedimage.png")]);
+  execFileSync("cp", [join(dir, "mergedimage.png"), join(dir, "preview.png")]);
+  execFileSync("cp", [join(dir, "mergedimage.png"), join(dir, "Thumbnails", "thumbnail.png")]);
+  writeFileSync(join(dir, "mimetype"), name.includes(".ora") ? "image/openraster" : "application/x-krita");
+  const zip = join(art, name);
+  execFileSync("zip", ["-q", "-X", "-0", zip, "mimetype", "mergedimage.png", "preview.png", "Thumbnails/thumbnail.png"], { cwd: dir });
+  return zip;
+});
+await p.getByTestId("assets-import-input").setInputFiles(files);
+await p.getByTestId("asset-card").nth(12).waitFor();
+await p.getByTestId("assets-search").fill("kind:art");
+await p.locator('[data-testid="asset-card"]').nth(3).waitFor();
+await p.locator('[data-testid="asset-card"][title="character_study.kra~"]').click();
+await p.mouse.move(700, 880);
+await p.waitForTimeout(1500);
+await p.screenshot({ path: `${out}/art-files.png` });
+console.log("shot art-files");
 await ctx.close();
