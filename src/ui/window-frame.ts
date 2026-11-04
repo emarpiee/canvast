@@ -68,7 +68,7 @@ export async function mountWindowRow(): Promise<void> {
     }
     if (e.clientY <= row.getBoundingClientRect().bottom) {
       if (Date.now() >= heldUntil) show();
-    } else if (!row.matches(":focus-within") && Date.now() >= heldUntil) hideSoon();
+    } else if (!row.matches(":has(:focus-visible)") && Date.now() >= heldUntil) hideSoon(); // (a button reached by Tab keeps it; one clicked does not)
   }, { passive: true });
   // The pointer gone out of the window: over the top, which a quick move does without ever being seen at the edge, the row comes; anywhere else it goes.
   document.documentElement.addEventListener("mouseleave", (e) => {

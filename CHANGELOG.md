@@ -4,6 +4,7 @@
 
 - **Changed:** with Window frame off, the window's name and buttons are a row that floats over the app, from the very top edge when the pointer reaches it. It takes no room, it comes also when the pointer leaves over the top of the window, and clicks at the top of a window no longer go astray.
 - **Fixed:** with Window frame off, the row is there from the first moment and stays in front of the opening, lock and busy screens, with the workspace's name and the window's buttons. Before, it came only after unlocking, and no dialog let it through.
+- **Fixed:** with Window frame off, the row no longer stays after one of its buttons was clicked: it went only once the focus moved elsewhere.
 - **Changed:** the README is in two parts, for users and for developers, with a section for each big feature, tables and pictures first and the full wording after them; new pictures of the sidebar, several items selected, art files and the Trash.
 - **Changed:** the library's list has the same thumbnail slider as the grid, in the same place, with its own size: its rows and thumbnails grow with it. The slider is longer, and the list's columns button moved to the left of the grid and list buttons so that nothing shifts.
 - **Added:** Details in the details panel show the file's type, size, pixels, time of import, place on disk and whole hash, a JPEG's channels and colour sampling, all lined up. They open from the file's line, with an info icon at its right end, in one card.
