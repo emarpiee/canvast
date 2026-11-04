@@ -42,13 +42,11 @@ await p.screenshot({ path: `${out}/organize.png` });
 console.log("shot organize");
 await p.getByTestId("choice-cancel").click();
 
-// The sidebar: a folder pinned, a search typed
-await p.getByTestId("side-find-folders").fill("s");
-await p.mouse.move(700, 880);
+// The sidebar: a folder pinned, the pointer on its row
+await p.getByTestId("folder-tree").getByRole("button", { name: /^Lighting/ }).first().hover();
 await p.waitForTimeout(400);
 await p.screenshot({ path: `${out}/sidebar.png`, clip: { x: 0, y: 50, width: 480, height: 620 } });
 console.log("shot sidebar");
-await p.getByTestId("side-find-folders").fill("");
 
 // Several selected: their tags and folders together, in the details panel
 await p.keyboard.press("Escape");
