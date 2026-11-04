@@ -125,7 +125,7 @@ import { renderExport } from "./export-render";
 import type { ExportTarget } from "./export-render";
 import { openExportDialog } from "../ui/export-dialog";
 import { mountViewSwitch } from "../ui/view-switch";
-import { mountWindowFrame } from "../ui/window-frame";
+import { followFrameSetting, mountWindowRow } from "../ui/window-frame";
 import { followScrolling } from "../ui/scrollbars";
 import type { AppView } from "../ui/view-switch";
 import { entriesOfDrop, fileByFolders, filesOfEntries, hasFolder } from "./directory";
@@ -456,6 +456,7 @@ async function start(): Promise<void> {
   let storageError = "";
   // Until the workspace is open, a start screen stands in front of the app (nothing can be used half-loaded); it says each step.
   let opening: BusyScreen | null = openStartScreen("");
+  void mountWindowRow(); // (in front of the start and lock screens too)
   const NEXT: Record<string, string> = {
     "storage opened": "Reading the workspace",
     "writer lease": "Reading the workspace",
@@ -1946,7 +1947,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     if (v !== "settings") settings.set("ui.view", v);
   };
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView);
-  void mountWindowFrame(settings);
+  void followFrameSetting(settings);
   followScrolling();
   markTab("canvas");
   markNav("canvas");

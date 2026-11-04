@@ -1096,9 +1096,11 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .view-settings button:hover { background: var(--hud-hover); }
 .view-settings button[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
 /* The window with no frame (src/ui/window-frame.ts): a row over the top of the app, which comes from the very top edge and takes no room. Its drag area exists only while it shows. */
-.win-edge { position: fixed; z-index: var(--z-pop); top: 0; left: 0; right: 0; height: var(--edge); }
+/* (both in the top layer, as popovers: the bare look of one is undone here) */
+.win-edge { position: fixed; inset: 0 0 auto; width: auto; height: var(--edge); margin: 0; padding: 0; background: transparent; border: 0; }
 @media (hover: none) { .win-edge { height: var(--sp-6); } }
-.win-row { position: fixed; z-index: var(--z-pop); top: 0; left: 0; right: 0; display: flex; align-items: center; gap: var(--gap); height: var(--bar-h); box-sizing: border-box; padding: var(--pad) var(--edge); color: var(--hud-fg); background: var(--paper); border-bottom: 1px solid var(--hud-border); box-shadow: var(--hud-lift); visibility: hidden; transform: translateY(-100%); transition: transform var(--dur-fast) var(--ease-out), visibility var(--dur-fast); }
+.win-row:popover-open { display: flex; }
+.win-row { position: fixed; inset: 0 0 auto; width: auto; margin: 0; overflow: hidden; align-items: center; gap: var(--gap); height: var(--bar-h); box-sizing: border-box; padding: var(--pad) var(--edge); color: var(--hud-fg); background: var(--paper); border: 0; border-bottom: 1px solid var(--hud-border); box-shadow: var(--hud-lift); visibility: hidden; transform: translateY(-100%); transition: transform var(--dur-fast) var(--ease-out), visibility var(--dur-fast); }
 .win-row.is-shown { visibility: visible; transform: none; -webkit-app-region: drag; }
 .win-title { flex: 1; min-width: 0; overflow: hidden; font: var(--font-control); text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .win-row button { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--ctl); height: var(--ctl); padding: 0; color: inherit; background: transparent; border: 0; border-radius: var(--ctl-r, var(--r-md)); cursor: pointer; -webkit-app-region: no-drag; }

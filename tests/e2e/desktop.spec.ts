@@ -745,6 +745,7 @@ test("a workspace with a password, moved and renamed, still asks for it when ope
   }
   const moved = `${ws}-moved`;
   renameSync(ws, moved);
+  writeFileSync(`${ws}-userdata/window.json`, JSON.stringify({ frame: "off" })); // (and with no frame, the window's row in front of the lock screen)
   // (the same device: its data folder is named after the old place here)
   app = await electron.launch({ args: [join(buildDir(), "desktop"), `--workspace=${moved}`, `--user-data-dir=${ws}-userdata`], env: { ...process.env, CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug" } });
   try {
@@ -752,6 +753,10 @@ test("a workspace with a password, moved and renamed, still asks for it when ope
     await expect(page.getByTestId("lock-screen")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByTestId("lock-open-folder")).toBeVisible(); // (another workspace can be reached from here)
     await expect(page.getByTestId("lock-new-workspace")).toBeVisible();
+    await expect(page.getByTestId("win-row")).toContainText(basename(moved));
+    await page.waitForTimeout(3_500); // (longer than it shows at a start: here it stays)
+    await page.getByTestId("win-close").click({ trial: true }); // (seen, and not inert behind the modal)
+    await expect(page.getByTestId("win-minimize")).toBeVisible();
   } finally {
     await app.close();
   }

@@ -1057,7 +1057,7 @@ My art/
 
 In the desktop app your workspace is a **folder of ordinary files** that you choose, so any sync tool, backup tool or file manager can see it. It works offline and loads nothing from the network.
 
-**The window's frame.** Settings > Appearance > **Window frame**: *System* (the default) is the title bar your desktop draws; *Off* has none, for more room: move the pointer to the very top edge and a row comes over the app, with minimise, maximise and close, and the window moves by dragging it. It shows for a moment at each start, and goes when the pointer leaves. It applies at the next start, for every workspace.
+**The window's frame.** Settings > Appearance > **Window frame**: *System* (the default) is the title bar your desktop draws; *Off* has none, for more room: move the pointer to the very top edge and a row comes over the app, with minimise, maximise and close, and the window moves by dragging it. It shows for a moment at each start, and goes when the pointer leaves. It stays while the opening, lock and busy screens are up, so the workspace's name and the buttons are always there. It applies at the next start, for every workspace.
 
 **Switching workspaces.** *Switch workspace…* is in the board and canvas menu (under *Whole workspace*), in Settings > Storage and in the command palette, with its choices to open a folder or make a new workspace; the lock screen of a workspace with a password has those two as well, and the workspace stays locked. `Ctrl`+`Shift`+`O` opens a workspace folder.
 
