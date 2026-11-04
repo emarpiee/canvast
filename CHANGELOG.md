@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.42 — An item whose file is there is never taken as erased (2026-11-04)
+
+- **Fixed:** the app stopped at the wrong moment (a crash, a kill, power lost) could leave hidden items out of the sealed index for a moment; on the next start they were taken as erased on another device and their files moved to `.trash`. An item whose file is still there is now never taken as erased, for hidden and shown items alike, and the lists are written again.
+- **Fixed:** in a big library, the first write after a start could have written only some hidden items into the sealed index. The first write is now always whole.
+
 ## 0.53.41 — Delete everywhere on a canvas; merging folders; hidden items out of reach (2026-11-04)
 
 - **Added:** **Delete everywhere** in a canvas's right-click menu and the command palette, with the library's question. Text and shapes selected with it stay.

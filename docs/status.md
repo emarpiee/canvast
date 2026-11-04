@@ -37,6 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.42: an item whose file is there is never taken as erased (2026-11-04)
+
+- **Implemented:** `fileThere` in `LibraryDb.sync`, `hiddenRead` in `writeJson`.
+- **Tested:** typecheck and unit here; Stress hidden on GitHub (same seeds), desktop spec.
+- **Known failures:** found by Stress hidden: seed 760855378 round 28, seed 761817972 round 45: items marked deleted by `sync`, sealed files moved to `.trash` (recoverable from there).
+- **Committed:** v0.53.42.
+
 ## v0.53.41: Delete everywhere on a canvas; merging folders; hidden items out of reach (2026-11-04)
 
 - **Implemented:** `ui/delete-everywhere.ts` (library and canvas), `app/folder-merge.ts`, `ui/folder-clash.ts`, `selectedHashes` in `main.ts` with `hiddenInReach`. `stress-hidden.mjs` counts sealed files under encrypted names.

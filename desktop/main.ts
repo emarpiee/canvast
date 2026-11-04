@@ -694,7 +694,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
             return null;
           }
         };
-        return l.sync(keys, read, extra, args[2] === true, (done, total) => !win.webContents.isDestroyed() && win.webContents.send("canvast:libProgress", done, total), args[3] === true);
+        return l.sync(keys, read, extra, args[2] === true, (done, total) => !win.webContents.isDestroyed() && win.webContents.send("canvast:libProgress", done, total), args[3] === true, (file) => isSafeRelativePath(file) && existsSync(join(root, file)));
       }
       case "write": {
         const only = args[0] === null ? null : hashes(args[0]);

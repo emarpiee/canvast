@@ -1535,8 +1535,11 @@ export class LibraryMirror {
    * Write the library's files (in the main process, from the library: `LibraryCalls.write`): the parts of `only`'s items, or all of
    * them, the index, `library.json` for a small library. Then the sealed index from the hidden items (with the key open).
    */
-  private async writeJson(only?: ReadonlySet<string>): Promise<void> {
+  private async writeJson(asked?: ReadonlySet<string>): Promise<void> {
     const blank = await this.anyBlank();
+    // (the sealed index is written whole: until the hidden items have all been read here, a write of some would leave the others out of it)
+    const only = asked && this.hiddenRead ? asked : undefined;
+    this.hiddenRead = true;
     const r = await this.lib.serial(() => this.lib.calls.write(only ? [...only] : null, libraryTesting.compatMax, blank));
     if (!only) this.partsMissing = false;
     this.lastText = r.compat;
@@ -1575,4 +1578,6 @@ export class LibraryMirror {
   partsMissing = false;
   /** The hidden items sealed, as last written. */
   private hiddenItems = new Map<string, LibraryItem>();
+  /** Whether `hiddenItems` holds them all: after the first whole write. */
+  private hiddenRead = false;
 }

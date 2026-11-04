@@ -18,6 +18,21 @@ const folder = (items: LibraryItem[]) => {
 };
 
 describe("library database (desktop)", () => {
+  it("an item whose file is still there is never taken as erased: a list behind is written again; with its file gone, it is erased", () => {
+    const lib = new Library(openLibraryDb(":memory:"));
+    const sealed = (n: number) => item(n, { file: `.hidden/a/${n}` });
+    lib.sync([], () => null, [sealed(1), sealed(2)], true);
+    // The sealed index is behind (the app stopped before writing it): both still on disk.
+    const on = new Set([sealed(1).file!, sealed(2).file!]);
+    expect(lib.sync([], () => null, [], true, undefined, false, (f) => on.has(f)).whole).toBe(false);
+    expect(lib.entry(sealed(1).hash)!.state).toBe("active");
+    expect(lib.entry(sealed(2).hash)!.state).toBe("active");
+    // Erased on another device: the list and, then, the file.
+    on.delete(sealed(2).file!);
+    lib.sync([], () => null, [sealed(1)], true, undefined, false, (f) => on.has(f));
+    expect(lib.entry(sealed(1).hash)!.state).toBe("active");
+    expect(lib.entry(sealed(2).hash)!.state).toBe("deleted");
+  });
   it("takes the folder's items, then only what changed; this device's own change wins; erased items are marked deleted", () => {
     const lib = new Library(openLibraryDb(":memory:"));
     let f = folder([item(1), item(2), item(3)]);

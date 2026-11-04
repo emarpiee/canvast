@@ -248,7 +248,7 @@ export class Library {
    * this device's version. With `deletions` (the library read whole, the hidden items not locked) an item no longer in its part was
    * erased on another device and is marked deleted here; `extra` are the hidden items of the sealed index, which no part holds.
    */
-  sync(keys: readonly string[], readPart: (key: string) => Buffer | null, extra: readonly LibraryItem[], deletions: boolean, onPart?: (done: number, total: number) => void, all = false): SyncResult {
+  sync(keys: readonly string[], readPart: (key: string) => Buffer | null, extra: readonly LibraryItem[], deletions: boolean, onPart?: (done: number, total: number) => void, all = false, fileThere: (file: string) => boolean = () => false): SyncResult {
     const fpOf = this.db.prepare<[string], { fp: string }>("SELECT fp FROM parts WHERE key = ?");
     const setFp = this.db.prepare("INSERT OR REPLACE INTO parts VALUES (?, ?)");
     const dropFp = this.db.prepare("DELETE FROM parts WHERE key = ?");
@@ -330,6 +330,13 @@ export class Library {
       for (const c of candidates) {
         if (present.has(c.hash) || unchanged.has(c.hash.slice(0, 3)) || unchanged.has(c.hash.slice(0, 2)) || unchanged.has(c.hash.slice(0, 1))) continue;
         if (changedHere(c.hash, c.v)) continue; // changed here: kept
+        // Its file is still there: it was not erased, whatever a list says. A list can be behind (the app stopped between writing the library's files and
+        // the sealed index, a sync tool bringing them one by one). Kept, and the lists written again; an erase elsewhere comes with the file gone.
+        const held = this.rec(c.hash) as { file?: string | null } | undefined;
+        if (held?.file && fileThere(held.file)) {
+          whole = false;
+          continue;
+        }
         const e = this.entry(c.hash);
         if (e?.state === "active") this.one({ t: "entry", hash: c.hash, v: { ...e, state: "deleted", deletedAt: Date.now() } }, false);
         this.one({ t: "seen", hash: c.hash, v: null });
