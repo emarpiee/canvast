@@ -41,6 +41,12 @@ for (const r of RULES) {
 const HINT_MAX = 44;
 for (const f of all) for (const m of readFileSync(f, "utf8").matchAll(/\bhint: "([^"]*)"/g)) if (m[1].length > HINT_MAX) failed.push(`Menu rows: ${f}: "${m[1]}" is over ${HINT_MAX} characters.`);
 const css = readFileSync("src/styles.css", "utf8");
+// Every colour of the notes editor is the theme's: one with a colour of its own that our theme does not set would show through, whatever the accent.
+const SE_OWN_COLOURS = new Set(["--se-show-blocks-color", "--se-show-blocks-pre-color", "--se-show-blocks-li-color", "--se-show-blocks-component-color"]); // (tell kinds of block apart, on purpose)
+const seCss = readFileSync("node_modules/suneditor/src/assets/suneditor.css", "utf8");
+for (const m of readFileSync("node_modules/suneditor/src/assets/design/color.css", "utf8").matchAll(/^\s*(--se-[a-z0-9-]+):\s*#[0-9a-fA-F]{3,8}\b/gm)) {
+  if (seCss.includes(`var(${m[1]})`) && !SE_OWN_COLOURS.has(m[1]) && !css.includes(`${m[1]}:`)) failed.push(`Notes editor colours: ${m[1]} has its own colour. Set it in .se-theme-canvast in src/styles.css.`);
+}
 // One arrow for what opens: the chevron icon or --chevron-mask, never a character.
 for (const f of [...all, "src/styles.css", "src/index.html"]) if (/[▾▼▿▽⌄˅⏷]/.test(readFileSync(f, "utf8"))) failed.push(`Arrows: ${f} writes an arrow as a character. Use ICONS.chevronDown or --chevron-mask.`);
 for (const c of RETIRED_CSS) if (css.includes(c)) failed.push(`src/styles.css still styles ${c}, which the shared component replaced.`);

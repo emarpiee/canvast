@@ -275,3 +275,22 @@ test("a checkbox is the app's, not the browser's", async ({ app }) => {
   await expect(box).toBeAttached();
   expect(await box.evaluate((e) => getComputedStyle(e).appearance)).toBe("none");
 });
+
+test("a focus ring is the accent, also on what has no look of its own", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("Shift"); // (the keyboard in use: a focus shows)
+  const ring = await p.evaluate(() => {
+    const b = document.createElement("button");
+    const c = document.createElement("span");
+    c.style.color = "var(--hud-accent)";
+    document.body.append(b, c);
+    b.focus();
+    const s = getComputedStyle(b);
+    const out = { style: s.outlineStyle, colour: s.outlineColor, accent: getComputedStyle(c).color };
+    b.remove();
+    c.remove();
+    return out;
+  });
+  expect(ring.style).toBe("solid");
+  expect(ring.colour).toBe(ring.accent);
+});
