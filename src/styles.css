@@ -1055,7 +1055,10 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .view-switch button { padding: 0 var(--sp-6); gap: var(--sp-3); }
 .view-switch button svg { width: 16px; height: 16px; }
 .nav-pill { height: var(--bar-h); }
-.view-switch { height: calc(var(--ctl) + 2 * var(--pad) + 2px); align-items: center; }
+/* (one button: the button itself, as tall as the ∞ beside it, with no bar around it) */
+.view-switch { height: var(--bar-h); align-items: center; padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; }
+.view-switch button { box-sizing: border-box; height: var(--bar-h); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); }
+.view-switch button[aria-selected="true"] { border-color: var(--hud-accent); }
 #nav { left: var(--edge); top: var(--edge); gap: var(--near); }
 #toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); } /* (the Settings button is in the corner) */
 /* Settings: a button of its own in the top-right corner of every view. */
