@@ -1392,7 +1392,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer .viewer-ground { display: none; }
 .viewer.has-alpha .viewer-ground { display: inline-flex; }
 /* The tools at the bottom right of the picture, beside each other: grey, and the ground of a see-through picture when it has one. */
-.viewer-tools { position: absolute; right: var(--sp-6); bottom: var(--sp-6); z-index: var(--z-item-bar); display: flex; gap: var(--s-2); }
+.viewer-picture-tools { position: absolute; right: var(--sp-6); bottom: var(--sp-6); z-index: var(--z-item-bar); display: flex; gap: var(--s-2); }
 .vbtn.viewer-ground, .vbtn.viewer-grey { width: var(--ctl); padding: 0; color: var(--v-fg); background: var(--v-pill); border: 1px solid var(--v-line); border-radius: var(--ctl-r); }
 .viewer.is-grey .viewer-stage > figure { filter: grayscale(1); }
 .viewer.is-note .viewer-grey { display: none; }

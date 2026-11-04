@@ -998,6 +998,12 @@ test("viewer: opens from a card, steps through the library with a filmstrip, and
   await p.keyboard.press("f");
   await expect(viewer.locator(".viewer-bar")).toBeVisible();
   await expect(viewer.locator(".film-item.is-current")).toHaveCount(1);
+  // The bar's controls are in the bar, in a row, not over each other.
+  const barBox = (await viewer.locator(".viewer-bar").boundingBox())!;
+  const zoomBox = (await viewer.locator(".viewer-bar .viewer-tools").boundingBox())!;
+  const posBox = (await viewer.locator(".viewer-pos").boundingBox())!;
+  expect(zoomBox.y).toBeGreaterThanOrEqual(barBox.y - 1);
+  expect(zoomBox.x).toBeGreaterThanOrEqual(posBox.x + posBox.width - 1);
   // Greyscale is only a look: on, then gone with the next item.
   const grey = viewer.getByTestId("viewer-grey");
   await grey.click();
