@@ -3,7 +3,7 @@
 ## 0.54.1 — The thumbnail slider in the list too (2026-11-05)
 
 - **Changed:** the library's list has the same thumbnail slider as the grid, in the same place, with its own size: its rows and thumbnails grow with it. The slider is longer, and the list's columns button moved to the left of the grid and list buttons so that nothing shifts.
-- **Fixed:** on a small window the ∞ button stretched across the top row and the Settings button covered the canvas's name; the name takes the room now, clear of the buttons. With the window frame off, the viewer's buttons keep clear of the window buttons, which look like one group, and clicks at the top of a small window no longer go astray: only a grip beside them and the top edge move the window.
+- **Fixed:** on a small window the ∞ button stretched across the top row and the Settings button covered the canvas's name; the name takes the room now, clear of the buttons. With the window frame off, the window buttons look like one group, and clicks at the top of a small window no longer go astray: only a grip beside them and the top edge move the window.
 - **Fixed:** the status bars of the canvas and the library have one height with room around their buttons, which are square.
 - **Fixed:** the action buttons in the details panel were cut off (`Rename …`, `Export 4 …`); they now take the panel's whole width, one to a row.
 
