@@ -130,6 +130,7 @@
   /* The one arrow of what opens or folds, the chevron-down icon as a mask, for what CSS draws (a select, a summary): colour it with its background. Without masks on selects: a fixed grey that reads on both themes. */
   --chevron-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --chevron-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='gray' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --check-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
   --icon-sm: 14px;
   --drag-stack: 96px; /* the stack of thumbnails a drag from the library shows */
   --icon-md: 16px;
@@ -1036,7 +1037,17 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .hud-pos, .hud-save { color: var(--hud-muted); }
 .hud-save:hover { color: var(--hud-fg); }
 .hud-controls { padding: var(--s-2); }
-input[type="range"], input[type="checkbox"], input[type="radio"], progress { accent-color: var(--hud-accent); }
+input[type="range"], progress { accent-color: var(--hud-accent); }
+/* The one checkbox and the one radio of the app, the theme's and not the browser's, sized by Density: the whole look is here. */
+input[type="checkbox"], input[type="radio"] { appearance: none; flex: none; display: inline-grid; place-content: center; box-sizing: border-box; width: var(--icon-md); height: var(--icon-md); margin: 0; vertical-align: middle; color: var(--hud-accent-fg); background: var(--hud-bg); border: 1px solid var(--hud-edge); cursor: pointer; transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out); }
+input[type="checkbox"] { border-radius: var(--r-sm); }
+input[type="radio"] { border-radius: var(--r-dot); }
+:is(input[type="checkbox"], input[type="radio"]):hover:not(:disabled) { border-color: var(--hud-accent); }
+:is(input[type="checkbox"], input[type="radio"]):is(:checked, :indeterminate) { background: var(--hud-accent); border-color: var(--hud-accent); }
+:is(input[type="checkbox"], input[type="radio"]):disabled { opacity: 0.5; cursor: default; }
+input[type="checkbox"]:checked::before { content: ""; width: var(--icon-sm); height: var(--icon-sm); background: currentColor; mask: var(--check-mask) center / contain no-repeat; }
+input[type="checkbox"]:indeterminate:not(:checked)::before { content: ""; width: var(--sp-4); height: var(--sp-1); background: currentColor; border-radius: var(--r-dot); }
+input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: var(--sp-3); background: currentColor; border-radius: var(--r-dot); }
 
 /* The hue slider: a rainbow at one lightness, so what it shows is what the dial does (the same L and C as the accent). */
 .set-hue { -webkit-appearance: none; appearance: none; height: 10px; border-radius: var(--r-pill); background: linear-gradient(in oklch longer hue to right, oklch(var(--swatch-lc) 0), oklch(var(--swatch-lc) 360)); }
@@ -1352,7 +1363,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-fields [data-action="field-remove"] { height: var(--ctl); background: transparent; border-color: transparent; }
 .asset-fields [data-action="field-remove"]:hover:not(:disabled) { background: var(--hud-hover); }
 .asset-field > .field-warn { grid-area: warn; }
-.asset-field input[type="checkbox"].field-value { justify-self: start; width: var(--icon-md); height: var(--ctl); margin: 0; }
+.asset-field input[type="checkbox"].field-value { justify-self: start; align-self: center; }
 .field-type { display: inline-flex; align-items: center; justify-content: center; width: var(--icon-lg); height: var(--ctl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
 .field-type:hover:not(:disabled) { color: var(--hud-fg); background: var(--hud-hover); }
 .field-type:disabled { cursor: default; opacity: 0.4; }
@@ -2205,7 +2216,6 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .layers-tags .tag-chip .tag-chip-name:hover { background: var(--hud-hover); }
 
 /* Canvas search: checkboxes, recent searches, clear button (ADR 0071). */
-.cs-check { flex: none; width: var(--icon-md); height: var(--icon-md); margin: 0; accent-color: var(--hud-accent); cursor: pointer; }
 .cs-clear, .cs-save { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--icon-xl); height: var(--icon-xl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--ctl-r); cursor: pointer; }
 .cs-clear:hover, .cs-save:hover:not(:disabled) { color: var(--hud-fg); background: var(--hud-hover); }
 .cs-clear[hidden], .cs-save[hidden] { display: none; }
@@ -2538,7 +2548,6 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 .set-scope { opacity: 1; color: var(--hud-muted); min-width: var(--sp-15); }
 .set-control select, .set-control input[type="text"], .set-control input:not([type]) { width: 100%; height: var(--ctl); padding: 0 var(--s-6); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-md); }
 .set-control select { padding-right: var(--s-4); }
-.set-control input[type="checkbox"] { width: var(--icon-lg); height: var(--icon-lg); margin: 0; }
 .set-control output { opacity: 1; color: var(--hud-muted); }
 /* The shortcut keys: the same rows as every other tab, the whole width. */
 .set-keys, .set-info.set-keys { max-width: none; }

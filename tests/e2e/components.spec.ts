@@ -268,3 +268,10 @@ test("a select's arrow is the app's chevron, not the browser's", async ({ app, b
   const arrow = await select.evaluate((e) => (CSS.supports("appearance: base-select") ? getComputedStyle(e, "::picker-icon").maskImage : getComputedStyle(e).backgroundImage));
   expect(arrow, browserName).toContain("data:image/svg+xml");
 });
+
+test("a checkbox is the app's, not the browser's", async ({ app }) => {
+  await app.page.getByTestId("view-settings").click();
+  const box = app.page.locator('input[type="checkbox"]').first();
+  await expect(box).toBeAttached();
+  expect(await box.evaluate((e) => getComputedStyle(e).appearance)).toBe("none");
+});
