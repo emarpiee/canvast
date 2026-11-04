@@ -75,6 +75,8 @@ export interface LibraryCalls {
 export type DeleteMode = "trash" | "system" | "erase";
 
 /** Paths are relative to the workspace folder and `/`-separated; the main process refuses any that would leave it. */
+export type WindowFrame = "system" | "off";
+
 export interface DesktopBridge {
   /** The workspace folder this window is open on. */
   workspace(): Promise<DesktopWorkspace | null>;
@@ -114,6 +116,12 @@ export interface DesktopBridge {
   openCopy(name: string, bytes: Uint8Array | string): Promise<string>;
   /** Real files on the system clipboard: `files` in the workspace, and `copies` written like `openCopy`'s (hidden items). How many. */
   copyFiles(files: readonly string[], copies: ReadonlyArray<{ name: string; bytes: Uint8Array | string }>): Promise<number>;
+  /** A real file drag out of the app, of these files of the workspace. Starts while the pointer is held. */
+  startDrag(files: readonly string[]): void;
+  /** The window's frame: `saved` is for the next start, `window` what this window has. */
+  frame(): Promise<{ saved: WindowFrame; window: WindowFrame }>;
+  setFrame(mode: WindowFrame): Promise<void>;
+  windowAct(act: "minimize" | "maximize" | "close"): void;
   dropOpened(): Promise<void>;
   /** Show a file of the workspace folder in the system's file manager (its folder opened, the file selected). */
   showFile(path: string): Promise<void>;

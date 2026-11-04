@@ -140,6 +140,7 @@ export const SETTINGS = {
   "key.navLeft": { scope: "device", default: "a", validate: letter, effect: "immediate" } as Def<string>,
   "key.navDown": { scope: "device", default: "s", validate: letter, effect: "immediate" } as Def<string>,
   "key.navRight": { scope: "device", default: "d", validate: letter, effect: "immediate" } as Def<string>,
+  "ui.frame": { scope: "device", default: "system", validate: oneOf("system", "off"), effect: "restart" } as Def<"system" | "off">,
   "ui.hueAdaptive": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "ui.hue": { scope: "device", default: 178, validate: range(0, 360), effect: "immediate" } as Def<number>,
   "ui.vivid": { scope: "device", default: 100, validate: range(0, 150), effect: "immediate" } as Def<number>,

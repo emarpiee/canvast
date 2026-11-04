@@ -1,0 +1,27 @@
+name: File managers
+
+# Copy file, pasted in real Linux file managers under a virtual X11 screen: every week and by hand, not on each push.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+
+jobs:
+  paste:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y xvfb xdotool openbox dbus-x11 nautilus nemo thunar pcmanfm dolphin
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run build:desktop
+      - name: Paste in each one
+        env:
+          ELECTRON_DISABLE_SANDBOX: "1"
+        run: xvfb-run -a dbus-run-session bash -c 'openbox & sleep 2; node scripts/file-manager-paste.mjs "$GITHUB_STEP_SUMMARY"'

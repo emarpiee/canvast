@@ -6,7 +6,7 @@
  * two workspaces never share boards or a library. The folder is the one passed with `--workspace=<path>`, else the last
  * one opened, else the one chosen in the start dialog (recent ones, open a folder, a new workspace).
  */
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, protocol, session, shell, clipboard, ClipboardItem } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, net, protocol, session, shell, clipboard, ClipboardItem } from "electron";
 import { execFile } from "node:child_process";
 import { createHash, randomBytes, randomUUID, scrypt } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, watch, writeFileSync } from "node:fs";
@@ -40,6 +40,20 @@ interface Recent {
 }
 
 const recentFile = (): string => join(app.getPath("userData"), "workspaces.json");
+/** The window's frame (Settings > Appearance), read when a window is made: it cannot change on an open one. */
+const frameFile = (): string => join(app.getPath("userData"), "window.json");
+function readFrame(): "system" | "off" {
+  try {
+    return (JSON.parse(readFileSync(frameFile(), "utf8")) as { frame?: unknown }).frame === "off" ? "off" : "system";
+  } catch {
+    return "system";
+  }
+}
+function saveFrame(frame: "system" | "off"): void {
+  mkdirSync(app.getPath("userData"), { recursive: true });
+  writeFileSync(frameFile(), JSON.stringify({ frame }));
+}
+let frameAtStart: "system" | "off" = "system";
 
 function readRecent(): Recent {
   try {
@@ -611,6 +625,30 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     await clipboard.write([new ClipboardItem({ [raw("text/uri-list")]: new Blob([`${urls.join("\r\n")}\r\n`]), [raw("x-special/gnome-copied-files")]: new Blob([`copy\n${urls.join("\n")}`]) })]);
     return fulls.length;
   });
+  // A real file drag out of the app (only the workspace's own files: a hidden item's is encrypted, and is not asked for). The picture under the pointer is a plain tile.
+  ipcMain.removeAllListeners("canvast:startDrag");
+  ipcMain.on("canvast:startDrag", (e, rels: unknown) => {
+    if (e.sender !== win.webContents || !Array.isArray(rels) || !rels.length) return;
+    void Promise.all(rels.map((r) => inside(root, String(r)))).then((fulls) => {
+      if (win.isDestroyed()) return;
+      e.sender.startDrag({ file: fulls[0]!, files: fulls, icon: nativeImage.createFromBitmap(Buffer.alloc(32 * 32 * 4, 0x88), { width: 32, height: 32 }) });
+    }, () => undefined);
+  });
+  ipcMain.handle("canvast:frame", (e) => {
+    own(e);
+    return { saved: readFrame(), window: frameAtStart };
+  });
+  ipcMain.handle("canvast:setFrame", (e, mode: unknown) => {
+    own(e);
+    if (mode === "system" || mode === "off") saveFrame(mode);
+  });
+  ipcMain.removeAllListeners("canvast:windowAct");
+  ipcMain.on("canvast:windowAct", (e, act: unknown) => {
+    if (e.sender !== win.webContents) return;
+    if (act === "minimize") win.minimize();
+    else if (act === "maximize") (win.isMaximized() ? win.unmaximize() : win.maximize());
+    else if (act === "close") win.close();
+  });
   ipcMain.handle("canvast:dropOpened", (e) => {
     own(e);
     return dropOpened();
@@ -1064,7 +1102,9 @@ async function openWindow(workspace: string): Promise<void> {
   });
 
   const hidden = process.env["CANVAST_HIDDEN"] === "1"; // (tests: no window on the screen)
+  frameAtStart = readFrame();
   const win = new BrowserWindow({
+    frame: frameAtStart !== "off",
     width: 1400,
     height: 900,
     show: !hidden,

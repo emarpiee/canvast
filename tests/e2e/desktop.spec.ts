@@ -868,7 +868,9 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     expect(await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.folders.map((f) => f.name)))).toEqual(["Secret Folder"]);
     // Locked again: hiding (its folder, here) waits for the key (the readable file stays until the password is given).
     await hid("lock");
-    await lib("hideFolder", "sf1");
+    // (by its name: opening can read the folder from the sealed files before the sealed list, and it then has another id)
+    const folderNow = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.folders.find((f) => f.name === "Secret Folder")!.id));
+    await lib("hideFolder", folderNow);
     await flush();
     expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual(["library/secret_folder/secret_plan.png"]);
     page.on("console", (m) => void (m.text().startsWith("canvast: the library's files") && console.log(`HIDDEN WATCH: ${m.text()}`))); // (a write that had to be tried again: in the run's log)
@@ -1957,6 +1959,33 @@ test("the Trash is a state of the library: this workspace's .trash for the mode,
   }
 });
 
+test("the window frame off: no bar, and the window's buttons and what moves it are in the page; after a restart, and back", async () => {
+  const ws = tempDir("cv-frame-");
+  let { app, page } = await launch(ws, "userdata", true);
+  try {
+    await expect(page.getByTestId("win-close")).toHaveCount(0);
+    await page.evaluate(() => window.__canvastDebug.setSetting("ui.frame", "off"));
+    await expect.poll(() => readFileSync(`${ws}-userdata/window.json`, "utf8")).toContain("off");
+    await expect(page.getByTestId("win-close")).toHaveCount(0); // (a window's frame cannot change: at the next start)
+    await app.close();
+    ({ app, page } = await launch(ws, "userdata", true));
+    await expect(page.locator("html")).toHaveAttribute("data-frame", "off");
+    await expect(page.getByTestId("win-minimize")).toBeVisible();
+    await expect(page.getByTestId("win-maximize")).toBeVisible();
+    await expect(page.getByTestId("win-close")).toBeVisible();
+    expect(await page.locator(".win-strip").evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"))).toBe("drag");
+    const box = async (id: string) => (await page.getByTestId(id).boundingBox())!;
+    expect((await box("view-settings")).x + (await box("view-settings")).width).toBeLessThanOrEqual((await box("win-minimize")).x); // (the Settings button keeps clear of them)
+    await page.evaluate(() => window.__canvastDebug.setSetting("ui.frame", "system"));
+    await expect.poll(() => readFileSync(`${ws}-userdata/window.json`, "utf8")).toContain("system");
+    await app.close();
+    ({ app, page } = await launch(ws, "userdata", true));
+    await expect(page.getByTestId("win-close")).toHaveCount(0);
+  } finally {
+    await app.close();
+  }
+});
+
 test("Copy file: the real files on the clipboard, from the library, as a list of addresses inside the workspace", async () => {
   const ws = tempDir("cv-copy-file-");
   const { app, page } = await launch(ws, "userdata", true);
@@ -1980,6 +2009,29 @@ test("Copy file: the real files on the clipboard, from the library, as a list of
     expect(list).toContain("a.zip");
     expect(list.trim().split(/\r\n/)).toHaveLength(2);
     for (const line of list.trim().split(/\r\n/)) expect(decodeURIComponent(line)).toContain(ws);
+    // Dragged out: the plain drag says where the files are; with Alt, a real file drag. A hidden item stays in, its file encrypted.
+    const drag = (name: string, altKey = false) => on(name).evaluate(async (el, alt) => {
+      el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 500));
+      const dataTransfer = new DataTransfer();
+      el.dispatchEvent(new DragEvent("dragstart", { bubbles: true, cancelable: true, dataTransfer, altKey: alt }));
+      const list = dataTransfer.getData("text/uri-list");
+      el.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer }));
+      return list;
+    }, altKey);
+    const carried = await drag("b file.pdf");
+    expect(carried.trim().split(/\r\n/)).toHaveLength(2);
+    expect(decodeURIComponent(carried)).toContain(`${ws}/library/`);
+    await app.evaluate(({ BrowserWindow }) => void (BrowserWindow.getAllWindows()[0]!.webContents.startDrag = (item) => void ((globalThis as { dragged?: unknown }).dragged = item.files ?? [item.file])));
+    expect(await drag("b file.pdf", true)).toBe("");
+    await expect.poll(() => app.evaluate(() => ((globalThis as { dragged?: string[] }).dragged ?? []).length)).toBe(2);
+    await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"));
+    const hash = await on("a.zip").getAttribute("data-hash");
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("hide", h!, "1"), hash);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await page.keyboard.press("Escape");
+    await expect(on("a.zip")).toHaveCount(0);
+    expect(decodeURIComponent(await drag("b file.pdf"))).not.toContain("a.zip");
   } finally {
     await app.close();
   }

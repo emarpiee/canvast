@@ -269,6 +269,8 @@ One icon per function: two buttons that do different things never share an icon,
 | (own inline icon in `src/colour-picker/picker.ts`, not lucide) | Pick a colour from the screen (the colour picker's eyedropper) |
 | `funnel-x` | Reset every filter of the library (Show, Sort, direction, the sidebar's list) |
 | `arrow-up-to-line` | Back to the top of the library (status bar, grid and list) |
+| `minimize-2` | Minimize the window (desktop app, window frame off) |
+| `maximize-2` | Maximize or restore the window (desktop app, window frame off) |
 | `anchor` | Stay in hidden mode when leaving the library (hidden mode, status bar) |
 | `pin` | Pin a folder to the top of the library sidebar (filled on a pinned one) |
 | `folder-up` | The mark of a pinned folder in the library sidebar |

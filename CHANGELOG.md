@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.54.0 — Drag items out of the app; a window with no frame (2026-11-05)
+
+- **Added:** drag library items out of the desktop app onto a file manager or another program; hold `Alt` to start a real file drag if a program refuses the plain one. Hidden items stay in: use Copy file.
+- **Added:** Settings > Appearance > Window frame: System, or Off with no title bar, its buttons at the top right. It applies at the next start.
+- **Added:** a `File managers` workflow that pastes a Copy file in five Linux file managers on a virtual screen.
+
 ## 0.53.66 — No menu bar in the desktop app (2026-11-05)
 
 - **Removed:** the File, Edit and View bar of the desktop app's window. Its keys still work (`Ctrl+Shift+O` opens a workspace folder), and the workspace switcher has its commands.

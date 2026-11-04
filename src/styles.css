@@ -1054,16 +1054,26 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .nav-pill { height: var(--bar-h); }
 .view-switch { height: calc(var(--ctl) + 2 * var(--pad) + 2px); align-items: center; }
 #nav { left: var(--edge); top: var(--edge); gap: var(--near); }
-#toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); } /* (the Settings button is in the corner) */
+#toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc((var(--edge) + var(--win-w, 0px) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); } /* (the Settings button is in the corner) */
 /* Settings: a button of its own in the top-right corner of every view. */
-.view-settings { position: fixed; pointer-events: auto; top: var(--edge); right: var(--edge); z-index: var(--z-edge); zoom: var(--ui-scale, 1); }
+.view-settings { position: fixed; pointer-events: auto; top: var(--edge); right: calc(var(--edge) + var(--win-w, 0px)); z-index: var(--z-edge); zoom: var(--ui-scale, 1); }
 .view-settings button { display: inline-flex; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); padding: 0; box-sizing: border-box; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); cursor: pointer; }
 .view-settings button svg { width: 18px; height: 18px; }
 .view-settings button:hover { background: var(--hud-hover); }
 .view-settings button[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
+/* The window with no frame (src/ui/window-frame.ts): the buttons in the corner, what moves the window, and room kept beside them. */
+:root[data-frame="off"] { --win-w: calc(3 * var(--bar-h) + var(--near)); }
+.win-strip { position: fixed; z-index: var(--z-edge); top: 0; left: 0; right: 0; height: var(--edge); -webkit-app-region: drag; }
+.win-controls { position: fixed; z-index: var(--z-pop); top: var(--edge); right: var(--edge); display: flex; -webkit-app-region: no-drag; }
+.win-controls button { display: inline-flex; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); padding: 0; color: inherit; background: var(--hud-bg); border: 0; border-radius: var(--r-md); cursor: pointer; }
+.win-controls button:hover { background: var(--hud-hover); }
+.win-controls button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: -2px; }
+.win-controls svg { width: var(--icon-md); height: var(--icon-md); }
+:root[data-frame="off"] :is(.assets-bar, .set-head, #nav) { -webkit-app-region: drag; }
+:root[data-frame="off"] :is(.assets-bar, .set-head, #nav) :is(button, input, select, a, [role="tab"], label) { -webkit-app-region: no-drag; }
 .view-settings button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 #toolbar > .rail { left: calc(var(--edge) / var(--ui-scale, 1)); }
-#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + var(--bar-h) + 2 * var(--near) + 2 * var(--edge)) / var(--ui-scale, 1)); }
+#toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + var(--win-w, 0px) + var(--bar-h) + 2 * var(--near) + 2 * var(--edge)) / var(--ui-scale, 1)); }
 /* The Properties bar takes the room between the left cluster and the dock and no more: wider than that, its row scrolls (ADR 0128). */
 #toolbar > .toolbar { min-width: 0; }
 .tb-options-row { min-width: 0; }
@@ -1144,7 +1154,7 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 .drag-stack { position: fixed; top: calc(-1 * var(--drag-stack) * 3); left: 0; width: var(--drag-stack); height: var(--drag-stack); }
 .drag-stack img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border: 2px solid var(--hud-bg); border-radius: var(--r-md); box-shadow: var(--hud-lift); transform: translate(calc(var(--i) * var(--sp-2)), calc(var(--i) * var(--sp-2))) rotate(calc(var(--i) * 3deg)); }
 .drag-count { position: absolute; top: calc(-1 * var(--sp-4)); right: calc(-1 * var(--sp-4)); min-width: var(--sp-10); padding: var(--sp-1) var(--sp-3); font: var(--weight-semibold) var(--text-sm) var(--font-ui); text-align: center; color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: var(--r-pill); }
-.assets-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--near); min-height: calc(var(--ctl) + 2 * var(--pad) + 2px); padding-left: calc(var(--nav-w, 0px) + var(--near)); padding-right: calc(var(--bar-h) + var(--near) + var(--edge)); }
+.assets-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--near); min-height: calc(var(--ctl) + 2 * var(--pad) + 2px); padding-left: calc(var(--nav-w, 0px) + var(--near)); padding-right: calc(var(--win-w, 0px) + var(--bar-h) + var(--near) + var(--edge)); }
 .assets-search { flex: 1 1 220px; min-width: 0; max-width: 380px; }
 .assets-bar input[type="search"], .assets-bar select { height: var(--ctl); padding: 0 var(--sp-6); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-md); }
 .assets-bar select { padding-right: var(--sp-4); }

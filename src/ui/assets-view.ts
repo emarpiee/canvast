@@ -154,6 +154,8 @@ const SIDE_SORT_LOOK: Record<SideSort, { word: string; icon: string }> = {
   new: { word: "newest first", icon: ICONS.calendarDays },
   old: { word: "oldest first", icon: ICONS.calendarArrowUp },
 };
+/** The most items dragged out of the app at once (each is looked up when the pointer goes down). */
+const MAX_DRAG_OUT = 1000;
 const SIDE_SHOWN = { folders: 8, types: 8, tags: 12, ctags: 12, saved: 8 } as const;
 /** How many loaded thumbnails are kept ready to show again. */
 const THUMB_URLS_KEPT = 3000;
@@ -3843,12 +3845,44 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // ---- sidebar: scope, folders
   // ---- dragging items onto the sidebar: a folder moves them into it, Unfiled out of theirs, a tag adds it, Favourites marks them
   const DRAG_TYPE = "application/x-canvast-assets";
+  // Dragging out of the app (desktop): a drag starts at once, so what its files are is read when the pointer goes down. Hidden items stay in: their files are encrypted,
+  // and a drag cannot stop to ask, as Copy file does, before a readable copy leaves the app.
+  const outPaths = new Map<string, string>();
+  let outFolder = "";
+  const dragPick = (hash: string): string[] => (picked.has(hash) ? [...picked] : [hash]); // (a picked one carries the whole pick)
+  const outFiles = (hashes: readonly string[]): string[] | null => {
+    const shown = hashes.filter((h) => { const en = entryOf(h); return !!en && !meta(en).hidden; });
+    const rels = shown.map((h) => outPaths.get(h)).filter((p): p is string => !!p && !p.startsWith(".hidden/"));
+    return shown.length && rels.length === shown.length ? rels : null;
+  };
+  grid.addEventListener("pointerdown", (e) => {
+    const bridge = desktopBridge();
+    const hash = (e.target as HTMLElement).closest<HTMLElement>(".asset-card")?.dataset["hash"];
+    if (!bridge || !hash || hiddenMode) return;
+    void bridge.workspace().then((w) => void (outFolder = w?.path ?? ""));
+    for (const h of dragPick(hash).slice(0, MAX_DRAG_OUT)) {
+      const en = entryOf(h);
+      if (en && !meta(en).hidden && !outPaths.has(h)) void session.storage?.originals.fileOf(h).then((p: string | null) => void (p && outPaths.set(h, p)), () => undefined);
+    }
+  });
   grid.addEventListener("dragstart", (e) => {
     const card = (e.target as HTMLElement).closest<HTMLElement>(".asset-card");
     if (!card || !e.dataTransfer) return;
     const hash = card.dataset["hash"]!;
-    const hashes = picked.has(hash) ? [...picked] : [hash]; // (a picked one carries the whole pick)
+    const hashes = dragPick(hash);
+    const bridge = desktopBridge();
+    const rels = bridge && !hiddenMode && hashes.length <= MAX_DRAG_OUT ? outFiles(hashes) : null;
+    // With Alt: a real file drag, for what will not take the plain one. It is that drag alone: nothing here receives it.
+    if (bridge && e.altKey) {
+      e.preventDefault();
+      if (rels) bridge.startDrag(rels);
+      session.editor.message = rels ? "" : hashes.some((h) => { const en = entryOf(h); return !en || meta(en).hidden; }) ? "Hidden items cannot be dragged out of the app: use Copy file." : "Their files are not ready yet: try again.";
+      if (!rels) session.editor.changed();
+      return;
+    }
     e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(hashes));
+    // (and their addresses, for a file manager that takes them; inside the app DRAG_TYPE decides)
+    if (rels && outFolder) e.dataTransfer.setData("text/uri-list", `${rels.map((r) => encodeURI(`file://${outFolder}/${r}`).replace(/[?#]/g, encodeURIComponent)).join("\r\n")}\r\n`);
     e.dataTransfer.setData("text/plain", hashes.length > 1 ? `${hashes.length} items` : (entryOf(hash)?.name ?? ""));
     e.dataTransfer.effectAllowed = "copyMove";
     // What is dragged: up to DRAG_STACK of their thumbnails stacked, with how many there are.
