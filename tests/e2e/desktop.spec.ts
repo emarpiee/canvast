@@ -908,7 +908,8 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     expect(files(ws).some((f) => readFileSync(join(ws, f)).includes(nested.subarray(0, 24)))).toBe(false);
     expect(await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => (l.hiddenFolders ?? []).map((f) => f.name).sort()))).toEqual(expect.arrayContaining(["Art Folder", "Items"]));
     // Unhide folder: the folder and what is in it opened back into library/; a shown item filed into a hidden folder is sealed with it.
-    await lib("showFolder", "sf1");
+    // (by its name: this device gave the folder its own id when it opened the sealed list)
+    await lib("showFolder", await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => (l.hiddenFolders ?? []).find((f) => f.name === "Secret Folder")!.id)));
     await flush();
     expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual(["library/secret_folder/secret_plan.png"]);
     expect(readFileSync(join(ws, "library/secret_folder/secret_plan.png")).equals(secret)).toBe(true);

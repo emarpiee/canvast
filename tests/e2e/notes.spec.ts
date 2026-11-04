@@ -1155,3 +1155,22 @@ test("a note's Links card lists what it links to, pictures too, and links that f
   await expect(p.getByTestId("asset-backlinks")).toContainText("No notes link here.");
   await expect(out.locator("[data-count]")).toHaveText("3");
 });
+
+test("a picture dragged to another place in a note is one step of undo", async ({ app }) => {
+  const p = app.page;
+  const NOTE = "# Move\n\nFirst words.\n\n![cat](cat.png)\n\nLast words.\n";
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles([
+    { name: "cat.png", mimeType: "image/png", buffer: CAT },
+    { name: "Move.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) },
+  ]);
+  await card(p, hashOf(NOTE)).dblclick();
+  await expect(page(p).locator("h1")).toHaveText("Move");
+  const order = () => page(p).evaluate((e) => [...e.children].map((c) => (c.querySelector("img") ? "img" : (c.textContent ?? "").trim())));
+  const before = await order();
+  await page(p).locator("img").click();
+  await p.locator(".se-drag-handle").filter({ visible: true }).first().dragTo(page(p).locator("h1"));
+  await expect.poll(order).not.toEqual(before);
+  await p.keyboard.press("Control+z");
+  await expect.poll(order).toEqual(before);
+});

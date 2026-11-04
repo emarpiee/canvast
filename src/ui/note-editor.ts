@@ -674,6 +674,8 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       }
     }
   };
+  // A picture or other component dragged to another place: SunEditor moves it but records no step, so Undo would seem to do nothing.
+  page()?.addEventListener("drop", () => editor.$.history.push(false));
   const strays = new MutationObserver(() => void (repairing = repairing.then(repair)));
   const watched = page();
   if (watched) strays.observe(watched, { childList: true, subtree: true, attributes: true, attributeFilter: ["src", "href"] });
