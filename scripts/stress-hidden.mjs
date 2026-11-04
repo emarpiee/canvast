@@ -13,9 +13,9 @@
 // Never point --dir inside a synced folder.
 import { _electron as electron } from "@playwright/test";
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { cpSync, existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, relative, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { decryptHidden } from "./hidden-items.mjs";
 import { makeWorkspace } from "./lib/bench-workspace.mjs";
 
@@ -240,6 +240,7 @@ console.log(`seed ${SEED}`);
 
 // ---- 2. crashes ----
 const crashes = [];
+let traced = false;
 {
   const ws = join(root, `crash-${M}`);
   rmSync(`${ws}-data`, { recursive: true, force: true });
@@ -274,7 +275,21 @@ const crashes = [];
     await s.flush();
     await s.app.close();
     const d = await onDisk(ws);
-    const lost = [...expected].filter((h) => !d.readable.has(h) && !d.sealed.has(h)).length;
+    const lostHashes = [...expected].filter((h) => !d.readable.has(h) && !d.sealed.has(h));
+    const lost = lostHashes.length;
+    // The first time: where they are, if anywhere, and the folder as it stands, for a person to read (only made-up files).
+    if (lost && !traced) {
+      traced = true;
+      const everywhere = filesUnder(ws).filter((f) => !f.includes(`${ws}${sep}.hidden${sep}`));
+      const found = everywhere.filter((f) => lostHashes.includes(sha(readFileSync(f))));
+      console.log(`  TRACE round ${r}: ${lost} lost; readable ${d.readable.size}, sealed opened ${d.sealed.size}, sealed files on disk ${filesUnder(join(ws, ".hidden")).filter((f) => !/\.name$|\.json$|[\\/]thumbnails[\\/]/.test(f)).length}, in .trash ${filesUnder(join(ws, ".trash")).length}`);
+      console.log(`  TRACE found readable elsewhere: ${found.length}: ${found.slice(0, 8).map((f) => relative(ws, f)).join(", ")}`);
+      console.log(`  TRACE the tool said: missing ${d.missing.length} (${d.missing.slice(0, 5).join(" | ")}), damaged ${d.damaged.length}`);
+      if (process.env.STRESS_KEEP) {
+        cpSync(ws, join(process.env.STRESS_KEEP, "workspace"), { recursive: true });
+        cpSync(`${ws}-data`, join(process.env.STRESS_KEEP, "data"), { recursive: true, filter: (f) => !/Cache|GPUCache|Crashpad|blob_storage/.test(f) });
+      }
+    }
     const unknown = [...d.readable, ...d.sealed].filter((h) => !expected.has(h)).length;
     const both = [...d.readable].filter((h) => d.sealed.has(h)).length;
     crashes.push([r, action, `${after} ms`, cut ? "yes" : "no", lost, d.damaged.length, unknown, both, d.temps.length]);

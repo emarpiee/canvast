@@ -38,5 +38,15 @@ jobs:
       - run: set -o pipefail; xvfb-run -a node scripts/stress-hidden.mjs --items ${{ inputs.items }} --rounds ${{ inputs.rounds }} ${{ inputs.seed && format('--seed {0}', inputs.seed) || '' }} --dir "$RUNNER_TEMP/stress" | tee stress.txt
         env:
           ELECTRON_DISABLE_SANDBOX: "1"
+          STRESS_KEEP: ${{ runner.temp }}/stress-keep
       - if: always()
         run: grep -E '^(\||seed|✅|❌|[0-9]+ of)' stress.txt >> "$GITHUB_STEP_SUMMARY" || true
+      # (when items went missing: the folder as it stood, made-up files only)
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stress-keep
+          path: ${{ runner.temp }}/stress-keep
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 14
