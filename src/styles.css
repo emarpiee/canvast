@@ -879,6 +879,13 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .set-row { display: grid; grid-template-columns: minmax(0, 1fr) 220px 100px 60px; align-items: center; gap: var(--sp-6); padding: var(--sp-5) 0; border-bottom: 1px solid var(--hud-border); }
 .set-row label { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }
 .set-help { opacity: 0.65; font-size: var(--text-sm); }
+.assets-trash { padding: var(--sp-5); }
+.assets-trash[hidden] { display: none; }
+.trash-list { list-style: none; margin: 0 0 var(--sp-5); padding: 0; display: grid; gap: var(--sp-2); }
+.trash-row { display: grid; grid-template-columns: var(--ctl) minmax(0, 1fr) auto auto auto; gap: var(--sp-4); align-items: center; padding: var(--sp-2) var(--sp-4); border-bottom: 1px solid var(--hud-border); }
+.trash-thumb { width: var(--ctl); height: var(--ctl); object-fit: cover; display: inline-flex; align-items: center; justify-content: center; border-radius: var(--r-sm); color: var(--hud-muted); }
+.trash-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trash-size { font-size: var(--text-sm); color: var(--hud-muted); }
 .set-words { min-width: 0; display: grid; gap: var(--sp-1); }
 .set-more { font-size: var(--text-sm); }
 .set-more summary { cursor: pointer; color: var(--hud-muted); width: fit-content; }

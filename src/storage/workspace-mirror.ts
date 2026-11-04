@@ -606,6 +606,30 @@ export class WorkspaceMirror {
     this.running = this.running.then(() => this.lib.setPartSplit(split)).then(() => this.library());
     return this.running;
   }
+  /** The workspace's trash (see FolderSync.trashList). A restore or an erase waits its turn on the write queue, and what it brings back is looked at next. */
+  trashList(hidden: boolean): ReturnType<LibraryMirror["trashList"]> {
+    return this.lib.trashList(hidden);
+  }
+  trashRead(path: string): ReturnType<LibraryMirror["trashRead"]> {
+    return this.lib.trashRead(path);
+  }
+  private queued<T>(work: () => Promise<T>): Promise<T> {
+    const done = Promise.all([this.running, this.ready]).then(work);
+    this.running = done.then(() => undefined, () => undefined);
+    return done;
+  }
+  async trashRestore(path: string, onChange: () => void): Promise<"restored" | "already" | "shut"> {
+    const { result, file } = await this.queued(() => this.lib.trashRestore(path));
+    if (result === "restored" && file) {
+      this.library();
+      await this.rescan(onChange, file.startsWith(".hidden/"), [file]);
+      onChange();
+    }
+    return result;
+  }
+  trashErase(path: string): Promise<void> {
+    return this.queued(() => this.lib.trashErase(path));
+  }
   /** Check the library files' contents (see FolderSync.checkFiles). */
   checkFiles(onStep: (done: number, total: number) => void, quick = false): ReturnType<LibraryMirror["checkFiles"]> {
     return this.lib.checkFiles(onStep, quick);

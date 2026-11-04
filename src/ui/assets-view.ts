@@ -64,6 +64,8 @@ import { mountPlayerControls } from "./player-controls";
 import type { ImageObject } from "../doc/model";
 import { chooseDialog, promptDialog } from "./confirm";
 import { askTagName } from "./tag-name-dialog";
+import { TRASH_WORD, mountTrashView } from "./trash-view";
+import type { FolderSync } from "../storage/store";
 import { askFolderClash } from "./folder-clash";
 import { deleteEverywhere } from "./delete-everywhere";
 import { freeFolderName, mergeFolderInto } from "../app/folder-merge";
@@ -254,7 +256,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <nav class="assets-side" data-testid="assets-side" aria-label="Library"></nav>
       <div class="col-grip" data-grip="side" data-testid="side-grip" role="separator" aria-orientation="vertical" aria-label="Resize the library panel" title="Drag to resize the library panel (double-click to reset)" tabindex="0"></div>
       <div class="assets-main">
-        <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map(headCell).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div>
+        <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map(headCell).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div><div class="assets-trash" data-testid="assets-trash" hidden></div></div>
         <div class="assets-filtered" data-testid="assets-filtered" role="status" hidden>${ICONS.funnelX}<span class="assets-filtered-text"></span><button type="button" data-action="show-all" data-testid="assets-show-all">Show all items</button></div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
           <button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.arrowLeft}</button>
@@ -313,6 +315,25 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const viewer = root.querySelector<HTMLElement>(".viewer")!;
   const film = root.querySelector<HTMLElement>(".viewer-film")!;
   const grid = root.querySelector<HTMLElement>(".assets-grid")!;
+  const trashBox = root.querySelector<HTMLElement>(".assets-trash")!;
+  let trashCount = 0;
+  const trashSync = (): FolderSync | undefined => session.storage?.folderSync ?? undefined;
+  const trashView = mountTrashView(trashBox, {
+    list: () => trashSync()?.trashList(hiddenMode) ?? Promise.resolve([]),
+    read: (path) => trashSync()?.trashRead(path) ?? Promise.resolve(null),
+    restore: (path) => trashSync()!.trashRestore(path),
+    erase: (path) => trashSync()!.trashErase(path),
+    say: (m) => {
+      session.editor.message = m;
+      session.editor.changed();
+    },
+    changed: (n) => {
+      if (n === trashCount) return;
+      trashCount = n;
+      renderSide();
+    },
+    readOnly: () => session.readOnly,
+  });
   const inspector = root.querySelector<HTMLElement>(".asset-inspector")!;
   // The Details fold stays open (or closed) as you left it when you go to another item; only you close it.
   let detailsOpen = false;
@@ -1751,6 +1772,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // ---- data
   /** Read the library again; `metaOnly` after a change to its organization only, which keeps the usage and the canvas tags read before. */
   const refresh = async (metaOnly = false): Promise<void> => {
+    if (desktopBridge()) void trashView.refresh();
     if (!visible) return;
     const gen = ++generation;
     if (!session.catalog) {
@@ -2153,6 +2175,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const render = (): void => {
     keepFilters();
     root.querySelector<HTMLElement>(".assets-searchbox .cs-clear")!.hidden = !search.value;
+    // The Trash: the workspace's own, for the mode, in place of the grid.
+    const inTrash = TRASH_WORD.test(search.value);
+    if (inTrash !== !trashBox.hidden) renderSide();
+    trashBox.hidden = !inTrash;
+    grid.hidden = inTrash;
+    listHead.hidden = inTrash;
+    if (inTrash) {
+      filteredChip.hidden = true;
+      void trashView.show(search.value);
+      return;
+    }
     if (!listing) return;
     const pages = pagesNow();
     // Listed a page at a time: a scope, search or sort not listed yet is asked for (drawn again when it comes); until then, the last list.
@@ -2322,6 +2355,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           ${item("favorites", "Favourites", counts.favourites, { icon: ICONS.star })}
           ${item("unfiled", "Unfiled", counts.unfiled, { icon: ICONS.folderX })}
           ${pagesNow() ? "" : item("similar", "Similar images", similar().reduce((n, g) => n + g.length, 0), { icon: ICONS.copyCheck })}
+          ${desktopBridge() ? item("trash", "Trash", trashCount, { icon: ICONS.trashBin }).replace('class="side-item', `class="side-item${TRASH_WORD.test(search.value) ? " is-active" : ""}`) : ""}
         </ul>
         ${section(
           "folders",
@@ -3808,6 +3842,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         });
       }
       return;
+    }
+    if (b.dataset["scope"] === "trash") {
+      // (a filter in the search box: the way out is to clear it, as for any search, or this again)
+      setWay("all");
+      search.value = TRASH_WORD.test(search.value) ? "" : "is:trash";
+      scope = "all";
+      return searchChanged();
     }
     if (b.dataset["scope"]) {
       // Choosing the one already chosen lets go of it (back to all assets).

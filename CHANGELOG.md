@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.53.43 — A Trash in the library (2026-11-04)
+
+- **Added:** **Trash** in the library's sidebar (desktop app): it puts `is:trash` in the search box and lists the files in this workspace's `.trash` folder, not your system's trash. In hidden mode, with the Hidden items open, it lists the hidden ones instead; outside it, nothing of them shows or counts.
+- **Added:** **Restore** puts a file back where it was, with its item when the library still has it, and **Delete for good** erases it after asking.
+- **Fixed:** temporary files of a write the app was stopped in are swept at the next start, in `library/` too: the sweep looked for an older spelling and never found them.
+
 ## 0.53.42 — An item whose file is there is never taken as erased (2026-11-04)
 
 - **Fixed:** the app stopped at the wrong moment (a crash, a kill, power lost) could leave hidden items out of the sealed index for a moment; on the next start they were taken as erased on another device and their files moved to `.trash`. An item whose file is still there is now never taken as erased, for hidden and shown items alike, and the lists are written again.

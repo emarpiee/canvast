@@ -186,6 +186,7 @@ const IS: Record<string, (s: Subject, x: Extra) => boolean> = {
   untagged: (_s, x) => x.tags === 0,
   thumbed: (_s, x) => !!x.thumbed,
   unthumbed: (_s, x) => !x.thumbed,
+  trash: () => false, // (the Trash has files, not items: the library's view lists them instead)
 };
 
 function libraryKeyword(w: string, now: number): Filter | null {

@@ -1718,6 +1718,74 @@ test("a file renamed outside the app keeps its place in notes: the links follow,
   await app.close();
 });
 
+test("the Trash lists this workspace's .trash for the mode: shown files in the library, sealed ones only in hidden mode, with Restore and Delete for good", async () => {
+  const ws = tempDir("cv-trash-");
+  const { app, page } = await launch(ws, "userdata", true);
+  try {
+    await page.getByTestId("view-assets").click();
+    const png = (seed: number) => makePng(6, 4, () => [seed, 90, 40, 255]);
+    await page.getByTestId("assets-import-input").setInputFiles([{ name: "keep.png", mimeType: "image/png", buffer: png(10) }, { name: "gone.png", mimeType: "image/png", buffer: png(60) }, { name: "secret.png", mimeType: "image/png", buffer: png(120) }]);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/")).length, { timeout: 15_000 }).toBe(3);
+    const hashOf = (n: string) => page.evaluate((n) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === n)!.hash), n);
+    const trash = page.locator('[data-scope="trash"]');
+    const rows = page.getByTestId("trash-row");
+    const search = page.getByTestId("assets-search");
+    // Deleted: it shows there, by the button, as a word in the search box.
+    const gone = await hashOf("gone.png");
+    await page.evaluate((h) => window.__canvastDebug.deleteEverywhere([h]), gone);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(".trash/library/")).length, { timeout: 15_000 }).toBe(1);
+    await trash.click();
+    await expect(search).toHaveValue("is:trash");
+    await expect(rows).toHaveCount(1);
+    await expect(rows).toContainText("gone.png");
+    await search.fill("is:trash nothing");
+    await expect(page.getByTestId("trash-empty")).toBeVisible();
+    await search.fill("is:trash gone");
+    await expect(rows).toHaveCount(1);
+    // Restored: the file where it was, the item back, not in the trash.
+    await page.locator('[data-trash="restore"]').click();
+    await expect(rows).toHaveCount(0);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/") && f.endsWith("gone.png")).length, { timeout: 15_000 }).toBe(1);
+    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.some((e) => e.hash === h && e.present)), gone), { timeout: 15_000 }).toBe(true);
+    await search.fill("");
+    // Hidden, then deleted: nothing of it outside hidden mode.
+    expect(await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"))).toEqual({ ok: true, state: "open" });
+    const secret = await hashOf("secret.png");
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), secret);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(".hidden/") && !f.endsWith(".json")).length, { timeout: 15_000 }).toBeGreaterThan(0);
+    await page.evaluate((h) => window.__canvastDebug.deleteEverywhere([h]), secret);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(".trash/.hidden/")).length, { timeout: 15_000 }).toBeGreaterThan(0);
+    await trash.click();
+    await expect(page.getByTestId("trash-empty")).toBeVisible();
+    expect(await page.evaluate(() => document.querySelector('[data-testid="assets-trash"]')!.textContent)).not.toContain("secret");
+    await search.fill("");
+    // In hidden mode: it, by its own name, and only it. Restored: sealed where it was, hidden still.
+    await search.fill("hidden:");
+    const asked = page.getByTestId("prompt-input");
+    if (await asked.isVisible({ timeout: 2000 }).catch(() => false)) (await asked.fill("pw"), await page.getByTestId("prompt-ok").click());
+    await expect(page.getByTestId("hidden-mode-exit")).toBeVisible();
+    await trash.click();
+    await expect(rows).toHaveCount(1);
+    await expect(rows).toContainText("secret.png");
+    await page.locator('[data-trash="restore"]').click();
+    await expect(rows).toHaveCount(0);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(".trash/.hidden/") && !f.endsWith(".name")).length).toBe(0);
+    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.some((e) => e.hash === h && e.hidden)), secret), { timeout: 45_000 }).toBe(true);
+    await search.fill("");
+    await page.getByTestId("hidden-mode-exit").click();
+    // Delete for good: a shown one, asked first.
+    await page.evaluate((h) => window.__canvastDebug.deleteEverywhere([h]), gone);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(".trash/library/")).length, { timeout: 15_000 }).toBe(1);
+    await trash.click();
+    await page.locator('[data-trash="erase"]').click();
+    await page.getByTestId("confirm-ok").click();
+    await expect(rows).toHaveCount(0);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(".trash/library/")).length).toBe(0);
+  } finally {
+    await app.close();
+  }
+});
+
 test("Copy file: the real files on the clipboard, from the library, as a list of addresses inside the workspace", async () => {
   const ws = tempDir("cv-copy-file-");
   const { app, page } = await launch(ws, "userdata", true);

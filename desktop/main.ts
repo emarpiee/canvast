@@ -242,7 +242,7 @@ async function inside(root: string, rel: string): Promise<string> {
  * another device's included (the stress run shortens the wait).
  */
 const STALE_TMP_MS = Number(process.env["CANVAST_STALE_TMP_MS"] ?? 10 * 60_000);
-const TMP_RE = /\.tmp-\d+-[0-9a-z]+$/;
+const TMP_RE = /\.tmp-[0-9a-z-]+$/i; // (a write's own name beside its file: see writeAtomic)
 const staleTmp = (name: string, mtimeMs: number): boolean => TMP_RE.test(name) && Date.now() - mtimeMs >= STALE_TMP_MS;
 async function sweepTemps(dir: string): Promise<void> {
   for (const ent of await readdir(dir, { withFileTypes: true }).catch(() => [])) {
@@ -586,7 +586,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
   const lookFile = join(app.getPath("userData"), "library-looks", `${cacheKey(partition)}.json`);
   ipcMain.handle("canvast:libraryChanges", async (e) => {
     own(e);
-    await Promise.all([sweepTemps(join(root, ".canvast")), sweepTemps(join(root, ".hidden"))]);
+    await Promise.all([sweepTemps(join(root, ".canvast")), sweepTemps(join(root, ".hidden")), sweepTemps(join(root, "library"))]);
     const walked = await walkFiles(join(root, "library"), "library");
     walkedSizes.clear();
     for (const f of walked) walkedSizes.set(f.path, f.size);

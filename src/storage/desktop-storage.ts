@@ -159,6 +159,10 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   let folderOn: FolderHandlers | null = null;
   const folderSync: FolderSync = {
     checkFiles: (onStep, quick) => mirror.checkFiles(onStep, quick),
+    trashList: (hidden) => mirror.trashList(hidden),
+    trashRead: (path) => mirror.trashRead(path),
+    trashRestore: (path) => mirror.trashRestore(path, () => folderOn?.libraryChanged()),
+    trashErase: (path) => mirror.trashErase(path),
     partSplit: () => mirror.partSplit(),
     setPartSplit: (split) => mirror.setPartSplit(split),
     saveFile: (hash, bytes) => mirror.saveItemFile(hash, bytes, () => folderOn?.libraryChanged()),

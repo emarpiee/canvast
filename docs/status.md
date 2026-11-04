@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.43: a Trash in the library (2026-11-04)
+
+- **Implemented:** `ui/trash-view.ts`, `trashList`, `trashRead`, `trashRestore`, `trashErase` on the mirror and FolderSync; TMP_RE fixed, sweep of `library/`; stress-hidden counts temporary files but does not fail on them.
+- **Tested:** typecheck and unit here; desktop test on GitHub. Restoring a sealed file in hidden mode has no E2E of its own yet.
+- **Committed:** v0.53.43.
+
 ## v0.53.42: an item whose file is there is never taken as erased (2026-11-04)
 
 - **Implemented:** `fileThere` in `LibraryDb.sync`, `hiddenRead` in `writeJson`.

@@ -269,6 +269,13 @@ export interface FolderHandlers {
 }
 
 /** The desktop build: the workspace folder's changes from outside the app. */
+/** A file in the workspace's `.trash/`, as the trash lists it. */
+export interface TrashFile {
+  path: string;
+  name: string;
+  size: number;
+}
+
 export interface FolderSync {
   /** Start following the folder: it is looked through at once, then on each change. */
   start(handlers: FolderHandlers): void;
@@ -277,6 +284,14 @@ export interface FolderSync {
    * out (that needs their key). The names of those gone and those changed (damaged, or replaced by another file).
    * `quick`: only each file's presence and size are looked at (no reading), which a big library does in seconds.
    */
+  /** The files in `.trash/` for a mode: shown items' readable ones, or in hidden mode (the key open) the sealed ones. Never both, never the system's trash. */
+  trashList(hidden: boolean): Promise<TrashFile[]>;
+  /** A trashed file's bytes (a sealed one opened, for hidden mode only); null when it does not open. */
+  trashRead(path: string): Promise<Blob | null>;
+  /** Back to where it was, the library's item with it. */
+  trashRestore(path: string): Promise<"restored" | "already" | "shut">;
+  /** Erased for good. */
+  trashErase(path: string): Promise<void>;
   checkFiles(onStep: (done: number, total: number) => void, quick?: boolean): Promise<{ checked: number; missing: string[]; damaged: string[] }>;
   /**
    * How the workspace splits its library's files (`.canvast/library/items-…json`): by 1, 2 or 3 characters of an item's hash (16, 256 or

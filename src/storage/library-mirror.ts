@@ -21,9 +21,9 @@ import type { NameKeys } from "./hidden-vault";
 import { sha256Hex } from "../assets/sha256";
 import { done, idbGet, req } from "./idb";
 import { noteKindOf } from "../notes/note-file";
-import { MAX_BASE, UNFINISHED_FILE, cutBytes, isClashOf, numberedName } from "../doc/file-names";
+import { MAX_BASE, UNFINISHED_FILE, cutBytes, isClashOf, numberedName, splitName } from "../doc/file-names";
 import { KIND_FOLDERS, MAX_LIBRARY_DIR, extOfBytes, fileExt, fitsPlace, freePath, isFolderOf, isSafeRelativePath, keptBase, keptFile, keptFits, keptPart, libraryDir, nameBase, safeBase } from "./workspace-names";
-import type { FolderFile } from "./store";
+import type { FolderFile, TrashFile } from "./store";
 
 export const LIBRARY_JSON = ".canvast/library.json";
 export const LIBRARY_JSON_FORMAT = "canvast-library";
@@ -108,6 +108,9 @@ interface Moving {
   to: string;
 }
 const MOVING_KEY = "libraryMoving";
+/** Where a deleted file goes in `.trash/`, by what it was. */
+const TRASH_SHOWN = ".trash/library";
+const TRASH_SEALED = ".trash/.hidden";
 const HASH_RE = /^[0-9a-f]{64}$/;
 
 /** What a write of the library works from. */
@@ -1210,6 +1213,84 @@ export class LibraryMirror {
     }
     const dir = parentOf(file);
     return { name, folders: dir === ".hidden" ? [] : await this.dirNames(dir) };
+  }
+
+  /** The files of `.trash/` for a mode (see FolderSync.trashList). Sealed ones only with the key open, under their own names. */
+  async trashList(hidden: boolean): Promise<TrashFile[]> {
+    if (!hidden) return (await this.bridge.tree(TRASH_SHOWN).catch(() => [])).filter((f) => !UNFINISHED_FILE.test(f.path)).map((f) => ({ path: f.path, name: f.path.slice(f.path.lastIndexOf("/") + 1), size: f.size }));
+    if (!(await this.nameKeysNow())) return [];
+    const out: TrashFile[] = [];
+    for (const f of await this.bridge.tree(TRASH_SEALED).catch(() => [])) {
+      if (UNFINISHED_FILE.test(f.path) || f.path.endsWith(".name") || f.path.endsWith(".json") || f.path.includes("/thumbnails/")) continue;
+      out.push({ path: f.path, name: (await this.placeOf(f.path.slice(".trash/".length))).name ?? "Encrypted file", size: f.size });
+    }
+    return out;
+  }
+
+  /** Only a trashed file of its own kind: a path outside these two is no file of the trash, and a sealed one needs the key. */
+  private async openTrashed(path: string): Promise<Uint8Array<ArrayBuffer> | null> {
+    if (!isSafeRelativePath(path)) return null;
+    const bytes = await this.bridge.read(path);
+    if (!bytes) return null;
+    if (path.startsWith(`${TRASH_SHOWN}/`)) return bytes as Uint8Array<ArrayBuffer>;
+    if (!path.startsWith(`${TRASH_SEALED}/`)) return null;
+    return (await this.vault.openItem(bytes as Uint8Array<ArrayBuffer>).catch(() => null))?.bytes ?? null;
+  }
+  async trashRead(path: string): Promise<Blob | null> {
+    const bytes = await this.openTrashed(path);
+    return bytes && new Blob([bytes]);
+  }
+
+  /**
+   * A trashed file back where it was: its item taken up again when the library still has it (deleted), or the file found by the next look otherwise. Checked first, moved
+   * in one step, never over another file. How it went, and the file's new place.
+   */
+  async trashRestore(path: string): Promise<{ result: "restored" | "already" | "shut"; file?: string }> {
+    const bytes = await this.openTrashed(path);
+    if (!bytes) return { result: "shut" };
+    const sealed = path.startsWith(`${TRASH_SEALED}/`);
+    const hash = await sha256Hex(bytes.buffer);
+    const entry = await this.lib.entry(hash);
+    const rec = await this.lib.rec(hash);
+    if (entry?.state === "active" && rec?.file && (await this.bridge.exists(rec.file))) return { result: "already" };
+    const place = path.slice(".trash/".length);
+    const dir = parentOf(place);
+    await this.bridge.makeFolder(dir);
+    let target: string;
+    if (sealed) {
+      // (a long folder's name is kept beside it: it comes along)
+      let at = ".hidden";
+      for (const part of dir.split("/").slice(1)) {
+        at += `/${part}`;
+        if (part.startsWith("0") && !(await this.bridge.exists(`${at}/.name`))) {
+          const named = await this.bridge.read(`.trash/${at}/.name`);
+          if (named) await this.bridge.write(`${at}/.name`, named as Uint8Array<ArrayBuffer>);
+        }
+      }
+      target = (await this.bridge.exists(place)) ? hiddenFileName(dir) : place;
+    } else {
+      const { stem, ext } = splitName(place.slice(dir.length + 1));
+      target = await freePath(dir, stem, ext.slice(1), (p) => this.bridge.exists(p));
+    }
+    await this.bridge.rename(path, target);
+    if (sealed && (await this.bridge.exists(`${path}.name`))) await this.bridge.rename(`${path}.name`, `${target}.name`);
+    for (let d = parentOf(path); d.startsWith(".trash/") && d.split("/").length > 2; d = parentOf(d)) if (!(await this.bridge.removeEmptyFolder(d))) break;
+    if (entry && rec) {
+      await this.setFile(hash, () => true, target);
+      if (entry.state !== "active") await this.lib.serial(() => this.lib.apply([{ t: "entry", hash, v: { ...entry, state: "active", deletedAt: null } }]));
+    } else if (sealed) {
+      // (no item names it: taken back at once, as a backup's are; no entry is on its way)
+      await this.setMeta(NO_WAIT_KEY, [...((await this.metaOf<string[]>(NO_WAIT_KEY)) ?? []), target]);
+    }
+    return { result: "restored", file: target };
+  }
+
+  /** Erased for good, with what it leaves behind in the trash. */
+  async trashErase(path: string): Promise<void> {
+    if (!isSafeRelativePath(path) || !(path.startsWith(`${TRASH_SHOWN}/`) || path.startsWith(`${TRASH_SEALED}/`))) return;
+    await this.bridge.erase(path);
+    if (path.startsWith(`${TRASH_SEALED}/`)) await this.bridge.erase(`${path}.name`);
+    for (let d = parentOf(path); d.startsWith(".trash/") && d.split("/").length > 2; d = parentOf(d)) if (!(await this.bridge.removeEmptyFolder(d))) break;
   }
 
   /** The library folder names a folder of `.hidden/` stands for: its encrypted ones opened (a long one from its `.name`), a person's own as they are. */
