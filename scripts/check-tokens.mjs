@@ -53,7 +53,7 @@ const pickerCss = await readFile(resolve(root, "src/colour-picker/style.ts"), "u
 for (const m of pickerCss.matchAll(/--cp-[a-z-]+:\s*(#[0-9a-fA-F]{3,8}\b|rgba?\()/g)) found.notOklch.push(`colour-picker/style.ts:${lineOf(pickerCss, m.index)}: ${m[0]}`);
 // A button is a rounded square (--ctl-r, or --r-sm on a row); round is for chips, what is on them, and dots.
 for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-  if (/border-radius:\s*var\(--r-(pill|dot)\)/.test(m[2]) && /\bbutton\b|-btn\b|\.vbtn/.test(m[1]) && !/tag-chip|cs-chip|tag-cloud|hidden-bar|assets-filtered/.test(m[1])) found.offGrid.push(`${lineOf(css, m.index)}: ${m[1].trim()}: a round button`);
+  if (/border-radius:\s*var\(--r-(pill|dot)\)/.test(m[2]) && /\bbutton\b|-btn\b|\.vbtn/.test(m[1]) && !/tag-chip|cs-chip|tag-cloud|hidden-bar|assets-filtered|::after|::before/.test(m[1])) found.offGrid.push(`${lineOf(css, m.index)}: ${m[1].trim()}: a round button`);
 }
 const counts = Object.fromEntries(Object.entries(found).map(([k, v]) => [k, v.length]));
 if (process.argv.includes("--list")) for (const [k, v] of Object.entries(found)) for (const l of v) console.log(`${k.padEnd(7)} ${l}`);
