@@ -1080,6 +1080,7 @@ async function openWindow(workspace: string): Promise<void> {
       backgroundThrottling: !hidden,
     },
   });
+  win.setMenuBarVisibility(false); // (no bar and no Alt to bring it back, as Alt is one of the canvas's keys; its keys still work, and the workspace switcher has its commands)
   // The page asks which workspace it is in; only this window's own page is answered.
   ipcMain.handle("canvast:workspace", (e) => (e.sender === win.webContents ? { path: workspace, name: basename(workspace) } : null));
   installFileCalls(win, await realpath(workspace), partition);

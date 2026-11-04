@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.66: no menu bar in the desktop app (2026-11-05)
+
+- **Implemented:** `setMenuBarVisibility(false)` on the window; the menu's keys stay.
+- **Tested:** no new test needed; the desktop project opens the window, on GitHub.
+- **Known failures:** none.
+- **Unverified:** the look on a real desktop.
+- **Committed:** v0.53.66.
+- **Next bounded task:** the release.
+
 ## v0.53.65: sections scroll as they are dragged; the README brought up to date (2026-11-05)
 
 - **Implemented:** `scrollAtEdges` in `sortable-sections.ts`; on a drop target everything takes the on-accent colour; the logo's light-theme accent; one text size in the filter pill and the Hidden mode bar; README platform and browser statements; pictures taken on GitHub.

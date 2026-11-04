@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.66 — No menu bar in the desktop app (2026-11-05)
+
+- **Removed:** the File, Edit and View bar of the desktop app's window. Its keys still work (`Ctrl+Shift+O` opens a workspace folder), and the workspace switcher has its commands.
+
 ## 0.53.65 — Sections scroll as they are dragged; the README brought up to date (2026-11-05)
 
 - **Changed:** the README says the desktop app is built for Linux and other systems are out of scope for now, gives the browsers the app really needs, and its pictures are taken again, with a new one of Organize.
