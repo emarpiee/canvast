@@ -7,6 +7,13 @@ test("every setting says what it is on one short line, the rest under its More; 
   await p.getByTestId("view-settings").click();
   const long = await p.locator(".set-row .set-help").evaluateAll((l) => l.map((h) => h.textContent ?? "").filter((t) => t.length > 130));
   expect(long).toEqual([]);
+  // Nothing of a row is cut or runs into the next one.
+  await p.getByRole("tab", { name: "Notes", exact: true }).click();
+  const cut = await p.locator('[data-panel="notes"] .set-row').evaluateAll((rows) => rows.filter((r) => {
+    const words = r.querySelector(".set-words")!;
+    return words.scrollHeight > words.clientHeight + 1 || words.getBoundingClientRect().bottom > r.getBoundingClientRect().bottom + 1;
+  }).map((r) => (r as HTMLElement).dataset["row"]));
+  expect(cut).toEqual([]);
   await p.getByRole("tab", { name: "Notes", exact: true }).click();
   const titles = await p.locator('[data-panel="notes"] .set-card > h3').allTextContents();
   expect(titles).toEqual(["Editor", "New notes", "Cards and previews", "Properties", "File names"]);

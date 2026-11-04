@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.36 — Settings rows no longer overlap (2026-11-04)
+
+- **Fixed:** rows in Settings had a fixed height from 0.53.34, so their words were cut and ran into the next row.
+
 ## 0.53.35 — Settings say it in one line, all of them (2026-11-04)
 
 - **Changed:** Library files (Settings > Storage) says what it is on one line too.
