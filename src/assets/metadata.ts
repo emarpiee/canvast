@@ -139,6 +139,14 @@ function readJpeg(b: Uint8Array): { rows: MetaRow[]; orientation: number } {
     } else if (marker === 0xe2 && text(b, body, body + 11) === "ICC_PROFILE") icc.push(b.subarray(body + 14, body + len - 2));
     else if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
       rows.push({ group: "Picture", label: "Kind", value: marker === 0xc2 ? "Progressive JPEG" : "JPEG" }, { group: "Picture", label: "Bits per channel", value: String(b[body]) });
+      // (how many channels, and how much of the colour is kept: the first channel's sampling against the others')
+      const channels = b[body + 5]!;
+      rows.push({ group: "Picture", label: "Channels", value: channels === 1 ? "1, greyscale" : channels === 4 ? "4, CMYK" : `${channels}, colour` });
+      if (channels === 3) {
+        const h = b[body + 7]! >> 4, v = b[body + 7]! & 15;
+        const sampling = h === 1 && v === 1 ? "4:4:4" : h === 2 && v === 1 ? "4:2:2" : h === 2 && v === 2 ? "4:2:0" : h === 4 && v === 1 ? "4:1:1" : "";
+        if (sampling) rows.push({ group: "Picture", label: "Colour sampling", value: sampling });
+      }
     } else if (marker === 0xda) break;
     p += 2 + len;
   }

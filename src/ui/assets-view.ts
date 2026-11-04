@@ -2747,9 +2747,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       </div>
       <details class="asset-more" data-testid="asset-metadata" data-metadata${detailsOpen ? " open" : ""}><summary>Details</summary>
         <div data-metadata-body></div>
+        <h4>File</h4>
         <dl>
-          ${e ? `<dt>Imported</dt><dd>${new Date(e.importedAt).toLocaleDateString()}</dd>` : ""}
-          <dt>Hash</dt><dd class="asset-hash" title="${selected}">${selected!.slice(0, 12)}…</dd>
+          ${e ? `<dt>Type</dt><dd>${esc(e.type || "Unknown")}</dd><dt>Size</dt><dd>${fmtBytes(e.size)}</dd>` : ""}
+          ${e && !isCard(e) ? `<dt>Pixels</dt><dd>${e.pixelW} × ${e.pixelH}</dd>` : ""}
+          ${e ? `<dt>Imported</dt><dd>${new Date(e.importedAt).toLocaleString()}</dd>` : ""}
+          <dt data-file-place hidden>In</dt><dd data-file-place hidden></dd>
+          <dt>Hash</dt><dd class="asset-hash">${selected}</dd>
         </dl>
       </details>`;
     for (const h of inspector.querySelectorAll<HTMLElement>("[data-dsec] h3")) {
@@ -2758,6 +2762,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       h.title = "Drag to move this section (or Alt+Up and Alt+Down on its name)";
     }
     if (e?.present && !isCard(e)) void fillMetadata(e.hash, e.type);
+    // (where its file is, in the desktop app; a hidden item's name on disk is encrypted, and says nothing)
+    if (e && desktopBridge() && !meta(e).hidden) {
+      const hash = e.hash;
+      void session.storage?.originals.fileOf(hash).then((path: string | null) => {
+        if (!path || inspector.dataset["hash"] !== hash) return;
+        for (const el of inspector.querySelectorAll<HTMLElement>("[data-file-place]")) el.hidden = false;
+        inspector.querySelector<HTMLElement>("dd[data-file-place]")!.textContent = path;
+      }, () => undefined);
+    }
     if (e) void fillBacklinks(e.hash);
     const prev = inspector.querySelector<HTMLImageElement>(".asset-preview img");
     if (prev) loadThumb(prev);

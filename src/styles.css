@@ -47,6 +47,7 @@
   --hud-success: oklch(0.5 0.13 150);
   --hud-warning: oklch(0.52 0.11 80);
   --logo-colour: var(--hud-accent);
+  --meta-label-w: 7.5rem;
   /* Sizes that follow Density too (these are Compact's): small buttons on a row, buttons on a chip, a tree's indent. */
   --row-btn: 26px; --chip-btn: 20px; --tree-indent: 20px;
   /* Spacing: gaps, paddings and margins, set by Density (Settings > Appearance; these are Compact's). --sp-* are fixed lengths, for what is not spacing. */
@@ -1298,8 +1299,11 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-more h4 { margin: var(--s-4) 0 var(--s-1); font: var(--font-meta); color: var(--hud-muted); text-transform: uppercase; }
 .asset-more { margin-top: var(--s-8); color: var(--hud-muted); }
 .asset-more summary { cursor: pointer; }
-.asset-more dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--s-2) var(--s-6); margin: var(--s-4) 0 0; }
-.asset-more dt { opacity: 0.8; }
+/* (one label column for all its groups, so that they line up) */
+.asset-more dl { display: grid; grid-template-columns: var(--meta-label-w) minmax(0, 1fr); gap: var(--s-2) var(--s-4); margin: var(--s-2) 0 0; }
+.asset-more [hidden] { display: none; }
+.asset-hash { font-family: var(--font-mono); font-size: var(--text-xs); }
+.asset-more dt { color: var(--hud-muted); }
 .asset-more dd { margin: 0; overflow-wrap: anywhere; color: var(--hud-fg); }
 .asset-hash { font-family: var(--font-mono); font-size: var(--text-sm); }
 .asset-actions { display: flex; flex-direction: column; align-items: stretch; gap: var(--near); margin-top: var(--s-10); padding-top: var(--s-8); border-top: 1px solid var(--hud-border); }
