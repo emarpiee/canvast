@@ -1376,7 +1376,7 @@ test("custom thumbnails in the workspace folder: an uploaded one in .canvast/thu
       })(),
     ]);
     await chooser.setFiles({ name: "cover.png", mimeType: "image/png", buffer: makePng(40, 30, () => [200, 40, 40, 255]) });
-    const inDir = (d: string) => (existsSync(join(ws, d)) ? readdirSync(join(ws, d)) : []);
+    const inDir = (d: string) => (existsSync(join(ws, d)) ? readdirSync(join(ws, d)).filter((f) => !f.includes(".tmp-")) : []); // (not one still being written)
     await expect.poll(() => inDir(".canvast/thumbnails").length).toBe(1);
     expect(inDir(".canvast/thumbnails")[0]).toMatch(/^[0-9a-f]{64}\.webp$/);
     const thumbName = inDir(".canvast/thumbnails")[0]!;
@@ -1751,7 +1751,7 @@ test("a folder of files an earlier version named: opening it, twice, renames and
   const png = (seed: number): Buffer => makePng(6, 4, () => [seed, 90, 40, 255]);
   const dirs = ["library/A- B", "library/a-b", "library/Refs"];
   for (const d of dirs) mkdirSync(join(ws, d), { recursive: true });
-  const NAMES = ["library/A- B/one.png", "library/a-b/two.png", "library/Refs/Scan v2.1", "library/Refs/cafe\u0301.png", "library/Refs/a\u200bb.png", "library/Refs/C# notes.md", "library/Refs/draft.final.png", "library/Refs/README", "library/Refs/x.7z.001"];
+  const NAMES = ["library/A- B/one.png", "library/a-b/two.png", "library/Refs/cafe\u0301.png", "library/Refs/a\u200bb.png", "library/Refs/C# notes.md", "library/Refs/draft.final.png", "library/Refs/README", "library/Refs/x.7z.001"];
   NAMES.forEach((f, i) => writeFileSync(join(ws, f), f.endsWith(".md") ? "# C#\n" : png(i * 20 + 10)));
   const seen = () => files(ws).filter((f) => f.startsWith("library/")).sort();
   const before = seen();
@@ -1766,6 +1766,16 @@ test("a folder of files an earlier version named: opening it, twice, renames and
   await expect.poll(items, { timeout: 20_000 }).toBe(NAMES.length);
   await page.waitForTimeout(2500);
   expect(seen(), "nor on opening again").toEqual(before);
+  // A picture an earlier version named from `Scan v2.1`, its extension lost: the library knows it is a PNG.
+  await page.getByTestId("view-assets").click();
+  await page.getByTestId("assets-import-input").setInputFiles({ name: "scan.png", mimeType: "image/png", buffer: png(200) });
+  await expect.poll(seen, { timeout: 15_000 }).toContain("library/images/scan.png");
+  await app.close();
+  renameSync(join(ws, "library/images/scan.png"), join(ws, "library/Refs/Scan v2.1"));
+  ({ app, page } = await launch(ws, "userdata", true));
+  await expect.poll(() => page.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.some((e) => e.name === "Scan v2.1" && e.type === "image/png")), { timeout: 20_000 }).toBe(true);
+  await page.waitForTimeout(2500);
+  expect(seen(), "not moved either").toContain("library/Refs/Scan v2.1");
   // Asked for: today's names, and nothing else.
   await page.keyboard.press("Control+k");
   await page.keyboard.type("Repair library file names");
@@ -1774,7 +1784,7 @@ test("a folder of files an earlier version named: opening it, twice, renames and
   await expect.poll(seen, { timeout: 15_000 }).toContain("library/Refs/Scan v2.1.png");
   await expect.poll(seen).toContain("library/Refs/ab.png");
   for (const f of ["library/A- B/one.png", "library/a-b/two.png", "library/Refs/C# notes.md", "library/Refs/draft.final.png", "library/Refs/README", "library/Refs/x.7z.001"]) expect(seen()).toContain(f);
-  expect(seen()).toHaveLength(NAMES.length);
+  expect(seen()).toHaveLength(NAMES.length + 1);
   await app.close();
 });
 
