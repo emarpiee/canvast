@@ -1530,13 +1530,12 @@ test("a file imported with a folder open goes into it, dropped from outside or b
   const folderOf = (name: string) => p.evaluate((n) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === n)?.folderIds ?? null), name);
   await p.getByTestId("assets-import-input").setInputFiles({ name: "by-button.png", mimeType: "image/png", buffer: makePng(6, 6, () => [200, 10, 30, 255]) });
   await expect.poll(() => folderOf("by-button.png")).toEqual(["box"]);
-  await p.evaluate(async () => {
-    const bytes = await (await fetch("data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==")).arrayBuffer();
+  await p.evaluate((bytes) => {
     const data = new DataTransfer();
-    data.items.add(new File([bytes], "dropped.gif", { type: "image/gif" }));
+    data.items.add(new File([new Uint8Array(bytes)], "dropped.png", { type: "image/png" }));
     document.body.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
-  });
-  await expect.poll(() => folderOf("dropped.gif")).toEqual(["box"]);
+  }, [...makePng(7, 7, () => [30, 10, 200, 255])]);
+  await expect.poll(() => folderOf("dropped.png")).toEqual(["box"]);
   await p.getByTestId("assets-import-input").setInputFiles({ name: "had.png", mimeType: "image/png", buffer: first });
   await expect(p.getByTestId("asset-card")).toHaveCount(2);
   expect(await folderOf("had.png")).toEqual([]);
