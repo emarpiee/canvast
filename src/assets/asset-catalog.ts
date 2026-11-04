@@ -102,10 +102,10 @@ export function unhiddenFolders(folders: readonly AssetFolder[], id: string): { 
 }
 
 /** A listing's folders by name: those lists show, and the hidden ones (see `CatalogListing`). */
-export function listedFolders(all: readonly AssetFolder[]): Pick<CatalogListing, "folders" | "hiddenFolders"> {
+export function listedFolders(all: readonly AssetFolder[]): Pick<CatalogListing, "folders" | "hiddenFolders" | "folderOrder"> {
   const shown = visibleFolders(all).sort((a, b) => a.name.localeCompare(b.name));
   const ids = new Set(shown.map((f) => f.id));
-  return { folders: shown, hiddenFolders: all.filter((f) => !ids.has(f.id)).sort((a, b) => a.name.localeCompare(b.name)) };
+  return { folders: shown, hiddenFolders: all.filter((f) => !ids.has(f.id)).sort((a, b) => a.name.localeCompare(b.name)), folderOrder: all.map((f) => f.id) };
 }
 
 /** The folders hidden mode shows: the hidden ones, and those holding hidden items (`holding`), with the folders above them. */
@@ -212,6 +212,8 @@ export interface CatalogListing {
   pendingDeletion: number;
   /** The folders lists show (none hidden, or inside a hidden one). */
   folders: AssetFolder[];
+  /** Every folder's id in the order the library holds them: the oldest first, as a new one goes at the end. */
+  folderOrder?: string[];
   /** The hidden folders and those inside them (hidden mode lists them). */
   hiddenFolders?: AssetFolder[];
 }

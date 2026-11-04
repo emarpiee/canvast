@@ -145,6 +145,15 @@ const THUMB_MAKERS = 6;
 /** "Where it is used" lists this many canvases, then a button for the rest. */
 const PLACES_SHOWN = 5;
 /** A list of the sidebar (folders, file types, tags) shows this many rows before a "Show more" button. */
+/** What a sidebar list's sort button goes through, in order. */
+const SIDE_SORTS = { folders: ["az", "za", "new", "old"], tag: ["az", "za"], ctag: ["az", "za"] } as const;
+type SideSort = (typeof SIDE_SORTS.folders)[number];
+const SIDE_SORT_LOOK: Record<SideSort, { word: string; icon: string }> = {
+  az: { word: "A to Z", icon: ICONS.arrowDownAZ },
+  za: { word: "Z to A", icon: ICONS.arrowDownZA },
+  new: { word: "newest first", icon: ICONS.calendarDays },
+  old: { word: "oldest first", icon: ICONS.calendarArrowUp },
+};
 const SIDE_SHOWN = { folders: 8, types: 8, tags: 12, ctags: 12, saved: 8 } as const;
 /** How many loaded thumbnails are kept ready to show again. */
 const THUMB_URLS_KEPT = 3000;
@@ -423,7 +432,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; tagsInline: boolean; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", tagsInline: false, expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; tagsInline: boolean; sideSort: Record<keyof typeof SIDE_SORTS, SideSort>; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", tagsInline: false, sideSort: { folders: "az", tag: "az", ctag: "az" }, expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -450,6 +459,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (Array.isArray(saved.folded)) ui.folded = saved.folded.filter((c) => typeof c === "string").slice(0, 20000);
     if (saved.chooser === "inline") ui.chooser = "inline";
     if (saved.tagsInline === true) ui.tagsInline = true;
+    for (const id of Object.keys(SIDE_SORTS) as Array<keyof typeof SIDE_SORTS>) {
+      const way = saved.sideSort?.[id];
+      if (way && (SIDE_SORTS[id] as readonly SideSort[]).includes(way)) ui.sideSort[id] = way;
+    }
     if (Array.isArray(saved.expanded)) ui.expanded = saved.expanded.filter((c) => typeof c === "string").slice(0, 8);
     if (saved.colW && typeof saved.colW === "object") {
       for (const c of ui.order.map(colOf)) {
@@ -1814,6 +1827,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       missing: used.filter((h) => !have.has(h)).map((hash) => ({ hash, ...usageOf(usage, hash) })),
       pendingDeletion: 0,
       folders: modeFolders(counts.folders.map(([id]) => id)),
+      folderOrder: allFolders.map((f) => f.id),
     };
   };
   // ---- data
@@ -2353,9 +2367,23 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       `<li class="side-row"><input class="side-name" data-testid="folder-name-input" value="${esc(value)}" aria-label="${label}" maxlength="120"></li>`;
     const subtreeCount = (id: string): number => counts.folders.get(id) ?? 0;
     const findBox = (id: SideFind, noun: string): string => `<input type="search" class="side-find" data-side-find="${id}" data-testid="side-find-${id}" value="${esc(sideFind[id])}" placeholder="Search ${noun}" aria-label="Search ${noun}" maxlength="120">`;
+    const sortBtn = (id: SideFind): string => {
+      const ways: readonly SideSort[] = SIDE_SORTS[id];
+      const now = ui.sideSort[id];
+      const next = ways[(ways.indexOf(now) + 1) % ways.length]!;
+      const word = `Sorted ${SIDE_SORT_LOOK[now].word}. Change to ${SIDE_SORT_LOOK[next].word}`;
+      return `<button type="button" class="side-add" data-side-sort="${id}" data-testid="side-sort-${id}" aria-label="${word}" title="${word}">${SIDE_SORT_LOOK[now].icon}</button>`;
+    };
+    // (the listing's folders are by name; the order the library holds them in says which is newer)
+    const folderAge = new Map((listing.folderOrder ?? []).map((id, i) => [id, i]));
+    const ageOf = (f: AssetFolder): number => folderAge.get(f.id) ?? folderAge.size; // (not in the listing yet: just made)
+    const folderSorted = (list: AssetFolder[]): AssetFolder[] => {
+      const way = ui.sideSort.folders;
+      return way === "az" ? list : list.sort((a, b) => (way === "za" ? b.name.localeCompare(a.name) : way === "new" ? ageOf(b) - ageOf(a) : ageOf(a) - ageOf(b)) || a.name.localeCompare(b.name));
+    };
     const findingFolders = sideFind.folders.trim() !== "";
     const foldersKept = findingFolders ? treeSearch(listing.folders, (f) => f.parentId, (f) => folderPath(listing!.folders, f.id).join("/"), sideFind.folders).keep : null;
-    const folderKids = (id: string): AssetFolder[] => listing!.folders.filter((f) => f.parentId === id && (!foldersKept || foldersKept.has(f.id)));
+    const folderKids = (id: string): AssetFolder[] => folderSorted(listing!.folders.filter((f) => f.parentId === id && (!foldersKept || foldersKept.has(f.id))));
     /** A folder's row, then its subfolders' rows, in the app's one tree. */
     const treeOf = (root: AssetFolder): string =>
       walkTree([root], (f) => folderKids(f.id), (f) => findingFolders || !ui.folded.includes(f.id), (f, at) =>
@@ -2404,7 +2432,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // The tags and the canvas tags: a tree on `/`, or all in a row with their whole names.
     sideTagLabels.clear();
     const tagList = (o: { scope: "tag" | "ctag"; labels: readonly string[]; shown: keyof typeof SIDE_SHOWN; word: string; cls: string; n: (id: string) => number; active: (id: string) => boolean; title?: (id: string) => string | undefined; menu: (id: string, own: boolean, nested: boolean, label: string) => string }): { rows: string; head: string; find: string; empty: string | null } => {
-      const nodes = pathNodes([...o.labels].sort((a, b) => a.localeCompare(b)).map((l) => ({ id: l, name: l, value: l })));
+      const nodes = pathNodes([...o.labels].sort((a, b) => (ui.sideSort[o.scope] === "za" ? b.localeCompare(a) : a.localeCompare(b))).map((l) => ({ id: l, name: l, value: l })));
       const kids = new Map<string | null, typeof nodes>();
       for (const t of nodes) kids.set(t.parent, [...(kids.get(t.parent) ?? []), t]);
       const full = (id: string): string => sideTagLabels.get(`${o.scope}:${id}`) ?? id;
@@ -2427,7 +2455,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         ? capped(o.shown, nodes.filter((t) => t.value !== null && hit.has(t.id)).map((t) => ({ active: o.active(t.id), html: row(t, t.value!, { cls: o.cls }) })), finding)
         : capped(o.shown, (kids.get(null) ?? []).filter((t) => found.keep.has(t.id)).map((t) => ({ active: nodes.some((x) => (x.id === t.id || x.id.startsWith(`${t.id}/`)) && o.active(x.id)), html: tree(t) })), finding);
       const view = ui.tagsInline ? "Show as a tree" : "Show in a row";
-      const head = (nodes.length ? `<button type="button" class="side-add" data-tags-view aria-label="${view}" title="${view}">${ui.tagsInline ? ICONS.listTree : ICONS.wrapText}</button>` : "") + (ui.tagsInline || finding ? "" : foldAllBtn(`data-tags-fold="${o.scope}"`, o.word, parents));
+      const head = (nodes.length ? `<button type="button" class="side-add" data-tags-view aria-label="${view}" title="${view}">${ui.tagsInline ? ICONS.listTree : ICONS.wrapText}</button>` : "") + (o.labels.length > 1 ? sortBtn(o.scope) : "") + (ui.tagsInline || finding ? "" : foldAllBtn(`data-tags-fold="${o.scope}"`, o.word, parents));
       return { rows, head, find: nodes.length ? findBox(o.scope, o.word) : "", empty: finding ? `No ${o.word} match.` : null };
     };
     const tagSection = tagList({
@@ -2482,10 +2510,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         ${section(
           "folders",
           "Folders",
-          foldAll + addBtn('data-folder-action="new" data-id="" data-testid="folder-new"', "New folder"),
+          (listing.folders.length > 1 ? sortBtn("folders") : "") + foldAll + addBtn('data-folder-action="new" data-id="" data-testid="folder-new"', "New folder"),
           `${listing.folders.length ? findBox("folders", "folders") : ""}<ul class="side-list" data-testid="folder-tree">
             ${naming?.kind === "new" && naming.parent === null ? nameInput("", "Name of the new folder") : ""}
-            ${capped("folders", listing.folders.filter((f) => f.parentId === null && (!foldersKept || foldersKept.has(f.id))).map((f) => ({ html: treeOf(f), active: [scope.startsWith("folder:") ? scope.slice(7) : "", naming?.kind === "rename" ? naming.id : "", naming?.kind === "new" ? (naming.parent ?? "") : ""].some((id) => id && folderSubtree(listing!.folders, f.id).has(id)) })), findingFolders) || (naming ? "" : `<li class="side-empty">${findingFolders ? "No folders match." : "No folders yet."}</li>`)}
+            ${capped("folders", folderSorted(listing.folders.filter((f) => f.parentId === null && (!foldersKept || foldersKept.has(f.id)))).map((f) => ({ html: treeOf(f), active: [scope.startsWith("folder:") ? scope.slice(7) : "", naming?.kind === "rename" ? naming.id : "", naming?.kind === "new" ? (naming.parent ?? "") : ""].some((id) => id && folderSubtree(listing!.folders, f.id).has(id)) })), findingFolders) || (naming ? "" : `<li class="side-empty">${findingFolders ? "No folders match." : "No folders yet."}</li>`)}
           </ul>`,
         )}
         ${section(
@@ -3962,6 +3990,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const parents = tree ? (sideTagParents.get(tree) ?? []) : (listing?.folders ?? []).filter((f) => listing!.folders.some((k) => k.parentId === f.id)).map((f) => f.id);
       const others = ui.folded.filter((k) => (tree ? !k.startsWith(`${tree}:`) : /^c?tag:/.test(k)));
       ui.folded = parents.some((id) => !ui.folded.includes(id)) ? [...others, ...parents] : others;
+      saveUi();
+      renderSide();
+      return;
+    }
+    if (b.dataset["sideSort"]) {
+      const id = b.dataset["sideSort"] as keyof typeof SIDE_SORTS;
+      const ways: readonly SideSort[] = SIDE_SORTS[id];
+      ui.sideSort[id] = ways[(ways.indexOf(ui.sideSort[id]) + 1) % ways.length]!;
       saveUi();
       renderSide();
       return;

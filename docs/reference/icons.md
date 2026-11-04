@@ -55,8 +55,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `align-vertical-justify-center` | Middle |
 | `align-vertical-justify-end` | Bottom |
 | `align-vertical-justify-start` | Top |
-| `arrow-down-a-z` | Sort the layers by name; By name, A to Z |
-| `arrow-down-z-a` | By name, Z to A |
+| `arrow-down-a-z` | Sort the layers by name; By name, A to Z (also the library sidebar's sort button) |
+| `arrow-down-z-a` | By name, Z to A (also the library sidebar's sort button) |
 | `arrow-up-down` | Sorted: Newest first. Reverse the order |
 | `bell` | Show a sample notice (developer tools) |
 | `blocks` | Arrange and align |
@@ -95,7 +95,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `bookmark-check` | Bookmark the picked things |
 | `box-select` | Axis-aligned selection box |
 | `bring-to-front` | Bring to front |
-| `calendar-days` | By date added, newest first |
+| `calendar-days` | By date added, newest first (also the library sidebar's sort button) |
+| `calendar-arrow-up` | Oldest first (the library sidebar's sort button) |
 | `camera` | Screenshot (left tool rail, above Search) |
 | `arrow-left` | Back to the library (top left of the library viewer) |
 | `sun-moon` | Background of see-through pictures (library viewer, bottom right) |

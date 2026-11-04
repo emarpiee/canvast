@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.58 — Sort folders and tags in the sidebar (2026-11-04)
+
+- **Added:** a sort button on the library sidebar's Folders (A to Z, Z to A, newest, oldest), Tags and Canvas tags (A to Z, Z to A) headers, remembered on this device.
+
 ## 0.53.57 — Search folders and tags in the sidebar (2026-11-04)
 
 - **Added:** a search box in the library sidebar's Folders, Tags and Canvas tags sections. It finds by name or path, opens what leads to a match, and `Esc` empties it.

@@ -258,6 +258,7 @@ import chevronUp from "lucide-static/icons/chevron-up.svg";
 import arrowDownAZ from "lucide-static/icons/arrow-down-a-z.svg";
 import arrowDownZA from "lucide-static/icons/arrow-down-z-a.svg";
 import calendarDays from "lucide-static/icons/calendar-days.svg";
+import calendarArrowUp from "lucide-static/icons/calendar-arrow-up.svg";
 import rulerIcon from "lucide-static/icons/ruler.svg";
 import fileType from "lucide-static/icons/file-type.svg";
 import fileTextSvg from "lucide-static/icons/file-text.svg";
@@ -563,6 +564,7 @@ export const ICONS = {
   arrowDownAZ: clean(arrowDownAZ),
   arrowDownZA: clean(arrowDownZA),
   calendarDays: clean(calendarDays),
+  calendarArrowUp: clean(calendarArrowUp),
   rulerIcon: clean(rulerIcon),
   fileType: clean(fileType),
   fileText: clean(fileTextSvg),
