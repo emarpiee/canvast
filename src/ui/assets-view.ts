@@ -56,7 +56,7 @@ import { runExport, runExportFiles, runExportFolder } from "./archive-ui";
 import { openLibraryPicker } from "./library-picker";
 import { OpenNote } from "./note-session";
 import type { NoteDeps, NotePlace } from "./note-session";
-import { RICH_NOTE_SUFFIX, WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget, newNoteFile } from "../notes/note-file";
+import { RICH_NOTE_SUFFIX, WIKI, linkTarget, noteKindOf, opensAsNote, tooBigForNote, richNameOf, richNoteBody, wikiTarget, newNoteFile } from "../notes/note-file";
 import { nameWarnings } from "../doc/file-names";
 import { splitFrontmatter, underProps, wholeMarkdown, withFileMeta } from "../notes/frontmatter";
 import { AUTO_NOTE_SETTINGS, autoDates, formatNoteDate, isAutoDate, isAutoKey } from "../notes/note-dates";
@@ -220,6 +220,9 @@ const sortOfCol = (id: ColumnId): { key: SortKey; desc: boolean } => (isPropColu
 
 
 /** Fields that take typed text: shortcuts keep out of them (a checkbox or a slider is not one). */
+const ZOOM_STEP = 1.25;
+const NOTE_ZOOM_MIN = 0.5;
+const NOTE_ZOOM_MAX = 3;
 const TYPING = 'input:not([type="checkbox"]):not([type="range"]), textarea, select, [contenteditable="true"]';
 
 /** How many thumbnails a drag from the library shows, stacked. */
@@ -963,7 +966,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const noteWords = new Map<string, string>();
   let readingWords = false;
   const ensureNoteWords = (entries: readonly CatalogListing["entries"][number][]): void => {
-    const todo = readingWords ? [] : entries.filter((e) => e.present && noteKindOf(e.name) && !noteWords.has(e.hash) && meta(e).hidden === hiddenMode);
+    const todo = readingWords ? [] : entries.filter((e) => e.present && noteKindOf(e.name) && !tooBigForNote(e.name, e.size) && !noteWords.has(e.hash) && meta(e).hidden === hiddenMode);
     if (!todo.length) return;
     readingWords = true;
     void (async () => {
@@ -1090,6 +1093,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     sec.querySelector(".show-more")?.remove();
     if (linksCap.long) sec.insertAdjacentHTML("beforeend", showMoreButton({ open: linksOpen, hidden: linksCap.hidden, attrs: `data-action="show-more" data-list="links" data-testid="asset-links-more"` }));
   };
+  let noteZoom = 1; // (for this session, from note to note)
   const openNote = async (hash: string, name: string, blob: Blob, token: number): Promise<void> => {
     if (token !== slideToken) return;
     slideImg.hidden = true;
@@ -1111,6 +1115,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     if (token !== slideToken) return opened.close(false);
     note = opened;
+    paintNoteZoom();
   };
   /** Before the note is left (another item, Back, Esc): its changes are saved or let go, or it stays open. Whether to go on. */
   const leaveNote = (): Promise<boolean> => (note ? note.leave() : Promise.resolve(true));
@@ -1121,6 +1126,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     note = null;
     viewer.classList.remove("is-note");
     noteBox.hidden = true;
+    paintZoom();
     n.close(!!entryOf(n.hash));
     noteBox.replaceChildren();
   };
@@ -1385,6 +1391,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // The stage changes size when the controls are hidden or shown (and with the window): the picture is fitted and drawn again for its new size, so an SVG is never a stale bitmap stretched to fit.
   new ResizeObserver(() => paintZoom()).observe(stage);
   const paintZoom = (): void => {
+    if (note) return paintNoteZoom();
     const el = shownMedia();
     const z = sizes();
     const vec = vector && el === slideImg;
@@ -1400,6 +1407,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     zoomPct.textContent = z ? (zoom.s === 1 ? "Fit" : `${Math.round(((zoom.s * z.fw) / z.nw) * 100)}%`) : "Fit";
     viewer.classList.toggle("is-zoomed", zoom.s !== 1);
     paintVector();
+  };
+  /** The zoom control and its keys are one, for a picture and for a note: a note's words are drawn bigger, its file does not change. */
+  const paintNoteZoom = (): void => {
+    noteBox.style.setProperty("--note-zoom", String(noteZoom));
+    zoomPct.textContent = `${Math.round(noteZoom * 100)}%`;
+  };
+  const zoomStep = (dir: 1 | -1 | 0): void => {
+    if (note) {
+      const next = dir === 0 ? 1 : Math.max(NOTE_ZOOM_MIN, Math.min(NOTE_ZOOM_MAX, noteZoom * ZOOM_STEP ** dir));
+      noteZoom = Math.abs(next - 1) < 0.02 ? 1 : next;
+      paintNoteZoom();
+    } else if (dir === 0) resetZoom();
+    else zoomAt(zoom.s * ZOOM_STEP ** dir, ...centre());
   };
   const resetZoom = (): void => {
     zoom.s = 1;
@@ -1451,6 +1471,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   stage.addEventListener(
     "wheel",
     (e) => {
+      if (note && e.ctrlKey) { // (a note's wheel scrolls its words)
+        e.preventDefault();
+        zoomStep(e.deltaY < 0 ? 1 : -1);
+        return;
+      }
       if (!shownMedia()) return;
       e.preventDefault();
       zoomAt(zoom.s * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0018)), e.clientX, e.clientY);
@@ -1497,9 +1522,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   viewer.querySelector<HTMLElement>(".viewer-zoom")!.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-zoom]");
     if (!b) return;
-    const [cx, cy] = centre();
-    if (b.dataset["zoom"] === "in") zoomAt(zoom.s * 1.25, cx, cy);
-    else if (b.dataset["zoom"] === "out") zoomAt(zoom.s / 1.25, cx, cy);
+    if (b.dataset["zoom"] === "in") zoomStep(1);
+    else if (b.dataset["zoom"] === "out") zoomStep(-1);
+    else if (note) zoomStep(0);
     else toggleActual();
   });
   for (const m of [slideImg, slideMedia]) {
@@ -1576,7 +1601,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     };
     if (!rec) return void (await thumbnail());
     const kind = noteKindOf(rec.name);
-    if (kind) return void (await openNote(hash, rec.name, rec.blob, token));
+    if (kind && (await opensAsNote(rec.name, rec.blob))) return void (await openNote(hash, rec.name, rec.blob, token));
     if (isFontFile(rec)) {
       // A font: its sample, in its own letters, at several sizes.
       slideImg.hidden = true;
@@ -1813,7 +1838,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
   viewer.addEventListener("keydown", (e) => {
     const typing = (e.target as HTMLElement).closest(TYPING);
-    if (note && (e.target as HTMLElement).closest(".viewer-note")) return; // (a note's keys are the editor's: Back closes it)
+    if (note && (e.target as HTMLElement).closest(".viewer-note")) {
+      // (a note's keys are the editor's: Back closes it. + and - are words there, so with Ctrl.)
+      const dir = !(e.ctrlKey || e.metaKey) || e.altKey ? null : e.key === "+" || e.key === "=" ? 1 : e.key === "-" || e.key === "_" ? -1 : e.key === "0" ? 0 : null;
+      if (dir === null) return;
+      zoomStep(dir);
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (e.key === "Escape") {
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
       else void leaveNote().then((ok) => ok && closeSlide());
@@ -1822,10 +1855,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     else if (e.key === "ArrowRight") stepSlide(1);
     else if (e.key === "i" || e.key === "I") toggleDetails();
     else if (e.key === "f" || e.key === "F") toggleBar();
-    else if (e.key === "+" || e.key === "=") zoomAt(zoom.s * 1.25, ...centre());
-    else if (e.key === "-" || e.key === "_") zoomAt(zoom.s / 1.25, ...centre());
-    else if (e.key === "0") resetZoom();
-    else if (e.key === "1") toggleActual();
+    else if (e.key === "+" || e.key === "=") zoomStep(1);
+    else if (e.key === "-" || e.key === "_") zoomStep(-1);
+    else if (e.key === "0") zoomStep(0);
+    else if (e.key === "1") note ? zoomStep(0) : toggleActual();
     else return;
     e.preventDefault();
     e.stopPropagation();

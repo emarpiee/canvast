@@ -2,7 +2,7 @@ import { CARD_SCALE } from "../notes/note-preview";
 import type { RasterSource } from "../render/draw-objects";
 import { plural } from "../doc/plural";
 import { sha256Hex } from "./sha256";
-import { noteKindOf } from "../notes/note-file";
+import { isDataText, noteKindOf } from "../notes/note-file";
 import type { OriginalStore } from "../storage/store";
 import { makeThumb } from "./thumb";
 import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
@@ -290,7 +290,7 @@ export class AssetLibrary {
     if (existing) {
       const state = this.store ? await this.store.entryState(hash) : undefined;
       // Another note with the same words (an empty template, say) is a note of its own: one line more at its end, as an item is its bytes.
-      if (!at && state === "active" && file.name && file.name !== existing.name && noteKindOf(file.name)) return this.importFileDetailed(new File([bytes, "\n"], file.name, { type: file.type }), keepDecoded);
+      if (!at && state === "active" && file.name && file.name !== existing.name && noteKindOf(file.name) && !isDataText(file.name)) return this.importFileDetailed(new File([bytes, "\n"], file.name, { type: file.type }), keepDecoded);
       const duplicate: ImportOutcome["duplicate"] = state && state !== "active" ? "restored" : "present";
       const had = this.decoded.has(hash);
       if (keepDecoded || Math.max(existing.pixelW, existing.pixelH) <= SMALL_EDGE) await this.ensureDecoded(existing);

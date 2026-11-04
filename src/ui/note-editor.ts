@@ -470,6 +470,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   let editsAtCurrent = 0;
   el.addEventListener("input", () => void edits++, true);
   const holder = document.createElement("div");
+  el.classList.toggle("is-plain-note", opts.kind === "txt"); // (its spaces and tabs are shown and kept)
   el.append(holder);
   /** What the editor holds and how it cleans it (the same for the hidden one that compares notes). */
   const content: SunEditor.InitOptions = {
@@ -784,7 +785,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       for (const br of box.querySelectorAll("br")) br.replaceWith("\n");
       const lineOf = (b: Element): string => (b.matches("ul, ol") ? [...b.children].map(lineOf).join("\n") : (b.textContent ?? "").replace(/^\n$/, ""));
       const lines = [...box.children].map(lineOf);
-      const text = lines.join("\n");
+      const text = lines.join(/\r\n/.test(opts.text) ? "\r\n" : "\n"); // (the file's own line ends)
       return { text, keepsAll: held(textHtml(text)) === held(now) };
     },
     asRich: (title) => richNoteFile(title, output().replace(/(href|src)="canvast-wiki:([^"]+)"/g, (m, a: string, t: string) => { const p = wikiPath.get(decodeURIComponent(t)); return p ? `${a}="${p}"` : m; })),

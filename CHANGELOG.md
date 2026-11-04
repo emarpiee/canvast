@@ -11,6 +11,8 @@
 - **Fixed:** a panel's resize handle no longer covers a scrollbar: in the viewer and the notes editor beside the details, and on panels docked on the left of the canvas.
 - **Fixed:** in the notes editor, the room above and below the Back and Details buttons is the same in every density.
 - **Fixed:** the highlight in a select box's list no longer gets a focus ring.
+- **Added:** text files open in the notes editor as plain text: `.json`, `.csv`, `.tsv`, `.xml`, `.yaml`, `.toml`, `.ini`, `.log`, `.tex` and code files, up to 5 MiB and in UTF-8. Spaces, tabs and line ends are kept, also in `.txt`; the app never adds to or rewrites them by itself.
+- **Added:** the viewer's zoom control works on a note too, with the same keys (+, -, 0 outside the words; Ctrl with them while typing): the words are drawn bigger, the file does not change.
 - **Changed:** the README is in two parts, for users and for developers, with a section for each big feature, tables and pictures first and the full wording after them; new pictures of the sidebar, several items selected, art files and the Trash.
 - **Changed:** the library's list has the same thumbnail slider as the grid, in the same place, with its own size: its rows and thumbnails grow with it. The slider is longer, and the list's columns button moved to the left of the grid and list buttons so that nothing shifts.
 - **Added:** Details in the details panel show the file's type, size, pixels, time of import, place on disk and whole hash, a JPEG's channels and colour sampling, all lined up. They open from the file's line, with an info icon at its right end, in one card.

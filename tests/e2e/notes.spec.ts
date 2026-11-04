@@ -1080,3 +1080,46 @@ test("a hidden note open in the Note panel closes when hidden items are no longe
   await expect(page(p).locator("p").first()).toContainText("More.");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a data file opens as plain text: its spaces, tabs and line ends come back exactly, and one not in UTF-8 stays a file", async ({ app }) => {
+  const p = app.page;
+  const JSON_TEXT = '{\n  "a": [\n    1,\n\t\t2\n  ],\n  "b":   "x  y",\n\n    "c": "<&>"\n}\n';
+  const YAML_TEXT = "a:\r\n  b: 1\r\n";
+  const LATIN = Buffer.from([0x63, 0x61, 0x66, 0xe9, 0x0a]);
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles([
+    { name: "data.json", mimeType: "application/json", buffer: Buffer.from(JSON_TEXT) },
+    { name: "conf.yaml", mimeType: "text/yaml", buffer: Buffer.from(YAML_TEXT) },
+    { name: "old.log", mimeType: "text/plain", buffer: LATIN },
+  ]);
+  const text = () => p.evaluate(() => window.__canvastDebug.notesAsText()[0]?.text);
+  const back = () => p.locator(".viewer-back").click();
+  await card(p, hashOf(JSON_TEXT)).dblclick();
+  await expect(page(p)).toContainText('"b"');
+  await expect.poll(text).toBe(JSON_TEXT);
+  await page(p).click();
+  await p.keyboard.press("Control+End");
+  await p.keyboard.type("z");
+  await expect.poll(text).toBe(`${JSON_TEXT}z`);
+  await p.keyboard.press("Backspace");
+  await expect.poll(text).toBe(JSON_TEXT);
+  // The viewer's zoom control and keys are the note's too: its words are drawn bigger, its file stays.
+  const pct = p.locator(".viewer-zoom-pct");
+  const zoomed = () => page(p).evaluate((e) => getComputedStyle(e).zoom);
+  await expect(pct).toHaveText("100%");
+  await p.locator('.viewer-zoom [data-zoom="in"]').click();
+  await expect(pct).toHaveText("125%");
+  expect(await zoomed()).toBe("1.25");
+  await page(p).click();
+  await p.keyboard.press("Control+-");
+  await expect(pct).toHaveText("100%");
+  expect(await zoomed()).toBe("1");
+  await expect.poll(text).toBe(JSON_TEXT);
+  await back();
+  await card(p, hashOf(YAML_TEXT)).dblclick();
+  await expect.poll(text).toBe(YAML_TEXT);
+  await back();
+  await card(p, hashOf(LATIN)).dblclick();
+  await expect(p.locator(".assets-body.is-viewing")).toBeVisible();
+  await expect(page(p)).toBeHidden();
+});

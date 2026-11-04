@@ -3,7 +3,7 @@ import { stampNote } from "../notes/note-dates";
 import { NO_META, fileInlineTags, fileMeta, sameMeta, withFileMeta } from "../notes/frontmatter";
 import type { NoteMeta } from "../notes/frontmatter";
 import { makeThumb } from "../assets/thumb";
-import { WIKI, libraryLink, linkTarget, noteKindOf, noteLinks, relativeLink, relinkNote, wikiTarget, wikiKeyOf } from "../notes/note-file";
+import { isDataText, WIKI, libraryLink, linkTarget, noteKindOf, noteLinks, relativeLink, relinkNote, wikiTarget, wikiKeyOf } from "../notes/note-file";
 import type { PathTarget } from "../notes/note-file";
 import { nameBase } from "../storage/workspace-names";
 import type { NoteKind } from "../notes/note-file";
@@ -888,7 +888,7 @@ export class Session {
       let hash = await sha256Hex(bytes.buffer);
       if (hash === old) return old;
       // A note's words the same as another note's: one line more at its end keeps them two notes (an item is its bytes).
-      while (noteKindOf(file.name) && (await this.catalog.entry(hash).catch(() => undefined))?.state === "active") {
+      while (noteKindOf(file.name) && !isDataText(file.name) && (await this.catalog.entry(hash).catch(() => undefined))?.state === "active") {
         bytes = new Uint8Array([...bytes, 10]);
         hash = await sha256Hex(bytes.buffer);
         file = new File([bytes], file.name, { type: file.type });

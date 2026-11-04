@@ -3,7 +3,7 @@ import type { CatalogEntry } from "../assets/asset-catalog";
 import { copyItemsAsFiles, copyItemsToClipboard, type CopyDeps } from "./copy-items";
 import { externalFolder } from "../storage/external-folder";
 import { askHiddenPassword } from "../ui/hidden-access";
-import { noteKindOf } from "../notes/note-file";
+import { noteKindOf, tooBigForNote } from "../notes/note-file";
 import { AUTO_NOTE_SETTINGS, setAutoDates } from "../notes/note-dates";
 import { setPropTypes } from "../notes/prop-types";
 import { CARD_SCALE, notePageHeight, setNoteItemMeta, setNoteLook, setNotePictures, setShownProps } from "../notes/note-preview";
@@ -1990,7 +1990,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         if (!noteTexts.has(o.assetId)) {
           const e = await session.catalog.entry(o.assetId).catch(() => undefined);
           if (!e) continue; // (not listed yet, or gone: looked at again on the next pass)
-          if (!noteKindOf(e.name)) {
+          if (!noteKindOf(e.name) || tooBigForNote(e.name, e.size)) {
             otherAssets.add(o.assetId);
             continue;
           }

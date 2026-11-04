@@ -1,4 +1,4 @@
-import { noteKindOf } from "../notes/note-file";
+import { opensAsNote } from "../notes/note-file";
 import { openBatchRename } from "./batch-rename";
 import { esc } from "./format";
 import { ICONS } from "./icons";
@@ -50,7 +50,7 @@ export function mountNotePanel(
     // A link to another note opens it here; to anything else, in the library.
     show: async (hash) => {
       const rec = await deps.assets.record(hash).catch(() => undefined);
-      if (rec && noteKindOf(rec.name)) await open(hash, note?.hash === hash);
+      if (rec && (await opensAsNote(rec.name, rec.blob))) await open(hash, note?.hash === hash);
       else if (await leave()) deps.showInLibrary(hash);
     },
     showCanvas: () => shut(),
@@ -60,7 +60,7 @@ export function mountNotePanel(
   };
   const open = async (hash: string, /** Opened again: the note became another kind. */ fresh = false): Promise<boolean> => {
     const rec = await deps.assets.record(hash).catch(() => undefined);
-    if (!rec || !noteKindOf(rec.name)) return false;
+    if (!rec || !(await opensAsNote(rec.name, rec.blob))) return false;
     if (note?.hash === hash && !fresh) return (el.hidden = false), true; // (already open here)
     // (a hidden note's card is a padlock: it opens only while the hidden items show)
     const e = await deps.session.catalog?.entry(hash).catch(() => undefined);

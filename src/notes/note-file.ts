@@ -22,8 +22,28 @@ export function noteKindOf(name: string): NoteKind | null {
   const n = name.toLowerCase();
   if (n.endsWith(RICH_NOTE_SUFFIX)) return "rich";
   if (n.endsWith(".md") || n.endsWith(".markdown")) return "md";
-  if (n.endsWith(".txt")) return "txt";
+  if (n.endsWith(".txt") || isDataText(n)) return "txt";
   return null;
+}
+
+/** Text that is not a note but opens in the notes editor as plain text. A page (`.html`) stays out: that name is a rich note's. */
+const DATA_TEXT = /\.(json|csv|tsv|xml|yaml|yml|toml|ini|log|css|js|mjs|ts|tsx|jsx|py|rb|go|rs|java|c|h|cpp|hpp|cs|php|sh|sql|tex)$/i;
+export const isDataText = (name: string): boolean => DATA_TEXT.test(name);
+/** Past this, such a file is a file: an editor, a preview and the search would each read all of it. */
+export const DATA_TEXT_MAX = 5 * 1024 * 1024;
+export const tooBigForNote = (name: string, size: number): boolean => isDataText(name) && size > DATA_TEXT_MAX;
+
+/** Whether the notes editor opens this file. A data file only when small and in UTF-8: another encoding read as UTF-8 and saved would be damaged. */
+export async function opensAsNote(name: string, blob: Blob): Promise<boolean> {
+  if (!noteKindOf(name)) return false;
+  if (!isDataText(name)) return true;
+  if (blob.size > DATA_TEXT_MAX) return false;
+  try {
+    new TextDecoder("utf-8", { fatal: true }).decode(await blob.arrayBuffer());
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** The name of the rich text note made from a note (`plan.md` → `plan.note.html`). */

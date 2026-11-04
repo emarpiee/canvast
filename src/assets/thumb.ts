@@ -1,5 +1,5 @@
 import { notePicture } from "../notes/note-preview";
-import { noteKindOf } from "../notes/note-file";
+import { noteKindOf, tooBigForNote } from "../notes/note-file";
 import type { AssetRecord } from "./asset-library";
 import type { ThumbRecord } from "./asset-catalog";
 import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
@@ -23,7 +23,7 @@ const THUMB_QUALITY = 0.6;
 export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
   // A file shown as a card has no stored picture: the library draws a fixed tile for it (ADR 0089), so there is nothing to make.
   if (isFontFile(rec)) return makeFontThumb(rec);
-  if (noteKindOf(rec.name)) return makeNoteThumb(rec);
+  if (noteKindOf(rec.name) && !tooBigForNote(rec.name, rec.blob.size)) return makeNoteThumb(rec);
   if (isArtFile(rec.name)) return makeArtThumb(rec);
   if (isCard(rec)) return null;
   try {
