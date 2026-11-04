@@ -15,7 +15,7 @@ The README is the one place for documentation, in two parts: **For users** (feat
 | Part | Who it is for | One sentence |
 | Section (`##`) | A short intro, then links or a table of its sub-sections | About 3 lines before the first sub-section |
 | Feature (`###`) | One sentence, its screenshot if it has one, then a table or short bullets | About one screen, before any `<details>` |
-| Detail (`<details>`) | Edge cases, long explanations, rare options, under a clear title | Never a warning about data loss, passwords or encryption |
+| Detail (`<details>`) | Edge cases, long explanations, rare options. Its title: `📖 <b>More about folders and tags:</b> Organize, Pinned folders…`, bold, naming what is inside | Never a warning about data loss, passwords or encryption |
 
 | Format | Use it for | Rule |
 | --- | --- | --- |

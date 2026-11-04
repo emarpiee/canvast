@@ -141,7 +141,7 @@ Remove the app the way you installed it. **Your workspace folders always stay wh
 | Browser version | Delete the file and clear the site data; **this deletes the work kept there, so export a backup first** |
 
 <details>
-<summary>Everything left behind, and where</summary>
+<summary>📖 <b>Everything left behind, and where</b></summary>
 
 Remove the app the way you installed it (`sudo apt remove canvast`, `sudo dnf remove canvast`, or delete the AppImage or the unpacked folder). Your workspace folders stay where they are. The app's own working copy and settings on this device are in `~/.config/canvast/` (`%APPDATA%\canvast` on Windows, `~/Library/Application Support/canvast` on a Mac); removing the app never deletes it, so delete that folder too to remove everything. An AppImage also may leave an entry in your launcher if an AppImage manager added one. Readable copies of hidden items opened in another app (`canvast-opened-…` in the temporary folder) are deleted when the app closes; a crash leaves them until the next start, or until the system clears its temporary folder. The app removes, by itself, the working copies of workspaces it no longer opens once they are a month old. For the browser version, delete the file and clear the site data of `file://` pages in the browser (for the online copy, the site data of `emarpiee.github.io`); this deletes the work kept there, so export a backup first.
 
@@ -264,7 +264,7 @@ There is no edge and no zoom limit, in either direction.
 | Choose how the view travels | **Camera travel** in Settings > Navigation: *Fly*, *Glide near only* or *Cut* |
 
 <details>
-<summary>All about navigating</summary>
+<summary>📖 <b>More about navigating:</b> Zoom, Pan, Boards and canvases, Return, Orientation aids, Bookmarks, and more</summary>
 
 - **Zoom** with the wheel, a trackpad pinch, `+` and `−`, or the on-screen buttons. The point under the pointer (or between your fingers) stays where it is.
 - **Pan** with the middle button, `Space`+drag, the Hand tool (`H`), two fingers, `Shift`+wheel or the arrow keys. Dragging objects near an edge of the view pans it too, the nearer the edge the faster, and what is dragged stays in view; only what is bigger than the view, or was already past its edge, goes beyond it (**Pan at the edge while dragging** in Settings > Navigation turns this off, and **Edge panning speed** sets how fast).
@@ -320,7 +320,7 @@ Everything you draw is vector, so it stays sharp at every magnification.
 ![The Pattern panel: the Contours generator on a sheet, with its colours, settings and seed](docs/screenshots/pattern.webp)
 
 <details>
-<summary>All about drawing</summary>
+<summary>📖 <b>More about drawing:</b> Pen, Shapes, Paths, Fill and outline, Combine shapes, Vector networks, and more</summary>
 
 - **Pen** (`P`): four pens (fine, pencil, ink, marker) with pressure, tilt and a stabilizer. Size is 0.5–128 px. A stroke is made at the current scale, so a 3 px line drawn deep in a zoom is a 3 px line there, and it stays vector-sharp at every magnification. *Thickness lock* keeps strokes the same width on screen at any zoom.
 - **Shapes** (`U`): rectangle, ellipse, line, polygon and star. Sides, points, ratio and per-corner radii stay editable after drawing.
@@ -366,7 +366,7 @@ One colour picker for everything, and saved styles that objects stay linked to.
 | **Styles panel** | Saved colours, gradients, text styles, adjustments and patterns, which linked objects follow |
 
 <details>
-<summary>All about colour and styles</summary>
+<summary>📖 <b>More about colour and styles:</b> Colour picker, Gradients, Palettes, Styles panel</summary>
 
 - **Colour picker:** one picker for every colour. Choose OKHSL, OKHSV or OKLCH (CSS `oklch()`'s own lightness, chroma and hue); a ring and box, a plane with a hue bar, or sliders; text as hex or another format. It also has an eyedropper, recent colours and saved colours. A number changes by dragging its name left or right; with `Shift` it snaps to round steps worked out from its range (steps of 5 for 0–100, 10 for 0–255).
 - **Gradients:** linear, radial and angular, with stops you drag on the canvas, a *Randomize* button and a gradient map for pictures.
@@ -394,7 +394,7 @@ Press `T`, click and type. Text is stored as Markdown, and you can zoom into a l
 | **Notes** (`M`) | A markdown note with a card on the canvas: see [Notes](#notes) |
 
 <details>
-<summary>All about text</summary>
+<summary>📖 <b>More about text:</b> Text, Formatting, Look, Fonts, Text on a path, Notes, and more</summary>
 
 - **Text** (`T`): click and type. A click makes a text as wide as its words; a drag makes a box of that width. Double-click to edit.
 - **Formatting:** bold, italic, underline, strikethrough, links, colour and size of any range, headings, bulleted, numbered and nested lists. Text is stored as Markdown; **Copy Markdown** is one click away.
@@ -426,7 +426,7 @@ Files are placed as they are and never altered: every edit here can be undone or
 | **Make a new picture** | Bakes the crop, flip and adjustments into a new item |
 
 <details>
-<summary>All about pictures and media</summary>
+<summary>📖 <b>More about pictures and media:</b> Pictures, Adjustments, Crop, Drop shadow and inner shadow, Adjustments on shapes, strokes and text, Make a new picture, and more</summary>
 
 - **Pictures** are placed one source pixel to one screen pixel. Zooming in shows real pixels; nothing is invented and the file is never altered.
 - **Adjustments** are non-destructive stacks you can reorder, hide and copy between pictures, video, GIFs, shapes, pen strokes and texts: exposure, contrast, highlights, shadows, temperature, tint, saturation, vibrance, red/green/blue, levels, curves, gradient map, blur, sharpen and grain.
@@ -464,7 +464,7 @@ Keep a large canvas in order, and reach things that lie under others.
 | **Reveal** | Hold `Ctrl` to see and select what is under the pointer |
 
 <details>
-<summary>All about organizing</summary>
+<summary>📖 <b>More about organizing:</b> Layers panel, Sheets, Masks, Snapping, Arranging, Tags, and more</summary>
 
 - **Layers panel:** group and nest, rename, hide, lock, re-stack, set opacity and blend mode, rotate. Select with `Ctrl` (toggle) and `Shift` (range).
 - **Sheets** (`C`): a sheet clips what it holds and has a ratio rather than a size (see [Shapes, sheets and masks](docs/reference/shapes-sheets-masks.md)).
@@ -566,7 +566,7 @@ Every file, with its size, type and usage. Search it, filter it and sort it.
 | **Sections** | Drag a head to reorder the sidebar and the details panel |
 
 <details>
-<summary>All about the gallery</summary>
+<summary>📖 <b>More about the gallery:</b> The gallery, Dragging items, The status bar</summary>
 
 - **The gallery:** every imported file with its size, type and usage (*4 uses · 3 canvases*), with search, filters by file type, and sorting.
   - **Grid or list.** In the list, drag a column header's edge to resize it (double-click for its usual width). **List columns** also adds any **property** as a column by its name (`status`, `created`); a click on its head sorts by it, as the Sort menu's *Properties* do: dates by date, numbers by number, and items without it last either way. Columns, widths and the thumbnail size are kept.
@@ -599,7 +599,7 @@ An item is in one folder and can have many tags. Both show as trees in the sideb
 ![The Organize dialog over the library: a search, the folders as a tree, and tabs for the folder and the tags](docs/screenshots/organize.webp)
 
 <details>
-<summary>All about folders and tags</summary>
+<summary>📖 <b>More about folders and tags:</b> Folders, Organize…, Searching the sidebar, Pinned folders, Sorting the sidebar, Quick filters, and more</summary>
 
 - **Folders** fold: press the arrow on a folder with subfolders, or Collapse all on the Folders header. It is remembered on this device. A right click on a folder or tag opens its menu.
 - **Organize…** (right click an item, in Details, or `O`) moves what is selected to a folder and sets its tags from one dialog, with a search, as a tree or in a row. An item is in one folder; it can have many tags. A tag with a slash, such as `art/ink`, shows as `ink` under `art`. Nothing changes until Apply.
@@ -627,7 +627,7 @@ Double-click a card to see it large, with a filmstrip, zoom, pan and a slideshow
 | **Keys** | Arrows change file; in the player they step, and `Space` plays |
 
 <details>
-<summary>All about the viewer</summary>
+<summary>📖 <b>More about the viewer</b></summary>
 
 - A **viewer** with filmstrip, zoom, pan, slideshow and a details panel. The details show where an item is used (*Used on 3 canvases (4 times)*, then each canvas with its own count; past five canvases, **Show all** lists the rest), and **Show** takes you to it on the canvas at any depth. A button switches the background behind the picture, the controls can be hidden, and a double tap opens it on phones. The button beside the details button (or `F`) hides and shows the controls; with them hidden, the picture gets their room. A video or GIF plays with the canvas's player, floating over the bottom of the picture: while the pointer rests, playing or paused, the player fades away (after *Hide the player* in Settings > Library, 1.5 s by default), also with the pointer resting on it; only a move of the mouse, a click or a touch brings it back, never a key. While the focus is in the player (click any part of it, its empty space too; also once it has faded), `Left` and `Right` step the file and `Space` plays or pauses it; elsewhere in the viewer the arrows go to the previous and next file. A GIF whose frames were never counted (imported long ago, or taken from a workspace folder) gets the player too.
 
@@ -640,7 +640,7 @@ Double-click a card to see it large, with a filmstrip, zoom, pan and a slideshow
 ![Library cards of art files showing their own pictures, with one selected and described in the details panel](docs/screenshots/art-files.webp)
 
 <details>
-<summary>All about art files</summary>
+<summary>📖 <b>More about art files</b></summary>
 
 - **Art files** (`.kra`, `.ora`, `.psd`, `.psb`, `.procreate`, `.sketch`, `.fig`, `.figcraft`, `.clip`) show the picture they keep, on their library card and details, in the viewer and on a canvas. A backup copy (`a.kra~`, `a-autosave.kra`) shows its picture too, and says it is an automatic backup: on its card and in its details. It is a preview as the file was last saved: the file is only read, its layers stay its program's. A Photoshop file without a stored thumbnail shows its merged picture when that is 8-bit RGB or grey; the viewer shows that merged picture too, reduced to 64 megapixels when it is bigger. An art file of any size is only read in parts, also one past the import limit that lies in the desktop app's `library/`. A picture stored inside a ZIP-based file (`.kra`, `.ora`, `.procreate`, `.sketch`, `.fig`, `.figcraft`) is used up to 256 MiB unpacked; past that its next, smaller picture is used, or its tile if it has none. On a canvas a newly imported art file has its picture's shape; one imported earlier keeps a 4:3 card, its picture cropped to fit. Other art files (`.xcf`, `.ai`, `.sai`, `.afphoto`, `.afdesign`) keep their tile.
 
@@ -661,7 +661,7 @@ Click to select, `Ctrl`+click to add, `Shift`+click for a range. The details pan
 | **Undo** | `Ctrl+Z` undoes tags, favourites, folders and names, up to 50 steps |
 
 <details>
-<summary>All about selecting and details</summary>
+<summary>📖 <b>More about selecting and details:</b> Selecting and the details panel, Tags and folders of several items at once, Properties, Custom thumbnail, Rename, Undo in the library</summary>
 
 - **Selecting and the details panel**
   - A click selects an item. The details panel opens and closes with its button (or `I`) and shows what is selected (for several: their tags and folder together). A click never moves the grid under the pointer.
@@ -702,7 +702,7 @@ Take items to other apps, as a picture, as words, or as real files.
 **Hidden items:** Copy file asks first, then copies a readable temporary file; they cannot be dragged out. See [Limitations](#limitations).
 
 <details>
-<summary>All about copying and dragging out</summary>
+<summary>📖 <b>More about copying and dragging out:</b> Copy, Copy and paste, Drag items out of the app, Open in default app, Show in file manager</summary>
 
 - **Copy** (`Ctrl+C` in the library and its viewer, or the menu): a picture goes as a PNG, also a GIF's first frame and an SVG drawn, which the message says; only the first of several pictures fits. A markdown or rich text note goes as markdown with its properties on top, a plain text note as its words, several notes joined. A video or sound goes as its library picture. Any other file, or a picture the app cannot draw (TIFF, HEIC, PSD), goes as its name, which the message says. **Copy file** (desktop app; the same menu and a right click on a canvas) puts the real files on the clipboard, of any kind, to paste in a file manager. On a canvas, `Ctrl+C` on one note card gives the note's words and pastes back as the card; other objects give a picture of them, as ever, and paste back as themselves.
 - **Copy and paste** with the system clipboard: *Copy* (the menu, or `Ctrl`+`C` over the library) puts the picture, as a PNG, alone on the clipboard (a name beside it would be pasted instead of the picture by many programs); *Copy file name* puts the name as text; a file that is not a picture is copied as its name. *Paste* brings a picture from the clipboard in, named by the text beside it when there is one and it is a file name, else `image`.
@@ -721,7 +721,7 @@ Take items to other apps, as a picture, as words, or as real files.
 | One folder and its subfolders | **Export folder…**: a ZIP, or a folder in the desktop app |
 
 <details>
-<summary>All about exporting from the library</summary>
+<summary>📖 <b>More about exporting from the library:</b> Export, Export folder…</summary>
 
 - **Export** items as a `.canvast` archive, download files, or export all files as a plain ZIP sorted by file type or by folder.
 - **Export folder…** (a folder's ⋯ menu) writes the folder's files and those of its subfolders, under their names in the library: as a ZIP, or in the desktop app as a folder where you choose (outside the workspace), either keeping its folders (from the folder itself down) or with all the files together (two of the same name are numbered). Each file written to a folder is read back and checked against its SHA-256. In hidden mode it exports the hidden items in it, written readable after you confirm; outside hidden mode, only the shown ones.
@@ -743,7 +743,7 @@ Take items to other apps, as a picture, as words, or as real files.
 ![The Trash in the library: deleted files as cards, with Restore and Delete for good in the details panel](docs/screenshots/trash.webp)
 
 <details>
-<summary>All about deleting and Trash</summary>
+<summary>📖 <b>More about deleting and Trash:</b> Safe deletion, Delete everywhere, Trash, Missing files</summary>
 
 - **Safe deletion:** the details panel has one **Delete…** button.
   - An unused item is deleted from the library.
@@ -761,7 +761,7 @@ Take items to other apps, as a picture, as words, or as real files.
 Browser version, Chromium only: keep the library's files on your disk, so your disk sets the limit.
 
 <details>
-<summary>All about the library folder</summary>
+<summary>📖 <b>More about the library folder</b></summary>
 
 - **Library folder** (browser version, Chromium only): keep the library's files on your disk instead of in the browser's storage, so its size is limited by your disk.
   - **Set it up** in Settings > Storage with *Choose library folder…*. Files are named by their content and keep their extension (`a07c9f….png`), so other programs can open them. *Move into folder* and *Move back to browser* move what is already there.
@@ -806,7 +806,7 @@ Markdown, plain text and rich text notes, written in a full editor, in the libra
 | **Task lists** | Click a box to tick it |
 
 <details>
-<summary>All about writing</summary>
+<summary>📖 <b>More about writing:</b> Notes, The <code>/</code> menu, Editor style, Links from the clipboard, Remove format, Markdown and Code views, and more</summary>
 
 - **Notes** open in the viewer in a full notes editor ([SunEditor](https://suneditor.com)): markdown (`.md`, `.markdown`), plain text (`.txt`) and the app's own **rich text notes** (`.note.html`). **New note** (the Import menu) makes a markdown note in the open folder (else in the **Notes** folder, whose name is set in Settings > Notes) and opens it. On a canvas, the **Note tool** (`M`) does the same where you click (drag a box to set the card's width; a click makes it as wide as *Note tool card size*). A new note is named by *New note name* (Settings > Notes; `Note {yyyy}-{mm}-{dd} {hhmmss}` at first), which is also its title: the note goes in the Notes folder, its card is placed there and it opens in the Note panel. Texts on a card (what the Note tool made before notes were files; a card is also one of a text's box options) become notes with **Make note files** in their Actions bar: the same place, width and stacking, the words in a `.md` file named by its first line.
 - **The `/` menu**, in every editor style: type `/` at the start of a line or after a space, then words to find a command (headings, lists, quote, code, table, picture, link and more).
@@ -838,7 +838,7 @@ Double-click a note's card and it opens in the **Note** panel, with the canvas s
 | **Hidden notes** | Open only while the hidden items show, and close when they stop |
 
 <details>
-<summary>All about notes on a canvas</summary>
+<summary>📖 <b>More about notes on a canvas:</b> On a canvas, Previews, Labels on cards</summary>
 
 - **On a canvas:** double-click a note's card (or **Edit note** in its Actions bar) and the note opens in the **Note** panel: the same editor and saving as in the library, in the style of *Editor style on a canvas* (Settings > Notes). *Note editor on a canvas* chooses where: **Panel** (the default) or **Window**, centred over the canvas until it is closed (a click beside it closes it, asking about unsaved changes). The panel is a panel like Layers (it never folds): it floats, docks to a side (keeping its own width), its width and height can be dragged, and the canvas stays usable beside it. ✕ closes it (asking about unsaved changes); the card shows the saved version at once. Saving is no step of the canvas's undo: undo and redo on the canvas keep the saved version (they never bring an older one back). The rename button in its header (or F2) renames the note with the library's rename dialog; the extension stays as it is, and `.note.html` counts as one extension there and in batch rename. A hidden note opens there only while the hidden items show, and closes (its changes saved) as soon as they no longer do: hidden mode ended, the hidden items locked.
 - **Previews:** a note's library card and details show the top of its page (headings, lists, tables, colours); its card on a canvas is its page, laid out at the card's own size and drawn at twice that so it stays sharp when zoomed in. A side handle lays the page out at the new width or height, the words keeping their size; dragging a corner evenly (`Shift`) zooms the whole card. **Note cards show** (Settings > Notes) applies to every card at once: *Whole note* (the default), the height follows the note, also when it is saved longer; *Part*, you set the height and what does not fit fades out into the page's paper. A new version keeps the card's width. **Reset size** in a card's Actions bar puts it back to its Note tool card size. The pictures it links to show in it (also Obsidian's `![[picture]]`), a video by its picture with ▶, a sound by its waveform with ♪, a GIF by its first frame; never a hidden item's. Its text is in the system's font in the preview only. The paper is light or dark as **Preview look** says (Settings > Notes: Auto, the default, follows the app's theme; a change redraws every preview at once, so a note's previews are made when shown, never stored). Shown small on a canvas, a note's card is drawn from a copy at that size.
@@ -858,7 +858,7 @@ Double-click a note's card and it opens in the **Note** panel, with the canvas s
 | What a save may change by itself | Nothing by default; created, modified, title and renaming are settings |
 
 <details>
-<summary>All about saving</summary>
+<summary>📖 <b>More about saving:</b> Saving is manual, Markdown keeps what markdown can hold, Settings &gt; Notes, Changed elsewhere, What a save may change by itself, The title</summary>
 
 - **Saving is manual** (no autosave while you work): `Ctrl+S` or File ▸ Save. Until you save, your changes live only in the open editor. The note's own file is rewritten in place (in the desktop app, the same file in `library/`, so other programs see it); it keeps its name, folder, tags, note and fields. Leaving a note with unsaved changes asks: *Save them*, *Don't save* or Cancel (or saves without asking, with **Save notes on close** on); so does closing the desktop app's window, and the browser asks before the page is left.
 - **Markdown keeps what markdown can hold:** headings, bold and italic, lists and task lists, quotes, code, tables, links, pictures; coloured or styled words are kept as inline HTML. When a note has formatting a markdown or text file cannot hold (an alignment, a font size, the page layout), saving asks: **Save as a rich text note** (the note becomes `name.note.html` in its place, keeping everything; its folder, tags, links to it and its cards on canvases follow it, and no markdown file is left beside it) or **Save as plain markdown** (that formatting is dropped). Obsidian's own syntax is written as Obsidian writes it: footnotes (`[^1]`), embeds kept as written (`![[picture]]`) and table column alignment (`:---:`). Empty lines and spaces at a line's start are no formatting: they never make it ask.
@@ -884,7 +884,7 @@ Link notes and files as Obsidian does. Renaming or moving an item updates the li
 | `#tag` in the words | One of the item's tags; `#` offers the library's |
 
 <details>
-<summary>All about links and tags</summary>
+<summary>📖 <b>More about links and tags:</b> Links, Links between notes, Canvas links, A look before opening, Search inside notes, Linked from, and more</summary>
 
 - **Links** to library items are written as their path from the root of the library (`Pictures/cat.png`, brackets and spaces encoded), whichever folder the note is in. A link is found by the file it names on disk (with **Keep file names** off, a file's name there differs from the item's: `my cat.png` is `my_cat.png`), read from the note's folder, then from the root of the library (`library/Pictures/cat.png` too), then the one item of that name anywhere; so a path relative to the note, written elsewhere, still works, as does `<my cat.png>`, and a copy of an item's file shows that item. The app's own link `canvast:<sha-256>` is read too, and kept as written. The picture dialog shows a picture's link, and a path typed there is found in the library.
 - **Links between notes** (as Obsidian writes them): `[[Plan]]`, `[[Plan|shown text]]`, and `[[Projects/Plan]]` when two items share a name. Type `[[` and the library's notes and files are offered; the one chosen goes in as a link. In the editor a link is an ordinary link: a click puts the cursor in it, **Ctrl+click** (⌘ on a Mac) opens the note or file it points at in the viewer (asking first about unsaved changes). A markdown note keeps them as `[[…]]`; a rich text note writes the path to the item (`../Projects/Plan.md`). Links to web addresses are not opened from a note (the app never goes online). `![[…]]` (an Obsidian embed) is kept as it is written, not shown.
@@ -909,7 +909,7 @@ A markdown note's YAML block is its tags, description and properties, and each p
 | **Writing back** | **Write tags and properties into note files** is off by default |
 
 <details>
-<summary>All about properties</summary>
+<summary>📖 <b>More about properties:</b> Properties, Property types</summary>
 
 - **Properties** (as Obsidian writes them): a markdown note's YAML block at its top (`---` … `---`) is its item's tags (`tags:`), its description (`description:`) and its properties (every other key; a list shows as `a, b`). Importing the note or saving it, here or elsewhere (Obsidian), reads them into the item, and the file wins. Changing its tags, description or properties in the library (the details panel, bulk tags, renaming or deleting a tag, undo) stays in the library, unless **Write tags and properties into note files** is on: then it is written into the file too, as a new version. A `|` or `>` block is read as text with its lines (a value of several lines is edited in a larger box), and written back as it was while it is unchanged. A nested map is kept as written and not shown. The editor shows the note without its YAML. A rich text note keeps the same properties as `<meta>` in its head (`keywords`, `description`, one per field); a plain text note keeps them in the library only.
 - **Property types** (as Obsidian has them): the button before a property's name chooses its type: *Text*, *List*, *Number*, *Checkbox*, *Date* or *Date & time*. A type belongs to the name, for every item with that name. A name with no type of its own takes one from its value (`4` a number, `true` a checkbox, `2025-01-31` a date, `2025-01-31T10:30` a date and time; `aliases` and `cssclasses` are lists); editing such a value keeps that type for the name. A checkbox is a box to tick and a date a picker. A **list** is a row of items, each kept whole (a comma is part of an item): Enter adds what is typed, × or Backspace in the empty box removes, dragging moves one, and it is a real YAML list in the file. A value that does not fit its type is **never changed**: it stays as it is in a plain box, marked in red with what the type expects, also while it is typed. In the file (with **Write tags and properties into note files**, when a value changes) a checkbox is written as a bare `true` or `false`. `tags` and `description` have their own places in the panel and no type button. In a narrow panel a property's value has a line of its own under its name, and a long value wraps, so neither is cut.
@@ -925,7 +925,7 @@ A markdown note's YAML block is its tags, description and properties, and each p
 | Keep `.obsidian/` in `library/` | Any folder starting with a dot is never taken in |
 
 <details>
-<summary>All about working with Obsidian</summary>
+<summary>📖 <b>More about working with Obsidian:</b> Pasting from Obsidian, Copying a whole note</summary>
 
 - **Pasting from Obsidian:** a note copied from Obsidian comes in as a note: its `![[embeds]]` show their pictures when the files are in the library (found by name, wherever they lie; one not there stays as `![[name]]`), and `[[links]]` and footnotes stay as Obsidian writes them. Its properties join the note's own at the next save: tags are added, a key the note does not have (or has empty) is added, and what the note already says stays. Undoing or deleting all that was pasted takes them back; when only properties were pasted, closing the note without saving does.
 - **Copying a whole note** (`Ctrl+A` then `Ctrl+C` or the editor's Copy; **Copy** on one markdown note in the library) copies it as its markdown file, with its properties as YAML at the top, as the details panel has them, so pasted at the top of an empty note in another app they arrive as properties. It is plain text. Copying part of a note copies that part as before.
@@ -955,7 +955,7 @@ A markdown note's YAML block is its tags, description and properties, and each p
 | **Info bar** | Bottom left | Zoom, position and save state |
 
 <details>
-<summary>All about the interface</summary>
+<summary>📖 <b>More about the interface:</b> Tool rail, Properties bar, Actions bar, Panels, Command palette, Context menus, and more</summary>
 
 - **Tool rail** (left): Undo and Redo, the tools (Import after Note), then Screenshot and Search.
 - **Properties bar** (top): the options of the tool or of what is selected.
@@ -1165,7 +1165,7 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 | **Check library files** | The command palette checks every file |
 
 <details>
-<summary>All about how it saves</summary>
+<summary>📖 <b>More about how it saves:</b> Every edit, The library on this device, The library's files, If <code>.canvast/library/</code> is deleted, Names on disk, Library folders are real folders, and more</summary>
 
 - **Every edit** is saved first in the app's own storage on this device, then written to the folder about 2 seconds after editing pauses, and when the window closes.
 - **The library on this device** (its items, names, tags, folders and where each file is) is kept in a SQLite database in the app's own data folder (`~/.config/canvast/library-db/`), not in the workspace folder. It is a working copy of the folder's library files, one per workspace folder (not per path: a folder renamed onto the path of another opened before starts its own copy): a new device, or one whose copy was deleted, makes it again from them. Only the parts of the library that changed are read at start-up and written after an edit.
@@ -1370,7 +1370,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Video | Only what the built-in engine plays: HEVC does not, on desktop or in most browsers |
 
 <details>
-<summary>Content limits in full</summary>
+<summary>📖 <b>Content limits, in full:</b> PDF, 3D, Text, Vector networks, Notes, Angular gradient in SVG, and more</summary>
 
 | Area | Limitation |
 | --- | --- |
@@ -1407,7 +1407,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Frame rate | Measured on one desktop machine only |
 
 <details>
-<summary>Scale and precision limits in full</summary>
+<summary>📖 <b>Scale and precision limits, in full:</b> Far trips, Camera precision, Very deep views, Dense scenes, Far zoom-out, Very large documents, and more</summary>
 
 | Area | Limitation |
 | --- | --- |
@@ -1442,7 +1442,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | ⚠️ Passwords | Gates, not encryption: they do not stop someone with access to the storage or an export, and cannot be recovered |
 
 <details>
-<summary>Browser limits in full</summary>
+<summary>📖 <b>Browser limits, in full:</b> Library size, What to do about it, Storage, Origin, Browsers, Passwords</summary>
 
 | Area | Limitation |
 | --- | --- |
@@ -1475,7 +1475,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Packages | x86_64 and aarch64; only the AppImage updates itself |
 
 <details>
-<summary>Desktop limits in full</summary>
+<summary>📖 <b>Desktop limits, in full:</b> Platform, Hidden items in the desktop app, Sync tools, Copy file, Dragging out of the app, Window frame off, and more</summary>
 
 | Area | Limitation |
 | --- | --- |
@@ -1490,7 +1490,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 </details>
 
 <details>
-<summary>How firm these limits are</summary>
+<summary>📖 <b>How firm these limits are</b></summary>
 
 These are canvast's current limits: first those of both versions, then those of the browser version and of the desktop app. They describe the app as it is today. Some of them, such as fuller support for PDF and 3D files, may be lifted in later versions, but none is promised and there is no schedule: if one matters to you, plan around it as it stands.
 
