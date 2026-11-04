@@ -310,28 +310,28 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     openColourPopover(anchor, { name, value, alpha: true, onInput: () => undefined, onChange: change });
   const remove = (item: StyleItem): void => void confirmDialog({ title: `Delete “${item.name}”?`, lines: ["It is removed from the saved styles. What it was used on keeps its look."], confirmLabel: "Delete" }).then((ok) => { if (ok) void styles.remove(item.id); });
   const common = (item: StyleItem): MenuItem[] => [
-    { label: "Rename", icon: ICONS.textCursorInput, aria: `Rename style ${item.name}`, run: () => { renaming = item.id; render(); panel.querySelector<HTMLInputElement>("[data-rename]")?.select(); } },
-    { label: "Duplicate", icon: ICONS.copy, aria: `Duplicate style ${item.name}`, run: () => void styles.duplicate(item.id) },
+    { label: "Rename", hint: "Give it a new name", icon: ICONS.textCursorInput, aria: `Rename style ${item.name}`, run: () => { renaming = item.id; render(); panel.querySelector<HTMLInputElement>("[data-rename]")?.select(); } },
+    { label: "Duplicate", hint: "Make a copy", icon: ICONS.copy, aria: `Duplicate style ${item.name}`, run: () => void styles.duplicate(item.id) },
   ];
   const menuFor = (item: StyleItem): MenuItem[] => {
     const can = canApply(item.kind);
-    const del: MenuItem = { label: "Delete", icon: ICONS.trash2, danger: true, aria: `Delete style ${item.name}`, run: () => remove(item) };
+    const del: MenuItem = { label: "Delete", hint: "Remove it for good", icon: ICONS.trash2, danger: true, aria: `Delete style ${item.name}`, run: () => remove(item) };
     if (item.kind === "gradient")
       return [
-        { label: "Apply to the fill", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false, item.id) },
-        { label: "Apply to the outline", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false, item.id) },
-        { label: "Edit the gradient", icon: ICONS.blend, aria: `Edit the gradient ${item.name}`, run: () => openGradientPopover(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, { name: `Gradient ${item.name}`, gradient: item.data as Gradient, onChange: (g) => void styles.update(item.id, g) }) },
-        { label: "Copy as CSS", icon: ICONS.clipboardCopy, aria: `Copy the gradient ${item.name} as CSS`, run: () => copyItem(item) },
+        { label: "Apply to the fill", hint: "On what is selected", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false, item.id) },
+        { label: "Apply to the outline", hint: "On what is selected", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false, item.id) },
+        { label: "Edit the gradient", hint: "Change its colours", icon: ICONS.blend, aria: `Edit the gradient ${item.name}`, run: () => openGradientPopover(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, { name: `Gradient ${item.name}`, gradient: item.data as Gradient, onChange: (g) => void styles.update(item.id, g) }) },
+        { label: "Copy as CSS", hint: "As text for a stylesheet", icon: ICONS.clipboardCopy, aria: `Copy the gradient ${item.name} as CSS`, run: () => copyItem(item) },
         ...common(item),
-        { label: "Export as .ggr", icon: ICONS.download, aria: `Export ${item.name} as a GIMP gradient`, run: () => void exportItems("gradient", [item]) },
+        { label: "Export as .ggr", hint: "A GIMP gradient file", icon: ICONS.download, aria: `Export ${item.name} as a GIMP gradient`, run: () => void exportItems("gradient", [item]) },
         del,
       ];
     if (item.kind === "colour")
       return [
-        { label: "Apply to the fill", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false, item.id) },
-        { label: "Apply to the outline", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false, item.id) },
-        { label: "Change colour", icon: ICONS.droplets, aria: `Change the colour of ${item.name}`, run: () => editColour(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, `Colour ${item.name}`, String(item.data), (hex) => void styles.update(item.id, hex)) },
-        { label: "Copy hex", icon: ICONS.clipboardCopy, aria: `Copy the hex of ${item.name}`, run: () => copyItem(item) },
+        { label: "Apply to the fill", hint: "On what is selected", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the fill`, run: () => deps.paint.apply(item.data as Paint, item.name, "fill", false, item.id) },
+        { label: "Apply to the outline", hint: "On what is selected", icon: ICONS.pointer, disabled: deps.paint.count() === 0, aria: `Apply ${item.name} to the outline`, run: () => deps.paint.apply(item.data as Paint, item.name, "stroke", false, item.id) },
+        { label: "Change colour", hint: "Pick another colour", icon: ICONS.droplets, aria: `Change the colour of ${item.name}`, run: () => editColour(panel.querySelector<HTMLElement>(`[data-more="${item.id}"]`)!, `Colour ${item.name}`, String(item.data), (hex) => void styles.update(item.id, hex)) },
+        { label: "Copy hex", hint: "As a colour code", icon: ICONS.clipboardCopy, aria: `Copy the hex of ${item.name}`, run: () => copyItem(item) },
         ...common(item),
         del,
       ];
@@ -340,27 +340,27 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       const sorted = (by: "hue" | "light"): PaletteColour[] => [...cols].sort((a, b) => (by === "hue" ? hueLightness(a.c)[0] - hueLightness(b.c)[0] : hueLightness(a.c)[1] - hueLightness(b.c)[1]));
       const fromSel = deps.selectionColours();
       return [
-        { label: editing === item.id ? "Finish editing" : "Edit colours", icon: ICONS.pencilLine, aria: `Edit the colours of ${item.name}`, run: () => { editing = editing === item.id ? null : item.id; opened.add(item.id); render(); } },
-        { label: "Add the selection's colours", icon: ICONS.listPlus, disabled: fromSel.length === 0, aria: `Add the colours of the selection to ${item.name}`, run: () => void setPalette(item, [...cols, ...fromSel.filter((c) => !cols.some((x) => x.c === c)).map((c) => ({ c }))].slice(0, MAX_PALETTE)) },
-        { label: "Sort by hue", icon: ICONS.arrowUpDown, aria: `Sort ${item.name} by hue`, run: () => void setPalette(item, sorted("hue")) },
-        { label: "Sort by lightness", icon: ICONS.arrowUpDown, aria: `Sort ${item.name} by lightness`, run: () => void setPalette(item, sorted("light")) },
-        { label: "Copy as CSS variables", icon: ICONS.clipboardCopy, aria: `Copy ${item.name} as CSS variables`, run: () => copyItem(item) },
+        { label: editing === item.id ? "Finish editing" : "Edit colours", hint: "Add, change or remove colours", icon: ICONS.pencilLine, aria: `Edit the colours of ${item.name}`, run: () => { editing = editing === item.id ? null : item.id; opened.add(item.id); render(); } },
+        { label: "Add the selection's colours", hint: "Colours of what is selected", icon: ICONS.listPlus, disabled: fromSel.length === 0, aria: `Add the colours of the selection to ${item.name}`, run: () => void setPalette(item, [...cols, ...fromSel.filter((c) => !cols.some((x) => x.c === c)).map((c) => ({ c }))].slice(0, MAX_PALETTE)) },
+        { label: "Sort by hue", hint: "Red through violet", icon: ICONS.arrowUpDown, aria: `Sort ${item.name} by hue`, run: () => void setPalette(item, sorted("hue")) },
+        { label: "Sort by lightness", hint: "Dark to light", icon: ICONS.arrowUpDown, aria: `Sort ${item.name} by lightness`, run: () => void setPalette(item, sorted("light")) },
+        { label: "Copy as CSS variables", hint: "As text for a stylesheet", icon: ICONS.clipboardCopy, aria: `Copy ${item.name} as CSS variables`, run: () => copyItem(item) },
         ...common(item),
-        { label: "Export as .gpl", icon: ICONS.download, aria: `Export ${item.name} as a GIMP palette`, run: () => void exportItems("palette", [item]) },
-        { label: "Export as .ase", icon: ICONS.download, aria: `Export ${item.name} as an Adobe swatch file`, run: () => void exportItems("palette", [item], "ase") },
-        { label: "Export as .aco", icon: ICONS.download, aria: `Export ${item.name} as an Adobe colour file`, run: () => void exportItems("palette", [item], "aco") },
+        { label: "Export as .gpl", hint: "A GIMP palette file", icon: ICONS.download, aria: `Export ${item.name} as a GIMP palette`, run: () => void exportItems("palette", [item]) },
+        { label: "Export as .ase", hint: "An Adobe swatch file", icon: ICONS.download, aria: `Export ${item.name} as an Adobe swatch file`, run: () => void exportItems("palette", [item], "ase") },
+        { label: "Export as .aco", hint: "An Adobe colour file", icon: ICONS.download, aria: `Export ${item.name} as an Adobe colour file`, run: () => void exportItems("palette", [item], "aco") },
         del,
       ];
     }
     if (item.kind === "adjustment")
       return [
-        { label: "Update from the selected picture", icon: ICONS.refresh, disabled: !deps.adjustment.can(), aria: `Replace ${item.name} with the adjustments of the selected picture: the pictures that follow it change too`, run: () => { const a = deps.adjustment.current(); if (a) void styles.update(item.id, a); } },
+        { label: "Update from the selected picture", hint: "Take its adjustments", icon: ICONS.refresh, disabled: !deps.adjustment.can(), aria: `Replace ${item.name} with the adjustments of the selected picture: the pictures that follow it change too`, run: () => { const a = deps.adjustment.current(); if (a) void styles.update(item.id, a); } },
         ...common(item),
         del,
       ];
     if (item.kind === "pattern")
       return [
-        { label: "Update from the Pattern panel", icon: ICONS.refresh, aria: `Replace ${item.name} with the generator, settings and seed in the Pattern panel`, run: () => { void styles.update(item.id, deps.pattern.current()).then((ok) => deps.notify(ok ? `Updated “${item.name}” from the Pattern panel.` : "The Pattern panel holds nothing that can be saved.")); } },
+        { label: "Update from the Pattern panel", hint: "Take its current settings", icon: ICONS.refresh, aria: `Replace ${item.name} with the generator, settings and seed in the Pattern panel`, run: () => { void styles.update(item.id, deps.pattern.current()).then((ok) => deps.notify(ok ? `Updated “${item.name}” from the Pattern panel.` : "The Pattern panel holds nothing that can be saved.")); } },
         ...common(item),
         del,
       ];
@@ -488,10 +488,10 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       openMoreMenu(
         add,
         [
-          { label: "Empty palette", icon: ICONS.palette, aria: "New empty palette", run: () => void addPalette(styles.nextName("palette"), ["#808080"], (m) => { editing = m.id; render(); }) },
-          { label: "From the selection's colours", icon: ICONS.pointer, disabled: sel.length === 0, aria: "New palette from the selection", run: () => void addPalette(styles.nextName("palette"), sel) },
-          { label: "From the selected picture", icon: ICONS.imagePlus, aria: "New palette from the selected picture", run: () => void deps.picturePalette().then((c) => (c ? addPalette(styles.nextName("palette"), c) : deps.notify("Select one picture first."))) },
-          { label: "From a colour (harmony)", icon: ICONS.rainbow, aria: "New palette from a colour", run: () => void harmonyPalette(add) },
+          { label: "Empty palette", hint: "Start with one grey", icon: ICONS.palette, aria: "New empty palette", run: () => void addPalette(styles.nextName("palette"), ["#808080"], (m) => { editing = m.id; render(); }) },
+          { label: "From the selection's colours", hint: "Colours of what is selected", icon: ICONS.pointer, disabled: sel.length === 0, aria: "New palette from the selection", run: () => void addPalette(styles.nextName("palette"), sel) },
+          { label: "From the selected picture", hint: "Its main colours", icon: ICONS.imagePlus, aria: "New palette from the selected picture", run: () => void deps.picturePalette().then((c) => (c ? addPalette(styles.nextName("palette"), c) : deps.notify("Select one picture first."))) },
+          { label: "From a colour (harmony)", hint: "Colours that go together", icon: ICONS.rainbow, aria: "New palette from a colour", run: () => void harmonyPalette(add) },
         ],
         "New style",
       );
@@ -504,8 +504,8 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       openMoreMenu(
         kindMore,
         [
-          { label: `Export all as ${kind === "gradient" ? ".ggr" : ".gpl"}`, icon: ICONS.download, disabled: items.length === 0, aria: `Export all ${kind === "gradient" ? "gradients" : "palettes"}`, run: () => void exportItems(kind, items) },
-          { label: "Import files", icon: ICONS.arrowDownToLine, aria: "Import GIMP files", run: () => fileInput.click() },
+          { label: `Export all as ${kind === "gradient" ? ".ggr" : ".gpl"}`, hint: "Every one, as GIMP files", icon: ICONS.download, disabled: items.length === 0, aria: `Export all ${kind === "gradient" ? "gradients" : "palettes"}`, run: () => void exportItems(kind, items) },
+          { label: "Import files", hint: "GIMP palettes and gradients", icon: ICONS.arrowDownToLine, aria: "Import GIMP files", run: () => fileInput.click() },
         ],
         `Actions for ${kind === "gradient" ? "gradients" : "palettes"}`,
       );

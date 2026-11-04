@@ -3,7 +3,8 @@ import { boardFilterHtml, boardFilterState, wireBoardFilter } from "./board-filt
 import { plural } from "../doc/plural";
 import { confirmDialog } from "./confirm";
 import { esc } from "./format";
-import { placeMenu } from "./more-menu";
+import { closeMoreMenu, openMoreMenu, pressAs } from "./more-menu";
+import type { MenuItem } from "./more-menu";
 import { ARCHIVE_ACCEPT, runExport, runExportFiles, runImport } from "./archive-ui";
 import { ICONS } from "./icons";
 import type { AppView } from "./view-switch";
@@ -39,7 +40,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
   const banner = root.querySelector<HTMLElement>(".readonly-banner")!;
   let renaming: { kind: "board" | "canvas" | "workspace"; id: string } | null = null;
   /** The board or canvas whose actions are open (the "More" button of its row). */
-  let actionsOf: { kind: "board" | "canvas"; id: string } | null = null;
+  const rowMenus = new Map<string, { label: string; items: MenuItem[] }>();
 
   const renderMenu = (): void => {
     const tree = session.tree;
@@ -52,26 +53,29 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
       renaming && renaming.kind === kind && renaming.id === id
         ? `<input class="nav-rename" data-rename="${kind}" data-id="${id}" value="${esc(name)}" aria-label="New ${kind} name">`
         : extra;
-    /** The labelled actions of a board or canvas, opened by its More button: plain words, not icons to guess at. */
+    /** The actions of a board or canvas, opened by its More button in the shared menu. */
     const boards = tree.boards;
     const actions = (kind: "board" | "canvas", id: string, name: string, canDelete: boolean, why: string, first: boolean, last: boolean, here: string): string => {
-      const open = actionsOf?.kind === kind && actionsOf.id === id;
-      return `<button type="button" class="nav-more" data-action="more" data-kind="${kind}" data-id="${id}" aria-haspopup="menu" aria-expanded="${open}"
-          aria-label="More actions for ${kind} ${esc(name)}" title="More: rename, export, delete">${ICONS.ellipsis}</button>
-        ${
-          open
-            ? `<div class="nav-actions" role="menu" aria-label="Actions for ${kind} ${esc(name)}">
-                 <button type="button" role="menuitem" data-action="rename-${kind}" data-id="${id}" aria-label="Rename ${kind} ${esc(name)}">${ICONS.textCursorInput}<span>Rename</span></button>
-                 <button type="button" role="menuitem" data-action="duplicate-${kind}" data-id="${id}" aria-label="Duplicate ${kind} ${esc(name)}">${ICONS.copy}<span>Duplicate</span></button>
-                 <button type="button" role="menuitem" data-action="up-${kind}" data-id="${id}" aria-label="Move ${kind} ${esc(name)} up"${first ? " disabled" : ""}>${ICONS.arrowUp}<span>Move up</span></button>
-                 <button type="button" role="menuitem" data-action="down-${kind}" data-id="${id}" aria-label="Move ${kind} ${esc(name)} down"${last ? " disabled" : ""}>${ICONS.arrowDown}<span>Move down</span></button>
-                 ${kind === "canvas" && boards.length > 1 ? boards.filter((b) => b.board.id !== here).map((b) => `<button type="button" role="menuitem" data-action="to-board" data-id="${id}" data-board="${b.board.id}" aria-label="Move canvas ${esc(name)} to board ${esc(b.board.name)}">${ICONS.squareStack}<span>Move to ${esc(b.board.name)}</span></button>`).join("") : ""}
-                 <button type="button" role="menuitem" data-action="export-${kind}" data-id="${id}" aria-label="Export ${kind} ${esc(name)}">${ICONS.fileOutput}<span>Export to a file</span></button>
-                 <button type="button" role="menuitem" data-action="export-files-${kind}" data-id="${id}" aria-label="Export the files of ${kind} ${esc(name)} as a ZIP">${ICONS.fileArchive}<span>Export files as ZIP</span></button>
-                 <button type="button" role="menuitem" class="is-danger" data-action="delete-${kind}" data-id="${id}" aria-label="Delete ${kind} ${esc(name)}"${canDelete ? "" : ` disabled title="${why}"`}>${ICONS.trash2}<span>Delete</span></button>
-               </div>`
-            : ""
-        }`;
+      const row = (action: string, label: string, hint: string, icon: string, aria: string, more: Partial<MenuItem> = {}, attrs: Record<string, string> = {}): MenuItem => ({
+        label, hint, icon, aria, ...more, run: () => pressAs(menu, { "data-action": action, "data-id": id, ...attrs }),
+      });
+      rowMenus.set(`${kind}:${id}`, {
+        label: `Actions for ${kind} ${name}`,
+        items: [
+          row(`rename-${kind}`, "Rename", "Give it a new name", ICONS.textCursorInput, `Rename ${kind} ${name}`),
+          row(`duplicate-${kind}`, "Duplicate", "Make a copy", ICONS.copy, `Duplicate ${kind} ${name}`),
+          row(`up-${kind}`, "Move up", "Earlier in the list", ICONS.arrowUp, `Move ${kind} ${name} up`, { disabled: first }),
+          row(`down-${kind}`, "Move down", "Later in the list", ICONS.arrowDown, `Move ${kind} ${name} down`, { disabled: last }),
+          ...(kind === "canvas" && boards.length > 1
+            ? boards.filter((b) => b.board.id !== here).map((b) => row("to-board", `Move to ${b.board.name}`, "Another board", ICONS.squareStack, `Move canvas ${name} to board ${b.board.name}`, {}, { "data-board": b.board.id }))
+            : []),
+          row(`export-${kind}`, "Export to a file", "A file to keep or share", ICONS.fileOutput, `Export ${kind} ${name}`),
+          row(`export-files-${kind}`, "Export files as ZIP", "The files it uses", ICONS.fileArchive, `Export the files of ${kind} ${name} as a ZIP`),
+          row(`delete-${kind}`, "Delete", canDelete ? "Remove it" : why, ICONS.trash2, `Delete ${kind} ${name}`, { danger: true, disabled: !canDelete }),
+        ],
+      });
+      return `<button type="button" class="nav-more" data-action="more" data-kind="${kind}" data-id="${id}" aria-haspopup="menu" aria-expanded="false"
+          aria-label="More actions for ${kind} ${esc(name)}" title="More: rename, export, delete">${ICONS.ellipsis}</button>`;
     };
     menu.innerHTML =
       boardFilterHtml(filter, "nav-find") +
@@ -117,10 +121,6 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
          ${canSwitchWorkspace() ? `<button type="button" data-action="switch-workspace" data-testid="nav-switch-workspace" aria-haspopup="menu">${ICONS.arrowLeftRight}<span>Switch workspace…</span></button>` : ""}
        </section>`;
     wireBoardFilter(menu, { board: ".nav-board", head: ".nav-board-head", row: ".nav-canvas-row", current: (s) => !!s.querySelector(".nav-canvas.is-active") }, filter);
-    // The row's actions float over the page like every other menu, kept inside the window.
-    const pop = menu.querySelector<HTMLElement>(".nav-actions");
-    const opener = menu.querySelector<HTMLElement>('.nav-more[aria-expanded="true"]');
-    if (pop && opener) placeMenu(pop, opener);
     const input = menu.querySelector<HTMLInputElement>(".nav-rename");
     if (input) {
       input.focus();
@@ -147,7 +147,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
     if (open) renderMenu();
     else {
       renaming = null;
-      actionsOf = null;
+      closeMoreMenu();
     }
   };
 
@@ -155,20 +155,14 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
   crumb.addEventListener("click", () => (view === "canvas" ? setOpen(menu.hidden === true) : openCanvasView()));
   chev.addEventListener("click", () => setOpen(menu.hidden === true));
   root.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !menu.hidden && !renaming && actionsOf) {
-      const was = actionsOf;
-      actionsOf = null;
-      renderMenu();
-      menu.querySelector<HTMLElement>(`.nav-more[data-kind="${was.kind}"][data-id="${was.id}"]`)?.focus();
-      e.stopPropagation();
-    } else if (e.key === "Escape" && !menu.hidden && !renaming) {
+    if (e.key === "Escape" && !menu.hidden && !renaming) {
       setOpen(false);
       chev.focus();
       e.stopPropagation();
     }
   });
   document.addEventListener("pointerdown", (e) => {
-    if (!menu.hidden && !root.contains(e.target as Node)) setOpen(false);
+    if (!menu.hidden && !root.contains(e.target as Node) && !(e.target as HTMLElement).closest?.(".pop-menu")) setOpen(false);
   });
 
   menu.addEventListener("change", (e) => {
@@ -185,13 +179,10 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
     if (!b) return;
     const id = b.dataset["id"] ?? "";
     if (b.dataset["action"] === "more") {
-      const kind = b.dataset["kind"] as "board" | "canvas";
-      actionsOf = actionsOf?.kind === kind && actionsOf.id === id ? null : { kind, id };
-      renderMenu();
-      menu.querySelector<HTMLElement>(".nav-actions button:not(:disabled)")?.focus();
+      const row = rowMenus.get(`${b.dataset["kind"]}:${id}`);
+      if (row) openMoreMenu(b, row.items, row.label);
       return;
     }
-    actionsOf = null; // any other press closes an open list of actions
     switch (b.dataset["action"]) {
       case "open":
         void session.openCanvas(id).then(() => setOpen(false));

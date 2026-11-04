@@ -1,3 +1,4 @@
+import { makeModal, showModal } from "./modal";
 import type { EditorState } from "../app/editor-state";
 import type { Progress } from "../app/progress";
 import { esc } from "./format";
@@ -19,21 +20,21 @@ export const currentBusy = (): BusyScreen | null => current;
  * the workspace folder): nothing can be clicked or typed until it ends, and Escape does nothing. Its bar is the notices' bar.
  */
 export function openBusyScreen(title: string, lines: string[], start = false): BusyScreen {
-  const dlg = document.createElement("dialog");
-  dlg.className = start ? "confirm busy-screen start-screen" : "confirm busy-screen";
-  dlg.dataset["testid"] = start ? "start-screen" : "busy-screen";
-  dlg.setAttribute("aria-labelledby", "busy-title");
-  dlg.innerHTML = `
+  const dlg = makeModal({
+    className: start ? "confirm busy-screen start-screen" : "confirm busy-screen",
+    testid: start ? "start-screen" : "busy-screen",
+    locked: true,
+    titleId: "busy-title",
+    html: `
     ${start ? `<div class="lock-brand"><span class="lock-logo">${logoSvg()}</span><span class="lock-name">canvast</span></div>` : ""}
     <h2 id="busy-title">${esc(title)}</h2>
     ${lines.map((l) => `<p>${esc(l)}</p>`).join("")}
     <span class="notice-bar busy-bar is-unknown" role="progressbar" aria-labelledby="busy-title" aria-valuemin="0" aria-valuemax="100"><span></span></span>
-    <p class="busy-detail" data-testid="busy-detail" aria-live="polite"></p>`;
-  document.body.appendChild(dlg);
+    <p class="busy-detail" data-testid="busy-detail" aria-live="polite"></p>`,
+  });
   const bar = dlg.querySelector<HTMLElement>(".busy-bar")!;
   const detail = dlg.querySelector<HTMLElement>(".busy-detail")!;
-  dlg.addEventListener("cancel", (e) => e.preventDefault()); // (Escape does not close it)
-  dlg.showModal();
+  showModal(dlg);
   const screen: BusyScreen = {
     update(fraction, text) {
       bar.classList.toggle("is-unknown", fraction === null);

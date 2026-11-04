@@ -1,3 +1,4 @@
+import { makeModal, showModal } from "./modal";
 import { plural } from "../doc/plural";
 import { esc } from "./format";
 
@@ -21,12 +22,12 @@ export const RESET_WORD = "DELETE";
  * ticks off), a note that the library folder's files are never touched, and a word to type. Resolves true to delete.
  */
 export function confirmReset(d: ResetDeps): Promise<boolean> {
-  const dlg = document.createElement("dialog");
-  dlg.className = "confirm reset-dialog";
-  dlg.dataset["testid"] = "reset-dialog";
-  dlg.setAttribute("aria-labelledby", "reset-title");
-  const step = (id: string, label: string, help: string): string => `<div class="reset-step"><button type="button" data-step="${id}">${esc(label)}</button><span>${esc(help)}</span><b data-done="${id}" aria-live="polite"></b></div>`;
-  dlg.innerHTML = `
+    const step = (id: string, label: string, help: string): string => `<div class="reset-step"><button type="button" data-step="${id}">${esc(label)}</button><span>${esc(help)}</span><b data-done="${id}" aria-live="polite"></b></div>`;
+  const dlg = makeModal({
+    className: "confirm reset-dialog",
+    testid: "reset-dialog",
+    titleId: "reset-title",
+    html: `
     <h2 id="reset-title">Delete all canvast data?</h2>
     <p><strong>This cannot be undone.</strong> canvast starts again as if it was never used in this browser.</p>
     <ul class="reset-list">${d.summary.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
@@ -40,8 +41,8 @@ export function confirmReset(d: ResetDeps): Promise<boolean> {
     <div class="confirm-actions">
       <button type="button" data-testid="reset-cancel" value="cancel">Cancel</button>
       <button type="button" class="is-danger" data-testid="reset-ok" value="ok" disabled>Delete everything</button>
-    </div>`;
-  document.body.appendChild(dlg);
+    </div>`,
+  });
   const ok = dlg.querySelector<HTMLButtonElement>('[value="ok"]')!;
   const word = dlg.querySelector<HTMLInputElement>('[data-testid="reset-word"]')!;
   word.addEventListener("input", () => (ok.disabled = word.value.trim() !== RESET_WORD));
@@ -67,11 +68,7 @@ export function confirmReset(d: ResetDeps): Promise<boolean> {
       if (b.value === "ok" && word.value.trim() === RESET_WORD) answer = true;
       if (b.value) dlg.close();
     });
-    dlg.addEventListener("close", () => {
-      dlg.remove();
-      resolve(answer);
-    });
-    dlg.showModal();
+        showModal(dlg, () => resolve(answer));
     dlg.querySelector<HTMLButtonElement>('[value="cancel"]')!.focus();
   });
 }

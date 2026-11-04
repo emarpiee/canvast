@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.53.49 — Folders as a tree, Organize, and one shared component per thing (2026-11-04)
+
+- **Added:** folders fold: an arrow on a folder with subfolders, Collapse or Expand all on the Folders header, and it is remembered on this device.
+- **Added:** Organize… on a library item (right click, or Details): one dialog to move it to a folder and set its tags, with a search, as a tree or in a row. A tag such as `art/ink` shows as `ink` under `art`. Nothing changes until Apply.
+- **Added:** a right click on a folder or tag in the sidebar opens its menu.
+- **Changed:** the folder list has the look of the layers: guide lines, arrows and count pills, from one shared tree.
+- **Changed:** every menu row has an icon, a name and a very short description, across the app.
+- **Changed:** the sidebar's and the workspace's row menus are now the app's one menu; all dialogs come from one shell. `npm run check:components` and a browser test hold this.
+
 ## 0.53.48 — Previews for .figcraft (2026-11-04)
 
 - **Added:** `.figcraft` files show the picture they keep (`thumbnail.png` in the file). One without it keeps its card.

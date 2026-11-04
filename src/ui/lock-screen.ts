@@ -1,3 +1,4 @@
+import { makeModal, showModal } from "./modal";
 import { logoSvg } from "./brand";
 import { secretFieldHtml, wireSecretFields } from "./confirm";
 
@@ -6,18 +7,19 @@ import { secretFieldHtml, wireSecretFields } from "./confirm";
  * nothing). A gate, not encryption.
  */
 export function openLockScreen(check: (typed: string) => Promise<boolean>): Promise<void> {
-  const dlg = document.createElement("dialog");
-  dlg.className = "confirm lock-screen";
-  dlg.dataset["testid"] = "lock-screen";
-  dlg.setAttribute("aria-labelledby", "lock-title");
-  dlg.innerHTML = `
+  const dlg = makeModal({
+    className: "confirm lock-screen",
+    testid: "lock-screen",
+    locked: true,
+    titleId: "lock-title",
+    html: `
     <div class="lock-brand"><span class="lock-logo">${logoSvg()}</span><span class="lock-name">canvast</span></div>
     <h2 id="lock-title">This workspace is locked</h2>
     <p class="lock-text">Enter the password to open it.</p>
     ${secretFieldHtml(`data-testid="lock-input" aria-labelledby="lock-title" autocomplete="current-password" spellcheck="false"`)}
     <p class="lock-error" data-lock-error role="alert" hidden>That is not the password.</p>
-    <div class="confirm-actions"><button type="button" class="is-primary" data-testid="lock-ok">Open</button></div>`;
-  document.body.appendChild(dlg);
+    <div class="confirm-actions"><button type="button" class="is-primary" data-testid="lock-ok">Open</button></div>`,
+  });
   const input = dlg.querySelector<HTMLInputElement>(".prompt-input")!;
   const error = dlg.querySelector<HTMLElement>("[data-lock-error]")!;
   const openButton = dlg.querySelector<HTMLButtonElement>("[data-testid=lock-ok]")!;
@@ -44,14 +46,13 @@ export function openLockScreen(check: (typed: string) => Promise<boolean>): Prom
       input.value = "";
       input.focus();
     };
-    dlg.addEventListener("cancel", (e) => e.preventDefault()); // (Escape does not close it)
     openButton.addEventListener("click", () => void submit());
     input.addEventListener("keydown", (e) => {
       if (e.key !== "Enter") return;
       e.preventDefault();
       void submit();
     });
-    dlg.showModal();
+    showModal(dlg);
     input.focus();
   });
 }

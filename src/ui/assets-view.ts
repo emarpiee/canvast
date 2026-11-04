@@ -34,13 +34,17 @@ import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
 import type { AssetField, AssetFolder, CatalogEntry, CatalogListing } from "../assets/asset-catalog";
 import type { LibraryPages } from "../storage/store";
-import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT, folderClash, folderPath, folderSubtree, hiddenModeFolders, meta, usageOf, visibleFolders } from "../assets/asset-catalog";
+import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT, folderClash, folderName, folderPath, folderSubtree, hiddenModeFolders, meta, usageOf, visibleFolders } from "../assets/asset-catalog";
 import { artTile, THUMB_PX, makeThumb, shrinkPicture } from "../assets/thumb";
 import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
-import { clearRect, MENU_GAP, openMoreMenu } from "./more-menu";
+import { clearRect, MENU_GAP, openMoreMenu, pressAs } from "./more-menu";
 import type { MenuItem } from "./more-menu";
 import { bindContextMenu, grouped as groupedMenu } from "./context-menu";
+import { openTreeChooser } from "./tree-chooser";
+import type { ChoiceNode, ChoiceState, ChooserView } from "./tree-chooser";
+import { pathNodes, treeGuides, treeTwist, walkTree } from "./tree";
+import { formatTags } from "../doc/tags";
 import { cleanFileName, splitName } from "../doc/rename-rules";
 import { copyItemsAsFiles, copyItemsToClipboard, type CopyDeps } from "../app/copy-items";
 import { readClipboardPictures } from "../app/system-clipboard";
@@ -418,7 +422,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -442,6 +446,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (typeof saved.inspW === "number" && saved.inspW >= INSP_W.min && saved.inspW <= INSP_W.max) ui.inspW = saved.inspW;
     if (typeof saved.sheetH === "number" && saved.sheetH >= 120 && saved.sheetH <= 2000) ui.sheetH = saved.sheetH;
     if (Array.isArray(saved.closed)) ui.closed = saved.closed.filter((c) => typeof c === "string").slice(0, 8);
+    if (Array.isArray(saved.folded)) ui.folded = saved.folded.filter((c) => typeof c === "string").slice(0, 20000);
+    if (saved.chooser === "inline") ui.chooser = "inline";
     if (Array.isArray(saved.expanded)) ui.expanded = saved.expanded.filter((c) => typeof c === "string").slice(0, 8);
     if (saved.colW && typeof saved.colW === "object") {
       for (const c of ui.order.map(colOf)) {
@@ -752,7 +758,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let canvasTags = new Map<string, { label: string; objects: number; canvases: Set<string>; assets: Set<string> }>();
   let assetCanvasTags: Array<{ tag: string; canvases: string[] }> = [];
   /** The row whose "more" menu is open in the sidebar. */
-  let sideMenu: { kind: "folder" | "tag" | "ctag" | "style"; id: string } | null = null;
+  type SideKind = "folder" | "tag" | "ctag" | "style";
+  interface SideRow { attr: string; value: string; label: string; hint: string; icon: string; aria: string; danger?: boolean }
+  const sideRows = new Map<string, { label: string; items: MenuItem[] }>();
   /** On a narrow screen the sidebar is a strip that opens on demand. */
   const narrow = window.matchMedia("(max-width: 900px)");
   let sideOpen = !narrow.matches;
@@ -2312,49 +2320,41 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const typeCounts = counts.types;
     const ro = session.readOnly;
     const kindWord = { folder: "folder", tag: "tag", ctag: "canvas tag", style: "style" } as const;
-    /** A row's "more" button and, when open, its labelled menu (Rename, Delete and so on): one button instead of a row of them. */
-    const more = (kind: "folder" | "tag" | "ctag" | "style", id: string, name: string, items: Array<{ attr: string; label: string; icon: string; aria: string; danger?: boolean }>): string => {
+    /** A row's "more" button: it opens the shared menu with these rows, and a right click on the row does too. */
+    const more = (kind: SideKind, id: string, name: string, items: SideRow[]): string => {
       if (ro) return "";
-      const open = sideMenu?.kind === kind && sideMenu.id === id;
-      return `<button type="button" class="side-more" data-side-more data-kind="${kind}" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="${open}" aria-label="More actions for ${kindWord[kind]} ${esc(name)}" title="More">${ICONS.ellipsis}</button>${
-        open
-          ? `<div class="side-menu" role="menu" aria-label="Actions for ${kindWord[kind]} ${esc(name)}">${items
-              .map((i) => `<button type="button" role="menuitem" class="${i.danger ? "is-danger" : ""}" ${i.attr} data-id="${esc(id)}" data-key="${esc(id)}" aria-label="${esc(i.aria)}">${i.icon}<span>${i.label}</span></button>`)
-              .join("")}</div>`
-          : ""
-      }`;
+      sideRows.set(`${kind}:${id}`, { label: `Actions for ${kindWord[kind]} ${name}`, items: items.map((i) => ({ label: i.label, hint: i.hint, icon: i.icon, aria: i.aria, ...(i.danger ? { danger: true } : {}), run: () => pressAs(side, { [i.attr]: i.value, "data-id": id, "data-key": id }) })) });
+      return `<button type="button" class="side-more" data-side-more data-kind="${kind}" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for ${kindWord[kind]} ${esc(name)}" title="More">${ICONS.ellipsis}</button>`;
     };
     const picked = pickedKeys(scope);
-    const item = (key: string, label: string, n: number, opts: { depth?: number; icon?: string; extra?: string; cls?: string } = {}): string =>
-      `<li class="side-row ${opts.cls ?? ""}" style="--depth:${opts.depth ?? 0}"><button type="button" class="side-item${(TRASH_WORD.test(search.value) ? key === "trash" : scope === key || picked.has(key)) ? " is-active" : ""}" data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}" title="${label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : ""}">
-        ${opts.icon ?? ""}<span class="side-label">${label}</span><span class="side-n">${n}</span></button>${opts.extra ?? ""}</li>`;
+    const item = (key: string, label: string, n: number, opts: { depth?: number; icon?: string; extra?: string; cls?: string; before?: string } = {}): string =>
+      `<li class="side-row ${opts.cls ?? ""}" style="--depth:${opts.depth ?? 0}">${opts.before ?? ""}<button type="button" class="side-item${(TRASH_WORD.test(search.value) ? key === "trash" : scope === key || picked.has(key)) ? " is-active" : ""}" data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}" title="${label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : ""}">
+        ${opts.icon ?? ""}<span class="side-label">${label}</span><span class="side-n${opts.before !== undefined ? " layer-count" : ""}">${n}</span></button>${opts.extra ?? ""}</li>`;
     const nameInput = (value: string, label: string): string =>
       `<li class="side-row"><input class="side-name" data-testid="folder-name-input" value="${esc(value)}" aria-label="${label}" maxlength="120"></li>`;
     const subtreeCount = (id: string): number => counts.folders.get(id) ?? 0;
-    const tree = (parent: string | null, depth: number): string =>
-      listing!.folders
-        .filter((f) => f.parentId === parent)
-        .map((f) => treeOf(f, depth))
-        .join("");
-    /** A folder's row, then its subfolders' rows. */
-    const treeOf = (f: AssetFolder, depth: number): string =>
-      (naming?.kind === "rename" && naming.id === f.id
-        ? nameInput(f.name, `New name for folder ${f.name}`)
-        : item(`folder:${f.id}`, esc(f.name), subtreeCount(f.id), {
-                depth,
-                icon: ICONS.folder,
-                extra: more("folder", f.id, f.name, [
-                  { attr: 'data-folder-action="new"', label: "New subfolder", icon: ICONS.folderPlus, aria: `New folder inside ${f.name}` },
-                  { attr: 'data-folder-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename folder ${f.name}` },
-                  hiddenMode
-                    ? { attr: 'data-folder-action="show"', label: "Unhide folder", icon: ICONS.eye, aria: `Unhide folder ${f.name} and everything in it` }
-                    : { attr: 'data-folder-action="hide"', label: "Hide folder", icon: ICONS.eyeClosed, aria: `Hide folder ${f.name} and everything in it` },
-                  { attr: 'data-folder-action="export"', label: "Export folder…", icon: ICONS.fileArchive, aria: `Export folder ${f.name} and what is in it` },
-                  { attr: 'data-folder-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete folder ${f.name}`, danger: true },
-                ]),
-              })) +
-      (naming?.kind === "new" && naming.parent === f.id ? nameInput("", `Name of the new folder inside ${f.name}`) : "") +
-      tree(f.id, depth + 1);
+    const folderKids = (id: string): AssetFolder[] => listing!.folders.filter((f) => f.parentId === id);
+    /** A folder's row, then its subfolders' rows, in the app's one tree. */
+    const treeOf = (root: AssetFolder): string =>
+      walkTree([root], (f) => folderKids(f.id), (f) => !ui.folded.includes(f.id), (f, at) =>
+        (naming?.kind === "rename" && naming.id === f.id
+          ? nameInput(f.name, `New name for folder ${f.name}`)
+          : item(`folder:${f.id}`, esc(f.name), subtreeCount(f.id), {
+              depth: at.depth,
+              cls: "tree-row",
+              before: treeGuides(at.depth, at.last, at.conts) + (at.hasKids ? treeTwist(at.open, `data-folder-twist="${esc(f.id)}"`) : ""),
+              icon: ICONS.folder,
+              extra: more("folder", f.id, f.name, [
+                { attr: "data-folder-action", value: "new", label: "New subfolder", hint: "A folder inside this one", icon: ICONS.folderPlus, aria: `New folder inside ${f.name}` },
+                { attr: "data-folder-action", value: "rename", label: "Rename", hint: "Give it a new name", icon: ICONS.textCursorInput, aria: `Rename folder ${f.name}` },
+                hiddenMode
+                  ? { attr: "data-folder-action", value: "show", label: "Unhide folder", hint: "And everything in it", icon: ICONS.eye, aria: `Unhide folder ${f.name} and everything in it` }
+                  : { attr: "data-folder-action", value: "hide", label: "Hide folder", hint: "And everything in it", icon: ICONS.eyeClosed, aria: `Hide folder ${f.name} and everything in it` },
+                { attr: "data-folder-action", value: "export", label: "Export folder…", hint: "An archive of what is in it", icon: ICONS.fileArchive, aria: `Export folder ${f.name} and what is in it` },
+                { attr: "data-folder-action", value: "delete", label: "Delete", hint: "The items stay in the library", icon: ICONS.trash2, aria: `Delete folder ${f.name}`, danger: true },
+              ]),
+            })) + (naming?.kind === "new" && naming.parent === f.id ? nameInput("", `Name of the new folder inside ${f.name}`) : ""),
+      );
     /** A section with a header that folds it away (remembered on this device) and an optional add button. */
     const section = (id: string, title: string, add: string, body: string): string => {
       const closed = ui.closed.includes(id);
@@ -2371,6 +2371,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return `${shown.map((r) => r.html).join("")}<li class="side-row side-show-row"><button type="button" class="side-show-all" data-show-all="${id}" data-testid="side-show-all" aria-expanded="${open}">${open ? "Show fewer" : `Show ${rows.length - shown.length} more`}</button></li>`;
     };
     const addBtn = (attr: string, label: string, extra = ""): string => (ro ? "" : `<button type="button" class="side-add" ${attr} aria-label="${label}" title="${label}"${extra}>${ICONS.folderPlus}</button>`);
+    const parents = listing.folders.filter((f) => folderKids(f.id).length);
+    const anyOpen = parents.some((f) => !ui.folded.includes(f.id));
+    const foldAll = parents.length ? `<button type="button" class="side-add" data-folders-fold aria-label="${anyOpen ? "Collapse all folders" : "Expand all folders"}" title="${anyOpen ? "Collapse all folders" : "Expand all folders"}">${anyOpen ? ICONS.chevronsDownUp : ICONS.chevronsUpDown}</button>` : "";
     // Saved searches, one click away, each with the look it was saved with.
     const savedRows = byUse(parseSaved(settings.get("search.saved.library")) ?? []).map((s) => ({
       active: false,
@@ -2391,10 +2394,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         ${section(
           "folders",
           "Folders",
-          addBtn('data-folder-action="new" data-id="" data-testid="folder-new"', "New folder"),
+          foldAll + addBtn('data-folder-action="new" data-id="" data-testid="folder-new"', "New folder"),
           `<ul class="side-list" data-testid="folder-tree">
             ${naming?.kind === "new" && naming.parent === null ? nameInput("", "Name of the new folder") : ""}
-            ${capped("folders", listing.folders.filter((f) => f.parentId === null).map((f) => ({ html: treeOf(f, 0), active: [scope.startsWith("folder:") ? scope.slice(7) : "", naming?.kind === "rename" ? naming.id : "", naming?.kind === "new" ? (naming.parent ?? "") : ""].some((id) => id && folderSubtree(listing!.folders, f.id).has(id)) }))) || (naming ? "" : `<li class="side-empty">No folders yet.</li>`)}
+            ${capped("folders", listing.folders.filter((f) => f.parentId === null).map((f) => ({ html: treeOf(f), active: [scope.startsWith("folder:") ? scope.slice(7) : "", naming?.kind === "rename" ? naming.id : "", naming?.kind === "new" ? (naming.parent ?? "") : ""].some((id) => id && folderSubtree(listing!.folders, f.id).has(id)) }))) || (naming ? "" : `<li class="side-empty">No folders yet.</li>`)}
           </ul>`,
         )}
         ${section(
@@ -2421,8 +2424,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                   item(`tag:${k}`, `#${esc(c.label)}`, c.n, {
                         cls: "is-tag",
                         extra: more("tag", k, c.label, [
-                          { attr: 'data-tag-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename tag ${c.label}` },
-                          { attr: 'data-tag-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete tag ${c.label}`, danger: true },
+                          { attr: "data-tag-action", value: "rename", label: "Rename", hint: "On every item that has it", icon: ICONS.textCursorInput, aria: `Rename tag ${c.label}` },
+                          { attr: "data-tag-action", value: "delete", label: "Delete", hint: "The items stay", icon: ICONS.trash2, aria: `Delete tag ${c.label}`, danger: true },
                         ]),
                       }) }))) || `<li class="side-empty">No tags yet. Add them in the details.</li>`
             }
@@ -2440,8 +2443,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
                   item(`ctag:${k}`, `#${esc(c.label)}`, c.assets.size, {
                         cls: "is-tag is-canvas-tag",
                         extra: more("ctag", k, c.label, [
-                          { attr: 'data-ctag-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename canvas tag ${c.label}` },
-                          { attr: 'data-ctag-action="delete"', label: "Delete", icon: ICONS.trash2, aria: `Delete canvas tag ${c.label}`, danger: true },
+                          { attr: "data-ctag-action", value: "rename", label: "Rename", hint: "On every canvas that has it", icon: ICONS.textCursorInput, aria: `Rename canvas tag ${c.label}` },
+                          { attr: "data-ctag-action", value: "delete", label: "Delete", hint: "The canvases stay", icon: ICONS.trash2, aria: `Delete canvas tag ${c.label}`, danger: true },
                         ]),
                       }).replace("<button ", `<button title="On ${plural(c.objects, "item")}. Canvases: ${esc([...c.canvases].slice(0, 6).map(crumbOf).join("; "))}${c.canvases.size > 6 ? ` and ${c.canvases.size - 6} more` : ""}. ${c.assets.size} from the library" `) }))) || `<li class="side-empty">No tags on canvases yet. Tag items on a canvas (Layers panel).</li>`
             }
@@ -2460,15 +2463,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     for (const id of ui.sections) {
       const s = secs.get(id);
       if (s && last?.parentNode) last.parentNode.insertBefore(s, after);
-    }
-    // The menu floats over the page (the sidebar scrolls and would clip it), kept inside the window.
-    const pop = side.querySelector<HTMLElement>(".side-menu");
-    const anchor = side.querySelector<HTMLElement>('[data-side-more][aria-expanded="true"]');
-    if (pop && anchor) {
-      const r = anchor.getBoundingClientRect();
-      const w = pop.offsetWidth;
-      pop.style.left = `${Math.max(8, Math.min(window.innerWidth - w - 8, r.right - w))}px`;
-      pop.style.top = `${Math.min(window.innerHeight - pop.offsetHeight - 8, r.bottom + MENU_GAP)}px`;
     }
     const input = side.querySelector<HTMLInputElement>(".side-name");
     if (input) {
@@ -2703,8 +2697,86 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         </div>
         <h3 class="asset-sub">${bulk ? "Folder of these" : "Folder"}</h3>
         ${sorted.length ? `<ul class="asset-folders" data-testid="${bulk ? "bulk-folders" : "asset-folders"}">${[radio("", "No folder", ents.filter((e) => meta(e).folderIds.length === 0).length), ...sorted.map((f: AssetFolder) => radio(f.id, esc(folderPath(folders, f.id).join(" › ")), ents.filter((e) => meta(e).folderIds[0] === f.id).length))].join("")}</ul>` : ""}
+        <button type="button" class="assets-btn" data-action="organize" data-testid="${bulk ? "bulk-organize" : "asset-organize"}" title="Move to a folder and add tags, from one list"${dis}>${ICONS.folderTree}<span>Organize…</span></button>
         <button type="button" class="assets-btn" data-action="new-folder-into" data-testid="${bulk ? "bulk-new-folder" : "asset-new-folder"}" title="${bulk ? "Make a folder and move the selected items into it" : "Make a folder and move it into it"}"${dis}>${ICONS.folderPlus}<span>New folder${bulk ? ` for these ${n}` : ""}…</span></button>
       </section>`;
+  };
+
+  /**
+   * Organize: the tree chooser with a tab for the folder (an item is in one folder) and a tab for the tags (any number; `art/ink` is `ink` under `art`).
+   * Nothing changes until Apply; then one change, which undo takes back as one.
+   */
+  const organizeItems = async (hashes: readonly string[]): Promise<void> => {
+    if (!hashes.length || !listing) return;
+    await ensure(hashes);
+    const ents = hashes.flatMap((h) => { const e = entryOf(h); return e ? [e] : []; });
+    const n = ents.length;
+    if (!n) return;
+    const stateOf = (k: number): ChoiceState => (k === 0 ? "off" : k === n ? "on" : "some");
+    const counts = countSide(listing);
+    const folders = listing.folders;
+    const folderNode = (f: AssetFolder): ChoiceNode => ({ id: f.id, name: f.name, parent: f.parentId, n: counts.folders.get(f.id) ?? 0, state: stateOf(ents.filter((e) => meta(e).folderIds[0] === f.id).length) });
+    const tagLabels = new Map<string, string>([...counts.tags.values()].map((t) => [t.label.toLowerCase(), t.label]));
+    for (const e of ents) for (const t of meta(e).tags) if (!tagLabels.has(t.toLowerCase())) tagLabels.set(t.toLowerCase(), t);
+    const tagNode = (label: string, on: number, used: number): { id: string; name: string; value: { on: number; used: number } } => ({ id: label.toLowerCase(), name: label, value: { on, used } });
+    const tagNodes = (labels: ReadonlyArray<{ id: string; name: string; value: { on: number; used: number } }>): ChoiceNode[] =>
+      pathNodes(labels).map((t) => ({ id: t.id, name: t.name, parent: t.parent, ...(t.value ? { state: stateOf(t.value.on), n: t.value.used } : { state: "off" as const, group: true }) }));
+    const tagsOn = (key: string): number => ents.filter((e) => meta(e).tags.some((t) => t.toLowerCase() === key)).length;
+    const done = await openTreeChooser({
+      title: n === 1 ? `Organize “${ents[0]!.name || "Untitled"}”` : `Organize ${plural(n, "item")}`,
+      applyLabel: "Apply",
+      view: ui.chooser,
+      onView: (v) => {
+        ui.chooser = v;
+        saveUi();
+      },
+      tabs: [
+        {
+          id: "folder",
+          title: "Folder",
+          icon: ICONS.folder,
+          one: true,
+          noun: "folders",
+          nodes: [{ id: "", name: "No folder", parent: null, state: stateOf(ents.filter((e) => !meta(e).folderIds.length).length) }, ...folders.map(folderNode)],
+          make: (words) => {
+            try {
+              const name = folderName(words);
+              return !hiddenMode && folderClash(folders, null, name) ? null : [{ id: `new:${name}`, name, parent: null, state: "on" }];
+            } catch {
+              return null;
+            }
+          },
+        },
+        {
+          id: "tags",
+          title: "Tags",
+          icon: ICONS.tag,
+          one: false,
+          noun: "tags",
+          nodes: tagNodes([...tagLabels.entries()].map(([key, label]) => tagNode(label, tagsOn(key), counts.tags.get(key)?.n ?? 0))),
+          make: (words) => {
+            const label = formatTags([words])[0];
+            if (!label) return null;
+            tagLabels.set(label.toLowerCase(), label);
+            return tagNodes([tagNode(label, 0, 0)]).map((t) => (t.id === label.toLowerCase() ? { ...t, state: "on" as const } : t));
+          },
+        },
+      ],
+    });
+    const folder = done?.get("folder");
+    const tags = done?.get("tags");
+    if (!folder && !tags) return;
+    const made = folder?.made[0]?.slice(4);
+    const addTags = (tags?.on ?? []).map((k) => tagLabels.get(k) ?? k);
+    const removeTags = (tags?.off ?? []).map((k) => tagLabels.get(k) ?? k);
+    await session.organize(async (c) => {
+      const into = made ? newObjectId() : folder?.on[0];
+      if (made) {
+        await c.createFolder(made, null, into!);
+        if (hiddenMode) await c.hideFolder(into!); // (a folder made in hidden mode is hidden)
+      }
+      await c.updateMetaEach(ents.map((e) => ({ hash: e.hash, change: { ...(into ? { addFolders: [into] } : folder?.on[0] === "" ? { clearFolder: true } : {}), ...(addTags.length ? { addTags } : {}), ...(removeTags.length ? { removeTags } : {}) } })));
+    }, "Organized");
   };
 
   /** Tags and folders of an entry (inspector). */
@@ -3193,7 +3265,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const now = notesNow().fields[Number(b.dataset["index"])];
         if (!now?.key.trim()) break;
         const type = propType(now.key, now.value);
-        openMoreMenu(b, PROP_TYPES.map((t) => ({ label: t.label, icon: PROP_ICON[t.id], checked: t.id === type, id: `prop-type-${t.id}`, run: () => pinType(now.key, t.id) })), "Property type");
+        openMoreMenu(b, PROP_TYPES.map((t) => ({ label: t.label, hint: t.expects, icon: PROP_ICON[t.id], checked: t.id === type, id: `prop-type-${t.id}`, run: () => pinType(now.key, t.id) })), "Property type");
         break;
       }
       case "item-remove": {
@@ -3230,6 +3302,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         renderInspector();
         break;
       }
+      case "organize":
+        void organizeItems(pickedGroup());
+        break;
       case "new-folder-into": {
         const group = pickedGroup();
         void promptDialog({ title: group.length > 1 ? `New folder for ${group.length} items` : "New folder", lines: ["They are moved into it."], value: "", confirmLabel: "Make and move" }).then((name) => {
@@ -3825,17 +3900,24 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       renderSide();
       return;
     }
-    if (b.hasAttribute("data-side-more")) {
-      const kind = b.dataset["kind"] as "folder" | "tag" | "ctag" | "style";
-      const id = b.dataset["id"]!;
-      sideMenu = sideMenu?.kind === kind && sideMenu.id === id ? null : { kind, id };
+    if (b.dataset["folderTwist"] !== undefined) {
+      const id = b.dataset["folderTwist"];
+      ui.folded = ui.folded.includes(id) ? ui.folded.filter((x) => x !== id) : [...ui.folded, id];
+      saveUi();
       renderSide();
-      side.querySelector<HTMLElement>(sideMenu ? ".side-menu button" : `[data-side-more][data-id="${CSS.escape(id)}"]`)?.focus();
       return;
     }
-    if (b.getAttribute("role") === "menuitem") {
-      sideMenu = null; // an action was chosen: the menu closes
+    if (b.hasAttribute("data-folders-fold")) {
+      const parents = (listing?.folders ?? []).filter((f) => listing!.folders.some((k) => k.parentId === f.id)).map((f) => f.id);
+      ui.folded = parents.some((id) => !ui.folded.includes(id)) ? parents : [];
+      saveUi();
       renderSide();
+      return;
+    }
+    if (b.hasAttribute("data-side-more")) {
+      const row = sideRows.get(`${b.dataset["kind"]}:${b.dataset["id"]}`);
+      if (row) openMoreMenu(b, row.items, row.label);
+      return;
     }
     if (b.dataset["tagAction"]) {
       const key = b.dataset["key"]!;
@@ -3891,13 +3973,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if ((e.ctrlKey || e.metaKey) && /^(ext|tag):/.test(next)) next = togglePicked(scope, next);
       else if (next === scope && next !== "all") {
         scope = "all";
-        sideMenu = null;
         render();
         return;
       }
       scope = next;
       if (narrow.matches) sideOpen = false; // a choice on a small screen folds the list away
-      sideMenu = null;
       render();
       return;
     }
@@ -3906,6 +3986,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     switch (b.dataset["folderAction"]) {
       case "new":
         naming = { kind: "new", parent: id || null };
+        ui.folded = ui.folded.filter((x) => x !== id); // (where the new one will show)
         renderSide();
         break;
       case "rename":
@@ -3963,14 +4044,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           if (ok && (await session.organize((c) => c.deleteFolder(id))) && scope === `folder:${id}`) scope = "all";
         });
         break;
-    }
-  });
-  document.addEventListener("pointerdown", (e) => {
-    if (sideMenu && !(e.target as HTMLElement).closest?.(".side-menu, .side-more")) {
-      // Only the menu goes: re-drawing the list now would replace the very button being pressed and lose its click.
-      sideMenu = null;
-      side.querySelector(".side-menu")?.remove();
-      side.querySelector('[data-side-more][aria-expanded="true"]')?.setAttribute("aria-expanded", "false");
     }
   });
   narrow.addEventListener("change", () => {
@@ -4083,13 +4156,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     mounted.get(items[0]!.id)?.el.querySelector<HTMLElement>(".asset-card")?.focus({ preventScroll: true });
   };
   root.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && sideMenu) {
-      const was = sideMenu;
-      sideMenu = null;
-      renderSide();
-      side.querySelector<HTMLElement>(`[data-side-more][data-id="${CSS.escape(was.id)}"]`)?.focus();
-      e.stopPropagation();
-    } else if (e.key === "Escape" && (selected || picked.size)) {
+    if (e.key === "Escape" && (selected || picked.size)) {
       void select(null);
       e.stopPropagation();
     } else if (e.key === "F2" && !(e.target as HTMLElement).closest(TYPING) && (picked.size || selected)) {
@@ -4122,11 +4189,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return;
     }
     if (e.key === "Escape") {
-      if (sideMenu) {
-        sideMenu = null;
-        renderSide();
-        return;
-      }
       if (!colPop.hidden) return void closeColumns();
       cursor = null;
       if (!(selected || picked.size)) return;
@@ -4154,19 +4216,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
   // ---- the context menu (right click, menu key, long touch): on an item the actions of the details panel, on empty ground the library's own.
   // The item rows are read from the panel's buttons (their words, icon and state) and press them, so the menu and the panel can never disagree.
-  const PANEL_GROUPS: ReadonlyArray<ReadonlyArray<readonly [string, string?]>> = [
-    [["slide", "Open in the viewer"], ["place"], ["place-all"], ["slideshow-all"], ["favorite"], ["favorite-all"], ["hide"], ["hide-all"]],
-    [["rename", "Rename…"], ["rename-all"], ["download", "Download"], ["open-tab"], ["open-app"], ["show-file"], ["export", "Export as archive"], ["export-all"], ["export-files-all"]],
-    [["delete"], ["delete-all"], ["delete-everywhere"]],
+  const PANEL_GROUPS: ReadonlyArray<ReadonlyArray<readonly [action: string, hint: string, icon: string, label?: string]>> = [
+    [["slide", "See it large", ICONS.maximize, "Open in the viewer"], ["place", "On the canvas in view", ICONS.imagePlus], ["place-all", "On the canvas in view", ICONS.imagePlus], ["slideshow-all", "One after another", ICONS.play], ["favorite", "Find it under Favourites", ICONS.star], ["favorite-all", "Find them under Favourites", ICONS.star], ["organize", "Move to a folder, add tags", ICONS.folderTree], ["hide", "Only with the password", ICONS.eyeClosed], ["hide-all", "Only with the password", ICONS.eyeClosed]],
+    [["rename", "Give it a new name", ICONS.textCursorInput, "Rename…"], ["rename-all", "Give them new names", ICONS.textCursorInput], ["download", "Save a copy", ICONS.download, "Download"], ["open-tab", "In a new browser tab", ICONS.externalLink], ["open-app", "In your usual program", ICONS.externalLink], ["show-file", "In your file manager", ICONS.folderOpen], ["export", "A file to keep or share", ICONS.fileArchive, "Export as archive"], ["export-all", "A file to keep or share", ICONS.fileArchive], ["export-files-all", "The files, in a ZIP", ICONS.fileArchive]],
+    [["delete", "From the library", ICONS.trash2], ["delete-all", "From the library", ICONS.trash2], ["delete-everywhere", "Library and every canvas", ICONS.trash2]],
   ];
   const panelGroups = (): MenuItem[][] =>
     PANEL_GROUPS.map((g) =>
-      g.flatMap(([action, label]): MenuItem[] => {
+      g.flatMap(([action, hint, icon, label]): MenuItem[] => {
         const b = inspector.querySelector<HTMLButtonElement>(`[data-action="${action}"]`);
         if (!b || b.hidden) return [];
         const text = label ?? (b.getAttribute("aria-label") || b.textContent?.trim() || action);
-        const icon = b.querySelector("svg")?.outerHTML;
-        return [{ id: action, label: text, ...(icon ? { icon } : {}), danger: b.classList.contains("is-danger"), disabled: b.disabled, run: () => b.click() }];
+        return [{ id: action, label: text, hint, icon: b.querySelector("svg")?.outerHTML ?? icon, danger: b.classList.contains("is-danger"), disabled: b.disabled, run: () => b.click() }];
       }),
     );
   // Copy and paste with the system clipboard. Copy puts the picture (as PNG, the one picture type every program takes) alone, because a program that is offered a
@@ -4226,25 +4287,25 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const clipboardGroup = (hashes: readonly string[]): MenuItem[] => [
     ...(hashes.length
       ? [
-          { id: "copy", label: "Copy", icon: ICONS.clipboardCopy, run: () => void copyItems(hashes) },
-          { id: "copy-name", label: hashes.length > 1 ? "Copy names" : "Copy file name", icon: ICONS.fileText, run: () => void copyItems(hashes, "name") },
+          { id: "copy", label: "Copy", hint: "To paste elsewhere", icon: ICONS.clipboardCopy, run: () => void copyItems(hashes) },
+          { id: "copy-name", label: hashes.length > 1 ? "Copy names" : "Copy file name", hint: "As text", icon: ICONS.fileText, run: () => void copyItems(hashes, "name") },
           ...(desktopBridge() ? [{ id: "copy-file", label: hashes.length > 1 ? "Copy files" : "Copy file", hint: "The real file, to paste in a file manager", icon: ICONS.files, run: () => void entriesOf(hashes).then((ents) => copyItemsAsFiles(copyDeps, ents)) }] : []),
         ]
       : []),
-    { id: "paste", label: "Paste", icon: ICONS.paste, run: () => void pasteFromClipboard() },
+    { id: "paste", label: "Paste", hint: "From the clipboard", icon: ICONS.paste, run: () => void pasteFromClipboard() },
   ];
   const emptyItems = (): MenuItem[] => {
     const press = (sel: string) => (): void => root.querySelector<HTMLElement>(sel)?.click();
     return groupedMenu([
-      [{ id: "select-all", label: "Select everything", icon: ICONS.selectAll, run: selectAll }, ...clipboardGroup([])],
+      [{ id: "select-all", label: "Select everything", hint: "All that is listed", icon: ICONS.selectAll, run: selectAll }, ...clipboardGroup([])],
       [
-        { id: "import-files", label: "Import files", icon: ICONS.arrowDownToLine, run: press('[data-action="import"]') },
-        { id: "import-folder", label: "Import a folder", icon: ICONS.arrowDownToLine, run: () => root.querySelector<HTMLInputElement>('[data-testid="assets-import-folder-input"]')?.click() },
-        { id: "new-folder", label: "New folder", icon: ICONS.folderPlus, run: press('[data-folder-action="new"][data-id=""]') },
+        { id: "import-files", label: "Import files", hint: "From this device", icon: ICONS.arrowDownToLine, run: press('[data-action="import"]') },
+        { id: "import-folder", label: "Import a folder", hint: "With its subfolders", icon: ICONS.arrowDownToLine, run: () => root.querySelector<HTMLInputElement>('[data-testid="assets-import-folder-input"]')?.click() },
+        { id: "new-folder", label: "New folder", hint: "To file things in", icon: ICONS.folderPlus, run: press('[data-folder-action="new"][data-id=""]') },
       ],
       [
-        { id: "slideshow", label: "Slideshow", icon: ICONS.play, run: press('[data-action="slideshow"]') },
-        { id: "details", label: "Details panel", icon: ICONS.panelRight, run: toggleDetails },
+        { id: "slideshow", label: "Slideshow", hint: "One after another", icon: ICONS.play, run: press('[data-action="slideshow"]') },
+        { id: "details", label: "Details panel", hint: "Show or hide it", icon: ICONS.panelRight, run: toggleDetails },
       ],
     ]);
   };
@@ -4258,13 +4319,22 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (hash && !picked.has(hash)) await select(hash); // (a card outside the pick is picked alone; one inside it keeps the whole pick)
       const g = panelGroups();
       // Select several: from now on a tap (or a click) adds a card or takes it away, the way to pick several on a touch screen.
-      const several: MenuItem = { id: "select-several", label: "Select several", icon: ICONS.squareCheckBig, run: () => {
+      const several: MenuItem = { id: "select-several", label: "Select several", hint: "Tap to add or remove", icon: ICONS.squareCheckBig, run: () => {
           selecting = severalOn = true;
           markPicked();
           session.editor.message = "Selecting several: tap or click items to add or remove them. Esc ends it.";
           session.editor.changed();
         } };
       return groupedMenu([[...(severalOn ? [] : [several]), ...g[0]!], clipboardGroup(picked.size ? [...picked] : hash ? [hash] : []), g[1]!, g[2]!]);
+    },
+  });
+  // A row of the sidebar (a folder, a tag): what its ⋯ button offers.
+  bindContextMenu(side, {
+    label: "Sidebar actions",
+    active: () => visible,
+    build: ({ target }) => {
+      const b = target.closest<HTMLElement>(".side-row")?.querySelector<HTMLElement>("[data-side-more]");
+      return b ? (sideRows.get(`${b.dataset["kind"]}:${b.dataset["id"]}`)?.items ?? null) : null;
     },
   });
   // The viewer: the same menu for the item it shows (a right click, or a long touch on a phone), from the picture or the filmstrip.
@@ -4585,7 +4655,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     hiddenMode = true;
     setHiddenMode(true);
     scope = "all";
-    sideMenu = null;
     search.value = "";
     search.blur(); // (its panel would cover the first items)
     leaveSelection();

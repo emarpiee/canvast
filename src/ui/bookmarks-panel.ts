@@ -117,8 +117,8 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
       openMoreMenu(
         t.closest<HTMLElement>("[data-thumbs]")!,
         [
-          { label: list.items.length === 1 ? "Update the picture" : `Update all ${list.items.length} pictures`, icon: ICONS.refresh, aria: "Update the pictures of all bookmarks", run: () => thumbs.update() },
-          { label: missing.length ? `Fill in the ${missing.length} missing` : "None are missing", icon: ICONS.imagePlus, disabled: missing.length === 0, aria: "Fill in the missing bookmark pictures", run: () => thumbs.update(missing.map((b) => b.id)) },
+          { label: list.items.length === 1 ? "Update the picture" : `Update all ${list.items.length} pictures`, hint: "Draw them again", icon: ICONS.refresh, aria: "Update the pictures of all bookmarks", run: () => thumbs.update() },
+          { label: missing.length ? `Fill in the ${missing.length} missing` : "None are missing", hint: "Only those with no picture", icon: ICONS.imagePlus, disabled: missing.length === 0, aria: "Fill in the missing bookmark pictures", run: () => thumbs.update(missing.map((b) => b.id)) },
         ],
         "Update the bookmark pictures",
       );
@@ -133,9 +133,10 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
       openMoreMenu(
         t.closest<HTMLElement>("[data-bm-more]")!,
         [
-          { label: "Rename", icon: ICONS.textCursorInput, aria: `Rename ${name}`, run: () => startRename(li) },
+          { label: "Rename", hint: "Give it a new name", icon: ICONS.textCursorInput, aria: `Rename ${name}`, run: () => startRename(li) },
           {
             label: "Update to the current view",
+            hint: "Where you are now",
             icon: ICONS.refresh,
             aria: `Update ${name} to the current view`,
             run: () =>
@@ -144,10 +145,10 @@ export function mountBookmarksPanel(host: HTMLElement, editor: EditorState, list
                 editor.changed();
               }),
           },
-          { label: "Update its picture", icon: ICONS.refresh, aria: `Update the picture of ${name}`, run: () => thumbs.update([id]) },
-          { label: "Move up", icon: ICONS.arrowUp, disabled: at <= 0, aria: `Move ${name} up`, run: () => void list.move(id, at - 1) },
-          { label: "Move down", icon: ICONS.arrowDown, disabled: at >= list.items.length - 1, aria: `Move ${name} down`, run: () => void list.move(id, at + 1) },
-          { label: "Delete", icon: ICONS.trash2, danger: true, aria: `Delete ${name}`, run: () => void list.remove(id) },
+          { label: "Update its picture", hint: "From the current view", icon: ICONS.refresh, aria: `Update the picture of ${name}`, run: () => thumbs.update([id]) },
+          { label: "Move up", hint: "Earlier in the list", icon: ICONS.arrowUp, disabled: at <= 0, aria: `Move ${name} up`, run: () => void list.move(id, at - 1) },
+          { label: "Move down", hint: "Later in the list", icon: ICONS.arrowDown, disabled: at >= list.items.length - 1, aria: `Move ${name} down`, run: () => void list.move(id, at + 1) },
+          { label: "Delete", hint: "Remove this bookmark", icon: ICONS.trash2, danger: true, aria: `Delete ${name}`, run: () => void list.remove(id) },
         ],
         `Actions for bookmark ${name}`,
       );

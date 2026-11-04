@@ -10,7 +10,8 @@ import { ICONS } from "./icons";
  */
 export interface MenuItem {
   label: string;
-  icon?: string;
+  /** Every row has an icon and a very short description: the type says so, for every menu of the app. */
+  icon: string;
   danger?: boolean;
   disabled?: boolean;
   /** A choice among several (the current operation): shown ticked, announced as a radio. */
@@ -18,12 +19,26 @@ export interface MenuItem {
   /** The accessible name when the visible label is not enough (default: the label). */
   aria?: string;
   /** A short line of what it does, under the label (the menu is then a list to read, not only to pick from). */
-  hint?: string;
+  hint: string;
   /** A line above this item: it starts a new group of the menu. */
   sep?: boolean;
   /** Names the item for tests and scripts (`data-id`). */
   id?: string;
   run(): void;
+}
+
+/**
+ * A row's choice done by the host's own click handler: a button with these attributes is pressed inside `host` and gone again. For lists whose
+ * rows are told apart by attributes (`data-action`), so the handler stays the one place for what a choice does.
+ */
+export function pressAs(host: HTMLElement, attrs: Readonly<Record<string, string>>): void {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.hidden = true;
+  for (const [k, v] of Object.entries(attrs)) b.setAttribute(k, v);
+  host.appendChild(b);
+  b.click();
+  b.remove();
 }
 
 /** The markup of the ⋯ button. `label` names it ("More actions for bookmark Home"). */
@@ -182,7 +197,7 @@ export function installMenuKeys(): void {
   if (installed) return;
   installed = true;
   document.addEventListener("keydown", (e) => {
-    const inMenu = (e.target as HTMLElement | null)?.closest?.(".pop-menu, .side-menu, .nav-actions");
+    const inMenu = (e.target as HTMLElement | null)?.closest?.(".pop-menu");
     if (!inMenu) {
       // a menu that stays open (grouped tools) closes on Escape wherever the focus is
       if (e.key === "Escape" && open?.menu.dataset["keep"] === "true") {

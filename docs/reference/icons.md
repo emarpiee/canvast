@@ -278,3 +278,6 @@ One icon per function: two buttons that do different things never share an icon,
 | `file-pen-line` | Edit note: the note selected on a canvas, opened in the note panel (Actions bar) |
 | `file-input` | Make note files: texts on a card become notes in the library (Actions bar) |
 | `image-upscale` | Reset size: pictures and note cards back to the size they are placed at (Actions bar) |
+| `list-tree` | Show as a tree (the tree chooser) |
+| `wrap-text` | Show in a row (the tree chooser) |
+| `folder-tree` | Organize: move to a folder and add tags, from one list (library) |

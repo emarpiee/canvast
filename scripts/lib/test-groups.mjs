@@ -7,7 +7,7 @@ export const GROUPS = {
   drawing: ["editing", "vectors", "text", "sheets", "styles", "pattern"],
   rendering: ["tiles", "density", "lowmem"],
   pictures: ["pictures", "files", "screenshot"],
-  library: ["assets", "organize", "library-folder", "notes"],
+  library: ["assets", "organize", "components", "library-folder", "notes"],
   storage: ["storage", "archive", "upgrade"],
   desktop: ["desktop"],
   interface: ["settings", "dock", "a11y", "icon-audit", "scrub-audit"],

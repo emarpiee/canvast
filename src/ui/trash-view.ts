@@ -200,8 +200,8 @@ export function mountTrashView(deps: TrashDeps): TrashView {
         showPicks();
       }
       return [
-        { label: "Restore", icon: ICONS.archiveRestore, run: () => void restore() },
-        { label: "Delete for good", icon: ICONS.trash2, danger: true, run: () => void erase() },
+        { label: "Restore", hint: "Put it back where it was", icon: ICONS.archiveRestore, run: () => void restore() },
+        { label: "Delete for good", hint: "Cannot be undone", icon: ICONS.trash2, danger: true, run: () => void erase() },
       ];
     },
   });

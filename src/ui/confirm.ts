@@ -1,3 +1,4 @@
+import { makeModal, showModal } from "./modal";
 import { esc } from "./format";
 import { ICONS } from "./icons";
 
@@ -59,19 +60,19 @@ export interface ConfirmOptions extends DialogSummary {
  * is Cancel, so pressing Enter by reflex never deletes anything.
  */
 export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
-  const dlg = document.createElement("dialog");
-  dlg.className = "confirm";
-  dlg.dataset["testid"] = "confirm-dialog";
-  dlg.setAttribute("aria-labelledby", "confirm-title");
-  dlg.innerHTML = `
+  const dlg = makeModal({
+    className: "confirm",
+    testid: "confirm-dialog",
+    titleId: "confirm-title",
+    html: `
     <h2 id="confirm-title">${esc(opts.title)}</h2>
     ${opts.lines.map((l) => `<p>${esc(l)}</p>`).join("")}
     ${summaryHtml(opts)}
     <div class="confirm-actions">
       <button type="button" data-testid="confirm-cancel" value="cancel">Cancel</button>
       <button type="button" class="${opts.danger === false ? "is-primary" : "is-danger"}" data-testid="confirm-ok" value="ok">${esc(opts.confirmLabel)}</button>
-    </div>`;
-  document.body.appendChild(dlg);
+    </div>`,
+  });
   return new Promise((resolve) => {
     let answer = false;
     dlg.addEventListener("click", (e) => {
@@ -80,11 +81,7 @@ export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
       answer = b.value === "ok";
       dlg.close();
     });
-    dlg.addEventListener("close", () => {
-      dlg.remove();
-      resolve(answer);
-    });
-    dlg.showModal();
+        showModal(dlg, () => resolve(answer));
     dlg.querySelector<HTMLButtonElement>('[value="cancel"]')!.focus();
   });
 }
@@ -99,11 +96,11 @@ export interface ChooseOptions extends DialogSummary {
 
 /** Modal choice between a few options (radio buttons). Resolves with the picked value, or null when cancelled. */
 export function chooseDialog(opts: ChooseOptions): Promise<string | null> {
-  const dlg = document.createElement("dialog");
-  dlg.className = "confirm";
-  dlg.dataset["testid"] = "choose-dialog";
-  dlg.setAttribute("aria-labelledby", "choose-title");
-  dlg.innerHTML = `
+  const dlg = makeModal({
+    className: "confirm",
+    testid: "choose-dialog",
+    titleId: "choose-title",
+    html: `
     <h2 id="choose-title">${esc(opts.title)}</h2>
     ${opts.lines.map((l) => `<p>${esc(l)}</p>`).join("")}
     ${summaryHtml(opts)}
@@ -113,8 +110,8 @@ export function chooseDialog(opts: ChooseOptions): Promise<string | null> {
     <div class="confirm-actions">
       <button type="button" data-testid="choose-cancel" value="cancel">Cancel</button>
       <button type="button" class="is-primary" data-testid="choose-ok" value="ok">${esc(opts.confirmLabel)}</button>
-    </div>`;
-  document.body.appendChild(dlg);
+    </div>`,
+  });
   return new Promise((resolve) => {
     let answer: string | null = null;
     dlg.addEventListener("click", (e) => {
@@ -123,11 +120,7 @@ export function chooseDialog(opts: ChooseOptions): Promise<string | null> {
       if (b.value === "ok") answer = dlg.querySelector<HTMLInputElement>('input[name="choose"]:checked')?.value ?? null;
       dlg.close();
     });
-    dlg.addEventListener("close", () => {
-      dlg.remove();
-      resolve(answer);
-    });
-    dlg.showModal();
+        showModal(dlg, () => resolve(answer));
     dlg.querySelector<HTMLInputElement>('input[name="choose"]:checked')?.focus();
   });
 }
@@ -143,11 +136,11 @@ export interface PromptOptions {
 
 /** Modal question with one line to type in. Resolves with the text (possibly empty) when confirmed, or null when cancelled. */
 export function promptDialog(opts: PromptOptions): Promise<string | null> {
-  const dlg = document.createElement("dialog");
-  dlg.className = "confirm";
-  dlg.dataset["testid"] = "prompt-dialog";
-  dlg.setAttribute("aria-labelledby", "prompt-title");
-  dlg.innerHTML = `
+  const dlg = makeModal({
+    className: "confirm",
+    testid: "prompt-dialog",
+    titleId: "prompt-title",
+    html: `
     <h2 id="prompt-title">${esc(opts.title)}</h2>
     ${opts.lines.map((l) => `<p>${esc(l)}</p>`).join("")}
     ${opts.secret
@@ -156,8 +149,8 @@ export function promptDialog(opts: PromptOptions): Promise<string | null> {
     <div class="confirm-actions">
       <button type="button" data-testid="prompt-cancel" value="cancel">Cancel</button>
       <button type="button" class="is-primary" data-testid="prompt-ok" value="ok">${esc(opts.confirmLabel)}</button>
-    </div>`;
-  document.body.appendChild(dlg);
+    </div>`,
+  });
   const input = dlg.querySelector<HTMLInputElement>(".prompt-input")!;
   wireSecretFields(dlg);
   return new Promise((resolve) => {
@@ -174,11 +167,7 @@ export function promptDialog(opts: PromptOptions): Promise<string | null> {
       answer = input.value;
       dlg.close();
     });
-    dlg.addEventListener("close", () => {
-      dlg.remove();
-      resolve(answer);
-    });
-    dlg.showModal();
+        showModal(dlg, () => resolve(answer));
     input.focus();
     input.select();
   });

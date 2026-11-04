@@ -49,6 +49,9 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 
 ## UI rules
 
+- **DRY first: one shared component per thing.** Context menus, modals and dialogs, docks, panels, notices, settings rows, cards, trees and rules (names, dates) each have one implementation. Before writing UI, look for the shared component and call it; if it almost fits, extend it with an option; never copy it or restyle a copy. A second copy found while working is folded into the shared one in the same pass. `npm run check:components` guards this.
+- **Every menu row has an icon, a name and a very short description** (`MenuItem.icon`, `label`, `hint`), in every context menu and action menu.
+
 - **No hardcoded CSS values.** Every colour, text size, padding, margin, gap, radius and icon size uses a token from `:root` in `src/styles.css`; add a token rather than a literal. `npm run check:tokens` enforces it. Row actions use the shared `src/ui/more-menu.ts` pattern (ADR 0068).
 
 - **Group tools in menus, do not add a row of icons (ADR 0151).** A family of tools on the Actions bar (`ui/context-bar.ts`) is one button that opens `openMoreMenu(anchor, items, label, { keepOpen: true, refresh })`: an icon, a label and a hint per item, placed off the picked things, closing only on Escape or a press outside. List only what applies to the pick and hide the button when nothing does. The button carries `aria-haspopup="menu"` (it gets the corner mark from CSS). Reuse this menu for any new group; E2E chooses in it with `chooseInMenu` / `alignWith` / `boolWith` / `maskWith` / `pathWith` in `tests/e2e/harness.ts`.

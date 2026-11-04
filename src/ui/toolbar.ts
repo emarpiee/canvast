@@ -145,16 +145,16 @@ const SHAPE_MENU: Array<{ id: ShapeKind; label: string; title: string; icon: str
 ];
 void SHAPE_KINDS;
 
-export const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label: string; icon: string; hint?: string }> }> = [
+export const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label: string; icon: string; hint: string }> }> = [
   {
     head: "Arrange in a grid",
     items: [
-      { id: "grid:name-asc", label: "By name, A to Z", icon: ICONS.arrowDownAZ },
-      { id: "grid:name-desc", label: "By name, Z to A", icon: ICONS.arrowDownZA },
-      { id: "grid:date", label: "By date added, newest first", icon: ICONS.calendarDays },
-      { id: "grid:size", label: "By size, largest first", icon: ICONS.rulerIcon },
-      { id: "grid:type", label: "By type", icon: ICONS.fileType },
-      { id: "grid:stack", label: "In stacking order", icon: ICONS.chevronsUpDown },
+      { id: "grid:name-asc", label: "By name, A to Z", hint: "In a grid, by name", icon: ICONS.arrowDownAZ },
+      { id: "grid:name-desc", label: "By name, Z to A", hint: "In a grid, by name", icon: ICONS.arrowDownZA },
+      { id: "grid:date", label: "By date added, newest first", hint: "In a grid, by date", icon: ICONS.calendarDays },
+      { id: "grid:size", label: "By size, largest first", hint: "In a grid, by size", icon: ICONS.rulerIcon },
+      { id: "grid:type", label: "By type", hint: "In a grid, by kind", icon: ICONS.fileType },
+      { id: "grid:stack", label: "In stacking order", hint: "In a grid, front to back", icon: ICONS.chevronsUpDown },
     ],
   },
   {

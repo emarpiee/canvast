@@ -201,7 +201,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "alignmenu": {
         // One menu for Align and Distribute; it stays open while several are tried (the shared grouped-tools menu, more-menu.ts)
         const rows = (head: string, prefix: string): MenuItem[] => LAYOUT_MENU.find((g) => g.head.startsWith(head))!.items.map((i) => ({
-          id: i.id, label: `${prefix}${i.label}`, ...(i.hint ? { hint: i.hint } : {}), icon: i.icon,
+          id: i.id, label: `${prefix}${i.label}`, hint: i.hint, icon: i.icon,
           disabled: i.id.startsWith("distribute") && editor.selection.size < 3,
           run: () => { const [kind, arg] = i.id.split(":") as [string, string]; actions.layout(kind === "align" ? { align: arg as AlignKey } : { distribute: arg as "x" | "y" }); },
         }));
@@ -211,7 +211,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "arrangemenu": {
         // The grid orders and the space between the items in one menu that stays open (the same grouped-tools menu as Align); the space is ticked
         const items = (): MenuItem[] => [
-          ...LAYOUT_MENU.find((g) => g.head.startsWith("Arrange"))!.items.map((i): MenuItem => ({ id: i.id, label: i.label, ...(i.hint ? { hint: i.hint } : {}), icon: i.icon, run: () => actions.layout({ grid: i.id.split(":")[1] as SortKey }) })),
+          ...LAYOUT_MENU.find((g) => g.head.startsWith("Arrange"))!.items.map((i): MenuItem => ({ id: i.id, label: i.label, hint: i.hint, icon: i.icon, run: () => actions.layout({ grid: i.id.split(":")[1] as SortKey }) })),
           ...GAP_ORDER.map((g): MenuItem => ({ id: `gap:${g}`, label: `Space: ${GAP_LABEL[g].toLowerCase()}`, hint: GAP_HINT[g], icon: `<span class="menu-gap">${GAP_SHORT[g]}</span>`, checked: g === actions.gap(), run: () => { actions.setGap(g); update(); } })),
         ];
         openMoreMenu(b, items(), "Arrange in a grid", { keepOpen: true, refresh: items });

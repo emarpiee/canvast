@@ -1089,7 +1089,7 @@ async function start(): Promise<void> {
         ...things.map((o): MenuItem => {
           const l = labelOf(o, assetNames.map);
           // ticked while picked; in "Add to the pick" a tap on a picked one takes it out again
-          return { id: o.id, label: l.text, icon: l.icon, checked: editor.selection.has(o.id), run: () => {
+          return { id: o.id, label: l.text, hint: "Select this one", icon: l.icon, checked: editor.selection.has(o.id), run: () => {
             if (add && editor.selection.has(o.id)) editor.select([...editor.selection].filter((x) => x !== o.id));
             else pick(o.id, add);
             if (!add) closeMoreMenu();

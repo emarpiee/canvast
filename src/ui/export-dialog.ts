@@ -4,6 +4,7 @@
  * a story, the picture's own pixels …), or type a width or a height; the preview shows the shape with its measures, and the file is
  * made at exactly that size. PNG, WebP and JPEG; SVG too when everything is vector.
  */
+import { makeModal, showModal } from "./modal";
 import { cleanName, replaceInvalid } from "../doc/file-names";
 import { plural } from "../doc/plural";
 import { forgetCopiedPicture } from "../app/actions";
@@ -92,12 +93,12 @@ export function openExportDialog(deps: ExportDeps): void {
   let nameTouched = false;
   let busy = false;
 
-  const dlg = document.createElement("dialog");
-  dlg.className = multi ? "export-dlg is-multi" : "export-dlg";
-  dlg.dataset["testid"] = "export-dialog";
-  dlg.setAttribute("aria-labelledby", "ex-title");
-  const preset = presetOf(t.ratio);
-  dlg.innerHTML = `
+    const preset = presetOf(t.ratio);
+  const dlg = makeModal({
+    className: multi ? "export-dlg is-multi" : "export-dlg",
+    testid: "export-dialog",
+    titleId: "ex-title",
+    html: `
     <header class="ex-head">
       <h2 id="ex-title">Export <span class="ex-what">${multi ? `${ts.length} sheets` : esc(t.name)}</span></h2>
       <button type="button" class="ex-x" data-ex="close" aria-label="Close">${ICONS.x}</button>
@@ -144,8 +145,8 @@ export function openExportDialog(deps: ExportDeps): void {
       <button type="button" class="ex-btn" data-ex="library" title="Keep it in the library of this workspace">${ICONS.save}<span>Save to library</span></button>
       <button type="button" class="ex-btn" data-ex="copy" title="Copy the picture to the clipboard (as PNG)">${ICONS.clipboardPlain}<span>Copy</span></button>
       <button type="button" class="ex-btn is-primary" data-ex="download">${ICONS.download}<span>Download</span></button>
-    </footer>`;
-  document.body.appendChild(dlg);
+    </footer>`,
+  });
 
   const q = <T extends HTMLElement>(sel: string): T => dlg.querySelector<T>(sel)!;
   scrubNumbers(dlg);
@@ -510,11 +511,7 @@ export function openExportDialog(deps: ExportDeps): void {
     if (k === "close") dlg.close();
     else if (k === "download" || k === "copy" || k === "library") void run(k);
   });
-  dlg.addEventListener("close", () => {
-    savePrefs(prefs);
-    dlg.remove();
-  });
-  dlg.showModal();
+  showModal(dlg, () => savePrefs(prefs));
   refresh();
   void refreshThumb();
   wIn.focus();

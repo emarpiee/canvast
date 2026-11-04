@@ -1,3 +1,4 @@
+import { makeModal, showModal } from "./modal";
 import { scrubNumbers } from "../colour-picker/scrub";
 import { MAX_NAME, applyRule, ruleProblem, splitName } from "../doc/rename-rules";
 import type { RenameMode, RenameRule } from "../doc/rename-rules";
@@ -35,16 +36,16 @@ export function openBatchRename(items: readonly RenameItem[], opts: RenameOption
   const ext = opts.extensions !== false;
   const one = items.length === 1;
   const noun = opts.noun ?? "items";
-  const dlg = document.createElement("dialog");
-  dlg.className = "confirm rename-dialog";
-  dlg.dataset["testid"] = "rename-dialog";
-  dlg.setAttribute("aria-labelledby", "rn-title");
-  // One name: only the part before the extension is edited (the extension stays, so it cannot be changed by accident); "Change the extension too" opens the whole name.
+    // One name: only the part before the extension is edited (the extension stays, so it cannot be changed by accident); "Change the extension too" opens the whole name.
   const one0 = one ? splitName(items[0]!.name) : { stem: "", ext: "" };
   const oneExt = one && ext && one0.ext !== "";
   let whole = !oneExt;
   const modes = MODES.filter(([m]) => ext || m !== "extension");
-  dlg.innerHTML = `
+  const dlg = makeModal({
+    className: "confirm rename-dialog",
+    testid: "rename-dialog",
+    titleId: "rn-title",
+    html: `
     <h2 id="rn-title">${one ? "Rename" : `Rename ${items.length} ${esc(noun)}`}</h2>
     ${
       one
@@ -76,7 +77,8 @@ export function openBatchRename(items: readonly RenameItem[], opts: RenameOption
     <div class="confirm-actions">
       <button type="button" value="cancel" data-testid="rename-cancel">Cancel</button>
       <button type="button" class="is-primary" value="ok" data-testid="rename-ok">Rename</button>
-    </div>`;
+    </div>`,
+  });
   scrubNumbers(dlg);
   document.body.appendChild(dlg);
   const q = <T extends HTMLElement>(sel: string): T => dlg.querySelector<T>(sel)!;
@@ -155,12 +157,8 @@ export function openBatchRename(items: readonly RenameItem[], opts: RenameOption
         finish();
       }
     });
-    dlg.addEventListener("close", () => {
-      dlg.remove();
-      resolve(answer);
-    });
-    refresh();
-    dlg.showModal();
+        refresh();
+    showModal(dlg, () => resolve(answer));
     // The name to edit gets the focus, all of it selected (the extension is not in the field).
     const first = one ? field("one") : (modeSel as HTMLElement);
     first.focus();

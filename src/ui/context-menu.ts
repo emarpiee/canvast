@@ -12,13 +12,33 @@ const ON_ITEMS: ReadonlyArray<readonly string[]> = [
   ["Delete the selection", "Delete everywhere"],
 ];
 const ON_EMPTY: ReadonlyArray<readonly string[]> = [["Paste", "Select everything"], ["Show all hidden", "Unlock all"], ["Fit everything in view", "Return to the origin"]];
-/** The icon of each row: the same icon as the button that does the same thing elsewhere (one icon for one function). */
-const ICON: Record<string, string> = {
-  Rename: ICONS.textCursorInput, Copy: ICONS.clipboardCopy, "Copy file": ICONS.files, Cut: ICONS.scissors, Paste: ICONS.paste, Duplicate: ICONS.copy, Group: ICONS.group, Ungroup: ICONS.ungroup,
-  "Bring to front": ICONS.bringToFront, "Send to back": ICONS.sendToBack, "Put the selection on a sheet": ICONS.sheetSelection, "Detach from what it follows": ICONS.unlink,
-  "Save the selection to the library as SVG": ICONS.save, "Delete the selection": ICONS.trash, "Delete everywhere": ICONS.trash, "Select everything": ICONS.selectAll, "Show all hidden": ICONS.eye, "Unlock all": ICONS.lockKeyholeOpen,
-  "Fit everything in view": ICONS.frame, "Return to the origin": ICONS.house, "Export… (choose a size)": ICONS.exportMenu, "Copy the selection as SVG": ICONS.fileCode,
+/** The icon and the short line of each row: the same icon as the button that does the same thing elsewhere (one icon for one function). */
+export const ROWS: Readonly<Record<string, { icon: string; hint: string }>> = {
+  Copy: { icon: ICONS.clipboardCopy, hint: "To paste elsewhere" },
+  "Copy file": { icon: ICONS.files, hint: "The real file, for a file manager" },
+  Cut: { icon: ICONS.scissors, hint: "Copy, then remove" },
+  Paste: { icon: ICONS.paste, hint: "From the clipboard" },
+  Duplicate: { icon: ICONS.copy, hint: "A copy beside it" },
+  Rename: { icon: ICONS.textCursorInput, hint: "Give it a new name" },
+  Group: { icon: ICONS.group, hint: "Move them as one" },
+  Ungroup: { icon: ICONS.ungroup, hint: "Separate them again" },
+  "Put the selection on a sheet": { icon: ICONS.sheetSelection, hint: "A frame around them" },
+  "Detach from what it follows": { icon: ICONS.unlink, hint: "It stays where it is" },
+  "Bring to front": { icon: ICONS.bringToFront, hint: "Above everything" },
+  "Send to back": { icon: ICONS.sendToBack, hint: "Behind everything" },
+  "Export… (choose a size)": { icon: ICONS.exportMenu, hint: "Save as a picture file" },
+  "Copy the selection as SVG": { icon: ICONS.fileCode, hint: "Vector text to paste" },
+  "Save the selection to the library as SVG": { icon: ICONS.save, hint: "A new library item" },
+  "Delete the selection": { icon: ICONS.trash, hint: "From this canvas" },
+  "Delete everywhere": { icon: ICONS.trash, hint: "From every canvas" },
+  "Select everything": { icon: ICONS.selectAll, hint: "All on this canvas" },
+  "Show all hidden": { icon: ICONS.eye, hint: "Items hidden on this canvas" },
+  "Unlock all": { icon: ICONS.lockKeyholeOpen, hint: "So they can be moved" },
+  "Fit everything in view": { icon: ICONS.frame, hint: "Zoom to see it all" },
+  "Return to the origin": { icon: ICONS.house, hint: "Back to the start" },
 };
+/** Every title a canvas menu lists (a test holds `ROWS` to it). */
+export const MENU_TITLES: readonly string[] = [...ON_ITEMS, ...ON_EMPTY].flat();
 const LONG_PRESS_MS = 500;
 const LONG_PRESS_SLOP_PX = 10;
 
@@ -32,8 +52,9 @@ export function commandItems(registry: CommandRegistry, titles: readonly string[
   const all = registry.all();
   return titles.flatMap((title): MenuItem[] => {
     const c = all.find((x) => x.title === title && x.group !== "Tool");
-    if (!c || (c.enabled && !c.enabled())) return [];
-    return [{ label: title, ...(ICON[title] ? { icon: ICON[title] } : {}), danger: title.startsWith("Delete"), run: () => void registry.run(c.id) }];
+    const row = ROWS[title];
+    if (!c || !row || (c.enabled && !c.enabled())) return [];
+    return [{ label: title, ...row, danger: title.startsWith("Delete"), run: () => void registry.run(c.id) }];
   });
 }
 

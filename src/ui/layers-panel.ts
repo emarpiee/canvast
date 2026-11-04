@@ -1,3 +1,4 @@
+import { treeGuides, treeTwist } from "./tree";
 import type { EditorState } from "../app/editor-state";
 import { revealRow } from "../interaction/reveal";
 import { plural } from "../doc/plural";
@@ -206,18 +207,6 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       }
     }
     let rows = 0;
-    /**
-     * The guide lines of a row: for each level above it a vertical line under that level's chevron (only while the branch goes on), and for
-     * its own level a line that ends at the row's middle with a short tick into the row when it is the last of its group. The lines stop
-     * at the last item of the group, so a group never looks as if it covered what follows it.
-     */
-    const guides = (depth: number, last: boolean, conts: readonly boolean[]): string => {
-      if (depth === 0) return "";
-      const parts: string[] = [];
-      for (let j = 0; j < depth - 1; j++) if (conts[j]) parts.push(`<i class="tg" style="--l:${j}"></i>`);
-      parts.push(`<i class="tg tg-own${last ? " is-last" : ""}" style="--l:${depth - 1}"></i>`);
-      return `<span class="tree" aria-hidden="true">${parts.join("")}</span>`;
-    };
     /** `last`: the last item of its group; `conts`: for each ancestor below the top, whether its own branch goes on below it (its guide line continues). */
     const row = (n: Node, depth: number, last: boolean, conts: readonly boolean[]): string => {
       if (rows >= limit) return "";
@@ -230,8 +219,8 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       const locked = n.members.every((m) => m.locked);
       const expanded = n.group && open.has(n.id);
       const key = n.group ? n.id : first.id;
-      const head = `<li role="treeitem" ${n.group ? `aria-expanded="${expanded}"` : ""} aria-selected="${selected}" class="layer${n.group ? " is-group" : ""}${selected ? " is-selected" : ""}${hidden ? " is-hidden" : ""}${locked ? " is-locked" : ""}" data-key="${key}" data-ids="${n.members.map((m) => m.id).join(",")}" data-group="${n.group}" draggable="true" style="--depth:${depth}">
-        ${guides(depth, last, conts)}${n.group ? `<button type="button" class="layer-twist" data-twist aria-label="${expanded ? "Collapse" : "Expand"}">${expanded ? ICONS.chevronDown : ICONS.chevronRight}</button>` : ""}
+      const head = `<li role="treeitem" ${n.group ? `aria-expanded="${expanded}"` : ""} aria-selected="${selected}" class="layer tree-row${n.group ? " is-group" : ""}${selected ? " is-selected" : ""}${hidden ? " is-hidden" : ""}${locked ? " is-locked" : ""}" data-key="${key}" data-ids="${n.members.map((m) => m.id).join(",")}" data-group="${n.group}" draggable="true" style="--depth:${depth}">
+        ${treeGuides(depth, last, conts)}${n.group ? treeTwist(expanded, "data-twist") : ""}
         <span class="layer-icon">${lab.icon}</span>${lab.swatch ? `<span class="layer-swatch" style="background:${swatchBackground(lab.swatch)}"></span>` : ""}
         ${renaming?.key === key ? `<input class="layer-rename" data-rename maxlength="${MAX_NAME_LENGTH}" value="${esc(renaming.value)}" aria-label="Layer name">` : `<span class="layer-name" title="${esc([...(first.groups ?? []).slice(0, n.group && !n.sheet ? first.groups!.indexOf(n.id) : undefined).map((g) => first.groupNames?.[g] ?? "Group"), lab.text].join(" › "))} (double-click to rename)">${splitName(lab.text)}</span>${n.group ? `<span class="layer-count" title="${plural(n.members.length, "item")} inside">${n.members.length}</span>` : ""}`}
         ${n.sheet ? `<button type="button" class="layer-state layer-clip" data-clip aria-pressed="${n.sheet.container!.clip}" aria-label="Clip content of ${esc(lab.text)}" title="${n.sheet.container!.clip ? "Clipping: what is outside the frame is hidden. Press to show it" : "Not clipping: press to hide what is outside the sheet"}">${ICONS.scissorsLineDashed}</button>` : ""}${hidden ? `<button type="button" class="layer-state" data-eye aria-pressed="true" aria-label="Show ${esc(lab.text)}" title="Hidden: show it">${ICONS.eyeOff}</button>` : ""}${locked ? `<button type="button" class="layer-state" data-lock aria-pressed="true" aria-label="Unlock ${esc(lab.text)}" title="Locked: unlock it">${ICONS.lockKeyhole}</button>` : ""}

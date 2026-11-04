@@ -138,9 +138,9 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
       openMoreMenu(
         more,
         [
-          { label: "Select the items with this tag", icon: ICONS.pointer, aria: `Select the items tagged ${tag}`, run: () => { editor.entered = []; editor.select(doc.ordered().filter((o) => (o.tags ?? []).some((x) => x.toLowerCase() === key)).map((o) => o.id)); } },
-          { label: "Rename on every canvas", icon: ICONS.textCursorInput, aria: `Rename tag ${tag}`, run: () => void askTagName(tag, "canvases").then((to) => to !== null && to.trim() && actions.renameTag(tag, to)) },
-          { label: "Delete from every canvas", icon: ICONS.trash2, danger: true, aria: `Delete tag ${tag}`, run: () => actions.deleteTag(tag) },
+          { label: "Select the items with this tag", hint: "Everything tagged with it", icon: ICONS.pointer, aria: `Select the items tagged ${tag}`, run: () => { editor.entered = []; editor.select(doc.ordered().filter((o) => (o.tags ?? []).some((x) => x.toLowerCase() === key)).map((o) => o.id)); } },
+          { label: "Rename on every canvas", hint: "Everywhere it is used", icon: ICONS.textCursorInput, aria: `Rename tag ${tag}`, run: () => void askTagName(tag, "canvases").then((to) => to !== null && to.trim() && actions.renameTag(tag, to)) },
+          { label: "Delete from every canvas", hint: "The items stay", icon: ICONS.trash2, danger: true, aria: `Delete tag ${tag}`, run: () => actions.deleteTag(tag) },
         ],
         `Actions for tag ${tag}`,
       );

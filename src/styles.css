@@ -71,6 +71,9 @@
   --text-2xs: 10px;
   --text-xs: 11px;
   --text-sm: 12px;
+  --tree-row-h: 26px;
+  --choice-w: 460px;
+  --choice-h: 320px;
   --text-md: 13px;
   --text-lg: 14px;
   --text-xl: 15px;
@@ -764,11 +767,11 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .layer.is-selected { background: var(--hud-accent); color: var(--hud-accent-fg); }
 .layer.is-hidden .layer-name, .layer.is-hidden .layer-icon, .layer.is-hidden .layer-swatch { opacity: 0.4; }
 .layer-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.layer-icon svg, .layer-btn svg, .layer-twist svg { width: 14px; height: 14px; display: block; }
+.layer-icon svg, .layer-btn svg, .tree-twist svg { width: 14px; height: 14px; display: block; }
 .layer-swatch { width: 10px; height: 10px; border-radius: var(--r-dot); border: 1px solid var(--hud-border); flex: none; }
-.layer-btn, .layer-twist { width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--r-xs); background: transparent; color: inherit; display: grid; place-items: center; cursor: pointer; flex: none; }
-.layer-btn:hover, .layer-twist:hover:not(:disabled) { background: var(--hud-hover); }
-.layer-twist:disabled { cursor: default; }
+.layer-btn, .tree-twist { width: 24px; height: 24px; padding: 0; border: 0; border-radius: var(--r-xs); background: transparent; color: inherit; display: grid; place-items: center; cursor: pointer; flex: none; }
+.layer-btn:hover, .tree-twist:hover:not(:disabled) { background: var(--hud-hover); }
+.tree-twist:disabled { cursor: default; }
 .layer-btn[aria-pressed="false"] { opacity: 0.45; }
 .layer:hover .layer-btn[aria-pressed="false"] { opacity: 0.9; }
 .layers-empty, .layers-note { padding: var(--sp-5); color: var(--hud-muted); margin: 0; }
@@ -1467,7 +1470,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 :root[data-density="dense"] .set-row { padding: var(--sp-2) 0; }
 :root[data-density="dense"] .film-item { width: 44px; height: 30px; }
 :root[data-density="dense"] .colour-pop { padding: var(--sp-4); }
-:root[data-density="dense"] :is(.pop-menu, .side-menu, .place-menu) button { padding: 0 var(--sp-4); }
+:root[data-density="dense"] :is(.pop-menu, .place-menu) button { padding: 0 var(--sp-4); }
 :root[data-density="dense"] .tb-options-row { gap: var(--sp-2); }
 
 /* ---- Workspace menu: boards as sections, canvases as rows, actions as icons that show on hover ---------------------------------- */
@@ -1573,13 +1576,6 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .nav-more { flex: none; display: inline-flex; align-items: center; justify-content: center; width: calc(var(--ctl) - 4px); height: calc(var(--ctl) - 4px); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; opacity: 0.75; }
 .nav-more svg { width: 18px; height: 18px; }
 .nav-more:hover, .nav-more[aria-expanded="true"] { opacity: 1; color: var(--hud-fg); background: var(--hud-hover); }
-.nav-actions { position: absolute; right: 4px; top: calc(100% - 2px); z-index: 8; min-width: 190px; padding: var(--sp-2); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(10px); }
-.nav-actions button { display: flex; align-items: center; gap: var(--sp-5); width: 100%; min-height: var(--ctl); padding: 0 var(--sp-6); font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
-.nav-actions button svg { width: 16px; height: 16px; flex: none; color: var(--hud-muted); }
-.nav-actions button:hover:not(:disabled) { background: var(--hud-hover); }
-.nav-actions button.is-danger { color: var(--hud-danger); }
-.nav-actions button.is-danger svg { color: inherit; }
-.nav-actions button:disabled { opacity: 0.4; cursor: default; }
 .nav-add { color: var(--hud-fg); }
 
 /* ---- The library list, aligned: the header sits over its columns ---------------------------------------------------------------- */
@@ -1592,7 +1588,6 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .assets-body.is-list .asset-meta, .assets-body.is-list .asset-uses, .assets-body.is-list .asset-tags { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); }
 .assets-body.is-list .asset-cell.is-even .asset-card:not([aria-pressed="true"]) { background: color-mix(in oklch, var(--hud-hover) 45%, transparent); }
 /* The list of actions opens to the left of its More button, so the More buttons of the rows below stay reachable. */
-.nav-actions { top: 0; right: calc(var(--ctl) - 2px); }
 /* List rows read as text on the page, not as the white text of a picture overlay. */
 .assets-body.is-list .asset-info { color: var(--hud-fg); }
 
@@ -1691,11 +1686,6 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .side-row .side-more { opacity: 0; }
 .side-row:hover .side-more, .side-row:focus-within .side-more, .side-more[aria-expanded="true"] { opacity: 1; }
 @media (hover: none), (max-width: 640px) { .side-row .side-more { opacity: 0.8; } }
-.side-menu { position: fixed; z-index: 30; min-width: 168px; display: grid; padding: var(--sp-2); background: var(--hud-bg-solid, var(--hud-bg)); border: 1px solid var(--hud-border); border-radius: var(--r-md, var(--r-lg)); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
-.side-menu button { display: flex; align-items: center; gap: var(--sp-4); min-height: var(--list-h); padding: 0 var(--sp-4); font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
-.side-menu button:hover, .side-menu button:focus-visible { background: var(--hud-hover); }
-.side-menu button.is-danger { color: var(--hud-danger); }
-.side-menu svg { width: 16px; height: 16px; flex: none; }
 /* Tags are chips that wrap, not a list. */
 .tag-cloud { list-style: none; margin: var(--sp-2) 0 var(--sp-4); padding: 0 var(--sp-3); display: flex; flex-wrap: wrap; gap: var(--sp-3); }
 .tag-cloud .side-row { padding-left: 0; flex: 0 1 auto; max-width: 100%; }
@@ -2060,7 +2050,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .layers-panel .layer { padding-left: calc(var(--sp-2) + var(--depth, 0) * var(--sp-9)); gap: var(--sp-2); position: relative; }
 .layers-panel .layer::before { left: 4px; width: calc(var(--depth, 0) * 18px);
   background-image: repeating-linear-gradient(to right, transparent 0, transparent 8px, color-mix(in oklch, var(--hud-fg) 24%, transparent) 8px, color-mix(in oklch, var(--hud-fg) 24%, transparent) 9px, transparent 9px, transparent 18px); }
-.layers-panel .layer-twist { width: 18px; height: 24px; }
+.tree-row .tree-twist { width: 18px; height: 24px; }
 .layers-panel .layer-name { flex: 1; min-width: 0; }
 .layer-actions { display: inline-flex; flex: none; }
 .layer .layer-btn[aria-pressed="false"] { opacity: 0.85; }
@@ -2085,9 +2075,9 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 }
 @media (hover: none), (max-width: 640px) { .more-btn, .nav-more, .side-row .side-more { opacity: 1; } .more-btn, .nav-more, .side-more { width: 36px; height: 36px; } }
 /* The menu: one look and one place (floating, inside the window, over everything). */
-.pop-menu, .side-menu, .nav-actions { position: fixed; z-index: 60; min-width: 190px; max-width: min(320px, calc(100vw - 16px)); display: grid; gap: 1px; padding: var(--sp-2); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
-.pop-menu button, .side-menu button, .nav-actions button { display: flex; align-items: center; gap: var(--sp-5); width: 100%; min-height: var(--menu-h); padding: 0 var(--sp-5); font: var(--font-control); color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
-.pop-menu button:hover:not(:disabled), .side-menu button:hover:not(:disabled), .nav-actions button:hover:not(:disabled), .pop-menu button:focus-visible, .side-menu button:focus-visible, .nav-actions button:focus-visible { background: var(--hud-hover); outline: 0; }
+.pop-menu { position: fixed; z-index: 60; min-width: 190px; max-width: min(320px, calc(100vw - 16px)); display: grid; gap: 1px; padding: var(--sp-2); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
+.pop-menu button { display: flex; align-items: center; gap: var(--sp-5); width: 100%; min-height: var(--menu-h); padding: 0 var(--sp-5); font: var(--font-control); color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
+.pop-menu button:hover:not(:disabled), .pop-menu button:focus-visible { background: var(--hud-hover); outline: 0; }
 /* A menu never grows past the window: it scrolls. A compact one has closer rows (a long list to choose from). */
 .pop-menu { max-height: calc(100dvh - 2 * var(--edge)); overflow-y: auto; scrollbar-width: thin; }
 .pop-menu.is-compact button { min-height: var(--field-h); gap: var(--sp-4); font: var(--font-value); }
@@ -2095,10 +2085,10 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .pop-menu.is-compact .menu-text { display: flex; align-items: baseline; gap: var(--sp-3); }
 .pop-menu button.has-sep { margin-top: var(--sp-2); position: relative; }
 .pop-menu button.has-sep::before { content: ""; position: absolute; left: var(--sp-3); right: var(--sp-3); top: calc(-1 * var(--sp-1) - 1px); border-top: 1px solid var(--hud-border); }
-.pop-menu button:disabled, .side-menu button:disabled, .nav-actions button:disabled { opacity: 0.4; cursor: default; }
-.pop-menu button.is-danger, .side-menu button.is-danger, .nav-actions button.is-danger { color: var(--hud-danger); }
-.pop-menu svg, .side-menu svg, .nav-actions svg { width: 16px; height: 16px; flex: none; color: var(--hud-muted); }
-.pop-menu button.is-danger svg, .side-menu button.is-danger svg, .nav-actions button.is-danger svg { color: inherit; }
+.pop-menu button:disabled { opacity: 0.4; cursor: default; }
+.pop-menu button.is-danger { color: var(--hud-danger); }
+.pop-menu svg { width: 16px; height: 16px; flex: none; color: var(--hud-muted); }
+.pop-menu button.is-danger svg { color: inherit; }
 /* The retired bookmark button row and the layers' floating eye and lock */
 .bookmark-actions, .layer-actions { display: none; }
 /* A hidden or locked layer shows that state in its row (and a press undoes it); everything else is in the menu. */
@@ -2115,12 +2105,12 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .layers-panel ul[role="tree"] { padding: var(--sp-1) var(--sp-1) var(--sp-2); }
 .layers-panel .layer { padding: 0 var(--sp-2) 0 calc(var(--sp-3) + var(--depth, 0) * var(--sp-9)); gap: var(--sp-2); min-height: 26px; }
 .layers-panel .layer::before { display: none; }
-.layers-panel .layer-twist { width: 16px; height: 22px; margin-left: -2px; }
-.layers-panel .layer .tree { position: absolute; inset: 0; pointer-events: none; }
-.layers-panel .layer .tg { position: absolute; top: 0; bottom: 0; left: calc(6px + var(--l) * 20px + 6px); width: 1px; background: color-mix(in oklch, var(--hud-fg) 28%, transparent); }
-.layers-panel .layer .tg-own.is-last { bottom: 50%; }
-.layers-panel .layer .tg-own::after { content: ""; position: absolute; top: 50%; left: 0; width: 11px; height: 1px; background: inherit; }
-.layers-panel .layer .tg-own.is-last { background: color-mix(in oklch, var(--hud-fg) 28%, transparent); }
+.tree-row .tree-twist { width: 16px; height: 22px; margin-left: -2px; }
+.tree { position: absolute; inset: 0; pointer-events: none; }
+.tree .tg { position: absolute; top: 0; bottom: 0; left: calc(6px + var(--l) * 20px + 6px); width: 1px; background: color-mix(in oklch, var(--hud-fg) 28%, transparent); }
+.tree .tg-own.is-last { bottom: 50%; }
+.tree .tg-own::after { content: ""; position: absolute; top: 50%; left: 0; width: 11px; height: 1px; background: inherit; }
+.tree .tg-own.is-last { background: color-mix(in oklch, var(--hud-fg) 28%, transparent); }
 .layers-panel .layer-name { flex: 1; }
 .layers-do { display: flex; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4) 0; }
 .layers-do button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-3); height: 28px; padding: 0 var(--sp-3); font: inherit; color: inherit; background: color-mix(in oklch, var(--hud-fg) 8%, transparent); border: 0; border-radius: var(--r-sm); cursor: pointer; }
@@ -2498,7 +2488,7 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 @keyframes fade-in { from { opacity: 0; } }
 @keyframes pop-in { from { opacity: 0; translate: 0 calc(var(--sp-3) * var(--anim-move)); } }
 /* Menus, popovers, panels and dialogs come in with a short fade and rise. */
-.pop-menu, .side-menu, .nav-actions, .nav-menu, .place-menu, .assets-columns, .assets-search-pop, .layers-panel, .bookmarks-panel, .tags-panel, .search-help, .ctx-bar, .ctx-wrap > .toolbar, dialog.confirm[open] { animation: pop-in var(--dur-base) var(--ease-out) both; }
+.pop-menu, .nav-menu, .place-menu, .assets-columns, .assets-search-pop, .layers-panel, .bookmarks-panel, .tags-panel, .search-help, .ctx-bar, .ctx-wrap > .toolbar, dialog.confirm[open] { animation: pop-in var(--dur-base) var(--ease-out) both; }
 dialog.confirm[open]::backdrop { animation: fade-in var(--dur-base) var(--ease-out) both; }
 /* A view fades in when it opens; so does a settings tab. */
 #assets-view:not([hidden]), #settings-view:not([hidden]), .set-panels > section:not([hidden]), .viewer:not([hidden]) { animation: fade-in var(--dur-base) var(--ease-out) both; }
@@ -3015,3 +3005,29 @@ dialog.reset-dialog h3 { margin: var(--sp-6) 0 var(--sp-3); font-size: var(--tex
 .cols-add { display: flex; gap: var(--sp-3); margin-bottom: var(--sp-4); }
 .cols-add input { flex: 1; min-width: 0; }
 .asset-field input[list]::-webkit-calendar-picker-indicator { display: none !important; }
+
+/* The one tree (ui/tree.ts): the folders of the library and the chooser's rows, the same as the layers. */
+.tree-row { position: relative; display: flex; align-items: center; gap: var(--sp-2); min-height: var(--tree-row-h); padding: 0 var(--sp-2) 0 calc(var(--sp-3) + var(--depth, 0) * var(--sp-9)); border-radius: var(--r-sm); }
+.tree-row > .tree-twist { flex: none; }
+.side-row.tree-row { padding: 0 var(--sp-2) 0 calc(var(--sp-3) + var(--depth, 0) * var(--sp-9)); gap: var(--sp-2); }
+.side-row.tree-row .side-item { min-height: var(--tree-row-h); padding: 0 var(--sp-2); gap: var(--sp-3); }
+.side-row.tree-row .side-item svg { width: var(--icon-sm); height: var(--icon-sm); }
+.side-add + .side-add { margin-left: 0; }
+
+/* The tree chooser (ui/tree-chooser.ts). */
+dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); max-width: none; }
+.choice-tabs { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-4); }
+.choice-tabs [aria-selected="true"], .choice-bar [aria-pressed="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
+.choice-bar { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.choice-search { flex: 1; min-width: 0; }
+.choice-list { height: var(--choice-h); max-height: 50vh; overflow: auto; }
+.choice-tree { list-style: none; margin: 0; padding: 0; }
+.choice-row:hover { background: var(--hud-hover); }
+.choice-name { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--sp-3); cursor: pointer; }
+.choice-name.is-group { cursor: default; color: var(--hud-muted); }
+.choice-name span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.choice-name svg { flex: none; width: var(--icon-sm); height: var(--icon-sm); }
+.choice-chips { display: flex; flex-wrap: wrap; gap: var(--sp-3); }
+.choice-chip { display: inline-flex; align-items: center; gap: var(--sp-2); max-width: 100%; padding: var(--sp-1) var(--sp-4); background: var(--hud-hover); border-radius: var(--r-pill); }
+.choice-empty { color: var(--hud-muted); }
+.choice-make { margin-top: var(--sp-3); }
