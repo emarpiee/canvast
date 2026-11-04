@@ -102,7 +102,7 @@ export function fileExt(name: string, type: string): string {
 export async function libraryPath(name: string, type: string, taken: (path: string) => Promise<boolean>): Promise<string> {
   const keep = nameRules.keep();
   const kept = keep ? keptFile(name, "", type) : null;
-  return freePath(`library/${kindFolder(type, name)}`, kept ? kept.base : nameBase(name), kept?.ext || fileExt(name, type), taken);
+  return freePath(`library/${kindFolder(type, name)}`, kept ? kept.base : nameBase(name), kept ? kept.ext : fileExt(name, type), taken);
 }
 
 /** Settings > Keep file names as written: a new file takes its name as written, else its tidy name. */
@@ -114,7 +114,7 @@ export const nameBase = (name: string): string => safeBase(name.replace(/\.[A-Za
 /** The first of `<dir>/<base>.<ext>`, `<dir>/<base>-2.<ext>`… that is not taken. */
 export async function freePath(dir: string, base: string, ext: string, taken: (path: string) => Promise<boolean>): Promise<string> {
   for (let n = 1; n < 10_000; n++) {
-    const path = `${dir}/${numberedName(base, n, `.${ext}`)}`;
+    const path = `${dir}/${numberedName(base, n, ext ? `.${ext}` : "")}`;
     if (!(await taken(path))) return path;
   }
   throw new Error("no free file name");
@@ -151,7 +151,7 @@ export function keptFits(path: string, dirs: readonly string[], name: string, ty
   const whole = /\.([A-Za-z0-9]{1,8})$/.exec(file)?.[1] ?? "";
   const kept = keptFile(name, whole, type);
   // As it should be: what the name says, in the file's real type.
-  const fileStem = kept.ext && file.toLowerCase().endsWith(`.${kept.ext.toLowerCase()}`) ? file.slice(0, -kept.ext.length - 1) : null;
+  const fileStem = !kept.ext ? file : file.toLowerCase().endsWith(`.${kept.ext.toLowerCase()}`) ? file.slice(0, -kept.ext.length - 1) : null;
   if (fileStem !== null && (fileStem === kept.base || isClashOf(fileStem, kept.base))) return true;
   if (strict) return false;
   // As it was written by an earlier version: still right, never renamed for it.
@@ -171,8 +171,10 @@ const isFileExt = (ext: string): boolean => !!KIND_OF_EXT[ext.toLowerCase()] || 
 export function keptFile(name: string, current: string, type: string): { base: string; ext: string } {
   const named = /\.([A-Za-z0-9]{1,8})$/.exec(name)?.[1] ?? "";
   if (named && !/^\d+$/.test(named) && (named.toLowerCase() === current.toLowerCase() || isFileExt(named))) return { base: keptBase(name), ext: named };
-  const real = current && !/^\d+$/.test(current) ? current : fileExt("", type);
-  return { base: keptPart(name), ext: real };
+  // (the file's own, else what the library knows it is. Not known: no extension is made up, and what the name ends in stays: `x.7z.001`, `README`.)
+  const known = /^(image|video|audio|font|text)\/|^application\/pdf$/.test(type) ? fileExt("", type) : "";
+  const real = current && !/^\d+$/.test(current) ? current : known;
+  return real ? { base: keptPart(name), ext: real } : { base: named ? keptBase(name) : keptPart(name), ext: named };
 }
 
 /** A relative path inside a workspace: `/`-separated, no empty, `.` or `..` part, no backslash or NUL, not absolute. */

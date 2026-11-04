@@ -1723,7 +1723,7 @@ test("a folder of files an earlier version named: opening it, twice, renames and
   const png = (seed: number): Buffer => makePng(6, 4, () => [seed, 90, 40, 255]);
   const dirs = ["library/A- B", "library/a-b", "library/Refs"];
   for (const d of dirs) mkdirSync(join(ws, d), { recursive: true });
-  const NAMES = ["library/A- B/one.png", "library/a-b/two.png", "library/Refs/Scan v2.1", "library/Refs/cafe\u0301.png", "library/Refs/a\u200bb.png", "library/Refs/C# notes.md", "library/Refs/draft.final.png"];
+  const NAMES = ["library/A- B/one.png", "library/a-b/two.png", "library/Refs/Scan v2.1", "library/Refs/cafe\u0301.png", "library/Refs/a\u200bb.png", "library/Refs/C# notes.md", "library/Refs/draft.final.png", "library/Refs/README", "library/Refs/x.7z.001"];
   NAMES.forEach((f, i) => writeFileSync(join(ws, f), f.endsWith(".md") ? "# C#\n" : png(i * 20 + 10)));
   const seen = () => files(ws).filter((f) => f.startsWith("library/")).sort();
   const before = seen();
@@ -1745,7 +1745,7 @@ test("a folder of files an earlier version named: opening it, twice, renames and
   await page.getByTestId("confirm-ok").click();
   await expect.poll(seen, { timeout: 15_000 }).toContain("library/Refs/Scan v2.1.png");
   await expect.poll(seen).toContain("library/Refs/ab.png");
-  for (const f of ["library/A- B/one.png", "library/a-b/two.png", "library/Refs/C# notes.md", "library/Refs/draft.final.png"]) expect(seen()).toContain(f);
+  for (const f of ["library/A- B/one.png", "library/a-b/two.png", "library/Refs/C# notes.md", "library/Refs/draft.final.png", "library/Refs/README", "library/Refs/x.7z.001"]) expect(seen()).toContain(f);
   expect(seen()).toHaveLength(NAMES.length);
   await app.close();
 });

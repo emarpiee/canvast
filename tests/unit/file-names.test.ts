@@ -71,6 +71,10 @@ describe("no file on a disk is renamed by a newer rule", () => {
     expect(fits("Scan v2.1.png", "Scan v2.1", "image/png", true)).toBe(true);
     expect(fits("a​b.png", "a​b.png", "image/png", true)).toBe(false);
     expect(fitsWritten("x", "x.png", "x")).toBe(true);
+    // Repair leaves what it cannot tell alone.
+    expect(fits("README", "README", "", true)).toBe(true);
+    expect(fits("x.7z.001", "x.7z.001", "", true)).toBe(true);
+    expect(fits("data.xyz", "data.xyz", "", true)).toBe(true);
   });
   it("a file keeps its real extension: a dot in a name is a part of the name, unless it gives a kind of file", () => {
     expect(keptFile("Scan v2.1", "png", "image/png")).toEqual({ base: "Scan v2.1", ext: "png" });
@@ -79,6 +83,11 @@ describe("no file on a disk is renamed by a newer rule", () => {
     expect(keptFile("data.xyz", "xyz", "")).toEqual({ base: "data", ext: "xyz" });
     expect(keptFile("Scan v2.1", "1", "image/png")).toEqual({ base: "Scan v2.1", ext: "png" });
     expect(keptFile("plan.note.html", "html", "text/html")).toEqual({ base: "plan.note", ext: "html" });
+    // Not known what it is: nothing made up, and the name stays as it is.
+    expect(keptFile("README", "", "")).toEqual({ base: "README", ext: "" });
+    expect(keptFile("README", "", "application/octet-stream")).toEqual({ base: "README", ext: "" });
+    expect(keptFile("x.7z.001", "001", "")).toEqual({ base: "x.7z", ext: "001" });
+    expect(keptFile("photo", "", "image/png")).toEqual({ base: "photo", ext: "png" });
   });
 });
 

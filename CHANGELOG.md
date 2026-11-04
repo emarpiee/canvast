@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.31 — No extension made up (2026-11-04)
+
+- **Fixed:** with Keep file names, a file of an unknown type keeps its name as written (`README`, `x.7z.001`): no `.bin` is added, on import or by Repair library file names.
+
 ## 0.53.30 — One set of rules for file and folder names (2026-11-04)
 
 - **Changed:** every rule for file and folder names is in one place, and `npm run check:name-rules` fails on a rule written elsewhere; nine cleaners became one. Names taken in a ZIP, export or style file are numbered `-2`, as on disk (they were ` (2)`, `_2`), and rich text notes too.

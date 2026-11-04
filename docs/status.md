@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.31: no extension made up (2026-11-04)
+
+- **Implemented:** `keptFile` keeps a name as written when the file's type is not known.
+- **Tested:** typecheck and unit tests here; E2E on GitHub, with `README` and `x.7z.001` in the repair test.
+- **Committed:** v0.53.31.
+
 ## v0.53.30: one set of rules for file and folder names (2026-11-04)
 
 - **Implemented:** `src/doc/file-names.ts`, `src/doc/date-words.ts`, `scripts/check-name-rules.mjs` (in CI), `keptFile`, `keptFits` with the older rule, `repairNames`, `folderClash`, `wikiKeyOf`, `percentOf` (ADR 0180).

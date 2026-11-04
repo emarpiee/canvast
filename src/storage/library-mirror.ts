@@ -582,9 +582,9 @@ export class LibraryMirror {
       // a file in no folder goes in its kind's folder; else one in the library's root stays there. A file tidied before fits too: turning a setting on
       // renames nothing that fits. A hidden item's place is its own business.
       const keep = this.keepsName(e.name) && !sealed;
-      const kept = keep ? keptFile(e.name, tidyExt, e.type) : null;
+      const kept = keep ? keptFile(e.name, rec.file && !sealed ? extOfPath(rec.file) : "", e.type) : null;
       const base = kept ? kept.base : tidyBase;
-      const ext = kept?.ext || tidyExt;
+      const ext = kept ? kept.ext : tidyExt;
       const places = sealed ? [tidyDir] : names.length ? (keep ? [await diskDir(names, tidyDir), tidyDir] : [tidyDir]) : this.sortFiles() ? [tidyDir] : [tidyDir, "library"];
       const dir = rec.file && places.includes(parentOf(rec.file)) ? parentOf(rec.file) : places[0]!;
       const fits = !!rec.file && (places.some((d) => fitsPlace(rec.file!, d, tidyBase, tidyExt)) || (keep && keptFits(rec.file, places, e.name, e.type, this.strictNames)));
@@ -1376,7 +1376,8 @@ export class LibraryMirror {
     const worker = async (): Promise<void> => {
       while (next < batch.length) {
         const a = batch[next++]!;
-        const target = await this.freeTarget(libraryDir([], a.type, a.name), this.keepNames() ? keptBase(a.name) : nameBase(a.name), fileExt(a.name, a.type), taken);
+        const kept = this.keepNames() ? keptFile(a.name, "", a.type) : null;
+        const target = await this.freeTarget(libraryDir([], a.type, a.name), kept ? kept.base : nameBase(a.name), kept ? kept.ext : fileExt(a.name, a.type), taken);
         try {
           await this.bridge.write(target, new Uint8Array(await a.blob.arrayBuffer()), { durable: false });
           if ((await this.bridge.hash(target)) !== a.hash) throw new Error(`${target} was not written whole`);
