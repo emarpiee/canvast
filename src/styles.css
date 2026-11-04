@@ -2351,6 +2351,7 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 .side-sec-toggle { padding: var(--sp-2) var(--sp-3) var(--sp-2) var(--sp-2); gap: var(--sp-3); }
 .side-sec-toggle svg { width: var(--icon-sm); height: var(--icon-sm); }
 .side-sec .side-list { margin: 0; }
+.side-find { width: 100%; min-height: var(--list-h); padding: 0 var(--sp-4); border-radius: var(--r-md); }
 .side-sec .tag-cloud { margin: 0; padding: 0 var(--sp-1) var(--sp-2); }
 /* Rows: one height, the count as a quiet number at the end, the open one in the accent. */
 .side-item { min-height: var(--list-h); padding: 0 var(--sp-4); border-radius: var(--r-md); font: var(--font-control); }

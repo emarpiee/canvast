@@ -1,7 +1,7 @@
 import { esc } from "./format";
 import { ICONS } from "./icons";
 import { makeModal, showModal } from "./modal";
-import { treeGuides, treeSlot, walkTree } from "./tree";
+import { treeGuides, treeSearch, treeSlot, walkTree } from "./tree";
 
 /** How much of the things chosen for has this choice. */
 export type ChoiceState = "on" | "off" | "some";
@@ -94,10 +94,8 @@ export function openTreeChooser(opts: ChooserOptions): Promise<Map<string, Choic
     dlg.querySelectorAll<HTMLElement>("[data-tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset["tab"] === tab.id)));
     dlg.querySelectorAll<HTMLElement>("[data-view]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset["view"] === view)));
     const typed = (n: ChoiceNode): string => pathOf(all, n).replaceAll(" / ", "/").toLowerCase(); // (as a path is typed)
-    const hits = q ? all.filter((n) => typed(n).includes(q)) : all;
     // With a search: what matches and what leads to it, all open.
-    const keep = new Set<string>();
-    for (const n of hits) for (let at: ChoiceNode | undefined = n; at && !keep.has(at.id); at = all.find((x) => x.id === at!.parent)) keep.add(at.id);
+    const { hits, keep } = treeSearch(all, (n) => n.parent, typed, q);
     const kids = (id: string | null): ChoiceNode[] => all.filter((n) => n.parent === id && keep.has(n.id)).sort((a, b) => Number(b.id === "") - Number(a.id === "") || a.name.localeCompare(b.name));
     const shut = closed.get(tab.id)!;
     const body =

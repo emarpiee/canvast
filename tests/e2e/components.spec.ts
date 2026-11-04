@@ -139,5 +139,24 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await expect(dlg).toHaveCount(0);
   await expect(p.getByTestId("asset-tags")).toContainText("style/ink");
   await expect(p.getByTestId("asset-folder-now")).toHaveText("Art › Ink");
+  // The sidebar's searches: a match opens what leads to it, and the keyboard stays in the box as the list is drawn again.
+  const findFolder = p.getByTestId("side-find-folders");
+  await findFolder.pressSequentially("ink");
+  await expect(findFolder).toHaveValue("ink");
+  await expect(tree.getByText("Ink")).toBeVisible();
+  await expect(tree.getByText("Plain")).toHaveCount(0);
+  await findFolder.press("Escape");
+  await expect(findFolder).toHaveValue("");
+  await expect(tree.getByText("Ink")).toHaveCount(0); // (folded as it was)
+  await expect(tree.getByText("Plain")).toBeVisible();
+  await expect(p.getByTestId("asset-organize")).toBeVisible(); // (the selection stays)
+  await findFolder.fill("zzz");
+  await expect(tree).toContainText("No folders match.");
+  const findTag = p.getByTestId("side-find-tag");
+  const tags = p.getByTestId("tag-list");
+  await findTag.fill("#ink");
+  await expect(tags).toContainText("ink");
+  await findTag.fill("zzz");
+  await expect(tags).toContainText("No tags match.");
   expect(app.consoleErrors).toEqual([]);
 });

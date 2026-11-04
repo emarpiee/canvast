@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.57 — Search folders and tags in the sidebar (2026-11-04)
+
+- **Added:** a search box in the library sidebar's Folders, Tags and Canvas tags sections. It finds by name or path, opens what leads to a match, and `Esc` empties it.
+
 ## 0.53.56 — Library keys leave a note's words alone (2026-11-04)
 
 - **Fixed:** typing in the notes editor could reach the library's keys: an `o` opened Organize, an `i` showed or hid the details.

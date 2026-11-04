@@ -44,7 +44,7 @@ import type { MenuItem } from "./more-menu";
 import { bindContextMenu, grouped as groupedMenu } from "./context-menu";
 import { openTreeChooser } from "./tree-chooser";
 import type { ChoiceNode, ChoiceState, ChooserView } from "./tree-chooser";
-import { pathNodes, treeGuides, treeSlot, walkTree } from "./tree";
+import { pathNodes, treeGuides, treeSearch, treeSlot, walkTree } from "./tree";
 import { formatTags } from "../doc/tags";
 import { cleanFileName, splitName } from "../doc/rename-rules";
 import { copyBytes, copyItemsAsFiles, copyItemsToClipboard, type CopyDeps } from "../app/copy-items";
@@ -776,6 +776,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const narrow = window.matchMedia("(max-width: 900px)");
   let sideOpen = !narrow.matches;
   let naming: { kind: "new"; parent: string | null } | { kind: "rename"; id: string } | null = null;
+  /** What is typed in the sidebar's search boxes, for this sitting only. */
+  const sideFind = { folders: "", tag: "", ctag: "" };
+  type SideFind = keyof typeof sideFind;
+  let sideFindHidden = false;
   const scroller = root.querySelector<HTMLElement>(".assets-scroll")!;
   /** A thumbnail being read or made: who still wants it (a card that scrolled away does not), and whether it is for the screen or the background. */
   type ThumbJob = { p: Promise<string>; wants: Array<() => boolean>; urgent: boolean; failed?: boolean; custom: string | null };
@@ -2324,6 +2328,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let lastSideHtml = "";
   const renderSide = (): void => {
     if (!listing) return;
+    // (a hidden folder's name typed in the box does not outlast the Hidden items; a folder being named is not searched away)
+    if (sideFindHidden !== hiddenMode) {
+      sideFindHidden = hiddenMode;
+      sideFind.folders = sideFind.tag = sideFind.ctag = "";
+    }
+    if (naming) sideFind.folders = "";
     const counts = countSide(listing);
     const tagCounts = counts.tags;
     const typeCounts = counts.types;
@@ -2342,10 +2352,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const nameInput = (value: string, label: string): string =>
       `<li class="side-row"><input class="side-name" data-testid="folder-name-input" value="${esc(value)}" aria-label="${label}" maxlength="120"></li>`;
     const subtreeCount = (id: string): number => counts.folders.get(id) ?? 0;
-    const folderKids = (id: string): AssetFolder[] => listing!.folders.filter((f) => f.parentId === id);
+    const findBox = (id: SideFind, noun: string): string => `<input type="search" class="side-find" data-side-find="${id}" data-testid="side-find-${id}" value="${esc(sideFind[id])}" placeholder="Search ${noun}" aria-label="Search ${noun}" maxlength="120">`;
+    const findingFolders = sideFind.folders.trim() !== "";
+    const foldersKept = findingFolders ? treeSearch(listing.folders, (f) => f.parentId, (f) => folderPath(listing!.folders, f.id).join("/"), sideFind.folders).keep : null;
+    const folderKids = (id: string): AssetFolder[] => listing!.folders.filter((f) => f.parentId === id && (!foldersKept || foldersKept.has(f.id)));
     /** A folder's row, then its subfolders' rows, in the app's one tree. */
     const treeOf = (root: AssetFolder): string =>
-      walkTree([root], (f) => folderKids(f.id), (f) => !ui.folded.includes(f.id), (f, at) =>
+      walkTree([root], (f) => folderKids(f.id), (f) => findingFolders || !ui.folded.includes(f.id), (f, at) =>
         (naming?.kind === "rename" && naming.id === f.id
           ? nameInput(f.name, `New name for folder ${f.name}`)
           : item(`folder:${f.id}`, esc(f.name), subtreeCount(f.id), {
@@ -2372,9 +2385,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         ${closed ? "" : body}</section>`;
     };
     /** A long list shows its first rows and a full-width button for the rest (remembered on this device); the row in use always shows. */
-    const capped = (id: keyof typeof SIDE_SHOWN, rows: Array<{ html: string; active: boolean }>): string => {
+    const capped = (id: keyof typeof SIDE_SHOWN, rows: Array<{ html: string; active: boolean }>, finding = false): string => {
       const limit = SIDE_SHOWN[id];
-      if (rows.length <= limit + 2) return rows.map((r) => r.html).join(""); // (no button for one or two more)
+      if (finding || rows.length <= limit + 2) return rows.map((r) => r.html).join(""); // (no button for one or two more)
       const open = ui.expanded.includes(id);
       const shown = open ? rows : rows.filter((r, i) => i < limit || r.active);
       return `${shown.map((r) => r.html).join("")}<li class="side-row side-show-row"><button type="button" class="side-show-all" data-show-all="${id}" data-testid="side-show-all" aria-expanded="${open}">${open ? "Show fewer" : `Show ${rows.length - shown.length} more`}</button></li>`;
@@ -2387,10 +2400,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const word = `${open ? "Collapse" : "Expand"} all ${what}`;
       return `<button type="button" class="side-add" ${attr} aria-label="${word}" title="${word}">${open ? ICONS.chevronsDownUp : ICONS.chevronsUpDown}</button>`;
     };
-    const foldAll = foldAllBtn("data-folders-fold", "folders", listing.folders.filter((f) => folderKids(f.id).length).map((f) => f.id));
+    const foldAll = findingFolders ? "" : foldAllBtn("data-folders-fold", "folders", listing.folders.filter((f) => folderKids(f.id).length).map((f) => f.id));
     // The tags and the canvas tags: a tree on `/`, or all in a row with their whole names.
     sideTagLabels.clear();
-    const tagList = (o: { scope: "tag" | "ctag"; labels: readonly string[]; shown: keyof typeof SIDE_SHOWN; word: string; cls: string; n: (id: string) => number; active: (id: string) => boolean; title?: (id: string) => string | undefined; menu: (id: string, own: boolean, nested: boolean, label: string) => string }): { rows: string; head: string } => {
+    const tagList = (o: { scope: "tag" | "ctag"; labels: readonly string[]; shown: keyof typeof SIDE_SHOWN; word: string; cls: string; n: (id: string) => number; active: (id: string) => boolean; title?: (id: string) => string | undefined; menu: (id: string, own: boolean, nested: boolean, label: string) => string }): { rows: string; head: string; find: string; empty: string | null } => {
       const nodes = pathNodes([...o.labels].sort((a, b) => a.localeCompare(b)).map((l) => ({ id: l, name: l, value: l })));
       const kids = new Map<string | null, typeof nodes>();
       for (const t of nodes) kids.set(t.parent, [...(kids.get(t.parent) ?? []), t]);
@@ -2398,20 +2411,24 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       for (const t of nodes) sideTagLabels.set(`${o.scope}:${t.id}`, t.value ?? (t.parent ? `${full(t.parent)}/${t.name}` : t.name));
       const parents = nodes.filter((t) => kids.has(t.id)).map((t) => `${o.scope}:${t.id}`);
       sideTagParents.set(o.scope, parents);
+      const words = sideFind[o.scope].trim().replace(/^#/, ""); // (the rows show a tag as #name)
+      const finding = words !== "";
+      const found = treeSearch(nodes, (t) => t.parent, (t) => t.id, words);
+      const hit = new Set(found.hits.map((t) => t.id));
       const row = (t: (typeof nodes)[number], label: string, opts: { depth?: number; cls: string; before?: string }): string => {
         const title = o.title?.(t.id);
         return item(`${o.scope}:${t.id}`, `#${esc(label)}`, o.n(t.id), { ...opts, ...(title || opts.before !== undefined ? { title: title ?? `#${esc(full(t.id))}` } : {}), extra: o.menu(t.id, t.value !== null, kids.has(t.id), full(t.id)) });
       };
       const tree = (root: (typeof nodes)[number]): string =>
-        walkTree([root], (t) => kids.get(t.id) ?? [], (t) => !ui.folded.includes(`${o.scope}:${t.id}`), (t, at) =>
+        walkTree([root], (t) => (kids.get(t.id) ?? []).filter((k) => found.keep.has(k.id)), (t) => finding || !ui.folded.includes(`${o.scope}:${t.id}`), (t, at) =>
           row(t, t.name, { depth: at.depth, cls: "tree-row", before: treeGuides(at.depth, at.last, at.conts) + treeSlot(at, `data-tag-twist="${o.scope}:${esc(t.id)}"`) }),
         );
       const rows = ui.tagsInline
-        ? capped(o.shown, nodes.filter((t) => t.value !== null).map((t) => ({ active: o.active(t.id), html: row(t, t.value!, { cls: o.cls }) })))
-        : capped(o.shown, (kids.get(null) ?? []).map((t) => ({ active: nodes.some((x) => (x.id === t.id || x.id.startsWith(`${t.id}/`)) && o.active(x.id)), html: tree(t) })));
+        ? capped(o.shown, nodes.filter((t) => t.value !== null && hit.has(t.id)).map((t) => ({ active: o.active(t.id), html: row(t, t.value!, { cls: o.cls }) })), finding)
+        : capped(o.shown, (kids.get(null) ?? []).filter((t) => found.keep.has(t.id)).map((t) => ({ active: nodes.some((x) => (x.id === t.id || x.id.startsWith(`${t.id}/`)) && o.active(x.id)), html: tree(t) })), finding);
       const view = ui.tagsInline ? "Show as a tree" : "Show in a row";
-      const head = (nodes.length ? `<button type="button" class="side-add" data-tags-view aria-label="${view}" title="${view}">${ui.tagsInline ? ICONS.listTree : ICONS.wrapText}</button>` : "") + (ui.tagsInline ? "" : foldAllBtn(`data-tags-fold="${o.scope}"`, o.word, parents));
-      return { rows, head };
+      const head = (nodes.length ? `<button type="button" class="side-add" data-tags-view aria-label="${view}" title="${view}">${ui.tagsInline ? ICONS.listTree : ICONS.wrapText}</button>` : "") + (ui.tagsInline || finding ? "" : foldAllBtn(`data-tags-fold="${o.scope}"`, o.word, parents));
+      return { rows, head, find: nodes.length ? findBox(o.scope, o.word) : "", empty: finding ? `No ${o.word} match.` : null };
     };
     const tagSection = tagList({
       scope: "tag",
@@ -2466,9 +2483,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           "folders",
           "Folders",
           foldAll + addBtn('data-folder-action="new" data-id="" data-testid="folder-new"', "New folder"),
-          `<ul class="side-list" data-testid="folder-tree">
+          `${listing.folders.length ? findBox("folders", "folders") : ""}<ul class="side-list" data-testid="folder-tree">
             ${naming?.kind === "new" && naming.parent === null ? nameInput("", "Name of the new folder") : ""}
-            ${capped("folders", listing.folders.filter((f) => f.parentId === null).map((f) => ({ html: treeOf(f), active: [scope.startsWith("folder:") ? scope.slice(7) : "", naming?.kind === "rename" ? naming.id : "", naming?.kind === "new" ? (naming.parent ?? "") : ""].some((id) => id && folderSubtree(listing!.folders, f.id).has(id)) }))) || (naming ? "" : `<li class="side-empty">No folders yet.</li>`)}
+            ${capped("folders", listing.folders.filter((f) => f.parentId === null && (!foldersKept || foldersKept.has(f.id))).map((f) => ({ html: treeOf(f), active: [scope.startsWith("folder:") ? scope.slice(7) : "", naming?.kind === "rename" ? naming.id : "", naming?.kind === "new" ? (naming.parent ?? "") : ""].some((id) => id && folderSubtree(listing!.folders, f.id).has(id)) })), findingFolders) || (naming ? "" : `<li class="side-empty">${findingFolders ? "No folders match." : "No folders yet."}</li>`)}
           </ul>`,
         )}
         ${section(
@@ -2487,16 +2504,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           "tags",
           "Tags",
           tagSection.head,
-          `<ul class="${ui.tagsInline ? "tag-cloud" : "side-list"}" data-testid="tag-list">
-            ${tagSection.rows || `<li class="side-empty">No tags yet. Add them in the details.</li>`}
+          `${tagSection.find}<ul class="${ui.tagsInline ? "tag-cloud" : "side-list"}" data-testid="tag-list">
+            ${tagSection.rows || `<li class="side-empty">${tagSection.empty ?? "No tags yet. Add them in the details."}</li>`}
           </ul>`,
         )}
         ${section(
           "ctags",
           "Canvas tags",
           canvasTagSection.head,
-          `<ul class="${ui.tagsInline ? "tag-cloud" : "side-list"}" data-testid="canvas-tag-list">
-            ${canvasTagSection.rows || `<li class="side-empty">No tags on canvases yet. Tag items on a canvas (Layers panel).</li>`}
+          `${canvasTagSection.find}<ul class="${ui.tagsInline ? "tag-cloud" : "side-list"}" data-testid="canvas-tag-list">
+            ${canvasTagSection.rows || `<li class="side-empty">${canvasTagSection.empty ?? "No tags on canvases yet. Tag items on a canvas (Layers panel)."}</li>`}
           </ul>`,
         )}
         ${savedRows.length ? section("saved", "Saved searches", "", `<ul class="side-list" data-testid="side-saved">${capped("saved", savedRows)}</ul>`) : ""}
@@ -2504,6 +2521,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // Drawn again only when something in it changed (a redraw for a pick or a look read leaves it, its scroll and its input alone).
     if (html + ui.sections.join() === lastSideHtml && side.firstElementChild) return;
     lastSideHtml = html + ui.sections.join();
+    // (the box being typed in is drawn again: the keyboard stays in it, at the same place)
+    const typing = document.activeElement instanceof HTMLInputElement && side.contains(document.activeElement) && document.activeElement.dataset["sideFind"] ? { id: document.activeElement.dataset["sideFind"], at: document.activeElement.selectionStart } : null;
     side.innerHTML = html;
     // The sections in the order chosen (dragged by their heads), kept with the library's layout.
     const secs = new Map([...side.querySelectorAll<HTMLElement>("[data-sec]")].map((s) => [s.dataset["sec"]!, s]));
@@ -2512,6 +2531,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     for (const id of ui.sections) {
       const s = secs.get(id);
       if (s && last?.parentNode) last.parentNode.insertBefore(s, after);
+    }
+    const box = typing && side.querySelector<HTMLInputElement>(`[data-side-find="${typing.id}"]`);
+    if (box) {
+      box.focus();
+      box.setSelectionRange(typing!.at, typing!.at);
     }
     const input = side.querySelector<HTMLInputElement>(".side-name");
     if (input) {
@@ -4086,8 +4110,26 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     sideOpen = !narrow.matches;
     renderSide();
   });
+  const findTyped = (e: Event): void => {
+    const box = e.target as HTMLInputElement;
+    const id = box.dataset["sideFind"] as SideFind | undefined;
+    if (!id || (e as InputEvent).isComposing) return; // (a word still being composed is drawn when it is done)
+    sideFind[id] = box.value;
+    renderSide();
+  };
+  side.addEventListener("input", findTyped);
+  side.addEventListener("compositionend", findTyped);
   side.addEventListener("keydown", (e) => {
     const input = e.target as HTMLInputElement;
+    if (input.dataset["sideFind"] && input.value && e.key === "Escape") {
+      // (Escape empties the box first; the selection stays)
+      input.value = "";
+      sideFind[input.dataset["sideFind"] as SideFind] = "";
+      renderSide();
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (!input.classList.contains("side-name") || !naming) return;
     if (e.key === "Escape") {
       naming = null;

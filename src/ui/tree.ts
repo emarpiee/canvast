@@ -45,6 +45,25 @@ export function walkTree<T>(roots: readonly T[], kids: (t: T) => readonly T[], i
   return walk(roots, 0, []);
 }
 
+/**
+ * A search in a tree: what matches, by its whole path as a path is typed (`art/ink`, so a parent's name finds what is under it too), and `keep`: those and
+ * what leads to them.
+ */
+export function treeSearch<T extends { id: string }>(all: readonly T[], parentOf: (t: T) => string | null, typed: (t: T) => string, words: string): { hits: T[]; keep: Set<string> } {
+  const q = words.trim().toLowerCase();
+  const hits = q ? all.filter((t) => typed(t).toLowerCase().includes(q)) : [...all];
+  const byId = new Map(all.map((t) => [t.id, t]));
+  const keep = new Set<string>();
+  for (const hit of hits) {
+    for (let at: T | undefined = hit; at && !keep.has(at.id); ) {
+      keep.add(at.id);
+      const up: string | null = parentOf(at);
+      at = up === null ? undefined : byId.get(up);
+    }
+  }
+  return { hits, keep };
+}
+
 /** A flat list of names that are paths (`art/ink`): a node for each, and one for each parent no name stands for. */
 export function pathNodes<V>(names: ReadonlyArray<{ id: string; name: string; value: V }>, sep = "/"): Array<{ id: string; name: string; parent: string | null; value: V | null }> {
   const out = new Map<string, { id: string; name: string; parent: string | null; value: V | null }>();
