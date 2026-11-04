@@ -104,7 +104,7 @@ export const kindOf = (s: Subject): "picture" | "video" | "audio" | "gif" | "fon
   if (t.startsWith("audio/")) return "audio";
   return "file";
 };
-const KINDS: Record<string, ReturnType<typeof kindOf>> = { picture: "picture", pictures: "picture", image: "picture", images: "picture", video: "video", videos: "video", audio: "audio", sound: "audio", gif: "gif", gifs: "gif", font: "font", fonts: "font", file: "file", files: "file", card: "file" };
+const KINDS: Record<string, ReturnType<typeof kindOf>> = { picture: "picture", pictures: "picture", image: "picture", images: "picture", video: "video", videos: "video", audio: "audio", sound: "audio", gif: "gif", gifs: "gif", font: "font", fonts: "font", typeface: "font", typefaces: "font", file: "file", files: "file", card: "file" };
 /** Kinds by what the file is: the kind folders of a workspace folder (notes, vectors, documents...). */
 const FILE_KINDS: Record<string, string> = { note: "notes", notes: "notes", vector: "vectors", vectors: "vectors", document: "documents", documents: "documents", archive: "archives", archives: "archives", "3d": "3d", model: "3d", models: "3d", preset: "presets", presets: "presets", icon: "icons", icons: "icons", art: "art_sources" };
 
