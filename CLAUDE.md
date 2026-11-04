@@ -77,7 +77,7 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 
 - **Every menu row has an icon, a name and a very short description** (`MenuItem.icon`, `label`, `hint`), in every context menu and action menu.
 
-- **Spacing follows Density.** Gaps, paddings and margins use only `--s-1`, `2`, `4`, `6`, `8`, `10`, `12`, `13`, `14`, `15`, which have a value for each of Dense, Compact and Comfortable. Control sizes use `--ctl`, `--bar-h`, `--field-h`, `--list-h`, `--menu-h`, and offsets from an edge use `--edge` and `--near`, which do too. `--sp-*` are fixed lengths, for what must not change. `check:tokens` refuses `--sp-*` in spacing.
+- **Spacing follows Density.** Gaps, paddings and margins use only `--s-1`, `2`, `4`, `6`, `8`, `10`, `12`, `13`, `14`, `15`, which have a value for each of Dense, Compact and Comfortable. Control and row sizes use `--ctl`, `--bar-h`, `--field-h`, `--list-h`, `--menu-h`, `--tree-row-h`, `--row-btn`, `--chip-btn`, `--tree-indent`, `--icon-*`, and offsets from an edge use `--edge` and `--near`, which do too. `--sp-*` are fixed lengths, for what must not change. `check:tokens` refuses `--sp-*` in spacing.
 
 - **No hardcoded CSS values.** Every colour, text size, padding, margin, gap, radius and icon size uses a token from `:root` in `src/styles.css`; add a token rather than a literal. `npm run check:tokens` enforces it. Row actions use the shared `src/ui/more-menu.ts` pattern (ADR 0068).
 

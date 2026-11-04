@@ -7,7 +7,7 @@
 - **Changed:** the library's list has the same thumbnail slider as the grid, in the same place, with its own size: its rows and thumbnails grow with it. The slider is longer, and the list's columns button moved to the left of the grid and list buttons so that nothing shifts.
 - **Added:** long lists in the details panel show their first rows and **Show more** / **Show fewer**: tags, properties and notes linking to an item. Every such button in the app is now one component.
 - **Changed:** the view buttons have a look of their own: Library and Canvas are joined as one set, Settings matches them, and the one in use is filled.
-- **Changed:** spacing across the app is on one grid, and Dense, Compact and Comfortable now set every gap, padding and margin, not only the bars' sizes.
+- **Changed:** spacing across the app is on one grid, and Dense, Compact and Comfortable now set every gap, padding, margin, field, list row, small button, tree indent and icon, not only the bars' sizes.
 - **Fixed:** a drag of a library item could leave the app stuck (it scrolled, but took no click or key): the card dragged now stays in the page while the grid scrolls, and the drop places go away whichever way a drag ends. A drag out of the app is always a copy, so a file manager cannot move a file out of the library.
 - **Fixed:** dragging an item to place it on the canvas: the strip covers the whole top row, and a drop anywhere on the row counts. It sat half over the row, under its buttons.
 - **Fixed:** the Library button is one button, as tall as the ∞ beside it, with no white bar around it.

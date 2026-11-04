@@ -219,12 +219,12 @@ test("appearance: motion, density and corners apply at once, persist, and the to
   await expect(root).toHaveAttribute("data-density", "dense");
   expect(await dockHeight(), "dense: a smaller dock").toBeLessThan(compact);
   // Density sets the spacing too, not only the controls: the sets of the three are different.
-  const spacing = () => p.evaluate(() => { const cs = getComputedStyle(document.documentElement); return ["--s-4", "--s-6", "--tree-row-h", "--near", "--edge"].map((k) => parseFloat(cs.getPropertyValue(k))); });
+  const spacing = () => p.evaluate(() => { const cs = getComputedStyle(document.documentElement); return ["--s-4", "--s-6", "--tree-row-h", "--near", "--edge", "--row-btn", "--icon-md", "--tree-indent"].map((k) => parseFloat(cs.getPropertyValue(k))); });
   const denseSpacing = await spacing();
-  expect(denseSpacing).toEqual([4, 8, 22, 4, 4]);
+  expect(denseSpacing).toEqual([4, 8, 22, 4, 4, 22, 14, 16]);
   await panel.getByLabel("Density", { exact: true }).selectOption("comfortable");
   await expect(root).toHaveAttribute("data-density", "comfortable");
-  expect(await spacing()).toEqual([12, 16, 30, 12, 12]);
+  expect(await spacing()).toEqual([12, 16, 30, 12, 12, 30, 18, 24]);
   expect(await dockHeight(), "comfortable: a larger dock").toBeGreaterThan(compact);
   await expect(root).toHaveAttribute("data-motion", "reduce");
   await p.reload();
