@@ -1085,7 +1085,7 @@ async function start(): Promise<void> {
       document.body.appendChild(anchor);
       let add = false;
       const items = (): MenuItem[] => [
-        { id: "reveal-add", label: "Add to the selection", hint: "Tap to add or take out; tap outside when done", icon: ICONS.listChecks, checked: add, run: () => { add = !add; } },
+        { id: "reveal-add", label: "Add to the selection", hint: "Tap to add or remove; tap outside to end", icon: ICONS.listChecks, checked: add, run: () => { add = !add; } },
         ...things.map((o): MenuItem => {
           const l = labelOf(o, assetNames.map);
           // ticked while picked; in "Add to the pick" a tap on a picked one takes it out again

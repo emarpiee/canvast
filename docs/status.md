@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.50: menu descriptions kept very short (2026-11-04)
+
+- **Implemented:** long descriptions shortened; `check:components` fails over 44 characters.
+- **Tested:** the bookmark and component specs, on GitHub.
+- **Committed:** v0.53.50.
+
 ## v0.53.49: folders as a tree, Organize, one shared component per thing (2026-11-04)
 
 - **Implemented:** `ui/tree.ts`, `ui/tree-chooser.ts`, `ui/modal.ts`, `check:components`, ADR 0181; required `MenuItem.icon` and `hint`.

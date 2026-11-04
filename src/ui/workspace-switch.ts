@@ -28,10 +28,10 @@ export async function openWorkspaceSwitcher(anchor: HTMLElement): Promise<void> 
       .filter((w) => w.exists)
       .slice(0, RECENT_SHOWN)
       .map((w): MenuItem => ({ label: w.name, icon: ICONS.folderClock, hint: w.path, aria: `Switch to the workspace ${w.name}`, id: "recent", run: () => go(w.path) })),
-    { label: "Open a folder…", icon: ICONS.folderOpen, hint: "A workspace folder, or any folder to start one in", sep: true, id: "open", run: () => go("open") },
+    { label: "Open a folder…", icon: ICONS.folderOpen, hint: "A workspace, or a folder to start one in", sep: true, id: "open", run: () => go("open") },
     { label: "New workspace…", icon: ICONS.folderRoot, hint: "A new, empty folder you name", id: "new", run: () => go("new") },
     ...(others.length
-      ? [{ label: "Clear the recent list", icon: ICONS.listX, hint: "Only the open workspace stays on it; no folder is touched", sep: true, id: "clear", run: () => void Promise.all(others.map((w) => bridge.forgetWorkspace(w.path))) }]
+      ? [{ label: "Clear the recent list", icon: ICONS.listX, hint: "Keeps the open one; no folder is touched", sep: true, id: "clear", run: () => void Promise.all(others.map((w) => bridge.forgetWorkspace(w.path))) }]
       : []),
   ];
   openMoreMenu(anchor, items, "Switch workspace");

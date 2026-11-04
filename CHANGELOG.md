@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.50 — Menu descriptions kept very short (2026-11-04)
+
+- **Changed:** every menu description is at most 44 characters, and `check:components` holds it there.
+
 ## 0.53.49 — Folders as a tree, Organize, and one shared component per thing (2026-11-04)
 
 - **Added:** folders fold: an arrow on a folder with subfolders, Collapse or Expand all on the Folders header, and it is remembered on this device.

@@ -4884,8 +4884,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   importMenu.addEventListener("click", () =>
     openMoreMenu(importMenu, [
       { label: "Import files", icon: ICONS.arrowDownToLine, hint: "Pictures, video, audio and other files", run: () => fileInput.click() },
-      { label: "A folder", icon: ICONS.folderInput, hint: "Every file in it, put in library folders of the same names", run: () => folderInput.click() },
-      { label: "New note", icon: ICONS.notebookPen, hint: "A markdown note in the open folder (else the Notes folder), opened to write in", run: () => void newNote() },
+      { label: "A folder", icon: ICONS.folderInput, hint: "With its subfolders", run: () => folderInput.click() },
+      { label: "New note", icon: ICONS.notebookPen, hint: "A markdown note, opened to write in", run: () => void newNote() },
     ], "Import"),
   );
   /** A new markdown note (its first line says when it was made, so no two are the same file), in the folder open in the sidebar. */

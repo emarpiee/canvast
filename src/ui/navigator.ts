@@ -86,7 +86,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
             board.id,
             board.name,
             `<span class="nav-board-icon" title="A board is a group of canvases">${ICONS.squareStack}</span><span class="nav-board-name">${esc(board.name)}</span><span class="nav-board-n">${canvases.length} ${canvases.length === 1 ? "canvas" : "canvases"}</span>
-             ${actions("board", board.id, board.name, tree.boards.length > 1, "A workspace needs at least one board", tree.boards[0]!.board.id === board.id, tree.boards[tree.boards.length - 1]!.board.id === board.id, board.id)}`,
+             ${actions("board", board.id, board.name, tree.boards.length > 1, "A workspace keeps one board", tree.boards[0]!.board.id === board.id, tree.boards[tree.boards.length - 1]!.board.id === board.id, board.id)}`,
           );
           const items = canvases
             .map((c) => {
@@ -96,7 +96,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
                 c.id,
                 c.name,
                 `<button type="button" role="menuitemradio" aria-checked="${active}" class="nav-canvas${active ? " is-active" : ""}" data-action="open" data-id="${c.id}"><span class="nav-name">${esc(c.name)}</span><span class="nav-count">${c.objectCount === 0 ? "empty" : `${c.objectCount} object${c.objectCount === 1 ? "" : "s"}`}</span></button>
-                 ${actions("canvas", c.id, c.name, canvases.length > 1, "A board needs at least one canvas; delete the board instead", canvases[0]!.id === c.id, canvases[canvases.length - 1]!.id === c.id, board.id)}`,
+                 ${actions("canvas", c.id, c.name, canvases.length > 1, "A board keeps one canvas", canvases[0]!.id === c.id, canvases[canvases.length - 1]!.id === c.id, board.id)}`,
               )}</li>`;
             })
             .join("");

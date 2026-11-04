@@ -36,6 +36,9 @@ for (const r of RULES) {
   for (const f of Object.keys(r.known ?? {})) if (!inUse.has(f)) failed.push(`${r.name}: ${f} no longer makes its own: take it off the known list.`);
   console.log(`${r.name}: ${r.owners.join(", ")}${r.known ? `; still their own: ${Object.keys(r.known).join(", ")}` : ""}`);
 }
+// A menu row's description is very short, wherever it is written.
+const HINT_MAX = 44;
+for (const f of all) for (const m of readFileSync(f, "utf8").matchAll(/\bhint: "([^"]*)"/g)) if (m[1].length > HINT_MAX) failed.push(`Menu rows: ${f}: "${m[1]}" is over ${HINT_MAX} characters.`);
 const css = readFileSync("src/styles.css", "utf8");
 for (const c of RETIRED_CSS) if (css.includes(c)) failed.push(`src/styles.css still styles ${c}, which the shared component replaced.`);
 if (failed.length) {

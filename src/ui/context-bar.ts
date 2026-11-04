@@ -220,8 +220,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "sheetmenu": {
         // Put on a sheet, release it, fit it to what is on it: one menu that stays open; only what applies to the pick is listed
         const items = (): MenuItem[] => [
-          { id: "puton", label: "Put on a sheet", hint: "The selected objects go on a new sheet (Ctrl+Alt+G)", icon: ICONS.sheetSelection, run: () => actions.putOnSheet() },
-          ...(actions.canReleaseSheet() ? [{ id: "unsheet", label: "Release the sheet", hint: "Keep what is on it, take the sheet away (a clipping mask goes back to being its shape)", icon: ICONS.releaseSheet, run: () => actions.releaseSheet() }] : []),
+          { id: "puton", label: "Put on a sheet", hint: "On a new sheet (Ctrl+Alt+G)", icon: ICONS.sheetSelection, run: () => actions.putOnSheet() },
+          ...(actions.canReleaseSheet() ? [{ id: "unsheet", label: "Release the sheet", hint: "Keeps what is on it", icon: ICONS.releaseSheet, run: () => actions.releaseSheet() }] : []),
           ...(actions.canFitSheet() ? [{ id: "fitsheet", label: "Fit the sheet to its contents", hint: "The sheet shrinks or grows to what is on it", icon: ICONS.shrink, run: () => actions.fitSheet() }] : []),
         ];
         openMoreMenu(b, items(), "Sheets", { keepOpen: true, refresh: items });
@@ -230,9 +230,9 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "exportmenu": {
         // What takes the picked things out of the canvas, in one menu that stays open: only what applies to the pick is listed
         const items = (): MenuItem[] => [
-          ...(actions.canExport() ? [{ id: "exportpic", label: "Export…", hint: "Choose a size and save it as a picture (PNG, WebP, JPEG, SVG or PDF)", icon: ICONS.imageUp, run: () => { closeMoreMenu(); actions.exportPicture(); } }] : []),
-          ...(actions.canDownload() ? [{ id: "download", label: "Download the file", hint: "The file (several files: one ZIP; an edited picture comes with its file)", icon: ICONS.download, run: () => actions.downloadFile() }] : []),
-          ...(actions.canExportSvg() ? [{ id: "svglibrary", label: "Save to library", hint: "The shapes as an SVG picture in the library, to place again", icon: ICONS.save, run: () => actions.saveSvgToLibrary() }] : []),
+          ...(actions.canExport() ? [{ id: "exportpic", label: "Export…", hint: "PNG, WebP, JPEG, SVG or PDF, at a size", icon: ICONS.imageUp, run: () => { closeMoreMenu(); actions.exportPicture(); } }] : []),
+          ...(actions.canDownload() ? [{ id: "download", label: "Download the file", hint: "Its file; several go in a ZIP", icon: ICONS.download, run: () => actions.downloadFile() }] : []),
+          ...(actions.canExportSvg() ? [{ id: "svglibrary", label: "Save to library", hint: "An SVG in the library, to place again", icon: ICONS.save, run: () => actions.saveSvgToLibrary() }] : []),
           ...([...editor.selection].some((id) => doc.get(id)?.kind === "text") ? [{ id: "copymd", label: "Copy Markdown", hint: "The Markdown of the selected text", icon: ICONS.markdown, run: () => actions.copyMarkdown() }] : []),
         ];
         openMoreMenu(b, items(), "Export", { keepOpen: true, refresh: items });
@@ -244,8 +244,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           const st = actions.initialState();
           if (!st) return [];
           return [
-            ...(st.saved < st.count ? [{ id: "stateset", label: "Set initial state", hint: "Save the shape as it is now, to come back to it later", icon: ICONS.stateSet, run: () => actions.setInitialState(true) }] : []),
-            ...(st.saved > 0 ? [{ id: "stateupdate", label: "Update initial state", hint: "Replace the saved state with the shape as it is now", icon: ICONS.refresh, run: () => actions.setInitialState(false) }, { id: "statereset", label: "Reset to initial state", hint: "Put the shape back as it was saved (its middle stays where it is)", icon: ICONS.stateReset, run: () => actions.resetInitialState() }] : []),
+            ...(st.saved < st.count ? [{ id: "stateset", label: "Set initial state", hint: "To come back to it later", icon: ICONS.stateSet, run: () => actions.setInitialState(true) }] : []),
+            ...(st.saved > 0 ? [{ id: "stateupdate", label: "Update initial state", hint: "Save the shape as it is now", icon: ICONS.refresh, run: () => actions.setInitialState(false) }, { id: "statereset", label: "Reset to initial state", hint: "Back to how it was saved", icon: ICONS.stateReset, run: () => actions.resetInitialState() }] : []),
           ];
         };
         openMoreMenu(b, items(), "Initial state", { keepOpen: true, refresh: items });
