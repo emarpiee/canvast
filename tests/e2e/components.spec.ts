@@ -212,5 +212,10 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await pinFolder("Unpin", "Ink");
   await pinFolder("Unpin", "Art");
   await expect(folderOrder).toHaveText(["Bee", "Plain", "Art", "Ink"]);
+  // A small screen has no row pin: pinning is in the row's menu.
+  const shown = p.viewportSize()!;
+  await p.setViewportSize({ width: 600, height: shown.height });
+  await expect.poll(() => tree.locator(".side-pin").first().evaluate((e) => getComputedStyle(e).display)).toBe("none");
+  await p.setViewportSize(shown);
   expect(app.consoleErrors).toEqual([]);
 });

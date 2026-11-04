@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.61 — No row pin on small screens (2026-11-04)
+
+- **Changed:** on small and touch screens a folder's row has no pin button; pinning is in its ⋯ menu.
+
 ## 0.53.60 — A pin button on each folder (2026-11-04)
 
 - **Added:** a pin button on a folder's row in the library sidebar, shown on hover beside ⋯: outlined to pin, filled on a pinned folder.

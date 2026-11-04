@@ -3018,6 +3018,7 @@ dialog.reset-dialog h3 { margin: var(--sp-6) 0 var(--sp-3); font-size: var(--tex
   .side-row.tree-row:has(.side-pin):hover .side-item, .side-row.tree-row:has(.side-pin):focus-within .side-item { padding-right: calc(var(--sp-2) + var(--tree-row-h)); }
 }
 .side-pin[aria-pressed="true"] svg { fill: currentColor; }
+@media (hover: none), (max-width: 640px) { .side-row .side-more.side-pin { display: none; } } /* (no hover to show it: pinning is in the row's More) */
 .asset-where { margin: 0 0 var(--sp-3); font-size: var(--text-sm); overflow-wrap: anywhere; }
 
 /* The tree chooser (ui/tree-chooser.ts). */
