@@ -9,14 +9,14 @@ const ON_ITEMS: ReadonlyArray<readonly string[]> = [
   ["Group", "Ungroup", "Put the selection on a sheet", "Detach from what it follows"],
   ["Bring to front", "Send to back"],
   ["Export… (choose a size)", "Copy the selection as SVG", "Save the selection to the library as SVG"],
-  ["Delete the selection"],
+  ["Delete the selection", "Delete everywhere"],
 ];
 const ON_EMPTY: ReadonlyArray<readonly string[]> = [["Paste", "Select everything"], ["Show all hidden", "Unlock all"], ["Fit everything in view", "Return to the origin"]];
 /** The icon of each row: the same icon as the button that does the same thing elsewhere (one icon for one function). */
 const ICON: Record<string, string> = {
   Rename: ICONS.textCursorInput, Copy: ICONS.clipboardCopy, "Copy file": ICONS.files, Cut: ICONS.scissors, Paste: ICONS.paste, Duplicate: ICONS.copy, Group: ICONS.group, Ungroup: ICONS.ungroup,
   "Bring to front": ICONS.bringToFront, "Send to back": ICONS.sendToBack, "Put the selection on a sheet": ICONS.sheetSelection, "Detach from what it follows": ICONS.unlink,
-  "Save the selection to the library as SVG": ICONS.save, "Delete the selection": ICONS.trash, "Select everything": ICONS.selectAll, "Show all hidden": ICONS.eye, "Unlock all": ICONS.lockKeyholeOpen,
+  "Save the selection to the library as SVG": ICONS.save, "Delete the selection": ICONS.trash, "Delete everywhere": ICONS.trash, "Select everything": ICONS.selectAll, "Show all hidden": ICONS.eye, "Unlock all": ICONS.lockKeyholeOpen,
   "Fit everything in view": ICONS.frame, "Return to the origin": ICONS.house, "Export… (choose a size)": ICONS.exportMenu, "Copy the selection as SVG": ICONS.fileCode,
 };
 const LONG_PRESS_MS = 500;

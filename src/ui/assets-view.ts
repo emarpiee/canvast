@@ -64,6 +64,9 @@ import { mountPlayerControls } from "./player-controls";
 import type { ImageObject } from "../doc/model";
 import { chooseDialog, promptDialog } from "./confirm";
 import { askTagName } from "./tag-name-dialog";
+import { askFolderClash } from "./folder-clash";
+import { deleteEverywhere } from "./delete-everywhere";
+import { freeFolderName, mergeFolderInto } from "../app/folder-merge";
 import type { SettingsStore } from "../settings/settings";
 
 /**
@@ -3164,20 +3167,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "new-folder-into": {
         const group = pickedGroup();
         void promptDialog({ title: group.length > 1 ? `New folder for ${group.length} items` : "New folder", lines: ["They are moved into it."], value: "", confirmLabel: "Make and move" }).then((name) => {
-          if (name && !hiddenMode) {
-            const same = folderClash(listing?.folders ?? [], null, name);
-            if (same) {
-              session.editor.message = `A folder named “${same.name}” is already there, and on a disk these would be one folder. Choose another name.`;
-              session.editor.changed();
-              return;
-            }
-          }
           if (!name?.trim()) return;
-          const id = newObjectId();
-          void session.organize(async (c) => {
-            await c.createFolder(name.trim(), null, id);
-            if (hiddenMode) await c.hideFolder(id); // (a folder made in hidden mode is hidden)
-            await c.updateMetaEach(group.map((h) => ({ hash: h, change: { addFolders: [id] } })));
+          const fileIn = (named: string): void => {
+            const id = newObjectId();
+            void session.organize(async (c) => {
+              await c.createFolder(named, null, id);
+              if (hiddenMode) await c.hideFolder(id); // (a folder made in hidden mode is hidden)
+              await c.updateMetaEach(group.map((h) => ({ hash: h, change: { addFolders: [id] } })));
+            });
+          };
+          const folders = listing?.folders ?? [];
+          const same = hiddenMode ? undefined : folderClash(folders, null, name);
+          if (!same) return fileIn(name.trim());
+          void askFolderClash(same.name, name, "Move").then((way) => {
+            if (way === "merge") void session.organize((c) => c.updateMetaEach(group.map((h) => ({ hash: h, change: { addFolders: [same.id] } }))), "Moved to a folder");
+            else if (way === "separate") fileIn(freeFolderName(folders, null, name));
           });
         });
         break;
@@ -3238,20 +3242,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         // in use: their instances go too, everywhere, after a confirmation that says what and where
         const hashes = pickedGroup();
         const ents = hashes.map(entryOf).filter((x): x is CatalogListing["entries"][number] => !!x);
-        const uses = ents.reduce((t, x) => t + x.instances, 0);
         const canvases = new Set(hashes.length === 1 ? places.map((pl) => pl.canvasId) : []).size || ents.reduce((t, x) => Math.max(t, x.canvases), 0);
-        const named = places.slice(0, 3).map((pl) => `${pl.boardName} › ${pl.canvasName}`).join(", ");
-        const where = hashes.length === 1 && places.length ? (places.length > 3 ? `${named} and ${plural(places.length - 3, "other canvas", "other canvases")}` : named) : null;
-        const name = hashes.length === 1 ? `“${ents[0]?.name || "Untitled"}”` : `${hashes.length} items`;
-        void confirmDialog({
-          title: `Delete ${name} everywhere?`,
-          lines: [
-            `${hashes.length === 1 ? "It is" : "They are"} used ${plural(uses, "time")}${where ? ` on ${where}` : canvases ? ` on ${plural(canvases, "canvas", "canvases")} or more` : ""}. Those instances are removed too; a text that uses one as its font keeps its words in the default font.`,
-            "On the open canvas Undo brings them back; on the other canvases they cannot be brought back. The files are erased from this browser's storage once nothing can use them any more.",
-          ],
-          confirmLabel: "Delete everywhere",
-        }).then(async (ok) => {
-          if (ok) await session.deleteAssetsEverywhere(hashes);
+        void deleteEverywhere(session, { hashes, name: ents[0]?.name, uses: ents.reduce((t, x) => t + x.instances, 0), canvases, places: places.map((pl) => `${pl.boardName} › ${pl.canvasName}`) }).then(async () => {
           await refresh();
           search.focus();
         });
@@ -3872,7 +3864,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           danger: false,
         }).then(async (ok) => {
           if (!ok || !(await readyForHidden(session, false))) return;
-          if ((await session.organize((c) => c.showFolder(id), "Not hidden")) && scope.startsWith("folder:")) scope = "all";
+          // (shown beside a shown folder a disk would take for it: the person chooses. Only here, in hidden mode, so no hidden folder is told of elsewhere.)
+          const folders = allFolders;
+          const parent = f.parentId ?? null;
+          const same = folderClash(folders, parent, f.name, id);
+          const way = same ? await askFolderClash(same.name, f.name, "Unhide") : null;
+          if (same && !way) return;
+          const done = await session.organize(async (c) => {
+            if (way === "separate") await c.renameFolder(id, freeFolderName(folders, parent, f.name, id));
+            await c.showFolder(id);
+            if (way === "merge") await mergeFolderInto(c, id, same!.id);
+          }, "Not hidden");
+          if (done && scope.startsWith("folder:")) scope = "all";
         });
         break;
       case "delete":
@@ -3912,24 +3915,38 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const n = naming;
       const name = input.value;
       naming = null;
-      // (two folders side by side that a disk would take for one: refused, with its name to choose again)
-      const clash = !hiddenMode && (n.kind === "new" || n.kind === "rename") ? folderClash(listing?.folders ?? [], n.kind === "new" ? n.parent : (listing?.folders.find((f) => f.id === n.id)?.parentId ?? null), name, n.kind === "rename" ? n.id : undefined) : undefined;
-      if (clash && name.trim()) {
-        session.editor.message = `A folder named “${clash.name}” is already there, and on a disk these would be one folder. Choose another name.`;
-        session.editor.changed();
-        renderSide();
-        return;
-      }
       if (n.kind === "new" || n.kind === "rename") warnName(name);
-      if (n.kind === "new") {
+      const folders = listing?.folders ?? [];
+      const parent = n.kind === "new" ? n.parent : (folders.find((f) => f.id === n.id)?.parentId ?? null);
+      const except = n.kind === "rename" ? n.id : undefined;
+      // (two folders side by side that a disk would take for one: the person chooses)
+      const clash = !hiddenMode && name.trim() ? folderClash(folders, parent, name, except) : undefined;
+      const make = (named: string): void => {
         const id = newObjectId();
         void session.organize(async (c) => {
-          await c.createFolder(name, n.parent, id);
+          await c.createFolder(named, parent, id);
           if (hiddenMode) await c.hideFolder(id); // (a folder made in hidden mode is hidden)
         }).then((ok) => {
           if (!ok) renderSide();
         });
-      } else void session.organize((c) => c.renameFolder(n.id, name)).then(() => renderSide());
+      };
+      const rename = (id: string, named: string): void => void session.organize((c) => c.renameFolder(id, named)).then(() => renderSide());
+      if (!clash) {
+        if (n.kind === "new") make(name);
+        else rename(n.id, name);
+        return;
+      }
+      void askFolderClash(clash.name, name, n.kind === "new" ? "Continue" : "Rename").then(async (way) => {
+        if (way === "separate") {
+          const free = freeFolderName(folders, parent, name, except);
+          if (n.kind === "new") make(free);
+          else rename(n.id, free);
+        } else if (way === "merge" && n.kind === "rename") {
+          await session.organize((c) => mergeFolderInto(c, n.id, clash.id), "Merged folders");
+          if (scope === `folder:${n.id}`) scope = `folder:${clash.id}`;
+        }
+        renderSide();
+      });
     }
   });
 

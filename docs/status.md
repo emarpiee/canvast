@@ -37,6 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.41: Delete everywhere on a canvas; merging folders; hidden items out of reach (2026-11-04)
+
+- **Implemented:** `ui/delete-everywhere.ts` (library and canvas), `app/folder-merge.ts`, `ui/folder-clash.ts`, `selectedHashes` in `main.ts` with `hiddenInReach`. `stress-hidden.mjs` counts sealed files under encrypted names.
+- **Tested:** typecheck and unit here; E2E on GitHub.
+- **Unverified:** a merge stopped midway on a real disk has no test of its own: its moves are the mirror's, which `stress-hidden` kills at random.
+- **Committed:** v0.53.41.
+
 ## v0.53.40: Repair removed (2026-11-04)
 
 - **Implemented:** the command, `repairNames` and the strict test are gone; older names still count as right.

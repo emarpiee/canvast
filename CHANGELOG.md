@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.53.41 — Delete everywhere on a canvas; merging folders; hidden items out of reach (2026-11-04)
+
+- **Added:** **Delete everywhere** in a canvas's right-click menu and the command palette, with the library's question. Text and shapes selected with it stay.
+- **Added:** two folders a disk would take for one (`Refs`, `refs`): when naming, renaming or unhiding, choose **Merge** (a file with the same name gets `-2`, nothing is overwritten, one undo step) or **Keep separate** (a numbered name).
+- **Fixed:** outside hidden mode, a hidden item on a canvas is out of reach of Ctrl+C on a note card and of Copy file: they could read it while the Hidden items were open. Delete everywhere is not offered for it either.
+- **Fixed:** selecting a text with a library font no longer offers that font for Copy file.
+- **Fixed:** the Delete everywhere question says the workspace folder in the desktop app, not this browser's storage.
+
 ## 0.53.40 — Repair removed (2026-11-04)
 
 - **Removed:** Repair library file names: new names are right as they are made, and older files keep working as they are.

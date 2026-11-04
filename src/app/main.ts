@@ -1,3 +1,4 @@
+import { deleteEverywhere } from "../ui/delete-everywhere";
 import type { CatalogEntry } from "../assets/asset-catalog";
 import { copyItemsAsFiles, copyItemsToClipboard, type CopyDeps } from "./copy-items";
 import { externalFolder } from "../storage/external-folder";
@@ -2327,11 +2328,12 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Edit", title: "Change the old default ink to the canvas ink", words: "recolour near-black dark outline theme light old drawings readable", enabled: () => onCanvas && newInk(DEFAULT_INK) !== DEFAULT_INK, run: () => void recolourOldInk(doc, editor) },
       { group: "Edit", title: "Redo", keys: "Ctrl+Shift+Z", words: "again", enabled: () => onCanvas, run: () => redo(doc, editor) },
       { group: "Edit", title: "Copy", keys: "Ctrl+C", enabled: () => onCanvas && sel, run: () => { if (!document.execCommand("copy")) copySelection(doc, editor, view); } }, // (as the keys do: the copy event below puts it on the system clipboard too)
-      ...(desktopBridge() ? [{ group: "Edit", title: "Copy file", words: "real file clipboard file manager", enabled: () => onCanvas && sel && [...editor.selection].some((id) => !!(doc.get(id) as { assetId?: string } | undefined)?.assetId), run: () => void selectedFiles().then((ents) => (forgetCopiedPicture(), copyItemsAsFiles(copyOnCanvas, ents))) }] : []),
+      ...(desktopBridge() ? [{ group: "Edit", title: "Copy file", words: "real file clipboard file manager", enabled: () => onCanvas && sel && selectedHashes().length > 0, run: () => void selectedFiles().then((ents) => (forgetCopiedPicture(), copyItemsAsFiles(copyOnCanvas, ents))) }] : []),
       { group: "Edit", title: "Cut", keys: "Ctrl+X", enabled: () => onCanvas && sel, run: () => void cutSelection(doc, editor, view) },
       { group: "Edit", title: "Paste", keys: "Ctrl+V", enabled: () => onCanvas, run: () => void pasteObjects(doc, editor, view, null) },
       { group: "Edit", title: "Duplicate", keys: "Ctrl+D", words: "copy", enabled: () => onCanvas && sel, run: () => duplicateSelection(doc, editor, view) },
       { group: "Edit", title: "Rename", words: "file name picture image library layer", enabled: () => onCanvas && !session.readOnly && selectedPictures().length > 0, run: () => void renamePictures() },
+      { group: "Edit", title: "Delete everywhere", words: "remove erase library every canvas file", enabled: () => onCanvas && sel && !session.readOnly && selectedHashes().length > 0, run: () => void deleteSelectedEverywhere() },
       { group: "Edit", title: "Delete the selection", keys: "Delete", words: "remove erase", enabled: () => onCanvas && sel, run: () => deleteSelection(doc, editor) },
       { group: "Edit", title: "Show all hidden", words: "unhide reveal eye", enabled: () => onCanvas && [...doc.all()].some((o) => o.hidden), run: () => clearFlag(doc, editor, "hidden") },
       { group: "Edit", title: "Unlock all", words: "unlock locked", enabled: () => onCanvas && [...doc.all()].some((o) => o.locked), run: () => clearFlag(doc, editor, "locked") },
@@ -2546,14 +2548,30 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     // (the words go beside the picture only for copied texts: otherwise a program that takes text would paste the SVG or a count and not the picture)
     await writeSystemClipboard({ image: png, text, withText: withText && !isPlaceholderText(text) });
   };
-  /** The file-backed things selected, as library items. */
-  const selectedFiles = async (): Promise<CatalogEntry[]> => {
-    const hashes = [...new Set([...editor.selection].flatMap((id) => {
-      const o = doc.get(id) as { assetId?: string } | undefined;
-      return o?.assetId ? [o.assetId] : [];
+  /** A hidden item is a padlock outside hidden mode: no file action reaches it there, whatever the password state. */
+  const hiddenInReach = (): boolean => hiddenModeOn() && (storage?.hidden ? storage.hidden.isOpen() : true);
+  /** The library files of the things selected that file actions may reach: not a text's font, not a padlock. */
+  const selectedHashes = (): string[] =>
+    [...new Set([...editor.selection].flatMap((id) => {
+      const o = doc.get(id) as { assetId?: string; kind?: string } | undefined;
+      return o?.assetId && o.kind !== "text" && (hiddenInReach() || !assets.isHidden(o.assetId)) ? [o.assetId] : [];
     }))];
-    const found = await Promise.all(hashes.map((h) => session.catalog?.entry(h).catch(() => undefined)));
-    return found.filter((e): e is NonNullable<typeof e> => !!e);
+  const selectedFiles = async (): Promise<CatalogEntry[]> => {
+    const found = await Promise.all(selectedHashes().map((h) => session.catalog?.entry(h).catch(() => undefined)));
+    return found.filter((e): e is NonNullable<typeof e> => !!e && (hiddenInReach() || !meta(e).hidden));
+  };
+  const deleteSelectedEverywhere = async (): Promise<void> => {
+    const ents = await selectedFiles();
+    if (!ents.length) return;
+    const found = await Promise.all(ents.map((e) => session.assetPlaces(e.hash)));
+    const places = found.flat();
+    await deleteEverywhere(session, {
+      hashes: ents.map((e) => e.hash),
+      name: ents[0]!.name,
+      uses: places.reduce((t, pl) => t + pl.ids.length, 0),
+      canvases: new Set(places.map((pl) => pl.canvasId)).size,
+      places: places.map((pl) => `${pl.boardName} › ${pl.canvasName}`),
+    });
   };
   const copyOnCanvas: CopyDeps = {
     file: async (h) => (await assets.record(h).catch(() => undefined))?.blob,

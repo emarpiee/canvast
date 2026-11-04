@@ -1164,20 +1164,84 @@ test("several picked: each tag with how many have it, removed from all or added 
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("two folders a disk would take for one are refused, by name and on rename; the name that works is taken", async ({ app }) => {
+test("two folders a disk would take for one: the person chooses to merge or keep them separate, when naming and when renaming", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
+  const label = (t: string) => p.locator(".side-label", { hasText: new RegExp(`^${t}$`) });
   await newFolder(p, "A: B");
-  await expect(p.locator(".side-label", { hasText: "A: B" })).toBeVisible();
-  await p.getByTestId("folder-new").click();
-  await p.getByTestId("folder-name-input").fill("a- b");
-  await p.keyboard.press("Enter");
-  await expect(p.locator(".side-label", { hasText: "a- b" })).toHaveCount(0);
-  await newFolder(p, "Other");
-  await sideAct(p, "folder", "Other", "Rename folder Other");
+  await expect(label("A: B")).toBeVisible();
+  // Naming: cancel, then keep separate.
+  const typeNew = async (name: string): Promise<void> => {
+    await p.getByTestId("folder-new").click();
+    await p.getByTestId("folder-name-input").fill(name);
+    await p.keyboard.press("Enter");
+  };
+  await typeNew("a- b");
+  await expect(p.getByTestId("choose-dialog")).toContainText("one folder");
+  await p.getByTestId("choose-cancel").click();
+  await expect(label("a- b")).toHaveCount(0);
+  await typeNew("a- b");
+  await p.locator('input[name="choose"][value="separate"]').check();
+  await p.getByTestId("choose-ok").click();
+  await expect(label("a- b-2")).toBeVisible();
+  // Renaming: an item in the folder goes with a merge; none leaves the library.
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "in.png", mimeType: "image/png", buffer: makePng(4, 4, () => [9, 9, 9, 255]) });
+  await expect(cards(p)).toHaveCount(1);
+  const folderOf = () => p.evaluate(async () => {
+    const l = await window.__canvastDebug.assetListing();
+    return l.folders.find((f) => f.id === l.entries[0]?.folderIds?.[0])?.name ?? null;
+  });
+  const idOf = (n: string) => p.evaluate(async (n) => (await window.__canvastDebug.assetListing()).folders.find((f) => f.name === n)!.id, n);
+  const hash = await p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries[0]!.hash);
+  const other = await idOf("a- b-2");
+  await p.evaluate(([h, id]) => window.__canvastDebug.libraryOp("file", h!, id!), [hash, other]);
+  await expect.poll(folderOf).toBe("a- b-2");
+  await sideAct(p, "folder", "a- b-2", "Rename folder a- b-2");
   await p.getByTestId("folder-name-input").fill("a: b");
   await p.keyboard.press("Enter");
-  await expect(p.locator(".side-label", { hasText: "Other" })).toBeVisible();
+  await p.getByTestId("choose-ok").click(); // (merge, the first)
+  await expect.poll(folderOf).toBe("A: B");
+  await expect(label("a- b-2")).toHaveCount(0);
+  await expect(cards(p)).toHaveCount(1);
+});
+
+test("on a canvas Delete everywhere asks as the library does and goes from every canvas; a hidden item is a padlock no file action reaches outside hidden mode", async ({ app, browserName }) => {
+  const p = app.page;
+  await p.getByTestId("import-input").setInputFiles({ name: "blocks.png", mimeType: "image/png", buffer: BLOCKS });
+  const objects = () => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "image").length);
+  await expect.poll(objects).toBe(1);
+  await p.getByTestId("workspace-nav").click();
+  await p.getByRole("button", { name: /^\+ New canvas/ }).click();
+  await expect(p.getByTestId("workspace-nav")).toHaveText("Board 1 › Canvas 2");
+  await p.getByTestId("import-input").setInputFiles({ name: "blocks.png", mimeType: "image/png", buffer: BLOCKS });
+  await expect.poll(objects).toBe(1);
+  await p.keyboard.press("Control+a");
+  const menu = async () => {
+    const box = (await p.locator("canvas").first().boundingBox())!;
+    await p.evaluate(() => window.__canvastDebug.nextFrame());
+    const at = await p.evaluate(() => window.__canvastDebug.objects().find((o) => o.kind === "image")!.id);
+    const c = await app.landmark(at).catch(() => ({ x: box.width / 2, y: box.height / 2 }));
+    await p.mouse.click(box.x + c.x, box.y + c.y, { button: "right" });
+  };
+  // Hidden: a padlock. Not offered, and a copy does not read it.
+  await p.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), HASH);
+  await expect.poll(() => p.evaluate((h) => window.__canvastDebug.pictureLocked(h), HASH)).toBe(true);
+  await menu();
+  await expect(p.getByRole("menuitem", { name: "Delete the selection" })).toBeVisible();
+  await expect(p.getByRole("menuitem", { name: "Delete everywhere" })).toHaveCount(0);
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("Control+c");
+  await expect(p.getByTestId("confirm-dialog")).toHaveCount(0);
+  // Shown again: offered, asked as in the library, gone from both canvases and the library.
+  await p.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, ""), HASH);
+  await expect.poll(() => p.evaluate((h) => window.__canvastDebug.pictureLocked(h), HASH)).toBe(false);
+  await menu();
+  await p.getByRole("menuitem", { name: "Delete everywhere" }).click();
+  await expect(p.getByTestId("confirm-dialog")).toContainText("used 2 times");
+  await p.getByTestId("confirm-ok").click();
+  await expect.poll(objects).toBe(0);
+  await expect.poll(() => p.evaluate((h) => window.__canvastDebug.catalogEntries().then((es) => es.find((e) => e.hash === h)?.state), HASH)).not.toBe("active");
+  expect(browserName).toBeTruthy();
 });
 
 test("the library's own undo and redo; items dragged onto a folder or a tag; a plain click picks one alone after Ctrl+A; picks a search hides are shown and can be dropped", async ({ app }) => {
