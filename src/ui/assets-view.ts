@@ -18,7 +18,7 @@ import type { SuggestSources } from "../search/suggest";
 import { itemsIn, justifiedLayout, listLayout, nearestInRow, rowOf, squaresLayout, type GridLayout } from "./library-layout";
 import { newNoteName, storeFrame } from "../app/frames";
 import { artFileOf, artFullPicture, isArtFile } from "../assets/art-preview";
-import { chipOf, describeFile, extOf, hasThumb, isCard, isFontFile } from "../assets/file-kind";
+import { AUTO_COPY_NOTE, chipOf, describeFile, extOf, hasThumb, isAutoCopy, isCard, isFontFile } from "../assets/file-kind";
 import { FILE_CARD_NOTE } from "../assets/card";
 import { fontSampleHtml, showFont } from "./font-specimen";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actions";
@@ -1554,7 +1554,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       slideImg.className = "";
       slideUrl = URL.createObjectURL(art);
       slideImg.src = slideUrl;
-      slideCaption.textContent = `${e.name || "Untitled"}, ${fmtBytes(e.size)}. A preview: the picture the file keeps, as it was last saved.`;
+      slideCaption.textContent = `${e.name || "Untitled"}, ${fmtBytes(e.size)}. ${isAutoCopy(e.name) ? `${AUTO_COPY_NOTE} ` : ""}A preview: the picture the file keeps, as it was last saved.`;
       slideCaption.classList.add("is-note");
       armShow();
       return;
@@ -2009,8 +2009,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const name = e.name || "Untitled";
     const html = `<div class="asset-cell" role="listitem">
         <button type="button" class="asset-card${e.present ? "" : " is-missing"}" data-testid="asset-card" data-hash="${e.hash}" draggable="${session.readOnly ? "false" : "true"}"
-          aria-pressed="false" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}">
-        <span class="asset-thumb thumb-slot">${!hasThumb(e) && !meta(e).thumb ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}${isFontFile(e) ? " is-font-thumb" : ""}" data-hash="${e.hash}"><span class="ext-chip">${esc(chipOf(e.name, e.type))}</span>`}</span>
+          aria-pressed="false" aria-label="${esc(name)}, ${e.pixelW} × ${e.pixelH} px" title="${esc(name)}${isAutoCopy(e.name) ? `. ${AUTO_COPY_NOTE}` : ""}">
+        <span class="asset-thumb thumb-slot">${!hasThumb(e) && !meta(e).thumb ? fileTile(e) : `<img alt="" draggable="false" class="${small.trim()}${isFontFile(e) ? " is-font-thumb" : ""}" data-hash="${e.hash}"><span class="ext-chip">${esc(chipOf(e.name, e.type))}${isAutoCopy(e.name) ? " backup" : ""}</span>`}</span>
         ${e.present ? "" : `<span class="asset-missing-label">File missing</span>`}
         <span class="asset-info">
           <span class="asset-name">${esc(name)}</span>
@@ -2589,7 +2589,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     keepDetails();
     // (in the order they were put in: `sortableSections`)
     const detail: Record<(typeof DETAIL_SECTIONS)[number], () => string> = {
-      file: () => `${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays ${noteKindOf(e.name) === "rich" ? "a rich text note (HTML) that other apps open too" : "plain text other apps read"}. Tag it <em>template</em> to offer it in Insert ▸ Template of every note.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>${isArtFile(e.name) ? "An art file" : "No preview for this file"}</h3><p class="asset-note">${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as ${isArtFile(e.name) ? "the picture it keeps, when it keeps one" : "a card"}. ${esc(d.todo)}</p></section>`; })() : ""}`,
+      file: () => `${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays ${noteKindOf(e.name) === "rich" ? "a rich text note (HTML) that other apps open too" : "plain text other apps read"}. Tag it <em>template</em> to offer it in Insert ▸ Template of every note.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>${isArtFile(e.name) ? "An art file" : "No preview for this file"}</h3><p class="asset-note">${isAutoCopy(e.name) ? `${AUTO_COPY_NOTE} ` : ""}${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as ${isArtFile(e.name) ? "the picture it keeps, when it keeps one" : "a card"}. ${esc(d.todo)}</p></section>`; })() : ""}`,
       organize: () => (e ? organizeHtml(e) : ""),
       notes: () => (e ? notesHtml(e) : ""),
       links: () => `<section class="asset-sec" data-testid="asset-backlinks" hidden><h3>Linked from</h3><ul class="asset-places"></ul></section>`,

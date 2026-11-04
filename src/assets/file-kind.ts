@@ -24,10 +24,15 @@ export function extOf(name: string): string {
   return m ? m[1]!.toUpperCase() : "";
 }
 
-/** What to say on the chip: the extension, else the subtype of the type ("model/gltf-binary" is GLTF-BINARY, cut to eight), else FILE. */
+/** A copy a program saved by itself: `a.kra~` (the mark of a backup on Linux, Krita's among them) or `a-autosave.kra`. */
+export const isAutoCopy = (name: string): boolean => /~$|-autosave\.[^.]+$/i.test(name.trim());
+/** The one way the app says so. */
+export const AUTO_COPY_NOTE = "An automatic backup its program saved by itself, not your own save.";
+
+/** What to say on the chip: the extension (with its `~` on a backup copy, which is listed apart), else the subtype of the type ("model/gltf-binary" is GLTF-BINARY, cut to eight), else FILE. */
 export function chipOf(name: string, type: string): string {
-  const e = extOf(name);
-  if (e) return e;
+  const e = extOf(name.trim().replace(/~$/, ""));
+  if (e) return /~\s*$/.test(name) ? `${e}~` : e;
   const sub = /^[a-z]+\/(?:x-|vnd\.)?([a-z0-9+.-]+)/i.exec(type)?.[1];
   return sub && type !== "application/octet-stream" ? sub.toUpperCase().slice(0, 8) : "FILE";
 }
@@ -66,7 +71,7 @@ export interface FileDescription {
 const TEXT_EXTS = new Set(["txt", "md", "markdown", "csv", "tsv", "json", "xml", "yaml", "yml", "toml", "ini", "log"]);
 
 export function describeFile(name: string, type: string): FileDescription {
-  const ext = extOf(name).toLowerCase();
+  const ext = extOf(name.trim().replace(/~$/, "")).toLowerCase();
   const found = CATEGORIES.find((c) => c.exts.includes(ext));
   const t = type.toLowerCase();
   const openIn = ext === "pdf" || t === "application/pdf" ? "pdf" : TEXT_EXTS.has(ext) || t === "text/plain" || t === "text/csv" || t === "application/json" ? "text" : null;

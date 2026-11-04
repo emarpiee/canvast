@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { artPicture, isArtFile, psdPixels } from "../../src/assets/art-preview";
 import { writeZip } from "../../src/storage/zip";
+import { chipOf, describeFile, isAutoCopy } from "../../src/assets/file-kind";
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 13, 10, 26, 10, 1, 2, 3, 4, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82]);
 const zipOf = async (entries: Record<string, Uint8Array>): Promise<Blob> => {
@@ -87,7 +88,9 @@ function clip(png: Uint8Array, pageSize = 512): Blob {
 
 describe("pictures art files keep", () => {
   it("knows its kinds, by name", () => {
-    for (const n of ["a.kra", "a.ORA", "a.psd", "a.psb", "a.procreate", "a.sketch", "a.fig", "a.figcraft", "a.clip"]) expect(isArtFile(n), n).toBe(true);
+    for (const n of ["a.kra", "a.ORA", "a.psd", "a.psb", "a.procreate", "a.sketch", "a.fig", "a.figcraft", "a.clip", "a.kra~", "a.psd~"]) expect(isArtFile(n), n).toBe(true);
+    expect([isAutoCopy("a.kra~"), isAutoCopy("a-autosave.kra"), isAutoCopy("a.kra")]).toEqual([true, true, false]);
+    expect([chipOf("a.kra~", ""), chipOf("a.kra", ""), describeFile("a.kra~", "").category]).toEqual(["KRA~", "KRA", "Design file"]);
     for (const n of ["a.xcf", "a.ai", "a.png", "kra"]) expect(isArtFile(n), n).toBe(false);
   });
   it("ZIP kinds: the best picture there, nothing when there is none or it is no ZIP", async () => {

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.53 — Previews and a label for automatic backups (2026-11-04)
+
+- **Added:** an art file's backup copy (`.kra~`, also `.psd~` and the other art kinds) shows the picture it keeps. An item imported earlier keeps its 4:3 card, its picture cropped to fit.
+- **Added:** a file ending in `~` or named `-autosave` says it is an automatic backup: on its card, in its details and in the viewer. `~` files are their own entry under File types (`.KRA~`).
+
 ## 0.53.52 — The folder tree lines up (2026-11-04)
 
 - **Removed:** the folder list and *New folder…* from the details panel. It says which folder the items are in, and **Organize…** moves them and makes a new folder.

@@ -6,8 +6,10 @@
 import { externalFolder, type FileParts } from "../storage/external-folder";
 
 /** The extensions that may hold a picture. */
-const ART = /\.(kra|ora|psd|psb|procreate|sketch|fig|figcraft|clip)$/i;
+const ART = /\.(kra|ora|psd|psb|procreate|sketch|fig|figcraft|clip)~?$/i;
 export const isArtFile = (name: string): boolean => ART.test(name);
+/** The name a backup copy (`a.kra~`) is the copy of: it is the same kind of file. */
+const kindName = (name: string): string => name.trim().replace(/~$/, "");
 
 /** Most a picture inside a file may take once unpacked: a small file must not become a huge one in memory. */
 const MAX_UNPACKED = 256 * 1024 * 1024;
@@ -369,10 +371,11 @@ async function clipPreview(file: ArtFile): Promise<Blob | null> {
 
 /** The ready-made picture an art file keeps, encoded, or null. Quick: what a thumbnail is made from. */
 export async function artPicture(file: ArtFile, name: string): Promise<Blob | null> {
+  const kind = kindName(name);
   try {
-    for (const [kind, names] of IN_ZIP) if (kind.test(name)) return await zipEntry(file, names);
-    if (/\.(psd|psb)$/i.test(name)) return await psdThumbnail(file);
-    if (/\.clip$/i.test(name)) return await clipPreview(file);
+    for (const [zip, names] of IN_ZIP) if (zip.test(kind)) return await zipEntry(file, names);
+    if (/\.(psd|psb)$/i.test(kind)) return await psdThumbnail(file);
+    if (/\.clip$/i.test(kind)) return await clipPreview(file);
   } catch {
     // (not what its name says, or damaged: its tile)
   }
@@ -384,7 +387,7 @@ export const artCardPicture = async (file: ArtFile, name: string): Promise<Blob 
 
 /** The largest picture an art file gives, for the viewer, encoded; a Photoshop file's merged one when it can be read, else what `artPicture` finds. */
 export async function artFullPicture(file: ArtFile, name: string): Promise<Blob | null> {
-  if (/\.(psd|psb)$/i.test(name)) {
+  if (/\.(psd|psb)$/i.test(kindName(name))) {
     const px = await psdPixels(file).catch(() => null);
     if (px) {
       const c = document.createElement("canvas");
