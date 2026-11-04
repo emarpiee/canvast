@@ -2368,8 +2368,12 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 .asset-places { gap: var(--s-2); }
 .asset-places li { align-items: center; gap: var(--s-4); padding: var(--s-4) 0; border-top: 1px solid var(--hud-border); }
 .asset-places li:first-child { border-top: 0; padding-top: 0; }
-.asset-place-name { min-width: 0; overflow-wrap: anywhere; }
+/* (a canvas's name in full, its board quieter, how many times, and an icon to go there) */
+.asset-place-name { min-width: 0; font-weight: var(--weight-regular); overflow-wrap: anywhere; white-space: normal; }
+.asset-place-board { color: var(--hud-muted); }
 .asset-places .assets-btn { flex: none; }
+.asset-places .assets-btn.is-icon { width: var(--row-btn); min-width: var(--row-btn); height: var(--row-btn); min-height: var(--row-btn); padding: 0; background: transparent; border-color: transparent; }
+.asset-places .assets-btn.is-icon:hover:not(:disabled) { background: var(--hud-hover); }
 /* Actions: a grid of equal buttons, the dangerous one alone at the end. */
 .asset-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); padding-top: var(--s-6); margin-top: 0; border-top: 1px solid var(--hud-border); }
 .asset-actions .assets-btn { justify-content: flex-start; min-width: 0; background: color-mix(in oklch, var(--hud-fg) 6%, transparent); border-color: transparent; }

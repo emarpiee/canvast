@@ -12,6 +12,7 @@
 - **Fixed:** a drag of a library item could leave the app stuck (it scrolled, but took no click or key): the card dragged now stays in the page while the grid scrolls, and the drop places go away whichever way a drag ends. A drag out of the app is always a copy, so a file manager cannot move a file out of the library.
 - **Fixed:** dragging an item to place it on the canvas: the strip covers the whole top row, and a drop anywhere on the row counts. It sat half over the row, under its buttons.
 - **Fixed:** the viewer's back, details, hide and background buttons, its bars, filmstrip and zoom control follow the theme; they stayed dark in the light theme.
+- **Changed:** *Where it is used* reads more easily: the canvas's name in full, its board quieter, a count, and an icon to go there.
 - **Fixed:** the Library button is one button, as tall as the ∞ beside it, with no white bar around it.
 - **Fixed:** on a small window the ∞ button stretched across the top row and the Settings button covered the canvas's name; the name takes the room now, clear of the buttons. 
 - **Fixed:** the status bars of the canvas and the library have one height with room around their buttons, which are square.

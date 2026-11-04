@@ -2691,9 +2691,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const placesShown = placesCap.shown;
     const placeRows = placesShown
       .map(
-        (p) => `<li><span class="asset-place-name" title="${esc(p.boardName)} › ${esc(p.canvasName)}">${esc(p.boardName)} › ${esc(p.canvasName)}</span><span class="asset-place-n" title="${plural(p.ids.length, "time")} on this canvas">×${p.ids.length}</span>
-          <button type="button" class="assets-btn" data-action="show" data-canvas="${p.canvasId}" data-testid="asset-show"
-            aria-label="Show ${plural(p.ids.length, "instance")} on ${esc(p.boardName)} › ${esc(p.canvasName)}">${ICONS.locate}<span>Show</span></button></li>`,
+        (p) => `<li><span class="asset-place-name" title="${esc(p.boardName)} › ${esc(p.canvasName)}"><span class="asset-place-board">${esc(p.boardName)} ›</span> ${esc(p.canvasName)}</span><span class="asset-place-n layer-count" title="${plural(p.ids.length, "time")} on this canvas">${p.ids.length}</span>
+          <button type="button" class="assets-btn is-icon" data-action="show" data-canvas="${p.canvasId}" data-testid="asset-show"
+            aria-label="Show ${plural(p.ids.length, "instance")} on ${esc(p.boardName)} › ${esc(p.canvasName)}" title="Show it on this canvas">${ICONS.locate}</button></li>`,
       )
       .join("");
     const ro = session.readOnly ? " disabled title=\"Read-only: another tab is editing\"" : "";
