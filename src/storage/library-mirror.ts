@@ -13,6 +13,7 @@ import type { AssetRecord } from "../assets/asset-library";
 import { MAX_IMPORT_BYTES, storedStub } from "../assets/asset-library";
 import type { DeleteMode, DesktopBridge, LibraryOp } from "./desktop-bridge";
 import type { DesktopLibrary } from "./desktop-library";
+import { DiskFile, hashOf, pipeInto, writeProven } from "./disk-file";
 import { externalFolder } from "./external-folder";
 import type { HiddenVault } from "./hidden-store";
 import { RECOVERED_PREFIX } from "./hidden-store";
@@ -879,6 +880,8 @@ export class LibraryMirror {
     }
     // A file the key opens is sealed, whatever its name (a sync tool's copy renamed further): it is not readable.
     const opens = await Promise.all(plain.map(async (p) => {
+      const big = await this.bigSize(p);
+      if (big) return !!(await this.vault.openAt(this.rawAt(p, big)));
       const bytes = await this.bridge.read(p);
       return !!bytes && !!(await this.vault.open(bytes as Uint8Array<ArrayBuffer>));
     }));
@@ -891,7 +894,8 @@ export class LibraryMirror {
       const dir = parentOf(path);
       if (!folderIds.has(dir)) folderIds.set(dir, dir === ".hidden" ? null : await this.hiddenFolderFor(await this.dirNames(dir)));
     }
-    await this.importFiles(plain.map((path) => ({ path, name: path.slice(path.lastIndexOf("/") + 1), folderId: folderIds.get(parentOf(path)) ?? null, hidden: true, read: async () => {
+    const plainSizes = await this.bridge.sizes(plain);
+    await this.importFiles(plain.map((path, k) => ({ path, name: path.slice(path.lastIndexOf("/") + 1), folderId: folderIds.get(parentOf(path)) ?? null, hidden: true, size: plainSizes[k] ?? 0, hash: () => this.bridge.hash(path), read: async () => {
       const bytes = await this.bridge.read(path);
       return bytes && new Blob([bytes as Uint8Array<ArrayBuffer>]);
     } })));
@@ -936,14 +940,17 @@ export class LibraryMirror {
     const found: FolderFile[] = [];
     const shut: string[] = [];
     for (const p of due) {
-      const bytes = await this.bridge.read(p);
-      const opened = bytes && (await this.vault.openItem(bytes as Uint8Array<ArrayBuffer>));
-      if (!opened) {
-        if (bytes) shut.push(p);
+      // (a file too big to read into the page is opened where it lies: its hash and the start of it are all that is asked of it)
+      const big = await this.bigSize(p);
+      const bytes = big ? null : await this.bridge.read(p);
+      const at_ = big ? await this.vault.openAt(this.rawAt(p, big)) : null;
+      const opened = at_ ?? (bytes && (await this.vault.openItem(bytes as Uint8Array<ArrayBuffer>)));
+      const hash = at_ ? await hashOf(at_.file).catch(() => null) : opened && "bytes" in opened ? await sha256Hex(opened.bytes.buffer) : null;
+      if (!opened || !hash) {
+        if (bytes || big) shut.push(p);
         continue;
       }
-      const plain = opened.bytes;
-      const hash = await sha256Hex(plain.buffer);
+      const plain = "bytes" in opened ? opened.bytes : new Uint8Array(await at_!.file.slice(0, 4096).arrayBuffer());
       const rec = await this.recOf(hash);
       if (rec && (!rec.ext || (rec.file && rec.file !== p && (await this.bridge.exists(rec.file))))) {
         await this.bridge.erase(p); // a copy of what an item has
@@ -983,7 +990,8 @@ export class LibraryMirror {
         folderId,
         hidden: true,
         ...(item ? { meta: { tags: item.tags, favorite: item.favorite, note: item.note, fields: item.fields } } : {}),
-        read: async () => new Blob([plain]),
+        ...(at_ ? { size: at_.file.size, hash: async () => hash } : {}),
+        read: async () => new Blob([plain as Uint8Array<ArrayBuffer>]),
       });
     }
     if (shut.some((p) => !this.toldShut.has(p))) {
@@ -1016,7 +1024,8 @@ export class LibraryMirror {
       if (rec && (!rec.ext || (rec.file && (await this.bridge.exists(rec.file))))) continue; // (the library has it)
       const at = f.at && isHiddenFile(f.at) && !(await this.bridge.exists(f.at)) ? f.at : hiddenFileName();
       if (at !== ".hidden" && parentOf(at) !== ".hidden") await this.bridge.makeFolder(parentOf(at));
-      await this.bridge.write(at, new Uint8Array(await f.data.arrayBuffer()), { durable: false });
+      if (f.data.size > MAX_IMPORT_BYTES) await writeProven(this.bridge.stream, await this.bridge.stream.begin(at), f.data);
+      else await this.bridge.write(at, new Uint8Array(await f.data.arrayBuffer()), { durable: false });
       written.push(at);
     }
     const put = written.length;
@@ -1236,7 +1245,16 @@ export class LibraryMirror {
     if (!path.startsWith(`${TRASH_SEALED}/`)) return null;
     return (await this.vault.openItem(bytes as Uint8Array<ArrayBuffer>).catch(() => null))?.bytes ?? null;
   }
+  /** The SHA-256 of a trashed file too big to read into the page; null when it does not open. */
+  private async trashedBigHash(path: string, size: number): Promise<string | null> {
+    if (!isSafeRelativePath(path)) return null;
+    if (path.startsWith(`${TRASH_SHOWN}/`)) return this.bridge.hash(path);
+    if (!path.startsWith(`${TRASH_SEALED}/`)) return null;
+    const opened = await this.vault.openAt(this.rawAt(path, size));
+    return opened && hashOf(opened.file).catch(() => null);
+  }
   async trashRead(path: string): Promise<Blob | null> {
+    if (await this.bigSize(path)) return null; // (its tile: too big to show from here)
     const bytes = await this.openTrashed(path);
     return bytes && new Blob([bytes]);
   }
@@ -1246,10 +1264,11 @@ export class LibraryMirror {
    * in one step, never over another file. How it went, and the file's new place.
    */
   async trashRestore(path: string): Promise<{ result: "restored" | "already" | "shut"; file?: string }> {
-    const bytes = await this.openTrashed(path);
-    if (!bytes) return { result: "shut" };
+    const big = await this.bigSize(path);
+    const bytes = big ? null : await this.openTrashed(path);
+    const hash = big ? await this.trashedBigHash(path, big) : bytes && (await sha256Hex(bytes.buffer));
+    if (!hash) return { result: "shut" };
     const sealed = path.startsWith(`${TRASH_SEALED}/`);
-    const hash = await sha256Hex(bytes.buffer);
     const entry = await this.lib.entry(hash);
     const rec = await this.lib.rec(hash);
     if (entry?.state === "active" && rec?.file && (await this.bridge.exists(rec.file))) return { result: "already" };
@@ -1361,6 +1380,11 @@ export class LibraryMirror {
 
   /** Whether a sealed file opens, with the key in memory, into the bytes of `hash` (false while locked). */
   private async sealedHolds(file: string, hash: string): Promise<boolean> {
+    const big = await this.bigSize(file);
+    if (big) {
+      const opened = await this.vault.openAt(this.rawAt(file, big));
+      return !!opened && (await hashOf(opened.file).catch(() => null)) === hash;
+    }
     const sealed = await this.bridge.read(file);
     const bytes = sealed && (await this.vault.open(sealed as Uint8Array<ArrayBuffer>));
     return !!bytes && (await sha256Hex(bytes.buffer)) === hash;
@@ -1374,10 +1398,18 @@ export class LibraryMirror {
         // Shown again: opened, proven, written to its place, and only then the sealed file erased.
         const from = m.from!;
         await this.setMeta(MOVING_KEY, { hash: m.hash, from, to: target } satisfies Moving);
-        const sealed = await this.bridge.read(from);
-        const bytes = sealed && (await this.vault.open(sealed as Uint8Array<ArrayBuffer>));
-        if (!bytes || (await sha256Hex(bytes.buffer)) !== m.hash) throw new Error("a hidden file did not open with the key");
-        await externalFolder.write(m.hash, new Blob([bytes]), target);
+        const big = await this.bigSize(from);
+        if (big) {
+          // (a part at a time: its chunks are checked as they are opened, and its hash read from the disk before it is put in its place)
+          const opened = await this.vault.openAt(this.rawAt(from, big));
+          if (!opened) throw new Error("a hidden file did not open with the key");
+          await writeProven(this.bridge.stream, await this.bridge.stream.begin(target), opened.file, m.hash);
+        } else {
+          const sealed = await this.bridge.read(from);
+          const bytes = sealed && (await this.vault.open(sealed as Uint8Array<ArrayBuffer>));
+          if (!bytes || (await sha256Hex(bytes.buffer)) !== m.hash) throw new Error("a hidden file did not open with the key");
+          await externalFolder.write(m.hash, new Blob([bytes]), target);
+        }
         await this.setFile(m.hash, (r) => r.ext === 1 && r.file === from, target);
         await this.bridge.erase(from);
         await this.setMeta(MOVING_KEY, null);
@@ -1434,6 +1466,31 @@ export class LibraryMirror {
    * folder) without waiting for the disk each time, checked by their content, then made sure on the disk at once. The file of each one
    * written; one that failed is left out (the import keeps it in the app's storage, and it is written later as any).
    */
+  /** A file too big to read into the page, imported: copied into `library/` a part at a time, with nothing left when the library has its content already (`path` null). */
+  async importBig(file: Blob & { name?: string }): Promise<{ hash: string; path: string | null }> {
+    const name = file.name ?? "";
+    const kept = this.keepNames() ? keptFile(name, "", file.type) : null;
+    const target = await this.freeTarget(libraryDir([], file.type, name), kept ? kept.base : nameBase(name), kept ? kept.ext : fileExt(name, file.type), new Set());
+    const stream = this.bridge.stream;
+    try {
+      const id = await stream.begin(target);
+      const got = await pipeInto(stream, id, file);
+      if (got.size !== file.size) {
+        await stream.abort(id);
+        throw new Error("the file written did not read back the same");
+      }
+      const rec = await this.recOf(got.hash);
+      if (rec?.ext && rec.file && (await this.bridge.exists(rec.file))) {
+        await stream.abort(id);
+        return { hash: got.hash, path: null };
+      }
+      await stream.commit(id);
+      return { hash: got.hash, path: target };
+    } finally {
+      externalFolder.release(target);
+    }
+  }
+
   async writeOriginals(batch: readonly AssetRecord[]): Promise<Map<string, string>> {
     const out = new Map<string, string>();
     const taken = new Set<string>();
@@ -1444,8 +1501,11 @@ export class LibraryMirror {
         const kept = this.keepNames() ? keptFile(a.name, "", a.type) : null;
         const target = await this.freeTarget(libraryDir([], a.type, a.name), kept ? kept.base : nameBase(a.name), kept ? kept.ext : fileExt(a.name, a.type), taken);
         try {
-          await this.bridge.write(target, new Uint8Array(await a.blob.arrayBuffer()), { durable: false });
-          if ((await this.bridge.hash(target)) !== a.hash) throw new Error(`${target} was not written whole`);
+          if (a.size > MAX_IMPORT_BYTES) await writeProven(this.bridge.stream, await this.bridge.stream.begin(target), a.blob, a.hash);
+          else {
+            await this.bridge.write(target, new Uint8Array(await a.blob.arrayBuffer()), { durable: false });
+            if ((await this.bridge.hash(target)) !== a.hash) throw new Error(`${target} was not written whole`);
+          }
           out.set(a.hash, target);
         } catch {
           taken.delete(target.toLowerCase());
@@ -1493,6 +1553,52 @@ export class LibraryMirror {
     }
   }
 
+  /** A file of the workspace folder as it lies, read a part at a time. */
+  private rawAt(path: string, size: number): DiskFile {
+    return new DiskFile(async (from, to) => {
+      const got = await this.bridge.part(path, from, to);
+      if (!got) throw new Error(`${path} is not there`);
+      return got;
+    }, size);
+  }
+
+  /** The size of a file too big to read into the page, or null when it is not one. */
+  private async bigSize(path: string): Promise<number | null> {
+    const [size] = await this.bridge.sizes([path]);
+    return size && size > MAX_IMPORT_BYTES ? size : null;
+  }
+
+  /**
+   * `seal` for a file too big to read into the page, a part at a time. It is opened back from the disk and its hash proven before it is put in
+   * its place; only then the readable file is erased. A failure leaves it as it was, with nothing at the sealed place.
+   */
+  private async sealBig(rec: AssetRecord, hash: string, name: string, failed: string[]): Promise<void> {
+    const stream = this.bridge.stream;
+    let id: string | null = null;
+    try {
+      if (!rec.ext || !rec.file) throw new Error(`“${rec.name}” has no file in the workspace folder`);
+      await this.setMeta(MOVING_KEY, { hash, from: rec.file, to: name } satisfies Moving);
+      const writing = (id = await stream.begin(name));
+      await this.vault.sealTo(this.rawAt(rec.file, rec.size), { hash }, (b) => stream.append(writing, b));
+      const written = await stream.finish(writing);
+      const back = await this.vault.openAt(new DiskFile((from, to) => stream.read(writing, from, to), written.size));
+      if (!back || back.file.size !== rec.size || (await hashOf(back.file)) !== hash) throw new Error("the sealed file did not open back the same");
+      await stream.commit(writing);
+      id = null;
+      await this.setFile(hash, (r) => r.ext === 1 && r.file === rec.file, name);
+      await this.bridge.erase(rec.file);
+      await this.pruneHidden(rec.file);
+      const tx = this.db.transaction("thumbs", "readwrite");
+      tx.objectStore("thumbs").delete(hash);
+      await done(tx);
+      await this.setMeta(MOVING_KEY, null);
+    } catch (e) {
+      if (id) await stream.abort(id).catch(() => undefined);
+      await this.setMeta(MOVING_KEY, null).catch(() => undefined);
+      failed.push((e as Error).message);
+    }
+  }
+
   /**
    * Hide an original: sealed with the key into `.hidden/<random>.bin`, read back and opened to prove it, then the readable copy
    * erased (never put in `.trash/`) and its thumbnail dropped. A failure leaves it as it was.
@@ -1500,12 +1606,8 @@ export class LibraryMirror {
   private async seal(hash: string, failed: string[]): Promise<void> {
     const rec = await this.recOf(hash);
     if (!rec || isHiddenFile(rec.file)) return;
-    // shortcut: a file too big to read into the page is not encrypted (it stays readable, and is said); seal it in a stream to lift this.
-    if (rec.size > MAX_IMPORT_BYTES) {
-      failed.push(`“${rec.name}” is larger than ${MAX_IMPORT_BYTES / 2 ** 20} MiB, too big to encrypt`);
-      return;
-    }
     const name = await this.hiddenPath(hash);
+    if (rec.size > MAX_IMPORT_BYTES) return this.sealBig(rec, hash, name, failed);
     try {
       const bytes = rec.ext ? await this.bridge.read(rec.file ?? "") : new Uint8Array(await rec.blob.arrayBuffer());
       if (!bytes || (await sha256Hex((bytes as Uint8Array<ArrayBuffer>).slice().buffer)) !== hash) throw new Error("the file is not what the library says");

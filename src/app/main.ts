@@ -559,6 +559,7 @@ async function start(): Promise<void> {
     return blob ? { blob, type: e.type } : null;
   });
   // The desktop build: files that appear in library/ outside the app are imported where they lie (ADR 0177).
+  if (storage?.folderSync) assets.bigImport = (file) => storage!.folderSync!.importBig(file);
   storage?.folderSync?.start({
     importFiles: async (files) => {
       let n = 0;
@@ -2574,7 +2575,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     });
   };
   const copyOnCanvas: CopyDeps = {
-    file: async (h) => (await assets.record(h).catch(() => undefined))?.blob,
+    file: async (h) => {
+      const rec = await assets.record(h).catch(() => undefined);
+      return rec && externalFolder.fileOf(rec);
+    },
     thumb: async (h) => (await session.catalog?.thumb(h).catch(() => undefined))?.blob,
     fileOf: (h) => session.storage?.originals.fileOf(h) ?? Promise.resolve(null),
     say: (m) => {

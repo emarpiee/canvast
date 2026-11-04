@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.53.55 — No 256 MiB limit in the desktop app (2026-11-04)
+
+- **Added:** files past 256 MiB can be imported by the button or by dropping them: copied into `library/` a part at a time, and each comes in as a card. An import of content the library has adds nothing.
+- **Added:** files past 256 MiB can be hidden and shown again. They are encrypted a part at a time, in the same format as every hidden file, and the readable file is erased only after the encrypted one has been opened back from the disk and its hash proven. `scripts/hidden-items.mjs` opens them.
+- **Added:** backups and ZIP exports hold files past 256 MiB, written where you choose in a save dialog, and such a backup can be imported.
+- **Added:** a hidden art file past 256 MiB shows its picture once the Hidden items are open.
+- **Fixed:** saving a copy of a file past 256 MiB, opening a hidden one in another app, or copying a hidden one wrote an empty file.
+
 ## 0.53.54 — Organize key, canvas tags as a tree, the preview left alone (2026-11-04)
 
 - **Added:** `O` opens Organize for what is selected in the library.

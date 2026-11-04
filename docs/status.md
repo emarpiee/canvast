@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.55: no 256 MiB limit in the desktop app (2026-11-04)
+
+- **Implemented:** ADR 0182. `storage/disk-file.ts` (`DiskFile`, `joined`, `Sha256`, `writeProven`), `canvast:stream` (temporary file beside its place, read back, then moved), `sealFileTo` and `openFileAt` in the vault (the same version 2 format), big paths in `seal`, `place`, recovery, the trash, `writeOriginals`, `importSealed`, archives, ZIPs, copies; `scripts/hidden-items.mjs` opens large files a chunk at a time.
+- **Tested:** `tests/unit/disk-file.test.ts` (hash against the browser's, both directions of the format, cut, changed and swapped files, a failed write); the desktop test with a 300 MiB file through import, hide, restart, show, backup and restore. On GitHub.
+- **Known failures:** none.
+- **Unverified:** real files past 2 GiB (the test uses 300 MiB); a browser's own limit stays.
+- **Committed:** v0.53.55.
+- **Next bounded task:** the owner's check with a real large file.
+
 ## v0.53.54: Organize key, canvas tags as a tree, the preview left alone (2026-11-04)
 
 - **Implemented:** `tagList` in the sidebar (both tag sections), `canvasTagAssets`, `O` in the library, `treeSlot` in the layers panel, viewer notes removed for art, backups and custom thumbnails.

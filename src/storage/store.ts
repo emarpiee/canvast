@@ -305,6 +305,8 @@ export interface FolderSync {
    * program is (the item keeps its name, folder and place). False when the item has no readable file there (a hidden one).
    */
   saveFile(hash: string, bytes: Uint8Array): Promise<boolean>;
+  /** A file too big to read into the page, copied into the folder a part at a time; `path` is null when the library has its content already. */
+  importBig(file: Blob & { name?: string }): Promise<{ hash: string; path: string | null }>;
 }
 
 /**

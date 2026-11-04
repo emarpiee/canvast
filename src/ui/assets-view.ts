@@ -17,7 +17,8 @@ import { mountSuggest } from "./search-suggest";
 import type { SuggestSources } from "../search/suggest";
 import { itemsIn, justifiedLayout, listLayout, nearestInRow, rowOf, squaresLayout, type GridLayout } from "./library-layout";
 import { newNoteName, storeFrame } from "../app/frames";
-import { artFileOf, artFullPicture, isArtFile } from "../assets/art-preview";
+import { artFullPicture, isArtFile } from "../assets/art-preview";
+import { externalFolder } from "../storage/external-folder";
 import { AUTO_COPY_NOTE, chipOf, describeFile, extOf, hasThumb, isAutoCopy, isCard, isFontFile } from "../assets/file-kind";
 import { FILE_CARD_NOTE } from "../assets/card";
 import { fontSampleHtml, showFont } from "./font-specimen";
@@ -46,7 +47,7 @@ import type { ChoiceNode, ChoiceState, ChooserView } from "./tree-chooser";
 import { pathNodes, treeGuides, treeSlot, walkTree } from "./tree";
 import { formatTags } from "../doc/tags";
 import { cleanFileName, splitName } from "../doc/rename-rules";
-import { copyItemsAsFiles, copyItemsToClipboard, type CopyDeps } from "../app/copy-items";
+import { copyBytes, copyItemsAsFiles, copyItemsToClipboard, type CopyDeps } from "../app/copy-items";
 import { readClipboardPictures } from "../app/system-clipboard";
 import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
@@ -1548,7 +1549,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       armShow();
       return;
     }
-    const art = isCard(rec) && isArtFile(rec.name) ? await artFullPicture(await artFileOf(rec), rec.name).catch(() => null) : null;
+    const art = isCard(rec) && isArtFile(rec.name) ? await artFullPicture(await externalFolder.fileOf(rec), rec.name).catch(() => null) : null;
     if (token !== slideToken) return;
     if (art) {
       // An art file: the picture it keeps, and what it is. Its layers stay its program's; the size in its record is its card's, so neither limits nor names the picture.
@@ -3384,7 +3385,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             if (!openCopyAsked && !(await confirmDialog({ title: "Open a hidden item", lines: ["A readable copy of it is written to this app's own temporary folder, readable by your user only, for the other app to open.", "It is deleted when the hidden items are locked or canvast closes. The other app may keep copies of its own (recent files, previews)."], confirmLabel: "Open it", danger: false }))) return;
             openCopyAsked = true;
             const rec = await session.storage?.originals.get(hash).catch(() => null);
-            problem = rec ? await desktopBridge()!.openCopy(e.name, new Uint8Array(await rec.blob.arrayBuffer())) : "it could not be read (are the hidden items locked?)";
+            problem = rec ? await desktopBridge()!.openCopy(e.name, await copyBytes(desktopBridge()!, e.name, await externalFolder.fileOf(rec))) : "it could not be read (are the hidden items locked?)";
           } else {
             const file = await session.storage?.originals.fileOf(hash).catch(() => null);
             problem = file ? await desktopBridge()!.openFile(file) : "its file is not in the workspace folder yet; try again in a moment";
@@ -4274,7 +4275,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const MIME_EXT: Record<string, string> = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif", "image/svg+xml": ".svg", "image/bmp": ".bmp", "image/avif": ".avif" };
   /** Copy the first picture alone, or the names as text (what is not a picture goes as its name). */
   const copyDeps: CopyDeps = {
-    file: async (h) => (await assets.record(h).catch(() => undefined))?.blob,
+    file: async (h) => {
+      const rec = await assets.record(h).catch(() => undefined);
+      return rec && externalFolder.fileOf(rec);
+    },
     thumb: async (h) => (await session.catalog?.thumb(h).catch(() => undefined))?.blob,
     fileOf: (h) => session.storage?.originals.fileOf(h) ?? Promise.resolve(null),
     say: (m) => {

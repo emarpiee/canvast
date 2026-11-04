@@ -3,7 +3,7 @@
  * add up gives null, and the library shows its usual tile. The pictures found are decoded only by the browser's own image decoder.
  */
 
-import { externalFolder, type FileParts } from "../storage/external-folder";
+import { WINDOW } from "../storage/disk-file";
 
 /** The extensions that may hold a picture. */
 const ART = /\.(kra|ora|psd|psb|procreate|sketch|fig|figcraft|clip)~?$/i;
@@ -18,39 +18,15 @@ const MAX_PIXELS = 64_000_000;
 /** The longest side a canvas takes, and the longest a Photoshop file has. */
 const MAX_EDGE = 16384;
 const MAX_SIDE = 300_000;
-/** How much of a file is held at a time. */
-const WINDOW = 16 * 1024 * 1024;
 /** Most of a Clip Studio file's database that is looked through. */
 const MAX_DATABASE = 512 * 1024 * 1024;
 
-/** What the readers take: a Blob, or a file too big to read into the page, read a part at a time. */
-export type ArtFile = Blob | FileParts;
-
-const bytesOf = async (file: ArtFile, from: number, to: number): Promise<Uint8Array> => {
-  if (file instanceof Blob) return new Uint8Array(await file.slice(from, to).arrayBuffer());
-  const end = Math.min(to, file.size);
-  if (end - from <= WINDOW) return from < end ? file.part(from, end) : new Uint8Array(0);
-  const out = new Uint8Array(end - from);
-  for (let at = from; at < end; at += WINDOW) out.set(await file.part(at, Math.min(end, at + WINDOW)), at - from);
-  return out;
-};
+/** What the readers take: a Blob, or a file too big to read into the page standing in for one (`DiskFile`). */
+const bytesOf = async (file: Blob, from: number, to: number): Promise<Uint8Array> => new Uint8Array(await file.slice(from, to).arrayBuffer());
 const textAt = (b: Uint8Array, at: number, n: number): string => String.fromCharCode(...b.subarray(at, at + n));
 
-/** A part of a file as a stream, a window at a time. */
-const streamOf = (file: ArtFile, from: number, to: number): ReadableStream<Uint8Array<ArrayBuffer>> => {
-  let at = from;
-  return new ReadableStream({
-    async pull(c) {
-      const b = at < to ? await bytesOf(file, at, Math.min(to, at + WINDOW)) : new Uint8Array(0);
-      if (!b.length) return c.close();
-      at += b.length;
-      c.enqueue(b as Uint8Array<ArrayBuffer>);
-    },
-  });
-};
-
 /** A ZIP's central directory, also of a file past 4 GiB (ZIP64). */
-async function zipDirectory(file: ArtFile): Promise<{ start: number; size: number } | null> {
+async function zipDirectory(file: Blob): Promise<{ start: number; size: number } | null> {
   const n = file.size;
   if (n < 22) return null;
   const from = Math.max(0, n - 22 - 0xffff);
@@ -71,7 +47,7 @@ async function zipDirectory(file: ArtFile): Promise<{ start: number; size: numbe
 }
 
 /** The first of these names a ZIP has that can be read: a look through its central directory, and only what is asked for is read. One too big gives way to the next. */
-async function zipEntry(file: ArtFile, want: readonly string[]): Promise<Blob | null> {
+async function zipEntry(file: Blob, want: readonly string[]): Promise<Blob | null> {
   const place = await zipDirectory(file);
   if (!place || place.start + place.size > file.size || place.size > MAX_UNPACKED) return null;
   const dir = await bytesOf(file, place.start, place.start + place.size);
@@ -111,7 +87,7 @@ async function zipEntry(file: ArtFile, want: readonly string[]): Promise<Blob | 
   return null;
 }
 
-async function zipUnpack(file: ArtFile, e: { method: number; csize: number; usize: number; at: number }): Promise<Blob | null> {
+async function zipUnpack(file: Blob, e: { method: number; csize: number; usize: number; at: number }): Promise<Blob | null> {
   if (e.usize > MAX_UNPACKED || e.csize > MAX_UNPACKED || e.at + 30 > file.size) return null;
   const head = await bytesOf(file, e.at, e.at + 30);
   const h = new DataView(head.buffer, head.byteOffset, head.byteLength);
@@ -121,7 +97,7 @@ async function zipUnpack(file: ArtFile, e: { method: number; csize: number; usiz
   if (e.method === 0) return new Blob([(await bytesOf(file, dataAt, dataAt + e.csize)) as BlobPart]);
   if (e.method !== 8) return null;
   // (unpacked with a limit: what a file says of its own size is not taken on trust)
-  const reader = streamOf(file, dataAt, dataAt + e.csize).pipeThrough(new DecompressionStream("deflate-raw")).getReader();
+  const reader = file.slice(dataAt, dataAt + e.csize).stream().pipeThrough(new DecompressionStream("deflate-raw")).getReader();
   const parts: Uint8Array[] = [];
   let total = 0;
   for (;;) {
@@ -152,7 +128,7 @@ interface PsdHead {
   resourcesAt: number;
   resourcesLen: number;
 }
-async function psdHead(file: ArtFile): Promise<PsdHead | null> {
+async function psdHead(file: Blob): Promise<PsdHead | null> {
   const b = await bytesOf(file, 0, 34);
   if (b.length < 34 || textAt(b, 0, 4) !== "8BPS") return null;
   const v = new DataView(b.buffer, b.byteOffset, b.byteLength);
@@ -168,7 +144,7 @@ async function psdHead(file: ArtFile): Promise<PsdHead | null> {
 }
 
 /** A Photoshop file's own thumbnail: a JPEG among its image resources. */
-async function psdThumbnail(file: ArtFile): Promise<Blob | null> {
+async function psdThumbnail(file: Blob): Promise<Blob | null> {
   const head = await psdHead(file);
   if (!head || head.resourcesLen > 64 * 1024 * 1024) return null;
   const r = await bytesOf(file, head.resourcesAt, head.resourcesAt + head.resourcesLen);
@@ -192,7 +168,7 @@ async function psdThumbnail(file: ArtFile): Promise<Blob | null> {
  * A Photoshop file's merged picture, when it is one this can read (8 bits, RGB or grey): its pixels. Null otherwise (saved without it, 16 bits, CMYK...).
  * Read a window at a time and reduced as it is read when it is past `maxPixels`, so a file of any size takes the same memory; `w` and `h` are what was kept.
  */
-export async function psdPixels(file: ArtFile, maxPixels = MAX_PIXELS): Promise<{ w: number; h: number; rgba: Uint8ClampedArray<ArrayBuffer> } | null> {
+export async function psdPixels(file: Blob, maxPixels = MAX_PIXELS): Promise<{ w: number; h: number; rgba: Uint8ClampedArray<ArrayBuffer> } | null> {
   const head = await psdHead(file);
   if (!head) return null;
   const { w, h, channels, depth, mode } = head;
@@ -329,7 +305,7 @@ function pngIn(b: Uint8Array): Blob | null {
 }
 
 /** A Clip Studio file's preview: a PNG in a row of the SQLite database it holds as a chunk; the biggest such row, read as a table's leaf pages say. */
-async function clipPreview(file: ArtFile): Promise<Blob | null> {
+async function clipPreview(file: Blob): Promise<Blob | null> {
   const head = await bytesOf(file, 0, 24);
   if (head.length < 24 || textAt(head, 0, 8) !== "CSFCHUNK") return null;
   for (let at = 24; at + 16 <= file.size; ) {
@@ -370,7 +346,7 @@ async function clipPreview(file: ArtFile): Promise<Blob | null> {
 }
 
 /** The ready-made picture an art file keeps, encoded, or null. Quick: what a thumbnail is made from. */
-export async function artPicture(file: ArtFile, name: string): Promise<Blob | null> {
+export async function artPicture(file: Blob, name: string): Promise<Blob | null> {
   const kind = kindName(name);
   try {
     for (const [zip, names] of IN_ZIP) if (zip.test(kind)) return await zipEntry(file, names);
@@ -383,10 +359,10 @@ export async function artPicture(file: ArtFile, name: string): Promise<Blob | nu
 }
 
 /** The picture for a thumbnail or a card: the ready-made one, else the merged one. */
-export const artCardPicture = async (file: ArtFile, name: string): Promise<Blob | null> => (await artPicture(file, name)) ?? (await artFullPicture(file, name));
+export const artCardPicture = async (file: Blob, name: string): Promise<Blob | null> => (await artPicture(file, name)) ?? (await artFullPicture(file, name));
 
 /** The largest picture an art file gives, for the viewer, encoded; a Photoshop file's merged one when it can be read, else what `artPicture` finds. */
-export async function artFullPicture(file: ArtFile, name: string): Promise<Blob | null> {
+export async function artFullPicture(file: Blob, name: string): Promise<Blob | null> {
   if (/\.(psd|psb)$/i.test(kindName(name))) {
     const px = await psdPixels(file).catch(() => null);
     if (px) {
@@ -400,6 +376,3 @@ export async function artFullPicture(file: ArtFile, name: string): Promise<Blob 
   }
   return artPicture(file, name);
 }
-
-/** Where an item's art file is read from: its bytes, or, too big to be read into the page, its file on disk. */
-export const artFileOf = async (rec: { hash: string; size: number; file?: string; blob: Blob }): Promise<ArtFile> => (rec.blob.size || !rec.size ? rec.blob : ((await externalFolder.parts(rec.hash, rec.size, rec.file)) ?? rec.blob));

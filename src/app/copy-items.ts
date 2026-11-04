@@ -2,6 +2,8 @@
  * Library items on the system's clipboard: the library's Copy and Ctrl+C, its viewer's, and a note card on a canvas, all through here. What each kind becomes is
  * `clipboardFor`; putting it there is `writeSystemClipboard`. The message always says what landed.
  */
+import { isDisk, writeProven } from "../storage/disk-file";
+import type { DesktopBridge } from "../storage/desktop-bridge";
 import { meta, type CatalogEntry } from "../assets/asset-catalog";
 import { clipboardFor, isPicture, isWords } from "../assets/clipboard-kinds";
 import { plural } from "../doc/plural";
@@ -102,18 +104,24 @@ export async function copyItemsToClipboard(deps: CopyDeps, ents: readonly Catalo
   return null;
 }
 
+/** What `openCopy` and `copyFiles` take: the bytes, or, too big to pass through the page, where a readable copy was written a part at a time. */
+export async function copyBytes(bridge: DesktopBridge, name: string, blob: Blob): Promise<Uint8Array | string> {
+  if (!isDisk(blob)) return new Uint8Array(await blob.arrayBuffer());
+  return writeProven(bridge.stream, await bridge.stream.copy(name), blob);
+}
+
 /** The desktop app: the items' real files on the clipboard, of any kind, to paste into a file manager. In a browser, what Copy gives. */
 export async function copyItemsAsFiles(deps: CopyDeps, ents: readonly CatalogEntry[]): Promise<void> {
   const bridge = desktopBridge();
   if (!bridge) return void (await copyItemsToClipboard(deps, ents));
   if (!ents.length || !(await hiddenFine(ents))) return;
   const files: string[] = [];
-  const copies: Array<{ name: string; bytes: Uint8Array }> = [];
+  const copies: Array<{ name: string; bytes: Uint8Array | string }> = [];
   for (const e of ents) {
     if (meta(e).hidden) {
       // (its file is encrypted: a readable copy in the app's own temporary folder, deleted on lock and on closing, as for opening it in another app)
       const blob = await deps.file(e.hash).catch(() => undefined);
-      if (blob) copies.push({ name: e.name, bytes: new Uint8Array(await blob.arrayBuffer()) });
+      if (blob) copies.push({ name: e.name, bytes: await copyBytes(bridge, e.name, blob) });
     } else {
       const file = await deps.fileOf?.(e.hash).catch(() => null);
       if (file) files.push(file);

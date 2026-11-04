@@ -9,6 +9,8 @@
  * records (a ZIP64 end-of-directory record and its locator, and a ZIP64 extra field on every entry), which every current
  * unzip tool reads; a smaller archive is plain ZIP, as before. Both are read.
  */
+import { asBlob, isDisk, joined } from "./disk-file";
+
 export interface ZipInput {
   name: string;
   data: Blob;
@@ -180,6 +182,8 @@ export async function writeZip(entries: readonly ZipInput[], when = new Date(), 
   ev.setUint16(10, need64 ? 0xffff : entries.length, true);
   ev.setUint32(12, need64 ? LIMIT : cdSize, true);
   ev.setUint32(16, need64 ? LIMIT : offset, true);
+  // (with a file too big for the page in it: the same bytes, read from where they lie as far as is asked)
+  if (entries.some((e) => isDisk(e.data))) return asBlob(joined([...parts, ...central, ...tail, end].map((p) => (isDisk(p) ? p : p instanceof Blob ? p : new Blob([p as BlobPart]))), "application/zip"));
   return new Blob([...parts, ...central, ...tail, end], { type: "application/zip" });
 }
 

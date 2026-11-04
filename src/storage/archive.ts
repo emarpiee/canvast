@@ -22,6 +22,7 @@ import type { Bookmark } from "./bookmarks";
 import { readBookmarks } from "./bookmarks";
 import type { BoardRecord, CanvasRecord, FrameStoreRecord, ObjectRecord, StoredView, WorkspaceRecord } from "./workspace-repo";
 import type { ZipEntry, ZipInput } from "./zip";
+import { hashOf } from "./disk-file";
 import { ZipError, readZip, verifyEntry, writeZip } from "./zip";
 
 /**
@@ -373,8 +374,8 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       sealedReads.push({ input, file: r.file! });
       continue;
     }
-    // Too big to read into the page (a card of the desktop build): not in the backup, counted with the missing.
-    if (r.ext && r.size > MAX_IMPORT_BYTES && !noBytes) {
+    // Too big to read into the page, in a build that cannot write it a part at a time: not in the backup, counted with the missing.
+    if (r.ext && r.size > MAX_IMPORT_BYTES && !noBytes && !externalFolder.takesBig) {
       missingAssets.push(hash);
       continue;
     }
@@ -821,12 +822,16 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
       if (org) plan.organization.set(hash, org);
       continue;
     }
-    if (!e || e.size > MAX_IMPORT_BYTES || !posInt(a["pixelW"]) || !posInt(a["pixelH"])) {
+    if (e && e.size > MAX_IMPORT_BYTES && !externalFolder.takesBig) {
+      problems.push(`Library item “${label}” is larger than ${MAX_IMPORT_BYTES / 2 ** 20} MiB, too big for this build, and was skipped. The desktop app takes it.`);
+      continue;
+    }
+    if (!e || !posInt(a["pixelW"]) || !posInt(a["pixelH"])) {
       problems.push(`Library item “${label}” is missing or invalid in the archive and was skipped.`);
       continue;
     }
     // The bytes are read for the hash and let go: the plan keeps a slice of the file, read again when it is written (ADR 0176).
-    if ((await sha256Hex(await e.data.arrayBuffer())) !== hash) {
+    if ((e.size > MAX_IMPORT_BYTES ? await hashOf(e.data) : await sha256Hex(await e.data.arrayBuffer())) !== hash) {
       problems.push(`Library item “${label}” does not match its content hash (damaged) and was skipped.`);
       continue;
     }
@@ -855,7 +860,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
       if (!isObj(s) || typeof s["hash"] !== "string" || !HASH_RE.test(s["hash"]) || typeof s["file"] !== "string" || sealedSeen.has(s["hash"]) || valid.has(s["hash"])) continue;
       const e = parts[i]!.entries.get(s["file"]);
       const head = e ? new Uint8Array(await e.data.slice(0, 8).arrayBuffer()) : null;
-      if (!e || !head || e.size < 28 || e.size > MAX_IMPORT_BYTES + 2 ** 22 || (e.size > 64 && !isFileV2(head) && e.size > MAX_IMPORT_BYTES + 28)) {
+      if (!e || !head || e.size < 28 || (!externalFolder.takesBig && e.size > MAX_IMPORT_BYTES + 2 ** 22) || (e.size > 64 && !isFileV2(head) && e.size > MAX_IMPORT_BYTES + 28)) {
         problems.push("A hidden item's sealed file is missing or damaged in the archive and was skipped.");
         continue;
       }
@@ -1006,10 +1011,12 @@ async function stageOriginals(db: IDBDatabase, assets: readonly AssetRecord[], p
     })();
     const fresh = batch.filter((_, k) => !have[k]);
     if (fresh.length) {
-      const files = writer ? await writer(fresh.filter((a) => !hidden?.(a.hash))) : new Map<string, string>();
+      // (one too big to keep in the page's storage goes to the folder even when hidden: it is sealed there)
+      const files = writer ? await writer(fresh.filter((a) => !hidden?.(a.hash) || a.size > MAX_IMPORT_BYTES)) : new Map<string, string>();
       const loaded = await Promise.all(
         fresh.map(async (a): Promise<AssetRecord> => {
           const file = files.get(a.hash);
+          if (!file && a.size > MAX_IMPORT_BYTES) throw new ArchiveError(`“${a.name}” could not be written to the workspace folder`);
           return file ? { ...a, blob: new Blob([]), ext: 1, file } : { ...a, blob: new Blob([await a.blob.arrayBuffer()], { type: a.type }) };
         }),
       );

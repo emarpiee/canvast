@@ -9,7 +9,9 @@ import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { GifFrames } from "./gif";
 import { probeMp4 } from "./mp4-probe";
 import { makeFileCardFrom } from "./adapters";
-import { artCardPicture, artFileOf, isArtFile } from "./art-preview";
+import { MAX_IMPORT_BYTES } from "../storage/disk-file";
+import { externalFolder } from "../storage/external-folder";
+import { artCardPicture, isArtFile } from "./art-preview";
 import { FILE_CARD_H, FILE_CARD_W, cardFromPicture, makeCard } from "./card";
 import { describeFile, isCard, isMediaType } from "./file-kind";
 
@@ -49,7 +51,7 @@ export interface AssetRecord {
 }
 
 /** Largest accepted import, to fail fast instead of exhausting memory. */
-export const MAX_IMPORT_BYTES = 256 * 1024 * 1024;
+export { MAX_IMPORT_BYTES };
 
 /** The long edge of an art file's card on a canvas. */
 const ART_CARD_EDGE = 800;
@@ -257,11 +259,14 @@ export class AssetLibrary {
    * size), from its SHA-256 read in the main process. It opens in the system's app for its kind.
    * shortcut: a card only, no picture or playback; serve the file to the page from disk to show or play it.
    */
+  /** Set in the desktop build: a file too big to read into the page, into the workspace folder. `path` is null when the library has that content already. */
+  bigImport: ((file: Blob & { name?: string }) => Promise<{ hash: string; path: string | null }>) | null = null;
+
   async importLargeFound(name: string, type: string, size: number, hash: string, at: string): Promise<ImportOutcome> {
     const existing = await this.record(hash);
     if (existing) return { record: existing, duplicate: "present" };
     // (an art file's card has the shape of the picture it keeps, read from its file a part at a time)
-    const parts = isArtFile(name) ? await artFileOf({ hash, size, file: at, blob: new Blob([]) }) : null;
+    const parts = isArtFile(name) ? await externalFolder.fileOf({ hash, size, file: at, blob: new Blob([]) }) : null;
     const art = parts && (await artCardPicture(parts, name).catch(() => null));
     const shape = art && (await shapeOfPicture(art));
     const record: AssetRecord = { hash, type, size, name, pixelW: shape ? shape.w : FILE_CARD_W, pixelH: shape ? shape.h : FILE_CARD_H, blob: new Blob([]), importedAt: Date.now(), card: true, file: at };
@@ -272,7 +277,12 @@ export class AssetLibrary {
   }
 
   async importFileDetailed(file: Blob & { name?: string }, keepDecoded = true, /** A file of the workspace folder, kept where it is (desktop build). */ at?: string): Promise<ImportOutcome> {
-    if (file.size > MAX_IMPORT_BYTES) throw new ImportError(`file is larger than ${MAX_IMPORT_BYTES / 2 ** 20} MiB`);
+    if (file.size > MAX_IMPORT_BYTES) {
+      // (the desktop build copies it into the workspace folder a part at a time, and takes it in where it lies)
+      if (at || !this.bigImport) throw new ImportError(`file is larger than ${MAX_IMPORT_BYTES / 2 ** 20} MiB`);
+      const big = await this.bigImport(file);
+      return this.importLargeFound(file.name ?? "", file.type || "application/octet-stream", file.size, big.hash, big.path ?? "");
+    }
     const type = file.type || "application/octet-stream";
     const bytes = await file.arrayBuffer();
     const hash = await sha256Hex(bytes);
@@ -571,7 +581,7 @@ export class AssetLibrary {
   private async cardOf(rec: AssetRecord, size = { w: rec.pixelW, h: rec.pixelH }, /** A note's page width (a smaller copy keeps the full card's). */ layoutW?: number): Promise<ImageBitmap> {
     // A custom thumbnail stands for a file card on a canvas too (never a hidden one: see `customPicture`).
     // (and an art file's card shows the picture the file keeps)
-    const own = (await this.customPicture?.(rec.hash).catch(() => null)) ?? (isArtFile(rec.name) ? await artCardPicture(await artFileOf(rec), rec.name) : null);
+    const own = (await this.customPicture?.(rec.hash).catch(() => null)) ?? (isArtFile(rec.name) ? await artCardPicture(await externalFolder.fileOf(rec), rec.name) : null);
     if (own) {
       try {
         return await cardFromPicture(own, size);

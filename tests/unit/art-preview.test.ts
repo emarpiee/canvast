@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { artPicture, isArtFile, psdPixels } from "../../src/assets/art-preview";
+import { DiskFile, asBlob } from "../../src/storage/disk-file";
 import { writeZip } from "../../src/storage/zip";
 import { chipOf, describeFile, isAutoCopy } from "../../src/assets/file-kind";
 
@@ -165,18 +166,15 @@ describe("pictures art files keep", () => {
     const dataAt = head.length;
     const size = dataAt + w * h * 3;
     let most = 0;
-    const file = {
-      size,
-      part: async (from: number, to: number): Promise<Uint8Array> => {
-        most = Math.max(most, to - from);
-        const out = new Uint8Array(Math.min(to, size) - from);
-        for (let i = 0; i < out.length; i++) {
-          const at = from + i;
-          out[i] = at < dataAt ? head[at]! : Math.floor(((at - dataAt) % (w * h)) / w) % 2 ? 200 : 100;
-        }
-        return out;
-      },
-    };
+    const file = asBlob(new DiskFile(async (from, to) => {
+      most = Math.max(most, to - from);
+      const out = new Uint8Array(to - from);
+      for (let i = 0; i < out.length; i++) {
+        const at = from + i;
+        out[i] = at < dataAt ? head[at]! : Math.floor(((at - dataAt) % (w * h)) / w) % 2 ? 200 : 100;
+      }
+      return out;
+    }, size));
     const got = await psdPixels(file, 1_000_000);
     expect(most).toBeLessThanOrEqual(16 * 2 ** 20);
     expect([got!.w, got!.h]).toEqual([500, 1500]);

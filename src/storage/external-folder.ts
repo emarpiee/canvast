@@ -9,6 +9,7 @@
 import { sha256Hex } from "../assets/sha256";
 import { extOf } from "../assets/file-kind";
 import { done, idbGet, idbPut, req } from "./idb";
+import { DiskFile, MAX_IMPORT_BYTES, asBlob, writeProven, type FileStream } from "./disk-file";
 import { SEAL_OVERHEAD, isHiddenFile } from "./hidden-vault";
 
 export type FolderState = "none" | "ready" | "needs-permission" | "unavailable";
@@ -26,18 +27,14 @@ export interface Dir {
   hashOf?(name: string): Promise<string | null>;
   /** Some of a file's bytes without reading the rest into the page (the desktop build's workspace folder), or null when it is not there. */
   partOf?(name: string, from: number, to: number): Promise<Uint8Array | null>;
+  /** Writes a part at a time (the desktop build's workspace folder): a file too big to read into the page. */
+  stream?: FileStream & { begin(name: string, replace?: boolean): Promise<string> };
   queryPermission?(o: { mode: "readwrite" }): Promise<PermissionState>;
   requestPermission?(o: { mode: "readwrite" }): Promise<PermissionState>;
 }
 interface FileHandle {
   getFile(): Promise<File>;
   createWritable(): Promise<{ write(b: Blob): Promise<void>; close(): Promise<void> }>;
-}
-
-/** A file read a part at a time, for one too big to read into the page. */
-export interface FileParts {
-  readonly size: number;
-  part(from: number, to: number): Promise<Uint8Array>;
 }
 
 export class FolderError extends Error {}
@@ -176,7 +173,7 @@ class ExternalFolder {
    * The desktop build's hidden items (ADR 0177): a file under `.hidden/` is sealed, and is read through this (null while the
    * key is locked). Unset elsewhere.
    */
-  unseal: { open(blob: Blob): Promise<Blob | null>; ready(): boolean } | null = null;
+  unseal: { open(blob: Blob): Promise<Blob | null>; openAt?(raw: Blob): Promise<DiskFile | null>; ready(): boolean } | null = null;
 
   /** Tests only: a stand-in directory cannot be saved in the database (it has functions), so it is used for the session. */
   saveHandle = true;
@@ -223,6 +220,10 @@ class ExternalFolder {
   /** Write the file, read it back and compare it with the hash. Throws when it cannot be proven stored. */
   async write(hash: string, blob: Blob, file = hash): Promise<void> {
     if (!this.dir || !HASH_RE.test(hash) || !this.naming.valid(hash, file)) throw new FolderError("the library folder is not available");
+    if (blob.size > MAX_IMPORT_BYTES && this.dir.stream) {
+      await writeProven(this.dir.stream, await this.dir.stream.begin(file), blob, hash);
+      return;
+    }
     try {
       const fh = await this.dir.getFileHandle(file, { create: true });
       const w = await fh.createWritable();
@@ -245,6 +246,7 @@ class ExternalFolder {
    */
   async read(hash: string, size: number, type = "", file = hash): Promise<Blob | null> {
     if (!this.dir || this.status !== "ready" || !this.naming.valid(hash, file)) return null;
+    if (size > MAX_IMPORT_BYTES && this.dir.partOf) return this.big(hash, size, file, type);
     try {
       let f: Blob = await (await this.dir.getFileHandle(file)).getFile();
       if (isHiddenFile(file)) {
@@ -269,25 +271,42 @@ class ExternalFolder {
     }
   }
 
-  /** A file too big to read into the page, for reading parts of it; null when it is not there, or sealed. */
-  async parts(hash: string, size: number, file = hash): Promise<FileParts | Blob | null> {
-    if (!this.dir || this.status !== "ready" || isHiddenFile(file) || !this.naming.valid(hash, file)) return null;
-    const dir = this.dir;
-    if (!dir.partOf) return this.readRaw(file); // (a browser's file is only read as far as it is asked)
-    return {
-      size,
-      part: async (from, to) => {
-        const got = await dir.partOf!(file, from, to);
-        if (!got) throw new FolderError(`${file} is not there`);
-        return got;
-      },
-    };
+  /** Whether this folder can take files too big to read into the page (the desktop build). */
+  get takesBig(): boolean {
+    return !!this.dir?.stream && !!this.dir.partOf;
+  }
+
+  /** A file of the folder as it lies, standing in for a Blob: read a part at a time. */
+  private atDisk(file: string, size: number, type = ""): DiskFile {
+    const dir = this.dir!;
+    return new DiskFile(async (from, to) => {
+      const got = await dir.partOf!(file, from, to);
+      if (!got) throw new FolderError(`${file} is not there`);
+      return got;
+    }, size, type);
+  }
+
+  /** A file too big to read into the page, readable (a hidden one opened with the key, as far as is asked): null when it is not there or locked. In a browser, a file is only read as far as it is asked anyway. */
+  async big(hash: string, size: number, file = hash, type = ""): Promise<Blob | null> {
+    if (!this.dir || this.status !== "ready" || !this.naming.valid(hash, file)) return null;
+    if (!this.dir.partOf) return isHiddenFile(file) ? null : this.readRaw(file);
+    if (!isHiddenFile(file)) return asBlob(this.atDisk(file, size, type));
+    const [raw] = this.dir.sizes ? await this.dir.sizes([file]) : [null];
+    const opened = raw ? await this.unseal?.openAt?.(asBlob(this.atDisk(file, raw))) : null;
+    return opened ? asBlob(opened.slice(0, opened.size, type)) : null;
+  }
+
+  /** An item's file to read: its bytes, or, too big for the page (its record has none), from where it lies. */
+  async fileOf(rec: { hash: string; size: number; file?: string | undefined; blob: Blob }): Promise<Blob> {
+    return rec.blob.size || !rec.size ? rec.blob : ((await this.big(rec.hash, rec.size, rec.file)) ?? rec.blob);
   }
 
   /** A file of the folder as it is on disk (a sealed hidden file stays sealed), or null when it is not there. */
   async readRaw(file: string): Promise<Blob | null> {
     if (!this.dir || this.status !== "ready" || !this.naming.valid("0".repeat(64), file)) return null;
     try {
+      const [size] = this.dir.partOf && this.dir.sizes ? await this.dir.sizes([file]) : [null];
+      if (size && size > MAX_IMPORT_BYTES) return asBlob(this.atDisk(file, size));
       return await (await this.dir.getFileHandle(file)).getFile();
     } catch {
       return null;
@@ -299,7 +318,7 @@ class ExternalFolder {
     if (!isHiddenFile(file)) return (await this.read(hash, size, "", file)) !== null;
     if (!this.dir || this.status !== "ready" || !this.naming.valid(hash, file)) return false;
     try {
-      return (await (await this.dir.getFileHandle(file)).getFile()).size >= size + SEAL_OVERHEAD;
+      return ((await this.readRaw(file))?.size ?? 0) >= size + SEAL_OVERHEAD; // (a big one is not read to know its size)
     } catch {
       return false;
     }

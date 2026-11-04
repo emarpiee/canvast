@@ -1,3 +1,4 @@
+import type { FileStream } from "./disk-file";
 /**
  * What the desktop build's preload gives the page as `window.canvastDesktop` (ADR 0177). Absent in the browser build,
  * which is how the app knows where it runs. Types only, shared by the page and `desktop/preload.ts`.
@@ -81,6 +82,17 @@ export interface DesktopBridge {
   read(path: string): Promise<Uint8Array | null>;
   /** The bytes of a file from one place to another (at most 64 MiB), or null when there is no such file. */
   part(path: string, from: number, to: number): Promise<Uint8Array | null>;
+  /** A file too big to read into the page, written a part at a time (see `FileStream`). */
+  stream: FileStream & {
+    /** Into the workspace folder. */
+    begin(path: string, replace?: boolean): Promise<string>;
+    /** Where the person chooses in the system's dialog; null when they do not. */
+    save(name: string): Promise<{ id: string; path: string } | null>;
+    /** Into a folder `exportTo` began. */
+    intoExport(exportId: string, path: string): Promise<string>;
+    /** A readable copy in the app's own temporary folder, deleted as `openCopy`'s are. */
+    copy(name: string): Promise<string>;
+  };
   /** The first kilobyte of a file as text (a canvas file's header), or null when there is no such file. */
   head(path: string): Promise<string | null>;
   /** Whether a file is there. */
@@ -99,9 +111,9 @@ export interface DesktopBridge {
    * only) and opened there (the answer as `openFile`'s). `dropOpened` deletes every such copy: when the hidden items are locked, and
    * when the app closes (the next start deletes any a crash left).
    */
-  openCopy(name: string, bytes: Uint8Array): Promise<string>;
+  openCopy(name: string, bytes: Uint8Array | string): Promise<string>;
   /** Real files on the system clipboard: `files` in the workspace, and `copies` written like `openCopy`'s (hidden items). How many. */
-  copyFiles(files: readonly string[], copies: ReadonlyArray<{ name: string; bytes: Uint8Array }>): Promise<number>;
+  copyFiles(files: readonly string[], copies: ReadonlyArray<{ name: string; bytes: Uint8Array | string }>): Promise<number>;
   dropOpened(): Promise<void>;
   /** Show a file of the workspace folder in the system's file manager (its folder opened, the file selected). */
   showFile(path: string): Promise<void>;

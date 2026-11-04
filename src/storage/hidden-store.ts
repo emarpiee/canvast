@@ -6,7 +6,8 @@
 import type { DesktopBridge } from "./desktop-bridge";
 import type { HiddenState, HiddenStore } from "./store";
 import type { VaultRecord } from "./hidden-vault";
-import { SEALED_COPY_RE, createVault, holdsKey, keyCheck, needsUpgrade, openBytes, openFile, openText, openVault, readVault, rewrapVault, sameKey, sealBytes, sealFile, sealText } from "./hidden-vault";
+import { DiskFile, MAX_IMPORT_BYTES, hashOf } from "./disk-file";
+import { SEALED_COPY_RE, createVault, holdsKey, keyCheck, needsUpgrade, openBytes, openFile, openFileAt, openText, openVault, readVault, rewrapVault, sameKey, sealBytes, sealFile, sealFileTo, sealText } from "./hidden-vault";
 
 export const HIDDEN_JSON = ".canvast/hidden.json";
 /**
@@ -308,6 +309,11 @@ export class HiddenVault implements HiddenStore {
     // (in their folders too; the folders' names, sealed with the other key, are moved by the next write to this key's names)
     for (const { path } of await this.bridge.tree(".hidden")) {
       if (!SEALED_COPY_RE.test(path)) continue;
+      const [size] = await this.bridge.sizes([path]);
+      if (size && size > MAX_IMPORT_BYTES) {
+        if (!(await this.sealBigAgain(path, size, other))) return false;
+        continue;
+      }
       const bytes = (await this.bridge.read(path)) as Uint8Array<ArrayBuffer> | null;
       if (!bytes || !this.key || (await openFile(this.key, bytes))) continue;
       const opened = await openFile(other, bytes);
@@ -325,6 +331,45 @@ export class HiddenVault implements HiddenStore {
   async seal(bytes: Uint8Array<ArrayBuffer>, item: object): Promise<Uint8Array<ArrayBuffer>> {
     if (!this.key) throw new Error("the Hidden items are locked");
     return sealFile(this.key, bytes, item);
+  }
+
+  /** `sealAgain` for one file too big to read into the page: written beside itself and read back before it takes the old one's place. Whether it did. */
+  private async sealBigAgain(path: string, size: number, other: CryptoKey): Promise<boolean> {
+    if (!this.key) return false;
+    const raw = new DiskFile(async (from, to) => (await this.bridge.part(path, from, to)) ?? new Uint8Array(0), size);
+    if (await openFileAt(this.key, raw)) return true;
+    const opened = await openFileAt(other, raw);
+    if (!opened) return true;
+    const hash = await hashOf(opened.file);
+    const stream = this.bridge.stream;
+    const id = await stream.begin(path, true);
+    try {
+      await sealFileTo(this.key, opened.file, opened.item ?? {}, (b) => stream.append(id, b));
+      const written = await stream.finish(id);
+      const back = await openFileAt(this.key, new DiskFile((from, to) => stream.read(id, from, to), written.size));
+      if (!back || (await hashOf(back.file)) !== hash) throw new Error("did not open back the same");
+      await stream.commit(id);
+      return true;
+    } catch {
+      await stream.abort(id).catch(() => undefined);
+      return false;
+    }
+  }
+
+  /** Seal a file of any size into `put`, a part at a time: the same file `seal` makes. */
+  async sealTo(src: Blob | DiskFile, item: object, put: (bytes: Uint8Array<ArrayBuffer>) => Promise<void>): Promise<void> {
+    if (!this.key) throw new Error("the Hidden items are locked");
+    return sealFileTo(this.key, src, item, put);
+  }
+
+  /** A sealed file of any size opened where it lies, read as far as is asked; null while locked, when no key opens it, or for a version 1 file. */
+  async openAt(raw: Blob | DiskFile): Promise<{ file: DiskFile; item: Record<string, unknown> | null } | null> {
+    if (!this.key) return null;
+    for (const key of [this.key, ...this.others.values()]) {
+      const opened = await openFileAt(key, raw);
+      if (opened) return opened;
+    }
+    return null;
   }
 
   /** The original of a sealed file, or null while locked (or when it does not open). */

@@ -1,3 +1,6 @@
+import { desktopBridge } from "../storage/desktop-bridge";
+import { hashOf, isDisk, writeProven } from "../storage/disk-file";
+import { externalFolder } from "../storage/external-folder";
 import type { AssetLibrary } from "../assets/asset-library";
 import { describeFile, viewableBlob } from "../assets/file-kind";
 
@@ -10,7 +13,16 @@ export interface FileActions {
 export const fileActionsOf = (name: string, type: string): FileActions => ({ canOpen: describeFile(name, type).openIn !== null });
 
 /** Save a blob under a name (the browser's download). */
-export function saveFile(name: string, blob: Blob): void {
+export async function saveFile(name: string, blob: Blob): Promise<boolean> {
+  if (isDisk(blob)) {
+    // Too big to pass through the page: where the person chooses, a part at a time, read back before it is there.
+    const stream = desktopBridge()!.stream;
+    const place = await stream.save(name);
+    if (!place) return false;
+    const want = await hashOf(blob);
+    await writeProven(stream, place.id, blob, want);
+    return true;
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -20,22 +32,14 @@ export function saveFile(name: string, blob: Blob): void {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  return true;
 }
 
 /** Save a copy of the original, under its own name. Returns false when the original is not stored. */
 export async function downloadOriginal(assets: AssetLibrary, hash: string): Promise<boolean> {
   const rec = await assets.record(hash);
   if (!rec) return false;
-  const url = URL.createObjectURL(rec.blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = rec.name || `file-${hash.slice(0, 8)}`;
-  a.hidden = true;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
-  return true;
+  return saveFile(rec.name || `file-${hash.slice(0, 8)}`, await externalFolder.fileOf(rec));
 }
 
 /** Show a PDF or a text file in a new tab. It is opened as a typed copy (a PDF as a PDF, text as plain text), never as a page. */

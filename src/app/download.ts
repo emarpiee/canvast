@@ -9,6 +9,7 @@ import { cropOf, isNeutral } from "../doc/adjust";
 import { renderedPicture } from "../render/adjust-image";
 import type { AssetLibrary } from "../assets/asset-library";
 import type { SettingsStore } from "../settings/settings";
+import { externalFolder } from "../storage/external-folder";
 import { writeZip } from "../storage/zip";
 import type { ZipInput } from "../storage/zip";
 import { saveFile } from "../ui/file-actions";
@@ -43,7 +44,7 @@ export async function downloadSelection(doc: DocumentStore, editor: EditorState,
     const base = safeName(rec.name, `file-${o.assetId.slice(0, 8)}`);
     if (!done.has(o.assetId)) {
       done.add(o.assetId); // (one original, however many times it is on the canvas)
-      entries.push({ name: free(taken, base), data: rec.blob });
+      entries.push({ name: free(taken, base), data: await externalFolder.fileOf(rec) });
     }
     const changed = !!o.crop || !!o.flipX || !!o.flipY || !isNeutral(o.adjust);
     if (!changed) continue;
@@ -63,13 +64,13 @@ export async function downloadSelection(doc: DocumentStore, editor: EditorState,
   }
   let how: string;
   if (entries.length === 1) {
-    saveFile(entries[0]!.name, entries[0]!.data);
+    await saveFile(entries[0]!.name, entries[0]!.data);
     how = entries[0]!.name;
   } else {
     const d = new Date();
     const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}-${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`;
     const name = `canvast-files-${stamp}.zip`;
-    saveFile(name, await writeZip(entries));
+    await saveFile(name, await writeZip(entries));
     how = `${name} (${entries.length} files)`;
   }
   editor.message =

@@ -643,6 +643,10 @@ export class WorkspaceMirror {
   importSealed(files: ReadonlyArray<{ hash: string; data: Blob }>, key: string | null): Promise<number> {
     return this.lib.importSealed(files, key);
   }
+  /** A file too big to read into the page, imported (see LibraryMirror.importBig): not queued, as it takes as long as the copy. */
+  importBig(file: Blob & { name?: string }): Promise<{ hash: string; path: string | null }> {
+    return this.lib.importBig(file);
+  }
   /** An import's originals, written straight into `library/` (see LibraryMirror.writeOriginals). */
   writeOriginals(batch: readonly AssetRecord[]): Promise<Map<string, string>> {
     return this.lib.writeOriginals(batch);

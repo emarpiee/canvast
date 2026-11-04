@@ -61,7 +61,6 @@ export async function buildFilesZip(db: IDBDatabase, workspaceId: string, scope:
     if (blob) inputs.push({ name: f.path, data: blob });
     else missing++;
   }
-  // shortcut: the ZIP is made in memory (its files are read one at a time, then written together); stream it to disk for exports of many GB.
   return { blob: await writeZip(inputs, new Date(), false, (d, n) => progress?.("Writing the ZIP", d, n)), files: inputs.length, missing, paths: inputs.map((i) => i.name) };
 }
 
@@ -107,8 +106,8 @@ export async function planFiles(db: IDBDatabase, workspaceId: string, scope: Exp
     rows.push({ hash, rec, entry: await libraryIn(tx, snap).entry(hash) });
   }
   for (let i = rows.length - 1; i >= 0; i--) {
-    if (rows[i]!.rec.ext && rows[i]!.rec.size > MAX_IMPORT_BYTES) {
-      rows.splice(i, 1); // (too big to read into the page: left out, and counted as not included)
+    if (rows[i]!.rec.ext && rows[i]!.rec.size > MAX_IMPORT_BYTES && !externalFolder.takesBig) {
+      rows.splice(i, 1); // (too big to read into the page, and this build cannot write it a part at a time: left out, and counted as not included)
       missing++;
     }
   }

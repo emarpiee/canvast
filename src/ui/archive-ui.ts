@@ -1,3 +1,5 @@
+import { isDisk, pipeInto } from "../storage/disk-file";
+import { saveFile } from "./file-actions";
 import { LIBRARY_FILE, externalFolder } from "../storage/external-folder";
 import type { FolderFiles } from "../storage/archive";
 import type { Session } from "../app/session";
@@ -29,19 +31,6 @@ function tell(session: Session, message: string): void {
 /** A storage job's report as a progress notice: the stage in words with "n of m", and the bar for that stage. */
 const stages = (p: Progress) => (stage: string, done: number, total: number): void => p.update(total > 0 ? done / total : null, `${stage}${total > 1 ? ` (${done} of ${total})` : ""}`);
 
-/** Hand a Blob to the browser's download mechanism. */
-function download(blob: Blob, fileName: string): void {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  a.hidden = true;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  // The download has started reading by now; keep the URL briefly for slow starts.
-  setTimeout(() => URL.revokeObjectURL(url), 60_000);
-}
 
 export async function runExport(session: Session, asked: ExportScope): Promise<boolean> {
   const hiddenChosen = await scopeWithHiddenChoice(session, asked);
@@ -51,7 +40,7 @@ export async function runExport(session: Session, asked: ExportScope): Promise<b
   try {
     const r = await session.exportArchive(scope, stages(p));
     p.update(null, "handing the file over");
-    download(r.blob, r.fileName);
+    if (!(await saveFile(r.fileName, r.blob))) return p.done("Nothing was exported."), false;
     const missing = r.manifest.missingAssets.length;
     const inc = r.manifest.incremental;
     const kept = r.manifest.assets.filter((a) => a.file).length;
@@ -88,7 +77,7 @@ export async function runExportFiles(session: Session, asked: ExportScope): Prom
       return false;
     }
     p.update(null, "handing the file over");
-    download(r.blob, r.fileName);
+    if (!(await saveFile(r.fileName, r.blob))) return p.done("Nothing was exported."), false;
     p.done(`Exported ${r.fileName} (${fmtBytes(r.blob.size)}; ${plural(r.files, "file")}).` + (r.missing ? ` ${plural(r.missing, "file")} ${were(r.missing)} missing and ${be(r.missing)} not included.` : ""));
     return true;
   } catch (e) {
@@ -124,7 +113,7 @@ export async function runExportFolder(session: Session, folder: { id: string; na
     if (how.startsWith("zip")) {
       const r = await session.exportFiles(scope, layout, stages(p));
       p.update(null, "handing the file over");
-      download(r.blob, `${safeName(folder.name, "Folder")}.zip`);
+      if (!(await saveFile(`${safeName(folder.name, "Folder")}.zip`, r.blob))) return p.done("Nothing was exported."), false;
       p.done(`Exported ${safeName(folder.name, "Folder")}.zip (${fmtBytes(r.blob.size)}; ${plural(r.files, "file")}).` + (r.missing ? ` ${plural(r.missing, "file")} ${were(r.missing)} missing and ${be(r.missing)} not included.` : ""));
       return true;
     }
@@ -144,7 +133,14 @@ export async function runExportFolder(session: Session, folder: { id: string; na
           continue;
         }
         const path = top && f.path.startsWith(top) ? f.path.slice(top.length) : f.path;
-        if ((await bridge!.exportTo.write(out.id, path, new Uint8Array(await blob.arrayBuffer()))) === f.hash) written++;
+        if (isDisk(blob)) {
+          // (too big to pass through the page: a part at a time, read back before it is there)
+          const stream = bridge!.stream;
+          const id = await stream.intoExport(out.id, path);
+          const got = await pipeInto(stream, id, blob);
+          if (got.hash === f.hash) (await stream.commit(id), written++);
+          else (await stream.abort(id), failed.push(path));
+        } else if ((await bridge!.exportTo.write(out.id, path, new Uint8Array(await blob.arrayBuffer()))) === f.hash) written++;
         else failed.push(path);
       }
     } finally {

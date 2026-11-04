@@ -10,7 +10,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shel
 import { execFile } from "node:child_process";
 import { createHash, randomBytes, randomUUID, scrypt } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, watch, writeFileSync } from "node:fs";
-import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, utimes, writeFile } from "node:fs/promises";
+import { lstat, mkdir, open, type FileHandle, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, utimes, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { cleanWholeName } from "../src/doc/file-names";
 import { BOARDS_DIR, isSafeRelativePath } from "../src/storage/workspace-names";
@@ -283,6 +283,8 @@ async function walkFiles(dir: string, at: string): Promise<Array<{ path: string;
 
 /** Where hidden items opened in the system's app get their readable copies (see `canvast:openCopy`); emptied at start, lock and quit. */
 const OPENED_DIR = join(app.getPath("temp"), `canvast-opened-${createHash("sha256").update(app.getPath("userData")).digest("hex").slice(0, 12)}`);
+/** Readable copies the page wrote a part at a time: the only paths it can name to `openCopy` and `copyFiles`. */
+const copiedByStream = new Set<string>();
 const dropOpened = (): Promise<void> => rm(OPENED_DIR, { recursive: true, force: true });
 void dropOpened(); // (left by a crash)
 
@@ -414,6 +416,95 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
       throw err;
     }
   });
+  // A file too big to pass through the page at once: written a part at a time to a temporary file beside its place (swept like `writeAtomic`'s when a
+  // crash leaves one), made sure on the disk and read back for its SHA-256, and only then moved into its place.
+  const streams = new Map<string, { tmp: string; target: string; fh: FileHandle | null; replace: boolean; copy: boolean }>();
+  const begun = async (target: string, replace: boolean, copy = false): Promise<string> => {
+    await mkdir(dirname(target), { recursive: true, ...(copy ? { mode: 0o700 } : {}) });
+    const tmp = `${target}.tmp-${randomUUID()}`;
+    const id = randomUUID();
+    streams.set(id, { tmp, target, fh: await open(tmp, "w", copy ? 0o600 : 0o666), replace, copy });
+    return id;
+  };
+  const freeFile = (full: string): string => {
+    const dot = basename(full).lastIndexOf(".");
+    const stem = dot > 0 ? full.slice(0, full.length - (basename(full).length - dot)) : full;
+    const ext = dot > 0 ? basename(full).slice(dot) : "";
+    let out = full;
+    for (let n = 2; existsSync(out); n++) out = `${stem} (${n})${ext}`;
+    return out;
+  };
+  ipcMain.handle("canvast:stream", async (e, op: unknown, ...args: unknown[]) => {
+    own(e);
+    if (op === "begin") return begun(await inside(root, String(args[0])), args[1] === true);
+    if (op === "copy") return begun(join(OPENED_DIR, randomUUID(), cleanWholeName(basename(String(args[0])), "file")), false, true);
+    if (op === "save") {
+      const name = cleanWholeName(basename(String(args[0])), "file");
+      const chosen = process.env["CANVAST_EXPORT_DIR"] ? freeFile(join(process.env["CANVAST_EXPORT_DIR"], name)) : (await dialog.showSaveDialog(win, { title: "Save", defaultPath: name })).filePath;
+      if (!chosen) return null;
+      const realRoot = await realpath(root);
+      const dest = await realpath(dirname(chosen));
+      if (dest === realRoot || dest.startsWith(realRoot + sep)) throw new Error("choose a place outside the workspace");
+      return { id: await begun(chosen, true), path: chosen };
+    }
+    if (op === "export") {
+      const base = exports.get(String(args[0]));
+      const rel = args[1];
+      if (!base || typeof rel !== "string" || !isSafeRelativePath(rel)) throw new Error("not a path inside the export");
+      const full = resolve(base, ...rel.split("/"));
+      if (!full.startsWith(base + sep)) throw new Error("not a path inside the export");
+      return begun(full, true);
+    }
+    const s = streams.get(String(args[0]));
+    if (!s) throw new Error("no such write");
+    if (op === "append") {
+      if (!s.fh || !(args[1] instanceof Uint8Array)) throw new Error("not a part of a write");
+      await s.fh.appendFile(args[1]);
+      return;
+    }
+    if (op === "read") {
+      const from = args[1];
+      const to = args[2];
+      if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || (from as number) < 0 || (to as number) < (from as number) || (to as number) - (from as number) > 64 * 2 ** 20) throw new Error("not a part of a file");
+      const fh = await open(s.tmp, "r");
+      try {
+        const buf = Buffer.alloc((to as number) - (from as number));
+        const { bytesRead } = await fh.read(buf, 0, buf.length, from as number);
+        return new Uint8Array(buf.subarray(0, bytesRead));
+      } finally {
+        await fh.close();
+      }
+    }
+    if (op === "finish") {
+      if (s.fh) {
+        await s.fh.sync();
+        await s.fh.close();
+        s.fh = null;
+      }
+      const h = createHash("sha256");
+      let size = 0;
+      for await (const chunk of createReadStream(s.tmp)) {
+        h.update(chunk as Buffer);
+        size += (chunk as Buffer).length;
+      }
+      return { hash: h.digest("hex"), size };
+    }
+    if (op === "commit") {
+      if (s.fh) throw new Error("a write is committed once it is finished");
+      if (!s.replace && existsSync(s.target)) throw new Error("a file is already at that place");
+      await rename(s.tmp, s.target);
+      streams.delete(String(args[0]));
+      if (s.copy) copiedByStream.add(s.target);
+      return s.target;
+    }
+    if (op === "abort") {
+      streams.delete(String(args[0]));
+      await s.fh?.close().catch(() => undefined);
+      await rm(s.tmp, { force: true });
+      return;
+    }
+    throw new Error("a write call the app does not know");
+  });
   ipcMain.handle("canvast:part", async (e, rel: string, from: unknown, to: unknown) => {
     own(e);
     if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || (from as number) < 0 || (to as number) < (from as number) || (to as number) - (from as number) > 64 * 2 ** 20) throw new Error("not a part of a file");
@@ -486,7 +577,10 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
   // workspace; deleted on lock (the page asks), when the app quits, and at the next start for any a crash left.
   ipcMain.handle("canvast:openCopy", async (e, name: unknown, bytes: unknown) => {
     own(e);
-    if (typeof name !== "string" || !(bytes instanceof Uint8Array)) throw new Error("not a file to open");
+    if (typeof name !== "string") throw new Error("not a file to open");
+    // (a copy too big to pass through the page: already written, by the page, a part at a time)
+    if (typeof bytes === "string" && copiedByStream.has(bytes)) return process.env["CANVAST_NO_OPEN"] === "1" ? "" : shell.openPath(bytes);
+    if (!(bytes instanceof Uint8Array)) throw new Error("not a file to open");
     const dir = join(OPENED_DIR, randomUUID());
     await mkdir(dir, { recursive: true, mode: 0o700 });
     const file = join(dir, cleanWholeName(basename(name), "file"));
@@ -499,6 +593,10 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     if (!Array.isArray(rels) || !Array.isArray(copies)) throw new Error("not files to copy");
     const fulls = await Promise.all(rels.map((r) => inside(root, String(r))));
     for (const c of copies as Array<{ name?: unknown; bytes?: unknown }>) {
+      if (typeof c?.bytes === "string" && copiedByStream.has(c.bytes)) {
+        fulls.push(c.bytes);
+        continue;
+      }
       if (typeof c?.name !== "string" || !(c.bytes instanceof Uint8Array)) throw new Error("not a file to copy");
       const dir = join(OPENED_DIR, randomUUID());
       await mkdir(dir, { recursive: true, mode: 0o700 });

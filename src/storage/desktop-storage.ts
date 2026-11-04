@@ -48,6 +48,7 @@ export function bridgeDir(bridge: DesktopBridge, name: string, deleteTo: () => D
     sizes: (paths) => bridge.sizes(paths),
     hashOf: (path) => bridge.hash(path),
     partOf: (path, from, to) => bridge.part(path, from, to),
+    stream: bridge.stream,
   };
 }
 
@@ -69,6 +70,23 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     erase: (p) => (note(p), raw.erase(p)),
     makeFolder: (p) => (note(p), raw.makeFolder(p)),
     removeEmptyFolder: (p) => (note(p), raw.removeEmptyFolder(p)),
+    // (a long write's file arrives when it is committed: noted then, not when it began)
+    stream: (() => {
+      const paths = new Map<string, string>();
+      return {
+        ...raw.stream,
+        begin: async (p: string, replace?: boolean) => {
+          const id = await raw.stream.begin(p, replace);
+          paths.set(id, p);
+          return id;
+        },
+        commit: (id: string) => {
+          const p = paths.get(id);
+          if (p) (note(p), paths.delete(id));
+          return raw.stream.commit(id);
+        },
+      };
+    })(),
   };
   const ws = await bridge.workspace();
   if (!ws) throw new Error("the desktop app did not say which workspace folder is open");
@@ -95,6 +113,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
       const bytes = await hidden.open(new Uint8Array(await blob.arrayBuffer()));
       return bytes && new Blob([bytes]);
     },
+    openAt: async (raw) => (await hidden.openAt(raw))?.file ?? null,
     ready: () => hidden.isOpen(),
   };
   // An import's originals go straight into the workspace folder: nothing large passes through the app's storage (ADR 0177).
@@ -167,6 +186,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     partSplit: () => mirror.partSplit(),
     setPartSplit: (split) => mirror.setPartSplit(split),
     saveFile: (hash, bytes) => mirror.saveItemFile(hash, bytes, () => folderOn?.libraryChanged()),
+    importBig: (file) => mirror.importBig(file),
     start(on) {
       folderOn = on;
       mirror.importFiles = (files) => on.importFiles(files);

@@ -17,7 +17,7 @@
 // scrypt (version 2) or PBKDF2-SHA-256 (version 1) stretches the password into a key that unwraps (AES-KW) the data key; the data key
 // opens each file and the index (AES-256-GCM).
 import { createHash, scryptSync } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -150,6 +150,54 @@ async function openFile(key, sealed) {
   return { bytes: new Uint8Array(Buffer.concat(parts)), item: h.item ?? null };
 }
 
+/** Past this a sealed file is opened into a temporary file, a chunk at a time, not read into memory (Node reads at most 2 GiB in one go). */
+const LARGE = 2 ** 30;
+/** `openFile` for a large version 2 file: its chunks written to `tmp`; what it holds, its hash, its start and its size. Throws when it does not open. */
+async function openLarge(key, path, tmp) {
+  const fd = openSync(path, "r");
+  const out = openSync(tmp, "w", 0o600);
+  try {
+    const size = statSync(path).size;
+    const at = (from, n) => {
+      const b = Buffer.alloc(n);
+      return b.subarray(0, readSync(fd, b, 0, n, from));
+    };
+    const first = at(0, 24);
+    const len = first.readUInt32LE(20);
+    if (!first.subarray(0, 8).equals(MAGIC)) throw new Error("not a version 2 file");
+    const top = at(0, 24 + len);
+    const h = JSON.parse(new TextDecoder().decode(await subtle.decrypt({ name: "AES-GCM", iv: top.subarray(8, 20), additionalData: MAGIC }, key, top.subarray(24))));
+    const chunk = h.chunk;
+    const prefix = unb64(h.prefix);
+    const start = 24 + len;
+    const whole = chunk + 16;
+    const rest = size - start;
+    const n = Math.max(1, Math.ceil(rest / whole));
+    const sha = createHash("sha256");
+    let head = null;
+    let written = 0;
+    for (let i = 0; i < n; i++) {
+      const plain = Buffer.from(await subtle.decrypt({ name: "AES-GCM", iv: nonce(prefix, i, i === n - 1) }, key, at(start + i * whole, whole)));
+      head ??= plain.subarray(0, 4096);
+      sha.update(plain);
+      writeSync(out, plain);
+      written += plain.length;
+    }
+    return { tmp, item: h.item ?? null, hash: sha.digest("hex"), head, size: written };
+  } catch (e) {
+    closeSync(out);
+    rmSync(tmp, { force: true });
+    throw e;
+  } finally {
+    closeSync(fd);
+    try {
+      closeSync(out);
+    } catch {
+      // (closed above)
+    }
+  }
+}
+
 /** The hidden items' index: the library entries of the hidden items (as in library.json), sealed in hidden.json. */
 async function readIndex(record, key) {
   if (!record.index) return [];
@@ -181,7 +229,8 @@ function place(out, sub, name, bytes, taken) {
   const dir = sub ? join(out, ...sub.split("/")) : out;
   mkdirSync(dir, { recursive: true });
   const file = freeName(dir, name, taken, sub);
-  writeFileSync(join(dir, file), bytes);
+  if (bytes.tmp) renameSync(bytes.tmp, join(dir, file)); // (a large file, opened into a temporary file)
+  else writeFileSync(join(dir, file), bytes);
   return sub ? `${sub}/${file}` : file;
 }
 
@@ -212,7 +261,7 @@ function extOfBytes(b) {
  * Decrypt every hidden item of `workspace` into `out`: those of hidden.json and of each copy beside it the password opens, then every
  * sealed file of .hidden/ no entry named that one of their keys opens (as recovered-<hash>.<ext>). Returns how many were written.
  */
-export async function decryptHidden(workspace, out, password, { flat = false } = {}) {
+export async function decryptHidden(workspace, out, password, { flat = false, largeFrom = LARGE } = {}) {
   const vaults = [];
   let failed = null;
   // hidden.json, the copies a sync tool left beside it, and the spare of its key (when hidden.json is lost: files then come out as recovered-…).
@@ -226,6 +275,20 @@ export async function decryptHidden(workspace, out, password, { flat = false } =
     }
   }
   if (!vaults.length) throw failed ?? new Error(`no ${HIDDEN_JSON}: this workspace has no Hidden items password`);
+  const tryOpenPath = async (path) => {
+    if (statSync(path).size <= largeFrom) return tryOpen(new Uint8Array(readFileSync(path)));
+    mkdirSync(out, { recursive: true });
+    const tmp = join(out, `.opening-${createHash("sha256").update(path).digest("hex").slice(0, 16)}`);
+    for (const v of vaults) {
+      try {
+        const big = await openLarge(v.key, path, tmp);
+        return { bytes: big, item: big.item, hash: big.hash, head: big.head, size: big.size };
+      } catch {
+        // another key
+      }
+    }
+    return null;
+  };
   const tryOpen = async (sealed) => {
     for (const v of vaults) {
       try {
@@ -292,7 +355,7 @@ export async function decryptHidden(workspace, out, password, { flat = false } =
         console.warn(`missing: ${item.file} (${item.name})`);
         continue;
       }
-      const opened = await tryOpen(new Uint8Array(readFileSync(sealed)));
+      const opened = await tryOpenPath(sealed);
       if (!opened) {
         console.warn(`does not open: ${item.file} (${item.name})`);
         continue;
@@ -306,19 +369,22 @@ export async function decryptHidden(workspace, out, password, { flat = false } =
   // Sealed files no entry names: their entries were lost (or each is a sync tool's copy of one written above, then skipped by its content).
   for (const n of sealedFiles(workspace)) {
     if (files.has(n)) continue;
-    const opened = await tryOpen(new Uint8Array(readFileSync(join(workspace, ...n.split("/")))));
+    const opened = await tryOpenPath(join(workspace, ...n.split("/")));
     if (!opened) {
       console.warn(`does not open with this password: ${n}`);
       continue;
     }
     const { bytes, item: own } = opened;
-    const hash = createHash("sha256").update(bytes).digest("hex");
-    if (hashes.has(hash)) continue;
+    const hash = opened.hash ?? createHash("sha256").update(bytes).digest("hex");
+    if (hashes.has(hash)) {
+      if (bytes.tmp) rmSync(bytes.tmp, { force: true });
+      continue;
+    }
     // A version 2 file says what it was (its name, folder, tags…); one of version 1 is named by its content.
     const named = await fileName(n);
     const mine = own?.hash === hash && typeof own.name === "string";
-    const name = place(out, await whereOf(n, mine ? own : null), named ?? (mine ? own.name : `recovered-${hash.slice(0, 12)}.${extOfBytes(bytes)}`), bytes, taken);
-    written.push(mine ? { ...own, ...(named ? { name: named } : {}), file: n, hidden: true, writtenAs: name } : { hash, name: named ?? name, file: n, size: bytes.length, ...(named ? {} : { recovered: true }), writtenAs: name });
+    const name = place(out, await whereOf(n, mine ? own : null), named ?? (mine ? own.name : `recovered-${hash.slice(0, 12)}.${extOfBytes(opened.head ?? bytes)}`), bytes, taken);
+    written.push(mine ? { ...own, ...(named ? { name: named } : {}), file: n, hidden: true, writtenAs: name } : { hash, name: named ?? name, file: n, size: opened.size ?? bytes.length, ...(named ? {} : { recovered: true }), writtenAs: name });
     hashes.add(hash);
   }
   // Hidden custom thumbnails (`.hidden/thumbnails/`): each as thumbnails/<hash>.webp, which an item's `thumb` names.

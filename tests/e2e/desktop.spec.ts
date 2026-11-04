@@ -1,6 +1,6 @@
 import { _electron as electron, expect, test } from "@playwright/test";
 import type { ElectronApplication, Page } from "@playwright/test";
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
+import { appendFileSync, createReadStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
 import { createHash, scryptSync } from "node:crypto";
@@ -1240,6 +1240,103 @@ test("library files changed outside the app: a renamed or moved file is found by
       ["while_closed.png", "poses", true, 0],
     ]);
     expect(readdirSync(join(`${ws}-userdata`, "library-looks"))).toHaveLength(1);
+  } finally {
+    await app.close();
+  }
+});
+
+test("a file past what the page can hold (300 MiB): imported by the button, hidden and shown again, kept in a backup and brought back, every time the same bytes", async () => {
+  const ws = tempDir("canvast-ws-");
+  const hugeAt = (path: string, seed: number): string => {
+    // (mostly a hole: no disk used; its first and last bytes say which file it is)
+    const mark = Buffer.alloc(4096, seed);
+    writeFileSync(path, mark);
+    truncateSync(path, 300 * 2 ** 20);
+    appendFileSync(path, mark);
+    return path;
+  };
+  const shaOf = (path: string): Promise<string> => new Promise((done, fail) => {
+    const h = createHash("sha256");
+    createReadStream(path).on("data", (c) => h.update(c)).on("end", () => done(h.digest("hex"))).on("error", fail);
+  });
+  const source = hugeAt(`${ws}-huge_scan.tif`, 7);
+  const want = await shaOf(source);
+  const size = statSync(source).size;
+  let { app, page } = await launch(ws);
+  const listing = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, !!e.hidden, e.present, e.size, e.hash])));
+  const hid = (op: "set" | "check", pw: string) => page.evaluate(([o, p]) => window.__canvastDebug.hiddenOp(o as "set", p), [op, pw] as const);
+  const hide = (v: string) => page.evaluate(([h, x]) => window.__canvastDebug.libraryOp("hide", h!, x!), [want, v] as const);
+  const flush = () => page.evaluate(() => window.__canvastDebug.flushStorage());
+  const inLibrary = () => files(ws).filter((f) => f.startsWith("library/") && !/\.tmp-/.test(f));
+  const sealed = () => files(ws).filter((f) => f.startsWith(".hidden/"));
+  const item = ["huge_scan.tif", false, true, size, want];
+  try {
+    // Imported by the button: copied into the folder, the first write's temporary file gone; the same content again adds nothing.
+    await page.getByTestId("view-assets").click();
+    await page.getByTestId("assets-import-input").setInputFiles(source);
+    await expect.poll(listing, { timeout: 60_000 }).toEqual([item]);
+    await expect.poll(inLibrary).toHaveLength(1);
+    const placed = inLibrary()[0]!;
+    expect(await shaOf(join(ws, placed))).toBe(want);
+    await page.getByTestId("assets-import-input").setInputFiles(source);
+    await page.waitForTimeout(3000);
+    expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual([placed]);
+
+    // Hidden: sealed where nothing readable is left, in the same format the outside tool opens, whole and a chunk at a time.
+    expect(await hid("set", "pw")).toEqual({ ok: true, state: "open" });
+    await hide("1");
+    await flush();
+    await expect.poll(() => [inLibrary().length, sealed().length], { timeout: 90_000 }).toEqual([0, 1]);
+    const onDisk = join(ws, sealed()[0]!);
+    expect(statSync(onDisk).size).toBeGreaterThan(size);
+    expect(readFileSync(onDisk).subarray(0, 8).toString()).toBe("CVSTHID2");
+    expect(readFileSync(onDisk).includes(Buffer.alloc(4096, 7))).toBe(false);
+    const { decryptHidden } = (await import(join(process.cwd(), "scripts/hidden-items.mjs"))) as { decryptHidden: (ws: string, out: string, pw: string, o?: { flat?: boolean; largeFrom?: number }) => Promise<number> };
+    for (const largeFrom of [2 ** 30, 2 ** 20]) {
+      const out = tempDir("canvast-out-");
+      await decryptHidden(ws, out, "pw", { flat: true, largeFrom });
+      const got = readdirSync(out).filter((n) => n.endsWith(".tif"));
+      expect(got).toHaveLength(1);
+      expect(await shaOf(join(out, got[0]!))).toBe(want);
+      expect(readdirSync(out).filter((n) => n.startsWith(".opening-"))).toEqual([]);
+    }
+  } finally {
+    await app.close();
+  }
+  // After a restart, opened with the password: the sealed file holds it; the file back in the library is the same bytes, the sealed one gone.
+  ({ app, page } = await launch(ws));
+  try {
+    expect(await hid("check", "pw")).toMatchObject({ ok: true });
+    await expect.poll(listing, { timeout: 60_000 }).toEqual([["huge_scan.tif", true, true, size, want]]);
+    await hide("");
+    await flush();
+    await expect.poll(() => [inLibrary().length, sealed().length], { timeout: 90_000 }).toEqual([1, 0]);
+    expect(await shaOf(join(ws, inLibrary()[0]!))).toBe(want);
+    // A backup holds it: written where the person chose (tests name the place), a ZIP past 300 MiB that comes back whole in another workspace.
+    await page.getByTestId("view-canvas").click();
+    await page.getByTestId("save-status").click();
+    await page.getByTestId("set-export-full").click();
+    await page.getByTestId("choose-ok").click(); // (the passwords and privacy settings: left out)
+    const exports = `${ws}-exports`;
+    await expect.poll(() => (existsSync(exports) ? readdirSync(exports).filter((n) => n.endsWith(".canvast")) : []), { timeout: 120_000 }).toHaveLength(1);
+    await expect(page.getByTestId("toast")).toContainText(/Exported/, { timeout: 120_000 });
+  } finally {
+    await app.close();
+  }
+  const backup = join(`${ws}-exports`, readdirSync(`${ws}-exports`).find((n) => n.endsWith(".canvast"))!);
+  expect(statSync(backup).size).toBeGreaterThan(size);
+  const ws2 = tempDir("canvast-ws-");
+  ({ app, page } = await launch(ws2));
+  try {
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.session().tree?.length ?? 0)).toBe(1);
+    await page.getByTestId("save-status").click();
+    await page.getByTestId("set-import-input").setInputFiles(backup);
+    await Promise.all([page.waitForEvent("load", { timeout: 120_000 }), page.getByTestId("confirm-ok").click({ timeout: 120_000 })]);
+    await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
+    await expect.poll(listing, { timeout: 60_000 }).toEqual([item]);
+    const back = files(ws2).filter((f) => f.startsWith("library/") && !/\.tmp-/.test(f));
+    expect(back).toHaveLength(1);
+    expect(await shaOf(join(ws2, back[0]!))).toBe(want);
   } finally {
     await app.close();
   }

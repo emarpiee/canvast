@@ -4,6 +4,8 @@
  * A wrong password fails to unwrap, so unwrapping is also the check; a new password wraps the same key again, so no file is
  * encrypted again. WebCrypto only; nothing here touches storage.
  */
+import { DiskFile, WINDOW } from "./disk-file";
+
 export const VAULT_FORMAT = "canvast-hidden";
 /** PBKDF2 rounds of a version 1 vault (read, and upgraded to scrypt when opened). */
 export const VAULT_ITERATIONS = 600_000;
@@ -292,6 +294,72 @@ export async function openFile(key: CryptoKey, sealed: Uint8Array<ArrayBuffer>):
     at = end;
   }
   return { bytes: out, item: h.item };
+}
+
+/**
+ * Seal a file of any size into `put`, a part at a time, as the same version 2 file `sealFile` makes: nothing but a chunk is held. `src` is
+ * read in windows, so a chunk may straddle two of them.
+ */
+export async function sealFileTo(key: CryptoKey, src: Blob | DiskFile, item: object, put: (bytes: Uint8Array<ArrayBuffer>) => Promise<void>, chunk = FILE_CHUNK): Promise<void> {
+  const prefix = crypto.getRandomValues(new Uint8Array(7));
+  const hiv = crypto.getRandomValues(new Uint8Array(12));
+  const header = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: hiv, additionalData: MAGIC }, key, enc.encode(JSON.stringify({ v: 2, chunk, prefix: b64(prefix), item }))));
+  const head = new Uint8Array(MAGIC.length + 16 + header.length);
+  head.set(MAGIC);
+  head.set(hiv, MAGIC.length);
+  new DataView(head.buffer).setUint32(MAGIC.length + 12, header.length, true);
+  head.set(header, MAGIC.length + 16);
+  await put(head);
+  const n = Math.max(1, Math.ceil(src.size / chunk));
+  const reach = Math.max(1, Math.floor(WINDOW / chunk)) * chunk;
+  for (let at = 0; at < n; ) {
+    const from = at * chunk;
+    const bytes = new Uint8Array(await src.slice(from, Math.min(src.size, from + reach)).arrayBuffer());
+    const count = Math.max(1, Math.ceil(bytes.length / chunk));
+    const sealed = await Promise.all(Array.from({ length: count }, async (_, k) => {
+      const i = at + k;
+      return new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: streamNonce(prefix, i, i === n - 1) }, key, bytes.subarray(k * chunk, Math.min(bytes.length, (k + 1) * chunk))));
+    }));
+    const out = new Uint8Array(sealed.reduce((s, c) => s + c.length, 0));
+    let p = 0;
+    for (const c of sealed) (out.set(c, p), (p += c.length));
+    await put(out);
+    at += count;
+  }
+}
+
+/**
+ * A version 2 hidden file of any size opened where it lies: what it holds, and its bytes as a file read as far as is asked. Each chunk read is
+ * checked by its own tag and number, so what was cut off, reordered or changed fails the read (a throw), never gives wrong bytes. Null
+ * when the key does not open its header. A version 1 file is one ciphertext and cannot be read in parts: use `openFile`.
+ */
+export async function openFileAt(key: CryptoKey, raw: Blob | DiskFile): Promise<{ file: DiskFile; item: Record<string, unknown> | null } | null> {
+  const first = new Uint8Array(await raw.slice(0, MAGIC.length + 16).arrayBuffer());
+  if (!isFileV2(first) || first.length < MAGIC.length + 16) return null;
+  const len = new DataView(first.buffer).getUint32(MAGIC.length + 12, true);
+  if (len < 16 || len > 16 * 1024 * 1024) return null;
+  const h = await fileHeader(key, new Uint8Array(await raw.slice(0, MAGIC.length + 16 + len).arrayBuffer()));
+  if (!h) return null;
+  const rest = raw.size - h.start;
+  const whole = h.chunk + 16;
+  const n = Math.max(1, Math.ceil(rest / whole));
+  if (rest < 16 || rest - 16 * n < 0) return null;
+  const size = rest - 16 * n;
+  const read = async (from: number, to: number): Promise<Uint8Array> => {
+    const a = Math.floor(from / h.chunk);
+    const b = Math.max(a + 1, Math.ceil(to / h.chunk));
+    const sealed = new Uint8Array(await raw.slice(h.start + a * whole, Math.min(raw.size, h.start + b * whole)).arrayBuffer());
+    const plain = await Promise.all(Array.from({ length: b - a }, (_, k) => crypto.subtle.decrypt({ name: "AES-GCM", iv: streamNonce(h.prefix, a + k, a + k === n - 1) }, key, sealed.subarray(k * whole, Math.min(sealed.length, (k + 1) * whole)))));
+    const out = new Uint8Array(to - from);
+    plain.forEach((part, k) => {
+      const start = (a + k) * h.chunk;
+      const lo = Math.max(from, start);
+      const hi = Math.min(to, start + part.byteLength);
+      if (lo < hi) out.set(new Uint8Array(part, lo - start, hi - lo), lo - from);
+    });
+    return out;
+  };
+  return { file: new DiskFile(read, size), item: h.item };
 }
 
 /**
