@@ -1059,7 +1059,7 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 
 **The window's frame.** Settings > Appearance > **Window frame**: *System* (the default) is the title bar your desktop draws; *Off* has none, for more room: move the pointer to the very top edge and a row comes over the app, with minimise, maximise and close, and the window moves by dragging it. It shows for a moment at each start, and goes when the pointer leaves. It applies at the next start, for every workspace.
 
-**Switching workspaces.** *Switch workspace…* is in the board and canvas menu (under *Whole workspace*), in Settings > Storage and in the command palette, with its choices to open a folder or make a new workspace. `Ctrl`+`Shift`+`O` opens a workspace folder.
+**Switching workspaces.** *Switch workspace…* is in the board and canvas menu (under *Whole workspace*), in Settings > Storage and in the command palette, with its choices to open a folder or make a new workspace; the lock screen of a workspace with a password has those two as well, and the workspace stays locked. `Ctrl`+`Shift`+`O` opens a workspace folder.
 
 - It lists the open workspace and the five latest ones whose folders still exist, plus **Open a folder…** (an existing workspace, or any folder to start one in) and **New workspace…** (an empty folder you name). **Clear the recent list** keeps only the open one (no folder is touched).
 - A switch writes your last edits into the folder, closes the window and starts the app again on the other folder.

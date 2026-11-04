@@ -750,6 +750,8 @@ test("a workspace with a password, moved and renamed, still asks for it when ope
   try {
     page = await app.firstWindow();
     await expect(page.getByTestId("lock-screen")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("lock-open-folder")).toBeVisible(); // (another workspace can be reached from here)
+    await expect(page.getByTestId("lock-new-workspace")).toBeVisible();
   } finally {
     await app.close();
   }

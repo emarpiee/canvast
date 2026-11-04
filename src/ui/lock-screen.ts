@@ -1,6 +1,8 @@
 import { makeModal, showModal } from "./modal";
 import { logoSvg } from "./brand";
 import { secretFieldHtml, wireSecretFields } from "./confirm";
+import { desktopBridge } from "../storage/desktop-bridge";
+import { ICONS } from "./icons";
 
 /**
  * The screen in front of a workspace that has a password: nothing is read or drawn until the right one is typed. It cannot be closed (Escape does
@@ -18,12 +20,18 @@ export function openLockScreen(check: (typed: string) => Promise<boolean>): Prom
     <p class="lock-text">Enter the password to open it.</p>
     ${secretFieldHtml(`data-testid="lock-input" aria-labelledby="lock-title" autocomplete="current-password" spellcheck="false"`)}
     <p class="lock-error" data-lock-error role="alert" hidden>That is not the password.</p>
-    <div class="confirm-actions"><button type="button" class="is-primary" data-testid="lock-ok">Open</button></div>`,
+    <div class="confirm-actions"><button type="button" class="is-primary" data-testid="lock-ok">Open</button></div>
+    ${desktopBridge() ? `<div class="lock-other"><button type="button" class="assets-btn" data-go="open" data-testid="lock-open-folder">${ICONS.folderOpen}<span>Open another folder…</span></button><button type="button" class="assets-btn" data-go="new" data-testid="lock-new-workspace">${ICONS.folderRoot}<span>New workspace…</span></button></div>` : ""}`,
   });
   const input = dlg.querySelector<HTMLInputElement>(".prompt-input")!;
   const error = dlg.querySelector<HTMLElement>("[data-lock-error]")!;
   const openButton = dlg.querySelector<HTMLButtonElement>("[data-testid=lock-ok]")!;
   wireSecretFields(dlg);
+  // (the desktop app: another workspace, as the workspace switcher goes there; this one stays locked)
+  dlg.querySelector(".lock-other")?.addEventListener("click", (e) => {
+    const to = (e.target as HTMLElement).closest<HTMLElement>("[data-go]")?.dataset["go"];
+    if (to) void desktopBridge()?.switchWorkspace(to);
+  });
   return new Promise((resolve) => {
     let busy = false;
     const submit = async (): Promise<void> => {

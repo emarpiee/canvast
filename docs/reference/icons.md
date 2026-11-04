@@ -100,7 +100,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `camera` | Screenshot (left tool rail, above Search) |
 | `arrow-left` | Back to the library (top left of the library viewer) |
 | `sun-moon` | Background of see-through pictures (library viewer, bottom right) |
-| `droplet-off` | See it in greyscale, for now (library viewer, bottom right) |
+| `eclipse` | See it in greyscale, for now (library viewer, bottom right) |
 | `chevrons-down` | Hide the controls (library viewer) |
 | `chevrons-up` | Show the controls (library viewer) |
 | `rotate-cw-square` | Apply rotation (Actions bar, beside Reset rotation, `rotate-ccw`) |
@@ -125,9 +125,9 @@ One icon per function: two buttons that do different things never share an icon,
 | `grip-vertical` | Move a field of a library item's note (drag, or the Up and Down arrows) |
 | `arrow-left-right` | Switch workspace (desktop app: the navigator's menu, Settings > Storage) |
 | `folder-clock` | A recent workspace in the workspace switcher |
-| `folder-open` | Open a folder as the workspace (workspace switcher) |
+| `folder-open` | Open a folder as the workspace (workspace switcher, lock screen) |
 | `folder-search` | Show in file manager: a library item's file in the system's file manager (desktop app) |
-| `folder-root` | New workspace (workspace switcher) |
+| `folder-root` | New workspace (workspace switcher, lock screen) |
 | `list-x` | Take a workspace whose folder is gone off the recent list |
 | `file-archive` | Export all files as ZIP; Export the files of canvas Canvas 1 as a ZIP; Export folder… (Library folder menu) |
 | `file-output` | Export canvas Canvas 1; Export as archive |
