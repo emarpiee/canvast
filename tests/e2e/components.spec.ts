@@ -240,6 +240,7 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   expect(moved.stopped).toBe(true);
   await p.setViewportSize(short);
   // A long list in the details panel: its first rows, Show more and Show fewer.
+  await p.locator('[data-testid="asset-card"]').first().click(); // (the reload above left nothing selected)
   for (let i = 0; i < 15; i++) {
     await p.getByTestId("asset-tag-input").fill(`many-${i}`);
     await p.getByTestId("asset-tag-input").press("Enter");

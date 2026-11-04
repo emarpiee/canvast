@@ -2792,7 +2792,9 @@ input[data-scrub-input]:focus { cursor: text; }
 .dock-item[data-folded] > .layers-panel { max-height: none; }
 .dock-grip { position: absolute; top: var(--sp-4); bottom: var(--sp-4); width: var(--sp-3); cursor: ew-resize; z-index: 1; touch-action: none; }
 .dock-item[data-side="right"] > .dock-grip { left: 0; }
-.dock-item:not([data-side="right"]) > .dock-grip { right: calc(-1 * var(--sp-3)); } /* (outside: the panel's scrollbar is on this edge) */
+.dock-item:not([data-side="right"]) > .dock-grip { right: 0; }
+.dock-item:not([data-side="right"]) { --dock-grip-room: var(--sp-3); }
+.dock-item:not([data-side="right"]) .panel-body { margin-right: var(--dock-grip-room); } /* (the panel's scrollbar is on this edge: it stops short of the grip) */
 .dock-grip:hover, .dock-item.is-resizing > .dock-grip { background: color-mix(in oklch, var(--hud-accent) 45%, transparent); border-radius: var(--r-pill); }
 .dock-item[data-folded] > .dock-grip { display: none; }
 #dock-float { position: fixed; inset: 0; pointer-events: none; z-index: var(--z-edge); }

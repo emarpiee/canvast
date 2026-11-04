@@ -1559,8 +1559,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const showSlide = async (hash: string): Promise<void> => {
     if (!entryOf(hash)) await ensure([hash]).catch(() => undefined); // (a long library: what a link points at need not be on a page read yet)
     if (!entryOf(hash)) {
-      session.editor.message = "That item is no longer in the library.";
-      session.editor.changed();
+      // (a note just saved as a new version is not listed yet, and shows by itself when it is: only what is really gone is said)
+      if (!(await session.catalog?.entry(hash).catch(() => undefined))) {
+        session.editor.message = "That item is no longer in the library.";
+        session.editor.changed();
+      }
       return;
     }
     const e = entryOf(hash)!;

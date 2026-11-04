@@ -1989,8 +1989,7 @@ test("the window frame off: a row from the top edge has the window's buttons and
     await expect(page.getByTestId("win-maximize")).toBeVisible();
     await expect(page.getByTestId("win-close")).toBeVisible();
     expect(await row.evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"))).not.toBe("drag");
-    await page.getByTestId("win-maximize").click(); // (a clicked button keeps the focus: that must not keep the row)
-    await page.getByTestId("win-maximize").click();
+    await page.getByTestId("win-maximize").focus(); // (a button clicked keeps the focus: that must not keep the row)
     await page.mouse.move(400, 300);
     await expect(row).not.toHaveClass(/is-shown/);
     await page.evaluate(() => window.__canvastDebug.setSetting("ui.frame", "system"));
