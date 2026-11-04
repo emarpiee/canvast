@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.25 — A name taken from a file shows at once (2026-11-04)
+
+- **Fixed:** an item that took its file's name (`image-2.png`) showed the old name until the library was drawn again; the lists now follow at once.
+
 ## 0.53.24 — Whole notes copied with their properties; lists as lists (2026-11-04)
 
 - **Added:** copying a whole note (select all and copy in the editor, or Copy on one markdown note in the library) copies its markdown file with its properties as YAML at the top, to paste into a note in Obsidian or elsewhere.

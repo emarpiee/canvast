@@ -37,6 +37,14 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.25: a name taken from a file shows at once (2026-11-04)
+
+- **Implemented:** `onNamesChanged` from the mirror to the lists.
+- **Tested:** typecheck here; the same-name desktop test on GitHub, whose failure on v0.53.24 found it.
+- **Known failures:** none known beyond that run.
+- **Committed:** v0.53.25.
+- **Next bounded task:** an AppImage when the workstation is free.
+
 ## v0.53.24: whole notes copied, lists kept whole (2026-11-04)
 
 - **Implemented:** `AssetField.items` (both builds, library files, archives), list items in the panel, `wholeMarkdown` for a copy in the editor and the library.

@@ -286,6 +286,9 @@ export class LibraryMirror {
   /** Imports files found in `library/` that no item has (set by the app through `Storage.folderImports`). */
   importFiles: ((files: FolderFile[]) => Promise<void>) | null = null;
   /** Told when an item could not be moved or written, in plain words. */
+  /** An item took its file's name (see `nameFollowsFile`): the lists are drawn again. */
+  onNamesChanged: (() => void) | null = null;
+  private namesTimer: ReturnType<typeof setTimeout> | null = null;
   onNotice: ((text: string) => void) | null = null;
   /** Told how far a write of files is (files written or moved of all it has to), after each one; `total` 0 when it ended. */
   onProgress: ((done: number, total: number, encrypting?: boolean | "placing") => void) | null = null;
@@ -1460,7 +1463,12 @@ export class LibraryMirror {
       const entry = await this.lib.entry(hash);
       if (!entry) return;
       const kept = keptBase(entry.name);
-      if (stem.startsWith(`${kept}-`) && /^\d+$/.test(stem.slice(kept.length + 1))) await this.lib.apply([{ t: "entry", hash, v: { ...entry, name: base } }]);
+      if (stem.startsWith(`${kept}-`) && /^\d+$/.test(stem.slice(kept.length + 1))) {
+        await this.lib.apply([{ t: "entry", hash, v: { ...entry, name: base } }]);
+        // (many at once, in a library from before: one redraw)
+        if (this.namesTimer) clearTimeout(this.namesTimer);
+        this.namesTimer = setTimeout(() => this.onNamesChanged?.(), 150);
+      }
     });
   }
 
