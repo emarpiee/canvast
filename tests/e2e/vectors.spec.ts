@@ -3623,8 +3623,7 @@ test("adjusted shapes at any zoom and in a picture file: deep inside a blurred s
   await click(app, cx, cy);
   // Export: the shape of the picture is the shape's box; a blur makes it wider (the halo is not cut)
   const ratio = async () => {
-    await p.getByTestId("context-bar").getByRole("button", { name: /^Export and copy out/ }).click();
-    await p.getByRole("menuitem").filter({ hasText: /picture/i }).first().click();
+    await exportWith(p, "exportpic");
     const t = await p.getByTestId("export-shape").innerText();
     await p.getByTestId("export-dialog").locator('[data-ex="close"]').click();
     return t;
