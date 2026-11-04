@@ -4,7 +4,7 @@ import type { AssetRecord } from "./asset-library";
 import type { ThumbRecord } from "./asset-catalog";
 import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { probeMp4 } from "./mp4-probe";
-import { makeCard } from "./card";
+import { fillTextCentred, makeCard } from "./card";
 import { externalFolder } from "../storage/external-folder";
 import { artCardPicture, isArtFile } from "./art-preview";
 import { makeFileCard } from "./card";
@@ -113,7 +113,7 @@ async function makeFontThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
     const w = g.measureText("Aa").width || 100;
     const size = Math.min(THUMB_PX * 0.62, (100 * THUMB_PX * 0.78) / w);
     g.font = `${size}px "${face.family}"`;
-    g.fillText("Aa", THUMB_PX / 2, THUMB_PX / 2);
+    fillTextCentred(g, "Aa", THUMB_PX / 2, THUMB_PX / 2);
     const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/png"));
     return blob ? { hash: rec.hash, blob, w: c.width, h: c.height } : null;
   } catch {

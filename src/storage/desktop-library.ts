@@ -3,6 +3,7 @@
  * (`desktop/library-db.ts`), reached through `LibraryCalls`; thumbnails, the password locks and the canvases (which items use) stay
  * in the page's IndexedDB. `DesktopCatalog` is the browser build's `AssetCatalog` on that storage, operation for operation.
  */
+import { isFontFile } from "../assets/file-kind";
 import type { AssetFolder, AssetLocation, CatalogEntry, CatalogListing, GcReport, MetaChange, MetaSnapshot, PasswordKind, ThumbRecord } from "../assets/asset-catalog";
 import { AssetInUseError, CatalogInputError, FOLDERS_KEY, entryFromRecord, folderName, folderSubtree, meta, normalizeFields, normalizeNote, normalizeTags, usageOf, listedFolders, inHiddenFolder, unhiddenFolders } from "../assets/asset-catalog";
 import type { AssetRecord } from "../assets/asset-library";
@@ -134,12 +135,13 @@ export class DesktopCatalog implements CatalogStore {
   /** (`AssetCatalog.healThumbs`: thumbnails of types that do not always decode, dropped once.) */
   async healThumbs(): Promise<void> {
     const KEY = "thumbVersion";
-    if (((await idbGet<number>(this.db, "meta", KEY)) ?? 1) >= 2) return;
+    const v = (await idbGet<number>(this.db, "meta", KEY)) ?? 1;
+    if (v >= 3) return;
     const ok = /^(image\/(png|jpeg|webp|gif|avif|bmp)|video\/|audio\/)/;
-    const drop = (await this.lib.entries()).filter((e) => !ok.test(e.type)).map((e) => e.hash);
+    const drop = (await this.lib.entries()).filter((e) => (v < 2 && !ok.test(e.type)) || isFontFile(e)).map((e) => e.hash);
     const tx = this.db.transaction(["meta", "thumbs"], "readwrite");
     for (const h of drop) tx.objectStore("thumbs").delete(h);
-    tx.objectStore("meta").put(2, KEY);
+    tx.objectStore("meta").put(3, KEY);
     await done(tx);
   }
 

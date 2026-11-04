@@ -1,7 +1,7 @@
 import { CARD_SCALE, noteCardSize, notePicture } from "../notes/note-preview";
 import { noteKindOf, tooBigForNote } from "../notes/note-file";
 import { extOf, isFontFile } from "./file-kind";
-import { FILE_CARD_H, FILE_CARD_W, cardContext, makeFileCard } from "./card";
+import { FILE_CARD_H, FILE_CARD_W, cardContext, makeFileCard, fillTextCentred } from "./card";
 
 /** Triangles as a flat list of x,y,z (nine numbers each). */
 export function parseModel(bytes: Uint8Array, ext: string): Float32Array | null {
@@ -148,7 +148,7 @@ async function fontCard(chip: string, bytes: Uint8Array): Promise<ImageBitmap | 
     const size = Math.min(c.height * 0.5, (100 * c.width * 0.7) / w);
     x.font = `${size}px "${face.family}"`;
     x.fillStyle = "oklch(0.93 0 0)";
-    x.fillText("Aa", c.width / 2, c.height * 0.44);
+    fillTextCentred(x, "Aa", c.width / 2, c.height * 0.44);
     x.font = "14px system-ui, sans-serif";
     x.fillStyle = "oklch(0.8 0 0)";
     x.fillText(chip, c.width / 2, c.height - 22);

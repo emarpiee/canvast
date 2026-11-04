@@ -1,3 +1,4 @@
+import { isFontFile } from "./file-kind";
 import { externalFolder } from "../storage/external-folder";
 import type { ObjectId } from "../doc/model";
 import { plural } from "../doc/plural";
@@ -349,7 +350,12 @@ export class AssetCatalog implements CatalogStore {
       const ok = /^(image\/(png|jpeg|webp|gif|avif|bmp)|video\/|audio\/)/;
       const entries = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
       for (const e of entries) if (!ok.test(e.type)) tx.objectStore("thumbs").delete(e.hash);
-      tx.objectStore("meta").put(2, KEY);
+    }
+    // Version 3: a font's "Aa" is centred on its letters; the ones already made are made again when shown.
+    if ((v ?? 1) < 3) {
+      const entries = await req(tx.objectStore("assetCatalog").getAll() as IDBRequest<CatalogEntry[]>);
+      for (const e of entries) if (isFontFile(e)) tx.objectStore("thumbs").delete(e.hash);
+      tx.objectStore("meta").put(3, KEY);
     }
     await committed;
   }

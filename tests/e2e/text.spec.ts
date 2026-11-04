@@ -275,6 +275,17 @@ test("a font file is imported from the options bar, a text is set in it, and it 
   // In the library the font shows its letters: an "Aa" thumbnail in that font, not the file tile.
   await p.getByTestId("view-assets").click();
   await expect(p.locator('[data-testid="asset-card"] img.is-font-thumb')).toHaveClass(/is-loaded/);
+  // Its letters in the middle of the picture, whatever the font's own line box.
+  const off = await p.locator('[data-testid="asset-card"] img.is-font-thumb').evaluate((i: HTMLImageElement) => {
+    const c = Object.assign(document.createElement("canvas"), { width: i.naturalWidth, height: i.naturalHeight });
+    const g = c.getContext("2d")!;
+    g.drawImage(i, 0, 0);
+    const d = g.getImageData(0, 0, c.width, c.height).data;
+    let top = c.height, bottom = 0;
+    for (let y = 0; y < c.height; y++) for (let x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3]! > 40) { top = Math.min(top, y); bottom = Math.max(bottom, y); }
+    return Math.abs(top - (c.height - 1 - bottom)) / c.height;
+  });
+  expect(off).toBeLessThan(0.03);
   expect(await p.locator('[data-testid="asset-card"] img.is-font-thumb').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   // Selected, the details show its sample sentence in the font; the viewer shows it at several sizes with the letters and digits.
   await p.locator('[data-testid="asset-card"]').click();

@@ -118,3 +118,13 @@ export async function cardFromPicture(blob: Blob, size = { w: FILE_CARD_W, h: FI
   bmp.close();
   return createImageBitmap(c);
 }
+
+/** Text with its ink centred on a point: a font's own line box can sit far off its letters (a pixel font's does). */
+export function fillTextCentred(g: CanvasRenderingContext2D, text: string, cx: number, cy: number): void {
+  g.save();
+  g.textAlign = "center";
+  g.textBaseline = "alphabetic";
+  const m = g.measureText(text);
+  g.fillText(text, cx + (m.actualBoundingBoxLeft - m.actualBoundingBoxRight) / 2, cy + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2);
+  g.restore();
+}
