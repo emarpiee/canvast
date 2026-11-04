@@ -10,6 +10,7 @@
 - **Added:** a greyscale button in the viewer, beside the background button: it changes only how the picture is seen, and goes with the next item or on closing.
 - **Added:** long lists in the details panel show their first rows and **Show more** / **Show fewer**: tags, properties and notes linking to an item. Every such button in the app is now one component.
 - **Changed:** the view buttons have a look of their own: Library and Canvas are joined as one set, Settings matches them, and the one in use is filled.
+- **Changed:** one scrollbar across the app, in the accent: out of sight until the pointer is over its area or it scrolls, thin, and it grows when the pointer is on it. Its room is kept, so nothing moves.
 - **Changed:** spacing across the app is on one grid, and Dense, Compact and Comfortable now set every gap, padding, margin, field, list row, small button, tree indent and icon, not only the bars' sizes.
 - **Fixed:** a drag of a library item could leave the app stuck (it scrolled, but took no click or key): the card dragged now stays in the page while the grid scrolls, and the drop places go away whichever way a drag ends. A drag out of the app is always a copy, so a file manager cannot move a file out of the library.
 - **Fixed:** dragging an item to place it on the canvas: the strip covers the whole top row, and a drop anywhere on the row counts. It sat half over the row, under its buttons.

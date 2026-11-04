@@ -79,6 +79,8 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 
 - **Button shapes:** a button is a rounded square (`--ctl-r`, or `--r-sm` on a row); `--r-pill` and `--r-dot` are for chips, what is on them, and dots (`check:tokens`).
 
+- **Scrollbars** are one rule at the top of `src/styles.css` (`src/ui/scrollbars.ts`). Do not set `scrollbar-width` or `scrollbar-color` on an element, which turns it off in Chromium; only `none` for a row that scrolls sideways with its cue.
+
 - **Spacing follows Density.** Gaps, paddings and margins use only `--s-1`, `2`, `4`, `6`, `8`, `10`, `12`, `13`, `14`, `15`, which have a value for each of Dense, Compact and Comfortable. Control and row sizes use `--ctl`, `--bar-h`, `--field-h`, `--list-h`, `--menu-h`, `--tree-row-h`, `--row-btn`, `--chip-btn`, `--tree-indent`, `--icon-*`, and offsets from an edge use `--edge` and `--near`, which do too. `--sp-*` are fixed lengths, for what must not change. `check:tokens` refuses `--sp-*` in spacing.
 
 - **No hardcoded CSS values.** Every colour, text size, padding, margin, gap, radius and icon size uses a token from `:root` in `src/styles.css`; add a token rather than a literal. `npm run check:tokens` enforces it. Row actions use the shared `src/ui/more-menu.ts` pattern (ADR 0068).

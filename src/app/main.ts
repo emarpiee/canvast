@@ -126,6 +126,7 @@ import type { ExportTarget } from "./export-render";
 import { openExportDialog } from "../ui/export-dialog";
 import { mountViewSwitch } from "../ui/view-switch";
 import { mountWindowFrame } from "../ui/window-frame";
+import { followScrolling } from "../ui/scrollbars";
 import type { AppView } from "../ui/view-switch";
 import { entriesOfDrop, fileByFolders, filesOfEntries, hasFolder } from "./directory";
 import { isArchiveFile, runExport, runExportChanges, runExportFiles, runImport, takeAfterReload, takeStayUnlocked } from "../ui/archive-ui";
@@ -1946,6 +1947,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   };
   const markTab = mountViewSwitch(document.getElementById("view-switch")!, setView);
   void mountWindowFrame(settings);
+  followScrolling();
   markTab("canvas");
   markNav("canvas");
   const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings, libraryFonts);

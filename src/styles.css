@@ -47,6 +47,7 @@
   --hud-success: oklch(0.5 0.13 150);
   --hud-warning: oklch(0.52 0.11 80);
   --logo-colour: var(--hud-accent);
+  --scroll-size: 10px; --scroll-inset: var(--sp-2);
   --meta-label-w: 7.5rem;
   /* Sizes that follow Density too (these are Compact's): small buttons on a row, buttons on a chip, a tree's indent. */
   --row-btn: 26px; --chip-btn: 20px; --tree-indent: 20px;
@@ -287,8 +288,21 @@ input, textarea, [contenteditable="true"] { caret-color: var(--hud-accent); }
 body { -webkit-user-select: none; user-select: none; }
 input, textarea, [contenteditable="true"], pre, code, .asset-more dd, [data-selectable] { -webkit-user-select: text; user-select: text; }
 :where(select) { height: var(--field-h); padding-block: 0; max-width: 100%; text-overflow: ellipsis; }
-/* Every scroll area has the same thin scrollbar in the theme's colours (the library grid had the system's own, with arrows). */
-:where(*) { scrollbar-width: thin; scrollbar-color: var(--hud-muted) transparent; }
+/* One scrollbar everywhere (src/ui/scrollbars.ts): its room is kept, so nothing moves when it shows; it is out of sight until the pointer is over its area or it
+   scrolls, then a thin line in the accent, and it grows and fills when the pointer is on it. A row that scrolls sideways has none (below). In Chromium the standard
+   scrollbar-width and scrollbar-color would turn these rules off, so those are only for the browsers without them. */
+@supports selector(::-webkit-scrollbar) {
+  ::-webkit-scrollbar { width: var(--scroll-size); height: var(--scroll-size); background: transparent; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-button { display: none; }
+  ::-webkit-scrollbar-thumb { min-height: var(--sp-12); min-width: var(--sp-12); background-color: transparent; background-clip: padding-box; border: var(--scroll-inset) solid transparent; border-radius: var(--r-pill); }
+  :hover::-webkit-scrollbar-thumb, .is-scrolling::-webkit-scrollbar-thumb, :focus-within::-webkit-scrollbar-thumb { background-color: color-mix(in oklch, var(--hud-accent) 60%, transparent); }
+  ::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:active { background-color: var(--hud-accent); border-width: var(--sp-1); }
+}
+@supports not selector(::-webkit-scrollbar) {
+  :where(*) { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+  :where(:hover, .is-scrolling, :focus-within) { scrollbar-color: var(--hud-accent) transparent; }
+}
 :where(option) { color: var(--hud-fg); background: var(--hud-bg); }
 :where(select, textarea, input):where(:focus-visible) { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub-input] { touch-action: none; } /* (a number field takes a finger that drags it; its name does not, so a bar that scrolls sideways scrolls from the name) */
@@ -1406,7 +1420,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .vbtn[data-act="favorite"][aria-pressed="true"] svg { fill: var(--hud-star); color: var(--hud-star); }
 .vbtn.is-primary { color: var(--hud-accent-fg); background: var(--hud-accent); }
 .vbtn.is-primary:hover:not(:disabled) { background: var(--hud-accent-hover); }
-.viewer-film { flex: 1; min-width: 0; display: flex; gap: var(--s-4); overflow-x: auto; padding: var(--s-2) var(--s-1); scrollbar-width: thin; }
+.viewer-film { flex: 1; min-width: 0; display: flex; gap: var(--s-4); overflow-x: auto; padding: var(--s-2) var(--s-1); }
 .film-spacer { flex: none; }
 .film-win { display: contents; }
 .film-item { flex: none; width: 64px; height: 44px; padding: 0; overflow: hidden; background: var(--v-hover); border: 0; border-radius: var(--r-sm); cursor: pointer; opacity: 0.7; }
@@ -1514,9 +1528,9 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .assets-grid { user-select: none; -webkit-user-select: none; }
 
 /* Comfortable density: the roomier grid (compact is the default). */
-:root[data-density="comfortable"] { --row-btn: 30px; --chip-btn: 24px; --tree-indent: 24px; --icon-sm: 16px; --icon-md: 18px; --icon-lg: 20px; --icon-xl: 22px; --tree-row-h: 30px; --s-1: 2px; --s-2: 6px; --s-4: 12px; --s-6: 16px; --s-8: 20px; --s-10: 28px; --s-12: 36px; --s-13: 44px; --s-14: 48px; --s-15: 64px; --edge: 12px; --ctl: 36px; --pad: 4px; --gap: 2px; --near: 12px; --r-lg: 12px; --r-md: 8px; --ctl-r: 8px; --field-h: var(--sp-12); --menu-h: 38px; --list-h: calc(var(--sp-12) + var(--sp-2)); }
+:root[data-density="comfortable"] { --scroll-size: 12px; --row-btn: 30px; --chip-btn: 24px; --tree-indent: 24px; --icon-sm: 16px; --icon-md: 18px; --icon-lg: 20px; --icon-xl: 22px; --tree-row-h: 30px; --s-1: 2px; --s-2: 6px; --s-4: 12px; --s-6: 16px; --s-8: 20px; --s-10: 28px; --s-12: 36px; --s-13: 44px; --s-14: 48px; --s-15: 64px; --edge: 12px; --ctl: 36px; --pad: 4px; --gap: 2px; --near: 12px; --r-lg: 12px; --r-md: 8px; --ctl-r: 8px; --field-h: var(--sp-12); --menu-h: 38px; --list-h: calc(var(--sp-12) + var(--sp-2)); }
 /* Dense: the smallest the interface goes. The tokens above drive the bars, fields and menu rows; the rest is the paddings that are not tokens. */
-:root[data-density="dense"] { --row-btn: 22px; --chip-btn: 16px; --tree-indent: 16px; --icon-sm: 12px; --icon-md: 14px; --icon-lg: 16px; --icon-xl: 18px; --tree-row-h: 22px; --s-1: 1px; --s-2: 2px; --s-4: 4px; --s-6: 8px; --s-8: 12px; --s-10: 16px; --s-12: 24px; --s-13: 32px; --s-14: 36px; --s-15: 48px; --edge: 4px; --ctl: 26px; --pad: 2px; --gap: 0px; --near: 4px; --r-lg: 8px; --r-md: 6px; --ctl-r: 6px; --field-h: var(--sp-10); --menu-h: 28px; --list-h: calc(var(--sp-10) + var(--sp-1)); }
+:root[data-density="dense"] { --scroll-size: 8px; --scroll-inset: var(--sp-1); --row-btn: 22px; --chip-btn: 16px; --tree-indent: 16px; --icon-sm: 12px; --icon-md: 14px; --icon-lg: 16px; --icon-xl: 18px; --tree-row-h: 22px; --s-1: 1px; --s-2: 2px; --s-4: 4px; --s-6: 8px; --s-8: 12px; --s-10: 16px; --s-12: 24px; --s-13: 32px; --s-14: 36px; --s-15: 48px; --edge: 4px; --ctl: 26px; --pad: 2px; --gap: 0px; --near: 4px; --r-lg: 8px; --r-md: 6px; --ctl-r: 6px; --field-h: var(--sp-10); --menu-h: 28px; --list-h: calc(var(--sp-10) + var(--sp-1)); }
 :root[data-density="dense"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls, .view-switch, .view-settings, .nav-pill, .win-row) button svg { width: 14px; height: 14px; }
 :root[data-density="dense"] .panel-head { min-height: 26px; }
 :root[data-density="dense"] .asset-inspector { flex-basis: 248px; }
@@ -2127,7 +2141,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .pop-menu button { display: flex; align-items: center; gap: var(--s-6); width: 100%; min-height: var(--menu-h); padding: 0 var(--s-6); font: var(--font-control); color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
 .pop-menu button:hover:not(:disabled), .pop-menu button:focus-visible { background: var(--hud-hover); outline: 0; }
 /* A menu never grows past the window: it scrolls. A compact one has closer rows (a long list to choose from). */
-.pop-menu { max-height: calc(100dvh - 2 * var(--edge)); overflow-y: auto; scrollbar-width: thin; }
+.pop-menu { max-height: calc(100dvh - 2 * var(--edge)); overflow-y: auto; }
 .pop-menu.is-compact button { min-height: var(--field-h); gap: var(--s-4); font: var(--font-value); }
 .pop-menu.is-compact .menu-hint { display: inline; margin-left: var(--s-4); }
 .pop-menu.is-compact .menu-text { display: flex; align-items: baseline; gap: var(--s-4); }
@@ -2678,7 +2692,7 @@ input[data-scrub-input]:focus { cursor: text; }
 .tex-newseed svg { width: var(--icon-sm); height: var(--icon-sm); }
 /* a choice (Mode, Grid, Align) ends at the right edge, in the column of the numbers above it, as wide as its words need */
 .tex-fields .adj-row > select { grid-column: 2 / -1; justify-self: end; width: auto; min-width: 3.75rem; max-width: 100%; height: var(--field-h); padding: 0 var(--s-4); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
-.paint-modes { display: flex; overflow-x: auto; scrollbar-width: thin; gap: var(--s-1); padding: var(--s-1); margin-bottom: var(--s-6); background: var(--hud-hover); border-radius: var(--r-md); }
+.paint-modes { display: flex; overflow-x: auto; gap: var(--s-1); padding: var(--s-1); margin-bottom: var(--s-6); background: var(--hud-hover); border-radius: var(--r-md); }
 .paint-modes button { flex: 1 0 auto; display: grid; place-items: center; padding: var(--s-2) var(--s-4); font: var(--font-meta); color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; white-space: nowrap; }
 .paint-modes button svg { width: var(--icon-md); height: var(--icon-md); }
 .paint-modes button:hover { background: var(--hud-hover); color: var(--hud-fg); }
@@ -2758,7 +2772,7 @@ input[data-scrub-input]:focus { cursor: text; }
 .styles-empty-actions button:hover { border-color: var(--hud-accent); }
 
 /* The panel dock (ui/panel-dock.ts, ADR 0123): two stacks and a free layer for every floating panel */
-#side-panels, #side-panels-left { width: auto; overflow-y: auto; scrollbar-width: thin; align-items: flex-start; }
+#side-panels, #side-panels-left { width: auto; overflow-y: auto; align-items: flex-start; }
 #side-panels { align-items: flex-end; }
 #side-panels > .dock-item, #side-panels-left > .dock-item { border: 0; background: none; box-shadow: none; backdrop-filter: none; border-radius: 0; }
 .dock-item { position: relative; flex: none; box-sizing: border-box; max-width: 100%; pointer-events: auto; }
