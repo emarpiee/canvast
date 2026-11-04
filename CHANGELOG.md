@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.48 — Previews for .figcraft (2026-11-04)
+
+- **Added:** `.figcraft` files show the picture they keep (`thumbnail.png` in the file). One without it keeps its card.
+
 ## 0.53.47 — The viewer's note leaves the picture clear (2026-11-04)
 
 - **Fixed:** a note in the viewer (an art file's preview, a custom thumbnail, a file with no preview) no longer covers the bottom of the picture: the picture ends above it.

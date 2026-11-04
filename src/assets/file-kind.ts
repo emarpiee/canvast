@@ -45,7 +45,7 @@ const CATEGORIES: readonly Category[] = [
   { label: "Spreadsheet", exts: ["xls", "xlsx", "ods", "numbers", "xlsm"], todo: "Download it and open it in a spreadsheet app." },
   { label: "Presentation", exts: ["ppt", "pptx", "odp", "key"], todo: "Download it and open it in a presentation app." },
   { label: "Archive", exts: ["zip", "rar", "7z", "tar", "gz", "tgz", "bz2", "xz", "iso", "dmg"], todo: "Download it and unpack it with an archive tool." },
-  { label: "Design file", exts: ["psd", "psb", "ai", "xd", "sketch", "fig", "afdesign", "afphoto", "kra", "clip", "xcf", "indd", "eps"], todo: "Download it and open it in the app that made it." },
+  { label: "Design file", exts: ["psd", "psb", "ai", "xd", "sketch", "fig", "figcraft", "afdesign", "afphoto", "kra", "clip", "xcf", "indd", "eps"], todo: "Download it and open it in the app that made it." },
   { label: "Font", exts: ["ttf", "otf", "woff", "woff2", "eot"], todo: "Download it and install it, or open it in a font viewer." },
   { label: "Text or code", exts: ["txt", "md", "markdown", "csv", "tsv", "json", "xml", "yaml", "yml", "toml", "ini", "log", "html", "htm", "css", "js", "mjs", "ts", "tsx", "jsx", "py", "rb", "go", "rs", "java", "c", "h", "cpp", "hpp", "cs", "php", "sh", "sql", "tex"], todo: "Download it and open it in a text or code editor." },
   { label: "Data", exts: ["db", "sqlite", "sqlite3", "parquet", "npy", "npz", "h5", "hdf5", "mat", "bin", "dat"], todo: "Download it and open it in the program that reads it." },

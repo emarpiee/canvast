@@ -4,7 +4,7 @@
  */
 
 /** The extensions that may hold a picture. */
-const ART = /\.(kra|ora|psd|psb|procreate|sketch|fig|clip)$/i;
+const ART = /\.(kra|ora|psd|psb|procreate|sketch|fig|figcraft|clip)$/i;
 export const isArtFile = (name: string): boolean => ART.test(name);
 
 /** Most a picture inside a file may take once unpacked: a small file must not become a huge one in memory. */
@@ -69,7 +69,7 @@ const IN_ZIP: ReadonlyArray<readonly [RegExp, readonly string[]]> = [
   [/\.(kra|ora)$/i, ["mergedimage.png", "preview.png", "Thumbnails/thumbnail.png"]],
   [/\.procreate$/i, ["QuickLook/Thumbnail.png"]],
   [/\.sketch$/i, ["previews/preview.png"]],
-  [/\.fig$/i, ["thumbnail.png"]],
+  [/\.(fig|figcraft)$/i, ["thumbnail.png"]],
 ];
 
 interface PsdHead {

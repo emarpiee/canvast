@@ -87,7 +87,7 @@ function clip(png: Uint8Array, pageSize = 512): Blob {
 
 describe("pictures art files keep", () => {
   it("knows its kinds, by name", () => {
-    for (const n of ["a.kra", "a.ORA", "a.psd", "a.psb", "a.procreate", "a.sketch", "a.fig", "a.clip"]) expect(isArtFile(n), n).toBe(true);
+    for (const n of ["a.kra", "a.ORA", "a.psd", "a.psb", "a.procreate", "a.sketch", "a.fig", "a.figcraft", "a.clip"]) expect(isArtFile(n), n).toBe(true);
     for (const n of ["a.xcf", "a.ai", "a.png", "kra"]) expect(isArtFile(n), n).toBe(false);
   });
   it("ZIP kinds: the best picture there, nothing when there is none or it is no ZIP", async () => {
@@ -97,6 +97,7 @@ describe("pictures art files keep", () => {
     expect(await bytes(await artPicture(await zipOf({ "QuickLook/Thumbnail.png": PNG }), "a.procreate"))).toEqual([...PNG]);
     expect(await bytes(await artPicture(await zipOf({ "previews/preview.png": PNG }), "a.sketch"))).toEqual([...PNG]);
     expect(await bytes(await artPicture(await zipOf({ "thumbnail.png": PNG }), "a.fig"))).toEqual([...PNG]);
+    expect(await bytes(await artPicture(await zipOf({ "thumbnail.png": PNG }), "a.figcraft"))).toEqual([...PNG]);
     expect(await artPicture(await zipOf({ "other.txt": PNG }), "a.kra")).toBeNull();
     expect(await artPicture(new Blob(["not a zip at all, whatever its name says"]), "a.kra")).toBeNull();
     expect(await artPicture(new Blob([]), "a.ora")).toBeNull();
