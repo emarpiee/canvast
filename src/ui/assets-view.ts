@@ -22,7 +22,7 @@ import { artFullPicture, isArtFile } from "../assets/art-preview";
 import { externalFolder } from "../storage/external-folder";
 import { AUTO_COPY_NOTE, chipOf, describeFile, extOf, hasThumb, isAutoCopy, isCard, isFontFile } from "../assets/file-kind";
 import { FILE_CARD_NOTE } from "../assets/card";
-import { fontSampleHtml, showFont } from "./font-specimen";
+import { FONT_SAMPLES, fontSampleHtml, showFont } from "./font-specimen";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actions";
 import { LIBRARY_ROWS, searchHelpButton, wireSearchHelp } from "./search-help";
 import { ASSETS_RECENT, rememberSearch } from "../search/history";
@@ -289,7 +289,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.arrowLeft}</button>
           <button type="button" class="vbtn viewer-hide" data-act="bar" aria-label="Hide the controls" title="Hide the controls (F)">${ICONS.chevronsDown}</button>
           <button type="button" class="vbtn viewer-details" data-act="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
-          <div class="viewer-stage"><div class="viewer-picture-tools"><button type="button" class="vbtn viewer-grey" data-act="grey" data-testid="viewer-grey" aria-pressed="false" aria-label="See it in greyscale" title="See it in greyscale, for now: the file stays as it is">${ICONS.eclipse}</button><button type="button" class="vbtn viewer-ground" data-act="ground" aria-label="Background of see-through pictures" title="Background of see-through pictures">${ICONS.sunMoon}</button></div><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
+          <div class="viewer-stage"><div class="viewer-picture-tools"><button type="button" class="vbtn viewer-grey" data-act="grey" data-testid="viewer-grey" aria-pressed="false" aria-label="See it in greyscale" title="See it in greyscale, for now: the file stays as it is">${ICONS.eclipse}</button><button type="button" class="vbtn viewer-sample" data-act="sample" data-testid="viewer-sample" aria-label="Sample text" title="Sample text">${ICONS.wholeWord}</button><button type="button" class="vbtn viewer-ground" data-act="ground" aria-label="Background of see-through pictures" title="Background of see-through pictures">${ICONS.sunMoon}</button></div><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
             <figure><div class="viewer-checker" hidden><i></i></div><canvas class="viewer-vec" hidden></canvas><img alt="" draggable="false"><video hidden></video><canvas class="viewer-gif" hidden></canvas><figcaption></figcaption></figure></div>
           <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
             <div class="viewer-nav">
@@ -453,7 +453,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; tagsInline: boolean; sideSort: Record<keyof typeof SIDE_SORTS, SideSort>; pinned: string[]; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; listThumb: number; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", tagsInline: false, sideSort: { folders: "az", tag: "az", ctag: "az" }, pinned: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, listThumb: 96, sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; tagsInline: boolean; sideSort: Record<keyof typeof SIDE_SORTS, SideSort>; pinned: string[]; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; listThumb: number; fontSample: number; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", tagsInline: false, sideSort: { folders: "az", tag: "az", ctag: "az" }, pinned: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, listThumb: 96, fontSample: 0, sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -493,6 +493,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       }
     }
     if (typeof saved.thumb === "number" && saved.thumb >= 96 && saved.thumb <= 240) ui.thumb = saved.thumb;
+    if (typeof saved.fontSample === "number" && FONT_SAMPLES[saved.fontSample]) ui.fontSample = saved.fontSample;
     if (typeof saved.listThumb === "number" && saved.listThumb >= 96 && saved.listThumb <= 240) ui.listThumb = saved.listThumb;
     if (saved.filters && typeof saved.filters === "object") {
       const f = saved.filters as Partial<typeof ui.filters>;
@@ -1377,10 +1378,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     b.title = `Background of see-through pictures: ${GROUND_NAME[now]} (click for ${GROUND_NAME[next]})`;
     b.setAttribute("aria-label", `Background of see-through pictures: ${GROUND_NAME[now]}. Next: ${GROUND_NAME[next]}`);
     b.dataset["ground"] = now;
+    viewer.dataset["ground"] = now;
+  };
+  /** The button that goes through a font's sample sentences says which comes next. */
+  const labelSample = (): void => {
+    const next = FONT_SAMPLES[(ui.fontSample + 1) % FONT_SAMPLES.length]!;
+    const b = viewer.querySelector<HTMLElement>(".viewer-sample")!;
+    b.title = `Sample text (click for “${next}”)`;
+    b.setAttribute("aria-label", `Sample text. Next: ${next}`);
   };
   const paintVector = (): void => {
     labelGround();
-    const ground = !vector && !slideImg.hidden && slideAlpha && slideGif.hidden && slideMedia.hidden; // (a see-through picture: only the chequered ground)
+    const font = viewer.classList.contains("is-font");
+    const ground = font || (!vector && !slideImg.hidden && slideAlpha && slideGif.hidden && slideMedia.hidden); // (a see-through picture or a font: only the chequered ground)
     slideVec.hidden = !(vector || ground);
     if (!vector && !ground) return;
     const sr = stage.getBoundingClientRect();
@@ -1393,10 +1403,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const g = slideVec.getContext("2d")!;
     g.clearRect(0, 0, w, h);
     const z = sizes();
-    if (!z || !slideImg.complete) return;
+    if (!font && (!z || !slideImg.complete)) return;
     const base = slideImg.getBoundingClientRect(); // (a raster picture is scaled by a transform: its box already holds the zoom and the pan)
-    const dw = z.fw * zoom.s;
-    const dh = ((z.fw * z.nh) / z.nw) * zoom.s;
+    const dw = z ? z.fw * zoom.s : 0;
+    const dh = z ? ((z.fw * z.nh) / z.nw) * zoom.s : 0;
     const x = base.left + base.width / 2 - sr.left + (vector ? zoom.x : 0) - dw / 2;
     const y = base.top + base.height / 2 - sr.top + (vector ? zoom.y : 0) - dh / 2;
     const cs = getComputedStyle(viewer);
@@ -1615,6 +1625,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideImg.hidden = false;
     slideTile.hidden = true;
     slideAlpha = false;
+    viewer.classList.remove("is-font", "has-alpha");
     checker.hidden = true;
     const rec = e.present ? await assets.record(hash).catch(() => undefined) : undefined;
     if (token !== slideToken) return;
@@ -1641,8 +1652,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (isFontFile(rec)) {
       // A font: its sample, in its own letters, at several sizes.
       slideImg.hidden = true;
-      slideTile.innerHTML = fontSampleHtml(rec.name, true);
+      slideTile.innerHTML = fontSampleHtml(rec.name, true, FONT_SAMPLES[ui.fontSample]);
       slideTile.hidden = false;
+      slideAlpha = true; // (its letters lie on the same ground as a see-through picture)
+      viewer.classList.add("is-font", "has-alpha");
+      labelSample();
+      paintVector();
       slideCaption.textContent = `${e.name || "Untitled"}, ${fmtBytes(e.size)}`;
       void showFont(slideTile.querySelector<HTMLElement>(".font-sample")!, hash, async () => rec.blob);
       armShow();
@@ -1861,6 +1876,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     else if (act === "next") stepSlide(1);
     else if (act === "close") void leaveNote().then((ok) => ok && closeSlide());
     else if (act === "grey") setGrey(!viewer.classList.contains("is-grey"));
+    else if (act === "sample") {
+      ui.fontSample = (ui.fontSample + 1) % FONT_SAMPLES.length;
+      saveUi();
+      labelSample();
+      for (const line of root.querySelectorAll(".font-sample-line")) line.textContent = FONT_SAMPLES[ui.fontSample]!;
+    }
     else if (act === "ground") {
       const now = session.viewGround;
       void session.setViewGround(VIEW_GROUNDS[(VIEW_GROUNDS.indexOf(now) + 1) % VIEW_GROUNDS.length]!);
@@ -2795,7 +2816,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="asset-insp-head">
         <h2 title="${esc(e ? `${e.name || "Untitled"} (double-click to rename)` : "Missing original")}">${esc(e ? e.name || "Untitled" : "Missing original")}</h2>
       </div>
-      ${e ? `<div class="asset-preview-box"><button type="button" class="asset-preview thumb-slot" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open in the viewer (double-click a card, or Enter)">${isFontFile(e) && !meta(e).thumb ? fontSampleHtml(e.name, false) : !hasThumb(e) && !meta(e).thumb ? fileTile(e) : `<img alt="Preview of ${esc(e.name)}" draggable="false" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}">`}</button></div>` : ""}
+      ${e ? `<div class="asset-preview-box"><button type="button" class="asset-preview thumb-slot" data-action="slide" data-testid="asset-preview" aria-label="Open slide view" title="Open in the viewer (double-click a card, or Enter)">${isFontFile(e) && !meta(e).thumb ? fontSampleHtml(e.name, false, FONT_SAMPLES[ui.fontSample]) : !hasThumb(e) && !meta(e).thumb ? fileTile(e) : `<img alt="Preview of ${esc(e.name)}" draggable="false" data-hash="${e.hash}" class="${Math.max(e.pixelW, e.pixelH) < THUMB_PX ? "is-pixelated" : ""}">`}</button></div>` : ""}
       ${
         e
           ? `<div class="asset-quick">

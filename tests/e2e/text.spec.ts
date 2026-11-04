@@ -300,6 +300,19 @@ test("a font file is imported from the options bar, a text is set in it, and it 
   const big = p.locator(".viewer-tile").getByTestId("font-sample");
   await expect(big).toHaveClass(/is-ready/);
   await expect(big.locator(".font-sample-line")).toHaveCount(4);
+  // Its sample sentence changes and stays, in the details too; it lies on the background of see-through pictures.
+  await p.getByTestId("viewer-sample").click();
+  await expect(big.locator(".font-sample-line").first()).toHaveText("Pack my box with five dozen liquor jugs");
+  await expect(sample).toContainText("Pack my box");
+  await expect(p.locator(".viewer-ground")).toBeVisible();
+  await p.locator(".viewer-ground").click();
+  await expect(p.getByTestId("slide-view")).toHaveAttribute("data-ground", "gray");
+  await p.locator(".viewer-ground").click();
+  await p.locator(".viewer-ground").click();
+  await p.locator(".viewer-ground").click();
+  await p.getByTestId("viewer-sample").click();
+  for (let i = 2; i < 8; i++) await p.getByTestId("viewer-sample").click();
+  await expect(big.locator(".font-sample-line").first()).toHaveText("The quick brown fox jumps over the lazy dog");
   await expect(big).toContainText("0123456789");
 });
 
@@ -1126,4 +1139,18 @@ test("a text on a card (Paragraph and box options): the card is part of its box,
   await p.evaluate(() => window.__canvastDebug.nextFrame());
   expect((await textObjects(p)).at(-1)!["card"]).toEqual({ fill: "#bfe3ff", pad: 1.2, radius: 0.3 });
   expect(app.consoleErrors).toEqual([]);
+});
+
+test("a font's sample sentence is kept over a reload", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "Sample.ttf", mimeType: "font/ttf", buffer: readFileSync("node_modules/@expo-google-fonts/inter/900Black/Inter_900Black.ttf") });
+  await p.locator('[data-testid="asset-card"]').dblclick();
+  await p.getByTestId("viewer-sample").click();
+  await expect(p.locator(".viewer-tile .font-sample-line").first()).toHaveText("Pack my box with five dozen liquor jugs");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.getByTestId("view-assets").click();
+  await p.locator('[data-testid="asset-card"]').dblclick();
+  await expect(p.locator(".viewer-tile .font-sample-line").first()).toHaveText("Pack my box with five dozen liquor jugs");
 });

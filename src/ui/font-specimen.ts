@@ -4,7 +4,17 @@ import { esc } from "./format";
  * A font file shown in its own letters: the standard sample sentence, the alphabet and the digits, in the font itself. One sample for
  * the details panel and the viewer (the details show it small, the viewer at several sizes).
  */
-const PANGRAM = "The quick brown fox jumps over the lazy dog";
+/** The sentences a font can be seen in: the viewer's sample button goes through them (kept by their place: add new ones at the end). */
+export const FONT_SAMPLES: readonly string[] = [
+  "The quick brown fox jumps over the lazy dog",
+  "Pack my box with five dozen liquor jugs",
+  "Sphinx of black quartz, judge my vow",
+  "How vexingly quick daft zebras jump",
+  "The five boxing wizards jump quickly",
+  "Waltz, bad nymph, for quick jigs vex",
+  "Lorem ipsum dolor sit amet, consectetur adipiscing elit",
+  "Hamburgefonstiv",
+];
 const LETTERS = ["ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz", "0123456789 .,;:!?&@()"];
 /** Fonts kept loaded at once (the last ones shown); an older one is let go. */
 const KEEP = 6;
@@ -39,10 +49,10 @@ export function loadFontFile(hash: string, file: () => Promise<Blob | undefined>
 }
 
 /** The sample's markup; `large` is the viewer's (the sentence at several sizes). Filled in with `showFont`. */
-export const fontSampleHtml = (name: string, large: boolean): string =>
+export const fontSampleHtml = (name: string, large: boolean, sample = FONT_SAMPLES[0]!): string =>
   `<div class="font-sample${large ? " is-large" : ""}" data-testid="font-sample" aria-label="Sample of ${esc(name)}">` +
   `<span class="font-sample-aa">Aa</span>` +
-  (large ? ["is-xl", "is-lg", "is-md", "is-sm"].map((s) => `<p class="font-sample-line ${s}">${PANGRAM}</p>`).join("") : `<p class="font-sample-line">${PANGRAM}</p>`) +
+  (large ? ["is-xl", "is-lg", "is-md", "is-sm"].map((s) => `<p class="font-sample-line ${s}">${esc(sample)}</p>`).join("") : `<p class="font-sample-line">${esc(sample)}</p>`) +
   LETTERS.map((l) => `<p class="font-sample-chars">${esc(l)}</p>`).join("") +
   `</div>`;
 
