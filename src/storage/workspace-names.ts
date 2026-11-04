@@ -127,6 +127,15 @@ export function fitsPlace(path: string, dir: string, base: string, ext: string):
   return stem === base || isClashOf(stem, base) || stem.normalize("NFC") === base || isClashOf(stem.normalize("NFC"), base);
 }
 
+/**
+ * Whether a folder on disk is the place of this library folder under another spelling: `library/A- B` and `library/a-b` are both read as one library folder,
+ * and a file in either is where it belongs.
+ */
+export function isFolderOf(dir: string, names: readonly string[]): boolean {
+  const parts = dir.split("/").slice(1);
+  return names.length > 0 && parts.length === names.length && parts.every((p, i) => cleanName(p, "clean") === cleanName(names[i]!, "clean"));
+}
+
 /** Longest library folder path kept on disk; a deeper one files its items under their kind folder (paths stay well inside every system's limit). */
 export const MAX_LIBRARY_DIR = 800;
 

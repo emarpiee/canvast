@@ -22,7 +22,7 @@ import { sha256Hex } from "../assets/sha256";
 import { done, idbGet, req } from "./idb";
 import { noteKindOf } from "../notes/note-file";
 import { MAX_BASE, UNFINISHED_FILE, cutBytes, isClashOf, numberedName } from "../doc/file-names";
-import { KIND_FOLDERS, MAX_LIBRARY_DIR, extOfBytes, fileExt, fitsPlace, freePath, isSafeRelativePath, keptBase, keptFile, keptFits, keptPart, libraryDir, nameBase, safeBase } from "./workspace-names";
+import { KIND_FOLDERS, MAX_LIBRARY_DIR, extOfBytes, fileExt, fitsPlace, freePath, isFolderOf, isSafeRelativePath, keptBase, keptFile, keptFits, keptPart, libraryDir, nameBase, safeBase } from "./workspace-names";
 import type { FolderFile } from "./store";
 
 export const LIBRARY_JSON = ".canvast/library.json";
@@ -586,6 +586,8 @@ export class LibraryMirror {
       const base = kept ? kept.base : tidyBase;
       const ext = kept ? kept.ext : tidyExt;
       const places = sealed ? [tidyDir] : names.length ? (keep ? [await diskDir(names, tidyDir), tidyDir] : [tidyDir]) : this.sortFiles() ? [tidyDir] : [tidyDir, "library"];
+      // (a folder on disk read as this library folder under another spelling is its place too: nothing moves for how a folder is spelled)
+      if (keep && rec.file && isFolderOf(parentOf(rec.file), names) && !places.includes(parentOf(rec.file))) places.push(parentOf(rec.file));
       const dir = rec.file && places.includes(parentOf(rec.file)) ? parentOf(rec.file) : places[0]!;
       const fits = !!rec.file && (places.some((d) => fitsPlace(rec.file!, d, tidyBase, tidyExt)) || (keep && keptFits(rec.file, places, e.name, e.type, this.strictNames)));
       if (fits && !taken.has(rec.file!.toLowerCase())) {

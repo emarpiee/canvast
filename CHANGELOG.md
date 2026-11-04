@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.39 — Opening a folder moves nothing, however its folders are spelled (2026-11-04)
+
+- **Fixed:** two folders on disk read as one library folder (`A- B`, `a-b`) could have one's files moved into the other when a workspace was opened. A file in either now stays where it is.
+
 ## 0.53.38 — One dialog for every tag; fewer Settings tabs (2026-11-04)
 
 - **Changed:** Canvas tags in the library's sidebar and the Tags panel rename in the same dialog as the library's tags, in place of a box in the list.

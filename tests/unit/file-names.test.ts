@@ -4,7 +4,7 @@ import type { CatalogEntry } from "../../src/assets/asset-catalog";
 import { propValues } from "../../src/assets/library-match";
 import { dateWords } from "../../src/doc/date-words";
 import { encodeLinkPart, wikiKeyOf, wikiTarget } from "../../src/notes/note-file";
-import { keptFile, keptFits } from "../../src/storage/workspace-names";
+import { isFolderOf, keptFile, keptFits } from "../../src/storage/workspace-names";
 
 describe("the rules of file and folder names", () => {
   it("what a system refuses goes, in every style, on every system", () => {
@@ -90,6 +90,17 @@ describe("no file on a disk is renamed by a newer rule", () => {
     expect(keptFile("README", "", "application/octet-stream")).toEqual({ base: "README", ext: "" });
     expect(keptFile("x.7z.001", "001", "")).toEqual({ base: "x.7z", ext: "001" });
     expect(keptFile("photo", "", "image/png")).toEqual({ base: "photo", ext: "png" });
+  });
+});
+
+describe("folders spelled another way on disk", () => {
+  it("are the place of their library folder, at every depth, and no other folder's", () => {
+    expect(isFolderOf("library/A- B", ["a-b"])).toBe(true);
+    expect(isFolderOf("library/a-b", ["A- B"])).toBe(true);
+    expect(isFolderOf("library/Refs/A: B", ["refs", "a-b"])).toBe(true);
+    expect(isFolderOf("library/Refs", ["Other"])).toBe(false);
+    expect(isFolderOf("library/Refs/Sub", ["Refs"])).toBe(false);
+    expect(isFolderOf("library", [])).toBe(false);
   });
 });
 
