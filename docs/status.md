@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.1: the thumbnail slider in the list too (2026-11-05)
+
+- **Implemented:** `ui.listThumb`, `applyThumbSize` (row height and thumbnail from the slider); a longer slider; the columns button before the layout buttons.
+- **Tested:** `assets.spec.ts` extended, on GitHub.
+- **Known failures:** none.
+- **Unverified:** the look on screen.
+- **Committed:** v0.54.1.
+- **Next bounded task:** the README's new layout.
+
 ## v0.54.0: drag items out of the app; a window with no frame (2026-11-05)
 
 - **Implemented:** `text/uri-list` on a card's drag and `webContents.startDrag` with Alt, hidden items left out; `ui.frame` with `window.json` read when the window is made, `src/ui/window-frame.ts`; `scripts/file-manager-paste.mjs` and its workflow.

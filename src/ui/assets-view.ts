@@ -320,9 +320,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="hud-controls assets-controls" role="toolbar" aria-label="View of the library">
         <button type="button" data-action="to-top" data-testid="assets-to-top" aria-label="Back to top" title="Back to top (Home)" hidden>${ICONS.arrowUpToLine}</button>
         <span class="hud-sep assets-top-sep" role="separator" hidden></span>
+        <button type="button" data-action="columns" data-testid="assets-columns" aria-haspopup="dialog" aria-expanded="false" aria-label="List columns" title="Choose and arrange the columns of the list">${ICONS.columns3}</button>
         <button type="button" data-layout="grid" aria-pressed="true" aria-label="Thumbnails" title="Thumbnails">${ICONS.layoutGrid}</button>
         <button type="button" data-layout="list" aria-pressed="false" aria-label="List" title="List">${ICONS.layoutList}</button>
-        <button type="button" data-action="columns" data-testid="assets-columns" aria-haspopup="dialog" aria-expanded="false" aria-label="List columns" title="Choose and arrange the columns of the list">${ICONS.columns3}</button>
         <span class="hud-sep assets-size-sep" role="separator"></span>
         <label class="assets-size" title="Thumbnail size">${ICONS.moveDiagonal}<input type="range" min="96" max="240" step="24" value="144" aria-label="Thumbnail size"></label>
       </div>
@@ -428,13 +428,22 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   showSort();
   const sizeInput = root.querySelector<HTMLInputElement>(".assets-size input")!;
+  /** One slider for both layouts, each with its own size: the grid's row height, or the list's rows and thumbnails (at its left end, the list's usual rows). */
+  const applyThumbSize = (): void => {
+    sizeInput.value = String(ui.layout === "list" ? ui.listThumb : (ui.thumb ?? 144));
+    if (ui.thumb) grid.style.setProperty("--thumb", `${ui.thumb}px`);
+    const row = Math.round(ui.listThumb * 0.48);
+    grid.style.setProperty("--list-row", `${row}px`);
+    body.style.setProperty("--list-thumb-h", `${row - 8}px`);
+    body.style.setProperty("--list-thumb-w", `${Math.round(row * 1.22)}px`);
+  };
   const fileInput = root.querySelector<HTMLInputElement>('[data-testid="assets-import-input"]')!;
   const importBtn = root.querySelector<HTMLButtonElement>('[data-action="import"]')!;
   const side = root.querySelector<HTMLElement>(".assets-side")!;
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; tagsInline: boolean; sideSort: Record<keyof typeof SIDE_SORTS, SideSort>; pinned: string[]; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", tagsInline: false, sideSort: { folders: "az", tag: "az", ctag: "az" }, pinned: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; tagsInline: boolean; sideSort: Record<keyof typeof SIDE_SORTS, SideSort>; pinned: string[]; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; listThumb: number; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", tagsInline: false, sideSort: { folders: "az", tag: "az", ctag: "az" }, pinned: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, listThumb: 96, sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -474,6 +483,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       }
     }
     if (typeof saved.thumb === "number" && saved.thumb >= 96 && saved.thumb <= 240) ui.thumb = saved.thumb;
+    if (typeof saved.listThumb === "number" && saved.listThumb >= 96 && saved.listThumb <= 240) ui.listThumb = saved.listThumb;
     if (saved.filters && typeof saved.filters === "object") {
       const f = saved.filters as Partial<typeof ui.filters>;
       ui.filters = { usage: typeof f.usage === "string" ? f.usage : "all", sort: typeof f.sort === "string" ? f.sort : "newest", reversed: f.reversed === true, scope: typeof f.scope === "string" ? f.scope : "all" };
@@ -530,6 +540,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     root.classList.toggle("no-controls", !ui.bar);
     syncViewing();
     body.classList.toggle("is-list", ui.layout === "list");
+    applyThumbSize();
     root.classList.toggle("is-list", ui.layout === "list");
     for (const b of root.querySelectorAll<HTMLElement>("[data-layout]")) b.setAttribute("aria-pressed", String(b.dataset["layout"] === ui.layout));
     // The list's columns: their order (CSS `order`), which are shown, and the grid they sit on.
@@ -549,7 +560,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       h.style.order = `var(--o-p${i})`;
     });
     // (a column resized by its header's edge keeps that width; the others share the room as usual)
-    body.style.setProperty("--cols", ["56px", ...shown.map((c) => (ui.colW[c] ? `${ui.colW[c]}px` : trackOf(colOf(c))))].join(" "));
+    body.style.setProperty("--cols", ["var(--list-thumb-w, 56px)", ...shown.map((c) => (ui.colW[c] ? `${ui.colW[c]}px` : trackOf(colOf(c))))].join(" "));
     // The list never squeezes a column below its minimum: when the window is narrower it scrolls sideways instead.
     body.style.setProperty("--list-min", `${56 + shown.reduce((n, c) => n + colOf(c).min, 0) + 12 * shown.length + 48}px`);
     if (ui.sheetH) body.style.setProperty("--sheet-h", `${ui.sheetH}px`);
@@ -2607,7 +2618,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="asset-quick">
         <button type="button" class="assets-btn is-icon" data-action="favorite-all" data-testid="bulk-favorite" aria-pressed="${allFav}" aria-label="${allFav ? "Remove all from favourites" : "Add all to favourites"}" title="${allFav ? "Remove all from favourites" : "Add all to favourites"}"${dis}>${ICONS.star}</button>
         <button type="button" class="assets-btn is-icon" data-action="hide-all" data-testid="bulk-hide" aria-pressed="${allHidden}" aria-label="${allHidden ? "Show them again in the library" : "Hide them from the library"}" title="${allHidden ? "Show them again in the library" : "Hide them from the library (they stay in the Hidden list)"}"${dis}>${ICONS.eyeClosed}</button>
-        <span class="split"><button type="button" class="assets-btn is-primary" data-action="place-all" data-testid="bulk-place"${placeable ? "" : " disabled"}${dis} title="Place them on the open canvas, in a grid">${ICONS.mapPin}<span>Place ${placeable} on canvas</span></button><button type="button" class="assets-btn is-primary is-icon" data-action="place-all-menu" data-testid="bulk-place-menu"${placeable ? "" : " disabled"}${dis} aria-haspopup="menu" aria-label="Place them on another canvas or a new one" title="Place them on another canvas or a new one">${ICONS.chevronDown}</button></span>
+        <span class="split"><button type="button" class="assets-btn is-primary" data-action="place-all" data-testid="bulk-place"${placeable ? "" : " disabled"}${dis} title="Place them on the open canvas, in a grid">${ICONS.mapPin}<span>Place ${placeable}</span></button><button type="button" class="assets-btn is-primary is-icon" data-action="place-all-menu" data-testid="bulk-place-menu"${placeable ? "" : " disabled"}${dis} aria-haspopup="menu" aria-label="Place them on another canvas or a new one" title="Place them on another canvas or a new one">${ICONS.chevronDown}</button></span>
       </div>
       <div class="asset-facts"><span>${fmtBytes(bytes)} in all</span><span>${unused} of ${n} not used on any canvas</span></div>
       ${tagsAndFolderHtml(ents, true)}
@@ -4946,16 +4957,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     typingTimer = window.setTimeout(render, SEARCH_PAUSE_MS);
   });
   sizeInput.addEventListener("input", () => {
-    grid.style.setProperty("--thumb", `${sizeInput.value}px`);
-    ui.thumb = Number(sizeInput.value);
+    if (ui.layout === "list") ui.listThumb = Number(sizeInput.value);
+    else ui.thumb = Number(sizeInput.value);
+    applyThumbSize();
     saveUi();
     relayout();
   });
   // The thumbnail size, as it was left.
-  if (ui.thumb) {
-    sizeInput.value = String(ui.thumb);
-    grid.style.setProperty("--thumb", `${ui.thumb}px`);
-  }
+  applyThumbSize();
   // A column of the list is resized by dragging its header's right edge (double-click: back to its usual width); kept with the layout.
   let resizedAt = 0;
   listHead.addEventListener("pointerdown", (e) => {

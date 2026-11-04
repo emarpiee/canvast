@@ -1533,11 +1533,20 @@ test("list columns: each can be hidden or moved, the header follows, and the cho
   await p.locator('[data-layout="grid"]').click();
   await p.locator(".assets-size input").fill("216");
   await p.locator('[data-layout="list"]').click();
+  // The list has the same slider in the same place, with its own size: its rows grow with it.
+  await expect(p.locator(".assets-size input")).toHaveValue("96");
+  const rowH = () => p.locator(".assets-body.is-list .asset-cell").first().evaluate((e) => e.getBoundingClientRect().height);
+  const slim = await rowH();
+  await p.locator(".assets-size input").fill("240");
+  await expect.poll(rowH).toBeGreaterThan(slim * 2);
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await p.getByTestId("view-assets").click();
   expect(Math.abs((await head("width").boundingBox())!.width - w1)).toBeLessThan(2);
+  await expect(p.locator(".assets-size input")).toHaveValue("240");
+  await p.locator('[data-layout="grid"]').click();
   await expect(p.locator(".assets-size input")).toHaveValue("216");
+  await p.locator('[data-layout="list"]').click();
   // The list never squeezes a column: it scrolls sideways instead of clipping (the header and the rows are as wide as the columns need).
   await p.setViewportSize({ width: 700, height: 700 });
   const wide = await p.locator(".assets-body.is-list .assets-list-head").evaluate((e) => e.scrollWidth <= e.clientWidth + 1 || e.parentElement!.scrollWidth > e.parentElement!.clientWidth);

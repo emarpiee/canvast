@@ -47,6 +47,7 @@
   --hud-success: oklch(0.5 0.13 150);
   --hud-warning: oklch(0.52 0.11 80);
   --logo-colour: var(--hud-accent);
+  --size-slider-w: 160px; /* the library's thumbnail size */
   --hud-scrim: oklch(0.2 calc(0.02 * var(--vivid)) var(--hue) / 0.4);
   --hud-lift: 0 1px 2px oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.08), 0 8px 22px oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.1);
   /* Layers (ADR 0096): what is on the canvas (a player's picture, its bars, the selection bar) is always under the floating bars and panels on the edges, whatever is selected or being moved. */
@@ -1172,7 +1173,7 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 @media (max-width: 900px) { .assets-total { display: none; } }
 .assets-size { display: inline-flex; align-items: center; gap: var(--sp-3); padding: 0 var(--sp-3); color: var(--hud-muted); }
 .assets-size svg { width: 16px; height: 16px; }
-.assets-size input { width: 96px; }
+.assets-size input { width: var(--size-slider-w); }
 .assets-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-3); min-height: var(--ctl); padding: 0 var(--sp-6); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); cursor: pointer; }
 .assets-btn svg { width: 16px; height: 16px; flex: none; }
 .assets-btn.is-icon { width: var(--ctl); padding: 0; }
@@ -1533,7 +1534,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .assets-list-head { display: none; }
 
 /* List mode: a row per asset (picture, name, pixels, type and size, usage, tags), the same cards with a different layout. */
-.assets-body { --cols: 56px minmax(140px, 2fr) 110px 130px minmax(120px, 1.2fr) minmax(80px, 1fr); }
+.assets-body { --cols: var(--list-thumb-w, 56px) minmax(140px, 2fr) 110px 130px minmax(120px, 1.2fr) minmax(80px, 1fr); }
 .assets-body.is-list .assets-list-head { display: grid; grid-template-columns: var(--cols); gap: var(--sp-6); position: sticky; top: 0; z-index: 3; padding: var(--sp-2) var(--sp-4) var(--sp-3) var(--sp-13); color: var(--hud-muted); font-size: var(--text-sm); font-weight: 600; background: var(--theme-bg); border-bottom: 1px solid var(--hud-border); margin-bottom: var(--sp-2); }
 .assets-body.is-list .assets-grid { display: block; }
 .assets-body.is-list .assets-grid::after { display: none; }
@@ -1546,7 +1547,6 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .assets-body.is-list .asset-info { position: static; display: contents; opacity: 1; padding: 0; background: none; }
 .assets-body.is-list .asset-name { color: inherit; }
 .assets-body.is-list .asset-meta, .assets-body.is-list .asset-uses, .assets-body.is-list .asset-tags { color: var(--hud-muted); font-variant-numeric: tabular-nums; }
-#assets-view.is-list .assets-size, #assets-view.is-list .assets-size-sep { display: none; }
 
 /* The viewer takes the page: what does not apply to it leaves the library bar, and with the controls hidden so does the bar. */
 #assets-view.is-viewing .assets-import, #assets-view.is-viewing .assets-bar [data-action="slideshow"], #assets-view.is-viewing .assets-bar [data-action="details"] { display: none; }
@@ -1574,8 +1574,8 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .assets-bar .assets-search { flex-shrink: 1; min-width: 80px; }
 .assets-bar select { min-width: 0; text-overflow: ellipsis; }
 .assets-bar > select { flex-shrink: 1; }
-@media (max-width: 1380px) { .assets-bar [data-action="import"] span { display: none; } .assets-bar [data-action="import"] { width: var(--ctl); padding: 0; } .assets-size input { width: 64px; } }
-@media (max-width: 1180px) { .assets-size input { width: 56px; } }
+@media (max-width: 1380px) { .assets-bar [data-action="import"] span { display: none; } .assets-bar [data-action="import"] { width: var(--ctl); padding: 0; } .assets-size input { width: calc(var(--size-slider-w) * 0.75); } }
+@media (max-width: 1180px) { .assets-size input { width: calc(var(--size-slider-w) * 0.6); } }
 /* Nothing in the bar is hidden on a narrow window: what does not fit in one row wraps to a second (the thumbnail size included). Down to 960 px the bar shares the row of the view tabs (the search gives way first). */
 @media (max-width: 960px) { .assets-bar .assets-sep { display: none; } .assets-bar { flex-wrap: wrap; padding-left: 0; padding-top: calc(var(--ctl) + 2 * var(--pad) + var(--near) + var(--sp-1)); } }
 
@@ -1612,7 +1612,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .assets-body.is-list .asset-cell { height: var(--list-row); padding-left: var(--sp-12); }
 .assets-body.is-list .assets-grid { --list-row: 46px; row-gap: var(--sp-1); }
 .assets-body.is-list .asset-card { padding: var(--sp-2) var(--sp-4) var(--sp-2) 0; }
-.assets-body.is-list .asset-thumb { width: 56px; height: 38px; }
+.assets-body.is-list .asset-thumb { width: var(--list-thumb-w, 56px); height: var(--list-thumb-h, 38px); }
 .assets-body.is-list .asset-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .assets-body.is-list .asset-meta, .assets-body.is-list .asset-uses, .assets-body.is-list .asset-tags { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--text-sm); }
 .assets-body.is-list .asset-cell.is-even .asset-card:not([aria-pressed="true"]) { background: color-mix(in oklch, var(--hud-hover) 45%, transparent); }
@@ -2359,7 +2359,7 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 .asset-place-name { min-width: 0; overflow-wrap: anywhere; }
 .asset-places .assets-btn { flex: none; }
 /* Actions: a grid of equal buttons, the dangerous one alone at the end. */
-.asset-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3); padding-top: var(--sp-5); margin-top: 0; border-top: 1px solid var(--hud-border); }
+.asset-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-3); padding-top: var(--sp-5); margin-top: 0; border-top: 1px solid var(--hud-border); }
 .asset-actions .assets-btn { justify-content: flex-start; min-width: 0; background: color-mix(in oklch, var(--hud-fg) 6%, transparent); border-color: transparent; }
 .asset-actions .assets-btn span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .asset-actions .assets-btn.is-danger { grid-column: 1 / -1; color: var(--hud-danger); background: transparent; border-color: color-mix(in oklch, var(--hud-danger) 45%, transparent); }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.1 — The thumbnail slider in the list too (2026-11-05)
+
+- **Changed:** the library's list has the same thumbnail slider as the grid, in the same place, with its own size: its rows and thumbnails grow with it. The slider is longer, and the list's columns button moved to the left of the grid and list buttons so that nothing shifts.
+- **Fixed:** the action buttons in the details panel were cut off (`Rename …`, `Export 4 …`); they now take the panel's whole width, one to a row.
+
 ## 0.54.0 — Drag items out of the app; a window with no frame (2026-11-05)
 
 - **Added:** drag library items out of the desktop app onto a file manager or another program; hold `Alt` to start a real file drag if a program refuses the plain one. Hidden items stay in: use Copy file.
