@@ -1809,7 +1809,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .tag-cloud .side-row .side-more svg { width: var(--icon-sm); height: var(--icon-sm); }
 .tag-cloud .side-more:hover, .tag-cloud .side-more[aria-expanded="true"] { background: var(--hud-hover); }
 .tag-cloud .side-row:not(.is-type):hover .side-n, .tag-cloud .side-row:not(.is-type):focus-within .side-n, .tag-cloud .side-more[aria-expanded="true"] ~ .side-n { visibility: hidden; }
-@media (hover: none), (max-width: 640px) { .tag-cloud .side-row .side-item { padding-right: var(--s-12); } /* (more specific than the density paddings, which come first) */ .tag-cloud .side-more { opacity: 1; } }
+@media (hover: none), (max-width: 640px) { .tag-cloud .side-row .side-item { padding-right: calc(var(--chip-btn) + var(--s-2)); } /* (more specific than the density paddings, which come first) */ .tag-cloud .side-more { opacity: 1; } }
 
 /* ---- The viewer follows the theme (a light or dark ground, bars and overlays); see-through pictures sit on a chequered ground ---- */
 :root {
