@@ -2026,6 +2026,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** The cards changed while the grid could not be laid out (the library was not on screen): it is laid out when it can be. */
   let layoutDirty = false;
   const mounted = new Map<string, { el: HTMLElement; html: string }>();
+  let dragCell: string | null = null;
   let gridRange: [number, number] = [0, 0];
   let gridEmpty = "";
   const phone = window.matchMedia("(max-width: 640px)");
@@ -2145,6 +2146,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       m.el.setAttribute("aria-setsize", String(shown.length));
       keep.set(it.hash, m);
       els.push(m.el);
+    }
+    // (the card being dragged stays in the page though the grid scrolls past it: a drag whose source has gone can leave the window taking no clicks until it ends)
+    const dragged = dragCell ? mounted.get(dragCell) : undefined;
+    if (dragged && !keep.has(dragCell!)) {
+      keep.set(dragCell!, dragged);
+      els.push(dragged.el);
     }
     syncChildren(grid, els);
     mounted.clear();
@@ -3859,6 +3866,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // Dragging out of the app (desktop, with Alt): a drag starts at once, so what its files are is read when the pointer goes down. Hidden items stay in: their files are
   // encrypted, and a drag cannot stop to ask, as Copy file does, before a readable copy leaves the app.
   const outPaths = new Map<string, string>();
+  let outFolder = "";
   const dragPick = (hash: string): string[] => (picked.has(hash) ? [...picked] : [hash]); // (a picked one carries the whole pick)
   const outFiles = (hashes: readonly string[]): string[] | null => {
     const shown = hashes.filter((h) => { const en = entryOf(h); return !!en && !meta(en).hidden; });
@@ -3869,6 +3877,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const bridge = desktopBridge();
     const hash = (e.target as HTMLElement).closest<HTMLElement>(".asset-card")?.dataset["hash"];
     if (!bridge || !hash || hiddenMode) return;
+    void bridge.workspace().then((w) => void (outFolder = w?.path ?? ""));
     for (const h of dragPick(hash).slice(0, MAX_DRAG_OUT)) {
       const en = entryOf(h);
       if (en && !meta(en).hidden && !outPaths.has(h)) void session.storage?.originals.fileOf(h).then((p: string | null) => void (p && outPaths.set(h, p)), () => undefined);
@@ -3881,7 +3890,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const hashes = dragPick(hash);
     const bridge = desktopBridge();
     const rels = bridge && !hiddenMode && hashes.length <= MAX_DRAG_OUT ? outFiles(hashes) : null;
-    // With Alt: a real file drag out of the app. It is that drag alone: nothing here receives it. A plain drag stays in the app: it says nothing of files.
+    // With Alt: a real file drag, for what will not take the plain one. It is that drag alone: nothing here receives it.
     if (bridge && e.altKey) {
       e.preventDefault();
       if (rels) bridge.startDrag(rels);
@@ -3890,8 +3899,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return;
     }
     e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(hashes));
+    // (and their addresses, for a program that takes them; inside the app DRAG_TYPE decides)
+    if (rels && outFolder) e.dataTransfer.setData("text/uri-list", `${rels.map((r) => encodeURI(`file://${outFolder}/${r}`).replace(/[?#]/g, encodeURIComponent)).join("\r\n")}\r\n`);
+    dragCell = hash;
     e.dataTransfer.setData("text/plain", hashes.length > 1 ? `${hashes.length} items` : (entryOf(hash)?.name ?? ""));
-    e.dataTransfer.effectAllowed = "copyMove";
+    e.dataTransfer.effectAllowed = "copy"; // (never a move: a file manager must not be able to take a file out of the library)
     // What is dragged: up to DRAG_STACK of their thumbnails stacked, with how many there are.
     const stack = document.createElement("div");
     stack.className = "drag-stack";
@@ -3912,6 +3924,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
   // (on the document: the card dragged may be gone from the grid by then, which is drawn as it scrolls, and its end would not reach the grid)
   const dragOver = (): void => {
+    dragCell = null;
     placeZone.hidden = true;
     for (const t of root.querySelectorAll<HTMLElement>(".drop-zone")) t.classList.remove("is-drop-target");
     for (const t of side.querySelectorAll<HTMLElement>(".drop-zone")) t.classList.remove("drop-zone");
@@ -3974,7 +3987,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     lightDrop(t);
     if (!t) return;
     e.preventDefault();
-    e.dataTransfer!.dropEffect = t.dataset["scope"]!.startsWith("folder:") || t.dataset["scope"] === "unfiled" ? "move" : "copy";
+    e.dataTransfer!.dropEffect = "copy";
   });
   side.addEventListener("dragleave", (e) => {
     if (!side.contains(e.relatedTarget as Node | null)) lightDrop(null);

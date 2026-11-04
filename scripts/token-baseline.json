@@ -4,5 +4,6 @@
   "radius": 0,
   "space": 0,
   "inline": 0,
-  "notOklch": 0
+  "notOklch": 0,
+  "offGrid": 0
 }

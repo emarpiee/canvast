@@ -75,6 +75,8 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 - **DRY first: one shared component per thing.** Context menus, modals and dialogs, docks, panels, notices, settings rows, cards, trees and rules (names, dates) each have one implementation. Before writing UI, look for the shared component and call it; if it almost fits, extend it with an option; never copy it or restyle a copy. A second copy found while working is folded into the shared one in the same pass. `npm run check:components` guards this.
 - **Every menu row has an icon, a name and a very short description** (`MenuItem.icon`, `label`, `hint`), in every context menu and action menu.
 
+- **Spacing is on one grid (2, 4, 8, 12, 16, 24, 32 px and up).** Gaps, paddings and margins use only `--sp-1`, `2`, `4`, `6`, `8`, `10`, `12`, `13` and up; offsets from an edge use the same tokens, or `--edge` and `--near`. `check:tokens` refuses other steps.
+
 - **No hardcoded CSS values.** Every colour, text size, padding, margin, gap, radius and icon size uses a token from `:root` in `src/styles.css`; add a token rather than a literal. `npm run check:tokens` enforces it. Row actions use the shared `src/ui/more-menu.ts` pattern (ADR 0068).
 
 - **Colours are `oklch()`, with contrast measured.** Theme colours are `oklch()` tokens; hex only for a colour meant to be fixed (`check:tokens`). Text keeps 4.5:1 and icons 3:1 in both themes: use a colour token rather than opacity to quieten text, `--hud-accent-text` for accent as text, and `--hud-accent-fg` for anything on a selected row, an overlay on it too (`tests/e2e/contrast.spec.ts`).

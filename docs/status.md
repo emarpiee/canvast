@@ -41,7 +41,7 @@ Unverified / Committed / Next bounded task**.
 
 - **Implemented:** `ui.listThumb`, `applyThumbSize` (row height and thumbnail from the slider); a longer slider; the columns button before the layout buttons; `src/ui/window-frame.ts` as a row that comes from the top edge; shared status bar height.
 - **Tested:** `assets.spec.ts` extended, on GitHub.
-- **Known failures:** a library drag once left the app stuck on a real desktop; its cause is not proven, and the plain drag no longer offers files.
+- **Known failures:** a library drag once left the app stuck on a real desktop; its cause is not proven (the likeliest, a source card removed as the grid scrolled, is prevented now).
 - **Unverified:** the look on screen; the row on a real desktop and Wayland.
 - **Committed:** v0.54.1.
 - **Next bounded task:** the README's new layout.

@@ -12,7 +12,11 @@ import { readdir } from "node:fs/promises";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const baselinePath = resolve(root, "scripts/token-baseline.json");
 const css = (await readFile(resolve(root, "src/styles.css"), "utf8")).replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
-const found = { colour: [], text: [], radius: [], space: [], inline: [], notOklch: [] };
+const found = { colour: [], text: [], radius: [], space: [], inline: [], notOklch: [], offGrid: [] };
+// Spacing is on one grid (2, 4, 8, 12, 16, 24, 32…): gaps, paddings and margins use only its steps, and offsets from an edge use its tokens. A tree's indent is its own.
+const SPACING = /^(row-gap|column-gap|gap|padding|margin)(-(top|right|bottom|left|inline|block)(-start|-end)?)?$/;
+const OFF_GRID = /--sp-(3|5|7|9|11)\b/;
+const RAW_OFFSET = /(?<![\w.,-])(4|6|8|10|12|16|20|24)px\b/;
 // Theme colours are oklch(): no hex, rgb() or hsl() in a value or a token, no mix in another space, no filter that changes a colour's contrast. A fixed colour that is meant to be fixed is listed here.
 const FIXED_COLOUR = new Set(["--canvas-ink"]); // (the same value as the default ink drawn on the canvas)
 const NOT_OKLCH = /#[0-9a-fA-F]{3,8}\b|\b(rgba?|hsla?|hwb)\(|color-mix\(in (?!oklch)|filter:\s*brightness/;
@@ -23,6 +27,7 @@ for (const m of css.matchAll(decl)) {
   const [, prop, value] = m;
   if (!FIXED_COLOUR.has(prop) && NOT_OKLCH.test(`${prop === "filter" ? "filter: " : ""}${value.replace(/url\([^)]*\)/g, "")}`)) found.notOklch.push(`${lineOf(css, m.index)}: ${prop}: ${value.trim()}`);
   if (prop.startsWith("--")) continue;
+  if ((SPACING.test(prop) && OFF_GRID.test(value) && !value.includes("--depth") && !value.includes("--l)")) || (/^(top|right|bottom|left)$/.test(prop) && RAW_OFFSET.test(value))) found.offGrid.push(`${at}: ${prop}: ${value.trim()}`);
   const at = lineOf(css, m.index);
   if (/oklch\((?!var\()|#[0-9a-fA-F]{3,8}\b|rgba?\(/.test(value)) found.colour.push(`${at}: ${prop}: ${value.trim()}`);
   if ((prop === "font-size" || prop === "font") && /(?<![\w-])\d+(\.\d+)?px/.test(value.replace(/var\([^)]*\)/g, ""))) found.text.push(`${at}: ${prop}: ${value.trim()}`);
