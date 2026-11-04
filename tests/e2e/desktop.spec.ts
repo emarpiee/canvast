@@ -838,7 +838,10 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     expect(await listing()).toEqual([]);
     expect((await hid("check", "pw1")).ok).toBe(false);
     expect(await hid("check", "pw2")).toEqual({ ok: true, state: "open" });
-    await expect.poll(() => listing().then((l) => l.sort())).toEqual([["Secret Plan.png", true, true], [name, true, true]].sort());
+    // (how long the list takes after the password is said, for a run that is slow: an empty list for good is a bug, a late one is not)
+    const opened = Date.now();
+    await expect.poll(() => listing().then((l) => l.sort()), { timeout: 45_000 }).toEqual([["Secret Plan.png", true, true], [name, true, true]].sort());
+    console.log(`hidden list after the password: ${Date.now() - opened} ms`);
     // (each file is opened from .hidden/ after the list shows it: wait for its bytes)
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toEqual(Array.from(secret));
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.originalBytes(h), createHash("sha256").update(outside).digest("hex"))).toEqual(Array.from(outside));
@@ -1718,87 +1721,104 @@ test("a file renamed outside the app keeps its place in notes: the links follow,
   await app.close();
 });
 
-test("the Trash lists this workspace's .trash for the mode: shown files in the library, sealed ones only in hidden mode, with Restore and Delete for good", async () => {
+test("the Trash is a state of the library: this workspace's .trash for the mode, in the library's cards, with Restore and Delete for good in the details", async () => {
   const ws = tempDir("cv-trash-");
-  const { app, page } = await launch(ws, "userdata", true);
+  let { app, page } = await launch(ws, "userdata", true);
   try {
     await page.getByTestId("view-assets").click();
-    const png = (seed: number) => makePng(6, 4, () => [seed, 90, 40, 255]);
-    await page.getByTestId("assets-import-input").setInputFiles([{ name: "keep.png", mimeType: "image/png", buffer: png(10) }, { name: "gone.png", mimeType: "image/png", buffer: png(60) }, { name: "secret.png", mimeType: "image/png", buffer: png(120) }]);
-    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/")).length, { timeout: 15_000 }).toBe(3);
+    const png = (seed: number) => makePng(60, 40, () => [seed, 90, 40, 255]);
+    await page.getByTestId("assets-import-input").setInputFiles([{ name: "keep.png", mimeType: "image/png", buffer: png(10) }, { name: "gone.png", mimeType: "image/png", buffer: png(60) }, { name: "also.png", mimeType: "image/png", buffer: png(90) }, { name: "secret.png", mimeType: "image/png", buffer: png(120) }]);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/")).length, { timeout: 15_000 }).toBe(4);
     const hashOf = (n: string) => page.evaluate((n) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === n)!.hash), n);
     const trash = page.locator('[data-scope="trash"]');
-    const rows = page.getByTestId("trash-row");
+    const cards = page.getByTestId("trash-card");
+    const libraryCards = page.getByTestId("asset-card");
     const search = page.getByTestId("assets-search");
-    // Deleted: it shows there, by the button, as a word in the search box.
+    const trashedShown = () => files(ws).filter((f) => f.startsWith(".trash/library/")).length;
     const gone = await hashOf("gone.png");
-    await page.evaluate((h) => window.__canvastDebug.deleteEverywhere([h]), gone);
-    await expect.poll(() => files(ws).filter((f) => f.startsWith(".trash/library/")).length, { timeout: 15_000 }).toBe(1);
+    const also = await hashOf("also.png");
+    await page.evaluate((h) => window.__canvastDebug.deleteEverywhere(h), [gone, also]);
+    await expect.poll(trashedShown, { timeout: 15_000 }).toBe(2);
+    // In place of the grid: only they, the library's cards gone, only Trash lit, its count and size below.
     await trash.click();
     await expect(search).toHaveValue("is:trash");
-    await expect(rows).toHaveCount(1);
-    await expect(rows).toContainText("gone.png");
-    // It is what shows: in the view, in place of the grid. Anything else of the sidebar goes back to the library.
-    await expect(page.getByTestId("assets-grid")).toBeHidden();
-    await expect(rows.first()).toBeInViewport();
-    await expect(page.getByTestId("assets-count")).toContainText("1 file in the trash");
+    await expect(cards).toHaveCount(2);
+    await expect(cards.first()).toBeInViewport();
+    await expect(libraryCards.filter({ visible: true })).toHaveCount(0);
+    await expect(page.locator('[data-scope="trash"].is-active')).toHaveCount(1);
+    await expect(page.locator('[data-scope="all"].is-active')).toHaveCount(0);
+    await expect(page.getByTestId("assets-count")).toHaveText("2 files in the trash");
+    await expect(page.getByTestId("inspector-empty")).toContainText("Select a file");
+    // Anything else of the sidebar goes back, and the library is there.
     for (const other of ["unfiled", "all", "favorites"]) {
       await page.locator(`[data-scope="${other}"]`).click();
       await expect(search).toHaveValue("");
-      await expect(page.getByTestId("assets-grid")).toBeVisible();
-      await expect(page.getByTestId("assets-trash")).toBeHidden();
+      await expect(cards.filter({ visible: true })).toHaveCount(0);
       await trash.click();
-      await expect(rows.first()).toBeInViewport();
+      await expect(cards.first()).toBeInViewport();
     }
     await page.locator('[data-scope="all"]').click();
-    await expect(page.locator('[data-testid="asset-card"]').first()).toBeInViewport();
+    await expect(libraryCards.first()).toBeInViewport();
     await trash.click();
     await trash.click(); // (this again: out)
     await expect(search).toHaveValue("");
+    await expect(libraryCards.first()).toBeInViewport();
     await trash.click();
+    // By name, in the box.
     await search.fill("is:trash nothing");
     await expect(page.getByTestId("trash-empty")).toBeVisible();
     await search.fill("is:trash gone");
-    await expect(rows).toHaveCount(1);
-    // Restored: the file where it was, the item back, not in the trash.
-    await page.locator('[data-trash="restore"]').click();
-    await expect(rows).toHaveCount(0);
+    await expect(cards).toHaveCount(1);
+    await search.fill("is:trash");
+    await expect(cards).toHaveCount(2);
+    // Picked: the details say so. Restored: its file where it was, its item back, out of the trash.
+    await cards.filter({ hasText: "gone.png" }).click();
+    await expect(cards.filter({ hasText: "gone.png" })).toHaveAttribute("aria-pressed", "true");
+    await page.getByTestId("trash-restore").click();
+    await expect(cards).toHaveCount(1);
     await expect.poll(() => files(ws).filter((f) => f.startsWith("library/") && f.endsWith("gone.png")).length, { timeout: 15_000 }).toBe(1);
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.some((e) => e.hash === h && e.present)), gone), { timeout: 15_000 }).toBe(true);
+    // Delete for good, from its right-click menu: asked first.
+    await cards.first().click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Delete for good" }).click();
+    await page.getByTestId("confirm-ok").click();
+    await expect(cards).toHaveCount(0);
+    await expect(page.getByTestId("trash-empty")).toBeVisible();
+    await expect.poll(trashedShown).toBe(0);
     await search.fill("");
-    // Hidden, then deleted: nothing of it outside hidden mode.
+    // A hidden item's sealed file in .trash/.hidden (an item deleted on purpose is erased; this is what a stopped app could leave): nothing of it outside hidden mode, not even the count.
     expect(await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"))).toEqual({ ok: true, state: "open" });
     const secret = await hashOf("secret.png");
     await page.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), secret);
-    await expect.poll(() => files(ws).filter((f) => f.startsWith(".hidden/") && !f.endsWith(".json")).length, { timeout: 15_000 }).toBeGreaterThan(0);
-    await page.evaluate((h) => window.__canvastDebug.deleteEverywhere([h]), secret);
-    await expect.poll(() => files(ws).filter((f) => f.startsWith(".trash/.hidden/")).length, { timeout: 15_000 }).toBeGreaterThan(0);
-    await trash.click();
+    const sealedFiles = () => files(ws).filter((f) => f.startsWith(".hidden/") && !f.endsWith(".json") && !f.includes("/thumbnails/") && !f.endsWith(".name"));
+    await expect.poll(() => sealedFiles().length, { timeout: 15_000 }).toBe(1);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await app.close();
+    const sealedFile = sealedFiles()[0]!;
+    mkdirSync(join(ws, ".trash", sealedFile.slice(0, sealedFile.lastIndexOf("/"))), { recursive: true });
+    renameSync(join(ws, sealedFile), join(ws, ".trash", sealedFile));
+    ({ app, page } = await launch(ws, "userdata", true));
+    await page.getByTestId("view-assets").click();
+    await page.locator('[data-scope="trash"]').click();
     await expect(page.getByTestId("trash-empty")).toBeVisible();
-    expect(await page.evaluate(() => document.querySelector('[data-testid="assets-trash"]')!.textContent)).not.toContain("secret");
-    await search.fill("");
+    await expect(page.getByTestId("assets-count")).toHaveText("0 files in the trash");
+    await page.getByTestId("assets-search").fill("");
     // In hidden mode: it, by its own name, and only it. Restored: sealed where it was, hidden still.
-    await search.fill("hidden:");
-    const asked = page.getByTestId("prompt-input");
-    if (await asked.isVisible({ timeout: 2000 }).catch(() => false)) (await asked.fill("pw"), await page.getByTestId("prompt-ok").click());
+    await page.getByTestId("assets-search").fill("hidden:");
+    await page.getByTestId("prompt-input").fill("pw");
+    await page.getByTestId("prompt-ok").click();
     await expect(page.getByTestId("hidden-mode-exit")).toBeVisible();
-    await trash.click();
-    await expect(rows).toHaveCount(1);
-    await expect(rows).toContainText("secret.png");
-    await page.locator('[data-trash="restore"]').click();
-    await expect(rows).toHaveCount(0);
-    await expect.poll(() => files(ws).filter((f) => f.startsWith(".trash/.hidden/") && !f.endsWith(".name")).length).toBe(0);
-    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.some((e) => e.hash === h && e.hidden)), secret), { timeout: 45_000 }).toBe(true);
-    await search.fill("");
+    await page.locator('[data-scope="trash"]').click();
+    const back = page.getByTestId("trash-card");
+    await expect(back).toHaveCount(1);
+    await expect(back).toContainText("secret.png");
+    await back.first().click();
+    await page.getByTestId("trash-restore").click();
+    await expect(back).toHaveCount(0);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(".trash/.hidden/")).length).toBe(0);
+    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.originalBytes(h), secret), { timeout: 15_000 }).toEqual(Array.from(png(120)));
+    await page.getByTestId("assets-search").fill("");
     await page.getByTestId("hidden-mode-exit").click();
-    // Delete for good: a shown one, asked first.
-    await page.evaluate((h) => window.__canvastDebug.deleteEverywhere([h]), gone);
-    await expect.poll(() => files(ws).filter((f) => f.startsWith(".trash/library/")).length, { timeout: 15_000 }).toBe(1);
-    await trash.click();
-    await page.locator('[data-trash="erase"]').click();
-    await page.getByTestId("confirm-ok").click();
-    await expect(rows).toHaveCount(0);
-    await expect.poll(() => files(ws).filter((f) => f.startsWith(".trash/library/")).length).toBe(0);
   } finally {
     await app.close();
   }

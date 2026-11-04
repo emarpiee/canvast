@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.45 — The Trash, rebuilt into the library (2026-11-04)
+
+- **Changed:** the Trash is a state of the library view: the library's own cards in place of its grid (it still showed behind), only Trash lit in the sidebar, and what is picked in the details panel. Ctrl and Shift pick several, Ctrl+A all, a right click offers the same actions.
+- **Changed:** Restore and Delete for good are in the details panel and the right-click menu, for one file or many, instead of buttons on each row.
+
 ## 0.53.44 — Trash shows, and the sidebar leaves it (2026-11-04)
 
 - **Fixed:** the Trash's list showed under the grid, out of sight, and its search word stayed, so All items, Unfiled and the rest seemed to do nothing. The grid now gives way to it, and anything else in the sidebar, or the filter and sort menus, goes back to the library.

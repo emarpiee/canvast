@@ -1,97 +1,228 @@
-/** The workspace's `.trash/` in the library: its files, what each is, Restore and Delete for good. Only what the storage gives for the mode: never the system's trash. */
+/**
+ * The Trash in the library: this workspace's `.trash/` for the mode, never the system's. It is a state of the library view, as the viewer is: the library's own cards in place
+ * of its grid, and its details panel for what is picked, with Restore and Delete for good.
+ */
 import { plural } from "../doc/plural";
 import type { TrashFile } from "../storage/store";
 import { confirmDialog } from "./confirm";
+import { bindContextMenu } from "./context-menu";
 import { esc, fmtBytes } from "./format";
 import { ICONS } from "./icons";
+import type { MenuItem } from "./more-menu";
 
 export interface TrashDeps {
+  box: HTMLElement;
+  details: HTMLElement;
   list(): Promise<TrashFile[]>;
   read(path: string): Promise<Blob | null>;
   restore(path: string): Promise<"restored" | "already" | "shut">;
   erase(path: string): Promise<void>;
   say(text: string): void;
-  changed(n: number): void;
+  /** How many files the trash holds and their size: its count in the sidebar and the status bar. */
+  counted(n: number, bytes: number): void;
   readOnly(): boolean;
+  /** The library's own tile for a file with no picture. */
+  tile(name: string): string;
 }
 
-/** How many rows are drawn at once: a long trash shows more on asking. */
+export interface TrashView {
+  /** Show the files whose names hold what else the search box says. */
+  show(typed: string): Promise<void>;
+  /** Read the folder again. */
+  refresh(): Promise<void>;
+  drawDetails(): void;
+  selectAll(): void;
+  clear(): void;
+}
+
+/** The search box's word for this state. */
+export const TRASH_WORD = /(^|\s)is:trash(?=\s|$)/i;
+/** How many cards are drawn at once: a long trash shows more on asking. */
 const PAGE = 300;
 const PICTURE = /\.(png|jpe?g|webp|gif|avif|bmp|svg)$/i;
 
-/** The search box's word for this view, and what else it says (a filter by name). */
-export const TRASH_WORD = /(^|\s)is:trash(?=\s|$)/i;
-
-export function mountTrashView(box: HTMLElement, deps: TrashDeps): { show(words: string): Promise<void>; refresh(): Promise<void> } {
+export function mountTrashView(deps: TrashDeps): TrashView {
+  const { box, details } = deps;
   let files: TrashFile[] = [];
   let words: string[] = [];
   let shown = PAGE;
-  const urls = new Set<string>();
+  const picked = new Set<string>();
+  let anchor: string | null = null;
+  const urls = new Map<string, string>();
+  const fit = (): TrashFile[] => files.filter((f) => words.every((w) => f.name.toLowerCase().includes(w)));
+  const urlOf = async (path: string): Promise<string | null> => {
+    if (urls.has(path)) return urls.get(path)!;
+    const blob = await deps.read(path).catch(() => null);
+    if (!blob) return null;
+    const url = URL.createObjectURL(blob);
+    urls.set(path, url);
+    return url;
+  };
   const seeing = new IntersectionObserver((seen) => {
     for (const s of seen) {
       if (!s.isIntersecting) continue;
       seeing.unobserve(s.target);
-      void deps.read((s.target as HTMLElement).dataset["path"]!).then((blob) => {
-        if (!blob || !s.target.isConnected) return;
-        const url = URL.createObjectURL(blob);
-        urls.add(url);
-        (s.target as HTMLImageElement).src = url;
+      const img = s.target as HTMLImageElement;
+      // (the card takes the picture's shape, as the library's do)
+      img.addEventListener("load", () => img.closest<HTMLElement>(".asset-cell")?.style.setProperty("--ar", String(img.naturalWidth / Math.max(1, img.naturalHeight) || 1)), { once: true });
+      void urlOf(img.dataset["path"]!).then((url) => {
+        if (url && img.isConnected) img.src = url;
       });
     }
-  });
+  }, { root: box, rootMargin: "400px" });
+
+  const cardHtml = (f: TrashFile): string => `<div class="asset-cell" role="listitem" style="--ar: ${PICTURE.test(f.name) ? 1.33 : 1}">
+      <button type="button" class="asset-card" data-testid="trash-card" data-path="${esc(f.path)}" aria-pressed="${picked.has(f.path)}" aria-label="${esc(f.name)}, ${fmtBytes(f.size)}" title="${esc(f.name)}">
+        <span class="asset-thumb thumb-slot">${PICTURE.test(f.name) ? `<img alt="" draggable="false" data-path="${esc(f.path)}">` : deps.tile(f.name)}</span>
+        <span class="asset-info"><span class="asset-name">${esc(f.name)}</span><span class="asset-size">${fmtBytes(f.size)}</span></span>
+      </button></div>`;
   const draw = (): void => {
-    for (const u of urls) URL.revokeObjectURL(u);
-    urls.clear();
-    const fit = files.filter((f) => words.every((w) => f.name.toLowerCase().includes(w)));
-    const dis = deps.readOnly() ? " disabled" : "";
-    box.innerHTML = fit.length
-      ? `<ul class="trash-list" data-testid="trash-list">${fit.slice(0, shown).map((f) => `<li class="trash-row" data-testid="trash-row">
-          ${PICTURE.test(f.name) ? `<img class="trash-thumb" alt="" data-path="${esc(f.path)}">` : `<span class="trash-thumb">${ICONS.fileText}</span>`}
-          <span class="trash-name" title="${esc(f.name)}">${esc(f.name)}</span>
-          <span class="trash-size">${fmtBytes(f.size)}</span>
-          <button type="button" class="assets-btn" data-trash="restore" data-path="${esc(f.path)}"${dis}>${ICONS.archiveRestore}<span>Restore</span></button>
-          <button type="button" class="assets-btn is-danger" data-trash="erase" data-path="${esc(f.path)}" data-name="${esc(f.name)}"${dis}>${ICONS.trash2}<span>Delete for good</span></button>
-        </li>`).join("")}</ul>${fit.length > shown ? `<button type="button" class="assets-btn" data-trash="more">Show ${plural(Math.min(PAGE, fit.length - shown), "more file")}</button>` : ""}`
-      : `<p class="asset-note" data-testid="trash-empty">${files.length ? "No file in the trash has that name." : "The trash is empty. Only this workspace's .trash folder is listed, not your system's trash."}</p>`;
+    seeing.disconnect();
+    const list = fit();
+    box.innerHTML = list.length
+      ? `<div class="assets-grid" role="list" data-testid="trash-grid">${list.slice(0, shown).map(cardHtml).join("")}</div>${list.length > shown ? `<button type="button" class="assets-btn" data-trash="more">Show ${plural(Math.min(PAGE, list.length - shown), "more file")}</button>` : ""}`
+      : `<p class="asset-note" data-testid="trash-empty">${files.length ? "No file in the trash has that name." : "The trash is empty. It lists this workspace's .trash folder, not your system's trash."}</p>`;
     for (const img of box.querySelectorAll("img[data-path]")) seeing.observe(img);
+    drawDetails();
+  };
+  const showPicks = (): void => {
+    for (const c of box.querySelectorAll<HTMLElement>("[data-testid='trash-card']")) c.setAttribute("aria-pressed", String(picked.has(c.dataset["path"]!)));
+    drawDetails();
+  };
+  const actionsHtml = (): string => {
+    const dis = deps.readOnly() ? " disabled" : "";
+    return `<div class="trash-actions">
+      <button type="button" class="assets-btn" data-trash="restore" data-testid="trash-restore"${dis}>${ICONS.archiveRestore}<span>Restore</span></button>
+      <button type="button" class="assets-btn is-danger" data-trash="erase" data-testid="trash-erase"${dis}>${ICONS.trash2}<span>Delete for good</span></button>
+    </div>`;
+  };
+  function drawDetails(): void {
+    details.hidden = false;
+    delete details.dataset["hash"];
+    const on = files.filter((f) => picked.has(f.path));
+    if (!on.length) {
+      details.innerHTML = `<p class="asset-note asset-insp-empty" data-testid="inspector-empty">Select a file to restore it or delete it for good. A file comes back where it was; its tags and folder come back only if the library still remembers it.</p>`;
+      return;
+    }
+    if (on.length > 1) {
+      details.innerHTML = `<div class="asset-insp-head"><h2>${plural(on.length, "file")} selected</h2></div><p class="asset-note">${fmtBytes(on.reduce((n, f) => n + f.size, 0))}</p>${actionsHtml()}`;
+      return;
+    }
+    const f = on[0]!;
+    const was = f.path.startsWith(".trash/library/") ? f.path.slice(".trash/".length, f.path.lastIndexOf("/")) : "";
+    details.innerHTML = `<div class="asset-insp-head"><h2 title="${esc(f.name)}">${esc(f.name)}</h2></div>
+      ${PICTURE.test(f.name) ? `<div class="asset-preview-box"><span class="asset-preview"><img alt="" data-trash-preview></span></div>` : ""}
+      <p class="asset-note">${fmtBytes(f.size)}${was ? ` · was in ${esc(was)}` : ""}</p>${actionsHtml()}`;
+    const img = details.querySelector<HTMLImageElement>("[data-trash-preview]");
+    if (img) void urlOf(f.path).then((url) => {
+      if (url && img.isConnected) img.src = url;
+    });
+  }
+
+  /** What the cards drawn are of: drawn again only when that changes, so pictures do not blink. */
+  let drawnOf: string | null = null;
+  const drawIfChanged = (): void => {
+    const now = `${shown}\n${words.join(" ")}\n${files.map((f) => f.path).join("\n")}`;
+    if (box.hidden || now === drawnOf) return;
+    drawnOf = now;
+    draw();
   };
   const refresh = async (): Promise<void> => {
-    files = await deps.list().catch(() => []);
-    deps.changed(files.length);
-    if (!box.hidden) draw();
+    files = await deps.list().catch((e: unknown) => {
+      deps.say(`Could not read the trash: ${(e as Error).message}`);
+      return [];
+    });
+    for (const p of [...picked]) if (!files.some((f) => f.path === p)) picked.delete(p);
+    for (const [p, u] of urls) if (!files.some((f) => f.path === p)) (URL.revokeObjectURL(u), urls.delete(p));
+    deps.counted(files.length, files.reduce((n, f) => n + f.size, 0));
+    drawIfChanged();
+    if (!box.hidden) drawDetails();
   };
-  box.addEventListener("click", (e) => {
+  const restore = async (): Promise<void> => {
+    let back = 0, had = 0, shut = 0, failed = 0;
+    for (const path of [...picked]) {
+      const r = await deps.restore(path).catch(() => null);
+      if (r === "restored") back++;
+      else if (r === "already") had++;
+      else if (r === "shut") shut++;
+      else failed++;
+    }
+    const said = [back ? `Restored ${plural(back, "file")}.` : "", had ? `The library already has ${plural(had, "file")}: left in the trash.` : "", shut ? `${plural(shut, "file")} did not open with this key: left in the trash.` : "", failed ? `${plural(failed, "file")} could not be restored.` : ""];
+    deps.say(said.filter(Boolean).join(" "));
+    await refresh();
+  };
+  const erase = async (): Promise<void> => {
+    const on = files.filter((f) => picked.has(f.path));
+    const ok = await confirmDialog({ title: on.length === 1 ? `Delete “${on[0]?.name}” for good?` : `Delete ${plural(on.length, "file")} for good?`, lines: ["Erased from the workspace's .trash folder. This cannot be undone."], confirmLabel: "Delete for good" });
+    if (!ok) return;
+    for (const f of on) await deps.erase(f.path).catch(() => undefined);
+    await refresh();
+  };
+  const act = (e: Event): void => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-trash]");
     if (!b || b.disabled) return;
     if (b.dataset["trash"] === "more") {
       shown += PAGE;
-      return draw();
-    }
-    const path = b.dataset["path"]!;
-    if (b.dataset["trash"] === "restore") {
-      b.disabled = true;
-      void deps.restore(path).then((r) => {
-        deps.say(r === "restored" ? "Restored to the library." : r === "already" ? "The library already has this file: the copy stays in the trash." : "It could not be opened with this key: it stays in the trash.");
-        return refresh();
-      }).catch((err: unknown) => {
-        deps.say(`Could not restore it: ${(err as Error).message}`);
-        return refresh();
-      });
+      drawIfChanged();
+    } else void (b.dataset["trash"] === "restore" ? restore() : erase());
+  };
+  details.addEventListener("click", act);
+  box.addEventListener("click", (e) => {
+    const card = (e.target as HTMLElement).closest<HTMLElement>("[data-testid='trash-card']");
+    act(e);
+    if (!card) {
+      if (!(e.target as HTMLElement).closest("button")) (picked.clear(), showPicks());
       return;
     }
-    void confirmDialog({ title: `Delete “${b.dataset["name"]}” for good?`, lines: ["It is erased from the workspace's .trash folder and cannot be brought back."], confirmLabel: "Delete for good" }).then(async (ok) => {
-      if (!ok) return;
-      await deps.erase(path);
-      await refresh();
-    });
+    const path = card.dataset["path"]!;
+    if (e.shiftKey && anchor) {
+      const paths = fit().slice(0, shown).map((f) => f.path);
+      const [a, b] = [paths.indexOf(anchor), paths.indexOf(path)].sort((x, y) => x - y);
+      for (const p of paths.slice(a!, b! + 1)) picked.add(p);
+    } else if (e.ctrlKey || e.metaKey) {
+      if (!picked.delete(path)) picked.add(path);
+      anchor = path;
+    } else {
+      picked.clear();
+      picked.add(path);
+      anchor = path;
+    }
+    showPicks();
   });
+  bindContextMenu(box, {
+    label: "Trash",
+    build: (at): MenuItem[] => {
+      const card = (at.target as HTMLElement | null)?.closest?.<HTMLElement>("[data-testid='trash-card']");
+      if (!card || deps.readOnly()) return [];
+      if (!picked.has(card.dataset["path"]!)) {
+        picked.clear();
+        picked.add(card.dataset["path"]!);
+        showPicks();
+      }
+      return [
+        { label: "Restore", icon: ICONS.archiveRestore, run: () => void restore() },
+        { label: "Delete for good", icon: ICONS.trash2, danger: true, run: () => void erase() },
+      ];
+    },
+  });
+
   return {
     refresh,
+    drawDetails,
+    selectAll: () => {
+      for (const f of fit().slice(0, shown)) picked.add(f.path);
+      showPicks();
+    },
+    clear: () => {
+      picked.clear();
+      showPicks();
+    },
     async show(typed) {
-      words = typed.replace(TRASH_WORD, " ").toLowerCase().split(/\s+/).filter(Boolean);
-      shown = PAGE;
+      const next = typed.replace(TRASH_WORD, " ").toLowerCase().split(/\s+/).filter(Boolean);
+      if (next.join(" ") !== words.join(" ")) shown = PAGE;
+      words = next;
+      drawIfChanged();
       await refresh();
-      draw();
     },
   };
 }

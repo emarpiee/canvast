@@ -256,7 +256,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <nav class="assets-side" data-testid="assets-side" aria-label="Library"></nav>
       <div class="col-grip" data-grip="side" data-testid="side-grip" role="separator" aria-orientation="vertical" aria-label="Resize the library panel" title="Drag to resize the library panel (double-click to reset)" tabindex="0"></div>
       <div class="assets-main">
-        <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map(headCell).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div><div class="assets-trash" data-testid="assets-trash" hidden></div></div>
+        <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map(headCell).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div><div class="assets-trash" data-testid="assets-trash" hidden></div>
         <div class="assets-filtered" data-testid="assets-filtered" role="status" hidden>${ICONS.funnelX}<span class="assets-filtered-text"></span><button type="button" data-action="show-all" data-testid="assets-show-all">Show all items</button></div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
           <button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.arrowLeft}</button>
@@ -318,7 +318,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const trashBox = root.querySelector<HTMLElement>(".assets-trash")!;
   let trashCount = 0;
   const trashSync = (): FolderSync | undefined => session.storage?.folderSync ?? undefined;
-  const trashView = mountTrashView(trashBox, {
+  const trashView = mountTrashView({
+    box: trashBox,
+    details: root.querySelector<HTMLElement>(".asset-inspector")!,
     list: () => trashSync()?.trashList(hiddenMode) ?? Promise.resolve([]),
     read: (path) => trashSync()?.trashRead(path) ?? Promise.resolve(null),
     restore: (path) => trashSync()!.trashRestore(path),
@@ -327,13 +329,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       session.editor.message = m;
       session.editor.changed();
     },
-    changed: (n) => {
-      if (TRASH_WORD.test(search.value)) count.textContent = plural(n, "file") + " in the trash";
+    counted: (n, bytes) => {
+      if (TRASH_WORD.test(search.value)) {
+        count.textContent = `${plural(n, "file")} in the trash`;
+        total.textContent = `${fmtBytes(bytes)} in all`;
+        totalOf = null;
+      }
       if (n === trashCount) return;
       trashCount = n;
       renderSide();
     },
     readOnly: () => session.readOnly,
+    tile: (name) => fileTile({ name, type: "" }),
   });
   const inspector = root.querySelector<HTMLElement>(".asset-inspector")!;
   // The Details fold stays open (or closed) as you left it when you go to another item; only you close it.
@@ -2176,13 +2183,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const render = (): void => {
     keepFilters();
     root.querySelector<HTMLElement>(".assets-searchbox .cs-clear")!.hidden = !search.value;
-    // The Trash: the workspace's own, for the mode, in place of the grid.
+    // The Trash: a state of this view, as the viewer is (see trash-view.ts).
     const inTrash = TRASH_WORD.test(search.value);
-    const trashTurned = inTrash === trashBox.hidden;
+    const turned = inTrash === trashBox.hidden;
     trashBox.hidden = !inTrash;
-    grid.hidden = inTrash;
-    listHead.hidden = inTrash;
-    if (trashTurned) renderSide();
+    body.classList.toggle("is-trash", inTrash);
+    if (turned) {
+      if (inTrash) void select(null);
+      else trashView.clear();
+      renderSide();
+      renderInspector();
+    }
     if (inTrash) {
       filteredChip.hidden = true;
       void trashView.show(search.value);
@@ -2297,7 +2308,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     };
     const picked = pickedKeys(scope);
     const item = (key: string, label: string, n: number, opts: { depth?: number; icon?: string; extra?: string; cls?: string } = {}): string =>
-      `<li class="side-row ${opts.cls ?? ""}" style="--depth:${opts.depth ?? 0}"><button type="button" class="side-item${scope === key || picked.has(key) ? " is-active" : ""}" data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}" title="${label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : ""}">
+      `<li class="side-row ${opts.cls ?? ""}" style="--depth:${opts.depth ?? 0}"><button type="button" class="side-item${(TRASH_WORD.test(search.value) ? key === "trash" : scope === key || picked.has(key)) ? " is-active" : ""}" data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}" title="${label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : ""}">
         ${opts.icon ?? ""}<span class="side-label">${label}</span><span class="side-n">${n}</span></button>${opts.extra ?? ""}</li>`;
     const nameInput = (value: string, label: string): string =>
       `<li class="side-row"><input class="side-name" data-testid="folder-name-input" value="${esc(value)}" aria-label="${label}" maxlength="120"></li>`;
@@ -2357,7 +2368,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           ${item("favorites", "Favourites", counts.favourites, { icon: ICONS.star })}
           ${item("unfiled", "Unfiled", counts.unfiled, { icon: ICONS.folderX })}
           ${pagesNow() ? "" : item("similar", "Similar images", similar().reduce((n, g) => n + g.length, 0), { icon: ICONS.copyCheck })}
-          ${desktopBridge() ? item("trash", "Trash", trashCount, { icon: ICONS.trashBin }).replace('class="side-item', `class="side-item${TRASH_WORD.test(search.value) ? " is-active" : ""}`) : ""}
+          ${desktopBridge() ? item("trash", "Trash", trashCount, { icon: ICONS.trashBin }) : ""}
         </ul>
         ${section(
           "folders",
@@ -2491,6 +2502,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
 
   const renderInspector = (): void => {
+    if (TRASH_WORD.test(search.value)) return trashView.drawDetails();
     if (picked.size > 1) {
       inspector.hidden = false;
       renderBulk();
@@ -4086,6 +4098,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     if (target?.closest?.("dialog, " + TYPING)) return;
     if (e.altKey) return;
+    if (TRASH_WORD.test(search.value)) {
+      if (e.key === "Escape") trashView.clear();
+      else if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) (trashView.selectAll(), e.preventDefault());
+      return;
+    }
     if (e.key === "Escape") {
       if (sideMenu) {
         sideMenu = null;
