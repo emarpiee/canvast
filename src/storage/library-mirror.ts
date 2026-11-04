@@ -589,7 +589,7 @@ export class LibraryMirror {
       // (a folder on disk read as this library folder under another spelling is its place too: nothing moves for how a folder is spelled)
       if (keep && rec.file && isFolderOf(parentOf(rec.file), names) && !places.includes(parentOf(rec.file))) places.push(parentOf(rec.file));
       const dir = rec.file && places.includes(parentOf(rec.file)) ? parentOf(rec.file) : places[0]!;
-      const fits = !!rec.file && (places.some((d) => fitsPlace(rec.file!, d, tidyBase, tidyExt)) || (keep && keptFits(rec.file, places, e.name, e.type, this.strictNames)));
+      const fits = !!rec.file && (places.some((d) => fitsPlace(rec.file!, d, tidyBase, tidyExt)) || (keep && keptFits(rec.file, places, e.name, e.type)));
       if (fits && !taken.has(rec.file!.toLowerCase())) {
         taken.add(rec.file!.toLowerCase());
         // (looked at in this name first: a full pass of a big library asks the library nothing for an item that fits)
@@ -600,7 +600,6 @@ export class LibraryMirror {
     for (const m of moves) if (m.from) taken.add(m.from.toLowerCase());
     const emptied = new Set<string>();
     const failed: string[] = [];
-    this.lastPlaced = moves.length;
     const total = moves.length + toSeal.length;
     let done = 0;
     const step = (encrypting = false): void => this.onProgress?.(++done, total, encrypting);
@@ -1052,23 +1051,6 @@ export class LibraryMirror {
       await this.lib.apply(ops);
     });
     if (was !== undefined) this.movedOutside({ hash, name: was, path: from });
-  }
-
-  /** Only when asked for: a file right by an earlier version's rules is named by today's too (see `repairNames`). */
-  private strictNames = false;
-  private lastPlaced = 0;
-  /**
-   * Asked for by name, never on its own: files an earlier version named less well get today's names (a picture that lost its extension to a dot in its name,
-   * letters composed another way, unseen characters), and the links to them follow. How many moved.
-   */
-  async repairNames(): Promise<number> {
-    this.strictNames = true;
-    try {
-      await this.write();
-      return this.lastPlaced;
-    } finally {
-      this.strictNames = false;
-    }
   }
 
   /** Whether files keep the item's name as written (Settings: Keep file names), else their tidy name. */

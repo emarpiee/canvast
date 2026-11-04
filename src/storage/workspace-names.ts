@@ -153,7 +153,7 @@ export function libraryDir(folderNames: readonly string[], type: string, name: s
  * Keep file names: whether a file already fits its item where it lies: in one of `dirs`, under the item's name as written (`-2` on a clash), with
  * the extension the name has, or none when it has none.
  */
-export function keptFits(path: string, dirs: readonly string[], name: string, type = "", strict = false): boolean {
+export function keptFits(path: string, dirs: readonly string[], name: string, type = ""): boolean {
   const at = path.lastIndexOf("/");
   if (!dirs.includes(path.slice(0, at))) return false;
   const file = path.slice(at + 1);
@@ -162,7 +162,6 @@ export function keptFits(path: string, dirs: readonly string[], name: string, ty
   // As it should be: what the name says, in the file's real type.
   const fileStem = !kept.ext ? file : file.toLowerCase().endsWith(`.${kept.ext.toLowerCase()}`) ? file.slice(0, -kept.ext.length - 1) : null;
   if (fileStem !== null && (fileStem === kept.base || isClashOf(fileStem, kept.base))) return true;
-  if (strict) return false;
   // As it was written by an earlier version: still right, never renamed for it.
   const ext = /\.[A-Za-z0-9]{1,8}$/.exec(name)?.[0] ?? "";
   if (ext ? file.slice(-ext.length).toLowerCase() !== ext.toLowerCase() : false) return false;

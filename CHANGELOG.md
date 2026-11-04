@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.40 — Repair removed (2026-11-04)
+
+- **Removed:** Repair library file names: new names are right as they are made, and older files keep working as they are.
+
 ## 0.53.39 — Opening a folder moves nothing, however its folders are spelled (2026-11-04)
 
 - **Fixed:** two folders on disk read as one library folder (`A- B`, `a-b`) could have one's files moved into the other when a workspace was opened. A file in either now stays where it is.

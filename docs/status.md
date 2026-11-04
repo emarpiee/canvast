@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.40: Repair removed (2026-11-04)
+
+- **Implemented:** the command, `repairNames` and the strict test are gone; older names still count as right.
+- **Tested:** typecheck and unit here; the desktop test of older names on GitHub.
+- **Committed:** v0.53.40.
+
 ## v0.53.39: opening a folder moves nothing, however spelled (2026-11-04)
 
 - **Implemented:** `isFolderOf`: a folder read as a library folder under another spelling counts as its place.

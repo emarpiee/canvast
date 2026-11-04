@@ -1746,7 +1746,7 @@ test("Copy file: the real files on the clipboard, from the library, as a list of
   }
 });
 
-test("a folder of files an earlier version named: opening it, twice, renames and moves nothing; Repair library file names does, when asked", async () => {
+test("a folder of files an earlier version named: opening it, twice, renames and moves nothing", async () => {
   const ws = tempDir("cv-names-open-");
   const png = (seed: number): Buffer => makePng(6, 4, () => [seed, 90, 40, 255]);
   const dirs = ["library/A- B", "library/a-b", "library/Refs"];
@@ -1776,14 +1776,6 @@ test("a folder of files an earlier version named: opening it, twice, renames and
   await expect.poll(() => page.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.some((e) => e.name === "Scan v2.1" && e.type === "image/png")), { timeout: 20_000 }).toBe(true);
   await page.waitForTimeout(2500);
   expect(seen(), "not moved either").toContain("library/Refs/Scan v2.1");
-  // Asked for: today's names, and nothing else.
-  await page.keyboard.press("Control+k");
-  await page.keyboard.type("Repair library file names");
-  await page.keyboard.press("Enter");
-  await page.getByTestId("confirm-ok").click();
-  await expect.poll(seen, { timeout: 15_000 }).toContain("library/Refs/Scan v2.1.png");
-  await expect.poll(seen).toContain("library/Refs/ab.png");
-  for (const f of ["library/A- B/one.png", "library/a-b/two.png", "library/Refs/C# notes.md", "library/Refs/draft.final.png", "library/Refs/README", "library/Refs/x.7z.001"]) expect(seen()).toContain(f);
   expect(seen()).toHaveLength(NAMES.length + 1);
   await app.close();
 });

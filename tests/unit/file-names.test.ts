@@ -59,7 +59,7 @@ describe("the rules of file and folder names", () => {
 
 describe("no file on a disk is renamed by a newer rule", () => {
   it("a name right by an earlier version still fits: dots taken for an extension, other letters, unseen ones, runs of forbidden ones", () => {
-    const fits = (file: string, name: string, type = "image/png", strict = false): boolean => keptFits(`library/${file}`, ["library"], name, type, strict);
+    const fits = (file: string, name: string, type = "image/png"): boolean => keptFits(`library/${file}`, ["library"], name, type);
     expect(fits("Scan v2.1", "Scan v2.1")).toBe(true);
     expect(fits("Scan v2.1.png", "Scan v2.1")).toBe(true);
     expect(fits("café.png", "café.png")).toBe(true);
@@ -68,15 +68,10 @@ describe("no file on a disk is renamed by a newer rule", () => {
     expect(fits("C# notes.md", "C# notes.md", "text/markdown")).toBe(true);
     expect(fits("photo-2.png", "photo.png")).toBe(true);
     expect(fits("other.png", "photo.png")).toBe(false);
-    // Asked for by name, they take today's.
-    expect(fits("Scan v2.1", "Scan v2.1", "image/png", true)).toBe(false);
-    expect(fits("Scan v2.1.png", "Scan v2.1", "image/png", true)).toBe(true);
-    expect(fits("a​b.png", "a​b.png", "image/png", true)).toBe(false);
     expect(fitsWritten("x", "x.png", "x")).toBe(true);
-    // Repair leaves what it cannot tell alone.
-    expect(fits("README", "README", "", true)).toBe(true);
-    expect(fits("x.7z.001", "x.7z.001", "", true)).toBe(true);
-    expect(fits("data.xyz", "data.xyz", "", true)).toBe(true);
+    expect(fits("README", "README", "")).toBe(true);
+    expect(fits("x.7z.001", "x.7z.001", "")).toBe(true);
+    expect(fits("data.xyz", "data.xyz", "")).toBe(true);
   });
   it("a file keeps its real extension: a dot in a name is a part of the name, unless it gives a kind of file", () => {
     expect(keptFile("Scan v2.1", "png", "image/png")).toEqual({ base: "Scan v2.1", ext: "png" });
