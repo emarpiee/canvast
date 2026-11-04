@@ -4,35 +4,15 @@
  * The name shown in the app stays what was typed; only the file's name is made safe.
  */
 import { extOf } from "../assets/file-kind";
-import { MAX_FILE_BYTES, cutBytes } from "../doc/rename-rules";
+import { MAX_BASE as BASE_BYTES, cleanName, fitsWritten, isClashOf, numberedName } from "../doc/file-names";
 import type { FolderNaming } from "./external-folder";
 import { isHiddenFile } from "./hidden-vault";
 
 /** Longest file base kept, in UTF-8 bytes (with room for `-99` and an extension of up to eight: the whole name under 255 bytes). */
-export const MAX_BASE = MAX_FILE_BYTES - 10;
-
-/** Names Windows reserves for devices, with or without an extension. */
-const RESERVED = /^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])$/i;
+export const MAX_BASE = BASE_BYTES;
 
 /** A display name as a safe file base, without extension. Never empty, never a reserved name, never starts with a dot. */
-export function safeBase(name: string): string {
-  let s = name
-    .normalize("NFC")
-    .toLowerCase()
-    .replace(/[()[\]{},;:+&|]+/g, " - ") // brackets and lists separate parts
-    .replace(/\s+-\s+|\s*[–—]\s*/g, "-") // a spaced dash separates parts
-    .replace(/\s+/g, "_") // words of one part
-    .replace(/[^\p{L}\p{N}_.-]+/gu, "") // nothing a system forbids (<>:"/\|?* and control characters) or that reads badly
-    .replace(/_*-[-_]*/g, "-")
-    .replace(/_+/g, "_")
-    .replace(/\.{2,}/g, ".")
-    .replace(/^[-_.]+|[-_.]+$/g, "");
-  const cut = cutBytes(s, MAX_BASE);
-  if (cut !== s) s = cut.replace(/[-_.]+$/, "");
-  if (!s) s = "file";
-  if (RESERVED.test(s)) s = `${s}_file`;
-  return s;
-}
+export const safeBase = (name: string): string => cleanName(name, "clean");
 
 /**
  * A file's name kept as written (Settings: Keep file names): only what a system forbids or a file cannot hold is changed: `<>:"/\\|?*` and control
@@ -41,18 +21,7 @@ export function safeBase(name: string): string {
 export const keptBase = (name: string): string => keptPart(name.replace(/\.[A-Za-z0-9]{1,8}$/, ""));
 
 /** A folder's or file's name kept as written: see `keptBase`. */
-export function keptPart(name: string): string {
-  let s = name
-    .normalize("NFC")
-    // eslint-disable-next-line no-control-regex
-    .replace(/[<>:"/\\|?*\u0000-\u001f\u007f]/g, "-")
-    .replace(/^[\s.]+|[\s.]+$/g, "");
-  const cut = cutBytes(s, MAX_BASE);
-  if (cut !== s) s = cut.replace(/[\s.]+$/, "");
-  if (!s) s = "file";
-  if (RESERVED.test(s)) s = `${s}_file`;
-  return s;
-}
+export const keptPart = (name: string): string => cleanName(name, "kept");
 
 /** The folder of `library/` for an original that is in no library folder, by its kind. */
 export function kindFolder(type: string, name: string): string {
@@ -132,7 +101,8 @@ export function fileExt(name: string, type: string): string {
  */
 export async function libraryPath(name: string, type: string, taken: (path: string) => Promise<boolean>): Promise<string> {
   const keep = nameRules.keep();
-  return freePath(`library/${kindFolder(type, name)}`, keep ? keptBase(name) : nameBase(name), (keep && /\.([A-Za-z0-9]{1,8})$/.exec(name)?.[1]) || fileExt(name, type), taken);
+  const kept = keep ? keptFile(name, "", type) : null;
+  return freePath(`library/${kindFolder(type, name)}`, kept ? kept.base : nameBase(name), kept?.ext || fileExt(name, type), taken);
 }
 
 /** Settings > Keep file names as written: a new file takes its name as written, else its tidy name. */
@@ -144,7 +114,7 @@ export const nameBase = (name: string): string => safeBase(name.replace(/\.[A-Za
 /** The first of `<dir>/<base>.<ext>`, `<dir>/<base>-2.<ext>`… that is not taken. */
 export async function freePath(dir: string, base: string, ext: string, taken: (path: string) => Promise<boolean>): Promise<string> {
   for (let n = 1; n < 10_000; n++) {
-    const path = `${dir}/${n === 1 ? base : `${base}-${n}`}.${ext}`;
+    const path = `${dir}/${numberedName(base, n, `.${ext}`)}`;
     if (!(await taken(path))) return path;
   }
   throw new Error("no free file name");
@@ -154,7 +124,7 @@ export async function freePath(dir: string, base: string, ext: string, taken: (p
 export function fitsPlace(path: string, dir: string, base: string, ext: string): boolean {
   if (!path.startsWith(`${dir}/`) || !path.endsWith(`.${ext}`)) return false;
   const stem = path.slice(dir.length + 1, path.length - ext.length - 1);
-  return stem === base || (stem.startsWith(`${base}-`) && /^(?:[2-9]|[1-9]\d+)$/.test(stem.slice(base.length + 1)));
+  return stem === base || isClashOf(stem, base) || stem.normalize("NFC") === base || isClashOf(stem.normalize("NFC"), base);
 }
 
 /** Longest library folder path kept on disk; a deeper one files its items under their kind folder (paths stay well inside every system's limit). */
@@ -174,15 +144,35 @@ export function libraryDir(folderNames: readonly string[], type: string, name: s
  * Keep file names: whether a file already fits its item where it lies: in one of `dirs`, under the item's name as written (`-2` on a clash), with
  * the extension the name has, or none when it has none.
  */
-export function keptFits(path: string, dirs: readonly string[], name: string): boolean {
+export function keptFits(path: string, dirs: readonly string[], name: string, type = "", strict = false): boolean {
   const at = path.lastIndexOf("/");
   if (!dirs.includes(path.slice(0, at))) return false;
   const file = path.slice(at + 1);
+  const whole = /\.([A-Za-z0-9]{1,8})$/.exec(file)?.[1] ?? "";
+  const kept = keptFile(name, whole, type);
+  // As it should be: what the name says, in the file's real type.
+  const fileStem = kept.ext && file.toLowerCase().endsWith(`.${kept.ext.toLowerCase()}`) ? file.slice(0, -kept.ext.length - 1) : null;
+  if (fileStem !== null && (fileStem === kept.base || isClashOf(fileStem, kept.base))) return true;
+  if (strict) return false;
+  // As it was written by an earlier version: still right, never renamed for it.
   const ext = /\.[A-Za-z0-9]{1,8}$/.exec(name)?.[0] ?? "";
   if (ext ? file.slice(-ext.length).toLowerCase() !== ext.toLowerCase() : false) return false;
-  const stem = ext ? file.slice(0, -ext.length) : file;
-  const base = keptBase(name);
-  return stem === base || (stem.startsWith(`${base}-`) && /^(?:[2-9]|[1-9]\d+)$/.test(stem.slice(base.length + 1)));
+  return fitsWritten(ext ? file.slice(0, -ext.length) : file, name, keptBase(name));
+}
+
+const COMMON_EXTS = ["png", "jpg", "jpeg", "jfif", "gif", "webp", "avif", "bmp", "tif", "tiff", "heic", "heif", "raw", "dng", "mp4", "m4v", "mov", "webm", "mkv", "avi", "mp3", "wav", "ogg", "oga", "flac", "m4a", "aac", "opus", "json", "xml", "js", "ts", "css", "yml", "yaml", "canvast", "bin"];
+/** Whether words after a dot are an extension, not words of a name (`Scan v2.1`, `draft.final`): a kind of file this app knows. */
+const isFileExt = (ext: string): boolean => !!KIND_OF_EXT[ext.toLowerCase()] || COMMON_EXTS.includes(ext.toLowerCase());
+
+/**
+ * Keep file names: the base and extension of an item's file. The extension is the file's real one, unless the name gives another kind of file: a dot in a name
+ * is otherwise a part of the name, and `Scan v2.1` on a PNG is `Scan v2.1.png`.
+ */
+export function keptFile(name: string, current: string, type: string): { base: string; ext: string } {
+  const named = /\.([A-Za-z0-9]{1,8})$/.exec(name)?.[1] ?? "";
+  if (named && !/^\d+$/.test(named) && (named.toLowerCase() === current.toLowerCase() || isFileExt(named))) return { base: keptBase(name), ext: named };
+  const real = current && !/^\d+$/.test(current) ? current : fileExt("", type);
+  return { base: keptPart(name), ext: real };
 }
 
 /** A relative path inside a workspace: `/`-separated, no empty, `.` or `..` part, no backslash or NUL, not absolute. */

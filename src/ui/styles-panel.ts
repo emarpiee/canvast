@@ -1,3 +1,4 @@
+import { cleanName, freeNameIn } from "../doc/file-names";
 import type { Adjust } from "../doc/adjust";
 import { plural } from "../doc/plural";
 import type { EditorState } from "../app/editor-state";
@@ -55,7 +56,7 @@ export interface StylesDeps {
 }
 
 const MAX_NAME = 40;
-const slug = (s: string, fallback: string): string => s.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_").toLowerCase().slice(0, 60) || fallback;
+const slug = (s: string, fallback: string): string => cleanName(s, "clean", fallback).slice(0, 60);
 const dataOf = <T>(item: StyleItem): T => item.data as T;
 const hueLightness = (hex: string): [number, number] => {
   const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255) as [number, number, number];
@@ -244,11 +245,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     }
     const used = new Set<string>();
     const entries = items.map((s) => {
-      let n = slug(s.name, kind), i = 2;
-      const base = n;
-      while (used.has(n)) n = `${base}_${i++}`;
-      used.add(n);
-      return { name: `${n}.${ext}`, data: new Blob([text(s)], { type: format === "gpl" || kind === "gradient" ? "text/plain" : "application/octet-stream" }) };
+      return { name: freeNameIn(used, `${slug(s.name, kind)}.${ext}`), data: new Blob([text(s)], { type: format === "gpl" || kind === "gradient" ? "text/plain" : "application/octet-stream" }) };
     });
     saveFile(`${kind === "gradient" ? "gradients" : "palettes"}.zip`, await writeZip(entries));
     deps.notify(`Saved ${items.length} ${kind === "gradient" ? "gradients" : "palettes"} as ${ext} files in a ZIP.`);

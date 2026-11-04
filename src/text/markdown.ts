@@ -41,8 +41,10 @@ export const MAX_LINK_LENGTH = 2000;
 const LINK_URL = /^(https?:\/\/|mailto:)[^\s<>"()\\]+$/i;
 /** Whether `url` may be a link of a text: a plain web or mail address (nothing a page could run). */
 export const isLinkUrl = (url: string): boolean => url.length <= MAX_LINK_LENGTH && LINK_URL.test(url);
+/** One character as a web address writes it. */
+export const percentOf = (c: string): string => `%${[...new TextEncoder().encode(c)].map((b) => b.toString(16).toUpperCase().padStart(2, "0")).join("%")}`;
 /** A web address made safe to write between the parentheses of a Markdown link: the characters that would end it are percent-encoded. */
-export const linkUrlOf = (url: string): string => url.replace(/[()\s<>"\\]/g, (c) => encodeURIComponent(c).replace(/\(/g, "%28").replace(/\)/g, "%29"));
+export const linkUrlOf = (url: string): string => url.replace(/[()\s<>"\\]/g, percentOf);
 
 export const SCALE_RANGE = [0.1, 10] as const;
 const HEX = /^#[0-9a-f]{6}([0-9a-f]{2})?$/i;

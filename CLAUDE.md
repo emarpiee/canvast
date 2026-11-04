@@ -62,6 +62,8 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 
 - **Icons (`src/ui/icons.ts`, registry in `docs/reference/icons.md`).** Every icon button must use an icon no other *different* function uses, and the icon must make sense for what the button does (not a stand-in picked because it was free). Buttons with the same function (all "close", all "delete", all "More") share one icon. Before adding an icon button, check the registry and `src/ui/icons.ts` for the icon you want, and add a row when you add one. Don't reuse an icon from another function even if it is close (a pencil is the Pen tool, so Rename uses a text cursor).
 
+- **File and folder names (ADR 0180).** Every rule is in `src/doc/file-names.ts`: call it, never write a regex of your own (`npm run check:name-rules`). A newer rule never renames a file already on a disk.
+
 ## Architecture (big picture)
 
 - **Exact world coordinates** (ADR 0001): positions are `Dyadic` numbers (BigInt mantissa · 2^exponent, `src/core/dyadic.ts`); the camera (`src/core/camera.ts`) is a centre plus an integer-quantized log2 zoom, so zoom/pan are exactly reversible at any depth. Never introduce plain-float world coordinates; convert to doubles only relative to the camera/cell for drawing.

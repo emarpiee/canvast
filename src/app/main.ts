@@ -2391,6 +2391,12 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       ...(storage?.folderSync
         ? [
             { group: "Workspace", title: "Check library files", words: "verify damaged corrupt missing integrity hash folder", run: () => checkLibraryFiles(false) },
+            { group: "Workspace", title: "Repair library file names", words: "fix extension names tidy files folder", run: () => void confirmDialog({ title: "Repair library file names?", lines: ["Files an earlier version named less well get today's names: a file that lost its extension to a dot in its name, unseen characters, letters composed another way. Links in notes follow. Other files stay as they are."], confirmLabel: "Repair names", danger: false }).then(async (ok) => {
+              if (!ok) return;
+              const n = await storage!.folderSync!.repairNames();
+              editor.message = n ? `Repaired the names of ${plural(n, "file")}.` : "All library file names are fine.";
+              editor.changed();
+            }) },
             { group: "Workspace", title: "Check library files (quick)", words: "verify damaged missing size fast folder", run: () => checkLibraryFiles(true) },
           ]
         : []),

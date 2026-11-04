@@ -3,7 +3,7 @@ import { stampNote } from "../notes/note-dates";
 import { NO_META, fileInlineTags, fileMeta, sameMeta, withFileMeta } from "../notes/frontmatter";
 import type { NoteMeta } from "../notes/frontmatter";
 import { makeThumb } from "../assets/thumb";
-import { WIKI, libraryLink, linkTarget, noteKindOf, noteLinks, relativeLink, relinkNote, wikiTarget } from "../notes/note-file";
+import { WIKI, libraryLink, linkTarget, noteKindOf, noteLinks, relativeLink, relinkNote, wikiTarget, wikiKeyOf } from "../notes/note-file";
 import type { PathTarget } from "../notes/note-file";
 import { nameBase } from "../storage/workspace-names";
 import type { NoteKind } from "../notes/note-file";
@@ -509,7 +509,7 @@ export class Session {
     return l;
   }
   /** The name a `[[link]]` names an item by: a markdown note without `.md`, any other file by its whole name (lower case). */
-  private static wikiKey = (name: string): string => name.toLowerCase().replace(/\.(md|markdown)$/, "");
+  private static wikiKey = wikiKeyOf;
 
   /** The notes that link to an item (`[[its name]]`, a path to it, `canvast:<its hash>`). Hidden notes only when `hidden`. */
   async backlinks(hash: string, hidden = false): Promise<CatalogEntry[]> {

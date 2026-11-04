@@ -1,6 +1,6 @@
 {
   "name": "canvast",
-  "version": "0.53.29",
+  "version": "0.53.30",
   "private": true,
   "description": "canvast — an offline-first endless canvas that ships as a single HTML file",
   "type": "module",
@@ -27,6 +27,7 @@
     "check:tokens": "node scripts/check-tokens.mjs",
     "check:names": "node scripts/check-names.mjs",
     "check:storage": "node scripts/check-storage.mjs",
+    "check:name-rules": "node scripts/check-name-rules.mjs",
     "test": "npm run typecheck && npm run test:unit && node scripts/test-affected.mjs && npm run check:tokens && npm run check:storage && npm run check:picker && npm run check:patterns",
     "test:affected": "node scripts/test-affected.mjs",
     "test:group": "node scripts/test-affected.mjs --groups",

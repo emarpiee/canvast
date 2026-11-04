@@ -606,6 +606,12 @@ export class WorkspaceMirror {
     this.running = this.running.then(() => this.lib.setPartSplit(split)).then(() => this.library());
     return this.running;
   }
+  /** Today's names for files an earlier version named less well (on the write queue; see LibraryMirror.repairNames). */
+  repairNames(): Promise<number> {
+    const done = Promise.all([this.running, this.ready]).then(() => this.lib.repairNames());
+    this.running = done.then(() => undefined, () => undefined);
+    return done;
+  }
   /** Check the library files' contents (see FolderSync.checkFiles). */
   checkFiles(onStep: (done: number, total: number) => void, quick = false): ReturnType<LibraryMirror["checkFiles"]> {
     return this.lib.checkFiles(onStep, quick);

@@ -2,6 +2,8 @@
  * Batch rename rules (ADR 0085): how a list of names becomes a list of new names. Pure, so any list of named things can use it (assets today;
  * layers, bookmarks or boards later) through the dialog in `ui/batch-rename.ts`.
  */
+import { MAX_NAME, cleanItemName, splitName } from "./file-names";
+
 export type RenameRule =
   /** `#` is replaced by ascending numbers from `start`; a run of `#` is zero-padded to its length; no `#`: the number follows a space. `{name}` is the old name. */
   | { mode: "enumerate"; pattern: string; start: number; keepExt: boolean }
@@ -12,42 +14,9 @@ export type RenameRule =
 
 export type RenameMode = RenameRule["mode"];
 
-/** Longest name an item can have (only its file's name on disk is shorter: `cutBytes`). */
-export const MAX_NAME = 1000;
-
-/** Longest file name kept on disk, in UTF-8 bytes: under every system's 255-byte limit, with room for a `-99` or ` (99)`. */
-export const MAX_FILE_BYTES = 240;
-
-/** `s` cut to at most `max` UTF-8 bytes, never inside a character. */
-export function cutBytes(s: string, max: number): string {
-  const enc = new TextEncoder();
-  if (enc.encode(s).length <= max) return s;
-  let out = "";
-  let n = 0;
-  for (const ch of s) {
-    n += enc.encode(ch).length;
-    if (n > max) break;
-    out += ch;
-  }
-  return out;
-}
-
-/** A name and its extension (with the dot). An extension is up to eight letters or digits after the last dot of a name that has something before it. */
-export function splitName(name: string): { stem: string; ext: string } {
-  // (a rich text note's `.note.html` is one extension: the library knows a note by it, so a rename keeps it whole)
-  const m = /^(.+?)(\.note\.html|\.[A-Za-z0-9]{1,8})$/i.exec(name);
-  return m ? { stem: m[1]!, ext: m[2]! } : { stem: name, ext: "" };
-}
-
-/** A name safe on every file system: forbidden characters become "-", edges are trimmed, and it is cut to a sensible length. */
-export function cleanFileName(name: string): string {
-  return name
-    .normalize("NFC")
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001f\\/:*?"<>|]+/g, "-")
-    .replace(/^[.\s]+|\s+$/g, "")
-    .slice(0, MAX_NAME);
-}
+export { MAX_FILE_BYTES, MAX_NAME, cutBytes, splitName } from "./file-names";
+/** A name safe on every file system (see `cleanItemName`). */
+export const cleanFileName = cleanItemName;
 
 const escapeRegex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 

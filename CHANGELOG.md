@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.53.30 — One set of rules for file and folder names (2026-11-04)
+
+- **Changed:** every rule for file and folder names is in one place, and `npm run check:name-rules` fails on a rule written elsewhere; nine cleaners became one. Names taken in a ZIP, export or style file are numbered `-2`, as on disk (they were ` (2)`, `_2`), and rich text notes too.
+- **Added:** names that work but can bite elsewhere (a leading `-` or `~`, `% & ; $`, an ending the library skips when it reads its folder) get a word when chosen; nothing is refused for them.
+- **Added:** **Repair library file names** (command palette): files an earlier version named less well get today's names, when asked. Opening a folder never renames anything.
+- **Changed:** two library folders side by side that a disk would take for one are refused when named.
+- **Changed:** a note's name holds none of `# ^ [ ]`, which a link cannot; unseen characters go from new names.
+- **Fixed:** a dot in a name no longer costs the file its extension (`Scan v2.1` on a picture is `Scan v2.1.png`).
+- **Fixed:** a very long name stays whole after a clash on disk; a full pass over a big library no longer asks the library about each item for its name.
+- **Fixed:** a heading such as `Chapter` renames `Chapter-2024.md` with Rename notes on save; a year is no clash.
+- **Fixed:** a `[[link]]` finds a note by one rule everywhere, so a backlink to a plain text or rich text note is found; a saved name ending in a dot or a device name no longer differs from its file.
+- **Changed:** dates in file name templates and in notes come from one engine, and every template writes what it did; link parts are percent-encoded by one rule.
+
 ## 0.53.29 — Rename notes on save; automatic changes off by default (2026-11-04)
 
 - **Added:** **Rename notes on save** (Settings > Notes, off by default): each save names the note's file from its first heading or its title property, in its own **File name style**: Keep as written or Clean. Links to it in other notes follow.

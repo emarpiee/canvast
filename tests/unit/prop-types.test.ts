@@ -118,6 +118,8 @@ describe("what a save changes by itself", () => {
     expect(name("No heading\n")).toBeNull();
     expect(name("# .hidden\n"), "never a hidden file").toBe("hidden.md");
     expect(name("# CON\n")).toBe("CON_file.md");
+    expect(name("# C# notes\n"), "a link can reach it").toBe("C- notes.md");
+    expect(name("# Chapter\n", "Chapter-2024.md"), "a year is no clash").toBe("Chapter.md");
     expect(name("# a/b\\c\n"), "never a path").toBe("a-b-c.md");
     expect(name("# Same\n", "Same.md")).toBeNull();
     expect(name("# Same\n", "Same-2.md"), "another note had it first").toBeNull();

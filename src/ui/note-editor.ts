@@ -3,7 +3,7 @@ import suneditor, { helper } from "suneditor";
 import { markdownHtml, pastedHtml, pastedMarkdown } from "../notes/note-markdown";
 import { align, anchor, audio, audioGallery, autocomplete, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
 import type { SunEditor } from "suneditor/types";
-import { FENCE_TICK, WIKI, keepSpelling, libraryLink, linkTarget, linksToWiki, obsidianMarkdown, richNoteBody, richNoteFile, textHtml, wikiToLinks } from "../notes/note-file";
+import { FENCE_TICK, WIKI, encodeLinkPart, keepSpelling, libraryLink, linkTarget, linksToWiki, obsidianMarkdown, richNoteBody, richNoteFile, textHtml, wikiToLinks } from "../notes/note-file";
 import type { NoteKind, NoteStyle, PathTarget } from "../notes/note-file";
 import { splitFrontmatter, type Prop } from "../notes/frontmatter";
 
@@ -365,7 +365,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     void host.findWiki(target).then(async (item) => item && wikiPath.set(target, libraryLink(await host.pathOf(item.hash))));
   const wikiLink = (target: string, shownText: string): HTMLAnchorElement => {
     const a = document.createElement("a");
-    a.href = `${WIKI}${encodeURIComponent(target)}`;
+    a.href = `${WIKI}${encodeLinkPart(target)}`;
     a.textContent = shownText;
     knowPath(target);
     return a;

@@ -33,7 +33,7 @@ import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
 import type { AssetField, AssetFolder, CatalogEntry, CatalogListing } from "../assets/asset-catalog";
 import type { LibraryPages } from "../storage/store";
-import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT, folderPath, folderSubtree, hiddenModeFolders, meta, usageOf, visibleFolders } from "../assets/asset-catalog";
+import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT, folderClash, folderPath, folderSubtree, hiddenModeFolders, meta, usageOf, visibleFolders } from "../assets/asset-catalog";
 import { THUMB_PX, makeThumb, shrinkPicture } from "../assets/thumb";
 import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
@@ -49,6 +49,7 @@ import { openLibraryPicker } from "./library-picker";
 import { OpenNote } from "./note-session";
 import type { NoteDeps, NotePlace } from "./note-session";
 import { RICH_NOTE_SUFFIX, WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget, newNoteFile } from "../notes/note-file";
+import { nameWarnings } from "../doc/file-names";
 import { splitFrontmatter, underProps, wholeMarkdown, withFileMeta } from "../notes/frontmatter";
 import { AUTO_NOTE_SETTINGS, autoDates, formatNoteDate, isAutoDate, isAutoKey } from "../notes/note-dates";
 import { asWritten, hasPropType, pickerShows, PROP_TYPES, propType, typeWarning, withPropType, type PropType } from "../notes/prop-types";
@@ -3167,6 +3168,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "new-folder-into": {
         const group = pickedGroup();
         void promptDialog({ title: group.length > 1 ? `New folder for ${group.length} items` : "New folder", lines: ["They are moved into it."], value: "", confirmLabel: "Make and move" }).then((name) => {
+          if (name && !hiddenMode) {
+            const same = folderClash(listing?.folders ?? [], null, name);
+            if (same) {
+              session.editor.message = `A folder named “${same.name}” is already there, and on a disk these would be one folder. Choose another name.`;
+              session.editor.changed();
+              return;
+            }
+          }
           if (!name?.trim()) return;
           const id = newObjectId();
           void session.organize(async (c) => {
@@ -3903,6 +3912,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const n = naming;
       const name = input.value;
       naming = null;
+      // (two folders side by side that a disk would take for one: refused, with its name to choose again)
+      const clash = !hiddenMode && (n.kind === "new" || n.kind === "rename") ? folderClash(listing?.folders ?? [], n.kind === "new" ? n.parent : (listing?.folders.find((f) => f.id === n.id)?.parentId ?? null), name, n.kind === "rename" ? n.id : undefined) : undefined;
+      if (clash && name.trim()) {
+        session.editor.message = `A folder named “${clash.name}” is already there, and on a disk these would be one folder. Choose another name.`;
+        session.editor.changed();
+        renderSide();
+        return;
+      }
+      if (n.kind === "new" || n.kind === "rename") warnName(name);
       if (n.kind === "rename-ctag") {
         const was = n.label;
         void session.changeCanvasTag(was, name).then((changed) => {
@@ -3921,6 +3939,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
   });
 
+  /** A name that works here but can bite elsewhere: said, not refused. */
+  const warnName = (name: string): void => {
+    const said = nameWarnings(name);
+    if (!said.length) return;
+    session.editor.message = `“${name}”: ${said.join("; ")}.`;
+    session.editor.changed();
+  };
   /** Rename one or many assets with the shared rename dialog (ADR 0085); names keep the order given. */
   /**
    * Files imported again that the library already holds under another name (the same bytes): offered their new names, listed first (a
@@ -3965,6 +3990,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (n) {
       session.editor.message = n === 1 ? `Renamed to “${result[0]!.name}”.` : `Renamed ${n} items.`;
       session.editor.changed();
+      for (const r of result.slice(0, 1)) warnName(r.name);
     }
     await refresh(true);
     // Keep the keyboard where it was: on the first renamed card (F2 works again).

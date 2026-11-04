@@ -1,3 +1,5 @@
+import { dateWords } from "../doc/date-words";
+import { cleanName, replaceInvalid } from "../doc/file-names";
 /**
  * Screenshots (ADR 0080): what the canvas shows, stored in the library like any picture. This file holds the pure parts (the file name, the
  * tags, the formats) and the parts that make the picture (the interface laid over it, the encoding).
@@ -19,7 +21,6 @@ export interface NameParts {
   extra?: Record<string, string>;
 }
 
-const p2 = (n: number): string => String(n).padStart(2, "0");
 
 /** How the words of a name are written in a file name. */
 export type NameStyle = "snake" | "kebab" | "camel" | "pascal" | "keep" | "underscores";
@@ -33,7 +34,7 @@ export const NAME_STYLES: ReadonlyArray<[NameStyle, string]> = [
 
 /** One name part as a file name word, in a naming style; characters a file system refuses become "-". */
 export function nameWord(text: string, style: NameStyle): string {
-  const base = text.normalize("NFC").replace(/[\u0000-\u001f\\/:*?"<>|]+/g, "-").trim();
+  const base = replaceInvalid(text).trim();
   const words = base.split(/[\s_]+|-+/).filter(Boolean);
   const cap = (w: string): string => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
   let out: string;
@@ -62,26 +63,25 @@ export function nameWord(text: string, style: NameStyle): string {
  * An unknown word in braces is left as it is; an empty result falls back to "screenshot". The extension is added by the caller.
  */
 export function shotFileName(template: string, parts: NameParts, style: NameStyle): string {
-  const d = parts.at;
+  const when = dateWords(parts.at);
   const t: Record<string, string> = {
     workspace: nameWord(parts.workspace, style),
     board: nameWord(parts.board, style),
     canvas: nameWord(parts.canvas, style),
     ...Object.fromEntries(Object.entries(parts.extra ?? {}).map(([k, v]) => [k, nameWord(v, style)])),
-    yyyy: String(d.getFullYear()),
-    mm: p2(d.getMonth() + 1),
-    dd: p2(d.getDate()),
-    hh: p2(d.getHours()),
-    min: p2(d.getMinutes()),
-    ss: p2(d.getSeconds()),
+    yyyy: when.YYYY,
+    mm: when.MM,
+    dd: when.DD,
+    hh: when.HH,
+    min: when.mm,
+    ss: when.ss,
   };
   t["ddmmyyyy"] = `${t["dd"]}${t["mm"]}${t["yyyy"]}`;
   t["yyyymmdd"] = `${t["yyyy"]}${t["mm"]}${t["dd"]}`;
   t["hhmmss"] = `${t["hh"]}${t["min"]}${t["ss"]}`;
   t["hhmm"] = `${t["hh"]}${t["min"]}`;
   const raw = template.replace(/\{([a-z]+)\}/g, (m, k: string) => t[k] ?? m);
-  const clean = raw.normalize("NFC").replace(/[\u0000-\u001f\\/:*?"<>|]+/g, "-").replace(/^[.\s]+|[.\s]+$/g, "").slice(0, 150);
-  return clean || "screenshot";
+  return cleanName(raw, "kept", "screenshot").slice(0, 150);
 }
 
 export interface TagChoices {

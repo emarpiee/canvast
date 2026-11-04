@@ -1,3 +1,4 @@
+import { percentOf } from "../text/markdown";
 // Notes: the library files the notes editor opens (markdown, plain text and the app's rich text notes) and how a note links to other
 // library items. Pure: the editor itself is `ui/note-editor.ts`.
 
@@ -52,7 +53,7 @@ export function resolvePath(dir: readonly string[], rel: string): string[] | nul
 }
 
 /** A part of a link, URL-encoded, brackets too: a `)` in an address would end a markdown link. */
-export const encodeLinkPart = (part: string): string => encodeURIComponent(part).replace(/[()'!*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+export const encodeLinkPart = (part: string): string => encodeURIComponent(part).replace(/[()'!*]/g, percentOf);
 
 /** The link from a note in folder `from` to the file at `to` (both inside the library), each part URL-encoded (`../Pictures/my%20cat.png`). */
 export function relativeLink(from: readonly string[], to: readonly string[]): string {
@@ -201,9 +202,12 @@ export const linksToWiki = (md: string): string =>
   });
 
 /** A link target's name and folders: `Projects/Plan` → name `plan` (no `.md`), folders `projects`, lower case. */
+/** What a `[[link]]` names an item by: a note without its extension, any other file by its whole name, in lower case. */
+export const wikiKeyOf = (name: string): string => name.toLowerCase().replace(/\.(md|markdown|txt|note\.html)$/, "");
+
 export function wikiTarget(target: string): { name: string; dirs: string[] } {
   const parts = target.split("#")[0]!.split("/").filter(Boolean).map((p) => p.toLowerCase());
-  return { name: (parts.pop() ?? "").replace(/\.(md|markdown|txt|note\.html)$/, ""), dirs: parts };
+  return { name: wikiKeyOf(parts.pop() ?? ""), dirs: parts };
 }
 
 /** The links a note's words hold: `[[targets]]` (embeds too) and paths or `canvast:` links as written (pictures, files, other notes). */

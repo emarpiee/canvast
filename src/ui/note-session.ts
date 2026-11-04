@@ -5,8 +5,9 @@ import { meta } from "../assets/asset-catalog";
 import { chipOf } from "../assets/file-kind";
 import type { SettingsStore } from "../settings/settings";
 import { desktopBridge } from "../storage/desktop-bridge";
-import { WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget } from "../notes/note-file";
+import { WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget, wikiKeyOf } from "../notes/note-file";
 import type { NoteKind } from "../notes/note-file";
+import { numberedName } from "../doc/file-names";
 import { autoDates, noteFileName, stampNote } from "../notes/note-dates";
 import { NO_META, richMeta, splitFrontmatter, underProps, wholeMarkdown, withFileMeta, withPastedProps, type NoteMeta } from "../notes/frontmatter";
 import { fontFor } from "../text/fonts";
@@ -194,7 +195,7 @@ export class OpenNote {
       tags: async () => [...new Set(all.flatMap((x) => x.tags ?? []))].sort((a, b) => a.localeCompare(b)),
       async findWiki(target) {
         const t = wikiTarget(target);
-        const named = all.filter((x) => x.name.toLowerCase() === t.name || x.name.toLowerCase().replace(/\.(md|markdown|txt|note\.html)$/, "") === t.name);
+        const named = all.filter((x) => x.name.toLowerCase() === t.name || wikiKeyOf(x.name) === t.name);
         if (named.length < 2 || !t.dirs.length) return named[0] ? item(named[0]) : null;
         for (const x of named) {
           const dirs = (await pathOf(x)).slice(0, -1).map((d) => d.toLowerCase());
@@ -321,7 +322,7 @@ export class OpenNote {
       const names = new Set(((await session.catalog?.list().catch(() => null))?.entries ?? []).filter((x) => x.hash !== this.hash).map((x) => x.name.toLowerCase()));
       const stem = richNameOf(this.name).slice(0, -".note.html".length);
       let name = `${stem}.note.html`;
-      for (let n = 2; names.has(name.toLowerCase()); n++) name = `${stem} ${n}.note.html`;
+      for (let n = 2; names.has(name.toLowerCase()); n++) name = numberedName(stem, n, ".note.html");
       const rich = withFileMeta("rich", body.replace("<title></title>", () => `<title>${titleOf(name).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`)}</title>`), { tags: e?.tags ?? [], note: e?.note ?? "", fields: e?.fields ?? [] }); // (its properties go with it)
       if (!(await session.renameAssets([{ hash: this.hash, name }]))) return false;
       const stamped = stampNote("rich", rich, e?.importedAt, Date.now());

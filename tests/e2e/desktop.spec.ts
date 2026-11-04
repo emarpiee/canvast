@@ -1718,6 +1718,38 @@ test("a file renamed outside the app keeps its place in notes: the links follow,
   await app.close();
 });
 
+test("a folder of files an earlier version named: opening it, twice, renames and moves nothing; Repair library file names does, when asked", async () => {
+  const ws = tempDir("cv-names-open-");
+  const png = (seed: number): Buffer => makePng(6, 4, () => [seed, 90, 40, 255]);
+  const dirs = ["library/A- B", "library/a-b", "library/Refs"];
+  for (const d of dirs) mkdirSync(join(ws, d), { recursive: true });
+  const NAMES = ["library/A- B/one.png", "library/a-b/two.png", "library/Refs/Scan v2.1", "library/Refs/cafe\u0301.png", "library/Refs/a\u200bb.png", "library/Refs/C# notes.md", "library/Refs/draft.final.png"];
+  NAMES.forEach((f, i) => writeFileSync(join(ws, f), f.endsWith(".md") ? "# C#\n" : png(i * 20 + 10)));
+  const seen = () => files(ws).filter((f) => f.startsWith("library/")).sort();
+  const before = seen();
+  expect(before).toEqual([...NAMES].sort());
+  let { app, page } = await launch(ws, "userdata", true);
+  const items = () => page.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.length);
+  await expect.poll(items, { timeout: 20_000 }).toBe(NAMES.length);
+  await page.waitForTimeout(2500); // (past the app's writing pause)
+  expect(seen(), "nothing moved on opening").toEqual(before);
+  await app.close();
+  ({ app, page } = await launch(ws, "userdata", true));
+  await expect.poll(items, { timeout: 20_000 }).toBe(NAMES.length);
+  await page.waitForTimeout(2500);
+  expect(seen(), "nor on opening again").toEqual(before);
+  // Asked for: today's names, and nothing else.
+  await page.keyboard.press("Control+k");
+  await page.keyboard.type("Repair library file names");
+  await page.keyboard.press("Enter");
+  await page.getByTestId("confirm-ok").click();
+  await expect.poll(seen, { timeout: 15_000 }).toContain("library/Refs/Scan v2.1.png");
+  await expect.poll(seen).toContain("library/Refs/ab.png");
+  for (const f of ["library/A- B/one.png", "library/a-b/two.png", "library/Refs/C# notes.md", "library/Refs/draft.final.png"]) expect(seen()).toContain(f);
+  expect(seen()).toHaveLength(NAMES.length);
+  await app.close();
+});
+
 test("Keep file names: two items of one name are two names in the app too, as on the disk; a name taken in the app comes back to its file's", async () => {
   const ws = tempDir("cv-same-name-");
   const { app, page } = await launch(ws, "userdata", true);

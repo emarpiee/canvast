@@ -1,22 +1,12 @@
 // What a save may change by itself, all of it off until asked for: a note's title, when it was created, when it was last saved, and its file's name. Pure, but for the settings.
-import { keptPart, safeBase } from "../storage/workspace-names";
+import { dateWords } from "../doc/date-words";
+import { cleanNoteName, isClashOf } from "../doc/file-names";
 import { fileMeta, withFrontmatter, splitFrontmatter, richMeta, withRichMeta, NO_META, type Prop } from "./frontmatter";
-
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const two = (n: number): string => String(n).padStart(2, "0");
 
 /** A moment in a format's words, as Obsidian's date formats write them: `YYYY-MM-DDTHH:mm`. What is in `[brackets]`, and any other letter, stays as it is. */
 export function formatNoteDate(d: Date, format: string): string {
-  const h12 = d.getHours() % 12 || 12;
-  const words: Record<string, string> = {
-    YYYY: String(d.getFullYear()), YY: two(d.getFullYear() % 100),
-    MMMM: MONTHS[d.getMonth()]!, MMM: MONTHS[d.getMonth()]!.slice(0, 3), MM: two(d.getMonth() + 1), M: String(d.getMonth() + 1),
-    DD: two(d.getDate()), D: String(d.getDate()), dddd: DAYS[d.getDay()]!, ddd: DAYS[d.getDay()]!.slice(0, 3),
-    HH: two(d.getHours()), H: String(d.getHours()), hh: two(h12), h: String(h12), mm: two(d.getMinutes()), ss: two(d.getSeconds()),
-    A: d.getHours() < 12 ? "AM" : "PM", a: d.getHours() < 12 ? "am" : "pm",
-  };
-  return format.replace(/\[([^\]]*)\]|YYYY|YY|MMMM|MMM|MM|M|DD|D|dddd|ddd|HH|H|hh|h|mm|ss|A|a/g, (m, plain?: string) => plain ?? words[m]!);
+  const words = dateWords(d);
+  return format.replace(/\[([^\]]*)\]|YYYY|YY|MMMM|MMM|MM|M|DD|D|dddd|ddd|HH|H|hh|h|mm|ss|A|a/g, (m, plain?: string) => plain ?? words[m as keyof typeof words]);
 }
 
 export interface AutoDates {
@@ -123,10 +113,10 @@ export function noteFileName(kind: "md" | "txt" | "rich", file: string, current:
   const said = auto.nameFrom === "h1" ? firstHeading(kind, file) : ((fileMeta(kind, file)?.fields.find((f) => same(f.key, auto.title))?.value || itemTitle) ?? "");
   const words = said.split("\n")[0]!.trim();
   if (!/[\p{L}\p{N}\p{Extended_Pictographic}]/u.test(words)) return null;
-  const base = auto.nameStyle === "clean" ? safeBase(words) : keptPart(words);
+  const base = cleanNoteName(words, auto.nameStyle);
   if (base === "file" && words.toLowerCase() !== "file") return null; // (all of it was cleaned away)
   const ext = kind === "rich" ? ".note.html" : (/\.[A-Za-z0-9]{1,8}$/.exec(current)?.[0] ?? ".md");
   const stem = current.toLowerCase().endsWith(ext.toLowerCase()) ? current.slice(0, -ext.length) : current;
-  if (stem === base || (stem.startsWith(`${base}-`) && /^\d+$/.test(stem.slice(base.length + 1)))) return null;
+  if (stem === base || isClashOf(stem, base, 999)) return null;
   return `${base}${ext}`;
 }

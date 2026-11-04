@@ -1164,6 +1164,22 @@ test("several picked: each tag with how many have it, removed from all or added 
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("two folders a disk would take for one are refused, by name and on rename; the name that works is taken", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await newFolder(p, "A: B");
+  await expect(p.locator(".side-label", { hasText: "A: B" })).toBeVisible();
+  await p.getByTestId("folder-new").click();
+  await p.getByTestId("folder-name-input").fill("a- b");
+  await p.keyboard.press("Enter");
+  await expect(p.locator(".side-label", { hasText: "a- b" })).toHaveCount(0);
+  await newFolder(p, "Other");
+  await sideAct(p, "folder", "Other", "Rename folder Other");
+  await p.getByTestId("folder-name-input").fill("a: b");
+  await p.keyboard.press("Enter");
+  await expect(p.locator(".side-label", { hasText: "Other" })).toBeVisible();
+});
+
 test("the library's own undo and redo; items dragged onto a folder or a tag; a plain click picks one alone after Ctrl+A; picks a search hides are shown and can be dropped", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();

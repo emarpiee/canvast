@@ -4,7 +4,7 @@ import { extOf } from "../assets/file-kind";
 import type { AssetFolder, CatalogEntry } from "../assets/asset-catalog";
 import { folderPath, meta } from "../assets/asset-catalog";
 import { storedAssetOf } from "../doc/model";
-import { MAX_FILE_BYTES, cutBytes, splitName } from "../doc/rename-rules";
+import { cleanWholeName, freeNameIn } from "../doc/file-names";
 import { req } from "./idb";
 import { externalFolder } from "./external-folder";
 import type { BoardRecord, CanvasRecord, ObjectRecord } from "./workspace-repo";
@@ -44,31 +44,10 @@ export function kindFolder(_type: string, name: string): string {
 }
 
 /** A name safe on every file system, keeping the original wording; a long one is cut before its extension. */
-export function safeName(raw: string, fallback: string): string {
-  const cleaned = raw
-    .normalize("NFC")
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001f\\/:*?"<>|]+/g, "-")
-    .replace(/^[.\s]+|[\s.]+$/g, "");
-  const { stem, ext } = splitName(cleaned);
-  const cut = cutBytes(cleaned, MAX_FILE_BYTES) === cleaned ? cleaned : `${cutBytes(stem, MAX_FILE_BYTES - new TextEncoder().encode(ext).length).trimEnd()}${ext}`;
-  return cut || fallback;
-}
+export const safeName = cleanWholeName;
 
-/** `name.ext` becomes `name (2).ext` when `taken` already holds it (compared without regard to case). */
-export function uniquePath(taken: Set<string>, dir: string, file: string): string {
-  const dot = file.lastIndexOf(".");
-  const stem = dot > 0 ? file.slice(0, dot) : file;
-  const ext = dot > 0 ? file.slice(dot) : "";
-  for (let n = 1; ; n++) {
-    const candidate = `${dir ? `${dir}/` : ""}${n === 1 ? file : `${stem} (${n})${ext}`}`;
-    const key = candidate.toLowerCase();
-    if (!taken.has(key)) {
-      taken.add(key);
-      return candidate;
-    }
-  }
-}
+/** `name.ext` becomes `name-2.ext` when `taken` already holds it (compared without regard to case). */
+export const uniquePath = (taken: Set<string>, dir: string, file: string): string => freeNameIn(taken, file, dir ? `${dir}/` : "");
 
 const range = (canvasId: string): IDBKeyRange => IDBKeyRange.bound([canvasId, ""], [canvasId, "￿"]);
 

@@ -26,10 +26,10 @@ describe("plain ZIP of the original files", () => {
   it("numbers names that collide in one folder, without regard to case, and not across folders", () => {
     const taken = new Set<string>();
     expect(uniquePath(taken, "png", "cat.png")).toBe("png/cat.png");
-    expect(uniquePath(taken, "png", "CAT.png")).toBe("png/CAT (2).png");
-    expect(uniquePath(taken, "png", "cat.png")).toBe("png/cat (3).png");
+    expect(uniquePath(taken, "png", "CAT.png")).toBe("png/CAT-2.png");
+    expect(uniquePath(taken, "png", "cat.png")).toBe("png/cat-3.png");
     expect(uniquePath(taken, "Refs", "cat.png")).toBe("Refs/cat.png");
     expect(uniquePath(taken, "Text", "README")).toBe("Text/README");
-    expect(uniquePath(taken, "Text", "README")).toBe("Text/README (2)");
+    expect(uniquePath(taken, "Text", "README")).toBe("Text/README-2");
   });
 });

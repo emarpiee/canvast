@@ -4,6 +4,7 @@
  * a story, the picture's own pixels …), or type a width or a height; the preview shows the shape with its measures, and the file is
  * made at exactly that size. PNG, WebP and JPEG; SVG too when everything is vector.
  */
+import { cleanName, replaceInvalid } from "../doc/file-names";
 import { plural } from "../doc/plural";
 import { forgetCopiedPicture } from "../app/actions";
 import { writeSystemClipboard } from "../app/system-clipboard";
@@ -69,7 +70,7 @@ const savePrefs = (p: Prefs): void => {
   }
 };
 
-const slug = (s: string): string => s.normalize("NFC").toLowerCase().replace(/[\u0000-\u001f\\/:*?"<>|]+/g, "-").replace(/\s+/g, "_").replace(/^[.\-_]+|[.\-_]+$/g, "") || "export";
+const slug = (s: string): string => cleanName(s, "clean", "export");
 const UNIT_LABEL: Record<Unit, string> = { px: "px", in: "in", cm: "cm", mm: "mm" };
 const decimals = (u: Unit): number => (u === "px" ? 0 : u === "in" ? 2 : 1);
 const shown = (v: number, u: Unit): string => String(Number(v.toFixed(decimals(u))));
@@ -410,7 +411,7 @@ export function openExportDialog(deps: ExportDeps): void {
   nameIn.addEventListener("input", () => (nameTouched = true));
 
   interface Made { name: string; blob: Blob; mime: string }
-  const base = (): string => nameIn.value.trim().replace(/[\u0000-\u001f\\/:*?"<>|]+/g, "-") || slug(t.name);
+  const base = (): string => replaceInvalid(nameIn.value).trim() || slug(t.name);
   const sizeText = (i: number): { w: string; h: string } => {
     const z = sizeOf(i), u = prefs.unit;
     const one = (v: number): string => `${shown(fromPx(v, u, prefs.dpi), u)}${u === "px" ? "" : u}`;

@@ -12,6 +12,7 @@ import type { SettingsStore } from "../settings/settings";
 import { writeZip } from "../storage/zip";
 import type { ZipInput } from "../storage/zip";
 import { saveFile } from "../ui/file-actions";
+import { freeNameIn } from "../doc/file-names";
 import { safeName } from "../storage/files-zip";
 import { encodePicture, editedName } from "./frames";
 import type { Session } from "./session";
@@ -21,19 +22,8 @@ import type { EditorState } from "./editor-state";
 export const pickedFiles = (doc: DocumentStore, editor: EditorState): ImageObject[] =>
   [...editor.selection].map((id) => doc.get(id)).filter((o): o is ImageObject => o?.kind === "image");
 
-/** A name not yet taken in the ZIP: "a.png", "a (2).png", without regard to case. */
-function free(taken: Set<string>, name: string): string {
-  const dot = name.lastIndexOf(".");
-  const stem = dot > 0 ? name.slice(0, dot) : name;
-  const ext = dot > 0 ? name.slice(dot) : "";
-  for (let n = 1; ; n++) {
-    const c = n === 1 ? name : `${stem} (${n})${ext}`;
-    if (!taken.has(c.toLowerCase())) {
-      taken.add(c.toLowerCase());
-      return c;
-    }
-  }
-}
+/** A name not yet taken in the ZIP: "a.png", "a-2.png", without regard to case. */
+const free = (taken: Set<string>, name: string): string => freeNameIn(taken, name);
 
 export async function downloadSelection(doc: DocumentStore, editor: EditorState, assets: AssetLibrary, session: Session, settings: SettingsStore): Promise<void> {
   const objs = pickedFiles(doc, editor);

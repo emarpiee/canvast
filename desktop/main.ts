@@ -12,6 +12,7 @@ import { createHash, randomBytes, randomUUID, scrypt } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, watch, writeFileSync } from "node:fs";
 import { lstat, mkdir, open, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, utimes, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve, sep } from "node:path";
+import { cleanWholeName } from "../src/doc/file-names";
 import { BOARDS_DIR, isSafeRelativePath } from "../src/storage/workspace-names";
 import { readItem } from "../src/storage/library-mirror";
 import { SEAL_OVERHEAD, isHiddenFile } from "../src/storage/hidden-vault";
@@ -471,7 +472,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     if (typeof name !== "string" || !(bytes instanceof Uint8Array)) throw new Error("not a file to open");
     const dir = join(OPENED_DIR, randomUUID());
     await mkdir(dir, { recursive: true, mode: 0o700 });
-    const file = join(dir, basename(name).replace(/[\u0000-\u001f/\\]/g, "_").replace(/^\.+/, "") || "file");
+    const file = join(dir, cleanWholeName(basename(name), "file"));
     await writeFile(file, bytes, { mode: 0o600 });
     return process.env["CANVAST_NO_OPEN"] === "1" ? "" : shell.openPath(file); // (tests: the copy is made, no app is started)
   });

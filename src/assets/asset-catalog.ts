@@ -1,6 +1,7 @@
 import { externalFolder } from "../storage/external-folder";
 import type { ObjectId } from "../doc/model";
 import { plural } from "../doc/plural";
+import { sameOnDisk } from "../doc/file-names";
 import { cleanFileName } from "../doc/rename-rules";
 import { isCard } from "./file-kind";
 import { formatTag, formatTags, renamedTag, tagIsOrUnder } from "../doc/tags";
@@ -167,6 +168,10 @@ export function folderName(name: string): string {
   if (n.length > MAX_FOLDER_NAME) throw new CatalogInputError(`a folder name can be at most ${MAX_FOLDER_NAME} characters`);
   return n;
 }
+
+/** A shown sibling folder that would be the same folder on a disk under another spelling (`A: B`, `a- b`), when there is one. */
+export const folderClash = (folders: readonly AssetFolder[], parentId: string | null, name: string, except?: string): AssetFolder | undefined =>
+  folders.find((f) => f.id !== except && !f.hidden && (f.parentId ?? null) === parentId && sameOnDisk(f.name, name));
 
 /** Ids of `id` and every folder below it. */
 export function folderSubtree(folders: readonly AssetFolder[], id: string): Set<string> {

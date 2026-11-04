@@ -21,7 +21,8 @@ import type { NameKeys } from "./hidden-vault";
 import { sha256Hex } from "../assets/sha256";
 import { done, idbGet, req } from "./idb";
 import { noteKindOf } from "../notes/note-file";
-import { KIND_FOLDERS, MAX_LIBRARY_DIR, extOfBytes, fileExt, fitsPlace, freePath, isSafeRelativePath, keptBase, keptFits, keptPart, libraryDir, nameBase, safeBase } from "./workspace-names";
+import { MAX_BASE, UNFINISHED_FILE, cutBytes, isClashOf } from "../doc/file-names";
+import { KIND_FOLDERS, MAX_LIBRARY_DIR, extOfBytes, fileExt, fitsPlace, freePath, isSafeRelativePath, keptBase, keptFile, keptFits, keptPart, libraryDir, nameBase, safeBase } from "./workspace-names";
 import type { FolderFile } from "./store";
 
 export const LIBRARY_JSON = ".canvast/library.json";
@@ -124,7 +125,7 @@ const SETTLE_MS = 1500;
 const usable = (path: string): boolean => {
   const name = path.slice(path.lastIndexOf("/") + 1);
   // (nothing in a dot-folder either: another app's own, as Obsidian's .obsidian/, is never taken into the library)
-  return !path.split("/").some((part) => part.startsWith(".")) && !/\.tmp-|\.(tmp|part|partial|crdownload|download|!sync|sync-conflict)$/i.test(name) && !/^(thumbs\.db|desktop\.ini)$/i.test(name);
+  return !path.split("/").some((part) => part.startsWith(".")) && !UNFINISHED_FILE.test(name) && !/^(thumbs\.db|desktop\.ini)$/i.test(name);
 };
 const parentOf = (path: string): string => path.slice(0, path.lastIndexOf("/"));
 /** A file's own extension (`library/images/x.png` → `png`), or "" when it has none. */
@@ -581,20 +582,23 @@ export class LibraryMirror {
       // a file in no folder goes in its kind's folder; else one in the library's root stays there. A file tidied before fits too: turning a setting on
       // renames nothing that fits. A hidden item's place is its own business.
       const keep = this.keepsName(e.name) && !sealed;
-      const base = keep ? keptBase(e.name) : tidyBase;
-      const ext = (keep && /\.([A-Za-z0-9]{1,8})$/.exec(e.name)?.[1]) || tidyExt;
+      const kept = keep ? keptFile(e.name, tidyExt, e.type) : null;
+      const base = kept ? kept.base : tidyBase;
+      const ext = kept?.ext || tidyExt;
       const places = sealed ? [tidyDir] : names.length ? (keep ? [await diskDir(names, tidyDir), tidyDir] : [tidyDir]) : this.sortFiles() ? [tidyDir] : [tidyDir, "library"];
       const dir = rec.file && places.includes(parentOf(rec.file)) ? parentOf(rec.file) : places[0]!;
-      const fits = !!rec.file && (places.some((d) => fitsPlace(rec.file!, d, tidyBase, tidyExt)) || (keep && keptFits(rec.file, places, e.name)));
+      const fits = !!rec.file && (places.some((d) => fitsPlace(rec.file!, d, tidyBase, tidyExt)) || (keep && keptFits(rec.file, places, e.name, e.type, this.strictNames)));
       if (fits && !taken.has(rec.file!.toLowerCase())) {
         taken.add(rec.file!.toLowerCase());
-        if (!sealed) await this.nameFollowsFile(e.hash, rec.file!);
+        // (looked at in this name first: a full pass of a big library asks the library nothing for an item that fits)
+        if (!sealed && rec.file!.slice(rec.file!.lastIndexOf("/") + 1) !== e.name) await this.nameFollowsFile(e.hash, rec.file!);
       } else moves.push({ hash: e.hash, from: rec.ext ? rec.file! : null, dir, base, ext });
     }
     // A file that moves keeps its old place until it has moved, so no two items ever pass through one name.
     for (const m of moves) if (m.from) taken.add(m.from.toLowerCase());
     const emptied = new Set<string>();
     const failed: string[] = [];
+    this.lastPlaced = moves.length;
     const total = moves.length + toSeal.length;
     let done = 0;
     const step = (encrypting = false): void => this.onProgress?.(++done, total, encrypting);
@@ -1048,6 +1052,23 @@ export class LibraryMirror {
     if (was !== undefined) this.movedOutside({ hash, name: was, path: from });
   }
 
+  /** Only when asked for: a file right by an earlier version's rules is named by today's too (see `repairNames`). */
+  private strictNames = false;
+  private lastPlaced = 0;
+  /**
+   * Asked for by name, never on its own: files an earlier version named less well get today's names (a picture that lost its extension to a dot in its name,
+   * letters composed another way, unseen characters), and the links to them follow. How many moved.
+   */
+  async repairNames(): Promise<number> {
+    this.strictNames = true;
+    try {
+      await this.write();
+      return this.lastPlaced;
+    } finally {
+      this.strictNames = false;
+    }
+  }
+
   /** Whether files keep the item's name as written (Settings: Keep file names), else their tidy name. */
   keepNames: () => boolean = () => false;
   /** Rename notes on save: how notes' files are named, over `keepNames`; null: as other files. */
@@ -1471,7 +1492,8 @@ export class LibraryMirror {
       const clean = !!noteKindOf(entry.name) && this.noteFileKeep() === false;
       if (!clean && !this.keepsName(entry.name)) return;
       const kept = clean ? nameBase(entry.name) : keptBase(entry.name);
-      if (stem.startsWith(`${kept}-`) && /^\d+$/.test(stem.slice(kept.length + 1))) {
+      // (a name too long for a file is cut there: the item keeps it whole)
+      if (cutBytes(entry.name, MAX_BASE) === entry.name && isClashOf(stem, kept, 999)) {
         await this.lib.apply([{ t: "entry", hash, v: { ...entry, name: base } }]);
         // (many at once, in a library from before: one redraw)
         if (this.namesTimer) clearTimeout(this.namesTimer);
