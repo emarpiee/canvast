@@ -1731,7 +1731,7 @@ test("Copy file: the real files on the clipboard, from the library, as a list of
     await on("b file.pdf").click({ modifiers: ["Control"] });
     await on("b file.pdf").click({ button: "right" });
     await page.getByRole("menuitem", { name: "Copy files", exact: true }).click();
-    const FORMAT = 'electron application/osclipboard;format="text/uri-list"';
+    const FORMAT = "text/uri-list";
     const listed = () => app.evaluate(async ({ clipboard }, format) => {
       const [item] = await clipboard.read();
       return item && item.types.includes(format) ? (await item.getType(format) as Blob).text() : `no file list in: ${item?.types.join(", ")}`;

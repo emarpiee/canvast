@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.37 — Panels kept open in one line (2026-11-04)
+
+- **Changed:** Panels kept open (Settings > Panels) says what it is on one line, the rest under More.
+
 ## 0.53.36 — Settings rows no longer overlap (2026-11-04)
 
 - **Fixed:** rows in Settings had a fixed height from 0.53.34, so their words were cut and ran into the next row.

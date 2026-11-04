@@ -265,7 +265,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
     label: "Panels",
     rows: [
       { key: "panel.autoFold", label: "Minimize inactive panels", help: "Side panels fold to their title bar when you use another one.", more: "The panels stacked on a side fold to their title bar when you use another one. Off: they stay as you left them. Only the active one: just the panel on top of each stack stays open. The latest few: the panels you used last stay open (set how many below). Floating panels are never folded.", control: { kind: "select", options: [["off", "Off"], ["all", "Keep only the active panel open"], ["latest", "Keep the latest few open"]] } },
-      { key: "panel.keep", label: "Panels kept open", help: `How many stacked panels stay open with "Keep the latest few open", counting the active one; up to the ${DOCK_PANEL_IDS.length} panels the app has. Press a title bar to open or fold a panel yourself; drag it to float it or to stack it on the other side.`, control: { kind: "range", min: 1, max: DOCK_PANEL_IDS.length, step: 1, unit: "panels" } },
+      { key: "panel.keep", label: "Panels kept open", help: "How many stacked panels stay open with Keep the latest few open.", more: `Counting the active one; up to the ${DOCK_PANEL_IDS.length} panels the app has. Press a title bar to open or fold a panel yourself; drag it to float it or to stack it on the other side.`, control: { kind: "range", min: 1, max: DOCK_PANEL_IDS.length, step: 1, unit: "panels" } },
     ],
   },
   {
