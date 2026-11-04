@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.44 — Trash shows, and the sidebar leaves it (2026-11-04)
+
+- **Fixed:** the Trash's list showed under the grid, out of sight, and its search word stayed, so All items, Unfiled and the rest seemed to do nothing. The grid now gives way to it, and anything else in the sidebar, or the filter and sort menus, goes back to the library.
+
 ## 0.53.43 — A Trash in the library (2026-11-04)
 
 - **Added:** **Trash** in the library's sidebar (desktop app): it puts `is:trash` in the search box and lists the files in this workspace's `.trash` folder, not your system's trash. In hidden mode, with the Hidden items open, it lists the hidden ones instead; outside it, nothing of them shows or counts.

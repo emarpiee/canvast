@@ -1738,6 +1738,24 @@ test("the Trash lists this workspace's .trash for the mode: shown files in the l
     await expect(search).toHaveValue("is:trash");
     await expect(rows).toHaveCount(1);
     await expect(rows).toContainText("gone.png");
+    // It is what shows: in the view, in place of the grid. Anything else of the sidebar goes back to the library.
+    await expect(page.getByTestId("assets-grid")).toBeHidden();
+    await expect(rows.first()).toBeInViewport();
+    await expect(page.getByTestId("assets-count")).toContainText("1 file in the trash");
+    for (const other of ["unfiled", "all", "favorites"]) {
+      await page.locator(`[data-scope="${other}"]`).click();
+      await expect(search).toHaveValue("");
+      await expect(page.getByTestId("assets-grid")).toBeVisible();
+      await expect(page.getByTestId("assets-trash")).toBeHidden();
+      await trash.click();
+      await expect(rows.first()).toBeInViewport();
+    }
+    await page.locator('[data-scope="all"]').click();
+    await expect(page.locator('[data-testid="asset-card"]').first()).toBeInViewport();
+    await trash.click();
+    await trash.click(); // (this again: out)
+    await expect(search).toHaveValue("");
+    await trash.click();
     await search.fill("is:trash nothing");
     await expect(page.getByTestId("trash-empty")).toBeVisible();
     await search.fill("is:trash gone");

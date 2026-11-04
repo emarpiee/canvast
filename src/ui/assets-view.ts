@@ -328,6 +328,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       session.editor.changed();
     },
     changed: (n) => {
+      if (TRASH_WORD.test(search.value)) count.textContent = plural(n, "file") + " in the trash";
       if (n === trashCount) return;
       trashCount = n;
       renderSide();
@@ -2177,10 +2178,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     root.querySelector<HTMLElement>(".assets-searchbox .cs-clear")!.hidden = !search.value;
     // The Trash: the workspace's own, for the mode, in place of the grid.
     const inTrash = TRASH_WORD.test(search.value);
-    if (inTrash !== !trashBox.hidden) renderSide();
+    const trashTurned = inTrash === trashBox.hidden;
     trashBox.hidden = !inTrash;
     grid.hidden = inTrash;
     listHead.hidden = inTrash;
+    if (trashTurned) renderSide();
     if (inTrash) {
       filteredChip.hidden = true;
       void trashView.show(search.value);
@@ -3844,12 +3846,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return;
     }
     if (b.dataset["scope"] === "trash") {
-      // (a filter in the search box: the way out is to clear it, as for any search, or this again)
+      // (a filter in the search box: the way out is to clear it, as for any search, this again, or anything else of the sidebar)
       setWay("all");
       search.value = TRASH_WORD.test(search.value) ? "" : "is:trash";
       scope = "all";
+      root.querySelector<HTMLElement>(".assets-scroll")!.scrollTop = 0;
       return searchChanged();
     }
+    if (b.dataset["scope"]) leaveTrash();
     if (b.dataset["scope"]) {
       // Choosing the one already chosen lets go of it (back to all assets).
       let next = b.dataset["scope"];
@@ -4482,6 +4486,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     session.editor.message = `“${q}” comes back with this layout, these columns and this sort now.`;
     session.editor.changed();
   };
+  /** Out of the Trash, for what lists the library's items: its word leaves the search box, what else was typed stays. */
+  const leaveTrash = (): void => {
+    if (!TRASH_WORD.test(search.value)) return;
+    search.value = search.value.replace(TRASH_WORD, " ").trim();
+    paintSearchUi();
+  };
+  for (const menu of [usageSel, sortSel]) menu.addEventListener("change", () => (leaveTrash(), render()));
   /** Search again, as it was saved; its look with it. */
   const useSearch = (m: string, q: string): void => {
     const view = savedNow().find((s) => sameSearch(s, q, m as SearchWay))?.look ?? ui.views[viewKey(m, q)];
