@@ -126,7 +126,7 @@ export function openTreeChooser(opts: ChooserOptions): Promise<Map<string, Choic
     let answer: Map<string, ChoiceDone> | null = null;
     dlg.addEventListener("change", (e) => {
       const box = e.target as HTMLInputElement;
-      if (!box.dataset["id"]) return;
+      if (box.dataset["id"] === undefined) return; // ("No folder" is the empty one)
       const all = nodes.get(tab.id)!;
       for (const n of all) {
         if (n.id === box.dataset["id"]) n.state = box.checked ? "on" : "off";

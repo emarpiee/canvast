@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.53.54 — Organize key, canvas tags as a tree, the preview left alone (2026-11-04)
+
+- **Added:** `O` opens Organize for what is selected in the library.
+- **Added:** canvas tags are a tree on `/`, as library tags are; a parent lists what is nested under it, and renaming it renames those too.
+- **Changed:** the layers panel keeps room for the arrow on every row, so its rows line up.
+- **Fixed:** in Organize, choosing *No folder* did nothing.
+- **Fixed:** in the library's list view, a thin gap above the column names let scrolled thumbnails show through.
+- **Removed:** the note under an art file's preview, a backup copy's and a custom thumbnail's in the viewer, which took room from the picture. What it said is in the details. The "no preview" note and the notes about a failure stay.
+
 ## 0.53.53 — Previews and a label for automatic backups (2026-11-04)
 
 - **Added:** an art file's backup copy (`.kra~`, also `.psd~` and the other art kinds) shows the picture it keeps. An item imported earlier keeps its 4:3 card, its picture cropped to fit.

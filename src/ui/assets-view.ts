@@ -12,7 +12,7 @@ import type { Session, AssetPlace } from "../app/session";
 import { plural } from "../doc/plural";
 import { openBatchRename } from "./batch-rename";
 import { askHiddenPassword, readyForHidden, setHiddenMode } from "./hidden-access";
-import { tagFormatNote, tagIsOrUnder } from "../doc/tags";
+import { renamedTag, tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { mountSuggest } from "./search-suggest";
 import type { SuggestSources } from "../search/suggest";
 import { itemsIn, justifiedLayout, listLayout, nearestInRow, rowOf, squaresLayout, type GridLayout } from "./library-layout";
@@ -764,7 +764,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const sideRows = new Map<string, { label: string; items: MenuItem[] }>();
   /** The tags of the sidebar's tree as they are spelled, by key (a row shows only the last part of a path), and those with tags nested under them. */
   const sideTagLabels = new Map<string, string>();
-  let sideTagParents: string[] = [];
+  /** What a canvas tag finds: its items' library items, and those of the tags nested under it. */
+  const canvasTagAssets = (key: string): Set<string> => {
+    const out = new Set<string>();
+    for (const [k, c] of canvasTags) if (k === key || k.startsWith(`${key}/`)) for (const h of c.assets) out.add(h);
+    return out;
+  };
+  const sideTagParents = new Map<string, string[]>();
   /** On a narrow screen the sidebar is a strip that opens on demand. */
   const narrow = window.matchMedia("(max-width: 900px)");
   let sideOpen = !narrow.matches;
@@ -1538,8 +1544,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       slideTile.hidden = true;
       slideImg.hidden = false;
       slideImg.src = await thumbFor(hash).catch(() => "");
-      slideCaption.textContent = `${label}. No preview for this kind of file: this is its custom thumbnail.`;
-      slideCaption.classList.add("is-note");
+      slideCaption.textContent = `${label}. No preview for this kind of file: this is its custom thumbnail.`; // (for a screen reader: on screen nothing takes room from the picture)
       armShow();
       return;
     }
@@ -1554,8 +1559,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       slideImg.className = "";
       slideUrl = URL.createObjectURL(art);
       slideImg.src = slideUrl;
-      slideCaption.textContent = `${e.name || "Untitled"}, ${fmtBytes(e.size)}. ${isAutoCopy(e.name) ? `${AUTO_COPY_NOTE} ` : ""}A preview: the picture the file keeps, as it was last saved.`;
-      slideCaption.classList.add("is-note");
+      slideCaption.textContent = `${e.name || "Untitled"}, ${fmtBytes(e.size)}. ${isAutoCopy(e.name) ? `${AUTO_COPY_NOTE} ` : ""}A preview: the picture the file keeps, as it was last saved.`; // (for a screen reader: on screen nothing takes room from the picture)
       armShow();
       return;
     }
@@ -1852,7 +1856,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       assetCanvasTags = selected && picked.size <= 1 ? await session.canvasTagsOfAsset(selected).catch(() => []) : [];
     } else if (!selected || picked.size !== 1) places = [];
     if (gen !== generation) return;
-    if (scope.startsWith("ctag:") && !canvasTags.has(scope.slice(5))) scope = "all";
+    if (scope.startsWith("ctag:") && ![...canvasTags.keys()].some((k) => tagIsOrUnder(k, scope.slice(5)))) scope = "all";
     render();
     startStep("library shown");
     void fillThumbs();
@@ -1955,7 +1959,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const group = new Map<string, number>();
     if (scope === "similar") similar().forEach((g, i) => g.forEach((h) => group.set(h, i)));
     const inFolders = scope.startsWith("folder:") ? folderSubtree(listing.folders, scope.slice(7)) : null;
-    const sets = { inFolders, canvasTagged: scope.startsWith("ctag:") ? (canvasTags.get(scope.slice(5))?.assets ?? null) : null, similar: group };
+    const sets = { inFolders, canvasTagged: scope.startsWith("ctag:") ? canvasTagAssets(scope.slice(5)) : null, similar: group };
     const inScope = (e: CatalogListing["entries"][number]): boolean => inScopeOf(e, scope, sets, hiddenMode);
     // The library sorted once for this sort (kept until the library or the sort changes); a search or a filter only keeps rows of it, in
     // that order: sorting again on every keystroke cost most of the time with tens of thousands of items.
@@ -2193,7 +2197,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       used,
       canvasNames,
       ...(scope.startsWith("folder:") && listing ? { inFolders: [...folderSubtree(listing.folders, scope.slice(7))] } : {}),
-      ...(scope.startsWith("ctag:") ? { canvasTagged: [...(canvasTags.get(scope.slice(5))?.assets ?? [])] } : {}),
+      ...(scope.startsWith("ctag:") ? { canvasTagged: [...canvasTagAssets(scope.slice(5))] } : {}),
       ...(hiddenMode ? { hidden: true } : {}),
     };
     const r = await pages.query(q).catch(() => null);
@@ -2383,34 +2387,63 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return `<button type="button" class="side-add" ${attr} aria-label="${word}" title="${word}">${open ? ICONS.chevronsDownUp : ICONS.chevronsUpDown}</button>`;
     };
     const foldAll = foldAllBtn("data-folders-fold", "folders", listing.folders.filter((f) => folderKids(f.id).length).map((f) => f.id));
-    // The tags: a tree on `/`, or all in a row with their whole names.
-    const tagNodes = pathNodes([...tagCounts].sort((a, b) => a[1].label.localeCompare(b[1].label)).map(([, c]) => ({ id: c.label, name: c.label, value: c.label })));
-    const tagKids = new Map<string | null, typeof tagNodes>();
-    for (const t of tagNodes) tagKids.set(t.parent, [...(tagKids.get(t.parent) ?? []), t]);
+    // The tags and the canvas tags: a tree on `/`, or all in a row with their whole names.
     sideTagLabels.clear();
-    for (const t of tagNodes) sideTagLabels.set(t.id, t.value ?? (t.parent ? `${sideTagLabels.get(t.parent)}/${t.name}` : t.name));
-    sideTagParents = tagNodes.filter((t) => tagKids.has(t.id)).map((t) => t.id);
-    const tagMore = (id: string, own: boolean, nested: boolean): string => {
-      const label = sideTagLabels.get(id)!;
-      return more("tag", id, label, [
-        { attr: "data-tag-action", value: "rename", label: "Rename", hint: nested ? "With the tags nested under it" : "On every item that has it", icon: ICONS.textCursorInput, aria: `Rename tag ${label}` },
-        ...(own ? [{ attr: "data-tag-action", value: "delete", label: "Delete", hint: nested ? "Items and nested tags stay" : "The items stay", icon: ICONS.trash2, aria: `Delete tag ${label}`, danger: true }] : []),
-      ]);
+    const tagList = (o: { scope: "tag" | "ctag"; labels: readonly string[]; shown: keyof typeof SIDE_SHOWN; word: string; cls: string; n: (id: string) => number; active: (id: string) => boolean; title?: (id: string) => string | undefined; menu: (id: string, own: boolean, nested: boolean, label: string) => string }): { rows: string; head: string } => {
+      const nodes = pathNodes([...o.labels].sort((a, b) => a.localeCompare(b)).map((l) => ({ id: l, name: l, value: l })));
+      const kids = new Map<string | null, typeof nodes>();
+      for (const t of nodes) kids.set(t.parent, [...(kids.get(t.parent) ?? []), t]);
+      const full = (id: string): string => sideTagLabels.get(`${o.scope}:${id}`) ?? id;
+      for (const t of nodes) sideTagLabels.set(`${o.scope}:${t.id}`, t.value ?? (t.parent ? `${full(t.parent)}/${t.name}` : t.name));
+      const parents = nodes.filter((t) => kids.has(t.id)).map((t) => `${o.scope}:${t.id}`);
+      sideTagParents.set(o.scope, parents);
+      const row = (t: (typeof nodes)[number], label: string, opts: { depth?: number; cls: string; before?: string }): string => {
+        const title = o.title?.(t.id);
+        return item(`${o.scope}:${t.id}`, `#${esc(label)}`, o.n(t.id), { ...opts, ...(title || opts.before !== undefined ? { title: title ?? `#${esc(full(t.id))}` } : {}), extra: o.menu(t.id, t.value !== null, kids.has(t.id), full(t.id)) });
+      };
+      const tree = (root: (typeof nodes)[number]): string =>
+        walkTree([root], (t) => kids.get(t.id) ?? [], (t) => !ui.folded.includes(`${o.scope}:${t.id}`), (t, at) =>
+          row(t, t.name, { depth: at.depth, cls: "tree-row", before: treeGuides(at.depth, at.last, at.conts) + treeSlot(at, `data-tag-twist="${o.scope}:${esc(t.id)}"`) }),
+        );
+      const rows = ui.tagsInline
+        ? capped(o.shown, nodes.filter((t) => t.value !== null).map((t) => ({ active: o.active(t.id), html: row(t, t.value!, { cls: o.cls }) })))
+        : capped(o.shown, (kids.get(null) ?? []).map((t) => ({ active: nodes.some((x) => (x.id === t.id || x.id.startsWith(`${t.id}/`)) && o.active(x.id)), html: tree(t) })));
+      const view = ui.tagsInline ? "Show as a tree" : "Show in a row";
+      const head = (nodes.length ? `<button type="button" class="side-add" data-tags-view aria-label="${view}" title="${view}">${ui.tagsInline ? ICONS.listTree : ICONS.wrapText}</button>` : "") + (ui.tagsInline ? "" : foldAllBtn(`data-tags-fold="${o.scope}"`, o.word, parents));
+      return { rows, head };
     };
-    const tagTree = (root: (typeof tagNodes)[number]): string =>
-      walkTree([root], (t) => tagKids.get(t.id) ?? [], (t) => !ui.folded.includes(`tag:${t.id}`), (t, at) =>
-        item(`tag:${t.id}`, `#${esc(t.name)}`, counts.tagsUnder.get(t.id) ?? 0, {
-          depth: at.depth,
-          cls: "tree-row",
-          title: `#${esc(sideTagLabels.get(t.id)!)}`,
-          before: treeGuides(at.depth, at.last, at.conts) + treeSlot(at, `data-tag-twist="${esc(t.id)}"`),
-          extra: tagMore(t.id, t.value !== null, at.hasKids),
-        }),
-      );
-    const tagRowsHtml = ui.tagsInline
-      ? capped("tags", tagNodes.filter((t) => t.value !== null).map((t) => ({ active: picked.has(`tag:${t.id}`), html: item(`tag:${t.id}`, `#${esc(t.value!)}`, counts.tagsUnder.get(t.id) ?? 0, { cls: "is-tag", extra: tagMore(t.id, true, tagKids.has(t.id)) }) })))
-      : capped("tags", (tagKids.get(null) ?? []).map((t) => ({ active: [...picked].some((k) => k === `tag:${t.id}` || k.startsWith(`tag:${t.id}/`)), html: tagTree(t) })));
-    const tagHead = (tagNodes.length ? `<button type="button" class="side-add" data-tags-view aria-label="${ui.tagsInline ? "Show as a tree" : "Show in a row"}" title="${ui.tagsInline ? "Show as a tree" : "Show in a row"}">${ui.tagsInline ? ICONS.listTree : ICONS.wrapText}</button>` : "") + (ui.tagsInline ? "" : foldAllBtn("data-tags-fold", "tags", sideTagParents.map((id) => `tag:${id}`)));
+    const tagSection = tagList({
+      scope: "tag",
+      labels: [...tagCounts.values()].map((c) => c.label),
+      shown: "tags",
+      word: "tags",
+      cls: "is-tag",
+      n: (id) => counts.tagsUnder.get(id) ?? 0,
+      active: (id) => picked.has(`tag:${id}`),
+      menu: (id, own, nested, label) =>
+        more("tag", id, label, [
+          { attr: "data-tag-action", value: "rename", label: "Rename", hint: nested ? "With the tags nested under it" : "On every item that has it", icon: ICONS.textCursorInput, aria: `Rename tag ${label}` },
+          ...(own ? [{ attr: "data-tag-action", value: "delete", label: "Delete", hint: nested ? "Items and nested tags stay" : "The items stay", icon: ICONS.trash2, aria: `Delete tag ${label}`, danger: true }] : []),
+        ]),
+    });
+    const canvasTagSection = tagList({
+      scope: "ctag",
+      labels: [...canvasTags.values()].map((c) => c.label),
+      shown: "ctags",
+      word: "canvas tags",
+      cls: "is-tag is-canvas-tag",
+      n: (id) => canvasTagAssets(id).size,
+      active: (id) => scope === `ctag:${id}`,
+      title: (id) => {
+        const c = canvasTags.get(id);
+        return c && `On ${plural(c.objects, "item")}. Canvases: ${esc([...c.canvases].slice(0, 6).map(crumbOf).join("; "))}${c.canvases.size > 6 ? ` and ${c.canvases.size - 6} more` : ""}. ${c.assets.size} from the library`;
+      },
+      menu: (id, own, nested, label) =>
+        more("ctag", id, label, [
+          { attr: "data-ctag-action", value: "rename", label: "Rename", hint: nested ? "With the tags nested under it" : "On every canvas that has it", icon: ICONS.textCursorInput, aria: `Rename canvas tag ${label}` },
+          ...(own ? [{ attr: "data-ctag-action", value: "delete", label: "Delete", hint: nested ? "Canvases and nested tags stay" : "The canvases stay", icon: ICONS.trash2, aria: `Delete canvas tag ${label}`, danger: true }] : []),
+        ]),
+    });
     // Saved searches, one click away, each with the look it was saved with.
     const savedRows = byUse(parseSaved(settings.get("search.saved.library")) ?? []).map((s) => ({
       active: false,
@@ -2452,28 +2485,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         ${section(
           "tags",
           "Tags",
-          tagHead,
+          tagSection.head,
           `<ul class="${ui.tagsInline ? "tag-cloud" : "side-list"}" data-testid="tag-list">
-            ${tagRowsHtml || `<li class="side-empty">No tags yet. Add them in the details.</li>`}
+            ${tagSection.rows || `<li class="side-empty">No tags yet. Add them in the details.</li>`}
           </ul>`,
         )}
         ${section(
           "ctags",
           "Canvas tags",
-          "",
-          `<ul class="tag-cloud" data-testid="canvas-tag-list">
-            ${
-              capped("ctags", [...canvasTags]
-                .sort((a, b) => a[1].label.localeCompare(b[1].label))
-                .map(([k, c]) => ({ active: scope === `ctag:${k}`, html:
-                  item(`ctag:${k}`, `#${esc(c.label)}`, c.assets.size, {
-                        cls: "is-tag is-canvas-tag",
-                        extra: more("ctag", k, c.label, [
-                          { attr: "data-ctag-action", value: "rename", label: "Rename", hint: "On every canvas that has it", icon: ICONS.textCursorInput, aria: `Rename canvas tag ${c.label}` },
-                          { attr: "data-ctag-action", value: "delete", label: "Delete", hint: "The canvases stay", icon: ICONS.trash2, aria: `Delete canvas tag ${c.label}`, danger: true },
-                        ]),
-                      }).replace("<button ", `<button title="On ${plural(c.objects, "item")}. Canvases: ${esc([...c.canvases].slice(0, 6).map(crumbOf).join("; "))}${c.canvases.size > 6 ? ` and ${c.canvases.size - 6} more` : ""}. ${c.assets.size} from the library" `) }))) || `<li class="side-empty">No tags on canvases yet. Tag items on a canvas (Layers panel).</li>`
-            }
+          canvasTagSection.head,
+          `<ul class="${ui.tagsInline ? "tag-cloud" : "side-list"}" data-testid="canvas-tag-list">
+            ${canvasTagSection.rows || `<li class="side-empty">No tags on canvases yet. Tag items on a canvas (Layers panel).</li>`}
           </ul>`,
         )}
         ${savedRows.length ? section("saved", "Saved searches", "", `<ul class="side-list" data-testid="side-saved">${capped("saved", savedRows)}</ul>`) : ""}
@@ -3861,7 +3883,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const hashes = (JSON.parse(e.dataTransfer!.getData(DRAG_TYPE) || "[]") as string[]).filter((h) => !!entryOf(h));
     if (!hashes.length) return;
     const k = t.dataset["scope"]!;
-    const label = k.startsWith("tag:") ? (sideTagLabels.get(k.slice(4)) ?? k.slice(4)) : (t.querySelector(".side-label")?.textContent ?? "");
+    const label = k.startsWith("tag:") ? (sideTagLabels.get(k) ?? k.slice(4)) : (t.querySelector(".side-label")?.textContent ?? "");
     const change = k.startsWith("folder:") ? { addFolders: [k.slice(7)] } : k === "unfiled" ? { clearFolder: true } : k === "favorites" ? { favorite: true } : { addTags: [label] };
     const what = k.startsWith("folder:") ? `Moved to ${label}` : k === "unfiled" ? "Taken out of their folders" : k === "favorites" ? "Added to the favourites" : `Tagged #${label}`;
     void session.organize((c) => c.updateMetaEach(hashes.map((hash) => ({ hash, change }))), `${what}: ${plural(hashes.length, "item")}`).then((ok) => {
@@ -3903,17 +3925,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return;
     }
     if (b.dataset["tagTwist"] !== undefined) {
-      const id = `tag:${b.dataset["tagTwist"]}`;
+      const id = b.dataset["tagTwist"];
       ui.folded = ui.folded.includes(id) ? ui.folded.filter((x) => x !== id) : [...ui.folded, id];
       saveUi();
       renderSide();
       return;
     }
-    if (b.hasAttribute("data-folders-fold") || b.hasAttribute("data-tags-fold")) {
-      // (each tree folds on its own: what the other has folded stays)
-      const tags = b.hasAttribute("data-tags-fold");
-      const parents = tags ? sideTagParents.map((id) => `tag:${id}`) : (listing?.folders ?? []).filter((f) => listing!.folders.some((k) => k.parentId === f.id)).map((f) => f.id);
-      const others = ui.folded.filter((k) => k.startsWith("tag:") !== tags);
+    if (b.hasAttribute("data-folders-fold") || b.dataset["tagsFold"]) {
+      // (each tree folds on its own: what another has folded stays)
+      const tree = b.dataset["tagsFold"];
+      const parents = tree ? (sideTagParents.get(tree) ?? []) : (listing?.folders ?? []).filter((f) => listing!.folders.some((k) => k.parentId === f.id)).map((f) => f.id);
+      const others = ui.folded.filter((k) => (tree ? !k.startsWith(`${tree}:`) : /^c?tag:/.test(k)));
       ui.folded = parents.some((id) => !ui.folded.includes(id)) ? [...others, ...parents] : others;
       saveUi();
       renderSide();
@@ -3932,7 +3954,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     if (b.dataset["tagAction"]) {
       const key = b.dataset["key"]!;
-      const label = sideTagLabels.get(key) ?? key;
+      const label = sideTagLabels.get(`tag:${key}`) ?? key;
       if (b.dataset["tagAction"] === "rename") {
         void renameTagDialog(label);
       } else {
@@ -3948,11 +3970,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     if (b.dataset["ctagAction"]) {
       const key = b.dataset["key"]!;
-      const label = canvasTags.get(key)?.label ?? key;
+      const label = sideTagLabels.get(`ctag:${key}`) ?? key;
       if (b.dataset["ctagAction"] === "rename") {
         void askTagName(label, "canvases").then(async (name) => {
           if (name === null) return;
-          const changed = await session.changeCanvasTag(label, name);
+          // (with the tags nested under it, as a library tag)
+          let changed = 0;
+          for (const c of [...canvasTags.values()].filter((t) => tagIsOrUnder(t.label, key))) changed += await session.changeCanvasTag(c.label, renamedTag(c.label, key, name)!);
           if (changed && scope === `ctag:${key}`) scope = `ctag:${name.replace(/\s+/g, " ").trim().replace(/^#+/, "").toLowerCase()}`;
           renderSide();
         });
@@ -4172,6 +4196,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       e.stopPropagation();
     } else if (e.key === "F2" && !(e.target as HTMLElement).closest(TYPING) && (picked.size || selected)) {
       void renameAssetsDialog(picked.size ? filtered().filter((h) => picked.has(h)) : [selected!]);
+      e.preventDefault();
+    } else if ((e.key === "o" || e.key === "O") && !(e.target as HTMLElement).closest(TYPING) && !e.ctrlKey && !e.metaKey && !e.altKey && !session.readOnly && (picked.size || selected)) {
+      void organizeItems(picked.size ? filtered().filter((h) => picked.has(h)) : [selected!]);
       e.preventDefault();
     } else if ((e.key === "i" || e.key === "I") && !(e.target as HTMLElement).closest(TYPING) && !e.ctrlKey && !e.metaKey && !e.altKey) {
       toggleDetails();

@@ -1452,6 +1452,9 @@ test("keyboard in the library, in either layout: arrows, Home and End move and p
   await expect(picked()).toHaveCount(1);
   // Shift-click takes a range in the list as in the gallery.
   await p.locator('[data-layout="list"]').click();
+  // (the column names touch the top: no gap for scrolled rows to show through)
+  const gapAbove = () => p.locator(".assets-list-head").evaluate((h) => h.getBoundingClientRect().top - h.closest(".assets-scroll")!.getBoundingClientRect().top);
+  await expect.poll(gapAbove).toBe(0);
   await cards.nth(0).click();
   await cards.nth(3).click({ modifiers: ["Shift"] });
   await expect(picked()).toHaveCount(4);

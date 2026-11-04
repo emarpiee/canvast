@@ -1,4 +1,4 @@
-import { treeGuides, treeTwist } from "./tree";
+import { treeGuides, treeSlot } from "./tree";
 import type { EditorState } from "../app/editor-state";
 import { revealRow } from "../interaction/reveal";
 import { plural } from "../doc/plural";
@@ -220,7 +220,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       const expanded = n.group && open.has(n.id);
       const key = n.group ? n.id : first.id;
       const head = `<li role="treeitem" ${n.group ? `aria-expanded="${expanded}"` : ""} aria-selected="${selected}" class="layer tree-row${n.group ? " is-group" : ""}${selected ? " is-selected" : ""}${hidden ? " is-hidden" : ""}${locked ? " is-locked" : ""}" data-key="${key}" data-ids="${n.members.map((m) => m.id).join(",")}" data-group="${n.group}" draggable="true" style="--depth:${depth}">
-        ${treeGuides(depth, last, conts)}${n.group ? treeTwist(expanded, "data-twist") : ""}
+        ${treeGuides(depth, last, conts)}${treeSlot({ hasKids: !!n.group, open: !!expanded }, "data-twist")}
         <span class="layer-icon">${lab.icon}</span>${lab.swatch ? `<span class="layer-swatch" style="background:${swatchBackground(lab.swatch)}"></span>` : ""}
         ${renaming?.key === key ? `<input class="layer-rename" data-rename maxlength="${MAX_NAME_LENGTH}" value="${esc(renaming.value)}" aria-label="Layer name">` : `<span class="layer-name" title="${esc([...(first.groups ?? []).slice(0, n.group && !n.sheet ? first.groups!.indexOf(n.id) : undefined).map((g) => first.groupNames?.[g] ?? "Group"), lab.text].join(" › "))} (double-click to rename)">${splitName(lab.text)}</span>${n.group ? `<span class="layer-count" title="${plural(n.members.length, "item")} inside">${n.members.length}</span>` : ""}`}
         ${n.sheet ? `<button type="button" class="layer-state layer-clip" data-clip aria-pressed="${n.sheet.container!.clip}" aria-label="Clip content of ${esc(lab.text)}" title="${n.sheet.container!.clip ? "Clipping: what is outside the frame is hidden. Press to show it" : "Not clipping: press to hide what is outside the sheet"}">${ICONS.scissorsLineDashed}</button>` : ""}${hidden ? `<button type="button" class="layer-state" data-eye aria-pressed="true" aria-label="Show ${esc(lab.text)}" title="Hidden: show it">${ICONS.eyeOff}</button>` : ""}${locked ? `<button type="button" class="layer-state" data-lock aria-pressed="true" aria-label="Unlock ${esc(lab.text)}" title="Locked: unlock it">${ICONS.lockKeyhole}</button>` : ""}

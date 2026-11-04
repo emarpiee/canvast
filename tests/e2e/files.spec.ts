@@ -101,9 +101,8 @@ test("an art file shows the picture it keeps, in that picture's shape, on the ca
   await p.getByTestId("asset-preview").click();
   await expect(p.locator('[data-testid="slide-view"] figcaption')).toContainText("A preview");
   await expect.poll(() => p.getByTestId("slide-view").locator("figure img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(80);
-  // (its note is under the picture, not over it)
-  const edges = await p.getByTestId("slide-view").locator("figure").evaluate((f) => [f.querySelector("img")!.getBoundingClientRect().bottom, f.querySelector("figcaption")!.getBoundingClientRect().top]);
-  expect(edges[0]!).toBeLessThanOrEqual(edges[1]!);
+  // (nothing on screen takes room from the picture; the words are for a screen reader)
+  await expect(p.locator('[data-testid="slide-view"] figcaption')).not.toHaveClass(/is-note/);
   await p.keyboard.press("Escape");
   await p.locator('[data-testid="asset-card"][aria-label^="fake.kra"]').click();
   await p.getByTestId("asset-preview").click();

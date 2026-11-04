@@ -1952,7 +1952,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .assets-body.is-list .assets-list-head .col-resize:hover { background: color-mix(in oklch, var(--hud-accent) 40%, transparent); }
 .assets-body.is-list .assets-list-head [data-col].is-dragging { opacity: 0.4; }
 .assets-body.is-list .assets-list-head [data-col].is-drop { box-shadow: inset 2px 0 0 var(--hud-accent); }
-.assets-body.is-list .assets-scroll { overflow-x: auto; }
+.assets-body.is-list .assets-scroll { overflow-x: auto; padding-top: 0; } /* (a sticky head stops below any padding: rows would show through above it) */
 .assets-body.is-list .assets-list-head, .assets-body.is-list .assets-grid { min-width: var(--list-min, 0); }
 
 /* ---- Viewer on a phone: the picture is centred (the inset is inside its box, not added to it), the bar is two tidy rows ---- */

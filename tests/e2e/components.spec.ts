@@ -72,6 +72,11 @@ test("the sidebar's tags are a tree on /, a parent finds what is nested and coun
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await p.getByTestId("view-assets").click();
   await expect(tags.getByRole("button", { name: /^#art\/oil/ })).toBeVisible();
+  // O opens Organize for what is selected.
+  await p.getByTestId("asset-card").first().click();
+  await p.keyboard.press("o");
+  await expect(p.getByTestId("tree-chooser")).toBeVisible();
+  await p.getByTestId("choice-cancel").click();
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -102,7 +107,7 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await p.getByTestId("folder-new").click();
   await name("Plain");
   const leftOf = (t: string) => tree.getByRole("button", { name: new RegExp(`^${t}`) }).locator(".side-label").evaluate((e) => e.getBoundingClientRect().left);
-  expect(await leftOf("Art")).toBe(await leftOf("Plain"));
+  await expect.poll(async () => (await leftOf("Art")) - (await leftOf("Plain"))).toBe(0);
   const rightGap = await tree.getByRole("button", { name: /^Plain/ }).locator(".side-n").evaluate((e) => e.closest(".side-row")!.getBoundingClientRect().right - e.getBoundingClientRect().right);
   expect(rightGap).toBeLessThan(16);
 
