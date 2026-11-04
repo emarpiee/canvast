@@ -1917,6 +1917,8 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .viewer.is-zoomed .viewer-edge, .viewer.is-actual .viewer-edge { display: none; }
 /* The picture uses the whole stage, with the same margin on every side; with the controls hidden the stage, and so the picture, grows. */
 .viewer { --edge-w: 15; --viewer-bottom: var(--sp-8); }
+/* A note under the picture (a preview, a custom thumbnail, a file with none): the picture's room ends above it. */
+.viewer:has(figure > figcaption.is-note) { --viewer-bottom: calc(var(--sp-8) + var(--sp-8) + var(--text-sm)); }
 .viewer-stage .viewer-edge { -webkit-tap-highlight-color: transparent; }
 .viewer figcaption:not(.is-note):not(:where(.viewer-note *)) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; background: none; }
 

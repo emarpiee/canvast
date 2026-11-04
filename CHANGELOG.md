@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.47 — The viewer's note leaves the picture clear (2026-11-04)
+
+- **Fixed:** a note in the viewer (an art file's preview, a custom thumbnail, a file with no preview) no longer covers the bottom of the picture: the picture ends above it.
+
 ## 0.53.46 — Previews for art files (2026-11-04)
 
 - **Added:** `.kra`, `.ora`, `.psd`, `.psb`, `.procreate`, `.sketch`, `.fig` and `.clip` show the picture they keep: on their library card and details, in the viewer and on a canvas. A preview, as the file was last saved; the file is only read, and one with no picture keeps its tile. A newly imported one has the picture's shape on a canvas; one imported earlier keeps its 4:3 card, the picture cropped to fit.

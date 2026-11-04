@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.47: the viewer's note leaves the picture clear (2026-11-04)
+
+- **Implemented:** the picture's room ends above a note.
+- **Tested:** check in the art file test, on GitHub.
+- **Committed:** v0.53.47.
+
 ## v0.53.46: previews for art files (2026-11-04)
 
 - **Implemented:** `assets/art-preview.ts`: a ZIP entry reader with a limit, Photoshop thumbnail and merged pixels, a table-leaf reader for the SQLite in a `.clip`.
