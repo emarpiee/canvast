@@ -76,9 +76,12 @@ const files = made.map(([name, from], i) => {
   return zip;
 });
 await p.getByTestId("assets-import-input").setInputFiles(files);
-await p.getByTestId("assets-search").fill("kind:art");
+await p.getByTestId("assets-search").fill("study OR poster OR grade");
 await p.locator('[data-testid="asset-card"][title="planet_poster.kra"]').waitFor({ timeout: 60_000 });
-await p.locator('[data-testid="asset-card"][title="character_study.kra~"]').click();
+await p.waitForTimeout(1500);
+const backup = p.locator('[data-testid="asset-card"][title$=".kra~"]');
+console.log("listed:", await p.getByTestId("asset-card").evaluateAll((c) => c.map((e) => e.getAttribute("title")).join(", ")));
+await ((await backup.count()) ? backup.first() : p.locator('[data-testid="asset-card"][title="planet_poster.kra"]')).click();
 await p.mouse.move(700, 880);
 await p.waitForTimeout(1500);
 await p.screenshot({ path: `${out}/art-files.png` });
