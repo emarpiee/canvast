@@ -879,6 +879,10 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .set-row { display: grid; grid-template-columns: minmax(0, 1fr) 220px 100px 60px; align-items: center; gap: var(--sp-6); padding: var(--sp-5) 0; border-bottom: 1px solid var(--hud-border); }
 .set-row label { display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0; }
 .set-help { opacity: 0.65; font-size: var(--text-sm); }
+.set-text { min-width: 0; display: grid; gap: var(--sp-1); }
+.set-more { font-size: var(--text-sm); }
+.set-more summary { cursor: pointer; color: var(--hud-muted); width: fit-content; }
+.set-more p { margin: var(--sp-1) 0 0; opacity: 0.8; }
 .set-list { margin: 0; padding-left: var(--sp-6); display: grid; gap: var(--sp-2); font-size: var(--text-sm); }
 .set-control { display: flex; align-items: center; gap: var(--sp-4); min-width: 0; }
 .set-control input[type="range"] { flex: 1; min-width: 0; }

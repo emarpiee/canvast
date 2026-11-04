@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.34 — Settings say it in one line (2026-11-04)
+
+- **Changed:** every setting says what it is on one short line; the whole explanation is under its **More**, and search still finds it.
+- **Changed:** Settings > Notes is in cards: Editor, New notes, Cards and previews, Properties, File names. Saving to the library and Navigation gain cards too.
+
 ## 0.53.33 — Copy, for every kind of file (2026-11-04)
 
 - **Added:** Copy in the library: a plain text note gives its words, a rich text note markdown with its properties, several notes their words joined. A video or sound gives its library picture. Where only the name can go, or a picture stands for more (a GIF, an SVG), or only the first of several pictures fits, the message says so.

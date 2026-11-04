@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.34: settings say it in one line (2026-11-04)
+
+- **Implemented:** `Row.more` under `<details>`, help lines cut to one line, cards for Notes, Saving and Navigation.
+- **Tested:** typecheck and checks here; `settings.spec` on GitHub.
+- **Committed:** v0.53.34.
+
 ## v0.53.33: copy, for every kind of file (2026-11-04)
 
 - **Implemented:** `clipboardFor` (`assets/clipboard-kinds.ts`), `copyItemsToClipboard`, `copyItemsAsFiles` (`app/copy-items.ts`), `copyPlainText`, `readClipboardPictures`, `htmlMarkdown`, `canvast:copyFiles`, `setCopiedText`.

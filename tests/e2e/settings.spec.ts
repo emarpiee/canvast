@@ -2,6 +2,23 @@ import { APP_URL, expect, test } from "./harness";
 
 /** The Settings view (ADR 0048): tabs, rows that write the shared store, scope and reset, theme, and what is remembered. */
 
+test("every setting says what it is on one short line, the rest under its More; Notes is in cards, and search finds what is under More", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-settings").click();
+  const long = await p.locator(".set-row .set-help").evaluateAll((l) => l.map((h) => h.textContent ?? "").filter((t) => t.length > 130));
+  expect(long).toEqual([]);
+  await p.getByRole("tab", { name: "Notes", exact: true }).click();
+  const titles = await p.locator('[data-panel="notes"] .set-card > h3').allTextContents();
+  expect(titles).toEqual(["Editor", "New notes", "Cards and previews", "Properties", "File names"]);
+  const row = p.locator('[data-row="notes.renameOnSave"]');
+  await expect(row.locator(".set-more p")).toBeHidden();
+  await row.locator(".set-more summary").click();
+  await expect(row.locator(".set-more p")).toContainText("links to it in other notes follow");
+  await expect(row.locator('input[type="checkbox"]')).not.toBeChecked(); // (opening More is not a click on the setting)
+  await p.getByTestId("settings-search").fill("links to it in other notes");
+  await expect(row).toBeVisible();
+});
+
 test("settings view: tabs, a row reaches the tools, reset, theme and reload (ADR 0048)", async ({ app }) => {
   const p = app.page;
   const view = p.getByTestId("view-settings");
