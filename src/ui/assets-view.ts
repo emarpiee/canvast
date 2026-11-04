@@ -204,7 +204,7 @@ const sortOfCol = (id: ColumnId): { key: SortKey; desc: boolean } => (isPropColu
 
 
 /** Fields that take typed text: shortcuts keep out of them (a checkbox or a slider is not one). */
-const TYPING = 'input:not([type="checkbox"]):not([type="range"]), textarea, select';
+const TYPING = 'input:not([type="checkbox"]):not([type="range"]), textarea, select, [contenteditable="true"]';
 
 /** How many thumbnails a drag from the library shows, stacked. */
 const DRAG_STACK = 5;
@@ -4198,7 +4198,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     } else if (e.key === "F2" && !(e.target as HTMLElement).closest(TYPING) && (picked.size || selected)) {
       void renameAssetsDialog(picked.size ? filtered().filter((h) => picked.has(h)) : [selected!]);
       e.preventDefault();
-    } else if ((e.key === "o" || e.key === "O") && !(e.target as HTMLElement).closest(TYPING) && !e.ctrlKey && !e.metaKey && !e.altKey && !session.readOnly && (picked.size || selected)) {
+    } else if ((e.key === "o" || e.key === "O") && !(e.target as HTMLElement).closest(TYPING) && !e.ctrlKey && !e.metaKey && !e.altKey && !session.readOnly && viewer.hidden && (picked.size || selected)) {
       void organizeItems(picked.size ? filtered().filter((h) => picked.has(h)) : [selected!]);
       e.preventDefault();
     } else if ((e.key === "i" || e.key === "I") && !(e.target as HTMLElement).closest(TYPING) && !e.ctrlKey && !e.metaKey && !e.altKey) {

@@ -1259,7 +1259,7 @@ test("a file past what the page can hold (300 MiB): imported by the button, hidd
     const h = createHash("sha256");
     createReadStream(path).on("data", (c) => h.update(c)).on("end", () => done(h.digest("hex"))).on("error", fail);
   });
-  const source = hugeAt(`${ws}-huge_scan.tif`, 7);
+  const source = hugeAt(join(tempDir("canvast-src-"), "huge_scan.tif"), 7);
   const want = await shaOf(source);
   const size = statSync(source).size;
   let { app, page } = await launch(ws);

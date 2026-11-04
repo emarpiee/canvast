@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.56 — Library keys leave a note's words alone (2026-11-04)
+
+- **Fixed:** typing in the notes editor could reach the library's keys: an `o` opened Organize, an `i` showed or hid the details.
+
 ## 0.53.55 — No 256 MiB limit in the desktop app (2026-11-04)
 
 - **Added:** files past 256 MiB can be imported by the button or by dropping them: copied into `library/` a part at a time, and each comes in as a card. An import of content the library has adds nothing.
