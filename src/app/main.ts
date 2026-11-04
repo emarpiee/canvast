@@ -1953,18 +1953,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   markTab("canvas");
   markNav("canvas");
   const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings, libraryFonts);
-  // A font's card on a canvas: the viewer's sample sentence, on its ground; the chequered one is the theme's own, as a card has no see-through.
+  // A font's card on a canvas: the viewer's sample sentence, on its ground (a ground that follows the theme is drawn again with it).
   const fontCardsLook = (): void => {
-    const probe = document.createElement("i");
-    document.body.append(probe);
-    const colour = (token: string): string => {
-      probe.style.color = `var(${token})`;
-      return getComputedStyle(probe).color;
-    };
-    const ground = session.viewGround;
-    const [bg, fg] = ground === "gray" ? ["#808080", colour("--ink-on-light")] : ground === "white" ? ["#ffffff", colour("--ink-on-light")] : ground === "black" ? ["#000000", colour("--ink-on-dark")] : [colour("--paper"), colour("--hud-fg")];
-    probe.remove();
-    setFontCardLook({ sample: session.fontSample, bg: bg!, fg: fg! });
+    setFontCardLook({ sample: session.fontSample, ground: session.viewGround });
     for (const [h, n] of assetNames.map) if (isFontFile({ type: "", name: n })) assets.forget(h);
     tiles.clear();
     invalidate();

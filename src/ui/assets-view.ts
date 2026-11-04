@@ -1,3 +1,4 @@
+import { groundFill } from "../assets/card";
 import { sectionOrder, sortableSections } from "./sortable-sections";
 import { fileInLibrary } from "../app/library-filing";
 import { beginProgress } from "../app/progress";
@@ -1369,7 +1370,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return { nw, nh, fw: Math.min(boxW, (boxH * nw) / nh) };
   };
   /** A see-through picture lies on a chequered ground that fills the stage and stays where it is (it does not zoom or move with the picture); an SVG is also drawn here, again at every zoom, so it is crisp. */
-  const GROUND_NAME: Record<ViewGround, string> = { checker: "chequered", gray: "neutral grey", black: "black", white: "white" };
+  const GROUND_NAME: Record<ViewGround, string> = { checker: "chequered", gray: "neutral grey", black: "black", white: "white", auto: "the theme's colour" };
   /** The button that cycles the ground under see-through pictures says which one it is now and which comes next. */
   const labelGround = (): void => {
     const now = session.viewGround;
@@ -1378,7 +1379,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     b.title = `Background of see-through pictures: ${GROUND_NAME[now]} (click for ${GROUND_NAME[next]})`;
     b.setAttribute("aria-label", `Background of see-through pictures: ${GROUND_NAME[now]}. Next: ${GROUND_NAME[next]}`);
     b.dataset["ground"] = now;
-    viewer.dataset["ground"] = now;
+    root.dataset["ground"] = now; // (a font's samples in the viewer and the details lie on it too)
   };
   /** The button that goes through a font's sample sentences says which comes next. */
   const labelSample = (): void => {
@@ -1409,18 +1410,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const dh = z ? ((z.fw * z.nh) / z.nw) * zoom.s : 0;
     const x = base.left + base.width / 2 - sr.left + (vector ? zoom.x : 0) - dw / 2;
     const y = base.top + base.height / 2 - sr.top + (vector ? zoom.y : 0) - dh / 2;
-    const cs = getComputedStyle(viewer);
-    const cell = Math.max(2, Math.round(16 * dpr));
-    const tile = document.createElement("canvas");
-    tile.width = tile.height = cell * 2;
-    const t = tile.getContext("2d")!;
-    t.fillStyle = cs.getPropertyValue("--check-b").trim();
-    t.fillRect(0, 0, cell * 2, cell * 2);
-    t.fillStyle = cs.getPropertyValue("--check-a").trim();
-    t.fillRect(cell, 0, cell, cell);
-    t.fillRect(0, cell, cell, cell);
-    const tone = session.viewGround;
-    g.fillStyle = tone === "gray" ? "#808080" : tone === "black" ? "#000000" : tone === "white" ? "#ffffff" : (g.createPattern(tile, "repeat") ?? "transparent"); // (the whole stage, anchored to it: the picture slides over a ground that stays put)
+    g.fillStyle = groundFill(g, session.viewGround, Math.max(2, Math.round(16 * dpr)));
     g.fillRect(0, 0, w, h);
     if (vector) g.drawImage(slideImg, x * dpr, y * dpr, dw * dpr, dh * dpr);
   };
@@ -5264,6 +5254,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const view: AssetsView = {
     show() {
       visible = true;
+      labelGround();
       root.hidden = false;
       status.textContent = "";
       syncViewing();

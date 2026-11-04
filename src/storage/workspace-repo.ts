@@ -25,8 +25,8 @@ import type { StartupOutcome } from "./migrate-v1";
 export const SCHEMA_VERSION = 2;
 
 /** What a see-through picture lies on in the library viewer (kept with the workspace). */
-export type ViewGround = "checker" | "gray" | "black" | "white";
-export const VIEW_GROUNDS: readonly ViewGround[] = ["checker", "gray", "black", "white"];
+export type ViewGround = "checker" | "gray" | "black" | "white" | "auto";
+export const VIEW_GROUNDS: readonly ViewGround[] = ["checker", "gray", "black", "white", "auto"];
 
 export interface WorkspaceRecord {
   id: string;

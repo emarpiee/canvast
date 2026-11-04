@@ -306,10 +306,9 @@ test("a font file is imported from the options bar, a text is set in it, and it 
   await expect(sample).toContainText("Pack my box");
   await expect(p.locator(".viewer-ground")).toBeVisible();
   await p.locator(".viewer-ground").click();
-  await expect(p.getByTestId("slide-view")).toHaveAttribute("data-ground", "gray");
-  await p.locator(".viewer-ground").click();
-  await p.locator(".viewer-ground").click();
-  await p.locator(".viewer-ground").click();
+  await expect(p.locator("#assets-view")).toHaveAttribute("data-ground", "gray");
+  expect(await sample.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe("rgb(128, 128, 128)"); // (the details' sample too)
+  for (let i = 0; i < 4; i++) await p.locator(".viewer-ground").click();
   await p.getByTestId("viewer-sample").click();
   for (let i = 2; i < 8; i++) await p.getByTestId("viewer-sample").click();
   await expect(big.locator(".font-sample-line").first()).toHaveText("The quick brown fox jumps over the lazy dog");

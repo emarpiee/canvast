@@ -131,6 +131,9 @@
   --chevron-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --chevron-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='gray' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --check-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  --ground-gray: #808080; /* the fixed grounds of see-through pictures and fonts */
+  --ground-black: #000000;
+  --ground-white: #ffffff;
   --ink-on-light: oklch(0.15 0 0); /* words on a fixed grey or white, whatever the theme */
   --ink-on-dark: oklch(0.93 0 0);
   --icon-sm: 14px;
@@ -1418,6 +1421,15 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer.is-grey .viewer-stage > figure { filter: grayscale(1); }
 .viewer:is(.is-note, .is-font) .viewer-grey { display: none; }
 .viewer:not(.is-font) .viewer-sample { display: none; }
+/* What floats over a picture or a font stays seen on any ground: it never goes see-through under the pointer, and the background button shows which ground it is on. */
+:is(.vbtn.viewer-back, .vbtn.viewer-details, .vbtn.viewer-hide, .vbtn.viewer-ground, .vbtn.viewer-grey, .vbtn.viewer-sample):hover:not(:disabled) { color: var(--v-fg); background: color-mix(in oklch, var(--v-fg) 14%, var(--v-pill)); }
+.vbtn.viewer-ground { position: relative; }
+.vbtn.viewer-ground::after { content: ""; position: absolute; right: var(--sp-1); bottom: var(--sp-1); width: var(--sp-4); height: var(--sp-4); border: 1px solid var(--v-fg); border-radius: var(--r-xs); }
+.vbtn.viewer-ground[data-ground="checker"]::after { background: var(--check); }
+.vbtn.viewer-ground[data-ground="auto"]::after { background: linear-gradient(135deg, var(--ground-white) 50%, var(--ground-black) 50%); }
+.vbtn.viewer-ground[data-ground="gray"]::after { background: var(--ground-gray); }
+.vbtn.viewer-ground[data-ground="black"]::after { background: var(--ground-black); }
+.vbtn.viewer-ground[data-ground="white"]::after { background: var(--ground-white); }
 .viewer.no-bar .viewer-back, .viewer.no-bar .viewer-details, .viewer.no-bar .viewer-hide, .viewer.no-bar .viewer-ground, .viewer.no-bar .viewer-grey, .viewer.no-bar .viewer-sample { opacity: 0; transition: opacity var(--dur-base) var(--ease-out); }
 .viewer.no-bar.is-near-top .viewer-back, .viewer.no-bar.is-near-top .viewer-details, .viewer.no-bar.is-near-top .viewer-hide, .viewer.no-bar .viewer-hide:hover, .viewer.no-bar .viewer-hide:focus-visible, .viewer.no-bar.is-near-bottom .viewer-ground, .viewer.no-bar .viewer-ground:hover, .viewer.no-bar.is-near-bottom .viewer-grey, .viewer.no-bar .viewer-grey:hover, .viewer.no-bar .viewer-back:hover, .viewer.no-bar .viewer-details:hover, .viewer.no-bar .viewer-back:focus-visible, .viewer.no-bar .viewer-details:focus-visible { opacity: 1; }
 .vbtn { display: inline-flex; align-items: center; justify-content: center; gap: var(--s-4); min-width: var(--ctl); height: var(--ctl); padding: 0 var(--s-6); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
@@ -2465,8 +2477,14 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 /* A font's sample, in its own letters (the details: "Aa" and the sentence; the viewer: the sentence at several sizes, the letters and digits). */
 :root { --sample-aa: 56px; --sample-aa-lg: 120px; --sample-sm: 16px; --sample-md: 24px; --sample-lg: 36px; --sample-xl: 56px; }
 .font-sample { display: flex; flex-direction: column; justify-content: center; gap: var(--s-1); width: 100%; height: 100%; padding: var(--s-4); overflow: hidden; color: var(--file-fg); background: var(--file-bg); text-align: start; opacity: 0; transition: opacity var(--dur-fast); }
-/* (a font is seen on the theme, not on the fixed grey of a file's tile) */
-.font-sample { --file-bg: var(--paper); --file-fg: var(--hud-fg); --file-muted: var(--hud-muted); }
+/* A font's sample, in the details and the viewer, lies on the ground of see-through pictures (its button, kept with the workspace), with letters that can be read on it; in the viewer that ground is the stage's own. */
+.font-sample { --file-fg: var(--hud-fg); --file-muted: var(--hud-muted); }
+#assets-view[data-ground="checker"] .font-sample { background: var(--check); }
+#assets-view[data-ground="auto"] .font-sample { background: var(--paper); }
+#assets-view[data-ground="gray"] .font-sample { background: var(--ground-gray); --file-fg: var(--ink-on-light); --file-muted: var(--ink-on-light); }
+#assets-view[data-ground="white"] .font-sample { background: var(--ground-white); --file-fg: var(--ink-on-light); --file-muted: var(--ink-on-light); }
+#assets-view[data-ground="black"] .font-sample { background: var(--ground-black); --file-fg: var(--ink-on-dark); --file-muted: var(--ink-on-dark); }
+#assets-view .viewer-tile .font-sample { background: transparent; }
 .font-sample.is-ready, .font-sample.is-unreadable { opacity: 1; }
 .font-sample.is-unreadable { align-items: center; justify-content: center; color: var(--file-muted); font: var(--font-meta); }
 .font-sample p { margin: 0; overflow-wrap: anywhere; }
@@ -2474,12 +2492,8 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 .font-sample-line { font-size: var(--text-xl); line-height: 1.25; }
 .font-sample-chars { font-size: var(--text-md); line-height: 1.35; color: var(--file-muted); }
 .asset-preview .font-sample-chars { display: none; }
-.font-sample.is-large { justify-content: flex-start; gap: var(--s-8); max-width: 100%; padding: var(--under-viewer-buttons) var(--s-14) var(--s-14); overflow: auto; background: transparent; }
-/* A font in the viewer lies on the ground of see-through pictures (its button, kept with the workspace): letters that can be read on each. */
+.font-sample.is-large { justify-content: flex-start; gap: var(--s-8); max-width: 100%; padding: var(--under-viewer-buttons) var(--s-14) var(--s-14); overflow: auto; }
 .viewer-tile { position: relative; z-index: var(--z-item); }
-.viewer.is-font .font-sample { --file-fg: var(--v-fg); --file-muted: var(--v-muted); }
-.viewer.is-font[data-ground="gray"] .font-sample, .viewer.is-font[data-ground="white"] .font-sample { --file-fg: var(--ink-on-light); --file-muted: var(--ink-on-light); }
-.viewer.is-font[data-ground="black"] .font-sample { --file-fg: var(--ink-on-dark); --file-muted: var(--ink-on-dark); }
 .font-sample.is-large .font-sample-aa { font-size: var(--sample-aa-lg); }
 .font-sample.is-large .is-xl { font-size: var(--sample-xl); line-height: 1.1; }
 .font-sample.is-large .is-lg { font-size: var(--sample-lg); line-height: 1.15; }

@@ -1,3 +1,4 @@
+import type { ViewGround } from "../storage/workspace-repo";
 /**
  * The picture of a video this browser cannot decode (ADR 0045, ADR 0089): a grey card of the video's own shape with a play sign, its codec
  * and size, and the same general message as every file card. Not the name: renaming never makes it again.
@@ -128,3 +129,31 @@ export function fillTextCentred(g: CanvasRenderingContext2D, text: string, cx: n
   g.fillText(text, cx + (m.actualBoundingBoxLeft - m.actualBoundingBoxRight) / 2, cy + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2);
   g.restore();
 }
+
+/** A colour token of the stylesheet as a canvas can use it. */
+function cssColour(token: string): string {
+  const probe = document.createElement("i");
+  probe.style.color = `var(${token})`;
+  document.body.append(probe);
+  const colour = getComputedStyle(probe).color;
+  probe.remove();
+  return colour;
+}
+
+/** What fills the ground of see-through pictures and fonts: the chequer in squares of `cell`, the theme's own colour (auto) or a fixed one. */
+export function groundFill(g: CanvasRenderingContext2D, ground: ViewGround, cell: number): string | CanvasPattern {
+  if (ground === "auto") return cssColour("--paper");
+  if (ground !== "checker") return cssColour(`--ground-${ground}`);
+  const tile = document.createElement("canvas");
+  tile.width = tile.height = cell * 2;
+  const t = tile.getContext("2d")!;
+  t.fillStyle = cssColour("--check-b");
+  t.fillRect(0, 0, cell * 2, cell * 2);
+  t.fillStyle = cssColour("--check-a");
+  t.fillRect(cell, 0, cell, cell);
+  t.fillRect(0, cell, cell, cell);
+  return g.createPattern(tile, "repeat") ?? "transparent";
+}
+
+/** Letters that can be read on a ground. */
+export const inkOnGround = (ground: ViewGround): string => cssColour(ground === "gray" || ground === "white" ? "--ink-on-light" : ground === "black" ? "--ink-on-dark" : "--hud-fg");

@@ -1,7 +1,8 @@
 import { CARD_SCALE, noteCardSize, notePicture } from "../notes/note-preview";
 import { noteKindOf, tooBigForNote } from "../notes/note-file";
 import { extOf, isFontFile } from "./file-kind";
-import { FILE_CARD_H, FILE_CARD_W, cardContext, makeFileCard, fillTextCentred } from "./card";
+import { FILE_CARD_H, FILE_CARD_W, cardContext, makeFileCard, fillTextCentred, groundFill, inkOnGround } from "./card";
+import type { ViewGround } from "../storage/workspace-repo";
 
 /** Triangles as a flat list of x,y,z (nine numbers each). */
 export function parseModel(bytes: Uint8Array, ext: string): Float32Array | null {
@@ -125,8 +126,8 @@ export async function makeFileCardFrom(name: string, chip: string, bytes: Uint8A
   }
 }
 
-/** How a font's card looks: the sample sentence and the ground chosen in the viewer, in colours the canvas can draw. */
-let fontLook = { sample: "The quick brown fox jumps over the lazy dog", bg: "oklch(0.3 0 0)", fg: "oklch(0.93 0 0)" };
+/** How a font's card looks: the sample sentence and the ground chosen in the viewer. */
+let fontLook: { sample: string; ground: ViewGround } = { sample: "The quick brown fox jumps over the lazy dog", ground: "checker" };
 export const setFontCardLook = (look: typeof fontLook): void => void (fontLook = look);
 
 /** A sentence in lines that fit a width, at the largest size from `start` that takes at most `most` lines. */
@@ -153,9 +154,10 @@ async function fontCard(chip: string, bytes: Uint8Array): Promise<ImageBitmap | 
     c.width = FILE_CARD_W;
     c.height = FILE_CARD_H;
     const x = cardContext(c);
-    x.fillStyle = fontLook.bg;
+    const fg = inkOnGround(fontLook.ground);
+    x.fillStyle = groundFill(x, fontLook.ground, 16);
     x.fillRect(0, 0, c.width, c.height);
-    x.strokeStyle = fontLook.fg;
+    x.strokeStyle = fg;
     x.globalAlpha = 0.1;
     x.lineWidth = 2;
     x.strokeRect(1, 1, c.width - 2, c.height - 2);
@@ -167,7 +169,7 @@ async function fontCard(chip: string, bytes: Uint8Array): Promise<ImageBitmap | 
     const w = x.measureText("Aa").width || 100;
     const size = Math.min(c.height * 0.34, (100 * c.width * 0.6) / w);
     x.font = `${size}px "${face.family}"`;
-    x.fillStyle = fontLook.fg;
+    x.fillStyle = fg;
     fillTextCentred(x, "Aa", c.width / 2, c.height * 0.27);
     const { lines, size: small } = fitLines(x, fontLook.sample, face.family, c.height * 0.085, c.width * 0.86, 3);
     x.font = `${small}px "${face.family}"`;

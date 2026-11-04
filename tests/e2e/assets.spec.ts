@@ -1394,6 +1394,10 @@ test("a button at the bottom right of the viewer cycles the ground under see-thr
     await expect(btn).toHaveAttribute("title", new RegExp(`: ${name} \\(click for`));
   }
   await btn.click();
+  await expect(btn).toHaveAttribute("title", /the theme's colour \(click for chequered\)/);
+  const paper = await p.evaluate(() => { const i = document.createElement("i"); i.style.color = "var(--paper)"; document.body.append(i); const c = getComputedStyle(i).color; i.remove(); return c; });
+  expect(paper).toBeTruthy();
+  await btn.click();
   expect(await far(), "round to the chequered ground again").toEqual(chequer);
   await btn.click();
   await btn.click(); // black

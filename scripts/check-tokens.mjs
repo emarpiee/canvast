@@ -18,7 +18,7 @@ const SPACING = /^(row-gap|column-gap|gap|padding|margin)(-(top|right|bottom|lef
 const OFF_GRID = /--sp-\d/; // (the density's tokens, --s-*, not the fixed lengths)
 const RAW_OFFSET = /(?<![\w.,-])(4|6|8|10|12|16|20|24)px\b/;
 // Theme colours are oklch(): no hex, rgb() or hsl() in a value or a token, no mix in another space, no filter that changes a colour's contrast. A fixed colour that is meant to be fixed is listed here.
-const FIXED_COLOUR = new Set(["--canvas-ink"]); // (the same value as the default ink drawn on the canvas)
+const FIXED_COLOUR = new Set(["--canvas-ink", "--ground-gray", "--ground-black", "--ground-white"]); // (the same value as the default ink drawn on the canvas)
 const NOT_OKLCH = /#[0-9a-fA-F]{3,8}\b|\b(rgba?|hsla?|hwb)\(|color-mix\(in (?!oklch)|filter:\s*brightness/;
 
 const lineOf = (text, i) => text.slice(0, i).split("\n").length;
