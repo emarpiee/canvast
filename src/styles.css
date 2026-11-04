@@ -1880,11 +1880,11 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 @media (max-width: 640px) {
   :root { --row: calc(var(--ctl) + 2 * var(--pad) + 2px); }
   /* Row 1: the view tabs and the workspace menu share the width. */
-  #nav { right: var(--edge); }
+  #nav { right: calc(var(--edge) + var(--win-w, 0px) + var(--bar-h) + var(--near)); } /* (clear of the Settings button, and of the window's buttons) */
   #workspace { flex: 1; min-width: 0; }
   #workspace .nav { display: block; }
   .nav-pill { width: 100%; max-width: none; }
-  .nav-crumb { flex: 1; text-align: left; }
+  .nav-name-btn { flex: 1; justify-content: space-between; } /* (the ∞ stays its own size: the name takes the room) */
   .nav-menu { width: min(340px, calc(100vw - 2 * var(--edge))); }
   /* Row 2: the dock, spread across the width. */
   #toolbar > .dock { top: calc((var(--nav-bottom) + var(--near)) / var(--ui-scale, 1)); left: calc(var(--edge) / var(--ui-scale, 1)); right: calc(var(--edge) / var(--ui-scale, 1)); justify-content: space-between; overflow-x: auto; scrollbar-width: none; }
