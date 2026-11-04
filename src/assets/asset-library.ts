@@ -9,6 +9,7 @@ import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { GifFrames } from "./gif";
 import { probeMp4 } from "./mp4-probe";
 import { makeFileCardFrom } from "./adapters";
+import { artCardPicture, isArtFile } from "./art-preview";
 import { FILE_CARD_H, FILE_CARD_W, cardFromPicture, makeCard } from "./card";
 import { describeFile, isCard, isMediaType } from "./file-kind";
 
@@ -49,6 +50,9 @@ export interface AssetRecord {
 
 /** Largest accepted import, to fail fast instead of exhausting memory. */
 export const MAX_IMPORT_BYTES = 256 * 1024 * 1024;
+
+/** The long edge of an art file's card on a canvas. */
+const ART_CARD_EDGE = 800;
 
 export class ImportError extends Error {}
 
@@ -281,6 +285,17 @@ export class AssetLibrary {
     let carded = false;
     const asCard = async (): Promise<void> => {
       carded = true;
+      // An art file's card is the picture it keeps, in that picture's shape.
+      const art = isArtFile(file.name ?? "") ? await artCardPicture(file, file.name ?? "").catch(() => null) : null;
+      const shape = art ? await createImageBitmap(art).catch(() => null) : null;
+      if (art && shape) {
+        const k = ART_CARD_EDGE / Math.max(shape.width, shape.height);
+        size = { w: Math.max(1, Math.round(shape.width * k)), h: Math.max(1, Math.round(shape.height * k)) };
+        shape.close();
+        img = await cardFromPicture(art, size);
+        duration = undefined;
+        return;
+      }
       img = await makeFileCardFrom(file.name ?? "", describeFile(file.name ?? "", type).chip, new Uint8Array(bytes));
       size = { w: img.width, h: img.height }; // (400 × 300, but a note's page is as tall as the note)
       duration = undefined;
@@ -544,7 +559,8 @@ export class AssetLibrary {
   /** The picture of a file shown as a card, at `size` (its own, or a reduced copy's): a custom thumbnail, or the file's own card (a note's page). */
   private async cardOf(rec: AssetRecord, size = { w: rec.pixelW, h: rec.pixelH }, /** A note's page width (a smaller copy keeps the full card's). */ layoutW?: number): Promise<ImageBitmap> {
     // A custom thumbnail stands for a file card on a canvas too (never a hidden one: see `customPicture`).
-    const own = await this.customPicture?.(rec.hash).catch(() => null);
+    // (and an art file's card shows the picture the file keeps)
+    const own = (await this.customPicture?.(rec.hash).catch(() => null)) ?? (isArtFile(rec.name) ? await artCardPicture(rec.blob, rec.name) : null);
     if (own) {
       try {
         return await cardFromPicture(own, size);

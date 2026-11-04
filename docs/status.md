@@ -37,6 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.46: previews for art files (2026-11-04)
+
+- **Implemented:** `assets/art-preview.ts`: a ZIP entry reader with a limit, Photoshop thumbnail and merged pixels, a table-leaf reader for the SQLite in a `.clip`.
+- **Tested:** typecheck and unit tests, with files built in code; not yet on real files from those programs.
+- **Unverified:** real `.clip`, `.procreate`, `.fig` files: their inner layouts are written from what is known of them.
+- **Committed:** v0.53.46.
+
 ## v0.53.45: the Trash rebuilt into the library (2026-11-04)
 
 - **Implemented:** `.assets-body.is-trash`, as `.is-viewing`, `trash-view.ts` rewritten on the library's cards and details panel; the earlier `[hidden]` rule lost to the virtual grid's `#assets-view` rule.

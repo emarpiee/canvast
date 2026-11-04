@@ -5,7 +5,9 @@ import type { ThumbRecord } from "./asset-catalog";
 import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { probeMp4 } from "./mp4-probe";
 import { makeCard } from "./card";
-import { isCard, isFontFile } from "./file-kind";
+import { artCardPicture, isArtFile } from "./art-preview";
+import { makeFileCard } from "./card";
+import { chipOf, isCard, isFontFile } from "./file-kind";
 
 /** Longest edge of a stored thumbnail (CSS px: cards show them at up to 240). */
 export const THUMB_PX = 256;
@@ -21,6 +23,7 @@ export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
   // A file shown as a card has no stored picture: the library draws a fixed tile for it (ADR 0089), so there is nothing to make.
   if (isFontFile(rec)) return makeFontThumb(rec);
   if (noteKindOf(rec.name)) return makeNoteThumb(rec);
+  if (isArtFile(rec.name)) return makeArtThumb(rec);
   if (isCard(rec)) return null;
   try {
     const k = Math.min(1, THUMB_PX / Math.max(rec.pixelW, rec.pixelH));
@@ -52,6 +55,38 @@ export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
     return blob ? { hash: rec.hash, blob, w: c.width, h: c.height } : null;
   } catch {
     // A picture the browser cannot decode at a size (an SVG, say) has no thumbnail: the library shows the original itself, as it always did.
+    return null;
+  }
+}
+
+/** What stands for an art file that keeps no picture this can read: its card, not kept, so a later reader may still find one. */
+export async function artTile(rec: AssetRecord): Promise<Blob | null> {
+  const bmp = await makeFileCard(chipOf(rec.name, rec.type));
+  const c = document.createElement("canvas");
+  c.width = bmp.width;
+  c.height = bmp.height;
+  c.getContext("2d")!.drawImage(bmp, 0, 0);
+  bmp.close();
+  return new Promise((r) => c.toBlob(r, "image/webp", THUMB_QUALITY));
+}
+
+/** An art file's thumbnail, from the picture it keeps; null when it has none. */
+async function makeArtThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
+  const picture = await artCardPicture(rec.blob, rec.name);
+  if (!picture) return null;
+  try {
+    const bmp = await createImageBitmap(picture);
+    const s = Math.min(1, THUMB_PX / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(bmp.width * s));
+    c.height = Math.max(1, Math.round(bmp.height * s));
+    const ctx = c.getContext("2d")!;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close();
+    const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", THUMB_QUALITY));
+    return blob ? { hash: rec.hash, blob, w: c.width, h: c.height } : null;
+  } catch {
     return null;
   }
 }

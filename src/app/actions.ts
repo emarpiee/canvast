@@ -1,3 +1,4 @@
+import { isArtFile } from "../assets/art-preview";
 import { beginProgress } from "./progress";
 import { withStyleLinks } from "../doc/style-links";
 import { hasCorners, paramsOf, withRadius, withShapeParams, type ShapePatch } from "../doc/shape-params";
@@ -783,7 +784,7 @@ export async function importImages(
   const notice = duplicateNotice(seen, list.length);
   progress.done();
   // A file the app cannot show is kept as a card: say so once, and what to do.
-  const cards = records.filter((r) => isCard(r));
+  const cards = records.filter((r) => isCard(r) && !isArtFile(r.name)); // (an art file shows the picture it keeps)
   const cardNote = !cards.length ? "" : cards.length === 1 ? `“${cards[0]!.name || "File"}” has no preview here, so it shows as a card. Select it to download it.` : `${cards.length} files have no preview here and show as cards. Select one to download it.`;
   editor.message = notice ?? (cardNote || (list.length > 3 ? `Imported ${records.length} files.` : ""));
   editor.changed();

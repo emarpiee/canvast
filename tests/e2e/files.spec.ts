@@ -1,6 +1,7 @@
 import { exportWith, expect, test } from "./harness";
 import { readFileSync } from "node:fs";
-import { blockyFixture } from "./png";
+import { blockyFixture, makePng } from "./png";
+import { writeZip } from "../../src/storage/zip";
 
 /** Any file can be imported (ADR 0078): what the browser cannot show is kept as a card with its extension, name and kind. */
 
@@ -77,6 +78,32 @@ test("any file imports: a 3D model becomes a card on the canvas and in the libra
   await p.locator('[data-testid="asset-card"][aria-label^="robot.glb"]').click();
   await p.getByTestId("asset-preview").click();
   await expect(p.getByTestId("slide-view")).toBeVisible();
+  await expect(p.locator('[data-testid="slide-view"] figcaption')).toContainText("No preview for this kind of file");
+  await p.keyboard.press("Escape");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("an art file shows the picture it keeps, in that picture's shape, on the canvas, in the library and the viewer; one that keeps none stays a card", async ({ app }) => {
+  const p = app.page;
+  const picture = makePng(80, 40, () => [200, 40, 40, 255]);
+  const zip = await writeZip([{ name: "mergedimage.png", data: new Blob([new Uint8Array(picture)]) }] as never);
+  await p.getByTestId("import-input").setInputFiles({ name: "art.ora", mimeType: "", buffer: Buffer.from(await (zip as unknown as Blob).arrayBuffer()) });
+  await expect.poll(async () => (await objects(p)).length).toBe(1);
+  await expect(p.getByTestId("toast")).not.toContainText("no preview");
+  await p.getByTestId("import-input").setInputFiles({ name: "fake.kra", mimeType: "", buffer: Buffer.from("no zip in here") });
+  await expect.poll(async () => (await objects(p)).length).toBe(2);
+  await p.getByTestId("view-assets").click();
+  const thumb = (name: string) => p.locator(`[data-testid="asset-card"][aria-label^="${name}"] .asset-thumb img`);
+  const shape = (name: string) => thumb(name).evaluate((i: HTMLImageElement) => [i.naturalWidth, i.naturalHeight]);
+  await expect.poll(() => shape("art.ora")).toEqual([80, 40]);
+  await expect.poll(async () => (await shape("fake.kra"))[0]).toBeGreaterThan(0);
+  await p.locator('[data-testid="asset-card"][aria-label^="art.ora"]').click();
+  await p.getByTestId("asset-preview").click();
+  await expect(p.locator('[data-testid="slide-view"] figcaption')).toContainText("A preview");
+  await expect.poll(() => p.getByTestId("slide-view").locator("figure img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(80);
+  await p.keyboard.press("Escape");
+  await p.locator('[data-testid="asset-card"][aria-label^="fake.kra"]').click();
+  await p.getByTestId("asset-preview").click();
   await expect(p.locator('[data-testid="slide-view"] figcaption')).toContainText("No preview for this kind of file");
   await p.keyboard.press("Escape");
   expect(app.consoleErrors).toEqual([]);

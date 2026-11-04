@@ -17,6 +17,7 @@ import { mountSuggest } from "./search-suggest";
 import type { SuggestSources } from "../search/suggest";
 import { itemsIn, justifiedLayout, listLayout, nearestInRow, rowOf, squaresLayout, type GridLayout } from "./library-layout";
 import { newNoteName, storeFrame } from "../app/frames";
+import { artFullPicture, isArtFile } from "../assets/art-preview";
 import { chipOf, describeFile, extOf, hasThumb, isCard, isFontFile } from "../assets/file-kind";
 import { FILE_CARD_NOTE } from "../assets/card";
 import { fontSampleHtml, showFont } from "./font-specimen";
@@ -34,7 +35,7 @@ import { duplicateNotice } from "../assets/asset-library";
 import type { AssetField, AssetFolder, CatalogEntry, CatalogListing } from "../assets/asset-catalog";
 import type { LibraryPages } from "../storage/store";
 import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT, folderClash, folderPath, folderSubtree, hiddenModeFolders, meta, usageOf, visibleFolders } from "../assets/asset-catalog";
-import { THUMB_PX, makeThumb, shrinkPicture } from "../assets/thumb";
+import { artTile, THUMB_PX, makeThumb, shrinkPicture } from "../assets/thumb";
 import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
 import { clearRect, MENU_GAP, openMoreMenu } from "./more-menu";
@@ -823,7 +824,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           if (!noteKindOf(rec.name)) void session.catalog?.putThumb(made).catch(() => undefined);
           return URL.createObjectURL(made.blob);
         }
-        return URL.createObjectURL(rec.blob);
+        const tile = isArtFile(rec.name) ? await artTile(rec) : null;
+        return URL.createObjectURL(tile ?? rec.blob);
       } finally {
         making--;
         pump();
@@ -1525,6 +1527,22 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       slideImg.hidden = false;
       slideImg.src = await thumbFor(hash).catch(() => "");
       slideCaption.textContent = `${label}. No preview for this kind of file: this is its custom thumbnail.`;
+      slideCaption.classList.add("is-note");
+      armShow();
+      return;
+    }
+    const art = isCard(rec) && isArtFile(rec.name) ? await artFullPicture(rec.blob, rec.name).catch(() => null) : null;
+    if (token !== slideToken) return;
+    if (art) {
+      // An art file: the picture it keeps, and what it is. Its layers stay its program's; the size in its record is its card's, so neither limits nor names the picture.
+      slideTile.hidden = true;
+      slideImg.hidden = false;
+      slideImg.style.maxWidth = "";
+      slideImg.style.maxHeight = "";
+      slideImg.className = "";
+      slideUrl = URL.createObjectURL(art);
+      slideImg.src = slideUrl;
+      slideCaption.textContent = `${e.name || "Untitled"}, ${fmtBytes(e.size)}. A preview: the picture the file keeps, as it was last saved.`;
       slideCaption.classList.add("is-note");
       armShow();
       return;
@@ -2551,7 +2569,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     keepDetails();
     // (in the order they were put in: `sortableSections`)
     const detail: Record<(typeof DETAIL_SECTIONS)[number], () => string> = {
-      file: () => `${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays ${noteKindOf(e.name) === "rich" ? "a rich text note (HTML) that other apps open too" : "plain text other apps read"}. Tag it <em>template</em> to offer it in Insert ▸ Template of every note.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>No preview for this file</h3><p class="asset-note">${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as a card. ${esc(d.todo)}</p></section>`; })() : ""}`,
+      file: () => `${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays ${noteKindOf(e.name) === "rich" ? "a rich text note (HTML) that other apps open too" : "plain text other apps read"}. Tag it <em>template</em> to offer it in Insert ▸ Template of every note.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>${isArtFile(e.name) ? "An art file" : "No preview for this file"}</h3><p class="asset-note">${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as ${isArtFile(e.name) ? "the picture it keeps, when it keeps one" : "a card"}. ${esc(d.todo)}</p></section>`; })() : ""}`,
       organize: () => (e ? organizeHtml(e) : ""),
       notes: () => (e ? notesHtml(e) : ""),
       links: () => `<section class="asset-sec" data-testid="asset-backlinks" hidden><h3>Linked from</h3><ul class="asset-places"></ul></section>`,
