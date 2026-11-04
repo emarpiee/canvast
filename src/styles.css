@@ -1047,7 +1047,7 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 :root { --edge: 12px; --ctl: 36px; --pad: 4px; --gap: 2px; --near: 8px; --field-h: var(--sp-11); --menu-h: 34px; --list-h: var(--sp-12); } /* (--field-h: the height of an input or select in a bar; --menu-h: a row of a menu) */
 /* The thickness every floating bar has (the Properties bar, the Actions bar, the dock, the rail, the view controls, the view tabs): a control, the padding on both sides and the border. */
 :root { --bar-h: calc(var(--ctl) + 2 * var(--pad) + 2px); }
-.rail, .dock, .toolbar, .view-switch, .hud-controls, .ctx-bar { padding: var(--pad); gap: var(--gap); border-radius: var(--r-lg); border: 1px solid var(--hud-border); background: var(--hud-bg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); }
+.rail, .dock, .toolbar, .view-switch, .hud-controls, .ctx-bar, .win-controls { padding: var(--pad); gap: var(--gap); border-radius: var(--r-lg); border: 1px solid var(--hud-border); background: var(--hud-bg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); }
 .rail button, .dock button, .toolbar button, .view-switch button, .hud-controls button, .ctx-bar button, .tb-options-row button { min-width: var(--ctl); height: var(--ctl); border-radius: var(--ctl-r, var(--r-md)); }
 .rail button, .ctx-bar button { width: var(--ctl); padding: 0; }
 .rail button svg, .dock button svg, .toolbar button svg, .ctx-bar button svg, .hud-controls button svg { width: 18px; height: 18px; }
@@ -1065,10 +1065,10 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .view-settings button:hover { background: var(--hud-hover); }
 .view-settings button[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
 /* The window with no frame (src/ui/window-frame.ts): the buttons in the corner, what moves the window, and room kept beside them. */
-:root[data-frame="off"] { --win-w: calc(3 * var(--bar-h) + var(--near)); }
+:root[data-frame="off"] { --win-w: calc(3 * var(--ctl) + 2 * var(--gap) + 2 * var(--pad) + 2px + var(--near)); }
 .win-strip { position: fixed; z-index: var(--z-edge); top: 0; left: 0; right: 0; height: var(--edge); -webkit-app-region: drag; }
 .win-controls { position: fixed; z-index: var(--z-pop); top: var(--edge); right: var(--edge); display: flex; -webkit-app-region: no-drag; }
-.win-controls button { display: inline-flex; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); padding: 0; color: inherit; background: var(--hud-bg); border: 0; border-radius: var(--r-md); cursor: pointer; }
+.win-controls button { display: inline-flex; align-items: center; justify-content: center; width: var(--ctl); height: var(--ctl); padding: 0; color: inherit; background: transparent; border: 0; border-radius: var(--ctl-r, var(--r-md)); cursor: pointer; }
 .win-controls button:hover { background: var(--hud-hover); }
 .win-controls button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: -2px; }
 .win-controls svg { width: var(--icon-md); height: var(--icon-md); }
