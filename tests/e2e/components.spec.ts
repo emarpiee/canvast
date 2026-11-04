@@ -295,3 +295,18 @@ test("a focus ring is the accent, also on what has no look of its own", async ({
   expect(ring.style).toBe("solid");
   expect(ring.colour).toBe(ring.accent);
 });
+
+test("a list column made wider: the rows hold every column, with no empty room after them", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "b.png", mimeType: "image/png", buffer: blockyFixture() });
+  await p.locator('[data-testid="asset-card"]').first().waitFor();
+  await p.locator('[data-layout="list"]').click();
+  const grip = p.locator(".assets-list-head [data-resize]").last();
+  const at = (await grip.boundingBox())!;
+  await p.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(at.x + 500, at.y + at.height / 2, { steps: 4 });
+  await p.mouse.up();
+  await expect.poll(() => p.locator(".assets-scroll").evaluate((s) => s.scrollWidth - s.querySelector<HTMLElement>(".assets-grid")!.offsetWidth - s.querySelector<HTMLElement>(".assets-grid")!.offsetLeft)).toBeLessThanOrEqual(1);
+});

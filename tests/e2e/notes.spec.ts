@@ -1159,16 +1159,17 @@ test("a note's Links card lists what it links to, pictures too, and links that f
 test("a picture dragged to another place in a note is one step of undo", async ({ app }) => {
   const p = app.page;
   const NOTE = "# Move\n\nFirst words.\n\n![cat](cat.png)\n\nLast words.\n";
+  const PIC = makePng(240, 160, () => [200, 120, 40, 255]);
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles([
-    { name: "cat.png", mimeType: "image/png", buffer: CAT },
+    { name: "cat.png", mimeType: "image/png", buffer: PIC },
     { name: "Move.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) },
   ]);
   await card(p, hashOf(NOTE)).dblclick();
   await expect(page(p).locator("h1")).toHaveText("Move");
   const order = () => page(p).evaluate((e) => [...e.children].map((c) => (c.querySelector("img") ? "img" : (c.textContent ?? "").trim())));
   const before = await order();
-  await page(p).locator("img").click();
+  await page(p).locator("figure").click();
   await p.locator(".se-drag-handle").filter({ visible: true }).first().dragTo(page(p).locator("h1"));
   await expect.poll(order).not.toEqual(before);
   await p.keyboard.press("Control+z");

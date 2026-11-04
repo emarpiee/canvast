@@ -572,7 +572,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // (a column resized by its header's edge keeps that width; the others share the room as usual)
     body.style.setProperty("--cols", ["var(--list-thumb-w, 56px)", ...shown.map((c) => (ui.colW[c] ? `${ui.colW[c]}px` : trackOf(colOf(c))))].join(" "));
     // The list never squeezes a column below its minimum: when the window is narrower it scrolls sideways instead.
-    body.style.setProperty("--list-min", `${56 + shown.reduce((n, c) => n + colOf(c).min, 0) + 12 * shown.length + 48}px`);
+    // (every track as it is drawn, with the row's gaps and paddings: anything less and the last column is cut with empty room after the row)
+    body.style.setProperty("--list-min", `calc(var(--list-thumb-w, 56px) + ${shown.reduce((n, c) => n + (ui.colW[c] ?? colOf(c).min), 0)}px + ${shown.length} * var(--s-6) + var(--s-13) + var(--s-4))`);
     if (ui.sheetH) body.style.setProperty("--sheet-h", `${ui.sheetH}px`);
     else body.style.removeProperty("--sheet-h");
     for (const [cls, prop, w] of [["has-side-w", "--side-w", ui.sideW], ["has-insp-w", "--insp-w", ui.inspW]] as const) {
@@ -5107,6 +5108,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       grip.removeEventListener("pointercancel", up);
       resizedAt = performance.now();
       applyUi();
+      onLayoutChange(); // (the rows' width comes from the grid's, which the column just changed; the window did not resize)
       saveUi();
     };
     grip.addEventListener("pointermove", move);
