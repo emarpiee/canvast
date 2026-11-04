@@ -15,7 +15,7 @@ The README is the one place for documentation, in two parts: **For users** (feat
 | Part | Who it is for | One sentence |
 | Section (`##`) | A short intro, then links or a table of its sub-sections | About 3 lines before the first sub-section |
 | Feature (`###`) | One sentence, its screenshot if it has one, then a table or short bullets | About one screen, before any `<details>` |
-| Detail (`<details>`) | Edge cases, long explanations, rare options. Its title: `📖 <b>More about folders and tags:</b> Organize, Pinned folders…`, bold, naming what is inside | Never a warning about data loss, passwords or encryption |
+| Detail (`####`, *More about …*) | Edge cases, long explanations, rare options, shown in full under its own heading | No folded text: `<details>` goes unnoticed |
 
 | Format | Use it for | Rule |
 | --- | --- | --- |
@@ -25,8 +25,8 @@ The README is the one place for documentation, in two parts: **For users** (feat
 | Paragraph | How or why | At most 3 lines |
 | Screenshot | A big feature | One each, after its first sentence, with `alt` text saying what it shows |
 
-- A big feature gets its own sub-section, not a bullet. Key terms also appear outside `<details>`, so a page search finds them.
-- **Limitations follows these rules too:** one section, in separate tables, one short sentence a row, its long explanations in `<details>`. Every limit stays in it, and limits about data loss, passwords or encryption stay visible.
+- A big feature gets its own sub-section, not a bullet.
+- **Limitations follows these rules too:** one section, in separate tables, one short sentence a row, its long explanations under a heading after the table. Every limit stays in it, and those about data loss, passwords or encryption are marked ⚠️.
 - When rewriting, compare before and after so that no fact or limit is lost, and check the links.
 
 ## Testing
