@@ -3037,11 +3037,11 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
 .style-pattern svg { display: block; width: 100%; height: auto; }
 
 .asset-sec .asset-sub { margin-top: var(--s-4); padding-top: var(--s-6); border-top: 1px solid var(--hud-border); }
-/* The file's line and its details are one card: the line, led by the info icon, opens them. */
+/* The file's line and its details are one card: the line, with the info icon at its right end, opens them. */
 .asset-facts.asset-more[data-metadata] { display: block; margin: 0; }
 .asset-more[data-metadata] summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-4); min-height: 0; list-style: none; cursor: pointer; }
 .asset-more[data-metadata] summary::-webkit-details-marker { display: none; }
-.asset-more[data-metadata] summary > svg { flex: none; width: var(--icon-md); height: var(--icon-md); }
+.asset-more[data-metadata] summary > svg { flex: none; order: 1; margin-left: auto; width: var(--icon-md); height: var(--icon-md); }
 .asset-more[data-metadata] summary:hover > svg, .asset-more[data-metadata][open] summary > svg { color: var(--hud-accent-text); }
 .asset-more[data-metadata] h4 { margin-top: var(--s-6); }
 .assets-import { flex: none; }
