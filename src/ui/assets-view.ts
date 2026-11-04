@@ -41,7 +41,8 @@ import { clearRect, MENU_GAP, openMoreMenu } from "./more-menu";
 import type { MenuItem } from "./more-menu";
 import { bindContextMenu, grouped as groupedMenu } from "./context-menu";
 import { cleanFileName, splitName } from "../doc/rename-rules";
-import { asPng, writeSystemClipboard } from "../app/system-clipboard";
+import { copyItemsAsFiles, copyItemsToClipboard, type CopyDeps } from "../app/copy-items";
+import { readClipboardPictures } from "../app/system-clipboard";
 import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
 import { runExport, runExportFiles, runExportFolder } from "./archive-ui";
@@ -635,11 +636,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     } else if (how === "paste") {
       let picture: Blob | null = null;
       try {
-        for (const item of await navigator.clipboard.read()) {
-          const type = item.types.find((t) => t.startsWith("image/"));
-          if (type) (picture = await item.getType(type));
-          if (picture) break;
-        }
+        picture = (await readClipboardPictures())[0]?.blob ?? null;
       } catch {
         picture = null;
       }
@@ -708,7 +705,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   /** Whether opening a hidden item in the system's app was confirmed this session (a readable copy is written for it). */
   let openCopyAsked = false;
-  let hiddenCopyAsked = false;
   /** Hidden mode (the word that opens the hidden items, then their password): the same view, listing the hidden items only. */
   let hiddenMode = false;
   /** The view as it was before hidden mode, put back when it ends. */
@@ -4084,46 +4080,30 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // clipboard, named by the text beside it when that is a file name, else "image".
   const MIME_EXT: Record<string, string> = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp", "image/gif": ".gif", "image/svg+xml": ".svg", "image/bmp": ".bmp", "image/avif": ".avif" };
   /** Copy the first picture alone, or the names as text (what is not a picture goes as its name). */
-  const copyItems = async (hashes: readonly string[], what: "picture" | "name" = "picture"): Promise<void> => {
-    await ensure(hashes);
-    const ents = hashes.flatMap((h) => (entryOf(h)?.present ? [entryOf(h)!] : []));
-    if (!ents.length) return;
-    // (the system's clipboard is outside the app: clipboard managers keep what they see. Asked once, as for opening a hidden item in another app.)
-    if (!hiddenCopyAsked && ents.some((e) => meta(e).hidden)) {
-      if (!(await confirmDialog({ title: "Copy a hidden item", lines: ["It goes on the system's clipboard, readable, where other programs and clipboard managers can see and keep it."], confirmLabel: "Copy it", danger: false }))) return;
-      hiddenCopyAsked = true;
-    }
-    // One note: the note itself, as its file with its properties, to paste into a note elsewhere.
-    const note = what === "picture" && ents.length === 1 && noteKindOf(ents[0]!.name) === "md" ? ents[0]! : null;
-    if (note) {
-      const m = meta(note);
-      const file = await (await assets.record(note.hash).catch(() => undefined))?.blob.text();
-      if (file !== undefined) {
-        const done = await writeSystemClipboard({ text: wholeMarkdown("md", file, splitFrontmatter(file).body, { tags: m.tags, note: m.note, fields: m.fields }, []) });
-        session.editor.message = done ? `Copied the note “${note.name}”, with its properties.` : "Could not copy to the clipboard.";
-        session.editor.changed();
-        return;
-      }
-    }
-    const first = what === "picture" ? ents.find((e) => e.type.startsWith("image/")) : undefined;
-    const names = ents.map((e) => e.name || "image").join("\n");
-    const rec = first ? await assets.record(first.hash).catch(() => undefined) : undefined;
-    const done = await writeSystemClipboard({ ...(rec ? { image: asPng(rec.blob) } : {}), text: names });
-    session.editor.message =
-      done === "image" ? `Copied “${first!.name || "image"}”.` : done === "text" ? (ents.length === 1 ? `Copied the name “${ents[0]!.name || "image"}”.` : `Copied ${ents.length} names.`) : "Could not copy to the clipboard.";
-    session.editor.changed();
+  const copyDeps: CopyDeps = {
+    file: async (h) => (await assets.record(h).catch(() => undefined))?.blob,
+    thumb: async (h) => (await session.catalog?.thumb(h).catch(() => undefined))?.blob,
+    fileOf: (h) => session.storage?.originals.fileOf(h) ?? Promise.resolve(null),
+    say: (m) => {
+      session.editor.message = m;
+      session.editor.changed();
+    },
   };
+  const entriesOf = async (hashes: readonly string[]): Promise<CatalogEntry[]> => {
+    await ensure(hashes);
+    return hashes.flatMap((h) => (entryOf(h)?.present ? [entryOf(h)!] : []));
+  };
+  const copyItems = async (hashes: readonly string[], what: "picture" | "name" = "picture"): Promise<void> => void (await copyItemsToClipboard(copyDeps, await entriesOf(hashes), what));
   const pasteFromClipboard = async (): Promise<void> => {
     const say = (m: string): void => { session.editor.message = m; session.editor.changed(); };
     try {
       const files: File[] = [];
-      for (const it of await navigator.clipboard.read()) {
-        const type = it.types.find((t) => t.startsWith("image/"));
-        if (!type) continue;
-        const text = it.types.includes("text/plain") ? (await (await it.getType("text/plain")).text()).split(/\r?\n/)[0]!.trim() : "";
+      for (const it of await readClipboardPictures()) {
+        const type = it.type;
+        const text = it.text.split(/\r?\n/)[0]!.trim();
         const named = text.length > 0 && text.length <= 120 ? cleanFileName(text) : "";
         const name = named ? (splitName(named).ext ? named : named + (MIME_EXT[type] ?? "")) : `image${MIME_EXT[type] ?? ""}`;
-        files.push(new File([await it.getType(type)], name, { type }));
+        files.push(new File([it.blob], name, { type }));
       }
       if (!files.length) return say("No picture on the clipboard.");
       await view.importFiles(files);
@@ -4139,24 +4119,22 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return viewer.hidden && picked.size ? filtered().filter((h) => picked.has(h)) : selected ? [selected] : [];
   };
   // (the key itself as well: a page with nothing selected does not always get a copy event)
+  const copyShortcut = (e: Event): void => {
+    const hashes = copyTargets(e.target);
+    if (!hashes.length) return;
+    e.preventDefault();
+    void copyItems(hashes);
+  };
   window.addEventListener("keydown", (e) => {
-    if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || (e.key !== "c" && e.key !== "C")) return;
-    const hashes = copyTargets(e.target);
-    if (!hashes.length) return;
-    e.preventDefault();
-    void copyItems(hashes);
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === "c" || e.key === "C")) copyShortcut(e);
   });
-  document.addEventListener("copy", (e) => {
-    const hashes = copyTargets(e.target);
-    if (!hashes.length) return;
-    e.preventDefault();
-    void copyItems(hashes);
-  });
+  document.addEventListener("copy", copyShortcut);
   const clipboardGroup = (hashes: readonly string[]): MenuItem[] => [
     ...(hashes.length
       ? [
           { id: "copy", label: "Copy", icon: ICONS.clipboardCopy, run: () => void copyItems(hashes) },
           { id: "copy-name", label: hashes.length > 1 ? "Copy names" : "Copy file name", icon: ICONS.fileText, run: () => void copyItems(hashes, "name") },
+          ...(desktopBridge() ? [{ id: "copy-file", label: hashes.length > 1 ? "Copy files" : "Copy file", hint: "The real file, to paste in a file manager", icon: ICONS.files, run: () => void entriesOf(hashes).then((ents) => copyItemsAsFiles(copyDeps, ents)) }] : []),
         ]
       : []),
     { id: "paste", label: "Paste", icon: ICONS.paste, run: () => void pasteFromClipboard() },

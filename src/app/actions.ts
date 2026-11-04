@@ -246,6 +246,17 @@ export function copySelection(doc: DocumentStore, editor: EditorState, view: Vie
 /** The text copySelection put on the system clipboard (what a paste must find there to know the copy is still ours). */
 export const copiedText = (): string | null => inMemory?.text ?? null;
 
+/** What a copy put on the system clipboard turned out to be (a note's words, read after the copy event): a paste here still knows its objects by it. */
+export function setCopiedText(text: string): void {
+  if (!inMemory) return;
+  inMemory = { ...inMemory, text };
+  try {
+    localStorage.setItem(CLIP_KEY, JSON.stringify(inMemory));
+  } catch {
+    // too large or storage unavailable: this tab still has it
+  }
+}
+
 /** Copy the selection and delete it, as one undo step for the delete. */
 export function cutSelection(doc: DocumentStore, editor: EditorState, view: ViewState, e?: ClipboardEvent, plain?: string): boolean {
   if (editor.blockEdit() || !copySelection(doc, editor, view, e, plain)) return false;
@@ -267,7 +278,8 @@ function readClipboard(systemText: string | null): ClipboardPayload | null {
   }
   if (!own) return null;
   // Something else was copied since (outside canvast, or another tab's text): that is not ours to paste.
-  return systemText !== null && systemText !== "" && systemText !== own.text ? null : own.payload;
+  const lines = (s: string): string => s.replace(/\r\n?/g, "\n"); // (a system may write line ends its own way)
+  return systemText !== null && systemText !== "" && lines(systemText) !== lines(own.text) ? null : own.payload;
 }
 
 /** Whether canvast has objects to paste for this paste event's system clipboard text. */

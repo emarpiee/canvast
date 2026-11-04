@@ -219,6 +219,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `scaling` | Pen size follows zoom |
 | `search` | Search the canvas |
 | `search-check` | A saved search in the library's sidebar |
+| `files` | Copy file: an item's real file on the clipboard |
 | `letter-text` | A property's type: Text |
 | `list` | A property's type: List |
 | `binary` | A property's type: Number |

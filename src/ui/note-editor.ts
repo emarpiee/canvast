@@ -1,6 +1,7 @@
 import { scrubNumbers } from "../colour-picker/scrub";
 import suneditor, { helper } from "suneditor";
-import { markdownHtml, pastedHtml, pastedMarkdown } from "../notes/note-markdown";
+import { htmlMarkdown, markdownHtml, pastedHtml, pastedMarkdown } from "../notes/note-markdown";
+import { copyPlainText } from "../app/system-clipboard";
 import { align, anchor, audio, audioGallery, autocomplete, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
 import type { SunEditor } from "suneditor/types";
 import { FENCE_TICK, WIKI, encodeLinkPart, keepSpelling, libraryLink, linkTarget, linksToWiki, obsidianMarkdown, richNoteBody, richNoteFile, textHtml, wikiToLinks } from "../notes/note-file";
@@ -688,20 +689,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     for (const [url, link] of links) out = out.split(url).join(link);
     return out;
   };
-  // (as Obsidian writes it: footnotes, embeds and table alignment kept, see obsidianMarkdown)
-  const toMarkdown = (h: string): string => {
-    const t = document.createElement("template");
-    t.innerHTML = h;
-    // (a code block holding a code fence: its backticks are out of the writer's sight, and its own fence made longer after, see obsidianMarkdown)
-    // (and its lines, which the writer reads from newlines, are `<br>` in the editor)
-    for (const c of t.content.querySelectorAll("pre")) {
-      c.innerHTML = c.innerHTML.replace(/<br\s*\/?>/g, "\n");
-      if (/(?:^|>|\n)`{3,}/.test(c.innerHTML)) c.innerHTML = c.innerHTML.replace(/`/g, FENCE_TICK);
-    }
-    h = t.innerHTML;
-    const aligns = [...t.content.querySelectorAll("table")].map((tb) => [...(tb.querySelector("tr")?.children ?? [])].map((c) => ((c as HTMLElement).style.textAlign || null) as "left" | "center" | "right" | null));
-    return obsidianMarkdown(helper.markdown.jsonToMarkdown(helper.converter.htmlToJson(h)), aligns);
-  };
+  const toMarkdown = htmlMarkdown;
   const mdOf = (h: string): string => linksToWiki(toMarkdown(h)).replace(/[\u200B\uFEFF]/g, "");
   // Two notes are compared as a hidden editor of the same kind holds them (it writes pictures, tables and lists its own way).
   let twin: ReturnType<typeof suneditor.create> | null = null;
@@ -773,7 +761,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     if (whole === null) return;
     e.preventDefault();
     e.stopPropagation();
-    void navigator.clipboard?.writeText(whole);
+    void copyPlainText(whole);
   }, true);
   const self: NoteEditor = {
     // (edited since it was saved: a change the editor reports late, as its history taking the last keys, is no edit when the note is as saved)

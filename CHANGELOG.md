@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.53.33 — Copy, for every kind of file (2026-11-04)
+
+- **Added:** Copy in the library: a plain text note gives its words, a rich text note markdown with its properties, several notes their words joined. A video or sound gives its library picture. Where only the name can go, or a picture stands for more (a GIF, an SVG), or only the first of several pictures fits, the message says so.
+- **Added:** **Copy file** (desktop app; the library's menu and a right click on a canvas): the real files, of any kind, to paste in a file manager. A hidden item goes as a readable temporary copy, asked first, deleted on lock and on closing.
+- **Changed:** Ctrl+C on one note card on a canvas gives the note's words with its properties; pasted back here it is still the card.
+- **Fixed:** Copy in a canvas's right-click menu now reaches the system clipboard, as Ctrl+C does.
+- **Fixed:** an SVG with no size of its own is copied at a size that can be seen, not one pixel.
+- **Changed:** text on the clipboard, reading pictures from it and what each kind of file becomes are each written once.
+
 ## 0.53.32 — Hidden items stay out of suggestions (2026-11-04)
 
 - **Fixed:** outside hidden mode, the names and values of hidden items' properties are no longer offered in the suggestions, the list columns or the Sort menu.

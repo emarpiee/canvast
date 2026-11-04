@@ -1,3 +1,4 @@
+import { copyPlainText } from "../app/system-clipboard";
 import * as D from "../core/dyadic";
 import { syncScroll } from "./bar";
 import { newInk } from "../render/ink";
@@ -49,18 +50,7 @@ export function lastCopiedText(): string {
 
 export async function copyText(s: string): Promise<void> {
   lastCopied = s;
-  try {
-    await navigator.clipboard.writeText(s);
-  } catch {
-    const t = document.createElement("textarea");
-    t.value = s;
-    t.style.position = "fixed";
-    t.style.opacity = "0";
-    document.body.append(t);
-    t.select();
-    document.execCommand("copy");
-    t.remove();
-  }
+  await copyPlainText(s);
 }
 
 const FORMATS: Array<{ cmd: string; icon: string; label: string }> = [

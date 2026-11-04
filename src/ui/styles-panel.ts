@@ -1,3 +1,4 @@
+import { copyPlainText } from "../app/system-clipboard";
 import { cleanName, freeNameIn } from "../doc/file-names";
 import type { Adjust } from "../doc/adjust";
 import { plural } from "../doc/plural";
@@ -296,7 +297,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   });
 
   // ---- Menus ------------------------------------------------------------------------------------------------------------------
-  const copyText = (text: string, what: string): void => void navigator.clipboard?.writeText(text).then(() => deps.notify(`Copied ${what}.`), () => deps.notify("Could not copy."));
+  const copyText = (text: string, what: string): void => void copyPlainText(text).then((done) => deps.notify(done ? `Copied ${what}.` : "Could not copy."));
   /** A colour as hex and a gradient as CSS: the text `parseCssPaint` pastes back (the menu items and the right click both copy it). */
   const paletteCss = (item: StyleItem): string => `:root {\n${paletteOf(item).map((c, i) => `  --${slug(item.name, "palette")}-${slug(c.name ?? "", String(i + 1))}: ${c.c};`).join("\n")}\n}`;
   const copyItem = (item: StyleItem): boolean => {

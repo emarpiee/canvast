@@ -6,7 +6,7 @@
  * two workspaces never share boards or a library. The folder is the one passed with `--workspace=<path>`, else the last
  * one opened, else the one chosen in the start dialog (recent ones, open a folder, a new workspace).
  */
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell, clipboard, ClipboardItem } from "electron";
 import { execFile } from "node:child_process";
 import { createHash, randomBytes, randomUUID, scrypt } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, watch, writeFileSync } from "node:fs";
@@ -475,6 +475,25 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     const file = join(dir, cleanWholeName(basename(name), "file"));
     await writeFile(file, bytes, { mode: 0o600 });
     return process.env["CANVAST_NO_OPEN"] === "1" ? "" : shell.openPath(file); // (tests: the copy is made, no app is started)
+  });
+  // Real files on the system clipboard, of any kind: the workspace's own, and readable copies of hidden items (made as for opening them, deleted the same way).
+  ipcMain.handle("canvast:copyFiles", async (e, rels: unknown, copies: unknown) => {
+    own(e);
+    if (!Array.isArray(rels) || !Array.isArray(copies)) throw new Error("not files to copy");
+    const fulls = await Promise.all(rels.map((r) => inside(root, String(r))));
+    for (const c of copies as Array<{ name?: unknown; bytes?: unknown }>) {
+      if (typeof c?.name !== "string" || !(c.bytes instanceof Uint8Array)) throw new Error("not a file to copy");
+      const dir = join(OPENED_DIR, randomUUID());
+      await mkdir(dir, { recursive: true, mode: 0o700 });
+      const file = join(dir, cleanWholeName(basename(c.name), "file"));
+      await writeFile(file, c.bytes, { mode: 0o600 });
+      fulls.push(file);
+    }
+    // (as file managers read files: a list of addresses for most, the same list after a word for those of GNOME)
+    const urls = fulls.map((f) => pathToFileURL(f).href);
+    const raw = (format: string): string => `electron application/osclipboard;format="${format}"`;
+    await clipboard.write([new ClipboardItem({ [raw("text/uri-list")]: new Blob([`${urls.join("\r\n")}\r\n`]), [raw("x-special/gnome-copied-files")]: new Blob([`copy\n${urls.join("\n")}`]) })]);
+    return fulls.length;
   });
   ipcMain.handle("canvast:dropOpened", (e) => {
     own(e);

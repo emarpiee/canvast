@@ -98,6 +98,8 @@ export interface DesktopBridge {
    * when the app closes (the next start deletes any a crash left).
    */
   openCopy(name: string, bytes: Uint8Array): Promise<string>;
+  /** Real files on the system clipboard: `files` in the workspace, and `copies` written like `openCopy`'s (hidden items). How many. */
+  copyFiles(files: readonly string[], copies: ReadonlyArray<{ name: string; bytes: Uint8Array }>): Promise<number>;
   dropOpened(): Promise<void>;
   /** Show a file of the workspace folder in the system's file manager (its folder opened, the file selected). */
   showFile(path: string): Promise<void>;

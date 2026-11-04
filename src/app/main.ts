@@ -1,3 +1,5 @@
+import type { CatalogEntry } from "../assets/asset-catalog";
+import { copyItemsAsFiles, copyItemsToClipboard, type CopyDeps } from "./copy-items";
 import { externalFolder } from "../storage/external-folder";
 import { askHiddenPassword } from "../ui/hidden-access";
 import { noteKindOf } from "../notes/note-file";
@@ -28,7 +30,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { imageAt, pasteCssPaint, copiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
+import { imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -2324,7 +2326,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Edit", title: "Undo", keys: "Ctrl+Z", words: "back revert", enabled: () => onCanvas, run: () => undo(doc, editor) },
       { group: "Edit", title: "Change the old default ink to the canvas ink", words: "recolour near-black dark outline theme light old drawings readable", enabled: () => onCanvas && newInk(DEFAULT_INK) !== DEFAULT_INK, run: () => void recolourOldInk(doc, editor) },
       { group: "Edit", title: "Redo", keys: "Ctrl+Shift+Z", words: "again", enabled: () => onCanvas, run: () => redo(doc, editor) },
-      { group: "Edit", title: "Copy", keys: "Ctrl+C", enabled: () => onCanvas && sel, run: () => void copySelection(doc, editor, view) },
+      { group: "Edit", title: "Copy", keys: "Ctrl+C", enabled: () => onCanvas && sel, run: () => { if (!document.execCommand("copy")) copySelection(doc, editor, view); } }, // (as the keys do: the copy event below puts it on the system clipboard too)
+      ...(desktopBridge() ? [{ group: "Edit", title: "Copy file", words: "real file clipboard file manager", enabled: () => onCanvas && sel && [...editor.selection].some((id) => !!(doc.get(id) as { assetId?: string } | undefined)?.assetId), run: () => void selectedFiles().then((ents) => (forgetCopiedPicture(), copyItemsAsFiles(copyOnCanvas, ents))) }] : []),
       { group: "Edit", title: "Cut", keys: "Ctrl+X", enabled: () => onCanvas && sel, run: () => void cutSelection(doc, editor, view) },
       { group: "Edit", title: "Paste", keys: "Ctrl+V", enabled: () => onCanvas, run: () => void pasteObjects(doc, editor, view, null) },
       { group: "Edit", title: "Duplicate", keys: "Ctrl+D", words: "copy", enabled: () => onCanvas && sel, run: () => duplicateSelection(doc, editor, view) },
@@ -2549,6 +2552,37 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     // (the words go beside the picture only for copied texts: otherwise a program that takes text would paste the SVG or a count and not the picture)
     await writeSystemClipboard({ image: png, text, withText: withText && !isPlaceholderText(text) });
   };
+  /** The file-backed things selected, as library items. */
+  const selectedFiles = async (): Promise<CatalogEntry[]> => {
+    const hashes = [...new Set([...editor.selection].flatMap((id) => {
+      const o = doc.get(id) as { assetId?: string } | undefined;
+      return o?.assetId ? [o.assetId] : [];
+    }))];
+    const found = await Promise.all(hashes.map((h) => session.catalog?.entry(h).catch(() => undefined)));
+    return found.filter((e): e is NonNullable<typeof e> => !!e);
+  };
+  const copyOnCanvas: CopyDeps = {
+    file: async (h) => (await assets.record(h).catch(() => undefined))?.blob,
+    thumb: async (h) => (await session.catalog?.thumb(h).catch(() => undefined))?.blob,
+    fileOf: (h) => session.storage?.originals.fileOf(h) ?? Promise.resolve(null),
+    say: (m) => {
+      editor.message = m;
+      editor.changed();
+    },
+  };
+  /** What a copy on the canvas puts out: one note card is its words, so it pastes into a note elsewhere (and still as the card here); the rest a picture. */
+  const copyOut = async (t: ExportTarget | null, withText: boolean): Promise<void> => {
+    const one = editor.selection.size === 1 ? await selectedFiles() : [];
+    if (one[0] && noteKindOf(one[0].name)) {
+      const text = await copyItemsToClipboard(copyOnCanvas, one);
+      if (text !== null) {
+        forgetCopiedPicture();
+        setCopiedText(text);
+        return;
+      }
+    }
+    if (t) await copyPicture(t, withText);
+  };
   // Copy and cut take the selected objects (text fields and the text editor keep their own).
   for (const kind of ["copy", "cut"] as const) {
     document.addEventListener(kind, (e) => {
@@ -2561,7 +2595,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       const svg = svg0 && svg0.length <= 1_000_000 ? svg0 : null;
       if ((kind === "copy" ? copySelection : cutSelection)(doc, editor, view, e, svg ?? undefined)) {
         e.preventDefault();
-        if (kind === "copy" && t) void copyPicture(t, !svg);
+        if (kind === "copy") void copyOut(t, !svg);
       }
     });
   }

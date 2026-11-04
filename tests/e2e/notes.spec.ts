@@ -821,6 +821,55 @@ test("a note's created and modified are automatic: a save writes them, under the
   expect(await text()).toContain("Datedxy: z!");
 });
 
+test("Copy, by kind of file: words of notes, joined when several; only a name where that is all there can be; a note card on a canvas is its note, and pastes back as the card", async ({ app, browserName }) => {
+  test.skip(browserName === "firefox", "Firefox does not let a test read the clipboard");
+  const p = app.page;
+  await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await p.getByTestId("view-assets").click();
+  const FILE = "---\nstatus: new\n---\n# One\n";
+  await p.getByTestId("assets-import-input").setInputFiles([
+    { name: "one.md", mimeType: "text/markdown", buffer: Buffer.from(FILE) },
+    { name: "two.txt", mimeType: "text/plain", buffer: Buffer.from("Two words") },
+    { name: "three.note.html", mimeType: "text/html", buffer: Buffer.from("<!doctype html><html><head><title>three</title><meta name=\"status\" content=\"rich\"></head><body><h1>Three</h1></body></html>") },
+    { name: "four.zip", mimeType: "application/zip", buffer: Buffer.from("PK") },
+  ]);
+  const card = (n: string) => p.locator(`[data-testid="asset-card"][title="${n}"]`);
+  await expect(card("four.zip")).toBeAttached();
+  const clip = () => p.evaluate(() => navigator.clipboard.readText());
+  const copy = async (n: string) => {
+    await p.evaluate(() => navigator.clipboard.writeText(""));
+    await card(n).click();
+    await p.keyboard.press("Control+c");
+  };
+  await copy("one.md");
+  await expect.poll(clip).toBe(FILE);
+  await copy("two.txt");
+  await expect.poll(clip).toBe("Two words");
+  await copy("three.note.html");
+  await expect.poll(clip).toContain("# Three");
+  expect(await clip()).toContain("status: rich");
+  await copy("four.zip");
+  await expect.poll(clip).toBe("four.zip");
+  await p.evaluate(() => navigator.clipboard.writeText(""));
+  await card("one.md").click();
+  await card("two.txt").click({ modifiers: ["Control"] });
+  await p.keyboard.press("Control+c");
+  await expect.poll(clip).toContain("# One");
+  expect(await clip()).toContain("Two words");
+  // On a canvas.
+  await card("one.md").click();
+  await p.getByTestId("asset-place").click();
+  await p.getByTestId("view-canvas").click();
+  const objects = () => p.evaluate(() => window.__canvastDebug.objects().length);
+  await expect.poll(objects).toBe(1);
+  await p.keyboard.press("Control+a");
+  await p.evaluate(() => navigator.clipboard.writeText(""));
+  await p.keyboard.press("Control+c");
+  await expect.poll(clip).toBe(FILE);
+  await p.keyboard.press("Control+v");
+  await expect.poll(objects).toBe(2);
+});
+
 test("Note cards show properties: a card shows the note's chosen properties, at once", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();

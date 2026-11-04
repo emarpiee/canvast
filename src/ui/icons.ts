@@ -163,6 +163,7 @@ import layoutListIcon from "lucide-static/icons/layout-list.svg";
 import listPlusIcon from "lucide-static/icons/list-plus.svg";
 import fieldAddIcon from "lucide-static/icons/between-horizontal-end.svg";
 import savedSearchIcon from "lucide-static/icons/search-check.svg";
+import filesIcon from "lucide-static/icons/files.svg";
 import propTextIcon from "lucide-static/icons/letter-text.svg";
 import propListIcon from "lucide-static/icons/list.svg";
 import propNumberIcon from "lucide-static/icons/binary.svg";
@@ -418,6 +419,7 @@ export const ICONS = {
   listPlus: clean(listPlusIcon),
   fieldAdd: clean(fieldAddIcon),
   savedSearch: clean(savedSearchIcon),
+  files: clean(filesIcon),
   propText: clean(propTextIcon),
   propList: clean(propListIcon),
   propNumber: clean(propNumberIcon),

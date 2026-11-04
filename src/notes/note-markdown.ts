@@ -1,3 +1,4 @@
+import { FENCE_TICK, obsidianMarkdown } from "./note-file";
 import { helper } from "suneditor";
 import { WIKI, encodeLinkPart, readableMarkdown } from "./note-file";
 import { parseProps, splitFrontmatter, type Prop } from "./frontmatter";
@@ -103,4 +104,19 @@ export function markdownHtml(text: string): string {
   for (const pre of t.content.querySelectorAll("pre")) codeLines(pre);
   cellPictures(t.content, document);
   return t.innerHTML;
+}
+
+/** A note's HTML as markdown, as Obsidian writes it: footnotes, embeds and table alignment kept (see obsidianMarkdown). */
+export function htmlMarkdown(h: string): string {
+  const t = document.createElement("template");
+  t.innerHTML = h;
+  // (a code block holding a code fence: its backticks are out of the writer's sight, and its own fence made longer after, see obsidianMarkdown)
+  // (and its lines, which the writer reads from newlines, are `<br>` in the editor)
+  for (const c of t.content.querySelectorAll("pre")) {
+    c.innerHTML = c.innerHTML.replace(/<br\s*\/?>/g, "\n");
+    if (/(?:^|>|\n)`{3,}/.test(c.innerHTML)) c.innerHTML = c.innerHTML.replace(/`/g, FENCE_TICK);
+  }
+  h = t.innerHTML;
+  const aligns = [...t.content.querySelectorAll("table")].map((tb) => [...(tb.querySelector("tr")?.children ?? [])].map((c) => ((c as HTMLElement).style.textAlign || null) as "left" | "center" | "right" | null));
+  return obsidianMarkdown(helper.markdown.jsonToMarkdown(helper.converter.htmlToJson(h)), aligns);
 }

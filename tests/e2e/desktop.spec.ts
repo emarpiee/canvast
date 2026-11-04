@@ -1718,6 +1718,34 @@ test("a file renamed outside the app keeps its place in notes: the links follow,
   await app.close();
 });
 
+test("Copy file: the real files on the clipboard, from the library, as a list of addresses inside the workspace", async () => {
+  const ws = tempDir("cv-copy-file-");
+  const { app, page } = await launch(ws, "userdata", true);
+  try {
+    await page.getByTestId("view-assets").click();
+    await page.getByTestId("assets-import-input").setInputFiles([{ name: "a.zip", mimeType: "application/zip", buffer: Buffer.from("PK") }, { name: "b file.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF") }]);
+    const on = (n: string) => page.locator(`[data-testid="asset-card"][title="${n}"]`);
+    await expect(on("b file.pdf")).toBeAttached();
+    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/")).length, { timeout: 15_000 }).toBe(2);
+    await on("a.zip").click();
+    await on("b file.pdf").click({ modifiers: ["Control"] });
+    await on("b file.pdf").click({ button: "right" });
+    await page.getByRole("menuitem", { name: "Copy files", exact: true }).click();
+    const FORMAT = 'electron application/osclipboard;format="text/uri-list"';
+    const listed = () => app.evaluate(async ({ clipboard }, format) => {
+      const [item] = await clipboard.read();
+      return item && item.types.includes(format) ? (await item.getType(format) as Blob).text() : `no file list in: ${item?.types.join(", ")}`;
+    }, FORMAT);
+    await expect.poll(listed).toContain("b%20file.pdf");
+    const list = await listed();
+    expect(list).toContain("a.zip");
+    expect(list.trim().split(/\r\n/)).toHaveLength(2);
+    for (const line of list.trim().split(/\r\n/)) expect(decodeURIComponent(line)).toContain(ws);
+  } finally {
+    await app.close();
+  }
+});
+
 test("a folder of files an earlier version named: opening it, twice, renames and moves nothing; Repair library file names does, when asked", async () => {
   const ws = tempDir("cv-names-open-");
   const png = (seed: number): Buffer => makePng(6, 4, () => [seed, 90, 40, 255]);

@@ -25,15 +25,37 @@ export async function writeSystemClipboard(p: ClipboardParts): Promise<Clipboard
       // the picture could not be made or written: the text, if there is any, is the next best thing
     }
   }
-  if (p.text) {
-    try {
-      await navigator.clipboard.writeText(p.text);
-      return "text";
-    } catch {
-      // refused: nothing was put there
-    }
-  }
+  if (p.text && (await copyPlainText(p.text))) return "text";
   return "failed";
+}
+
+/** Words on the system clipboard, by the older way when the browser refuses the newer: whether it worked. */
+export async function copyPlainText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const t = document.createElement("textarea");
+    t.value = text;
+    t.style.position = "fixed";
+    t.style.opacity = "0";
+    document.body.append(t);
+    t.select();
+    const done = document.execCommand("copy");
+    t.remove();
+    return done;
+  }
+}
+
+/** The pictures on the system clipboard, each with the words beside it; none when the browser does not let them be read. */
+export async function readClipboardPictures(): Promise<Array<{ blob: Blob; type: string; text: string }>> {
+  const out: Array<{ blob: Blob; type: string; text: string }> = [];
+  for (const item of await navigator.clipboard.read()) {
+    const type = item.types.find((t) => t.startsWith("image/"));
+    if (!type) continue;
+    out.push({ blob: await item.getType(type), type, text: item.types.includes("text/plain") ? await (await item.getType("text/plain")).text() : "" });
+  }
+  return out;
 }
 
 /** A picture of any type the browser can show as a PNG (the clipboard takes no other picture type). */
@@ -45,8 +67,9 @@ export async function asPng(blob: Blob): Promise<Blob> {
     img.src = url;
     await img.decode();
     const c = document.createElement("canvas");
-    c.width = img.naturalWidth || 1;
-    c.height = img.naturalHeight || 1;
+    // (a vector with no size of its own: at a size that can be seen, not one pixel)
+    c.width = img.naturalWidth || 1024;
+    c.height = img.naturalHeight || (img.naturalWidth ? 1 : 1024);
     c.getContext("2d")!.drawImage(img, 0, 0);
     return await new Promise<Blob>((ok, no) => c.toBlob((b) => (b ? ok(b) : no(new Error("no picture"))), "image/png"));
   } finally {

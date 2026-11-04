@@ -14,6 +14,7 @@ const bridge: DesktopBridge = {
   syncFiles: (paths) => ipcRenderer.invoke("canvast:syncFiles", paths),
   openFile: (path) => ipcRenderer.invoke("canvast:openFile", path),
   openCopy: (name, bytes) => ipcRenderer.invoke("canvast:openCopy", name, bytes),
+  copyFiles: (files, copies) => ipcRenderer.invoke("canvast:copyFiles", files, copies),
   dropOpened: () => ipcRenderer.invoke("canvast:dropOpened"),
   showFile: (path) => ipcRenderer.invoke("canvast:showFile", path),
   sizes: (paths) => ipcRenderer.invoke("canvast:sizes", paths),
