@@ -1170,8 +1170,8 @@ test("a picture dragged to another place in a note is one step of undo", async (
   await expect(page(p).locator("h1")).toHaveText("Move");
   const order = () => page(p).evaluate((e) => [...e.children].map((c) => (c.querySelector("img") ? "img" : (c.textContent ?? "").trim())));
   const before = await order();
-  await page(p).locator("figure").hover(); // (the editor's handle comes over it)
-  await p.locator(".se-drag-handle-full").dragTo(page(p).locator("h1"));
+  await page(p).locator("figure").click({ force: true }); // (the editor's handle comes over it, and takes the click for it)
+  await p.locator(".se-drag-handle").filter({ visible: true }).first().dragTo(page(p).locator("h1"));
   await expect.poll(order).not.toEqual(before);
   await p.keyboard.press("Control+z");
   await expect.poll(order).toEqual(before);
@@ -1189,7 +1189,7 @@ test("Ctrl+F in an open note finds in that note with the focus off its words, in
   await p.keyboard.press("Control+f");
   await expect.poll(inFind).toBe(true);
   await expect(p.locator(".assets-body.is-viewing")).toBeVisible();
-  await p.keyboard.press("Escape");
+  await p.locator(".viewer-details").click(); // (back on: Place is in the details)
   await p.locator(".viewer-back").click();
   await card(p, hashOf(NOTE)).click();
   await p.getByTestId("asset-place").click();

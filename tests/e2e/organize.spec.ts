@@ -1518,3 +1518,26 @@ test("a hidden picture shown on the canvas (its password remembered) never reach
   await expect.poll(red).toBe(false);
   await expect.poll(label).toBe("Hidden item.png");
 });
+
+test("a file imported with a folder open goes into it, dropped from outside or by Import; one the library had stays where it is", async ({ app }) => {
+  const p = app.page;
+  const first = makePng(5, 5, () => [10, 200, 30, 255]);
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "had.png", mimeType: "image/png", buffer: first });
+  await expect(p.getByTestId("asset-card")).toHaveCount(1);
+  await p.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "box", "Box"));
+  await p.getByTestId("assets-side").getByRole("button", { name: /^Box/ }).first().click();
+  const folderOf = (name: string) => p.evaluate((n) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === n)?.folderIds ?? null), name);
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "by-button.png", mimeType: "image/png", buffer: makePng(6, 6, () => [200, 10, 30, 255]) });
+  await expect.poll(() => folderOf("by-button.png")).toEqual(["box"]);
+  await p.evaluate(async () => {
+    const bytes = await (await fetch("data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==")).arrayBuffer();
+    const data = new DataTransfer();
+    data.items.add(new File([bytes], "dropped.gif", { type: "image/gif" }));
+    document.body.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: data }));
+  });
+  await expect.poll(() => folderOf("dropped.gif")).toEqual(["box"]);
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "had.png", mimeType: "image/png", buffer: first });
+  await expect(p.getByTestId("asset-card")).toHaveCount(2);
+  expect(await folderOf("had.png")).toEqual([]);
+});

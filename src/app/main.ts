@@ -2486,7 +2486,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     const files = all.filter((f) => !isArchiveFile(f));
     if (!files.length) return;
     // (files that came from a folder are then put in library folders of the same names)
-    void (appView === "assets" ? assetsView.importFiles(files) : importFiles(files)).then(() => fileByFolders(session, files));
+    void (appView === "assets" ? assetsView.importFiles(files, true) : importFiles(files)).then(() => fileByFolders(session, files));
   };
   // A drag that starts inside the app (a picture dragged out of the library, a layer row) is never a file import: the browser would hand
   // the dragged thumbnail over as a new file and store it as an asset of its own.

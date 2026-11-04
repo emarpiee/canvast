@@ -5,7 +5,7 @@ import { searchHelpLineHtml, searchKeysHtml, searchWaysHtml } from "./search-par
 import { boardFilterHtml, boardFilterState, wireBoardFilter } from "./board-filter";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { startStep } from "../app/startup-log";
-import { fileByFolders, filesOfPicker } from "../app/directory";
+import { fileByFolders, filesOfPicker, folderPathOf } from "../app/directory";
 import { readMetadata } from "../assets/metadata";
 import type { MetaRow } from "../assets/metadata";
 import type { LinkCards, LinkRow } from "../app/session";
@@ -34,7 +34,7 @@ import { countSide as countSideOf, inScope as inScopeOf, libraryPaging, matcher,
 import { LOOK_SIZE, lookOf, similarGroups, type Look } from "../assets/look";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
-import type { AssetField, AssetFolder, CatalogEntry, CatalogListing } from "../assets/asset-catalog";
+import type { AssetField, AssetFolder, CatalogEntry, CatalogListing, MetaChange } from "../assets/asset-catalog";
 import type { LibraryPages } from "../storage/store";
 import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT, folderClash, folderName, folderPath, folderSubtree, hiddenModeFolders, meta, usageOf, visibleFolders } from "../assets/asset-catalog";
 import { artTile, THUMB_PX, makeThumb, shrinkPicture } from "../assets/thumb";
@@ -104,8 +104,8 @@ export interface AssetsView {
   focusSearch(): void;
   /** Show these originals: leave the viewer, clear the search and filters, pick them and scroll to the first (ADR 0077). */
   reveal(hashes: readonly string[]): Promise<void>;
-  /** Import files into the library only (no placement): the hashes of those taken in (or already there). */
-  importFiles(files: File[]): Promise<string[]>;
+  /** Import files into the library only (no placement): the hashes of those taken in (or already there). `here`: new ones go into the folder, tag or favourites open in the sidebar. */
+  importFiles(files: File[], here?: boolean): Promise<string[]>;
   /** Draw the notes' cards again (the preview look changed). */
   redrawNotes(): void;
 }
@@ -646,6 +646,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let severalOn = false;
   let places: AssetPlace[] = [];
   let generation = 0;
+  /** What being put in a place of the sidebar changes on an item. */
+  const scopeChange = (k: string, label: string): MetaChange => (k.startsWith("folder:") ? { addFolders: [k.slice(7)] } : k === "unfiled" ? { clearFolder: true } : k === "favorites" ? { favorite: true } : { addTags: [label] });
   /** Sidebar scope: "all", "favorites", "unfiled", "folder:<id>" or "tag:<lowercased tag>". */
   let scope = ui.filters.scope === "hidden" ? "all" : ui.filters.scope; // (the filters are kept with the library's layout: a restart opens the library as it was left)
   /**
@@ -4109,7 +4111,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!hashes.length) return;
     const k = t.dataset["scope"]!;
     const label = k.startsWith("tag:") ? (sideTagLabels.get(k) ?? k.slice(4)) : (t.querySelector(".side-label")?.textContent ?? "");
-    const change = k.startsWith("folder:") ? { addFolders: [k.slice(7)] } : k === "unfiled" ? { clearFolder: true } : k === "favorites" ? { favorite: true } : { addTags: [label] };
+    const change = scopeChange(k, label);
     const what = k.startsWith("folder:") ? `Moved to ${label}` : k === "unfiled" ? "Taken out of their folders" : k === "favorites" ? "Added to the favourites" : `Tagged #${label}`;
     void session.organize((c) => c.updateMetaEach(hashes.map((hash) => ({ hash, change }))), `${what}: ${plural(hashes.length, "item")}`).then((ok) => {
       if (!ok) return;
@@ -4558,7 +4560,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         files.push(new File([it.blob], name, { type }));
       }
       if (!files.length) return say("No picture on the clipboard.");
-      await view.importFiles(files);
+      await view.importFiles(files, true);
     } catch {
       say("The browser did not let canvast read the clipboard: press Ctrl+V to paste.");
     }
@@ -5202,7 +5204,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   fileInput.addEventListener("change", () => {
     const files = [...(fileInput.files ?? [])];
     fileInput.value = "";
-    void view.importFiles(files);
+    void view.importFiles(files, true);
   });
 
   // Notices are shown by the notice stack over every view; the view keeps the last one as text for screen readers and tests.
@@ -5292,8 +5294,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     redrawNotes() {
       redrawCards((listing?.entries ?? []).filter((e) => noteKindOf(e.name)).map((e) => e.hash));
     },
-    async importFiles(files) {
+    async importFiles(files, here = false) {
       const hashes: string[] = [];
+      const fresh: string[] = [];
       if (session.editor.blockEdit()) return hashes;
       let n = 0;
       const seen: Array<{ name: string; duplicate: "present" | "restored" }> = [];
@@ -5306,6 +5309,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         try {
           const { record, duplicate } = await assets.importFileDetailed(f, false); // nothing is placed, so a big batch keeps no decoded pictures
           hashes.push(record.hash);
+          // (a file the library had stays where it is; one from a dropped folder goes to a folder of that name)
+          if (duplicate !== "present" && !folderPathOf(f).length) fresh.push(record.hash);
           if (noteKindOf(record.name || f.name || "")) await session.adoptNoteProps(record.hash); // (its YAML: its tags, note and fields)
           if (duplicate) seen.push({ name: record.name || f.name, duplicate });
           if (duplicate && f.name) renamed.push({ hash: record.hash, name: f.name });
@@ -5316,6 +5321,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         }
       }
       progress.done();
+      if (here && fresh.length && (scope.startsWith("folder:") || scope.startsWith("tag:") || scope === "favorites")) {
+        const change = scopeChange(scope, sideTagLabels.get(scope) ?? scope.slice(4));
+        await session.organize((c) => c.updateMetaEach(fresh.map((hash) => ({ hash, change }))), `Import ${plural(fresh.length, "file")}`);
+      }
       if (n) {
         const notice = duplicateNotice(seen, n);
         session.editor.message = !notice ? `Imported ${plural(n, "file")} into the library.` : seen.length === n ? notice : `${plural(n - seen.length, "new file")} imported. ${notice}`;

@@ -23,6 +23,7 @@
 - **Fixed:** Ctrl+F in an open note always finds in that note, in the library's viewer and beside a canvas, wherever the focus is; before, with the focus off its words, it went to the library's search.
 - **Fixed:** a font's "Aa" sits in the middle of its library card: its picture hung past the card's bottom and was cut. It is also centred on its letters, whatever the font's own spacing; fonts' thumbnails are made again once.
 - **Added:** `kind:typeface` finds fonts, as `kind:font` does.
+- **Fixed:** files imported into the library, dropped from a file manager or by Import or paste, go into the folder, tag or favourites open in the sidebar. A file the library already had stays where it is.
 - **Changed:** the README is in two parts, for users and for developers, with a section for each big feature, tables and pictures first and the full wording after them; new pictures of the sidebar, several items selected, art files and the Trash.
 - **Changed:** the library's list has the same thumbnail slider as the grid, in the same place, with its own size: its rows and thumbnails grow with it. The slider is longer, and the list's columns button moved to the left of the grid and list buttons so that nothing shifts.
 - **Added:** Details in the details panel show the file's type, size, pixels, time of import, place on disk and whole hash, a JPEG's channels and colour sampling, all lined up. They open from the file's line, with an info icon at its right end, in one card.

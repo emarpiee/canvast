@@ -308,5 +308,5 @@ test("a list column made wider: the rows hold every column, with no empty room a
   await p.mouse.down();
   await p.mouse.move(at.x + 500, at.y + at.height / 2, { steps: 4 });
   await p.mouse.up();
-  await expect.poll(() => p.locator(".assets-scroll").evaluate((s) => s.scrollWidth - s.querySelector<HTMLElement>(".assets-grid")!.offsetWidth - s.querySelector<HTMLElement>(".assets-grid")!.offsetLeft)).toBeLessThanOrEqual(1);
+  await expect.poll(() => p.locator(".assets-scroll").evaluate((s) => s.scrollWidth - s.querySelector<HTMLElement>(".assets-grid")!.offsetWidth - s.querySelector<HTMLElement>(".assets-grid")!.offsetLeft)).toBeLessThanOrEqual(3); // (the grid's own small inset)
 });
