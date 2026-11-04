@@ -29,38 +29,28 @@
 - **Yours, on your machine.** In the browser everything is saved in the browser's own storage; in the desktop app, in a folder you choose, as plain files any sync or backup tool can see. Nothing is uploaded, ever. Back up to a single `.canvast` file whenever you like.
 - **Made for projects, with a Library for what they use.** Storyboards, mood boards, references, sketches: from a small board to a very large one. Pictures, video and files you place are kept in the Library, where you can tag, sort into folders, search and reuse them. In the browser the library lives in the browser's storage, which has a size limit; the desktop app keeps it on your disk (see [Limitations](#limitations)).
 - **One file, or a desktop app.** Copy `canvast.html` anywhere (a folder, a USB stick) and open it, or install the desktop app on Linux (see [Installation](#installation)).
-
 ## Contents
 
-**Using canvast**
-
-1. [Features at a glance](#features-at-a-glance)
-2. [Installation](#installation)
-3. [Getting started](#getting-started)
-4. [Try the showcase](#try-the-showcase-powers-of-two)
-5. [User guide](#user-guide)
-6. [Keyboard and pointer reference](#keyboard-and-pointer-reference)
-7. [Settings and accessibility](#settings-and-accessibility)
-8. [Your data: saving, backups, the workspace folder](#your-data-saving-backups-the-workspace-folder)
-9. [Privacy and security](#privacy-and-security)
-10. [Limitations](#limitations)
-
-**For developers**
-
-11. [How it works](#how-it-works)
-12. [API and file formats](#api-and-file-formats)
-13. [Building from source](#building-from-source)
-14. [Testing](#testing)
-15. [Releasing and project scripts](#releasing-and-project-scripts)
-
-**Project**
-
-16. [Platform support](#platform-support)
-17. [Contributing and support](#contributing-and-support)
-18. [Notes from the developer](#notes-from-the-developer)
-19. [Licence](#licence)
+| For users | For developers |
+| --- | --- |
+| [Features at a glance](#features-at-a-glance) | [How it works](#how-it-works) |
+| [Installation](#installation) | [API and file formats](#api-and-file-formats) |
+| [Getting started](#getting-started) | [Building from source](#building-from-source) |
+| [Try the showcase](#try-the-showcase-powers-of-two) | [Testing](#testing) |
+| [The canvas](#the-canvas) | [Releasing and project scripts](#releasing-and-project-scripts) |
+| [The Library](#the-library) | [Contributing and support](#contributing-and-support) |
+| [Notes](#notes) | [Notes from the developer](#notes-from-the-developer) |
+| [The interface and settings](#the-interface-and-settings) | [Licence](#licence) |
+| [Keyboard and pointer](#keyboard-and-pointer-reference) | |
+| [Your data](#your-data-saving-backups-the-workspace-folder) | |
+| [Privacy and security](#privacy-and-security) | |
+| [Limitations](#limitations) | |
 
 ---
+
+# For users
+
+Everything you need to install canvast, use it and keep your work safe.
 
 ## Features at a glance
 
@@ -74,13 +64,11 @@
 | **Text** | Rich text stored as Markdown, imported fonts (variable fonts too), text on a path, notes, sharp letters at any zoom. [Text](#text) |
 | **Pictures and media** | Pixel-exact pictures, non-destructive adjustments and shadows, crop, flip and masks; video, audio and GIFs play on the canvas. [Pictures, video, audio and other files](#pictures-video-audio-and-other-files) |
 | **Organizing** | Layers, groups, sheets that clip, masks, snapping, align and arrange, tags, Reveal for things under others. [Organizing](#organizing) |
-| **Notes** | A notes editor for markdown, text and rich text notes, in the library and beside the canvas: Obsidian-style `[[links]]`, properties and `#tags` that can be searched, sorted and shown as columns, templates, layouts, cards on a canvas that lay out their page at the size you give them. [The Library](#the-library) |
+| **Notes** | A notes editor for markdown, text and rich text notes, in the library and beside the canvas: Obsidian-style `[[links]]`, properties and `#tags` that can be searched, sorted and shown as columns, templates, layouts, cards on a canvas that lay out their page at the size you give them. [Notes](#notes) |
 | **Library** | Every imported file once, with folders, tags, favourites, descriptions and properties, similar-image search, a viewer and safe deletion. [The Library](#the-library) |
 | **Privacy** | Hidden items and passwords; in the desktop app hidden files are encrypted, and can be decrypted outside the app. [Privacy and security](#privacy-and-security) |
 | **Export** | PNG, WebP, JPEG, SVG and PDF from sheets and selections; `.canvast` backups of everything. [Exporting](#exporting), [Backups](#backups) |
 | **Your data** | Saved as you work, verified, never uploaded; in the desktop app a plain folder that any sync tool can carry. [Your data](#your-data-saving-backups-the-workspace-folder) |
-
----
 
 ## Installation
 
@@ -140,10 +128,24 @@ sha256sum -c canvast-X.Y.Z-x86_64.AppImage.sha256
 | The `.deb`, `.rpm` or `.tar.gz` | Install or unpack the new release's package. There is no package repository yet, so the system's own updates do not include canvast |
 
 Your workspace folder is never touched by an update.
-
 ### Uninstalling
 
+Remove the app the way you installed it. **Your workspace folders always stay where they are.**
+
+| You installed | To remove it |
+| --- | --- |
+| `.deb` | `sudo apt remove canvast` |
+| `.rpm` | `sudo dnf remove canvast` |
+| AppImage or `.tar.gz` | Delete the file or the unpacked folder |
+| App data on this device | Delete `~/.config/canvast/`; removing the app never does |
+| Browser version | Delete the file and clear the site data; **this deletes the work kept there, so export a backup first** |
+
+<details>
+<summary>Everything left behind, and where</summary>
+
 Remove the app the way you installed it (`sudo apt remove canvast`, `sudo dnf remove canvast`, or delete the AppImage or the unpacked folder). Your workspace folders stay where they are. The app's own working copy and settings on this device are in `~/.config/canvast/` (`%APPDATA%\canvast` on Windows, `~/Library/Application Support/canvast` on a Mac); removing the app never deletes it, so delete that folder too to remove everything. An AppImage also may leave an entry in your launcher if an AppImage manager added one. Readable copies of hidden items opened in another app (`canvast-opened-…` in the temporary folder) are deleted when the app closes; a crash leaves them until the next start, or until the system clears its temporary folder. The app removes, by itself, the working copies of workspaces it no longer opens once they are a month old. For the browser version, delete the file and clear the site data of `file://` pages in the browser (for the online copy, the site data of `emarpiee.github.io`); this deletes the work kept there, so export a backup first.
+
+</details>
 
 ### What the desktop app keeps on this computer
 
@@ -156,19 +158,16 @@ Outside your workspace folders, in the app's data folder (above):
 | Hidden items opened in another app | the system's temporary folder, `canvast-opened-…` | Readable copies, deleted when the hidden items are locked, when the app closes, and at the next start |
 
 **For full privacy:** turn on *Keep hidden items' names off this device while locked*; leave *Remember the Hidden password* off; lock the hidden items before leaving the computer (closing the app locks them); avoid *Open in default app* for hidden items (the other app may keep its own copy or recent-files entry); use your system's disk encryption; and remember that a backup keeps hidden items encrypted while a ZIP of files or an exported folder does not. Settings > Privacy shows the same list.
+### Building it yourself
 
-### Building from source
+See [Building from source](#building-from-source), in the developers' part.
 
-```sh
-git clone https://github.com/emarpiee/canvast.git
-cd canvast
-npm ci               # Node.js 26.4 (see .nvmrc) and npm
-npm run build        # → dist/canvast.html
-npm run build:all    # also the desktop packages in dist-package/ (needs zsyncmake and rpmbuild)
-npm run build:appimage   # or only the AppImage (needs zsyncmake)
-```
+### Platform support
 
-See [Building from source](#building-from-source) for what each step needs and makes.
+- **Desktop app:** Linux, x86_64 and aarch64; other systems are out of scope for now (see [The desktop app](#the-desktop-app-linux)). Watching the workspace folder for changes made outside the app is verified on Linux.
+- **Browser version:** any system with a modern browser. It requires `BigInt`, Pointer Events, `ResizeObserver`, Canvas 2D, IndexedDB, `oklch()` and `color-mix()`: roughly Chromium 111+, Firefox 113+, Safari 16.2+. A custom background colour also needs relative colours and `abs()`: Chromium 119+, Firefox 128+, Safari 16.4+ or later. The automated tests run on Linux, in Chromium and Firefox; Safari and the browsers on Windows and macOS are not tested.
+- **Tested** in Chromium 156 (default, CPU-only, and devicePixelRatio 2 with touch) and Firefox 157 on Linux. **Not tested** in Safari.
+- Firefox on `file://` supports everything canvast uses (IndexedDB, Web Locks, BroadcastChannel) with frame times close to Chromium's.
 
 ---
 
@@ -202,7 +201,6 @@ The info bar at the bottom left shows the zoom level and position. Click the zoo
 | Zoom level | `z` means 2^z screen pixels per world unit. Level 0 is the starting scale |
 
 ---
-
 ## Try the showcase: powers of two
 
 [`showcase.canvast`](showcase.canvast) is a journey through **one million and one thousand zoom levels** on a single canvas. Each scene is hidden inside a speck of the one above it, so you can get from one end to the other with nothing but the mouse wheel:
@@ -230,10 +228,43 @@ To open it: click the save indicator at the bottom left, choose **Import archive
 How the showcase and its pictures are made is in [Releasing and project scripts](#releasing-and-project-scripts).
 
 ---
+## The canvas
 
-## User guide
+One endless surface: move around it, draw and write on it, place your files, keep it organized, and export the result.
+
+| Section | What is in it |
+| --- | --- |
+| [Navigating](#navigating) | Zoom, pan, bookmarks, tours, search, stepping from item to item |
+| [Drawing](#drawing) | Pens, shapes, paths, fills, boolean shapes, patterns, SVG |
+| [Colour and styles](#colour-and-styles) | The colour picker, gradients, palettes, linked styles |
+| [Text](#text) | Rich text, fonts, text on a path |
+| [Pictures and media](#pictures-video-audio-and-other-files) | Adjustments, crop, shadows, the media player, importing |
+| [Organizing](#organizing) | Layers, sheets, masks, snapping, tags, Reveal |
+| [Exporting](#exporting) | Copying to other apps, and Export… |
 
 ### Navigating
+
+There is no edge and no zoom limit, in either direction.
+
+| | |
+| --- | --- |
+| ![A tour of the bookmarks](docs/screenshots/tour.webp) | ![The board and canvas menu, searched for "st": the boards and canvases that match, each board with its canvases](docs/screenshots/switcher.webp) |
+| A tour of the bookmarks | The board and canvas menu, searched |
+
+| To | Use |
+| --- | --- |
+| Zoom | The wheel, a pinch, `+` and `−`, or the buttons |
+| Pan | Middle button, `Space`+drag, `H`, two fingers, `Shift`+wheel, arrow keys |
+| Go back to the start | `0`, `Home` or the house button |
+| Go to a level | Click the zoom in the info bar and type it |
+| Switch canvas | The board and canvas menu, at the top left |
+| Save a place | **Bookmarks**, which also play as a tour |
+| Find something | `Ctrl+F`: by name, tag or bookmark |
+| Step from item to item | `W` `A` `S` `D`; `F` brings the selection into view |
+| Choose how the view travels | **Camera travel** in Settings > Navigation: *Fly*, *Glide near only* or *Cut* |
+
+<details>
+<summary>All about navigating</summary>
 
 - **Zoom** with the wheel, a trackpad pinch, `+` and `−`, or the on-screen buttons. The point under the pointer (or between your fingers) stays where it is.
 - **Pan** with the middle button, `Space`+drag, the Hand tool (`H`), two fingers, `Shift`+wheel or the arrow keys. Dragging objects near an edge of the view pans it too, the nearer the edge the faster, and what is dragged stays in view; only what is bigger than the view, or was already past its edge, goes beyond it (**Pan at the edge while dragging** in Settings > Navigation turns this off, and **Edge panning speed** sets how fast).
@@ -264,12 +295,32 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
   - The tour has its own travel speed.
   - **Reduced motion:** with Animation set to None the view always cuts. When the system asks for reduced motion the view cuts too and says so once, unless *Follow the system's reduced motion* is off.
 
-| | |
-| --- | --- |
-| ![A tour of the bookmarks](docs/screenshots/tour.webp) | ![The board and canvas menu, searched for "st": the boards and canvases that match, each board with its canvases](docs/screenshots/switcher.webp) |
-| A tour of the bookmarks | The board and canvas menu, searched |
+</details>
 
 ### Drawing
+
+Everything you draw is vector, so it stays sharp at every magnification.
+
+![Boolean shapes: the rocket is a Union, and the Shapes menu is open](docs/screenshots/shapes.webp)
+
+| Tool | Key | What it does |
+| --- | --- | --- |
+| **Pen** | `P` | Four pens with pressure, tilt and a stabilizer |
+| **Shapes** | `U` | Rectangle, ellipse, line, polygon and star, editable after drawing |
+| **Paths**, **Edit nodes** | `B`, `N` | Bézier curves, node editing across several paths |
+| **Fill and outline** |  | Colour, gradients, pictures, repeated objects with variation |
+| **Combine shapes** |  | Union, intersect, subtract, exclude, divide, Shape builder, Fill gaps |
+| **Eraser** | `E` | Removes whole objects, or trims strokes |
+| **SVG** |  | Paste it as editable paths; export or copy shapes as SVG |
+
+#### Pattern
+
+39 vector pattern generators in six families, each with its own settings and seed.
+
+![The Pattern panel: the Contours generator on a sheet, with its colours, settings and seed](docs/screenshots/pattern.webp)
+
+<details>
+<summary>All about drawing</summary>
 
 - **Pen** (`P`): four pens (fine, pencil, ink, marker) with pressure, tilt and a stabilizer. Size is 0.5–128 px. A stroke is made at the current scale, so a 3 px line drawn deep in a zoom is a 3 px line there, and it stays vector-sharp at every magnification. *Thickness lock* keeps strokes the same width on screen at any zoom.
 - **Shapes** (`U`): rectangle, ellipse, line, polygon and star. Sides, points, ratio and per-corner radii stay editable after drawing.
@@ -296,11 +347,26 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
   - **Afterwards:** the result is a group of ordinary editable shapes that remembers its settings. Select it later and the panel shows them; changes replace it in place. Resizing its sheet makes it again to fill the new size (it stretches while you drag).
 - **SVG:** paste SVG text to get editable paths (gradients, including a radial one sized by its own transform and an angular one written as a CSS conic gradient box, dashes, transforms, `<use>`, symbols and clip paths, which become clipping masks), or make a vector copy of an SVG picture. Export shapes as SVG, copy them as SVG text, or save them to the library as an SVG picture.
 
-![Boolean shapes: the rocket is a Union, and the Shapes menu is open](docs/screenshots/shapes.webp)
-
-![The Pattern panel: the Contours generator on a sheet, with its colours, settings and seed](docs/screenshots/pattern.webp)
+</details>
 
 ### Colour and styles
+
+One colour picker for everything, and saved styles that objects stay linked to.
+
+| | |
+| --- | --- |
+| ![The colour picker, opened from a fill: OKHSV as a ring and box, with the recent colours](docs/screenshots/colour-picker.webp) | ![The Styles panel with saved colours](docs/screenshots/styles.webp) |
+| The colour picker, opened from a fill | The Styles panel: saved colours, gradients, text styles, adjustments and patterns |
+
+| Feature | What it does |
+| --- | --- |
+| **Colour picker** | OKHSL, OKHSV or OKLCH, with an eyedropper, recent and saved colours |
+| **Gradients** | Linear, radial and angular, with stops you drag on the canvas |
+| **Palettes** | Built from a colour or a picture; `.gpl`, `.ase`, `.aco` and `.ggr` files |
+| **Styles panel** | Saved colours, gradients, text styles, adjustments and patterns, which linked objects follow |
+
+<details>
+<summary>All about colour and styles</summary>
 
 - **Colour picker:** one picker for every colour. Choose OKHSL, OKHSV or OKLCH (CSS `oklch()`'s own lightness, chroma and hue); a ring and box, a plane with a hue bar, or sliders; text as hex or another format. It also has an eyedropper, recent colours and saved colours. A number changes by dragging its name left or right; with `Shift` it snaps to round steps worked out from its range (steps of 5 for 0–100, 10 for 0–255).
 - **Gradients:** linear, radial and angular, with stops you drag on the canvas, a *Randomize* button and a gradient map for pictures.
@@ -311,24 +377,56 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
   - **Copy** a colour, gradient or palette card with a long press or right click (a palette as CSS variables; a colour inside an opened palette as hex), or with *Copy hex* / *Copy as CSS* in its More menu. A long press copies without applying.
   - **Paste** CSS (a colour in any notation, or a gradient) with the pointer over the panel or nothing selected, and it is saved as a new style.
 
-| | |
-| --- | --- |
-| ![The colour picker, opened from a fill: OKHSV as a ring and box, with the recent colours](docs/screenshots/colour-picker.webp) | ![The Styles panel with saved colours](docs/screenshots/styles.webp) |
-| The colour picker, opened from a fill | The Styles panel: saved colours, gradients, text styles, adjustments and patterns |
+</details>
 
 ### Text
+
+Press `T`, click and type. Text is stored as Markdown, and you can zoom into a letter as far as you like.
+
+![A text being edited, with its formatting bar and its look in the bar above](docs/screenshots/text.webp)
+
+| Feature | What it does |
+| --- | --- |
+| **Formatting** | Bold, italic, links, headings, lists, any range's colour and size |
+| **Look** | Spacing, alignment, kerning, OpenType features, variable font axes |
+| **Fonts** | Import `.ttf`, `.otf`, `.woff` or `.woff2`; right-to-left text works |
+| **Text on a path** | Text follows a path; **Text to path** (`Ctrl+E`) makes outlines |
+| **Notes** (`M`) | A markdown note with a card on the canvas: see [Notes](#notes) |
+
+<details>
+<summary>All about text</summary>
 
 - **Text** (`T`): click and type. A click makes a text as wide as its words; a drag makes a box of that width. Double-click to edit.
 - **Formatting:** bold, italic, underline, strikethrough, links, colour and size of any range, headings, bulleted, numbered and nested lists. Text is stored as Markdown; **Copy Markdown** is one click away.
 - **Look:** colour or gradient, outline, size, line height, letter spacing, alignment, auto or fixed width, paragraph spacing, indent, case, line limit, a set height, kerning, OpenType features and the axes of variable fonts.
 - **Fonts:** import `.ttf`, `.otf`, `.woff` or `.woff2` into the library, including variable fonts. One text may use several fonts. Right-to-left and mixed-direction text are supported.
 - **Text on a path**, and **Text to path** (`Ctrl+E`) to turn letters into editable outlines.
-- **Notes** (`M`): the Note tool makes a markdown note in the library's Notes folder, places its card where you click and opens it in the Note panel (see [Notes](#the-library) in the Library). A text can still sit on a coloured card (its box options); **Make note files** turns such texts into notes.
+- **Notes** (`M`): the Note tool makes a markdown note in the library's Notes folder, places its card where you click and opens it in the Note panel (see [Notes](#notes)). A text can still sit on a coloured card (its box options); **Make note files** turns such texts into notes.
 - **No zoom limit:** zoom into a letter as far as you like; the font's real outlines are drawn.
 
-![A text being edited, with its formatting bar and its look in the bar above](docs/screenshots/text.webp)
+</details>
 
 ### Pictures, video, audio and other files
+
+Files are placed as they are and never altered: every edit here can be undone or removed.
+
+| | |
+| --- | --- |
+| ![A video playing on the canvas, with its player under it](docs/screenshots/media.webp) | ![The Adjust panel on the same video: exposure, contrast, temperature, saturation and vibrance changed](docs/screenshots/adjust.webp) |
+| A video playing on the canvas, with its player | The Adjust panel: the file itself is not changed |
+
+| Feature | What it does |
+| --- | --- |
+| **Import** | By button, drag and drop, paste, or a whole folder |
+| **Adjustments** | Non-destructive stacks, from exposure to curves and grain |
+| **Crop and flip** | Also rounded corners, an outline and masks |
+| **Shadows** | Drop and inner shadow, the same at any zoom |
+| **Media player** | Video, audio and GIFs play on the canvas |
+| **Extract frame** | A video's or GIF's frame becomes a picture in the library |
+| **Make a new picture** | Bakes the crop, flip and adjustments into a new item |
+
+<details>
+<summary>All about pictures and media</summary>
 
 - **Pictures** are placed one source pixel to one screen pixel. Zooming in shows real pixels; nothing is invented and the file is never altered.
 - **Adjustments** are non-destructive stacks you can reorder, hide and copy between pictures, video, GIFs, shapes, pen strokes and texts: exposure, contrast, highlights, shadows, temperature, tint, saturation, vibrance, red/green/blue, levels, curves, gradient map, blur, sharpen and grain.
@@ -347,12 +445,26 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
 - **File details:** EXIF, colour profile and codec information are shown. STL and OBJ 3D models and PDFs are kept as cards with a preview; any other file is kept as a card with its extension and can be downloaded again.
 - **Import** by button (in the Library the Import button has a menu for files or for a whole folder), drag and drop, paste, or a whole folder. Files up to 256 MiB are accepted and decoded before being stored; in the desktop app a bigger file is copied into `library/` a part at a time and comes in as a card. A file the library already has is not stored again; imported into the Library under another name, the app lists the old and new names and offers to rename (in hidden mode, for hidden items only). Importing your originals again this way brings back names that were cut short; Undo puts the old names back.
 
-| | |
-| --- | --- |
-| ![A video playing on the canvas, with its player under it](docs/screenshots/media.webp) | ![The Adjust panel on the same video: exposure, contrast, temperature, saturation and vibrance changed](docs/screenshots/adjust.webp) |
-| A video playing on the canvas, with its player | The Adjust panel: the file itself is not changed |
+</details>
 
 ### Organizing
+
+Keep a large canvas in order, and reach things that lie under others.
+
+![Layers panel, with Jupiter selected exactly by Ctrl+click and its fill in the Properties bar](docs/screenshots/layers.webp)
+
+| Feature | What it does |
+| --- | --- |
+| **Layers panel** | Group, rename, hide, lock, re-stack, opacity and blend modes |
+| **Sheets** (`C`) | Hold objects and cut them at their edge; what you export |
+| **Masks** | By shape, opacity or brightness, or painted with the Pen |
+| **Snapping** | To boxes, corners and sides, with guide lines |
+| **Arranging** | Align, distribute, arrange in a grid; `Alt`+drag copies |
+| **Tags** | On the selection, with a panel of every tag |
+| **Reveal** | Hold `Ctrl` to see and select what is under the pointer |
+
+<details>
+<summary>All about organizing</summary>
 
 - **Layers panel:** group and nest, rename, hide, lock, re-stack, set opacity and blend mode, rotate. Select with `Ctrl` (toggle) and `Shift` (range).
 - **Sheets** (`C`): a sheet clips what it holds and has a ratio rather than a size (see [Shapes, sheets and masks](docs/reference/shapes-sheets-masks.md)).
@@ -376,168 +488,11 @@ How the showcase and its pictures are made is in [Releasing and project scripts]
 - **Hide and lock:** *Show all hidden* and *Unlock all* bring everything back.
 - **Kind chips:** with a mixed selection, chips at the start of the Actions bar (All, Pictures, Media, Shapes, Strokes, Texts) narrow it to one kind.
 
-![Layers panel, with Jupiter selected exactly by Ctrl+click and its fill in the Properties bar](docs/screenshots/layers.webp)
-
-### The interface
-
-- **Tool rail** (left): Undo and Redo, the tools (Import after Note), then Screenshot and Search.
-- **Properties bar** (top): the options of the tool or of what is selected.
-  - The colours of a selected pen stroke, or of several selected things, show as chips; changing a chip changes that colour everywhere it is used.
-  - Pasting CSS with shapes selected sets their fill: a gradient (`linear-gradient(...)`, `radial-gradient(...)`, `conic-gradient(...)`) or a colour (hex, `rgb()`, `hsl()`, `oklch()` and the other CSS notations, or a name such as `rebeccapurple`).
-  - In the colour picker, a long press (or right click) on a swatch or saved gradient copies it without choosing it. Copying the hex field includes the `#`; pasting one drops it. The Styles panel copies the same text (a colour as hex, a gradient as CSS).
-- **Actions bar:** what can be done with the selection, grouped in menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies.
-  - It sits at the bottom or follows the selection (Settings).
-  - When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways.
-- **Panels** (Layers, Bookmarks, Tags, Styles, Adjust, Pattern) float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back.
-- **Command palette** (`Ctrl/⌘+K`) runs any command by name, takes a value where one is needed (`@kind` narrows the list), and records and replays **macros**.
-- **Context menus** open with a right click, the menu key, or a long press on a touch screen, at the pointer (to its left when there is no room), and list what fits where you are:
-
-  | Where | What it offers |
-  | --- | --- |
-  | On something on the canvas | The commands for it. On a picture, *Rename* renames its file in the library (a layer with a name of its own takes the new name) |
-  | On empty canvas | The canvas commands. A long touch first lists what is under the finger |
-  | On a library item | Its details-panel actions, plus *Copy*, *Copy file name* and *Paste* |
-  | In the viewer (the picture, or a picture of the filmstrip) | The same as on a library item, for the one shown (or that picture of the filmstrip) |
-  | On empty library ground | *Select everything*, *Paste*, the imports, *New folder*, *Slideshow* and the details panel |
-  | In Settings | A setting's reset; a shortcut's key actions |
-
-  The viewer has no context menu.
-- **Zen mode** (`Z`, or the leaf button) fades the bars and panels until the pointer is over them.
-- **Screenshot** (camera button) saves the selection, or the whole view, to the library. Settings choose the format, quality, name, folder and tags. They also choose whether to include the canvas pattern and the interface, a transparent background, and a copy on the clipboard.
-- **Info bar** (bottom left): the zoom, position and save state. *Information shown* switches between simple and technical (exact zoom as a power of two, frame rate, diagnostics). The bottom-right buttons cycle the canvas pattern (grid and others) and the item names (always, when selected, hidden).
-- **Hint line** (bottom): what the tool does, and what each key does over a handle.
-- **Notices** report results, often with a *View* button that opens what was made. They fade after a time that fits their length (an error stays to be read), and stack above the Actions bar, never over it.
-- **Long work** (exporting, importing, opening a library, moving files, deleting everything) shows a notice with a progress bar and its current stage, which stays until the work ends and then says the result.
-
-| | |
-| --- | --- |
-| ![Command palette](docs/screenshots/command-palette.webp) | ![The context menu of a selected picture, with Rename](docs/screenshots/context-menu.webp) |
-| The command palette | The context menu of a selected picture: its commands in groups, with *Rename* for the file in the Library |
-
-### The Library
-
-Switch between **Canvas** and **Library** at the top left. The canvas keeps its view, selection and undo history while you are away.
-
-- **The gallery:** every imported file with its size, type and usage (*4 uses · 3 canvases*), with search, filters by file type, and sorting.
-  - **Grid or list.** In the list, drag a column header's edge to resize it (double-click for its usual width). **List columns** also adds any **property** as a column by its name (`status`, `created`); a click on its head sorts by it, as the Sort menu's *Properties* do: dates by date, numbers by number, and items without it last either way. Columns, widths and the thumbnail size are kept.
-  - **The sidebar's sections** (Folders, File types, Tags, Canvas tags, Saved searches) and **the details panel's** (a note's or file's information, Tags and Folder, Properties, Linked from, Where it is used) can be reordered by dragging their heads (the list scrolls when you drag near its top or bottom, or past it), or with `Alt+↑` / `Alt+↓` on a section's name. A double-click on the name at the top of the details panel renames the item.
-  - **Filters** (Show, Sort by and its direction, the sidebar's list) are kept over a restart; the funnel-with-a-cross button resets them, and it is coloured while one is on. While a search or a filter hides items, a chip over the grid says what and how many are shown, with **Show all items**.
-  - **Thumbnails** are made in the background after an import, so the grid fills in on its own. A font shows "Aa" in its letters (on the canvas too); selected, its details show a sample sentence, and the viewer shows it at four sizes with the alphabet and digits.
-  - **Search keywords** (the help card beside the box lists them, each with an example): `width>1000`, `height<`, `pixels>2mp`, `size<5mb`, `ratio:16x9`, `orientation:portrait`, `colour:blue`; `kind:` (picture, video, audio, gif, font, file; and by what a file is: note, vector, document, archive, 3d, preset, icon, art); `is:` favourite, used, unused, missing, filed, unfiled, tagged, untagged, thumbed (has a custom thumbnail), unthumbed; `uses>2` and `canvases>1`; `date:2026-10` (also a day or a year, `today`, `yesterday`, `week`, `month`, `year`, and `date>` / `date<` for after and before); `on:name` (placed on a canvas or board of that name); `folder:`, `description:`, `property:source` or `property:source=web`, and by what a property says: `property:created>2025-01`, `property:rating>=4`, `property:status>m` (dates, numbers, or the alphabet; any item of a list counts; `note:` and `field:` mean the same); `duration>30s` (`2m`, `1:30`). They combine with words and operators: `kind:video duration>1m -is:used`. A search can be saved with the button in the box (see *Saved searches* under Navigating); in the Library it also keeps the look of the library at that moment (grid or list, columns, sort), is listed under **Saved searches** in the sidebar, and one click brings back the search and its look, so a saved search works as a view: `kind:note property:type=Zettel`, sorted by `created`. While a search, a section of the side panel or *In use* / *Unused* hides items, a chip over the bottom of the grid says so (*Showing 12 of 340 items: Unused · Refs*); its **Show all items** clears them all, as does the coloured reset button beside the sort while any filter is on.
-  - **Back to top:** the arrow in the status bar, once you have scrolled down.
-- **Dragging items** shows up to five of them stacked, with their count. Drop them on a folder, a tag or Favourites in the sidebar to file them, or on the strip across the top to place them on the open canvas (the library stays open).
-- **The status bar** along the bottom (the same as the canvas's) shows how many items are listed (*3 of 5 items*), how many are selected and their size, and the size of the whole library. At its right end: grid or list, the list's columns, and the thumbnail size.
-- **Open in default app** (desktop app; in the details, the right-click menu, and a file card's Actions bar on a canvas) opens an item's file in your system's app for that kind of file: for a file canvast cannot show, or to edit a picture elsewhere.
-- **Folders** fold: press the arrow on a folder with subfolders, or Collapse all on the Folders header. It is remembered on this device. A right click on a folder or tag opens its menu.
-- **Organize…** (right click an item, in Details, or `O`) moves what is selected to a folder and sets its tags from one dialog, with a search, as a tree or in a row. An item is in one folder; it can have many tags. A tag with a slash, such as `art/ink`, shows as `ink` under `art`. Nothing changes until Apply.
-
-  ![The Organize dialog over the library: a search, the folders as a tree, and tabs for the folder and the tags](docs/screenshots/organize.webp)
-
-- **Art files** (`.kra`, `.ora`, `.psd`, `.psb`, `.procreate`, `.sketch`, `.fig`, `.figcraft`, `.clip`) show the picture they keep, on their library card and details, in the viewer and on a canvas. A backup copy (`a.kra~`, `a-autosave.kra`) shows its picture too, and says it is an automatic backup: on its card and in its details. It is a preview as the file was last saved: the file is only read, its layers stay its program's. A Photoshop file without a stored thumbnail shows its merged picture when that is 8-bit RGB or grey; the viewer shows that merged picture too, reduced to 64 megapixels when it is bigger. An art file of any size is only read in parts, also one past the import limit that lies in the desktop app's `library/`. A picture stored inside a ZIP-based file (`.kra`, `.ora`, `.procreate`, `.sketch`, `.fig`, `.figcraft`) is used up to 256 MiB unpacked; past that its next, smaller picture is used, or its tile if it has none. On a canvas a newly imported art file has its picture's shape; one imported earlier keeps a 4:3 card, its picture cropped to fit. Other art files (`.xcf`, `.ai`, `.sai`, `.afphoto`, `.afdesign`) keep their tile.
-- **Trash** (desktop app; the library's sidebar) puts `is:trash` in the search box and shows the files in this workspace's `.trash` folder as cards in place of the grid, not your system's trash; anything else typed filters by name, and anything else in the sidebar goes back to the library. Pick files as in the library (Ctrl, Shift, Ctrl+A): **Restore** and **Delete for good** are in the details panel and the right-click menu. A file comes back where it was, never over another; its tags and folder come back only if the library still remembers it. Delete for good asks first. Hidden files there are listed only in hidden mode with the Hidden items open; outside it they neither show nor count. Boards and canvases in `.trash` are not listed.
-- **Delete everywhere** (a selected item's right-click menu on a canvas, the command palette, and the library's details) deletes the file and every instance of it, after saying where it is used; on a canvas, text and shapes selected with it stay. Outside hidden mode, a hidden item is a padlock: Delete everywhere, Copy file and copying a note card do not reach it, whatever the password state.
-- **Drag items out of the app** (desktop app): drag a card onto a file manager or another program; several selected go together, up to 1,000. If a program refuses the plain drag, hold `Alt` while you start it for a real file drag (which nothing inside the app receives). Hidden items stay in: use **Copy file**.
-- **Copy** (`Ctrl+C` in the library and its viewer, or the menu): a picture goes as a PNG, also a GIF's first frame and an SVG drawn, which the message says; only the first of several pictures fits. A markdown or rich text note goes as markdown with its properties on top, a plain text note as its words, several notes joined. A video or sound goes as its library picture. Any other file, or a picture the app cannot draw (TIFF, HEIC, PSD), goes as its name, which the message says. **Copy file** (desktop app; the same menu and a right click on a canvas) puts the real files on the clipboard, of any kind, to paste in a file manager. On a canvas, `Ctrl+C` on one note card gives the note's words and pastes back as the card; other objects give a picture of them, as ever, and paste back as themselves.
-- **Show in file manager** (desktop app; in the details of one item, and its right-click menu) opens the item's folder in your system's file manager with its file selected. A hidden item has no *Show in file manager*; *Open in default app* (in hidden mode, after asking once per session) opens a readable copy written to the app's own temporary folder, deleted when the hidden items are locked or canvast closes. Copying a hidden item to the system's clipboard asks first, once a session: other programs can see and keep what is there. Outside hidden mode, hidden items' property names and values are never offered as suggestions, columns or sorts.
-- A **viewer** with filmstrip, zoom, pan, slideshow and a details panel. The details show where an item is used (*Used on 3 canvases (4 times)*, then each canvas with its own count; past five canvases, **Show all** lists the rest), and **Show** takes you to it on the canvas at any depth. A button switches the background behind the picture, the controls can be hidden, and a double tap opens it on phones. The button beside the details button (or `F`) hides and shows the controls; with them hidden, the picture gets their room. A video or GIF plays with the canvas's player, floating over the bottom of the picture: while the pointer rests, playing or paused, the player fades away (after *Hide the player* in Settings > Library, 1.5 s by default), also with the pointer resting on it; only a move of the mouse, a click or a touch brings it back, never a key. While the focus is in the player (click any part of it, its empty space too; also once it has faded), `Left` and `Right` step the file and `Space` plays or pauses it; elsewhere in the viewer the arrows go to the previous and next file. A GIF whose frames were never counted (imported long ago, or taken from a workspace folder) gets the player too.
-- **Notes** open in the viewer in a full notes editor ([SunEditor](https://suneditor.com)): markdown (`.md`, `.markdown`), plain text (`.txt`) and the app's own **rich text notes** (`.note.html`). **New note** (the Import menu) makes a markdown note in the open folder (else in the **Notes** folder, whose name is set in Settings > Notes) and opens it. On a canvas, the **Note tool** (`M`) does the same where you click (drag a box to set the card's width; a click makes it as wide as *Note tool card size*). A new note is named by *New note name* (Settings > Notes; `Note {yyyy}-{mm}-{dd} {hhmmss}` at first), which is also its title: the note goes in the Notes folder, its card is placed there and it opens in the Note panel. Texts on a card (what the Note tool made before notes were files; a card is also one of a text's box options) become notes with **Make note files** in their Actions bar: the same place, width and stacking, the words in a `.md` file named by its first line.
-  - **The `/` menu**, in every editor style: type `/` at the start of a line or after a space, then words to find a command (headings, lists, quote, code, table, picture, link and more).
-  - **Editor style** (Settings > Notes): *Document* (pages, every tool; the default), *Classic* (one short toolbar row, the rest behind its **+**), *Bottom* (the same, below), *Balloon* (the toolbar only over selected words), *Notion-like* (a handle beside each block).
-  - **On a canvas:** double-click a note's card (or **Edit note** in its Actions bar) and the note opens in the **Note** panel: the same editor and saving as in the library, in the style of *Editor style on a canvas* (Settings > Notes). *Note editor on a canvas* chooses where: **Panel** (the default) or **Window**, centred over the canvas until it is closed (a click beside it closes it, asking about unsaved changes). The panel is a panel like Layers (it never folds): it floats, docks to a side (keeping its own width), its width and height can be dragged, and the canvas stays usable beside it. ✕ closes it (asking about unsaved changes); the card shows the saved version at once. Saving is no step of the canvas's undo: undo and redo on the canvas keep the saved version (they never bring an older one back). The rename button in its header (or F2) renames the note with the library's rename dialog; the extension stays as it is, and `.note.html` counts as one extension there and in batch rename. A hidden note opens there only while the hidden items show, and closes (its changes saved) as soon as they no longer do: hidden mode ended, the hidden items locked.
-  - **Pasting from Obsidian:** a note copied from Obsidian comes in as a note: its `![[embeds]]` show their pictures when the files are in the library (found by name, wherever they lie; one not there stays as `![[name]]`), and `[[links]]` and footnotes stay as Obsidian writes them. Its properties join the note's own at the next save: tags are added, a key the note does not have (or has empty) is added, and what the note already says stays. Undoing or deleting all that was pasted takes them back; when only properties were pasted, closing the note without saving does.
-  - **Links from the clipboard:** select words and paste a web address or a `[[link]]`: those words become the link. The selection's toolbar has the 🔗 link button too.
-  - **Remove format** (the eraser in the toolbar over selected words, and in Text ▾) takes sizes, fonts and colours off the words chosen: a heading made bigger or smaller by accident goes back to its own size.
-  - **Markdown and Code views** show the note as text; coming back without a change there, the note is as it was (picture sizes, spacing). A change made there is read back from that text, which markdown keeps without sizes or styles.
-  - **Numbers drag:** the font size and a picture's or video's width and height change by dragging the field left or right, as every number of the app (a picture keeps its proportion when that is on; a dragged font size applies on release).
-  - **Saving is manual** (no autosave while you work): `Ctrl+S` or File ▸ Save. Until you save, your changes live only in the open editor. The note's own file is rewritten in place (in the desktop app, the same file in `library/`, so other programs see it); it keeps its name, folder, tags, note and fields. Leaving a note with unsaved changes asks: *Save them*, *Don't save* or Cancel (or saves without asking, with **Save notes on close** on); so does closing the desktop app's window, and the browser asks before the page is left.
-  - **Markdown keeps what markdown can hold:** headings, bold and italic, lists and task lists, quotes, code, tables, links, pictures; coloured or styled words are kept as inline HTML. When a note has formatting a markdown or text file cannot hold (an alignment, a font size, the page layout), saving asks: **Save as a rich text note** (the note becomes `name.note.html` in its place, keeping everything; its folder, tags, links to it and its cards on canvases follow it, and no markdown file is left beside it) or **Save as plain markdown** (that formatting is dropped). Obsidian's own syntax is written as Obsidian writes it: footnotes (`[^1]`), embeds kept as written (`![[picture]]`) and table column alignment (`:---:`). Empty lines and spaces at a line's start are no formatting: they never make it ask.
-  - **Settings > Notes:** **Write tags and properties into note files** (off by default) writes what is changed in the library into the file too; off, the file changes only when you save its words, and what its YAML says is still read into the library. **Save notes on close** saves a note's changes on leaving it without asking. **When a note's formatting does not fit its file** answers the question above once and for all: keep its file (`.md`, `.txt`, dropping that formatting) or rich text (`.note.html`). A note whose formatting fits stays as it is.
-  - **Pictures, video, sound and files come from the library:** the gallery buttons (Insert ▸ Image gallery, Video gallery, Audio gallery, File gallery, File browser) open the library chooser, and a file uploaded, dropped or pasted into a note is put in the library first. Its own **Import…** button takes files from this device into the library and into the note.
-  - **Links** to library items are written as their path from the root of the library (`Pictures/cat.png`, brackets and spaces encoded), whichever folder the note is in. A link is found by the file it names on disk (with **Keep file names** off, a file's name there differs from the item's: `my cat.png` is `my_cat.png`), read from the note's folder, then from the root of the library (`library/Pictures/cat.png` too), then the one item of that name anywhere; so a path relative to the note, written elsewhere, still works, as does `<my cat.png>`, and a copy of an item's file shows that item. The app's own link `canvast:<sha-256>` is read too, and kept as written. The picture dialog shows a picture's link, and a path typed there is found in the library.
-  - **Links between notes** (as Obsidian writes them): `[[Plan]]`, `[[Plan|shown text]]`, and `[[Projects/Plan]]` when two items share a name. Type `[[` and the library's notes and files are offered; the one chosen goes in as a link. In the editor a link is an ordinary link: a click puts the cursor in it, **Ctrl+click** (⌘ on a Mac) opens the note or file it points at in the viewer (asking first about unsaved changes). A markdown note keeps them as `[[…]]`; a rich text note writes the path to the item (`../Projects/Plan.md`). Links to web addresses are not opened from a note (the app never goes online). `![[…]]` (an Obsidian embed) is kept as it is written, not shown.
-  - **Canvas links:** `[[canvas:Characters]]` (`[[` offers the workspace's canvases too); Ctrl+click opens that canvas.
-  - **A look before opening:** the pointer resting on a link shows the preview of what it points at (a note's page, a picture).
-  - **Search inside notes:** the library search (All) finds a note by the words in it too (read once per version while searching). The desktop app's paged list of a very large library (20,000 items or more) does not search note words yet.
-  - **Linked from:** an item's details list the notes that link to it (by `[[name]]`, a path or `canvast:` link); a name there opens that note. **Renaming or moving** an item in the library writes the links to it in every note again (`[[old name]]` when that name was its alone, a path to its old place), and a note that moved has its own paths written from its new folder; each changed note is saved as a new version.
-  - **Properties** (as Obsidian writes them): a markdown note's YAML block at its top (`---` … `---`) is its item's tags (`tags:`), its description (`description:`) and its properties (every other key; a list shows as `a, b`). Importing the note or saving it, here or elsewhere (Obsidian), reads them into the item, and the file wins. Changing its tags, description or properties in the library (the details panel, bulk tags, renaming or deleting a tag, undo) stays in the library, unless **Write tags and properties into note files** is on: then it is written into the file too, as a new version. A `|` or `>` block is read as text with its lines (a value of several lines is edited in a larger box), and written back as it was while it is unchanged. A nested map is kept as written and not shown. The editor shows the note without its YAML. A rich text note keeps the same properties as `<meta>` in its head (`keywords`, `description`, one per field); a plain text note keeps them in the library only.
-  - **Property types** (as Obsidian has them): the button before a property's name chooses its type: *Text*, *List*, *Number*, *Checkbox*, *Date* or *Date & time*. A type belongs to the name, for every item with that name. A name with no type of its own takes one from its value (`4` a number, `true` a checkbox, `2025-01-31` a date, `2025-01-31T10:30` a date and time; `aliases` and `cssclasses` are lists); editing such a value keeps that type for the name. A checkbox is a box to tick and a date a picker. A **list** is a row of items, each kept whole (a comma is part of an item): Enter adds what is typed, × or Backspace in the empty box removes, dragging moves one, and it is a real YAML list in the file. A value that does not fit its type is **never changed**: it stays as it is in a plain box, marked in red with what the type expects, also while it is typed. In the file (with **Write tags and properties into note files**, when a value changes) a checkbox is written as a bare `true` or `false`. `tags` and `description` have their own places in the panel and no type button. In a narrow panel a property's value has a line of its own under its name, and a long value wraps, so neither is cut.
-  - **What a save may change by itself** (Settings > Notes), all off by default, so a note changes only as you change it; plain text notes are left alone:
-    - **Automatic created and modified:** both properties are always there, not editable or removable in the details panel (also before the first save). A save writes the time into modified, and into created when the note has none (from when it came into the library). Their names (`created-on`, say) and the **Date and time format** (`YYYY-MM-DDTHH:mm`) are settings; sorting and date searches need the numbers in that order.
-    - **Title:** *First heading*: a save writes the first H1 into the title property, which is then not editable or removable there. With no H1 the title stays.
-    - **Rename notes on save:** a save names the file from **File name comes from** (*First heading* or *Title property*), in **File name style**: *Keep as written* (only what a file cannot hold changes: `My Note: Part 1` → `My Note- Part 1.md`) or *Clean* (`my_note-part_1.md`), the two rules of Keep file names, used for these notes in its place. The links to it in other notes follow, and it is a step of the library's undo (the next save renames it again). Turning it on renames nothing until a note is saved. With nothing to name it by (no heading or title, or only marks such as `# ???`) the name stays; when another note has the name first, the file and the item end in `-2`, and stay so until the name wanted changes. In the desktop app with Keep file names off, a note named as written has a tidy file until its name next changes. It happens when a note is saved in its editor.
-    - **Pasted notes:** a title or created pasted with a note is kept over what the note had for that save; modified becomes the time of the save. Links rewritten after a rename do not count as a save.
-  - **Copying a whole note** (`Ctrl+A` then `Ctrl+C` or the editor's Copy; **Copy** on one markdown note in the library) copies it as its markdown file, with its properties as YAML at the top, as the details panel has them, so pasted at the top of an empty note in another app they arrive as properties. It is plain text. Copying part of a note copies that part as before.
-  - **#tags in the words** (as Obsidian reads them: `#` then a word with a letter in it, not in code, `#123` and `# Heading` are none) are the item's tags too; typing `#` offers the library's tags. With a YAML block, the item's tags are exactly its `tags:` and its #tags, and taking a `#tag` out of the words takes the tag away at the next save; tags added in the library go into the YAML, never into the words. A note without YAML only adds its #tags.
-  - **Changed elsewhere:** if a note's words were changed in another app since it was opened here, saving asks before putting your version in their place.
-  - **Task lists:** click a box to tick it; it is saved as `- [x]`. A task shows its box only (no bullet).
-  - **Templates** (Insert ▸ Template; `{{date}}`, `{{time}}` and `{{title}}` in one are filled in: today, now, the note's name) insert a block at the cursor: *Meeting notes*, *To-do list*, *Journal entry*, *Reference sheet*, then **your own**: any note in the library tagged `template` (an existing note, or a New note you write for it) is listed by its name, its pictures and links pointing at the same library items.
-  - **Layouts** (Insert ▸ Layout): *Two columns*, *Three columns*, *Sidebar and main*. A layout takes the place of the whole note (`Ctrl+Z` brings the note back), and markdown cannot hold columns, so a note with one is saved as a rich text note.
-  - **Labels on cards:** **Note cards show properties** (Settings > Notes) takes names separated by commas (`status, type, tags`): their values show as small labels at the top of each note's card and library picture, at once. They say what the details panel says, written into the file or not, and change as soon as a property does.
-  - **Previews:** a note's library card and details show the top of its page (headings, lists, tables, colours); its card on a canvas is its page, laid out at the card's own size and drawn at twice that so it stays sharp when zoomed in. A side handle lays the page out at the new width or height, the words keeping their size; dragging a corner evenly (`Shift`) zooms the whole card. **Note cards show** (Settings > Notes) applies to every card at once: *Whole note* (the default), the height follows the note, also when it is saved longer; *Part*, you set the height and what does not fit fades out into the page's paper. A new version keeps the card's width. **Reset size** in a card's Actions bar puts it back to its Note tool card size. The pictures it links to show in it (also Obsidian's `![[picture]]`), a video by its picture with ▶, a sound by its waveform with ♪, a GIF by its first frame; never a hidden item's. Its text is in the system's font in the preview only. The paper is light or dark as **Preview look** says (Settings > Notes: Auto, the default, follows the app's theme; a change redraws every preview at once, so a note's previews are made when shown, never stored). Shown small on a canvas, a note's card is drawn from a copy at that size.
-  - **The title** shown for a note is the file's name (as in Obsidian); a `title:` property is one of its properties (see Automatic properties).
-  - **Other apps' folders:** a folder whose name starts with a dot in `library/` (Obsidian's `.obsidian/`, say) is never taken into the library.
-  - **Its look is the app's:** the app's font, colours, corners and light or dark theme. A dialog of the editor (Insert image…) opens the library chooser above itself.
-  - **Fonts:** the font list is *Inter* (built in; *Default* when words have no font of their own) and the library's fonts (the ones the canvas's text uses), by their family names; files of one family (Regular, Bold…) are one entry. A rich text note names them so, and other apps show them where the font is installed.
-  - **Not in a note's toolbar:** New document (it would empty the open note), Print, and the page buttons (page break, page number, previous and next page): a note is a file of the library, not a page to print. Document style still shows its pages.
-
-| | |
-| --- | --- |
-| ![A markdown note open in the library's notes editor: headings, a task list, a quote and a table, with its tags and fields in the details](docs/screenshots/notes-editor.webp) | ![The same note on a canvas: its card shows its page, and the Note panel beside it edits it](docs/screenshots/notes-panel.webp) |
-| A note in the library's notes editor, its YAML properties as tags and properties | Its card on a canvas and the Note panel |
-
-- **Folders** (an item lives in one folder, folders nest; a long list in the sidebar shows its first rows and **Show N more**, remembered on this device; the search box above the list finds a folder by name or path, opens what leads to it, and `Esc` empties it), **tags** (several per item; a tag with a `/` is a branch of a tree in the sidebar, with arrows that fold it and a parent that finds and counts what is nested under it, each item once; or all in a row with their whole names, by the button on the Tags header; renamed in one dialog, from a tag's ⋯ menu in the sidebar or the Tags panel, or a double-click on it in the details), **favourites**, file types, **Similar images** (duplicates and near-duplicates found by their pixels) and **hidden** items, which are kept out of every list and listed only in hidden mode (see [Hidden items and passwords](#hidden-items-and-passwords)).
-- **Searching the sidebar:** Folders, Tags and Canvas tags each have a search box for their own list. It only narrows that list: the items shown change when you choose a row.
-- **Pinned folders:** the pin button on a folder's row (it shows when the pointer is on the row, filled on a pinned folder; not on small or touch screens), or **Pin to top** in its ⋯ menu or on a right click, puts it first in the Folders list, a subfolder too, with an arrow on its folder icon; **Unpin** puts it back. Pins are remembered on this device only, and a search shows every folder in its usual place.
-- **Sorting the sidebar:** the sort button on a section's header changes the order at each click, remembered on this device. Folders go through A to Z, Z to A, newest first and oldest first; Tags and Canvas tags through A to Z and Z to A. Newest and oldest follow the order the library holds its folders in, as folders have no date of their own: one found on the disk counts from when it was found, and one hidden and shown again can count as newer.
-- **Quick filters:** a file type or a tag in the sidebar lists only those items; `Ctrl`+click (`⌘` on a Mac) adds another type or tag to the filter, or takes it out: any of the types chosen and any of the tags chosen.
-- **Custom thumbnail** (the picture button beside ★ and Hide in the details panel; **Thumbnail…** for several selected): what the Library shows for an item instead of its own picture, also for a file with no preview (a font, a 3D file, a document), and what its card shows on a canvas. Choose one uploaded or pasted before (**Uploaded thumbnails**, with how many items use each, and **Delete an uploaded thumbnail…**), another item's picture (**From the library**), **Upload a picture** or **Paste a picture** (kept small, 512 px, in its own place: never a library item; `Ctrl`+`V` while the dialog is open pastes at once), or **Original** (its own picture again). Changing it can be undone. In hidden mode an uploaded one is a hidden thumbnail: listed and shown only there (normal mode never sees it), sealed with the hidden items' key in the desktop app. Hiding an item takes its uploaded thumbnail with it (sealed, unless shown items use it too); showing it again makes it normal.
-- **Export folder…** (a folder's ⋯ menu) writes the folder's files and those of its subfolders, under their names in the library: as a ZIP, or in the desktop app as a folder where you choose (outside the workspace), either keeping its folders (from the folder itself down) or with all the files together (two of the same name are numbered). Each file written to a folder is read back and checked against its SHA-256. In hidden mode it exports the hidden items in it, written readable after you confirm; outside hidden mode, only the shown ones.
-- **Selecting and the details panel**
-  - A click selects an item. The details panel opens and closes with its button (or `I`) and shows what is selected (for several: their tags and folder together). A click never moves the grid under the pointer.
-  - When the grid is laid out again (the panel toggled, the window or thumbnails resized), the selected item stays where it is on the screen.
-  - `Ctrl+A` selects all shown; a plain click then selects one alone. `Ctrl`+click adds or removes, `Shift`+click takes a range. A selected item shows a coloured border (no checkboxes).
-  - **Select several** (a card's menu: right click, or a long touch on a phone or tablet): from then on each tap or click adds an item or takes it away, until nothing is selected or `Esc`. The way to pick several without a keyboard.
-  - Selected items hidden by a search or filter are counted in the panel, with a button to keep only the shown ones.
-  - The *Details* fold (the file's own metadata) stays open or closed as you left it.
-- **Drag items onto the sidebar:** onto a folder to move them into it, onto *Unfiled* to take them out of their folders, onto a tag to tag them, onto *Favourites* to mark them; a selected item carries the whole select.
-- **Undo in the library:** `Ctrl+Z` undoes the last change to tags, favourites, folders or names (`Ctrl+Shift+Z` or `Ctrl+Y` redoes), up to 50 steps; deleting from the library has its own safety (files are kept while undo on a canvas can need them).
-- **Tags and folders of several items at once**
-  - The details panel lists every tag any of them has, with how many have it (*2/4*). **×** takes a tag off all of them; **+** puts it on the rest.
-  - The tag field suggests the library's tags and takes several at once, separated by commas.
-  - The details panel says which folder they are in (for a mixed selection, each with how many). **Organize…** moves them to a folder, makes a new one, and sets tags.
-  - Changes to hundreds of items are one write, so they take a moment, not minutes.
-- **Properties** (the details panel of one item): every kind of file has them. A markdown note's are its YAML (see *Properties* under Notes), a rich text note's its `<meta>` tags; every other file's stay in the library, and the file itself never changes.
-  - **Description:** a plain-text box (not Markdown).
-  - **Add a property** adds a row with a name you choose and its value: `link` and an address, `author`, `source`, `licence`… Names already used in the library are suggested, and so are the values others of that name have (the most used first, each item of a list on its own).
-  - Each is saved when you leave it or press `Enter`. **×** removes a property; the grip at its start moves it (drag it, or press `↑` / `↓` on it). `Ctrl+Z` undoes.
-  - The library search (All) finds words in descriptions and in properties; see *Search keywords* for the rest.
-  - Descriptions and properties travel in backups and in the library index. Importing keeps an item's own description (the backup's fills an empty one) and adds the properties it does not have yet.
-- **Rename** one item or many at once, with a preview: number them, replace text, add text or change the extension. Renaming one item edits only the name before the extension (it stays, so it cannot change by accident); *Change the extension too* opens the whole name.
-- **Copy and paste** with the system clipboard: *Copy* (the menu, or `Ctrl`+`C` over the library) puts the picture, as a PNG, alone on the clipboard (a name beside it would be pasted instead of the picture by many programs); *Copy file name* puts the name as text; a file that is not a picture is copied as its name. *Paste* brings a picture from the clipboard in, named by the text beside it when there is one and it is a file name, else `image`.
-- **Export** items as a `.canvast` archive, download files, or export all files as a plain ZIP sorted by file type or by folder.
-- **Safe deletion:** the details panel has one **Delete…** button.
-  - An unused item is deleted from the library.
-  - An item in use is deleted everywhere, after a confirmation that says where it is used (the first three canvases and how many others). Its instances are removed from every canvas first; a text using it as its font keeps its words in the default font.
-  - Undo brings them back on the open canvas, not on the others.
-  - A file is erased only when nothing, undo included, can bring it back.
-- **Missing files** (for example after clearing site data, or a file taken out of the library folder) are flagged with their usage; importing the same file again restores every instance.
-- **Library folder** (browser version, Chromium only): keep the library's files on your disk instead of in the browser's storage, so its size is limited by your disk.
-  - **Set it up** in Settings > Storage with *Choose library folder…*. Files are named by their content and keep their extension (`a07c9f….png`), so other programs can open them. *Move into folder* and *Move back to browser* move what is already there.
-  - **The library index** (`.canvast-index`, a hidden file beside the files) is the whole workspace without the files: boards, canvases, objects, names, tags, folders, descriptions, properties, styles, settings. It is saved by itself shortly after each change (a checkbox turns that off; **Save index** saves at once). It is not a backup (a `.canvast` backup holds the files), and not a cache to delete: on another device it is your canvases.
-  - **On another device**, choose the same folder: you are offered to open its index (**Open index** does it later). The canvases are added and every file is matched by name. Do this on a device with no canvases of its own yet, or they are added twice.
-  - **After a restart** the browser asks for permission again: press *Reconnect folder*.
-  - **Leave the files alone:** don't move, rename or edit them, as canvast finds each by its name. Files kept before extensions were added get one with *Add extensions* on the card.
-
-| | |
-| --- | --- |
-| ![The Library](docs/screenshots/library.webp) | ![The viewer](docs/screenshots/viewer.webp) |
-| The Library, filled by six screenshots of the showcase (shown by file type: the showcase also carries its two font files) | The viewer with its filmstrip and details |
-
-![The Library as a list, with a font selected: its sample in the details panel](docs/screenshots/library-list.webp)
-
-*The list layout with its columns, and a font's sample in the details panel.*
+</details>
 
 ### Exporting
+
+Copy to other apps, or export a sheet, a picture or selected shapes, and get what you see.
 
 **Copy to other apps.** `Ctrl/⌘+C` keeps the real objects for pasting back here, and also puts a PNG picture on the system clipboard:
 
@@ -575,6 +530,493 @@ Switch between **Canvas** and **Library** at the top left. The canvas keeps its 
 
 ---
 
+## The Library
+
+Every file you import, kept once, with folders, tags and search. Switch between **Canvas** and **Library** at the top left. The canvas keeps its view, selection and undo history while you are away.
+
+| Section | What is in it |
+| --- | --- |
+| [The gallery](#the-gallery) | Grid or list, filters, thumbnails, search keywords |
+| [Folders and tags](#folders-and-tags) | The folder tree, tags, Organize, quick filters |
+| [The viewer](#the-viewer) | Filmstrip, zoom, slideshow, players |
+| [Art files](#art-files) | Pictures from `.kra`, `.psd`, `.procreate` and others |
+| [Selecting and details](#selecting-and-details) | Several items at once, properties, thumbnails, renaming |
+| [Copying and dragging out](#copying-and-dragging-out) | The clipboard, real files, other apps |
+| [Exporting from the library](#exporting-from-the-library) | Archives, ZIPs and folders |
+| [Deleting and Trash](#deleting-and-trash) | Safe deletion, Trash, missing files |
+| [The library folder](#the-library-folder) | The browser version's files on your disk |
+
+### The gallery
+
+Every file, with its size, type and usage. Search it, filter it and sort it.
+
+![The Library, filled by six screenshots of the showcase, shown by file type](docs/screenshots/library.webp)
+
+![The Library as a list, with a font selected: its sample in the details panel](docs/screenshots/library-list.webp)
+
+*The list layout with its columns, and a font's sample in the details panel.*
+
+| Feature | What it does |
+| --- | --- |
+| **Grid or list** | The list has columns you can resize, move, and add from any property |
+| **Filters** | Kept over a restart; a chip says what is hidden, with **Show all items** |
+| **Search keywords** | `kind:video duration>1m -is:used`: the box's help card lists them |
+| **Saved searches** | Keep a search and its layout, in the sidebar |
+| **Status bar** | How many listed, how many selected, and their size |
+| **Sections** | Drag a head to reorder the sidebar and the details panel |
+
+<details>
+<summary>All about the gallery</summary>
+
+- **The gallery:** every imported file with its size, type and usage (*4 uses · 3 canvases*), with search, filters by file type, and sorting.
+  - **Grid or list.** In the list, drag a column header's edge to resize it (double-click for its usual width). **List columns** also adds any **property** as a column by its name (`status`, `created`); a click on its head sorts by it, as the Sort menu's *Properties* do: dates by date, numbers by number, and items without it last either way. Columns, widths and the thumbnail size are kept.
+  - **The sidebar's sections** (Folders, File types, Tags, Canvas tags, Saved searches) and **the details panel's** (a note's or file's information, Tags and Folder, Properties, Linked from, Where it is used) can be reordered by dragging their heads (the list scrolls when you drag near its top or bottom, or past it), or with `Alt+↑` / `Alt+↓` on a section's name. A double-click on the name at the top of the details panel renames the item.
+  - **Filters** (Show, Sort by and its direction, the sidebar's list) are kept over a restart; the funnel-with-a-cross button resets them, and it is coloured while one is on. While a search or a filter hides items, a chip over the grid says what and how many are shown, with **Show all items**.
+  - **Thumbnails** are made in the background after an import, so the grid fills in on its own. A font shows "Aa" in its letters (on the canvas too); selected, its details show a sample sentence, and the viewer shows it at four sizes with the alphabet and digits.
+  - **Search keywords** (the help card beside the box lists them, each with an example): `width>1000`, `height<`, `pixels>2mp`, `size<5mb`, `ratio:16x9`, `orientation:portrait`, `colour:blue`; `kind:` (picture, video, audio, gif, font, file; and by what a file is: note, vector, document, archive, 3d, preset, icon, art); `is:` favourite, used, unused, missing, filed, unfiled, tagged, untagged, thumbed (has a custom thumbnail), unthumbed; `uses>2` and `canvases>1`; `date:2026-10` (also a day or a year, `today`, `yesterday`, `week`, `month`, `year`, and `date>` / `date<` for after and before); `on:name` (placed on a canvas or board of that name); `folder:`, `description:`, `property:source` or `property:source=web`, and by what a property says: `property:created>2025-01`, `property:rating>=4`, `property:status>m` (dates, numbers, or the alphabet; any item of a list counts; `note:` and `field:` mean the same); `duration>30s` (`2m`, `1:30`). They combine with words and operators: `kind:video duration>1m -is:used`. A search can be saved with the button in the box (see *Saved searches* under Navigating); in the Library it also keeps the look of the library at that moment (grid or list, columns, sort), is listed under **Saved searches** in the sidebar, and one click brings back the search and its look, so a saved search works as a view: `kind:note property:type=Zettel`, sorted by `created`. While a search, a section of the side panel or *In use* / *Unused* hides items, a chip over the bottom of the grid says so (*Showing 12 of 340 items: Unused · Refs*); its **Show all items** clears them all, as does the coloured reset button beside the sort while any filter is on.
+  - **Back to top:** the arrow in the status bar, once you have scrolled down.
+- **Dragging items** shows up to five of them stacked, with their count. Drop them on a folder, a tag or Favourites in the sidebar to file them, or on the strip across the top to place them on the open canvas (the library stays open).
+- **The status bar** along the bottom (the same as the canvas's) shows how many items are listed (*3 of 5 items*), how many are selected and their size, and the size of the whole library. At its right end: the list's columns, grid or list, and the thumbnail size, a slider in the same place in both, each with its own size.
+
+</details>
+
+### Folders and tags
+
+An item is in one folder and can have many tags. Both show as trees in the sidebar.
+
+![The library sidebar: a search box over the folder tree, with a pinned folder first and the sort and collapse buttons on the header](docs/screenshots/sidebar.webp)
+
+| Feature | How |
+| --- | --- |
+| **Organize…** | `O`, the right-click menu, or Details: moves to a folder and sets tags at one Apply |
+| **Search a list** | The box over Folders, Tags or Canvas tags |
+| **Sort a list** | The sort button: A to Z, Z to A; folders also newest and oldest |
+| **Pin a folder** | The pin on its row, or **Pin to top** in its menu; on this device only |
+| **Nested tags** | `art/ink` shows as `ink` under `art` |
+| **Quick filters** | Click a type or tag; `Ctrl`+click adds another |
+| **File by dragging** | Drop items on a folder, tag, *Unfiled* or *Favourites* |
+
+![The Organize dialog over the library: a search, the folders as a tree, and tabs for the folder and the tags](docs/screenshots/organize.webp)
+
+<details>
+<summary>All about folders and tags</summary>
+
+- **Folders** fold: press the arrow on a folder with subfolders, or Collapse all on the Folders header. It is remembered on this device. A right click on a folder or tag opens its menu.
+- **Organize…** (right click an item, in Details, or `O`) moves what is selected to a folder and sets its tags from one dialog, with a search, as a tree or in a row. An item is in one folder; it can have many tags. A tag with a slash, such as `art/ink`, shows as `ink` under `art`. Nothing changes until Apply.
+
+- **Folders** (an item lives in one folder, folders nest; a long list in the sidebar shows its first rows and **Show N more**, remembered on this device; the search box above the list finds a folder by name or path, opens what leads to it, and `Esc` empties it), **tags** (several per item; a tag with a `/` is a branch of a tree in the sidebar, with arrows that fold it and a parent that finds and counts what is nested under it, each item once; or all in a row with their whole names, by the button on the Tags header; renamed in one dialog, from a tag's ⋯ menu in the sidebar or the Tags panel, or a double-click on it in the details), **favourites**, file types, **Similar images** (duplicates and near-duplicates found by their pixels) and **hidden** items, which are kept out of every list and listed only in hidden mode (see [Hidden items and passwords](#hidden-items-and-passwords)).
+- **Searching the sidebar:** Folders, Tags and Canvas tags each have a search box for their own list. It only narrows that list: the items shown change when you choose a row.
+- **Pinned folders:** the pin button on a folder's row (it shows when the pointer is on the row, filled on a pinned folder; not on small or touch screens), or **Pin to top** in its ⋯ menu or on a right click, puts it first in the Folders list, a subfolder too, with an arrow on its folder icon; **Unpin** puts it back. Pins are remembered on this device only, and a search shows every folder in its usual place.
+- **Sorting the sidebar:** the sort button on a section's header changes the order at each click, remembered on this device. Folders go through A to Z, Z to A, newest first and oldest first; Tags and Canvas tags through A to Z and Z to A. Newest and oldest follow the order the library holds its folders in, as folders have no date of their own: one found on the disk counts from when it was found, and one hidden and shown again can count as newer.
+- **Quick filters:** a file type or a tag in the sidebar lists only those items; `Ctrl`+click (`⌘` on a Mac) adds another type or tag to the filter, or takes it out: any of the types chosen and any of the tags chosen.
+- **Drag items onto the sidebar:** onto a folder to move them into it, onto *Unfiled* to take them out of their folders, onto a tag to tag them, onto *Favourites* to mark them; a selected item carries the whole select.
+
+</details>
+
+### The viewer
+
+Double-click a card to see it large, with a filmstrip, zoom, pan and a slideshow.
+
+![The viewer with its filmstrip and details](docs/screenshots/viewer.webp)
+
+| Feature | How |
+| --- | --- |
+| **Controls** | `F` hides and shows them; a button changes the background |
+| **Where it is used** | The details list each canvas, and **Show** goes there |
+| **Video and GIFs** | Play with the canvas's player, which fades while the pointer rests |
+| **Keys** | Arrows change file; in the player they step, and `Space` plays |
+
+<details>
+<summary>All about the viewer</summary>
+
+- A **viewer** with filmstrip, zoom, pan, slideshow and a details panel. The details show where an item is used (*Used on 3 canvases (4 times)*, then each canvas with its own count; past five canvases, **Show all** lists the rest), and **Show** takes you to it on the canvas at any depth. A button switches the background behind the picture, the controls can be hidden, and a double tap opens it on phones. The button beside the details button (or `F`) hides and shows the controls; with them hidden, the picture gets their room. A video or GIF plays with the canvas's player, floating over the bottom of the picture: while the pointer rests, playing or paused, the player fades away (after *Hide the player* in Settings > Library, 1.5 s by default), also with the pointer resting on it; only a move of the mouse, a click or a touch brings it back, never a key. While the focus is in the player (click any part of it, its empty space too; also once it has faded), `Left` and `Right` step the file and `Space` plays or pauses it; elsewhere in the viewer the arrows go to the previous and next file. A GIF whose frames were never counted (imported long ago, or taken from a workspace folder) gets the player too.
+
+</details>
+
+### Art files
+
+`.kra`, `.ora`, `.psd`, `.psb`, `.procreate`, `.sketch`, `.fig`, `.figcraft` and `.clip` show the picture they keep. The file is only read.
+
+![Library cards of art files showing their own pictures, with one selected and described in the details panel](docs/screenshots/art-files.webp)
+
+<details>
+<summary>All about art files</summary>
+
+- **Art files** (`.kra`, `.ora`, `.psd`, `.psb`, `.procreate`, `.sketch`, `.fig`, `.figcraft`, `.clip`) show the picture they keep, on their library card and details, in the viewer and on a canvas. A backup copy (`a.kra~`, `a-autosave.kra`) shows its picture too, and says it is an automatic backup: on its card and in its details. It is a preview as the file was last saved: the file is only read, its layers stay its program's. A Photoshop file without a stored thumbnail shows its merged picture when that is 8-bit RGB or grey; the viewer shows that merged picture too, reduced to 64 megapixels when it is bigger. An art file of any size is only read in parts, also one past the import limit that lies in the desktop app's `library/`. A picture stored inside a ZIP-based file (`.kra`, `.ora`, `.procreate`, `.sketch`, `.fig`, `.figcraft`) is used up to 256 MiB unpacked; past that its next, smaller picture is used, or its tile if it has none. On a canvas a newly imported art file has its picture's shape; one imported earlier keeps a 4:3 card, its picture cropped to fit. Other art files (`.xcf`, `.ai`, `.sai`, `.afphoto`, `.afdesign`) keep their tile.
+
+</details>
+
+### Selecting and details
+
+Click to select, `Ctrl`+click to add, `Shift`+click for a range. The details panel (`I`) acts on what is selected.
+
+![The details panel with four items selected: their tags with how many have each, their folders, and what can be done to all of them](docs/screenshots/bulk.webp)
+
+| Feature | What it does |
+| --- | --- |
+| **Several at once** | Tags with counts (*2/4*): **×** takes off all, **+** adds to the rest |
+| **Properties** | A description and any named value, on every kind of file |
+| **Custom thumbnail** | What the Library shows instead of an item's own picture |
+| **Rename** | One or many, with a preview, numbers and replacing text |
+| **Undo** | `Ctrl+Z` undoes tags, favourites, folders and names, up to 50 steps |
+
+<details>
+<summary>All about selecting and details</summary>
+
+- **Selecting and the details panel**
+  - A click selects an item. The details panel opens and closes with its button (or `I`) and shows what is selected (for several: their tags and folder together). A click never moves the grid under the pointer.
+  - When the grid is laid out again (the panel toggled, the window or thumbnails resized), the selected item stays where it is on the screen.
+  - `Ctrl+A` selects all shown; a plain click then selects one alone. `Ctrl`+click adds or removes, `Shift`+click takes a range. A selected item shows a coloured border (no checkboxes).
+  - **Select several** (a card's menu: right click, or a long touch on a phone or tablet): from then on each tap or click adds an item or takes it away, until nothing is selected or `Esc`. The way to pick several without a keyboard.
+  - Selected items hidden by a search or filter are counted in the panel, with a button to keep only the shown ones.
+  - The *Details* fold (the file's own metadata) stays open or closed as you left it.
+- **Tags and folders of several items at once**
+  - The details panel lists every tag any of them has, with how many have it (*2/4*). **×** takes a tag off all of them; **+** puts it on the rest.
+  - The tag field suggests the library's tags and takes several at once, separated by commas.
+  - The details panel says which folder they are in (for a mixed selection, each with how many). **Organize…** moves them to a folder, makes a new one, and sets tags.
+  - Changes to hundreds of items are one write, so they take a moment, not minutes.
+- **Properties** (the details panel of one item): every kind of file has them. A markdown note's are its YAML (see *Properties* under Notes), a rich text note's its `<meta>` tags; every other file's stay in the library, and the file itself never changes.
+  - **Description:** a plain-text box (not Markdown).
+  - **Add a property** adds a row with a name you choose and its value: `link` and an address, `author`, `source`, `licence`… Names already used in the library are suggested, and so are the values others of that name have (the most used first, each item of a list on its own).
+  - Each is saved when you leave it or press `Enter`. **×** removes a property; the grip at its start moves it (drag it, or press `↑` / `↓` on it). `Ctrl+Z` undoes.
+  - The library search (All) finds words in descriptions and in properties; see *Search keywords* for the rest.
+  - Descriptions and properties travel in backups and in the library index. Importing keeps an item's own description (the backup's fills an empty one) and adds the properties it does not have yet.
+- **Custom thumbnail** (the picture button beside ★ and Hide in the details panel; **Thumbnail…** for several selected): what the Library shows for an item instead of its own picture, also for a file with no preview (a font, a 3D file, a document), and what its card shows on a canvas. Choose one uploaded or pasted before (**Uploaded thumbnails**, with how many items use each, and **Delete an uploaded thumbnail…**), another item's picture (**From the library**), **Upload a picture** or **Paste a picture** (kept small, 512 px, in its own place: never a library item; `Ctrl`+`V` while the dialog is open pastes at once), or **Original** (its own picture again). Changing it can be undone. In hidden mode an uploaded one is a hidden thumbnail: listed and shown only there (normal mode never sees it), sealed with the hidden items' key in the desktop app. Hiding an item takes its uploaded thumbnail with it (sealed, unless shown items use it too); showing it again makes it normal.
+- **Rename** one item or many at once, with a preview: number them, replace text, add text or change the extension. Renaming one item edits only the name before the extension (it stays, so it cannot change by accident); *Change the extension too* opens the whole name.
+- **Undo in the library:** `Ctrl+Z` undoes the last change to tags, favourites, folders or names (`Ctrl+Shift+Z` or `Ctrl+Y` redoes), up to 50 steps; deleting from the library has its own safety (files are kept while undo on a canvas can need them).
+
+</details>
+
+### Copying and dragging out
+
+Take items to other apps, as a picture, as words, or as real files.
+
+| To | Do this | What arrives |
+| --- | --- | --- |
+| Paste in an image app or a note | **Copy**, or `Ctrl+C` | A picture as a PNG; a note as its words |
+| Paste in a file manager | **Copy file** (desktop app) | The real files, of any kind |
+| Drop in another program | Drag the card (desktop app); hold `Alt` if it is refused | The real files |
+| Open it elsewhere | **Open in default app** (desktop app) | Your system's app for that file |
+| Find it on disk | **Show in file manager** (desktop app) | Its folder, with the file selected |
+
+**Hidden items:** Copy file asks first, then copies a readable temporary file; they cannot be dragged out. See [Limitations](#limitations).
+
+<details>
+<summary>All about copying and dragging out</summary>
+
+- **Copy** (`Ctrl+C` in the library and its viewer, or the menu): a picture goes as a PNG, also a GIF's first frame and an SVG drawn, which the message says; only the first of several pictures fits. A markdown or rich text note goes as markdown with its properties on top, a plain text note as its words, several notes joined. A video or sound goes as its library picture. Any other file, or a picture the app cannot draw (TIFF, HEIC, PSD), goes as its name, which the message says. **Copy file** (desktop app; the same menu and a right click on a canvas) puts the real files on the clipboard, of any kind, to paste in a file manager. On a canvas, `Ctrl+C` on one note card gives the note's words and pastes back as the card; other objects give a picture of them, as ever, and paste back as themselves.
+- **Copy and paste** with the system clipboard: *Copy* (the menu, or `Ctrl`+`C` over the library) puts the picture, as a PNG, alone on the clipboard (a name beside it would be pasted instead of the picture by many programs); *Copy file name* puts the name as text; a file that is not a picture is copied as its name. *Paste* brings a picture from the clipboard in, named by the text beside it when there is one and it is a file name, else `image`.
+- **Drag items out of the app** (desktop app): drag a card onto a file manager or another program; several selected go together, up to 1,000. If a program refuses the plain drag, hold `Alt` while you start it for a real file drag (which nothing inside the app receives). Hidden items stay in: use **Copy file**.
+- **Open in default app** (desktop app; in the details, the right-click menu, and a file card's Actions bar on a canvas) opens an item's file in your system's app for that kind of file: for a file canvast cannot show, or to edit a picture elsewhere.
+- **Show in file manager** (desktop app; in the details of one item, and its right-click menu) opens the item's folder in your system's file manager with its file selected. A hidden item has no *Show in file manager*; *Open in default app* (in hidden mode, after asking once per session) opens a readable copy written to the app's own temporary folder, deleted when the hidden items are locked or canvast closes. Copying a hidden item to the system's clipboard asks first, once a session: other programs can see and keep what is there. Outside hidden mode, hidden items' property names and values are never offered as suggestions, columns or sorts.
+
+</details>
+
+### Exporting from the library
+
+| To | Use |
+| --- | --- |
+| A `.canvast` archive, or download files | **Export** |
+| All files as a plain ZIP | **Export**: sorted by file type or by folder |
+| One folder and its subfolders | **Export folder…**: a ZIP, or a folder in the desktop app |
+
+<details>
+<summary>All about exporting from the library</summary>
+
+- **Export** items as a `.canvast` archive, download files, or export all files as a plain ZIP sorted by file type or by folder.
+- **Export folder…** (a folder's ⋯ menu) writes the folder's files and those of its subfolders, under their names in the library: as a ZIP, or in the desktop app as a folder where you choose (outside the workspace), either keeping its folders (from the folder itself down) or with all the files together (two of the same name are numbered). Each file written to a folder is read back and checked against its SHA-256. In hidden mode it exports the hidden items in it, written readable after you confirm; outside hidden mode, only the shown ones.
+
+</details>
+
+### Deleting and Trash
+
+**A file is erased only when nothing, undo included, can bring it back.**
+
+| Action | What happens |
+| --- | --- |
+| **Delete…** on an unused item | It leaves the library |
+| **Delete…** on an item in use | Deleted everywhere, after saying where it is used; undo brings it back on the open canvas only |
+| **Delete everywhere** | The file and every instance of it, after saying where |
+| **Trash** (desktop app) | This workspace's `.trash` folder as cards: **Restore** or **Delete for good** |
+| **Missing files** | Flagged with their usage; importing the same file restores every instance |
+
+![The Trash in the library: deleted files as cards, with Restore and Delete for good in the details panel](docs/screenshots/trash.webp)
+
+<details>
+<summary>All about deleting and Trash</summary>
+
+- **Safe deletion:** the details panel has one **Delete…** button.
+  - An unused item is deleted from the library.
+  - An item in use is deleted everywhere, after a confirmation that says where it is used (the first three canvases and how many others). Its instances are removed from every canvas first; a text using it as its font keeps its words in the default font.
+  - Undo brings them back on the open canvas, not on the others.
+  - A file is erased only when nothing, undo included, can bring it back.
+- **Delete everywhere** (a selected item's right-click menu on a canvas, the command palette, and the library's details) deletes the file and every instance of it, after saying where it is used; on a canvas, text and shapes selected with it stay. Outside hidden mode, a hidden item is a padlock: Delete everywhere, Copy file and copying a note card do not reach it, whatever the password state.
+- **Trash** (desktop app; the library's sidebar) puts `is:trash` in the search box and shows the files in this workspace's `.trash` folder as cards in place of the grid, not your system's trash; anything else typed filters by name, and anything else in the sidebar goes back to the library. Pick files as in the library (Ctrl, Shift, Ctrl+A): **Restore** and **Delete for good** are in the details panel and the right-click menu. A file comes back where it was, never over another; its tags and folder come back only if the library still remembers it. Delete for good asks first. Hidden files there are listed only in hidden mode with the Hidden items open; outside it they neither show nor count. Boards and canvases in `.trash` are not listed.
+- **Missing files** (for example after clearing site data, or a file taken out of the library folder) are flagged with their usage; importing the same file again restores every instance.
+
+</details>
+
+### The library folder
+
+Browser version, Chromium only: keep the library's files on your disk, so your disk sets the limit.
+
+<details>
+<summary>All about the library folder</summary>
+
+- **Library folder** (browser version, Chromium only): keep the library's files on your disk instead of in the browser's storage, so its size is limited by your disk.
+  - **Set it up** in Settings > Storage with *Choose library folder…*. Files are named by their content and keep their extension (`a07c9f….png`), so other programs can open them. *Move into folder* and *Move back to browser* move what is already there.
+  - **The library index** (`.canvast-index`, a hidden file beside the files) is the whole workspace without the files: boards, canvases, objects, names, tags, folders, descriptions, properties, styles, settings. It is saved by itself shortly after each change (a checkbox turns that off; **Save index** saves at once). It is not a backup (a `.canvast` backup holds the files), and not a cache to delete: on another device it is your canvases.
+  - **On another device**, choose the same folder: you are offered to open its index (**Open index** does it later). The canvases are added and every file is matched by name. Do this on a device with no canvases of its own yet, or they are added twice.
+  - **After a restart** the browser asks for permission again: press *Reconnect folder*.
+  - **Leave the files alone:** don't move, rename or edit them, as canvast finds each by its name. Files kept before extensions were added get one with *Add extensions* on the card.
+
+</details>
+
+---
+
+## Notes
+
+Markdown, plain text and rich text notes, written in a full editor, in the library and beside the canvas. Each note is a real file.
+
+| | |
+| --- | --- |
+| ![A markdown note open in the library's notes editor: headings, a task list, a quote and a table, with its tags and fields in the details](docs/screenshots/notes-editor.webp) | ![The same note on a canvas: its card shows its page, and the Note panel beside it edits it](docs/screenshots/notes-panel.webp) |
+| A note in the library's notes editor, its YAML properties as tags and properties | Its card on a canvas and the Note panel |
+
+| Section | What is in it |
+| --- | --- |
+| [Writing](#writing) | Making a note, the editor, its styles and tools |
+| [On a canvas](#notes-on-a-canvas) | Note cards and the Note panel |
+| [Saving and what a file can hold](#saving-and-what-a-file-can-hold) | Manual saving, markdown and rich text |
+| [Links and tags](#links-and-tags) | `[[links]]`, `#tags`, renames that follow |
+| [Properties](#properties) | YAML properties, types, automatic ones |
+| [Obsidian](#working-with-obsidian) | Pasting from it and copying to it |
+
+### Writing
+
+**New note** (the Import menu) makes a markdown note and opens it; on a canvas the Note tool (`M`) does the same where you click.
+
+| Feature | How |
+| --- | --- |
+| **The `/` menu** | Type `/` at the start of a line or after a space |
+| **Editor style** | Settings > Notes: Document, Classic, Bottom, Balloon or Notion-like |
+| **Pictures and files** | Come from the library; **Import…** takes new ones in |
+| **Templates** | Insert ▸ Template; any note tagged `template` is listed too |
+| **Layouts** | Insert ▸ Layout: columns, which only a rich text note can hold |
+| **Task lists** | Click a box to tick it |
+
+<details>
+<summary>All about writing</summary>
+
+- **Notes** open in the viewer in a full notes editor ([SunEditor](https://suneditor.com)): markdown (`.md`, `.markdown`), plain text (`.txt`) and the app's own **rich text notes** (`.note.html`). **New note** (the Import menu) makes a markdown note in the open folder (else in the **Notes** folder, whose name is set in Settings > Notes) and opens it. On a canvas, the **Note tool** (`M`) does the same where you click (drag a box to set the card's width; a click makes it as wide as *Note tool card size*). A new note is named by *New note name* (Settings > Notes; `Note {yyyy}-{mm}-{dd} {hhmmss}` at first), which is also its title: the note goes in the Notes folder, its card is placed there and it opens in the Note panel. Texts on a card (what the Note tool made before notes were files; a card is also one of a text's box options) become notes with **Make note files** in their Actions bar: the same place, width and stacking, the words in a `.md` file named by its first line.
+- **The `/` menu**, in every editor style: type `/` at the start of a line or after a space, then words to find a command (headings, lists, quote, code, table, picture, link and more).
+- **Editor style** (Settings > Notes): *Document* (pages, every tool; the default), *Classic* (one short toolbar row, the rest behind its **+**), *Bottom* (the same, below), *Balloon* (the toolbar only over selected words), *Notion-like* (a handle beside each block).
+- **Links from the clipboard:** select words and paste a web address or a `[[link]]`: those words become the link. The selection's toolbar has the 🔗 link button too.
+- **Remove format** (the eraser in the toolbar over selected words, and in Text ▾) takes sizes, fonts and colours off the words chosen: a heading made bigger or smaller by accident goes back to its own size.
+- **Markdown and Code views** show the note as text; coming back without a change there, the note is as it was (picture sizes, spacing). A change made there is read back from that text, which markdown keeps without sizes or styles.
+- **Numbers drag:** the font size and a picture's or video's width and height change by dragging the field left or right, as every number of the app (a picture keeps its proportion when that is on; a dragged font size applies on release).
+- **Pictures, video, sound and files come from the library:** the gallery buttons (Insert ▸ Image gallery, Video gallery, Audio gallery, File gallery, File browser) open the library chooser, and a file uploaded, dropped or pasted into a note is put in the library first. Its own **Import…** button takes files from this device into the library and into the note.
+- **Task lists:** click a box to tick it; it is saved as `- [x]`. A task shows its box only (no bullet).
+- **Templates** (Insert ▸ Template; `{{date}}`, `{{time}}` and `{{title}}` in one are filled in: today, now, the note's name) insert a block at the cursor: *Meeting notes*, *To-do list*, *Journal entry*, *Reference sheet*, then **your own**: any note in the library tagged `template` (an existing note, or a New note you write for it) is listed by its name, its pictures and links pointing at the same library items.
+- **Layouts** (Insert ▸ Layout): *Two columns*, *Three columns*, *Sidebar and main*. A layout takes the place of the whole note (`Ctrl+Z` brings the note back), and markdown cannot hold columns, so a note with one is saved as a rich text note.
+- **Its look is the app's:** the app's font, colours, corners and light or dark theme. A dialog of the editor (Insert image…) opens the library chooser above itself.
+- **Fonts:** the font list is *Inter* (built in; *Default* when words have no font of their own) and the library's fonts (the ones the canvas's text uses), by their family names; files of one family (Regular, Bold…) are one entry. A rich text note names them so, and other apps show them where the font is installed.
+- **Not in a note's toolbar:** New document (it would empty the open note), Print, and the page buttons (page break, page number, previous and next page): a note is a file of the library, not a page to print. Document style still shows its pages.
+
+</details>
+
+### Notes on a canvas
+
+Double-click a note's card and it opens in the **Note** panel, with the canvas still usable beside it.
+
+| Feature | How |
+| --- | --- |
+| **Where it opens** | *Note editor on a canvas*: Panel or Window |
+| **Card size** | A side handle lays the page out again; `Shift` on a corner zooms it |
+| **Whole note or part** | *Note cards show*, in Settings > Notes |
+| **Labels** | *Note cards show properties* lists which values show on cards |
+| **Hidden notes** | Open only while the hidden items show, and close when they stop |
+
+<details>
+<summary>All about notes on a canvas</summary>
+
+- **On a canvas:** double-click a note's card (or **Edit note** in its Actions bar) and the note opens in the **Note** panel: the same editor and saving as in the library, in the style of *Editor style on a canvas* (Settings > Notes). *Note editor on a canvas* chooses where: **Panel** (the default) or **Window**, centred over the canvas until it is closed (a click beside it closes it, asking about unsaved changes). The panel is a panel like Layers (it never folds): it floats, docks to a side (keeping its own width), its width and height can be dragged, and the canvas stays usable beside it. ✕ closes it (asking about unsaved changes); the card shows the saved version at once. Saving is no step of the canvas's undo: undo and redo on the canvas keep the saved version (they never bring an older one back). The rename button in its header (or F2) renames the note with the library's rename dialog; the extension stays as it is, and `.note.html` counts as one extension there and in batch rename. A hidden note opens there only while the hidden items show, and closes (its changes saved) as soon as they no longer do: hidden mode ended, the hidden items locked.
+- **Previews:** a note's library card and details show the top of its page (headings, lists, tables, colours); its card on a canvas is its page, laid out at the card's own size and drawn at twice that so it stays sharp when zoomed in. A side handle lays the page out at the new width or height, the words keeping their size; dragging a corner evenly (`Shift`) zooms the whole card. **Note cards show** (Settings > Notes) applies to every card at once: *Whole note* (the default), the height follows the note, also when it is saved longer; *Part*, you set the height and what does not fit fades out into the page's paper. A new version keeps the card's width. **Reset size** in a card's Actions bar puts it back to its Note tool card size. The pictures it links to show in it (also Obsidian's `![[picture]]`), a video by its picture with ▶, a sound by its waveform with ♪, a GIF by its first frame; never a hidden item's. Its text is in the system's font in the preview only. The paper is light or dark as **Preview look** says (Settings > Notes: Auto, the default, follows the app's theme; a change redraws every preview at once, so a note's previews are made when shown, never stored). Shown small on a canvas, a note's card is drawn from a copy at that size.
+- **Labels on cards:** **Note cards show properties** (Settings > Notes) takes names separated by commas (`status, type, tags`): their values show as small labels at the top of each note's card and library picture, at once. They say what the details panel says, written into the file or not, and change as soon as a property does.
+
+</details>
+
+### Saving and what a file can hold
+
+**Saving is manual:** `Ctrl+S` or File ▸ Save. Until you save, changes live only in the open editor, and **there is no version history: a saved note replaces the file.**
+
+| Situation | What happens |
+| --- | --- |
+| Leaving with unsaved changes | It asks: *Save them*, *Don't save* or Cancel, unless **Save notes on close** is on |
+| Formatting markdown cannot hold | It asks: **Save as a rich text note**, or **Save as plain markdown**, which drops that formatting |
+| Changed in another app since it was opened | Saving asks before replacing their version |
+| What a save may change by itself | Nothing by default; created, modified, title and renaming are settings |
+
+<details>
+<summary>All about saving</summary>
+
+- **Saving is manual** (no autosave while you work): `Ctrl+S` or File ▸ Save. Until you save, your changes live only in the open editor. The note's own file is rewritten in place (in the desktop app, the same file in `library/`, so other programs see it); it keeps its name, folder, tags, note and fields. Leaving a note with unsaved changes asks: *Save them*, *Don't save* or Cancel (or saves without asking, with **Save notes on close** on); so does closing the desktop app's window, and the browser asks before the page is left.
+- **Markdown keeps what markdown can hold:** headings, bold and italic, lists and task lists, quotes, code, tables, links, pictures; coloured or styled words are kept as inline HTML. When a note has formatting a markdown or text file cannot hold (an alignment, a font size, the page layout), saving asks: **Save as a rich text note** (the note becomes `name.note.html` in its place, keeping everything; its folder, tags, links to it and its cards on canvases follow it, and no markdown file is left beside it) or **Save as plain markdown** (that formatting is dropped). Obsidian's own syntax is written as Obsidian writes it: footnotes (`[^1]`), embeds kept as written (`![[picture]]`) and table column alignment (`:---:`). Empty lines and spaces at a line's start are no formatting: they never make it ask.
+- **Settings > Notes:** **Write tags and properties into note files** (off by default) writes what is changed in the library into the file too; off, the file changes only when you save its words, and what its YAML says is still read into the library. **Save notes on close** saves a note's changes on leaving it without asking. **When a note's formatting does not fit its file** answers the question above once and for all: keep its file (`.md`, `.txt`, dropping that formatting) or rich text (`.note.html`). A note whose formatting fits stays as it is.
+- **Changed elsewhere:** if a note's words were changed in another app since it was opened here, saving asks before putting your version in their place.
+- **What a save may change by itself** (Settings > Notes), all off by default, so a note changes only as you change it; plain text notes are left alone:
+  - **Automatic created and modified:** both properties are always there, not editable or removable in the details panel (also before the first save). A save writes the time into modified, and into created when the note has none (from when it came into the library). Their names (`created-on`, say) and the **Date and time format** (`YYYY-MM-DDTHH:mm`) are settings; sorting and date searches need the numbers in that order.
+  - **Title:** *First heading*: a save writes the first H1 into the title property, which is then not editable or removable there. With no H1 the title stays.
+  - **Rename notes on save:** a save names the file from **File name comes from** (*First heading* or *Title property*), in **File name style**: *Keep as written* (only what a file cannot hold changes: `My Note: Part 1` → `My Note- Part 1.md`) or *Clean* (`my_note-part_1.md`), the two rules of Keep file names, used for these notes in its place. The links to it in other notes follow, and it is a step of the library's undo (the next save renames it again). Turning it on renames nothing until a note is saved. With nothing to name it by (no heading or title, or only marks such as `# ???`) the name stays; when another note has the name first, the file and the item end in `-2`, and stay so until the name wanted changes. In the desktop app with Keep file names off, a note named as written has a tidy file until its name next changes. It happens when a note is saved in its editor.
+  - **Pasted notes:** a title or created pasted with a note is kept over what the note had for that save; modified becomes the time of the save. Links rewritten after a rename do not count as a save.
+- **The title** shown for a note is the file's name (as in Obsidian); a `title:` property is one of its properties (see Automatic properties).
+
+</details>
+
+### Links and tags
+
+Link notes and files as Obsidian does. Renaming or moving an item updates the links to it.
+
+| Write | What it does |
+| --- | --- |
+| `[[Plan]]`, `[[Plan|shown text]]` | A link to a note or file; `Ctrl`+click opens it |
+| `[[canvas:Characters]]` | A link to a canvas |
+| `#tag` in the words | One of the item's tags; `#` offers the library's |
+
+<details>
+<summary>All about links and tags</summary>
+
+- **Links** to library items are written as their path from the root of the library (`Pictures/cat.png`, brackets and spaces encoded), whichever folder the note is in. A link is found by the file it names on disk (with **Keep file names** off, a file's name there differs from the item's: `my cat.png` is `my_cat.png`), read from the note's folder, then from the root of the library (`library/Pictures/cat.png` too), then the one item of that name anywhere; so a path relative to the note, written elsewhere, still works, as does `<my cat.png>`, and a copy of an item's file shows that item. The app's own link `canvast:<sha-256>` is read too, and kept as written. The picture dialog shows a picture's link, and a path typed there is found in the library.
+- **Links between notes** (as Obsidian writes them): `[[Plan]]`, `[[Plan|shown text]]`, and `[[Projects/Plan]]` when two items share a name. Type `[[` and the library's notes and files are offered; the one chosen goes in as a link. In the editor a link is an ordinary link: a click puts the cursor in it, **Ctrl+click** (⌘ on a Mac) opens the note or file it points at in the viewer (asking first about unsaved changes). A markdown note keeps them as `[[…]]`; a rich text note writes the path to the item (`../Projects/Plan.md`). Links to web addresses are not opened from a note (the app never goes online). `![[…]]` (an Obsidian embed) is kept as it is written, not shown.
+- **Canvas links:** `[[canvas:Characters]]` (`[[` offers the workspace's canvases too); Ctrl+click opens that canvas.
+- **A look before opening:** the pointer resting on a link shows the preview of what it points at (a note's page, a picture).
+- **Search inside notes:** the library search (All) finds a note by the words in it too (read once per version while searching). The desktop app's paged list of a very large library (20,000 items or more) does not search note words yet.
+- **Linked from:** an item's details list the notes that link to it (by `[[name]]`, a path or `canvast:` link); a name there opens that note. **Renaming or moving** an item in the library writes the links to it in every note again (`[[old name]]` when that name was its alone, a path to its old place), and a note that moved has its own paths written from its new folder; each changed note is saved as a new version.
+- **#tags in the words** (as Obsidian reads them: `#` then a word with a letter in it, not in code, `#123` and `# Heading` are none) are the item's tags too; typing `#` offers the library's tags. With a YAML block, the item's tags are exactly its `tags:` and its #tags, and taking a `#tag` out of the words takes the tag away at the next save; tags added in the library go into the YAML, never into the words. A note without YAML only adds its #tags.
+- **Other apps' folders:** a folder whose name starts with a dot in `library/` (Obsidian's `.obsidian/`, say) is never taken into the library.
+
+</details>
+
+### Properties
+
+A markdown note's YAML block is its tags, description and properties, and each property has a type, as in Obsidian.
+
+| Feature | What it does |
+| --- | --- |
+| **YAML** | Read into the item on import and on save; the file wins |
+| **Types** | *Text*, *List*, *Number*, *Checkbox*, *Date* or *Date & time* |
+| **A value that does not fit** | **Never changed**: it is marked in red |
+| **Writing back** | **Write tags and properties into note files** is off by default |
+
+<details>
+<summary>All about properties</summary>
+
+- **Properties** (as Obsidian writes them): a markdown note's YAML block at its top (`---` … `---`) is its item's tags (`tags:`), its description (`description:`) and its properties (every other key; a list shows as `a, b`). Importing the note or saving it, here or elsewhere (Obsidian), reads them into the item, and the file wins. Changing its tags, description or properties in the library (the details panel, bulk tags, renaming or deleting a tag, undo) stays in the library, unless **Write tags and properties into note files** is on: then it is written into the file too, as a new version. A `|` or `>` block is read as text with its lines (a value of several lines is edited in a larger box), and written back as it was while it is unchanged. A nested map is kept as written and not shown. The editor shows the note without its YAML. A rich text note keeps the same properties as `<meta>` in its head (`keywords`, `description`, one per field); a plain text note keeps them in the library only.
+- **Property types** (as Obsidian has them): the button before a property's name chooses its type: *Text*, *List*, *Number*, *Checkbox*, *Date* or *Date & time*. A type belongs to the name, for every item with that name. A name with no type of its own takes one from its value (`4` a number, `true` a checkbox, `2025-01-31` a date, `2025-01-31T10:30` a date and time; `aliases` and `cssclasses` are lists); editing such a value keeps that type for the name. A checkbox is a box to tick and a date a picker. A **list** is a row of items, each kept whole (a comma is part of an item): Enter adds what is typed, × or Backspace in the empty box removes, dragging moves one, and it is a real YAML list in the file. A value that does not fit its type is **never changed**: it stays as it is in a plain box, marked in red with what the type expects, also while it is typed. In the file (with **Write tags and properties into note files**, when a value changes) a checkbox is written as a bare `true` or `false`. `tags` and `description` have their own places in the panel and no type button. In a narrow panel a property's value has a line of its own under its name, and a long value wraps, so neither is cut.
+
+</details>
+
+### Working with Obsidian
+
+| Do this | What you get |
+| --- | --- |
+| Paste a note copied from Obsidian | A note: `![[embeds]]` show when the files are in the library, and its properties join at the next save |
+| `Ctrl+A`, then `Ctrl+C`, in a note | Its markdown file, with its properties as YAML at the top |
+| Keep `.obsidian/` in `library/` | Any folder starting with a dot is never taken in |
+
+<details>
+<summary>All about working with Obsidian</summary>
+
+- **Pasting from Obsidian:** a note copied from Obsidian comes in as a note: its `![[embeds]]` show their pictures when the files are in the library (found by name, wherever they lie; one not there stays as `![[name]]`), and `[[links]]` and footnotes stay as Obsidian writes them. Its properties join the note's own at the next save: tags are added, a key the note does not have (or has empty) is added, and what the note already says stays. Undoing or deleting all that was pasted takes them back; when only properties were pasted, closing the note without saving does.
+- **Copying a whole note** (`Ctrl+A` then `Ctrl+C` or the editor's Copy; **Copy** on one markdown note in the library) copies it as its markdown file, with its properties as YAML at the top, as the details panel has them, so pasted at the top of an empty note in another app they arrive as properties. It is plain text. Copying part of a note copies that part as before.
+
+</details>
+
+---
+
+## The interface and settings
+
+### The interface
+
+| | |
+| --- | --- |
+| ![Command palette](docs/screenshots/command-palette.webp) | ![The context menu of a selected picture, with Rename](docs/screenshots/context-menu.webp) |
+| The command palette | The context menu of a selected picture: its commands in groups, with *Rename* for the file in the Library |
+
+| Part | Where | What it does |
+| --- | --- | --- |
+| **Tool rail** | Left | Undo, redo, the tools, Screenshot and Search |
+| **Properties bar** | Top | The options of the tool or the selection |
+| **Actions bar** | Bottom, or with the selection | What can be done with the selection, in menus |
+| **Panels** | Either side, or floating | Layers, Bookmarks, Tags, Styles, Adjust, Pattern |
+| **Command palette** | `Ctrl/⌘+K` | Any command by name, and macros |
+| **Context menus** | Right click, menu key, long press | What fits where you are |
+| **Zen mode** | `Z` | Fades the bars until the pointer is over them |
+| **Info bar** | Bottom left | Zoom, position and save state |
+
+<details>
+<summary>All about the interface</summary>
+
+- **Tool rail** (left): Undo and Redo, the tools (Import after Note), then Screenshot and Search.
+- **Properties bar** (top): the options of the tool or of what is selected.
+  - The colours of a selected pen stroke, or of several selected things, show as chips; changing a chip changes that colour everywhere it is used.
+  - Pasting CSS with shapes selected sets their fill: a gradient (`linear-gradient(...)`, `radial-gradient(...)`, `conic-gradient(...)`) or a colour (hex, `rgb()`, `hsl()`, `oklch()` and the other CSS notations, or a name such as `rebeccapurple`).
+  - In the colour picker, a long press (or right click) on a swatch or saved gradient copies it without choosing it. Copying the hex field includes the `#`; pasting one drops it. The Styles panel copies the same text (a colour as hex, a gradient as CSS).
+- **Actions bar:** what can be done with the selection, grouped in menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies.
+  - It sits at the bottom or follows the selection (Settings).
+  - When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways.
+- **Panels** (Layers, Bookmarks, Tags, Styles, Adjust, Pattern) float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back.
+- **Command palette** (`Ctrl/⌘+K`) runs any command by name, takes a value where one is needed (`@kind` narrows the list), and records and replays **macros**.
+- **Context menus** open with a right click, the menu key, or a long press on a touch screen, at the pointer (to its left when there is no room), and list what fits where you are:
+
+  | Where | What it offers |
+  | --- | --- |
+  | On something on the canvas | The commands for it. On a picture, *Rename* renames its file in the library (a layer with a name of its own takes the new name) |
+  | On empty canvas | The canvas commands. A long touch first lists what is under the finger |
+  | On a library item | Its details-panel actions, plus *Copy*, *Copy file name* and *Paste* |
+  | In the viewer (the picture, or a picture of the filmstrip) | The same as on a library item, for the one shown (or that picture of the filmstrip) |
+  | On empty library ground | *Select everything*, *Paste*, the imports, *New folder*, *Slideshow* and the details panel |
+  | In Settings | A setting's reset; a shortcut's key actions |
+
+  The viewer has no context menu.
+- **Zen mode** (`Z`, or the leaf button) fades the bars and panels until the pointer is over them.
+- **Screenshot** (camera button) saves the selection, or the whole view, to the library. Settings choose the format, quality, name, folder and tags. They also choose whether to include the canvas pattern and the interface, a transparent background, and a copy on the clipboard.
+- **Info bar** (bottom left): the zoom, position and save state. *Information shown* switches between simple and technical (exact zoom as a power of two, frame rate, diagnostics). The bottom-right buttons cycle the canvas pattern (grid and others) and the item names (always, when selected, hidden).
+- **Hint line** (bottom): what the tool does, and what each key does over a handle.
+- **Notices** report results, often with a *View* button that opens what was made. They fade after a time that fits their length (an error stays to be read), and stack above the Actions bar, never over it.
+- **Long work** (exporting, importing, opening a library, moving files, deleting everything) shows a notice with a progress bar and its current stage, which stays until the work ends and then says the result.
+
+</details>
+
+### Settings and accessibility
+
+Open Settings with the gear button. Settings have a *device* scope and a *canvas* scope, can be searched, and reset individually (the undo-arrow icon at the end of a row) or together. Every group has an icon in the list on the left, and the groups are indented under their heading. Device settings travel in a workspace backup and in the library index (see Backups).
+
+Each setting says what it is on one line; **More** under it has the whole explanation, and the search box finds words in both.
+
+| Group | What it holds |
+| --- | --- |
+| Drawing and selection | Pen, colour picker model and layout, pen width and stabilizer, lasso filter, snapping, align to the selection box, grid spacing for Arrange, initial shape and paint, the distance Fill gaps closes openings by, eraser |
+| Navigation | How `W` `A` `S` `D` choose the next item (nearest in view or anywhere, by layer or by name A to Z, in view or anywhere); focus on the item or keep the zoom; camera travel (style, time, longest trip, easing) and the wait at each tour stop; whether dragging near an edge pans the view, and how fast (Pan at the edge while dragging, Edge panning speed) |
+| Shortcuts | Rebind any shortcut to a key or a chord; the full list is also on `?` |
+| Notes | The notes editor's style in the library and on a canvas (each its own, Document at first); on a canvas, Panel or Window; a new note's name (a pattern, as screenshots have) and the width of the Note tool's card; the Notes folder new notes are filed in; light or dark previews (Preview look); whether note cards show the whole note or a part (Note cards show), and which properties they show (Note cards show properties); Write tags and properties into note files; Save notes on close; what to do when a note's formatting does not fit its file |
+| Media and playback | Players: starting volume and step sizes. The library viewer: its edges (a click on the left or right goes to the previous or next item), how long the player stays while a video plays, slideshow time |
+| Saving to the library | Extracted frames and edited pictures (format, quality, folder, name, tags), and the folder and tags of what is saved to the library from the canvas, one pair for each kind: pictures from Export… (*Exports*, `export`), patterns (*Patterns*, `pattern`) and shapes saved as SVG (*Shapes*, `shape`); screenshots have theirs in the Screenshot group. In the desktop app, Keep file names and Sort files by kind |
+| Screenshot | Format, quality, pattern, transparency, interface, clipboard, folder, name and tags |
+| Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, Actions bar place, item names, density (comfortable, compact, dense), round or sharp corners, Zen mode; panels: minimize inactive ones, how many stay open |
+| Performance | Adaptive quality, fixed quality level, memory for pictures, animation and its speed |
+| Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, changes only, files as ZIP, import); in the desktop app, where deleted files go and *Delete library files at once*; *Start from scratch* (delete all data, after a warning with a backup offered first) |
+| Privacy | The word that begins hidden mode, remembering the Hidden password until the tab closes, and the passwords of the workspace and of the Hidden items; what stays on your machine |
+| About and diagnostics | Version and diagnostics |
+| Develop | Developer tools (see [Building from source](#building-from-source)) |
+
+- **Accessibility:** controls are keyboard reachable with visible focus; panels have title bars that work by keyboard; status changes are announced to screen readers; the system's reduced-motion preference is honoured and animation can be turned off; colour contrast is audited automatically.
+- **Layouts** adapt to large, medium and phone-sized screens, with scroll cues on bars that scroll.
+
+![Settings, Appearance](docs/screenshots/settings.webp)
+
+---
+
 ## Keyboard and pointer reference
 
 Every shortcut can be changed in **Settings → Shortcuts**: a single key or a chord, with several keys per command, and warnings when a key clashes with another command or the browser. Defaults:
@@ -609,35 +1051,6 @@ Every shortcut can be changed in **Settings → Shortcuts**: a single key or a c
 | Jump to a zoom level | Click the zoom in the info bar, type `3000`, `2^-500` or `10^900`, Enter |
 
 **Touch:** two-finger drag pans and pinches zooms; a two-finger tap is undo and a three-finger tap is redo; a long press on Select lists what is under the finger; a resting finger while another drags acts as `Shift`, two as `Alt`. Number fields change by dragging their name.
-
----
-
-## Settings and accessibility
-
-Open Settings with the gear button. Settings have a *device* scope and a *canvas* scope, can be searched, and reset individually (the undo-arrow icon at the end of a row) or together. Every group has an icon in the list on the left, and the groups are indented under their heading. Device settings travel in a workspace backup and in the library index (see Backups).
-
-Each setting says what it is on one line; **More** under it has the whole explanation, and the search box finds words in both.
-
-| Group | What it holds |
-| --- | --- |
-| Drawing and selection | Pen, colour picker model and layout, pen width and stabilizer, lasso filter, snapping, align to the selection box, grid spacing for Arrange, initial shape and paint, the distance Fill gaps closes openings by, eraser |
-| Navigation | How `W` `A` `S` `D` choose the next item (nearest in view or anywhere, by layer or by name A to Z, in view or anywhere); focus on the item or keep the zoom; camera travel (style, time, longest trip, easing) and the wait at each tour stop; whether dragging near an edge pans the view, and how fast (Pan at the edge while dragging, Edge panning speed) |
-| Shortcuts | Rebind any shortcut to a key or a chord; the full list is also on `?` |
-| Notes | The notes editor's style in the library and on a canvas (each its own, Document at first); on a canvas, Panel or Window; a new note's name (a pattern, as screenshots have) and the width of the Note tool's card; the Notes folder new notes are filed in; light or dark previews (Preview look); whether note cards show the whole note or a part (Note cards show), and which properties they show (Note cards show properties); Write tags and properties into note files; Save notes on close; what to do when a note's formatting does not fit its file |
-| Media and playback | Players: starting volume and step sizes. The library viewer: its edges (a click on the left or right goes to the previous or next item), how long the player stays while a video plays, slideshow time |
-| Saving to the library | Extracted frames and edited pictures (format, quality, folder, name, tags), and the folder and tags of what is saved to the library from the canvas, one pair for each kind: pictures from Export… (*Exports*, `export`), patterns (*Patterns*, `pattern`) and shapes saved as SVG (*Shapes*, `shape`); screenshots have theirs in the Screenshot group. In the desktop app, Keep file names and Sort files by kind |
-| Screenshot | Format, quality, pattern, transparency, interface, clipboard, folder, name and tags |
-| Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, Actions bar place, item names, density (comfortable, compact, dense), round or sharp corners, Zen mode; panels: minimize inactive ones, how many stay open |
-| Performance | Adaptive quality, fixed quality level, memory for pictures, animation and its speed |
-| Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, changes only, files as ZIP, import); in the desktop app, where deleted files go and *Delete library files at once*; *Start from scratch* (delete all data, after a warning with a backup offered first) |
-| Privacy | The word that begins hidden mode, remembering the Hidden password until the tab closes, and the passwords of the workspace and of the Hidden items; what stays on your machine |
-| About and diagnostics | Version and diagnostics |
-| Develop | Developer tools (see [Building from source](#building-from-source)) |
-
-- **Accessibility:** controls are keyboard reachable with visible focus; panels have title bars that work by keyboard; status changes are announced to screen readers; the system's reduced-motion preference is honoured and animation can be turned off; colour contrast is audited automatically.
-- **Layouts** adapt to large, medium and phone-sized screens, with scroll cues on bars that scroll.
-
-![Settings, Appearance](docs/screenshots/settings.webp)
 
 ---
 
@@ -713,7 +1126,7 @@ My art/
 
 In the desktop app your workspace is a **folder of ordinary files** that you choose, so any sync tool, backup tool or file manager can see it. It works offline and loads nothing from the network.
 
-**The window's frame.** Settings > Appearance > **Window frame**: *System* (the default) is the title bar your desktop draws; *Off* has none, for more room, with minimise, maximise and close at the top right, and the window moves by its top edge and the empty parts of the top row. It applies at the next start, for every workspace.
+**The window's frame.** Settings > Appearance > **Window frame**: *System* (the default) is the title bar your desktop draws; *Off* has none, for more room: move the pointer to the very top edge and a row comes over the app, with minimise, maximise and close, and the window moves by dragging it. It shows for a moment at each start, and goes when the pointer leaves. It applies at the next start, for every workspace.
 
 **Switching workspaces.** *Switch workspace…* is in the board and canvas menu (under *Whole workspace*), in Settings > Storage and in the command palette, with its choices to open a folder or make a new workspace. `Ctrl`+`Shift`+`O` opens a workspace folder.
 
@@ -737,8 +1150,22 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 | `.hidden/`, `.canvast/hidden.json`, `.canvast/keys/hidden.json` | Hidden items, encrypted, and a spare of their key (see [Hidden items and passwords](#hidden-items-and-passwords)) |
 | `.canvast/thumbnails/<hash>.webp`, `.hidden/thumbnails/` | Custom thumbnails uploaded for items, by their SHA-256; hidden ones encrypted, each named so it says nothing of its picture |
 | `.trash/` | What canvast deleted, when Settings > Storage says so (the default) |
+#### How it saves
 
-**How it saves**
+| What | How |
+| --- | --- |
+| **Every edit** | Saved first in the app's storage on this device, then written to the folder |
+| **Library files** | In parts under `.canvast/library/`, so a sync tool uploads only what changed |
+| **If `.canvast/library/` is deleted** | Nothing counts as erased: this device writes it all back |
+| **An item whose file is there** | Never taken as erased, whatever a list says |
+| **Library folders** | Real folders: filing an item moves its file |
+| **File names** | **Keep file names** is on by default |
+| **Deleted files** | Into `.trash/`, the system trash, or away for good (Settings > Storage) |
+| **Sync tools** | Every file is written whole and then renamed |
+| **Check library files** | The command palette checks every file |
+
+<details>
+<summary>All about how it saves</summary>
 
 - **Every edit** is saved first in the app's own storage on this device, then written to the folder about 2 seconds after editing pauses, and when the window closes.
 - **The library on this device** (its items, names, tags, folders and where each file is) is kept in a SQLite database in the app's own data folder (`~/.config/canvast/library-db/`), not in the workspace folder. It is a working copy of the folder's library files, one per workspace folder (not per path: a folder renamed onto the path of another opened before starts its own copy): a new device, or one whose copy was deleted, makes it again from them. Only the parts of the library that changed are read at start-up and written after an edit.
@@ -764,6 +1191,8 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 - **A password** on the workspace is asked for wherever its folder is opened from.
 - **An item whose file is still in the folder is never taken as erased**, whatever the library's lists say, so an app stopped mid-write or a sync tool bringing files one by one cannot delete anything.
 - **Each folder has its own id** (`.canvast/folder.json`): a new folder made where a deleted one was is a new, empty workspace. Nothing of the deleted one comes back, and its copy on this device is cleared.
+
+</details>
 
 **Changes made outside the app** (by a sync tool, another device or a file manager). canvast watches the folder while it runs and catches up at start-up. A file renamed or moved outside the app, in either case, stays the same item, and the links to it in notes are written again.
 
@@ -792,7 +1221,6 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 **Bringing a browser workspace in:** export a full backup in the browser and import it in the desktop app. One screen shows the import and how many files are written into the folder; then the app starts again on them and says what was imported, without asking for the workspace password again (it was given before the import).
 
 ---
-
 ## Privacy and security
 
 ### What stays on your machine
@@ -819,14 +1247,14 @@ For a workspace that is shown in a public place, an item of the Library can be *
 | ![The details of a selected item, with the Hide button beside the star](docs/screenshots/library-hide.webp) | ![Hidden mode: the Library listing the hidden items only](docs/screenshots/hidden-list.webp) |
 | **Hide** is the eye button beside the star in the details panel (also in the bulk bar of several selected items, and in the library's context menu) | **Hidden mode**: the Library listing the hidden items only |
 
-**Hiding**
+#### Hiding
 
 - A hidden item is left out of *All items*, every folder, tag and file type, the counts and totals, searches and their suggestions, *Similar images*, and the pickers that list the library (a texture fill's picture, the fonts).
 - Where it is already placed on a canvas, its picture shows a padlock at once (with or without a password) until it is shown again, and it is named *Hidden item* there (its label, the Layers panel): its name shows only with its picture. Canvas files never hold an item's name. A hidden video or sound does not play. With *Remember the Hidden password* on (Settings > Privacy), once the password is given its picture shows on the canvas until the tab or app closes, the hidden items are locked, or remembering is turned off. That is the screen only: exports, copies, pattern fills, baked pictures, screenshots and bookmark pictures still draw the padlock, so nothing readable of it leaves the app.
 - Hiding does not move, delete or change the file. In hidden mode, the same button shows the item again.
 - **Hide folder** (a library folder's ⋯ menu) hides the folder, its subfolders and every item in them. An item filed into a hidden folder later is hidden with it, and a folder made inside one is hidden too. Showing one item again shows its folder (and the ones above it) again; its other items stay hidden. In the desktop app a hidden folder's name is kept only encrypted, and its real folder leaves `library/`.
 
-**Hidden mode**
+#### Hidden mode
 
 - Outside it, nothing hidden is listed, counted or suggested anywhere. To begin it, type the **opening word** in the library's search box (`hidden:` by default; change it, or empty it to turn this off, in Settings > Privacy); the password is asked for if there is one.
 - In hidden mode the Library is the same view with every function (folders, *Unfiled*, *Favourites*, tags, file types, *Similar images*, search, sorts, layouts, the viewer and slideshow, rename, descriptions and properties, filing, bulk actions), over the hidden items only. The folders listed are the hidden ones and those holding hidden items; the counts are of hidden items. A chip at the start of the status bar (*Hidden mode*, with a pin and *Exit*; on a phone, the eye and *Exit*) says it is on.
@@ -845,7 +1273,7 @@ For a workspace that is shown in a public place, an item of the Library can be *
 | **Workspace** | Every time the app opens or is reloaded, before anything of the workspace is read. Escape does not close the screen | The whole workspace |
 | **Hidden items** | When the opening word is typed (unless the tab remembers it), and before an export that includes hidden items | Hidden mode and exporting hidden items |
 
-**Exports and backups ask.**
+#### Exports and backups ask
 
 ![The question asked before an export that would carry a hidden item](docs/screenshots/export-hidden.webp)
 
@@ -857,14 +1285,14 @@ For a workspace that is shown in a public place, an item of the Library can be *
 
 Whether an item is hidden is data of the item, so it travels in any export that includes it and the item comes back hidden. Importing a backup that carries a password sets it only on a device that has none, and the import dialog says so.
 
-**What this is not (browser version).**
+#### What this is not (browser version)
 
 - The passwords are asked by the app; the files are stored as they are. They keep out people at your screen, not someone who can open this browser's storage or who has an exported file with hidden items in it.
 - Only a salted hash of each password is kept: in this browser, and in an archive only if you include it.
 - A forgotten password cannot be recovered. The only way back into a locked workspace is to clear this site's data in the browser, which deletes it, so keep a backup (one made without the password opens without one).
 - In the browser, hidden files are not encrypted (in the desktop app they are, below).
 
-**In the desktop app, hidden items are encrypted.**
+#### In the desktop app, hidden items are encrypted
 
 - Hiding asks for a Hidden password first, and warns that a lost password means lost files.
 - The file is encrypted (AES-GCM) into `.hidden/`, read back to prove it, and the readable file is deleted (not moved to `.trash/`). As encrypting sync tools do (rclone's crypt, for one), its place says what it is: it is kept in the folders of its library folder's path, each folder's name encrypted, and named by its own name encrypted (`Hidden Art/Items/Study.png` becomes three runs of letters and digits). Renaming or moving it, or its folder, renames on disk; changing its tags, note, fields or favourite changes only the encrypted index (`.canvast/hidden.json`). A file is encrypted again only when its content is new, so a sync tool sees renames, not new files. What stays visible: how many folders and files there are, how deep they go and their sizes; never a name or a picture.
@@ -915,11 +1343,34 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 
 ## Limitations
 
-These are canvast's current limits: first those of both versions, then those of the browser version and of the desktop app. They describe the app as it is today. Some of them, such as fuller support for PDF and 3D files, may be lifted in later versions, but none is promised and there is no schedule: if one matters to you, plan around it as it stands.
+What canvast does not do today, for both versions, then each. **The limits that can cost you data or privacy are marked ⚠️.** None of the others is promised to change.
 
 ### Both versions
 
-**Content**
+#### Content
+
+| Area | Limitation |
+| --- | --- |
+| PDF | Kept as a card with its page count; pages are not drawn |
+| 3D | STL and OBJ only, as a preview card |
+| Text | No Indic shaping; other computers can wrap missing characters differently |
+| Vector networks | One fill for the whole network |
+| ⚠️ Notes | No autosave and no version history: a saved note replaces the file |
+| Notes | Markdown cannot hold fonts, sizes, alignment or layout; no math, embeds or PDF export |
+| Angular gradient in SVG | Exported as a picture, not vectors, with a warning |
+| Varied fills | Repeat after 16 to 31 cells |
+| Pattern | No rotated sheets; at most 600 shapes |
+| SVG import | No text, patterns or masks from inside an SVG |
+| Adjustments and shadows | Not on a playing video or GIF; only shapes keep them in SVG |
+| Boolean groups | No per-corner radii |
+| Fill gaps | Only closed places, or slits under the closing distance |
+| Eraser | Trims strokes, not vector paths |
+| Files | 256 MiB per file in a browser; no such limit on desktop |
+| Clipboard | Pasting back needs nothing else copied since; Cut puts text only |
+| Video | Only what the built-in engine plays: HEVC does not, on desktop or in most browsers |
+
+<details>
+<summary>Content limits in full</summary>
 
 | Area | Limitation |
 | --- | --- |
@@ -940,7 +1391,23 @@ These are canvast's current limits: first those of both versions, then those of 
 | Clipboard | Ctrl+C keeps the real objects for pasting back only while nothing else was copied: a picture copied for other apps pastes back as the objects only if the window kept the focus and the app copied nothing else in between (otherwise it comes back as a new picture, and shapes as an SVG import or a picture). A copy of a single picture, GIF or video is one PNG (a GIF or video is its current frame); files such as audio and PDF cannot be put on the system clipboard by a web page; Cut puts text only |
 | Video | Only what the built-in browser engine plays: HEVC (H.265) video, the format of many phones, does not play in the desktop app or in most browsers (the viewer says so; *Open in default app* plays it in the system's player), and shows as a card on Firefox for Android (it still plays from the player) |
 
-**Scale and precision**
+</details>
+
+#### Scale and precision
+
+| Area | Limitation |
+| --- | --- |
+| Far trips | Over 20,000 levels and a view apart, the camera switches instead of flying |
+| Camera precision | Within 2^-96 px after zooming out 4,096 levels past the deepest point and back |
+| Very deep views | No limit, but each level costs more CPU per frame |
+| Dense scenes | Zooming shows a scaled image, exact about 150 ms after you stop |
+| Far zoom-out | Too-small content is a soft mark you cannot select |
+| Very large documents | A million objects: about 940 MB and 6 s to load |
+| Large libraries | From 20,000 items on desktop, listed in pages; no *Similar images* |
+| Frame rate | Measured on one desktop machine only |
+
+<details>
+<summary>Scale and precision limits in full</summary>
 
 | Area | Limitation |
 | --- | --- |
@@ -953,7 +1420,9 @@ These are canvast's current limits: first those of both versions, then those of 
 | Large libraries | The Library draws only the cards near the view, so scrolling stays smooth however deep you go (measured with 20,000 items: opening about 1 s, wheel scrolling at 60 frames a second at the top and at the end, no stall while typing a search). Search results are redrawn when typing pauses for a quarter of a second. A thumbnail missing from storage is made from its file, three at a time. Backups of many gigabytes have not been measured; an import holds about one 128 MiB batch of files in memory at a time, and each canvas is read whole. In the desktop app a library of 20,000 items or more is listed a page at a time: only the cards near the view are read, and search, sort and counts are worked out where the library is kept; *Similar images* is then not offered (it reads how every picture looks), and a selection of more than 5,000 items shows its count but not its size. Measured on a GitHub runner with a million files: the app opens in about 8 s and the Library shows them all about 2 s later (about 500 MB); the first open on a new device takes about 2 minutes; a file put into `library/` from outside is listed in about 3 s |
 | Frame rate | Measured on one desktop machine; no results exist for other device classes |
 
-**Platform**
+</details>
+
+#### Platform
 
 | Area | Limitation |
 | --- | --- |
@@ -964,6 +1433,19 @@ These are canvast's current limits: first those of both versions, then those of 
 
 | Area | Limitation |
 | --- | --- |
+| ⚠️ Storage | Browsers cap it; when full, imports are refused and edits wait. **Export backups regularly** |
+| Library size | Not for a very large archive; a Chromium library folder removes the limit |
+| What to do about it | Keep long-term collections in your own folders |
+| ⚠️ Library folder | Files removed there show as missing, outside the browser's protection |
+| ⚠️ Origin | Data belongs to the browser profile: another browser, profile or private window starts empty |
+| Browsers | Tested in Chromium and Firefox on Linux; Safari is untested; touch by emulation |
+| ⚠️ Passwords | Gates, not encryption: they do not stop someone with access to the storage or an export, and cannot be recovered |
+
+<details>
+<summary>Browser limits in full</summary>
+
+| Area | Limitation |
+| --- | --- |
 | Library size | The Library manages the files your projects use. It is not meant to hold a very large archive. Files are stored in the browser's storage for local files, whose size limit depends on the browser and on the free disk space, so a library that grows past it stops accepting new files, says so in plain words and loses nothing already stored. canvast asks the browser once to keep the data under storage pressure, and warns once when 80% of the browser's quota is used. In Chromium a *library folder* removes the limit (see Library); Firefox cannot offer one |
 | What to do about it | Keep working files in canvast and long-term collections in your own folders. Use `.canvast` backups to move finished projects out, and *Delete…* in the library to free space |
 | Storage | Browsers cap local storage, and the cap grows once the browser agrees to keep the data (*Protect it*, Settings > Storage): Firefox allows at most 10 GiB (or 10% of the disk, if smaller) before that and up to half the disk after, Chromium about 10 GiB (a Chromium library folder is not counted). Settings > Storage shows the current figure. With a library folder, files in it are outside the browser's protection: files removed there show as missing, and each session needs one click to allow access again. When the browser's storage is full, an import is refused with a notice that points to the backup and to *Delete from library*; edits stay queued and the indicator shows the error. Export backups regularly |
@@ -971,7 +1453,29 @@ These are canvast's current limits: first those of both versions, then those of 
 | Browsers | Tested on Chromium and Firefox on one Linux machine. Safari has not been tested. Touch is tested by emulation |
 | Passwords | In the browser the workspace and Hidden passwords are gates, not encryption: the data is stored as it is, so they do not stop someone with access to the browser's storage or to an exported file that includes hidden items. They cannot be recovered. The workspace password is asked at every open and reload |
 
+</details>
+
 ### The desktop app
+
+| Area | Limitation |
+| --- | --- |
+| Platform | Linux only; other systems are out of scope for now |
+| Outside changes | Watching the folder is verified on Linux only; a `.cvst` copied in is not taken in |
+| ⚠️ Canvas files | Written about 2 s after editing pauses; another device waits for that |
+| ⚠️ Hidden items: deleted file | Deleting the readable file does not overwrite its disk blocks |
+| ⚠️ Hidden items: while locked | An item hidden while locked stays readable until the password is given |
+| ⚠️ Hidden items: this device | The app's cache keeps names and tags, unless *Keep hidden items' names off this device while locked* is on |
+| ⚠️ Hidden items: what shows | Canvas files and backups name content hashes; how many, how deep and how big can be seen in `.hidden/` |
+| ⚠️ Hidden items: browser backups | A backup made in the browser that includes hidden items is not encrypted |
+| ⚠️ Hidden items: lost keys | Losing both `.canvast/hidden.json` and its spare loses every hidden item: keep backups |
+| Sync tools | Tested with their copy names, not live; the same canvas changed on two devices stays two canvases |
+| Copy file | Tried in KDE's file manager; a workflow tries five on X11 |
+| Dragging out | Not hidden items, which are encrypted: use **Copy file**. At most 1,000 at once |
+| Window frame off | No desktop window menu; the row comes only from the very top edge |
+| Packages | x86_64 and aarch64; only the AppImage updates itself |
+
+<details>
+<summary>Desktop limits in full</summary>
 
 | Area | Limitation |
 | --- | --- |
@@ -980,10 +1484,23 @@ These are canvast's current limits: first those of both versions, then those of 
 | Sync tools | Tested with the copy names sync tools use (`name (1).ext`, `name.sync-conflict-….ext`), not live with each tool. The same canvas changed on two devices at once is kept as two canvases, not merged; the same library item changed on both keeps the kept file's version. A canvas copy saved by another device waits 10 minutes before this device takes it. A copy of the hidden items under another Hidden password is opened only with `hidden-items.mjs`, and a hidden file encrypted before 0.50.53 whose entry was lost comes back without its name (`recovered-…`) if it was not sealed again first. Losing both `.canvast/hidden.json` and its spare `.canvast/keys/hidden.json` loses every hidden item: keep backups |
 | Copy file | The paste has been tried in KDE's file manager on a desktop; the `File managers` workflow tries it on a virtual screen (X11) in five Linux file managers. |
 | Dragging out of the app | Hidden items cannot be dragged out: their files are encrypted, and a drag cannot stop to ask before a readable copy leaves the app, as **Copy file** does. At most 1,000 items at once. Which programs take the plain drag depends on the program. |
-| Window frame off | No title bar: the desktop's window menu on it is gone, and the window moves by its top edge and the empty parts of the top row. Tried on X11 by a test only for what the page shows. |
+| Window frame off | No title bar, so the desktop's window menu on it is gone; the row comes only from the very top edge. On a touch screen, tap the top edge. Its look and feel on a real desktop or Wayland are checked by hand, not by a test. |
 | Packages | Linux only, for x86_64 and aarch64. The `.deb` and `.rpm` are not in a package repository, so the system's updates do not include them; only the AppImage updates itself. The `.deb` and `.rpm` are checked for their contents before a release, not installed on every distribution they name |
 
+</details>
+
+<details>
+<summary>How firm these limits are</summary>
+
+These are canvast's current limits: first those of both versions, then those of the browser version and of the desktop app. They describe the app as it is today. Some of them, such as fuller support for PDF and 3D files, may be lifted in later versions, but none is promised and there is no schedule: if one matters to you, plan around it as it stands.
+
+</details>
+
 ---
+
+# For developers
+
+How canvast is made, and how to build, test and change it.
 
 ## How it works
 
@@ -1109,6 +1626,15 @@ Opening the app with `#debug` at the end of its address (or turning on Settings 
 
 ## Building from source
 
+```sh
+git clone https://github.com/emarpiee/canvast.git
+cd canvast
+npm ci               # Node.js 26.4 (see .nvmrc) and npm
+npm run build        # → dist/canvast.html
+npm run build:all    # also the desktop packages in dist-package/ (needs zsyncmake and rpmbuild)
+npm run build:appimage   # or only the AppImage (needs zsyncmake)
+```
+
 Requires Node.js 26.4 (see `.nvmrc`) and npm. Packaging the desktop app also needs `zsyncmake` (the `zsync` package) and `rpmbuild` (`rpm-build` on Fedora, `rpm` on Debian and Ubuntu), and the network once (electron-builder fetches its packaging tools).
 
 ```sh
@@ -1231,15 +1757,6 @@ The made files are kept in `docs/brand/`: the board (`canvast-brand-guidelines.c
 - **One drawing for every size**, the favicon too.
 - **In the app:** the full-colour logo is only the favicon (inline in `src/index.html`). Everywhere else (over the lock screen, beside the name in Settings > About and diagnostics) the app shows the one-colour mark in the theme's text colour, so it follows light, dark and the theme colour (`src/ui/brand.ts`, the same geometry as `pages.mjs`).
 - **The README cover** (`docs/brand/cover.webp`, made by `cover.mjs`) is drawn as a canvas in the default light theme: the grid and the orange origin axes, the tile selected with its dot on the origin, the wordmark on the x axis, and the status bar along the bottom.
-
----
-
-## Platform support
-
-- **Desktop app:** Linux, x86_64 and aarch64; other systems are out of scope for now (see [The desktop app](#the-desktop-app-linux)). Watching the workspace folder for changes made outside the app is verified on Linux.
-- **Browser version:** any system with a modern browser. It requires `BigInt`, Pointer Events, `ResizeObserver`, Canvas 2D, IndexedDB, `oklch()` and `color-mix()`: roughly Chromium 111+, Firefox 113+, Safari 16.2+. A custom background colour also needs relative colours and `abs()`: Chromium 119+, Firefox 128+, Safari 16.4+ or later. The automated tests run on Linux, in Chromium and Firefox; Safari and the browsers on Windows and macOS are not tested.
-- **Tested** in Chromium 156 (default, CPU-only, and devicePixelRatio 2 with touch) and Firefox 157 on Linux. **Not tested** in Safari.
-- Firefox on `file://` supports everything canvast uses (IndexedDB, Web Locks, BroadcastChannel) with frame times close to Chromium's.
 
 ---
 

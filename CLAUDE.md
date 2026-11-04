@@ -6,6 +6,29 @@ canvast: an offline-first endless canvas (unbounded pan and zoom, drawing, image
 
 This file is for coding agents working in the repo; it applies to this code only.
 
+## README format
+
+The README is the one place for documentation, in two parts: **For users** (features at a glance, installation, getting started, the canvas, the Library, notes, the interface and settings, keyboard and pointer, your data, privacy and hidden items, limitations), then **For developers** (how it works, file formats and API, building, testing, releasing, contributing).
+
+| Level | What it holds | Limit |
+| --- | --- | --- |
+| Part | Who it is for | One sentence |
+| Section (`##`) | A short intro, then links or a table of its sub-sections | About 3 lines before the first sub-section |
+| Feature (`###`) | One sentence, its screenshot if it has one, then a table or short bullets | About one screen, before any `<details>` |
+| Detail (`<details>`) | Edge cases, long explanations, rare options, under a clear title | Never a warning about data loss, passwords or encryption |
+
+| Format | Use it for | Rule |
+| --- | --- | --- |
+| Bullets | A few short facts | One line each, at most 5 or 6 in a row, not nested |
+| Table | Options, kinds, shortcuts, comparisons | Short cells, no long sentences |
+| Numbered list | Steps | Only when the order matters |
+| Paragraph | How or why | At most 3 lines |
+| Screenshot | A big feature | One each, after its first sentence, with `alt` text saying what it shows |
+
+- A big feature gets its own sub-section, not a bullet. Key terms also appear outside `<details>`, so a page search finds them.
+- **Limitations follows these rules too:** one section, in separate tables, one short sentence a row, its long explanations in `<details>`. Every limit stays in it, and limits about data loss, passwords or encryption stay visible.
+- When rewriting, compare before and after so that no fact or limit is lost, and check the links.
+
 ## Testing
 
 **Where tests run: GitHub or locally.** Wide test runs and very large benchmarks exhaust a workstation that is also in use, so they run on GitHub.
