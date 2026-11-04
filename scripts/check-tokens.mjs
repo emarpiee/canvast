@@ -13,9 +13,9 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const baselinePath = resolve(root, "scripts/token-baseline.json");
 const css = (await readFile(resolve(root, "src/styles.css"), "utf8")).replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
 const found = { colour: [], text: [], radius: [], space: [], inline: [], notOklch: [], offGrid: [] };
-// Spacing is on one grid (2, 4, 8, 12, 16, 24, 32…): gaps, paddings and margins use only its steps, and offsets from an edge use its tokens. A tree's indent is its own.
+// Spacing is on one grid, set by Density: gaps, paddings and margins use only --s-* (the fixed --sp-* are for what is not spacing), and offsets from an edge use tokens. A tree's indent is its own.
 const SPACING = /^(row-gap|column-gap|gap|padding|margin)(-(top|right|bottom|left|inline|block)(-start|-end)?)?$/;
-const OFF_GRID = /--sp-(3|5|7|9|11)\b/;
+const OFF_GRID = /--sp-\d/; // (the density's tokens, --s-*, not the fixed lengths)
 const RAW_OFFSET = /(?<![\w.,-])(4|6|8|10|12|16|20|24)px\b/;
 // Theme colours are oklch(): no hex, rgb() or hsl() in a value or a token, no mix in another space, no filter that changes a colour's contrast. A fixed colour that is meant to be fixed is listed here.
 const FIXED_COLOUR = new Set(["--canvas-ink"]); // (the same value as the default ink drawn on the canvas)
