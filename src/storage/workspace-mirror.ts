@@ -718,6 +718,18 @@ export class WorkspaceMirror {
     this.timer = setTimeout(() => void this.flush(), MIRROR_DELAY_MS);
   }
 
+  /**
+   * A write of the library that did not finish is tried again by itself, after a moment and then less often: a hidden item's readable file must not stay
+   * until some other change comes along. After that, with the next change.
+   */
+  private libraryAgain(why: string): void {
+    this.libraryDirty = true;
+    console.info(`canvast: the library's files could not all be written, trying again: ${why}`);
+    if (this.libraryTries >= 6 || this.timer) return;
+    this.timer = setTimeout(() => void this.flush(), 1000 * 2 ** this.libraryTries++);
+  }
+  private libraryTries = 0;
+
   /** Write what changed now; resolves when the folder has it. One write at a time. */
   flush(): Promise<void> {
     if (this.timer) clearTimeout(this.timer);
@@ -783,9 +795,10 @@ export class WorkspaceMirror {
       const only = this.libraryDirty === true ? undefined : this.libraryDirty;
       this.libraryDirty = false;
       try {
-        if (!(await this.lib.write(only))) this.libraryDirty = true; // (not timed again: tried with the next change)
+        if (await this.lib.write(only)) this.libraryTries = 0;
+        else this.libraryAgain(this.lib.lastFailed.join("; "));
       } catch (e) {
-        this.libraryDirty = true;
+        this.libraryAgain((e as Error).message);
         throw e;
       }
     }

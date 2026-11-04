@@ -288,6 +288,8 @@ export class LibraryMirror {
   private lastIndex = "";
   private lastFolders = "[]";
   private failing = false;
+  /** Why the last write left files out. */
+  lastFailed: readonly string[] = [];
   /** Imports files found in `library/` that no item has (set by the app through `Storage.folderImports`). */
   importFiles: ((files: FolderFile[]) => Promise<void>) | null = null;
   /** Told when an item could not be moved or written, in plain words. */
@@ -671,6 +673,7 @@ export class LibraryMirror {
     await this.writeJson(some);
     if (failed.length && !this.failing) this.onNotice?.(`${failed.length === 1 ? "A library file" : `${failed.length} library files`} could not be moved to ${failed.length === 1 ? "its" : "their"} place in the workspace folder (${failed[0]}). ${failed.length === 1 ? "It is" : "They are"} tried again with the next change.`);
     this.failing = failed.length > 0;
+    this.lastFailed = failed;
     return !this.failing;
   }
 

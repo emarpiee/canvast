@@ -60,7 +60,7 @@ async function lowContrast(p: Page, scope: string): Promise<string[]> {
       const px = parseFloat(cs.fontSize);
       const need = icon || px >= 24 || (px >= 18.66 && Number(cs.fontWeight) >= 700) ? 3 : 4.5;
       const got = ratio(over(ink, back), back);
-      if (got < need - 0.01) out.add(`${icon ? "icon" : "text"} ${got.toFixed(2)} < ${need}: ${el.closest("[class]")?.className.toString().slice(0, 50)} “${(el.textContent ?? "").trim().slice(0, 24)}”`);
+      if (got < need - 0.01) out.add(`${icon ? "icon" : "text"} ${got.toFixed(2)} < ${need}: ${el.closest("[class]")?.getAttribute("class")?.slice(0, 40)} in ${el.parentElement?.closest("[class]")?.getAttribute("class")?.slice(0, 40)} ${el.closest("[aria-label], [title]")?.getAttribute("aria-label") ?? el.closest("[title]")?.getAttribute("title")?.slice(0, 30) ?? ""} “${(el.textContent ?? "").trim().slice(0, 24)}”`);
     }
     return [...out];
   }, scope);

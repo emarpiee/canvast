@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.63: a library write that fails is tried again (2026-11-04)
+
+- **Implemented:** `WorkspaceMirror.libraryAgain`: six tries, each twice as far apart; each failure goes to the console.
+- **Tested:** the hidden items desktop test logs `HIDDEN WATCH` when a write is retried; on GitHub.
+- **Known failures:** the hidden items test's stall was seen in 2 runs; its root cause is not proven.
+- **Unverified:** why that write failed.
+- **Committed:** v0.53.63.
+- **Next bounded task:** repeat the desktop job, read `HIDDEN WATCH`, then the release.
+
 ## v0.53.62: contrast in both themes (2026-11-04)
 
 - **Implemented:** `--hud-accent-text`, `--hud-accent-hover`, `--hud-edge`; darker star and accent text in light, lighter danger and muted in dark; overlays on a selected row use the on-accent colour; quietened text uses a colour; remaining colours moved to `oklch()`; `check:tokens` refuses other notations.

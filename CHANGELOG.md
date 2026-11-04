@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.63 — A library write that fails is tried again (2026-11-04)
+
+- **Fixed:** when writing the library's files failed, nothing tried again until the next change, so an item hidden while locked could keep its readable file. It now retries by itself, less often each time.
+
 ## 0.53.62 — Contrast in both themes (2026-11-04)
 
 - **Fixed:** the pin and ⋯ could hardly be seen on a selected folder or tag row.

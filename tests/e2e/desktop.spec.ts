@@ -871,9 +871,10 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     await lib("hideFolder", "sf1");
     await flush();
     expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual(["library/secret_folder/secret_plan.png"]);
+    page.on("console", (m) => void (m.text().startsWith("canvast: the library's files") && console.log(`HIDDEN WATCH: ${m.text()}`))); // (a write that had to be tried again: in the run's log)
     expect((await hid("check", "pw2")).ok).toBe(true);
     await flush();
-    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/"))).toEqual([]); // (what waited for the key starts when the key is there, maybe after this flush)
+    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/")), { timeout: 20_000 }).toEqual([]); // (what waited for the key starts when the key is there, maybe after this flush)
     expect(traces()).toEqual([]);
     // A readable file put in .hidden/ from outside (a file manager) while the hidden items are open: it becomes a hidden item, sealed,
     // and nothing readable of it is left.
