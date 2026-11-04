@@ -643,6 +643,7 @@ test("tags can be renamed and deleted for the whole library (ADR 0057)", async (
   await expect(cards(p)).toHaveCount(2);
   await p.getByTestId("assets-search").fill("");
   // The same from the details: a double-click on a tag; Cancel changes nothing.
+  await p.getByTestId("assets-search").blur(); // (its help covers the cards while it has the focus)
   await pick(p, GREEN_HASH);
   const chip = p.getByTestId("asset-tags").locator('[data-tag-label="colour"]');
   await chip.dblclick({ position: { x: 8, y: 8 } });

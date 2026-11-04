@@ -1726,14 +1726,14 @@ test("Keep file names: two items of one name are two names in the app too, as on
     await page.getByTestId("assets-import-input").setInputFiles([pic("image.png", 10)]);
     await expect(page.locator('[data-testid="asset-card"][title="image.png"]')).toBeAttached();
     await page.getByTestId("assets-import-input").setInputFiles([pic("image.png", 200)]);
-    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/")).sort(), { timeout: 15_000 }).toEqual(["library/image-2.png", "library/image.png"]);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/")).sort(), { timeout: 15_000 }).toEqual(["library/images/image-2.png", "library/images/image.png"]);
     await expect(page.locator('[data-testid="asset-card"][title="image-2.png"]')).toBeAttached();
     await expect(page.locator('[data-testid="asset-card"][title="image.png"]')).toHaveCount(1);
     // A library from before: an item says the other's name, its file is -2.
     const hash = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === "image-2.png")!.hash));
     await page.evaluate((h) => window.__canvastDebug.libraryOp("rename", h, "image.png"), hash);
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)!.name), hash), { timeout: 15_000 }).toBe("image-2.png");
-    expect(files(ws).filter((f) => f.startsWith("library/")).sort()).toEqual(["library/image-2.png", "library/image.png"]);
+    expect(files(ws).filter((f) => f.startsWith("library/")).sort()).toEqual(["library/images/image-2.png", "library/images/image.png"]);
   } finally {
     await app.close();
   }
