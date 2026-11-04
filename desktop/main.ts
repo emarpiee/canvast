@@ -6,7 +6,7 @@
  * two workspaces never share boards or a library. The folder is the one passed with `--workspace=<path>`, else the last
  * one opened, else the one chosen in the start dialog (recent ones, open a folder, a new workspace).
  */
-import { app, BrowserWindow, dialog, ipcMain, Menu, net, protocol, session, shell, clipboard, ClipboardItem } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, net, protocol, session, shell, clipboard, ClipboardItem } from "electron";
 import { execFile } from "node:child_process";
 import { createHash, randomBytes, randomUUID, scrypt } from "node:crypto";
 import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, watch, writeFileSync } from "node:fs";
@@ -1069,7 +1069,7 @@ async function openWindow(workspace: string): Promise<void> {
     height: 900,
     show: !hidden,
     title: `${basename(workspace)} — canvast ${app.getVersion()}`, // (the version, as the browser tab shows it)
-    backgroundColor: "#1f1f1f",
+    backgroundColor: nativeTheme.shouldUseDarkColors ? "#101816" : "#e8f3f0", // (the app's own background before the page paints; Electron takes no oklch())
     webPreferences: {
       partition,
       preload: join(__dirname, "preload.cjs"),

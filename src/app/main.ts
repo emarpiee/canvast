@@ -190,6 +190,9 @@ function readTheme(el: HTMLElement): Theme & SceneTheme & { ink: string } {
     ink: v("--canvas-ink"),
     danger: v("--canvas-danger"),
     dangerWash: v("--canvas-danger-wash"),
+    builderOn: v("--canvas-builder-on"),
+    builderSoft: v("--canvas-builder-soft"),
+    builderOff: v("--canvas-builder-off"),
     guide: v("--canvas-guide"),
   };
   probe.remove();

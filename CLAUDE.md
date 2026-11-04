@@ -54,6 +54,8 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 
 - **No hardcoded CSS values.** Every colour, text size, padding, margin, gap, radius and icon size uses a token from `:root` in `src/styles.css`; add a token rather than a literal. `npm run check:tokens` enforces it. Row actions use the shared `src/ui/more-menu.ts` pattern (ADR 0068).
 
+- **Colours are `oklch()`, with contrast measured.** Theme colours are `oklch()` tokens; hex only for a colour meant to be fixed (`check:tokens`). Text keeps 4.5:1 and icons 3:1 in both themes: use a colour token rather than opacity to quieten text, `--hud-accent-text` for accent as text, and `--hud-accent-fg` for anything on a selected row, an overlay on it too (`tests/e2e/contrast.spec.ts`).
+
 - **Group tools in menus, do not add a row of icons (ADR 0151).** A family of tools on the Actions bar (`ui/context-bar.ts`) is one button that opens `openMoreMenu(anchor, items, label, { keepOpen: true, refresh })`: an icon, a label and a hint per item, placed off the picked things, closing only on Escape or a press outside. List only what applies to the pick and hide the button when nothing does. The button carries `aria-haspopup="menu"` (it gets the corner mark from CSS). Reuse this menu for any new group; E2E chooses in it with `chooseInMenu` / `alignWith` / `boolWith` / `maskWith` / `pathWith` in `tests/e2e/harness.ts`.
 - The dev panel (`.hud-dev`, `#debug` only) must end before x = 370: tests start drags at x 378 to 380.
 

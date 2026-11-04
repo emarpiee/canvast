@@ -12,14 +12,14 @@
  * `data-cp-theme="dark"` on the picker, on any ancestor (the page, a panel) or on the `<colour-picker>` tag (the `theme` option and
  * attribute do the same); that also sets `color-scheme`, so the browser's own controls (the layout list, scroll bars) match; so does the dark default.
  */
-const LIGHT = `--cp-bg: #ffffff; --cp-fg: #1f2329; --cp-muted: #5f6b76; --cp-border: rgba(31, 35, 41, 0.18); --cp-field: #f1f3f5; --cp-hover: rgba(31, 35, 41, 0.08); --cp-check-a: #d5d9dd; --cp-check-b: #ffffff;`;
-const DARK = `--cp-bg: #1d2126; --cp-fg: #e8eaed; --cp-muted: #9aa4ae; --cp-border: rgba(232, 234, 237, 0.2); --cp-field: #2a3037; --cp-hover: rgba(232, 234, 237, 0.1); --cp-check-a: #3a4048; --cp-check-b: #272c32;`;
+const LIGHT = `--cp-bg: oklch(1 0 0); --cp-fg: oklch(0.255 0.013 258); --cp-muted: oklch(0.522 0.023 246); --cp-border: oklch(0.255 0.013 258 / 0.18); --cp-field: oklch(0.963 0.003 248); --cp-hover: oklch(0.255 0.013 258 / 0.08); --cp-check-a: oklch(0.883 0.007 248); --cp-check-b: oklch(1 0 0);`;
+const DARK = `--cp-bg: oklch(0.246 0.011 254); --cp-fg: oklch(0.936 0.005 258); --cp-muted: oklch(0.714 0.018 248); --cp-border: oklch(0.936 0.005 258 / 0.2); --cp-field: oklch(0.306 0.015 252); --cp-hover: oklch(0.936 0.005 258 / 0.1); --cp-check-a: oklch(0.369 0.016 256); --cp-check-b: oklch(0.291 0.013 253);`;
 /** The picker, or what holds it, says which theme (zero specificity, like the defaults: any rule of the host wins). */
 const themed = (theme: "light" | "dark"): string => `:where(.cp[data-cp-theme="${theme}"], [data-cp-theme="${theme}"] .cp, :host([data-cp-theme="${theme}"]) .cp)`;
 export const PICKER_CSS = `
 :where(.cp) {
   ${LIGHT}
-  --cp-accent: #2563eb; --cp-accent-fg: #ffffff; --cp-focus: #2563eb;
+  --cp-accent: oklch(0.546 0.215 263); --cp-accent-fg: oklch(1 0 0); --cp-focus: oklch(0.546 0.215 263);
   --cp-text: 13px; --cp-text-sm: 11px; --cp-font: ui-sans-serif, system-ui, sans-serif; --cp-mono: ui-monospace, Menlo, Consolas, monospace;
   --cp-radius: 8px; --cp-radius-sm: 5px; --cp-gap: 10px; --cp-gap-sm: 6px; --cp-pad: 0px;
   --cp-thumb: 16px; --cp-bar: 12px; --cp-swatch: 20px;

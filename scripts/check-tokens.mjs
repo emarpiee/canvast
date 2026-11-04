@@ -3,7 +3,7 @@
 //   node scripts/check-tokens.mjs --update   rewrites the baseline (only ever lower it: fix literals, then update)
 //   node scripts/check-tokens.mjs --list     prints every literal found
 // Checked: colours (oklch, hex, rgb), text sizes (font-size and font), radii, spacing (padding, margin, gap) and, in the UI's
-// TypeScript, inline style="" values. Custom-property definitions (--x: …) are where values live and are not checked.
+// TypeScript, inline style="" values. Custom-property definitions (--x: …) are where values live: only checked for being oklch() (the `notOklch` count, also over all rules).
 import { readFile, writeFile } from "node:fs/promises";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,12 +12,16 @@ import { readdir } from "node:fs/promises";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const baselinePath = resolve(root, "scripts/token-baseline.json");
 const css = (await readFile(resolve(root, "src/styles.css"), "utf8")).replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, " "));
-const found = { colour: [], text: [], radius: [], space: [], inline: [] };
+const found = { colour: [], text: [], radius: [], space: [], inline: [], notOklch: [] };
+// Theme colours are oklch(): no hex, rgb() or hsl() in a value or a token, no mix in another space, no filter that changes a colour's contrast. A fixed colour that is meant to be fixed is listed here.
+const FIXED_COLOUR = new Set(["--canvas-ink"]); // (the same value as the default ink drawn on the canvas)
+const NOT_OKLCH = /#[0-9a-fA-F]{3,8}\b|\b(rgba?|hsla?|hwb)\(|color-mix\(in (?!oklch)|filter:\s*brightness/;
 
 const lineOf = (text, i) => text.slice(0, i).split("\n").length;
 const decl = /(?<![\w-])([a-z-]+)\s*:\s*([^;{}]*)(?=;|})/g;
 for (const m of css.matchAll(decl)) {
   const [, prop, value] = m;
+  if (!FIXED_COLOUR.has(prop) && NOT_OKLCH.test(`${prop === "filter" ? "filter: " : ""}${value.replace(/url\([^)]*\)/g, "")}`)) found.notOklch.push(`${lineOf(css, m.index)}: ${prop}: ${value.trim()}`);
   if (prop.startsWith("--")) continue;
   const at = lineOf(css, m.index);
   if (/oklch\((?!var\()|#[0-9a-fA-F]{3,8}\b|rgba?\(/.test(value)) found.colour.push(`${at}: ${prop}: ${value.trim()}`);
@@ -34,6 +38,14 @@ for (const f of await readdir(dir)) {
     if (/#[0-9a-fA-F]{3,8}\b|oklch\(|rgba?\(|font-size|\d+px/.test(m[1].replace(/\$\{[^}]*\}/g, ""))) found.inline.push(`${f}:${lineOf(src, m.index)}: ${m[1].slice(0, 80)}`);
   }
 }
+// A theme colour read in code has no second colour to fall back on, and the picker's defaults are oklch() too.
+for (const f of await readdir(dir)) {
+  if (!f.endsWith(".ts")) continue;
+  const src = await readFile(resolve(dir, f), "utf8");
+  for (const m of src.matchAll(/getPropertyValue\("--[^"]+"\)(\.trim\(\))?\s*\|\|\s*"#/g)) found.notOklch.push(`${f}:${lineOf(src, m.index)}: ${m[0]}`);
+}
+const pickerCss = await readFile(resolve(root, "src/colour-picker/style.ts"), "utf8");
+for (const m of pickerCss.matchAll(/--cp-[a-z-]+:\s*(#[0-9a-fA-F]{3,8}\b|rgba?\()/g)) found.notOklch.push(`colour-picker/style.ts:${lineOf(pickerCss, m.index)}: ${m[0]}`);
 const counts = Object.fromEntries(Object.entries(found).map(([k, v]) => [k, v.length]));
 if (process.argv.includes("--list")) for (const [k, v] of Object.entries(found)) for (const l of v) console.log(`${k.padEnd(7)} ${l}`);
 if (process.argv.includes("--update")) {

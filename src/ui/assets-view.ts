@@ -1343,9 +1343,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const tile = document.createElement("canvas");
     tile.width = tile.height = cell * 2;
     const t = tile.getContext("2d")!;
-    t.fillStyle = cs.getPropertyValue("--check-b").trim() || "#2a2a2a";
+    t.fillStyle = cs.getPropertyValue("--check-b").trim();
     t.fillRect(0, 0, cell * 2, cell * 2);
-    t.fillStyle = cs.getPropertyValue("--check-a").trim() || "#3a3a3a";
+    t.fillStyle = cs.getPropertyValue("--check-a").trim();
     t.fillRect(cell, 0, cell, cell);
     t.fillRect(0, cell, cell, cell);
     const tone = session.viewGround;

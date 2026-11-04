@@ -1140,7 +1140,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     const g = cv.getContext("2d")!;
     const css = getComputedStyle(cv);
     g.clearRect(0, 0, SIZE, SIZE);
-    g.strokeStyle = css.getPropertyValue("--hud-border") || "#888";
+    g.strokeStyle = css.getPropertyValue("--hud-border");
     g.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
       const [x, y] = toXY((i * 255) / 4, (i * 255) / 4);
@@ -1153,7 +1153,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     }
     const pts = points();
     const f = curveFn(pts);
-    g.strokeStyle = css.getPropertyValue("--hud-accent") || "#0a7";
+    g.strokeStyle = css.getPropertyValue("--hud-accent");
     g.lineWidth = 2;
     g.beginPath();
     for (let x = 0; x <= 255; x += 3) {
@@ -1162,7 +1162,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
       else g.lineTo(px, py);
     }
     g.stroke();
-    g.fillStyle = css.getPropertyValue("--hud-fg") || "#222";
+    g.fillStyle = css.getPropertyValue("--hud-fg");
     pts.forEach(([x, y], i) => {
       const [px, py] = toXY(x, y);
       g.beginPath();

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.53.62 — Contrast in both themes (2026-11-04)
+
+- **Fixed:** the pin and ⋯ could hardly be seen on a selected folder or tag row.
+- **Fixed:** low contrast of the favourite star and of accent text in the light theme, of the count on a selected row, and of danger text on a hovered row in the dark theme.
+- **Changed:** text that was quietened with opacity uses the muted colour, field edges are stronger, and the Shape builder's overlays follow the theme colour.
+- **Changed:** the colour picker's defaults, hover colours and scroll cues are `oklch()`, and the desktop window opens in the light or dark background that the system uses.
+
 ## 0.53.61 — No row pin on small screens (2026-11-04)
 
 - **Changed:** on small and touch screens a folder's row has no pin button; pinning is in its ⋯ menu.

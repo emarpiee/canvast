@@ -39,6 +39,9 @@ export interface SceneTheme {
   /** Eraser brush and its touched boxes. */
   danger: string;
   dangerWash: string;
+  builderOn: string;
+  builderSoft: string;
+  builderOff: string;
   /** Snap guide lines. */
   guide: string;
 }
@@ -200,7 +203,7 @@ export function drawOverlays(
   members: readonly ProjectedObject[] = [],
   labels: readonly ItemLabel[] = [],
 ): void {
-  if (editor.builder) drawBuilder(ctx, editor.builder, fc, vp);
+  if (editor.builder) drawBuilder(ctx, editor.builder, fc, vp, theme);
   if (editor.gapFill) drawGaps(ctx, editor.gapFill, fc, vp, theme);
   // The names above the items (ADR 0108, 0125).
   if (labels.length) {
@@ -602,7 +605,7 @@ function drawHandleLabel(ctx: CanvasRenderingContext2D, editor: EditorState, the
 }
 
 /** The regions of the open Shape builder (ADR 0145) as they will look, the ones being crossed or merged washed with colour (red when they are being deleted). */
-function drawBuilder(ctx: CanvasRenderingContext2D, b: NonNullable<EditorState["builder"]>, fc: FrameCamera, vp: Viewport): void {
+function drawBuilder(ctx: CanvasRenderingContext2D, b: NonNullable<EditorState["builder"]>, fc: FrameCamera, vp: Viewport, theme: SceneTheme): void {
   b.faces.forEach((f, i) => {
     if (b.deleted.has(i)) return;
     const cam = cameraIn(fc, f.obj.frame ?? b.world);
@@ -611,7 +614,7 @@ function drawBuilder(ctx: CanvasRenderingContext2D, b: NonNullable<EditorState["
     drawPath(ctx, po, vp);
     const on = b.touched.includes(i) || b.hover === i;
     if (!on && !b.merged.some((grp) => grp.includes(i))) return;
-    const wash = projectObject({ ...f.obj, fill: on ? (b.removing ? "#dc262699" : "#2563eb99") : "#2563eb55", stroke: null }, cam, vp, { keepTiny: true });
+    const wash = projectObject({ ...f.obj, fill: on ? (b.removing ? theme.builderOff : theme.builderOn) : theme.builderSoft, stroke: null }, cam, vp, { keepTiny: true });
     if (wash && !wash.cover) drawPath(ctx, wash, vp);
   });
 }
@@ -855,7 +858,7 @@ export function drawCropGhost(ctx: CanvasRenderingContext2D, po: ProjectedObject
   ctx.rect(l, t, r - l, b - t);
   ctx.clip("evenodd");
   // Everything outside the window is dimmed, so the window stands out; the cut-away part of the picture shows through that dimness.
-  ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+  ctx.fillStyle = "oklch(0 0 0 / 0.45)";
   ctx.fillRect(0, 0, vp.width, vp.height);
   if ([x, y, w, h].every(Number.isFinite) && w < 1e5 && h < 1e5) {
     ctx.globalAlpha = 0.55;

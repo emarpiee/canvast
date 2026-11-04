@@ -204,7 +204,7 @@ test("colour picker package: light and dark follow the system, and a theme (opti
   page.on("pageerror", (e) => errors.push(String(e)));
   await page.goto(DEMO);
   const bg = () => page.evaluate(() => getComputedStyle(document.querySelector("#host .cp")!).getPropertyValue("--cp-bg").trim());
-  const LIGHT = "#ffffff", DARK = "#1d2126";
+  const LIGHT = "oklch(1 0 0)", DARK = "oklch(0.246 0.011 254)";
   await page.emulateMedia({ colorScheme: "light" });
   expect(await bg()).toBe(LIGHT);
   await page.emulateMedia({ colorScheme: "dark" });
@@ -256,8 +256,8 @@ test("colour picker package: the demo page has an Auto, Light and Dark switch th
       const ge = document.querySelector("#ghost .cp")!;
       return { picker: getComputedStyle(cp).getPropertyValue("--cp-bg").trim(), scheme: getComputedStyle(cp).colorScheme, gradient: getComputedStyle(ge).getPropertyValue("--cp-bg").trim(), page: getComputedStyle(document.body).backgroundColor };
     });
-  const DARK = { picker: "#1d2126", scheme: "dark", gradient: "#1d2126", page: "rgb(20, 23, 26)" };
-  const LIGHT = { picker: "#ffffff", scheme: "light", gradient: "#ffffff", page: "rgb(238, 241, 243)" };
+  const DARK = { picker: "oklch(0.246 0.011 254)", scheme: "dark", gradient: "oklch(0.246 0.011 254)", page: "rgb(20, 23, 26)" };
+  const LIGHT = { picker: "oklch(1 0 0)", scheme: "light", gradient: "oklch(1 0 0)", page: "rgb(238, 241, 243)" };
   expect(await state(), "Auto follows the system: dark").toEqual(DARK);
   await page.getByRole("button", { name: "Light" }).click();
   expect(await state()).toEqual(LIGHT);

@@ -6,7 +6,7 @@ import { defineConfig } from "@playwright/test";
 // The other two keep the specs that depend on the rasterizer or the pixel ratio (docs/testing/README.md).
 // The desktop shell (ADR 0177) runs in Electron, in its own project only.
 const DESKTOP = ["**/desktop.spec.ts"];
-const LOGIC_ONLY = [...DESKTOP, "**/settings.spec.ts", "**/a11y.spec.ts", "**/storage.spec.ts", "**/archive.spec.ts", "**/assets.spec.ts", "**/organize.spec.ts", "**/components.spec.ts", "**/colour-picker.spec.ts", "**/colour-picker-package.spec.ts", "**/vectors.spec.ts", "**/scenarios.spec.ts", "**/upgrade.spec.ts", "**/lowmem.spec.ts", "**/release.spec.ts", "**/library-folder.spec.ts", "**/notes.spec.ts", "**/pattern.spec.ts", "**/patterns-package.spec.ts", "**/scrub-audit.spec.ts", "**/icon-audit.spec.ts"];
+const LOGIC_ONLY = [...DESKTOP, "**/settings.spec.ts", "**/a11y.spec.ts", "**/contrast.spec.ts", "**/storage.spec.ts", "**/archive.spec.ts", "**/assets.spec.ts", "**/organize.spec.ts", "**/components.spec.ts", "**/colour-picker.spec.ts", "**/colour-picker-package.spec.ts", "**/vectors.spec.ts", "**/scenarios.spec.ts", "**/upgrade.spec.ts", "**/lowmem.spec.ts", "**/release.spec.ts", "**/library-folder.spec.ts", "**/notes.spec.ts", "**/pattern.spec.ts", "**/patterns-package.spec.ts", "**/scrub-audit.spec.ts", "**/icon-audit.spec.ts"];
 
 export default defineConfig({
   testDir: "tests/e2e",

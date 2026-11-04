@@ -6,14 +6,14 @@ The defaults sit in `:where(.cp)`, which has no specificity, so **any rule of yo
 
 | Group | Property | Default (light) | Used for |
 | --- | --- | --- | --- |
-| Colour | `--cp-bg` | `#fff` | Where the picker sits (swatch rings are cut from it). |
-| | `--cp-fg` | `#1f2329` | Text, thumb outlines. |
-| | `--cp-muted` | `#5f6b76` | Labels, the contrast line. |
+| Colour | `--cp-bg` | white | Where the picker sits (swatch rings are cut from it). |
+| | `--cp-fg` | `oklch(0.255 0.013 258)` | Text, thumb outlines. |
+| | `--cp-muted` | `oklch(0.522 0.023 246)` | Labels, the contrast line. |
 | | `--cp-border` | 18% of the text colour | Outlines of boxes and swatches. |
-| | `--cp-field` | `#f1f3f5` | The switches, number fields and the text field. |
+| | `--cp-field` | `oklch(0.963 0.003 248)` | The switches, number fields and the text field. |
 | | `--cp-hover` | 8% of the text colour | A hovered switch. |
-| | `--cp-accent`, `--cp-accent-fg` | `#2563eb`, white | The chosen model, the selected swatch's ring, the thumbs' outline. |
-| | `--cp-focus` | `#2563eb` | Focus rings. |
+| | `--cp-accent`, `--cp-accent-fg` | `oklch(0.546 0.215 263)`, white | The chosen model, the selected swatch's ring, the thumbs' outline. |
+| | `--cp-focus` | `oklch(0.546 0.215 263)` | Focus rings. |
 | | `--cp-check-a`, `--cp-check-b` | grey and white | The chequer behind transparency. |
 | Type | `--cp-text`, `--cp-text-sm` | 13 px, 11 px | Body and small text. |
 | | `--cp-font`, `--cp-mono` | system UI, system mono | Text and numbers. |
