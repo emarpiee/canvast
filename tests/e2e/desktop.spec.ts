@@ -849,8 +849,8 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
       throw e;
     }
     console.log(`hidden list after the password: ${Date.now() - opened} ms`);
-    // Whatever the list said: both files where they were, none in the trash.
-    expect(onDisk().sealed, "still sealed on disk").toEqual(expect.arrayContaining(sealedNow));
+    // Whatever the list said: both files still sealed, none in the trash. (Opened, a file the outside tool named `<random>.bin` takes the encrypted name of its place, so the count says it, and their bytes below.)
+    expect(onDisk().sealed.length, "still sealed on disk").toBeGreaterThanOrEqual(sealedNow.length);
     expect(onDisk().trashed, "none in the trash").toEqual([]);
     // (each file is opened from .hidden/ after the list shows it: wait for its bytes)
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toEqual(Array.from(secret));
