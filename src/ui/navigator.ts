@@ -12,7 +12,7 @@ import { canSwitchWorkspace, openWorkspaceSwitcher } from "./workspace-switch";
 
 /**
  * Board › Canvas navigator (top-left, the first control) and the read-only banner (ADR 0079).
- * It is also the Canvas view's tab: one pill, "Board 1 › Canvas 1 ▾", so the word Canvas is not said twice. Pressing the name goes to
+ * It is also the Canvas view's tab: one pill, "Board 1 › Canvas 1" and its arrow, so the word Canvas is not said twice. Pressing the name goes to
  * the Canvas view (and, when already there, opens the menu); the chevron always opens the menu, which lists boards and their canvases
  * with create, rename and export actions. Everything is a button or input, so it is keyboard-usable; Escape closes the menu.
  * Returns a function that tells it which view is open.

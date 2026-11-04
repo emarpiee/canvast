@@ -79,6 +79,8 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 
 - **Button shapes:** a button is a rounded square (`--ctl-r`, or `--r-sm` on a row); `--r-pill` and `--r-dot` are for chips, what is on them, and dots (`check:tokens`).
 
+- **One arrow for what opens or folds:** `ICONS.chevronDown`, or `--chevron-mask` where CSS draws it (selects, summaries); never a character (`check:components`). The corner mark is for a button that opens a group of tools.
+
 - **Scrollbars** are one rule at the top of `src/styles.css` (`src/ui/scrollbars.ts`). Do not set `scrollbar-width` or `scrollbar-color` on an element, which turns it off in Chromium; only `none` for a row that scrolls sideways with its cue.
 
 - **Spacing follows Density.** Gaps, paddings and margins use only `--s-1`, `2`, `4`, `6`, `8`, `10`, `12`, `13`, `14`, `15`, which have a value for each of Dense, Compact and Comfortable. Control and row sizes use `--ctl`, `--bar-h`, `--field-h`, `--list-h`, `--menu-h`, `--tree-row-h`, `--row-btn`, `--chip-btn`, `--tree-indent`, `--icon-*`, and offsets from an edge use `--edge` and `--near`, which do too. `--sp-*` are fixed lengths, for what must not change. `check:tokens` refuses `--sp-*` in spacing.

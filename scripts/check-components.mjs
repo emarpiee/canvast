@@ -41,6 +41,8 @@ for (const r of RULES) {
 const HINT_MAX = 44;
 for (const f of all) for (const m of readFileSync(f, "utf8").matchAll(/\bhint: "([^"]*)"/g)) if (m[1].length > HINT_MAX) failed.push(`Menu rows: ${f}: "${m[1]}" is over ${HINT_MAX} characters.`);
 const css = readFileSync("src/styles.css", "utf8");
+// One arrow for what opens: the chevron icon or --chevron-mask, never a character.
+for (const f of [...all, "src/styles.css", "src/index.html"]) if (/[▾▼▿▽⌄˅⏷]/.test(readFileSync(f, "utf8"))) failed.push(`Arrows: ${f} writes an arrow as a character. Use ICONS.chevronDown or --chevron-mask.`);
 for (const c of RETIRED_CSS) if (css.includes(c)) failed.push(`src/styles.css still styles ${c}, which the shared component replaced.`);
 if (failed.length) {
   console.error(`\ncheck:components failed:\n${failed.map((f) => `  ${f}`).join("\n")}`);

@@ -120,15 +120,15 @@ const FULL_BUTTONS: SunEditor.UI.ButtonList = [
   ["bold", "italic", "underline", "strike"],
   "|",
   ["fontColor", "backgroundColor"],
-  [":Text-text.Text ▾", ...TEXT_TOOLS],
+  [":Text-text.Text", ...TEXT_TOOLS],
   "/",
   ["align", "list_bulleted", "list_numbered"],
-  [":Paragraph-text.Paragraph ▾", ...PARAGRAPH_TOOLS],
+  [":Paragraph-text.Paragraph", ...PARAGRAPH_TOOLS],
   "|",
   ["link", "image", "table", "video"],
-  [":Insert-text.Insert ▾", ...INSERT_TOOLS],
-  ["-right", ":File-text.File ▾", ...FILE_TOOLS],
-  ["-right", ":View-text.View ▾", ...VIEW_TOOLS],
+  [":Insert-text.Insert", ...INSERT_TOOLS],
+  ["-right", ":File-text.File", ...FILE_TOOLS],
+  ["-right", ":View-text.View", ...VIEW_TOOLS],
   ["-right", "codeView", "fullScreen"],
 ];
 // (Classic and Bottom: one short row, as SunEditor's own Classic, with everything else behind its +)
@@ -187,7 +187,7 @@ function presetOptions(style: NoteStyle): SunEditor.InitOptions {
       return { mode: "balloon", buttonList: [["bold", "italic", "underline", "strike"], "|", ["fontColor", "backgroundColor"], "|", ["removeFormat"], "|", ["link"]] };
     case "notion":
       return {
-        buttonList: [["undo", "redo"], ["-right", ":File-text.File ▾", ...FILE_TOOLS], ["-right", ":View-text.View ▾", ...VIEW_TOOLS]],
+        buttonList: [["undo", "redo"], ["-right", ":File-text.File", ...FILE_TOOLS], ["-right", ":View-text.View", ...VIEW_TOOLS]],
         placeholder_line: "Press '/' for commands",
         blockHandle: {
           menu: ["blockStyle", "list", "blockquote", "codeBlock", "fontColor", "backgroundColor", "align", "removeFormat", { title: "Duplicate", icon: "copy", action: ($, { block }) => (block.after(block.cloneNode(true)), $.history.push(false)) }, "copy", { title: "Delete", icon: "delete", action: ($, { block }) => (block.remove(), $.history.push(false)) }],

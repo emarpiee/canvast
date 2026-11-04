@@ -260,3 +260,11 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await p.setViewportSize(shown);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a select's arrow is the app's chevron, not the browser's", async ({ app, browserName }) => {
+  await app.page.getByTestId("view-assets").click();
+  const select = app.page.getByTestId("assets-usage");
+  await expect(select).toBeVisible();
+  const arrow = await select.evaluate((e) => (CSS.supports("appearance: base-select") ? getComputedStyle(e, "::picker-icon").maskImage : getComputedStyle(e).backgroundImage));
+  expect(arrow, browserName).toContain("data:image/svg+xml");
+});

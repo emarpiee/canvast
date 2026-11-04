@@ -127,6 +127,9 @@
   --sp-14: 44px;
   --sp-15: 60px;
   /* Icon sizes */
+  /* The one arrow of what opens or folds, the chevron-down icon as a mask, for what CSS draws (a select, a summary): colour it with its background. Without masks on selects: a fixed grey that reads on both themes. */
+  --chevron-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  --chevron-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='gray' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   --icon-sm: 14px;
   --drag-stack: 96px; /* the stack of thumbnails a drag from the library shows */
   --icon-md: 16px;
@@ -2815,7 +2818,19 @@ select option, select optgroup { color: var(--hud-fg); background: var(--hud-bg)
   select option { padding: var(--s-4) var(--s-6); border-radius: var(--r-sm); }
   select option:hover, select option:focus-visible { background: var(--hud-hover); }
   select option:checked { color: var(--hud-accent-fg); background: var(--hud-accent); }
+  select::picker-icon { content: ""; flex: none; width: var(--icon-md); height: var(--icon-md); background: currentColor; mask: var(--chevron-mask) center / contain no-repeat; }
 }
+/* (a browser that keeps its own select: the same arrow, as a picture; every rule that sets a select's background or padding gives way to it) */
+@supports not (appearance: base-select) {
+  select { appearance: none; background-image: var(--chevron-image) !important; background-repeat: no-repeat !important; background-position: right var(--s-4) center !important; background-size: var(--icon-md) !important; padding-right: calc(var(--icon-md) + 2 * var(--s-4)) !important; }
+}
+/* What folds in Settings: the same arrow, pointing right until it is open. In a note's toolbar, the menus named in words end in it. */
+#settings-view details > summary { list-style: none; }
+#settings-view details > summary::-webkit-details-marker { display: none; }
+#settings-view details > summary::before, .sun-editor .se-btn-more-text::after { content: ""; display: inline-block; width: var(--icon-sm); height: var(--icon-sm); vertical-align: middle; background: currentColor; mask: var(--chevron-mask) center / contain no-repeat; }
+#settings-view details > summary::before { margin-right: var(--s-2); rotate: -90deg; }
+#settings-view details[open] > summary::before { rotate: none; }
+.sun-editor .se-btn-more-text::after { margin-left: var(--s-2); }
 .toolbar input[data-text-size] { width: calc(var(--sp-14) + var(--sp-6)); }
 
 /* Phones: the library's controls wrap into rows that fill the width (the sort box and the thumbnail size take what is left of their row). */
