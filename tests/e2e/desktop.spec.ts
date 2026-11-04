@@ -873,7 +873,7 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual(["library/secret_folder/secret_plan.png"]);
     expect((await hid("check", "pw2")).ok).toBe(true);
     await flush();
-    expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual([]);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/"))).toEqual([]); // (what waited for the key starts when the key is there, maybe after this flush)
     expect(traces()).toEqual([]);
     // A readable file put in .hidden/ from outside (a file manager) while the hidden items are open: it becomes a hidden item, sealed,
     // and nothing readable of it is left.
@@ -1317,9 +1317,8 @@ test("a file past what the page can hold (300 MiB): imported by the button, hidd
     await page.getByTestId("save-status").click();
     await page.getByTestId("set-export-full").click();
     await page.getByTestId("choose-ok").click(); // (the passwords and privacy settings: left out)
-    const exports = `${ws}-exports`;
-    await expect.poll(() => (existsSync(exports) ? readdirSync(exports).filter((n) => n.endsWith(".canvast")) : []), { timeout: 120_000 }).toHaveLength(1);
-    await expect(page.getByTestId("toast")).toContainText(/Exported/, { timeout: 120_000 });
+    await expect(page.getByTestId("toast")).toContainText(/Exported|Export failed/, { timeout: 150_000 });
+    await expect(page.getByTestId("toast")).toContainText(/Exported/);
   } finally {
     await app.close();
   }

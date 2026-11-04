@@ -442,6 +442,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
       const name = cleanWholeName(basename(String(args[0])), "file");
       const chosen = process.env["CANVAST_EXPORT_DIR"] ? freeFile(join(process.env["CANVAST_EXPORT_DIR"], name)) : (await dialog.showSaveDialog(win, { title: "Save", defaultPath: name })).filePath;
       if (!chosen) return null;
+      await mkdir(dirname(chosen), { recursive: true }); // (tests name a folder not made yet)
       const realRoot = await realpath(root);
       const dest = await realpath(dirname(chosen));
       if (dest === realRoot || dest.startsWith(realRoot + sep)) throw new Error("choose a place outside the workspace");
