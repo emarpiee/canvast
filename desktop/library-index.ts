@@ -124,15 +124,15 @@ export class LibraryIndex {
   }
 
   /** Every field name the active items use (for the inspector's suggestions). */
-  fieldKeys(): string[] {
+  fieldKeys(hidden = false): string[] {
     const keys = new Set<string>();
-    for (const e of this.all().values()) for (const f of e.fields ?? []) if (f.key) keys.add(f.key);
+    for (const e of this.all().values()) if (!!e.hidden === hidden) for (const f of e.fields ?? []) if (f.key) keys.add(f.key);
     return [...keys].sort((a, b) => a.localeCompare(b));
   }
 
   /** The values a property has, the most used first (for the inspector's suggestions). */
-  fieldValues(key: string): string[] {
-    return propValues(this.all().values(), key);
+  fieldValues(key: string, hidden = false): string[] {
+    return propValues(this.all().values(), key, 50, hidden);
   }
 
   /** Forget everything (the database was emptied). */

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.32 — Hidden items stay out of suggestions (2026-11-04)
+
+- **Fixed:** outside hidden mode, the names and values of hidden items' properties are no longer offered in the suggestions, the list columns or the Sort menu.
+- **Changed:** the first copy of a hidden item to the system's clipboard in a session asks first, as it can be seen and kept by other programs.
+
 ## 0.53.31 — No extension made up (2026-11-04)
 
 - **Fixed:** with Keep file names, a file of an unknown type keeps its name as written (`README`, `x.7z.001`): no `.bin` is added, on import or by Repair library file names.

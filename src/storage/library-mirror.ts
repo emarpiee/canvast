@@ -21,7 +21,7 @@ import type { NameKeys } from "./hidden-vault";
 import { sha256Hex } from "../assets/sha256";
 import { done, idbGet, req } from "./idb";
 import { noteKindOf } from "../notes/note-file";
-import { MAX_BASE, UNFINISHED_FILE, cutBytes, isClashOf } from "../doc/file-names";
+import { MAX_BASE, UNFINISHED_FILE, cutBytes, isClashOf, numberedName } from "../doc/file-names";
 import { KIND_FOLDERS, MAX_LIBRARY_DIR, extOfBytes, fileExt, fitsPlace, freePath, isSafeRelativePath, keptBase, keptFile, keptFits, keptPart, libraryDir, nameBase, safeBase } from "./workspace-names";
 import type { FolderFile } from "./store";
 
@@ -1165,7 +1165,7 @@ export class LibraryMirror {
     const dot = e.name.lastIndexOf(".");
     const [stem, ext] = dot > 0 ? [e.name.slice(0, dot), e.name.slice(dot)] : [e.name, ""];
     for (let n = 1; n < 10_000; n++) {
-      const name = n === 1 ? e.name : `${stem}-${n}${ext}`;
+      const name = numberedName(stem, n, ext);
       const { seg, long } = await sealName(keys, name);
       const path = `${dir}/${seg}`;
       if (path !== own && (await this.bridge.exists(path))) continue;

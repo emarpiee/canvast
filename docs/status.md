@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.32: hidden items stay out of suggestions (2026-11-04)
+
+- **Implemented:** `fieldKeys`, `fieldValues` and `propValues` by mode, in both builds; a question before a hidden item goes on the clipboard; sealed names through `numberedName`, the same names as before.
+- **Tested:** typecheck and unit tests here; E2E on GitHub. The mode filter has unit tests, no E2E of its own.
+- **Committed:** v0.53.32.
+
 ## v0.53.31: no extension made up (2026-11-04)
 
 - **Implemented:** `keptFile` keeps a name as written when the file's type is not known.

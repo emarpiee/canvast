@@ -205,10 +205,11 @@ export function propValue(e: CatalogEntry, key: string): string {
 }
 
 /** The values a property has across items, the most used first, each item of a list on its own (the details panel suggests them). */
-export function propValues(entries: Iterable<CatalogEntry>, key: string, most = 50): string[] {
+export function propValues(entries: Iterable<CatalogEntry>, key: string, most = 50, hidden = false): string[] {
   const k = key.toLowerCase();
   const counts = new Map<string, number>();
   for (const e of entries) {
+    if (meta(e).hidden !== hidden) continue; // (what hidden items say is never offered outside hidden mode)
     for (const f of meta(e).fields) {
       if (f.key.toLowerCase() !== k || f.value.includes("\n")) continue;
       for (const v of f.items ?? f.value.split(/,\s+/)) if (v.trim()) counts.set(v.trim(), (counts.get(v.trim()) ?? 0) + 1);

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cleanItemName, cleanName, cleanNoteName, cleanWholeName, fitsWritten, freeNameIn, isClashOf, nameWarnings, numberedName, replaceInvalid, sameOnDisk } from "../../src/doc/file-names";
+import type { CatalogEntry } from "../../src/assets/asset-catalog";
+import { propValues } from "../../src/assets/library-match";
 import { dateWords } from "../../src/doc/date-words";
 import { encodeLinkPart, wikiKeyOf, wikiTarget } from "../../src/notes/note-file";
 import { keptFile, keptFits } from "../../src/storage/workspace-names";
@@ -88,6 +90,19 @@ describe("no file on a disk is renamed by a newer rule", () => {
     expect(keptFile("README", "", "application/octet-stream")).toEqual({ base: "README", ext: "" });
     expect(keptFile("x.7z.001", "001", "")).toEqual({ base: "x.7z", ext: "001" });
     expect(keptFile("photo", "", "image/png")).toEqual({ base: "photo", ext: "png" });
+  });
+});
+
+describe("hidden items", () => {
+  const item = (hidden: boolean, value: string): CatalogEntry => ({ hash: value, name: `${value}.png`, type: "image/png", size: 1, pixelW: 1, pixelH: 1, importedAt: 1, state: "active", hidden, fields: [{ key: "secret", value }] }) as unknown as CatalogEntry;
+  it("what a hidden item says is offered in hidden mode only", () => {
+    const all = [item(false, "shown"), item(true, "private")];
+    expect(propValues(all, "secret")).toEqual(["shown"]);
+    expect(propValues(all, "secret", 50, true)).toEqual(["private"]);
+  });
+  it("the sealed name of a clash is what it was, so no sealed file moves", () => {
+    expect(numberedName("plan.note", 2, ".html")).toBe("plan.note-2.html");
+    expect(numberedName("plan.note", 1, ".html")).toBe("plan.note.html");
   });
 });
 

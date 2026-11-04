@@ -524,7 +524,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** Whether this library is listed a page at a time: a big one, in the desktop app (decided at each read of the library). */
   let pagedMode = false;
   /** The property names the library uses. */
-  const fieldKeysNow = (): string[] => (pagesNow() ? pagedFieldKeys : [...new Set((listing?.entries ?? []).flatMap((x) => meta(x).fields.map((f) => f.key)))].filter(Boolean).sort((a, b) => a.localeCompare(b)));
+  const fieldKeysNow = (): string[] => (pagesNow() ? pagedFieldKeys : [...new Set((listing?.entries ?? []).filter((x) => meta(x).hidden === hiddenMode).flatMap((x) => meta(x).fields.map((f) => f.key)))].filter(Boolean).sort((a, b) => a.localeCompare(b)));
   const pagesNow = (): LibraryPages | null => (pagedMode ? (session.catalog?.pages ?? null) : null);
   const withUsage = (e: CatalogEntry & { present: boolean }): Listed => {
     const u = usageMap.get(e.hash);
@@ -708,6 +708,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   /** Whether opening a hidden item in the system's app was confirmed this session (a readable copy is written for it). */
   let openCopyAsked = false;
+  let hiddenCopyAsked = false;
   /** Hidden mode (the word that opens the hidden items, then their password): the same view, listing the hidden items only. */
   let hiddenMode = false;
   /** The view as it was before hidden mode, put back when it ends. */
@@ -1723,7 +1724,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
    */
   const pagedListing = async (pages: LibraryPages, metaOnly: boolean): Promise<CatalogListing | null> => {
     const gen = generation;
-    const [folders, counts, usage, keys] = await Promise.all([pages.folders(), pages.counts(hiddenMode), metaOnly ? Promise.resolve(usageMap) : pages.usage(), pages.fieldKeys()]);
+    const [folders, counts, usage, keys] = await Promise.all([pages.folders(), pages.counts(hiddenMode), metaOnly ? Promise.resolve(usageMap) : pages.usage(), pages.fieldKeys(hiddenMode)]);
     if (gen !== generation) return null;
     allFolders = folders;
     usageMap = usage;
@@ -3328,7 +3329,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const list = root.querySelector<HTMLDataListElement>("#field-value-suggest"); // (outside the panel: a redraw of the panel keeps what it offers)
     if (!key || !list) return;
     const pages = pagesNow();
-    void (pages ? pages.fieldValues(key).catch(() => []) : Promise.resolve(propValues(listing?.entries ?? [], key))).then((values) => {
+    void (pages ? pages.fieldValues(key, hiddenMode).catch(() => []) : Promise.resolve(propValues(listing?.entries ?? [], key, 50, hiddenMode))).then((values) => {
       if (document.activeElement === box || !box.isConnected) list.replaceChildren(...values.map((v) => Object.assign(document.createElement("option"), { value: v })));
     });
   });
@@ -4087,6 +4088,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     await ensure(hashes);
     const ents = hashes.flatMap((h) => (entryOf(h)?.present ? [entryOf(h)!] : []));
     if (!ents.length) return;
+    // (the system's clipboard is outside the app: clipboard managers keep what they see. Asked once, as for opening a hidden item in another app.)
+    if (!hiddenCopyAsked && ents.some((e) => meta(e).hidden)) {
+      if (!(await confirmDialog({ title: "Copy a hidden item", lines: ["It goes on the system's clipboard, readable, where other programs and clipboard managers can see and keep it."], confirmLabel: "Copy it", danger: false }))) return;
+      hiddenCopyAsked = true;
+    }
     // One note: the note itself, as its file with its properties, to paste into a note elsewhere.
     const note = what === "picture" && ents.length === 1 && noteKindOf(ents[0]!.name) === "md" ? ents[0]! : null;
     if (note) {
