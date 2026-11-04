@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.53.65 — Sections scroll as they are dragged; the README brought up to date (2026-11-05)
+
+- **Changed:** the README says the desktop app is built for Linux and other systems are out of scope for now, gives the browsers the app really needs, and its pictures are taken again, with a new one of Organize.
+- **Changed:** in the light theme, the logo on the lock screen, the start-up screen and About takes the accent colour.
+- **Fixed:** dragging a section of the library's sidebar or details panel could not reach the far end of a long list: the list now scrolls when the pointer nears its top or bottom, or passes it. The section under the pointer also keeps its counts and headings readable.
+- **Fixed:** the words and the button in the library's "Showing…" pill and the Hidden mode bar were two text sizes and did not line up. They are one size now; the button is bold with an outline.
+
 ## 0.53.64 — Notices keep their contrast (2026-11-04)
 
 - **Fixed:** the tick and warning icons on notices were too pale in the light theme; they now have a colour for each theme.

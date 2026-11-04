@@ -21,6 +21,42 @@ export interface SortableSections {
   headOf(id: string): HTMLElement | null | undefined;
 }
 
+/** How near a scrolling list's edge a drag starts to scroll it, and how far it goes in a frame at the edge or past it. */
+const EDGE_ZONE = 56;
+const EDGE_SPEED = 16;
+
+/**
+ * While a section is dragged, the list it is in scrolls when the pointer is near its top or bottom edge, or past it: at once, faster the closer it is, so that
+ * every place in a long list can be reached. A browser's own scrolling in a drag is too little and stops at the list's edge. Returns what stops it.
+ */
+function scrollAtEdges(from: HTMLElement): () => void {
+  let list: HTMLElement | null = from;
+  while (list && !(/auto|scroll/.test(getComputedStyle(list).overflowY) && list.scrollHeight > list.clientHeight)) list = list.parentElement;
+  if (!list) return () => undefined;
+  const scroller = list;
+  let y: number | null = null;
+  let frame = 0;
+  const seen = (e: DragEvent): void => void (y = e.clientY);
+  const step = (): void => {
+    if (y !== null) {
+      const box = scroller.getBoundingClientRect();
+      const toTop = y - box.top;
+      const toBottom = box.bottom - y;
+      const share = (near: number): number => Math.min(1, Math.max(0, (EDGE_ZONE - near) / EDGE_ZONE));
+      if (toTop < EDGE_ZONE) scroller.scrollTop -= Math.ceil(EDGE_SPEED * share(toTop));
+      else if (toBottom < EDGE_ZONE) scroller.scrollTop += Math.ceil(EDGE_SPEED * share(toBottom));
+    }
+    frame = requestAnimationFrame(step);
+  };
+  // (on the document, and first: the pointer may be past the list, and the list's own handlers end the event)
+  document.addEventListener("dragover", seen, true);
+  frame = requestAnimationFrame(step);
+  return () => {
+    document.removeEventListener("dragover", seen, true);
+    cancelAnimationFrame(frame);
+  };
+}
+
 /** Make the sections inside `host` movable. Add it before the host's other drag listeners: a drag of a section ends with it. */
 export function sortableSections(host: HTMLElement, s: SortableSections): void {
   const type = `application/x-canvast-section-${s.key.toLowerCase()}`;
@@ -42,6 +78,15 @@ export function sortableSections(host: HTMLElement, s: SortableSections): void {
     e.dataTransfer.setData(type, id);
     e.dataTransfer.effectAllowed = "move";
     for (const x of all()) if (x.dataset[s.key] !== id) x.classList.add("drop-zone");
+    const stop = scrollAtEdges(head!);
+    const end = (): void => {
+      stop();
+      document.removeEventListener("dragend", end, true);
+      document.removeEventListener("drop", end, true);
+    };
+    // (on the document: a drop draws the sections again, and the one dragged may be gone before its own end comes)
+    document.addEventListener("dragend", end, true);
+    document.addEventListener("drop", end, true);
   });
   host.addEventListener("dragend", () => {
     moving = null;

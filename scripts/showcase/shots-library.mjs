@@ -34,7 +34,7 @@ for (const tag of ["reference", "art/ink", "art/paint"]) {
   await p.getByTestId("asset-tag-input").fill(tag);
   await p.getByTestId("asset-tag-input").press("Enter");
 }
-await p.keyboard.press("o");
+await p.getByTestId("asset-organize").click();
 await p.getByTestId("tree-chooser").waitFor();
 await p.waitForTimeout(500);
 await p.screenshot({ path: `${out}/organize.png` });

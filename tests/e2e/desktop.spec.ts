@@ -1281,7 +1281,8 @@ test("a file past what the page can hold (300 MiB): imported by the button, hidd
     expect(await shaOf(join(ws, placed))).toBe(want);
     await page.getByTestId("assets-import-input").setInputFiles(source);
     await page.waitForTimeout(3000);
-    expect(files(ws).filter((f) => f.startsWith("library/"))).toEqual([placed]);
+    // (the same content again: it is copied a part at a time to be proven, and that copy goes when the hash says it is not new)
+    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/")), { timeout: 60_000 }).toEqual([placed]);
 
     // Hidden: sealed where nothing readable is left, in the same format the outside tool opens, whole and a chunk at a time.
     expect(await hid("set", "pw")).toEqual({ ok: true, state: "open" });

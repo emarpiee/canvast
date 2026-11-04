@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.65: sections scroll as they are dragged; the README brought up to date (2026-11-05)
+
+- **Implemented:** `scrollAtEdges` in `sortable-sections.ts`; on a drop target everything takes the on-accent colour; the logo's light-theme accent; one text size in the filter pill and the Hidden mode bar; README platform and browser statements; pictures taken on GitHub.
+- **Tested:** `components.spec.ts` extended (synthetic drag events); the owner confirmed a real drag scrolls.
+- **Known failures:** none.
+- **Unverified:** the hidden items test's earlier stall: its cause is not proven (see v0.53.63).
+- **Committed:** v0.53.65.
+- **Next bounded task:** the release.
+
 ## v0.53.64: notices keep their contrast (2026-11-04)
 
 - **Implemented:** `--hud-success` and `--hud-warning` in each theme; the `Screenshots` workflow and `shots-library.mjs`.

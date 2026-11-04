@@ -212,6 +212,33 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await pinFolder("Unpin", "Ink");
   await pinFolder("Unpin", "Art");
   await expect(folderOrder).toHaveText(["Bee", "Plain", "Art", "Ink"]);
+  // A section dragged near the list's edge, or past it, scrolls the list.
+  const short = p.viewportSize()!;
+  await p.setViewportSize({ width: short.width, height: 420 });
+  const moved = await p.evaluate(async () => {
+    const list = document.querySelector<HTMLElement>('[data-testid="assets-side"]')!;
+    const head = list.querySelector<HTMLElement>(".side-head")!;
+    const dataTransfer = new DataTransfer();
+    const wait = (): Promise<void> => new Promise((r) => setTimeout(r, 400));
+    const at = (clientY: number): void => void list.dispatchEvent(new DragEvent("dragover", { bubbles: true, dataTransfer, clientX: list.getBoundingClientRect().left + 10, clientY }));
+    head.dispatchEvent(new DragEvent("dragstart", { bubbles: true, dataTransfer }));
+    at(list.getBoundingClientRect().bottom - 2);
+    await wait();
+    const down = list.scrollTop;
+    at(list.getBoundingClientRect().top - 40); // (past the top)
+    await wait();
+    const up = list.scrollTop;
+    document.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer }));
+    await wait();
+    const after = list.scrollTop;
+    at(list.getBoundingClientRect().bottom - 2);
+    await wait();
+    return { down, up, after, stopped: list.scrollTop === after };
+  });
+  expect(moved.down).toBeGreaterThan(0);
+  expect(moved.up).toBeLessThan(moved.down);
+  expect(moved.stopped).toBe(true);
+  await p.setViewportSize(short);
   // A small screen has no row pin: pinning is in the row's menu.
   const shown = p.viewportSize()!;
   await p.setViewportSize({ width: 600, height: shown.height });
