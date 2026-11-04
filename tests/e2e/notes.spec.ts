@@ -1175,3 +1175,29 @@ test("a picture dragged to another place in a note is one step of undo", async (
   await p.keyboard.press("Control+z");
   await expect.poll(order).toEqual(before);
 });
+
+test("Ctrl+F in an open note finds in that note with the focus off its words, in the library's viewer and beside a canvas", async ({ app }) => {
+  const p = app.page;
+  const NOTE = `# Find here\n\n${"Some words of the page.\n\n".repeat(30)}`;
+  const inFind = () => p.evaluate(() => document.activeElement?.classList.contains("se-find-replace-input") ?? false);
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "find.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) });
+  await card(p, hashOf(NOTE)).dblclick();
+  await expect(page(p).locator("h1")).toHaveText("Find here");
+  await p.locator(".viewer-details").click();
+  await p.keyboard.press("Control+f");
+  await expect.poll(inFind).toBe(true);
+  await expect(p.locator(".assets-body.is-viewing")).toBeVisible();
+  await p.keyboard.press("Escape");
+  await p.locator(".viewer-back").click();
+  await card(p, hashOf(NOTE)).click();
+  await p.getByTestId("asset-place").click();
+  await p.getByTestId("view-canvas").click();
+  const box = (await p.locator("canvas").first().boundingBox())!;
+  await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
+  const panel = p.getByTestId("note-panel");
+  await expect(panel.locator(".sun-editor-editable h1").first()).toHaveText("Find here");
+  await panel.locator("header").first().click();
+  await p.keyboard.press("Control+f");
+  await expect.poll(inFind).toBe(true);
+});

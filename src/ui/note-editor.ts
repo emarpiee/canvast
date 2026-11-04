@@ -580,6 +580,11 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       e.stopImmediatePropagation();
       editor.$.history.push(false);
       void host.save();
+    } else if (e.code === "KeyF" && !e.shiftKey) {
+      // Find in this note, wherever the focus is: the editor's own shortcut works only from its words, and elsewhere the key went to the library's search.
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      editor.$.finder.open(true);
     } else if (!typing && (e.code === "KeyZ" || (e.code === "KeyY" && !e.shiftKey))) {
       // (in the words or a field, Undo is theirs already, and the app's own shortcuts leave those alone)
       e.preventDefault();
