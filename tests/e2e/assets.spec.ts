@@ -137,7 +137,7 @@ test("one original is shared by instances on several boards and canvases; usage 
   await expect(card(p, HASH).getByTestId("asset-uses")).toHaveText("Used 4 times on 3 canvases");
   await card(p, HASH).click();
   const rows = p.getByTestId("asset-places").locator("li");
-  await expect(rows).toHaveText([/Board 1 › Canvas 1\s*×2/, /Board 1 › Canvas 2\s*×1/, /Board 2 › Canvas 1\s*×1/]);
+  await expect(rows).toHaveText([/Board 1 › Canvas 1\s*2\s*$/, /Board 1 › Canvas 2\s*1\s*$/, /Board 2 › Canvas 1\s*1\s*$/]);
   await expect(p.getByTestId("asset-usage")).toHaveText("Used on 3 canvases (4 times)");
   // In use: the one Delete button asks to delete it everywhere, and says where.
   await p.getByTestId("asset-delete").click();
