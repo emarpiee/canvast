@@ -8,6 +8,7 @@ import { startStep } from "../app/startup-log";
 import { fileByFolders, filesOfPicker } from "../app/directory";
 import { readMetadata } from "../assets/metadata";
 import type { MetaRow } from "../assets/metadata";
+import type { LinkCards, LinkRow } from "../app/session";
 import type { Session, AssetPlace } from "../app/session";
 import { plural } from "../doc/plural";
 import { openBatchRename } from "./batch-rename";
@@ -149,6 +150,7 @@ const PLACES_SHOWN = 5;
 const DETAIL_TAGS_SHOWN = 12;
 const DETAIL_FIELDS_SHOWN = 8;
 const DETAIL_LINKS_SHOWN = 5;
+const LINKS_RETRY_MS = 800;
 /** A list of the sidebar (folders, file types, tags) shows this many rows before a "Show more" button. */
 /** What a sidebar list's sort button goes through, in order. */
 const SIDE_SORTS = { folders: ["az", "za", "new", "old"], tag: ["az", "za"], ctag: ["az", "za"] } as const;
@@ -1081,17 +1083,39 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     refresh: () => refresh(),
     hidden: () => hiddenMode,
   };
-  /** The notes that link to the item described (Linked from, in its details): each opens in the viewer. */
-  const fillBacklinks = async (hash: string): Promise<void> => {
-    const notes = await session.backlinks(hash, hiddenMode).catch(() => []);
-    const sec = inspector.querySelector<HTMLElement>('[data-testid="asset-backlinks"]');
-    if (!sec || selected !== hash) return;
-    sec.hidden = !notes.length;
-    const linksOpen = openLists.has("links");
-    const linksCap = capList(notes, DETAIL_LINKS_SHOWN, linksOpen);
-    sec.querySelector("ul")!.innerHTML = linksCap.shown.map((n) => `<li><button type="button" class="asset-place-name assets-link" data-action="open-linked" data-hash="${n.hash}" title="Open “${esc(n.name)}”">${esc(n.name)}</button></li>`).join("");
-    sec.querySelector(".show-more")?.remove();
-    if (linksCap.long) sec.insertAdjacentHTML("beforeend", showMoreButton({ open: linksOpen, hidden: linksCap.hidden, attrs: `data-action="show-more" data-list="links" data-testid="asset-links-more"` }));
+  /** The link cards of the item described: what links to it (Linked from) and, for a note, what it links to (Links). Each row opens in the viewer. */
+  let lastLinks: { hash: string; hiddenMode: boolean; cards: LinkCards } | null = null;
+  const paintLinks = (hash: string, cards: LinkCards): void => {
+    const name = entryOf(hash)?.name ?? "";
+    const kind = noteKindOf(name);
+    const isNote = kind === "md" || kind === "rich";
+    const rowOf = (r: LinkRow): string => `<li><button type="button" class="asset-link-row assets-link" data-action="open-linked" data-hash="${r.hash}" title="Open “${esc(r.name)}”">${ICONS.fileIcon}<span class="asset-place-name">${esc(r.name)}${r.folder ? `<small class="asset-link-folder">${esc(r.folder)}</small>` : ""}</span></button></li>`;
+    const fill = (testid: string, shown: boolean, count: number, list: string, rows: string[], empty: string): void => {
+      const sec = inspector.querySelector<HTMLElement>(`[data-testid="${testid}"]`);
+      if (!sec) return;
+      sec.hidden = !shown;
+      sec.querySelector<HTMLElement>("[data-count]")!.textContent = String(count);
+      const cap = capList(rows, DETAIL_LINKS_SHOWN, openLists.has(list));
+      sec.querySelector("ul")!.innerHTML = cap.shown.join("");
+      sec.querySelector(".show-more")?.remove();
+      sec.querySelector(".asset-note")?.remove();
+      if (!rows.length) sec.insertAdjacentHTML("beforeend", `<p class="asset-note">${empty}</p>`);
+      if (cap.long) sec.insertAdjacentHTML("beforeend", showMoreButton({ open: openLists.has(list), hidden: cap.hidden, attrs: `data-action="show-more" data-list="${list}" data-testid="${testid}-more"` }));
+    };
+    fill("asset-backlinks", isNote || cards.from.length > 0, cards.from.length, "links", cards.from.map(rowOf), "No notes link here.");
+    const lost = cards.missing.map((m) => `<li class="asset-link-missing" title="Nothing in the library has this name">${ICONS.fileIcon}<span class="asset-place-name">${esc(m)}</span></li>`);
+    fill("asset-outlinks", isNote, cards.to.length + cards.missing.length, "out", [...cards.to.map(rowOf), ...lost], "This note links to nothing.");
+  };
+  const fillLinks = async (hash: string, again = false): Promise<void> => {
+    if (lastLinks?.hash === hash && lastLinks.hiddenMode === hiddenMode && inspector.dataset["hash"] === hash) paintLinks(hash, lastLinks.cards); // (at once, so a card does not go and come back)
+    const cards = await session.linkCards(hash, hiddenMode).catch(() => null);
+    if (inspector.dataset["hash"] !== hash) return; // (the details moved on: they have their own)
+    if (!cards) {
+      if (!again) window.setTimeout(() => void fillLinks(hash, true), LINKS_RETRY_MS); // (the storage busy, right after a save)
+      return;
+    }
+    lastLinks = { hash, hiddenMode, cards };
+    paintLinks(hash, cards);
   };
   let noteZoom = 1; // (for this session, from note to note)
   const openNote = async (hash: string, name: string, blob: Blob, token: number): Promise<void> => {
@@ -1533,8 +1557,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   }
 
   const showSlide = async (hash: string): Promise<void> => {
-    const e = entryOf(hash);
-    if (!e || !(await leaveNote())) return;
+    if (!entryOf(hash)) await ensure([hash]).catch(() => undefined); // (a long library: what a link points at need not be on a page read yet)
+    if (!entryOf(hash)) {
+      session.editor.message = "That item is no longer in the library.";
+      session.editor.changed();
+      return;
+    }
+    const e = entryOf(hash)!;
+    if (!(await leaveNote())) return;
     const token = ++slideToken;
     const opening = viewer.hidden;
     if (hash !== slideHash) setGrey(false);
@@ -2748,7 +2778,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       file: () => `${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays ${noteKindOf(e.name) === "rich" ? "a rich text note (HTML) that other apps open too" : "plain text other apps read"}. Tag it <em>template</em> to offer it in Insert ▸ Template of every note.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>${isArtFile(e.name) ? "An art file" : "No preview for this file"}</h3><p class="asset-note">${isAutoCopy(e.name) ? `${AUTO_COPY_NOTE} ` : ""}${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as ${isArtFile(e.name) ? "the picture it keeps, when it keeps one" : "a card"}. ${esc(d.todo)}</p></section>`; })() : ""}`,
       organize: () => (e ? organizeHtml(e) : ""),
       notes: () => (e ? notesHtml(e) : ""),
-      links: () => `<section class="asset-sec" data-testid="asset-backlinks" hidden><h3>Linked from</h3><ul class="asset-places"></ul></section>`,
+      links: () => `<section class="asset-sec" data-testid="asset-backlinks" hidden><h3>Linked from <span class="layer-count" data-count></span></h3><ul class="asset-places"></ul></section><section class="asset-sec" data-testid="asset-outlinks" hidden><h3>Links <span class="layer-count" data-count></span></h3><ul class="asset-places"></ul></section>`,
       where: () => `<section class="asset-sec asset-where">
         <h3 data-testid="asset-usage">${instances ? `Used on ${plural(places.length || (e?.canvases ?? m!.canvases), "canvas", "canvases")} <span class="asset-place-total">(${plural(instances, "time")})</span>` : "Where it is used"}</h3>
         ${instances ? `<ul class="asset-places" data-testid="asset-places">${placeRows}</ul>
@@ -2812,7 +2842,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         inspector.querySelector<HTMLElement>("dd[data-file-place]")!.textContent = path;
       }, () => undefined);
     }
-    if (e) void fillBacklinks(e.hash);
+    if (e) void fillLinks(e.hash);
     const prev = inspector.querySelector<HTMLImageElement>(".asset-preview img");
     if (prev) loadThumb(prev);
     const sample = inspector.querySelector<HTMLElement>(".asset-preview .font-sample");

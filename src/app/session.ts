@@ -79,6 +79,18 @@ export interface WorkspaceTree {
  * objects are in memory at a time (lazy per-canvas loading); each canvas keeps
  * its own camera.
  */
+/** A row of a link card: an item, with the folder it is in. */
+export interface LinkRow {
+  hash: string;
+  name: string;
+  folder: string;
+}
+export interface LinkCards {
+  from: LinkRow[];
+  to: LinkRow[];
+  missing: string[];
+}
+
 export class Session {
   current: CurrentMeta | null = null;
   tree: WorkspaceTree | null = null;
@@ -534,6 +546,64 @@ export class Session {
       if (hit) out.push(e);
     }
     return out;
+  }
+
+  /** The two link cards of an item: the notes that link to it, and what it links to (notes, pictures, any file), with links that find nothing. */
+  async linkCards(hash: string, hidden = false): Promise<LinkCards> {
+    const listing = await this.catalog?.list();
+    const self = listing?.entries.find((x) => x.hash === hash);
+    if (!listing || !self) return { from: [], to: [], missing: [] };
+    const row = async (x: CatalogEntry): Promise<LinkRow> => ({ hash: x.hash, name: x.name, folder: (await this.itemPath(x, listing.folders)).slice(0, -1).join("/") });
+    const to = new Map<string, CatalogEntry>();
+    const missing = new Set<string>();
+    const kind = noteKindOf(self.name);
+    if (kind && kind !== "txt") {
+      const links = await this.linksOf(self, kind);
+      const dir = (await this.itemPath(self, listing.folders)).slice(0, -1);
+      // (a hidden item, out of hidden mode, is neither listed nor called missing: the card says nothing of it)
+      const found = (x: CatalogEntry | undefined): void => void (x && x.hash !== hash && (hidden || !x.hidden) && to.set(x.hash, x));
+      for (const w of links.wiki) {
+        if (/^canvas:/i.test(w)) continue;
+        const t = wikiTarget(w);
+        const named = listing.entries.filter((x) => x.name.toLowerCase() === t.name || wikiKeyOf(x.name) === t.name);
+        if (!named.length) missing.add(w);
+        else if (named.length < 2 || !t.dirs.length) found(named[0]);
+        else {
+          let at = named[0];
+          for (const x of named) {
+            const dirs = (await this.itemPath(x, listing.folders)).slice(0, -1).map((d) => d.toLowerCase());
+            if (t.dirs.every((d, i) => dirs[dirs.length - t.dirs.length + i] === d)) {
+              at = x;
+              break;
+            }
+          }
+          found(at);
+        }
+      }
+      for (const p of links.paths) {
+        const t = linkTarget(p, dir);
+        if (!t) continue;
+        if ("hash" in t) {
+          const x = listing.entries.find((y) => y.hash === t.hash);
+          if (x) found(x);
+          else missing.add(p);
+          continue;
+        }
+        const name = t.path[t.path.length - 1]!.toLowerCase();
+        let at: CatalogEntry | undefined;
+        for (const x of listing.entries) {
+          if (x.name.toLowerCase() !== name) continue;
+          const where = (await this.itemPath(x, listing.folders)).join("/");
+          if (where === t.path.join("/") || where === t.root?.join("/")) {
+            at = x;
+            break;
+          }
+        }
+        if (at) found(at);
+        else missing.add(t.path[t.path.length - 1]!);
+      }
+    }
+    return { from: await Promise.all((await this.backlinks(hash, hidden)).map(row)), to: await Promise.all([...to.values()].map(row)), missing: [...missing] };
   }
 
   /**

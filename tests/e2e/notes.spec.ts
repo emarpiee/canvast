@@ -138,7 +138,7 @@ test("New note makes a markdown note in the open folder and opens it to write in
   await p.getByRole("menuitem", { name: /New note/ }).click();
   await expect(page(p).locator("h1")).toHaveText(/^Note \d{4}-\d\d-\d\d \d{6}$/);
   await expect(p.getByTestId("asset-card")).toHaveCount(2);
-  await expect(p.getByTestId("asset-backlinks")).toBeHidden(); // (nothing links to it: no Linked from)
+  await expect(p.getByTestId("asset-backlinks")).toContainText("No notes link here."); // (a note always has the card)
 
   // A table from the size picker, shown.
   await page(p).locator("h1").click();
@@ -237,6 +237,8 @@ test("[[links]] between notes: shown as links, Ctrl+click opens the note, [[ off
   await expect(page(p).locator("h1")).toHaveText("Brief");
   if (!(await p.getByTestId("asset-download").isVisible())) await p.locator(".viewer-details").click();
   await expect(p.getByTestId("asset-backlinks")).toContainText("Plan.md");
+  await expect(p.getByTestId("asset-backlinks").locator("[data-count]")).toHaveText("1");
+  await expect(p.getByTestId("asset-outlinks")).toContainText("links to nothing");
   // Renamed: the links to it follow ([[Brief]] was its name alone).
   await p.evaluate(() => window.__canvastDebug.assetListing().then((l) => window.__canvastDebug.libraryOp("rename", l.entries.find((e) => e.name === "Brief.md")!.hash, "Overview.md")));
   await p.getByTestId("asset-backlinks").getByRole("button", { name: "Plan.md" }).click();
@@ -1122,4 +1124,34 @@ test("a data file opens as plain text: its spaces, tabs and line ends come back 
   await card(p, hashOf(LATIN)).dblclick();
   await expect(p.locator(".assets-body.is-viewing")).toBeVisible();
   await expect(page(p)).toBeHidden();
+});
+
+test("a note's Links card lists what it links to, pictures too, and links that find nothing; Go to link and the rows open them", async ({ app }) => {
+  const p = app.page;
+  const NOTE = "# Note\n\nSee [[Other]], [[Gone]] and ![cat](cat.png).\n";
+  const OTHER = "# Other\n";
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles([
+    { name: "cat.png", mimeType: "image/png", buffer: CAT },
+    { name: "Note.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) },
+    { name: "Other.md", mimeType: "text/markdown", buffer: Buffer.from(OTHER) },
+  ]);
+  await card(p, hashOf(NOTE)).dblclick();
+  await expect(page(p).locator("h1")).toHaveText("Note");
+  if (!(await p.getByTestId("asset-download").isVisible())) await p.locator(".viewer-details").click();
+  const out = p.getByTestId("asset-outlinks");
+  await expect(out.locator("[data-count]")).toHaveText("3");
+  await expect(out.getByRole("button", { name: "Other.md" })).toBeVisible();
+  await expect(out.getByRole("button", { name: "cat.png" })).toBeVisible();
+  await expect(out.locator(".asset-link-missing")).toHaveText("Gone");
+  // The link's card goes where it points.
+  await page(p).locator("a", { hasText: "Other" }).click();
+  await p.getByTestId("note-go-link").click();
+  await expect(page(p).locator("h1")).toHaveText("Other");
+  await expect(p.getByTestId("asset-backlinks").getByRole("button", { name: "Note.md" })).toBeVisible();
+  // Back by the card, which is there each time.
+  await p.getByTestId("asset-backlinks").getByRole("button", { name: "Note.md" }).click();
+  await expect(page(p).locator("h1")).toHaveText("Note");
+  await expect(p.getByTestId("asset-backlinks")).toContainText("No notes link here.");
+  await expect(out.locator("[data-count]")).toHaveText("3");
 });

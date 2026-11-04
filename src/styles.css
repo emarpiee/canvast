@@ -1312,6 +1312,11 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-sec[hidden] { display: none; } /* (a section with nothing to say: Linked from) */
 .assets-link { padding: 0; color: var(--hud-accent-text); text-align: left; background: none; border: 0; cursor: pointer; } /* (a name that opens what it names: Linked from) */
 .assets-link:hover, .assets-link:focus-visible { text-decoration: underline; }
+.asset-link-row, .asset-link-missing { display: flex; align-items: center; gap: var(--s-4); width: 100%; min-width: 0; }
+:is(.asset-link-row, .asset-link-missing) > svg { flex: none; width: var(--icon-sm); height: var(--icon-sm); }
+.asset-link-missing { color: var(--hud-muted); }
+.asset-link-folder { display: block; overflow: hidden; font-size: var(--text-sm); color: var(--hud-muted); text-overflow: ellipsis; white-space: nowrap; }
+.note-go-link svg { width: var(--icon-md); height: var(--icon-md); }
 .asset-more h4 { margin: var(--s-4) 0 var(--s-1); font: var(--font-meta); color: var(--hud-muted); text-transform: uppercase; }
 .asset-more { margin-top: var(--s-8); color: var(--hud-muted); }
 .asset-more summary { cursor: pointer; }

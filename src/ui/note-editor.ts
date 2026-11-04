@@ -1,3 +1,4 @@
+import { ICONS } from "./icons";
 import { scrubNumbers } from "../colour-picker/scrub";
 import suneditor, { helper } from "suneditor";
 import { htmlMarkdown, markdownHtml, pastedHtml, pastedMarkdown } from "../notes/note-markdown";
@@ -599,6 +600,17 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     host.open(links.get(href) ?? href);
   };
   el.addEventListener("click", follow, true);
+  // The small card on a link in the words: a button goes where it points, and so does the link's text on it (a browser's new window goes nowhere here).
+  const linkCard = editor.$.contextProvider.carrierWrapper.querySelector<HTMLElement>(".se-controller-link");
+  linkCard?.querySelector(".se-btn-group")?.insertAdjacentHTML("afterbegin", `<button type="button" class="se-btn se-tooltip note-go-link" data-go-link data-testid="note-go-link" tabindex="-1" aria-label="Go to link">${ICONS.goToLink}<span class="se-tooltip-inner"><span class="se-tooltip-text">Go to link</span></span></button>`);
+  linkCard?.addEventListener("click", (e) => {
+    const on = e.target as HTMLElement;
+    if (!on.closest("[data-go-link]") && !on.closest("a")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const href = linkCard.querySelector("a")!.getAttribute("href") ?? "";
+    host.open(links.get(href) ?? href);
+  }, true);
   // The pointer resting on a link: a small card with the preview of what it points at (a note's page, a picture), like a tooltip.
   let peekTimer = 0;
   let peekCard: HTMLElement | null = null;

@@ -260,6 +260,7 @@ import chevronDown from "lucide-static/icons/chevron-down.svg";
 import chevronRight from "lucide-static/icons/chevron-right.svg";
 import chevronLeft from "lucide-static/icons/chevron-left.svg";
 import arrowLeft from "lucide-static/icons/arrow-left.svg";
+import arrowUpRight from "lucide-static/icons/arrow-up-right.svg";
 import chevronUp from "lucide-static/icons/chevron-up.svg";
 import arrowDownAZ from "lucide-static/icons/arrow-down-a-z.svg";
 import arrowDownZA from "lucide-static/icons/arrow-down-z-a.svg";
@@ -565,6 +566,7 @@ export const ICONS = {
   magnet: clean(magnet),
   chevronLeft: clean(chevronLeft),
   arrowLeft: clean(arrowLeft),
+  goToLink: clean(arrowUpRight),
   chevronUp: clean(chevronUp),
   panelRight: clean(panelRight),
   maximize: clean(maximize),
