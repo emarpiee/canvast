@@ -1093,9 +1093,9 @@ test("slideshow: plays through the library on a timer, wraps, pauses with its bu
     await p.getByTestId("assets-import-input").setInputFiles({ name: `s-${i}.png`, mimeType: "image/png", buffer: makePng(8 + i, 6, () => [60 * i, 120, 200, 255]) });
   }
   await expect(p.getByTestId("asset-card")).toHaveCount(3);
-  // The time per slide is a setting (Settings > Library): 2 s, the shortest the test needs.
+  // The time per slide is a setting (Settings > Media and playback): 2 s, the shortest the test needs.
   await p.getByTestId("view-settings").click();
-  await p.locator("#settings-view").getByRole("tab", { name: "Library", exact: true }).click();
+  await p.locator("#settings-view").getByRole("tab", { name: "Media and playback", exact: true }).click();
   await p.locator("#settings-view").getByLabel("Slideshow", { exact: true }).fill("2");
   await toAssets(p);
   // From the library bar: the viewer opens on the first asset and the show starts.
@@ -1946,7 +1946,7 @@ test("in-canvas tags: rename and delete a tag on every canvas, from the Tags pan
   // The tag's ⋯ menu in the Tags panel renames it on this canvas and on the other one.
   await p.getByRole("button", { name: "More actions for tag Sky" }).click();
   await p.getByRole("menuitem", { name: "Rename tag Sky" }).click();
-  const box = p.getByLabel("New name for tag Sky on every canvas");
+  const box = p.getByTestId("prompt-input");
   await box.fill("cloud");
   await p.keyboard.press("Enter");
   await expect.poll(() => tagsOf(first)).toEqual(["cloud", "keep"]);
@@ -1969,7 +1969,7 @@ test("in-canvas tags: rename and delete a tag on every canvas, from the Tags pan
   await expect(ctags.getByRole("button", { name: /^#Sky/ })).toHaveCount(0);
   await p.getByRole("button", { name: "More actions for canvas tag cloud" }).click();
   await p.getByRole("menuitem", { name: "Rename canvas tag cloud" }).click();
-  await p.getByLabel("New name for canvas tag cloud").fill("keep");
+  await p.getByTestId("prompt-input").fill("keep");
   await p.keyboard.press("Enter");
   await expect(ctags.getByRole("button", { name: /^#keep/ })).toBeVisible();
   await expect(ctags.getByRole("button", { name: /^#cloud/ })).toHaveCount(0);

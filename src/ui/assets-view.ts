@@ -63,6 +63,7 @@ import { avEngine, gifEngine } from "./media-player";
 import { mountPlayerControls } from "./player-controls";
 import type { ImageObject } from "../doc/model";
 import { chooseDialog, promptDialog } from "./confirm";
+import { askTagName } from "./tag-name-dialog";
 import type { SettingsStore } from "../settings/settings";
 
 /**
@@ -722,7 +723,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** On a narrow screen the sidebar is a strip that opens on demand. */
   const narrow = window.matchMedia("(max-width: 900px)");
   let sideOpen = !narrow.matches;
-  let naming: { kind: "new"; parent: string | null } | { kind: "rename-ctag"; key: string; label: string } | { kind: "rename"; id: string } | null = null;
+  let naming: { kind: "new"; parent: string | null } | { kind: "rename"; id: string } | null = null;
   const scroller = root.querySelector<HTMLElement>(".assets-scroll")!;
   /** A thumbnail being read or made: who still wants it (a card that scrolled away does not), and whether it is for the screen or the background. */
   type ThumbJob = { p: Promise<string>; wants: Array<() => boolean>; urgent: boolean; failed?: boolean; custom: string | null };
@@ -2367,10 +2368,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             ${
               capped("ctags", [...canvasTags]
                 .sort((a, b) => a[1].label.localeCompare(b[1].label))
-                .map(([k, c]) => ({ active: scope === `ctag:${k}` || (naming?.kind === "rename-ctag" && naming.key === k), html:
-                  naming?.kind === "rename-ctag" && naming.key === k
-                    ? nameInput(c.label, `New name for canvas tag ${c.label}`)
-                    : item(`ctag:${k}`, `#${esc(c.label)}`, c.assets.size, {
+                .map(([k, c]) => ({ active: scope === `ctag:${k}`, html:
+                  item(`ctag:${k}`, `#${esc(c.label)}`, c.assets.size, {
                         cls: "is-tag is-canvas-tag",
                         extra: more("ctag", k, c.label, [
                           { attr: 'data-ctag-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename canvas tag ${c.label}` },
@@ -3003,7 +3002,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // A double-click on its name renames it.
   /** Rename a tag on every item that has it: the one way to, from the sidebar and from the details. A name another tag has joins the two. */
   const renameTagDialog = async (label: string): Promise<void> => {
-    const name = await promptDialog({ title: `Rename the tag “${label}”`, lines: ["It changes on every item that has it. A name another tag has joins the two."], value: label, confirmLabel: "Rename tag" });
+    const name = await askTagName(label, "library");
     if (name === null) return;
     const ok = await session.organize((c) => c.renameTag(label, name));
     if (ok && scope === `tag:${label.toLowerCase()}`) scope = `tag:${name.replace(/\s+/g, " ").trim().replace(/^#+/, "").toLowerCase()}`;
@@ -3800,8 +3799,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const key = b.dataset["key"]!;
       const label = canvasTags.get(key)?.label ?? key;
       if (b.dataset["ctagAction"] === "rename") {
-        naming = { kind: "rename-ctag", key, label };
-        renderSide();
+        void askTagName(label, "canvases").then(async (name) => {
+          if (name === null) return;
+          const changed = await session.changeCanvasTag(label, name);
+          if (changed && scope === `ctag:${key}`) scope = `ctag:${name.replace(/\s+/g, " ").trim().replace(/^#+/, "").toLowerCase()}`;
+          renderSide();
+        });
       } else {
         const c = canvasTags.get(key);
         void confirmDialog({
@@ -3918,13 +3921,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         return;
       }
       if (n.kind === "new" || n.kind === "rename") warnName(name);
-      if (n.kind === "rename-ctag") {
-        const was = n.label;
-        void session.changeCanvasTag(was, name).then((changed) => {
-          if (changed && scope === `ctag:${n.key}`) scope = `ctag:${name.replace(/\s+/g, " ").trim().replace(/^#+/, "").toLowerCase()}`;
-          renderSide();
-        });
-      } else if (n.kind === "new") {
+      if (n.kind === "new") {
         const id = newObjectId();
         void session.organize(async (c) => {
           await c.createFolder(name, n.parent, id);

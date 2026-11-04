@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.38: one dialog for tags, fewer Settings tabs (2026-11-04)
+
+- **Implemented:** `askTagName` (`ui/tag-name-dialog.ts`) for the library, the sidebar's canvas tags and the Tags panel; rows moved from the Library and Panels tabs.
+- **Tested:** typecheck and checks here; E2E on GitHub.
+- **Committed:** v0.53.38.
+
 ## v0.53.37: the Panels row; Copy file reads back (2026-11-04)
 
 - **Implemented:** `panel.keep` under More. GitHub showed the file list on the clipboard as `text/uri-list`.

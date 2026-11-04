@@ -150,7 +150,7 @@ test("Settings > Panels: minimize all inactive panels keeps only the active one 
   const folded = (id: string) => item(app, id).getAttribute("data-folded");
   expect(await folded("tags"), "off: nothing is folded for the person").toBeNull();
   await p.getByTestId("view-settings").click();
-  await p.locator("#set-tab-panels").click();
+  await p.locator("#set-tab-appearance").click();
   const set = (key: string) => p.locator(`[data-set="${key}"]`);
   await expect(set("panel.keep")).toHaveAttribute("max", "5"); // up to the panels the app has
   await set("panel.autoFold").selectOption("all");
@@ -166,7 +166,7 @@ test("Settings > Panels: minimize all inactive panels keeps only the active one 
   expect(await folded("styles")).toBe("");
   // the latest two stay open
   await p.getByTestId("view-settings").click();
-  await p.locator("#set-tab-panels").click();
+  await p.locator("#set-tab-appearance").click();
   await set("panel.autoFold").selectOption("latest");
   await set("panel.keep").fill("2");
   await p.getByTestId("view-canvas").click();

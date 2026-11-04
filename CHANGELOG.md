@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.38 — One dialog for every tag; fewer Settings tabs (2026-11-04)
+
+- **Changed:** Canvas tags in the library's sidebar and the Tags panel rename in the same dialog as the library's tags, in place of a box in the list.
+- **Changed:** Settings has two tabs fewer: the library viewer's options are in Media and playback, Panels is a card in Appearance. Their settings and values are the same; search and the command palette find them.
+
 ## 0.53.37 — Panels kept open in one line (2026-11-04)
 
 - **Changed:** Panels kept open (Settings > Panels) says what it is on one line, the rest under More.

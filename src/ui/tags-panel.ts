@@ -1,3 +1,4 @@
+import { askTagName } from "./tag-name-dialog";
 import type { EditorState } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
 import { MAX_TAG_TEXT } from "../assets/asset-catalog";
@@ -35,7 +36,6 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
   let scheduled = false;
   let filter = "";
   /** The tag being renamed (lower-cased) and the text typed so far. */
-  let renaming: { key: string; value: string } | null = null;
   /** The box that had the focus before a redraw, so typing carries on (a name or a tag being typed is never redrawn under the cursor). */
   let refocus: string | null = null;
 
@@ -46,7 +46,7 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
     const active = document.activeElement as HTMLInputElement | null;
     if (active && panel.contains(active) && active.matches("input")) {
       if (active.value) return;
-      refocus = ["data-tag-add", "data-tag-filter", "data-tag-rename"].find((a) => active.hasAttribute(a)) ?? null;
+      refocus = ["data-tag-add", "data-tag-filter"].find((a) => active.hasAttribute(a)) ?? null;
     }
     // Every tag of this canvas, as first spelled, with the items that carry it.
     const tags = new Map<string, { label: string; ids: string[] }>();
@@ -77,9 +77,7 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
     const shown = sorted.filter(([k]) => !q || k.includes(q.replace(/^#/, "")));
     const rows = shown
       .map(([k, e]) =>
-        renaming?.key === k
-          ? `<li class="tag-row"><input class="tag-input" data-tag-rename="${esc(e.label)}" value="${esc(renaming.value)}" aria-label="New name for tag ${esc(e.label)} on every canvas" maxlength="64"></li>`
-          : `<li class="tag-row"><button type="button" class="tag-row-main" data-select-tag="${esc(k)}" aria-label="Select the ${e.ids.length} item${e.ids.length === 1 ? "" : "s"} tagged ${esc(e.label)}" title="Select the items with this tag (Shift: add them to the selection)"><span class="tag-row-name">#${esc(e.label)}</span><span class="tag-row-n">${e.ids.length}</span></button>${moreButton(`More actions for tag ${e.label}`, `data-tag-more="${esc(e.label)}"`)}</li>`,
+        `<li class="tag-row"><button type="button" class="tag-row-main" data-select-tag="${esc(k)}" aria-label="Select the ${e.ids.length} item${e.ids.length === 1 ? "" : "s"} tagged ${esc(e.label)}" title="Select the items with this tag (Shift: add them to the selection)"><span class="tag-row-name">#${esc(e.label)}</span><span class="tag-row-n">${e.ids.length}</span></button>${moreButton(`More actions for tag ${e.label}`, `data-tag-more="${esc(e.label)}"`)}</li>`,
       )
       .join("");
     panel.innerHTML = panelHtml({
@@ -103,7 +101,6 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
     if (refocus) {
       const el = panel.querySelector<HTMLInputElement>(`[${refocus}]`);
       el?.focus();
-      if (refocus === "data-tag-rename") el?.select();
       refocus = null;
     }
   };
@@ -142,7 +139,7 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
         more,
         [
           { label: "Select the items with this tag", icon: ICONS.pointer, aria: `Select the items tagged ${tag}`, run: () => { editor.entered = []; editor.select(doc.ordered().filter((o) => (o.tags ?? []).some((x) => x.toLowerCase() === key)).map((o) => o.id)); } },
-          { label: "Rename on every canvas", icon: ICONS.textCursorInput, aria: `Rename tag ${tag}`, run: () => { renaming = { key, value: tag }; refocus = "data-tag-rename"; render(); } },
+          { label: "Rename on every canvas", icon: ICONS.textCursorInput, aria: `Rename tag ${tag}`, run: () => void askTagName(tag, "canvases").then((to) => to !== null && to.trim() && actions.renameTag(tag, to)) },
           { label: "Delete from every canvas", icon: ICONS.trash2, danger: true, aria: `Delete tag ${tag}`, run: () => actions.deleteTag(tag) },
         ],
         `Actions for tag ${tag}`,
@@ -155,7 +152,7 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
       filter = t.value;
       refocus = "data-tag-filter";
       render();
-    } else if (t.matches("[data-tag-rename]") && renaming) renaming.value = t.value;
+    }
   });
   panel.addEventListener("keydown", (e) => {
     const t = e.target as HTMLInputElement;
@@ -171,20 +168,6 @@ export function mountTagsPanel(host: HTMLElement, editor: EditorState, doc: Docu
         else render();
       } else if (e.key === "Escape") {
         t.value = "";
-        t.blur();
-        render();
-      }
-    } else if (t.matches("[data-tag-rename]")) {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        const from = t.dataset["tagRename"]!;
-        const to = t.value;
-        renaming = null;
-        t.blur(); // a box with text in it is never redrawn: let go of it first
-        if (to.trim() && to.trim().replace(/^#+/, "") !== from) actions.renameTag(from, to);
-        render();
-      } else if (e.key === "Escape") {
-        renaming = null;
         t.blur();
         render();
       }

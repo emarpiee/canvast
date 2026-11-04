@@ -62,6 +62,8 @@ const CARD_STARTS: Partial<Record<SettingKey, string>> = {
   "eraser.diameterPx": "Eraser",
   "colour.model": "Colour picker",
   "media.volume": "Players",
+  "assets.edgeWidth": "Library viewer",
+  "panel.autoFold": "Panels",
   "notes.panelMode": "Editor",
   "notes.name": "New notes",
   "notes.cardShows": "Cards and previews",
@@ -105,9 +107,9 @@ const TAB_ICON: Record<string, keyof typeof ICONS> = { drawing: "tabDrawing", na
 
 const TAB_GROUPS: ReadonlyArray<readonly [title: string, ids: readonly string[]]> = [
   ["Working", ["drawing", "navigation", "shortcuts"]],
-  ["Library", ["library", "notes", "saving"]],
+  ["Library", ["notes", "saving"]],
   ["Media", ["media", "screenshot"]],
-  ["Interface", ["appearance", "panels", "performance"]],
+  ["Interface", ["appearance", "performance"]],
   ["App", ["storage", "privacy", "about", "develop"]],
 ];
 
@@ -166,15 +168,6 @@ export const SETTINGS_TABS: readonly Tab[] = [
     ],
   },
   {
-    id: "library",
-    label: "Library",
-    rows: [
-      { key: "assets.edgeWidth", label: "Viewer edges", help: "Click this much of the viewer's left or right side to go to the previous or next item (invisible). 0 turns it off.", control: { kind: "range", min: 0, max: 40, step: 1, unit: "%" } },
-      { key: "assets.playerHideSeconds", label: "Hide the player", help: "Seconds the viewer's player stays after the pointer stops.", more: "Seconds the viewer's video and GIF player stays after the pointer stops moving, playing or paused; it comes back with any move.", control: { kind: "range", min: 0.5, max: 10, step: 0.5, unit: "s", live: true } },
-      { key: "assets.slideSeconds", label: "Slideshow", help: "Seconds each item stays in the library slideshow (a video or audio file plays to its end first).", control: { kind: "range", min: 1, max: 60, step: 1, unit: "s", live: true } },
-    ],
-  },
-  {
     id: "media",
     label: "Media and playback",
     rows: [
@@ -182,6 +175,9 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "media.step.video", label: "Video step", help: "Seconds the step buttons move a video.", control: { kind: "range", min: 0.5, max: 60, step: 0.5, unit: "s" } },
       { key: "media.step.audio", label: "Audio step", help: "Seconds the step buttons move an audio file.", control: { kind: "range", min: 0.5, max: 60, step: 0.5, unit: "s" } },
       { key: "media.step.gif", label: "GIF step", help: "Frames the step buttons move an animated GIF.", control: { kind: "range", min: 1, max: 100, step: 1, unit: "frames" } },
+      { key: "assets.edgeWidth", label: "Viewer edges", help: "Click this much of the viewer's left or right side to go to the previous or next item (invisible). 0 turns it off.", control: { kind: "range", min: 0, max: 40, step: 1, unit: "%" } },
+      { key: "assets.playerHideSeconds", label: "Hide the player", help: "Seconds the viewer's player stays after the pointer stops.", more: "Seconds the viewer's video and GIF player stays after the pointer stops moving, playing or paused; it comes back with any move.", control: { kind: "range", min: 0.5, max: 10, step: 0.5, unit: "s", live: true } },
+      { key: "assets.slideSeconds", label: "Slideshow", help: "Seconds each item stays in the library slideshow (a video or audio file plays to its end first).", control: { kind: "range", min: 1, max: 60, step: 1, unit: "s", live: true } },
     ],
   },
   {
@@ -261,14 +257,6 @@ export const SETTINGS_TABS: readonly Tab[] = [
     ],
   },
   {
-    id: "panels",
-    label: "Panels",
-    rows: [
-      { key: "panel.autoFold", label: "Minimize inactive panels", help: "Side panels fold to their title bar when you use another one.", more: "The panels stacked on a side fold to their title bar when you use another one. Off: they stay as you left them. Only the active one: just the panel on top of each stack stays open. The latest few: the panels you used last stay open (set how many below). Floating panels are never folded.", control: { kind: "select", options: [["off", "Off"], ["all", "Keep only the active panel open"], ["latest", "Keep the latest few open"]] } },
-      { key: "panel.keep", label: "Panels kept open", help: "How many stacked panels stay open with Keep the latest few open.", more: `Counting the active one; up to the ${DOCK_PANEL_IDS.length} panels the app has. Press a title bar to open or fold a panel yourself; drag it to float it or to stack it on the other side.`, control: { kind: "range", min: 1, max: DOCK_PANEL_IDS.length, step: 1, unit: "panels" } },
-    ],
-  },
-  {
     id: "performance",
     label: "Performance",
     rows: [
@@ -294,6 +282,8 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "ui.density", label: "Density", help: "How much room controls take: more canvas, or larger controls.", more: "Compact (the default): smaller controls and tighter spacing, so more of the canvas shows. Dense: the smallest controls, fields, menus and spacing, for the most canvas. Comfortable: larger, roomier controls.", control: { kind: "select", options: [["dense", "Dense"], ["compact", "Compact"], ["comfortable", "Comfortable"]] } },
       { key: "ui.corners", label: "Corners", help: "The shape of every corner of the interface: round or sharp.", more: "The shape of every corner of the interface: buttons, fields, panels, menus, chips and dots, in every view. Round (the default) or sharp.", control: { kind: "select", options: [["round", "Round"], ["sharp", "Sharp"]] } },
       { key: "ui.zen", label: "Zen mode", help: "Fade the floating bars and panels; each shows again under the pointer.", more: "Fade the floating bars and panels out; each shows again while the pointer is over it. Also the leaf button beside Home, or the Zen key (Settings > Shortcuts).", control: { kind: "toggle" } },
+      { key: "panel.autoFold", label: "Minimize inactive panels", help: "Side panels fold to their title bar when you use another one.", more: "The panels stacked on a side fold to their title bar when you use another one. Off: they stay as you left them. Only the active one: just the panel on top of each stack stays open. The latest few: the panels you used last stay open (set how many below). Floating panels are never folded.", control: { kind: "select", options: [["off", "Off"], ["all", "Keep only the active panel open"], ["latest", "Keep the latest few open"]] } },
+      { key: "panel.keep", label: "Panels kept open", help: "How many stacked panels stay open with Keep the latest few open.", more: `Counting the active one; up to the ${DOCK_PANEL_IDS.length} panels the app has. Press a title bar to open or fold a panel yourself; drag it to float it or to stack it on the other side.`, control: { kind: "range", min: 1, max: DOCK_PANEL_IDS.length, step: 1, unit: "panels" } },
     ],
   },
   { id: "shortcuts", label: "Shortcuts" },
