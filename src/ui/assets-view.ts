@@ -50,7 +50,7 @@ import { OpenNote } from "./note-session";
 import type { NoteDeps, NotePlace } from "./note-session";
 import { RICH_NOTE_SUFFIX, WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget, newNoteFile } from "../notes/note-file";
 import { splitFrontmatter, underProps, wholeMarkdown, withFileMeta } from "../notes/frontmatter";
-import { AUTO_NOTE_SETTINGS, autoDates, formatNoteDate, isAutoDate, isAutoKey, isAutoLocked, stemOf } from "../notes/note-dates";
+import { AUTO_NOTE_SETTINGS, autoDates, formatNoteDate, isAutoDate, isAutoKey } from "../notes/note-dates";
 import { asWritten, hasPropType, pickerShows, PROP_TYPES, propType, typeWarning, withPropType, type PropType } from "../notes/prop-types";
 import type { NoteKind } from "../notes/note-file";
 import { fontFor } from "../text/fonts";
@@ -2705,12 +2705,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const fieldRowHtml = (e: CatalogEntry, f: AssetField, i: number, dis: string, missing = false): string => {
     const kind = noteKindOf(e.name);
     const auto = isAutoKey(kind, f.key);
-    const locked = missing || isAutoLocked(kind, f.key);
     return `<li class="asset-field" data-type="${auto ? "text" : propType(f.key, f.value, f.items)}"${missing ? " data-auto-missing" : ""}>
             <button type="button" class="field-grip" data-index="${i}" aria-label="Move the property ${esc(f.key || String(i + 1))}" title="Drag to move this property (or the Up and Down arrows)"${dis || (missing ? " disabled" : "")}>${ICONS.gripVertical}</button>
             <button type="button" class="field-type" data-action="field-type" data-index="${i}" aria-haspopup="menu" aria-label="Type of ${esc(f.key || "this property")}: ${PROP_TYPES.find((t) => t.id === propType(f.key, f.value, f.items))!.label}" title="${f.key ? `Type: ${PROP_TYPES.find((t) => t.id === propType(f.key, f.value, f.items))!.label}. A type belongs to the name, for every item` : "Name it to choose its type"}"${dis || (f.key && !auto ? "" : " disabled")}>${auto ? (isAutoDate(kind, f.key) ? PROP_ICON.datetime : PROP_ICON.text) : PROP_ICON[propType(f.key, f.value, f.items)]}</button>
             <input class="field-key"${auto ? " readonly" : ""} data-prop="key-${i}" list="field-key-suggest" value="${esc(f.key)}" placeholder="Name" aria-label="Name of property ${i + 1}" maxlength="${MAX_FIELD_KEY}"${dis}>
-            ${fieldValueHtml(f, i, dis, locked)}
+            ${fieldValueHtml(f, i, dis, auto)}
             <p class="field-warn" data-testid="field-warn" role="status"${!auto && typeWarning(propType(f.key, f.value, f.items), f.value) ? "" : " hidden"}>${ICONS.triangleAlert}<span>${auto ? "" : esc(typeWarning(propType(f.key, f.value, f.items), f.value))}</span></p>
             ${auto ? "" : `<button type="button" class="assets-btn is-icon" data-action="field-remove" data-index="${i}" aria-label="Remove the property ${esc(f.key || String(i + 1))}" title="Remove this property"${dis}>${ICONS.x}</button>`}
           </li>`;
@@ -2726,10 +2725,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const keys = fieldKeysNow();
     const has = (k: string): boolean => m.fields.some((f) => f.key.toLowerCase() === k.toLowerCase());
     const dates = autoDates();
-    const autoMissing: AssetField[] = !isAutoDate(noteKindOf(e.name), dates.created) ? [] : [
-      ...(has(dates.title) ? [] : [{ key: dates.title, value: dates.titleFrom === "name" ? stemOf(e.name) : "" }]),
-      ...(has(dates.created) ? [] : [{ key: dates.created, value: formatNoteDate(new Date(e.importedAt), dates.format) }]),
-      ...(has(dates.modified) ? [] : [{ key: dates.modified, value: "" }]),
+    const kind = noteKindOf(e.name);
+    const autoMissing: AssetField[] = [
+      ...(isAutoKey(kind, dates.title) && !has(dates.title) ? [{ key: dates.title, value: "" }] : []),
+      ...(isAutoDate(kind, dates.created) && !has(dates.created) ? [{ key: dates.created, value: formatNoteDate(new Date(e.importedAt), dates.format) }] : []),
+      ...(isAutoDate(kind, dates.modified) && !has(dates.modified) ? [{ key: dates.modified, value: "" }] : []),
     ];
     return `
       <section class="asset-sec asset-notes" data-testid="asset-notes">

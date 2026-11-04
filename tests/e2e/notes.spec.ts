@@ -796,13 +796,29 @@ test("a note's created and modified are automatic: a save writes them, under the
   await expect.poll(async () => (await saved()).find((f) => f.key === "updated")?.value).toMatch(/^\d\d\/\d\d\/20[2-9]\d at \d\d:\d\d$/);
   await expect.poll(async () => (await saved()).find((f) => f.key === "created-on")?.value).toMatch(/^\d\d\/\d\d\/20[2-9]\d at /);
   expect(await text()).toContain("# Dated");
-  // The title: its file's name; set to follow the first heading, that, and read only.
-  await expect.poll(async () => (await saved()).find((f) => f.key === "title")?.value).toBe("d");
+  // The title follows the first heading, read only.
   await p.evaluate(() => window.__canvastDebug.setSetting("notes.titleFrom", "h1"));
   await expect(p.getByLabel("Value of title")).toHaveAttribute("readonly");
   await page(p).locator("h1").first().click();
+  await p.keyboard.press("End");
+  await p.keyboard.type(": z");
   await p.keyboard.press("Control+s");
-  await expect.poll(async () => (await saved()).find((f) => f.key === "title")?.value).toMatch(/^.*Dated/);
+  await expect.poll(async () => (await saved()).find((f) => f.key === "title")?.value).toBe("Datedxy: z");
+  // Rename notes on save: off, the name stays (above). On: from the heading, as written but for what a file cannot hold; then clean. A rename keeps the note's text.
+  const named = () => p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.map((e) => e.name));
+  expect(await named()).toEqual(["d.md"]);
+  await p.evaluate(() => window.__canvastDebug.setSetting("notes.renameOnSave", true));
+  expect(await named(), "turned on: nothing until a save").toEqual(["d.md"]);
+  await page(p).locator("h1").first().click();
+  await p.keyboard.press("Control+s");
+  await expect.poll(named).toEqual(["Datedxy- z.md"]);
+  await p.evaluate(() => window.__canvastDebug.setSetting("notes.nameStyle", "clean"));
+  await page(p).locator("h1").first().click();
+  await p.keyboard.press("End");
+  await p.keyboard.type("!");
+  await p.keyboard.press("Control+s");
+  await expect.poll(named).toEqual(["datedxy-z.md"]);
+  expect(await text()).toContain("Datedxy: z!");
 });
 
 test("Note cards show properties: a card shows the note's chosen properties, at once", async ({ app }) => {

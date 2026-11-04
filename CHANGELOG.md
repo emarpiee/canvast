@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.53.29 — Rename notes on save; automatic changes off by default (2026-11-04)
+
+- **Added:** **Rename notes on save** (Settings > Notes, off by default): each save names the note's file from its first heading or its title property, in its own **File name style**: Keep as written or Clean. Links to it in other notes follow.
+- **Changed:** **Title** is Off or First heading: a title is no longer filled in from the file's name.
+- **Changed:** **Automatic created and modified** is off by default, and on its own switch: a save changes a note only as asked.
+
 ## 0.53.28 — Automatic note properties; Ctrl+C in the library (2026-11-04)
 
 - **Added:** a note's **title**, **created** and **modified** properties are automatic: every save writes the modified time, the created time when there is none, and the title. In the details panel they cannot be removed, and the two times cannot be edited.

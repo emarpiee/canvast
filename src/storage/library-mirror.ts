@@ -580,7 +580,7 @@ export class LibraryMirror {
       // Two settings, each on its own. Keep file names: a file named as its item is stays so, and a library folder may be written either way. Sort files:
       // a file in no folder goes in its kind's folder; else one in the library's root stays there. A file tidied before fits too: turning a setting on
       // renames nothing that fits. A hidden item's place is its own business.
-      const keep = this.keepNames() && !sealed;
+      const keep = this.keepsName(e.name) && !sealed;
       const base = keep ? keptBase(e.name) : tidyBase;
       const ext = (keep && /\.([A-Za-z0-9]{1,8})$/.exec(e.name)?.[1]) || tidyExt;
       const places = sealed ? [tidyDir] : names.length ? (keep ? [await diskDir(names, tidyDir), tidyDir] : [tidyDir]) : this.sortFiles() ? [tidyDir] : [tidyDir, "library"];
@@ -588,7 +588,7 @@ export class LibraryMirror {
       const fits = !!rec.file && (places.some((d) => fitsPlace(rec.file!, d, tidyBase, tidyExt)) || (keep && keptFits(rec.file, places, e.name)));
       if (fits && !taken.has(rec.file!.toLowerCase())) {
         taken.add(rec.file!.toLowerCase());
-        if (keep) await this.nameFollowsFile(e.hash, rec.file!);
+        if (!sealed) await this.nameFollowsFile(e.hash, rec.file!);
       } else moves.push({ hash: e.hash, from: rec.ext ? rec.file! : null, dir, base, ext });
     }
     // A file that moves keeps its old place until it has moved, so no two items ever pass through one name.
@@ -1050,6 +1050,11 @@ export class LibraryMirror {
 
   /** Whether files keep the item's name as written (Settings: Keep file names), else their tidy name. */
   keepNames: () => boolean = () => false;
+  /** Rename notes on save: how notes' files are named, over `keepNames`; null: as other files. */
+  noteFileKeep: () => boolean | null = () => null;
+  private keepsName(name: string): boolean {
+    return (noteKindOf(name) ? this.noteFileKeep() : null) ?? this.keepNames();
+  }
   /** Whether a file in no library folder goes in its kind's folder (Settings: Sort files by kind), else may stay in the library's root. */
   sortFiles: () => boolean = () => false;
 
@@ -1456,13 +1461,16 @@ export class LibraryMirror {
    * what the disk says. (Links in notes stay: `[[name]]` now names the other, as it does in any other app reading the folder.)
    */
   private async nameFollowsFile(hash: string, file: string): Promise<void> {
-    if (!this.keepNames() || isHiddenFile(file)) return;
+    if (isHiddenFile(file)) return;
     const base = file.slice(file.lastIndexOf("/") + 1);
     const stem = base.replace(/\.[A-Za-z0-9]{1,8}$/, "");
     await this.lib.serial(async () => {
       const entry = await this.lib.entry(hash);
       if (!entry) return;
-      const kept = keptBase(entry.name);
+      // (a note named clean: its name is its file's, -2 and all. Another file with Keep file names off keeps a name of its own.)
+      const clean = !!noteKindOf(entry.name) && this.noteFileKeep() === false;
+      if (!clean && !this.keepsName(entry.name)) return;
+      const kept = clean ? nameBase(entry.name) : keptBase(entry.name);
       if (stem.startsWith(`${kept}-`) && /^\d+$/.test(stem.slice(kept.length + 1))) {
         await this.lib.apply([{ t: "entry", hash, v: { ...entry, name: base } }]);
         // (many at once, in a library from before: one redraw)

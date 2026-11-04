@@ -478,6 +478,7 @@ async function start(): Promise<void> {
       trashDays: () => Number(settings.get("storage.trashDays")),
       keepFileNames: () => settings.get("library.keepFileNames"),
       sortFiles: () => settings.get("library.sortFiles"),
+      noteFileKeep: () => (settings.get("notes.renameOnSave") ? settings.get("notes.nameStyle") === "kept" : null),
       onFileRules: (changed) => void settings.subscribe((key) => (key === "library.keepFileNames" || key === "library.sortFiles") && changed()),
     };
     storage = desktop ? await openDesktopStorage(desktop, opts) : await openBrowserStorage(opts);
@@ -535,7 +536,7 @@ async function start(): Promise<void> {
     if (key === "notes.cardProps" && setShownProps(settings.get("notes.cardProps"))) redrawNoteCards();
   });
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyNoteLook);
-  const autoDatesNow = (): void => setAutoDates({ on: settings.get("notes.autoDates"), created: settings.get("notes.createdKey"), modified: settings.get("notes.modifiedKey"), format: settings.get("notes.dateFormat"), title: settings.get("notes.titleKey"), titleFrom: settings.get("notes.titleFrom") });
+  const autoDatesNow = (): void => setAutoDates({ on: settings.get("notes.autoDates"), created: settings.get("notes.createdKey"), modified: settings.get("notes.modifiedKey"), format: settings.get("notes.dateFormat"), title: settings.get("notes.titleKey"), titleFrom: settings.get("notes.titleFrom"), rename: settings.get("notes.renameOnSave"), nameFrom: settings.get("notes.nameFrom"), nameStyle: settings.get("notes.nameStyle") });
   autoDatesNow();
   settings.subscribe((key) => AUTO_NOTE_SETTINGS.includes(key) && autoDatesNow());
   setPropTypes(settings.get("library.propTypes"));

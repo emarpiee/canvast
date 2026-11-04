@@ -37,6 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.29: rename notes on save; all automatic changes off by default (2026-11-04)
+
+- **Implemented:** `noteFileName` (`note-dates.ts`), `renameFromNote` after the version is saved, `noteFileKeep` over Keep file names in the mirror for these notes; settings `notes.renameOnSave`, `notes.nameFrom`, `notes.nameStyle`; `notes.titleFrom` is off or h1; `notes.autoDates` off by default.
+- **Tested:** typecheck and unit tests here (naming risks one by one); E2E on GitHub.
+- **Unverified:** a real two-note clash on disk with Rename notes on save has no E2E of its own beyond the same-name desktop test.
+- **Committed:** v0.53.29.
+
 ## v0.53.28: automatic note properties, Ctrl+C in the library (2026-11-04)
 
 - **Implemented:** `src/notes/note-dates.ts` (`formatNoteDate`, `firstHeading`, `stampNote`), settings `notes.autoDates`, `notes.titleKey`, `notes.titleFrom`, `notes.createdKey`, `notes.modifiedKey`, `notes.dateFormat`, fixed rows in the panel; a pasted title and created kept; Ctrl+C by key and by the copy event in the grid and the viewer.

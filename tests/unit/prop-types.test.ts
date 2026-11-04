@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { normalizeFields } from "../../src/assets/asset-catalog";
 import { fileMeta, parseProps, splitFrontmatter, wholeMarkdown, withFileMeta } from "../../src/notes/frontmatter";
-import { firstHeading, formatNoteDate, isAutoDate, isAutoLocked, setAutoDates, stampNote } from "../../src/notes/note-dates";
+import { firstHeading, formatNoteDate, isAutoDate, isAutoKey, noteFileName, setAutoDates, stampNote } from "../../src/notes/note-dates";
 import { asWritten, fitsType, guessType, parsePropTypes, pickerShows, propType, setPropTypes, typeWarning, validPropTypes, withPropType } from "../../src/notes/prop-types";
 
 describe("property types", () => {
@@ -59,46 +59,74 @@ describe("property types", () => {
   });
 });
 
-describe("automatic note dates", () => {
+describe("what a save changes by itself", () => {
   const AT = new Date(2026, 10, 4, 15, 7, 9);
-  const on = { on: true, created: "created", modified: "modified", format: "YYYY-MM-DDTHH:mm", title: "title", titleFrom: "name" as const };
+  const now = AT.getTime();
+  const off = { on: false, created: "created", modified: "modified", format: "YYYY-MM-DDTHH:mm", title: "title", titleFrom: "off" as const, rename: false, nameFrom: "h1" as const, nameStyle: "kept" as const };
   it("formats a moment; brackets and other letters stay", () => {
     expect(formatNoteDate(AT, "YYYY-MM-DDTHH:mm:ss")).toBe("2026-11-04T15:07:09");
     expect(formatNoteDate(AT, "ddd D MMM YY, h:mm A [at] [home]")).toBe("Wed 4 Nov 26, 3:07 PM at home");
   });
-  it("a title: from the file's name only when empty; from the first heading at every save, not one in code", () => {
-    setAutoDates(on);
-    const now = AT.getTime();
-    const title = (file: string): string | string[] | undefined => splitFrontmatter(stampNote("md", file, 1, now, "the-name.md")).props!.find((p) => p.key === "title")?.value;
-    expect(title("---\ntitle:\n---\n# Head\n")).toBe("the-name");
-    expect(title("---\ntitle: By hand\n---\n# Head\n")).toBe("By hand");
-    setAutoDates({ ...on, titleFrom: "h1" });
+  it("all off (the default): nothing changes", () => {
+    setAutoDates(off);
+    const file = '---\ntitle:   "x"\n---\n\n# H\n';
+    expect(stampNote("md", file, 1, now)).toBe(file);
+    expect(stampNote("rich", "<html></html>", 1, now)).toBe("<html></html>");
+    expect(noteFileName("md", file, "n.md")).toBeNull();
+  });
+  it("the two times: modified in its place, created kept or added", () => {
+    setAutoDates({ ...off, on: true });
+    expect(stampNote("md", '---\nmodified: "old"\ntitle: T\ncreated: 2000\n---\nBody\n', 1, now)).toBe("---\nmodified: 2026-11-04T15:07\ntitle: T\ncreated: 2000\n---\nBody\n");
+    expect(stampNote("md", "Body\n", new Date(2020, 0, 2, 3, 4).getTime(), now)).toBe("---\ncreated: 2020-01-02T03:04\nmodified: 2026-11-04T15:07\n---\nBody\n");
+    expect(stampNote("txt", "Body", 1, now)).toBe("Body");
+    expect(stampNote("rich", "<html><head><title>t</title></head><body></body></html>", now, now)).toContain('<meta name="modified" content="2026-11-04T15:07">');
+    expect(isAutoDate("md", "CREATED")).toBe(true);
+    expect(isAutoKey("md", "title")).toBe(false);
+    setAutoDates(off);
+  });
+  it("the title follows the first heading, not one in code; no heading leaves it", () => {
+    setAutoDates({ ...off, titleFrom: "h1" });
+    const title = (file: string): string | string[] | undefined => splitFrontmatter(stampNote("md", file, 1, now)).props?.find((p) => p.key === "title")?.value;
     expect(title("---\ntitle: By hand\n---\n```\n# not this\n```\n## Nor this\n# **My** [[a|Head]] #\n")).toBe("My Head");
     expect(title("---\ntitle: By hand\n---\nNo heading\n")).toBe("By hand");
-    expect(title("No heading\n")).toBe("the-name");
+    expect(stampNote("md", "No heading\n", 1, now)).toBe("No heading\n");
     expect(firstHeading("rich", '<body><h1 class="x">A <b>B</b> &amp; C</h1></body>')).toBe("A B & C");
-    expect(isAutoLocked("md", "Title")).toBe(true);
-    setAutoDates({ ...on, on: false });
+    expect(isAutoKey("md", "Title")).toBe(true);
+    expect(isAutoKey("txt", "Title")).toBe(false);
+    setAutoDates(off);
   });
   it("a note pasted with its own title and created keeps them over the note's; modified is the save's", () => {
-    setAutoDates({ ...on, titleFrom: "h1" });
-    const now = AT.getTime();
+    setAutoDates({ ...off, on: true, titleFrom: "h1" });
     const pasted = parseProps(["title: Pasted", "created: 2001-01-01", "modified: 2002-02-02"]);
-    expect(stampNote("md", "---\ntitle: Mine\ncreated: 2020-01-01\nmodified: 2020-01-01\n---\n# Head\n", 1, now, "x.md", pasted)).toBe("---\ntitle: Pasted\ncreated: 2001-01-01\nmodified: 2026-11-04T15:07\n---\n# Head\n");
-    setAutoDates({ ...on, on: false });
+    expect(stampNote("md", "---\ntitle: Mine\ncreated: 2020-01-01\nmodified: 2020-01-01\n---\n# Head\n", 1, now, pasted)).toBe("---\ntitle: Pasted\ncreated: 2001-01-01\nmodified: 2026-11-04T15:07\n---\n# Head\n");
+    setAutoDates(off);
   });
-  it("a save updates modified in its place, keeps created, and adds what is missing", () => {
-    setAutoDates(on);
-    const now = AT.getTime();
-    expect(stampNote("md", '---\nmodified: "old"\ntitle: T\ncreated: 2000\n---\nBody\n', 1, now, "x.md")).toBe("---\nmodified: 2026-11-04T15:07\ntitle: T\ncreated: 2000\n---\nBody\n");
-    expect(stampNote("md", "Body\n", new Date(2020, 0, 2, 3, 4).getTime(), now, "My note.md")).toBe("---\ntitle: My note\ncreated: 2020-01-02T03:04\nmodified: 2026-11-04T15:07\n---\nBody\n");
-    expect(stampNote("txt", "Body", 1, now, "x.txt")).toBe("Body");
-    expect(stampNote("rich", "<html><head><title>t</title></head><body></body></html>", now, now, "x.note.html")).toContain('<meta name="modified" content="2026-11-04T15:07">');
-    setAutoDates({ ...on, on: false });
-    expect(stampNote("md", "Body\n", 1, now, "x.md")).toBe("Body\n");
-    setAutoDates({ ...on, modified: " updated " });
-    expect(isAutoDate("md", "Updated")).toBe(true);
-    expect(isAutoDate("txt", "Updated")).toBe(false);
-    setAutoDates({ ...on, on: false });
+  it("a file's name: from the heading or the title, in either style, and what must never happen to it", () => {
+    const name = (file: string, current = "old.md", over = {}, itemTitle?: string): string | null => {
+      setAutoDates({ ...off, rename: true, ...over });
+      const out = noteFileName("md", file, current, itemTitle);
+      setAutoDates(off);
+      return out;
+    };
+    expect(name("# My Note: Part (1)\n")).toBe("My Note- Part (1).md");
+    expect(name("# My Note: Part (1)\n", "old.md", { nameStyle: "clean" })).toBe("my_note-part-1.md");
+    expect(name("---\ntitle: From Title\n---\n# Head\n", "old.md", { nameFrom: "title" })).toBe("From Title.md");
+    expect(name("# Head\n", "old.md", { nameFrom: "title" }, "In the library")).toBe("In the library.md");
+    expect(name("# Report v1.2\n"), "a dot is no extension").toBe("Report v1.2.md");
+    expect(name("# ???\n"), "nothing usable").toBeNull();
+    expect(name("# ???\n", "old.md", { nameStyle: "clean" })).toBeNull();
+    expect(name("No heading\n")).toBeNull();
+    expect(name("# .hidden\n"), "never a hidden file").toBe("hidden.md");
+    expect(name("# CON\n")).toBe("CON_file.md");
+    expect(name("# a/b\\c\n"), "never a path").toBe("a-b-c.md");
+    expect(name("# Same\n", "Same.md")).toBeNull();
+    expect(name("# Same\n", "Same-2.md"), "another note had it first").toBeNull();
+    expect(name("# Same-2\n", "Same-2.md")).toBeNull();
+    expect(name("# Other\n", "Same-2.md")).toBe("Other.md");
+    expect(name(`# ${"x".repeat(400)}\n`)!.length).toBeLessThan(260);
+    setAutoDates({ ...off, rename: true });
+    expect(noteFileName("rich", "<h1>Rich: one</h1>", "old.note.html")).toBe("Rich- one.note.html");
+    expect(noteFileName("txt", "# Head", "old.txt")).toBeNull();
+    setAutoDates(off);
   });
 });

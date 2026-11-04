@@ -21,7 +21,6 @@ async function launch(workspace: string, device = "userdata", /** Most of these 
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));
   await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
-  await page.evaluate(() => window.__canvastDebug.setSetting("notes.autoDates", false)); // (specs compare whole files)
   if (!keepFiles) await page.evaluate(() => (window.__canvastDebug.setSetting("library.keepFileNames", false), window.__canvastDebug.setSetting("library.sortFiles", true)));
   return { app, page, requests };
 }
@@ -1678,6 +1677,8 @@ test("a note's pictures are found by their files: pasted ones (the disk's name n
   writeFileSync(join(ws, "library/ext/copy.png"), png(90));
   writeFileSync(join(ws, "library/ext/out.md"), "# Out\n\n![a](orig%20(2).png)\n\n![b](<orig (2).png>)\n\n![c](copy.png)\n\n![d](ext/copy.png)\n\n![e](library/ext/copy.png)\n");
   await expect(entry("out.md")).toBeAttached({ timeout: 15_000 });
+  // (its folder comes a moment after the item, and its links are read from there)
+  await expect.poll(() => page.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.find((e) => e.name === "out.md")?.folderIds?.length ?? 0), { timeout: 15_000 }).toBeGreaterThan(0);
   await entry("out.md").dblclick();
   await expect.poll(shown).toEqual([true, true, true, true, true]);
   // Made rich text: a file of that kind, in its place.

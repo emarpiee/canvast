@@ -200,6 +200,8 @@ export interface OpenHooks {
   keepFileNames?: () => boolean;
   /** The desktop build: files in no library folder go in their kind's folder (Settings > Library), else may stay in the library's root. */
   sortFiles?: () => boolean;
+  /** Rename notes on save: whether notes' files keep their item's name as written, over `keepFileNames`; null: as other files. */
+  noteFileKeep?: () => boolean | null;
   /** The desktop build: tells who places the files when one of those two rules changes. */
   onFileRules?: (changed: () => void) => void;
   /** The desktop build: days after which what is in the folder's `.trash/` is erased at start-up (0: never). */

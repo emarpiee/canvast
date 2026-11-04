@@ -632,6 +632,10 @@ export class WorkspaceMirror {
     this.lib.scanLater = fn;
   }
   /** Who imports files found in `library/`. */
+  set noteFileKeep(fn: () => boolean | null) {
+    this.lib.noteFileKeep = fn;
+  }
+
   set keepNames(fn: () => boolean) {
     this.lib.keepNames = fn;
   }

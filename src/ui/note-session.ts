@@ -7,7 +7,7 @@ import type { SettingsStore } from "../settings/settings";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { WIKI, linkTarget, noteKindOf, richNameOf, richNoteBody, wikiTarget } from "../notes/note-file";
 import type { NoteKind } from "../notes/note-file";
-import { stampNote } from "../notes/note-dates";
+import { autoDates, noteFileName, stampNote } from "../notes/note-dates";
 import { NO_META, richMeta, splitFrontmatter, underProps, wholeMarkdown, withFileMeta, withPastedProps, type NoteMeta } from "../notes/frontmatter";
 import { fontFor } from "../text/fonts";
 import { chooseDialog, confirmDialog } from "./confirm";
@@ -238,6 +238,16 @@ export class OpenNote {
     return host;
   }
 
+  /** Rename notes on save: after the save, so a name that is refused never costs the note its words (the library says why). */
+  private async renameFromNote(hash: string, text: string): Promise<void> {
+    const { session } = this.deps;
+    const e = await session.catalog?.entry(hash).catch(() => undefined);
+    if (!e) return;
+    const itemTitle = e.fields?.find((f) => f.key.toLowerCase() === autoDates().title.toLowerCase())?.value;
+    const name = noteFileName(this.kind, text, e.name, itemTitle);
+    if (name && (await session.renameAssets([{ hash, name }]))) this.name = name;
+  }
+
   /** The file and the item's properties, ready for a copy (which cannot wait for them). */
   private fileNow = "";
   private metaNow: NoteMeta | null = null;
@@ -271,7 +281,7 @@ export class OpenNote {
       text = withPastedProps(this.kind, text, editor.pastedProps());
       if (e?.name) this.name = e.name;
       const was = this.hash;
-      text = stampNote(this.kind, text, e?.importedAt, Date.now(), this.name, editor.pastedProps());
+      text = stampNote(this.kind, text, e?.importedAt, Date.now(), editor.pastedProps());
       const hash = await session.saveVersion(was, new File([text], this.name, { type: this.type }));
       if (!hash) return false;
       if (open.has(this)) editor.saved(as); // (closed meanwhile: there is no editor left to tell; what was typed while it was being saved stays a change)
@@ -280,6 +290,7 @@ export class OpenNote {
         this.hash = hash;
         this.place.moved(was, hash);
       }
+      await this.renameFromNote(hash, text);
       void this.readWhole();
       session.editor.message = `Saved “${this.name}”.`;
       session.editor.changed();
@@ -313,7 +324,8 @@ export class OpenNote {
       for (let n = 2; names.has(name.toLowerCase()); n++) name = `${stem} ${n}.note.html`;
       const rich = withFileMeta("rich", body.replace("<title></title>", () => `<title>${titleOf(name).replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`)}</title>`), { tags: e?.tags ?? [], note: e?.note ?? "", fields: e?.fields ?? [] }); // (its properties go with it)
       if (!(await session.renameAssets([{ hash: this.hash, name }]))) return false;
-      const hash = await session.saveVersion(this.hash, new File([stampNote("rich", rich, e?.importedAt, Date.now(), name)], name, { type: "text/html" }));
+      const stamped = stampNote("rich", rich, e?.importedAt, Date.now());
+      const hash = await session.saveVersion(this.hash, new File([stamped], name, { type: "text/html" }));
       if (!hash) {
         await session.renameAssets([{ hash: this.hash, name: was }]); // (not saved: it stays what its file is)
         return false;
@@ -322,7 +334,8 @@ export class OpenNote {
       this.kind = "rich";
       this.base = wordsOf("rich", rich);
       if (open.has(this)) editor.saved(as);
-      session.editor.message = `“${was}” is now the rich text note “${name}”.`;
+      await this.renameFromNote(hash, stamped);
+      session.editor.message = `“${was}” is now the rich text note “${this.name}”.`;
       session.editor.changed();
       // (opened again as what it is now, once this save has ended: showing it leaves this note, which waits for a save on its way)
       if (show) setTimeout(() => void this.place.show(hash));
