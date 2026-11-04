@@ -991,6 +991,21 @@ test("viewer: opens from a card, steps through the library with a filmstrip, and
   await expect(viewer.locator(".viewer-bar")).toBeHidden();
   await viewer.getByRole("button", { name: "Show the controls" }).click();
   await expect(viewer.locator(".viewer-bar")).toBeVisible();
+  // Moved on while they were hidden: the filmstrip is drawn again when they come back.
+  await p.keyboard.press("f");
+  await expect(viewer.locator(".viewer-bar")).toBeHidden();
+  await p.keyboard.press("ArrowRight");
+  await p.keyboard.press("f");
+  await expect(viewer.locator(".viewer-bar")).toBeVisible();
+  await expect(viewer.locator(".film-item.is-current")).toHaveCount(1);
+  // Greyscale is only a look: on, then gone with the next item.
+  const grey = viewer.getByTestId("viewer-grey");
+  await grey.click();
+  await expect(grey).toHaveAttribute("aria-pressed", "true");
+  expect(await viewer.locator(".viewer-stage > figure").evaluate((e) => getComputedStyle(e).filter)).toContain("grayscale");
+  await viewer.locator(".viewer-stage").focus().catch(() => undefined);
+  await p.keyboard.press("ArrowRight");
+  await expect(grey).toHaveAttribute("aria-pressed", "false");
   await p.keyboard.press("Escape");
   await expect(viewer).toBeHidden();
   expect(app.consoleErrors).toEqual([]);

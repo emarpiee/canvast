@@ -284,7 +284,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           <button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.arrowLeft}</button>
           <button type="button" class="vbtn viewer-hide" data-act="bar" aria-label="Hide the controls" title="Hide the controls (F)">${ICONS.chevronsDown}</button>
           <button type="button" class="vbtn viewer-details" data-act="details" aria-pressed="true" aria-label="Details panel" title="Show or hide the details (I)">${ICONS.panelRight}</button>
-          <div class="viewer-stage"><button type="button" class="vbtn viewer-ground" data-act="ground" aria-label="Background of see-through pictures" title="Background of see-through pictures">${ICONS.sunMoon}</button><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
+          <div class="viewer-stage"><div class="viewer-tools"><button type="button" class="vbtn viewer-grey" data-act="grey" data-testid="viewer-grey" aria-pressed="false" aria-label="See it in greyscale" title="See it in greyscale, for now: the file stays as it is">${ICONS.dropletOff}</button><button type="button" class="vbtn viewer-ground" data-act="ground" aria-label="Background of see-through pictures" title="Background of see-through pictures">${ICONS.sunMoon}</button></div><span class="viewer-progress" hidden></span><div class="viewer-edge is-prev" data-edge="prev" aria-hidden="true"></div><div class="viewer-edge is-next" data-edge="next" aria-hidden="true"></div>
             <figure><div class="viewer-checker" hidden><i></i></div><canvas class="viewer-vec" hidden></canvas><img alt="" draggable="false"><video hidden></video><canvas class="viewer-gif" hidden></canvas><figcaption></figcaption></figure></div>
           <div class="viewer-bar" role="toolbar" aria-label="Viewer controls">
             <div class="viewer-nav">
@@ -1170,7 +1170,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (img) loadThumb(img);
     return b;
   };
+  /** Greyscale in the viewer: a look at the picture only, gone with the next item or on closing. */
+  const setGrey = (on: boolean): void => {
+    viewer.classList.toggle("is-grey", on);
+    viewer.querySelector<HTMLElement>(".viewer-grey")!.setAttribute("aria-pressed", String(on));
+  };
   const windowFilm = (force = false): void => {
+    if (!film.clientWidth) return; // (with the controls hidden it has no width: drawn when they come back)
     const { list } = viewList();
     if (!list.length) {
       filmWin.replaceChildren();
@@ -1506,6 +1512,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!e || !(await leaveNote())) return;
     const token = ++slideToken;
     const opening = viewer.hidden;
+    if (hash !== slideHash) setGrey(false);
     resetZoom();
     slideHash = hash;
     body.classList.add("is-viewing");
@@ -1688,6 +1695,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
   viewer.addEventListener("pointerleave", () => viewer.classList.remove("is-near-top", "is-near-bottom"));
   const closeSlide = (): void => {
+    setGrey(false);
     const was = slideHash;
     stopShow();
     slideSet = null;
@@ -1779,6 +1787,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     ui.bar = !ui.bar;
     saveUi();
     applyUi();
+    if (ui.bar && !viewer.hidden) renderFilm(); // (items passed while it was hidden: it is drawn at the one open now)
     // The button that was pressed may have just been hidden: keep the keyboard in the viewer.
     if (!viewer.hidden) viewer.focus();
   };
@@ -1790,6 +1799,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (act === "prev") stepSlide(-1);
     else if (act === "next") stepSlide(1);
     else if (act === "close") void leaveNote().then((ok) => ok && closeSlide());
+    else if (act === "grey") setGrey(!viewer.classList.contains("is-grey"));
     else if (act === "ground") {
       const now = session.viewGround;
       void session.setViewGround(VIEW_GROUNDS[(VIEW_GROUNDS.indexOf(now) + 1) % VIEW_GROUNDS.length]!);

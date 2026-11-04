@@ -594,14 +594,14 @@ Double-click a card to see it large, with a filmstrip, zoom, pan and a slideshow
 
 | Feature | How |
 | --- | --- |
-| **Controls** | `F` hides and shows them; a button changes the background |
+| **Controls** | `F` hides and shows them; a button changes the background, another shows the picture in greyscale for now |
 | **Where it is used** | The details list each canvas, and its locate button goes there |
 | **Video and GIFs** | Play with the canvas's player, which fades while the pointer rests |
 | **Keys** | Arrows change file; in the player they step, and `Space` plays |
 
 #### More about the viewer
 
-- A **viewer** with filmstrip, zoom, pan, slideshow and a details panel. The details show where an item is used (*Used on 3 canvases (4 times)*, then each canvas with its own count; past five canvases, **Show all** lists the rest), and the locate button beside one takes you to it on the canvas at any depth. A button switches the background behind the picture, the controls can be hidden, and a double tap opens it on phones. The button beside the details button (or `F`) hides and shows the controls; with them hidden, the picture gets their room. A video or GIF plays with the canvas's player, floating over the bottom of the picture: while the pointer rests, playing or paused, the player fades away (after *Hide the player* in Settings > Library, 1.5 s by default), also with the pointer resting on it; only a move of the mouse, a click or a touch brings it back, never a key. While the focus is in the player (click any part of it, its empty space too; also once it has faded), `Left` and `Right` step the file and `Space` plays or pauses it; elsewhere in the viewer the arrows go to the previous and next file. A GIF whose frames were never counted (imported long ago, or taken from a workspace folder) gets the player too.
+- A **viewer** with filmstrip, zoom, pan, slideshow and a details panel. The details show where an item is used (*Used on 3 canvases (4 times)*, then each canvas with its own count; past five canvases, **Show all** lists the rest), and the locate button beside one takes you to it on the canvas at any depth. A button switches the background behind the picture, another shows it in greyscale for now (it goes with the next item or on closing, and the file stays as it is), the controls can be hidden, and a double tap opens it on phones. The button beside the details button (or `F`) hides and shows the controls; with them hidden, the picture gets their room. A video or GIF plays with the canvas's player, floating over the bottom of the picture: while the pointer rests, playing or paused, the player fades away (after *Hide the player* in Settings > Library, 1.5 s by default), also with the pointer resting on it; only a move of the mouse, a click or a touch brings it back, never a key. While the focus is in the player (click any part of it, its empty space too; also once it has faded), `Left` and `Right` step the file and `Space` plays or pauses it; elsewhere in the viewer the arrows go to the previous and next file. A GIF whose frames were never counted (imported long ago, or taken from a workspace folder) gets the player too.
 
 ### Art files
 

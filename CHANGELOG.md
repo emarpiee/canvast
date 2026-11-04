@@ -6,6 +6,7 @@
 - **Changed:** the README is in two parts, for users and for developers, with a section for each big feature, tables and pictures first and the full wording after them; new pictures of the sidebar, several items selected, art files and the Trash.
 - **Changed:** the library's list has the same thumbnail slider as the grid, in the same place, with its own size: its rows and thumbnails grow with it. The slider is longer, and the list's columns button moved to the left of the grid and list buttons so that nothing shifts.
 - **Added:** Details in the details panel show the file's type, size, pixels, time of import, place on disk and whole hash, a JPEG's channels and colour sampling, all lined up. They open from the file's line, with an info icon at its right end, in one card.
+- **Added:** a greyscale button in the viewer, beside the background button: it changes only how the picture is seen, and goes with the next item or on closing.
 - **Added:** long lists in the details panel show their first rows and **Show more** / **Show fewer**: tags, properties and notes linking to an item. Every such button in the app is now one component.
 - **Changed:** the view buttons have a look of their own: Library and Canvas are joined as one set, Settings matches them, and the one in use is filled.
 - **Changed:** spacing across the app is on one grid, and Dense, Compact and Comfortable now set every gap, padding, margin, field, list row, small button, tree indent and icon, not only the bars' sizes.
@@ -13,6 +14,8 @@
 - **Fixed:** dragging an item to place it on the canvas: the strip covers the whole top row, and a drop anywhere on the row counts. It sat half over the row, under its buttons.
 - **Fixed:** the viewer's back, details, hide and background buttons, its bars, filmstrip and zoom control follow the theme; they stayed dark in the light theme.
 - **Changed:** *Where it is used* reads more easily: the canvas's name in full, its board quieter, a count, and an icon to go there.
+- **Changed:** buttons are rounded squares everywhere, following density and the Corners setting; round is kept for chips and dots.
+- **Fixed:** the viewer's filmstrip was empty after moving to another item with the controls hidden and bringing them back.
 - **Fixed:** the Library button is one button, as tall as the ∞ beside it, with no white bar around it.
 - **Fixed:** on a small window the ∞ button stretched across the top row and the Settings button covered the canvas's name; the name takes the room now, clear of the buttons. 
 - **Fixed:** the status bars of the canvas and the library have one height with room around their buttons, which are square.
