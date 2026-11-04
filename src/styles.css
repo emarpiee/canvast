@@ -1531,7 +1531,8 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer-note .sun-editor { flex: 1; min-height: 0; } /* (block, set by the editor itself) */
 .viewer-note .se-container { height: 100%; }
 .viewer-note .se-wrapper { flex: 1; min-height: 0; }
-.viewer.is-note .viewer-stage { display: flex; padding-top: calc(2 * var(--sp-6) + var(--ctl)); } /* (under the viewer's Back and Details buttons, the same room above and below them, in every density) */
+.viewer.is-note { --under-viewer-buttons: calc(2 * var(--sp-6) + var(--ctl)); }
+.viewer.is-note .viewer-stage { display: flex; padding-top: var(--under-viewer-buttons); } /* (under the viewer's Back and Details buttons, the same room above and below them, in every density) */
 .viewer.is-note .viewer-stage > figure:not(:where(.viewer-note *)), .viewer.is-note .viewer-edge, .viewer.is-note .viewer-ground, .viewer.is-note .viewer-zoom { display: none; }
 .viewer-progress { position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--hud-accent); transform-origin: left; transform: scaleX(0); z-index: 1; }
 .viewer-progress[hidden] { display: none; }

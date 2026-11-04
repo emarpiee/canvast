@@ -27,8 +27,8 @@ for (const m of css.matchAll(decl)) {
   const [, prop, value] = m;
   if (!FIXED_COLOUR.has(prop) && NOT_OKLCH.test(`${prop === "filter" ? "filter: " : ""}${value.replace(/url\([^)]*\)/g, "")}`)) found.notOklch.push(`${lineOf(css, m.index)}: ${prop}: ${value.trim()}`);
   if (prop.startsWith("--")) continue;
-  if ((SPACING.test(prop) && OFF_GRID.test(value) && !value.includes("--depth") && !value.includes("--l)")) || (/^(top|right|bottom|left)$/.test(prop) && RAW_OFFSET.test(value))) found.offGrid.push(`${at}: ${prop}: ${value.trim()}`);
   const at = lineOf(css, m.index);
+  if ((SPACING.test(prop) && OFF_GRID.test(value) && !value.includes("--depth") && !value.includes("--l)")) || (/^(top|right|bottom|left)$/.test(prop) && RAW_OFFSET.test(value))) found.offGrid.push(`${at}: ${prop}: ${value.trim()}`);
   if (/oklch\((?!var\()|#[0-9a-fA-F]{3,8}\b|rgba?\(/.test(value)) found.colour.push(`${at}: ${prop}: ${value.trim()}`);
   if ((prop === "font-size" || prop === "font") && /(?<![\w-])\d+(\.\d+)?px/.test(value.replace(/var\([^)]*\)/g, ""))) found.text.push(`${at}: ${prop}: ${value.trim()}`);
   if (prop === "border-radius" && /(?<![\w-])[1-9]\d*px/.test(value.replace(/var\([^)]*\)/g, ""))) found.radius.push(`${at}: ${prop}: ${value.trim()}`);
