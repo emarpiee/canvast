@@ -13,8 +13,8 @@ const REACH_PX = 8;
 
 /**
  * The desktop window with no frame (Settings > Appearance > Window frame): a row with the window's name and its buttons, floating over the top of the app, which comes
- * when the pointer reaches the very top edge and goes when it leaves. It takes no room from anything, and only while it shows is there a place that moves the window:
- * a drag area takes every click over it. Over a drag area the page gets no pointer events, so the row goes by where the pointer is next seen, below it.
+ * when the pointer reaches the very top edge and goes when it leaves. It takes no room from anything. It has no drag area (`-webkit-app-region`): with one, while the row showed, the mouse moved the window instead of reaching the
+ * app, and the page saw no pointer to hide the row by. So the window moves by the desktop's own way.
  * It is there from the first moment and above everything: a modal makes all outside itself inert, so the row moves into the newest modal, in the top layer so that
  * nothing of the modal's look reaches it. In front of a modal that cannot be closed (the start, the lock and the busy screens) it stays, so that the workspace's name
  * and the window's buttons are never out of reach, and it goes only after them.

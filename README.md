@@ -1057,7 +1057,7 @@ My art/
 
 In the desktop app your workspace is a **folder of ordinary files** that you choose, so any sync tool, backup tool or file manager can see it. It works offline and loads nothing from the network.
 
-**The window's frame.** Settings > Appearance > **Window frame**: *System* (the default) is the title bar your desktop draws; *Off* has none, for more room: move the pointer to the very top edge and a row comes over the app, with minimise, maximise and close, and the window moves by dragging it. It shows for a moment at each start, and goes when the pointer leaves. It stays while the opening, lock and busy screens are up, so the workspace's name and the buttons are always there. It applies at the next start, for every workspace.
+**The window's frame.** Settings > Appearance > **Window frame**: *System* (the default) is the title bar your desktop draws; *Off* has none, for more room: move the pointer to the very top edge and a row comes over the app, with the workspace's name, minimise, maximise and close. The row does not move the window: use your desktop's own way (on KDE Plasma, Meta and drag), or *System*. It shows for a moment at each start, and goes when the pointer leaves. It stays while the opening, lock and busy screens are up, so the workspace's name and the buttons are always there. It applies at the next start, for every workspace.
 
 **Switching workspaces.** *Switch workspace…* is in the board and canvas menu (under *Whole workspace*), in Settings > Storage and in the command palette, with its choices to open a folder or make a new workspace; the lock screen of a workspace with a password has those two as well, and the workspace stays locked. `Ctrl`+`Shift`+`O` opens a workspace folder.
 
@@ -1390,7 +1390,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Sync tools | Tested with their copy names, not live; the same canvas changed on two devices stays two canvases |
 | Copy file | Tried in KDE's file manager; a workflow tries five on X11 |
 | Dragging out | Not hidden items, which are encrypted: use **Copy file**. At most 1,000 at once |
-| Window frame off | No desktop window menu; the row comes only from the very top edge |
+| Window frame off | No desktop window menu; the row comes only from the very top edge and cannot move the window |
 | Packages | x86_64 and aarch64; only the AppImage updates itself |
 
 #### Desktop limits, in full
@@ -1402,7 +1402,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Sync tools | Tested with the copy names sync tools use (`name (1).ext`, `name.sync-conflict-….ext`), not live with each tool. The same canvas changed on two devices at once is kept as two canvases, not merged; the same library item changed on both keeps the kept file's version. A canvas copy saved by another device waits 10 minutes before this device takes it. A copy of the hidden items under another Hidden password is opened only with `hidden-items.mjs`, and a hidden file encrypted before 0.50.53 whose entry was lost comes back without its name (`recovered-…`) if it was not sealed again first. Losing both `.canvast/hidden.json` and its spare `.canvast/keys/hidden.json` loses every hidden item: keep backups |
 | Copy file | The paste has been tried in KDE's file manager on a desktop; the `File managers` workflow tries it on a virtual screen (X11) in five Linux file managers. |
 | Dragging out of the app | Hidden items cannot be dragged out: their files are encrypted, and a drag cannot stop to ask before a readable copy leaves the app, as **Copy file** does. At most 1,000 items at once. Which programs take the plain drag depends on the program. |
-| Window frame off | No title bar, so the desktop's window menu on it is gone; the row comes only from the very top edge. On a touch screen, tap the top edge. Its look and feel on a real desktop or Wayland are checked by hand, not by a test. |
+| Window frame off | No title bar, so the desktop's window menu on it is gone; the row comes only from the very top edge, and moving the window takes the desktop's own way, as dragging the row took the mouse from the app. On a touch screen, tap the top edge. Its look and feel on a real desktop or Wayland are checked by hand, not by a test. |
 | Packages | Linux only, for x86_64 and aarch64. The `.deb` and `.rpm` are not in a package repository, so the system's updates do not include them; only the AppImage updates itself. The `.deb` and `.rpm` are checked for their contents before a release, not installed on every distribution they name |
 
 #### How firm these limits are

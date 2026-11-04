@@ -1976,12 +1976,11 @@ test("the window frame off: a row from the top edge has the window's buttons and
     await expect(page.getByTestId("win-close")).toHaveCount(0); // (a window's frame cannot change: at the next start)
     await app.close();
     ({ app, page } = await launch(ws, "userdata", true));
-    // It shows for a moment at the start, goes, comes from the very top edge, and goes when the pointer leaves. Only then is there a drag area.
+    // It shows for a moment at the start, goes, comes from the very top edge, and goes when the pointer leaves. It never makes a drag area, which took the mouse from the app.
     const row = page.getByTestId("win-row");
     await expect(row).toHaveClass(/is-shown/);
     await expect(page.getByTestId("win-close")).toBeVisible();
     await expect(row).not.toHaveClass(/is-shown/, { timeout: 8_000 });
-    expect(await row.evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"))).not.toBe("drag");
     await expect(page.getByTestId("win-close")).toBeHidden();
     await page.mouse.move(400, 300);
     await page.mouse.move(400, 1);
@@ -1989,8 +1988,7 @@ test("the window frame off: a row from the top edge has the window's buttons and
     await expect(page.getByTestId("win-minimize")).toBeVisible();
     await expect(page.getByTestId("win-maximize")).toBeVisible();
     await expect(page.getByTestId("win-close")).toBeVisible();
-    expect(await row.evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"))).toBe("drag");
-    expect(await page.getByTestId("win-close").evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"))).toBe("no-drag");
+    expect(await row.evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"))).not.toBe("drag");
     await page.getByTestId("win-maximize").click(); // (a clicked button keeps the focus: that must not keep the row)
     await page.getByTestId("win-maximize").click();
     await page.mouse.move(400, 300);
