@@ -73,6 +73,8 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 ## UI rules
 
 - **DRY first: one shared component per thing.** Context menus, modals and dialogs, docks, panels, notices, settings rows, cards, trees and rules (names, dates) each have one implementation. Before writing UI, look for the shared component and call it; if it almost fits, extend it with an option; never copy it or restyle a copy. A second copy found while working is folded into the shared one in the same pass. `npm run check:components` guards this.
+- **A long list in a card** shows its first rows and `showMoreButton` / `capList` (`src/ui/show-more.ts`). Panels and dialogs that scroll on their own do not need it.
+
 - **Every menu row has an icon, a name and a very short description** (`MenuItem.icon`, `label`, `hint`), in every context menu and action menu.
 
 - **Spacing is on one grid (2, 4, 8, 12, 16, 24, 32 px and up).** Gaps, paddings and margins use only `--sp-1`, `2`, `4`, `6`, `8`, `10`, `12`, `13` and up; offsets from an edge use the same tokens, or `--edge` and `--near`. `check:tokens` refuses other steps.

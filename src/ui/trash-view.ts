@@ -2,6 +2,7 @@
  * The Trash in the library: this workspace's `.trash/` for the mode, never the system's. It is a state of the library view, as the viewer is: the library's own cards in place
  * of its grid, and its details panel for what is picked, with Restore and Delete for good.
  */
+import { showMoreButton } from "./show-more";
 import { plural } from "../doc/plural";
 import type { TrashFile } from "../storage/store";
 import { confirmDialog } from "./confirm";
@@ -80,7 +81,7 @@ export function mountTrashView(deps: TrashDeps): TrashView {
     seeing.disconnect();
     const list = fit();
     box.innerHTML = list.length
-      ? `<div class="assets-grid" role="list" data-testid="trash-grid">${list.slice(0, shown).map(cardHtml).join("")}</div>${list.length > shown ? `<button type="button" class="assets-btn" data-trash="more">Show ${plural(Math.min(PAGE, list.length - shown), "more file")}</button>` : ""}`
+      ? `<div class="assets-grid" role="list" data-testid="trash-grid">${list.slice(0, shown).map(cardHtml).join("")}</div>${list.length > shown ? showMoreButton({ attrs: 'data-trash="more"', label: `Show ${plural(Math.min(PAGE, list.length - shown), "more file")}` }) : ""}`
       : `<p class="asset-note" data-testid="trash-empty">${files.length ? "No file in the trash has that name." : "The trash is empty. It lists this workspace's .trash folder, not your system's trash."}</p>`;
     for (const img of box.querySelectorAll("img[data-path]")) seeing.observe(img);
     drawDetails();

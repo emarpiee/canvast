@@ -5,6 +5,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 const RULES = [
+  { name: "Show more", re: /Show fewer|class="[^"]*show-more/, owners: ["src/ui/show-more.ts"] },
   { name: "Modal dialogs", re: /createElement\("dialog"\)/, owners: ["src/ui/modal.ts"] },
   {
     name: "Menus",

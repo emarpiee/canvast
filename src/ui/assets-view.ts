@@ -44,6 +44,7 @@ import type { MenuItem } from "./more-menu";
 import { bindContextMenu, grouped as groupedMenu } from "./context-menu";
 import { openTreeChooser } from "./tree-chooser";
 import type { ChoiceNode, ChoiceState, ChooserView } from "./tree-chooser";
+import { capList, showMoreButton } from "./show-more";
 import { pathNodes, treeGuides, treeSearch, treeSlot, walkTree } from "./tree";
 import { formatTags } from "../doc/tags";
 import { cleanFileName, splitName } from "../doc/rename-rules";
@@ -144,6 +145,10 @@ function syncChildren(parent: HTMLElement, els: readonly HTMLElement[]): void {
 const THUMB_MAKERS = 6;
 /** "Where it is used" lists this many canvases, then a button for the rest. */
 const PLACES_SHOWN = 5;
+/** How many tags, properties and notes linking to it the details panel lists before Show more. */
+const DETAIL_TAGS_SHOWN = 12;
+const DETAIL_FIELDS_SHOWN = 8;
+const DETAIL_LINKS_SHOWN = 5;
 /** A list of the sidebar (folders, file types, tags) shows this many rows before a "Show more" button. */
 /** What a sidebar list's sort button goes through, in order. */
 const SIDE_SORTS = { folders: ["az", "za", "new", "old"], tag: ["az", "za"], ctag: ["az", "za"] } as const;
@@ -1079,7 +1084,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const sec = inspector.querySelector<HTMLElement>('[data-testid="asset-backlinks"]');
     if (!sec || selected !== hash) return;
     sec.hidden = !notes.length;
-    sec.querySelector("ul")!.innerHTML = notes.map((n) => `<li><button type="button" class="asset-place-name assets-link" data-action="open-linked" data-hash="${n.hash}" title="Open “${esc(n.name)}”">${esc(n.name)}</button></li>`).join("");
+    const linksOpen = openLists.has("links");
+    const linksCap = capList(notes, DETAIL_LINKS_SHOWN, linksOpen);
+    sec.querySelector("ul")!.innerHTML = linksCap.shown.map((n) => `<li><button type="button" class="asset-place-name assets-link" data-action="open-linked" data-hash="${n.hash}" title="Open “${esc(n.name)}”">${esc(n.name)}</button></li>`).join("");
+    sec.querySelector(".show-more")?.remove();
+    if (linksCap.long) sec.insertAdjacentHTML("beforeend", showMoreButton({ open: linksOpen, hidden: linksCap.hidden, attrs: `data-action="show-more" data-list="links" data-testid="asset-links-more"` }));
   };
   const openNote = async (hash: string, name: string, blob: Blob, token: number): Promise<void> => {
     if (token !== slideToken) return;
@@ -2442,10 +2451,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     /** A long list shows its first rows and a full-width button for the rest (remembered on this device); the row in use always shows. */
     const capped = (id: keyof typeof SIDE_SHOWN, rows: Array<{ html: string; active: boolean }>, finding = false): string => {
       const limit = SIDE_SHOWN[id];
-      if (finding || rows.length <= limit + 2) return rows.map((r) => r.html).join(""); // (no button for one or two more)
+      if (finding || !capList(rows, limit, false).long) return rows.map((r) => r.html).join("");
       const open = ui.expanded.includes(id);
-      const shown = open ? rows : rows.filter((r, i) => i < limit || r.active);
-      return `${shown.map((r) => r.html).join("")}<li class="side-row side-show-row"><button type="button" class="side-show-all" data-show-all="${id}" data-testid="side-show-all" aria-expanded="${open}">${open ? "Show fewer" : `Show ${rows.length - shown.length} more`}</button></li>`;
+      const shown = open ? rows : rows.filter((r, i) => i < limit || r.active); // (the row in use always shows)
+      return `${shown.map((r) => r.html).join("")}<li class="side-row side-show-row">${showMoreButton({ open, hidden: rows.length - shown.length, attrs: `data-show-all="${id}" data-testid="side-show-all"` })}</li>`;
     };
     const addBtn = (attr: string, label: string, extra = ""): string => (ro ? "" : `<button type="button" class="side-add" ${attr} aria-label="${label}" title="${label}"${extra}>${ICONS.folderPlus}</button>`);
     /** A header's button that folds or opens all of a tree. */
@@ -2675,9 +2684,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // A long list shows its first canvases and a button for the rest.
     if (placesOf !== selected) {
       placesOf = selected;
-      placesAll = false;
+      openLists.clear();
     }
-    const placesShown = placesAll || places.length <= PLACES_SHOWN + 1 ? places : places.slice(0, PLACES_SHOWN);
+    const placesAll = openLists.has("places");
+    const placesCap = capList(places, PLACES_SHOWN, placesAll, 1);
+    const placesShown = placesCap.shown;
     const placeRows = placesShown
       .map(
         (p) => `<li><span class="asset-place-name" title="${esc(p.boardName)} › ${esc(p.canvasName)}">${esc(p.boardName)} › ${esc(p.canvasName)}</span><span class="asset-place-n" title="${plural(p.ids.length, "time")} on this canvas">×${p.ids.length}</span>
@@ -2698,7 +2709,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       where: () => `<section class="asset-sec asset-where">
         <h3 data-testid="asset-usage">${instances ? `Used on ${plural(places.length || (e?.canvases ?? m!.canvases), "canvas", "canvases")} <span class="asset-place-total">(${plural(instances, "time")})</span>` : "Where it is used"}</h3>
         ${instances ? `<ul class="asset-places" data-testid="asset-places">${placeRows}</ul>
-          ${places.length > placesShown.length || placesAll ? `<button type="button" class="assets-btn asset-places-more" data-action="places-all" data-testid="asset-places-more" aria-expanded="${placesAll}" title="${placesAll ? "List only the first canvases" : "List every canvas it is on"}">${placesAll ? "Show fewer" : `Show all ${places.length} canvases`}</button>` : ""}` : `<p class="asset-note">Not used on any canvas.</p>`}
+          ${placesCap.long ? showMoreButton({ open: placesAll, hidden: placesCap.hidden, attrs: `data-action="show-more" data-list="places" data-testid="asset-places-more"` }) : ""}` : `<p class="asset-note">Not used on any canvas.</p>`}
       </section>`,
     };
     inspector.innerHTML = `
@@ -2810,6 +2821,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         some ? `<span class="tag-count" title="On ${k} of ${n}">${k}/${n}</span><button type="button" data-action="tag-all" data-tag="${esc(t)}" aria-label="Add tag ${esc(t)} to all ${n}" title="Add to all ${n}"${dis}>+</button>` : ""
       }<button type="button" data-action="untag" data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}${bulk ? ` from all ${n}` : ""}" title="Remove${bulk ? ` from all ${n}` : ""}"${dis}>×</button></span>`;
     });
+    const chipsCap = capList(chips, DETAIL_TAGS_SHOWN, openLists.has("tags"));
     const known = (pagesNow() ? [...countSide(listing!).tags.values()].map((t) => t.label) : [...new Set(listing!.entries.flatMap((e) => meta(e).tags))]).filter((t) => !on.has(t.toLowerCase())).sort((a, b) => a.localeCompare(b));
     const folders = listing!.folders;
     // (where they are: the one folder, or each with how many, the fullest first)
@@ -2821,10 +2833,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <section class="asset-sec">
         <h3>${bulk ? "Tags of these" : "Tags"}</h3>
         <div class="tag-chips" data-testid="${bulk ? "bulk-tags" : "asset-tags"}">
-          ${chips.join("")}
+          ${chipsCap.shown.join("")}
           <input class="tag-input${bulk ? " bulk-tag-input" : ""}" data-testid="${bulk ? "bulk-tag-input" : "asset-tag-input"}" list="tag-suggest" placeholder="${bulk ? `Add a tag to all ${n}` : "Add a tag"}" aria-label="${bulk ? "Add a tag to all selected" : "Add a tag"}" title="Type a tag (or several, with commas) and press Enter" maxlength="${MAX_TAG_TEXT}"${dis}>
           <datalist id="tag-suggest">${known.map((t) => `<option value="${esc(t)}"></option>`).join("")}</datalist>
         </div>
+        ${chipsCap.long ? showMoreButton({ open: openLists.has("tags"), hidden: chipsCap.hidden, attrs: `data-action="show-more" data-list="tags" data-testid="asset-tags-more"` }) : ""}
         <h3 class="asset-sub">${bulk ? "Folder of these" : "Folder"}</h3>
         <p class="asset-where" data-testid="${bulk ? "bulk-folder-now" : "asset-folder-now"}">${esc(where)}</p>
         <button type="button" class="assets-btn" data-action="organize" data-testid="${bulk ? "bulk-organize" : "asset-organize"}" title="Move to a folder and add tags, from one list"${dis}>${ICONS.folderTree}<span>Organize…</span></button>
@@ -2990,6 +3003,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const m = savingNotes?.hash === e.hash ? savingNotes : stored;
     const dis = session.readOnly ? " disabled" : "";
     const rows = blankField === e.hash ? [...m.fields, { key: "", value: "" }] : m.fields;
+    // (a property being added shows, at the end of them)
+    const fieldsOpen = openLists.has("fields") || blankField === e.hash;
+    const fieldsCap = capList(rows, DETAIL_FIELDS_SHOWN, fieldsOpen);
     const keys = fieldKeysNow();
     const has = (k: string): boolean => m.fields.some((f) => f.key.toLowerCase() === k.toLowerCase());
     const dates = autoDates();
@@ -3005,14 +3021,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <label class="asset-note-label" for="asset-note-box">Description</label>
         <textarea id="asset-note-box" class="asset-note-box" data-prop="note" data-testid="asset-note" rows="4" maxlength="${MAX_NOTE}" placeholder="Anything about it, in plain text"${dis}>${esc(m.note)}</textarea>
         ${autoMissing.length ? `<ul class="asset-fields" data-testid="asset-auto-fields">${autoMissing.map((f, i) => fieldRowHtml(e, f, i, dis, true)).join("")}</ul>` : ""}
-        ${rows.length ? `<ul class="asset-fields" data-testid="asset-fields">${rows.map((f, i) => fieldRowHtml(e, f, i, dis)).join("")}</ul>` : ""}
+        ${rows.length ? `<ul class="asset-fields" data-testid="asset-fields">${fieldsCap.shown.map((f, i) => fieldRowHtml(e, f, i, dis)).join("")}</ul>` : ""}
+        ${fieldsCap.long ? showMoreButton({ open: fieldsOpen, hidden: fieldsCap.hidden, attrs: `data-action="show-more" data-list="fields" data-testid="asset-fields-more"` }) : ""}
         <datalist id="field-key-suggest">${keys.map((k) => `<option value="${esc(k)}"></option>`).join("")}</datalist>
         <button type="button" class="assets-btn" data-action="field-add" data-testid="asset-field-add" title="Add a property with a name you choose (a link, a source, an author...)"${dis}>${ICONS.fieldAdd}<span>Add a property</span></button>
       </section>`;
   };
 
   /** Whether every canvas of "Where it is used" is listed (for the item `placesOf`; another item starts with the first ones). */
-  let placesAll = false;
+  /** The details panel's lists opened with Show more, for the item selected. */
+  const openLists = new Set<string>();
   let placesOf: string | null = null;
   /** The grip to focus once the details are drawn again (a field moved with the keyboard). */
   let focusGrip: number | null = null;
@@ -3483,10 +3501,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       case "export":
         void runExport(session, { kind: "assets", hashes: [hash] });
         break;
-      case "places-all":
-        placesAll = !placesAll;
+      case "show-more": {
+        const list = b.dataset["list"]!;
+        if (!openLists.delete(list)) openLists.add(list);
         renderInspector();
         break;
+      }
       case "delete-everywhere": {
         // in use: their instances go too, everywhere, after a confirmation that says what and where
         const hashes = pickedGroup();

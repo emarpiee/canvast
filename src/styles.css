@@ -47,6 +47,9 @@
   --hud-success: oklch(0.5 0.13 150);
   --hud-warning: oklch(0.52 0.11 80);
   --logo-colour: var(--hud-accent);
+  --view-tint: color-mix(in oklch, var(--hud-accent) 14%, var(--paper)); /* the buttons that change the view */
+  --view-tint-hover: color-mix(in oklch, var(--hud-accent) 26%, var(--paper));
+  --view-edge: color-mix(in oklch, var(--hud-accent) 40%, var(--hud-border));
   --size-slider-w: 160px; /* the library's thumbnail size */
   --hud-scrim: oklch(0.2 calc(0.02 * var(--vivid)) var(--hue) / 0.4);
   --hud-lift: 0 1px 2px oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.08), 0 8px 22px oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.1);
@@ -1055,10 +1058,15 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .view-switch button { padding: 0 var(--sp-6); gap: var(--sp-4); }
 .view-switch button svg { width: 16px; height: 16px; }
 .nav-pill { height: var(--bar-h); }
-/* (one button: the button itself, as tall as the ∞ beside it, with no bar around it) */
+/* The buttons that change the view (Library, Canvas, Settings) have a look of their own, a tint of the accent, so they read apart from the tools. Library and Canvas are joined as one set; the one in use is filled. */
 .view-switch { height: var(--bar-h); align-items: center; padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; }
-.view-switch button { box-sizing: border-box; height: var(--bar-h); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); }
-.view-switch button[aria-selected="true"] { border-color: var(--hud-accent); }
+.view-switch button { box-sizing: border-box; height: var(--bar-h); border: 1px solid var(--view-edge); border-right: 0; border-radius: var(--r-lg) 0 0 var(--r-lg); box-shadow: var(--hud-lift); }
+.view-switch button:not([aria-selected="true"]), .nav-pill:not([data-active="true"]) .nav-crumb, .view-settings button:not([aria-pressed="true"]) { color: var(--hud-accent-text); background: var(--view-tint); }
+.nav-pill .nav-crumb { border: 1px solid var(--view-edge); border-radius: 0 var(--r-lg) var(--r-lg) 0; }
+.view-settings button { border: 1px solid var(--view-edge); box-shadow: var(--hud-lift); }
+#nav { gap: 0; }
+.nav-pill .nav-name-btn { margin-left: var(--near); }
+.view-switch button:not([aria-selected="true"]):hover, .nav-pill:not([data-active="true"]) .nav-crumb:hover, .view-settings button:not([aria-pressed="true"]):hover { background: var(--view-tint-hover); }
 #nav { left: var(--edge); top: var(--edge); gap: var(--near); }
 #toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); } /* (the Settings button is in the corner) */
 /* Settings: a button of its own in the top-right corner of every view. */
@@ -1255,9 +1263,10 @@ body:has(.assets-place-zone:not([hidden])) :is(#nav, .view-settings, .assets-bar
 .side-empty { padding: var(--sp-2) var(--sp-6); color: var(--hud-muted); font-size: var(--text-sm); }
 /* a long list: its first rows, then one full-width button for the rest (and back) */
 .side-show-row, .tag-cloud .side-show-row { flex: 1 0 100%; }
-.side-show-all { flex: 1; padding: var(--sp-2) var(--sp-6); font: inherit; font-size: var(--text-sm); color: var(--hud-muted); text-align: center; background: transparent; border: 1px dashed var(--hud-border); border-radius: var(--r-md); cursor: pointer; }
-.side-show-all:hover { color: var(--hud-fg); background: var(--hud-hover); }
-.side-show-all:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+/* The one Show more / Show fewer of a long list (src/ui/show-more.ts). */
+.show-more { display: block; width: 100%; margin-top: var(--sp-2); padding: var(--sp-2) var(--sp-6); font: inherit; font-size: var(--text-sm); color: var(--hud-muted); text-align: center; background: transparent; border: 1px dashed var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
+.show-more:hover { color: var(--hud-fg); background: var(--hud-hover); }
+.show-more:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 
 /* The details: what you do first, then the facts, then the rest. */
 .asset-inspector { flex: 0 0 308px; min-height: 0; overflow: auto; padding: var(--sp-8); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); }
@@ -1282,7 +1291,6 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-sec[hidden] { display: none; } /* (a section with nothing to say: Linked from) */
 .assets-link { padding: 0; color: var(--hud-accent-text); text-align: left; background: none; border: 0; cursor: pointer; } /* (a name that opens what it names: Linked from) */
 .assets-link:hover, .assets-link:focus-visible { text-decoration: underline; }
-.asset-places-more { width: 100%; justify-content: center; margin-top: var(--sp-4); }
 .asset-more h4 { margin: var(--sp-4) 0 var(--sp-1); font: var(--font-meta); color: var(--hud-muted); text-transform: uppercase; }
 .asset-more { margin-top: var(--sp-8); color: var(--hud-muted); }
 .asset-more summary { cursor: pointer; }
@@ -2068,8 +2076,6 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .layers-filter input { width: 100%; box-sizing: border-box; height: var(--ctl); padding: 0 var(--sp-6); font: inherit; color: inherit; background: color-mix(in oklch, var(--hud-fg) 6%, transparent); border: 1px solid var(--hud-border); border-radius: var(--r-pill); outline: 0; }
 .layers-filter input:focus { border-color: var(--hud-accent); }
 .layers-more-row { list-style: none; padding: var(--sp-2) 0; }
-.layers-more-row button { width: 100%; height: var(--ctl); font: inherit; color: var(--hud-accent-text); background: transparent; border: 1px dashed var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
-.layers-more-row button:hover { background: var(--hud-hover); }
 /* The eye and the lock stay quiet until a row is pointed at or selected, unless the item is hidden or locked (touch screens always show them). */
 @media (hover: hover) {
   .layer .layer-btn[aria-pressed="false"] { opacity: 0; }

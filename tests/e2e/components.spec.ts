@@ -239,6 +239,20 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   expect(moved.up).toBeLessThan(moved.down);
   expect(moved.stopped).toBe(true);
   await p.setViewportSize(short);
+  // A long list in the details panel: its first rows, Show more and Show fewer.
+  for (let i = 0; i < 15; i++) {
+    await p.getByTestId("asset-tag-input").fill(`many-${i}`);
+    await p.getByTestId("asset-tag-input").press("Enter");
+  }
+  const chipRows = p.getByTestId("asset-tags").locator(".tag-chip");
+  const moreTags = p.getByTestId("asset-tags-more");
+  await expect(chipRows).toHaveCount(12);
+  await expect(moreTags).toContainText("more");
+  await moreTags.click();
+  await expect(chipRows).toHaveCount(17);
+  await expect(moreTags).toHaveText("Show fewer");
+  await moreTags.click();
+  await expect(chipRows).toHaveCount(12);
   // A small screen has no row pin: pinning is in the row's menu.
   const shown = p.viewportSize()!;
   await p.setViewportSize({ width: 600, height: shown.height });
