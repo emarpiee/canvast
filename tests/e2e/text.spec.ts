@@ -275,6 +275,9 @@ test("a font file is imported from the options bar, a text is set in it, and it 
   // In the library the font shows its letters: an "Aa" thumbnail in that font, not the file tile.
   await p.getByTestId("view-assets").click();
   await expect(p.locator('[data-testid="asset-card"] img.is-font-thumb')).toHaveClass(/is-loaded/);
+  // The picture fills its card, so it is not cut at the bottom and sits in the middle.
+  const fit = await p.locator('[data-testid="asset-card"] img.is-font-thumb').evaluate((i) => i.getBoundingClientRect().height - i.closest<HTMLElement>('[data-testid="asset-card"]')!.getBoundingClientRect().height);
+  expect(Math.abs(fit)).toBeLessThanOrEqual(1);
   // Its letters in the middle of the picture, whatever the font's own line box.
   const off = await p.locator('[data-testid="asset-card"] img.is-font-thumb').evaluate((i: HTMLImageElement) => {
     const c = Object.assign(document.createElement("canvas"), { width: i.naturalWidth, height: i.naturalHeight });
