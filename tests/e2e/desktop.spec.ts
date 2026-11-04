@@ -840,8 +840,18 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     expect(await hid("check", "pw2")).toEqual({ ok: true, state: "open" });
     // (how long the list takes after the password is said, for a run that is slow: an empty list for good is a bug, a late one is not)
     const opened = Date.now();
-    await expect.poll(() => listing().then((l) => l.sort()), { timeout: 45_000 }).toEqual([["Secret Plan.png", true, true], [name, true, true]].sort());
+    const onDisk = () => ({ sealed: files(ws).filter((f) => f.startsWith(".hidden/") && !f.endsWith(".name")), trashed: files(ws).filter((f) => f.startsWith(".trash/.hidden/")) });
+    try {
+      await expect.poll(() => listing().then((l) => l.sort()), { timeout: 45_000 }).toEqual([["Secret Plan.png", true, true], [name, true, true]].sort());
+    } catch (e) {
+      // (the list did not come: are the files still there, and where?)
+      console.error(`hidden list empty after ${Date.now() - opened} ms; on disk: ${JSON.stringify(onDisk())}`);
+      throw e;
+    }
     console.log(`hidden list after the password: ${Date.now() - opened} ms`);
+    // Whatever the list said: both files where they were, none in the trash.
+    expect(onDisk().sealed, "still sealed on disk").toEqual(expect.arrayContaining(sealedNow));
+    expect(onDisk().trashed, "none in the trash").toEqual([]);
     // (each file is opened from .hidden/ after the list shows it: wait for its bytes)
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toEqual(Array.from(secret));
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.originalBytes(h), createHash("sha256").update(outside).digest("hex"))).toEqual(Array.from(outside));
