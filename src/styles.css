@@ -1064,16 +1064,16 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .view-settings button svg { width: 18px; height: 18px; }
 .view-settings button:hover { background: var(--hud-hover); }
 .view-settings button[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
-/* The window with no frame (src/ui/window-frame.ts): the buttons in the corner, what moves the window, and room kept beside them. */
-:root[data-frame="off"] { --win-w: calc(3 * var(--ctl) + 2 * var(--gap) + 2 * var(--pad) + 2px + var(--near)); }
+/* The window with no frame (src/ui/window-frame.ts): the buttons in the corner, what moves the window, and room kept beside them. Only the strip and the grip move it: a drag area takes every click over it, also from a menu or a button drawn over it, so none lies under the top row. */
+:root[data-frame="off"] { --win-w: calc(4 * var(--ctl) + 3 * var(--gap) + 2 * var(--pad) + 2px + var(--near)); }
 .win-strip { position: fixed; z-index: var(--z-edge); top: 0; left: 0; right: 0; height: var(--edge); -webkit-app-region: drag; }
 .win-controls { position: fixed; z-index: var(--z-pop); top: var(--edge); right: var(--edge); display: flex; -webkit-app-region: no-drag; }
 .win-controls button { display: inline-flex; align-items: center; justify-content: center; width: var(--ctl); height: var(--ctl); padding: 0; color: inherit; background: transparent; border: 0; border-radius: var(--ctl-r, var(--r-md)); cursor: pointer; }
 .win-controls button:hover { background: var(--hud-hover); }
 .win-controls button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: -2px; }
 .win-controls svg { width: var(--icon-md); height: var(--icon-md); }
-:root[data-frame="off"] :is(.assets-bar, .set-head, #nav) { -webkit-app-region: drag; }
-:root[data-frame="off"] :is(.assets-bar, .set-head, #nav) :is(button, input, select, a, [role="tab"], label) { -webkit-app-region: no-drag; }
+.win-grip { display: inline-flex; align-items: center; justify-content: center; width: var(--ctl); height: var(--ctl); color: var(--hud-muted); cursor: grab; -webkit-app-region: drag; }
+.win-grip svg { width: var(--icon-md); height: var(--icon-md); }
 .view-settings button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 #toolbar > .rail { left: calc(var(--edge) / var(--ui-scale, 1)); }
 #toolbar { top: var(--edge); left: calc((var(--nav-w, 0px) + var(--edge)) / var(--ui-scale, 1)); right: calc((var(--dock-w, 0px) + var(--win-w, 0px) + var(--bar-h) + 2 * var(--near) + 2 * var(--edge)) / var(--ui-scale, 1)); }

@@ -1973,7 +1973,10 @@ test("the window frame off: no bar, and the window's buttons and what moves it a
     await expect(page.getByTestId("win-minimize")).toBeVisible();
     await expect(page.getByTestId("win-maximize")).toBeVisible();
     await expect(page.getByTestId("win-close")).toBeVisible();
-    expect(await page.locator(".win-strip").evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"))).toBe("drag");
+    const region = (sel: string) => page.locator(sel).evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"));
+    expect(await region(".win-strip")).toBe("drag");
+    expect(await region(".win-grip")).toBe("drag");
+    expect(await region("#nav")).not.toBe("drag"); // (a drag area takes every click over it: none under the top row)
     const box = async (id: string) => (await page.getByTestId(id).boundingBox())!;
     expect((await box("view-settings")).x + (await box("view-settings")).width).toBeLessThanOrEqual((await box("win-minimize")).x); // (the Settings button keeps clear of them)
     await page.evaluate(() => window.__canvastDebug.setSetting("ui.frame", "system"));
