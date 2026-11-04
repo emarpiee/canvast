@@ -883,6 +883,18 @@ test("a property's type belongs to its name: the value's control follows it, and
   await p.getByLabel("Add an item to aliases").fill("left in the box");
   await p.getByLabel("Add an item to aliases").blur();
   await expect.poll(listed).toEqual(["Smith, John", "left in the box"]);
+  // Dragged by its grip, over more than one row: it goes where the pointer ends, and nothing stays lifted.
+  const keys = () => p.locator(".field-key").evaluateAll((l) => l.map((k) => (k as HTMLInputElement).value));
+  const order = await keys();
+  const grip = (await p.getByRole("button", { name: `Move the property ${order.at(-1)}`, exact: true }).boundingBox())!;
+  const top = (await p.locator(".asset-field").first().boundingBox())!;
+  await p.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(grip.x + grip.width / 2, top.y + 2, { steps: 12 });
+  await p.mouse.up();
+  await expect.poll(keys).toEqual([order.at(-1), ...order.slice(0, -1)]);
+  await expect(p.locator(".asset-field.is-moving")).toHaveCount(0);
+  await expect.poll(() => p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.find((e) => e.name === "a.png")!.fields?.map((f) => f.key))).toEqual([order.at(-1), ...order.slice(0, -1)]);
   // A date and time keeps how it was written.
   await add("a", "created", "2024-09-03T10:30:00");
   await expect(p.getByLabel("Value of created")).toHaveAttribute("type", "datetime-local");

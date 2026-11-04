@@ -246,7 +246,7 @@ html, body {
 /* A finger that drags a slider or a number's name must not scroll the bar or page under it: the drag is the control's (otherwise the browser takes it and cancels it) */
 /* The theme's controls, never the browser's: a select, a text field or a number field that no rule below styles (a new one, one made in code) still looks like the rest.
    :where() gives it no weight, so every rule of a panel or bar overrides it whatever its place in the file. */
-:where(select, textarea, input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"]) { font: var(--font-value); color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); }
+:where(select, textarea, input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], input[type="date"], input[type="datetime-local"]) { font: var(--font-value); color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); padding: var(--sp-2) var(--sp-3); }
 /* Every place text is typed shows its caret and its selection in the accent, so neither depends on the browser's default against our backgrounds. */
 input, textarea, [contenteditable="true"] { caret-color: var(--hud-accent); }
 ::selection { background: color-mix(in oklch, var(--hud-accent) 45%, transparent); }
@@ -1259,10 +1259,14 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-sec > .assets-btn[data-action="new-folder-into"] { margin-top: var(--sp-3); }
 /* the note (plain text) and the fields the user names: a name and a value per row, × to remove one, "Add a field" below */
 .asset-note-box { display: block; width: 100%; min-height: calc(var(--sp-15) + var(--sp-8)); resize: vertical; box-sizing: border-box; }
-.asset-fields { list-style: none; margin: var(--sp-4) 0 0; padding: 0; display: grid; gap: var(--sp-3); container-type: inline-size; }
+.asset-fields { list-style: none; margin: var(--sp-4) 0 0; padding: 0; display: grid; gap: var(--sp-5); container-type: inline-size; }
 .asset-field { display: grid; grid-template: auto auto / auto auto minmax(0, 2fr) minmax(0, 3fr) auto; grid-template-areas: "grip type key value remove" ". . warn warn warn"; gap: var(--sp-3); align-items: start; }
 .asset-field > .field-grip { grid-area: grip; }
 .asset-field > .field-type { grid-area: type; }
+.asset-fields .field-key { background: transparent; border-color: transparent; font-weight: inherit; }
+.asset-fields .field-key:hover, .asset-fields .field-key:focus { border-color: var(--hud-border); }
+.asset-fields [data-action="field-remove"] { height: var(--ctl); background: transparent; border-color: transparent; }
+.asset-fields [data-action="field-remove"]:hover:not(:disabled) { background: var(--hud-hover); }
 .asset-field > .field-warn { grid-area: warn; }
 .asset-field input[type="checkbox"].field-value { justify-self: start; width: var(--icon-md); height: var(--ctl); margin: 0; }
 .field-type { display: inline-flex; align-items: center; justify-content: center; width: var(--icon-lg); height: var(--ctl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; }
@@ -1270,7 +1274,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .field-type:disabled { cursor: default; opacity: 0.4; }
 .field-type svg { width: var(--icon-md); height: var(--icon-md); }
 .asset-field .field-value[aria-invalid] { border-color: var(--hud-danger); outline-color: var(--hud-danger); }
-.asset-field input[type="date"], .asset-field input[type="datetime-local"] { font-size: var(--text-sm); }
+.asset-field input::-webkit-calendar-picker-indicator { margin: 0; opacity: 0.7; cursor: pointer; }
 .field-list { padding: var(--sp-2); border: 1px solid var(--hud-border); border-radius: var(--r-sm); min-width: 0; }
 .field-item { max-width: 100%; min-width: 0; cursor: grab; }
 .field-item > span { min-width: 0; overflow-wrap: anywhere; }
@@ -1283,7 +1287,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .asset-field > [data-action="field-remove"] { grid-area: remove; }
 /* a narrow panel: the name has a line of its own, with the value under it, so neither is cut */
 @container (max-width: 340px) {
-  .asset-field { grid-template: auto auto auto / auto auto minmax(0, 1fr) auto; grid-template-areas: "grip type key remove" ". value value value" ". warn warn warn"; row-gap: var(--sp-1); }
+  .asset-field { grid-template: auto auto auto / auto auto minmax(0, 1fr) auto; grid-template-areas: "grip type key remove" "value value value value" "warn warn warn warn"; row-gap: var(--sp-1); }
 }
 /* the grip moves a field (drag it, or the Up and Down arrows on it); the row being dragged is lifted */
 .field-grip { display: inline-flex; align-items: center; justify-content: center; width: var(--icon-lg); height: var(--ctl); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-sm); cursor: grab; touch-action: none; }

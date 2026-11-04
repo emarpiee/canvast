@@ -2742,6 +2742,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     });
     saveNotes(hash, notesNow(), "Moved a property");
   };
+  const DRAG_EDGE = 32;
+  const DRAG_STEP = 8;
   // A field is moved by dragging its grip (the order is stored), or with the Up and Down arrows on it.
   inspector.addEventListener("pointerdown", (e) => {
     const grip = (e.target as HTMLElement).closest<HTMLButtonElement>(".field-grip");
@@ -2751,22 +2753,28 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const li = grip.closest<HTMLElement>(".asset-field")!;
     const ul = li.parentElement!;
     const was = [...ul.children].indexOf(li);
-    grip.setPointerCapture(e.pointerId);
     li.classList.add("is-moving");
+    // (followed on the window: the row moves in the page under the pointer, and a move takes the pointer's capture away from its grip)
+    let scroller: HTMLElement | null = ul.parentElement;
+    while (scroller && scroller.scrollHeight <= scroller.clientHeight) scroller = scroller.parentElement;
     const move = (ev: PointerEvent): void => {
+      if (!ul.isConnected) return end();
+      // (near an edge of a long list, it scrolls)
+      const edge = scroller?.getBoundingClientRect();
+      if (scroller && edge) scroller.scrollTop += ev.clientY < edge.top + DRAG_EDGE ? -DRAG_STEP : ev.clientY > edge.bottom - DRAG_EDGE ? DRAG_STEP : 0;
       const other = [...ul.children].find((x) => x !== li && ev.clientY < x.getBoundingClientRect().top + x.getBoundingClientRect().height / 2);
       if (other ? li.nextElementSibling !== other : ul.lastElementChild !== li) ul.insertBefore(li, other ?? null);
     };
-    const end = (): void => {
-      grip.removeEventListener("pointermove", move);
-      grip.removeEventListener("pointerup", end);
-      grip.removeEventListener("pointercancel", end);
+    function end(): void {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", end);
+      window.removeEventListener("pointercancel", end);
       li.classList.remove("is-moving");
-      if ([...ul.children].indexOf(li) !== was) fieldsMoved(hash, ul);
-    };
-    grip.addEventListener("pointermove", move);
-    grip.addEventListener("pointerup", end);
-    grip.addEventListener("pointercancel", end);
+      if (ul.isConnected && [...ul.children].indexOf(li) !== was) fieldsMoved(hash!, ul);
+    }
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", end);
+    window.addEventListener("pointercancel", end);
   });
   inspector.addEventListener("keydown", (e) => {
     const grip = (e.target as HTMLElement).closest<HTMLButtonElement>(".field-grip");

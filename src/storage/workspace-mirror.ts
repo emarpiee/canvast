@@ -640,6 +640,10 @@ export class WorkspaceMirror {
     this.lib.sortFiles = fn;
   }
 
+  set onNamesChanged(fn: () => void) {
+    this.lib.onNamesChanged = fn;
+  }
+
   set onMoved(fn: (m: { hash: string; name: string; path: string }) => void) {
     this.lib.onMoved = fn;
   }

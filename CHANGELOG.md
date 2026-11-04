@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.53.26 — Properties: moving, layout and date boxes (2026-11-04)
+
+- **Fixed:** dragging a property by its grip stopped after its first step and left the row marked as moving; it now follows the pointer to the end, and a long list scrolls near its edges.
+- **Fixed:** date and date-and-time boxes look like the other value boxes, in every theme.
+- **Changed:** a narrow details panel gives a property's value the whole width under its name; the name and its × are quieter, and properties are further apart.
+- **Fixed:** a type error in 0.53.25.
+
 ## 0.53.25 — A name taken from a file shows at once (2026-11-04)
 
 - **Fixed:** an item that took its file's name (`image-2.png`) showed the old name until the library was drawn again; the lists now follow at once.
