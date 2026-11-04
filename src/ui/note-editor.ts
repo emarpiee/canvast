@@ -604,7 +604,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   // (the editor makes that card only after it has started, in the wrapper that carries its floating parts: the button is added when it comes)
   const carrier = editor.$.contextProvider.carrierWrapper as HTMLElement;
   const armLinkCard = (): void => {
-    const linkCard = carrier.querySelector<HTMLElement>(".se-controller-link");
+    const linkCard = carrier.querySelector<HTMLElement>('.se-controller-link:has([data-command="unlink"])'); // (an anchor's and a formula's cards have that class too)
     if (!linkCard || linkCard.querySelector("[data-go-link]")) return;
     linkCard.querySelector(".se-btn-group")?.insertAdjacentHTML("afterbegin", `<button type="button" class="se-btn se-tooltip note-go-link" data-go-link data-testid="note-go-link" tabindex="-1" aria-label="Go to link">${ICONS.goToLink}<span class="se-tooltip-inner"><span class="se-tooltip-text">Go to link</span></span></button>`);
     linkCard.addEventListener("click", (e) => {
