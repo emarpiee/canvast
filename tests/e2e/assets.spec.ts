@@ -2493,6 +2493,15 @@ test("wide screen: the library and details panels are resized by their edges (dr
   await p.mouse.dblclick(sg2.x, sg2.y + 200);
   expect(await w(side)).toBe(side0);
   expect(app.consoleErrors).toEqual([]);
+  // in the viewer, with no gap: the details' grip leaves the scrollbar on the left of it alone
+  await p.locator('[data-testid="asset-card"]').first().dblclick();
+  await expect(p.locator(".assets-body.is-viewing")).toBeVisible();
+  const vg = (await p.getByTestId("insp-grip").boundingBox())!;
+  const gripAt = (x: number): Promise<boolean> => p.evaluate(([px, py]) => !!document.elementFromPoint(px!, py!)?.closest(".col-grip"), [x, vg.y + 200]);
+  expect(await gripAt(vg.x - 2), "left of it").toBe(false);
+  expect(await gripAt(vg.x + 2), "right of it").toBe(true);
+  await p.keyboard.press("Escape");
+  await expect(p.locator(".assets-body.is-viewing")).toHaveCount(0);
   // at their narrowest, nothing in either panel is wider than the panel (no sideways scroll, nothing cut at the edges)
   for (const [grip, dir] of [["side-grip", -1], ["insp-grip", 1]] as const) {
     const gb = (await p.getByTestId(grip).boundingBox())!;

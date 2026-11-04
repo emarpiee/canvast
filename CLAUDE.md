@@ -83,7 +83,7 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 
 - **Checkboxes and radios** are one rule in `src/styles.css`, sized by Density: an element sets only where it sits, never its size or colours.
 
-- **Scrollbars** are one rule at the top of `src/styles.css` (`src/ui/scrollbars.ts`). Do not set `scrollbar-width` or `scrollbar-color` on an element, which turns it off in Chromium; only `none` for a row that scrolls sideways with its cue.
+- **Scrollbars** are one rule at the top of `src/styles.css` (`src/ui/scrollbars.ts`). Do not set `scrollbar-width` or `scrollbar-color` on an element, which turns it off in Chromium; only `none` for a row that scrolls sideways with its cue. A resize grip sits on the side of an edge away from a scrollbar.
 
 - **Spacing follows Density.** Gaps, paddings and margins use only `--s-1`, `2`, `4`, `6`, `8`, `10`, `12`, `13`, `14`, `15`, which have a value for each of Dense, Compact and Comfortable. Control and row sizes use `--ctl`, `--bar-h`, `--field-h`, `--list-h`, `--menu-h`, `--tree-row-h`, `--row-btn`, `--chip-btn`, `--tree-indent`, `--icon-*`, and offsets from an edge use `--edge` and `--near`, which do too. `--sp-*` are fixed lengths, for what must not change. `check:tokens` refuses `--sp-*` in spacing.
 

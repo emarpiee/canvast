@@ -1531,7 +1531,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer-note .sun-editor { flex: 1; min-height: 0; } /* (block, set by the editor itself) */
 .viewer-note .se-container { height: 100%; }
 .viewer-note .se-wrapper { flex: 1; min-height: 0; }
-.viewer.is-note .viewer-stage { display: flex; padding-top: calc(var(--s-6) + var(--ctl) + var(--s-4)); } /* (under the viewer's Back and Details buttons) */
+.viewer.is-note .viewer-stage { display: flex; padding-top: calc(2 * var(--sp-6) + var(--ctl)); } /* (under the viewer's Back and Details buttons, the same room above and below them, in every density) */
 .viewer.is-note .viewer-stage > figure:not(:where(.viewer-note *)), .viewer.is-note .viewer-edge, .viewer.is-note .viewer-ground, .viewer.is-note .viewer-zoom { display: none; }
 .viewer-progress { position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--hud-accent); transform-origin: left; transform: scaleX(0); z-index: 1; }
 .viewer-progress[hidden] { display: none; }
@@ -2610,8 +2610,10 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 @media (min-width: 901px) {
   /* (no space of its own: it sits in the one gap between the panels, which the row would otherwise give twice, once on each side of it) */
   .col-grip { display: block; flex: none; position: relative; z-index: 2; width: 0; margin-inline: calc(var(--s-8) / -2); }
-  /* The hit area is the gap between the panels and no more, so it never covers what is beside it. */
-  .col-grip::before { content: ""; position: absolute; top: 0; bottom: 0; left: calc(-1 * var(--sp-4)); width: calc(2 * var(--sp-4)); cursor: col-resize; touch-action: none; }
+  /* The hit area starts where the panel before it ends and goes only forward, so it never covers that panel's scrollbar (on its right edge); with no gap (the viewer), the same. */
+  .col-grip::before { content: ""; position: absolute; top: 0; bottom: 0; left: calc(var(--s-8) / -2); width: calc(var(--s-8) / 2 + var(--sp-4)); cursor: col-resize; touch-action: none; }
+  .assets-body.is-viewing .col-grip::before { left: 0; width: var(--sp-4); }
+  .assets-body.is-viewing .col-grip::after { left: 0; }
   .col-grip::after { content: ""; position: absolute; top: 50%; left: calc(-1 * var(--sp-1)); width: var(--sp-2); height: var(--sp-10); transform: translateY(-50%); border-radius: var(--r-xs); background: var(--hud-muted); opacity: 0; transition: opacity var(--dur-fast) var(--ease-out); pointer-events: none; }
   .col-grip:hover::after, .col-grip:focus-visible::after, .col-grip.is-dragging::after { opacity: 0.7; background: var(--hud-accent); }
   .col-grip:focus-visible { outline: none; }
@@ -2799,7 +2801,7 @@ input[data-scrub-input]:focus { cursor: text; }
 .dock-item[data-folded] > .layers-panel { max-height: none; }
 .dock-grip { position: absolute; top: var(--sp-4); bottom: var(--sp-4); width: var(--sp-3); cursor: ew-resize; z-index: 1; touch-action: none; }
 .dock-item[data-side="right"] > .dock-grip { left: 0; }
-.dock-item:not([data-side="right"]) > .dock-grip { right: 0; }
+.dock-item:not([data-side="right"]) > .dock-grip { right: calc(-1 * var(--sp-3)); } /* (outside: the panel's scrollbar is on this edge) */
 .dock-grip:hover, .dock-item.is-resizing > .dock-grip { background: color-mix(in oklch, var(--hud-accent) 45%, transparent); border-radius: var(--r-pill); }
 .dock-item[data-folded] > .dock-grip { display: none; }
 #dock-float { position: fixed; inset: 0; pointer-events: none; z-index: var(--z-edge); }
@@ -2824,7 +2826,8 @@ select option, select optgroup { color: var(--hud-fg); background: var(--hud-bg)
   select, ::picker(select) { appearance: base-select; }
   select { align-items: center; justify-content: space-between; gap: var(--s-4); overflow: hidden; white-space: nowrap; }
   ::picker(select) { padding: var(--s-2); color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
-  select option { padding: var(--s-4) var(--s-6); border-radius: var(--r-sm); }
+  select option { padding: var(--s-4) var(--s-6); border-radius: var(--r-sm); outline: none; } /* (the browser's focus ring, on and off, made the highlight look as if it changed width) */
+  select option:checked:focus-visible { box-shadow: inset 0 0 0 1px var(--hud-accent-fg); }
   select option:hover, select option:focus-visible { background: var(--hud-hover); }
   select option:checked { color: var(--hud-accent-fg); background: var(--hud-accent); }
   select::picker-icon { content: ""; flex: none; width: var(--icon-md); height: var(--icon-md); background: currentColor; mask: var(--chevron-mask) center / contain no-repeat; }
