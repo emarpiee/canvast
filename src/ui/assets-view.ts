@@ -310,7 +310,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     </div>
     <footer class="hud-bottom assets-statusbar" data-testid="assets-statusbar">
       <div class="hud-readout assets-readout" aria-live="off">
-        <span class="assets-hidden-bar" data-testid="hidden-mode-bar" role="status" title="Hidden mode: only hidden items are listed, and what you do here is done to them" hidden>${ICONS.eyeClosed}<span class="assets-hidden-label">Hidden mode</span><button type="button" data-action="hidden-stay" data-testid="hidden-mode-stay" aria-pressed="false" aria-label="Stay in hidden mode when leaving the library" title="Stay in hidden mode when leaving the library (also in Settings > Privacy)">${ICONS.pin}</button><button type="button" data-action="exit-hidden" data-testid="hidden-mode-exit" aria-label="Exit hidden mode" title="Exit hidden mode">Exit</button></span>
+        <span class="assets-hidden-bar" data-testid="hidden-mode-bar" role="status" title="Hidden mode: only hidden items are listed, and what you do here is done to them" hidden>${ICONS.eyeClosed}<span class="assets-hidden-label">Hidden mode</span><button type="button" data-action="hidden-stay" data-testid="hidden-mode-stay" aria-pressed="false" aria-label="Stay in hidden mode when leaving the library" title="Stay in hidden mode when leaving the library (also in Settings > Privacy)">${ICONS.anchor}</button><button type="button" data-action="exit-hidden" data-testid="hidden-mode-exit" aria-label="Exit hidden mode" title="Exit hidden mode">Exit</button></span>
         <span class="assets-count" data-testid="assets-count"></span>
         <span class="assets-picked" data-testid="assets-picked" hidden></span>
         <span class="assets-total" data-testid="assets-total"></span>
@@ -2398,12 +2398,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
               before: treeGuides(at.depth, at.last, at.conts) + treeSlot(at, `data-folder-twist="${esc(f.id)}"`),
               icon: pinnedNow.has(f.id) ? ICONS.folderUp : at.open ? ICONS.folderOpen : ICONS.folder,
               ...(pinnedNow.has(f.id) ? { title: `${esc(folderPath(listing!.folders, f.id).join(" › "))} (pinned)` } : {}),
-              extra: more("folder", f.id, f.name, [
+              extra: (ro ? "" : `<button type="button" class="side-more side-pin" data-folder-action="pin" data-id="${esc(f.id)}" aria-pressed="${ui.pinned.includes(f.id)}" aria-label="${ui.pinned.includes(f.id) ? "Unpin" : "Pin"} folder ${esc(f.name)}" title="${ui.pinned.includes(f.id) ? "Unpin" : "Pin to top"}">${ICONS.pin}</button>`) + more("folder", f.id, f.name, [
                 { attr: "data-folder-action", value: "new", label: "New subfolder", hint: "A folder inside this one", icon: ICONS.folderPlus, aria: `New folder inside ${f.name}` },
                 { attr: "data-folder-action", value: "rename", label: "Rename", hint: "Give it a new name", icon: ICONS.textCursorInput, aria: `Rename folder ${f.name}` },
                 ui.pinned.includes(f.id)
                   ? { attr: "data-folder-action", value: "pin", label: "Unpin", hint: "Back in its place in the list", icon: ICONS.pinOff, aria: `Unpin folder ${f.name}` }
-                  : { attr: "data-folder-action", value: "pin", label: "Pin to top", hint: "First in the list, on this device", icon: ICONS.folderUp, aria: `Pin folder ${f.name}` },
+                  : { attr: "data-folder-action", value: "pin", label: "Pin to top", hint: "First in the list, on this device", icon: ICONS.pin, aria: `Pin folder ${f.name}` },
                 hiddenMode
                   ? { attr: "data-folder-action", value: "show", label: "Unhide folder", hint: "And everything in it", icon: ICONS.eye, aria: `Unhide folder ${f.name} and everything in it` }
                   : { attr: "data-folder-action", value: "hide", label: "Hide folder", hint: "And everything in it", icon: ICONS.eyeClosed, aria: `Hide folder ${f.name} and everything in it` },

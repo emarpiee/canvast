@@ -194,8 +194,9 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
     await p.getByRole("button", { name: `More actions for folder ${folder}`, exact: true }).click();
     await p.getByRole("menuitem", { name: `${word} folder ${folder}`, exact: true }).click();
   };
-  await pinFolder("Pin", "Art");
+  await tree.getByRole("button", { name: "Pin folder Art", exact: true }).click(); // (the row's own button)
   await expect(folderOrder).toHaveText(["Art", "Bee", "Plain"]);
+  await expect(tree.getByRole("button", { name: "Unpin folder Art", exact: true })).toHaveAttribute("aria-pressed", "true");
   await tree.getByRole("button", { name: "Expand", exact: true }).click();
   await expect(folderOrder).toHaveText(["Art", "Ink", "Bee", "Plain"]);
   await pinFolder("Pin", "Ink");

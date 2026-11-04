@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.60 — A pin button on each folder (2026-11-04)
+
+- **Added:** a pin button on a folder's row in the library sidebar, shown on hover beside ⋯: outlined to pin, filled on a pinned folder.
+- **Changed:** "Stay in hidden mode" now has an anchor icon, as the pin now means pinning a folder.
+
 ## 0.53.59 — Pin folders to the top (2026-11-04)
 
 - **Added:** **Pin to top** in a folder's menu in the library sidebar puts it first in the Folders list, a subfolder too; remembered on this device.

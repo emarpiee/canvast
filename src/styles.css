@@ -3013,7 +3013,11 @@ dialog.reset-dialog h3 { margin: var(--sp-6) 0 var(--sp-3); font-size: var(--tex
 @media (hover: hover) and (min-width: 641px) {
   .side-row.tree-row .side-more { position: absolute; right: var(--sp-2); top: 0; bottom: 0; margin: auto 0; width: var(--tree-row-h); height: var(--tree-row-h); }
   .side-row.tree-row:has(.side-more):hover .side-n, .side-row.tree-row:has(.side-more):focus-within .side-n, .side-row.tree-row:has(.side-more[aria-expanded="true"]) .side-n { visibility: hidden; }
+  /* (the pin beside More: the name ends before it) */
+  .side-row.tree-row .side-more.side-pin { right: calc(var(--sp-2) + var(--tree-row-h)); }
+  .side-row.tree-row:has(.side-pin):hover .side-item, .side-row.tree-row:has(.side-pin):focus-within .side-item { padding-right: calc(var(--sp-2) + var(--tree-row-h)); }
 }
+.side-pin[aria-pressed="true"] svg { fill: currentColor; }
 .asset-where { margin: 0 0 var(--sp-3); font-size: var(--text-sm); overflow-wrap: anywhere; }
 
 /* The tree chooser (ui/tree-chooser.ts). */
