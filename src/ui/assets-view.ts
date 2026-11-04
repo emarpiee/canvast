@@ -1881,10 +1881,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       saveUi();
       labelSample();
       for (const line of root.querySelectorAll(".font-sample-line")) line.textContent = FONT_SAMPLES[ui.fontSample]!;
+      session.fontSample = FONT_SAMPLES[ui.fontSample]!;
+      session.onFontLook?.();
     }
     else if (act === "ground") {
       const now = session.viewGround;
       void session.setViewGround(VIEW_GROUNDS[(VIEW_GROUNDS.indexOf(now) + 1) % VIEW_GROUNDS.length]!);
+      session.onFontLook?.();
       paintVector();
     }
     else if (act === "play") setShowing(!showing);
@@ -5257,6 +5260,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     refreshSoon(true); // hidden items opened or locked: pictures that could not be read are tried again
   });
 
+  session.fontSample = FONT_SAMPLES[ui.fontSample]!;
   const view: AssetsView = {
     show() {
       visible = true;

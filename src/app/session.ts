@@ -1296,6 +1296,10 @@ export class Session {
   }
 
   /** The ground under see-through pictures in the library viewer (kept with the workspace). */
+  /** The sample sentence fonts are shown in (the viewer's button), and who redraws their cards on a canvas when it or the ground changes. */
+  fontSample = "";
+  onFontLook: (() => void) | null = null;
+
   get viewGround(): ViewGround {
     return this.tree?.workspace.viewGround ?? "checker";
   }

@@ -2465,6 +2465,8 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 /* A font's sample, in its own letters (the details: "Aa" and the sentence; the viewer: the sentence at several sizes, the letters and digits). */
 :root { --sample-aa: 56px; --sample-aa-lg: 120px; --sample-sm: 16px; --sample-md: 24px; --sample-lg: 36px; --sample-xl: 56px; }
 .font-sample { display: flex; flex-direction: column; justify-content: center; gap: var(--s-1); width: 100%; height: 100%; padding: var(--s-4); overflow: hidden; color: var(--file-fg); background: var(--file-bg); text-align: start; opacity: 0; transition: opacity var(--dur-fast); }
+/* (a font is seen on the theme, not on the fixed grey of a file's tile) */
+.font-sample { --file-bg: var(--paper); --file-fg: var(--hud-fg); --file-muted: var(--hud-muted); }
 .font-sample.is-ready, .font-sample.is-unreadable { opacity: 1; }
 .font-sample.is-unreadable { align-items: center; justify-content: center; color: var(--file-muted); font: var(--font-meta); }
 .font-sample p { margin: 0; overflow-wrap: anywhere; }

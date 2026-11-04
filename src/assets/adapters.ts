@@ -125,7 +125,25 @@ export async function makeFileCardFrom(name: string, chip: string, bytes: Uint8A
   }
 }
 
-/** A font's card: "Aa" in the font itself, large, with the type under it (null when the browser cannot read the font). */
+/** How a font's card looks: the sample sentence and the ground chosen in the viewer, in colours the canvas can draw. */
+let fontLook = { sample: "The quick brown fox jumps over the lazy dog", bg: "oklch(0.3 0 0)", fg: "oklch(0.93 0 0)" };
+export const setFontCardLook = (look: typeof fontLook): void => void (fontLook = look);
+
+/** A sentence in lines that fit a width, at the largest size from `start` that takes at most `most` lines. */
+function fitLines(x: CanvasRenderingContext2D, text: string, family: string, start: number, width: number, most: number): { lines: string[]; size: number } {
+  for (let size = start; ; size *= 0.85) {
+    x.font = `${size}px "${family}"`;
+    const lines: string[] = [];
+    for (const word of text.split(" ")) {
+      const with_ = lines.length ? `${lines[lines.length - 1]} ${word}` : word;
+      if (lines.length && x.measureText(with_).width <= width) lines[lines.length - 1] = with_;
+      else lines.push(word);
+    }
+    if (size < 9 || (lines.length <= most && lines.every((l) => x.measureText(l).width <= width))) return { lines, size };
+  }
+}
+
+/** A font's card: "Aa" in the font itself, large, its sample sentence and its type under it (null when the browser cannot read the font). */
 async function fontCard(chip: string, bytes: Uint8Array): Promise<ImageBitmap | null> {
   const face = new FontFace(`canvast-card-${Math.random().toString(36).slice(2)}`, bytes.slice().buffer);
   await face.load();
@@ -135,23 +153,30 @@ async function fontCard(chip: string, bytes: Uint8Array): Promise<ImageBitmap | 
     c.width = FILE_CARD_W;
     c.height = FILE_CARD_H;
     const x = cardContext(c);
-    x.fillStyle = "oklch(0.3 0 0)";
+    x.fillStyle = fontLook.bg;
     x.fillRect(0, 0, c.width, c.height);
-    x.strokeStyle = "oklch(1 0 0 / 0.1)";
+    x.strokeStyle = fontLook.fg;
+    x.globalAlpha = 0.1;
     x.lineWidth = 2;
     x.strokeRect(1, 1, c.width - 2, c.height - 2);
+    x.globalAlpha = 1;
     x.textAlign = "center";
     x.textBaseline = "middle";
     // As large as fits, measured once at a reference size (the same way as the library's thumbnail).
     x.font = `100px "${face.family}"`;
     const w = x.measureText("Aa").width || 100;
-    const size = Math.min(c.height * 0.5, (100 * c.width * 0.7) / w);
+    const size = Math.min(c.height * 0.34, (100 * c.width * 0.6) / w);
     x.font = `${size}px "${face.family}"`;
-    x.fillStyle = "oklch(0.93 0 0)";
-    fillTextCentred(x, "Aa", c.width / 2, c.height * 0.44);
+    x.fillStyle = fontLook.fg;
+    fillTextCentred(x, "Aa", c.width / 2, c.height * 0.27);
+    const { lines, size: small } = fitLines(x, fontLook.sample, face.family, c.height * 0.085, c.width * 0.86, 3);
+    x.font = `${small}px "${face.family}"`;
+    const step = small * 1.3;
+    lines.forEach((line, i) => fillTextCentred(x, line, c.width / 2, c.height * 0.66 + (i - (lines.length - 1) / 2) * step));
     x.font = "14px system-ui, sans-serif";
-    x.fillStyle = "oklch(0.8 0 0)";
+    x.globalAlpha = 0.75;
     x.fillText(chip, c.width / 2, c.height - 22);
+    x.globalAlpha = 1;
     return await createImageBitmap(c);
   } finally {
     document.fonts.delete(face);

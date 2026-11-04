@@ -23,7 +23,8 @@ import type { Gradient, GradientStop } from "../doc/paint";
 import type { PathObject } from "../doc/model";
 import type { JoinChoice } from "../doc/stroke-look";
 import { SHOT_FORMATS, encodeShot, shotFileName, shotTags, withInterface } from "./screenshot";
-import { isCard } from "../assets/file-kind";
+import { isCard, isFontFile } from "../assets/file-kind";
+import { setFontCardLook } from "../assets/adapters";
 import { downloadOriginal, fileActionsOf, openOriginalInTab, saveFile } from "../ui/file-actions";
 import { FrameStats } from "./frame-stats";
 import type { FrameBreakdown } from "./frame-stats";
@@ -1952,6 +1953,25 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   markTab("canvas");
   markNav("canvas");
   const assetsView = mountAssetsView(assetsRoot, session, assets, () => setView("canvas"), notices, settings, libraryFonts);
+  // A font's card on a canvas: the viewer's sample sentence, on its ground; the chequered one is the theme's own, as a card has no see-through.
+  const fontCardsLook = (): void => {
+    const probe = document.createElement("i");
+    document.body.append(probe);
+    const colour = (token: string): string => {
+      probe.style.color = `var(${token})`;
+      return getComputedStyle(probe).color;
+    };
+    const ground = session.viewGround;
+    const [bg, fg] = ground === "gray" ? ["#808080", colour("--ink-on-light")] : ground === "white" ? ["#ffffff", colour("--ink-on-light")] : ground === "black" ? ["#000000", colour("--ink-on-dark")] : [colour("--paper"), colour("--hud-fg")];
+    probe.remove();
+    setFontCardLook({ sample: session.fontSample, bg: bg!, fg: fg! });
+    for (const [h, n] of assetNames.map) if (isFontFile({ type: "", name: n })) assets.forget(h);
+    tiles.clear();
+    invalidate();
+  };
+  session.onFontLook = fontCardsLook;
+  fontCardsLook();
+  settings.subscribe((key) => key === "ui.theme" && fontCardsLook());
   // A note's card on a canvas opens in the note panel (a double-click, Edit note): the same editor and saving as in the library.
   /** Into the library as a note, filed in the Notes folder (Settings > Notes): its record, or undefined. */
   const storeNote = async (file: File): Promise<AssetRecord | undefined> => {
