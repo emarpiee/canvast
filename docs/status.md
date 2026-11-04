@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.53.27: a dialog to rename a tag (2026-11-04)
+
+- **Implemented:** `renameTagDialog` in `assets-view.ts`, from the sidebar's menu and a double-click on a tag in the details. Canvas tags keep their box.
+- **Tested:** typecheck here; `organize.spec` on GitHub.
+- **Committed:** v0.53.27.
+
 ## v0.53.26: properties: moving, layout, date boxes (2026-11-04)
 
 - **Implemented:** grip drag followed on the window (a moved row loses pointer capture), edge scrolling, theme for date inputs, narrow layout.

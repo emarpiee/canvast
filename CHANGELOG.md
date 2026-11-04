@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.53.27 — A dialog to rename a tag (2026-11-04)
+
+- **Added:** a double-click on a tag in the details panel renames it.
+- **Changed:** the sidebar's Tags section renames in the same dialog, in place of a box in its list. A rename still applies to every item, and a name another tag has still joins the two.
+
 ## 0.53.26 — Properties: moving, layout and date boxes (2026-11-04)
 
 - **Fixed:** dragging a property by its grip stopped after its first step and left the row marked as moving; it now follows the pointer to the end, and a long list scrolls near its edges.

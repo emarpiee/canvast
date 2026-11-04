@@ -634,16 +634,24 @@ test("tags can be renamed and deleted for the whole library (ADR 0057)", async (
   await expect(tagRow("ref")).toContainText("2");
   // Rename: every asset that had it has the new name; renaming onto an existing tag merges.
   await sideAct(p, "tag", "ref", "Rename tag ref");
-  await p.getByTestId("folder-name-input").fill("reference");
+  await expect(p.getByTestId("prompt-input")).toHaveValue("ref");
+  await p.getByTestId("prompt-input").fill("reference");
   await p.keyboard.press("Enter");
   await expect(tagRow("reference")).toContainText("2");
   await expect(tagRow("ref")).toHaveCount(0);
   await p.getByTestId("assets-search").fill("#reference");
   await expect(cards(p)).toHaveCount(2);
   await p.getByTestId("assets-search").fill("");
-  await sideAct(p, "tag", "colour", "Rename tag colour");
-  await p.getByTestId("folder-name-input").fill("hands");
-  await p.keyboard.press("Enter");
+  // The same from the details: a double-click on a tag; Cancel changes nothing.
+  await pick(p, GREEN_HASH);
+  const chip = p.getByTestId("asset-tags").locator('[data-tag-label="colour"]');
+  await chip.dblclick({ position: { x: 8, y: 8 } });
+  await expect(p.getByTestId("prompt-input")).toHaveValue("colour");
+  await p.getByTestId("prompt-cancel").click();
+  await expect(tagRow("colour")).toBeVisible();
+  await chip.dblclick({ position: { x: 8, y: 8 } });
+  await p.getByTestId("prompt-input").fill("hands");
+  await p.getByTestId("prompt-ok").click();
   await expect(tagRow("hands")).toContainText("2");
   await expect(tagRow("colour")).toHaveCount(0);
   // Delete: taken off every asset, the assets stay.

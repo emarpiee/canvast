@@ -723,7 +723,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   /** On a narrow screen the sidebar is a strip that opens on demand. */
   const narrow = window.matchMedia("(max-width: 900px)");
   let sideOpen = !narrow.matches;
-  let naming: { kind: "new"; parent: string | null } | { kind: "rename-tag"; key: string; label: string } | { kind: "rename-ctag"; key: string; label: string } | { kind: "rename"; id: string } | null = null;
+  let naming: { kind: "new"; parent: string | null } | { kind: "rename-ctag"; key: string; label: string } | { kind: "rename"; id: string } | null = null;
   const scroller = root.querySelector<HTMLElement>(".assets-scroll")!;
   /** A thumbnail being read or made: who still wants it (a card that scrolled away does not), and whether it is for the screen or the background. */
   type ThumbJob = { p: Promise<string>; wants: Array<() => boolean>; urgent: boolean; failed?: boolean; custom: string | null };
@@ -2349,10 +2349,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             ${
               capped("tags", [...tagCounts]
                 .sort((a, b) => a[1].label.localeCompare(b[1].label))
-                .map(([k, c]) => ({ active: picked.has(`tag:${k}`) || (naming?.kind === "rename-tag" && naming.key === k), html:
-                  naming?.kind === "rename-tag" && naming.key === k
-                    ? nameInput(c.label, `New name for tag ${c.label}`)
-                    : item(`tag:${k}`, `#${esc(c.label)}`, c.n, {
+                .map(([k, c]) => ({ active: picked.has(`tag:${k}`), html:
+                  item(`tag:${k}`, `#${esc(c.label)}`, c.n, {
                         cls: "is-tag",
                         extra: more("tag", k, c.label, [
                           { attr: 'data-tag-action="rename"', label: "Rename", icon: ICONS.textCursorInput, aria: `Rename tag ${c.label}` },
@@ -2619,7 +2617,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     const chips = [...on.values()].sort((a, b) => b.k - a.k || a.label.localeCompare(b.label)).map(({ label: t, k }) => {
       const some = bulk && k < n;
-      return `<span class="tag-chip${some ? " is-partial" : ""}">#${esc(t)}${
+      return `<span class="tag-chip${some ? " is-partial" : ""}" data-tag-label="${esc(t)}"${session.readOnly ? "" : ' title="Double-click to rename this tag"'}>#${esc(t)}${
         some ? `<span class="tag-count" title="On ${k} of ${n}">${k}/${n}</span><button type="button" data-action="tag-all" data-tag="${esc(t)}" aria-label="Add tag ${esc(t)} to all ${n}" title="Add to all ${n}"${dis}>+</button>` : ""
       }<button type="button" data-action="untag" data-tag="${esc(t)}" aria-label="Remove tag ${esc(t)}${bulk ? ` from all ${n}` : ""}" title="Remove${bulk ? ` from all ${n}` : ""}"${dis}>×</button></span>`;
     });
@@ -2984,7 +2982,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     headOf: (id) => inspector.querySelector<HTMLElement>(`[data-dsec="${id}"] h3`),
   });
   // A double-click on its name renames it.
+  /** Rename a tag on every item that has it: the one way to, from the sidebar and from the details. A name another tag has joins the two. */
+  const renameTagDialog = async (label: string): Promise<void> => {
+    const name = await promptDialog({ title: `Rename the tag “${label}”`, lines: ["It changes on every item that has it. A name another tag has joins the two."], value: label, confirmLabel: "Rename tag" });
+    if (name === null) return;
+    const ok = await session.organize((c) => c.renameTag(label, name));
+    if (ok && scope === `tag:${label.toLowerCase()}`) scope = `tag:${name.replace(/\s+/g, " ").trim().replace(/^#+/, "").toLowerCase()}`;
+    renderSide();
+  };
   inspector.addEventListener("dblclick", (e) => {
+    const target = e.target as HTMLElement;
+    const chip = target.closest<HTMLElement>(".tag-chip[data-tag-label]");
+    if (chip && !target.closest("button") && !session.readOnly) return void renameTagDialog(chip.dataset["tagLabel"]!);
     if (selected && !session.readOnly && (e.target as HTMLElement).closest(".asset-insp-head h2") && entryOf(selected)) void renameAssetsDialog([selected]);
   });
   inspector.addEventListener("click", (e) => {
@@ -3748,8 +3757,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const key = b.dataset["key"]!;
       const label = [...side.querySelectorAll<HTMLElement>(`[data-scope="tag:${CSS.escape(key)}"] .side-label`)][0]?.textContent?.replace(/^#/, "") ?? key;
       if (b.dataset["tagAction"] === "rename") {
-        naming = { kind: "rename-tag", key, label };
-        renderSide();
+        void renameTagDialog(label);
       } else {
         void confirmDialog({
           title: `Delete the tag “${label}”?`,
@@ -3874,13 +3882,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       const n = naming;
       const name = input.value;
       naming = null;
-      if (n.kind === "rename-tag") {
-        const was = n.label;
-        void session.organize((c) => c.renameTag(was, name)).then((ok) => {
-          if (ok && scope === `tag:${n.key}`) scope = `tag:${name.replace(/\s+/g, " ").trim().replace(/^#+/, "").toLowerCase()}`;
-          renderSide();
-        });
-      } else if (n.kind === "rename-ctag") {
+      if (n.kind === "rename-ctag") {
         const was = n.label;
         void session.changeCanvasTag(was, name).then((changed) => {
           if (changed && scope === `ctag:${n.key}`) scope = `ctag:${name.replace(/\s+/g, " ").trim().replace(/^#+/, "").toLowerCase()}`;
