@@ -2019,7 +2019,7 @@ test("Copy file: the real files on the clipboard, from the library, as a list of
     expect(list).toContain("a.zip");
     expect(list.trim().split(/\r\n/)).toHaveLength(2);
     for (const line of list.trim().split(/\r\n/)) expect(decodeURIComponent(line)).toContain(ws);
-    // Dragged out: the plain drag says where the files are; with Alt, a real file drag. A hidden item stays in, its file encrypted.
+    // Dragged out, with Alt: a real file drag. A plain drag says nothing of files. A hidden item stays in, its file encrypted.
     const drag = (name: string, altKey = false) => on(name).evaluate(async (el, alt) => {
       el.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
       await new Promise((r) => setTimeout(r, 500));
@@ -2029,9 +2029,7 @@ test("Copy file: the real files on the clipboard, from the library, as a list of
       el.dispatchEvent(new DragEvent("dragend", { bubbles: true, dataTransfer }));
       return list;
     }, altKey);
-    const carried = await drag("b file.pdf");
-    expect(carried.trim().split(/\r\n/)).toHaveLength(2);
-    expect(decodeURIComponent(carried)).toContain(`${ws}/library/`);
+    expect(await drag("b file.pdf")).toBe("");
     await app.evaluate(({ BrowserWindow }) => void (BrowserWindow.getAllWindows()[0]!.webContents.startDrag = (item) => void ((globalThis as { dragged?: unknown }).dragged = item.files ?? [item.file])));
     expect(await drag("b file.pdf", true)).toBe("");
     await expect.poll(() => app.evaluate(() => ((globalThis as { dragged?: string[] }).dragged ?? []).length)).toBe(2);
@@ -2041,7 +2039,9 @@ test("Copy file: the real files on the clipboard, from the library, as a list of
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     await page.keyboard.press("Escape");
     await expect(on("a.zip")).toHaveCount(0);
-    expect(decodeURIComponent(await drag("b file.pdf"))).not.toContain("a.zip");
+    await app.evaluate(() => void ((globalThis as { dragged?: unknown }).dragged = undefined));
+    await drag("b file.pdf", true);
+    await expect.poll(() => app.evaluate(() => ((globalThis as { dragged?: string[] }).dragged ?? []).length)).toBe(1); // (the other, hidden, stays in)
   } finally {
     await app.close();
   }

@@ -5,6 +5,7 @@
 - **Changed:** with Window frame off, the window's name and buttons are a row that floats over the app, from the very top edge when the pointer reaches it. It takes no room, and clicks at the top of a window no longer go astray.
 - **Changed:** the README is in two parts, for users and for developers, with a section for each big feature, tables and pictures first and the long wording folded; new pictures of the sidebar, several items selected, art files and the Trash.
 - **Changed:** the library's list has the same thumbnail slider as the grid, in the same place, with its own size: its rows and thumbnails grow with it. The slider is longer, and the list's columns button moved to the left of the grid and list buttons so that nothing shifts.
+- **Fixed:** a drag of a library item could leave the app stuck (it scrolled, but took no click or key). A plain drag no longer offers files outside the app: hold `Alt` as it starts to drag items out. The drop places also go away when the card dragged has left the grid.
 - **Fixed:** on a small window the ∞ button stretched across the top row and the Settings button covered the canvas's name; the name takes the room now, clear of the buttons. 
 - **Fixed:** the status bars of the canvas and the library have one height with room around their buttons, which are square.
 - **Fixed:** the action buttons in the details panel were cut off (`Rename …`, `Export 4 …`); they now take the panel's whole width, one to a row.

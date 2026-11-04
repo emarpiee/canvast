@@ -3856,10 +3856,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // ---- sidebar: scope, folders
   // ---- dragging items onto the sidebar: a folder moves them into it, Unfiled out of theirs, a tag adds it, Favourites marks them
   const DRAG_TYPE = "application/x-canvast-assets";
-  // Dragging out of the app (desktop): a drag starts at once, so what its files are is read when the pointer goes down. Hidden items stay in: their files are encrypted,
-  // and a drag cannot stop to ask, as Copy file does, before a readable copy leaves the app.
+  // Dragging out of the app (desktop, with Alt): a drag starts at once, so what its files are is read when the pointer goes down. Hidden items stay in: their files are
+  // encrypted, and a drag cannot stop to ask, as Copy file does, before a readable copy leaves the app.
   const outPaths = new Map<string, string>();
-  let outFolder = "";
   const dragPick = (hash: string): string[] => (picked.has(hash) ? [...picked] : [hash]); // (a picked one carries the whole pick)
   const outFiles = (hashes: readonly string[]): string[] | null => {
     const shown = hashes.filter((h) => { const en = entryOf(h); return !!en && !meta(en).hidden; });
@@ -3870,7 +3869,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const bridge = desktopBridge();
     const hash = (e.target as HTMLElement).closest<HTMLElement>(".asset-card")?.dataset["hash"];
     if (!bridge || !hash || hiddenMode) return;
-    void bridge.workspace().then((w) => void (outFolder = w?.path ?? ""));
     for (const h of dragPick(hash).slice(0, MAX_DRAG_OUT)) {
       const en = entryOf(h);
       if (en && !meta(en).hidden && !outPaths.has(h)) void session.storage?.originals.fileOf(h).then((p: string | null) => void (p && outPaths.set(h, p)), () => undefined);
@@ -3883,7 +3881,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const hashes = dragPick(hash);
     const bridge = desktopBridge();
     const rels = bridge && !hiddenMode && hashes.length <= MAX_DRAG_OUT ? outFiles(hashes) : null;
-    // With Alt: a real file drag, for what will not take the plain one. It is that drag alone: nothing here receives it.
+    // With Alt: a real file drag out of the app. It is that drag alone: nothing here receives it. A plain drag stays in the app: it says nothing of files.
     if (bridge && e.altKey) {
       e.preventDefault();
       if (rels) bridge.startDrag(rels);
@@ -3892,8 +3890,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return;
     }
     e.dataTransfer.setData(DRAG_TYPE, JSON.stringify(hashes));
-    // (and their addresses, for a file manager that takes them; inside the app DRAG_TYPE decides)
-    if (rels && outFolder) e.dataTransfer.setData("text/uri-list", `${rels.map((r) => encodeURI(`file://${outFolder}/${r}`).replace(/[?#]/g, encodeURIComponent)).join("\r\n")}\r\n`);
     e.dataTransfer.setData("text/plain", hashes.length > 1 ? `${hashes.length} items` : (entryOf(hash)?.name ?? ""));
     e.dataTransfer.effectAllowed = "copyMove";
     // What is dragged: up to DRAG_STACK of their thumbnails stacked, with how many there are.
@@ -3914,11 +3910,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // Every place they can be dropped shows it, as the strip does.
     for (const t of side.querySelectorAll<HTMLElement>("[data-scope]")) if (takesDrop(t)) t.classList.add("drop-zone");
   });
-  grid.addEventListener("dragend", () => {
+  // (on the document: the card dragged may be gone from the grid by then, which is drawn as it scrolls, and its end would not reach the grid)
+  const dragOver = (): void => {
     placeZone.hidden = true;
     for (const t of root.querySelectorAll<HTMLElement>(".drop-zone")) t.classList.remove("is-drop-target");
     for (const t of side.querySelectorAll<HTMLElement>(".drop-zone")) t.classList.remove("drop-zone");
-  });
+  };
+  document.addEventListener("dragend", dragOver, true);
+  document.addEventListener("drop", () => queueMicrotask(dragOver), true);
   const placeZone = root.querySelector<HTMLElement>(".assets-place-zone")!;
   placeZone.addEventListener("dragover", (e) => {
     if (!e.dataTransfer?.types.includes(DRAG_TYPE)) return;
