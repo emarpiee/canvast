@@ -454,7 +454,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; tagsInline: boolean; sideSort: Record<keyof typeof SIDE_SORTS, SideSort>; pinned: string[]; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; listThumb: number; fontSample: number; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", tagsInline: false, sideSort: { folders: "az", tag: "az", ctag: "az" }, pinned: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, listThumb: 96, fontSample: 0, sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; tagsInline: boolean; sideSort: Record<keyof typeof SIDE_SORTS, SideSort>; pinned: string[]; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; listThumb: number; fontSample: number; fontTry: string; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", tagsInline: false, sideSort: { folders: "az", tag: "az", ctag: "az" }, pinned: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, listThumb: 96, fontSample: 0, fontTry: "", sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -495,6 +495,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     }
     if (typeof saved.thumb === "number" && saved.thumb >= 96 && saved.thumb <= 240) ui.thumb = saved.thumb;
     if (typeof saved.fontSample === "number" && FONT_SAMPLES[saved.fontSample]) ui.fontSample = saved.fontSample;
+    if (typeof saved.fontTry === "string") ui.fontTry = saved.fontTry;
     if (typeof saved.listThumb === "number" && saved.listThumb >= 96 && saved.listThumb <= 240) ui.listThumb = saved.listThumb;
     if (saved.filters && typeof saved.filters === "object") {
       const f = saved.filters as Partial<typeof ui.filters>;
@@ -1642,7 +1643,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (isFontFile(rec)) {
       // A font: its sample, in its own letters, at several sizes.
       slideImg.hidden = true;
-      slideTile.innerHTML = fontSampleHtml(rec.name, true, FONT_SAMPLES[ui.fontSample]);
+      slideTile.innerHTML = fontSampleHtml(rec.name, true, FONT_SAMPLES[ui.fontSample], ui.fontTry);
       slideTile.hidden = false;
       slideAlpha = true; // (its letters lie on the same ground as a see-through picture)
       viewer.classList.add("is-font", "has-alpha");
@@ -5251,6 +5252,13 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
 
   session.fontSample = FONT_SAMPLES[ui.fontSample]!;
+  // What is typed to try a font stays, for the next font and the next start.
+  viewer.addEventListener("input", (e) => {
+    const box = e.target as HTMLElement;
+    if (!box.matches(".font-sample-try")) return;
+    ui.fontTry = (box as HTMLTextAreaElement).value;
+    saveUi();
+  });
   const view: AssetsView = {
     show() {
       visible = true;

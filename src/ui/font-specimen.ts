@@ -49,11 +49,12 @@ export function loadFontFile(hash: string, file: () => Promise<Blob | undefined>
 }
 
 /** The sample's markup; `large` is the viewer's (the sentence at several sizes). Filled in with `showFont`. */
-export const fontSampleHtml = (name: string, large: boolean, sample = FONT_SAMPLES[0]!): string =>
+export const fontSampleHtml = (name: string, large: boolean, sample = FONT_SAMPLES[0]!, tried = ""): string =>
   `<div class="font-sample${large ? " is-large" : ""}" data-testid="font-sample" aria-label="Sample of ${esc(name)}">` +
   `<span class="font-sample-aa">Aa</span>` +
   (large ? ["is-xl", "is-lg", "is-md", "is-sm"].map((s) => `<p class="font-sample-line ${s}">${esc(sample)}</p>`).join("") : `<p class="font-sample-line">${esc(sample)}</p>`) +
   LETTERS.map((l) => `<p class="font-sample-chars">${esc(l)}</p>`).join("") +
+  (large ? `<textarea class="font-sample-try" data-testid="font-try" rows="3" spellcheck="false" aria-label="Try this font" placeholder="Type here to try this font">${esc(tried)}</textarea>` : "") +
   `</div>`;
 
 /** Load the font (its file is read only when it is not loaded yet) and draw the sample in it; a font the browser cannot read says so. */
