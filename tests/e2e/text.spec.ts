@@ -1147,16 +1147,18 @@ test("a font's sample sentence is kept over a reload", async ({ app }) => {
   await p.locator('[data-testid="asset-card"]').dblclick();
   await p.getByTestId("viewer-sample").click();
   await expect(p.locator(".viewer-tile .font-sample-line").first()).toHaveText("Pack my box with five dozen liquor jugs");
-  // The box to try it: in the font, its keys are its own, and what is typed stays.
+  // The box to try it: in the font, and its keys are its own. What is typed is dropped on closing.
   await expect(p.locator(".viewer-tile .font-sample")).toHaveClass(/is-ready/);
   await p.getByTestId("font-try").click();
   await p.keyboard.type("fi quiz");
   await expect(p.getByTestId("font-try")).toHaveValue("fi quiz");
   expect(await p.getByTestId("font-try").evaluate((e) => getComputedStyle(e).fontFamily)).toMatch(/canvast-font-/);
+  await p.locator(".viewer-back").click();
+  await p.locator('[data-testid="asset-card"]').dblclick();
+  await expect(p.getByTestId("font-try")).toHaveValue("");
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await p.getByTestId("view-assets").click();
   await p.locator('[data-testid="asset-card"]').dblclick();
   await expect(p.locator(".viewer-tile .font-sample-line").first()).toHaveText("Pack my box with five dozen liquor jugs");
-  await expect(p.getByTestId("font-try")).toHaveValue("fi quiz");
 });

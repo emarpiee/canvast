@@ -25,7 +25,7 @@
 - **Added:** `kind:typeface` finds fonts, as `kind:font` does.
 - **Fixed:** files imported into the library, dropped from a file manager or by Import or paste, go into the folder, tag or favourites open in the sidebar. A file the library already had stays where it is.
 - **Added:** a font in the viewer has the background button of see-through pictures, kept the same way, and a button that changes its sample sentence, kept too, in the details as well. It has more room around it. A font's preview in the details and its card on a canvas show that same sentence, background and letter colour.
-- **Added:** a box under a font's samples in the viewer to type in and see it in that font; what is typed stays.
+- **Added:** a box under a font's samples in the viewer to type in and see it in that font; what is typed goes from font to font and is dropped when the viewer closes.
 - **Added:** a fifth background for see-through pictures and fonts, the theme's own colour, which follows a change of theme. The background button shows the one in use, and the viewer's floating buttons stay visible under the pointer on any background.
 - **Changed:** the README is in two parts, for users and for developers, with a section for each big feature, tables and pictures first and the full wording after them; new pictures of the sidebar, several items selected, art files and the Trash.
 - **Changed:** the library's list has the same thumbnail slider as the grid, in the same place, with its own size: its rows and thumbnails grow with it. The slider is longer, and the list's columns button moved to the left of the grid and list buttons so that nothing shifts.

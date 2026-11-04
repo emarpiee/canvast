@@ -2492,7 +2492,7 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 .font-sample-line { font-size: var(--text-xl); line-height: 1.25; }
 .font-sample-chars { font-size: var(--text-md); line-height: 1.35; color: var(--file-muted); }
 .asset-preview .font-sample-chars { display: none; }
-.font-sample.is-large { justify-content: flex-start; gap: var(--s-10); max-width: 100%; padding: var(--under-viewer-buttons) var(--s-14) var(--s-14); overflow: auto; }
+.font-sample.is-large { justify-content: flex-start; gap: var(--s-10); max-width: 100%; padding: var(--under-viewer-buttons) var(--s-14); overflow: auto; } /* (top and bottom clear of the floating buttons, also scrolled to the end) */
 .viewer-tile { position: relative; z-index: var(--z-item); }
 .font-sample.is-large .font-sample-aa { font-size: var(--sample-aa-lg); }
 .font-sample.is-large .is-xl { font-size: var(--sample-xl); line-height: 1.1; }
