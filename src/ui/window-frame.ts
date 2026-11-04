@@ -5,6 +5,8 @@ import { ICONS } from "./icons";
 /** How long the row stays after the pointer has gone, and at the start, so that it is seen once. */
 const HIDE_AFTER_MS = 150;
 const SHOW_AT_START_MS = 3000;
+/** How near the top of the window the pointer brings the row. */
+const REACH_PX = 8;
 
 /**
  * The desktop window with no frame (Settings > Appearance > Window frame): a row with the window's name and its buttons, floating over the top of the app, which comes
@@ -55,13 +57,19 @@ export async function mountWindowFrame(settings: SettingsStore): Promise<void> {
   // (a finger has no way of leaving: the row goes by itself)
   edge.addEventListener("pointerdown", (e) => void (e.pointerType !== "mouse" && (show(), (heldUntil = Date.now() + SHOW_AT_START_MS), hideSoon(SHOW_AT_START_MS))));
   document.addEventListener("pointermove", (e) => {
-    if (!row.classList.contains("is-shown")) return;
+    if (!row.classList.contains("is-shown")) {
+      if (e.clientY <= REACH_PX) show(); // (also with something drawn over the edge)
+      return;
+    }
     if (e.clientY <= row.getBoundingClientRect().bottom) {
       if (Date.now() >= heldUntil) show();
     } else if (!row.matches(":focus-within") && Date.now() >= heldUntil) hideSoon();
   }, { passive: true });
-  // (the pointer gone out of the window, past the row)
-  document.documentElement.addEventListener("mouseleave", () => void (Date.now() >= heldUntil && hideSoon()));
+  // The pointer gone out of the window: over the top, which a quick move does without ever being seen at the edge, the row comes; anywhere else it goes.
+  document.documentElement.addEventListener("mouseleave", (e) => {
+    if (e.clientY <= REACH_PX) show();
+    else if (Date.now() >= heldUntil) hideSoon();
+  });
   document.body.append(edge, row);
   show();
   heldUntil = Date.now() + SHOW_AT_START_MS;

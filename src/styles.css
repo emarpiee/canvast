@@ -1065,7 +1065,7 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 .view-settings button:hover { background: var(--hud-hover); }
 .view-settings button[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
 /* The window with no frame (src/ui/window-frame.ts): a row over the top of the app, which comes from the very top edge and takes no room. Its drag area exists only while it shows. */
-.win-edge { position: fixed; z-index: var(--z-pop); top: 0; left: 0; right: 0; height: var(--sp-1); }
+.win-edge { position: fixed; z-index: var(--z-pop); top: 0; left: 0; right: 0; height: var(--edge); }
 @media (hover: none) { .win-edge { height: var(--sp-6); } }
 .win-row { position: fixed; z-index: var(--z-pop); top: 0; left: 0; right: 0; display: flex; align-items: center; gap: var(--gap); height: var(--bar-h); box-sizing: border-box; padding: var(--pad) var(--edge); color: var(--hud-fg); background: var(--paper); border-bottom: 1px solid var(--hud-border); box-shadow: var(--hud-lift); visibility: hidden; transform: translateY(-100%); transition: transform var(--dur-fast) var(--ease-out), visibility var(--dur-fast); }
 .win-row.is-shown { visibility: visible; transform: none; -webkit-app-region: drag; }
@@ -1143,8 +1143,10 @@ body:not([data-view="assets"]):has(.ctx-wrap:not(.is-following) > .ctx-bar:not([
 .is-folded > :first-child { cursor: pointer; }
 .is-folded > :first-child::after { content: "›"; margin-left: auto; padding-left: var(--sp-4); color: var(--hud-muted); }
 /* Dragging items in the library: the strip at the top places them on the open canvas when they are dropped on it. */
-.assets-place-zone { position: absolute; z-index: var(--z-edge); top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: var(--sp-4); height: var(--sp-14); font: var(--weight-semibold) var(--text-md) var(--font-ui); }
+.assets-place-zone { position: absolute; z-index: var(--z-edge); top: 0; left: 0; right: 0; display: flex; align-items: center; justify-content: center; gap: var(--sp-4); height: calc(var(--bar-bottom, var(--sp-14)) + var(--near)); font: var(--weight-semibold) var(--text-md) var(--font-ui); }
 .assets-place-zone[hidden] { display: none; }
+/* (while it shows it is the whole top row: what else is there steps aside, and a drop anywhere on the row counts) */
+body:has(.assets-place-zone:not([hidden])) :is(#nav, .view-settings, .assets-bar) { visibility: hidden; }
 .assets-place-zone svg { width: var(--icon-md); height: var(--icon-md); pointer-events: none; }
 .assets-place-zone span { pointer-events: none; }
 /* Where dragged items can be dropped (the strip at the top, a folder, a tag, Unfiled, Favourites): one look for all of them, dashed while
