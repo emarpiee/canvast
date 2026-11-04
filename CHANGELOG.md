@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.53.64 — Notices keep their contrast (2026-11-04)
+
+- **Fixed:** the tick and warning icons on notices were too pale in the light theme; they now have a colour for each theme.
+
 ## 0.53.63 — A library write that fails is tried again (2026-11-04)
 
 - **Fixed:** when writing the library's files failed, nothing tried again until the next change, so an item hidden while locked could keep its readable file. It now retries by itself, less often each time.

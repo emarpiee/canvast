@@ -1,0 +1,40 @@
+name: Screenshots
+
+# The README's pictures, taken on GitHub's runners (they drive the whole app, which lags a workstation in use). Run by hand; the pictures come as an artifact to look at and commit.
+on:
+  workflow_dispatch:
+
+jobs:
+  shots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y xvfb ffmpeg webp
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run build:desktop
+      - name: Draw the showcase
+        run: xvfb-run -a node scripts/showcase/build.mjs showcase.canvast
+      - name: Take the pictures
+        # (each on its own: one that fails leaves the others)
+        env:
+          ELECTRON_DISABLE_SANDBOX: "1"
+        run: |
+          mkdir -p shots
+          for s in shots shots-privacy shots-more shots-features shots-desktop shots-notes shots-library; do
+            echo "== $s"
+            xvfb-run -a node "scripts/showcase/$s.mjs" showcase.canvast shots/ || echo "FAILED $s"
+          done
+          for f in shots/*.png; do cwebp -quiet -q 80 "$f" -o "${f%.png}.webp"; done
+          ls -la shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots
+          path: shots/*.webp

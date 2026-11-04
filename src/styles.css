@@ -44,6 +44,8 @@
   --hud-danger: oklch(0.47 0.15 20);
   --hud-danger-fg: oklch(1 0 0);
   --hud-star: oklch(0.6 0.13 85);
+  --hud-success: oklch(0.5 0.13 150);
+  --hud-warning: oklch(0.52 0.11 80);
   --hud-scrim: oklch(0.2 calc(0.02 * var(--vivid)) var(--hue) / 0.4);
   --hud-lift: 0 1px 2px oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.08), 0 8px 22px oklch(0.25 calc(0.02 * var(--vivid)) var(--hue) / 0.1);
   /* Layers (ADR 0096): what is on the canvas (a player's picture, its bars, the selection bar) is always under the floating bars and panels on the edges, whatever is selected or being moved. */
@@ -181,6 +183,8 @@
     --hud-danger: oklch(0.74 0.14 20);
     --hud-danger-fg: oklch(0.2 0.02 20);
     --hud-star: oklch(0.8 0.14 85);
+    --hud-success: oklch(0.75 0.15 150);
+    --hud-warning: oklch(0.8 0.14 80);
     --hud-scrim: oklch(0.12 0.01 190 / 0.55);
     --hud-lift: 0 1px 2px oklch(0 0 0 / 0.3), 0 8px 22px oklch(0 0 0 / 0.35);
   }
@@ -222,6 +226,8 @@
   --hud-danger: oklch(0.74 0.14 20);
   --hud-danger-fg: oklch(0.2 0.02 20);
   --hud-star: oklch(0.8 0.14 85);
+  --hud-success: oklch(0.75 0.15 150);
+  --hud-warning: oklch(0.8 0.14 80);
   --hud-scrim: oklch(0.12 0.01 190 / 0.55);
   --hud-lift: 0 1px 2px oklch(0 0 0 / 0.3), 0 8px 22px oklch(0 0 0 / 0.35);
 }
@@ -1071,8 +1077,8 @@ input[type="range"], input[type="checkbox"], input[type="radio"], progress { acc
 #notices { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 20; display: flex; flex-direction: column; gap: var(--near); align-items: center; width: min(520px, calc(100vw - 2 * var(--edge))); pointer-events: none; }
 #notices[hidden] { display: none; }
 .notice { --tone: var(--hud-accent); pointer-events: auto; display: flex; align-items: center; gap: var(--sp-5); width: fit-content; min-width: min(300px, 100%); max-width: 100%; padding: var(--sp-3) var(--sp-3) var(--sp-3) var(--sp-4); color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(6px); font: var(--font-control); animation: notice-in var(--dur-base) var(--ease-out); }
-.notice.is-success { --tone: oklch(0.62 0.15 150); }
-.notice.is-warning { --tone: oklch(0.72 0.15 80); border-color: color-mix(in oklch, var(--tone) 40%, var(--hud-border)); }
+.notice.is-success { --tone: var(--hud-success); }
+.notice.is-warning { --tone: var(--hud-warning); border-color: color-mix(in oklch, var(--tone) 40%, var(--hud-border)); }
 .notice.is-error { --tone: var(--hud-danger); border-color: color-mix(in oklch, var(--tone) 40%, var(--hud-border)); }
 .notice-icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: var(--sp-10); height: var(--sp-10); color: var(--tone); background: color-mix(in oklch, var(--tone) 16%, transparent); border-radius: var(--r-dot); }
 .notice-icon svg { width: var(--icon-md); height: var(--icon-md); }
