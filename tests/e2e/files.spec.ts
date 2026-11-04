@@ -109,6 +109,15 @@ test("an art file shows the picture it keeps, in that picture's shape, on the ca
   await p.getByTestId("asset-preview").click();
   await expect(p.locator('[data-testid="slide-view"] figcaption')).toContainText("No preview for this kind of file");
   await p.keyboard.press("Escape");
+  // A backup copy (a.kra~) is the same kind of file, and says what it is.
+  const copy = await writeZip([{ name: "mergedimage.png", data: new Blob([new Uint8Array(makePng(60, 60, () => [40, 40, 200, 255]))]) }] as never);
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "art.kra~", mimeType: "", buffer: Buffer.from(await (copy as unknown as Blob).arrayBuffer()) });
+  await expect.poll(() => shape("art.kra~")).toEqual([60, 60]);
+  await expect(p.locator('[data-testid="asset-card"][aria-label^="art.kra~"] .ext-chip')).toHaveText("KRA~ backup");
+  await p.locator('[data-testid="asset-card"][aria-label^="art.kra~"]').click();
+  await p.getByTestId("asset-preview").click();
+  await expect(p.locator('[data-testid="slide-view"] figcaption')).toContainText("automatic backup");
+  await p.keyboard.press("Escape");
   expect(app.consoleErrors).toEqual([]);
 });
 
