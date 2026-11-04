@@ -12,7 +12,7 @@
 - **Fixed:** in the notes editor, the room above and below the Back and Details buttons is the same in every density.
 - **Fixed:** the highlight in a select box's list no longer gets a focus ring.
 - **Added:** text files open in the notes editor as plain text: `.json`, `.csv`, `.tsv`, `.xml`, `.yaml`, `.toml`, `.ini`, `.log`, `.tex` and code files, up to 5 MiB and in UTF-8. Spaces, tabs and line ends are kept, also in `.txt`; the app never adds to or rewrites them by itself.
-- **Added:** the viewer's zoom control works on a note too, with the same keys (+, -, 0 outside the words; Ctrl with them while typing): the words are drawn bigger, the file does not change.
+- **Added:** the viewer's zoom control works on a note too, with the same keys (+, -, 0 outside the words; Ctrl with them while typing, Ctrl and the wheel): its text is drawn bigger, its pictures keep their size and the file does not change.
 - **Fixed:** nothing is yellow against the theme any more: the notes editor's buttons on pictures and tables, what is dragged over a note, and the focus ring on the lock screen and in dialogs use the accent. The editor's table, success and error colours follow the theme too.
 - **Added:** a note's details have a **Links** card, with what it links to (notes, pictures, any file, each with its folder), links that find nothing greyed; **Linked from** is always there on a note, and both show a count. They follow the saved file.
 - **Added:** **Go to link** on the card of a link in a note; the link's text on it goes there too.

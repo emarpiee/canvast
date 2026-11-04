@@ -1107,15 +1107,16 @@ test("a data file opens as plain text: its spaces, tabs and line ends come back 
   await expect.poll(text).toBe(JSON_TEXT);
   // The viewer's zoom control and keys are the note's too: its words are drawn bigger, its file stays.
   const pct = p.locator(".viewer-zoom-pct");
-  const zoomed = () => page(p).evaluate((e) => getComputedStyle(e).zoom);
+  const zoomed = () => page(p).evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+  const base = await zoomed();
   await expect(pct).toHaveText("100%");
   await p.locator('.viewer-zoom [data-zoom="in"]').click();
   await expect(pct).toHaveText("125%");
-  expect(await zoomed()).toBe("1.25");
+  expect(await zoomed()).toBeCloseTo(base * 1.25, 1);
   await page(p).click();
   await p.keyboard.press("Control+-");
   await expect(pct).toHaveText("100%");
-  expect(await zoomed()).toBe("1");
+  expect(await zoomed()).toBeCloseTo(base, 1);
   await expect.poll(text).toBe(JSON_TEXT);
   await back();
   await card(p, hashOf(YAML_TEXT)).dblclick();
@@ -1169,8 +1170,8 @@ test("a picture dragged to another place in a note is one step of undo", async (
   await expect(page(p).locator("h1")).toHaveText("Move");
   const order = () => page(p).evaluate((e) => [...e.children].map((c) => (c.querySelector("img") ? "img" : (c.textContent ?? "").trim())));
   const before = await order();
-  await page(p).locator("figure").click();
-  await p.locator(".se-drag-handle").filter({ visible: true }).first().dragTo(page(p).locator("h1"));
+  await page(p).locator("figure").hover(); // (the editor's handle comes over it)
+  await p.locator(".se-drag-handle-full").dragTo(page(p).locator("h1"));
   await expect.poll(order).not.toEqual(before);
   await p.keyboard.press("Control+z");
   await expect.poll(order).toEqual(before);

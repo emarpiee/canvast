@@ -1433,7 +1433,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     viewer.classList.toggle("is-zoomed", zoom.s !== 1);
     paintVector();
   };
-  /** The zoom control and its keys are one, for a picture and for a note: a note's words are drawn bigger, its file does not change. */
+  /** The zoom control and its keys are one, for a picture and for a note: a note's text is drawn bigger, its pictures keep their size and its file does not change. */
   const paintNoteZoom = (): void => {
     noteBox.style.setProperty("--note-zoom", String(noteZoom));
     zoomPct.textContent = `${Math.round(noteZoom * 100)}%`;

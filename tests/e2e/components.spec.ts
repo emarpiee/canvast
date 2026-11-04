@@ -302,7 +302,7 @@ test("a list column made wider: the rows hold every column, with no empty room a
   await p.getByTestId("assets-import-input").setInputFiles({ name: "b.png", mimeType: "image/png", buffer: blockyFixture() });
   await p.locator('[data-testid="asset-card"]').first().waitFor();
   await p.locator('[data-layout="list"]').click();
-  const grip = p.locator(".assets-list-head [data-resize]").last();
+  const grip = p.locator('.assets-list-head [data-col="used"] [data-resize]');
   const at = (await grip.boundingBox())!;
   await p.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
   await p.mouse.down();

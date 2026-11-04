@@ -1526,7 +1526,8 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .viewer.is-note { --under-viewer-buttons: calc(2 * var(--sp-6) + var(--ctl)); }
 .viewer.is-note .viewer-stage { display: flex; padding-top: var(--under-viewer-buttons); background: var(--paper); } /* (under the viewer's Back and Details buttons, the same room above and below them, in every density) */
 .viewer.is-note .viewer-stage > figure:not(:where(.viewer-note *)), .viewer.is-note .viewer-edge, .viewer.is-note .viewer-ground { display: none; }
-.viewer-note .sun-editor-editable { zoom: var(--note-zoom, 1); }
+/* (the text size and not `zoom` or a transform: the editor measures what it selects unscaled, and its handles and menus would be drawn away from it) */
+.viewer-note .sun-editor-editable { font-size: calc(var(--se-edit-font-size) * var(--note-zoom, 1)); }
 .viewer-progress { position: absolute; left: 0; top: 0; height: 3px; width: 100%; background: var(--hud-accent); transform-origin: left; transform: scaleX(0); z-index: 1; }
 .viewer-progress[hidden] { display: none; }
 .viewer-progress.is-running { animation: show-run var(--ms, 5000ms) linear forwards; }
