@@ -2,10 +2,11 @@
 
 Vector pattern generators for the web, with no dependencies and no link to the app they were made in (canvast). A generator is a pure function: the same settings and the same seed always give the same shapes. It makes plain vector shapes (Bézier paths with a fill and an outline, gradients included), and `toSvg` writes them as a standalone SVG. It runs anywhere JavaScript runs: a browser, a worker, Node, a server. It is small (about 36 KiB minified for all 39 generators), touches no page, and works from `file://`.
 
-* **39 generators** in six families (below), each with settings of its own that it declares as data: ranges, choices, switches and colours, in titled sections. A form can be built from them without knowing the generator (the demo page does).
+* **69 generators**: 38 patterns in six families and 31 guides (`guide: true`) in six more (below), each with settings of its own that it declares as data: ranges, choices, switches and colours, in titled sections. A form can be built from them without knowing the generator (the demo page does).
 * **A seed** for repeatable results (a regular pattern is exact until its *Looseness* is raised, and only then does the seed move things about), and **random settings** (`randomValues`) that stay inside the middle of each range, with colours that go together.
-* **Sizes are fractions of the box**, so a result looks the same at any size and ratio.
-* **Held to what is valid:** `cleanValues` holds every value to its range, choice or colour, so any stored or typed settings are safe to pass in. A result is at most 600 shapes (`MAX_SHAPES`), and several shapes of one colour are one path.
+* **Sizes are fractions of the box**, so a result looks the same at any size and ratio; an exact cell size or line height (Grid, Pixel Grid, Baseline Grid) is in the box's own units.
+* **Guides** are generators for laying out and composing work. They start with no background (`bg` is `""`, and the setting stays), and `randomValues` keeps their own settings, changing only their look.
+* **Held to what is valid:** `cleanValues` holds every value to its range, choice or colour, so any stored or typed settings are safe to pass in. A result is at most 5000 shapes (`MAX_SHAPES`), and several shapes of one colour are one path.
 
 ## Use
 
@@ -58,14 +59,14 @@ Without a bundler: `npm run build:patterns` (in canvast) writes `dist-patterns/`
 
 | Name | What it does |
 | --- | --- |
-| `GENERATORS` | Every generator, in the order a picker shows them: `{ id, label, about, family, sections, run }` |
+| `GENERATORS` | Every generator, in the order a picker shows them: `{ id, label, about, family, sections, run }`, and optionally `guide`, `readout(values, w, h)` |
 | `generate(g, values, seed, w, h)` | The shapes of a pattern `w` wide and `h` high: the background first (unless its colour is none), then what the generator makes. Values are cleaned first |
 | `toSvg(shapes, w, h, options?)` | A standalone SVG: `viewBox`, `xmlns`, paths, gradients. Options: `width`, `height` (SVG lengths), `idPrefix` (for gradient ids, when several SVGs share a page), `fit` (`preserveAspectRatio`) |
 | `pathData(sub)` | The `d` of an SVG path for one sub-path |
 | `defaultValues(g)` | The default of every setting |
-| `randomValues(g, rng)` | Random values for every setting (colours that go together) |
+| `randomValues(g, rng, current?)` | Random values (colours that go together); a `steady` setting keeps its value in `current`, or its default |
 | `cleanValues(g, values)` | Every value held to its setting; anything missing or wrong becomes the default |
-| `sectionsOf(g)`, `settingsOf(g)` | The settings in sections, or as one list |
+| `sectionsOf(g)`, `settingsOf(g)` | The settings in sections, or as one list. A setting with `when: [choice, ...values]` applies only while that choice is one of those values |
 | `generatorById(id)` | One generator, or `undefined` |
 | `makeRng(seed)`, `makeNoise(seed)` | The seeded random source (`rng()`, `.range`, `.int`, `.pick`, `.chance`) and 2D value noise, for your own use |
 | `MAX_SHAPES` | The most shapes one result holds (5000) |
@@ -77,15 +78,22 @@ Without a bundler: `npm run build:patterns` (in canvast) writes `dist-patterns/`
 | Waves | Ripple (`ripple`): One wavy edge; Tides (`tides`): Wavy bands stacked from back to front; Dunes (`dunes`): Soft overlapping hills; Terraces (`terraces`): Stepped layers like stairs; Ridges (`ridges`): Mountain layers with peaks |
 | Blobs | Pebble (`pebble`): One organic blob; Drift (`drift`): Many blobs placed at random; Bubbles (`bubbles`): Circles of different sizes; Shards (`shards`): Scattered polygons and triangles |
 | Soft | Glow (`glow`): Soft clouds of colour; Blend (`blend`): A smooth blend of several colours; Grain (`grain`): Fine speckle, like film or paper; Aurora (`aurora`): Tall, soft curtains of light |
-| Lines | Stripes (`stripes`): Parallel bands, straight or tilted; Chevrons (`chevrons`): Zigzag bands; Dots (`dots`): A grid of dots, regular or loose; Checks (`checks`): A checkerboard, straight or turned; Rings (`rings`): Concentric circles; Rays (`rays`): A sunburst from one point; Spiral (`spiral`): A spiral line; Orbits (`orbits`): Rings with dots travelling on them; Confetti (`confetti`): Small shapes thrown at random; Stars (`stars`): Scattered stars and sparkles; Grid (`grid`): Lines in a lattice with stronger lines now and then; Halftone (`halftone`): Dots that grow along a direction, like print; Strands (`strands`): Many fine wavy lines side by side |
+| Lines | Stripes (`stripes`): Parallel bands, straight or tilted; Chevrons (`chevrons`): Zigzag bands; Dots (`dots`): A grid of dots, regular or loose; Checks (`checks`): A checkerboard, straight or turned; Rings (`rings`): Concentric circles; Rays (`rays`): A sunburst from one point; Spiral (`spiral`): A spiral line; Orbits (`orbits`): Rings with dots travelling on them; Confetti (`confetti`): Small shapes thrown at random; Stars (`stars`): Scattered stars and sparkles; Halftone (`halftone`): Dots that grow along a direction, like print; Strands (`strands`): Many fine wavy lines side by side |
 | Tiles | Tiles (`tiles`): Hexagons, triangles or squares; Bricks (`bricks`): Offset rows of bricks; Scales (`scales`): Overlapping fish scales; Weave (`weave`): Bands woven over and under |
 | Fields | Contours (`contours`): Map-like lines of equal height; Cells (`cells`): Irregular cells that fit together; Cracks (`cracks`): The seams between irregular cells; Facets (`triangulate`): A low-poly field of triangles; Flow (`flow`): Lines that follow a wind; Branches (`branches`): A tree or a bolt of lightning; Maze (`maze`): A random maze of walls; Ribbons (`ribbons`): Flowing swooshes across the sheet; Marble (`marble`): Flowing veins like polished stone |
+| Proportion (guides) | Golden Ratio (`golden-ratio`), Golden Spiral (`golden-spiral`), Fibonacci Grid (`fibonacci-grid`), Root Rectangles (`root-rectangles`), Modular Scale (`modular-scale`) |
+| Composition (guides) | Rule of Thirds (`rule-of-thirds`), Dynamic Symmetry (`dynamic-symmetry`), Harmonic Armature (`harmonic-armature`), Rabatment (`rabatment`), Diagonal Grid (`diagonal-grid`), Center and Safe Marks (`safe-marks`) |
+| Layout (guides) | Grid (`grid`), Column Grid (`column-grid`), Modular Grid (`modular-grid`), Baseline Grid (`baseline-grid`), Van de Graaf Canon (`van-de-graaf`), Bleed and Crop Marks (`crop-marks`) |
+| Perspective (guides) | Isometric Grid (`isometric-grid`), Dimetric Grid (`dimetric-grid`), Triangle Grid (`triangle-grid`), Perspective (`perspective`), Fisheye Grid (`fisheye-grid`) |
+| Geometry (guides) | Hex Grid (`hex-grid`), Polar Grid (`polar-grid`), Radial Symmetry (`radial-symmetry`), Logo Construction Circles (`logo-circles`), Sacred Circles (`sacred-circles`) |
+| Art study (guides) | Pixel Grid (`pixel-grid`), Comic Panels (`comic-panels`), Figure Proportion (`figure-proportion`), Face Proportion (`face-proportion`) |
 
 ## Files
 
 | File | What it is |
 | --- | --- |
 | `index.ts` | The API above: the registry, `generate`, the value helpers |
+| `guides.ts`, `guide-kit.ts` | The guides, and what they share: colours, look and a pen |
 | `types.ts` | `Generator`, `Setting`, `Section`, `GenShape`, `Values` |
 | `core.ts` | The few shared shapes (sub-path, paint, node helpers, colour parser), written out so nothing is imported from outside this folder |
 | `rng.ts`, `geom.ts`, `kit.ts` | Seeded random and noise, colour helpers; shape helpers (rectangle, ellipse, smooth curve, polygon); short builders for the settings |

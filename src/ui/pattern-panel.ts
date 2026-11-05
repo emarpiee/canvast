@@ -8,13 +8,16 @@ import { ICONS } from "./icons";
 import { liveNumber } from "./live";
 import { scrubNumbers } from "../colour-picker/scrub";
 import { panelHtml } from "./panel";
+import { tabFromKey, tabHtml } from "./tabs";
 
 /**
  * The Pattern panel (ADR 0162): pick a generator (a grid of small pictures), change the settings it declares, make it on the picked sheet or
  * shape (or a new sheet). The panel is built from the generator's settings, so every generator has its own controls. Once a result is made,
- * each change replaces it (one undo step for the whole session) until Done. Picking a pattern made earlier loads its settings, and changes
+ * each change replaces it (a change after a pause is an undo step of its own) until Done. Two tabs, Patterns and Guides, show the generators of their kind. Picking a pattern made earlier loads its settings, and changes
  * replace it where it is. A snowflake on a setting keeps it when Randomize runs.
  */
+export type PatternTab = "patterns" | "guides";
+
 export interface PatternActions {
   /** Make the result on the target (replacing the session's last one). False when it could not be made. */
   make(g: Generator, values: Values, seed: number): boolean;
@@ -22,6 +25,9 @@ export interface PatternActions {
   live(): boolean;
   /** The size of what the result goes on, once that is known. */
   box(): { w: number; h: number } | null;
+  /** The tab the panel was last on, and a new one to remember. */
+  tab(): PatternTab;
+  setTab(t: PatternTab): void;
   /** Undo, or redo. */
   history(forward: boolean): void;
   /** The picked pattern made by a generator, with its settings. */
@@ -56,9 +62,9 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
   panel.innerHTML = panelHtml({
     title: "Pattern",
     tools: `<button type="button" class="layer-btn" data-pg-reset aria-label="Reset the settings" title="Reset the settings of this generator">${ICONS.listRestart}</button>`,
-    sub: `<div class="pg-pick">
+    sub: `<div class="styles-tabs" role="tablist" aria-label="Kinds of pattern" data-pg-tabs></div><div class="pg-pick">
       <button type="button" class="pg-current" data-pg-pick aria-expanded="false" aria-label="Generator"><span class="pg-thumb" data-pg-cur></span><span class="pg-name" data-pg-name></span>${ICONS.chevronDown}</button>
-      <div class="pg-grid" data-pg-grid hidden>${families.map((f) => `<h5>${f}</h5><div class="pg-tiles">${GENERATORS.filter((g) => g.family === f).map((g) => `<button type="button" class="pg-tile" data-gen="${g.id}" aria-label="${esc(g.label)}: ${esc(g.about)}" title="${esc(g.about)}"><span class="pg-thumb"></span><span>${esc(g.label)}</span></button>`).join("")}</div>`).join("")}</div>
+      <div class="pg-grid" data-pg-grid hidden>${families.map((f) => `<div data-pg-family="${GENERATORS.find((g) => g.family === f)?.guide ? "guides" : "patterns"}"><h5>${f}</h5><div class="pg-tiles">${GENERATORS.filter((g) => g.family === f).map((g) => `<button type="button" class="pg-tile" data-gen="${g.id}" aria-label="${esc(g.label)}: ${esc(g.about)}" title="${esc(g.about)}"><span class="pg-thumb"></span><span>${esc(g.label)}</span></button>`).join("")}</div></div>`).join("")}</div>
       <p class="adj-note" data-pg-about></p>
       <p class="adj-note">On: <b data-pg-target></b></p>
       <p class="adj-note" data-pg-readout hidden></p>
@@ -74,7 +80,11 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
   const q = <T extends HTMLElement>(s: string): T => panel.querySelector<T>(s)!;
   const body = q("[data-pg-body]"), grid = q("[data-pg-grid]"), pick = q("[data-pg-pick]"), seedBox = q<HTMLInputElement>("[data-pg-seed]");
 
-  let gen: Generator = GENERATORS[0]!;
+  /** The tabs: which of them a generator is on, and the last generator of each. */
+  const tabOf = (g: Generator): PatternTab => (g.guide ? "guides" : "patterns");
+  const lastOf: Record<PatternTab, Generator> = { patterns: GENERATORS.find((g) => !g.guide)!, guides: generatorById("grid")! };
+  let gen: Generator = lastOf[actions.tab()];
+  let leftOf: string | null = null; // (a pattern still selected when its tab was left: it does not call its tab back)
   const kept = new Map<string, Values>();
   const frozen = new Map<string, Set<string>>(); // the settings kept when Randomize runs, for each generator
   let values: Values = defaultValues(gen);
@@ -142,6 +152,11 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
 
   const build = (): void => {
     for (const t of grid.querySelectorAll("[data-gen]")) t.setAttribute("aria-pressed", String(t.getAttribute("data-gen") === gen.id));
+    const here = tabOf(gen);
+    lastOf[here] = gen;
+    q("[data-pg-tabs]").innerHTML = tabHtml("patterns", "Patterns", here === "patterns", "Patterns") + tabHtml("guides", "Guides", here === "guides", "Guides");
+    for (const f of grid.querySelectorAll<HTMLElement>("[data-pg-family]")) f.hidden = f.dataset["pgFamily"] !== here;
+    if (here !== actions.tab()) actions.setTab(here);
     q("[data-pg-name]").textContent = gen.label;
     q("[data-pg-cur]").innerHTML = thumbs.get(gen.id) ?? "";
     q("[data-pg-about]").textContent = gen.about;
@@ -174,7 +189,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
       });
       else {
         const sw = r.querySelector<HTMLElement>("[data-swatch]")!, code = r.querySelector("code")!;
-        let last = (values[s.k] as string) || s.def;
+        let last = (values[s.k] as string) || s.shown || s.def;
         const paint = (): void => {
           const c = values[s.k] as string;
           sw.style.background = c || last;
@@ -188,6 +203,18 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
         r.querySelector("[data-eye]")?.addEventListener("click", () => { set(s.k, values[s.k] === "" ? last : ""); paint(); });
       }
     }
+  };
+
+  /** The other tab: its last generator comes in, and what is on the canvas stays as it is (the next Generate is a new result). */
+  const goToTab = (t: PatternTab): void => {
+    if (t === tabOf(gen)) return;
+    leftOf = actions.found()?.gid ?? null;
+    actions.end();
+    started = false;
+    gen = lastOf[t];
+    values = kept.get(gen.id) ?? defaultValues(gen);
+    build();
+    q(`[data-tab="${t}"]`).focus();
   };
 
   const choose = (id: string): void => {
@@ -208,7 +235,9 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     }
     if (panel.hidden) return;
     const f = actions.found();
+    if (f?.gid !== leftOf) leftOf = null;
     if (!f) loaded = null;
+    else if (leftOf) { /* (left for the other tab) */ }
     // A pattern made earlier is picked, or undo or redo brought another version of it: its settings come into the panel, and changes replace it.
     else if (generatorById(f.id) && (f.gid !== loaded || (!queued && (f.id !== gen.id || f.seed !== seed || JSON.stringify(cleanValues(gen, f.v)) !== JSON.stringify(cleanValues(gen, values)))))) {
       loaded = f.gid;
@@ -243,7 +272,8 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
   panel.addEventListener("click", (e) => {
     const t = (e.target as HTMLElement).closest<HTMLElement>("button");
     if (!t) return;
-    if (t.hasAttribute("data-close")) { editor.patternOpen = false; editor.changed(); }
+    if (t.hasAttribute("data-tab")) goToTab(t.dataset["tab"] as PatternTab);
+    else if (t.hasAttribute("data-close")) { editor.patternOpen = false; editor.changed(); }
     else if (t.hasAttribute("data-pg-pick")) { grid.hidden = !grid.hidden; pick.setAttribute("aria-expanded", String(!grid.hidden)); }
     else if (t.hasAttribute("data-gen")) { grid.hidden = true; pick.setAttribute("aria-expanded", "false"); choose(t.dataset["gen"]!); }
     else if (t.hasAttribute("data-pg-make")) run();
@@ -272,6 +302,12 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     else if (t.hasAttribute("data-pg-reset")) { values = defaultValues(gen); kept.set(gen.id, values); build(); again(); }
   });
   panel.addEventListener("keydown", (e) => {
+    const nextTab = tabFromKey(e, ["patterns", "guides"]);
+    if (nextTab) {
+      e.preventDefault();
+      goToTab(nextTab as PatternTab);
+      return;
+    }
     if (!(e.target as HTMLElement).matches("input, select, textarea")) return;
     e.stopPropagation();
     // (undo here is the pattern's, not the field's: a number field would keep it to itself)

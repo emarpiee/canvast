@@ -1,3 +1,4 @@
+import { tabFromKey, tabHtml } from "./tabs";
 import { copyPlainText } from "../app/system-clipboard";
 import { cleanName, freeNameIn } from "../doc/file-names";
 import type { Adjust } from "../doc/adjust";
@@ -170,7 +171,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     const tabs = kindsShown
       .map((t) => {
         const n = styles.of(t.id).filter((s) => !q || s.name.toLowerCase().includes(q)).length;
-        return `<button type="button" role="tab" class="styles-tab" data-tab="${t.id}" aria-selected="${t.id === k.id}" tabindex="${t.id === k.id ? 0 : -1}" aria-label="${esc(t.plural)} (${n})" title="${esc(t.plural)}">${TAB_ICON[t.id] ?? ""}<span class="styles-tab-n">${n}</span></button>`;
+        return tabHtml(t.id, `${t.plural} (${n})`, t.id === k.id, `${TAB_ICON[t.id] ?? ""}<span class="styles-tab-n">${n}</span>`);
       })
       .join("");
     const seg = (v: "fill" | "stroke" | "both", text: string, tip: string): string => `<button type="button" role="radio" data-target="${v}" aria-checked="${target === v}" title="${tip}">${text}</button>`;
@@ -595,11 +596,9 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     void setPalette(owner, list);
   });
   panel.addEventListener("keydown", (e) => {
-    const tb = (e.target as HTMLElement).closest<HTMLElement>("[data-tab]");
-    if (tb && (e.key === "ArrowRight" || e.key === "ArrowLeft" || e.key === "Home" || e.key === "End")) {
-      const ids = kindsShown.map((x) => x.id);
-      const at = ids.indexOf(tb.dataset["tab"]!);
-      tab = ids[e.key === "Home" ? 0 : e.key === "End" ? ids.length - 1 : (at + (e.key === "ArrowRight" ? 1 : -1) + ids.length) % ids.length]!;
+    const nextTab = tabFromKey(e, kindsShown.map((x) => x.id));
+    if (nextTab) {
+      tab = nextTab;
       e.preventDefault();
       render();
       panel.querySelector<HTMLElement>(`[data-tab="${tab}"]`)?.focus();

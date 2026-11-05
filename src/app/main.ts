@@ -1260,6 +1260,8 @@ async function start(): Promise<void> {
   const patternPanel = mountPatternPanel(side, editor, {
     make: (g, values, seed) => (makePatternEach(doc, editor, view, g, values, seed) === null ? makePattern(doc, editor, view, patternSession, g, values, seed) : false),
     box: () => patternBox(doc, editor, patternSession),
+    tab: () => settings.get("ui.patternTab"),
+    setTab: (t) => settings.set("ui.patternTab", t),
     history: (forward) => (forward ? redo : undo)(doc, editor),
     live: () => (patternSession.top !== null && doc.lastTransaction === patternSession.top) || foundPattern(doc, editor) !== null || sessionPattern(doc, editor, patternSession) !== null,
     found: () => { const f = foundPattern(doc, editor)?.info ?? sessionPattern(doc, editor, patternSession); return f ? { id: f.id, gid: f.gid, seed: f.seed, v: f.v } : null; },

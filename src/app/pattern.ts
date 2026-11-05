@@ -203,7 +203,7 @@ export function makePattern(doc: DocumentStore, editor: EditorState, view: ViewS
     const params = drawnParams("rect", 0, 0, s.w, s.h, 6, 5);
     const sheet: PathObject = {
       id: newObjectId(), kind: "path", ...(s.frame ? { frame: s.frame } : {}), anchor: s.anchor, unit: s.unit, z: z0 + 1, opacity: 1, attachmentTargetId: null,
-      sub: drawnSubs("rect", 0, 0, s.w, s.h, 6, 5), fill: "#ffffff", stroke: null, width: Math.max(Math.min(s.w, s.h) / 100, Number.MIN_VALUE), shape: "rect",
+      sub: drawnSubs("rect", 0, 0, s.w, s.h, 6, 5), fill: g.guide ? null : "#ffffff", stroke: null, width: Math.max(Math.min(s.w, s.h) / 100, Number.MIN_VALUE), shape: "rect",
       ...(params ? { params } : {}), container: { clip: true }, name: nextSheetName(doc.all()),
     };
     host = homeObject(normalizeUnit(sheet), doc.space) as PathObject;

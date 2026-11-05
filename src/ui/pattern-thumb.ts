@@ -16,4 +16,4 @@ export const styleThumbSvg = (id: string, v: Values, seed: number): string => {
   }
 };
 
-export const thumbSvg = (g: Generator): string => toSvg(generate(g, defaultValues(g), 7, THUMB_W, THUMB_H), THUMB_W, THUMB_H, { idPrefix: `pg-${g.id}-`, fit: "xMidYMid slice" });
+export const thumbSvg = (g: Generator): string => toSvg(generate(g, { ...defaultValues(g), ...(g.guide ? { weight: 14 } : {}) }, 7, THUMB_W, THUMB_H), THUMB_W, THUMB_H, { idPrefix: `pg-${g.id}-`, fit: "xMidYMid slice" });

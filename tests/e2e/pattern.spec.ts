@@ -8,6 +8,7 @@ import type { App } from "./harness";
 type Obj = { id: string; kind: string; name?: string; parent?: string; groups?: string[]; container?: { clip: boolean; mask?: boolean }; fill: string | null; sub?: unknown[] };
 const objs = async (app: App): Promise<Obj[]> => (await app.page.evaluate(() => window.__canvastDebug.objects())) as unknown as Obj[];
 const choose = async (app: App, id: string) => {
+  if (id === "grid") await app.page.locator('[data-tab="guides"]').click();
   await app.page.locator("[data-pg-pick]").click();
   await app.page.locator(`[data-gen="${id}"]`).click();
 };
@@ -417,5 +418,36 @@ test("Grid pattern: Rows and Cell size show for their own choice, and it says wh
   await expect(p.locator('[data-k="cols"]')).toHaveCount(0);
   await setNumber(app, "size", "50");
   await expect(p.locator("[data-pg-readout]")).toHaveText(/cell 50 × 50$/);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Guides are a tab of their own: only its patterns show, each tab keeps its last, the tab is remembered, and a guide starts with no background on a sheet with no fill", async ({ app }) => {
+  const p = app.page;
+  await p.click("[data-pattern-panel]");
+  await p.locator("[data-pg-pick]").click();
+  await expect(p.locator('[data-gen="tides"]')).toBeVisible();
+  await expect(p.locator('[data-gen="golden-ratio"]')).toBeHidden();
+  await p.locator('[data-gen="tides"]').click();
+  await p.locator('[data-tab="guides"]').click();
+  await expect(p.locator('[data-tab="guides"]')).toHaveAttribute("aria-selected", "true");
+  await expect(p.locator("[data-pg-name]")).toHaveText("Grid");
+  await p.locator("[data-pg-pick]").click();
+  await expect(p.locator('[data-gen="tides"]')).toBeHidden();
+  await p.locator('[data-gen="golden-ratio"]').click();
+  await make(app);
+  const all = await objs(app);
+  expect(sheets(all)[0]!.fill).toBeNull();
+  expect(all.some((o) => o.name === "Background")).toBe(false);
+  await p.keyboard.press("ArrowLeft"); // (from the focus on the page: nothing changes)
+  await p.locator('[data-tab="guides"]').focus();
+  await p.keyboard.press("ArrowLeft"); // the keys of a tab strip
+  await expect(p.locator("[data-pg-name]")).toHaveText("Tides");
+  expect((await objs(app)).length, "what is on the canvas stays").toBe(all.length);
+  await p.locator('[data-tab="guides"]').click();
+  await expect(p.locator("[data-pg-name]")).toHaveText("Golden Ratio");
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await p.click("[data-pattern-panel]");
+  await expect(p.locator('[data-tab="guides"]')).toHaveAttribute("aria-selected", "true");
   expect(app.consoleErrors).toEqual([]);
 });

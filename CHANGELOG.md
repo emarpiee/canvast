@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.54.10 — Guides (2026-11-05)
+
+- **Added:** the Pattern panel has two tabs, **Patterns** and **Guides**. Each keeps its last choice, and the panel remembers the tab.
+- **Added:** 30 new guides: Golden Ratio, Golden Spiral, Fibonacci Grid, Root Rectangles, Modular Scale; Rule of Thirds, Dynamic Symmetry, Harmonic Armature, Rabatment, Diagonal Grid, Center and Safe Marks; Column Grid, Modular Grid, Baseline Grid, Van de Graaf Canon, Bleed and Crop Marks; Isometric Grid, Dimetric Grid, Triangle Grid, Perspective, Fisheye Grid; Hex Grid, Polar Grid, Radial Symmetry, Logo Construction Circles, Sacred Circles; Pixel Grid, Comic Panels, Figure Proportion, Face Proportion.
+- **Changed:** **Grid** moves to Guides. A new guide has no background, with the setting still there, on a sheet with no fill; Randomize changes its look and keeps what it is.
+
 ## 0.54.9 — The Grid pattern is predictable (2026-11-05)
 
 - **Changed:** in the **Grid** pattern, changing **Across** or the cells leaves **Line width** and **Dash length** as they are.

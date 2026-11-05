@@ -3070,7 +3070,6 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
 .pg-grid { max-height: 18rem; overflow-y: auto; padding: var(--s-4); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 .pg-grid[hidden] { display: none; }
 .pg-grid h5 { margin: var(--s-4) 0 var(--s-2); font: var(--weight-semibold) var(--text-xs) var(--font-ui); color: var(--hud-muted); text-transform: uppercase; letter-spacing: 0.06em; }
-.pg-grid h5:first-child { margin-top: 0; }
 .pg-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-4); }
 .pg-tile { display: grid; gap: var(--s-1); padding: var(--s-1); color: var(--hud-fg); background: none; border: 1px solid transparent; border-radius: var(--r-sm); cursor: pointer; font: var(--font-meta); text-align: center; }
 .pg-tile:hover { background: var(--hud-hover); }

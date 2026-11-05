@@ -22,7 +22,7 @@ export type Setting = Base &
     | { readonly t: "choice"; readonly opts: readonly (readonly [string, string])[]; readonly def: string }
     | { readonly t: "toggle"; readonly def: boolean }
     /** A colour "#rrggbb"; with `hide`, "" means none (the eye of the panel). */
-    | { readonly t: "colour"; readonly def: string; readonly hide?: true }
+    | { readonly t: "colour"; readonly def: string; readonly hide?: true; /** The colour it takes when a hidden default is shown. */ readonly shown?: string }
   );
 
 export interface Section {
@@ -45,7 +45,9 @@ export interface Generator {
   readonly label: string;
   /** One line shown under the name in the picker. */
   readonly about: string;
-  readonly family: "Waves" | "Blobs" | "Soft" | "Lines" | "Tiles" | "Fields";
+  readonly family: "Waves" | "Blobs" | "Soft" | "Lines" | "Tiles" | "Fields" | "Proportion" | "Composition" | "Layout" | "Perspective" | "Geometry" | "Art study";
+  /** For laying out and composing work: it starts with no background, to sit over what is under it. */
+  readonly guide?: true;
   /** The settings, in sections; the "Colour" section gets the Background colour in front. */
   readonly sections: readonly Section[];
   readonly run: (v: Values, rng: Rng, w: number, h: number) => GenShape[];

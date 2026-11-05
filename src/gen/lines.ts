@@ -1,6 +1,6 @@
 import { ellipse, merged, poly, regular, rotated, solid, line, star as starPts, curve } from "./geom";
 import type { P } from "./geom";
-import { C, Ch, LOOSE, R, T, reader, steady, when } from "./kit";
+import { C, Ch, LOOSE, R, T, reader } from "./kit";
 import type { Rng } from "./rng";
 import type { Generator, GenShape, Values } from "./types";
 import { mix } from "./rng";
@@ -198,67 +198,4 @@ export const stars: Generator = {
   },
 };
 
-/** Where a grid's lines go: the same reckoning for drawing them and for saying what they come to. */
-function gridLayout(v: Values, w: number, h: number): { m: number; cols: number; rows: number; cellX: number; cellY: number } {
-  const { n, s } = reader(v);
-  const m = (n("margin") / 100) * Math.min(w, h), iw = w - 2 * m, ih = h - 2 * m, kind = s("cells");
-  if (kind === "size") {
-    const size = Math.max(n("size"), Math.max(iw, ih) / 1000); // (a tiny cell on a huge sheet would be more lines than can be held)
-    return { m, cols: Math.max(1, Math.floor(iw / size)), rows: Math.max(1, Math.floor(ih / size)), cellX: size, cellY: size };
-  }
-  const cols = n("cols"), cellX = iw / cols;
-  // Square: the whole rows nearest to square cells, so that the last line is on the edge.
-  const rows = kind === "equal" ? cols : kind === "rows" ? n("rows") : Math.max(1, Math.round(ih / cellX));
-  return { m, cols, rows, cellX, cellY: ih / rows };
-}
-const SOME_CELLS = ["square", "equal", "rows"] as const;
-export const grid: Generator = {
-  id: "grid", label: "Grid", family: "Lines", about: "Lines in a lattice with stronger lines now and then",
-  sections: [
-    { title: "Colour", items: [C("line", "Lines", "#5f7a99"), C("major", "Strong lines", "#ffffff", true)] },
-    { title: "Grid", items: [steady(Ch("cells", "Cells", [["square", "Square"], ["equal", "Equal"], ["rows", "Rows"], ["size", "Size"]], "square")), steady(when("cells", SOME_CELLS, R("cols", "Across", 2, 60, 16))), steady(when("cells", ["rows"], R("rows", "Rows", 2, 60, 16))), steady(when("cells", ["size"], R("size", "Cell size", 4, 200, 32))), R("weight", "Line width", 1, 20, 3), R("every", "Strong every", 0, 12, 4), steady(R("strongAt", "Strong start", 0, 12, 0)), R("strong", "Strong width", 100, 500, 180, 10), steady(T("rowsToo", "Rows too", true)), steady(LOOSE)] },
-    { title: "Layout", items: [steady(R("margin", "Margin", 0, 45, 0)), steady(T("frame", "Frame", false)), steady(R("shiftX", "Shift across", 0, 100, 0)), steady(R("shiftY", "Shift down", 0, 100, 0)), steady(R("dash", "Dash length", 0, 100, 0)), steady(R("angle", "Angle", 0, 90, 0))] },
-  ],
-  readout(v, w, h) {
-    const { cols, rows, cellX, cellY } = gridLayout(v, w, h);
-    return `${cols} across, ${rows} down · cell ${Math.round(cellX)} × ${Math.round(cellY)}`;
-  },
-  run(v, rng, w, h) {
-    const { n, b, c } = reader(v);
-    const { m, cellX: cell, cellY } = gridLayout(v, w, h), a = rad(n("angle"));
-    const { cx, cy, d } = geo(w, h), extra = a && !m ? d : 0; // (turned with no margin: past the box on all sides, for it to stay covered)
-    const off = (): number => (rng() - 0.5) * cell * 0.6 * (n("jitter") / 100); // (looseness: each line off its place)
-    // Line width and dash length go by the box, not the cell: changing the count leaves them as they are. (A 16th of the width: what a default grid's cell is.)
-    const unit = w / 16, minor: SubPath[] = [], major: SubPath[] = [], wd = (n("weight") / 100) * unit * 0.5;
-    const isStrong = (i: number): boolean => n("every") > 0 && !!c("major") && (i - n("strongAt")) % n("every") === 0;
-    const widthOf = (i: number): number => (isStrong(i) ? (wd * n("strong")) / 100 : wd);
-    const turned = (p: P[]): P[] => (a ? rotated(p, cx, cy, a) : p);
-    const add = (i: number, x0: number, y0: number, x1: number, y1: number): void => {
-      const to = isStrong(i) ? major : minor;
-      const len = Math.hypot(x1 - x0, y1 - y0), step = Math.max(2 * Math.max((n("dash") / 100) * unit, wd * 1.5), len / 400); // (a dash is never shorter than it can be seen; its gap is as long)
-      if (!n("dash")) return void to.push(poly(turned([[x0, y0], [x1, y1]]), false));
-      for (let t = 0; t < len; t += step) {
-        const e = Math.min(len, t + step / 2);
-        to.push(poly(turned([[x0 + ((x1 - x0) * t) / len, y0 + ((y1 - y0) * t) / len], [x0 + ((x1 - x0) * e) / len, y0 + ((y1 - y0) * e) / len]]), false));
-      }
-    };
-    /** Each line's place along an axis of `size`, `step` apart, from the margin, shifted by a share of a step. A line on the box's edge sits just inside it (the sheet would cut it in half). */
-    const lines = (step: number, size: number, shift: number, draw: (i: number, at: number) => void): void => {
-      for (let i = -Math.ceil(extra / step) - (shift ? 1 : 0); m + i * step + shift * step <= size - m + extra + 1e-6; i++) {
-        const at = m + i * step + shift * step;
-        if (at < m - extra - 1e-6) continue;
-        const inset = m || a ? 0 : at <= 1e-6 ? widthOf(i) / 2 : at >= size - 1e-6 ? -widthOf(i) / 2 : 0;
-        draw(i, at + inset + off());
-      }
-    };
-    lines(cell, w, n("shiftX") / 100, (i, x) => add(i, x, m - extra, x, h - m + extra));
-    if (b("rowsToo")) lines(cellY, h, n("shiftY") / 100, (j, y) => add(j, m - extra, y, w - m + extra, y));
-    if (b("frame")) {
-      const e = m + (m || a ? 0 : wd / 2);
-      minor.push(poly(turned([[e, e], [w - e, e], [w - e, h - e], [e, h - e]])));
-    }
-    return [line(minor, c("line")!, wd, "Lines"), ...(major.length ? [line(major, c("major")!, (wd * n("strong")) / 100, "Strong lines")] : [])];
-  },
-};
-
-export const LINES = [stripes, chevrons, dots, checks, rings, rays, spiral, orbits, confetti, stars, grid];
+export const LINES = [stripes, chevrons, dots, checks, rings, rays, spiral, orbits, confetti, stars];

@@ -1,6 +1,7 @@
 import { BLOBS } from "./blobs";
 import { EXTRA } from "./extra";
 import { FIELDS } from "./fields";
+import { GUIDES } from "./guides";
 import { LINES } from "./lines";
 import { SOFT } from "./soft";
 import { TILES } from "./tiles";
@@ -21,16 +22,18 @@ export { pathData, toSvg } from "./svg";
 export type { SvgOptions } from "./svg";
 
 /** Every pattern generator, in the order the picker shows them. */
-export const GENERATORS: readonly Generator[] = [...WAVES, ...BLOBS, ...SOFT, ...LINES, ...TILES, ...FIELDS, ...EXTRA];
+export const GENERATORS: readonly Generator[] = [...WAVES, ...BLOBS, ...SOFT, ...LINES, ...TILES, ...FIELDS, ...EXTRA, ...GUIDES];
 
 /** The most shapes one pattern is made of (one path may hold many sub-paths). */
 export const MAX_SHAPES = 5000;
 
 const BG = C("bg", "Background", "#0b1f33", true);
+/** A guide has none at first, to sit over what is under it; Randomize leaves that as it is. */
+const GUIDE_BG: Setting = { ...BG, t: "colour", def: "", shown: "#ffffff", steady: true };
 
 /** The settings of a generator in sections, the background colour in front of its colours. */
 export function sectionsOf(g: Generator): readonly Section[] {
-  return g.sections.map((s) => (s.title === "Colour" ? { ...s, items: [BG, ...s.items] } : s));
+  return g.sections.map((s) => (s.title === "Colour" ? { ...s, items: [g.guide ? GUIDE_BG : BG, ...s.items] } : s));
 }
 
 export const settingsOf = (g: Generator): Setting[] => sectionsOf(g).flatMap((s) => [...s.items]);

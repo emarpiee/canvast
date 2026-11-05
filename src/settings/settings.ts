@@ -74,6 +74,7 @@ export const SETTINGS = {
   "library.sortFiles": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "library.hiddenNamesOff": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "storage.autoIndex": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "ui.patternTab": { scope: "device", default: "patterns", validate: oneOf("patterns", "guides"), effect: "immediate" } as Def<"patterns" | "guides">,
   "ui.view": { scope: "device", default: "canvas", validate: oneOf("canvas", "assets"), effect: "restart" } as Def<"canvas" | "assets">,
   "pen.color": { scope: "device", default: "#1f2329", validate: colour, effect: "immediate" } as Def<string>,
   // The colour picker (ADR 0098): which colour model and layout it opens in, and the colours picked lately.

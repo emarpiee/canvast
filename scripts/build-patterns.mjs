@@ -56,13 +56,14 @@ const form = () => {
   for (const sec of P.sectionsOf(gen)) {
     const h = document.createElement("h2"); h.textContent = sec.title; settings.append(h);
     for (const s of sec.items) {
+      if (s.when && !s.when.slice(1).includes(values[s.when[0]])) continue;
       const row = document.createElement("label"); row.className = "row"; row.dataset.key = s.k;
       const name = document.createElement("span"); name.textContent = s.label; row.append(name);
       let input, out = document.createElement("span");
       if (s.t === "range") { input = Object.assign(document.createElement("input"), { type: "range", min: s.min, max: s.max, step: s.step, value: values[s.k] }); out.textContent = values[s.k]; input.oninput = () => { values[s.k] = Number(input.value); out.textContent = input.value; draw(); }; }
       else if (s.t === "toggle") { input = Object.assign(document.createElement("input"), { type: "checkbox", checked: values[s.k] }); input.onchange = () => { values[s.k] = input.checked; draw(); }; }
-      else if (s.t === "choice") { input = document.createElement("select"); for (const [v, l] of s.opts) input.append(new Option(l, v)); input.value = values[s.k]; input.onchange = () => { values[s.k] = input.value; draw(); }; }
-      else { input = Object.assign(document.createElement("input"), { type: "color", value: values[s.k] || s.def }); input.oninput = () => { values[s.k] = input.value; draw(); }; }
+      else if (s.t === "choice") { input = document.createElement("select"); for (const [v, l] of s.opts) input.append(new Option(l, v)); input.value = values[s.k]; input.onchange = () => { values[s.k] = input.value; if (P.sectionsOf(gen).some((x) => x.items.some((i) => i.when && i.when[0] === s.k))) form(); draw(); }; }
+      else { input = Object.assign(document.createElement("input"), { type: "color", value: values[s.k] || s.shown || s.def }); input.oninput = () => { values[s.k] = input.value; draw(); }; }
       row.append(input, out); settings.append(row);
     }
   }
@@ -75,7 +76,7 @@ for (const g of P.GENERATORS) {
 }
 seedBox.onchange = () => { seed = Math.max(1, Math.min(999999, Math.round(Number(seedBox.value)) || 1)); draw(); };
 document.getElementById("newseed").onclick = () => { seed = 1 + Math.floor(Math.random() * 999999); seedBox.value = seed; draw(); };
-document.getElementById("random").onclick = () => { seed = 1 + Math.floor(Math.random() * 999999); seedBox.value = seed; values = P.randomValues(gen, P.makeRng(seed)); form(); draw(); };
+document.getElementById("random").onclick = () => { seed = 1 + Math.floor(Math.random() * 999999); seedBox.value = seed; values = P.randomValues(gen, P.makeRng(seed), values); form(); draw(); };
 choose(gen);
 </script></html>`;
 await writeFile(resolve(out, "demo.html"), demo);
