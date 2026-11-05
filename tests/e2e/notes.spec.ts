@@ -1273,9 +1273,8 @@ test("a code block with a language is coloured over its words, and the note is a
   expect(await page(p).locator("pre span").count(), "nothing added to the note").toBe(0);
   // Typing changes them.
   await page(p).locator("pre").click();
-  await p.keyboard.press("Control+End");
-  await p.keyboard.press("Enter");
-  await p.keyboard.type("import os");
+  await p.keyboard.press("End");
+  await p.keyboard.type(" import os");
   await expect.poll(() => seen("keyword")).toContain("import");
   expect(app.consoleErrors).toEqual([]);
 });

@@ -106,7 +106,7 @@ test("code in a note: every colour keeps 4.5:1 on a code block, and inline code 
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles({ name: "code.md", mimeType: "text/markdown", buffer: Buffer.from("```python\ndef f(): pass\n```\n\nSome `code` here\n") });
   await p.locator('[data-testid="asset-card"][title="code.md"]').dblclick();
-  await expect(p.locator(".sun-editor-editable pre")).toBeVisible();
+  await expect(p.locator(".sun-editor-editable pre").first()).toBeVisible();
   for (const theme of ["light", "dark"] as const) {
     await p.evaluate((t) => window.__canvastDebug.setSetting("ui.theme", t), theme);
     await p.waitForTimeout(100);
