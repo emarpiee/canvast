@@ -33,7 +33,7 @@ export function toolHint(editor: EditorState, doc: DocumentStore): string | null
         ? "Click the first node to close the shape · Enter or double-click to finish · Backspace takes back a node · Esc ends it open"
         : "Click to place a corner · drag to pull out a curve · click the first node to close the shape";
     case "node":
-      return paths.length === 1 ? "Drag a node or a handle · click a line to add a node · Alt-click a node: smooth or corner · Delete removes it · Enter or Esc to finish" : "Click a shape to edit its nodes";
+      return paths.length === 1 ? "Drag a node or a handle · click a line to add a node · double-click: a whole closed path · Alt-click a node: smooth or corner · Delete removes it · Enter or Esc to finish" : "Click a shape to edit its nodes";
     case "select": {
       if (editor.cropId) return "Crop: drag a side or a corner of the picture; drag outward to bring back what was cut · Enter or Esc finishes";
       if (editor.attachMode) return "Click the object to attach the selected ones to · they will follow it when it moves · Esc cancels";

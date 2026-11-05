@@ -11,6 +11,7 @@ import type { CanvasObject, ImageObject, ObjectId, PathObject, StrokeObject, Tex
 import { editSubs, homeObject, newObjectId, pathSubs, strokePoints } from "../doc/model";
 import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
+import { holesOf } from "../doc/path-pieces";
 import { moveNodes, edgeBetween, deleteVertex, cellAt } from "../doc/network";
 import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
 import { nodesIn, roundCorners } from "../doc/rounding";
@@ -1237,6 +1238,7 @@ export function attachTools(
     if (gs.what === "seg") {
       commitSub(o, splitSegment(gs.base, gs.s, gs.k, gs.t), "Add node");
       editor.nodeSel = { s: gs.s, k: gs.k + 1 };
+      lastNodeAdd = performance.now();
     } else if (gs.what === "point" && altHeld) commitSub(o, toggleSmooth(gs.base, gs.s, gs.k), "Change node");
   };
   /**
@@ -2465,6 +2467,8 @@ export function attachTools(
     editor.changed();
   };
 
+  let lastNodeAdd = -Infinity;
+  const NODE_ADD_DOUBLE_MS = 500;
   const onDoubleClick = (e: MouseEvent): void => {
     if (performance.now() - editor.fingerListAt < 1500) return; // (the lift of a long press is not the second click of a double-click)
     if (effectiveTool() === "path" && editor.pathDraft) {
@@ -2472,6 +2476,26 @@ export function attachTools(
       const d = editor.pathDraft;
       if (d.n.length > NODE) d.n.splice(d.n.length - NODE, NODE);
       commitPath(false);
+      return;
+    }
+    if (editor.tool === "node" && !editor.readOnly) {
+      // On a path: all of that closed path's nodes, and its holes', to move as one. (A double-click on a line first added a node there: that goes.)
+      const at = local(e);
+      if (performance.now() - lastNodeAdd < NODE_ADD_DOUBLE_MS) undo(doc, editor);
+      lastNodeAdd = -Infinity;
+      for (const t of nodeTargets()) {
+        if (t.o.net) continue;
+        const hit = hitNodes(t.po, at.x, at.y, null);
+        if (hit?.kind !== "point" && hit?.kind !== "seg") continue;
+        const subs = baked(t.o).sub;
+        const keys = new Set<string>();
+        for (const si of [hit.s, ...holesOf(subs, hit.s)]) for (let k = 0; k < nodeCount(subs[si]!); k++) keys.add(`${si}:${k}`);
+        if (!e.shiftKey) editor.nodeMulti.clear();
+        editor.nodeMulti.set(t.o.id, new Set([...(editor.nodeMulti.get(t.o.id) ?? []), ...keys]));
+        editor.nodeSel = null;
+        editor.changed();
+        return;
+      }
       return;
     }
     if (effectiveTool() !== "select" || editor.readOnly) return;

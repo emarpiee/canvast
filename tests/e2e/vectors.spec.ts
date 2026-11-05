@@ -3658,3 +3658,40 @@ test("adjusted shapes at any zoom and in a picture file: deep inside a blurred s
   const deep = [await px(cx, cy), await px(30, vp.height - 30)];
   for (const d of deep) for (let i = 0; i < 3; i++) expect(Math.abs(d[i]! - centre0[i]!), "deep inside: the colour").toBeLessThan(25);
 });
+
+test("a whole closed path: a double-click in Edit nodes picks it with its hole, without adding a node; Split into pieces makes each its own object", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => {
+    const data = new DataTransfer();
+    data.setData("text/plain", '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 300"><path fill="#ea6209" d="M100 100H200V200H100Z M130 130H170V170H130Z M300 100H400V200H300Z"/></svg>');
+    window.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+  });
+  const paths = () => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "path") as unknown as Array<{ id: string; sub: Array<{ n: number[] }> }>);
+  await expect.poll(async () => (await paths()).length).toBe(1);
+  const nodes = async (): Promise<number> => (await paths()).reduce((a, o) => a + o.sub.reduce((b, s) => b + s.n.length / 6, 0), 0);
+  const before = await nodes();
+  const box = await p.evaluate((id) => window.__canvastDebug.objectScreen(id)!.box, (await paths())[0]!.id);
+  const h = box.maxY - box.minY;
+  await p.keyboard.press("n");
+  // On a line of the first letter: its four nodes and its hole's, and no node added.
+  await p.mouse.dblclick(box.minX, box.minY + h / 2);
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.pickedNodes().map(([, n]) => n))).toEqual([8]);
+  expect(await nodes()).toBe(before);
+  // On the other letter's corner: only its own.
+  await p.mouse.dblclick(box.maxX, box.minY);
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.pickedNodes().map(([, n]) => n))).toEqual([4]);
+  // Dragged: only those move.
+  const start = (await paths())[0]!.sub.map((s) => s.n[0]!);
+  await app.drag({ x: box.maxX, y: box.minY }, { x: box.maxX + 30, y: box.minY }, 4);
+  const after = (await paths())[0]!.sub.map((s) => s.n[0]!);
+  expect(after[0]).toBe(start[0]);
+  expect(after[1]).toBe(start[1]);
+  expect(after[2]).toBeGreaterThan(start[2]!);
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("v");
+  await pathWith(p, "splitpieces");
+  await expect.poll(async () => (await paths()).map((o) => o.sub.length).sort()).toEqual([1, 2]);
+  await p.keyboard.press("Control+z");
+  await expect.poll(async () => (await paths()).length).toBe(1);
+  expect(app.consoleErrors).toEqual([]);
+});

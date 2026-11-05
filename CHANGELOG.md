@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.43 — Move one closed path, or split them (2026-11-06)
+
+- **Added:** in Edit nodes, a double-click on a node or a line selects that whole closed path with its holes, to move as one. On a hole, only the hole.
+- **Added:** Split into pieces in the path menu: each outline of a path, with its holes, its own object in the same place and look. One step of undo.
+
 ## 0.54.42 — The lag monitor is gone (2026-11-06)
 
 - **Removed:** the temporary lag monitor. A log it wrote stays in `lag-monitor/` beside the app's settings until it is deleted.

@@ -104,6 +104,8 @@ export interface ContextActions {
   /** Fewer nodes for the picked paths, and pen strokes turned into paths. */
   simplify(): void;
   canSimplify(): boolean;
+  splitPaths(): void;
+  canSplitPaths(): boolean;
   strokeToPath(): void;
   canStrokeToPath(): boolean;
   /** The stroke of the picked paths as a shape (ADR 0143), plain or tapered. */
@@ -317,6 +319,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           const row = (id: string, label: string, hint: string, icon: string, run: () => void): MenuItem => ({ id, label, hint, icon, run });
           const free = editor.builder === null && editor.gapFill === null; // (while the Shape builder or Fill a gap is on, Done and Cancel are on the bar)
           return [
+            ...(actions.canSplitPaths() ? [row("splitpieces", "Split into pieces", "Each outline, with its holes, its own object", ICONS.splitPieces, () => actions.splitPaths())] : []),
             ...(actions.canSimplify() ? [row("simplify", "Simplify", "Fewer nodes, the same shape", ICONS.chartSpline, () => actions.simplify())] : []),
             ...(actions.canStrokeToPath() ? [row("strokepath", "Pen stroke to path", "Turn the pen stroke into an editable path", ICONS.pencilRuler, () => actions.strokeToPath())] : []),
             ...(actions.canOutlineStroke() ? [

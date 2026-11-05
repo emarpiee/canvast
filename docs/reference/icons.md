@@ -306,3 +306,4 @@ One icon per function: two buttons that do different things never share an icon,
 | `grid-2x2-plus` | Place a PDF's pages on the canvas |
 | `sliders` | Show or hide a 3D view's settings |
 | `signature` | Place a 3D view's line art on the canvas as paths |
+| `square-split-horizontal` | Split a path into its separate pieces |

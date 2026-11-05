@@ -51,6 +51,7 @@ import type { ObjectId } from "../doc/model";
 import { isMaskObject, maskMembers } from "../doc/masks";
 import { parseCssPaint } from "./css-paint";
 import { parseSvg } from "./svg-import";
+import { piecesOf } from "../doc/path-pieces";
 import { NOTE_PAGE_PIXEL_W, pivotOf } from "../doc/model";
 import { MAX_NAME_LENGTH, editSubs, inkStyle, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs, strokePoints } from "../doc/model";
 import { worldBounds, scaleAbout } from "../doc/edit-ops";
@@ -1701,6 +1702,23 @@ export function setWidthProfile(doc: DocumentStore, editor: EditorState, profile
 
 const simplifiable = (doc: DocumentStore, editor: EditorState): PathObject[] => selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !o.result && !o.container && o.sub.some((s) => s.n.length / NODE > 2));
 export const canSimplify = (doc: DocumentStore, editor: EditorState): boolean => simplifiable(doc, editor).length > 0;
+/** The selected paths made of several separate pieces. */
+const splittable = (doc: DocumentStore, editor: EditorState): PathObject[] => simplifiable(doc, editor).filter((o) => !o.net && piecesOf(o.sub).length > 1);
+export const canSplitPaths = (doc: DocumentStore, editor: EditorState): boolean => splittable(doc, editor).length > 0;
+/** Each separate piece of a path (an outline and its holes) an object of its own, in the same place and look; one step of undo. */
+export function splitPaths(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit()) return;
+  const paths = splittable(doc, editor);
+  if (!paths.length) return;
+  const made = paths.flatMap((o) => {
+    const { shape: _s, params: _p, radius: _r, base: _b, initial: _i, gen: _g, ...rest } = o;
+    const pieces = piecesOf(o.sub);
+    return pieces.map((subs, i): PathObject => ({ ...rest, id: newObjectId(), z: o.z + (i / pieces.length) * 1e-3, sub: subs.map((k) => o.sub[k]!) }));
+  });
+  doc.commit(doc.transaction(`Split into ${made.length} pieces`, made, paths.map((o) => o.id)));
+  editor.select(made.map((o) => o.id));
+  editor.changed();
+}
 const penStrokes = (doc: DocumentStore, editor: EditorState): StrokeObject[] => selected(doc, editor).filter((o): o is StrokeObject => o.kind === "stroke" && o.points.length >= 4);
 export const canStrokeToPath = (doc: DocumentStore, editor: EditorState): boolean => penStrokes(doc, editor).length > 0;
 
