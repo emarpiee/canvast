@@ -39,16 +39,16 @@ const SETTLE_MS = 500;
 
 const selected = (editor: EditorState): string => [...editor.selection].sort().join(",");
 
-let sessionMemo: { doc: DocumentStore; rev: number; gid: string; info: GenInfo | null } | null = null;
+let sessionMemo: { doc: DocumentStore; rev: number; gid: string; info: GenInfo | null; host: string | undefined } | null = null;
 
 /** The pattern of this session while it is on the canvas and nothing else was selected since (undo may have emptied the selection). */
 export function sessionPattern(doc: DocumentStore, editor: EditorState, session: PatternSession): GenInfo | null {
   const gid = session.gid;
   if (gid === null || (editor.selection.size > 0 && selected(editor) !== session.sel)) return null;
   if (!sessionMemo || sessionMemo.doc !== doc || sessionMemo.rev !== doc.revision || sessionMemo.gid !== gid) {
-    let info: GenInfo | null = null;
-    for (const m of doc.all()) if (m.gen?.gid === gid) { info = m.gen; break; }
-    sessionMemo = { doc, rev: doc.revision, gid, info };
+    let info: GenInfo | null = null, host: string | undefined;
+    for (const m of doc.all()) if (m.gen?.gid === gid) { info = m.gen; host = m.parent; break; }
+    sessionMemo = { doc, rev: doc.revision, gid, info, host };
   }
   return sessionMemo.info;
 }
@@ -131,6 +131,12 @@ const sizeOf = (o: PathObject) => {
   const b = geometryBounds(o.sub);
   return { x: b.minX, y: b.minY, w: b.maxX - b.minX, h: b.maxY - b.minY };
 };
+
+/** The size of what the next result goes on, in the units a generator is given; null for a new sheet not made yet. */
+export function patternBox(doc: DocumentStore, editor: EditorState, session: PatternSession): { w: number; h: number } | null {
+  const of = foundPattern(doc, editor)?.host ?? (sessionPattern(doc, editor, session) && sessionMemo?.host !== undefined ? doc.get(sessionMemo.host) : undefined) ?? patternTarget(doc, editor)?.obj;
+  return of?.kind === "path" ? sizeOf(of) : session.sheet;
+}
 
 /**
  * Make the pattern of `g` and put it on the target: one undo step. When `session` still holds the last step of the document it is taken

@@ -350,7 +350,8 @@ test("Grid pattern: a shape's corner lands on a crossing of its lines, on both a
   await p.click("[data-pattern-panel]"); // (closed: what is drawn next is not the panel's target)
   const box = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
   const sheet = await box(sheets(await objs(app))[0]!.id);
-  const cell = (sheet.maxX - sheet.minX) / 16; // (the default: 16 across, square, line 0 on the edge)
+  const cell = (sheet.maxX - sheet.minX) / 16; // (the default: 16 across)
+  const cellY = (sheet.maxY - sheet.minY) / Math.round((sheet.maxY - sheet.minY) / cell); // (whole rows, nearly square)
   expect(cell).toBeGreaterThan(24);
   const square = async (x: number, y: number): Promise<string> => {
     await p.keyboard.press("u");
@@ -363,13 +364,13 @@ test("Grid pattern: a shape's corner lands on a crossing of its lines, on both a
   // A few pixels off the crossing on both axes: both hold, with no other corner near.
   const landsOn = async (id: string, cx: number, cy: number): Promise<void> => {
     const b = await box(id);
-    const to = { x: sheet.minX + cx * cell + 3, y: sheet.minY + cy * cell - 2 };
+    const to = { x: sheet.minX + cx * cell + 3, y: sheet.minY + cy * cellY - 2 };
     const from = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
     await app.drag(from, { x: from.x + to.x - b.minX, y: from.y + to.y - b.minY });
     await app.frame();
     const e = await box(id);
     expect(Math.abs(e.minX - (sheet.minX + cx * cell)), "left on its line").toBeLessThan(0.5);
-    expect(Math.abs(e.minY - (sheet.minY + cy * cell)), "top on its line").toBeLessThan(0.5);
+    expect(Math.abs(e.minY - (sheet.minY + cy * cellY)), "top on its line").toBeLessThan(0.5);
   };
   await landsOn(a, 3, 3);
   // Two selected move as one: the corner of their box lands the same way.
@@ -398,5 +399,23 @@ test("Pattern: double-clicking a setting resets that one, not the others", async
   await first.locator(".adj-label").dblclick({ position: { x: 2, y: 4 } });
   await expect(num(k)).toHaveValue(was);
   if (k !== "layers") await expect(num("layers")).toHaveValue(String(Number(other) + 2));
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("Grid pattern: Rows and Cell size show for their own choice, and it says what the settings come to", async ({ app }) => {
+  const p = app.page;
+  await p.click("[data-pattern-panel]");
+  await choose(app, "grid");
+  await expect(p.locator('[data-k="rows"]')).toHaveCount(0);
+  await make(app);
+  await expect(p.locator("[data-pg-readout]")).toHaveText(/^16 across, \d+ down · cell \d+ × \d+$/);
+  await p.locator('[data-k="cells"] [data-v="rows"]').click();
+  await setNumber(app, "rows", "5");
+  await expect(p.locator("[data-pg-readout]")).toHaveText(/^16 across, 5 down/);
+  await p.locator('[data-k="cells"] [data-v="size"]').click();
+  await expect(p.locator('[data-k="rows"]')).toHaveCount(0);
+  await expect(p.locator('[data-k="cols"]')).toHaveCount(0);
+  await setNumber(app, "size", "50");
+  await expect(p.locator("[data-pg-readout]")).toHaveText(/cell 50 × 50$/);
   expect(app.consoleErrors).toEqual([]);
 });

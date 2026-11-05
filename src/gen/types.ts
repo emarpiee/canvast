@@ -8,7 +8,14 @@ import type { Rng } from "./rng";
  */
 export type Values = Record<string, number | string | boolean>;
 
-type Base = { readonly k: string; readonly label: string };
+type Base = {
+  readonly k: string;
+  readonly label: string;
+  /** Randomize leaves it as it is: it changes what kind of picture this is, not its look. */
+  readonly steady?: true;
+  /** Shown only while the choice `when[0]` is one of the others. */
+  readonly when?: readonly string[];
+};
 export type Setting = Base &
   (
     | { readonly t: "range"; readonly min: number; readonly max: number; readonly step: number; readonly def: number; /** The usual span, which Randomize keeps to (the whole span can be slow or empty). */ readonly usual: readonly [number, number] }
@@ -42,4 +49,6 @@ export interface Generator {
   /** The settings, in sections; the "Colour" section gets the Background colour in front. */
   readonly sections: readonly Section[];
   readonly run: (v: Values, rng: Rng, w: number, h: number) => GenShape[];
+  /** What these settings come to in a box of this size, in a few words. */
+  readonly readout?: (v: Values, w: number, h: number) => string;
 }

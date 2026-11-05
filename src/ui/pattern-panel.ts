@@ -20,6 +20,8 @@ export interface PatternActions {
   make(g: Generator, values: Values, seed: number): boolean;
   /** Whether a change can replace what is on the canvas now (the session's last result, or a picked pattern). */
   live(): boolean;
+  /** The size of what the result goes on, once that is known. */
+  box(): { w: number; h: number } | null;
   /** Undo, or redo. */
   history(forward: boolean): void;
   /** The picked pattern made by a generator, with its settings. */
@@ -59,6 +61,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
       <div class="pg-grid" data-pg-grid hidden>${families.map((f) => `<h5>${f}</h5><div class="pg-tiles">${GENERATORS.filter((g) => g.family === f).map((g) => `<button type="button" class="pg-tile" data-gen="${g.id}" aria-label="${esc(g.label)}: ${esc(g.about)}" title="${esc(g.about)}"><span class="pg-thumb"></span><span>${esc(g.label)}</span></button>`).join("")}</div>`).join("")}</div>
       <p class="adj-note" data-pg-about></p>
       <p class="adj-note">On: <b data-pg-target></b></p>
+      <p class="adj-note" data-pg-readout hidden></p>
     </div>`,
     body: `<div data-pg-body></div>`,
     foot: `<div class="adj-foot pg-foot">
@@ -95,11 +98,21 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     values[k] = v;
     kept.set(gen.id, values);
     again();
+    paintReadout();
+    if (sectionsOf(gen).some((x) => x.items.some((i) => i.when?.[0] === k))) build(); // (what it shows or hides)
+  };
+  /** What the settings come to on what the result goes on (nothing until that is known). */
+  const paintReadout = (): void => {
+    const box = actions.box();
+    const line = q("[data-pg-readout]");
+    line.textContent = box && gen.readout ? gen.readout(cleanValues(gen, values), box.w, box.h) : "";
+    line.hidden = !line.textContent;
   };
   const locks = (): Set<string> => frozen.get(gen.id) ?? frozen.set(gen.id, new Set()).get(gen.id)!;
 
   const lock = (s: Setting): string => `<button type="button" class="pg-lock" data-lock aria-pressed="${locks().has(s.k)}" aria-label="Keep ${esc(s.label)} when randomizing" title="Keep ${esc(s.label.toLowerCase())} when randomizing">${ICONS.snowflake}</button>`;
   const row = (s: Setting): string => {
+    if (s.when && !s.when.slice(1).includes(values[s.when[0]!] as string)) return "";
     const v = values[s.k]!;
     if (s.t === "range") return `<div class="adj-row" data-k="${s.k}"><label class="adj-label" for="pg-n-${s.k}">${esc(s.label)}${lock(s)}</label><input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)}"><input type="number" class="adj-num" id="pg-n-${s.k}" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)} value"></div>`;
     if (s.t === "toggle") return `<div class="adj-row pg-line" data-k="${s.k}"><label class="pg-check"><input type="checkbox"${v ? " checked" : ""}> <span>${esc(s.label)}</span>${lock(s)}</label></div>`;
@@ -208,6 +221,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     }
     if (started && !actions.live()) started = false; // (undone, or something else was done since: the next change does not replace anything)
     q("[data-pg-target]").textContent = actions.target();
+    paintReadout();
     q("[data-pg-done]").toggleAttribute("disabled", !started);
   };
   let scheduled = false;
@@ -248,7 +262,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     }
     else if (t.hasAttribute("data-pg-random")) {
       seed = newSeed();
-      const r = randomValues(gen, makeRng(seed));
+      const r = randomValues(gen, makeRng(seed), values);
       for (const k of locks()) if (k in values) r[k] = values[k]!; // (what is marked with a snowflake stays)
       values = r;
       kept.set(gen.id, values);

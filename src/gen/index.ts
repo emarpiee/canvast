@@ -56,13 +56,14 @@ export function cleanValues(g: Generator, v: Values): Values {
 }
 
 /** Random values for every setting, inside the middle of each one's range (the ends make poor pictures); the colours go together. */
-export function randomValues(g: Generator, rng: Rng): Values {
+export function randomValues(g: Generator, rng: Rng, current?: Values): Values {
   const all = settingsOf(g), cols = palette(rng, all.filter((s) => s.t === "colour").length);
   let ci = 0;
   const out: Values = {};
   for (const s of all) {
     out[s.k] =
-      s.t === "range" ? Math.min(s.usual[1], Math.max(s.usual[0], s.usual[0] + Math.round(((0.15 + 0.7 * ((rng() + rng()) / 2)) * (s.usual[1] - s.usual[0])) / s.step) * s.step))
+      s.steady ? (current?.[s.k] ?? s.def)
+      : s.t === "range" ? Math.min(s.usual[1], Math.max(s.usual[0], s.usual[0] + Math.round(((0.15 + 0.7 * ((rng() + rng()) / 2)) * (s.usual[1] - s.usual[0])) / s.step) * s.step))
       : s.t === "toggle" ? rng.chance(0.5)
       : s.t === "choice" ? rng.pick(s.opts)[0]
       : cols[ci++]!;

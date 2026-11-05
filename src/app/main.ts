@@ -116,7 +116,7 @@ import { linkedUpdates } from "./style-sync";
 import { PanelDock } from "../ui/panel-dock";
 import { mountAdjustPanel } from "../ui/adjust-panel";
 import { mountPatternPanel } from "../ui/pattern-panel";
-import { makePattern, makePatternEach, newPatternSession, patternTargetLabel, patternTargets, foundPattern, sessionPattern } from "./pattern";
+import { makePattern, makePatternEach, newPatternSession, patternBox, patternTargetLabel, patternTargets, foundPattern, sessionPattern } from "./pattern";
 import { cleanValues, generatorById } from "../gen";
 import { mountCanvasSearch } from "../ui/canvas-search";
 import { mountNotices } from "../ui/notices";
@@ -1259,6 +1259,7 @@ async function start(): Promise<void> {
   const patternSession = newPatternSession();
   const patternPanel = mountPatternPanel(side, editor, {
     make: (g, values, seed) => (makePatternEach(doc, editor, view, g, values, seed) === null ? makePattern(doc, editor, view, patternSession, g, values, seed) : false),
+    box: () => patternBox(doc, editor, patternSession),
     history: (forward) => (forward ? redo : undo)(doc, editor),
     live: () => (patternSession.top !== null && doc.lastTransaction === patternSession.top) || foundPattern(doc, editor) !== null || sessionPattern(doc, editor, patternSession) !== null,
     found: () => { const f = foundPattern(doc, editor)?.info ?? sessionPattern(doc, editor, patternSession); return f ? { id: f.id, gid: f.gid, seed: f.seed, v: f.v } : null; },

@@ -22,6 +22,11 @@ export const C = (k: string, label: string, def: string, hide?: true): Setting =
 export const T = (k: string, label: string, def: boolean): Setting => ({ k, label, t: "toggle", def });
 export const Ch = (k: string, label: string, opts: readonly (readonly [string, string])[], def: string): Setting => ({ k, label, t: "choice", opts, def });
 
+/** A setting Randomize leaves as it is. */
+export const steady = (s: Setting): Setting => ({ ...s, steady: true });
+/** A setting shown only while the choice `k` is one of `of`. */
+export const when = (k: string, of: readonly string[], s: Setting): Setting => ({ ...s, when: [k, ...of] });
+
 /** Read the settings inside `run`. */
 export const reader = (v: Values) => ({
   n: (k: string): number => v[k] as number,

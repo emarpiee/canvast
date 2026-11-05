@@ -66,19 +66,33 @@ describe("pattern generators (ADR 0162)", () => {
 
   it("keeps to the document's limit on one path", () => expect(GEN_MAX_SUBPATHS).toBe(MAX_SUBPATHS));
 
-  it("Grid: rows follow its Cells choice, and square cells are the default", () => {
+  it("Grid: rows follow its Cells choice, line width stays when the count changes, and Randomize keeps the layout", () => {
     const g = GENERATORS.find((x) => x.id === "grid")!;
-    const lines = (o: Record<string, string | number>): number => generate(g, { ...defaultValues(g), bg: "", every: 0, ...o }, 1, 800, 400)[0]!.sub.length;
-    expect(lines({})).toBe(17 + 9); // (16 across of 50: 8 rows fit)
+    const made = (o: Record<string, string | number | boolean>, w = 800, h = 400) => generate(g, { ...defaultValues(g), bg: "", every: 0, ...o }, 1, w, h)[0]!;
+    const lines = (o: Record<string, string | number | boolean>): number => made(o).sub.length;
+    expect(lines({})).toBe(17 + 9); // (16 across of 50: 8 rows)
+    expect(made({}, 900, 600).sub.length).toBe(17 + 12); // (10.67 rows round to 11: 12 lines)
     expect(lines({ cells: "equal" })).toBe(17 + 17);
     expect(lines({ cells: "rows", rows: 5 })).toBe(17 + 6);
-    expect(generate(g, { ...defaultValues(g), bg: "", every: 0, frame: true }, 1, 800, 400)[0]!.sub.length).toBe(17 + 9 + 1);
+    expect(lines({ cells: "size", size: 100 })).toBe(9 + 5);
+    expect(g.readout!({ ...defaultValues(g), cells: "size", size: 100 }, 800, 400)).toBe("8 across, 4 down · cell 100 × 100");
+    expect(made({ cols: 40 }).width).toBe(made({ cols: 8 }).width);
+    // Every line is in the box, the edges too; the last row's line is on the edge.
+    const ys = made({}).sub.flatMap((s) => (s.n[1] === s.n[NODE + 1] ? [s.n[1]!] : []));
+    const w = made({}).width;
+    expect(Math.min(...ys)).toBeCloseTo(w / 2, 6);
+    expect(Math.max(...ys)).toBeCloseTo(400 - w / 2, 6);
+    expect(made({ frame: true }).sub.length).toBe(17 + 9 + 1);
     expect(lines({ dash: 50 })).toBeGreaterThan(17 + 9);
-    sound(generate(g, { ...defaultValues(g), dash: 1, cols: 240 }, 1, 900, 600), 900, 600); // (the shortest dashes on the most lines: over one path's limit, so in several)
-    expect(lines({ margin: 25, cols: 4 })).toBe(5 + 2); // (inside the margin: 600 wide, 200 high, cells of 150)
+    expect(lines({ margin: 25, cols: 4 })).toBe(5 + 2); // (inside the margin: 600 by 200, cells of 150: 1.33 rows round to 1)
     expect(lines({ shiftX: 50, shiftY: 50 })).toBe(16 + 8); // (half a cell along: one line fewer each way)
-    // Randomize stays a plain grid: what changes the kind of picture stays off.
-    for (const k of ["margin", "shiftX", "shiftY", "dash", "angle"]) expect(randomValues(g, makeRng(7))[k]).toBe(0);
+    sound(generate(g, { ...defaultValues(g), dash: 1, cols: 240 }, 1, 900, 600), 900, 600); // (the shortest dashes on the most lines: over one path's limit, so in several)
+    const current = { ...defaultValues(g), cells: "rows", rows: 7, margin: 5, dash: 20, angle: 15, jitter: 30 };
+    for (const k of ["cells", "rows", "margin", "dash", "angle", "jitter"] as const) expect(randomValues(g, makeRng(7), current)[k]).toBe(current[k]);
+    // Strong lines are counted from Strong start.
+    const strong = (at: number) => generate(g, { ...defaultValues(g), bg: "", every: 4, strongAt: at, rowsToo: false, major: "#ffffff" }, 1, 800, 400)[1]!.sub.map((s) => Math.round(s.n[0]!));
+    expect(strong(0)[1]).toBe(200);
+    expect(strong(1)[0]).toBe(50);
   });
 
   it("a different seed changes the shapes of the generators that use chance", () => {

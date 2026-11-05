@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.54.9 — The Grid pattern is predictable (2026-11-05)
+
+- **Changed:** in the **Grid** pattern, changing **Across** or the cells leaves **Line width** and **Dash length** as they are.
+- **Changed:** square cells are as near square as whole rows allow, so the last line is on the edge.
+- **Changed:** lines and a frame on the sheet's edge sit just inside it, as thick as the others.
+- **Changed:** **Rows** shows only for its own choice of **Cells**, and **Across** and **Cell size** likewise.
+- **Changed:** **Randomize** keeps the grid's layout: cells, counts, margin, shifts, dashes, angle, frame, looseness and strong start.
+- **Added:** **Cells: Size**, an exact **Cell size**.
+- **Added:** a line saying what the settings come to, such as `16 across, 11 down · cell 56 × 55`.
+- **Added:** **Strong start**: which line the strong lines count from.
+
 ## 0.54.8 — Reset one pattern setting (2026-11-05)
 
 - **Added:** in the Pattern panel, double-clicking a setting's name, or its slider, resets that setting alone.
