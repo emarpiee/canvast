@@ -2072,9 +2072,9 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
   const out = () => app.evaluate(async ({ clipboard }) => {
     const [item] = await clipboard.read();
     const read = async (t: string): Promise<string> => (item?.types.includes(t) ? await (await item.getType(t) as Blob).text() : "");
-    // (asked for by its own name on the system's clipboard: asked as a picture, any picture type comes back as the PNG)
-    const offered = async (t: string): Promise<boolean> => clipboard.has(`electron application/osclipboard;format="${t}"`);
-    return { svg: await offered("image/svg+xml"), png: await offered("image/png"), text: await clipboard.readText(), file: decodeURIComponent((await read("text/uri-list")).trim().replace(/^file:\/\//, "")) };
+    // (what is offered, by its list of types: asked for its data, any picture type comes back as the PNG)
+    const offered = (t: string): boolean => !!item?.types.includes(t);
+    return { svg: offered("image/svg+xml"), png: offered("image/png"), text: await clipboard.readText(), file: decodeURIComponent((await read("text/uri-list")).trim().replace(/^file:\/\//, "")) };
   });
   try {
     // On the canvas: a shape, and an SVG picture with its own file.
