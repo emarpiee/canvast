@@ -890,6 +890,17 @@ test("Reset rotation and Reset proportions in the selection bar put a turned or 
   expect(Math.abs((b4.minX + b4.maxX) / 2 - (b0.minX + b0.maxX) / 2), "same middle").toBeLessThan(1);
   await expect(unresize).toBeDisabled();
   await expect(unresize).toHaveAttribute("title", /already has that size/);
+  // Also from another frame than the one it was placed in (past 32 levels the camera changes frame).
+  await p.evaluate(() => window.__canvastDebug.jump(40));
+  await app.frame();
+  await expect(unresize).toBeEnabled();
+  await unresize.click();
+  await app.frame();
+  const b5 = await box();
+  expect(Math.abs(b5.maxX - b5.minX - pw.pixelW), "file pixels, from another frame").toBeLessThan(1);
+  await key(app, "Control+z");
+  await p.evaluate(() => window.__canvastDebug.jump(-40));
+  await app.frame();
   await key(app, "Control+z");
   await app.frame();
   expect(Math.abs((await box()).maxX - b0.maxX)).toBeLessThan(1);

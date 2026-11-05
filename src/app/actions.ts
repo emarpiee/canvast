@@ -1,3 +1,4 @@
+import { levelsBetween } from "../core/frames";
 import { isArtFile } from "../assets/art-preview";
 import { beginProgress } from "./progress";
 import { withStyleLinks } from "../doc/style-links";
@@ -552,10 +553,10 @@ export function resetProportions(doc: DocumentStore, editor: EditorState): numbe
  */
 export function sizeResets(doc: DocumentStore, editor: EditorState, view: ViewState, noteWidth: (o: ImageObject) => number | null): ImageObject[] {
   const cam = view.camera;
-  const unit = -cam.zi;
   const f = 2 ** cam.zf; // (CSS px per local unit at `unit`, as imageAt places)
   return selected(doc, editor).flatMap((o): ImageObject[] => {
-    if (o.kind !== "image" || o.locked || (o.frame ?? doc.space.world) !== view.frame) return [];
+    if (o.kind !== "image" || o.locked) return [];
+    const unit = -(cam.zi + levelsBetween(o.frame ?? doc.space.world, view.frame)); // (it stays in its own frame: this zoom, as that frame counts it)
     const c = cropOf(o);
     const nw = noteWidth(o);
     const w = (nw ?? c.w) / f;
@@ -574,7 +575,6 @@ export function sizeResets(doc: DocumentStore, editor: EditorState, view: ViewSt
 export function sizeResetBlock(doc: DocumentStore, editor: EditorState, view: ViewState): string {
   const pics = selected(doc, editor).filter((o) => o.kind === "image");
   if (pics.some((o) => o.locked)) return "it is locked";
-  if (pics.some((o) => (o.frame ?? doc.space.world) !== view.frame)) return "it is at another depth of the canvas: zoom to where it was placed";
   return "it already has that size at this zoom";
 }
 
