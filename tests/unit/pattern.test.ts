@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MAX_SUBPATHS } from "../../src/doc/model";
+import { MAX_SUBPATHS as GEN_MAX_SUBPATHS } from "../../src/gen";
 import { GENERATORS, MAX_SHAPES, cleanValues, defaultValues, generate, makeRng, pathData, randomValues, settingsOf, toSvg } from "../../src/gen";
 import * as D from "../../src/core/dyadic";
 import { duplicateRecords } from "../../src/doc/duplicate";
@@ -62,6 +63,8 @@ describe("pattern generators (ADR 0162)", () => {
       }
     }
   }, 60_000); // (the slowest test of the unit suite: every generator at the extremes, which shares the machine with the other workers)
+
+  it("keeps to the document's limit on one path", () => expect(GEN_MAX_SUBPATHS).toBe(MAX_SUBPATHS));
 
   it("Grid: rows follow its Cells choice, and square cells are the default", () => {
     const g = GENERATORS.find((x) => x.id === "grid")!;

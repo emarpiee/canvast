@@ -20,6 +20,8 @@ export interface PatternActions {
   make(g: Generator, values: Values, seed: number): boolean;
   /** Whether a change can replace what is on the canvas now (the session's last result, or a picked pattern). */
   live(): boolean;
+  /** Undo, or redo. */
+  history(forward: boolean): void;
   /** The picked pattern made by a generator, with its settings. */
   found(): { id: string; gid: string; seed: number; v: Values } | null;
   /** End the session: the next result is a new one. */
@@ -187,7 +189,8 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     if (panel.hidden) return;
     const f = actions.found();
     if (!f) loaded = null;
-    else if (f.gid !== loaded && generatorById(f.id)) { // a pattern made earlier is picked: its settings come into the panel, and changes replace it
+    // A pattern made earlier is picked, or undo or redo brought another version of it: its settings come into the panel, and changes replace it.
+    else if (generatorById(f.id) && (f.gid !== loaded || (!queued && (f.id !== gen.id || f.seed !== seed || JSON.stringify(cleanValues(gen, f.v)) !== JSON.stringify(cleanValues(gen, values)))))) {
       loaded = f.gid;
       gen = generatorById(f.id)!;
       values = cleanValues(gen, f.v);
@@ -248,7 +251,13 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     else if (t.hasAttribute("data-pg-reset")) { values = defaultValues(gen); kept.set(gen.id, values); build(); again(); }
   });
   panel.addEventListener("keydown", (e) => {
-    if ((e.target as HTMLElement).matches("input, select, textarea")) e.stopPropagation();
+    if (!(e.target as HTMLElement).matches("input, select, textarea")) return;
+    e.stopPropagation();
+    // (undo here is the pattern's, not the field's: a number field would keep it to itself)
+    if ((e.ctrlKey || e.metaKey) && /^[zy]$/i.test(e.key)) {
+      e.preventDefault();
+      actions.history(e.key.toLowerCase() === "y" || e.shiftKey);
+    }
   });
   return {
     current: () => ({ id: gen.id, v: cleanValues(gen, values), seed }),

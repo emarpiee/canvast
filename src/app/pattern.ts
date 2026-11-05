@@ -18,16 +18,40 @@ import type { ViewState } from "./view-state";
 
 /**
  * Pattern (ADR 0162): put what a generator (src/gen) makes on a sheet, a shape, or a new sheet. While the Pattern panel is open the result
- * is live: each change takes back the last result and makes the new one, so the whole session is one undo step, whatever was tried.
+ * is live: a change takes back the last result and makes the new one. Changes in quick succession (a slider's drag) are one undo step; one
+ * after a pause is a step of its own, and undo and redo bring its settings back into the panel.
  */
 export interface PatternSession {
   /** The step this session last made; it is taken back before the next result as long as it is still the last step of the document. */
   top: Transaction | null;
   /** Where the sheet this session made stands, so the next result lands in the same place. */
   sheet: { frame: Frame | undefined; anchor: WorldPoint; unit: number; w: number; h: number } | null;
+  /** The pattern this session made, what was selected when it did, and when. */
+  gid: string | null;
+  sel: string;
+  at: number;
 }
 
-export const newPatternSession = (): PatternSession => ({ top: null, sheet: null });
+export const newPatternSession = (): PatternSession => ({ top: null, sheet: null, gid: null, sel: "", at: 0 });
+
+/** A change this soon after the last one replaces it in the same undo step (a drag, a scrub); later, it is a step of its own. */
+const SETTLE_MS = 500;
+
+const selected = (editor: EditorState): string => [...editor.selection].sort().join(",");
+
+let sessionMemo: { doc: DocumentStore; rev: number; gid: string; info: GenInfo | null } | null = null;
+
+/** The pattern of this session while it is on the canvas and nothing else was selected since (undo may have emptied the selection). */
+export function sessionPattern(doc: DocumentStore, editor: EditorState, session: PatternSession): GenInfo | null {
+  const gid = session.gid;
+  if (gid === null || (editor.selection.size > 0 && selected(editor) !== session.sel)) return null;
+  if (!sessionMemo || sessionMemo.doc !== doc || sessionMemo.rev !== doc.revision || sessionMemo.gid !== gid) {
+    let info: GenInfo | null = null;
+    for (const m of doc.all()) if (m.gen?.gid === gid) { info = m.gen; break; }
+    sessionMemo = { doc, rev: doc.revision, gid, info };
+  }
+  return sessionMemo.info;
+}
 
 /** What the next result would go on: a picked sheet, a picked closed shape (which cuts it), or a new sheet. */
 export function patternTarget(doc: DocumentStore, editor: EditorState): { kind: "sheet" | "shape"; obj: PathObject } | null {
@@ -94,11 +118,11 @@ export function foundPattern(doc: DocumentStore, editor: EditorState): { info: G
 }
 
 /** The words for what a result goes on, for the panel. */
-export function patternTargetLabel(doc: DocumentStore, editor: EditorState): string {
+export function patternTargetLabel(doc: DocumentStore, editor: EditorState, session: PatternSession): string {
   const many = patternTargets(doc, editor).length;
   if (many > 1) return `${many} selected shapes: one pattern on each`;
-  const f = foundPattern(doc, editor);
-  if (f) return `This pattern (${f.info.id}): changes replace it`;
+  const f = foundPattern(doc, editor)?.info ?? sessionPattern(doc, editor, session);
+  if (f) return `This pattern (${f.id}): changes replace it`;
   const t = patternTarget(doc, editor);
   return !t ? "A new sheet" : t.kind === "sheet" ? (t.obj.name ?? "The selected sheet") : `The selected shape (cuts the pattern to its outline)`;
 }
@@ -114,11 +138,15 @@ const sizeOf = (o: PathObject) => {
  */
 export function makePattern(doc: DocumentStore, editor: EditorState, view: ViewState, session: PatternSession, g: Generator, values: Values, seed: number): boolean {
   if (editor.blockEdit()) return false;
-  const editing = foundPattern(doc, editor)?.info.gid ?? null; // (looked for before a step is taken back: the picked shapes may be the ones about to go)
+  // (looked for before a step is taken back: the picked shapes may be the ones about to go)
+  const picked = foundPattern(doc, editor)?.info.gid ?? null;
+  const editing = picked ?? sessionPattern(doc, editor, session)?.gid ?? null;
   if (session.top && doc.lastTransaction === session.top) {
-    doc.undo();
-    pruneSelection(doc, editor);
-  } else session.sheet = null; // (something else was done since: this is a new result, in a new place)
+    if (performance.now() - session.at < SETTLE_MS) {
+      doc.undo();
+      pruneSelection(doc, editor);
+    } else if (!editing) session.sheet = null;
+  } else if (!editing) session.sheet = null; // (something else was done since: this is a new result, in a new place)
   session.top = null;
 
   const old = editing ? [...doc.all()].filter((m) => m.groups?.includes(editing)) : [];
@@ -182,8 +210,11 @@ export function makePattern(doc: DocumentStore, editor: EditorState, view: ViewS
   const tx = doc.transaction(`Pattern: ${g.label}`, [...fresh, ...grouped], again ? old.map((o) => o.id) : []);
   doc.commit(tx);
   session.top = tx;
-  if (again) editor.select(grouped.map((o) => o.id));
-  else if (!t) editor.select([host.id]);
+  if (again && picked) editor.select(grouped.map((o) => o.id));
+  else if (!t && !again) editor.select([host.id]);
+  session.gid = gid;
+  session.sel = selected(editor);
+  session.at = performance.now();
   editor.changed();
   return true;
 }

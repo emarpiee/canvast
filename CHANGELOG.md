@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.54.7 — Undo and redo in the Pattern panel (2026-11-05)
+
+- **Changed:** in the Pattern panel, a change after a pause is its own undo step, instead of the whole session being one; a slider's drag stays one step.
+- **Fixed:** after undo or redo the panel shows that version's settings, and changing them still works.
+- **Fixed:** `Ctrl+Z` and `Ctrl+Y` with a slider or number field of the panel focused undo the pattern.
+
 ## 0.54.6 — A pattern no longer vanishes at high counts (2026-11-05)
 
 - **Fixed:** a pattern with more pieces than one path can hold no longer vanishes: it goes into several paths of the same look, in every generator. Short dashes in the **Grid** pattern were the way to see it.

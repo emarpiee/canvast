@@ -3,7 +3,7 @@ import type { App } from "./harness";
 
 /**
  * Pattern generators (ADR 0162): the panel is built from each generator's own settings; a result goes on a new sheet, a picked sheet or a
- * picked shape; while the panel is open every change replaces the last result, and the whole session is one undo step.
+ * picked shape; while the panel is open every change replaces the last result; changes after a pause are undo steps of their own.
  */
 type Obj = { id: string; kind: string; name?: string; parent?: string; groups?: string[]; container?: { clip: boolean; mask?: boolean }; fill: string | null; sub?: unknown[] };
 const objs = async (app: App): Promise<Obj[]> => (await app.page.evaluate(() => window.__canvastDebug.objects())) as unknown as Obj[];
@@ -17,7 +17,7 @@ const sheets = (all: Obj[]) => all.filter((o) => o.container);
 const on = (all: Obj[], id: string) => all.filter((o) => o.parent === id);
 const subCount = (all: Obj[], id: string) => on(all, id).reduce((n, o) => n + (o.sub?.length ?? 0), 0); // (shapes of one colour are one path of many sub-paths)
 
-test("Pattern: a new sheet, each change replaces the result, hiding the background, one undo step for the session", async ({ app }) => {
+test("Pattern: a new sheet, each change replaces the result, hiding the background, undo and redo step through the settings and they still work", async ({ app }) => {
   const p = app.page;
   await p.click("[data-pattern-panel]");
   await expect(p.getByTestId("pattern-panel")).toBeVisible();
@@ -31,18 +31,38 @@ test("Pattern: a new sheet, each change replaces the result, hiding the backgrou
   expect(on(all, sheet.id)).toHaveLength(7); // background and 6 layers
   expect(new Set(on(all, sheet.id).map((o) => o.groups?.[0])).size).toBe(1); // one group
 
+  await p.waitForTimeout(600); // (a pause: the next change is a step of its own)
   await setNumber(app, "layers", "3"); // live: the result is replaced, not stacked
   await expect.poll(async () => (await objs(app)).length).toBe(5);
+  await p.waitForTimeout(600);
   await p.locator('[data-k="bg"] [data-eye]').click();
   await expect.poll(async () => (await objs(app)).some((o) => o.name === "Background")).toBe(false);
   all = await objs(app);
   expect(sheets(all)).toHaveLength(1);
   expect(on(all, sheets(all)[0]!.id)).toHaveLength(3);
 
-  await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await p.keyboard.press("Control+z"); // the whole session is one step
+  // With the field still focused: undo is the pattern's, and the panel follows it.
+  await p.locator('[data-k="layers"] input[type=number]').focus();
+  const layers = p.locator('[data-k="layers"] input[type=number]');
+  await p.keyboard.press("Control+z"); // the background back
+  await expect.poll(async () => (await objs(app)).some((o) => o.name === "Background")).toBe(true);
+  await p.keyboard.press("Control+z"); // 6 layers again
+  await expect.poll(async () => (await objs(app)).length).toBe(8);
+  await expect(layers).toHaveValue("6");
+  await p.keyboard.press("Control+y"); // 3 again
+  await expect.poll(async () => (await objs(app)).length).toBe(5);
+  await expect(layers).toHaveValue("3");
+  await p.waitForTimeout(600);
+  await setNumber(app, "layers", "2"); // and a setting still works
+  await expect.poll(async () => (await objs(app)).length).toBe(4);
+  // Back to before the pattern, then forward: it works again as well.
+  while (await p.evaluate(() => window.__canvastDebug.canUndo())) await p.keyboard.press("Control+z");
   await expect.poll(async () => (await objs(app)).length).toBe(0);
-  expect(await p.evaluate(() => window.__canvastDebug.canUndo())).toBe(false);
+  await p.keyboard.press("Control+y");
+  await expect.poll(async () => (await objs(app)).length).toBe(8);
+  await p.waitForTimeout(600);
+  await setNumber(app, "layers", "4");
+  await expect.poll(async () => (await objs(app)).length).toBe(6);
   expect(app.consoleErrors).toEqual([]);
 });
 

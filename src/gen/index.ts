@@ -9,10 +9,9 @@ import { C } from "./kit";
 import { makeRng, palette } from "./rng";
 import type { Rng } from "./rng";
 import { rect } from "./geom";
+import { NODE } from "./core";
 import type { SubPath } from "./core";
 import type { GenShape, Generator, Section, Setting, Values } from "./types";
-import { MAX_PATH_NODES, MAX_SUBPATHS } from "../doc/model";
-import { NODE } from "../doc/path";
 
 export type { GenShape, Generator, Section, Setting, Values } from "./types";
 export type { Gradient, GradientStop, Paint, SubPath } from "./core";
@@ -79,6 +78,10 @@ export function generate(g: Generator, values: Values, seed: number, w: number, 
   const all = bg ? [{ sub: [rect(0, 0, w, h)], fill: bg, stroke: null, width: 1, name: "Background" }, ...shapes] : shapes;
   return all.filter((s) => s.sub.length > 0).flatMap(fitted).slice(0, MAX_SHAPES);
 }
+
+/** What one path may hold (the document's own limits; `tests/unit/pattern.test.ts` holds them equal). */
+export const MAX_SUBPATHS = 4096;
+const MAX_PATH_NODES = 200_000;
 
 /** A shape past what one path may hold goes into several of the same look: a path over the limit is refused, and the pattern would vanish. */
 function fitted(s: GenShape): GenShape[] {
