@@ -153,6 +153,7 @@ Outside your workspace folders, in the app's data folder (above):
 | What | Where | Holds |
 | --- | --- | --- |
 | A working copy of each workspace | `Partitions/`, `library-db/`, `library-looks/` | Boards, canvases and the library, so the app opens fast. Hidden items' pictures and thumbnails are encrypted there; their names, tags and notes are readable there unless *Keep hidden items' names off this device while locked* is on (Settings > Privacy) |
+| This device's settings | `Partitions/` | Theme, shortcuts, panels, tools and the other *This device* settings (the workspace's are in its folder, with a copy here). Deleting it resets them; a backup restores them |
 | Recent workspaces | `workspaces.json`, `partitions.json` | Their folders' paths |
 | Hidden items opened in another app | the system's temporary folder, `canvast-opened-…` | Readable copies, deleted when the hidden items are locked, when the app closes, and at the next start |
 
@@ -983,6 +984,7 @@ Open Settings with the gear button. Each setting says where it is kept, at the e
 - **Shared:** every device that opens the workspace folder uses its settings, and a change on one is read by the others, as canvases are. Deleting the app's own data on a device keeps them.
 - **The first time:** a workspace that has none yet takes those of the device that opens it, so nothing changes. A folder written by an older version keeps the settings each device had.
 - **Hidden items:** saved searches made with the Hidden items open stay on the device, in their own list, and out of a backup unless *privacy settings* are included; nothing of them is written to the folder.
+- **Limits:** saved searches made with the Hidden items open before version 0.54.47 are in the workspace's list, as they cannot be told apart: remove those you do not want in the folder. When a sync tool keeps two copies of `workspace.json`, one device's settings are kept.
 
 Each setting says what it is on one line; **More** under it has the whole explanation, and the search box finds words in both.
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.48 — Where settings are kept, in the manual (2026-11-06)
+
+- **Changed:** the README says which settings are kept on the device (in the app's data folder) and their limits in the workspace.
+
 ## 0.54.47 — Settings of the workspace (2026-11-06)
 
 - **Added:** settings that shape the workspace's files are kept in the workspace (`.canvast/workspace.json` on desktop) and shared by every device that opens it: how notes are written, named and shown on cards; file names and placement of saved edits, frames, screenshots, exports, patterns and SVGs; where deleted files go; property types; saved searches; pinned folders. The rest stays on the device. A workspace without them takes the opening device's, so nothing changes.

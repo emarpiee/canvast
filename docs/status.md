@@ -37,6 +37,10 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.48: README on where settings are kept; released (2026-11-06)
+
+- **Committed:** v0.54.48, README only.
+
 ## v0.54.47: settings of the workspace; folders deleted outside (2026-11-06)
 
 - **Implemented:** scope `workspace` stored (`WorkspaceStore.settings/saveSettings`, IDB meta, `workspace.json` `settings`); `SettingsStore.workspaceValues/adoptWorkspace`; `Session.adoptWorkspaceSettings` at start, on outside changes and other tabs; `library.pinned`, `search.saved.hidden` (device, privacy); `adoptShared` for styles and settings; `LibraryState.dirs` kept by `writeJson`.
