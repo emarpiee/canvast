@@ -9,7 +9,10 @@ import { C } from "./kit";
 import { makeRng, palette } from "./rng";
 import type { Rng } from "./rng";
 import { rect } from "./geom";
+import type { SubPath } from "./core";
 import type { GenShape, Generator, Section, Setting, Values } from "./types";
+import { MAX_PATH_NODES, MAX_SUBPATHS } from "../doc/model";
+import { NODE } from "../doc/path";
 
 export type { GenShape, Generator, Section, Setting, Values } from "./types";
 export type { Gradient, GradientStop, Paint, SubPath } from "./core";
@@ -74,5 +77,22 @@ export function generate(g: Generator, values: Values, seed: number, w: number, 
   const shapes = g.run(v, makeRng(seed), w, h);
   const bg = v["bg"] as string;
   const all = bg ? [{ sub: [rect(0, 0, w, h)], fill: bg, stroke: null, width: 1, name: "Background" }, ...shapes] : shapes;
-  return all.filter((s) => s.sub.length > 0).slice(0, MAX_SHAPES);
+  return all.filter((s) => s.sub.length > 0).flatMap(fitted).slice(0, MAX_SHAPES);
+}
+
+/** A shape past what one path may hold goes into several of the same look: a path over the limit is refused, and the pattern would vanish. */
+function fitted(s: GenShape): GenShape[] {
+  const out: GenShape[] = [];
+  let sub: SubPath[] = [], nodes = 0;
+  for (const p of s.sub) {
+    const k = p.n.length / NODE;
+    if (sub.length >= MAX_SUBPATHS || (sub.length && nodes + k > MAX_PATH_NODES)) {
+      out.push({ ...s, sub });
+      [sub, nodes] = [[], 0];
+    }
+    sub.push(p);
+    nodes += k;
+  }
+  out.push({ ...s, sub });
+  return out; // shortcut: one gradient is then laid over each part, and one sub-path over the node limit stays too long; neither is reached by a pattern today
 }

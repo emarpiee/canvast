@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.6 — A pattern no longer vanishes at high counts (2026-11-05)
+
+- **Fixed:** a pattern with more pieces than one path can hold no longer vanishes: it goes into several paths of the same look, in every generator. Short dashes in the **Grid** pattern were the way to see it.
+- **Changed:** the Grid pattern's **Dashes** is now **Dash length**: a share of a cell, never too short to see, with a gap as long.
+
 ## 0.54.5 — More for the Grid pattern (2026-11-05)
 
 - **Added:** the **Grid** pattern's **Strong width**, and a **Layout** section: **Margin**, **Frame**, **Shift across**, **Shift down**, **Dashes** and **Angle**. All leave the default grid as it was, and Randomize leaves margin, shifts, dashes and angle off.

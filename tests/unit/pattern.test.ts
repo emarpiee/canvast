@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MAX_SUBPATHS } from "../../src/doc/model";
 import { GENERATORS, MAX_SHAPES, cleanValues, defaultValues, generate, makeRng, pathData, randomValues, settingsOf, toSvg } from "../../src/gen";
 import * as D from "../../src/core/dyadic";
 import { duplicateRecords } from "../../src/doc/duplicate";
@@ -12,6 +13,7 @@ const sound = (shapes: readonly GenShape[], w: number, h: number): void => {
   expect(shapes.length).toBeGreaterThan(0);
   expect(shapes.length).toBeLessThanOrEqual(MAX_SHAPES);
   for (const s of shapes) {
+    expect(s.sub.length).toBeLessThanOrEqual(MAX_SUBPATHS); // (a path over this is refused, and the pattern vanishes)
     expect(s.fill !== null || s.stroke !== null).toBe(true);
     if (s.fill !== null) expect(isPaint(s.fill)).toBe(true);
     if (s.stroke !== null) expect(isPaint(s.stroke)).toBe(true);
@@ -69,6 +71,7 @@ describe("pattern generators (ADR 0162)", () => {
     expect(lines({ cells: "rows", rows: 5 })).toBe(17 + 6);
     expect(generate(g, { ...defaultValues(g), bg: "", every: 0, frame: true }, 1, 800, 400)[0]!.sub.length).toBe(17 + 9 + 1);
     expect(lines({ dash: 50 })).toBeGreaterThan(17 + 9);
+    sound(generate(g, { ...defaultValues(g), dash: 1, cols: 240 }, 1, 900, 600), 900, 600); // (the shortest dashes on the most lines: over one path's limit, so in several)
     expect(lines({ margin: 25, cols: 4 })).toBe(5 + 2); // (inside the margin: 600 wide, 200 high, cells of 150)
     expect(lines({ shiftX: 50, shiftY: 50 })).toBe(16 + 8); // (half a cell along: one line fewer each way)
     // Randomize stays a plain grid: what changes the kind of picture stays off.

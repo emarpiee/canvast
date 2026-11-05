@@ -208,7 +208,7 @@ export const grid: Generator = {
   sections: [
     { title: "Colour", items: [C("line", "Lines", "#5f7a99"), C("major", "Strong lines", "#ffffff", true)] },
     { title: "Grid", items: [R("cols", "Across", 2, 60, 16), Ch("cells", "Cells", [["square", "Square"], ["equal", "Equal"], ["rows", "By rows"]], "square"), R("rows", "Rows", 2, 60, 16), R("weight", "Line width", 1, 20, 3), R("every", "Strong every", 0, 12, 4), R("strong", "Strong width", 100, 500, 180, 10), T("rowsToo", "Rows too", true), LOOSE] },
-    { title: "Layout", items: [offInRandom("margin", "Margin", 45), T("frame", "Frame", false), offInRandom("shiftX", "Shift across", 100), offInRandom("shiftY", "Shift down", 100), offInRandom("dash", "Dashes", 100), offInRandom("angle", "Angle", 90)] },
+    { title: "Layout", items: [offInRandom("margin", "Margin", 45), T("frame", "Frame", false), offInRandom("shiftX", "Shift across", 100), offInRandom("shiftY", "Shift down", 100), offInRandom("dash", "Dash length", 100), offInRandom("angle", "Angle", 90)] },
   ],
   run(v, rng, w, h) {
     const { n, s, b, c } = reader(v);
@@ -221,7 +221,7 @@ export const grid: Generator = {
     const turned = (p: P[]): P[] => (a ? rotated(p, cx, cy, a) : p);
     const add = (i: number, x0: number, y0: number, x1: number, y1: number): void => {
       const to = n("every") > 0 && c("major") && i % n("every") === 0 ? major : minor;
-      const len = Math.hypot(x1 - x0, y1 - y0), step = Math.max((n("dash") / 100) * cell, len / 400); // (the limit: a very fine dash on a long line)
+      const len = Math.hypot(x1 - x0, y1 - y0), step = Math.max(2 * Math.max((n("dash") / 100) * cell, wd * 1.5), len / 400); // (a dash is never shorter than it can be seen; its gap is as long)
       if (!n("dash")) return void to.push(poly(turned([[x0, y0], [x1, y1]]), false));
       for (let t = 0; t < len; t += step) {
         const e = Math.min(len, t + step / 2);
