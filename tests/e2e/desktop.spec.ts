@@ -2074,7 +2074,7 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     const read = async (t: string): Promise<string> => (item?.types.includes(t) ? await (await item.getType(t) as Blob).text() : "");
     // (what is offered, by its list of types: asked for its data, any picture type comes back as the PNG)
     const offered = (t: string): boolean => !!item?.types.includes(t) || !!item?.types.includes(`electron application/osclipboard;format="${t}"`);
-    return { svg: offered("image/svg+xml"), png: offered("image/png"), text: await clipboard.readText(), file: decodeURIComponent((await read("text/uri-list")).trim().replace(/^file:\/\//, "")) };
+    return { svg: offered("image/svg+xml"), png: offered("image/png"), text: await clipboard.readText(), file: decodeURIComponent((await read("text/uri-list")).trim().replace(/^file:\/\//gm, "")) };
   });
   try {
     // On the canvas: a shape, and an SVG picture with its own file.
@@ -2227,7 +2227,10 @@ test("Copy on the canvas: a flipped picture alone goes as a PNG, and among sever
       await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(before + 1);
     }
     await expect.poll(() => files(ws).filter((f) => f.startsWith("library/")).length, { timeout: 15_000 }).toBe(2);
-    await page.getByRole("button", { name: "Flip horizontally" }).click(); // (the last one, still selected)
+    await page.keyboard.press("v");
+    const top = (await page.evaluate(() => { const d = window.__canvastDebug; return d.objectScreen(d.objects().at(-1)!.id)!.box; }));
+    await page.mouse.click((top.minX + top.maxX) / 2, (top.minY + top.maxY) / 2);
+    await page.getByRole("button", { name: "Flip horizontally" }).click();
     await app.evaluate(({ clipboard }) => clipboard.clear());
     await page.keyboard.press("Control+c");
     await expect.poll(() => out().then((o) => o.png)).toBe(true);
