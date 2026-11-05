@@ -127,11 +127,11 @@ function free(root: Object3D): void {
 
 /** Finds lines at each pixel from a ring of its neighbours as far as the line's half width. */
 const LINE_SHADER = `
-  uniform sampler2D normals; uniform sampler2D depth; uniform vec2 texel; uniform float radius; uniform float near; uniform float far; uniform bool flat;
+  uniform sampler2D normals; uniform sampler2D depth; uniform vec2 texel; uniform float radius; uniform float near; uniform float far; uniform bool flatLens;
   uniform vec3 colour; uniform float outline; uniform float inner; varying vec2 vUv;
   float zAt(vec2 uv) {
     float d = texture2D(depth, uv).x;
-    return flat ? d * (far - near) + near : (near * far) / (far - d * (far - near));
+    return flatLens ? d * (far - near) + near : (near * far) / (far - d * (far - near));
   }
   void main() {
     float d0 = texture2D(depth, vUv).x;
@@ -422,7 +422,7 @@ export class ModelStage {
         transparent: true,
         depthTest: false,
         depthWrite: false,
-        uniforms: { normals: { value: null }, depth: { value: null }, texel: { value: new T.Vector2() }, radius: { value: 1 }, near: { value: 1 }, far: { value: 10 }, flat: { value: false }, colour: { value: new T.Color() }, outline: { value: 0.5 }, inner: { value: 0.5 } },
+        uniforms: { normals: { value: null }, depth: { value: null }, texel: { value: new T.Vector2() }, radius: { value: 1 }, near: { value: 1 }, far: { value: 10 }, flatLens: { value: false }, colour: { value: new T.Color() }, outline: { value: 0.5 }, inner: { value: 0.5 } },
         vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
         fragmentShader: LINE_SHADER,
       }));
@@ -438,7 +438,7 @@ export class ModelStage {
     u["radius"]!.value = Math.max(0.5, ((look["linesWidth"] as number) * seen.height) / 800 / 2);
     u["near"]!.value = camera.near;
     u["far"]!.value = camera.far;
-    u["flat"]!.value = camera === this.ortho;
+    u["flatLens"]!.value = camera === this.ortho;
     (u["colour"]!.value as { set(c: string): void }).set(look["linesColour"] as string);
     u["outline"]!.value = look["linesOutline"];
     u["inner"]!.value = look["linesInner"];
