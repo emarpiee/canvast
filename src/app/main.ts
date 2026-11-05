@@ -165,7 +165,7 @@ import { AssetNames } from "./asset-names";
 import { isLabelled, itemLabels, itemName } from "../render/item-label";
 import { drawReveal, drawRevealOutlines, revealWords } from "../render/reveal";
 import type { ItemLabel } from "../render/item-label";
-import { PRIVACY_KEYS, SettingsStore } from "../settings/settings";
+import { PRIVACY_KEYS, SETTINGS, SettingsStore } from "../settings/settings";
 import { DEFAULT_INK, newInk, setCanvasInk } from "../render/ink";
 import { paintFromText, paintToText } from "../doc/paint";
 
@@ -814,6 +814,17 @@ async function start(): Promise<void> {
   };
 
   const session = new Session(storage, doc, view, editor, assets);
+  session.settingsHook = { snapshot: (withPrivacy) => Object.fromEntries(Object.entries(settings.snapshot()).filter(([k]) => (withPrivacy || !PRIVACY_KEYS.includes(k)))), privacySet: () => PRIVACY_KEYS.some((k) => settings.isSet(k as never)), restore: (s) => settings.restore(s), restorable: (s) => settings.restorable(s), getAuto: () => settings.get("storage.autoIndex"), setAuto: (on) => void settings.set("storage.autoIndex", on), workspace: () => settings.workspaceValues(), adopt: (from) => void settings.adoptWorkspace(from) };
+  // A workspace setting changed here (not one just taken from the workspace) is kept in the workspace: once for many at a time (an import).
+  let wsSettingsDue = false;
+  settings.subscribe((key) => {
+    if (SETTINGS[key].scope !== "workspace" || settings.adopting || wsSettingsDue) return;
+    wsSettingsDue = true;
+    queueMicrotask(() => {
+      wsSettingsDue = false;
+      void session.saveWorkspaceSettings(settings.workspaceValues());
+    });
+  });
   // A file card on a canvas shows its custom thumbnail (a shown library item's, or an uploaded normal one): never a hidden one.
   assets.customPicture = async (hash) => {
     const e = await session.catalog?.entry(hash);
@@ -1716,8 +1727,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       setPreview: (preview, size) => {
         const o = doc.get(from.id);
         if (o?.kind !== "image" || editor.blockEdit()) return;
-        const { crop: _crop, ...rest } = o;
-        doc.commit(doc.transaction("Card preview", [{ ...rest, preview, pixelW: size.w, pixelH: size.h, h: (o.w * size.h) / size.w }]));
+        const { crop: _crop, preview: _was, ...rest } = o;
+        doc.commit(doc.transaction("Card preview", [{ ...rest, ...(preview && { preview }), pixelW: size.w, pixelH: size.h, h: (o.w * size.h) / size.w }])); // (none: its first page or view)
         editor.changed();
       },
       placeViews: (items) => {
@@ -2241,7 +2252,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   session.subscribeAssets(() => session.autoIndex?.poke()); // (commits, imports, catalog changes)
   settings.subscribe(() => session.autoIndex?.poke());
   externalFolder.subscribe(() => session.autoIndex?.poke()); // (a folder was chosen or came back)
-  session.settingsHook = { snapshot: (withPrivacy) => Object.fromEntries(Object.entries(settings.snapshot()).filter(([k]) => (withPrivacy || !PRIVACY_KEYS.includes(k)))), privacySet: () => PRIVACY_KEYS.some((k) => settings.isSet(k as never)), restore: (s) => settings.restore(s), restorable: (s) => settings.restorable(s), getAuto: () => settings.get("storage.autoIndex"), setAuto: (on) => void settings.set("storage.autoIndex", on) };
   const settingsView = mountSettingsView(document.getElementById("settings-view")!, settings, keymap, () => setView("canvas"), {
     last: async () => {
       const r = await session.lastBackup();
@@ -2827,7 +2837,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         invalidate();
         return new Promise((resolve) => frameWaiters.push(resolve));
       },
-      { doc, editor, session, renderNow, index, pictureLocked: (hash) => assets.isLocked(hash), appView: () => appView, setSetting: (k, v) => void (settings as unknown as { set(k: string, v: unknown): Promise<void> }).set(k, v), setView, tiles, density, quality, indexReady: () => indexSync.ready(), labels: () => labels },
+      { doc, editor, session, renderNow, index, pictureLocked: (hash) => assets.isLocked(hash), appView: () => appView, setSetting: (k, v) => void (settings as unknown as { set(k: string, v: unknown): Promise<void> }).set(k, v), getSetting: (k) => settings.get(k as never), setView, tiles, density, quality, indexReady: () => indexSync.ready(), labels: () => labels },
     );
   }
   resize();

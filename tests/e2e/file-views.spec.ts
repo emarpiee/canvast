@@ -314,8 +314,8 @@ test("a 3D model: a picture in the library, a view that turns, is lit and keeps 
   await p.mouse.dblclick(at.x + at.width / 2, at.y + at.height / 2);
   const panel = p.getByTestId("note-panel");
   await expect(panel.getByTestId("model-view")).toBeVisible();
-  // Opened from a card it starts at what the card shows (here its first look), wherever the viewer left the file.
-  await expect(panel.locator('[data-k="yaw"] input[type=number]')).toHaveValue("35");
+  // Placed from the viewer, the card shows the view in sight; opened from the card, the panel starts at what the card shows.
+  await expect(panel.locator('[data-k="yaw"] input[type=number]')).toHaveValue(turned);
   await panel.locator('[data-k="bg"] [data-eye]').click();
   await panel.getByTestId("view-card").click();
   await expect.poll(async () => JSON.parse((await pic())?.preview ?? "{}").bg).toBe("");

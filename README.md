@@ -276,7 +276,7 @@ There is no edge and no zoom limit, in either direction.
   - A **tour** plays them in list order: the bars fade, `→` and `←` step, `Esc` ends it. With *Tour: wait at each stop* (Settings) it moves on by itself.
   - Getting to a bookmark is a glide; a far one zooms out from here and in to there (see *Camera travel* below).
 - **Search** (`Ctrl+F`) finds objects by name, tag or bookmark. Combine words with space or `AND`, `OR`, `XOR`, `NOT`, parentheses and `"phrases"`. `/` searches names only, `#` tags only, `@` bookmarks only. Searches that found something are remembered, and a help card lists the syntax.
-  - **Saved searches:** the save button in the box keeps the search typed (pressed while it is saved; press it again to remove it). In the library a saved search also keeps its layout, columns and sort, in the same list; its update button in the sidebar gives it the ones shown now. With the box empty, the eight used last are listed above the recent ones, with how many more there are; while typing, the saved searches that hold the words typed are offered, so a long list is found by typing. The canvas search and the library search each keep their own list (up to 200 each), on this device, and it travels in a workspace backup with the other settings.
+  - **Saved searches:** the save button in the box keeps the search typed (pressed while it is saved; press it again to remove it). In the library a saved search also keeps its layout, columns and sort, in the same list; its update button in the sidebar gives it the ones shown now. With the box empty, the eight used last are listed above the recent ones, with how many more there are; while typing, the saved searches that hold the words typed are offered, so a long list is found by typing. The canvas search and the library search each keep their own list (up to 200 each), in the workspace (its folder, on desktop), and it travels in a workspace backup with the other settings. With the Hidden items open, the library keeps a separate list on this device only.
   - **Keywords:** `kind:` (picture, video, gif, audio, note (a note's card), text, stroke, shape, sheet), `group:name` (in a group of that name), `in:name` (on a sheet of that name), `fill:red` and `stroke:#2563eb` (the colour of the fill or the outline; `colour:` either), and `is:locked`, `is:masked`, `is:offscreen`, `is:tagged`, `is:named`, `is:rotated`, `is:grouped`.
 - **Step through items** with `W` `A` `S` `D`: the nearest in view (when you are zoomed in on an item and nothing is near enough on the screen, the nearest of its size that way, however far), the nearest anywhere, by layer or by name A to Z (each either among the items in the window or among all of them; `W` and `A` go back, `S` and `D` on). On arriving, focus on the item or keep the zoom. `F` brings the selection into view; press it again to fit everything.
 - **Jump anywhere:** click the zoom in the info bar and type a level. One jump can travel up to 2^50 levels.
@@ -583,7 +583,7 @@ An item is in one folder and can have many tags. Both show as trees in the sideb
 | **Organize…** | `O`, the right-click menu, or Details: moves to a folder and sets tags at one Apply |
 | **Search a list** | The box over Folders, Tags or Canvas tags |
 | **Sort a list** | The sort button: A to Z, Z to A; folders also newest and oldest |
-| **Pin a folder** | The pin on its row, or **Pin to top** in its menu; on this device only |
+| **Pin a folder** | The pin on its row, or **Pin to top** in its menu; kept in the workspace |
 | **Nested tags** | `art/ink` shows as `ink` under `art` |
 | **Quick filters** | Click a type or tag; `Ctrl`+click adds another |
 | **File by dragging** | Drop items on a folder, tag, *Unfiled* or *Favourites* |
@@ -597,7 +597,7 @@ An item is in one folder and can have many tags. Both show as trees in the sideb
 
 - **Folders** (an item lives in one folder, folders nest; a long list in the sidebar shows its first rows and **Show N more**, remembered on this device; the search box above the list finds a folder by name or path, opens what leads to it, and `Esc` empties it), **tags** (several per item; a tag with a `/` is a branch of a tree in the sidebar, with arrows that fold it and a parent that finds and counts what is nested under it, each item once; or all in a row with their whole names, by the button on the Tags header; renamed in one dialog, from a tag's ⋯ menu in the sidebar or the Tags panel, or a double-click on it in the details), **favourites**, file types, **Similar images** (duplicates and near-duplicates found by their pixels) and **hidden** items, which are kept out of every list and listed only in hidden mode (see [Hidden items and passwords](#hidden-items-and-passwords)).
 - **Searching the sidebar:** Folders, Tags and Canvas tags each have a search box for their own list. It only narrows that list: the items shown change when you choose a row.
-- **Pinned folders:** the pin button on a folder's row (it shows when the pointer is on the row, filled on a pinned folder; not on small or touch screens), or **Pin to top** in its ⋯ menu or on a right click, puts it first in the Folders list, a subfolder too, with an arrow on its folder icon; **Unpin** puts it back. Pins are remembered on this device only, and a search shows every folder in its usual place.
+- **Pinned folders:** the pin button on a folder's row (it shows when the pointer is on the row, filled on a pinned folder; not on small or touch screens), or **Pin to top** in its ⋯ menu or on a right click, puts it first in the Folders list, a subfolder too, with an arrow on its folder icon; **Unpin** puts it back. Pins are kept in the workspace (pins made before on a device move there), and a search shows every folder in its usual place.
 - **Sorting the sidebar:** the sort button on a section's header changes the order at each click, remembered on this device. Folders go through A to Z, Z to A, newest first and oldest first; Tags and Canvas tags through A to Z and Z to A. Newest and oldest follow the order the library holds its folders in, as folders have no date of their own: one found on the disk counts from when it was found, and one hidden and shown again can count as newer.
 - **Quick filters:** a file type or a tag in the sidebar lists only those items; `Ctrl`+click (`⌘` on a Mac) adds another type or tag to the filter, or takes it out: any of the types chosen and any of the tags chosen.
 - **Drag items onto the sidebar:** onto a folder to move them into it, onto *Unfiled* to take them out of their folders, onto a tag to tag them, onto *Favourites* to mark them; a selected item carries the whole select.
@@ -971,7 +971,18 @@ A markdown note's YAML block is its tags, description and properties, and each p
 
 ### Settings and accessibility
 
-Open Settings with the gear button. Settings have a *device* scope and a *canvas* scope, can be searched, and reset individually (the undo-arrow icon at the end of a row) or together. Every group has an icon in the list on the left, and the groups are indented under their heading. Device settings travel in a workspace backup and in the library index (see Backups).
+Open Settings with the gear button. Each setting says where it is kept, at the end of its row: *This device* or *This workspace*. Settings can be searched, and reset individually (the undo-arrow icon at the end of a row) or together. Every group has an icon in the list on the left, and the groups are indented under their heading. All of them travel in a workspace backup (see Backups).
+
+| Kept in | Settings |
+| --- | --- |
+| This workspace (in its folder, `.canvast/workspace.json`, on desktop) | How notes are written and named (properties, dates, names, titles, saving, their folder) and what their cards show; file names and placement (keep file names, sort files, the folder, name, tags, format and quality of saved edits, frames, screenshots, exports, patterns and SVGs); where deleted files go and for how long; property types; saved searches; pinned folders |
+| This device | Everything else: theme, density, panels, shortcuts, tools, colours, motion, media, the Hidden items' privacy settings, memory and indexing |
+
+#### More about workspace settings
+
+- **Shared:** every device that opens the workspace folder uses its settings, and a change on one is read by the others, as canvases are. Deleting the app's own data on a device keeps them.
+- **The first time:** a workspace that has none yet takes those of the device that opens it, so nothing changes. A folder written by an older version keeps the settings each device had.
+- **Hidden items:** saved searches made with the Hidden items open stay on the device, in their own list, and out of a backup unless *privacy settings* are included; nothing of them is written to the folder.
 
 Each setting says what it is on one line; **More** under it has the whole explanation, and the search box finds words in both.
 
@@ -1053,7 +1064,7 @@ The first tab to open a workspace edits it. Other tabs are read-only, follow its
 
 ### Backups
 
-- **Export a backup** (Settings > Storage) downloads one `.canvast` file holding every board, canvas, object and view, plus every file once, and your device settings (theme, shortcuts, panel layout). When you import it, only the settings this device has not set itself are restored; the ones you changed here are kept, and the import dialog says how many it will restore.
+- **Export a backup** (Settings > Storage) downloads one `.canvast` file holding every board, canvas, object and view, plus every file once, and your settings (the workspace's and this device's: theme, shortcuts, panel layout). When you import it, only the settings this device has not set itself are restored; the ones you changed here are kept, and the import dialog says how many it will restore.
 - A board, a canvas or a single library item can be exported on its own, with only the files it uses.
 - **Import archive…** (or drop a `.canvast` file on the page) verifies every checksum first, shows what it contains and any problems, and only then adds the boards and canvases in a single transaction. Nothing existing is replaced and files you already have are not stored twice. Paintings and brush presets in a backup from an older version are left out, and the summary says so.
 - A `.canvast` file is a standard, uncompressed ZIP you can open with any unzip tool. Do not re-compress it.
@@ -1125,7 +1136,7 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 | `.canvast/boards/<board>/` | A board, named after it (lowercase, `_` between words, `-` between parts; `-2` on a clash). Inside the app's own folder, so canvases are not edited by accident |
 | `.canvast/boards/<board>/<canvas>.cvst` | A canvas: one JSON file with its objects, frames and bookmarks |
 | `library/<folder path>/`, `library/images/`… | The library's files, named after their names in the library: in the folders of their library folders, or when in none, at the top of `library/` or by kind: `images`, `vectors` (svg, eps), `icons` (ico, icns), `art_sources` (psd, kra, xcf, clip, procreate, sai, ai, afphoto, …), `presets` (brushes and swatches: abr, kpp, ase, aco, gpl, …), `3d` (obj, fbx, glb, gltf, stl, blend, …), `video`, `audio`, `fonts`, `notes` (md, markdown, txt, note.html), `documents` (pdf, office files, epub, html, …), `archives` (zip, rar, 7z, tar, gz, …), `other` |
-| `.canvast/workspace.json`, `.canvast/library/` | Names, order, styles and passwords' kept forms; the library's names, tags, folders, descriptions and properties, in parts so a change rewrites one small file |
+| `.canvast/workspace.json`, `.canvast/library/` | Names, order, styles, the workspace's settings and passwords' kept forms; the library's names, tags, folders, descriptions and properties, in parts so a change rewrites one small file |
 | `.canvast/library.json` | A copy of the library in one file, for an older version of the app (kept up to 10,000 items) |
 | `.canvast/devices/` | One file per device: its open canvas and cameras |
 | `.canvast/folder.json` | This folder's own id, so a new folder at the same place is a new workspace |

@@ -6,8 +6,9 @@
  * fails its validator falls back to the default, so a damaged or hand-edited
  * value can never break the app.
  *
- *   device     this browser only; never exported, never shared. Stored in localStorage.
- *   workspace  shared by the whole workspace and included in its backups. Declared, no backend yet.
+ *   device     this browser only; never shared. Stored in localStorage (and in a backup's settings).
+ *   workspace  shared by the whole workspace (the workspace's storage: `workspace.json` in the desktop build) and included in its
+ *              backups. A copy stays in localStorage, so a workspace that cannot be read still has its last values.
  *   board      overrides the workspace value for one board. Declared, no backend yet.
  *
  * Instance-specific state (a video's pause position, an image's adjustments)
@@ -39,6 +40,16 @@ const bool = (v: unknown): boolean | undefined => (typeof v === "boolean" ? v : 
 const range = (lo: number, hi: number) => (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi ? v : undefined);
 const letter = (v: unknown): string | undefined => (typeof v === "string" && /^[a-z]$/.test(v) ? v : undefined);
 const text = (max: number) => (v: unknown): string | undefined => (typeof v === "string" && v.length <= max ? v : undefined);
+/** A JSON list of up to 2000 ids. */
+const idList = (v: unknown): string | undefined => {
+  if (typeof v !== "string" || v.length > 200_000) return undefined;
+  try {
+    const a: unknown = JSON.parse(v);
+    return Array.isArray(a) && a.length <= 2000 && a.every((x) => typeof x === "string") ? v : undefined;
+  } catch {
+    return undefined;
+  }
+};
 const colour = (v: unknown): string | undefined => (typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v) ? v : undefined);
 
 /** Up to eight "#rrggbb" colours, newest first, written as one comma-separated text. */
@@ -57,7 +68,7 @@ export function decodedMbFor(gb: number | undefined): "128" | "256" | "384" {
 }
 
 /** The privacy settings that stay out of a backup unless the person chooses to include them when exporting. */
-export const PRIVACY_KEYS: readonly string[] = ["library.hiddenWord", "library.hiddenRemember", "library.hiddenStay"];
+export const PRIVACY_KEYS: readonly string[] = ["library.hiddenWord", "library.hiddenRemember", "library.hiddenStay", "search.saved.hidden"];
 
 export const SETTINGS = {
   "dev.tools": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "restart" } as Def<boolean>,
@@ -67,12 +78,12 @@ export const SETTINGS = {
   "library.hiddenCopySeconds": { scope: "device", default: 30, validate: range(0, 3600), effect: "immediate" } as Def<number>,
   "library.hiddenStay": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   /** The desktop build (ADR 0177): where a file the app deletes from the workspace folder goes. */
-  "storage.deleteTo": { scope: "device", default: "trash", validate: oneOf("trash", "system", "erase"), effect: "immediate" } as Def<"trash" | "system" | "erase">,
+  "storage.deleteTo": { scope: "workspace", default: "trash", validate: oneOf("trash", "system", "erase"), effect: "immediate" } as Def<"trash" | "system" | "erase">,
   // The desktop app: a file deleted from the library leaves the folder at once, even while undo on the open canvas could still bring an instance back.
-  "storage.deleteAtOnce": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
-  "storage.trashDays": { scope: "device", default: "0", validate: oneOf("0", "30", "90", "365"), effect: "immediate" } as Def<"0" | "30" | "90" | "365">,
-  "library.keepFileNames": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
-  "library.sortFiles": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  "storage.deleteAtOnce": { scope: "workspace", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  "storage.trashDays": { scope: "workspace", default: "0", validate: oneOf("0", "30", "90", "365"), effect: "immediate" } as Def<"0" | "30" | "90" | "365">,
+  "library.keepFileNames": { scope: "workspace", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
+  "library.sortFiles": { scope: "workspace", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "library.hiddenNamesOff": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "storage.autoIndex": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "ui.patternTab": { scope: "device", default: "patterns", validate: oneOf("patterns", "guides"), effect: "immediate" } as Def<"patterns" | "guides">,
@@ -84,8 +95,12 @@ export const SETTINGS = {
   "colour.format": { scope: "device", default: "hex", validate: oneOf("hex", "rgb", "oklch"), effect: "immediate" } as Def<"hex" | "rgb" | "oklch">,
   "colour.recent": { scope: "device", default: "#1f2329,#2563eb,#dc2626,#16a34a", validate: colourList, effect: "immediate" } as Def<string>,
   // Saved searches (search/saved.ts): the library's and the canvas search's own lists, as JSON. Not shown in Settings: the search boxes manage them.
-  "search.saved.library": { scope: "device", default: "[]", validate: validSaved, effect: "immediate" } as Def<string>,
-  "search.saved.canvas": { scope: "device", default: "[]", validate: validSaved, effect: "immediate" } as Def<string>,
+  "search.saved.library": { scope: "workspace", default: "[]", validate: validSaved, effect: "immediate" } as Def<string>,
+  /** Saved searches made with the Hidden items open: on this device only, never in the workspace folder (their words may name hidden things). */
+  "search.saved.hidden": { scope: "device", default: "[]", validate: validSaved, effect: "immediate" } as Def<string>,
+  /** Library folders pinned to the top of the Folders list, by id. */
+  "library.pinned": { scope: "workspace", default: "[]", validate: idList, effect: "immediate" } as Def<string>,
+  "search.saved.canvas": { scope: "workspace", default: "[]", validate: validSaved, effect: "immediate" } as Def<string>,
   // Shapes and paths (ADR 0099): what the Shape and Path tools make. The outline is not remembered: every session starts with none.
   "shape.kind": { scope: "device", default: "rect", validate: oneOf("rect", "ellipse", "line", "polygon", "star"), effect: "immediate" } as Def<"rect" | "ellipse" | "line" | "polygon" | "star">,
   "shape.fill": { scope: "device", default: "#2563eb", validate: paint, effect: "immediate" } as Def<string>,
@@ -156,26 +171,26 @@ export const SETTINGS = {
   "ui.background": { scope: "device", default: "", validate: (v: unknown) => (typeof v === "string" && (v === "" || /^#[0-9a-f]{6}$/.test(v)) ? v : undefined), effect: "immediate" } as Def<string>,
   "ui.corners": { scope: "device", default: "round", validate: oneOf("round", "sharp"), effect: "immediate" } as Def<"round" | "sharp">,
   "ui.density": { scope: "device", default: "compact", validate: oneOf("comfortable", "compact", "dense"), effect: "immediate" } as Def<"comfortable" | "compact" | "dense">,
-  "notes.writeProps": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  "notes.writeProps": { scope: "workspace", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.codeColours": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.wrapSelection": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.saveOnClose": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
-  "notes.saveAs": { scope: "device", default: "ask", validate: oneOf("ask", "file", "rich"), effect: "immediate" } as Def<"ask" | "file" | "rich">,
-  "notes.cardShows": { scope: "device", default: "whole", validate: oneOf("part", "whole"), effect: "immediate" } as Def<"part" | "whole">,
-  "library.propTypes": { scope: "device", default: "{}", validate: validPropTypes, effect: "immediate" } as Def<string>,
-  "notes.autoDates": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
-  "notes.createdKey": { scope: "device", default: "created", validate: text(64), effect: "immediate" } as Def<string>,
-  "notes.modifiedKey": { scope: "device", default: "modified", validate: text(64), effect: "immediate" } as Def<string>,
-  "notes.dateFormat": { scope: "device", default: "YYYY-MM-DDTHH:mm", validate: text(60), effect: "immediate" } as Def<string>,
-  "notes.titleKey": { scope: "device", default: "title", validate: text(64), effect: "immediate" } as Def<string>,
-  "notes.titleFrom": { scope: "device", default: "off", validate: oneOf("off", "h1"), effect: "immediate" } as Def<"off" | "h1">,
-  "notes.renameOnSave": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
-  "notes.nameFrom": { scope: "device", default: "h1", validate: oneOf("h1", "title"), effect: "immediate" } as Def<"h1" | "title">,
-  "notes.nameStyle": { scope: "device", default: "kept", validate: oneOf("kept", "clean"), effect: "immediate" } as Def<"kept" | "clean">,
-  "notes.cardProps": { scope: "device", default: "", validate: text(200), effect: "immediate" } as Def<string>,
-  "notes.name": { scope: "device", default: "Note {yyyy}-{mm}-{dd} {hhmmss}", validate: text(120), effect: "immediate" } as Def<string>,
-  "notes.cardWidth": { scope: "device", default: 320, validate: range(120, 1200), effect: "immediate" } as Def<number>,
-  "notes.folder": { scope: "device", default: "Notes", validate: text(60), effect: "immediate" } as Def<string>,
+  "notes.saveAs": { scope: "workspace", default: "ask", validate: oneOf("ask", "file", "rich"), effect: "immediate" } as Def<"ask" | "file" | "rich">,
+  "notes.cardShows": { scope: "workspace", default: "whole", validate: oneOf("part", "whole"), effect: "immediate" } as Def<"part" | "whole">,
+  "library.propTypes": { scope: "workspace", default: "{}", validate: validPropTypes, effect: "immediate" } as Def<string>,
+  "notes.autoDates": { scope: "workspace", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  "notes.createdKey": { scope: "workspace", default: "created", validate: text(64), effect: "immediate" } as Def<string>,
+  "notes.modifiedKey": { scope: "workspace", default: "modified", validate: text(64), effect: "immediate" } as Def<string>,
+  "notes.dateFormat": { scope: "workspace", default: "YYYY-MM-DDTHH:mm", validate: text(60), effect: "immediate" } as Def<string>,
+  "notes.titleKey": { scope: "workspace", default: "title", validate: text(64), effect: "immediate" } as Def<string>,
+  "notes.titleFrom": { scope: "workspace", default: "off", validate: oneOf("off", "h1"), effect: "immediate" } as Def<"off" | "h1">,
+  "notes.renameOnSave": { scope: "workspace", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  "notes.nameFrom": { scope: "workspace", default: "h1", validate: oneOf("h1", "title"), effect: "immediate" } as Def<"h1" | "title">,
+  "notes.nameStyle": { scope: "workspace", default: "kept", validate: oneOf("kept", "clean"), effect: "immediate" } as Def<"kept" | "clean">,
+  "notes.cardProps": { scope: "workspace", default: "", validate: text(200), effect: "immediate" } as Def<string>,
+  "notes.name": { scope: "workspace", default: "Note {yyyy}-{mm}-{dd} {hhmmss}", validate: text(120), effect: "immediate" } as Def<string>,
+  "notes.cardWidth": { scope: "workspace", default: 320, validate: range(120, 1200), effect: "immediate" } as Def<number>,
+  "notes.folder": { scope: "workspace", default: "Notes", validate: text(60), effect: "immediate" } as Def<string>,
   "notes.look": { scope: "device", default: "auto", validate: oneOf("auto", "light", "dark"), effect: "immediate" } as Def<"auto" | "light" | "dark">,
   "notes.panelMode": { scope: "device", default: "panel", validate: oneOf("panel", "window"), effect: "immediate" } as Def<"panel" | "window">,
   "notes.panelStyle": { scope: "device", default: "document", validate: oneOf("document", "classic", "bottom", "balloon", "notion"), effect: "immediate" } as Def<NoteStyle>,
@@ -194,48 +209,48 @@ export const SETTINGS = {
   "key.zen": { scope: "device", default: "z", validate: letter, effect: "immediate" } as Def<string>,
   "arrange.gap": { scope: "device", default: "normal", validate: oneOf("none", "tight", "normal", "wide", "wider"), effect: "immediate" } as Def<"none" | "tight" | "normal" | "wide" | "wider">,
   // Screenshots (ADR 0080).
-  "shot.format": { scope: "device", default: "webp", validate: oneOf("webp", "png", "jpeg"), effect: "immediate" } as Def<"webp" | "png" | "jpeg">,
-  "shot.quality": { scope: "device", default: 90, validate: range(10, 100), effect: "immediate" } as Def<number>,
+  "shot.format": { scope: "workspace", default: "webp", validate: oneOf("webp", "png", "jpeg"), effect: "immediate" } as Def<"webp" | "png" | "jpeg">,
+  "shot.quality": { scope: "workspace", default: 90, validate: range(10, 100), effect: "immediate" } as Def<number>,
   "shot.pattern": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shot.interface": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shot.transparent": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
-  "shot.folder": { scope: "device", default: "Screenshots", validate: text(60), effect: "immediate" } as Def<string>,
-  "shot.name": { scope: "device", default: "{board}-{canvas}-{ddmmyyyy}-{hhmmss}", validate: text(120), effect: "immediate" } as Def<string>,
-  "shot.nameStyle": { scope: "device", default: "snake", validate: oneOf("snake", "kebab", "camel", "pascal", "keep", "underscores"), effect: "immediate" } as Def<"snake" | "kebab" | "camel" | "pascal" | "keep" | "underscores">,
-  "shot.tagsCustom": { scope: "device", default: "", validate: text(200), effect: "immediate" } as Def<string>,
+  "shot.folder": { scope: "workspace", default: "Screenshots", validate: text(60), effect: "immediate" } as Def<string>,
+  "shot.name": { scope: "workspace", default: "{board}-{canvas}-{ddmmyyyy}-{hhmmss}", validate: text(120), effect: "immediate" } as Def<string>,
+  "shot.nameStyle": { scope: "workspace", default: "snake", validate: oneOf("snake", "kebab", "camel", "pascal", "keep", "underscores"), effect: "immediate" } as Def<"snake" | "kebab" | "camel" | "pascal" | "keep" | "underscores">,
+  "shot.tagsCustom": { scope: "workspace", default: "", validate: text(200), effect: "immediate" } as Def<string>,
   // Edited pictures (ADR 0118): "Make a new picture" of a picture as it looks with its crop and adjustments.
-  "edit.format": { scope: "device", default: "png", validate: oneOf("webp", "png", "jpeg"), effect: "immediate" } as Def<"webp" | "png" | "jpeg">,
-  "edit.quality": { scope: "device", default: 92, validate: range(10, 100), effect: "immediate" } as Def<number>,
-  "edit.folder": { scope: "device", default: "Edited pictures", validate: text(60), effect: "immediate" } as Def<string>,
-  "edit.name": { scope: "device", default: "{name}-edited", validate: text(120), effect: "immediate" } as Def<string>,
-  "edit.nameStyle": { scope: "device", default: "keep", validate: oneOf("snake", "kebab", "camel", "pascal", "keep", "underscores"), effect: "immediate" } as Def<"snake" | "kebab" | "camel" | "pascal" | "keep" | "underscores">,
-  "edit.tagEdited": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
-  "edit.tagSource": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
-  "edit.tagInherit": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
-  "edit.tagsCustom": { scope: "device", default: "", validate: text(200), effect: "immediate" } as Def<string>,
+  "edit.format": { scope: "workspace", default: "png", validate: oneOf("webp", "png", "jpeg"), effect: "immediate" } as Def<"webp" | "png" | "jpeg">,
+  "edit.quality": { scope: "workspace", default: 92, validate: range(10, 100), effect: "immediate" } as Def<number>,
+  "edit.folder": { scope: "workspace", default: "Edited pictures", validate: text(60), effect: "immediate" } as Def<string>,
+  "edit.name": { scope: "workspace", default: "{name}-edited", validate: text(120), effect: "immediate" } as Def<string>,
+  "edit.nameStyle": { scope: "workspace", default: "keep", validate: oneOf("snake", "kebab", "camel", "pascal", "keep", "underscores"), effect: "immediate" } as Def<"snake" | "kebab" | "camel" | "pascal" | "keep" | "underscores">,
+  "edit.tagEdited": { scope: "workspace", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "edit.tagSource": { scope: "workspace", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "edit.tagInherit": { scope: "workspace", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "edit.tagsCustom": { scope: "workspace", default: "", validate: text(200), effect: "immediate" } as Def<string>,
   // Extracted frames (ADR 0081).
-  "frame.format": { scope: "device", default: "png", validate: oneOf("webp", "png", "jpeg"), effect: "immediate" } as Def<"webp" | "png" | "jpeg">,
-  "frame.quality": { scope: "device", default: 92, validate: range(10, 100), effect: "immediate" } as Def<number>,
-  "frame.folder": { scope: "device", default: "Extracted frames", validate: text(60), effect: "immediate" } as Def<string>,
-  "frame.name": { scope: "device", default: "{name}-{position}", validate: text(120), effect: "immediate" } as Def<string>,
-  "frame.nameStyle": { scope: "device", default: "keep", validate: oneOf("snake", "kebab", "camel", "pascal", "keep", "underscores"), effect: "immediate" } as Def<"snake" | "kebab" | "camel" | "pascal" | "keep" | "underscores">,
-  "frame.tagFrame": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
-  "frame.tagSource": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
-  "frame.tagInherit": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
-  "frame.tagsCustom": { scope: "device", default: "", validate: text(200), effect: "immediate" } as Def<string>,
+  "frame.format": { scope: "workspace", default: "png", validate: oneOf("webp", "png", "jpeg"), effect: "immediate" } as Def<"webp" | "png" | "jpeg">,
+  "frame.quality": { scope: "workspace", default: 92, validate: range(10, 100), effect: "immediate" } as Def<number>,
+  "frame.folder": { scope: "workspace", default: "Extracted frames", validate: text(60), effect: "immediate" } as Def<string>,
+  "frame.name": { scope: "workspace", default: "{name}-{position}", validate: text(120), effect: "immediate" } as Def<string>,
+  "frame.nameStyle": { scope: "workspace", default: "keep", validate: oneOf("snake", "kebab", "camel", "pascal", "keep", "underscores"), effect: "immediate" } as Def<"snake" | "kebab" | "camel" | "pascal" | "keep" | "underscores">,
+  "frame.tagFrame": { scope: "workspace", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "frame.tagSource": { scope: "workspace", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "frame.tagInherit": { scope: "workspace", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "frame.tagsCustom": { scope: "workspace", default: "", validate: text(200), effect: "immediate" } as Def<string>,
   // What is saved to the library from the canvas, each in a folder and with tags of its own: a picture from Export… (ADR 0147), a pattern made by
   // the Pattern panel (ADR 0162, saved by Export… or as SVG) and picked shapes saved as an SVG.
-  "export.folder": { scope: "device", default: "Exports", validate: text(60), effect: "immediate" } as Def<string>,
-  "export.tags": { scope: "device", default: "export", validate: text(200), effect: "immediate" } as Def<string>,
-  "pattern.folder": { scope: "device", default: "Patterns", validate: text(60), effect: "immediate" } as Def<string>,
-  "pattern.tags": { scope: "device", default: "pattern", validate: text(200), effect: "immediate" } as Def<string>,
-  "svg.folder": { scope: "device", default: "Shapes", validate: text(60), effect: "immediate" } as Def<string>,
-  "svg.tags": { scope: "device", default: "shape", validate: text(200), effect: "immediate" } as Def<string>,
+  "export.folder": { scope: "workspace", default: "Exports", validate: text(60), effect: "immediate" } as Def<string>,
+  "export.tags": { scope: "workspace", default: "export", validate: text(200), effect: "immediate" } as Def<string>,
+  "pattern.folder": { scope: "workspace", default: "Patterns", validate: text(60), effect: "immediate" } as Def<string>,
+  "pattern.tags": { scope: "workspace", default: "pattern", validate: text(200), effect: "immediate" } as Def<string>,
+  "svg.folder": { scope: "workspace", default: "Shapes", validate: text(60), effect: "immediate" } as Def<string>,
+  "svg.tags": { scope: "workspace", default: "shape", validate: text(200), effect: "immediate" } as Def<string>,
   "frame.place": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
-  "shot.tagShot": { scope: "device", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
-  "shot.tagBoard": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
-  "shot.tagCanvas": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
-  "shot.tagItems": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "shot.tagShot": { scope: "workspace", default: true, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "shot.tagBoard": { scope: "workspace", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "shot.tagCanvas": { scope: "workspace", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
+  "shot.tagItems": { scope: "workspace", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shot.copy": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "nav.edgePanOn": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "nav.edgePan": { scope: "device", default: 100, validate: range(10, 300), effect: "immediate" } as Def<number>,
@@ -330,7 +345,7 @@ export class SettingsStore {
   /** Set a value. An invalid value is rejected (returns false); an unchanged one is not written. */
   set<K extends SettingKey>(key: K, value: SettingValue<K>): boolean {
     const def = SETTINGS[key] as Def<unknown>;
-    if (def.scope !== "device") throw new Error(`setting ${key} has scope "${def.scope}", which has no storage yet`);
+    if (def.scope === "board") throw new Error(`setting ${key} has scope "${def.scope}", which has no storage yet`);
     const v = def.validate(value);
     if (v === undefined) return false;
     if (this.get(key) === v) return true;
@@ -345,6 +360,41 @@ export class SettingsStore {
     if (!this.values.delete(key)) return;
     this.save();
     for (const fn of this.listeners) fn(key);
+  }
+
+  /** The workspace's settings that are not the default, to keep in the workspace. */
+  workspaceValues(): Record<string, unknown> {
+    return Object.fromEntries([...this.values].filter(([k]) => (SETTINGS[k as SettingKey] as Def<unknown>).scope === "workspace"));
+  }
+
+  /** True while `adoptWorkspace` tells its changes: they came from the workspace, nothing needs writing back. */
+  adopting = false;
+
+  /**
+   * The workspace's settings as kept there: each takes its value, or its default when the workspace has none. Device settings are untouched.
+   * Returns the keys that changed.
+   */
+  adoptWorkspace(from: Record<string, unknown>): SettingKey[] {
+    const changed: SettingKey[] = [];
+    for (const key of Object.keys(SETTINGS) as SettingKey[]) {
+      const def = SETTINGS[key] as Def<unknown>;
+      if (def.scope !== "workspace") continue;
+      const v = def.validate(from[key]);
+      const next = v === undefined || v === def.default ? undefined : v;
+      if (next === (this.values.has(key) ? this.values.get(key) : undefined)) continue;
+      if (next === undefined) this.values.delete(key);
+      else this.values.set(key, next);
+      changed.push(key);
+    }
+    if (!changed.length) return changed;
+    this.save();
+    this.adopting = true;
+    try {
+      for (const key of changed) for (const fn of this.listeners) fn(key);
+    } finally {
+      this.adopting = false;
+    }
+    return changed;
   }
 
   subscribe(fn: (key: SettingKey) => void): () => void {

@@ -49,6 +49,7 @@ type TabMessage =
   | { kind: "commit"; canvasId: string; revision: number }
   | { kind: "tree" }
   | { kind: "styles" }
+  | { kind: "settings" }
   | { kind: "assets" };
 
 /** Where an asset is used: one row per canvas, named for display. */
@@ -164,6 +165,8 @@ export class Session {
       this.emitAssets();
     } else if (m.kind === "styles") {
       this.styles.load(await this.repo?.styles().catch(() => undefined));
+    } else if (m.kind === "settings") {
+      await this.adoptWorkspaceSettings();
     } else if (m.kind === "tree") {
       await this.refreshTree();
       await this.leaveDeletedCanvas();
@@ -199,6 +202,9 @@ export class Session {
    * loaded again (its camera kept) when its file was read in.
    */
   async outsideChanged(canvases: readonly string[]): Promise<void> {
+    // (styles and settings another device changed come with it)
+    this.styles.load(await this.repo?.styles().catch(() => undefined));
+    await this.adoptWorkspaceSettings();
     await this.refreshTree();
     await this.leaveDeletedCanvas();
     if (this.current && canvases.includes(this.current.canvasId)) {
@@ -254,6 +260,7 @@ export class Session {
     startStep("workspace read (and its folder)");
     this.current = this.startup.current;
     this.styles.load(await this.repo.styles().catch(() => undefined));
+    await this.adoptWorkspaceSettings();
     await this.refreshTree();
     await this.load(this.current.canvasId);
     startStep("canvas loaded");
@@ -1158,8 +1165,30 @@ export class Session {
     return ok;
   }
 
-  /** The device settings, which travel in a workspace backup and come back on import (set by the app). */
-  settingsHook: { snapshot(withPrivacy: boolean): Record<string, unknown>; privacySet(): boolean; restore(from: unknown): number; restorable(from: unknown): number; getAuto(): boolean; setAuto(on: boolean): void } | null = null;
+  /** The settings, which travel in a workspace backup and come back on import; those of the workspace are kept in it (set by the app). */
+  settingsHook: { snapshot(withPrivacy: boolean): Record<string, unknown>; privacySet(): boolean; restore(from: unknown): number; restorable(from: unknown): number; getAuto(): boolean; setAuto(on: boolean): void; workspace(): Record<string, unknown>; adopt(from: Record<string, unknown>): void } | null = null;
+
+  /**
+   * The workspace's settings, as kept in it: taken here. A workspace that has none yet (made before they were kept there, or by an
+   * older version) gets this device's, so nothing changes on opening it.
+   */
+  async adoptWorkspaceSettings(): Promise<void> {
+    const h = this.settingsHook;
+    if (!h || !this.repo) return;
+    const kept = await this.repo.settings().catch(() => undefined);
+    this.settingsRead = true;
+    if (kept && typeof kept === "object" && !Array.isArray(kept)) h.adopt(kept as Record<string, unknown>);
+    else if (!this.readOnly) await this.saveWorkspaceSettings(h.workspace());
+  }
+  /** Whether the workspace's settings were read: none is written before, so a change at start-up never covers the workspace's. */
+  private settingsRead = false;
+
+  /** A workspace setting changed here: kept in the workspace (written to its folder in the desktop build), and other tabs told. */
+  async saveWorkspaceSettings(values: Record<string, unknown>): Promise<void> {
+    if (!this.repo || this.readOnly || !this.settingsRead) return;
+    await this.repo.saveSettings(values).catch((e: unknown) => this.tell(`The workspace's settings could not be saved: ${(e as Error).message}`));
+    this.post({ kind: "settings" });
+  }
   /** Keeps the library index in the library folder up to date (storage/auto-index.ts); set by the app. */
   autoIndex: { poke(): void; flush(): Promise<void> } | null = null;
 

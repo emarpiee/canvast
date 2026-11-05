@@ -329,7 +329,7 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     keep();
     void place.refresh();
   };
-  const card = (): CardLook => ({ preview: String(current), size: pageFit(sizes.get(current) ?? first, PDF_CARD_EDGE) });
+  const card = (): CardLook => ({ preview: current === 1 ? "" : String(current), size: pageFit(sizes.get(current) ?? first, PDF_CARD_EDGE) }); // (the first page: a plain card, as any)
   const showOnCard = (): void => {
     const c = card();
     place.setPreview?.(c.preview, c.size);

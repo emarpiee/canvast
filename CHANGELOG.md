@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.54.47 — Settings of the workspace (2026-11-06)
+
+- **Added:** settings that shape the workspace's files are kept in the workspace (`.canvast/workspace.json` on desktop) and shared by every device that opens it: how notes are written, named and shown on cards; file names and placement of saved edits, frames, screenshots, exports, patterns and SVGs; where deleted files go; property types; saved searches; pinned folders. The rest stays on the device. A workspace without them takes the opening device's, so nothing changes.
+- **Changed:** saved searches made with the Hidden items open are kept in a list of their own, on the device only, and out of a backup unless privacy settings are included.
+- **Fixed:** a library folder deleted outside the app came back: every save of the library forgot which folders it had seen on disk, so a deletion was never noticed, while running or after a restart.
+- **Fixed:** styles changed on another device were read only when boards or canvases changed too.
+- **Fixed:** Ctrl+S on the first page of a PDF (and Place from it) failed: a card on its first page now stores no page, as a new card.
+
 ## 0.54.46 — Place takes the page or view in sight (2026-11-06)
 
 - **Changed:** Place in the details, while a PDF or a 3D model is open in the viewer, puts the page or view in sight on the card, not the first.

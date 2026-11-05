@@ -34,6 +34,8 @@ export interface WorkspaceFile {
   viewGround?: string;
   boards: PlacedBoard[];
   styles: unknown[];
+  /** The workspace's settings (0.54.47); a file without them (an older version wrote it) leaves each device's as they are. */
+  settings?: Record<string, unknown>;
   locks: { hidden?: string; workspace?: string };
   /**
    * Ids of canvases and boards deleted (0.50.57): only these are deleted on a device that reads the file. One the file lacks that is
@@ -184,6 +186,7 @@ export class WorkspaceMirror {
     await this.mergeTreeCopies(fileWs); // (written back below, with the tree)
     const tree = JSON.stringify(fileWs.boards);
     if (tree !== this.state.tree) await this.adoptTree(fileWs);
+    await this.adoptShared(fileWs);
     this.placed = fileWs.boards;
     this.state.tree = tree;
     await this.reconcile(fileWs.boards);
@@ -274,6 +277,7 @@ export class WorkspaceMirror {
         this.state.tree = text;
         tree = true;
       }
+      if (await this.adoptShared(fileWs)) tree = true;
       if (await this.followMoved()) tree = true;
       if (await this.takeSyncCopies()) tree = true;
       const canvases = await this.reconcile(this.placed);
@@ -442,6 +446,24 @@ export class WorkspaceMirror {
    * Take the folder's boards and canvases (names, order, which board): new ones are added (empty until their file is read),
    * ones the folder no longer has are deleted, unless the app has edits of them the folder never had (they stay). One transaction.
    */
+  /**
+   * The styles and settings of the file, when they differ from this device's (another device changed them), whether or not boards
+   * changed with them. What the file lacks stays as it is here. Whether any changed.
+   */
+  private async adoptShared(fileWs: WorkspaceFile): Promise<boolean> {
+    const styles = await this.repo.styles().catch(() => undefined);
+    const settings = await this.repo.settings().catch(() => undefined);
+    const newStyles = Array.isArray(fileWs.styles) && JSON.stringify(fileWs.styles) !== JSON.stringify(styles ?? []);
+    const s = fileWs.settings;
+    const newSettings = !!s && typeof s === "object" && !Array.isArray(s) && JSON.stringify(s) !== JSON.stringify(settings);
+    if (!newStyles && !newSettings) return false;
+    const tx = this.db.transaction("meta", "readwrite");
+    if (newStyles) tx.objectStore("meta").put(fileWs.styles, "styles");
+    if (newSettings) tx.objectStore("meta").put(s, "settings");
+    await done(tx);
+    return true;
+  }
+
   private async adoptTree(fileWs: WorkspaceFile): Promise<void> {
     const tx = this.db.transaction(["workspaces", "boards", "canvases", "objects", "frames", "canvasViews", "bookmarks", "meta"], "readwrite", { durability: "strict" });
     const committed = done(tx);
@@ -500,7 +522,6 @@ export class WorkspaceMirror {
       for (const c of orphans) tx.objectStore("canvases").put({ ...c, boardId: first.id });
     }
     tx.objectStore("workspaces").put({ ...ws, displayName: typeof fileWs.name === "string" && fileWs.name ? fileWs.name : ws.displayName, ...(fileWs.viewGround ? { viewGround: fileWs.viewGround as WorkspaceRecord["viewGround"] } : {}), boardIds: [...fileWs.boards.map((b) => b.id), ...keptBoards] });
-    if (Array.isArray(fileWs.styles)) tx.objectStore("meta").put(fileWs.styles, "styles");
     if (typeof fileWs.locks?.hidden === "string") tx.objectStore("meta").put(fileWs.locks.hidden, "hiddenLock");
     if (typeof fileWs.locks?.workspace === "string") tx.objectStore("meta").put(fileWs.locks.workspace, "workspaceLock");
     const open = fileWs.boards.some((b) => b.canvases.some((c) => c.id === cur.canvasId)) || keep.some((c) => c.id === cur.canvasId);
@@ -859,6 +880,7 @@ export class WorkspaceMirror {
     this.state.deleted = Object.fromEntries(kept);
     for (const [id] of newFile) if (!oldFile.has(id)) this.dirty.add(id); // a new canvas: its file is written below
     const styles = await this.repo.styles().catch(() => undefined);
+    const settings = await this.repo.settings().catch(() => undefined);
     // (The Hidden password's gate is not written to the folder: its vault checks it, with scrypt; a PBKDF2 form beside it, in a
     // synced file, would let the password be guessed far more cheaply. This device's own copy of the gate stays in its cache.)
     const lock = await idbGet<string>(this.db, "meta", "workspaceLock").catch(() => undefined);
@@ -870,6 +892,7 @@ export class WorkspaceMirror {
       ...(tree.workspace.viewGround ? { viewGround: tree.workspace.viewGround } : {}),
       boards: next,
       styles: Array.isArray(styles) ? styles : [],
+      ...(settings && typeof settings === "object" && !Array.isArray(settings) ? { settings: settings as Record<string, unknown> } : {}),
       locks: { ...(typeof lock === "string" ? { workspace: lock } : {}) },
       deleted: Object.keys(this.state.deleted ?? {}),
       app: APP_VERSION,

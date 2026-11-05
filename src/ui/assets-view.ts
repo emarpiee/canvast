@@ -489,7 +489,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (Array.isArray(saved.folded)) ui.folded = saved.folded.filter((c) => typeof c === "string").slice(0, 20000);
     if (saved.chooser === "inline") ui.chooser = "inline";
     if (saved.tagsInline === true) ui.tagsInline = true;
-    if (Array.isArray(saved.pinned)) ui.pinned = saved.pinned.filter((c) => typeof c === "string").slice(0, 2000);
+    if (Array.isArray(saved.pinned)) ui.pinned = saved.pinned.filter((c) => typeof c === "string").slice(0, 2000); // (where pins were kept before 0.54.47: taken once, below)
     for (const id of Object.keys(SIDE_SORTS) as Array<keyof typeof SIDE_SORTS>) {
       const way = saved.sideSort?.[id];
       if (way && (SIDE_SORTS[id] as readonly SideSort[]).includes(way)) ui.sideSort[id] = way;
@@ -800,6 +800,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let openCopyAsked = false;
   /** Hidden mode (the word that opens the hidden items, then their password): the same view, listing the hidden items only. */
   let hiddenMode = false;
+  /** Where the saved searches are: with the Hidden items open, a list of this device only (their words may name hidden things), never in the workspace. */
+  const savedKey = (): "search.saved.hidden" | "search.saved.library" => (hiddenMode ? "search.saved.hidden" : "search.saved.library");
   /** The view as it was before hidden mode, put back when it ends. */
   let beforeHidden: { scope: string; search: string; way: "all" | "name" | "tag"; top: number } | null = null;
   /** Every folder, the hidden ones too (a listing's `folders` are those the mode shows). */
@@ -2733,7 +2735,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         ]),
     });
     // Saved searches, one click away, each with the look it was saved with.
-    const savedRows = byUse(parseSaved(settings.get("search.saved.library")) ?? []).map((s) => ({
+    const savedRows = byUse(parseSaved(settings.get(savedKey())) ?? []).map((s) => ({
       active: false,
       html: `<li class="side-row"><button type="button" class="side-item" data-saved-search="${esc(s.q)}" data-saved-way="${s.m}" title="Search for ${esc(s.q)}">${ICONS.savedSearch}<span class="side-label">${esc(s.q)}</span></button><button type="button" class="side-mini" data-saved-look="${esc(s.q)}" data-saved-way="${s.m}" aria-label="Update ${esc(s.q)} to the layout, columns and sort shown now" title="Update it to the layout, columns and sort shown now"${ro ? " hidden" : ""}>${ICONS.refresh}</button></li>`,
     }));
@@ -4420,9 +4422,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const f = listing?.folders.find((x) => x.id === id);
     switch (b.dataset["folderAction"]) {
       case "pin":
-        ui.pinned = ui.pinned.includes(id) ? ui.pinned.filter((x) => x !== id) : [...ui.pinned, id];
-        saveUi();
-        renderSide();
+        settings.set("library.pinned", JSON.stringify(ui.pinned.includes(id) ? ui.pinned.filter((x) => x !== id) : [...ui.pinned, id]));
         break;
       case "new":
         naming = { kind: "new", parent: id || null };
@@ -5034,7 +5034,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     e.stopPropagation();
     search.blur();
   });
-  const savedSearches: SavedStore = { get: () => settings.get("search.saved.library"), set: (v) => void settings.set("search.saved.library", v) };
+  const savedSearches: SavedStore = { get: () => settings.get(savedKey()), set: (v) => void settings.set(savedKey(), v) };
   const saveBtn = root.querySelector<HTMLButtonElement>(".assets-searchbox .cs-save")!;
   const paintSearchUi = (): void => {
     clearBtn.hidden = !search.value;
@@ -5346,6 +5346,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       lastH = scroller.clientHeight;
     }).observe(scroller);
   }
+  // Pins and saved searches changed elsewhere (another device, a tab, an import).
+  settings.subscribe((key) => {
+    if (key === "library.pinned") {
+      ui.pinned = JSON.parse(settings.get("library.pinned")) as string[];
+      renderSide();
+    }
+    if (key === "search.saved.library" || key === "search.saved.hidden") renderSide(); // (another device or tab saved one)
+  });
+  // Pinned folders are the workspace's (0.54.47): this device's, from before, go there once.
+  if (settings.isSet("library.pinned")) ui.pinned = JSON.parse(settings.get("library.pinned")) as string[];
+  else if (ui.pinned.length) settings.set("library.pinned", JSON.stringify(ui.pinned));
   // The gaps between cards follow the density setting.
   settings.subscribe(() => relayout());
   importBtn.addEventListener("click", () => fileInput.click());

@@ -232,19 +232,32 @@ test("the folder is the truth: a new device opens the whole workspace, another d
   const t = await a.page.evaluate(() => window.__canvastDebug.session().tree!);
   await a.page.evaluate(([b, c]) => window.__canvastDebug.workspaceOp("renameBoard", b, "Sketches").then(() => window.__canvastDebug.workspaceOp("renameCanvas", c, "Characters")), [t[0]!.id, t[0]!.canvases[0]!.id] as [string, string]);
   await add(a.page, 3);
+  // Settings: the workspace's go with the folder (in workspace.json), a device's stay on it.
+  const setting = (p: Page, k: string) => p.evaluate((key) => window.__canvastDebug.getSetting(key), k);
+  await a.page.evaluate(() => (window.__canvastDebug.setSetting("notes.folder", "Journal"), window.__canvastDebug.setSetting("pen.widthPx", 9)));
+  await a.page.evaluate(() => window.__canvastDebug.flushStorage());
+  const filed = () => (JSON.parse(readFileSync(join(ws, ".canvast/workspace.json"), "utf8")) as { settings?: Record<string, unknown> }).settings?.["notes.folder"];
+  await expect.poll(filed, { timeout: 20_000 }).toBe("Journal");
   await a.app.close();
 
   // A new device (its own empty cache) on the same folder: the whole workspace, as the folder has it.
   let b = await launch(ws, "device-b");
   await ready(b.page);
   await expect.poll(() => counts(b.page)).toEqual([["Sketches", "Characters", 3]]);
+  await expect.poll(() => setting(b.page, "notes.folder")).toBe("Journal");
+  expect(await setting(b.page, "pen.widthPx")).toBe(3);
+  await b.page.evaluate(() => window.__canvastDebug.setSetting("notes.folder", "Diary"));
   await add(b.page, 2);
+  await b.page.evaluate(() => window.__canvastDebug.flushStorage());
+  await expect.poll(filed, { timeout: 20_000 }).toBe("Diary");
   await b.app.close();
 
   // The first device reads the other one's change at start-up.
   a = await launch(ws, "device-a");
   await ready(a.page);
   await expect.poll(() => counts(a.page)).toEqual([["Sketches", "Characters", 5]]);
+  await expect.poll(() => setting(a.page, "notes.folder")).toBe("Diary");
+  expect(await setting(a.page, "pen.widthPx")).toBe(9);
   await add(a.page, 1);
   await a.app.process().kill("SIGKILL"); // its edit is in its cache, not yet in the folder
 

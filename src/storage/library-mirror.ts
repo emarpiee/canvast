@@ -1801,7 +1801,7 @@ export class LibraryMirror {
     if (this.vault.dataKey) (this.lastIndex = index), (this.lastFolders = sealedFolders);
     // (the folders are now what the files say: with the hidden ones only when the sealed index was written; a folder hidden while locked
     // is not in it yet, and stays this device's until it is, instead of being dropped when the key opens an older index)
-    this.state = { folders: canonFolders(sealing ? folders : shown) };
+    this.state = { ...this.state, folders: canonFolders(sealing ? folders : shown) }; // (the folders seen on disk kept: without them a folder deleted outside was never noticed)
     await this.setMeta(STATE_KEY, this.state);
   }
   /** The workspace's split of its library into parts (Settings > Storage): 16, 256 or 4,096 parts. */

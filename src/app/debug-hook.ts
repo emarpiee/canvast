@@ -106,6 +106,8 @@ export interface DebugHook {
   glide(ms: number): void;
   /** Write a setting by key, as the Settings view does. */
   setSetting(key: string, value: unknown): void;
+  /** Read a setting by key. */
+  getSetting(key: string): unknown;
   /** Absolute zoom level as a BigInt string (exact at any depth). */
   depth(): string;
   /** Each object's frame: level (BigInt string, K-steps below the world frame) and id; world-frame objects have level "0". */
@@ -291,6 +293,7 @@ export interface DebugDeps {
   appView: () => AppView;
   /** Write a setting of this device by key (tests: travel and tour settings). */
   setSetting: (key: string, value: unknown) => void;
+  getSetting: (key: string) => unknown;
   setView: (v: AppView) => void;
   tiles: TileCache;
   density: DensityLayer;
@@ -366,6 +369,7 @@ export function installDebugHook(
     jump: (levels) => view.zoomBy(levels),
     glide: (ms) => void (view.glideMs = ms),
     setSetting: (key, value) => deps.setSetting(key, value),
+    getSetting: (key) => deps.getSetting(key),
     depth: () => {
       const d = depthOf(view.frameCamera);
       return `${d.levels}`;

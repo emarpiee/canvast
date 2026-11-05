@@ -65,3 +65,32 @@ describe("memory tier (Phase 8)", () => {
     expect(s.snapshot()).toEqual({ "pen.widthPx": 5, "pen.color": "#2563eb", "nav.mode": "anywhere" });
   });
 });
+
+describe("settings (workspace scope)", () => {
+  it("lists only the workspace's settings, takes the workspace's, leaves device settings alone, and tells what changed", () => {
+    const s = new SettingsStore(memory());
+    s.set("pen.widthPx", 8); // device
+    s.set("notes.folder", "Journal"); // workspace
+    s.set("library.keepFileNames", false);
+    expect(s.workspaceValues()).toEqual({ "notes.folder": "Journal", "library.keepFileNames": false });
+    const heard: Array<[string, boolean]> = [];
+    s.subscribe((k) => heard.push([k, s.adopting]));
+    // Another device's: one changed, one back to the default (absent), an invalid one ignored, a device setting never taken.
+    const changed = s.adoptWorkspace({ "notes.folder": "Diary", "storage.trashDays": "nope", "pen.widthPx": 20 });
+    expect(changed.sort()).toEqual(["library.keepFileNames", "notes.folder"]);
+    expect([s.get("notes.folder"), s.get("library.keepFileNames"), s.get("storage.trashDays"), s.get("pen.widthPx")]).toEqual(["Diary", true, "0", 8]);
+    expect(heard.every(([, adopting]) => adopting)).toBe(true);
+    expect(s.adopting).toBe(false);
+    expect(s.adoptWorkspace({ "notes.folder": "Diary" })).toEqual([]); // the same: nothing told
+  });
+
+  it("keeps folder pins as a list of ids, and a hidden-mode saved search on the device only, out of backups unless asked", async () => {
+    const s = new SettingsStore(memory());
+    expect(s.set("library.pinned", JSON.stringify(["f1", "f2"]))).toBe(true);
+    expect(s.set("library.pinned", "[1]")).toBe(false);
+    expect(s.set("search.saved.hidden", JSON.stringify([{ q: "cat", m: "all", u: 1 }]))).toBe(true);
+    expect(Object.keys(s.workspaceValues())).toEqual(["library.pinned"]);
+    const { PRIVACY_KEYS } = await import("../../src/settings/settings");
+    expect(PRIVACY_KEYS).toContain("search.saved.hidden");
+  });
+});

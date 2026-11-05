@@ -127,6 +127,16 @@ export class WorkspaceRepo implements WorkspaceStore {
     await done(tx);
   }
 
+  async settings(): Promise<unknown> {
+    return idbGet<unknown>(this.db, "meta", "settings");
+  }
+
+  async saveSettings(values: Record<string, unknown>): Promise<void> {
+    const tx = this.db.transaction("meta", "readwrite");
+    tx.objectStore("meta").put(values, "settings");
+    await done(tx);
+  }
+
   async setCurrent(cur: CurrentMeta): Promise<void> {
     const tx = this.db.transaction("meta", "readwrite");
     tx.objectStore("meta").put(cur, "current");

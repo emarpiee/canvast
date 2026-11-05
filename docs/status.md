@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.47: settings of the workspace; folders deleted outside (2026-11-06)
+
+- **Implemented:** scope `workspace` stored (`WorkspaceStore.settings/saveSettings`, IDB meta, `workspace.json` `settings`); `SettingsStore.workspaceValues/adoptWorkspace`; `Session.adoptWorkspaceSettings` at start, on outside changes and other tabs; `library.pinned`, `search.saved.hidden` (device, privacy); `adoptShared` for styles and settings; `LibraryState.dirs` kept by `writeJson`.
+- **Tested:** unit (settings workspace scope); desktop two-device test carries a workspace setting and keeps a device one; folder test.
+- **Known failures:** desktop middle-button pan once pasted (cause not found).
+- **Unverified:** on screen; a sync tool's conflict copy of `workspace.json` picks one device's settings.
+- **Committed:** v0.54.47.
+- **Next bounded task:** read the `Tests` run.
+
 ## v0.54.46: Place takes the page or view in sight; notes' thumbnails kept (2026-11-06)
 
 - **Implemented:** `OpenView.card()` (PDF and 3D) used by Place and the place menu; note thumbnails stored with `face` (`noteFaceKey`: paper and labels); `WorkspaceMirror.foldersCheck` on every library change, the app's own included.

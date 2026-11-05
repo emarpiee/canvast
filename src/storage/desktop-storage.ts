@@ -173,6 +173,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     deleteCanvas: tree,
     deleteBoard: tree,
     saveStyles: tree,
+    saveSettings: tree,
   });
   const backups = watched(storage.backups, { applyImport: () => mirror.everything(), recordBackup: () => mirror.device() });
   const library = (): void => mirror.library();

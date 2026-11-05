@@ -37,6 +37,9 @@ export interface WorkspaceStore {
   setCurrent(cur: CurrentMeta): Promise<void>;
   styles(): Promise<unknown>;
   saveStyles(items: readonly unknown[]): Promise<void>;
+  /** The workspace's settings as kept (`SettingsStore.workspaceValues`); undefined when it has none yet. */
+  settings(): Promise<unknown>;
+  saveSettings(values: Record<string, unknown>): Promise<void>;
 
   workspace(id: string): Promise<WorkspaceRecord | undefined>;
   board(id: string): Promise<BoardRecord | undefined>;
