@@ -1,5 +1,8 @@
 import type { Session } from "../app/session";
 import type { CatalogEntry } from "../assets/asset-catalog";
+import { promptDialog } from "./confirm";
+import { ICONS } from "./icons";
+import type { MenuItem } from "./more-menu";
 
 /** A place in a file its viewer can go back to: `at` as its kind of file reads it (a PDF's page), `label` what the row says. */
 export interface ViewMark {
@@ -37,4 +40,24 @@ export async function keepViewState(session: Session, hash: string, s: ViewState
 export function toggledMark(s: ViewState, mark: ViewMark, order: (at: string) => number): ViewState {
   const marks = s.marks.some((m) => m.at === mark.at) ? s.marks.filter((m) => m.at !== mark.at) : [...s.marks, mark].sort((a, b) => order(a.at) - order(b.at)).slice(0, MAX_MARKS);
   return { ...s, marks };
+}
+
+/** A change to the list of bookmarks, whoever holds it. */
+export type MarksChange = (change: (marks: ViewMark[]) => ViewMark[]) => void;
+
+/** What a bookmark's ⋯ offers, in a view's menu and in the details alike. */
+export function markActions(mark: ViewMark, change: MarksChange): MenuItem[] {
+  return [
+    {
+      id: "mark-rename",
+      label: "Rename",
+      hint: "Its name in the list",
+      icon: ICONS.textCursorInput,
+      run: () => void promptDialog({ title: "Rename this bookmark", lines: [], value: mark.label, confirmLabel: "Rename" }).then((name) => {
+        const label = name?.trim().slice(0, 120);
+        if (label) change((marks) => marks.map((m) => (m.at === mark.at ? { ...m, label } : m)));
+      }),
+    },
+    { id: "mark-delete", label: "Delete", hint: "Only this bookmark", icon: ICONS.trash, danger: true, run: () => change((marks) => marks.filter((m) => m.at !== mark.at)) },
+  ];
 }

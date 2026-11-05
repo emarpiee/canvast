@@ -41,7 +41,7 @@ import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT, folderClash, fo
 import { artTile, THUMB_PX, makeThumb, shrinkPicture } from "../assets/thumb";
 import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
-import { clearRect, MENU_GAP, openMoreMenu, pressAs } from "./more-menu";
+import { clearRect, MENU_GAP, moreButton, openMoreMenu, pressAs } from "./more-menu";
 import type { MenuItem } from "./more-menu";
 import { bindContextMenu, grouped as groupedMenu } from "./context-menu";
 import { openTreeChooser } from "./tree-chooser";
@@ -61,7 +61,8 @@ import { viewKindNamed, viewKindOf } from "./file-views";
 import { placeCardViews, placeLinesBeside } from "../app/actions";
 import { FILE_CARD_H, FILE_CARD_W } from "../assets/card";
 import { PDF_CARD_EDGE, pageFit } from "../assets/pdf-engine";
-import { keepViewState, viewStateOf } from "./view-state";
+import { keepViewState, markActions, viewStateOf } from "./view-state";
+import type { MarksChange } from "./view-state";
 import type { FileViewKind, OpenView, ViewDeps, ViewPlace } from "./file-views";
 
 import { RICH_NOTE_SUFFIX, WIKI, linkTarget, noteKindOf, tooBigForNote, richNameOf, richNoteBody, wikiTarget, newNoteFile } from "../notes/note-file";
@@ -3215,7 +3216,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!viewKindNamed(e.name)?.marks) return "";
     const { marks } = viewStateOf(e);
     const here = note?.hash === e.hash ? note.here?.() : null;
-    const rows = marks.map((m) => `<li><button type="button" class="asset-link-row assets-link" data-action="go-mark" data-at="${esc(m.at)}" title="Go to ${esc(m.label)}">${ICONS.bookmark}<span class="asset-place-name">${esc(m.label)}</span></button><button type="button" class="layer-btn" data-action="drop-mark" data-at="${esc(m.at)}" aria-label="Remove the bookmark ${esc(m.label)}" title="Remove this bookmark">${ICONS.x}</button></li>`);
+    const rows = marks.map((m) => `<li><button type="button" class="asset-link-row assets-link" data-action="go-mark" data-at="${esc(m.at)}" title="Go to ${esc(m.label)}">${ICONS.bookmark}<span class="asset-place-name">${esc(m.label)}</span></button>${moreButton(`More actions for bookmark ${m.label}`, `data-action="mark-more" data-at="${esc(m.at)}"`)}</li>`);
     const list = rows.length ? `<ul class="asset-places asset-marks">${rows.join("")}</ul>` : `<p class="asset-note">No bookmarks yet.</p>`;
     return `<section class="asset-sec" data-testid="asset-bookmarks"><h3>Bookmarks <span class="layer-count">${marks.length}</span></h3>${list}${here ? `<button type="button" class="assets-btn" data-action="add-mark" data-testid="asset-add-bookmark">${ICONS.bookmarkPlus} Bookmark ${esc(here.label.toLowerCase())}</button>` : ""}</section>`;
   };
@@ -3640,11 +3641,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         else void keepViewState(session, hash, { ...viewStateOf(entryOf(hash)), at }).then(() => showSlide(hash));
         break;
       }
-      case "drop-mark": {
+      case "mark-more": {
         const hash = inspector.dataset["hash"], at = b.dataset["at"]!, e = hash ? entryOf(hash) : undefined;
-        if (!hash || !e) break;
-        const s = viewStateOf(e);
-        void keepViewState(session, hash, { ...s, marks: s.marks.filter((m) => m.at !== at) }).then(() => refresh());
+        const mark = e && viewStateOf(e).marks.find((m) => m.at === at);
+        if (!hash || !mark) break;
+        // (an open view holds the list; else it is written here)
+        const change: MarksChange = note?.hash === hash && note.changeMarks ? note.changeMarks : (f) => {
+          const s = viewStateOf(entryOf(hash));
+          void keepViewState(session, hash, { ...s, marks: f(s.marks) }).then(() => refresh());
+        };
+        openMoreMenu(b, markActions(mark, change), `What to do with ${mark.label}`);
         break;
       }
       case "add-mark":

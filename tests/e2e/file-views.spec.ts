@@ -97,6 +97,19 @@ test("a PDF: its first page in the library, its shape on a card; it opens in the
   await expect(p.getByTestId("view-mark")).toHaveAttribute("aria-pressed", "true");
   await detailsShown(p);
   await expect(p.getByTestId("asset-bookmarks")).toContainText("Page 2");
+  // Renamed and deleted by its ⋯, in the view's own list and in the details: one list.
+  await p.getByTestId("view-marks").click();
+  await p.locator(".pop-menu .more-btn").first().click();
+  await p.locator('.pop-menu [data-id="mark-rename"]').click();
+  await p.getByTestId("prompt-input").fill("The chart");
+  await p.getByTestId("prompt-ok").click();
+  await expect(p.getByTestId("asset-bookmarks")).toContainText("The chart");
+  await p.getByTestId("asset-bookmarks").locator(".more-btn").first().click();
+  await p.locator('.pop-menu [data-id="mark-delete"]').click();
+  await expect(p.getByTestId("asset-bookmarks").getByText("No bookmarks yet.")).toBeVisible();
+  await expect(p.getByTestId("view-mark")).toHaveAttribute("aria-pressed", "false");
+  await p.getByTestId("view-mark").click();
+  await expect(p.getByTestId("asset-bookmarks")).toContainText("Page 2");
   // Keys: the pages' own, and the arrows stay the viewer's.
   await p.getByTestId("pdf-pages").click();
   await p.keyboard.press("PageDown");
@@ -106,7 +119,7 @@ test("a PDF: its first page in the library, its shape on a card; it opens in the
   // The details' row goes to it.
   await p.keyboard.press("Home");
   await expect(p.getByTestId("pdf-page")).toHaveValue("1");
-  await p.getByTestId("asset-bookmarks").getByRole("button", { name: /Go to|Page 2/ }).first().click();
+  await p.getByTestId("asset-bookmarks").getByRole("button", { name: /Go to Page 2/ }).click();
   await expect(p.getByTestId("pdf-page")).toHaveValue("2");
   // Left and opened again: where it was.
   await p.waitForTimeout(800);
@@ -149,7 +162,9 @@ test("a PDF's card on a canvas has its page's shape, opens in the panel, and a c
   expect(await camera()).toBe(seen);
   await panel.getByTestId("pdf-page").fill("2");
   await panel.getByTestId("pdf-page").press("Enter");
-  await panel.getByTestId("view-card").click();
+  // Ctrl+S in the panel: this page on the card.
+  await panel.getByTestId("pdf-pages").click();
+  await p.keyboard.press("Control+s");
   await expect.poll(async () => (await pics())[0]!.preview).toBe("2");
   const now = (await pics())[0]!;
   expect(now.w).toBeCloseTo(one.w, 3);

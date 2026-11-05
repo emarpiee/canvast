@@ -2,7 +2,7 @@ import { isModelFile, isPdfFile } from "../assets/file-kind";
 import { noteKindOf, opensAsNote, tooBigForNote } from "../notes/note-file";
 import { OpenNote } from "./note-session";
 import type { NoteDeps, NotePlace } from "./note-session";
-import type { ViewMark } from "./view-state";
+import type { MarksChange, ViewMark } from "./view-state";
 
 /**
  * The kinds of file that open in a view of their own, in the library's viewer and in the panel on a canvas alike. A new kind of file is one
@@ -45,6 +45,8 @@ export interface OpenView {
   toggleMark?(): Promise<void>;
   /** The place in view, as a bookmark would be. */
   here?(): ViewMark | null;
+  /** Changes its list of bookmarks (it holds them while it is open). */
+  changeMarks?: MarksChange;
 }
 
 export interface FileFacts {

@@ -3206,3 +3206,6 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .adj-num.pdf-find { width: calc(var(--ctl) * 5); text-align: left; }
 .pdf-link { position: absolute; padding: 0; background: none; border: none; cursor: pointer; z-index: 1; }
 ::highlight(canvast-find) { background: var(--hud-accent); color: transparent; }
+.pop-menu-row { display: flex; align-items: center; gap: var(--s-2); }
+.pop-menu-row > button[data-i] { flex: 1; min-width: 0; }
+.pop-menu-row > .more-btn { flex: none; opacity: 1; width: var(--row-btn); min-height: 0; height: var(--row-btn); padding: 0; justify-content: center; }

@@ -9,8 +9,8 @@ import { openMoreMenu } from "./more-menu";
 import { mountSettings } from "./setting-rows";
 import type { SettingValue } from "./setting-rows";
 import type { Section, Setting } from "../gen/types";
-import { keepViewState, toggledMark, viewStateOf } from "./view-state";
-import type { ViewState } from "./view-state";
+import { keepViewState, markActions, toggledMark, viewStateOf } from "./view-state";
+import type { MarksChange, ViewState } from "./view-state";
 
 const KEEP_MS = 600;
 /** The cards of a turnaround. */
@@ -46,13 +46,13 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
       ${barButton("marks", ICONS.tableOfContents, "Go to", "Bookmarked views", 'aria-haspopup="menu"')}
       ${place.placeViews ? barButton("turn", ICONS.rotate3d, "Place a turnaround", "Place a turnaround on the canvas: eight cards, this view from all around") : ""}
       ${place.placeLines ? barButton("lines", ICONS.lineArt, "Place the lines on the canvas", "Place this view's line art on the canvas, as paths to edit") : ""}
-      ${place.setPreview ? barButton("card", ICONS.pictureInPicture, "Show this view on the card", "Show this view on the card on the canvas (this copy only)") : ""}
+      ${place.setPreview ? barButton("card", ICONS.pictureInPicture, "Show this view on the card", "Show this view on the card on the canvas, this copy only (Ctrl+S)") : ""}
       <span class="view-gap"></span>
       ${barButton("reset", ICONS.listRestart, "Reset the settings", "Reset the settings of this view")}
       ${barButton("side", ICONS.sliders, "Settings", "Show or hide the settings", 'aria-pressed="true"')}
     </div>
     <div class="model-main">
-      <div class="model-stage is-checker" data-testid="model-stage"><canvas></canvas></div>
+      <div class="model-stage is-checker" tabindex="0" data-testid="model-stage"><canvas></canvas></div>
       <div class="model-side" data-testid="model-side"></div>
     </div>
   </div>`;
@@ -120,7 +120,7 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
   box.addEventListener("pointerdown", (e) => {
     drag = { x: e.clientX, y: e.clientY, pan: e.shiftKey || e.button !== 0 };
     box.setPointerCapture(e.pointerId);
-    box.closest<HTMLElement>("[tabindex]")?.focus({ preventScroll: true });
+    box.focus({ preventScroll: true });
     e.preventDefault();
     e.stopPropagation();
   });
@@ -162,6 +162,18 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
     changed();
   };
   const here = (): { at: string; label: string } => ({ at: writeLook(look), label: `View ${state.marks.length + 1}` });
+  const paintMark = (): void => markBtn.setAttribute("aria-pressed", String(state.marks.some((m) => m.at === state.at)));
+  const changeMarks: MarksChange = (change) => {
+    state = { ...state, marks: change(state.marks) };
+    paintMark();
+    keep();
+    void place.refresh();
+  };
+  const showOnCard = (): void => {
+    place.setPreview?.(writeLook(look) || "{}", modelCardFit(box.clientWidth / Math.max(1, box.clientHeight)));
+    deps.session.editor.message = "This view now shows on the card.";
+    deps.session.editor.changed();
+  };
   const toggleMark = async (): Promise<void> => {
     state = toggledMark({ ...state, at: writeLook(look) }, here(), () => 0);
     markBtn.setAttribute("aria-pressed", String(state.marks.some((m) => m.at === state.at)));
@@ -209,14 +221,14 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
         } })), "Lighting");
       case "mark": return void toggleMark();
       case "marks":
-        return openMoreMenu(b, state.marks.length ? state.marks.map((m) => ({ label: m.label, hint: "A bookmarked view", icon: ICONS.bookmark, run: () => go(m.at) })) : [{ label: "No bookmarks yet", hint: "Bookmark a view with the button beside this", icon: ICONS.bookmark, run: () => undefined }], "Go to");
+        return openMoreMenu(b, state.marks.length ? state.marks.map((m) => ({ label: m.label, hint: "A bookmarked view", icon: ICONS.bookmark, run: () => go(m.at), more: markActions(m, changeMarks) })) : [{ label: "No bookmarks yet", hint: "Bookmark a view with the button beside this", icon: ICONS.bookmark, run: () => undefined }], "Go to");
       case "turn": {
         const fit = modelCardFit(box.clientWidth / Math.max(1, box.clientHeight));
         return place.placeViews?.(Array.from({ length: TURNAROUND }, (_, i) => ({ preview: writeLook({ ...look, yaw: wrap((look["yaw"] as number) + (360 * i) / TURNAROUND) }) || "{}", size: fit })));
       }
       case "lines":
         return void placeLines();
-      case "card": return place.setPreview?.(writeLook(look) || "{}", modelCardFit(box.clientWidth / Math.max(1, box.clientHeight)));
+      case "card": return showOnCard();
       case "side": {
         side.hidden = !side.hidden;
         b.setAttribute("aria-pressed", String(!side.hidden));
@@ -246,8 +258,14 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
       showCamera();
       changed();
     },
+    key: (e) => {
+      if (!place.setPreview || !(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || (e.key !== "s" && e.key !== "S")) return false;
+      showOnCard();
+      return true;
+    },
     goTo: go,
     toggleMark,
+    changeMarks,
     here,
   };
 }

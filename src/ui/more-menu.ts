@@ -22,6 +22,8 @@ export interface MenuItem {
   hint: string;
   /** A line above this item: it starts a new group of the menu. */
   sep?: boolean;
+  /** Its own ⋯ at the end of the row: a menu of what can be done to it (rename, delete). */
+  more?: readonly MenuItem[];
   /** Names the item for tests and scripts (`data-id`). */
   id?: string;
   run(): void;
@@ -151,7 +153,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
   let current = items;
   const render = (): void => {
     menu.innerHTML = current
-    .map((it, i) => `<button type="button" role="${it.checked === undefined ? "menuitem" : "menuitemradio"}"${it.checked === undefined ? "" : ` aria-checked="${it.checked}"`} data-i="${i}"${it.id ? ` data-id="${esc(it.id)}"` : ""} class="${it.danger ? "is-danger" : ""}${it.checked ? " is-checked" : ""}${it.sep && i > 0 ? " has-sep" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}${it.hint ? `<span class="menu-text"><span>${esc(it.label)}</span><span class="menu-hint">${esc(it.hint)}</span></span>` : `<span>${esc(it.label)}</span>`}${it.checked ? `<span class="menu-tick" aria-hidden="true">${ICONS.check}</span>` : ""}</button>`)
+    .map((it, i) => { const row = `<button type="button" role="${it.checked === undefined ? "menuitem" : "menuitemradio"}"${it.checked === undefined ? "" : ` aria-checked="${it.checked}"`} data-i="${i}"${it.id ? ` data-id="${esc(it.id)}"` : ""} class="${it.danger ? "is-danger" : ""}${it.checked ? " is-checked" : ""}${it.sep && i > 0 ? " has-sep" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}${it.hint ? `<span class="menu-text"><span>${esc(it.label)}</span><span class="menu-hint">${esc(it.hint)}</span></span>` : `<span>${esc(it.label)}</span>`}${it.checked ? `<span class="menu-tick" aria-hidden="true">${ICONS.check}</span>` : ""}</button>`; return it.more ? `<div class="pop-menu-row">${row}${moreButton(`More actions for ${it.label}`, `data-more-i="${i}"`)}</div>` : row; })
     .join("");
   };
   render();
@@ -169,6 +171,12 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
   menu.addEventListener("pointerdown", () => { armed = true; });
   menu.addEventListener("click", (e) => {
     if (!armed) return;
+    const moreOf = (e.target as HTMLElement).closest<HTMLElement>("[data-more-i]");
+    if (moreOf) {
+      const it = current[Number(moreOf.dataset["moreI"])]!;
+      closeMoreMenu();
+      return openMoreMenu(anchor, it.more!, `What to do with ${it.label}`);
+    }
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-i]");
     if (!b || b.disabled) return;
     const index = Number(b.dataset["i"]);

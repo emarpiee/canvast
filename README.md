@@ -635,7 +635,7 @@ A PDF or a 3D model shows as its picture in the library and opens in a view of i
 | Several cards at once | **Place pages**: a card for each page typed, such as `1-4, 9` | **Place a turnaround**: eight cards, from all around |
 | Finding | Ctrl+F in it; the library's search finds its words too | |
 
-Bookmarks are in the view's bar and in the details. What a card shows belongs to that card, so copies can show different pages or views; it is one step of undo, and nothing new is stored.
+Bookmarks are in the view's bar and in the details, each with a ⋯ to rename or delete it. In the panel on a canvas, Ctrl+S shows the page or view on that card. What a card shows belongs to that card, so copies can show different pages or views; it is one step of undo, and nothing new is stored.
 
 #### More about 3D views
 

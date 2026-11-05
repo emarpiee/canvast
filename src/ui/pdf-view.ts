@@ -7,8 +7,8 @@ import type { FileFacts, OpenView, ViewDeps, ViewPlace } from "./file-views";
 import { ICONS } from "./icons";
 import { barButton } from "./view-bar";
 import { openMoreMenu } from "./more-menu";
-import { keepViewState, toggledMark, viewStateOf } from "./view-state";
-import type { ViewState } from "./view-state";
+import { keepViewState, markActions, toggledMark, viewStateOf } from "./view-state";
+import type { MarksChange, ViewState } from "./view-state";
 
 const ZOOM_STEP = 1.25;
 const ZOOM_MIN = 0.25;
@@ -64,7 +64,7 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
       ${barButton("mark", ICONS.bookmarkPlus, "Bookmark this page", "Bookmark this page, or take its bookmark off", 'aria-pressed="false"')}
       ${barButton("marks", ICONS.tableOfContents, "Go to", "Bookmarks, and the contents of this PDF", 'aria-haspopup="menu"')}
       ${place.placeViews ? barButton("place", ICONS.grid2x2Plus, "Place pages on the canvas", "Place pages on the canvas: a card for each") : ""}
-      ${place.setPreview ? barButton("card", ICONS.pictureInPicture, "Show this page on the card", "Show this page on the card on the canvas (this copy only)") : ""}
+      ${place.setPreview ? barButton("card", ICONS.pictureInPicture, "Show this page on the card", "Show this page on the card on the canvas, this copy only (Ctrl+S)") : ""}
     </div>
     <div class="pdf-pages" tabindex="0" data-testid="pdf-pages"></div>
   </div>`;
@@ -322,6 +322,18 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     pages.scrollTop = top;
   }, { passive: false });
   const mark = (): ViewState["marks"][number] => ({ at: String(current), label: `Page ${current}` });
+  const changeMarks: MarksChange = (change) => {
+    state = { ...state, marks: change(state.marks) };
+    paintBar();
+    keep();
+    void place.refresh();
+  };
+  const showOnCard = (): void => {
+    const z = sizes.get(current) ?? first;
+    place.setPreview?.(String(current), pageFit(z, PDF_CARD_EDGE));
+    deps.session.editor.message = `Page ${current} now shows on the card.`;
+    deps.session.editor.changed();
+  };
   const toggleMark = async (): Promise<void> => {
     state = toggledMark(state, mark(), Number);
     paintBar();
@@ -365,13 +377,11 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
       case "mark": return void toggleMark();
       case "place":
         return void placePages();
-      case "card": {
-        const z = sizes.get(current) ?? first;
-        return place.setPreview?.(String(current), pageFit(z, PDF_CARD_EDGE));
-      }
+      case "card":
+        return showOnCard();
       case "marks":
         return void outline().then((contents) => {
-          const items = [...state.marks.map((m) => ({ label: m.label, hint: "Bookmark", icon: ICONS.bookmark, run: () => show(Number(m.at)) })), ...contents.map((c) => ({ label: c.label, hint: `Page ${c.page}`, icon: ICONS.tableOfContents, run: () => show(c.page) }))];
+          const items = [...state.marks.map((m) => ({ label: m.label, hint: `Bookmark, page ${m.at}`, icon: ICONS.bookmark, run: () => show(Number(m.at)), more: markActions(m, changeMarks) })), ...contents.map((c) => ({ label: c.label, hint: `Page ${c.page}`, icon: ICONS.tableOfContents, run: () => show(c.page) }))];
           openMoreMenu(b, items.length ? items : [{ label: "No bookmarks yet", hint: "Bookmark a page with the button beside this", icon: ICONS.bookmark, run: () => undefined }], "Go to");
         });
     }
@@ -404,6 +414,10 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     },
     zoom: setZoom,
     key: (e) => {
+      if (place.setPreview && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && (e.key === "s" || e.key === "S")) {
+        showOnCard();
+        return true;
+      }
       if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "f" || e.key === "F")) {
         finder.focus();
         finder.select();
@@ -421,6 +435,7 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     },
     goTo: (at) => show(Number(at)),
     toggleMark,
+    changeMarks,
     here: mark,
   };
 }

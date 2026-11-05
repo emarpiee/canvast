@@ -88,6 +88,7 @@ export function mountFilePanel(
     el.hidden = false;
     try {
       note = await k.open(el.querySelector<HTMLElement>(".viewer-note > div")!, { hash, name: name0, blob: rec.blob }, deps, { ...place, ...card });
+      if (k.id !== "note") el.querySelector<HTMLElement>(".viewer-note [tabindex]")?.focus({ preventScroll: true });
     } catch (err) {
       shut();
       deps.session.editor.message = `This ${k.noun} could not be opened (“${rec.name}”): ${(err as Error).message}.`;
@@ -114,7 +115,12 @@ export function mountFilePanel(
   };
   for (const host of [hosts.panel, hosts.window])
     host.addEventListener("keydown", (e) => {
-      if (e.key === "F2" && !e.ctrlKey && !e.altKey && !e.metaKey) (e.preventDefault(), void rename());
+      if (e.key === "F2" && !e.ctrlKey && !e.altKey && !e.metaKey) return e.preventDefault(), void rename();
+      // (a view's own keys: its pages, Ctrl+S; they stop here, and do not reach the canvas behind)
+      if (note?.key?.(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
     });
   return {
     open: (hash, card) => open(hash, card),

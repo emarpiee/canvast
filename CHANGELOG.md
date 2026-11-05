@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.54.44 — Bookmarks can be renamed; Ctrl+S on a card (2026-11-06)
+
+- **Added:** a bookmark of a PDF or a 3D view has a ⋯ to rename or delete it, in the view's list and in the details.
+- **Added:** Ctrl+S in the panel on a canvas shows the page or view in it on that card.
+- **Fixed:** a PDF's keys (Page Up and Down, Home, End, Ctrl+F) work in the panel on a canvas too, and the view has the focus when it opens there.
+
 ## 0.54.43 — Move one closed path, or split them (2026-11-06)
 
 - **Added:** in Edit nodes, a double-click on a node or a line selects that whole closed path with its holes, to move as one. On a hole, only the hole.
