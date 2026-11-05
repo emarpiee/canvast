@@ -2389,15 +2389,11 @@ test("Extract frame follows Settings > Media and playback: name template and sty
   const gif = Buffer.from(encodeGif(16, 16, [[255, 0, 0], [0, 255, 0], [0, 0, 255]], [0, 1, 2].map((c) => ({ w: 16, h: 16, pixels: Array(256).fill(c) }))));
   await p.getByTestId("assets-import-input").setInputFiles({ name: "My Anim.gif", mimeType: "image/gif", buffer: gif });
   await expect(p.getByTestId("asset-card")).toHaveCount(1);
-  await p.evaluate(() =>
-    localStorage.setItem(
-      "canvast.settings",
-      JSON.stringify({ "frame.format": "webp", "frame.name": "{name}_{position}", "frame.nameStyle": "kebab", "frame.folder": "Stills", "frame.tagFrame": false, "frame.tagSource": true, "frame.tagsCustom": "ref, client x", "frame.place": false }),
-    ),
-  );
-  await p.reload();
-  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
-  await toAssets(p);
+  // (as the Settings view sets them: most are the workspace's, kept in it, so a value written straight into this device's storage is not theirs)
+  await p.evaluate(() => {
+    const s = { "frame.format": "webp", "frame.name": "{name}_{position}", "frame.nameStyle": "kebab", "frame.folder": "Stills", "frame.tagFrame": false, "frame.tagSource": true, "frame.tagsCustom": "ref, client x", "frame.place": false };
+    for (const [k, v] of Object.entries(s)) window.__canvastDebug.setSetting(k, v);
+  });
   await p.getByTestId("asset-card").first().click();
   await p.getByTestId("asset-preview").click();
   const viewer = p.getByTestId("slide-view");
