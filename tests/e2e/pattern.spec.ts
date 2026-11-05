@@ -321,3 +321,45 @@ test("Randomize buttons carry the dice icon (the Pattern panel's, and the random
   expect(dice).toContain("rect"); // (the lucide "dice-5")
   expect(await p.locator("[data-pg-random] svg").innerHTML(), "Randomize is the same icon as the random view").toBe(dice);
 });
+
+test("Grid pattern: a shape's corner lands on a crossing of its lines, on both axes, alone and with another selected", async ({ app }) => {
+  const p = app.page;
+  await p.click("[data-pattern-panel]");
+  await choose(app, "grid");
+  await make(app);
+  await p.click("[data-pattern-panel]"); // (closed: what is drawn next is not the panel's target)
+  const box = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+  const sheet = await box(sheets(await objs(app))[0]!.id);
+  const cell = (sheet.maxX - sheet.minX) / 16; // (the default: 16 across, square, line 0 on the edge)
+  expect(cell).toBeGreaterThan(24);
+  const square = async (x: number, y: number): Promise<string> => {
+    await p.keyboard.press("u");
+    await app.drag({ x, y }, { x: x + cell / 2, y: y + cell / 2 });
+    await app.frame();
+    return (await objs(app)).at(-1)!.id;
+  };
+  const a = await square(sheet.minX + 9.2 * cell, sheet.minY + 2.2 * cell);
+  await p.keyboard.press("v");
+  // A few pixels off the crossing on both axes: both hold, with no other corner near.
+  const landsOn = async (id: string, cx: number, cy: number): Promise<void> => {
+    const b = await box(id);
+    const to = { x: sheet.minX + cx * cell + 3, y: sheet.minY + cy * cell - 2 };
+    const from = { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+    await app.drag(from, { x: from.x + to.x - b.minX, y: from.y + to.y - b.minY });
+    await app.frame();
+    const e = await box(id);
+    expect(Math.abs(e.minX - (sheet.minX + cx * cell)), "left on its line").toBeLessThan(0.5);
+    expect(Math.abs(e.minY - (sheet.minY + cy * cell)), "top on its line").toBeLessThan(0.5);
+  };
+  await landsOn(a, 3, 3);
+  // Two selected move as one: the corner of their box lands the same way.
+  const c = await square(sheet.minX + 9.2 * cell, sheet.minY + 2.2 * cell);
+  await p.keyboard.press("v");
+  await p.keyboard.down("Shift");
+  await p.mouse.click(sheet.minX + 3.25 * cell, sheet.minY + 3.25 * cell);
+  await p.keyboard.up("Shift");
+  await app.frame();
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toHaveLength(2);
+  await landsOn(c, 7, 5);
+  expect(app.consoleErrors).toEqual([]);
+});

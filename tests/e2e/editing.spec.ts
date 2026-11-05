@@ -1156,7 +1156,9 @@ test("Size menu: vectors take a size too, a short stroke the width of a long one
 
 test("a lone object snaps to the grid's lines with the magnet on, and not with Snap to the grid off", async ({ app }) => {
   const p = app.page;
-  const img = await importImage(app);
+  await key(app, "u");
+  await app.drag({ x: 500, y: 300 }, { x: 700, y: 450 });
+  const img = (await objects(app)).at(-1)!;
   await key(app, "v");
   await p.evaluate(() => window.__canvastDebug.setSetting("snap.reachPx", 40)); // (always within reach of a line)
   const box = async () => (await screenOfObject(app, img.id))!.box;

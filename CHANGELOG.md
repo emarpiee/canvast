@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.54.3 — Moving snaps on both axes (2026-11-05)
+
+- **Fixed:** an object moved onto a level or upright line, a side of a shape or a pattern's, now snaps on the other axis too: one edge landing no longer stopped the other from snapping. For one object, a group and several selected.
+- **Fixed:** lines on both axes that are nearer than a corner now hold instead of that corner.
+- **Changed:** snapping looks at up to 20,000 things in view, not 2,000, and a square's sides no longer count twice, so a picture built of many squares keeps snapping.
+- **Fixed:** tests: starting with grid snapping off no longer disturbs settings kept over a reload.
+
 ## 0.54.2 — Snap to the grid and to groups, grid settings; long notes open faster (2026-11-05)
 
 - **Added:** the **Grid** pattern has a lattice (square or isometric), rows of their own, strong line width, angle, shift across and down, dashes, a margin and a frame.

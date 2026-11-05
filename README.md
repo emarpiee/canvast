@@ -457,6 +457,7 @@ Keep a large canvas in order, and reach things that lie under others.
 - **Moving a group:** a group or several selected move from anywhere in their box, gaps too; press outside it to draw a selection box.
 - **Snapping:** moving, resizing, turning, dragging a node and dragging a gradient's handles snap to other things, with guide lines (the magnet button turns it off). Moving, resizing and dragging a node also snap to the grid's lines as shown, and to a group's box and middle as a whole. *Snap to the grid* and *Snap distance* are in Settings > Drawing.
   - Boxes line up by their sides and middles.
+  - Moving snaps each axis on its own, so a corner can settle on a crossing of two lines, for one object, a group or several selected.
   - Shapes snap by their geometry: a corner onto another corner or the middle of a side (a ring marks it), a corner onto any side (curves too), a straight side flush along a nearly parallel one (the side is drawn).
   - Turning brings a corner round to another, or a side parallel to a nearby one.
 - **Arranging:** align, distribute, arrange in a grid (by name, date, size or type), copy, cut, paste, duplicate; `Alt`+drag copies. A group (also a boolean group) counts as one thing; its shapes line up with each other only when you select them one by one (in Layers, or inside the group).

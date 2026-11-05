@@ -89,10 +89,10 @@ export const test = base.extend<{ app: App }>({
       if (m.type() === "error") consoleErrors.push(m.text());
     });
     page.on("pageerror", (e) => consoleErrors.push(String(e) + "\n" + (e.stack ?? "")));
-    // (a drag in a test goes by the pixels it says: the grid catching it is tested on its own)
-    await page.addInitScript(() => { if (!localStorage.getItem("canvast.settings")) localStorage.setItem("canvast.settings", JSON.stringify({ "snap.grid": false })); });
     await page.goto(APP_URL);
     await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+    // (a drag in a test goes by the pixels it says: the grid catching it is tested on its own)
+    await page.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false));
     await page.evaluate(() => window.__canvastDebug.nextFrame());
 
     const app: App = {

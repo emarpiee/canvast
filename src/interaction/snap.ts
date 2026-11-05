@@ -8,7 +8,7 @@ export let SNAP_PX = 6;
 /** How near snapping catches (Settings > Drawing). */
 export const setSnapPx = (px: number): void => void (SNAP_PX = px);
 /** More candidates than this are not searched (a dense scene would make every pointer move slow). */
-export const MAX_SNAP_TARGETS = 2000;
+export const MAX_SNAP_TARGETS = 20_000;
 
 export interface Snap {
   /** Which line of the moving box matched: 0 min, 1 middle, 2 max. */

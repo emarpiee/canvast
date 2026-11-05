@@ -177,9 +177,9 @@ function shapeOnScreen(po: ProjectedObject): { pts: number[]; refs: CornerRef[];
  * (`source`) goes on the screen; a flush side has no corner (`side` is set instead).
  */
 type ShapeHit = { source: number; to: [number, number]; side: boolean; target: number | null; guides: NonNullable<EditorState["guides"]> };
-function shapeSnap(t: SnapTargets, pts: readonly number[], segs: readonly Seg[], lineDist = Infinity): ShapeHit | null {
+function shapeSnap(t: SnapTargets, pts: readonly number[], segs: readonly Seg[], lineDist = Infinity, crossDist = Infinity): ShapeHit | null {
   const pt = bestPointSnap(pts, t);
-  if (pt) {
+  if (pt && pt.dist <= crossDist) { // (lines on both axes nearer than the corner hold instead)
     const to: [number, number] = [t.pts[2 * pt.target]!, t.pts[2 * pt.target + 1]!];
     return { source: pt.source, to, side: false, target: pt.target, guides: { pt: to } };
   }
@@ -1555,6 +1555,9 @@ export function attachTools(
           if (!r || ctx.tx.length >= MAX_SNAP_TARGETS) return;
           const upright = Math.abs(s[0] - s[2]) < 0.5, level = Math.abs(s[1] - s[3]) < 0.5;
           if (upright === level) return;
+          // (on the object's own box lines, as a square's four sides are: its box is a target already, and many squares must not use up the limit)
+          const onBox = (v: number, lo: number, hi: number): boolean => [lo, (lo + hi) / 2, hi].some((l) => Math.abs(l - v) < 0.01);
+          if (upright ? onBox(s[0], b.minX, b.maxX) : onBox(s[1], b.minY, b.maxY)) return;
           const at = cornerIn(r, frame);
           ctx.groupLines.set(ctx.tx.length, { x: [at.x, at.x, at.x], y: [at.y, at.y, at.y] });
           ctx.tx.push(upright ? [s[0], s[0], s[0]] : [NaN, NaN, NaN]);
@@ -1653,7 +1656,12 @@ export function attachTools(
       const movedSegs = sh.srcSegs.map(([a, b2, c, d]): Seg => [a + ox, b2 + oy, c + ox, d + oy]);
       const gx = g.frame === view.frame ? gridMove(sn.src.x, dx) : null;
       const gy = g.frame === view.frame ? gridMove(sn.src.y, dy) : null;
-      const hit = shapeSnap(sh.targets, moved, movedSegs, Math.min(hx?.dist ?? Infinity, hy?.dist ?? Infinity, gx?.dist ?? Infinity, gy?.dist ?? Infinity));
+      const [nearX, nearY] = [Math.min(hx?.dist ?? Infinity, gx?.dist ?? Infinity), Math.min(hy?.dist ?? Infinity, gy?.dist ?? Infinity)];
+      const hit = shapeSnap(sh.targets, moved, movedSegs, Math.min(nearX, nearY), Math.hypot(nearX, nearY));
+      // A level or upright side holds its own axis only: the other still snaps (else one edge lands and the other never does).
+      const seg = hit?.target === null ? hit.guides.seg : undefined;
+      const heldY = !!seg && Math.abs(seg[1] - seg[3]) < 0.5 && Math.abs(seg[0] - seg[2]) >= 0.5;
+      const heldX = !!seg && Math.abs(seg[0] - seg[2]) < 0.5 && Math.abs(seg[1] - seg[3]) >= 0.5;
       if (hit) {
         editor.guides = hit.guides;
         if (hit.target !== null) {
@@ -1665,24 +1673,31 @@ export function attachTools(
           // Onto a side (a curve's too): the pointer moved as the corner or side did; as exact as the side's place on the screen.
           const [fx, fy] = hit.side ? [(movedSegs[hit.source]![0] + movedSegs[hit.source]![2]) / 2, (movedSegs[hit.source]![1] + movedSegs[hit.source]![3]) / 2] : [moved[2 * hit.source]!, moved[2 * hit.source + 1]!];
           const w2 = worldIn({ ...s, x: s.x + hit.to[0] - fx, y: s.y + hit.to[1] - fy }, g.frame);
-          [dx, dy] = [D.sub(w2.x, g.startWorld.x), D.sub(w2.y, g.startWorld.y)];
+          if (!heldY) dx = D.sub(w2.x, g.startWorld.x);
+          if (!heldX) dy = D.sub(w2.y, g.startWorld.y);
         }
-        editor.preview = { kind: "move", ids: g.ids, frame: g.frame, dx, dy };
-        editor.changed();
-        return;
+        if (!heldX && !heldY) {
+          editor.preview = { kind: "move", ids: g.ids, frame: g.frame, dx, dy };
+          editor.changed();
+          return;
+        }
       }
       // The alignment is exact: target line minus where the moving line started. What is nearer holds: another's line, or the grid's.
       const lineX = [b.minX + ox, (b.minX + b.maxX) / 2 + ox, b.maxX + ox];
       const lineY = [b.minY + oy, (b.minY + b.maxY) / 2 + oy, b.maxY + oy];
-      if (gx && (!hx || gx.dist < hx.dist)) {
+      if (heldX) {
+        // (the side has it)
+      } else if (gx && (!hx || gx.dist < hx.dist)) {
         dx = gx.move;
-        editor.guides = { x: lineX[gx.line]! + gx.by };
+        editor.guides = { ...editor.guides, x: lineX[gx.line]! + gx.by };
       } else if (hx) {
         const t = sn.groupLines.get(hx.target) ?? linesOf(sn.objs[hx.target]!, g.frame);
         dx = D.sub(t.x[hx.line]!, sn.src.x[hx.source]!);
-        editor.guides = { x: sn.tx[hx.target]![hx.line]! };
+        editor.guides = { ...editor.guides, x: sn.tx[hx.target]![hx.line]! };
       }
-      if (gy && (!hy || gy.dist < hy.dist)) {
+      if (heldY) {
+        // (the side has it)
+      } else if (gy && (!hy || gy.dist < hy.dist)) {
         dy = gy.move;
         editor.guides = { ...editor.guides, y: lineY[gy.line]! + gy.by };
       } else if (hy) {
