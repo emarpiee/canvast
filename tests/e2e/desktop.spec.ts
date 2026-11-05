@@ -2092,6 +2092,21 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await clear();
     await page.keyboard.press("Control+c");
     await expect.poll(() => out().then((o) => o.svg)).toContain("placed-mark");
+    expect((await out()).file).toMatch(/placed\.svg$/);
+    // Several, a picture and a shape: both files, and pasted back here the objects, with nothing imported.
+    const items = () => page.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.length);
+    const had = await items();
+    await page.keyboard.press("Control+a");
+    await clear();
+    await page.keyboard.press("Control+c");
+    await expect.poll(() => out().then((o) => o.file.split(/\r?\n/).length)).toBe(2);
+    expect((await out()).file).toMatch(/placed\.svg/);
+    expect((await out()).types).toContain("image/png");
+    await page.keyboard.press("Control+v");
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(6);
+    expect(await items()).toBe(had);
+    await page.keyboard.press("Control+z");
+    await page.mouse.click((at.minX + at.maxX) / 2, (at.minY + at.maxY) / 2);
     // Hidden, out of hidden mode: the canvas puts nothing of its file out.
     await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"));
     await page.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), placed.assetId);
@@ -2100,6 +2115,7 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await page.keyboard.press("Control+c");
     await page.waitForTimeout(1000);
     expect((await out()).svg).not.toContain("placed-mark");
+    expect((await out()).file).not.toContain("placed");
     // In the library: an SVG goes as itself.
     await page.getByTestId("view-assets").click();
     await page.getByTestId("assets-import-input").setInputFiles({ name: "shelf.svg", mimeType: "image/svg+xml", buffer: MARK("shelf-mark") });
@@ -2114,6 +2130,16 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     const shelfFile = (await out()).file;
     expect(shelfFile).toMatch(/shelf\.svg$/);
     expect(readFileSync(shelfFile, "utf8")).toContain("shelf-mark");
+    // Several in the library: every file, of any kind.
+    await page.getByTestId("assets-import-input").setInputFiles({ name: "clip.mp4", mimeType: "video/mp4", buffer: Buffer.from("not really a video") });
+    const clip = page.locator('[data-testid="asset-card"][title="clip.mp4"]');
+    await expect(clip).toBeAttached();
+    await expect.poll(() => files(ws).filter((f) => f.endsWith("clip.mp4")).length, { timeout: 15_000 }).toBe(1);
+    await clip.click({ modifiers: ["Control"] });
+    await clear();
+    await page.keyboard.press("Control+c");
+    await expect.poll(() => out().then((o) => o.file.split(/\r?\n/).length)).toBe(2);
+    expect((await out()).file).toContain("clip.mp4");
     // Hidden, in hidden mode: it asks; declined, nothing goes; agreed, it goes as itself.
     await page.keyboard.press("Escape");
     await page.evaluate(() => window.__canvastDebug.hiddenOp("lock"));

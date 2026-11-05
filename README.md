@@ -486,7 +486,7 @@ Keep a large canvas in order, and reach things that lie under others.
 
 Copy to other apps, or export a sheet, a picture or selected shapes, and get what you see.
 
-**Copy to other apps.** `Ctrl/⌘+C` keeps the real objects for pasting back here, and also puts a PNG picture on the system clipboard, with the SVG beside it for vector shapes and SVG files, where the browser allows it; in the desktop app they are a real `.svg` file on the clipboard too. Which it takes is up to the program you paste into:
+**Copy to other apps.** `Ctrl/⌘+C` keeps the real objects for pasting back here, and also puts a PNG picture on the system clipboard, with the SVG beside it for vector shapes and SVG files, where the browser allows it; Which it takes is up to the program you paste into. In the desktop app the real files go too, of any kind and any number, for a program that takes files (a cropped, flipped or adjusted picture goes as its PNG only):
 
 | You copy | The PNG is |
 | --- | --- |
@@ -497,7 +497,7 @@ Copy to other apps, or export a sheet, a picture or selected shapes, and get wha
 
 - The picture goes alone, with no text beside it (an app offered both often takes the text). Copied texts carry their words too.
 - `Ctrl/⌘+X` puts the text only (the shape is gone before a picture could be drawn).
-- Browsers cannot put files (audio, PDF) on the clipboard, so those stay in canvast.
+- Browsers cannot put files on the clipboard, so there a file goes as its picture or its name, and audio or a PDF stays in canvast.
 
 **Pasting back in canvast** brings the objects back exactly as they were (links, masks, crop, adjustments, their places relative to each other), under the pointer, as long as nothing else was copied in between. Ending a pan with the middle button never pastes, on Linux too, where a middle click is a system paste. Shapes and texts come back even from another tab; a picture or GIF only while this window keeps the focus (after switching windows it comes back as a new picture; see Limitations). Anything copied in another app is imported as usual: an SVG as shapes, an image as a picture. A paste into a text field, the notes editor, a dialog or a menu stays there: nothing is imported or placed.
 

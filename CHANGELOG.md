@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.18 — Ctrl+C copies real files in the desktop app (2026-11-05)
+
+- **Changed:** in the desktop app, Copy puts the real files on the clipboard, of any kind and any number, from the library and the canvas, beside what it already gives (a PNG, an SVG, a note's words); a program takes what it can use. A picture cropped, flipped or adjusted goes as its PNG only, as its file does not show that; shapes among other things go as one SVG file too.
+- **Fixed:** a paste on the canvas after copying several things there brings the objects back, with nothing imported; after a Copy in the library it no longer brings back an earlier canvas copy.
+
 ## 0.54.17 — Copied vectors are a real file too (2026-11-05)
 
 - **Fixed:** in the desktop app, copied vectors go on the clipboard as a real `.svg` file as well as SVG and PNG, so a program takes whichever it can use. A hidden item's readable copy is deleted when the hidden items are locked, as with **Copy file**.

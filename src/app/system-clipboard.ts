@@ -6,7 +6,13 @@
  */
 import { desktopBridge } from "../storage/desktop-bridge";
 
-export type ClipboardResult = "image" | "text" | "failed";
+export type ClipboardResult = "image" | "files" | "text" | "failed";
+
+/** Real files, as the desktop app's `copyFiles` takes them: its workspace's, and readable copies. */
+export interface ClipboardFiles {
+  readonly files: readonly string[];
+  readonly copies: ReadonlyArray<{ name: string; bytes: Uint8Array | string }>;
+}
 
 export interface ClipboardParts {
   /** The picture as a PNG (or a promise of it: it is awaited before writing, see below). */
@@ -16,8 +22,10 @@ export interface ClipboardParts {
   readonly withText?: boolean;
   /** The same picture as vectors, where the browser can put them there (a browser that cannot gives the PNG). */
   readonly svg?: string;
-  /** What the SVG is called, as a file. */
-  readonly name?: string;
+  /** In the desktop app: the SVG as a file of this name too. */
+  readonly svgFile?: string;
+  /** In the desktop app: real files too. A browser cannot put a file on the clipboard. */
+  readonly files?: ClipboardFiles;
 }
 
 /** Past this an SVG stays off the clipboard: most of it would be embedded images. */
@@ -25,19 +33,20 @@ export const MAX_COPIED_SVG = 1_000_000;
 const SVG_TYPE = "image/svg+xml";
 
 export async function writeSystemClipboard(p: ClipboardParts): Promise<ClipboardResult> {
+  const bridge = desktopBridge();
+  const svgNow = p.svg && p.svg.length <= MAX_COPIED_SVG ? p.svg : undefined;
+  const own = svgNow && p.svgFile ? [{ name: /\.svg$/i.test(p.svgFile) ? p.svgFile : `${p.svgFile}.svg`, bytes: new TextEncoder().encode(svgNow) }] : [];
+  const copies = [...(p.files?.copies ?? []), ...own], files = p.files?.files ?? [];
+  if (bridge && files.length + copies.length > 0) {
+    // Every way a program may want it: one that takes files gets the files, one that takes pictures or words those. (The words go beside a picture only as below.)
+    const image = await Promise.resolve(p.image).catch(() => undefined);
+    const also = { ...(svgNow ? { svg: svgNow } : {}), ...(image ? { png: new Uint8Array(await image.arrayBuffer()) } : {}), ...(p.text && (!image || p.withText) ? { text: p.text } : {}) };
+    if (await bridge.copyFiles(files, copies, also).catch(() => 0)) return image ? "image" : "files";
+  }
   if (p.image && typeof ClipboardItem !== "undefined") {
     try {
       // The picture is made first and written as a plain Blob: Firefox refuses a ClipboardItem that holds a promise (NotAllowedError), Chromium takes either.
       const image = await p.image;
-      // In the desktop app the SVG is a real file too: a program that takes files gets it as a file, one that takes pictures its SVG or PNG.
-      const bridge = desktopBridge();
-      if (bridge && p.svg && p.svg.length <= MAX_COPIED_SVG) {
-        const file = p.name || "vector";
-        const done = await bridge
-          .copyFiles([], [{ name: /\.svg$/i.test(file) ? file : `${file}.svg`, bytes: new TextEncoder().encode(p.svg) }], { svg: p.svg, png: new Uint8Array(await image.arrayBuffer()) })
-          .catch(() => 0);
-        if (done) return "image";
-      }
       const parts = { "image/png": image, ...(p.withText && p.text ? { "text/plain": new Blob([p.text], { type: "text/plain" }) } : {}) };
       const svg = p.svg && p.svg.length <= MAX_COPIED_SVG && ClipboardItem.supports?.(SVG_TYPE) ? new Blob([p.svg], { type: SVG_TYPE }) : null;
       // (refused with its SVG, the picture still goes)

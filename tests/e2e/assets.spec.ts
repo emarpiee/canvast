@@ -2686,6 +2686,38 @@ test("what a file says about itself is shown in its details (camera, settings, o
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("a browser cannot put a real file on the clipboard: a file list is refused and a file added to a copy does not come back, so Copy stays SVG and PNG there", async ({ app, browserName }) => {
+  const p = app.page;
+  if (browserName === "chromium") await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  const listRefused = await p.evaluate(async () => {
+    const list = new Blob(["file:///tmp/a.svg\r\n"], { type: "text/uri-list" });
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ "text/uri-list": list })]);
+      return false;
+    } catch {
+      return true;
+    }
+  });
+  expect(listRefused, "a list of files through the clipboard API").toBe(true);
+  // The other way in: a file added to the data of a copy event, read back by a paste.
+  await p.evaluate(() => {
+    document.addEventListener("copy", (e) => {
+      e.clipboardData!.items.add(new File(["<svg/>"], "a.svg", { type: "image/svg+xml" }));
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }, { capture: true, once: true });
+    (window as unknown as { pastedFiles: number }).pastedFiles = -1;
+    document.addEventListener("paste", (e) => {
+      (window as unknown as { pastedFiles: number }).pastedFiles = e.clipboardData!.files.length;
+      e.stopImmediatePropagation();
+    }, { capture: true, once: true });
+  });
+  await p.keyboard.press("Control+c");
+  await p.keyboard.press("Control+v");
+  await expect.poll(() => p.evaluate(() => (window as unknown as { pastedFiles: number }).pastedFiles)).toBeGreaterThanOrEqual(0);
+  expect(await p.evaluate(() => (window as unknown as { pastedFiles: number }).pastedFiles), "a file added to a copy event").toBe(0);
+});
+
 test("library Copy of an SVG puts the SVG itself beside its PNG, and Paste keeps it vectors", async ({ app, browserName }) => {
   test.skip(browserName !== "chromium", "reading and writing the clipboard in the test harness is Chromium's");
   const p = app.page;

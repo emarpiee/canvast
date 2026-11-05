@@ -11,7 +11,7 @@ import { splitFrontmatter, wholeMarkdown } from "../notes/frontmatter";
 import { linksToWiki, noteKindOf, richNoteBody } from "../notes/note-file";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { confirmDialog } from "../ui/confirm";
-import { asPng, copyPlainText, writeSystemClipboard } from "./system-clipboard";
+import { asPng, copyPlainText, writeSystemClipboard, type ClipboardFiles } from "./system-clipboard";
 
 export interface CopyDeps {
   file(hash: string): Promise<Blob | undefined>;
@@ -55,6 +55,10 @@ export async function copyItemsToClipboard(deps: CopyDeps, ents: readonly Catalo
     else deps.say("Could not copy to the clipboard.");
     return null;
   }
+  // The desktop app: their real files too, for whatever pastes files. (A browser cannot put a file on the clipboard.)
+  const bridge = desktopBridge();
+  const real = bridge ? await filesOf(deps, bridge, ents) : undefined;
+  const files = real?.n ? real : undefined;
   const kinds = ents.map((e) => clipboardFor(e.name, e.type));
   if (kinds.every(isWords)) {
     const parts: string[] = [];
@@ -76,7 +80,7 @@ export async function copyItemsToClipboard(deps: CopyDeps, ents: readonly Catalo
       return null;
     }
     const text = parts.join(NOTES_BETWEEN);
-    if (!(await copyPlainText(text))) {
+    if (files ? (await writeSystemClipboard({ text, files })) === "failed" : !(await copyPlainText(text))) {
       deps.say("Could not copy to the clipboard.");
       return null;
     }
@@ -87,16 +91,18 @@ export async function copyItemsToClipboard(deps: CopyDeps, ents: readonly Catalo
   const at = kinds.findIndex(isPicture);
   const single = ents.length === 1 && kinds[0] === "thumb";
   if (at < 0 && !single) {
-    if (await copyPlainText(names)) onlyName();
+    if (files) deps.say((await writeSystemClipboard({ text: names, files })) === "failed" ? "Could not copy to the clipboard." : ents.length === 1 ? `Copied “${ents[0]!.name}”.` : `Copied ${plural(files.n, "file")}.`);
+    else if (await copyPlainText(names)) onlyName();
     else deps.say("Could not copy to the clipboard.");
     return null;
   }
   const first = ents[single ? 0 : at]!;
   const source = single ? await deps.thumb(first.hash).catch(() => undefined) : await deps.file(first.hash).catch(() => undefined);
   const svg = source && kinds[single ? 0 : at] === "vector" ? await source.text().catch(() => undefined) : undefined;
-  const done = await writeSystemClipboard({ ...(source ? { image: asPng(source) } : {}), text: names, ...(svg ? { svg, name: first.name } : {}) });
+  const done = await writeSystemClipboard({ ...(source ? { image: asPng(source) } : {}), text: names, ...(svg ? { svg } : {}), ...(files ? { files } : {}) });
   if (done === "failed") deps.say("Could not copy to the clipboard.");
   else if (done === "text") onlyName();
+  else if (files && ents.length > 1) deps.say(`Copied ${plural(files.n, "file")}.`);
   else {
     const others = ents.length - 1;
     const kind = kinds[single ? 0 : at]!;
@@ -111,16 +117,12 @@ export async function copyBytes(bridge: DesktopBridge, name: string, blob: Blob)
   return writeProven(bridge.stream, await bridge.stream.copy(name), blob);
 }
 
-/** The desktop app: the items' real files on the clipboard, of any kind, to paste into a file manager. In a browser, what Copy gives. */
-export async function copyItemsAsFiles(deps: CopyDeps, ents: readonly CatalogEntry[]): Promise<void> {
-  const bridge = desktopBridge();
-  if (!bridge) return void (await copyItemsToClipboard(deps, ents));
-  if (!ents.length || !(await hiddenFine(ents))) return;
+/** The items' real files for the clipboard, of any kind: a hidden one's is encrypted, so a readable copy in the app's own temporary folder, deleted on lock and on closing, as for opening it in another app. */
+export async function filesOf(deps: CopyDeps, bridge: DesktopBridge, ents: readonly CatalogEntry[]): Promise<ClipboardFiles & { readonly n: number }> {
   const files: string[] = [];
   const copies: Array<{ name: string; bytes: Uint8Array | string }> = [];
   for (const e of ents) {
     if (meta(e).hidden) {
-      // (its file is encrypted: a readable copy in the app's own temporary folder, deleted on lock and on closing, as for opening it in another app)
       const blob = await deps.file(e.hash).catch(() => undefined);
       if (blob) copies.push({ name: e.name, bytes: await copyBytes(bridge, e.name, blob) });
     } else {
@@ -128,7 +130,15 @@ export async function copyItemsAsFiles(deps: CopyDeps, ents: readonly CatalogEnt
       if (file) files.push(file);
     }
   }
-  const n = files.length + copies.length;
+  return { files, copies, n: files.length + copies.length };
+}
+
+/** The desktop app: the items' real files alone on the clipboard, of any kind. In a browser, what Copy gives. */
+export async function copyItemsAsFiles(deps: CopyDeps, ents: readonly CatalogEntry[]): Promise<void> {
+  const bridge = desktopBridge();
+  if (!bridge) return void (await copyItemsToClipboard(deps, ents));
+  if (!ents.length || !(await hiddenFine(ents))) return;
+  const { files, copies, n } = await filesOf(deps, bridge, ents);
   if (!n) return deps.say(ents.some((e) => meta(e).hidden) ? "Could not read it: are the hidden items locked?" : "Its file is not in the workspace folder yet: try again in a moment.");
   try {
     await bridge.copyFiles(files, copies);

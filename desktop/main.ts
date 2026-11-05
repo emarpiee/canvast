@@ -622,13 +622,14 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     // (as file managers read files: a list of addresses for most, the same list after a word for those of GNOME)
     const urls = fulls.map((f) => pathToFileURL(f).href);
     const raw = (format: string): string => `electron application/osclipboard;format="${format}"`;
-    // (a vector picture goes every way a program may want it: the file, its SVG, its PNG)
-    const { svg, png } = (also ?? {}) as { svg?: unknown; png?: unknown };
+    // (what is copied goes every way a program may want it: the files, an SVG, a PNG, words)
+    const { svg, png, text } = (also ?? {}) as { svg?: unknown; png?: unknown; text?: unknown };
     await clipboard.write([new ClipboardItem({
       [raw("text/uri-list")]: new Blob([`${urls.join("\r\n")}\r\n`]),
       [raw("x-special/gnome-copied-files")]: new Blob([`copy\n${urls.join("\n")}`]),
       ...(typeof svg === "string" ? { [raw("image/svg+xml")]: new Blob([svg]) } : {}),
       ...(png instanceof Uint8Array ? { [raw("image/png")]: new Blob([png]) } : {}),
+      ...(typeof text === "string" ? { [raw("text/plain")]: new Blob([text]) } : {}),
     })]);
     return fulls.length;
   });
