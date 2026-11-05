@@ -117,6 +117,25 @@ describe("pattern generators (ADR 0162)", () => {
       for (const g of GENERATORS.filter((x) => !x.guide)) expect(settingsOf(g).find((s) => s.k === "bg")!.def, g.id).not.toBe("");
     });
 
+    it("go far past their usual span, and Randomize keeps to it", () => {
+      const span = (id: string, k: string) => { const r = settingsOf(G(id)).find((x) => x.k === k)!; return r.t === "range" ? [r.min, r.max, ...r.usual] : []; };
+      expect(span("golden-ratio", "depth")).toEqual([1, 8, 1, 5]);
+      expect(span("rule-of-thirds", "parts")).toEqual([1, 100, 2, 12]);
+      expect(span("perspective", "rays")).toEqual([1, 400, 1, 40]);
+      expect(span("polar-grid", "rings")[1]).toBe(400);
+      expect(span("grid", "dash")[1]).toBe(1000);
+      expect(span("fisheye-grid", "bulge")).toEqual([-1000, 1000, -100, 100]);
+      // Stronger bends further, whichever way; the corners stay put.
+      const bow = (bulge: number) => { const lines = all("fisheye-grid", { bulge, cols: 4, rows: 4 }); return { corner: lines[0]!.n[1]!, mid: lines[1]!.n[32 * NODE]! }; };
+      expect(bow(0).mid).toBeCloseTo(225, 6);
+      expect(bow(60).mid).toBeLessThan(225);
+      expect(bow(1000).mid).toBeLessThan(bow(60).mid);
+      expect(bow(-60).mid).toBeGreaterThan(225);
+      expect(bow(-1000).mid).toBeGreaterThan(bow(-60).mid);
+      expect(bow(1000).corner).toBeCloseTo(0, 6);
+      expect(bow(-1000).corner).toBeCloseTo(0, 6);
+    });
+
     it("draw with dashes, flipped and with a margin, in every guide", () => {
       for (const g of GENERATORS.filter((x) => x.guide)) sound(generate(g, { ...defaultValues(g), dash: 20, margin: 10, flipX: true, flipY: true, frame: true }, 3, 900, 600), 900, 600);
     });

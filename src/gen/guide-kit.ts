@@ -6,10 +6,25 @@ import type { GenShape, Generator, Section, Setting, Values } from "./types";
 
 /** What every guide shares: its colours, its look, and a pen that draws with them, so that a guide says only where its lines go. */
 
+/**
+ * How far a guide's settings go, past their usual span, when typed or dragged: as far as makes a picture (Levels triples with each one;
+ * past these a guide is lines too close to see, or more than a path can be drawn fast with).
+ */
+const SPANS: Readonly<Record<string, readonly [number, number]>> = {
+  action: [1, 100], title: [1, 100], bleed: [0, 50], bulge: [-1000, 1000], centreX: [-100, 200], centreY: [-100, 200], circles: [2, 40], crossSize: [1, 100], depth: [1, 8], dot: [1, 50], fib: [2, 60],
+  folds: [1, 360], gutter: [0, 200], horizon: [-100, 200], lines: [2, 1000], mark: [1, 50], mods: [2, 60], parts: [1, 100], rays: [1, 400], root: [2, 100], safeIn: [0, 50], spokes: [0, 720],
+  squares: [2, 30], startAt: [0, 360], strongAt: [0, 100], tilt: [1, 89], uprightN: [0, 400], x1: [-1000, 1000], x2: [-1000, 1000], x3: [-1000, 1000], y3: [-1000, 1000], angle: [0, 360],
+};
+/** A setting of a guide, with its whole span. */
+export const wide = (s: Setting): Setting => {
+  const span = SPANS[s.k];
+  return s.t === "range" && span ? { ...s, min: span[0], max: span[1] } : s;
+};
+
 export const COLOURS: Section = { title: "Colour", items: [C("line", "Lines", "#5f7a99"), C("major", "Strong lines", "#ff3d81", true)] };
 export const WEIGHT = R("weight", "Line width", 1, 20, 3);
-export const STRONG_WIDTH = R("strong", "Strong width", 100, 500, 180, 10);
-export const DASH = steady(R("dash", "Dash length", 0, 100, 0));
+export const STRONG_WIDTH: Setting = { ...R("strong", "Strong width", 100, 500, 180, 10), ...{ max: 2000 } };
+export const DASH: Setting = { ...steady(R("dash", "Dash length", 0, 100, 0)), ...{ max: 1000 } };
 export const MARGIN = steady(R("margin", "Margin", 0, 45, 0));
 export const frameSetting = (on: boolean): Setting => steady(T("frame", "Frame", on));
 export const FLIPS: readonly Setting[] = [T("flipX", "Flip across", false), T("flipY", "Flip down", false)];
@@ -111,7 +126,7 @@ export function pen(v: Values, w: number, h: number): Pen {
 export function guide(id: string, label: string, family: Generator["family"], about: string, items: readonly Setting[], draw: (p: Pen, v: ReturnType<typeof reader>, rng: () => number) => void, more: { frame?: boolean; readout?: Generator["readout"] } = {}): Generator {
   return {
     id, label, family, about, guide: true,
-    sections: [COLOURS, { title: label, items: items.map(steady) }, { title: "Look", items: [WEIGHT, STRONG_WIDTH, DASH, MARGIN, frameSetting(more.frame ?? true)] }],
+    sections: [COLOURS, { title: label, items: items.map((i) => wide(steady(i))) }, { title: "Look", items: [WEIGHT, STRONG_WIDTH, DASH, MARGIN, frameSetting(more.frame ?? true)] }],
     run(v, rng, w, h) {
       const p = pen(v, w, h);
       draw(p, reader(v), rng);

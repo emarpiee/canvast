@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.12 — Wider limits on guides (2026-11-05)
+
+- **Changed:** the guides' settings go far further when typed or dragged: parts, spokes, axes, lines, steps, angles, a centre or vanishing point well outside the sheet, dash length and strong width. Fisheye Grid's **Strength** goes from -1000 to 1000, and below zero it pinches instead of bulging.
+
 ## 0.54.11 — Fewer guides (2026-11-05)
 
 - **Removed:** the **Figure Proportion** and **Face Proportion** guides.

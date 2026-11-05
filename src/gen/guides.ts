@@ -1,6 +1,6 @@
 import { regular } from "./geom";
 import type { P } from "./geom";
-import { COLOURS, DASH, MARGIN, STRONG_WIDTH, WEIGHT, FLIPS, frameSetting, guide, pen } from "./guide-kit";
+import { COLOURS, DASH, MARGIN, STRONG_WIDTH, WEIGHT, FLIPS, frameSetting, guide, pen, wide } from "./guide-kit";
 import type { Pen } from "./guide-kit";
 import { Ch, LOOSE, R, T, reader, steady, when } from "./kit";
 import type { Generator, Values } from "./types";
@@ -234,8 +234,8 @@ export const grid: Generator = {
   id: "grid", label: "Grid", family: "Layout", guide: true, about: "Lines in a lattice with stronger lines now and then",
   sections: [
     COLOURS,
-    { title: "Grid", items: [steady(Ch("cells", "Cells", [["square", "Square"], ["equal", "Equal"], ["rows", "Rows"], ["size", "Size"]], "square")), steady(when("cells", SOME_CELLS, R("cols", "Across", 2, 60, 16))), steady(when("cells", ["rows"], R("rows", "Rows", 2, 60, 16))), steady(when("cells", ["size"], R("size", "Cell size", 4, 200, 32))), WEIGHT, R("every", "Strong every", 0, 12, 4), steady(R("strongAt", "Strong start", 0, 12, 0)), STRONG_WIDTH, steady(T("rowsToo", "Rows too", true)), steady(LOOSE)] },
-    { title: "Layout", items: [MARGIN, frameSetting(false), steady(R("shiftX", "Shift across", 0, 100, 0)), steady(R("shiftY", "Shift down", 0, 100, 0)), DASH, steady(R("angle", "Angle", 0, 90, 0))] },
+    { title: "Grid", items: [steady(Ch("cells", "Cells", [["square", "Square"], ["equal", "Equal"], ["rows", "Rows"], ["size", "Size"]], "square")), steady(when("cells", SOME_CELLS, R("cols", "Across", 2, 60, 16))), steady(when("cells", ["rows"], R("rows", "Rows", 2, 60, 16))), steady(when("cells", ["size"], R("size", "Cell size", 4, 200, 32))), WEIGHT, R("every", "Strong every", 0, 12, 4), wide(steady(R("strongAt", "Strong start", 0, 12, 0))), STRONG_WIDTH, steady(T("rowsToo", "Rows too", true)), steady(LOOSE)] },
+    { title: "Layout", items: [MARGIN, frameSetting(false), steady(R("shiftX", "Shift across", 0, 100, 0)), steady(R("shiftY", "Shift down", 0, 100, 0)), DASH, wide(steady(R("angle", "Angle", 0, 90, 0)))] },
   ],
   readout: cellsReadout,
   run(v, rng, w, h) {
@@ -336,15 +336,16 @@ export const perspective = guide("perspective", "Perspective", "Perspective", "A
   if (count < 3) for (let i = 1; i <= n("uprightN"); i++) { const x = p.x0 + (i / (n("uprightN") + 1)) * p.w; p.line(x, p.y0, x, p.y1); }
 });
 
-export const fisheyeGrid = guide("fisheye-grid", "Fisheye Grid", "Perspective", "Grid lines curved as through a wide-angle lens", [R("cols", "Across", 2, 40, 12), R("rows", "Rows", 2, 40, 8), R("bulge", "Strength", 0, 100, 60)], (p, { n }) => {
-  const k = (n("bulge") / 100) * 0.95, half = Math.hypot(p.w, p.h) / 2;
+export const fisheyeGrid = guide("fisheye-grid", "Fisheye Grid", "Perspective", "Grid lines curved as through a wide-angle lens", [R("cols", "Across", 2, 40, 12), R("rows", "Rows", 2, 40, 8), R("bulge", "Strength", -100, 100, 60)], (p, { n }) => {
+  const k = (Math.abs(n("bulge")) / 100) * 1.17, half = Math.hypot(p.w, p.h) / 2;
   const bent = (x: number, y: number): P => {
     const dx = x - p.cx, dy = y - p.cy, r = Math.hypot(dx, dy) / half;
     if (!k || !r) return [x, y];
-    const f = Math.sin((r * k * Math.PI) / 2) / Math.sin((k * Math.PI) / 2) / r;
+    // (the corners stay where they are at any strength; below zero is the exact opposite, a pinch)
+    const f = (n("bulge") > 0 ? Math.atan(r * k) / Math.atan(k) : Math.tan(r * Math.atan(k)) / k) / r;
     return [p.cx + dx * f, p.cy + dy * f];
   };
-  const STEPS = 32;
+  const STEPS = 64;
   for (let i = 0; i <= n("cols"); i++) { const x = p.x0 + (i / n("cols")) * p.w; p.curve(Array.from({ length: STEPS + 1 }, (_, j) => bent(x, p.y0 + (j / STEPS) * p.h)), i * 2 === n("cols")); }
   for (let i = 0; i <= n("rows"); i++) { const y = p.y0 + (i / n("rows")) * p.h; p.curve(Array.from({ length: STEPS + 1 }, (_, j) => bent(p.x0 + (j / STEPS) * p.w, y)), i * 2 === n("rows")); }
 }, { frame: false });
@@ -374,8 +375,10 @@ export const radialSymmetry = guide("radial-symmetry", "Radial Symmetry", "Geome
   const [x, y] = centreOf(p, n), reach = farthest(p, x, y);
   for (let i = 0; i < n("folds"); i++) {
     const a = (n("startAt") + (i * 180) / n("folds")) * RAD;
-    p.ray(x, y, Math.cos(a), Math.sin(a), true);
-    if (b("between")) { const m = a + (Math.PI / 2) / n("folds"); p.ray(x, y, Math.cos(m), Math.sin(m)); }
+    // (a centre off the box: the axes run on regardless, for the sheet to cut, or a turn of the setting would leave nothing)
+    const axis = (t: number, strong: boolean): void => { const [dx, dy] = [Math.cos(t) * reach, Math.sin(t) * reach]; if (x < p.x0 || x > p.x1 || y < p.y0 || y > p.y1) p.line(x - dx, y - dy, x + dx, y + dy, strong); else p.ray(x, y, dx, dy, strong); };
+    axis(a, true);
+    if (b("between")) axis(a + (Math.PI / 2) / n("folds"), false);
   }
   const rim = Math.min(p.w, p.h) / 2;
   for (let i = 1; i <= n("rings"); i++) p.circle(x, y, Math.min(reach, rim) * (i / n("rings")));
