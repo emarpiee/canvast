@@ -595,6 +595,24 @@ test("line art of a 3D model: live over it or alone, and placed on the canvas as
   await side.locator('[data-k="linesShow"] [data-v="only"]').click();
   await expect(side.locator('[data-k="bg"] code')).toHaveText("#FFFFFF");
   await expect.poll(() => painted(p)).toBeGreaterThan(0.001);
+  // A thin line finds what a thick one does: reach, not width, says how far it looks.
+  const inked = () => p.getByTestId("model-stage").locator("canvas").evaluate((x: HTMLCanvasElement) => {
+    const t = document.createElement("canvas");
+    t.width = x.width;
+    t.height = x.height;
+    const g = t.getContext("2d")!;
+    g.drawImage(x, 0, 0);
+    const d = g.getImageData(0, 0, t.width, t.height).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i]! < 128) n++;
+    return n;
+  });
+  await side.locator('[data-k="linesWidth"] input[type=number]').fill("4");
+  await p.waitForTimeout(200);
+  const thick = await inked();
+  await side.locator('[data-k="linesWidth"] input[type=number]').fill("1");
+  await expect.poll(inked).toBeLessThan(thick);
+  expect(await inked()).toBeGreaterThan(0);
   await detailsShown(p);
   await p.getByTestId("asset-place").click();
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "image").length)).toBe(1);

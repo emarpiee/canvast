@@ -843,10 +843,26 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // the background ones (what pictures look like) after, and one nobody wants any more (its card scrolled away) is not made at all.
   const waiting: Array<{ job: ThumbJob; go: () => void; drop: () => void }> = [];
   let making = 0;
+  let quietTurn = false, quietWait = false;
   const pump = (): void => {
     while (making < THUMB_MAKERS && waiting.length) {
       let i = waiting.length - 1;
       while (i >= 0 && !waiting[i]!.job.urgent) i--;
+      // What no card waits for is made one at a time, in the library, when the page is quiet: it must not take a machine from what is being done.
+      if (i < 0 && (!visible || making > 0)) return;
+      if (i < 0 && !quietTurn) {
+        if (quietWait) return;
+        quietWait = true;
+        const go = (): void => {
+          quietWait = false;
+          quietTurn = true;
+          pump();
+          quietTurn = false;
+        };
+        if (typeof requestIdleCallback === "function") requestIdleCallback(go, { timeout: 2000 });
+        else setTimeout(go, 200);
+        return;
+      }
       const [w] = waiting.splice(i < 0 ? waiting.length - 1 : i, 1);
       if (!w!.job.wants.some((f) => f())) {
         w!.drop();
@@ -2095,7 +2111,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const have = new Set(await session.catalog.thumbHashes().catch(() => []));
     for (const e of listing.entries) {
       if (have.has(e.hash) || !e.present || !hasThumb(e) || meta(e).hidden || thumbUrls.has(e.hash)) continue;
-      if (isPdfFile(e) || isModelFile(e.name)) continue; // (each takes reading and drawing a whole file: made when its card comes into view)
+      if (isPdfFile(e) || isModelFile(e.name) || noteKindOf(e.name)) continue; // (each takes reading and drawing a whole file, and a note's is never stored: made when its card comes into view)
       thumbFor(e.hash, always, false).then((url) => keepThumbUrl(e.hash, url), () => undefined);
     }
   };
@@ -5389,6 +5405,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const view: AssetsView = {
     show() {
       visible = true;
+      pump();
       labelGround();
       root.hidden = false;
       status.textContent = "";

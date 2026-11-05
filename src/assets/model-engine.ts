@@ -130,7 +130,7 @@ function free(root: Object3D): void {
 /** Finds lines at each pixel from a ring of its neighbours as far as the line's half width. */
 const LINE_SHADER = `
   uniform sampler2D normals; uniform sampler2D depth; uniform vec2 texel; uniform float radius; uniform float near; uniform float far; uniform bool flatLens;
-  uniform vec3 colour; uniform float outline; uniform float inner; varying vec2 vUv;
+  uniform float outline; uniform float inner; varying vec2 vUv;
   float zAt(vec2 uv) {
     float d = texture2D(depth, uv).x;
     return flatLens ? d * (far - near) + near : (near * far) / (far - d * (far - near));
@@ -155,7 +155,23 @@ const LINE_SHADER = `
     float slant = max(abs(n0.z), 0.12);
     float td = mix(0.25, 0.004, outline) / slant;
     float tn = mix(1.0, 0.03, inner);
-    float a = max(smoothstep(td, td * 1.5, dd), smoothstep(tn, tn * 1.5, nn));
+    gl_FragColor = vec4(1.0, 1.0, 1.0, max(smoothstep(td, td * 1.5, dd), smoothstep(tn, tn * 1.5, nn)));
+  }`;
+
+/** A band of edges as wide as a line: narrowed where the line is thinner than the band (what stays is its middle), or widened where it is thicker. */
+const LINE_DRAW_SHADER = `
+  uniform sampler2D band; uniform vec2 texel; uniform float spread; uniform vec3 colour; varying vec2 vUv;
+  void main() {
+    float a = texture2D(band, vUv).a;
+    float r = abs(spread);
+    if (r > 0.25) {
+      for (int i = 0; i < 12; i++) {
+        float t = float(i) * 0.5236;
+        vec2 off = vec2(cos(t), sin(t)) * texel;
+        float far = texture2D(band, vUv + off * r).a, mid = texture2D(band, vUv + off * r * 0.5).a;
+        a = spread < 0.0 ? min(a, min(far, mid)) : max(a, max(far, mid));
+      }
+    }
     gl_FragColor = vec4(colour, a);
     #include <colorspace_fragment>
   }`;
@@ -194,7 +210,9 @@ export class ModelStage {
   /** What the lines of a picture are found in: the surface's direction and how far it is, at each pixel. */
   private seen: WebGLRenderTarget | null = null;
   private seenNormals: MeshNormalMaterial | null = null;
-  private lineQuad: { scene: Scene; camera: OrthographicCamera; mesh: Mesh<PlaneGeometry, ShaderMaterial> } | null = null;
+  private lineQuad: { scene: Scene; camera: OrthographicCamera; mesh: Mesh<PlaneGeometry, ShaderMaterial>; find: ShaderMaterial; draw: ShaderMaterial } | null = null;
+  /** The band of edges found, before it is made as wide as a line. */
+  private edges: WebGLRenderTarget | null = null;
   /** A model of so many triangles that a drag should not also draw each at two pixels to one. */
   heavy = false;
   private readonly persp: PerspectiveCamera;
@@ -430,31 +448,62 @@ export class ModelStage {
   private lineQuadFor(look: ModelLook, camera: PerspectiveCamera | OrthographicCamera, seen: WebGLRenderTarget): { scene: Scene; camera: OrthographicCamera; mesh: Mesh<PlaneGeometry, ShaderMaterial> } {
     const T = this.T;
     if (!this.lineQuad) {
-      const mesh = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({
+      const vertexShader = "varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }";
+      const draw = new T.ShaderMaterial({
         transparent: true,
         depthTest: false,
         depthWrite: false,
-        uniforms: { normals: { value: null }, depth: { value: null }, texel: { value: new T.Vector2() }, radius: { value: 1 }, near: { value: 1 }, far: { value: 10 }, flatLens: { value: false }, colour: { value: new T.Color() }, outline: { value: 0.5 }, inner: { value: 0.5 } },
-        vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
+        uniforms: { band: { value: null }, texel: { value: new T.Vector2() }, spread: { value: 0 }, colour: { value: new T.Color() } },
+        vertexShader,
+        fragmentShader: LINE_DRAW_SHADER,
+      });
+      const find = new T.ShaderMaterial({
+        depthTest: false,
+        depthWrite: false,
+        uniforms: { normals: { value: null }, depth: { value: null }, texel: { value: new T.Vector2() }, radius: { value: 1 }, near: { value: 1 }, far: { value: 10 }, flatLens: { value: false }, outline: { value: 0.5 }, inner: { value: 0.5 } },
+        vertexShader,
         fragmentShader: LINE_SHADER,
-      }));
+      });
+      const mesh = new T.Mesh(new T.PlaneGeometry(2, 2), find);
       const scene = new T.Scene();
       scene.add(mesh);
-      this.lineQuad = { scene, camera: new T.OrthographicCamera(), mesh };
+      this.lineQuad = { scene, camera: new T.OrthographicCamera(), mesh, find, draw };
     }
-    const u = this.lineQuad.mesh.material.uniforms as Record<string, { value: unknown }>;
+    const quad = this.lineQuad;
+    if (!this.edges || this.edges.width !== seen.width || this.edges.height !== seen.height) {
+      this.edges?.dispose();
+      this.edges = new T.WebGLRenderTarget(seen.width, seen.height);
+    }
+    const u = quad.find.uniforms as Record<string, { value: unknown }>;
     u["normals"]!.value = seen.texture;
     u["depth"]!.value = seen.depthTexture;
     (u["texel"]!.value as { set(x: number, y: number): void }).set(1 / seen.width, 1 / seen.height);
-    // (a width is for a picture 800 pixels tall: the same drawing at any size)
-    u["radius"]!.value = Math.max(0.5, ((look["linesWidth"] as number) * seen.height) / 800 / 2);
+    // (sizes are for a picture 800 pixels tall: the same drawing at any size)
+    const toPixels = seen.height / 800;
+    const reach = Math.max(1, (look["linesReach"] as number) * toPixels);
+    u["radius"]!.value = reach;
     u["near"]!.value = camera.near;
     u["far"]!.value = camera.far;
     u["flatLens"]!.value = camera === this.ortho;
-    (u["colour"]!.value as { set(c: string): void }).set(look["linesColour"] as string);
     u["outline"]!.value = look["linesOutline"];
     u["inner"]!.value = look["linesInner"];
-    return this.lineQuad;
+    // First the band of edges, as far either side as the reach; then that band made as wide as a line. So what is found does not depend on how wide it is drawn.
+    const was = this.gl.getRenderTarget(), clear = this.gl.getClearColor(new T.Color()), alpha = this.gl.getClearAlpha(), auto = this.gl.autoClear;
+    quad.mesh.material = quad.find;
+    this.gl.setRenderTarget(this.edges);
+    this.gl.setClearColor(0x000000, 0);
+    this.gl.autoClear = true;
+    this.gl.render(quad.scene, quad.camera);
+    this.gl.setRenderTarget(was);
+    this.gl.setClearColor(clear, alpha);
+    this.gl.autoClear = auto;
+    const d = quad.draw.uniforms as Record<string, { value: unknown }>;
+    d["band"]!.value = this.edges.texture;
+    (d["texel"]!.value as { set(x: number, y: number): void }).set(1 / seen.width, 1 / seen.height);
+    d["spread"]!.value = ((look["linesWidth"] as number) * toPixels) / 2 - reach;
+    (d["colour"]!.value as { set(c: string): void }).set(look["linesColour"] as string);
+    quad.mesh.material = quad.draw;
+    return quad;
   }
 
   /** The line art of the view last drawn, as a mask of `w` × `h` (the same shape as the canvas): the very lines it shows. Top row first; flipped when the view is mirrored. */
@@ -499,8 +548,10 @@ export class ModelStage {
     this.seen?.depthTexture?.dispose();
     this.seen?.dispose();
     this.seenNormals?.dispose();
+    this.edges?.dispose();
     this.lineQuad?.mesh.geometry.dispose();
-    this.lineQuad?.mesh.material.dispose();
+    this.lineQuad?.find.dispose();
+    this.lineQuad?.draw.dispose();
     this.gl.dispose();
     this.gl.forceContextLoss();
   }
