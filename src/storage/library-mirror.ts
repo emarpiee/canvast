@@ -673,7 +673,8 @@ export class LibraryMirror {
       const tidy = libraryDir(names, "", "");
       for (let d = this.keepNames() ? await diskDir(names, tidy) : tidy; d.includes("/"); d = parentOf(d)) wanted.add(d);
     }
-    for (const d of wanted) await this.bridge.makeFolder(d);
+    // (only those not made yet: made again at every save, a folder deleted just after one counted as the app's own change, and was missed)
+    for (const d of wanted) if (!this.dirs.has(d)) await this.bridge.makeFolder(d);
     const dirsNow = [...wanted].sort();
     if (JSON.stringify(dirsNow) !== JSON.stringify(this.state.dirs ?? [])) {
       this.state.dirs = dirsNow;

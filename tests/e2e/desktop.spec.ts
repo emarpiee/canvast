@@ -1094,8 +1094,11 @@ test("a library folder deleted outside the app stays deleted, while it runs and 
     await expect.poll(() => existsSync(join(ws, "library/going")), { timeout: 20_000 }).toBe(true);
     await page.waitForTimeout(500);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
+    // (a save just before: the app made no folder in it, so the deletion is seen as someone else's)
+    await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f9", "Another moment"));
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
     rmSync(join(ws, "library/going"), { recursive: true });
-    await expect.poll(names, { timeout: 20_000 }).toEqual(["Staying"]);
+    await expect.poll(names, { timeout: 20_000 }).toEqual(["Another moment", "Staying"]);
     await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f3", "Another"));
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     await expect.poll(() => existsSync(join(ws, "library/another")), { timeout: 20_000 }).toBe(true);
@@ -1108,7 +1111,7 @@ test("a library folder deleted outside the app stays deleted, while it runs and 
   rmSync(join(ws, "library/staying"), { recursive: true });
   ({ app, page } = await launch(ws));
   try {
-    await expect.poll(names, { timeout: 20_000 }).toEqual(["Another"]);
+    await expect.poll(names, { timeout: 20_000 }).toEqual(["Another", "Another moment"]);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     expect([existsSync(join(ws, "library/going")), existsSync(join(ws, "library/staying"))]).toEqual([false, false]);
   } finally {

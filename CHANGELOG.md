@@ -4,6 +4,7 @@
 
 - **Added:** a bookmark of a PDF or a 3D view has a ⋯ to rename or delete it, in the view's list and in the details.
 - **Added:** Ctrl+S in the panel on a canvas shows the page or view in it on that card.
+- **Fixed:** a library folder deleted just after a save was missed: every save made all the library's folders again, and a deletion right after counted as the app's own change. Folders are now made only once.
 - **Fixed:** a PDF's keys (Page Up and Down, Home, End, Ctrl+F) work in the panel on a canvas too, and the view has the focus when it opens there.
 
 ## 0.54.43 — Move one closed path, or split them (2026-11-06)
