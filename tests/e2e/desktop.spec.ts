@@ -2193,7 +2193,7 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await clear();
     await page.keyboard.press("Control+c");
     await page.waitForTimeout(500);
-    expect((await out()).svg).not.toContain("placed-mark");
+    expect((await out()).file).toBe("");
   } finally {
     await app.close();
   }

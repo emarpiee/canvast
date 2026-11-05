@@ -628,7 +628,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
       [raw("text/uri-list")]: new Blob([`${urls.join("\r\n")}\r\n`]),
       [raw("x-special/gnome-copied-files")]: new Blob([`copy\n${urls.join("\n")}`]),
       ...(typeof svg === "string" ? { [raw("image/svg+xml")]: new Blob([svg]) } : {}),
-      ...(png instanceof Uint8Array ? { [raw("image/png")]: new Blob([png]) } : {}),
+      ...(png instanceof Uint8Array ? { [raw("image/png")]: new Blob([new Uint8Array(png)]) } : {}),
       ...(typeof text === "string" ? { [raw("text/plain")]: new Blob([text]) } : {}),
     })]);
     return fulls.length;

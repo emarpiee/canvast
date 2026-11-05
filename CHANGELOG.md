@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.20 — The desktop app type-checks again (2026-11-05)
+
+- **Fixed:** a type error in the desktop app's clipboard code, which stopped the CI check; nothing changes for use.
+
 ## 0.54.19 — Copy of several files, and hidden items on the canvas (2026-11-05)
 
 - **Fixed:** in the desktop app, Ctrl+C of several files gives them all, as **Copy file** does: no picture of the first beside them, which a program could take in their place. One press copies once.

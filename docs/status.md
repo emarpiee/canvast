@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.20: the desktop app type-checks again (2026-11-05)
+
+- **Implemented:** the PNG for the clipboard as a plain array; a test's assertion corrected.
+- **Tested:** `npm run typecheck` (both projects), checks and unit tests locally; `CI` and `Tests` on GitHub.
+- **Known failures:** none known until those runs report.
+- **Unverified:** real programs.
+- **Committed:** v0.54.20.
+- **Next bounded task:** read the runs; the owner checks real pastes.
+
 ## v0.54.19: copy of several files, and hidden items on the canvas (2026-11-05)
 
 - **Implemented:** several files go through `copyItemsAsFiles`; `sayingProgress`; no placeholder line on the desktop clipboard; a hidden picture out of reach goes as a padlock.
