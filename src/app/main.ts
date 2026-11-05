@@ -2568,10 +2568,13 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   // On Linux a middle click is also a paste, of what is selected in any app: here the middle button pans, so what it ends is no paste. (In a field it stays one.)
   let middleUpAt = -Infinity;
   window.addEventListener("pointerup", (e) => void (e.button === 1 && (middleUpAt = performance.now())), true);
+  let pasteKeyAt = -Infinity;
+  window.addEventListener("keydown", (e) => void (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") || (e.shiftKey && e.key === "Insert") ? (pasteKeyAt = performance.now()) : 0), true);
   window.addEventListener("paste", (e) => {
     // A paste into a field, an editor (the notes editor takes a picture in itself), a dialog or a menu is theirs: nothing is imported or placed.
     if (e.defaultPrevented || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog, [popover], .note-dock") || document.querySelector("dialog:modal")) return;
-    if (performance.now() - middleUpAt < 300) return void e.preventDefault();
+    // (the system's paste of a middle click can come a good while after the button, on a busy machine; a paste key pressed since is a real paste)
+    if (performance.now() - middleUpAt < 3000 && middleUpAt > pasteKeyAt) return void e.preventDefault();
     const files = onePerPicture([...(e.clipboardData?.files ?? [])]);
     // What canvast copied comes back as the objects, even though the clipboard also holds its picture and SVG for other apps.
     const own = e.clipboardData?.getData("text/plain") ?? "";
