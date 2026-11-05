@@ -1,4 +1,5 @@
-import { MAX_MODEL_BYTES, ModelStage, firstLook, modelCardFit, readModel } from "../assets/model-engine";
+import { MAX_MODEL_BYTES, ModelStage, firstLook, linesInWorker, modelCardFit, readModel } from "../assets/model-engine";
+import { linesSvg } from "../assets/model-lines";
 import { LIGHT_PRESETS, MODEL_SECTIONS, defaultLook, readLook, writeLook } from "../assets/model-look";
 import type { ModelLook } from "../assets/model-look";
 import type { FileFacts, OpenView, ViewDeps, ViewPlace } from "./file-views";
@@ -14,6 +15,8 @@ import type { ViewState } from "./view-state";
 const KEEP_MS = 600;
 /** The cards of a turnaround. */
 const TURNAROUND = 8;
+/** The most lines placed at once, the longest first. */
+const MAX_LINES = 40_000;
 
 /** A 3D model in its view: turned, zoomed and lit by hand; what it shows can be kept (its place is kept by itself), bookmarked, or shown on a card on a canvas. */
 export async function openModelView(el: HTMLElement, file: FileFacts, deps: ViewDeps, place: ViewPlace): Promise<OpenView> {
@@ -39,6 +42,7 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
       ${barButton("mark", ICONS.bookmarkPlus, "Bookmark this view", "Bookmark this view, or take its bookmark off", 'aria-pressed="false"')}
       ${barButton("marks", ICONS.tableOfContents, "Go to", "Bookmarked views", 'aria-haspopup="menu"')}
       ${place.placeViews ? barButton("turn", ICONS.rotate3d, "Place a turnaround", "Place a turnaround on the canvas: eight cards, this view from all around") : ""}
+      ${place.placeLines ? barButton("lines", ICONS.lineArt, "Place the lines on the canvas", "Place this view's line art on the canvas, as paths to edit") : ""}
       ${place.setPreview ? barButton("card", ICONS.pictureInPicture, "Show this view on the card", "Show this view on the card on the canvas (this copy only)") : ""}
       <span class="view-gap"></span>
       ${barButton("reset", ICONS.listRestart, "Reset the settings", "Reset the settings of this view")}
@@ -93,7 +97,9 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
     set: (k, v) => {
       look = { ...look, [k]: k === "clip" ? Number(v) : v };
       changed();
-      if (k === "surface" || k === "clip") build(); // (what it shows or hides, the length of the time)
+      // Lines alone on the usual dark ground would not show: paper, until a ground is chosen.
+      if (k === "linesShow" && v === "only" && look["bg"] === defaultLook(first)["bg"]) look = { ...look, bg: "#ffffff" };
+      if (k === "surface" || k === "clip" || k === "linesShow") build(); // (what it shows or hides, the length of the time)
     },
     reset: (keys) => {
       look = { ...look, ...Object.fromEntries(keys.map((s) => [s.k, usual(s)])) };
@@ -159,6 +165,30 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
     keep();
     await place.refresh();
   };
+  /** The line art of this view, as real paths, worked out off the page. */
+  const placeLines = async (): Promise<void> => {
+    const { w, h } = stage.pixels;
+    const input = stage.linesInput(w, h);
+    if (!input) return;
+    deps.session.editor.message = "Finding the lines of this view…";
+    deps.session.editor.changed();
+    try {
+      // The sliders of the live lines, as an angle: more inner detail, gentler creases count.
+      const creaseDeg = 80 - 70 * (look["linesInner"] as number);
+      const { lines, dropped } = await linesInWorker({ ...input, creaseDeg, shortest: look["linesShortest"] as number, simplify: 0.6, most: MAX_LINES });
+      if (closed) return;
+      if (!lines.length) {
+        deps.session.editor.message = "No lines were found in this view.";
+        return deps.session.editor.changed();
+      }
+      place.placeLines?.(linesSvg(lines, w, h, look["linesColour"] as string, Math.max(0.5, ((look["linesWidth"] as number) * h) / 800)), { w, h });
+      deps.session.editor.message = `Placed ${lines.length.toLocaleString("en")} ${lines.length === 1 ? "line" : "lines"}${dropped ? `; the ${dropped.toLocaleString("en")} shortest left out` : ""}.`;
+      deps.session.editor.changed();
+    } catch (e) {
+      deps.session.editor.message = `The lines could not be found: ${(e as Error).message}.`;
+      deps.session.editor.changed();
+    }
+  };
   root.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-view-act]");
     switch (b?.dataset["viewAct"]) {
@@ -180,6 +210,8 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
         const fit = modelCardFit(box.clientWidth / Math.max(1, box.clientHeight));
         return place.placeViews?.(Array.from({ length: TURNAROUND }, (_, i) => ({ preview: writeLook({ ...look, yaw: wrap((look["yaw"] as number) + (360 * i) / TURNAROUND) }) || "{}", size: fit })));
       }
+      case "lines":
+        return void placeLines();
       case "card": return place.setPreview?.(writeLook(look) || "{}", modelCardFit(box.clientWidth / Math.max(1, box.clientHeight)));
       case "side": {
         side.hidden = !side.hidden;

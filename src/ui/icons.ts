@@ -259,6 +259,7 @@ import bookmark from "lucide-static/icons/bookmark.svg";
 import bookOpen from "lucide-static/icons/book-open.svg";
 import lightbulb from "lucide-static/icons/lightbulb.svg";
 import rotate3d from "lucide-static/icons/rotate-3d.svg";
+import signatureIcon from "lucide-static/icons/signature.svg";
 import slidersIconPv from "lucide-static/icons/sliders.svg";
 import pipIconPv from "lucide-static/icons/picture-in-picture-2.svg";
 import fileDownIconPv from "lucide-static/icons/file-down.svg";
@@ -565,6 +566,7 @@ export const ICONS = {
   bookOpen: clean(bookOpen),
   lightbulb: clean(lightbulb),
   rotate3d: clean(rotate3d),
+  lineArt: clean(signatureIcon),
   sliders: clean(slidersIconPv),
   pictureInPicture: clean(pipIconPv),
   pageDown: clean(fileDownIconPv),

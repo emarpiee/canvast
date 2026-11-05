@@ -43,6 +43,17 @@ export const MODEL_SECTIONS: readonly Section[] = [
       { t: "toggle", k: "mirror", label: "Mirror", def: false },
     ],
   },
+  {
+    title: "Lines",
+    items: [
+      { t: "choice", k: "linesShow", label: "Show", opts: [["off", "Off"], ["over", "Over it"], ["only", "Lines only"]], def: "off" },
+      { ...R("linesWidth", "Width", 0.5, 8, 0.1, 1.5), when: ["linesShow", "over", "only"] },
+      { ...C("linesColour", "Colour", "#111111"), when: ["linesShow", "over", "only"] },
+      { ...R("linesOutline", "Outline", 0, 1, 0.01, 0.5), when: ["linesShow", "over", "only"] },
+      { ...R("linesInner", "Inner detail", 0, 1, 0.01, 0.35), when: ["linesShow", "over", "only"] },
+      R("linesShortest", "Shortest line", 0, 100, 1, 6),
+    ],
+  },
   { title: "Background", items: [C("bg", "Colour", "#2b2b2f", true)] },
   // (what a model's animations let it be posed in: drawn by the view from the model's own clips)
   { title: "Pose", items: [R("clip", "Animation", 0, 999, 1, 0), R("poseTime", "Time", 0, 3600, 0.01, 0)] },

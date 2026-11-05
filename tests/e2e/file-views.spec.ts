@@ -569,3 +569,37 @@ test("a large 3D model (over 64 MB, read off the page): a picture in the library
   await expect.poll(() => painted(p)).toBeGreaterThan(0.001);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("line art of a 3D model: live over it or alone, and placed on the canvas as editable paths", async ({ app }) => {
+  const p = app.page;
+  test.skip(!(await hasGl(p)), "no 3D graphics in this browser here");
+  const c = await importModel(p, "cube.stl", STL);
+  await c.dblclick();
+  await expect(modelView(p)).toBeVisible();
+  const side = p.getByTestId("model-side");
+  await expect(side.locator('[data-k="linesWidth"]')).toHaveCount(0);
+  const look = () => p.getByTestId("model-stage").locator("canvas").evaluate((x: HTMLCanvasElement) => x.toDataURL());
+  await p.waitForTimeout(200);
+  const plain = await look();
+  await side.locator('[data-k="linesShow"] [data-v="over"]').click();
+  await expect(side.locator('[data-k="linesWidth"]')).toHaveCount(1);
+  await expect.poll(look).not.toBe(plain);
+  await side.locator('[data-k="linesShow"] [data-v="only"]').click();
+  await expect(side.locator('[data-k="bg"] code')).toHaveText("#FFFFFF");
+  await expect.poll(() => painted(p)).toBeGreaterThan(0.001);
+  await detailsShown(p);
+  await p.getByTestId("asset-place").click();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "image").length)).toBe(1);
+  const box = (await p.locator("canvas").first().boundingBox())!;
+  await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
+  const panel = p.getByTestId("note-panel");
+  await expect(panel.getByTestId("model-view")).toBeVisible();
+  await expect(panel.locator('[data-testid="model-stage"][data-drawn]')).toBeVisible();
+  await panel.getByTestId("view-lines").click();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "path").length), { timeout: 30_000 }).toBeGreaterThan(0);
+  const path = await p.evaluate(() => window.__canvastDebug.objects().find((o) => o.kind === "path") as unknown as { fill: unknown; stroke: unknown });
+  expect(path.fill).toBeNull();
+  expect(path.stroke).toBeTruthy();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "image").length)).toBe(1);
+  expect(app.consoleErrors).toEqual([]);
+});

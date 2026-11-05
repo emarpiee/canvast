@@ -305,3 +305,4 @@ One icon per function: two buttons that do different things never share an icon,
 | `picture-in-picture-2` | Show what is in view on the card on the canvas |
 | `grid-2x2-plus` | Place a PDF's pages on the canvas |
 | `sliders` | Show or hide a 3D view's settings |
+| `signature` | Place a 3D view's line art on the canvas as paths |

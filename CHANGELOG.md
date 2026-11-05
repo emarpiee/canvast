@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.40 — Line art of 3D models (2026-11-06)
+
+- **Added:** Lines in a 3D view: line art of the outer outline and inner forms, over the model or alone, with width, colour, outline and inner detail, also on cards.
+- **Added:** Place the lines: this view's line art on the canvas as editable paths, worked out in the background, which copy and export as vectors.
+
 ## 0.54.39 — Deleted folders stay deleted, large 3D models open (2026-11-06)
 
 - **Fixed:** a PDF zoomed wider than its view could not be scrolled to its left edge.

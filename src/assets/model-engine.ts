@@ -1,7 +1,8 @@
-import type { AnimationClip, AnimationMixer, Light, MeshToonMaterial, Material, Mesh, Object3D, OrthographicCamera, PerspectiveCamera, Scene, WebGLRenderer } from "three";
+import type { AnimationClip, AnimationMixer, Light, Material, Mesh, MeshNormalMaterial, MeshToonMaterial, Object3D, OrthographicCamera, PerspectiveCamera, PlaneGeometry, Scene, ShaderMaterial, WebGLRenderTarget, WebGLRenderer } from "three";
 import { extOf } from "./file-kind";
 import { defaultLook, readLook } from "./model-look";
 import type { ModelLook } from "./model-look";
+import type { LinesInput, LinesResult } from "./model-lines";
 
 // three.js, for what the app draws of a 3D model: one `ModelStage` draws a model with a look on its canvas, in a view and for a card alike.
 
@@ -60,6 +61,21 @@ async function readInWorker(bytes: Uint8Array, ext: string): Promise<WorkerPart[
   }
 }
 
+/** The lines of a view, worked out off the page. */
+export async function linesInWorker(input: LinesInput): Promise<LinesResult> {
+  workerUrl ??= import("./model-inside").then(({ workerText }) => URL.createObjectURL(new Blob([workerText], { type: "text/javascript" })));
+  const worker = new Worker(await workerUrl);
+  try {
+    return await new Promise<LinesResult>((done, failed) => {
+      worker.onmessage = (e: MessageEvent<{ result?: LinesResult; error?: string }>) => (e.data.result ? done(e.data.result) : failed(new Error(e.data.error ?? "its lines could not be read")));
+      worker.onerror = () => failed(new Error("its lines could not be read"));
+      worker.postMessage({ lines: input }, [input.position.buffer as ArrayBuffer, ...(input.depth ? [input.depth.buffer as ArrayBuffer] : [])]);
+    });
+  } finally {
+    worker.terminate();
+  }
+}
+
 /** A model's objects from its file. Throws on what cannot be read. */
 export async function readModel(bytes: Uint8Array, name: string): Promise<ReadModel> {
   const T = await three();
@@ -109,6 +125,39 @@ function free(root: Object3D): void {
   });
 }
 
+/** Finds lines at each pixel from a ring of its neighbours as far as the line's half width. */
+const LINE_SHADER = `
+  uniform sampler2D normals; uniform sampler2D depth; uniform vec2 texel; uniform float radius; uniform float near; uniform float far; uniform bool flat;
+  uniform vec3 colour; uniform float outline; uniform float inner; varying vec2 vUv;
+  float zAt(vec2 uv) {
+    float d = texture2D(depth, uv).x;
+    return flat ? d * (far - near) + near : (near * far) / (far - d * (far - near));
+  }
+  void main() {
+    float d0 = texture2D(depth, vUv).x;
+    vec3 n0 = texture2D(normals, vUv).xyz * 2.0 - 1.0;
+    float z0 = zAt(vUv);
+    float dd = 0.0, nn = 0.0;
+    for (int i = 0; i < 12; i++) {
+      float a = float(i) * 0.5236;
+      float r = radius * (mod(float(i), 2.0) < 0.5 ? 1.0 : 0.6);
+      vec2 uv = vUv + vec2(cos(a), sin(a)) * r * texel;
+      float d = texture2D(depth, uv).x;
+      if ((d0 >= 1.0) != (d >= 1.0)) { dd = 10.0; continue; }
+      if (d0 >= 1.0) continue;
+      dd = max(dd, abs(zAt(uv) - z0));
+      vec3 n = texture2D(normals, uv).xyz * 2.0 - 1.0;
+      nn = max(nn, 1.0 - dot(n0, n));
+    }
+    // (a surface seen at a slant changes depth quickly without any edge)
+    float slant = max(abs(n0.z), 0.12);
+    float td = mix(0.25, 0.004, outline) / slant;
+    float tn = mix(1.0, 0.03, inner);
+    float a = max(smoothstep(td, td * 1.5, dd), smoothstep(tn, tn * 1.5, nn));
+    gl_FragColor = vec4(colour, a);
+    #include <colorspace_fragment>
+  }`;
+
 let graphics: boolean | null = null;
 /** Asked once of a canvas of its own, as the library would say so as an error each time. */
 function hasGraphics(): boolean {
@@ -139,6 +188,11 @@ export class ModelStage {
   private shownLights = "";
   private shownSize = "";
   private shownPose = "";
+  private lastCamera: PerspectiveCamera | OrthographicCamera | null = null;
+  /** What the lines of a picture are found in: the surface's direction and how far it is, at each pixel. */
+  private seen: WebGLRenderTarget | null = null;
+  private seenNormals: MeshNormalMaterial | null = null;
+  private lineQuad: { scene: Scene; camera: OrthographicCamera; mesh: Mesh<PlaneGeometry, ShaderMaterial> } | null = null;
   /** A model of so many triangles that a drag should not also draw each at two pixels to one. */
   heavy = false;
   private readonly persp: PerspectiveCamera;
@@ -330,7 +384,136 @@ export class ModelStage {
       camera = this.persp;
     }
     camera.lookAt(target);
+    camera.updateMatrixWorld();
+    this.lastCamera = camera;
+    const show = look["linesShow"] as string;
+    if (show !== "only") this.gl.render(this.scene, camera);
+    if (show !== "off") this.drawLines(look, camera, show === "only");
+  }
+
+  /** Renders the surface's direction and depth into `seen`, at this canvas's size. */
+  private renderSeen(camera: PerspectiveCamera | OrthographicCamera): WebGLRenderTarget {
+    const T = this.T;
+    const size = this.gl.getDrawingBufferSize(new T.Vector2());
+    if (!this.seen || this.seen.width !== size.x || this.seen.height !== size.y) {
+      this.seen?.depthTexture?.dispose();
+      this.seen?.dispose();
+      this.seen = new T.WebGLRenderTarget(size.x, size.y, { depthTexture: new T.DepthTexture(size.x, size.y), minFilter: T.NearestFilter, magFilter: T.NearestFilter });
+    }
+    this.seenNormals ??= new T.MeshNormalMaterial({ side: T.DoubleSide });
+    const clear = this.gl.getClearColor(new T.Color()), alpha = this.gl.getClearAlpha();
+    this.gl.setRenderTarget(this.seen);
+    this.gl.setClearColor(0x000000, 0);
+    this.gl.clear();
+    this.scene.overrideMaterial = this.seenNormals;
     this.gl.render(this.scene, camera);
+    this.scene.overrideMaterial = null;
+    this.gl.setRenderTarget(null);
+    this.gl.setClearColor(clear, alpha);
+    return this.seen;
+  }
+
+  /** Line art over what is on the canvas: where depth or the surface's direction jumps between neighbouring pixels. Its cost follows the picture, not the triangles. */
+  private drawLines(look: ModelLook, camera: PerspectiveCamera | OrthographicCamera, only: boolean): void {
+    const T = this.T;
+    const seen = this.renderSeen(camera);
+    if (!this.lineQuad) {
+      const mesh = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+        uniforms: { normals: { value: null }, depth: { value: null }, texel: { value: new T.Vector2() }, radius: { value: 1 }, near: { value: 1 }, far: { value: 10 }, flat: { value: false }, colour: { value: new T.Color() }, outline: { value: 0.5 }, inner: { value: 0.5 } },
+        vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
+        fragmentShader: LINE_SHADER,
+      }));
+      const scene = new T.Scene();
+      scene.add(mesh);
+      this.lineQuad = { scene, camera: new T.OrthographicCamera(), mesh };
+    }
+    const u = this.lineQuad.mesh.material.uniforms as Record<string, { value: unknown }>;
+    u["normals"]!.value = seen.texture;
+    u["depth"]!.value = seen.depthTexture;
+    (u["texel"]!.value as { set(x: number, y: number): void }).set(1 / seen.width, 1 / seen.height);
+    // (a width is for a picture 800 pixels tall: the same drawing at any size)
+    u["radius"]!.value = Math.max(0.5, ((look["linesWidth"] as number) * seen.height) / 800 / 2);
+    u["near"]!.value = camera.near;
+    u["far"]!.value = camera.far;
+    u["flat"]!.value = camera === this.ortho;
+    (u["colour"]!.value as { set(c: string): void }).set(look["linesColour"] as string);
+    u["outline"]!.value = look["linesOutline"];
+    u["inner"]!.value = look["linesInner"];
+    const auto = this.gl.autoClear;
+    if (only) this.gl.clear();
+    this.gl.autoClear = false;
+    this.gl.render(this.lineQuad.scene, this.lineQuad.camera);
+    this.gl.autoClear = auto;
+  }
+
+  /** What the real lines of this view are worked out from, as last drawn: the triangles as they stand in the world, and the depth seen. */
+  linesInput(w: number, h: number): Omit<LinesInput, "creaseDeg" | "shortest" | "simplify" | "most"> | null {
+    const T = this.T, camera = this.lastCamera;
+    if (!camera || !this.model) return null;
+    this.scene.updateMatrixWorld(true);
+    let count = 0;
+    const meshes: Mesh[] = [];
+    this.model.traverse((o) => {
+      const m = o as Mesh;
+      if (m.isMesh) {
+        meshes.push(m);
+        count += m.geometry.index?.count ?? m.geometry.getAttribute("position")?.count ?? 0;
+      }
+    });
+    const position = new Float32Array(count * 3), v = new T.Vector3();
+    let at = 0;
+    for (const m of meshes) {
+      const index = m.geometry.index, n = index?.count ?? m.geometry.getAttribute("position").count;
+      const posed = !!(m as unknown as { isSkinnedMesh?: boolean }).isSkinnedMesh || !!m.morphTargetInfluences;
+      const pos = m.geometry.getAttribute("position");
+      for (let i = 0; i < n; i++) {
+        const c = index ? index.getX(i) : i;
+        if (posed) m.getVertexPosition(c, v);
+        else v.fromBufferAttribute(pos, c);
+        v.applyMatrix4(m.matrixWorld);
+        position[at++] = v.x;
+        position[at++] = v.y;
+        position[at++] = v.z;
+      }
+    }
+    // Depth, as bytes the page can read.
+    const seen = this.renderSeen(camera);
+    const target = new T.WebGLRenderTarget(w, h, { minFilter: T.NearestFilter, magFilter: T.NearestFilter });
+    const quad = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({
+      uniforms: { depth: { value: seen.depthTexture } },
+      depthTest: false,
+      depthWrite: false,
+      vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
+      fragmentShader: "uniform sampler2D depth; varying vec2 vUv; void main() { float d = texture2D(depth, vUv).x; vec3 e = fract(d * vec3(1.0, 255.0, 65025.0)); e -= e.yzz * vec3(1.0 / 255.0, 1.0 / 255.0, 0.0); gl_FragColor = vec4(e, 1.0); }",
+    }));
+    const scene = new T.Scene();
+    scene.add(quad);
+    this.gl.setRenderTarget(target);
+    this.gl.render(scene, new T.OrthographicCamera());
+    const bytes = new Uint8Array(w * h * 4);
+    this.gl.readRenderTargetPixels(target, 0, 0, w, h, bytes);
+    this.gl.setRenderTarget(null);
+    target.dispose();
+    quad.geometry.dispose();
+    quad.material.dispose();
+    const depth = new Float32Array(w * h);
+    for (let y = 0; y < h; y++)
+      for (let x = 0; x < w; x++) {
+        const s = ((h - 1 - y) * w + x) * 4;
+        depth[y * w + x] = bytes[s]! / 255 + bytes[s + 1]! / 255 / 255 + bytes[s + 2]! / 255 / 65025;
+      }
+    const eye = camera.getWorldPosition(new T.Vector3()), dir = camera.getWorldDirection(new T.Vector3());
+    const vp = new T.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    return { position, viewProj: [...vp.elements], camera: [eye.x, eye.y, eye.z], flatDir: camera === this.ortho ? [dir.x, dir.y, dir.z] : null, w, h, depth };
+  }
+
+  /** The canvas's size in pixels. */
+  get pixels(): { w: number; h: number } {
+    const z = this.gl.getDrawingBufferSize(new this.T.Vector2());
+    return { w: z.x, h: z.y };
   }
 
   /** Lets go of the graphics card. */
@@ -341,6 +524,11 @@ export class ModelStage {
     this.plain.wire.dispose();
     this.plain.tones.gradientMap?.dispose();
     this.plain.tones.dispose();
+    this.seen?.depthTexture?.dispose();
+    this.seen?.dispose();
+    this.seenNormals?.dispose();
+    this.lineQuad?.mesh.geometry.dispose();
+    this.lineQuad?.mesh.material.dispose();
     this.gl.dispose();
     this.gl.forceContextLoss();
   }

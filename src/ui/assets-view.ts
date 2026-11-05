@@ -58,7 +58,7 @@ import { confirmDialog } from "./confirm";
 import { runExport, runExportFiles, runExportFolder } from "./archive-ui";
 import { openLibraryPicker } from "./library-picker";
 import { viewKindNamed, viewKindOf } from "./file-views";
-import { placeCardViews } from "../app/actions";
+import { placeCardViews, placeLinesBeside } from "../app/actions";
 import { FILE_CARD_H, FILE_CARD_W } from "../assets/card";
 import { PDF_CARD_EDGE, pageFit } from "../assets/pdf-engine";
 import { keepViewState, viewStateOf } from "./view-state";
@@ -1107,6 +1107,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     },
     refresh: () => refresh(),
     hidden: () => hiddenMode,
+    placeLines: (svg, size) => {
+      const hash = note?.hash;
+      if (!hash) return;
+      void leaveNote().then(async (ok) => {
+        if (!ok) return;
+        const id = await session.placeAsset(hash);
+        const o = id ? session.doc.get(id) : undefined;
+        if (o?.kind !== "image") return;
+        closeSlide();
+        showCanvas();
+        placeLinesBeside(session.doc, session.editor, session.view, o, svg, size);
+      });
+    },
     // (from the library, a first card is placed for them to stand beside)
     placeViews: (items) => {
       const hash = note?.hash;

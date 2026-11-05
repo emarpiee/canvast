@@ -641,6 +641,7 @@ Bookmarks are in the view's bar and in the details. What a card shows belongs to
 - **Reset:** double-click a setting's name for that one, the button on a group for the group, or the one in the bar for all, as in the Pattern panel.
 - **Lighting** in the bar sets the lights to a classic setup: Rembrandt, loop, butterfly, split, rim, three-point, even.
 - **Lights stand still** round the model while the camera turns, as lamps in a room.
+- **Lines** draws line art, the outer outline and the inner forms, over the model or alone, with its width, colour and how much outline and inner detail show. **Place the lines** puts this view's line art on the canvas as paths to edit, which copy and export like any shape. A dense scan gives many short lines: raise *Shortest line* or lower *Inner detail*. Placed lines come from the model's edges and live ones from the picture, so they are alike, not the same.
 - **Tones** shows the light in 2 to 5 flat steps of value, to read shadow shapes. **Mirror** flips the picture, to check a drawing against it.
 
 ### Art files

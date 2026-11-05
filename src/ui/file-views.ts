@@ -15,9 +15,11 @@ export type ViewPlace = NotePlace & {
   setPreview?(preview: string, size: { w: number; h: number }): void;
   /** Cards of this file put on the canvas, one showing each (a PDF's pages, a model's turnaround). */
   placeViews?(items: ReadonlyArray<{ preview: string; size: { w: number; h: number } }>): void;
+  /** A drawing (SVG text) as editable paths on the canvas, as large as a card of `size`. */
+  placeLines?(svg: string, size: { w: number; h: number }): void;
 };
 /** What a place on a canvas can do with the card it was opened from. */
-export type CardActions = Pick<ViewPlace, "setPreview" | "placeViews">;
+export type CardActions = Pick<ViewPlace, "setPreview" | "placeViews" | "placeLines">;
 export type ViewDeps = NoteDeps;
 
 /** A file open in its view. */

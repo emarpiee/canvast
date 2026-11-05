@@ -763,6 +763,14 @@ export function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "t
   return homeObject(normalizeUnit(img), doc.space) as ImageObject;
 }
 
+/** A drawing as paths beside a card: as wide as it, one step of undo. */
+export function placeLinesBeside(doc: DocumentStore, editor: EditorState, view: ViewState, from: ImageObject, svg: string, size: { w: number; h: number }): void {
+  const gap = from.w * 0.08;
+  const where = translate({ ...from, pixelW: size.w, pixelH: size.h, h: (from.w * size.h) / size.w }, D.shift(D.fromNumber(from.w + gap), from.unit), D.ZERO) as ImageObject;
+  const { crop: _crop, ...at } = where;
+  importSvg(doc, editor, view, svg, at, true);
+}
+
 /** New cards of a file, each showing its own page or view, in rows beside `from` (their width its width); one step of undo. */
 export function placeCardViews(doc: DocumentStore, from: ImageObject, items: ReadonlyArray<{ preview: string; size: { w: number; h: number } }>): ImageObject[] {
   const { crop: _crop, name: _name, ...rest } = from;
@@ -1879,7 +1887,7 @@ export function pasteCssPaint(doc: DocumentStore, editor: EditorState, text: str
  * SVG text as editable shapes. Pasted, it lands under the pointer at half the view; with `over` (Make vector copy of an SVG picture) it
  * replaces that picture where it is, at its size, turn, layer, sheet and group (one undo step; the file stays in the library).
  */
-export function importSvg(doc: DocumentStore, editor: EditorState, view: ViewState, text: string, over?: ImageObject): boolean {
+export function importSvg(doc: DocumentStore, editor: EditorState, view: ViewState, text: string, over?: ImageObject, /** `over` only says where: nothing is replaced. */ beside = false): boolean {
   if (editor.blockEdit()) return false;
   const svg = parseSvg(text);
   if (!svg) {
@@ -1943,7 +1951,7 @@ export function importSvg(doc: DocumentStore, editor: EditorState, view: ViewSta
   objs = [...masks.filter((m): m is PathObject => m !== null), ...objs];
   if (objs.length > 1) objs = groupObjects(objs, over?.groups?.length ?? 0);
   const shapes = `${objs.length} ${objs.length === 1 ? "shape" : "shapes"}`;
-  doc.commit(over ? doc.transaction(`Make vector copy (${shapes})`, objs, [over.id]) : doc.transaction(`Import SVG (${shapes})`, objs));
+  doc.commit(over && !beside ? doc.transaction(`Make vector copy (${shapes})`, objs, [over.id]) : doc.transaction(`Import SVG (${shapes})`, objs));
   editor.select(objs.map((o) => o.id));
   editor.changed();
   return true;
