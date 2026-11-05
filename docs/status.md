@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.13: a typed pattern setting stays (2026-11-05)
+
+- **Implemented:** the panel takes stored settings only when they change.
+- **Tested:** typecheck and unit tests locally; `Tests` on GitHub.
+- **Known failures:** one Firefox failure on 3732e55 this should fix; its cause is not proven.
+- **Unverified:** in the app by hand.
+- **Committed:** v0.54.13.
+- **Next bounded task:** read the `Tests` run.
+
 ## v0.54.12: wider limits on guides (2026-11-05)
 
 - **Implemented:** a table of spans in `guide-kit.ts`, applied to every guide's own settings; the usual span stays for Randomize.

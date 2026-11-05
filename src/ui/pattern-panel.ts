@@ -84,6 +84,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
   const tabOf = (g: Generator): PatternTab => (g.guide ? "guides" : "patterns");
   const lastOf: Record<PatternTab, Generator> = { patterns: GENERATORS.find((g) => !g.guide)!, guides: generatorById("grid")! };
   let gen: Generator = lastOf[actions.tab()];
+  let seen: string | null = null; // (what is stored of the pattern, when last looked at)
   let leftOf: string | null = null; // (a pattern still selected when its tab was left: it does not call its tab back)
   const kept = new Map<string, Values>();
   const frozen = new Map<string, Set<string>>(); // the settings kept when Randomize runs, for each generator
@@ -236,10 +237,13 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     if (panel.hidden) return;
     const f = actions.found();
     if (f?.gid !== leftOf) leftOf = null;
+    // Only a change to what is stored (undo, redo) comes into the panel: settings ahead of it, not yet made, are not taken back.
+    const stored = f ? JSON.stringify([f.id, f.seed, f.v]) : null, changed = stored !== seen;
+    seen = stored;
     if (!f) loaded = null;
     else if (leftOf) { /* (left for the other tab) */ }
     // A pattern made earlier is picked, or undo or redo brought another version of it: its settings come into the panel, and changes replace it.
-    else if (generatorById(f.id) && (f.gid !== loaded || (!queued && (f.id !== gen.id || f.seed !== seed || JSON.stringify(cleanValues(gen, f.v)) !== JSON.stringify(cleanValues(gen, values)))))) {
+    else if (generatorById(f.id) && (f.gid !== loaded || (changed && !queued && (f.id !== gen.id || f.seed !== seed || JSON.stringify(cleanValues(gen, f.v)) !== JSON.stringify(cleanValues(gen, values)))))) {
       loaded = f.gid;
       gen = generatorById(f.id)!;
       values = cleanValues(gen, f.v);
