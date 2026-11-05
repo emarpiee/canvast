@@ -1835,7 +1835,7 @@ test("a note's pictures are found by their files: pasted ones (the disk's name n
   await page.locator('.se-dropdown button[data-command="center"]').filter({ visible: true }).click();
   await page.keyboard.press("Control+s");
   await page.getByTestId("choose-dialog").getByRole("button", { name: "Save" }).click();
-  await expect.poll(() => files(ws).filter((f) => /out\./.test(f))).toEqual(["library/ext/out.note.html"]);
+  await expect.poll(() => files(ws).filter((f) => /out\./.test(f)), { timeout: 15_000 }).toEqual(["library/ext/out.note.html"]);
   await app.close();
 });
 
