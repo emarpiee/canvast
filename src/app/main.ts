@@ -2626,7 +2626,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   window.addEventListener("pointerdown", trackPointer, true);
   // On Linux a middle click is also a paste, of what is selected in any app: here the middle button pans, so what it ends is no paste. (In a field it stays one.)
   let middleUpAt = -Infinity;
-  window.addEventListener("pointerup", (e) => void (e.button === 1 && (middleUpAt = performance.now())), true);
+  for (const type of ["pointerdown", "pointerup", "auxclick"]) window.addEventListener(type, (e) => void ((e as MouseEvent).button === 1 && (middleUpAt = performance.now())), true);
   let pasteKeyAt = -Infinity;
   window.addEventListener("keydown", (e) => void (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") || (e.shiftKey && e.key === "Insert") ? (pasteKeyAt = performance.now()) : 0), true);
   window.addEventListener("paste", (e) => {

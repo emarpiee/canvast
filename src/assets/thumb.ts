@@ -8,7 +8,7 @@ import { fillTextCentred, makeCard } from "./card";
 import { externalFolder } from "../storage/external-folder";
 import { artCardPicture, isArtFile } from "./art-preview";
 import { makeFileCard } from "./card";
-import { makeFileCardFrom } from "./adapters";
+import { drawnFromFile } from "./adapters";
 import { chipOf, describeFile, isCard, isFontFile, isModelFile, isPdfFile } from "./file-kind";
 
 /** Longest edge of a stored thumbnail (CSS px: cards show them at up to 240). */
@@ -134,13 +134,17 @@ async function encodeThumb(hash: string, c: HTMLCanvasElement): Promise<ThumbRec
 
 /** The thumbnail of a file whose card is drawn from its bytes (assets/adapters.ts): that picture, smaller. */
 async function makePictureThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
-  const bmp = await makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, async () => new Uint8Array(await rec.blob.arrayBuffer()), { edge: THUMB_PX, hash: rec.hash });
+  const chip = describeFile(rec.name, rec.type).chip;
+  const drawn = await drawnFromFile(rec.name, chip, async () => new Uint8Array(await rec.blob.arrayBuffer()), { edge: THUMB_PX, hash: rec.hash });
+  const bmp = drawn ?? (await makeFileCard(chip));
   const c = document.createElement("canvas");
   c.width = bmp.width;
   c.height = bmp.height;
   c.getContext("2d")!.drawImage(bmp, 0, 0);
   bmp.close();
-  return encodeThumb(rec.hash, c);
+  // (the plain card, because this time it could not be drawn, is shown and not kept: the next time may draw it)
+  const made = await encodeThumb(rec.hash, c);
+  return made && !drawn ? { ...made, notKept: true } : made;
 }
 
 /** A note's thumbnail: the top of its page (as on its card on a canvas, 4:3). Null when it cannot be drawn. */

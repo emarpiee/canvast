@@ -8,11 +8,10 @@ export const PDF_CARD_EDGE = 1600;
 const PICTURE_MS = 20_000;
 
 type PdfJs = typeof import("pdfjs-dist");
-let lib: Promise<{ m: PdfJs; factory: unknown }> | null = null;
+let lib: Promise<{ m: PdfJs; factory: unknown; workerUrl: string }> | null = null;
 /** The library, set up at the first PDF. */
-function pdfJs(): Promise<{ m: PdfJs; factory: unknown }> {
+function pdfJs(): Promise<{ m: PdfJs; factory: unknown; workerUrl: string }> {
   lib ??= Promise.all([import("pdfjs-dist"), import("./pdf-inside")]).then(([m, { workerText, WASM }]) => {
-    m.GlobalWorkerOptions.workerPort = new Worker(URL.createObjectURL(new Blob([workerText], { type: "text/javascript" })));
     class InsideFactory {
       async fetch({ kind, filename }: { kind: string; filename: string }): Promise<Uint8Array> {
         const bytes = kind === "wasmUrl" ? WASM[filename] : undefined;
@@ -20,7 +19,7 @@ function pdfJs(): Promise<{ m: PdfJs; factory: unknown }> {
         return bytes.slice();
       }
     }
-    return { m, factory: InsideFactory };
+    return { m, factory: InsideFactory, workerUrl: URL.createObjectURL(new Blob([workerText], { type: "text/javascript" })) };
   });
   return lib;
 }
@@ -28,11 +27,33 @@ function pdfJs(): Promise<{ m: PdfJs; factory: unknown }> {
 /** Whether an error is a PDF asking for its password (or refusing the one given). */
 export const needsPassword = (e: unknown): boolean => (e as { name?: string } | null)?.name === "PasswordException";
 
-/** Opens a PDF. Throws on a damaged file or one whose password is not given (`needsPassword`). */
+/** How each open PDF is closed. */
+const closers = new WeakMap<PDFDocumentProxy, () => void>();
+/** Closes a PDF: its worker goes with it, so nothing stays running or held. */
+export const closePdf = (doc: PDFDocumentProxy): void => closers.get(doc)?.();
+
+/**
+ * Opens a PDF. Throws on a damaged file or one whose password is not given (`needsPassword`). Each has a worker of its own: one shared by several dies with the
+ * first of them closed, and one being closed refuses the next.
+ */
 export async function openPdf(bytes: Uint8Array, password?: string): Promise<PDFDocumentProxy> {
-  const { m, factory } = await pdfJs();
+  const { m, factory, workerUrl } = await pdfJs();
+  const port = new Worker(workerUrl);
+  const worker = new m.PDFWorker({ port });
+  const stop = (): void => {
+    worker.destroy();
+    port.terminate();
+  };
   // (a copy: the worker takes the bytes it is given)
-  return m.getDocument({ data: bytes.slice(), ...(password === undefined ? {} : { password }), isEvalSupported: false, useWorkerFetch: false, BinaryDataFactory: factory, useSystemFonts: true, verbosity: 0 } as Parameters<PdfJs["getDocument"]>[0]).promise;
+  const task = m.getDocument({ data: bytes.slice(), worker, ...(password === undefined ? {} : { password }), isEvalSupported: false, useWorkerFetch: false, BinaryDataFactory: factory, useSystemFonts: true, verbosity: 0 } as Parameters<PdfJs["getDocument"]>[0]);
+  try {
+    const doc = await task.promise;
+    closers.set(doc, () => void task.destroy().finally(stop));
+    return doc;
+  } catch (e) {
+    void task.destroy().finally(stop);
+    throw e;
+  }
 }
 
 /** The PDF's text layer maker, for selecting its words. */
@@ -59,7 +80,7 @@ export async function pdfCardShape(bytes: Uint8Array): Promise<{ w: number; h: n
   } catch {
     return null;
   } finally {
-    void doc.loadingTask.destroy();
+    closePdf(doc);
   }
 }
 
@@ -83,7 +104,7 @@ export async function pdfWords(bytes: Uint8Array): Promise<string> {
   } catch {
     return "";
   } finally {
-    void doc.loadingTask.destroy();
+    closePdf(doc);
   }
 }
 
@@ -101,7 +122,7 @@ let open: { hash: string; doc: PDFDocumentProxy; timer: ReturnType<typeof setTim
 const closeOpen = (): void => {
   if (!open) return;
   clearTimeout(open.timer);
-  void open.doc.loadingTask.destroy();
+  closePdf(open.doc);
   open = null;
 };
 /** Pictures are drawn one at a time: pages of many cards at once would take every core. */

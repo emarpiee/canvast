@@ -1,5 +1,5 @@
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from "pdfjs-dist";
-import { PDF_CARD_EDGE, needsPassword, openPdf, pageFit, pageSize, pageWords, pdfTextLayer } from "../assets/pdf-engine";
+import { PDF_CARD_EDGE, closePdf, needsPassword, openPdf, pageFit, pageSize, pageWords, pdfTextLayer } from "../assets/pdf-engine";
 import { pageList } from "../assets/pdf-pages";
 import { scrubNumbers } from "../colour-picker/scrub";
 import { promptDialog } from "./confirm";
@@ -382,7 +382,7 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
       el.replaceChildren();
       finding++;
       (CSS as unknown as { highlights?: Map<string, unknown> }).highlights?.delete("canvast-find");
-      void pdf.loadingTask.destroy();
+      closePdf(pdf);
     },
     zoom: setZoom,
     key: (e) => {

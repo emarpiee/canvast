@@ -274,6 +274,8 @@ export interface ThumbRecord {
   blob: Blob;
   w: number;
   h: number;
+  /** Shown this once, not stored (a picture that could not be drawn just now). */
+  notKept?: boolean;
 }
 
 /** What organizing can change, for undo: each active asset's name, tags, favourite flag and folder, and the folders. */

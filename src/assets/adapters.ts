@@ -40,15 +40,18 @@ const PICTURE_KINDS: ReadonlyArray<{ claims(name: string): boolean; picture(name
   { claims: isModelFile, picture: (name, _chip, read, o) => modelPicture(read, name, o) },
 ];
 
-/** The card of a file, with what can be drawn from its bytes. Never fails: the plain card is the fallback. */
-export async function makeFileCardFrom(name: string, chip: string, /** Read only by what needs it: a kind may still hold the file open. */ read: () => Promise<Uint8Array>, o: PictureOptions = {}): Promise<ImageBitmap> {
+/** What can be drawn of a file from its bytes, null when nothing could be. */
+export async function drawnFromFile(name: string, chip: string, /** Read only by what needs it: a kind may still hold the file open. */ read: () => Promise<Uint8Array>, o: PictureOptions = {}): Promise<ImageBitmap | null> {
   try {
-    const drawn = await PICTURE_KINDS.find((k) => k.claims(name))?.picture(name, chip, read, o);
-    if (drawn) return drawn;
+    return (await PICTURE_KINDS.find((k) => k.claims(name))?.picture(name, chip, read, o)) ?? null;
   } catch {
-    // (the plain card)
+    return null;
   }
-  return makeFileCard(chip);
+}
+
+/** The card of a file, with what can be drawn from its bytes. Never fails: the plain card is the fallback. */
+export async function makeFileCardFrom(name: string, chip: string, read: () => Promise<Uint8Array>, o: PictureOptions = {}): Promise<ImageBitmap> {
+  return (await drawnFromFile(name, chip, read, o)) ?? makeFileCard(chip);
 }
 
 /** How a font's card looks: the sample sentence and the ground chosen in the viewer. */

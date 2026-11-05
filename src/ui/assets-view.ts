@@ -894,11 +894,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const made = await makeThumb(rec);
         if (made) {
           // A PDF imported before its pages were drawn: its item takes its first page's shape.
-          if (isPdfFile(rec) && rec.pixelW === FILE_CARD_W && rec.pixelH === FILE_CARD_H && !session.readOnly) {
+          if (!made.notKept && isPdfFile(rec) && rec.pixelW === FILE_CARD_W && rec.pixelH === FILE_CARD_H && !session.readOnly) {
             const fit = pageFit({ w: made.w, h: made.h }, PDF_CARD_EDGE);
             void session.catalog?.updateMeta(hash, { cardSize: fit }).catch(() => undefined);
           }
-          if (!noteKindOf(rec.name)) void session.catalog?.putThumb(made).catch(() => undefined);
+          if (!noteKindOf(rec.name) && !made.notKept) void session.catalog?.putThumb(made).catch(() => undefined);
           return URL.createObjectURL(made.blob);
         }
         const tile = isArtFile(rec.name) ? await artTile(rec) : null;

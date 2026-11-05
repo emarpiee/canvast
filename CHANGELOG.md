@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.37 — PDF pictures no longer lost at random (2026-11-06)
+
+- **Fixed:** a PDF's picture could fail and leave its plain card, and closing one PDF could stop another that was open, because they shared one worker. Each open PDF now has its own, gone when it closes, and a thumbnail that could not be drawn is not kept.
+- **Fixed:** a middle-button pan is recognised from its press too, so a paste the system sends with it never lands, however late.
+
 ## 0.54.36 — PDF and 3D tools, less work when idle (2026-11-05)
 
 - **Added:** in a PDF, Ctrl+F finds in it, links inside it are followed, a password is asked for, and **Place pages** puts a card for each page on the canvas; the library's search finds a PDF's words.
