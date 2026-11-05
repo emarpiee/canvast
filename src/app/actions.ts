@@ -802,13 +802,15 @@ export function placeImage(
   offsetPx: number,
   label: string,
   tags: readonly string[] = [],
+  /** What the card shows of its file (a page, a view), when not its first. */
+  preview?: string,
 ): ImageObject {
   const vp = view.viewport;
   const fit = Math.min(1, (PLACE_MAX_VIEWPORT_FRACTION * vp.width) / rec.pixelW, (PLACE_MAX_VIEWPORT_FRACTION * vp.height) / rec.pixelH);
   const w = rec.pixelW * fit;
   const h = rec.pixelH * fit;
   const placed = imageAt(rec, doc, view, vp.width / 2 + offsetPx - w / 2, vp.height / 2 + offsetPx - h / 2, w, h, doc.topZ() + 1);
-  const obj = tags.length ? ({ ...placed, tags: normalizeTags(tags) } as ImageObject) : placed;
+  const obj = { ...placed, ...(tags.length && { tags: normalizeTags(tags) }), ...(preview && { preview }) } as ImageObject;
   doc.commit(doc.transaction(label, [obj]));
   return obj;
 }

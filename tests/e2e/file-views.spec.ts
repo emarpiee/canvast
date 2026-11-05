@@ -124,7 +124,7 @@ test("a PDF: its first page in the library, its shape on a card; it opens in the
   // The details' row goes to it.
   await p.keyboard.press("Home");
   await expect(p.getByTestId("pdf-page")).toHaveValue("1");
-  await p.getByTestId("asset-bookmarks").getByRole("button", { name: /Go to Page 2/ }).click();
+  await p.getByTestId("asset-bookmarks").locator('[data-action="go-mark"]', { hasText: "Page 2" }).click();
   await expect(p.getByTestId("pdf-page")).toHaveValue("2");
   // Left and opened again: where it was.
   await p.waitForTimeout(800);
@@ -133,6 +133,9 @@ test("a PDF: its first page in the library, its shape on a card; it opens in the
   await card(p).dblclick();
   await expect(p.getByTestId("pdf-page")).toHaveValue("2");
   await expect(p.getByTestId("view-mark")).toHaveAttribute("aria-pressed", "true");
+  // Placed from the viewer: the page in sight, not the first.
+  await p.getByTestId("asset-place").click();
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().map((o) => (o as { preview?: string }).preview ?? ""))).toEqual(["2"]);
   expect(app.consoleErrors).toEqual([]);
 });
 

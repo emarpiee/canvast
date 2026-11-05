@@ -276,6 +276,8 @@ export interface ThumbRecord {
   h: number;
   /** Shown this once, not stored (a picture that could not be drawn just now). */
   notKept?: boolean;
+  /** A note's: the look it was drawn in (`noteFaceKey`); another look draws it again. */
+  face?: string | undefined;
 }
 
 /** What organizing can change, for undo: each active asset's name, tags, favourite flag and folder, and the folders. */

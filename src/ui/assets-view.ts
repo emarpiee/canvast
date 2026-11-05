@@ -63,9 +63,10 @@ import { FILE_CARD_H, FILE_CARD_W } from "../assets/card";
 import { PDF_CARD_EDGE, pageFit } from "../assets/pdf-engine";
 import { keepViewState, markActions, viewStateOf } from "./view-state";
 import type { MarksChange } from "./view-state";
-import type { FileViewKind, OpenView, ViewDeps, ViewPlace } from "./file-views";
+import type { CardLook, FileViewKind, OpenView, ViewDeps, ViewPlace } from "./file-views";
 
 import { RICH_NOTE_SUFFIX, WIKI, linkTarget, noteKindOf, tooBigForNote, richNameOf, richNoteBody, wikiTarget, newNoteFile } from "../notes/note-file";
+import { noteFaceKey } from "../notes/note-preview";
 import { nameWarnings } from "../doc/file-names";
 import { splitFrontmatter, underProps, wholeMarkdown, withFileMeta } from "../notes/frontmatter";
 import { AUTO_NOTE_SETTINGS, autoDates, formatNoteDate, isAutoDate, isAutoKey } from "../notes/note-dates";
@@ -896,8 +897,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         if (b) return URL.createObjectURL(b);
       }
       // A thumbnail stored earlier: the original is not read at all (and a lost original keeps its face).
-      const note = !!noteKindOf(entryOf(hash)?.name ?? ""); // (a note's is made when shown: it follows the preview look)
-      const stored = note ? undefined : await session.catalog?.thumb(hash).catch(() => undefined);
+      // (a note's is kept with the look it was drawn in: Settings > Notes may have changed it since)
+      const face = noteKindOf(entryOf(hash)?.name ?? "") ? await noteFaceKey(hash) : undefined;
+      const kept = await session.catalog?.thumb(hash).catch(() => undefined);
+      const stored = kept && kept.face === face ? kept : undefined;
       // A card that scrolled away while this was read gets no address (making one for each of thousands of passing cards was slow).
       if (!job.wants.some((f) => f())) throw new ThumbSkipped();
       if (stored) return URL.createObjectURL(stored.blob);
@@ -915,7 +918,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             const fit = pageFit({ w: made.w, h: made.h }, PDF_CARD_EDGE);
             void session.catalog?.updateMeta(hash, { cardSize: fit }).catch(() => undefined);
           }
-          if (!noteKindOf(rec.name) && !made.notKept) void session.catalog?.putThumb(made).catch(() => undefined);
+          if (!made.notKept) void session.catalog?.putThumb(face === undefined ? made : { ...made, face }).catch(() => undefined);
           return URL.createObjectURL(made.blob);
         }
         const tile = isArtFile(rec.name) ? await artTile(rec) : null;
@@ -1112,6 +1115,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   noteBox.hidden = true;
   viewer.querySelector(".viewer-stage")!.append(noteBox);
   let note: OpenView | null = null;
+  /** What the open view shows of an item, as a card: what Place puts on a canvas (the page or view in sight, not the first). */
+  const cardInView = (hash: string): CardLook | undefined => (note?.hash === hash ? note.card?.() : undefined);
   const noteDeps: ViewDeps = { session, assets, settings, fonts };
   const notePlace: ViewPlace = {
     importFiles: (files) => view.importFiles(files),
@@ -2112,7 +2117,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const have = new Set(await session.catalog.thumbHashes().catch(() => []));
     for (const e of listing.entries) {
       if (have.has(e.hash) || !e.present || !hasThumb(e) || meta(e).hidden || thumbUrls.has(e.hash)) continue;
-      if (isPdfFile(e) || isModelFile(e.name) || noteKindOf(e.name)) continue; // (each takes reading and drawing a whole file, and a note's is never stored: made when its card comes into view)
+      if (isPdfFile(e) || isModelFile(e.name) || noteKindOf(e.name)) continue; // (each takes reading and drawing a whole file: made when its card comes into view, then kept)
       thumbFor(e.hash, always, false).then((url) => keepThumbUrl(e.hash, url), () => undefined);
     }
   };
@@ -3593,13 +3598,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         }
         break;
       }
-      case "place":
+      case "place": {
+        const card = cardInView(hash);
         void askPlaceTags([hash]).then((withTags) => {
           if (withTags === null) return;
           showCanvas();
-          void session.placeAsset(hash, withTags);
+          void session.placeAsset(hash, withTags, card);
         });
         break;
+      }
       case "place-menu":
         openPlaceMenu(b, [hash]);
         break;
@@ -4108,13 +4115,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-pm]");
     if (!b) return;
     const hashes = placing;
+    const card = hashes.length === 1 ? cardInView(hashes[0]!) : undefined;
     closePlaceMenu();
     const kind = b.dataset["pm"];
     const target = kind === "canvas" ? { canvasId: b.dataset["id"]! } : kind === "new-canvas" ? { newCanvasIn: b.dataset["id"]! } : ({ newBoard: true } as const);
     void askPlaceTags(hashes).then((withTags) => {
       if (withTags === null) return;
       showCanvas();
-      void session.placeAssetsOn(hashes, target, withTags);
+      void session.placeAssetsOn(hashes, target, withTags, card);
     });
   });
   document.addEventListener("pointerdown", (e) => {

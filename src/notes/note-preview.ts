@@ -73,6 +73,15 @@ async function pictureData(blob: Blob): Promise<{ url: string; w: number; h: num
   }
 }
 
+/**
+ * What a note's thumbnail depends on besides its text (its hash): the paper and the labels shown. A kept thumbnail drawn otherwise is drawn again.
+ * shortcut: a linked picture changed since is not seen (the thumbnail keeps the old one) until the note is saved again.
+ */
+export async function noteFaceKey(hash: string): Promise<string> {
+  const own = shownProps.length && itemMeta ? await itemMeta(hash).catch(() => null) : null;
+  return `${look}|${shownProps.join()}|${own ? shownProps.flatMap((k) => propWords(own, k)).join("\u0000") : ""}`;
+}
+
 /** The last pages made (a card is measured, then drawn: its pictures are read and packed once). */
 const made = new Map<string, Promise<string>>();
 async function pageHtml(name: string, text: string, hash?: string): Promise<string> {

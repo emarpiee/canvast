@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.54.46 — Place takes the page or view in sight (2026-11-06)
+
+- **Changed:** Place in the details, while a PDF or a 3D model is open in the viewer, puts the page or view in sight on the card, not the first.
+- **Fixed:** a note's thumbnail was drawn again every time the library opened, which took many seconds for many notes; it is now kept, and drawn again only when the note, its labels or the Preview look change.
+- **Fixed:** a library folder deleted outside the app at the moment the app wrote in the library was still missed; which library folders are there is now looked at on every change in it.
+
 ## 0.54.45 — A PDF's words can be selected (2026-11-06)
 
 - **Fixed:** a PDF's words can be selected and copied: the app's rule that its own words are not selectable reached them too.

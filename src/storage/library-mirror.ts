@@ -850,7 +850,7 @@ export class LibraryMirror {
    * library, its items stay (their files gone with it, they show as missing; a file moved elsewhere is found by its content). A place never seen here is
    * only not made yet (a folder from another device, a new one), and with `library/` itself gone nothing is concluded (a drive not there).
    */
-  private async dropFoldersDeletedOutside(): Promise<boolean> {
+  async dropFoldersDeletedOutside(): Promise<boolean> {
     const seen = new Set(this.state.dirs ?? []);
     if (!seen.size || !(await this.bridge.exists("library"))) return false;
     return this.lib.serial(async () => {

@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.46: Place takes the page or view in sight; notes' thumbnails kept (2026-11-06)
+
+- **Implemented:** `OpenView.card()` (PDF and 3D) used by Place and the place menu; note thumbnails stored with `face` (`noteFaceKey`: paper and labels); `WorkspaceMirror.foldersCheck` on every library change, the app's own included.
+- **Tested:** local checks; `file-views.spec` places page 2; the desktop folder test. Test fixes: bookmark row selector, Firefox skip for a synthetic paste.
+- **Known failures:** the desktop middle-button pan once pasted (cause not found).
+- **Unverified:** on screen by hand; a linked picture changed since keeps the old one in a note's thumbnail until the note is saved.
+- **Committed:** v0.54.46.
+- **Next bounded task:** read the `Tests` run.
+
 ## v0.54.45: a PDF's words can be selected (2026-11-06)
 
 - **Implemented:** the text layer is `data-selectable`; `--text-found` and `--text-chosen` see-through.

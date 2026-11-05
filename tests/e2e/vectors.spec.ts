@@ -3659,7 +3659,8 @@ test("adjusted shapes at any zoom and in a picture file: deep inside a blurred s
   for (const d of deep) for (let i = 0; i < 3; i++) expect(Math.abs(d[i]! - centre0[i]!), "deep inside: the colour").toBeLessThan(25);
 });
 
-test("a whole closed path: a double-click in Edit nodes picks it with its hole, without adding a node; Split into pieces makes each its own object", async ({ app }) => {
+test("a whole closed path: a double-click in Edit nodes picks it with its hole, without adding a node; Split into pieces makes each its own object", async ({ app, browserName }) => {
+  test.skip(browserName === "firefox", "a synthetic paste event carries no data in Firefox");
   const p = app.page;
   await p.evaluate(() => {
     const data = new DataTransfer();

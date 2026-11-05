@@ -569,6 +569,17 @@ export class WorkspaceMirror {
       .catch((e: unknown) => this.onError?.(`The workspace folder could not be looked through: ${(e as Error).message}.`));
     return this.running;
   }
+  /** Library folders deleted outside the app leave the library (on the write queue): looked at even when the change seemed the app's own. */
+  foldersCheck(onChange: () => void): Promise<void> {
+    this.running = Promise.all([this.running, this.ready])
+      .then(async () => {
+        if (!(await this.lib.dropFoldersDeletedOutside())) return;
+        onChange();
+        this.library([]); // (the folders only)
+      })
+      .catch((e: unknown) => this.onError?.(`The workspace folder could not be looked through: ${(e as Error).message}.`));
+    return this.running;
+  }
   /** A new version of an item's file made in the app, written over it and followed (on the write queue). Whether it was. */
   saveItemFile(hash: string, bytes: Uint8Array, onChange: () => void): Promise<boolean> {
     const saved = Promise.all([this.running, this.ready]).then(async () => {

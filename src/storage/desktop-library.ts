@@ -129,7 +129,7 @@ export class DesktopCatalog implements CatalogStore {
     if (rec?.sealed === undefined) return rec;
     // (a hidden item's: opened with the key, or none while it is locked)
     const bytes = this.vault?.isOpen() ? await this.vault.open(new Uint8Array(await rec.blob.arrayBuffer())).catch(() => null) : null;
-    return bytes ? { hash: rec.hash, w: rec.w, h: rec.h, blob: new Blob([bytes], { type: rec.sealed }) } : undefined;
+    return bytes ? { hash: rec.hash, w: rec.w, h: rec.h, face: rec.face, blob: new Blob([bytes], { type: rec.sealed }) } : undefined;
   }
 
   /** (`AssetCatalog.healThumbs`: thumbnails of types that do not always decode, dropped once.) */

@@ -25,6 +25,9 @@ export type CardActions = Pick<ViewPlace, "setPreview" | "placeViews" | "placeLi
 export type ViewDeps = NoteDeps;
 
 /** A file open in its view. */
+/** What a card shows of a file, and its size in pixels. */
+export type CardLook = { preview: string; size: { w: number; h: number } };
+
 export interface OpenView {
   hash: string;
   /** Asks about what would be lost: whether to go on. */
@@ -45,6 +48,8 @@ export interface OpenView {
   toggleMark?(): Promise<void>;
   /** The place in view, as a bookmark would be. */
   here?(): ViewMark | null;
+  /** The page or view in sight as a card shows it (`ImageObject.preview` and the card's pixel size): what Place puts on a canvas. */
+  card?(): CardLook;
   /** Changes its list of bookmarks (it holds them while it is open). */
   changeMarks?: MarksChange;
 }

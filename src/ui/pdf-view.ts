@@ -3,7 +3,7 @@ import { PDF_CARD_EDGE, closePdf, needsPassword, openPdf, pageFit, pageSize, pag
 import { pageList } from "../assets/pdf-pages";
 import { scrubNumbers } from "../colour-picker/scrub";
 import { promptDialog } from "./confirm";
-import type { FileFacts, OpenView, ViewDeps, ViewPlace } from "./file-views";
+import type { CardLook, FileFacts, OpenView, ViewDeps, ViewPlace } from "./file-views";
 import { ICONS } from "./icons";
 import { barButton } from "./view-bar";
 import { openMoreMenu } from "./more-menu";
@@ -329,9 +329,10 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     keep();
     void place.refresh();
   };
+  const card = (): CardLook => ({ preview: String(current), size: pageFit(sizes.get(current) ?? first, PDF_CARD_EDGE) });
   const showOnCard = (): void => {
-    const z = sizes.get(current) ?? first;
-    place.setPreview?.(String(current), pageFit(z, PDF_CARD_EDGE));
+    const c = card();
+    place.setPreview?.(c.preview, c.size);
     deps.session.editor.message = `Page ${current} now shows on the card.`;
     deps.session.editor.changed();
   };
@@ -438,5 +439,6 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     toggleMark,
     changeMarks,
     here: mark,
+    card,
   };
 }

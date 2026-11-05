@@ -632,6 +632,7 @@ A PDF or a 3D model shows as its picture in the library and opens in a view of i
 | Opened from a card | At the page that card shows | At the view that card shows |
 | Bookmarks | Pages, and the contents the PDF carries | Views |
 | On a card on a canvas | Its page's shape; **Show this page on the card** | **Show this view on the card** |
+| Placed from the view (**Place**) | The page in sight | The view in sight |
 | Several cards at once | **Place pages**: a card for each page typed, such as `1-4, 9` | **Place a turnaround**: eight cards, from all around |
 | Finding | Ctrl+F in it; the library's search finds its words too | |
 

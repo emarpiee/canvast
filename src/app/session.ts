@@ -1,3 +1,4 @@
+import type { CardLook } from "../ui/file-views";
 import { sha256Hex } from "../assets/sha256";
 import { stampNote } from "../notes/note-dates";
 import { NO_META, fileInlineTags, fileMeta, sameMeta, withFileMeta } from "../notes/frontmatter";
@@ -840,7 +841,7 @@ export class Session {
   }
 
   /** Place a new instance of a library asset at the centre of the open canvas. */
-  async placeAsset(hash: string, withTags = false): Promise<ObjectId | null> {
+  async placeAsset(hash: string, withTags = false, card?: CardLook): Promise<ObjectId | null> {
     if (this.editor.blockEdit() || !this.assets) return null;
     const rec = await this.assets.record(hash);
     if (!rec) {
@@ -848,19 +849,20 @@ export class Session {
       return null;
     }
     const tags = withTags ? ((await this.catalog?.entry(hash).catch(() => undefined))?.tags ?? []) : [];
-    return placeImage(await withGifFrames(rec), this.doc, this.view, 0, "Place item", tags).id;
+    const r = await withGifFrames(rec);
+    return placeImage(card ? { ...r, pixelW: card.size.w, pixelH: card.size.h } : r, this.doc, this.view, 0, "Place item", tags, card?.preview).id;
   }
 
   /**
    * Place library assets on a chosen canvas: an existing one, a new canvas in a board, or a new board. The canvas is opened first, so
    * the pictures land there; one undo step on that canvas. Returns how many were placed.
    */
-  async placeAssetsOn(hashes: readonly string[], target: { canvasId: string } | { newCanvasIn: string } | { newBoard: true }, withTags = false): Promise<number> {
+  async placeAssetsOn(hashes: readonly string[], target: { canvasId: string } | { newCanvasIn: string } | { newBoard: true }, withTags = false, card?: CardLook): Promise<number> {
     if (this.editor.blockEdit()) return 0;
     if ("canvasId" in target) await this.openCanvas(target.canvasId);
     else if ("newCanvasIn" in target) await this.newCanvas(target.newCanvasIn);
     else await this.newBoard();
-    const n = await this.placeAssets(hashes, withTags);
+    const n = hashes.length === 1 && card ? Number(!!(await this.placeAsset(hashes[0]!, withTags, card))) : await this.placeAssets(hashes, withTags);
     const cur = this.current;
     const board = this.tree?.boards.find((b) => b.board.id === cur?.boardId);
     const canvas = board?.canvases.find((c) => c.id === cur?.canvasId);

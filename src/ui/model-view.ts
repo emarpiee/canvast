@@ -2,7 +2,7 @@ import { MAX_MODEL_BYTES, ModelStage, firstLook, linesInWorker, modelCardFit, re
 import { linesSvg } from "../assets/model-lines";
 import { LIGHT_PRESETS, MODEL_SECTIONS, defaultLook, readLook, writeLook } from "../assets/model-look";
 import type { ModelLook } from "../assets/model-look";
-import type { FileFacts, OpenView, ViewDeps, ViewPlace } from "./file-views";
+import type { CardLook, FileFacts, OpenView, ViewDeps, ViewPlace } from "./file-views";
 import { ICONS } from "./icons";
 import { barButton } from "./view-bar";
 import { openMoreMenu } from "./more-menu";
@@ -169,8 +169,10 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
     keep();
     void place.refresh();
   };
+  const card = (): CardLook => ({ preview: writeLook(look) || "{}", size: modelCardFit(box.clientWidth / Math.max(1, box.clientHeight)) });
   const showOnCard = (): void => {
-    place.setPreview?.(writeLook(look) || "{}", modelCardFit(box.clientWidth / Math.max(1, box.clientHeight)));
+    const c = card();
+    place.setPreview?.(c.preview, c.size);
     deps.session.editor.message = "This view now shows on the card.";
     deps.session.editor.changed();
   };
@@ -267,5 +269,6 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
     toggleMark,
     changeMarks,
     here,
+    card,
   };
 }

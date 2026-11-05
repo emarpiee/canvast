@@ -221,6 +221,8 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
         const hiddenTouched = paths.some((p) => p.startsWith(".hidden/") && !isHiddenFile(p) && !ownWrite(p));
         const outside = paths.filter((p) => (p === "library" || p.startsWith("library/")) && !ownWrite(p));
         if (hiddenTouched || outside.length) void mirror.rescan(() => undefined, hiddenTouched, outside).then(() => on.libraryChanged());
+        // (a folder deleted at the moment the app wrote in library/ is reported with the app's own change: which folders are there is always looked at, a few checks)
+        else if (paths.some((p) => p === "library" || p.startsWith("library/"))) void mirror.foldersCheck(() => on.libraryChanged());
         if (paths.some((p) => p === LIBRARY_JSON || /^\.canvast\/library[^/]+\.json$/i.test(p) || p === HIDDEN_JSON || isHiddenCopy(p) || p === LIBRARY_DIR || p.startsWith(`${LIBRARY_DIR}/`))) void mirror.rereadLibrary(() => on.libraryChanged());
         if (paths.some((p) => p === WORKSPACE_FILE || /^\.canvast\/workspace[^/]+\.json$/i.test(p) || p.startsWith(`${BOARDS_DIR}/`))) check();
       });
