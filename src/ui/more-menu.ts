@@ -49,8 +49,22 @@ export function moreButton(label: string, attrs = ""): string {
 }
 
 let open: { menu: HTMLElement; anchor: HTMLElement; onClose?: (() => void) | undefined } | null = null;
+/** A row's own menu (its ⋯), beside the menu it is in, which stays open. */
+let child: { menu: HTMLElement; from: HTMLElement } | null = null;
+const closeChild = (refocus = false): void => {
+  if (!child) return;
+  const { menu, from } = child;
+  child = null;
+  menu.remove();
+  from.setAttribute("aria-expanded", "false");
+  if (refocus && from.isConnected) from.focus();
+};
+
+/** A menu row's markup: its icon, label and hint. */
+const rowHtml = (it: MenuItem, i: number): string => `<button type="button" role="${it.checked === undefined ? "menuitem" : "menuitemradio"}"${it.checked === undefined ? "" : ` aria-checked="${it.checked}"`} data-i="${i}"${it.id ? ` data-id="${esc(it.id)}"` : ""} class="${it.danger ? "is-danger" : ""}${it.checked ? " is-checked" : ""}${it.sep && i > 0 ? " has-sep" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}${it.hint ? `<span class="menu-text"><span>${esc(it.label)}</span><span class="menu-hint">${esc(it.hint)}</span></span>` : `<span>${esc(it.label)}</span>`}${it.checked ? `<span class="menu-tick" aria-hidden="true">${ICONS.check}</span>` : ""}</button>`;
 
 export function closeMoreMenu(refocus = false): void {
+  closeChild();
   if (!open) return;
   const { menu, anchor, onClose } = open;
   open = null;
@@ -153,7 +167,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
   let current = items;
   const render = (): void => {
     menu.innerHTML = current
-    .map((it, i) => { const row = `<button type="button" role="${it.checked === undefined ? "menuitem" : "menuitemradio"}"${it.checked === undefined ? "" : ` aria-checked="${it.checked}"`} data-i="${i}"${it.id ? ` data-id="${esc(it.id)}"` : ""} class="${it.danger ? "is-danger" : ""}${it.checked ? " is-checked" : ""}${it.sep && i > 0 ? " has-sep" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}${it.hint ? `<span class="menu-text"><span>${esc(it.label)}</span><span class="menu-hint">${esc(it.hint)}</span></span>` : `<span>${esc(it.label)}</span>`}${it.checked ? `<span class="menu-tick" aria-hidden="true">${ICONS.check}</span>` : ""}</button>`; return it.more ? `<div class="pop-menu-row">${row}${moreButton(`More actions for ${it.label}`, `data-more-i="${i}"`)}</div>` : row; })
+    .map((it, i) => { const row = rowHtml(it, i); return it.more ? `<div class="pop-menu-row">${row}${moreButton(`More actions for ${it.label}`, `data-more-i="${i}"`)}</div>` : row; })
     .join("");
   };
   render();
@@ -174,8 +188,27 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
     const moreOf = (e.target as HTMLElement).closest<HTMLElement>("[data-more-i]");
     if (moreOf) {
       const it = current[Number(moreOf.dataset["moreI"])]!;
-      closeMoreMenu();
-      return openMoreMenu(anchor, it.more!, `What to do with ${it.label}`);
+      const same = child?.from === moreOf;
+      closeChild();
+      if (same) return;
+      const sub = document.createElement("div");
+      sub.className = "pop-menu is-child";
+      sub.setAttribute("role", "menu");
+      sub.setAttribute("aria-label", `What to do with ${it.label}`);
+      sub.innerHTML = it.more!.map(rowHtml).join("");
+      sub.addEventListener("click", (ev) => {
+        const b = (ev.target as HTMLElement).closest<HTMLButtonElement>("[data-i]");
+        if (!b || b.disabled) return;
+        const pick = it.more![Number(b.dataset["i"])]!;
+        closeMoreMenu();
+        pick.run();
+      });
+      document.body.appendChild(sub);
+      placeMenu(sub, moreOf);
+      moreOf.setAttribute("aria-expanded", "true");
+      child = { menu: sub, from: moreOf };
+      sub.querySelector<HTMLElement>("button:not(:disabled)")?.focus();
+      return;
     }
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("[data-i]");
     if (!b || b.disabled) return;
@@ -224,6 +257,10 @@ export function installMenuKeys(): void {
     else if (e.key === "End") to = items.length - 1;
     if (to !== null && items.length) {
       items[to]!.focus();
+      e.preventDefault();
+      e.stopPropagation();
+    } else if (e.key === "Escape" && child && inMenu === child.menu) {
+      closeChild(true);
       e.preventDefault();
       e.stopPropagation();
     } else if (e.key === "Escape" && open && inMenu === open.menu) {

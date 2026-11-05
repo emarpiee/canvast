@@ -104,6 +104,7 @@ test("a PDF: its first page in the library, its shape on a card; it opens in the
   // Renamed and deleted by its ⋯, in the view's own list and in the details: one list.
   await p.getByTestId("view-marks").click();
   await p.locator(".pop-menu .more-btn").first().click();
+  await expect(p.locator(".pop-menu:not(.is-child)")).toContainText("Page 2"); // (the list stays while its row's menu is open)
   await p.locator('.pop-menu [data-id="mark-rename"]').click();
   await p.getByTestId("prompt-input").fill("The chart");
   await p.getByTestId("prompt-ok").click();

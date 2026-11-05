@@ -3212,3 +3212,4 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .pop-menu-row { display: flex; align-items: center; gap: var(--s-2); }
 .pop-menu-row > button[data-i] { flex: 1; min-width: 0; }
 .pop-menu-row > .more-btn { flex: none; opacity: 1; width: var(--row-btn); min-height: 0; height: var(--row-btn); padding: 0; justify-content: center; }
+.pop-menu.is-child { z-index: 61; }
