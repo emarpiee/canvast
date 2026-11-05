@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.22 — Copied files on every system (2026-11-05)
+
+- **Fixed:** in the desktop app, Copy and Copy file wrote real files under Linux's name for them, so on Windows and macOS they would not have pasted as files. They now use Electron's own name, which it maps to each system's; this is checked in unit tests, and not yet on Windows or macOS themselves.
+
 ## 0.54.21 — Copy fixes: stretched shapes, Copy as picture of a padlock (2026-11-05)
 
 - **Fixed:** shapes copied with other things went into their SVG file stretched to the proportions of everything selected.

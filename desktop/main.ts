@@ -6,6 +6,7 @@
  * two workspaces never share boards or a library. The folder is the one passed with `--workspace=<path>`, else the last
  * one opened, else the one chosen in the start dialog (recent ones, open a folder, a new workspace).
  */
+import { clipboardEntries, type ClipboardAlso } from "./clipboard-entries";
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, net, protocol, session, shell, clipboard, ClipboardItem } from "electron";
 import { execFile } from "node:child_process";
 import { createHash, randomBytes, randomUUID, scrypt } from "node:crypto";
@@ -621,15 +622,8 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     }
     // (as file managers read files: a list of addresses for most, the same list after a word for those of GNOME)
     const urls = fulls.map((f) => pathToFileURL(f).href);
-    const raw = (format: string): string => `electron application/osclipboard;format="${format}"`;
-    // (what is copied goes every way a program may want it: the files, an SVG, a PNG, words)
-    const { svg, png, text } = (also ?? {}) as { svg?: unknown; png?: unknown; text?: unknown };
-    await clipboard.write([new ClipboardItem({
-      ...(urls.length ? { [raw("text/uri-list")]: new Blob([`${urls.join("\r\n")}\r\n`]), [raw("x-special/gnome-copied-files")]: new Blob([`copy\n${urls.join("\n")}`]) } : {}),
-      ...(typeof svg === "string" ? { [raw("image/svg+xml")]: new Blob([svg]) } : {}),
-      ...(png instanceof Uint8Array ? { [raw("image/png")]: new Blob([new Uint8Array(png)]) } : {}),
-      ...(typeof text === "string" ? { [raw("text/plain")]: new Blob([text]) } : {}),
-    })]);
+    const { svg, png, text } = (also ?? {}) as ClipboardAlso;
+    await clipboard.write([new ClipboardItem(clipboardEntries(urls, { svg, png, text }, process.platform))]);
     return fulls.length || (svg !== undefined || png !== undefined || text !== undefined ? 1 : 0); // (how many things went)
   });
   // A real file drag out of the app (only the workspace's own files: a hidden item's is encrypted, and is not asked for). The picture under the pointer is a plain tile.
