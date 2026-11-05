@@ -671,6 +671,8 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       },
       onToggleMarkdownView: viewToggled("markdown"),
       onToggleCodeView: viewToggled("code"),
+      // (full screen is fixed to the window, but stays in the stacking of what holds it: what holds it rises with it)
+      onToggleFullScreen: ({ is }: { is: boolean }) => void el.classList.toggle("has-full-note", is),
       onChange: () => void (dirty = true),
       onInput: () => void (dirty = true),
       onSave: async () => (await host.save()) || false,
@@ -701,6 +703,8 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       // app's shortcuts leave it alone and the editor still gets it.
       const page = el.querySelector(".sun-editor-editable");
       if (typing || !e.isTrusted || !page || e.key === "Escape" || e.key === "Tab" || /^F\d+$/.test(e.key)) return;
+      // (in the library's viewer, with nothing of the note selected, the key is the viewer's: its arrows go to the next note)
+      if (!opts.root && !el.querySelector(".se-component-selected, .se-figure-selected")) return;
       e.stopImmediatePropagation();
       e.preventDefault();
       page.dispatchEvent(new KeyboardEvent("keydown", { key: e.key, code: e.code, shiftKey: e.shiftKey, bubbles: true, cancelable: true }));

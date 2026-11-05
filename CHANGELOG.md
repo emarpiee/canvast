@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.33 — Arrows go to the next note again (2026-11-05)
+
+- **Fixed:** in the library's viewer, with the cursor out of a note's words, the arrow keys and the viewer's other keys work again; a note took them all since 0.53.3. With a picture or other item in the note selected, its keys are still the note's.
+- **Fixed:** a note on full screen covers the panel beside it: the date icons of its properties showed through.
+
 ## 0.54.32 — Long notes open faster (2026-11-05)
 
 - **Fixed:** a note's blocks off the page are laid out when they come near, so a long note does not wait for all of it on opening.

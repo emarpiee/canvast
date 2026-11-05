@@ -1899,16 +1899,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     else if (act === "bar") toggleBar();
     else if (act === "favorite" || act === "place") inspector.querySelector<HTMLButtonElement>(`[data-action="${act}"]`)?.click();
   });
-  viewer.addEventListener("keydown", (e) => {
+  const viewerKey = (e: KeyboardEvent): void => {
     const typing = (e.target as HTMLElement).closest(TYPING);
     if (note && (e.target as HTMLElement).closest(".viewer-note")) {
       // (a note's keys are the editor's: Back closes it. + and - are words there, so with Ctrl.)
       const dir = !(e.ctrlKey || e.metaKey) || e.altKey ? null : e.key === "+" || e.key === "=" ? 1 : e.key === "-" || e.key === "_" ? -1 : e.key === "0" ? 0 : null;
-      if (dir === null) return;
-      zoomStep(dir);
-      e.preventDefault();
-      e.stopPropagation();
-      return;
+      if (dir !== null) {
+        zoomStep(dir);
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      // (with the cursor out of the words, as on a button of its toolbar, the viewer's own keys are still the viewer's)
+      if (typing || (e.target as HTMLElement).isContentEditable || (e.target as HTMLElement).closest('[contenteditable="true"]') || !/^(ArrowLeft|ArrowRight|i|I|f|F)$/.test(e.key) || e.ctrlKey || e.metaKey) return;
     }
     if (e.key === "Escape") {
       if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
@@ -1925,6 +1928,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     else return;
     e.preventDefault();
     e.stopPropagation();
+  };
+  viewer.addEventListener("keydown", viewerKey);
+  // (with the focus on nothing, a press having left the words, a key reaches no element of the viewer)
+  document.addEventListener("keydown", (e) => {
+    if (e.target === document.body && visible && !viewer.hidden && !document.querySelector("dialog[open]")) viewerKey(e);
   });
 
   // ---- data

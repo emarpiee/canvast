@@ -1278,3 +1278,44 @@ test("a code block with a language is coloured over its words, and the note is a
   await expect.poll(() => seen("keyword")).toContain("import");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("in the library's viewer the arrows go to the next note unless the cursor is in the words", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles([{ name: "one.md", mimeType: "text/markdown", buffer: Buffer.from("# One\n") }, { name: "two.md", mimeType: "text/markdown", buffer: Buffer.from("# Two\n") }]);
+  await p.locator('[data-testid="asset-card"][title="one.md"]').dblclick();
+  const h1 = page(p).locator("h1");
+  await expect(h1).toHaveText("One");
+  // The cursor in the words: the arrow moves the cursor, and the note stays.
+  await h1.click();
+  await p.keyboard.press("ArrowRight");
+  await p.waitForTimeout(300);
+  await expect(h1).toHaveText("One");
+  // Off the words: the arrow is the viewer's.
+  await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // (the focus on nothing)
+  await p.keyboard.press("ArrowRight");
+  await expect(h1).toHaveText("Two");
+  await p.keyboard.press("ArrowLeft");
+  await expect(h1).toHaveText("One");
+  // On a button of the note's toolbar: still the viewer's.
+  await note(p).locator('.se-toolbar button[data-command="align"]').first().focus();
+  await p.keyboard.press("ArrowRight");
+  await expect(h1).toHaveText("Two");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a note on full screen covers the panel beside it: nothing of the panel shows through", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "dated.md", mimeType: "text/markdown", buffer: Buffer.from("---\ncreated: 2024-09-02T12:48\n---\n# Dated\n") });
+  await p.locator('[data-testid="asset-card"]').dblclick();
+  await expect(page(p).locator("h1")).toHaveText("Dated");
+  const icon = p.locator(".asset-field .field-type:disabled").first();
+  await expect(icon).toBeVisible();
+  const box = (await icon.boundingBox())!;
+  await note(p).locator('.se-toolbar button[data-command="fullScreen"]').first().click();
+  await expect.poll(() => p.evaluate(([x, y]) => !!document.elementFromPoint(x!, y!)?.closest(".sun-editor"), [box.x + box.width / 2, box.y + box.height / 2])).toBe(true);
+  await note(p).locator('.se-toolbar button[data-command="fullScreen"]').first().click();
+  await expect.poll(() => note(p).evaluate((e) => e.querySelector(".has-full-note") !== null || e.classList.contains("has-full-note"))).toBe(false);
+  expect(app.consoleErrors).toEqual([]);
+});
