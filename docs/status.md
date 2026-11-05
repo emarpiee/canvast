@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.31: density reaches everything on an edge (2026-11-05)
+
+- **Implemented:** offsets from an edge in `--edge`, `--near`, `--s-*`, not fixed `--sp-*`; a few controls and icons by their tokens.
+- **Tested:** `npm run typecheck`, checks and unit tests locally; `assets.spec` and the rest on GitHub's `Tests` run, as positions moved.
+- **Known failures:** none known until that run reports.
+- **Unverified:** every screen by eye in each density.
+- **Committed:** v0.54.31.
+- **Next bounded task:** read the `Tests` run; the notes' load time.
+
 ## v0.54.30: colours in notes' code (2026-11-05)
 
 - **Implemented:** `notes/code-colours.ts`: Prism's tokens painted with the browser's CSS highlights; `notes.codeColours`; `--code-*` tokens in both themes; inline code by theme tokens.

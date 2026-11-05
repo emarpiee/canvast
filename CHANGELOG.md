@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.31 — Density reaches everything on an edge (2026-11-05)
+
+- **Fixed:** Dense, Compact and Comfortable now reach the viewer's top bar and the room under it, the bars and panels placed against an edge, the canvas's small controls and the layer rows' buttons, which kept fixed sizes.
+
 ## 0.54.30 — Colours in notes' code (2026-11-05)
 
 - **Added:** code blocks with a language are coloured, in all 21 languages the code block offers. It is painted over the words, so the note, the cursor, undo and what is saved do not change. **Colour code in notes** in Settings > Notes turns it off.

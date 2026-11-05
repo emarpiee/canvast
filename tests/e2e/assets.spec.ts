@@ -2686,6 +2686,27 @@ test("what a file says about itself is shown in its details (camera, settings, o
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("the viewer's top buttons and the room left for them follow Density", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "a.md", mimeType: "text/markdown", buffer: Buffer.from("# A\n") });
+  await p.locator('[data-testid="asset-card"]').dblclick();
+  const back = p.getByTestId("slide-view").locator('[data-act="close"]');
+  await expect(back).toBeVisible();
+  const measure = async (density: string): Promise<{ top: number; size: number; room: number }> => {
+    await p.evaluate((d) => window.__canvastDebug.setSetting("ui.density", d as "dense"), density);
+    await p.waitForTimeout(100);
+    const [b, v] = [await back.boundingBox(), await p.getByTestId("slide-view").boundingBox()];
+    const room = await p.locator(".viewer.is-note .viewer-stage").evaluate((e) => parseFloat(getComputedStyle(e).paddingTop));
+    return { top: b!.y - v!.y, size: b!.height, room };
+  };
+  const [dense, comfortable] = [await measure("dense"), await measure("comfortable")];
+  expect(dense.top).toBeLessThan(comfortable.top);
+  expect(dense.size).toBeLessThan(comfortable.size);
+  expect(dense.room).toBeLessThan(comfortable.room);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("a browser cannot put a real file on the clipboard: a file list is refused and a file added to a copy does not come back, so Copy stays SVG and PNG there", async ({ app, browserName }) => {
   const p = app.page;
   if (browserName === "chromium") await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
