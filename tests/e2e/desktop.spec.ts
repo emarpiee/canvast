@@ -2057,6 +2057,88 @@ test("Copy file: the real files on the clipboard, from the library, as a list of
   }
 });
 
+test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks first, and goes nowhere out of reach", async () => {
+  const ws = tempDir("cv-copy-svg-");
+  const { app, page } = await launch(ws, "userdata", true);
+  const MARK = (m: string) => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><title>${m}</title><circle cx="20" cy="15" r="9" fill="#123456"/></svg>`);
+  const clear = () => app.evaluate(({ clipboard }) => clipboard.clear());
+  /** What another program would be offered, and the SVG if there is one. */
+  const out = () => app.evaluate(async ({ clipboard }) => {
+    const [item] = await clipboard.read();
+    return { types: [...(item?.types ?? [])], svg: item?.types.includes("image/svg+xml") ? await (await item.getType("image/svg+xml") as Blob).text() : "" };
+  });
+  try {
+    // On the canvas: a shape, and an SVG picture with its own file.
+    await page.keyboard.press("u");
+    await page.mouse.move(500, 300);
+    await page.mouse.down();
+    await page.mouse.move(700, 400, { steps: 4 });
+    await page.mouse.up();
+    await page.keyboard.press("v");
+    await clear();
+    await page.keyboard.press("Control+c");
+    await expect.poll(() => out().then((o) => o.types.sort().join(","))).toContain("image/svg+xml");
+    expect((await out()).types).toContain("image/png");
+    expect((await out()).svg).toMatch(/<svg[\s>]/);
+    await page.keyboard.press("Control+v"); // (back in here: the shape itself, not an import)
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(2);
+    await page.getByTestId("import-input").setInputFiles({ name: "placed.svg", mimeType: "image/svg+xml", buffer: MARK("placed-mark") });
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(3);
+    const placed = await page.evaluate(() => (window.__canvastDebug.objects().at(-1) as unknown as { id: string; assetId: string }));
+    const at = (await page.evaluate((id) => window.__canvastDebug.objectScreen(id), placed.id))!.box;
+    await page.mouse.click((at.minX + at.maxX) / 2, (at.minY + at.maxY) / 2);
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.selection())).toEqual([placed.id]);
+    await clear();
+    await page.keyboard.press("Control+c");
+    await expect.poll(() => out().then((o) => o.svg)).toContain("placed-mark");
+    // Hidden, out of hidden mode: the canvas puts nothing of its file out.
+    await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"));
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), placed.assetId);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await clear();
+    await page.keyboard.press("Control+c");
+    await page.waitForTimeout(1000);
+    expect((await out()).svg).not.toContain("placed-mark");
+    // In the library: an SVG goes as itself.
+    await page.getByTestId("view-assets").click();
+    await page.getByTestId("assets-import-input").setInputFiles({ name: "shelf.svg", mimeType: "image/svg+xml", buffer: MARK("shelf-mark") });
+    const shelf = page.locator('[data-testid="asset-card"][title="shelf.svg"]');
+    await expect(shelf).toBeAttached();
+    await shelf.click();
+    await clear();
+    await page.keyboard.press("Control+c");
+    await expect.poll(() => out().then((o) => o.svg)).toContain("shelf-mark");
+    expect((await out()).types).toContain("image/png");
+    // Hidden, in hidden mode: it asks; declined, nothing goes; agreed, it goes as itself.
+    await page.keyboard.press("Escape");
+    await page.evaluate(() => window.__canvastDebug.hiddenOp("lock"));
+    await page.getByTestId("assets-search").fill("hidden:");
+    await page.getByTestId("prompt-input").fill("pw");
+    await page.getByTestId("prompt-ok").click();
+    await expect(page.getByTestId("hidden-mode-bar")).toBeVisible();
+    const secret = page.locator(`[data-testid="asset-card"][data-hash="${placed.assetId}"]`);
+    await expect(secret).toBeAttached();
+    await secret.click();
+    await clear();
+    await page.keyboard.press("Control+c");
+    await page.getByTestId("confirm-cancel").click();
+    await page.waitForTimeout(500);
+    expect((await out()).svg).toBe("");
+    await page.keyboard.press("Control+c");
+    await page.getByTestId("confirm-ok").click();
+    await expect.poll(() => out().then((o) => o.svg)).toContain("placed-mark");
+    // Out again and locked: the card is gone, and Ctrl+C has nothing to take.
+    await page.getByTestId("hidden-mode-exit").click();
+    await expect(secret).toHaveCount(0);
+    await clear();
+    await page.keyboard.press("Control+c");
+    await page.waitForTimeout(500);
+    expect((await out()).svg).not.toContain("placed-mark");
+  } finally {
+    await app.close();
+  }
+});
+
 test("a folder of files an earlier version named: opening it, twice, renames and moves nothing", async () => {
   const ws = tempDir("cv-names-open-");
   const png = (seed: number): Buffer => makePng(6, 4, () => [seed, 90, 40, 255]);

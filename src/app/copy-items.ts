@@ -27,7 +27,7 @@ const NOTES_BETWEEN = "\n\n---\n\n";
 
 let hiddenAsked = false;
 /** The system's clipboard is outside the app: asked once a session before a hidden item goes there. */
-async function hiddenFine(ents: readonly CatalogEntry[]): Promise<boolean> {
+export async function hiddenFine(ents: readonly CatalogEntry[]): Promise<boolean> {
   if (hiddenAsked || !ents.some((e) => meta(e).hidden)) return true;
   if (!(await confirmDialog({ title: "Copy a hidden item", lines: ["It goes on the system's clipboard, readable, where other programs and clipboard managers can see and keep it."], confirmLabel: "Copy it", danger: false }))) return false;
   hiddenAsked = true;
@@ -93,13 +93,14 @@ export async function copyItemsToClipboard(deps: CopyDeps, ents: readonly Catalo
   }
   const first = ents[single ? 0 : at]!;
   const source = single ? await deps.thumb(first.hash).catch(() => undefined) : await deps.file(first.hash).catch(() => undefined);
-  const done = await writeSystemClipboard({ ...(source ? { image: asPng(source) } : {}), text: names });
+  const svg = source && kinds[single ? 0 : at] === "vector" ? await source.text().catch(() => undefined) : undefined;
+  const done = await writeSystemClipboard({ ...(source ? { image: asPng(source) } : {}), text: names, ...(svg ? { svg } : {}) });
   if (done === "failed") deps.say("Could not copy to the clipboard.");
   else if (done === "text") onlyName();
   else {
     const others = ents.length - 1;
     const kind = kinds[single ? 0 : at]!;
-    deps.say(others ? `Copied “${first.name}” only: a clipboard holds one picture (${others} more selected).` : kind === "picture" ? `Copied “${first.name}”.` : `Copied a picture of “${first.name}”: the clipboard holds a still picture.`);
+    deps.say(others ? `Copied “${first.name}” only: a clipboard holds one picture (${others} more selected).` : kind === "picture" || kind === "vector" ? `Copied “${first.name}”.` : `Copied a picture of “${first.name}”: the clipboard holds a still picture.`);
   }
   return null;
 }

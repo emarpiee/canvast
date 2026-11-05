@@ -2686,6 +2686,25 @@ test("what a file says about itself is shown in its details (camera, settings, o
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("library Copy of an SVG puts the SVG itself beside its PNG, and Paste keeps it vectors", async ({ app, browserName }) => {
+  test.skip(browserName !== "chromium", "reading and writing the clipboard in the test harness is Chromium's");
+  const p = app.page;
+  await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+  await p.getByTestId("view-assets").click();
+  const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><circle cx="20" cy="15" r="9" fill="#123456"/></svg>';
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "mark.svg", mimeType: "image/svg+xml", buffer: Buffer.from(SVG) });
+  const card = p.locator('[data-testid="asset-card"]');
+  await expect(card).toHaveCount(1);
+  await card.click();
+  await p.keyboard.press("Control+c");
+  await expect.poll(() => p.evaluate(async () => [...((await navigator.clipboard.read())[0]?.types ?? [])].sort().join(","))).toBe("image/png,image/svg+xml");
+  expect(await p.evaluate(async () => (await (await navigator.clipboard.read())[0]!.getType("image/svg+xml")).text())).toContain("circle");
+  await card.click({ button: "right" });
+  await p.getByRole("menuitem", { name: "Paste", exact: true }).click().catch(() => undefined);
+  await expect.poll(async () => (await p.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.map((e) => e.type)))).toEqual(["image/svg+xml"]); // (the same picture: stored once, still an SVG)
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("library Copy puts the picture on the system clipboard and Copy file name its name; Paste brings a clipboard picture in, named by the text beside it, else \"image\"", async ({ app, browserName }) => {
   test.skip(browserName !== "chromium", "reading and writing the clipboard in the test harness is Chromium's");
   const p = app.page;

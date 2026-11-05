@@ -3446,7 +3446,7 @@ test("CSS text pasted with a shape picked becomes its fill: a gradient (linear, 
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("Ctrl+C puts the shape on the system clipboard as a PNG picture alone, \"Copy the selection as SVG\" puts its SVG text, and Ctrl+V here still pastes the shape itself (not an SVG import)", async ({ app }) => {
+test("Ctrl+C puts the shape on the system clipboard as a PNG picture and its SVG, with no text, \"Copy the selection as SVG\" puts its SVG text, and Ctrl+V here still pastes the shape itself (not an SVG import)", async ({ app }) => {
   test.skip(app.page.context().browser()?.browserType().name() !== "chromium", "the clipboard picture is read back in Chromium");
   const p = app.page;
   await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -3455,7 +3455,8 @@ test("Ctrl+C puts the shape on the system clipboard as a PNG picture alone, \"Co
   await drag(app, [500, 300], [700, 400]);
   await key(app, "v");
   await p.keyboard.press("Control+c");
-  await expect.poll(() => p.evaluate(async () => (await navigator.clipboard.read())[0]?.types.join(",") ?? ""), "the picture is there, alone (text beside it would be pasted instead)").toBe("image/png");
+  await expect.poll(() => p.evaluate(async () => [...((await navigator.clipboard.read())[0]?.types ?? [])].sort().join(",")), "both pictures are there, with no text beside them (it would be pasted instead)").toBe("image/png,image/svg+xml");
+  expect(await p.evaluate(async () => (await (await navigator.clipboard.read())[0]!.getType("image/svg+xml")).text())).toMatch(/<svg[\s>]/);
   const png = await p.evaluate(async () => (await (await navigator.clipboard.read())[0]!.getType("image/png")).size);
   expect(png).toBeGreaterThan(100);
   await p.keyboard.press("Control+v");
@@ -3492,7 +3493,7 @@ test("Ctrl+C writes the picture to the clipboard in every browser (Firefox refus
   await drag(app, [500, 300], [700, 400]);
   await key(app, "v");
   await p.keyboard.press("Control+c");
-  await expect.poll(() => p.evaluate(() => (window as unknown as { __clip: string[] }).__clip)).toEqual(["ok image/png"]);
+  await expect.poll(() => p.evaluate(() => (window as unknown as { __clip: string[] }).__clip)).toEqual([expect.stringMatching(/^ok .*image\/png/)]); // (with its SVG, where the browser can)
 });
 
 test("adjustments on a shape: drawn on what it looks like, blur spreads past its edge, one undo step, kept over a reload", async ({ app }) => {

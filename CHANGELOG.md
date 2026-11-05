@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.16 — Ctrl+C keeps vectors (2026-11-05)
+
+- **Fixed:** Copy of vector shapes on the canvas, of an SVG picture placed as it was imported, and of an SVG in the library puts the SVG on the clipboard beside its PNG, so a program that can keep vectors gets them; it had gone out as an image alone since 0.45.2. A browser that cannot put an SVG there gives the PNG.
+- **Changed:** Paste in the library keeps an SVG as vectors, and a hidden SVG asks first as any hidden item does.
+
 ## 0.54.15 — A setting changed right after Generate stays (2026-11-05)
 
 - **Fixed:** in the Pattern panel, a setting changed within half a second of Generate could go back to its last value.

@@ -1,7 +1,8 @@
 import { setSnapPx } from "../interaction/snap";
 import { deleteEverywhere } from "../ui/delete-everywhere";
 import type { CatalogEntry } from "../assets/asset-catalog";
-import { copyItemsAsFiles, copyItemsToClipboard, type CopyDeps } from "./copy-items";
+import { copyItemsAsFiles, copyItemsToClipboard, hiddenFine, type CopyDeps } from "./copy-items";
+import { clipboardFor } from "../assets/clipboard-kinds";
 import { externalFolder } from "../storage/external-folder";
 import { askHiddenPassword } from "../ui/hidden-access";
 import { noteKindOf, tooBigForNote } from "../notes/note-file";
@@ -60,7 +61,7 @@ import { openBatchRename } from "../ui/batch-rename";
 import { askCurrentPassword, askPassword, forgetHiddenPassword, hiddenModeOn, hiddenRemembered, onHiddenRemembered } from "../ui/hidden-access";
 import { typeOfName } from "../storage/workspace-names";
 import { openLockScreen } from "../ui/lock-screen";
-import { writeSystemClipboard } from "./system-clipboard";
+import { MAX_COPIED_SVG, onePerPicture, writeSystemClipboard } from "./system-clipboard";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
 import { syncIndex } from "../scene/spatial-index";
@@ -2561,7 +2562,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     // A paste into a field, an editor (the notes editor takes a picture in itself), a dialog or a menu is theirs: nothing is imported or placed.
     if (e.defaultPrevented || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog, [popover], .note-dock") || document.querySelector("dialog:modal")) return;
     if (performance.now() - middleUpAt < 300) return void e.preventDefault();
-    const files = [...(e.clipboardData?.files ?? [])];
+    const files = onePerPicture([...(e.clipboardData?.files ?? [])]);
     // What canvast copied comes back as the objects, even though the clipboard also holds its picture and SVG for other apps.
     const own = e.clipboardData?.getData("text/plain") ?? "";
     if (appView === "canvas" && !textEditor.isOpen && (!files.length || own !== "" || (files.length === 1 && isCopiedPicture())) && pasteObjects(doc, editor, view, own || null)) {
@@ -2578,7 +2579,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   // A picture of the copied things (PNG: one still at full size with its crop and adjustments, else at most 1024 px) next to the text (alone when the text would only say "N objects"), for other apps; the text stays what copySelection set,
   // which is how a paste here knows the objects are still ours. Best effort: a browser without the clipboard picture API keeps the text.
   const copySize = (t: ExportTarget, long: number): { w: number; h: number } => ({ w: Math.max(1, Math.round(t.ratio >= 1 ? long : long * t.ratio)), h: Math.max(1, Math.round(t.ratio >= 1 ? long / t.ratio : long)) });
-  const copyPicture = async (t: ExportTarget, withText: boolean): Promise<void> => {
+  const copyPicture = async (t: ExportTarget, withText: boolean, svg?: string): Promise<void> => {
     const text = copiedText();
     if (text === null) return;
     const { w, h } = copySize(t, t.original ? Math.min(4096, Math.max(t.original.w, t.original.h)) : 1024);
@@ -2588,7 +2589,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       .then((b) => b ?? renderExport({ doc, index, assets: filesAssets, theme }, t, w, h, "transparent").then((c) => new Promise<Blob>((ok, no) => c.toBlob((x) => (x ? ok(x) : no(new Error("no picture"))), "image/png"))))
       .then((b) => (markCopiedPicture(), b));
     // (the words go beside the picture only for copied texts: otherwise a program that takes text would paste the SVG or a count and not the picture)
-    await writeSystemClipboard({ image: png, text, withText: withText && !isPlaceholderText(text) });
+    await writeSystemClipboard({ image: png, text, withText: withText && !isPlaceholderText(text), ...(svg ? { svg } : {}) });
   };
   /** A hidden item is a padlock outside hidden mode: no file action reaches it there, whatever the password state. */
   const hiddenInReach = (): boolean => hiddenModeOn() && (storage?.hidden ? storage.hidden.isOpen() : true);
@@ -2628,7 +2629,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     },
   };
   /** What a copy on the canvas puts out: one note card is its words, so it pastes into a note elsewhere (and still as the card here); the rest a picture. */
-  const copyOut = async (t: ExportTarget | null, withText: boolean): Promise<void> => {
+  const copyOut = async (t: ExportTarget | null, withText: boolean, svg?: string): Promise<void> => {
     const one = editor.selection.size === 1 ? await selectedFiles() : [];
     if (one[0] && noteKindOf(one[0].name)) {
       const text = await copyItemsToClipboard(copyOnCanvas, one);
@@ -2638,7 +2639,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         return;
       }
     }
-    if (t) await copyPicture(t, withText);
+    // One SVG picture, as it was imported: its own vectors go too. (Cropped, flipped or adjusted, only the picture shows that. A hidden one asks first, and one out of reach is not in `one`.)
+    const placed = one[0] && clipboardFor(one[0].name, one[0].type) === "vector" ? (doc.get([...editor.selection][0]!) as ImageObject | undefined) : undefined;
+    const own = placed && !placed.crop && !placed.flipX && !placed.flipY && !placed.adjust && (await hiddenFine(one)) ? await (await copyOnCanvas.file(placed.assetId))?.text().catch(() => undefined) : undefined;
+    if (t) await copyPicture(t, withText, svg ?? own);
   };
   // Copy and cut take the selected objects (text fields and the text editor keep their own).
   for (const kind of ["copy", "cut"] as const) {
@@ -2649,10 +2653,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       const t = ts.length === 1 ? ts[0]! : null;
       // (a picture or objects fill is written into an SVG as embedded images, which would be megabytes of text: those shapes go as a picture only)
       const svg0 = t?.vectors && !t.vectors.some((o) => isTexture(o.fill) || isTexture(o.stroke)) ? svgOfTarget(doc, t, { w: String(copySize(t, 1000).w), h: String(copySize(t, 1000).h) }) : null;
-      const svg = svg0 && svg0.length <= 1_000_000 ? svg0 : null;
+      const svg = svg0 && svg0.length <= MAX_COPIED_SVG ? svg0 : null;
       if ((kind === "copy" ? copySelection : cutSelection)(doc, editor, view, e, svg ?? undefined)) {
         e.preventDefault();
-        if (kind === "copy") void copyOut(t, !svg);
+        if (kind === "copy") void copyOut(t, !svg, svg ?? undefined);
       }
     });
   }

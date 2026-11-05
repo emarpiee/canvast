@@ -4578,7 +4578,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const say = (m: string): void => { session.editor.message = m; session.editor.changed(); };
     try {
       const files: File[] = [];
-      for (const it of await readClipboardPictures()) {
+      for (const it of await readClipboardPictures(true)) {
         const type = it.type;
         const text = it.text.split(/\r?\n/)[0]!.trim();
         const named = text.length > 0 && text.length <= 120 ? cleanFileName(text) : "";
