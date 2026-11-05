@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
 import { createHash, scryptSync } from "node:crypto";
 import { buildDir } from "./build-dir";
+import { makeFakeMp4 } from "./mp4";
 import { makePng } from "./png";
 
 // The desktop build (ADR 0177): the snapshot's own desktop shell (test-snap builds it into <snapshot>/desktop), on a
@@ -2062,11 +2063,18 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
   const { app, page } = await launch(ws, "userdata", true);
   const MARK = (m: string) => Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="30"><title>${m}</title><circle cx="20" cy="15" r="9" fill="#123456"/></svg>`);
   const clear = () => app.evaluate(({ clipboard }) => clipboard.clear());
-  /** What another program would be offered, and the SVG if there is one. */
+  /** Whether the file on the clipboard holds these words. */
+  const fileHas = async (words: string): Promise<boolean> => {
+    const { file } = await out();
+    return !!file && existsSync(file) && readFileSync(file, "utf8").includes(words);
+  };
+  /** What another program would be offered. */
   const out = () => app.evaluate(async ({ clipboard }) => {
     const [item] = await clipboard.read();
     const read = async (t: string): Promise<string> => (item?.types.includes(t) ? await (await item.getType(t) as Blob).text() : "");
-    return { types: [...(item?.types ?? [])], svg: await read("image/svg+xml"), file: decodeURIComponent((await read("text/uri-list")).trim().replace(/^file:\/\//, "")) };
+    // (asked for by its own name on the system's clipboard: asked as a picture, any picture type comes back as the PNG)
+    const offered = async (t: string): Promise<boolean> => clipboard.has(`electron application/osclipboard;format="${t}"`);
+    return { svg: await offered("image/svg+xml"), png: await offered("image/png"), text: await clipboard.readText(), file: decodeURIComponent((await read("text/uri-list")).trim().replace(/^file:\/\//, "")) };
   });
   try {
     // On the canvas: a shape, and an SVG picture with its own file.
@@ -2078,9 +2086,10 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await page.keyboard.press("v");
     await clear();
     await page.keyboard.press("Control+c");
-    await expect.poll(() => out().then((o) => o.types.sort().join(","))).toContain("image/svg+xml");
-    expect((await out()).types).toContain("image/png");
-    expect((await out()).svg).toMatch(/<svg[\s>]/);
+    await expect.poll(() => out().then((o) => o.file)).toMatch(/\.svg$/);
+    expect((await out()).svg).toBe(true);
+    expect((await out()).png).toBe(true);
+    expect(readFileSync((await out()).file, "utf8")).toMatch(/<svg[\s>]/);
     await page.keyboard.press("Control+v"); // (back in here: the shape itself, not an import)
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(2);
     await page.getByTestId("import-input").setInputFiles({ name: "placed.svg", mimeType: "image/svg+xml", buffer: MARK("placed-mark") });
@@ -2091,8 +2100,9 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.selection())).toEqual([placed.id]);
     await clear();
     await page.keyboard.press("Control+c");
-    await expect.poll(() => out().then((o) => o.svg)).toContain("placed-mark");
+    await expect.poll(() => fileHas("placed-mark")).toBe(true);
     expect((await out()).file).toMatch(/placed\.svg$/);
+    expect((await out()).svg).toBe(true);
     // Several, a picture and a shape: both files, and pasted back here the objects, with nothing imported.
     const items = () => page.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.length);
     const had = await items();
@@ -2101,7 +2111,7 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await page.keyboard.press("Control+c");
     await expect.poll(() => out().then((o) => o.file.split(/\r?\n/).length)).toBe(2);
     expect((await out()).file).toMatch(/placed\.svg/);
-    expect((await out()).types).toContain("image/png");
+    expect((await out()).png, "several files go alone: given one picture, a program would leave the rest").toBe(false);
     await page.keyboard.press("Control+v");
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(6);
     expect(await items()).toBe(had);
@@ -2114,7 +2124,7 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await clear();
     await page.keyboard.press("Control+c");
     await page.waitForTimeout(1000);
-    expect((await out()).svg).not.toContain("placed-mark");
+    expect((await out()).svg).toBe(false);
     expect((await out()).file).not.toContain("placed");
     // In the library: an SVG goes as itself.
     await page.getByTestId("view-assets").click();
@@ -2124,8 +2134,8 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await shelf.click();
     await clear();
     await page.keyboard.press("Control+c");
-    await expect.poll(() => out().then((o) => o.svg)).toContain("shelf-mark");
-    expect((await out()).types).toContain("image/png");
+    await expect.poll(() => fileHas("shelf-mark")).toBe(true);
+    expect((await out()).png).toBe(true);
     // A real file too, with its own name, for a program that takes files.
     const shelfFile = (await out()).file;
     expect(shelfFile).toMatch(/shelf\.svg$/);
@@ -2140,6 +2150,7 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await page.keyboard.press("Control+c");
     await expect.poll(() => out().then((o) => o.file.split(/\r?\n/).length)).toBe(2);
     expect((await out()).file).toContain("clip.mp4");
+    expect((await out()).png).toBe(false);
     // Hidden, in hidden mode: it asks; declined, nothing goes; agreed, it goes as itself.
     await page.keyboard.press("Escape");
     await page.evaluate(() => window.__canvastDebug.hiddenOp("lock"));
@@ -2154,12 +2165,26 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await page.keyboard.press("Control+c");
     await page.getByTestId("confirm-cancel").click();
     await page.waitForTimeout(500);
-    expect((await out()).svg).toBe("");
+    expect((await out()).file).toBe("");
     await page.keyboard.press("Control+c");
     await page.getByTestId("confirm-ok").click();
-    await expect.poll(() => out().then((o) => o.svg)).toContain("placed-mark");
+    await expect.poll(() => fileHas("placed-mark")).toBe(true);
     const readable = (await out()).file;
     expect(readFileSync(readable, "utf8")).toContain("placed-mark");
+    // A hidden video on the canvas, in hidden mode: its real file, and never the line a copy starts from.
+    await page.evaluate(() => window.__canvastDebug.setSetting("library.hiddenStay", true));
+    await page.getByTestId("view-canvas").click();
+    await page.getByTestId("import-input").setInputFiles({ name: "secret.mp4", mimeType: "video/mp4", buffer: makeFakeMp4(16, 16, 1, "avc1") });
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().at(-1)?.kind)).toBe("image");
+    const clipOn = await page.evaluate(() => window.__canvastDebug.objects().at(-1) as unknown as { id: string; assetId: string });
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), clipOn.assetId);
+    const onCanvas = (await page.evaluate((id) => window.__canvastDebug.objectScreen(id), clipOn.id))!.box;
+    await page.mouse.click((onCanvas.minX + onCanvas.maxX) / 2, (onCanvas.minY + onCanvas.maxY) / 2);
+    await clear();
+    await page.keyboard.press("Control+c");
+    await expect.poll(() => out().then((o) => o.file)).toMatch(/secret\.mp4$/);
+    expect((await out()).text).not.toMatch(/^canvast: \d+ object/);
+    await page.getByTestId("view-assets").click();
     // Out again and locked: the card is gone, Ctrl+C has nothing to take, and its readable copy is deleted.
     await page.getByTestId("hidden-mode-exit").click();
     await expect(secret).toHaveCount(0);

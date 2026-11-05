@@ -32,10 +32,13 @@ export interface ClipboardParts {
 export const MAX_COPIED_SVG = 1_000_000;
 const SVG_TYPE = "image/svg+xml";
 
+/** An SVG as a readable copy for `copyFiles`, by this name. */
+export const svgCopy = (name: string, svg: string): { name: string; bytes: Uint8Array } => ({ name: /\.svg$/i.test(name) ? name : `${name}.svg`, bytes: new TextEncoder().encode(svg) });
+
 export async function writeSystemClipboard(p: ClipboardParts): Promise<ClipboardResult> {
   const bridge = desktopBridge();
   const svgNow = p.svg && p.svg.length <= MAX_COPIED_SVG ? p.svg : undefined;
-  const own = svgNow && p.svgFile ? [{ name: /\.svg$/i.test(p.svgFile) ? p.svgFile : `${p.svgFile}.svg`, bytes: new TextEncoder().encode(svgNow) }] : [];
+  const own = svgNow && p.svgFile ? [svgCopy(p.svgFile, svgNow)] : [];
   const copies = [...(p.files?.copies ?? []), ...own], files = p.files?.files ?? [];
   if (bridge && files.length + copies.length > 0) {
     // Every way a program may want it: one that takes files gets the files, one that takes pictures or words those. (The words go beside a picture only as below.)

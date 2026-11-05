@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.54.19 — Copy of several files, and hidden items on the canvas (2026-11-05)
+
+- **Fixed:** in the desktop app, Ctrl+C of several files gives them all, as **Copy file** does: no picture of the first beside them, which a program could take in their place. One press copies once.
+- **Fixed:** a hidden video on the canvas could paste as a line of text. A copy no longer starts from that line in the desktop app, a picture that cannot be made is drawn instead, and a copy that fails says so; one that takes a moment says when it is ready.
+- **Fixed:** outside hidden mode, a hidden picture on the canvas copies as a padlock, and says so: its picture could reach the clipboard.
+
 ## 0.54.18 — Ctrl+C copies real files in the desktop app (2026-11-05)
 
 - **Changed:** in the desktop app, Copy puts the real files on the clipboard, of any kind and any number, from the library and the canvas, beside what it already gives (a PNG, an SVG, a note's words); a program takes what it can use. A picture cropped, flipped or adjusted goes as its PNG only, as its file does not show that; shapes among other things go as one SVG file too.

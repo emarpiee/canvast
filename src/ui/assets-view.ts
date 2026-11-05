@@ -50,7 +50,7 @@ import { capList, showMoreButton } from "./show-more";
 import { pathNodes, treeGuides, treeSearch, treeSlot, walkTree } from "./tree";
 import { formatTags } from "../doc/tags";
 import { cleanFileName, splitName } from "../doc/rename-rules";
-import { copyBytes, copyItemsAsFiles, copyItemsToClipboard, type CopyDeps } from "../app/copy-items";
+import { copyBytes, copyItemsAsFiles, copyItemsToClipboard, sayingProgress, type CopyDeps } from "../app/copy-items";
 import { readClipboardPictures } from "../app/system-clipboard";
 import { forgetCopiedPicture } from "../app/actions";
 import { esc, fmtBytes } from "./format";
@@ -4576,7 +4576,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   const copyItems = async (hashes: readonly string[], what: "picture" | "name" = "picture"): Promise<void> => {
     forgetCopiedPicture(); // (what is on the clipboard now is not a canvas's copy)
-    await copyItemsToClipboard(copyDeps, await entriesOf(hashes), what);
+    await sayingProgress(copyDeps.say, async () => void (await copyItemsToClipboard(copyDeps, await entriesOf(hashes), what)));
   };
   const pasteFromClipboard = async (): Promise<void> => {
     const say = (m: string): void => { session.editor.message = m; session.editor.changed(); };
@@ -4603,10 +4603,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     return viewer.hidden && picked.size ? filtered().filter((h) => picked.has(h)) : selected ? [selected] : [];
   };
   // (the key itself as well: a page with nothing selected does not always get a copy event)
+  let copyKeyAt = -Infinity;
   const copyShortcut = (e: Event): void => {
     const hashes = copyTargets(e.target);
     if (!hashes.length) return;
     e.preventDefault();
+    // (one press is both a key and, usually, a copy event: it copies once)
+    if (e.type === "copy" && performance.now() - copyKeyAt < 500) return;
+    if (e.type === "keydown") copyKeyAt = performance.now();
     void copyItems(hashes);
   };
   window.addEventListener("keydown", (e) => {

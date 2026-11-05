@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.19: copy of several files, and hidden items on the canvas (2026-11-05)
+
+- **Implemented:** several files go through `copyItemsAsFiles`; `sayingProgress`; no placeholder line on the desktop clipboard; a hidden picture out of reach goes as a padlock.
+- **Tested:** typecheck, checks and unit tests locally; `desktop.spec` on GitHub's `Tests` run.
+- **Known failures:** `desktop.spec`'s copy test on 2fac418 (it read the SVG in a way that gave PNG bytes), changed here.
+- **Unverified:** the exact cause of the text paste of a hidden video was not reproduced; real programs.
+- **Committed:** v0.54.19.
+- **Next bounded task:** read the `Tests` run; the owner checks real pastes.
+
 ## v0.54.18: Ctrl+C copies real files in the desktop app (2026-11-05)
 
 - **Implemented:** `writeSystemClipboard` takes `files` and `svgFile`; `filesOf` shared with Copy file; the canvas's `copyOut` finds what can go as a file.

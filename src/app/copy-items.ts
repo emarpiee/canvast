@@ -45,6 +45,23 @@ async function wordsOf(e: CatalogEntry, file: string): Promise<string> {
   return wholeMarkdown("rich", "", linksToWiki(htmlMarkdown(richNoteBody(file))), props, []);
 }
 
+/** A copy that takes a moment says so, and says when it can be pasted; one that fails says that, whatever went wrong. */
+export async function sayingProgress(say: (text: string) => void, work: () => Promise<void>): Promise<void> {
+  let slow = false;
+  const timer = setTimeout(() => {
+    slow = true;
+    say("Preparing the copy…");
+  }, 400);
+  try {
+    await work();
+    if (slow) say("Ready to paste.");
+  } catch {
+    say("Could not copy to the clipboard.");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Copy these items. What was written as text, when the words of notes were: a canvas needs it to know its own paste. */
 export async function copyItemsToClipboard(deps: CopyDeps, ents: readonly CatalogEntry[], what: "picture" | "name" = "picture"): Promise<string | null> {
   if (!ents.length || !(await hiddenFine(ents))) return null;
@@ -57,9 +74,14 @@ export async function copyItemsToClipboard(deps: CopyDeps, ents: readonly Catalo
   }
   // The desktop app: their real files too, for whatever pastes files. (A browser cannot put a file on the clipboard.)
   const bridge = desktopBridge();
+  const kinds = ents.map((e) => clipboardFor(e.name, e.type));
+  // Several real files: as Copy file, and nothing beside them, for a program given one picture would take that and leave the rest.
+  if (bridge && ents.length > 1 && !kinds.every(isWords)) {
+    await copyItemsAsFiles(deps, ents);
+    return null;
+  }
   const real = bridge ? await filesOf(deps, bridge, ents) : undefined;
   const files = real?.n ? real : undefined;
-  const kinds = ents.map((e) => clipboardFor(e.name, e.type));
   if (kinds.every(isWords)) {
     const parts: string[] = [];
     let size = 0;
@@ -91,7 +113,7 @@ export async function copyItemsToClipboard(deps: CopyDeps, ents: readonly Catalo
   const at = kinds.findIndex(isPicture);
   const single = ents.length === 1 && kinds[0] === "thumb";
   if (at < 0 && !single) {
-    if (files) deps.say((await writeSystemClipboard({ text: names, files })) === "failed" ? "Could not copy to the clipboard." : ents.length === 1 ? `Copied “${ents[0]!.name}”.` : `Copied ${plural(files.n, "file")}.`);
+    if (files) deps.say((await writeSystemClipboard({ text: names, files })) === "failed" ? "Could not copy to the clipboard." : `Copied “${ents[0]!.name}”.`);
     else if (await copyPlainText(names)) onlyName();
     else deps.say("Could not copy to the clipboard.");
     return null;
@@ -102,7 +124,6 @@ export async function copyItemsToClipboard(deps: CopyDeps, ents: readonly Catalo
   const done = await writeSystemClipboard({ ...(source ? { image: asPng(source) } : {}), text: names, ...(svg ? { svg } : {}), ...(files ? { files } : {}) });
   if (done === "failed") deps.say("Could not copy to the clipboard.");
   else if (done === "text") onlyName();
-  else if (files && ents.length > 1) deps.say(`Copied ${plural(files.n, "file")}.`);
   else {
     const others = ents.length - 1;
     const kind = kinds[single ? 0 : at]!;
@@ -146,5 +167,5 @@ export async function copyItemsAsFiles(deps: CopyDeps, ents: readonly CatalogEnt
     return deps.say("Could not copy to the clipboard.");
   }
   const left = ents.length - n;
-  deps.say(`Copied ${plural(n, "file")}${left ? `, not the other ${left} (not in the workspace folder yet)` : ""}: paste in a file manager.`);
+  deps.say(`Copied ${plural(n, "file")}${left ? `, not the other ${left} (not in the workspace folder yet)` : ""}.`);
 }

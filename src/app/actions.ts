@@ -1,3 +1,4 @@
+import { desktopBridge } from "../storage/desktop-bridge";
 import { levelsBetween } from "../core/frames";
 import { isArtFile } from "../assets/art-preview";
 import { beginProgress } from "./progress";
@@ -239,7 +240,8 @@ export function copySelection(doc: DocumentStore, editor: EditorState, view: Vie
   } catch {
     // too large or storage unavailable: this tab still has it
   }
-  e?.clipboardData?.setData("text/plain", text);
+  // (the desktop app's real copy follows at once; a line saying how many objects would be what an early paste gets. A browser's paste here needs it, to know its own.)
+  if (!desktopBridge() || !isPlaceholderText(text)) e?.clipboardData?.setData("text/plain", text);
   editor.message = `Copied ${objs.length} object${objs.length === 1 ? "" : "s"}`;
   editor.changed();
   return true;

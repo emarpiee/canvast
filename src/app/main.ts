@@ -1,7 +1,7 @@
 import { setSnapPx } from "../interaction/snap";
 import { deleteEverywhere } from "../ui/delete-everywhere";
 import type { CatalogEntry } from "../assets/asset-catalog";
-import { copyItemsAsFiles, copyItemsToClipboard, filesOf, hiddenFine, type CopyDeps } from "./copy-items";
+import { copyItemsAsFiles, copyItemsToClipboard, filesOf, hiddenFine, sayingProgress, type CopyDeps } from "./copy-items";
 import { clipboardFor } from "../assets/clipboard-kinds";
 import { externalFolder } from "../storage/external-folder";
 import { askHiddenPassword } from "../ui/hidden-access";
@@ -61,7 +61,7 @@ import { openBatchRename } from "../ui/batch-rename";
 import { askCurrentPassword, askPassword, forgetHiddenPassword, hiddenModeOn, hiddenRemembered, onHiddenRemembered } from "../ui/hidden-access";
 import { typeOfName } from "../storage/workspace-names";
 import { openLockScreen } from "../ui/lock-screen";
-import { MAX_COPIED_SVG, onePerPicture, writeSystemClipboard, type ClipboardFiles } from "./system-clipboard";
+import { MAX_COPIED_SVG, onePerPicture, svgCopy, writeSystemClipboard, type ClipboardFiles } from "./system-clipboard";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
 import { syncIndex } from "../scene/spatial-index";
@@ -2584,12 +2584,18 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     if (text === null) return;
     const { w, h } = copySize(t, t.original ? Math.min(4096, Math.max(t.original.w, t.original.h)) : 1024);
     // one still picture goes as it looks with its crop and adjustments at full size; a GIF or video as the frame shown; the rest as drawn
-    const still = t.original ? renderedStill(doc, editor, filesAssets) : Promise.resolve(null);
+    // (not a hidden one out of reach: what makes a file shows that as a padlock. One that cannot be made is drawn instead.)
+    const lockedOut = !hiddenInReach() && [...editor.selection].some((id) => assets.isHidden((doc.get(id) as { assetId?: string } | undefined)?.assetId ?? ""));
+    const still = t.original && !lockedOut ? renderedStill(doc, editor, filesAssets).catch(() => null) : Promise.resolve(null);
     const png = still
       .then((b) => b ?? renderExport({ doc, index, assets: filesAssets, theme }, t, w, h, "transparent").then((c) => new Promise<Blob>((ok, no) => c.toBlob((x) => (x ? ok(x) : no(new Error("no picture"))), "image/png"))))
       .then((b) => (markCopiedPicture(), b));
     // (the words go beside the picture only for copied texts: otherwise a program that takes text would paste the SVG or a count and not the picture)
-    await writeSystemClipboard({ image: png, text, withText: withText && !isPlaceholderText(text), ...(svg ? { svg } : {}), ...(svgFile ? { svgFile } : {}), ...(files ? { files } : {}) });
+    // (a line saying how many objects is for a paste here: it never takes the place of a picture that failed)
+    const words = isPlaceholderText(text) ? {} : { text, withText };
+    const done = await writeSystemClipboard({ image: png, ...words, ...(svg ? { svg } : {}), ...(svgFile ? { svgFile } : {}), ...(files ? { files } : {}) });
+    if (done === "failed") copyOnCanvas.say("Could not copy to the clipboard.");
+    else if (lockedOut) copyOnCanvas.say("A hidden item copies as a padlock outside hidden mode.");
   };
   /** A hidden item is a padlock outside hidden mode: no file action reaches it there, whatever the password state. */
   const hiddenInReach = (): boolean => hiddenModeOn() && (storage?.hidden ? storage.hidden.isOpen() : true);
@@ -2654,11 +2660,15 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     const shapes = bridge && t && !t.vectors ? objs.filter((o): o is PathObject => o?.kind === "path" && !isContainer(o) && !isTexture(o.fill) && !isTexture(o.stroke)) : [];
     const some = shapes.length ? svgOfTarget(doc, { ...t!, vectors: shapes }, { w: String(copySize(t!, 1000).w), h: String(copySize(t!, 1000).h) }) : null;
     const made = svg ?? some ?? undefined;
-    if (t) await copyPicture(t, withText, made ?? own, made ? t.name : undefined, files);
-    else if (files?.n) {
-      await writeSystemClipboard({ files });
-      markCopiedPicture();
+    markCopiedPicture(); // (from now: a paste here is the objects, even before the copy is on the clipboard)
+    // Several real files: those alone, as Copy file gives them, for a program given one picture would take that and leave the rest.
+    if ((files?.n ?? 0) + (made ? 1 : 0) > 1 || !t) {
+      if (!files?.n && !made) return;
+      const all = { files: files?.files ?? [], copies: [...(files?.copies ?? []), ...(made && t ? [svgCopy(t.name, made)] : [])] };
+      if ((await writeSystemClipboard({ files: all })) === "failed") copyOnCanvas.say("Could not copy to the clipboard.");
+      return;
     }
+    await copyPicture(t, withText, made ?? own, made ? t.name : undefined, files);
   };
   // Copy and cut take the selected objects (text fields and the text editor keep their own).
   for (const kind of ["copy", "cut"] as const) {
@@ -2672,7 +2682,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       const svg = svg0 && svg0.length <= MAX_COPIED_SVG ? svg0 : null;
       if ((kind === "copy" ? copySelection : cutSelection)(doc, editor, view, e, svg ?? undefined)) {
         e.preventDefault();
-        if (kind === "copy") void copyOut(t, !svg, svg ?? undefined);
+        if (kind === "copy") void sayingProgress(copyOnCanvas.say, () => copyOut(t, !svg, svg ?? undefined));
       }
     });
   }
