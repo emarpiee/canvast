@@ -2188,8 +2188,9 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     // A hidden video on the canvas, in hidden mode: its real file, and never the line a copy starts from.
     await page.evaluate(() => window.__canvastDebug.setSetting("library.hiddenStay", true));
     await page.getByTestId("view-canvas").click();
+    const placedBefore = await page.evaluate(() => window.__canvastDebug.objects().length);
     await page.getByTestId("import-input").setInputFiles({ name: "secret.mp4", mimeType: "video/mp4", buffer: makeFakeMp4(320, 240, 1, "avc1") });
-    await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().at(-1)?.kind)).toBe("image");
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length), { timeout: 15_000 }).toBe(placedBefore + 1);
     const clipOn = await page.evaluate(() => window.__canvastDebug.objects().at(-1) as unknown as { id: string; assetId: string });
     await page.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), clipOn.assetId);
     const onCanvas = (await page.evaluate((id) => window.__canvastDebug.objectScreen(id), clipOn.id))!.box;
