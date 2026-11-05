@@ -235,8 +235,62 @@ function toggleInline($: SunEditor.Deps, tag: string, names: readonly string[], 
   if (className) el.className = className;
   $.inline.apply(el, { stylesToModify: className ? [`.${className}`] : [], strictRemove: true });
 }
+const WORD_CHAR = /[\p{L}\p{N}_'’-]/u;
+/** With the cursor inside a word and nothing selected, what a format goes on: the run already in that format, else the word. Null at the edge of a word or outside one. */
+function rangeAtCursor(names: readonly string[]): Range | null {
+  const sel = window.getSelection();
+  const node = sel?.anchorNode;
+  if (!sel?.isCollapsed || node?.nodeType !== Node.TEXT_NODE) return null;
+  const words = node.textContent ?? "", at = sel.anchorOffset;
+  if (at <= 0 || at >= words.length || !WORD_CHAR.test(words[at - 1]!) || !WORD_CHAR.test(words[at]!) || helper.dom.query.getParentElement(node, "pre")) return null;
+  const range = document.createRange();
+  const run = names.map((n) => helper.dom.query.getParentElement(node, n)).find(Boolean);
+  if (run) {
+    range.selectNodeContents(run);
+    return range;
+  }
+  let [from, to] = [at, at];
+  while (from > 0 && WORD_CHAR.test(words[from - 1]!)) from--;
+  while (to < words.length && WORD_CHAR.test(words[to]!)) to++;
+  range.setStart(node, from);
+  range.setEnd(node, to);
+  return range;
+}
+/** A format on or off, of the selected words, or with the cursor inside a word of that word, the cursor staying where it was in it. Whether it took one with the cursor. */
+function toggleAtCursor($: SunEditor.Deps, tag: string, names: readonly string[], className = ""): boolean {
+  const range = rangeAtCursor(names);
+  if (!range) {
+    if (!window.getSelection()?.isCollapsed) toggleInline($, tag, names, className);
+    return false;
+  }
+  const sel = window.getSelection()!;
+  const before = document.createRange();
+  before.setStart(range.startContainer, range.startOffset);
+  before.setEnd(sel.anchorNode!, sel.anchorOffset);
+  const into = before.toString().length;
+  sel.removeAllRanges();
+  sel.addRange(range);
+  toggleInline($, tag, names, className);
+  // (the words now in a new element: the cursor goes back by how far in it was)
+  const now = window.getSelection();
+  if (now?.rangeCount) {
+    const done = now.getRangeAt(0), walker = document.createTreeWalker(done.commonAncestorContainer, NodeFilter.SHOW_TEXT);
+    let left = into, n: Node | null = done.startContainer.nodeType === Node.TEXT_NODE ? done.startContainer : walker.nextNode();
+    let off = n === done.startContainer ? done.startOffset : 0;
+    while (n && left > (n.textContent?.length ?? 0) - off) {
+      left -= (n.textContent?.length ?? 0) - off;
+      off = 0;
+      walker.currentNode = n;
+      n = walker.nextNode();
+    }
+    if (n) now.collapse(n, off + left);
+  }
+  return true;
+}
 /** The words as code: the same element and class as the editor's own Code text style, with one press. */
-const toggleCode = ($: SunEditor.Deps): void => toggleInline($, "code", ["code"], "__se__t-code");
+const toggleCode = ($: SunEditor.Deps): void => void toggleAtCursor($, "code", ["code"], "__se__t-code");
+/** The shortcuts that take the word under the cursor when nothing is selected. */
+const WORD_KEYS: Readonly<Record<string, readonly [string, readonly string[]]>> = { KeyB: ["strong", ["strong", "b"]], KeyI: ["em", ["em", "i"]], KeyU: ["u", ["u"]] };
 
 class NoteCode extends interfaces.PluginCommand {
   static override key = "noteCode";
@@ -643,6 +697,16 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       e.stopImmediatePropagation();
       e.preventDefault();
       page.dispatchEvent(new KeyboardEvent("keydown", { key: e.key, code: e.code, shiftKey: e.shiftKey, bubbles: true, cancelable: true }));
+      return;
+    }
+    const wordKey = WORD_KEYS[e.code];
+    if (wordKey && !e.shiftKey && opts.kind !== "txt" && t?.closest(".sun-editor-editable") && rangeAtCursor(wordKey[1])) {
+      // With the cursor inside a word, the format goes on or off the word (the editor's own would wait for what is typed next).
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      toggleAtCursor(editor.$, wordKey[0], wordKey[1]);
+      editor.$.history.push(false);
+      dirty = true;
       return;
     }
     if (e.code === "KeyS" && !e.shiftKey) {

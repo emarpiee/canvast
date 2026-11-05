@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.27 — Format the word under the cursor (2026-11-05)
+
+- **Added:** in a note, `Ctrl+B`, `Ctrl+I`, `Ctrl+U` and **Code** with the cursor inside a word and nothing selected format the whole word, and inside text already in that format remove it from all of it; the cursor stays where it was. At the edge of a word they do what they did.
+
 ## 0.54.26 — Code in the notes bar, signs round selected words (2026-11-05)
 
 - **Added:** the notes editor's floating bar has **Code**, the editor's own Code text style with one press.

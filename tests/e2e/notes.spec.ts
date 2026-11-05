@@ -1207,7 +1207,7 @@ test("Ctrl+F in an open note finds in that note with the focus off its words, in
 test("selected words: a sign typed over them goes round them, a format in a note that has them; the floating bar's Code", async ({ app }) => {
   const p = app.page;
   await p.getByTestId("view-assets").click();
-  await p.getByTestId("assets-import-input").setInputFiles([{ name: "signs.md", mimeType: "text/markdown", buffer: Buffer.from("first\n\nsecond\n\nthird\n") }, { name: "plain.txt", mimeType: "text/plain", buffer: Buffer.from("words\n") }]);
+  await p.getByTestId("assets-import-input").setInputFiles([{ name: "signs.md", mimeType: "text/markdown", buffer: Buffer.from("first\n\nsecond\n\nthird\n\nfourth word here\n") }, { name: "plain.txt", mimeType: "text/plain", buffer: Buffer.from("words\n") }]);
   await p.locator('[data-testid="asset-card"][title="signs.md"]').dblclick();
   const para = (n: number) => page(p).locator("p").nth(n);
   await expect(para(2)).toHaveText("third");
@@ -1231,5 +1231,28 @@ test("selected words: a sign typed over them goes round them, a format in a note
   await expect(code).toBeVisible();
   await code.click();
   await expect(para(2).locator("code")).toHaveCount(0);
+  // Ctrl+B and Ctrl+I with the cursor inside a word: on and off the word, the cursor staying in it; at its edge, as the editor does.
+  const put = (at: number) => para(3).evaluate((el, n) => {
+    const node = el.firstChild!;
+    window.getSelection()!.collapse(node, n);
+  }, at);
+  await para(3).click();
+  await put(2);
+  await p.keyboard.press("Control+b");
+  await expect(para(3).locator("strong")).toHaveText("fourth");
+  await p.keyboard.type("X");
+  await expect(para(3).locator("strong"), "the cursor is where it was").toHaveText("foXurth");
+  await p.keyboard.press("Backspace");
+  await p.keyboard.press("Control+b");
+  await expect(para(3).locator("strong")).toHaveCount(0);
+  await expect(para(3)).toHaveText("fourth word here");
+  await para(3).evaluate((el) => {
+    const n = el.firstChild!;
+    window.getSelection()!.collapse(n, 9);
+  });
+  await p.keyboard.press("Control+i");
+  await expect(para(3).locator("em")).toHaveText("word");
+  await p.keyboard.press("Control+i");
+  await expect(para(3).locator("em")).toHaveCount(0);
   expect(app.consoleErrors).toEqual([]);
 });
