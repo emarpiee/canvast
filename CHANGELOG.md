@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.54.35 — PDFs and 3D models open in views of their own (2026-11-05)
+
+- **Added:** PDFs show their first page in the library and the details, and their card on a canvas takes the page's shape. They open in a reader, in the viewer and in the panel on a canvas: pages, zoom, selectable words, the page it was left at, bookmarks (also in the details) and the PDF's own contents.
+- **Added:** 3D models (GLB, glTF, STL, OBJ, PLY) show a picture in the library and open in a view: turn, slide and zoom; camera lens and focal length; surface (own, clay, one colour, wireframe); shadows; background or none; three lights, each sun, point, spot or off with its colour, strength and direction; classic lighting setups; the view it was left at; bookmarks.
+- **Added:** a card on a canvas can show another page or view, that copy only, with **Show this on the card** in the panel. One step of undo, nothing new stored.
+- **Changed:** notes, PDFs and 3D models open through one table of file views, and a card's picture through one table of kinds, so a new kind of file plugs in as a row of each. The viewer's other kinds (fonts, art files, video, GIF, pictures) are a table too. The Note panel is now the File panel, and *Note editor on a canvas* is *Files on a canvas*.
+- **Changed:** the page's security rules allow WebAssembly to compile, for the decoders of scanned PDFs inside the file. The file grew from about 3.8 MB to about 6.8 MB.
+- **Removed:** the old drawing of STL and OBJ cards and the PDF page count on a card.
+
 ## 0.54.34 — Two signs make bold again in Firefox (2026-11-05)
 
 - **Fixed:** in Firefox, a second `*` typed over selected words of a note made them plain instead of bold, since 0.54.32. The words of a selection are now read from the note, not from what is laid out, also when checking that a whole note is selected.

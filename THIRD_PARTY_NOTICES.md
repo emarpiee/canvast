@@ -199,3 +199,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+## pdf.js
+
+- Package: `pdfjs-dist` 6.5.438 (draws PDFs: its code, its worker, and its JPEG 2000 and JBIG2 decoders)
+- Licence: Apache-2.0, https://www.apache.org/licenses/LICENSE-2.0
+
+## three.js
+
+- Package: `three` 0.187.0 (draws 3D models)
+- Licence: MIT

@@ -293,6 +293,7 @@ export class DesktopCatalog implements CatalogStore {
         const next: CatalogEntry = { ...e, ...m };
         if (change.favorite !== undefined) next.favorite = change.favorite;
         if (change.thumb !== undefined) next.thumb = change.thumb;
+        if (change.viewer !== undefined) (change.viewer ? (next.viewer = change.viewer) : delete next.viewer);
         if (change.hidden !== undefined) next.hidden = change.hidden;
         // Shown again from a hidden folder: that folder and the ones above it are shown again too (their other items stay hidden).
         if (change.hidden === false && m.folderIds.length) {

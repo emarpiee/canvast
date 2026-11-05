@@ -63,6 +63,7 @@ const styled = new WeakSet<SettingsStore>();
 
 /** A note open in the notes editor. */
 export class OpenNote {
+  readonly ownsKeys = true;
   private saving = false;
   private constructor(
     public hash: string,

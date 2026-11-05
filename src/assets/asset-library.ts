@@ -114,6 +114,11 @@ const pageOf = (k: string): { w: number; h: number } | null => {
   const m = /#p(\d+)x(\d+)/.exec(k);
   return m ? { w: +m[1]!, h: +m[2]! } : null;
 };
+/** What an object shows of its file (`hash#pWxH#v…`, doc/model.ts rasterKey), else undefined. */
+const previewOf = (k: string): string | undefined => {
+  const m = /#v([^@#]*)/.exec(k);
+  return m ? decodeURIComponent(m[1]!) : undefined;
+};
 /**
  * Images are decoded at most this many at a time. Hundreds of images asking at once (a big batch placed on the canvas)
  * would otherwise decode in parallel, each briefly holding its full pixels: gigabytes for a few seconds (ADR 0030).
@@ -578,10 +583,10 @@ export class AssetLibrary {
   }
 
   /** The picture of a file shown as a card, at `size` (its own, or a reduced copy's): a custom thumbnail, or the file's own card (a note's page). */
-  private async cardOf(rec: AssetRecord, size = { w: rec.pixelW, h: rec.pixelH }, /** A note's page width (a smaller copy keeps the full card's). */ layoutW?: number): Promise<ImageBitmap> {
+  private async cardOf(rec: AssetRecord, size = { w: rec.pixelW, h: rec.pixelH }, /** A note's page width (a smaller copy keeps the full card's). */ layoutW?: number, /** What this object shows of the file. */ preview?: string): Promise<ImageBitmap> {
     // A custom thumbnail stands for a file card on a canvas too (never a hidden one: see `customPicture`).
     // (and an art file's card shows the picture the file keeps)
-    const own = (await this.customPicture?.(rec.hash).catch(() => null)) ?? (isArtFile(rec.name) ? await artCardPicture(await externalFolder.fileOf(rec), rec.name) : null);
+    const own = preview ? null : (await this.customPicture?.(rec.hash).catch(() => null)) ?? (isArtFile(rec.name) ? await artCardPicture(await externalFolder.fileOf(rec), rec.name) : null);
     if (own) {
       try {
         return await cardFromPicture(own, size);
@@ -589,7 +594,7 @@ export class AssetLibrary {
         // (a picture that does not decode: the file's own card)
       }
     }
-    return makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, new Uint8Array(await rec.blob.arrayBuffer()), size, rec.hash, layoutW);
+    return makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, new Uint8Array(await rec.blob.arrayBuffer()), { size, hash: rec.hash, layoutW, preview });
   }
 
   /** `key` is the hash, or `hash#ms` for the picture of a video at a time (doc/model.ts rasterKey). */
@@ -598,7 +603,7 @@ export class AssetLibrary {
       const ms = key.includes("#") ? Number(key.slice(key.indexOf("#") + 1)) : 0;
       let img: CanvasImageSource & { width: number; height: number };
       const page = pageOf(key);
-      const card = (): Promise<ImageBitmap> => this.cardOf(rec, page ?? undefined);
+      const card = (): Promise<ImageBitmap> => this.cardOf(rec, page ?? undefined, undefined, previewOf(key));
       try {
         img = isCard(rec) ? await card() : await decode(rec.blob, ms);
       } catch (e) {
@@ -689,7 +694,7 @@ export class AssetLibrary {
     let bmp: ImageBitmap;
     try {
       // A card (a long note's page) is drawn at the smaller size itself, laid out as the full card is: its file is no picture to decode smaller.
-      bmp = isCard(rec) ? await this.cardOf(rec, { w: Math.max(1, Math.round(full.w * s)), h: Math.max(1, Math.round(full.h * s)) }, full.w / CARD_SCALE) : await createImageBitmap(rec.blob, { resizeWidth: Math.max(1, Math.round(rec.pixelW * s)), resizeHeight: Math.max(1, Math.round(rec.pixelH * s)), resizeQuality: "medium" });
+      bmp = isCard(rec) ? await this.cardOf(rec, { w: Math.max(1, Math.round(full.w * s)), h: Math.max(1, Math.round(full.h * s)) }, full.w / CARD_SCALE, previewOf(of)) : await createImageBitmap(rec.blob, { resizeWidth: Math.max(1, Math.round(rec.pixelW * s)), resizeHeight: Math.max(1, Math.round(rec.pixelH * s)), resizeQuality: "medium" });
     } catch {
       this.noReduced.add(rec.hash); // this browser cannot decode at a size: use the full image from now on
       return this.ensureDecoded(rec, of);

@@ -15,8 +15,14 @@ export const isCard = (x: { type: string; card?: boolean }): boolean => !isMedia
 /** A font file (shown by its letters: a thumbnail of "Aa" in that font). */
 export const isFontFile = (x: { type: string; name: string }): boolean => /^font\//.test(x.type) || /^(TTF|OTF|WOFF2?|TTC)$/.test(extOf(x.name));
 
-/** A file card with a thumbnail of its own (a font's letters, a note's page), else a card shows the file tile. */
-export const hasThumb = (x: { type: string; name: string; card?: boolean }): boolean => !isCard(x) || isFontFile(x) || isArtFile(x.name) || noteKindOf(x.name) !== null;
+/** A PDF (its pages are drawn). */
+export const isPdfFile = (x: { type?: string; name: string }): boolean => x.type === "application/pdf" || extOf(x.name) === "PDF";
+
+/** A 3D model this app reads. */
+export const isModelFile = (name: string): boolean => ["GLB", "GLTF", "STL", "OBJ", "PLY"].includes(extOf(name));
+
+/** A file card with a thumbnail of its own (a font's letters, a note's page, a PDF's first page, a 3D model's view), else a card shows the file tile. */
+export const hasThumb = (x: { type: string; name: string; card?: boolean }): boolean => !isCard(x) || isFontFile(x) || isArtFile(x.name) || noteKindOf(x.name) !== null || isPdfFile(x) || isModelFile(x.name);
 
 /** The extension of a file name, upper case and at most eight letters or digits; "" when there is none. */
 export function extOf(name: string): string {

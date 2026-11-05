@@ -10,8 +10,9 @@ import { AUTO_NOTE_SETTINGS, setAutoDates } from "../notes/note-dates";
 import { setPropTypes } from "../notes/prop-types";
 import { CARD_SCALE, notePageHeight, setNoteItemMeta, setNoteLook, setNotePictures, setShownProps } from "../notes/note-preview";
 import { anyNoteDirty, leaveAllNotes } from "../ui/note-session";
-import { mountNotePanel } from "../ui/note-panel";
-import type { NotePanelDeps } from "../ui/note-panel";
+import { mountFilePanel } from "../ui/file-panel";
+import type { FilePanelDeps } from "../ui/file-panel";
+import { viewKindNamed } from "../ui/file-views";
 import { ViewState } from "./view-state";
 import { newNoteFile } from "../notes/note-file";
 import { cleanFileName } from "../doc/rename-rules";
@@ -25,7 +26,9 @@ import type { Gradient, GradientStop } from "../doc/paint";
 import type { PathObject } from "../doc/model";
 import type { JoinChoice } from "../doc/stroke-look";
 import { SHOT_FORMATS, encodeShot, shotFileName, shotTags, withInterface } from "./screenshot";
-import { isCard, isFontFile } from "../assets/file-kind";
+import { isCard, isFontFile, isPdfFile } from "../assets/file-kind";
+import { FILE_CARD_H, FILE_CARD_W } from "../assets/card";
+import { pdfCardShape } from "../assets/pdf-engine";
 import { setFontCardLook } from "../assets/adapters";
 import { downloadOriginal, fileActionsOf, openOriginalInTab, saveFile } from "../ui/file-actions";
 import { FrameStats } from "./frame-stats";
@@ -898,8 +901,8 @@ async function start(): Promise<void> {
   // Hidden items' pictures on the canvas (the screen only): while Settings > Privacy remembers the Hidden password and it was given
   // here, or while hidden mode is on outside the library (Stay in hidden mode); and, in the desktop app, while their key is open. What makes a file uses `filesAssets`, and a capture of the screen is drawn with
   // padlocks first (`padlocked`), so nothing readable of them leaves the app.
-  // The note panel (note-panel.ts): made once the library view is, which it imports through.
-  let notePanel: { open(hash: string): Promise<boolean>; close(): Promise<boolean>; closeHidden(): void } = { open: async () => false, close: async () => true, closeHidden: () => undefined };
+  // The file panel (file-panel.ts): made once the library view is, which it imports through.
+  let notePanel: { open(hash: string, setPreview?: (preview: string, size: { w: number; h: number }) => void): Promise<boolean>; close(): Promise<boolean>; closeHidden(): void } = { open: async () => false, close: async () => true, closeHidden: () => undefined };
   const syncReveal = (): void => {
     const on = ((settings.get("library.hiddenRemember") && hiddenRemembered()) || hiddenModeOn()) && (storage?.hidden ? storage.hidden.isOpen() : true);
     if (on === assets.revealing) return;
@@ -1085,10 +1088,13 @@ async function start(): Promise<void> {
   noteWindow.append(noteWindowEl);
   document.body.append(noteWindow);
   noteWindow.addEventListener("pointerdown", (e) => void (e.target === noteWindow && notePanel.close()));
-  const notePanelReady = (d: NotePanelDeps): void => void (notePanel = mountNotePanel({ panel: notePanelEl, window: noteWindowEl }, d, () => settings.get("notes.panelMode")));
+  const notePanelReady = (d: FilePanelDeps): void => void (notePanel = mountFilePanel({ panel: notePanelEl, window: noteWindowEl }, d, () => settings.get("notes.panelMode")));
   let newNoteAt: (at: ScreenPoint, widthPx?: number) => Promise<void> = async () => undefined;
   let makeNoteFiles: () => Promise<void> = async () => undefined;
-  attachTools(canvas, view, doc, index, editor, { edgePanSpeed: () => (settings.get("nav.edgePanOn") ? settings.get("nav.edgePan") / 100 : 0), editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h) => void notePanel.open(h), newNote: (at, w) => void newNoteAt(at, w), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
+  attachTools(canvas, view, doc, index, editor, { edgePanSpeed: () => (settings.get("nav.edgePanOn") ? settings.get("nav.edgePan") / 100 : 0), editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h, id) => {
+        const o = doc.get(id);
+        void notePanel.open(h, o?.kind === "image" ? previewSetter(o) : undefined);
+      }, newNote: (at, w) => void newNoteAt(at, w), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
     navigate: (dir) =>
       void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus", (o, unit) => {
         // the name the Layers list shows: a group's own, else the item's
@@ -1253,7 +1259,7 @@ async function start(): Promise<void> {
   const panelEl = (testid: string): HTMLElement => side.querySelector<HTMLElement>(`[data-testid="${testid}"]`)!;
   dock.add(panelEl("layers-panel"), { id: "layers", title: "Layers", side: "right" });
   side.append(notePanelEl);
-  dock.add(notePanelEl, { id: "note", title: "Note", side: "float", width: 760, ownWidth: true, maxWidth: 1400, noFold: true });
+  dock.add(notePanelEl, { id: "note", title: "File", side: "float", width: 760, ownWidth: true, maxWidth: 1400, noFold: true });
   dock.add(panelEl("bookmarks-panel"), { id: "bookmarks", title: "Bookmarks", side: "left" });
   dock.add(panelEl("styles-panel"), { id: "styles", title: "Styles", side: "left" });
   dock.add(panelEl("tags-panel"), { id: "tags", title: "Tags", side: "left" });
@@ -1702,14 +1708,24 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     }
     editor.changed();
   };
-  const fileKinds = new Map<string, { card: boolean; open: boolean; svg: boolean; note: boolean }>();
+  /** Shows what is in a file's view on one card (doc/model.ts `preview`): its width kept, its height following the new picture; one step of undo. */
+  function previewSetter(from: ImageObject): (preview: string, size: { w: number; h: number }) => void {
+    return (preview, size) => {
+      const o = doc.get(from.id);
+      if (o?.kind !== "image" || editor.blockEdit()) return;
+      const { crop: _crop, ...rest } = o;
+      doc.commit(doc.transaction("Card preview", [{ ...rest, preview, pixelW: size.w, pixelH: size.h, h: (o.w * size.h) / size.w }]));
+      editor.changed();
+    };
+  }
+  const fileKinds = new Map<string, { card: boolean; open: boolean; svg: boolean; note: boolean; view: boolean }>();
   // (what the library says of an asset, read once: until it is read, nothing)
-  const fileKindOf = (hash: string): { card: boolean; open: boolean; svg: boolean; note: boolean } => {
+  const fileKindOf = (hash: string): { card: boolean; open: boolean; svg: boolean; note: boolean; view: boolean } => {
     if (!fileKinds.has(hash)) {
-      fileKinds.set(hash, { card: false, open: false, svg: false, note: false });
+      fileKinds.set(hash, { card: false, open: false, svg: false, note: false, view: false });
       void session.catalog?.entry(hash).then((e) => {
         if (!e) return;
-        fileKinds.set(hash, { card: isCard(e), open: desktopBridge() ? !meta(e).hidden : fileActionsOf(e.name, e.type).canOpen, svg: e.type === "image/svg+xml", note: !!noteKindOf(e.name) });
+        fileKinds.set(hash, { card: isCard(e), open: desktopBridge() ? !meta(e).hidden : fileActionsOf(e.name, e.type).canOpen, svg: e.type === "image/svg+xml", note: !!noteKindOf(e.name), view: !!viewKindNamed(e.name) });
         contextBar.update();
       });
     }
@@ -1798,7 +1814,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         const o = ids.length === 1 ? doc.get(ids[0]!) : undefined;
         if (o?.kind !== "image") return null;
         const k = fileKindOf(o.assetId);
-        return k.card ? { hash: o.assetId, open: k.open, note: k.note } : null;
+        return k.card ? { hash: o.assetId, open: k.open, note: k.note, view: k.view } : null;
       },
       pictureTools: () => {
         const sa = selectedAdjust(doc, editor);
@@ -1814,7 +1830,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         if (o?.kind !== "image") return false;
         void session.catalog?.entry(o.assetId).then((e) => {
           if (e && !fileKinds.get(o.assetId)?.svg && e.type === "image/svg+xml") {
-            fileKinds.set(o.assetId, { card: isCard(e), open: fileActionsOf(e.name, e.type).canOpen, svg: true, note: false });
+            fileKinds.set(o.assetId, { card: isCard(e), open: fileActionsOf(e.name, e.type).canOpen, svg: true, note: false, view: false });
             contextBar.update();
           }
         });
@@ -1840,7 +1856,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       makeNoteFiles: () => void makeNoteFiles(),
       editNote: () => {
         const o = doc.get([...editor.selection][0] ?? "");
-        if (o?.kind === "image") void notePanel.open(o.assetId);
+        if (o?.kind === "image") void notePanel.open(o.assetId, previewSetter(o));
       },
       openFile: () => {
         const o = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "image");
@@ -2053,7 +2069,31 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   };
   const wantNoteSync = (): void => {
     clearTimeout(notesTimer);
-    notesTimer = window.setTimeout(() => void syncNoteCards(), 120);
+    notesTimer = window.setTimeout(() => void (syncNoteCards(), syncOldPdfCards()), 120);
+  };
+  // A PDF imported before its pages were drawn has a card of the plain card's shape: its cards on a canvas take the shape of the first page. No undo step (as above).
+  const pdfShapes = new Map<string, { w: number; h: number } | null>();
+  const syncOldPdfCards = async (): Promise<void> => {
+    if (!session.catalog || session.readOnly) return;
+    let changed = false;
+    for (const o of [...doc.all()]) {
+      if (o.kind !== "image" || o.preview || o.pixelW !== FILE_CARD_W || o.pixelH !== FILE_CARD_H) continue;
+      if (!pdfShapes.has(o.assetId)) {
+        const e = await session.catalog.entry(o.assetId).catch(() => undefined);
+        if (!e) continue;
+        const rec = isPdfFile(e) ? await assets.record(o.assetId).catch(() => undefined) : undefined;
+        pdfShapes.set(o.assetId, rec ? await pdfCardShape(new Uint8Array(await rec.blob.arrayBuffer())) : null);
+      }
+      changed ||= !!pdfShapes.get(o.assetId);
+    }
+    if (!changed) return;
+    doc.remap((o) => {
+      const z = o.kind === "image" && !o.preview && o.pixelW === FILE_CARD_W && o.pixelH === FILE_CARD_H ? pdfShapes.get(o.assetId) : null;
+      if (!z || o.kind !== "image") return o;
+      const { crop: _crop, ...rest } = o;
+      return { ...rest, preview: "1", pixelW: z.w, pixelH: z.h, h: (o.w * z.h) / z.w };
+    });
+    editor.changed();
   };
   doc.subscribe((_source, changed) => {
     if (!changed || [...changed].some((id) => doc.get(id)?.kind === "image")) wantNoteSync();

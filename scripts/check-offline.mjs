@@ -22,6 +22,12 @@ for (const m of html.matchAll(/\b(?:import\s*\(|importScripts\s*\(|fetch\s*\(|ne
 // until it is looked at and added here: it could be something fetched.
 const KNOWN = [
   /^https:\/\/opensource\.org\/licenses\/MIT/, // (the same licence comment)
+  // pdf.js: its licence, the XML namespaces of a PDF's forms and metadata, and addresses in its link maker (only text: connect-src is closed)
+  /^https?:\/\/www\.apache\.org\/licenses\/LICENSE-2\.0/,
+  /^http:\/\/www\.xfa\.org\/schema\//,
+  /^http:\/\/ns\.adobe\.com\/(xdp|xfdf|xmpmeta)\//,
+  /^https?:\/\/(example\.com|foo\.bar)$/,
+  /^http:\/\/\$\{[a-zA-Z]\}$/,
   /^https:\/\/lea\.verou\.me/, // (the author in the licence comment of the code colouring)
   /^https?:\/\/www\.w3\.org\//, // XML namespaces (SVG, XLink)
   /^https:\/\/github\.com\/rsms\/inter$/, // the Inter licence text
@@ -45,7 +51,8 @@ const directive = (name) => csp.split(";").map((d) => d.trim()).find((d) => d.st
 for (const [name, want] of [["default-src", "'none'"], ["connect-src", "'none'"], ["base-uri", "'none'"], ["form-action", "'none'"], ["object-src", "'none'"]]) {
   if (directive(name) !== `${name} ${want}` && !(name === "object-src" && directive("default-src") === "default-src 'none'")) problems.push(`CSP: ${name} must be ${want} (is: ${directive(name) ?? "missing"})`);
 }
-if (/unsafe-eval|https?:|\*/.test(csp.replace(/'unsafe-inline'/g, ""))) problems.push(`CSP allows more than it should: ${csp}`);
+// ('wasm-unsafe-eval' only compiles WebAssembly, for the decoders of scanned PDFs inside this file: it runs no text as code, and nothing can be fetched to compile.)
+if (/unsafe-eval|https?:|\*/.test(csp.replace(/'unsafe-inline'|'wasm-unsafe-eval'/g, ""))) problems.push(`CSP allows more than it should: ${csp}`);
 
 if (problems.length) {
   console.error(`FAIL ${file}\n  ${problems.join("\n  ")}`);

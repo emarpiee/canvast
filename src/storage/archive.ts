@@ -183,6 +183,7 @@ interface ManifestAsset {
   fields?: AssetField[];
   /** Its custom thumbnail's SHA-256: an item of the archive, or one of its `thumbnails`. */
   thumb?: string;
+  viewer?: string;
 }
 
 /** An asset's organization as carried in an archive. */
@@ -194,6 +195,7 @@ export interface AssetOrganization {
   note: string;
   fields: AssetField[];
   thumb: string | null;
+  viewer: string;
 }
 
 export interface Manifest {
@@ -404,6 +406,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       ...(m.note ? { note: m.note } : {}),
       ...(m.fields.length ? { fields: m.fields } : {}),
       ...(m.thumb ? { thumb: m.thumb } : {}),
+      ...(entry?.viewer ? { viewer: entry.viewer } : {}),
     });
     if (!known) {
       const input: ZipInput = { name: file, data: r.blob };
@@ -920,7 +923,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
 
 /** Validate an asset's optional organization fields; anything invalid is reported and dropped. */
 function readOrganization(a: Record<string, unknown>, label: string, problems: string[]): AssetOrganization | null {
-  if (["tags", "favorite", "hidden", "folders", "note", "fields", "thumb"].every((k) => a[k] === undefined)) return null;
+  if (["tags", "favorite", "hidden", "folders", "note", "fields", "thumb", "viewer"].every((k) => a[k] === undefined)) return null;
   let tags: string[] = [];
   try {
     tags = normalizeTags(Array.isArray(a["tags"]) ? a["tags"].filter((t): t is string => typeof t === "string") : []);
@@ -948,7 +951,7 @@ function readOrganization(a: Record<string, unknown>, label: string, problems: s
   } catch (e) {
     problems.push(`The fields of “${label}” were invalid (${(e as Error).message}) and were not imported.`);
   }
-  return { tags, favorite: a["favorite"] === true, hidden: a["hidden"] === true, folders, note, fields, thumb: typeof a["thumb"] === "string" && HASH_RE.test(a["thumb"]) ? a["thumb"] : null };
+  return { tags, favorite: a["favorite"] === true, hidden: a["hidden"] === true, folders, note, fields, thumb: typeof a["thumb"] === "string" && HASH_RE.test(a["thumb"]) ? a["thumb"] : null, viewer: typeof a["viewer"] === "string" ? a["viewer"] : "" };
 }
 
 /** Originals are written at most this many bytes per transaction, before the canvases (ADR 0176). */
@@ -1135,6 +1138,7 @@ async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: st
         entry = { ...entry, tags: normalizeTags([...m.tags, ...org.tags]), favorite: m.favorite || org.favorite, hidden: m.hidden || org.hidden, folderIds: ids };
         if (m.note || org.note) entry.note = m.note || org.note;
         if (!m.thumb && org.thumb) entry.thumb = org.thumb; // (a custom thumbnail here is kept)
+        if (!entry.viewer && org.viewer) entry.viewer = org.viewer;
         if (fields.length) entry.fields = fields;
       }
       if (entry !== e) (snap ? libOps.push({ t: "entry", hash: entry.hash, v: entry }) : tx.objectStore("assetCatalog").put(entry));

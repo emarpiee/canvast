@@ -65,6 +65,7 @@ Everything you need to install canvast, use it and keep your work safe.
 | **Pictures and media** | Pixel-exact pictures, non-destructive adjustments and shadows, crop, flip and masks; video, audio and GIFs play on the canvas. [Pictures, video, audio and other files](#pictures-video-audio-and-other-files) |
 | **Organizing** | Layers, groups, sheets that clip, masks, snapping, align and arrange, tags, Reveal for things under others. [Organizing](#organizing) |
 | **Notes** | A notes editor for markdown, text and rich text notes, in the library and beside the canvas: Obsidian-style `[[links]]`, properties and `#tags` that can be searched, sorted and shown as columns, templates, layouts, cards on a canvas that lay out their page at the size you give them. [Notes](#notes) |
+| **PDFs and 3D models** | Page pictures and a reader with bookmarks; a 3D view with lights, for reference; a card on a canvas shows the page or view you choose. [PDFs and 3D models](#pdfs-and-3d-models) |
 | **Library** | Every imported file once, with folders, tags, favourites, descriptions and properties, similar-image search, a viewer and safe deletion. [The Library](#the-library) |
 | **Privacy** | Hidden items and passwords; in the desktop app hidden files are encrypted, and can be decrypted outside the app. [Privacy and security](#privacy-and-security) |
 | **Export** | PNG, WebP, JPEG, SVG and PDF from sheets and selections; `.canvast` backups of everything. [Exporting](#exporting), [Backups](#backups) |
@@ -437,7 +438,7 @@ Files are placed as they are and never altered: every edit here can be undone or
 - **Make a new picture** bakes the crop, flip and adjustments into a new library item; **Copy as picture** puts the result on the clipboard. **Copy** and **Paste adjustments** move a whole stack between items. **Make vector copy** turns an SVG picture into editable shapes in its place, at its size, turn and layer (one undo step; the file stays in the library). **Show in library** opens the Library with the file selected.
 - **Media player:** videos, audio and animated GIFs play on the canvas with a player right under the item. It has play and pause, a seek bar, step back and forward (seconds for video and audio, frames for GIFs), repeat, playback speed, volume, a waveform for audio, and a start and end to play only part of a file. The paused frame is saved. Playback continues when the item scrolls out of view.
 - **Extract frame** turns the current frame of a video or GIF into a picture in the library (PNG, WebP or JPEG). Settings name it, file it in a folder and tag it, optionally placing it on the canvas.
-- **File details:** type, size, pixels, time of import, place on disk and hash, with EXIF, colour profile and codec information when the file has them. STL and OBJ 3D models and PDFs are kept as cards with a preview; any other file is kept as a card with its extension and can be downloaded again.
+- **File details:** type, size, pixels, time of import, place on disk and hash, with EXIF, colour profile and codec information when the file has them. PDFs and 3D models show as their pictures and open in a [view of their own](#pdfs-and-3d-models); any other file is kept as a card with its extension and can be downloaded again.
 - **Import** by button (in the Library the Import button has a menu for files or for a whole folder), drag and drop, paste, or a whole folder. In the Library, new files go into the folder, tag or favourites open in the sidebar. Files up to 256 MiB are accepted and decoded before being stored; in the desktop app a bigger file is copied into `library/` a part at a time and comes in as a card. A file the library already has is not stored again; imported into the Library under another name, the app lists the old and new names and offers to rename (in hidden mode, for hidden items only). Importing your originals again this way brings back names that were cut short; Undo puts the old names back.
 
 ### Organizing
@@ -617,6 +618,26 @@ Double-click a card to see it large, with a filmstrip, zoom, pan and a slideshow
 
 - **A font in the viewer** shows its sample on the same background as a see-through picture, by the same button; another button changes the sample sentence, and a box under the samples takes your own words. All three are kept, and its preview in the details and its card on a canvas show the same. The backgrounds are chequered, grey, black, white and the theme's own colour.
 - A **viewer** with filmstrip, zoom, pan, slideshow and a details panel. The details show where an item is used (*Used on 3 canvases (4 times)*, then each canvas with its own count; past five canvases, **Show all** lists the rest), and the locate button beside one takes you to it on the canvas at any depth. A button switches the background behind the picture, another shows it in greyscale for now (it goes with the next item or on closing, and the file stays as it is), the controls can be hidden, and a double tap opens it on phones. The button beside the details button (or `F`) hides and shows the controls; with them hidden, the picture gets their room. A video or GIF plays with the canvas's player, floating over the bottom of the picture: while the pointer rests, playing or paused, the player fades away (after *Hide the player* in Settings > Library, 1.5 s by default), also with the pointer resting on it; only a move of the mouse, a click or a touch brings it back, never a key. While the focus is in the player (click any part of it, its empty space too; also once it has faded), `Left` and `Right` step the file and `Space` plays or pauses it; elsewhere in the viewer the arrows go to the previous and next file. A GIF whose frames were never counted (imported long ago, or taken from a workspace folder) gets the player too.
+
+### PDFs and 3D models
+
+A PDF or a 3D model shows as its picture in the library and opens in a view of its own: in the viewer, and in the [panel on a canvas](#notes-on-a-canvas) with a double-click on its card.
+
+| | PDF | 3D model (GLB, glTF, STL, OBJ, PLY) |
+| --- | --- | --- |
+| In the library and details | Its first page | Its first view |
+| Moving around | Page buttons, a page number, Page Up and Down, Home, End; zoom | Drag to turn, Shift or right drag to slide, wheel to zoom, double-click for the first view |
+| Remembered | The page it was left at | The view it was left at, with its lights |
+| Bookmarks | Pages, and the contents the PDF carries | Views |
+| On a card on a canvas | Its page's shape; **Show this page on the card** | **Show this view on the card** |
+
+Bookmarks are in the view's bar and in the details. What a card shows belongs to that card, so copies can show different pages or views; it is one step of undo, and nothing new is stored.
+
+#### More about 3D views
+
+- **Settings:** camera (around, height, zoom, lens and focal length), surface (its own, clay, one colour, wireframe), which way is up, shadows, background (a colour or none, so a card can be see-through), and three lights (sun, point, spot or off, each with a colour, strength and direction), with light all around.
+- **Lighting** in the bar sets the lights to a classic setup: Rembrandt, loop, butterfly, split, rim, three-point, even.
+- **Lights stand still** round the model while the camera turns, as lamps in a room.
 
 ### Art files
 
@@ -799,7 +820,7 @@ Double-click a note's card and it opens in the **Note** panel, with the canvas s
 
 | Feature | How |
 | --- | --- |
-| **Where it opens** | *Note editor on a canvas*: Panel or Window |
+| **Where it opens** | *Files on a canvas*: Panel or Window |
 | **Card size** | A side handle lays the page out again; `Shift` on a corner zooms it |
 | **Whole note or part** | *Note cards show*, in Settings > Notes |
 | **Labels** | *Note cards show properties* lists which values show on cards |
@@ -807,7 +828,7 @@ Double-click a note's card and it opens in the **Note** panel, with the canvas s
 
 #### More about notes on a canvas
 
-- **On a canvas:** double-click a note's card (or **Edit note** in its Actions bar) and the note opens in the **Note** panel: the same editor and saving as in the library, in the style of *Editor style on a canvas* (Settings > Notes). *Note editor on a canvas* chooses where: **Panel** (the default) or **Window**, centred over the canvas until it is closed (a click beside it closes it, asking about unsaved changes). The panel is a panel like Layers (it never folds): it floats, docks to a side (keeping its own width), its width and height can be dragged, and the canvas stays usable beside it. ✕ closes it (asking about unsaved changes); the card shows the saved version at once. Saving is no step of the canvas's undo: undo and redo on the canvas keep the saved version (they never bring an older one back). The rename button in its header (or F2) renames the note with the library's rename dialog; the extension stays as it is, and `.note.html` counts as one extension there and in batch rename. A hidden note opens there only while the hidden items show, and closes (its changes saved) as soon as they no longer do: hidden mode ended, the hidden items locked.
+- **On a canvas:** double-click a note's card (or **Edit note** in its Actions bar) and the note opens in the **File** panel: the same editor and saving as in the library, in the style of *Editor style on a canvas* (Settings > Notes). *Note editor on a canvas* chooses where: **Panel** (the default) or **Window**, centred over the canvas until it is closed (a click beside it closes it, asking about unsaved changes). The panel is a panel like Layers (it never folds): it floats, docks to a side (keeping its own width), its width and height can be dragged, and the canvas stays usable beside it. ✕ closes it (asking about unsaved changes); the card shows the saved version at once. Saving is no step of the canvas's undo: undo and redo on the canvas keep the saved version (they never bring an older one back). The rename button in its header (or F2) renames the note with the library's rename dialog; the extension stays as it is, and `.note.html` counts as one extension there and in batch rename. A hidden note opens there only while the hidden items show, and closes (its changes saved) as soon as they no longer do: hidden mode ended, the hidden items locked.
 - **Previews:** a note's library card and details show the top of its page (headings, lists, tables, colours); its card on a canvas is its page, laid out at the card's own size and drawn at twice that so it stays sharp when zoomed in. A side handle lays the page out at the new width or height, the words keeping their size; dragging a corner evenly (`Shift`) zooms the whole card. **Note cards show** (Settings > Notes) applies to every card at once: *Whole note* (the default), the height follows the note, also when it is saved longer; *Part*, you set the height and what does not fit fades out into the page's paper. A new version keeps the card's width. **Reset size** in a card's Actions bar puts it back to its Note tool card size. The pictures it links to show in it (also Obsidian's `![[picture]]`), a video by its picture with ▶, a sound by its waveform with ♪, a GIF by its first frame; never a hidden item's. Its text is in the system's font in the preview only. The paper is light or dark as **Preview look** says (Settings > Notes: Auto, the default, follows the app's theme; a change redraws every preview at once, so a note's previews are made when shown, never stored). Shown small on a canvas, a note's card is drawn from a copy at that size.
 - **Labels on cards:** **Note cards show properties** (Settings > Notes) takes names separated by commas (`status, type, tags`): their values show as small labels at the top of each note's card and library picture, at once. They say what the details panel says, written into the file or not, and change as soon as a property does.
 
@@ -1177,7 +1198,7 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 
 To report a security problem, see [SECURITY.md](SECURITY.md).
 
-- The page's Content Security Policy is `default-src 'none'` with `connect-src 'none'`: it cannot make network requests, even if code tried. Only inline script and style are allowed, images come from `blob:` and `data:`, and workers (if any) from `blob:`.
+- The page's Content Security Policy is `default-src 'none'` with `connect-src 'none'`: it cannot make network requests, even if code tried. Only inline script and style are allowed, images come from `blob:` and `data:`, and workers (if any) from `blob:`. WebAssembly may compile (`'wasm-unsafe-eval'`), only for the decoders of scanned PDFs that are inside the file; it runs no text as code.
 - canvast has no runtime dependencies and makes no network requests (the [online copy](#trying-it-online) is fetched once, as the page itself, and then makes none either). The interface font is supplied from memory, so no font source is allowed either. `npm run check:offline` and the end-to-end suite both verify this on every build. The desktop app is the same page in Electron: it opens no connection either (its updates are fetched by an AppImage updater, not by the app).
 - In a browser, imports are limited to files of at most 256 MiB, and each is decoded before being stored; a backup's item past that is skipped, and said. Files that fail to decode are rejected with a message.
 - In the desktop app, a bigger file comes in as a card (its name, kind and size, and the picture an art file keeps), by import or put into `library/`: it opens in the system's app for its kind and does not play in the app. It is read and written a part at a time, so it needs no memory of its size but room on the disk: hiding it, showing it again or bringing it back from a backup keeps a second copy until the new one is proven by its SHA-256. A backup or a ZIP with one in it is written where you choose in a save dialog, after being read through once to check it, so it takes as long as reading it three times. A hidden item's card shows no picture while the Hidden items are locked. `scripts/hidden-items.mjs` opens hidden files of any size; to encrypt with it, a file must be under 2 GiB.
@@ -1301,8 +1322,8 @@ What canvast does not do today, for both versions, then each. **The limits that 
 
 | Area | Limitation |
 | --- | --- |
-| PDF | Kept as a card with its page count; pages are not drawn |
-| 3D | STL and OBJ only, as a preview card |
+| PDF | Password-protected PDFs stay cards; forms and notes in a PDF are not shown or filled, links in it are not followed, no search inside; a font a PDF does not carry comes from the system, and East Asian text that needs one may not show |
+| 3D | GLB, glTF, STL, OBJ and PLY only, one file each: what lies in another file (an OBJ's materials, a glTF's textures), compressed glTF and animation are not read; a model over 256 MB stays a card |
 | Text | No Indic shaping; other computers can wrap missing characters differently |
 | Vector networks | One fill for the whole network |
 | ⚠️ Notes | No autosave and no version history: a saved note replaces the file |
@@ -1323,8 +1344,8 @@ What canvast does not do today, for both versions, then each. **The limits that 
 
 | Area | Limitation |
 | --- | --- |
-| PDF | A PDF is kept as a card with its page count; its pages are not rendered as pictures |
-| 3D | Only STL and OBJ are read, and only as a preview card |
+| PDF | A PDF with a password stays a card. Forms and notes in a PDF are not shown or filled, its links are not followed, and it has no search inside. A font a PDF does not carry comes from the system, and East Asian text that needs one may not show |
+| 3D | Only GLB, glTF, STL, OBJ and PLY are read, one file each: an OBJ's materials, a glTF's textures in other files, compressed glTF and animation are not. A model over 256 MB stays a card. Without 3D graphics in the browser or machine a model stays a card |
 | Text | Complex scripts that need Indic shaping are not supported; OpenType positioning goes no further than kerning. Characters missing from the interface font fall back to a system font: their width then comes from the browser, so such text can wrap differently on another computer and pixelates at extreme depth |
 | Vector networks | One fill for the whole network (no fill per region) |
 | Note zoom | Only a note's text grows; pictures keep their size |
@@ -1735,6 +1756,8 @@ The colour picker in `src/colour-picker/` is also published on its own and keeps
 | Lucide icons, in the built file | ISC |
 | Inter font, in the built file | SIL Open Font License 1.1 |
 | SunEditor (the notes editor), in the built file | MIT |
+| pdf.js (draws PDFs), in the built file | Apache-2.0 |
+| three.js (draws 3D models), in the built file | MIT |
 | Electron and Chromium, in the desktop packages | MIT and Chromium's licences (inside the packaged app) |
 | Space Grotesk, two library files in `showcase.canvast` | SIL Open Font License 1.1, copyright 2020 The Space Grotesk Project Authors ([OFL.txt](scripts/showcase/fonts/OFL.txt)) |
 

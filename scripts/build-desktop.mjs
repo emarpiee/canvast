@@ -38,7 +38,7 @@ const nativeAddon = {
     });
   },
 };
-const common = { bundle: true, platform: "node", format: "cjs", target: "node22", external: ["electron"], alias: { "better-sqlite3": sqlite }, plugins: [nativeAddon], logLevel: "warning" };
+const common = { bundle: true, platform: "node", format: "cjs", target: "node22", external: ["electron", "pdfjs-dist", "pdfjs-dist/*", "three", "three/*"] /* (what the page draws with: never run here) */, alias: { "better-sqlite3": sqlite }, plugins: [nativeAddon], logLevel: "warning" };
 await build({ ...common, entryPoints: [resolve(root, "desktop/main.ts")], outfile: resolve(out, "main.cjs") });
 await build({ ...common, entryPoints: [resolve(root, "desktop/preload.ts")], outfile: resolve(out, "preload.cjs") });
 await copyFile(html, resolve(out, "canvast.html"));

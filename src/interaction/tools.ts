@@ -314,7 +314,7 @@ export interface ToolHooks {
   /** Open the text editor on `target`, or on a new text object at `at` (a click: as wide as its words; a box dragged out: `box.widthPx` wide, `at` its top-left corner). */
   editText(target: TextObject | null, at: WorldPoint, box?: { widthPx: number }): void;
   /** A double-click on a picture or file card (a note's card opens the note to edit). */
-  openItem?(assetId: string): void;
+  openItem?(assetId: string, objectId: string): void;
   /** The Note tool: a new note file placed here (`at` on the screen, the card `widthPx` wide when a box was dragged), opened to write in. */
   newNote?(at: ScreenPoint, widthPx?: number): void;
   /** The tool a plain key picks (rebindable in Settings, ADR 0049). */
@@ -2517,7 +2517,7 @@ export function attachTools(
       editor.setTool("node");
       return;
     }
-    if (hit?.kind === "image") hooks.openItem?.(hit.assetId);
+    if (hit?.kind === "image") hooks.openItem?.(hit.assetId, hit.id);
     const t = textAt(s);
     if (t) hooks.editText(t, world(s));
   };

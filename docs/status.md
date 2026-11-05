@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.35: PDFs and 3D models open in views of their own (2026-11-05)
+
+- **Implemented:** `src/ui/file-views.ts`, `file-panel.ts`, `view-state.ts`, `pdf-view.ts`, `model-view.ts`, `setting-rows.ts`; `src/assets/pdf-engine.ts`, `model-engine.ts`, `model-look.ts`; `PICTURE_KINDS`; `ImageObject.preview`; `CatalogEntry.viewer`.
+- **Tested:** `tests/e2e/file-views.spec.ts` in Chromium and Firefox on GitHub; 3D is skipped where the browser has no 3D graphics (Firefox on GitHub); `npm run typecheck`, checks and unit tests locally.
+- **Known failures:** none known until the `Tests` run reports.
+- **Unverified:** on screen by hand; scanned PDFs (JPEG 2000, JBIG2); large PDFs and models; a hidden PDF or model in the desktop app.
+- **Committed:** v0.54.35.
+- **Next bounded task:** read the `Tests` run.
+
 ## v0.54.34: two signs make bold again in Firefox (2026-11-05)
 
 - **Implemented:** the words of a selection in a note are read from its range, which does not depend on the blocks being laid out.

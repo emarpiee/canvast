@@ -166,6 +166,8 @@ export interface ImageObject extends ObjectBase {
    * shape lays the page out again instead of stretching it. Absent: any other picture.
    */
   readonly page?: true;
+  /** What this object's card shows of its file, as that kind of file reads it (a PDF's page number); absent = its first look. Its picture is drawn from the file, nothing is stored. `pixelW` × `pixelH` are that picture's. */
+  readonly preview?: string;
   /** Mirrored left to right (`flipX`) or top to bottom (`flipY`) inside its box, about the box's centre; absent = not. */
   readonly flipX?: true;
   readonly flipY?: true;
@@ -203,6 +205,7 @@ export const NOTE_PAGE_PIXEL_W = 1200;
 
 export function rasterKey(o: ImageObject): string {
   if (o.page) return `${o.assetId}#p${o.pixelW}x${o.pixelH}`; // (a note's card, drawn at its own size)
+  if (o.preview) return `${o.assetId}#p${o.pixelW}x${o.pixelH}#v${encodeURIComponent(o.preview)}`; // (a card showing another page or view of its file)
   if (!o.media || o.media.t <= 0) return o.assetId;
   return o.media.kind === "video" ? `${o.assetId}#${Math.round(o.media.t * 1000)}` : o.media.kind === "gif" ? `${o.assetId}#${o.media.t}` : o.assetId;
 }
@@ -577,6 +580,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (o.crop !== undefined && !(Number.isInteger(o.crop.x) && Number.isInteger(o.crop.y) && Number.isInteger(o.crop.w) && Number.isInteger(o.crop.h) && o.crop.x >= 0 && o.crop.y >= 0 && o.crop.w >= 1 && o.crop.h >= 1 && o.crop.x + o.crop.w <= o.pixelW && o.crop.y + o.crop.h <= o.pixelH)) throw new InvalidObjectError("bad crop");
     if ((o.flipX !== undefined && o.flipX !== true) || (o.flipY !== undefined && o.flipY !== true)) throw new InvalidObjectError("bad flip");
     if (o.page !== undefined && o.page !== true) throw new InvalidObjectError("bad page");
+    if (o.preview !== undefined && (typeof o.preview !== "string" || o.preview.length === 0 || o.preview.length > 2000)) throw new InvalidObjectError("bad preview");
     if (o.radius !== undefined) {
       const rs = typeof o.radius === "number" ? [o.radius] : o.radius;
       if (!Array.isArray(rs) || (typeof o.radius !== "number" && rs.length !== 4) || !rs.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0)) throw new InvalidObjectError("bad radius");

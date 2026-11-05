@@ -56,6 +56,8 @@ export interface CatalogEntry {
   fields?: AssetField[];
   /** A custom thumbnail: the SHA-256 of a library item or of an uploaded custom thumbnail (`CustomThumbStore`) shown instead of its own. */
   thumb?: string | null;
+  /** What its viewer keeps for it, as its kind of file reads it (ui/view-state.ts): the page it was left at, bookmarks. Absent when there is nothing. */
+  viewer?: string;
 }
 
 /** A user-named field of an asset: any key, any value, both plain text. */
@@ -295,6 +297,8 @@ export interface MetaChange {
   clearFolder?: boolean;
   /** A custom thumbnail's SHA-256 (see `CatalogEntry.thumb`); null: its own again. */
   thumb?: string | null;
+  /** See `CatalogEntry.viewer`; "": nothing. */
+  viewer?: string;
 }
 
 /** The two passwords: of the Hidden items, and of the whole workspace (asked when the app opens). */
@@ -510,6 +514,7 @@ export class AssetCatalog implements CatalogStore {
         const next: CatalogEntry = { ...e, ...m };
         if (change.favorite !== undefined) next.favorite = change.favorite;
         if (change.thumb !== undefined) next.thumb = change.thumb;
+        if (change.viewer !== undefined) (change.viewer ? (next.viewer = change.viewer) : delete next.viewer);
         if (change.hidden !== undefined) next.hidden = change.hidden;
         // Shown again from a hidden folder: that folder and the ones above it are shown again too (their other items stay hidden).
         if (change.hidden === false && m.folderIds.length) {

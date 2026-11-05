@@ -7,7 +7,7 @@ export const GROUPS = {
   drawing: ["editing", "vectors", "text", "sheets", "styles", "pattern"],
   rendering: ["tiles", "density", "lowmem"],
   pictures: ["pictures", "files", "screenshot"],
-  library: ["assets", "organize", "components", "library-folder", "notes"],
+  library: ["assets", "organize", "components", "library-folder", "notes", "file-views"],
   storage: ["storage", "archive", "upgrade"],
   desktop: ["desktop"],
   interface: ["settings", "dock", "a11y", "contrast", "icon-audit", "scrub-audit"],
@@ -48,7 +48,7 @@ export const RULES = [
   [/^src\/storage\//, ["storage", "library", "desktop"]],
   [/^src\/assets\/(asset-catalog|asset-library|hidden-lock|sha256)\.ts$/, ["library", "storage", "pictures", "desktop"]],
   [/^src\/assets\//, ["library", "pictures"]],
-  [/^src\/(ui\/(assets-view|library-[a-z-]+|batch-rename|hidden-access|note-editor)\.ts|notes\/.+\.ts)$/, ["library"]],
+  [/^src\/(ui\/(assets-view|library-[a-z-]+|batch-rename|hidden-access|note-editor|file-views|file-panel|pdf-view|model-view|view-state|setting-rows)\.ts|notes\/.+\.ts)$/, ["library"]],
   [/^src\/ui\/(archive-ui|library-folder-card|reset-dialog)\.ts$/, ["storage", "library"]],
   [/^src\/app\/(library-filing|asset-names)\.ts$/, ["library"]],
   // pictures, files and export

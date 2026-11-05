@@ -256,6 +256,8 @@ import rainbowSvg from "lucide-static/icons/rainbow.svg";
 import wandSparklesSvg from "lucide-static/icons/wand-sparkles.svg";
 import swatchBookSvg from "lucide-static/icons/swatch-book.svg";
 import bookmark from "lucide-static/icons/bookmark.svg";
+import bookOpen from "lucide-static/icons/book-open.svg";
+import lightbulb from "lucide-static/icons/lightbulb.svg";
 import chevronDown from "lucide-static/icons/chevron-down.svg";
 import chevronRight from "lucide-static/icons/chevron-right.svg";
 import chevronLeft from "lucide-static/icons/chevron-left.svg";
@@ -551,6 +553,8 @@ export const ICONS = {
   alignMenu: clean(alignMenuSvg),
   paintBucket: clean(paintBucketSvg),
   bookmark: clean(bookmark),
+  bookOpen: clean(bookOpen),
+  lightbulb: clean(lightbulb),
   bookmarkPlus: clean(bookmarkPlus),
   bookmarkCheck: clean(bookmarkCheck),
   chevronDown: clean(chevronDown),

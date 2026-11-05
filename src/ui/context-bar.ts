@@ -40,8 +40,8 @@ export interface ContextActions {
   /** What the selection can be reset from. */
   resettable(): { turned: boolean; stretched: boolean; bakeable: boolean };
   /** The one selected item is a file the app cannot show (kept as a card): its asset, and whether a tab can open it (ADR 0078). */
-  fileSelection(): { hash: string; open: boolean; note: boolean } | null;
-  /** The note selected on the canvas, opened in the note panel. */
+  fileSelection(): { hash: string; open: boolean; note: boolean; view: boolean } | null;
+  /** The file selected on the canvas (a note, a PDF...), opened in the file panel. */
   editNote(): void;
   /** Texts on a card are selected (made by the Note tool before notes were files). */
   canMakeNoteFiles(): boolean;
@@ -173,6 +173,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     group("Files",
       btn("exportmenu", ICONS.exportMenu, "Export and copy out: save as a picture or SVG, download the file, copy the Markdown of a text", 'aria-haspopup="menu" aria-expanded="false"'),
       btn("editnote", ICONS.filePenLine, "Edit note (or double-click it)"),
+      btn("viewfile", ICONS.bookOpen, "Open it here (or double-click it)"),
       btn("makenote", ICONS.fileInput, "Make note files: the texts on a card become notes in the library, edited in the note panel"),
       btn("open", ICONS.externalLink, desktopBridge() ? "Open in default app" : "Open in a new tab"),
       btn("copyadj", ICONS.clipboardList, "Copy the adjustments of the picture"),
@@ -345,7 +346,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "tag": actions.tag(); break;
       case "library": actions.showInLibrary(); break;
       case "open": actions.openFile(); break;
-      case "editnote": actions.editNote(); break;
+      case "editnote": case "viewfile": actions.editNote(); break;
       case "makenote": actions.makeNoteFiles(); break;
       case "attach": actions.attach(); break;
       case "detach": actions.detach(); break;
@@ -439,6 +440,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     const file = actions.fileSelection();
     q("open").hidden = !file?.open;
     q("editnote").hidden = !file?.note;
+    q("viewfile").hidden = !file?.view || file.note;
     q("makenote").hidden = !actions.canMakeNoteFiles();
     q("attach").hidden = false;
     q("attach").setAttribute("aria-pressed", String(editor.attachMode));

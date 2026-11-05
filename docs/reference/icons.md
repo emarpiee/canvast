@@ -294,3 +294,5 @@ One icon per function: two buttons that do different things never share an icon,
 | `wrap-text` | Show in a row (the tree chooser, the sidebar's tags) |
 | `folder-open` | A folder whose subfolders are showing (library folder tree, tree chooser) |
 | `folder-tree` | Organize: move to a folder and add tags, from one list (library) |
+| `book-open` | Open a file in the panel on a canvas (a PDF, the Actions bar) |
+| `lightbulb` | Lighting of a 3D model: its classic setups |

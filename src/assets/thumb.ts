@@ -8,7 +8,8 @@ import { fillTextCentred, makeCard } from "./card";
 import { externalFolder } from "../storage/external-folder";
 import { artCardPicture, isArtFile } from "./art-preview";
 import { makeFileCard } from "./card";
-import { chipOf, isCard, isFontFile } from "./file-kind";
+import { makeFileCardFrom } from "./adapters";
+import { chipOf, describeFile, isCard, isFontFile, isModelFile, isPdfFile } from "./file-kind";
 
 /** Longest edge of a stored thumbnail (CSS px: cards show them at up to 240). */
 export const THUMB_PX = 256;
@@ -25,6 +26,7 @@ export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
   if (isFontFile(rec)) return makeFontThumb(rec);
   if (noteKindOf(rec.name) && !tooBigForNote(rec.name, rec.blob.size)) return makeNoteThumb(rec);
   if (isArtFile(rec.name)) return makeArtThumb(rec);
+  if (isPdfFile(rec) || isModelFile(rec.name)) return makePictureThumb(rec);
   if (isCard(rec)) return null;
   try {
     const k = Math.min(1, THUMB_PX / Math.max(rec.pixelW, rec.pixelH));
@@ -123,13 +125,29 @@ async function makeFontThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
   }
 }
 
+/** A canvas as a thumbnail, in the one format thumbnails are kept in. */
+async function encodeThumb(hash: string, c: HTMLCanvasElement): Promise<ThumbRecord | null> {
+  let blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", THUMB_QUALITY));
+  if (blob?.type !== "image/webp") blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", THUMB_QUALITY));
+  return blob ? { hash, blob, w: c.width, h: c.height } : null;
+}
+
+/** The thumbnail of a file whose card is drawn from its bytes (assets/adapters.ts): that picture, smaller. */
+async function makePictureThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
+  const bmp = await makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, new Uint8Array(await rec.blob.arrayBuffer()), { edge: THUMB_PX });
+  const c = document.createElement("canvas");
+  c.width = bmp.width;
+  c.height = bmp.height;
+  c.getContext("2d")!.drawImage(bmp, 0, 0);
+  bmp.close();
+  return encodeThumb(rec.hash, c);
+}
+
 /** A note's thumbnail: the top of its page (as on its card on a canvas, 4:3). Null when it cannot be drawn. */
 async function makeNoteThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
   try {
     const c = await notePicture(rec.name, await rec.blob.text(), THUMB_PX, Math.round((THUMB_PX * 3) / 4), rec.hash);
-    let blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", THUMB_QUALITY));
-    if (blob?.type !== "image/webp") blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", THUMB_QUALITY));
-    return blob ? { hash: rec.hash, blob, w: c.width, h: c.height } : null;
+    return await encodeThumb(rec.hash, c);
   } catch {
     return null;
   }

@@ -24,8 +24,19 @@ const result = await build({
   write: false,
   define: {
     __CANVAST_VERSION__: JSON.stringify(pkg.version),
+    "import.meta.url": '""', // (only in pdf.js' branch for Node)
   },
-  loader: { ".svg": "text", ".ttf": "binary", ".md": "text" },
+  loader: { ".svg": "text", ".ttf": "binary", ".md": "text", ".wasm": "binary" },
+  // pdf.js' worker, as the text of a plain script: a page opened from a file cannot start a module worker in every browser.
+  plugins: [{
+    name: "pdf-worker",
+    setup(b) {
+      b.onLoad({ filter: /pdf\.worker\.min\.mjs$/ }, async (args) => {
+        const r = await build({ entryPoints: [args.path], bundle: true, format: "iife", target: ["es2020"], minify: true, write: false, legalComments: "none", define: { "import.meta.url": '""' }, logLevel: "error" });
+        return { contents: r.outputFiles[0].text, loader: "text" };
+      });
+    },
+  }],
   logLevel: "warning",
 });
 
@@ -46,11 +57,15 @@ const licence = async (path) => (await readFile(resolve(root, "node_modules", pa
 const lucide = await pkgOf("lucide-static");
 const inter = await pkgOf("@expo-google-fonts/inter");
 const sun = await pkgOf("suneditor");
+const pdfjs = await pkgOf("pdfjs-dist");
+const threejs = await pkgOf("three");
 const own = (await readFile(resolve(root, "LICENSE"), "utf8")).replace(/--/g, "- -").trim(); // (canvast's own licence, the GNU GPL v3, travels in the file too)
 const notices =
   `<!--\ncanvast, copyright (C) 2026 emarpiee. Free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. Source: https://github.com/emarpiee/canvast\n\n${own}\n-->\n<!--\nThird-party notices\n\nLucide icons (lucide-static ${lucide.version})\n${await licence("lucide-static/LICENSE")}\n\n` +
   `Inter Regular font (@expo-google-fonts/inter ${inter.version}, Inter_400Regular.ttf, unmodified)\n${await licence("@expo-google-fonts/inter/LICENSE_FONT")}\n\n` +
-  `SunEditor (suneditor ${sun.version}, the notes editor)\n${await licence("suneditor/LICENSE.txt")}\n-->\n`;
+  `SunEditor (suneditor ${sun.version}, the notes editor)\n${await licence("suneditor/LICENSE.txt")}\n\n` +
+  `pdf.js (pdfjs-dist ${pdfjs.version}, draws PDFs), Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0\n\n` +
+  `three.js (three ${threejs.version}, draws 3D models)\n${await licence("three/LICENSE")}\n-->\n`;
 const html = template
   .replaceAll("__CANVAST_VERSION__", pkg.version)
   .replace("/*__CANVAST_STYLES__*/", () => styles)

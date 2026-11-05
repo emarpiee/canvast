@@ -1541,7 +1541,7 @@ body *:has(.has-full-note) { z-index: var(--z-pop); }
 .note-link-peek img { display: block; max-width: calc(var(--action-w) * 1.4); max-height: calc(var(--action-w) * 1.2); border-radius: var(--r-sm); }
 /* The note panel on a canvas: a panel of the dock with the notes editor (the same as in the library's viewer); its height can be dragged. */
 .note-dock { height: min(78dvh, 56rem); min-height: 20rem; resize: vertical; overflow: hidden; background: var(--paper); backdrop-filter: none; } /* (a page: opaque, so nothing behind it is blurred again on every frame of the canvas) */
-/* The Note window (Settings > Notes > Note editor on a canvas: Window): the same panel, centred over a scrim. */
+/* The Note window (Settings > Notes > Files on a canvas: Window): the same panel, centred over a scrim. */
 .note-window { position: fixed; inset: 0; z-index: var(--z-edge); display: grid; place-items: center; background: var(--hud-scrim); }
 .note-window:has(> .note-dock[hidden]) { display: none; }
 .note-window > .note-dock { width: min(60rem, calc(100vw - var(--sp-8))); max-height: calc(100dvh - var(--sp-8)); box-shadow: var(--hud-lift); }
@@ -3176,3 +3176,24 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .choice-chip { display: inline-flex; align-items: center; gap: var(--s-2); max-width: 100%; padding: var(--s-1) var(--s-4); background: var(--hud-hover); border-radius: var(--r-pill); }
 .choice-empty { color: var(--hud-muted); }
 .choice-make { margin-top: var(--s-4); }
+
+/* A file in a view of its own (ui/file-views.ts), in the library's viewer and in the panel on a canvas alike. */
+:is(.pdf-view, .model-view) { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--hud-bg); color: var(--hud-fg); }
+.view-bar { flex: none; display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-4); min-height: var(--bar-h); border-bottom: 1px solid var(--hud-border); }
+.view-gap { width: var(--s-8); }
+.pdf-at { width: calc(var(--ctl) * 2); height: var(--field-h); }
+.pdf-count { color: var(--hud-muted); font-size: var(--text-sm); white-space: nowrap; }
+.pdf-pages { flex: 1; min-height: 0; overflow: auto; padding: var(--s-8); display: flex; flex-direction: column; align-items: center; gap: var(--s-8); position: relative; }
+.pdf-pages:focus { outline: none; }
+.pdf-page { flex: none; position: relative; background: var(--paper); box-shadow: var(--hud-lift); overflow: clip; }
+.pdf-page canvas { display: block; width: 100%; height: 100%; }
+.textLayer { position: absolute; inset: 0; overflow: clip; line-height: 1; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; caret-color: CanvasText; z-index: 0; }
+.textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0 0; }
+.textLayer ::selection { background: var(--hud-hover); color: transparent; }
+.textLayer br::selection { background: transparent; }
+.model-main { flex: 1; min-height: 0; display: flex; }
+.model-stage { flex: 1; min-width: 0; position: relative; cursor: grab; touch-action: none; }
+.model-stage:active { cursor: grabbing; }
+.model-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.model-side { flex: none; width: calc(var(--ctl) * 12); overflow-y: auto; border-left: 1px solid var(--hud-border); }
+.model-side[hidden] { display: none; }

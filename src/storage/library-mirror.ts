@@ -75,6 +75,7 @@ export interface LibraryItem {
   note: string;
   fields: AssetField[];
   thumb?: string;
+  viewer?: string;
   state: "active" | "deleted";
 }
 
@@ -157,6 +158,7 @@ export function itemOf(e: CatalogEntry, rec: AssetRecord | undefined): LibraryIt
     note: m.note,
     fields: m.fields,
     ...(m.thumb ? { thumb: m.thumb } : {}),
+    ...(e.viewer ? { viewer: e.viewer } : {}),
     state: e.state,
   };
 }
@@ -190,6 +192,7 @@ export function readItem(a: unknown): LibraryItem | null {
       note: normalizeNote(typeof r.note === "string" ? r.note : ""),
       fields: normalizeFields(fields),
       ...(typeof r.thumb === "string" && HASH_RE.test(r.thumb) ? { thumb: r.thumb } : {}),
+      ...(typeof r.viewer === "string" && r.viewer ? { viewer: r.viewer } : {}),
       state: r.state === "deleted" ? "deleted" : "active",
     };
   } catch {
@@ -230,6 +233,7 @@ export function entryOf(it: LibraryItem, prev: CatalogEntry | undefined): Catalo
     ...(it.note ? { note: it.note } : {}),
     ...(it.fields.length ? { fields: it.fields } : {}),
     ...(it.thumb ? { thumb: it.thumb } : {}),
+    ...(it.viewer ? { viewer: it.viewer } : {}),
   };
 }
 

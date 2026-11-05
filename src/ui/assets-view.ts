@@ -57,9 +57,11 @@ import { esc, fmtBytes } from "./format";
 import { confirmDialog } from "./confirm";
 import { runExport, runExportFiles, runExportFolder } from "./archive-ui";
 import { openLibraryPicker } from "./library-picker";
-import { OpenNote } from "./note-session";
-import type { NoteDeps, NotePlace } from "./note-session";
-import { RICH_NOTE_SUFFIX, WIKI, linkTarget, noteKindOf, opensAsNote, tooBigForNote, richNameOf, richNoteBody, wikiTarget, newNoteFile } from "../notes/note-file";
+import { viewKindNamed, viewKindOf } from "./file-views";
+import { keepViewState, viewStateOf } from "./view-state";
+import type { FileViewKind, OpenView, ViewDeps, ViewPlace } from "./file-views";
+
+import { RICH_NOTE_SUFFIX, WIKI, linkTarget, noteKindOf, tooBigForNote, richNameOf, richNoteBody, wikiTarget, newNoteFile } from "../notes/note-file";
 import { nameWarnings } from "../doc/file-names";
 import { splitFrontmatter, underProps, wholeMarkdown, withFileMeta } from "../notes/frontmatter";
 import { AUTO_NOTE_SETTINGS, autoDates, formatNoteDate, isAutoDate, isAutoKey } from "../notes/note-dates";
@@ -235,7 +237,7 @@ const DRAG_STACK = 5;
 /** The library sidebar's sections, in their default order (the order can be changed by dragging them). */
 const SIDE_SECTIONS = ["folders", "types", "tags", "ctags", "saved"] as const;
 /** The details panel's sections, in their default order (moved the same way). */
-const DETAIL_SECTIONS = ["file", "organize", "notes", "links", "where"] as const;
+const DETAIL_SECTIONS = ["file", "marks", "organize", "notes", "links", "where"] as const;
 
 /** The library's filters as they are before any is chosen (the reset button goes back to these). */
 const NO_FILTERS = { usage: "all", sort: "newest", reversed: false, scope: "all" } as const;
@@ -1076,9 +1078,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   noteBox.dataset["testid"] = "note-editor";
   noteBox.hidden = true;
   viewer.querySelector(".viewer-stage")!.append(noteBox);
-  let note: OpenNote | null = null;
-  const noteDeps: NoteDeps = { session, assets, settings, fonts };
-  const notePlace: NotePlace = {
+  let note: OpenView | null = null;
+  const noteDeps: ViewDeps = { session, assets, settings, fonts };
+  const notePlace: ViewPlace = {
     importFiles: (files) => view.importFiles(files),
     show: (hash) => showSlide(hash),
     showCanvas,
@@ -1136,7 +1138,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     paintLinks(hash, cards);
   };
   let noteZoom = 1; // (for this session, from note to note)
-  const openNote = async (hash: string, name: string, blob: Blob, token: number): Promise<void> => {
+  const openView = async (kind: FileViewKind, hash: string, name: string, blob: Blob, token: number): Promise<void> => {
     if (token !== slideToken) return;
     slideImg.hidden = true;
     viewer.classList.add("is-note");
@@ -1144,14 +1146,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     noteBox.replaceChildren(box);
     noteBox.hidden = false;
     slideCaption.textContent = "";
-    let opened: OpenNote;
+    noteBox.toggleAttribute("data-testid", kind.id === "note");
+    if (kind.id === "note") noteBox.dataset["testid"] = "note-editor";
+    let opened: OpenView;
     try {
-      opened = await OpenNote.open(box, hash, name, blob, noteDeps, notePlace);
+      opened = await kind.open(box, { hash, name, blob }, noteDeps, notePlace);
     } catch (e) {
       noteBox.hidden = true;
       viewer.classList.remove("is-note");
       slideImg.hidden = false;
-      slideCaption.textContent = `${name}. The notes editor could not open it: ${(e as Error).message}.`;
+      slideCaption.textContent = `${name}. This ${kind.noun} could not be opened: ${(e as Error).message}.`;
       slideCaption.classList.add("is-note");
       return;
     }
@@ -1431,7 +1435,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   // The stage changes size when the controls are hidden or shown (and with the window): the picture is fitted and drawn again for its new size, so an SVG is never a stale bitmap stretched to fit.
   new ResizeObserver(() => paintZoom()).observe(stage);
   const paintZoom = (): void => {
-    if (note) return paintNoteZoom();
+    if (note) return note.zoom ? undefined : paintNoteZoom();
     const el = shownMedia();
     const z = sizes();
     const vec = vector && el === slideImg;
@@ -1454,7 +1458,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     zoomPct.textContent = `${Math.round(noteZoom * 100)}%`;
   };
   const zoomStep = (dir: 1 | -1 | 0): void => {
-    if (note) {
+    if (note?.zoom) note.zoom(dir);
+    else if (note) {
       const next = dir === 0 ? 1 : Math.max(NOTE_ZOOM_MIN, Math.min(NOTE_ZOOM_MAX, noteZoom * ZOOM_STEP ** dir));
       noteZoom = Math.abs(next - 1) < 0.02 ? 1 : next;
       paintNoteZoom();
@@ -1650,120 +1655,131 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       slideImg.src = await thumbFor(hash).catch(() => "");
     };
     if (!rec) return void (await thumbnail());
-    const kind = noteKindOf(rec.name);
-    if (kind && (await opensAsNote(rec.name, rec.blob))) return void (await openNote(hash, rec.name, rec.blob, token));
-    if (isFontFile(rec)) {
-      // A font: its sample, in its own letters, at several sizes.
-      slideImg.hidden = true;
-      slideTile.innerHTML = fontSampleHtml(rec.name, true, FONT_SAMPLES[ui.fontSample], ui.fontTry);
-      slideTile.hidden = false;
-      slideAlpha = true; // (its letters lie on the same ground as a see-through picture)
-      viewer.classList.add("is-font", "has-alpha");
-      labelSample();
-      paintVector();
-      slideCaption.textContent = `${e.name || "Untitled"}, ${fmtBytes(e.size)}`;
-      void showFont(slideTile.querySelector<HTMLElement>(".font-sample")!, hash, async () => rec.blob);
-      armShow();
-      return;
-    }
-    if (isCard(rec) && e && meta(e).thumb) {
-      // Not something the browser can show, with a custom thumbnail: that picture, and what it is.
-      slideTile.hidden = true;
-      slideImg.hidden = false;
-      slideImg.src = await thumbFor(hash).catch(() => "");
-      slideCaption.textContent = `${label}. No preview for this kind of file: this is its custom thumbnail.`; // (for a screen reader: on screen nothing takes room from the picture)
-      armShow();
-      return;
-    }
-    const art = isCard(rec) && isArtFile(rec.name) ? await artFullPicture(await externalFolder.fileOf(rec), rec.name).catch(() => null) : null;
-    if (token !== slideToken) return;
-    if (art) {
-      // An art file: the picture it keeps, and what it is. Its layers stay its program's; the size in its record is its card's, so neither limits nor names the picture.
-      slideTile.hidden = true;
-      slideImg.hidden = false;
-      slideImg.style.maxWidth = "";
-      slideImg.style.maxHeight = "";
-      slideImg.className = "";
-      slideUrl = URL.createObjectURL(art);
-      slideImg.src = slideUrl;
-      slideCaption.textContent = `${e.name || "Untitled"}, ${fmtBytes(e.size)}. ${isAutoCopy(e.name) ? `${AUTO_COPY_NOTE} ` : ""}A preview: the picture the file keeps, as it was last saved.`; // (for a screen reader: on screen nothing takes room from the picture)
-      armShow();
-      return;
-    }
-    if (isCard(rec)) {
-      // Not something the browser can show: its card, large, and what it is (ADR 0078).
-      const d = describeFile(rec.name, rec.type);
-      slideImg.hidden = true;
-      slideTile.innerHTML = fileTile(rec);
-      slideTile.hidden = false;
-      slideCaption.textContent = `${label}. No preview for this kind of file: ${d.todo}`;
-      slideCaption.classList.add("is-note");
-      armShow();
-      return;
-    }
-    slideUrl = URL.createObjectURL(rec.blob);
-    if (/^(video|audio)\//.test(rec.type)) {
-      // A video or audio original plays here, with the same player as on the canvas (an audio file shows the picture of its waveform above it).
-      const isVideo = rec.type.startsWith("video/");
-      slideImg.hidden = isVideo;
-      if (!slideImg.hidden) slideImg.src = await thumbFor(hash).catch(() => "");
-      avEng.visual = isVideo;
-      avEng.onEnded = () => {
-        controls.refresh();
-        if (showing) stepSlide(1);
-      };
-      slideMedia.hidden = false;
-      try {
-        await avEng.load(playOf(false), rec.blob, rec.duration ?? 0);
-      } catch {
-        if (token !== slideToken) return;
-        unloadMedia();
-        slideImg.hidden = false;
-        // (the file is there, read whole: its format is one this app cannot play, as HEVC (H.265) video in most builds)
-        void thumbnail(`This ${isVideo ? "video" : "sound"}'s format cannot be played in this app (HEVC / H.265 video, for one). ${desktopBridge() ? "Open in default app (in its details) plays it in your system's app" : "Download it to play it in another app"}`);
-        return;
-      }
-      if (token !== slideToken) return;
-      eng = avEng;
-      controls.show(avEng, isVideo ? "video" : "audio", false);
-      // In a slideshow a video or audio file plays and the show moves on when it ends.
-      if (showing) avEng.play();
-      armShow();
-      return;
-    }
-    if (rec.type === "image/gif" && (rec.frames === undefined || rec.frames > 1)) {
-      // An animated GIF plays frame by frame, with the same controls (it loops until the slideshow moves on). One whose frames were
-      // never counted (imported before they were, or taken from the workspace folder) is read here, and shown still if it has one.
-      slideImg.hidden = true;
-      slideGif.hidden = false;
-      try {
-        await gifEng.load(playOf(true), rec.blob, 0);
-      } catch {
-        if (token !== slideToken) return;
-        unloadMedia();
-        slideImg.hidden = false;
-        slideImg.src = slideUrl;
+    const kind = await viewKindOf({ hash, name: rec.name, blob: rec.blob });
+    if (kind) return void (await openView(kind, hash, rec.name, rec.blob, token));
+    // How the stage shows a file that opens in no view of its own, the first that claims it. (A kind that opens in a view of its own is a row of ui/file-views.ts.)
+    let art: Blob | null = null;
+    const stageKinds: ReadonlyArray<{ claims(): boolean | Promise<boolean>; show(): Promise<void> }> = [
+      { claims: () => isFontFile(rec), show: async () => {
+        // A font: its sample, in its own letters, at several sizes.
+        slideImg.hidden = true;
+        slideTile.innerHTML = fontSampleHtml(rec.name, true, FONT_SAMPLES[ui.fontSample], ui.fontTry);
+        slideTile.hidden = false;
+        slideAlpha = true; // (its letters lie on the same ground as a see-through picture)
+        viewer.classList.add("is-font", "has-alpha");
+        labelSample();
+        paintVector();
+        slideCaption.textContent = `${e.name || "Untitled"}, ${fmtBytes(e.size)}`;
+        void showFont(slideTile.querySelector<HTMLElement>(".font-sample")!, hash, async () => rec.blob);
         armShow();
         return;
-      }
-      if (token !== slideToken) return;
-      if (gifEng.len() < 1) {
-        unloadMedia();
+      } },
+      { claims: () => isCard(rec) && !!meta(e).thumb, show: async () => {
+        // Not something the browser can show, with a custom thumbnail: that picture, and what it is.
+        slideTile.hidden = true;
         slideImg.hidden = false;
-        slideImg.src = slideUrl;
+        slideImg.src = await thumbFor(hash).catch(() => "");
+        slideCaption.textContent = `${label}. No preview for this kind of file: this is its custom thumbnail.`; // (for a screen reader: on screen nothing takes room from the picture)
         armShow();
         return;
-      }
-      eng = gifEng;
-      controls.show(gifEng, "gif", true);
-      gifEng.play();
-      paintZoom();
-      armShow();
-      return;
+      } },
+      { claims: async () => !!(art = isCard(rec) && isArtFile(rec.name) ? await artFullPicture(await externalFolder.fileOf(rec), rec.name).catch(() => null) : null), show: async () => {
+        // An art file: the picture it keeps, and what it is. Its layers stay its program's; the size in its record is its card's, so neither limits nor names the picture.
+        slideTile.hidden = true;
+        slideImg.hidden = false;
+        slideImg.style.maxWidth = "";
+        slideImg.style.maxHeight = "";
+        slideImg.className = "";
+        slideUrl = URL.createObjectURL(art!);
+        slideImg.src = slideUrl;
+        slideCaption.textContent = `${e.name || "Untitled"}, ${fmtBytes(e.size)}. ${isAutoCopy(e.name) ? `${AUTO_COPY_NOTE} ` : ""}A preview: the picture the file keeps, as it was last saved.`; // (for a screen reader: on screen nothing takes room from the picture)
+        armShow();
+        return;
+      } },
+      { claims: () => isCard(rec), show: async () => {
+        // Not something the browser can show: its card, large, and what it is (ADR 0078).
+        const d = describeFile(rec.name, rec.type);
+        slideImg.hidden = true;
+        slideTile.innerHTML = fileTile(rec);
+        slideTile.hidden = false;
+        slideCaption.textContent = `${label}. No preview for this kind of file: ${d.todo}`;
+        slideCaption.classList.add("is-note");
+        armShow();
+        return;
+      } },
+      { claims: () => /^(video|audio)\//.test(rec.type), show: async () => {
+        slideUrl = URL.createObjectURL(rec.blob);
+        // A video or audio original plays here, with the same player as on the canvas (an audio file shows the picture of its waveform above it).
+        const isVideo = rec.type.startsWith("video/");
+        slideImg.hidden = isVideo;
+        if (!slideImg.hidden) slideImg.src = await thumbFor(hash).catch(() => "");
+        avEng.visual = isVideo;
+        avEng.onEnded = () => {
+          controls.refresh();
+          if (showing) stepSlide(1);
+        };
+        slideMedia.hidden = false;
+        try {
+          await avEng.load(playOf(false), rec.blob, rec.duration ?? 0);
+        } catch {
+          if (token !== slideToken) return;
+          unloadMedia();
+          slideImg.hidden = false;
+          // (the file is there, read whole: its format is one this app cannot play, as HEVC (H.265) video in most builds)
+          void thumbnail(`This ${isVideo ? "video" : "sound"}'s format cannot be played in this app (HEVC / H.265 video, for one). ${desktopBridge() ? "Open in default app (in its details) plays it in your system's app" : "Download it to play it in another app"}`);
+          return;
+        }
+        if (token !== slideToken) return;
+        eng = avEng;
+        controls.show(avEng, isVideo ? "video" : "audio", false);
+        // In a slideshow a video or audio file plays and the show moves on when it ends.
+        if (showing) avEng.play();
+        armShow();
+        return;
+      } },
+      { claims: () => rec.type === "image/gif" && (rec.frames === undefined || rec.frames > 1), show: async () => {
+        const url = (slideUrl = URL.createObjectURL(rec.blob));
+        // An animated GIF plays frame by frame, with the same controls (it loops until the slideshow moves on). One whose frames were
+        // never counted (imported before they were, or taken from the workspace folder) is read here, and shown still if it has one.
+        slideImg.hidden = true;
+        slideGif.hidden = false;
+        try {
+          await gifEng.load(playOf(true), rec.blob, 0);
+        } catch {
+          if (token !== slideToken) return;
+          unloadMedia();
+          slideImg.hidden = false;
+          slideImg.src = url;
+          armShow();
+          return;
+        }
+        if (token !== slideToken) return;
+        if (gifEng.len() < 1) {
+          unloadMedia();
+          slideImg.hidden = false;
+          slideImg.src = url;
+          armShow();
+          return;
+        }
+        eng = gifEng;
+        controls.show(gifEng, "gif", true);
+        gifEng.play();
+        paintZoom();
+        armShow();
+        return;
+      } },
+      { claims: () => true, show: async () => {
+        slideImg.onerror = () => void thumbnail();
+        slideImg.src = URL.createObjectURL(rec.blob);
+        slideUrl = slideImg.src;
+        armShow();
+      } },
+    ];
+    for (const k of stageKinds) {
+      const mine = await k.claims();
+      if (token !== slideToken) return;
+      if (mine) return void (await k.show());
     }
-    slideImg.onerror = () => void thumbnail();
-    slideImg.src = slideUrl;
-    armShow();
   };
   // With the controls hidden, the back arrow and the details toggle at the top show again while the pointer is near the top edge.
   viewer.addEventListener("pointermove", (e) => {
@@ -1901,7 +1917,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
   const viewerKey = (e: KeyboardEvent): void => {
     const typing = (e.target as HTMLElement).closest(TYPING);
-    if (note && (e.target as HTMLElement).closest(".viewer-note")) {
+    if (note?.key?.(e)) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (note?.ownsKeys && (e.target as HTMLElement).closest(".viewer-note")) {
       // (a note's keys are the editor's: Back closes it. + and - are words there, so with Ctrl.)
       const dir = !(e.ctrlKey || e.metaKey) || e.altKey ? null : e.key === "+" || e.key === "=" ? 1 : e.key === "-" || e.key === "_" ? -1 : e.key === "0" ? 0 : null;
       if (dir !== null) {
@@ -2817,6 +2838,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     // (in the order they were put in: `sortableSections`)
     const detail: Record<(typeof DETAIL_SECTIONS)[number], () => string> = {
       file: () => `${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays ${noteKindOf(e.name) === "rich" ? "a rich text note (HTML) that other apps open too" : "plain text other apps read"}. Tag it <em>template</em> to offer it in Insert ▸ Template of every note.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>${isArtFile(e.name) ? "An art file" : "No preview for this file"}</h3><p class="asset-note">${isAutoCopy(e.name) ? `${AUTO_COPY_NOTE} ` : ""}${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as ${isArtFile(e.name) ? "the picture it keeps, when it keeps one" : "a card"}. ${esc(d.todo)}</p></section>`; })() : ""}`,
+      marks: () => (e ? marksHtml(e) : ""),
       organize: () => (e ? organizeHtml(e) : ""),
       notes: () => (e ? notesHtml(e) : ""),
       links: () => `<section class="asset-sec" data-testid="asset-backlinks" hidden><h3>Linked from <span class="layer-count" data-count></span></h3><ul class="asset-places"></ul></section><section class="asset-sec" data-testid="asset-outlinks" hidden><h3>Links <span class="layer-count" data-count></span></h3><ul class="asset-places"></ul></section>`,
@@ -3121,6 +3143,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           </li>`;
   };
 
+  /** The bookmarks of a file whose view has them (a PDF's pages). */
+  const marksHtml = (e: CatalogEntry): string => {
+    if (!viewKindNamed(e.name)?.marks) return "";
+    const { marks } = viewStateOf(e);
+    const here = note?.hash === e.hash ? note.here?.() : null;
+    const rows = marks.map((m) => `<li><button type="button" class="asset-link-row assets-link" data-action="go-mark" data-at="${esc(m.at)}" title="Go to ${esc(m.label)}">${ICONS.bookmark}<span class="asset-place-name">${esc(m.label)}</span></button><button type="button" class="layer-btn" data-action="drop-mark" data-at="${esc(m.at)}" aria-label="Remove the bookmark ${esc(m.label)}" title="Remove this bookmark">${ICONS.x}</button></li>`);
+    const list = rows.length ? `<ul class="asset-places asset-marks">${rows.join("")}</ul>` : `<p class="asset-note">No bookmarks yet.</p>`;
+    return `<section class="asset-sec" data-testid="asset-bookmarks"><h3>Bookmarks <span class="layer-count">${marks.length}</span></h3>${list}${here ? `<button type="button" class="assets-btn" data-action="add-mark" data-testid="asset-add-bookmark">${ICONS.bookmarkPlus} Bookmark ${esc(here.label.toLowerCase())}</button>` : ""}</section>`;
+  };
   /** The note (plain text) and the fields the user names (a link, a source, an author...) of one asset. */
   const notesHtml = (e: CatalogListing["entries"][number]): string => {
     const stored = meta(e);
@@ -3534,6 +3565,24 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         keys[keys.length - 1]?.focus();
         break;
       }
+      case "go-mark": {
+        // Opens at it, when it is not open.
+        const hash = inspector.dataset["hash"], at = b.dataset["at"]!;
+        if (!hash) break;
+        if (note?.hash === hash) (note.goTo?.(at), viewer.focus());
+        else void keepViewState(session, hash, { ...viewStateOf(entryOf(hash)), at }).then(() => showSlide(hash));
+        break;
+      }
+      case "drop-mark": {
+        const hash = inspector.dataset["hash"], at = b.dataset["at"]!, e = hash ? entryOf(hash) : undefined;
+        if (!hash || !e) break;
+        const s = viewStateOf(e);
+        void keepViewState(session, hash, { ...s, marks: s.marks.filter((m) => m.at !== at) }).then(() => refresh());
+        break;
+      }
+      case "add-mark":
+        void note?.toggleMark?.();
+        break;
       case "field-type": {
         const now = notesNow().fields[Number(b.dataset["index"])];
         if (!now?.key.trim()) break;
