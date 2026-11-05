@@ -66,9 +66,19 @@ test("a PDF: its first page in the library, its shape on a card; it opens in the
   await expect(view(p).locator('.pdf-page[data-page="2"][data-drawn]')).toBeVisible();
   const [w, h] = await view(p).locator('.pdf-page[data-page="2"]').evaluate((e) => [e.clientWidth, e.clientHeight]);
   expect(w! / h!).toBeCloseTo(4 / 3, 1);
+  // Ctrl+wheel zooms it, in the viewer.
+  const pageW = () => view(p).locator('.pdf-page[data-page="2"]').evaluate((e) => e.clientWidth);
+  const wide = await pageW();
+  const over = (await p.getByTestId("pdf-pages").boundingBox())!;
+  await p.mouse.move(over.x + over.width / 2, over.y + over.height / 2);
+  await p.keyboard.down("Control");
+  await p.mouse.wheel(0, 200);
+  await p.keyboard.up("Control");
+  await expect.poll(pageW).toBeLessThan(wide);
+  await p.getByTestId("view-fit").click();
   // A bookmark, in the details and off again.
-  await p.getByTestId("pdf-mark").click();
-  await expect(p.getByTestId("pdf-mark")).toHaveAttribute("aria-pressed", "true");
+  await p.getByTestId("view-mark").click();
+  await expect(p.getByTestId("view-mark")).toHaveAttribute("aria-pressed", "true");
   await detailsShown(p);
   await expect(p.getByTestId("asset-bookmarks")).toContainText("Page 2");
   // Keys: the pages' own, and the arrows stay the viewer's.
@@ -88,7 +98,7 @@ test("a PDF: its first page in the library, its shape on a card; it opens in the
   await expect(view(p)).toBeHidden();
   await card(p).dblclick();
   await expect(p.getByTestId("pdf-page")).toHaveValue("2");
-  await expect(p.getByTestId("pdf-mark")).toHaveAttribute("aria-pressed", "true");
+  await expect(p.getByTestId("view-mark")).toHaveAttribute("aria-pressed", "true");
   expect(app.consoleErrors).toEqual([]);
 });
 
@@ -109,9 +119,21 @@ test("a PDF's card on a canvas has its page's shape, opens in the panel, and a c
   const panel = p.getByTestId("note-panel");
   await expect(panel.getByTestId("pdf-view")).toBeVisible();
   await expect(panel.locator('.pdf-page[data-page="1"][data-drawn]')).toBeVisible();
+  // Ctrl+wheel zooms it in the panel too, and leaves the canvas where it was.
+  const camera = () => p.evaluate(() => JSON.stringify(window.__canvastDebug.objectScreen(window.__canvastDebug.objects()[0]!.id)));
+  const seen = await camera();
+  const panelW = () => panel.locator('.pdf-page[data-page="1"]').evaluate((e) => e.clientWidth);
+  const was = await panelW();
+  const over = (await panel.getByTestId("pdf-pages").boundingBox())!;
+  await p.mouse.move(over.x + over.width / 2, over.y + over.height / 2);
+  await p.keyboard.down("Control");
+  await p.mouse.wheel(0, 200);
+  await p.keyboard.up("Control");
+  await expect.poll(panelW).toBeLessThan(was);
+  expect(await camera()).toBe(seen);
   await panel.getByTestId("pdf-page").fill("2");
   await panel.getByTestId("pdf-page").press("Enter");
-  await panel.getByTestId("pdf-card").click();
+  await panel.getByTestId("view-card").click();
   await expect.poll(async () => (await pics())[0]!.preview).toBe("2");
   const now = (await pics())[0]!;
   expect(now.w).toBeCloseTo(one.w, 3);
@@ -217,7 +239,7 @@ test("a 3D model: a picture in the library, a view that turns, is lit and keeps 
   await p.locator('[data-testid="model-side"] [data-group-reset="Camera"]').click();
   await expect(focal).toHaveValue("50");
   await focal.fill("120");
-  await p.getByTestId("model-reset").click();
+  await p.getByTestId("view-reset").click();
   await expect(focal).toHaveValue("50");
   // A drag turns it: the number in the settings follows.
   const yaw = () => p.locator('[data-testid="model-side"] [data-k="yaw"] input[type=number]').inputValue();
@@ -230,11 +252,11 @@ test("a 3D model: a picture in the library, a view that turns, is lit and keeps 
   await expect.poll(yaw).not.toBe(before);
   const turned = await yaw();
   // A lighting setup sets its lights.
-  await p.getByTestId("model-lights").click();
+  await p.getByTestId("view-lights").click();
   await p.getByRole("menuitem", { name: /Split/ }).click();
   await expect(p.locator('[data-testid="model-side"] [data-k="keyAround"] input[type=number]')).toHaveValue("-90");
   // A bookmark in the details, as a PDF's.
-  await p.getByTestId("model-mark").click();
+  await p.getByTestId("view-mark").click();
   await detailsShown(p);
   await expect(p.getByTestId("asset-bookmarks")).toContainText("View 1");
   // Left and opened again: as it was. (The arrows stay the viewer's: no second item here, so it stays.)
@@ -254,7 +276,7 @@ test("a 3D model: a picture in the library, a view that turns, is lit and keeps 
   const panel = p.getByTestId("note-panel");
   await expect(panel.getByTestId("model-view")).toBeVisible();
   await panel.locator('[data-k="bg"] [data-eye]').click();
-  await panel.getByTestId("model-card").click();
+  await panel.getByTestId("view-card").click();
   await expect.poll(async () => JSON.parse((await pic())?.preview ?? "{}").bg).toBe("");
   expect(app.consoleErrors).toEqual([]);
 });
@@ -415,7 +437,7 @@ test("on a canvas: pages placed as cards, one step of undo; the panel closes and
   await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
   const panel = p.getByTestId("note-panel");
   await expect(panel.getByTestId("pdf-view")).toBeVisible();
-  await panel.getByTestId("pdf-place").click();
+  await panel.getByTestId("view-place").click();
   await p.getByTestId("prompt-input").fill("2-3, 99");
   await p.getByTestId("prompt-ok").click();
   await expect.poll(async () => (await pics()).map((o) => o.preview ?? "")).toEqual(["", "2", "3"]);
@@ -462,7 +484,7 @@ test("a 3D model's study tools: tones in flat steps, a mirror, a pose from its a
   await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
   const panel = p.getByTestId("note-panel");
   await expect(panel.getByTestId("model-view")).toBeVisible();
-  await panel.getByTestId("model-turnaround").click();
+  await panel.getByTestId("view-turn").click();
   await expect.poll(async () => (await pics()).length).toBe(9);
   const yaws = (await pics()).slice(1).map((o) => (JSON.parse(o.preview!) as { yaw?: number }).yaw ?? 35);
   expect(new Set(yaws).size).toBe(8);
@@ -503,7 +525,7 @@ test("idle, nothing keeps working: the library, the viewer on a PDF or a model, 
   const panel = p.getByTestId("note-panel");
   await expect(panel.getByTestId("model-view")).toBeVisible();
   await idle("the panel on a model");
-  await panel.getByTestId("model-card").click();
+  await panel.getByTestId("view-card").click();
   await panel.locator("[data-close]").click();
   await p.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
   await p.keyboard.press("Control+d");

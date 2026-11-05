@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.38: file views follow the theme (2026-11-06)
+
+- **Implemented:** `src/ui/view-bar.ts`; the Pattern panel's spacing shared with the 3D settings; new icons in the registry.
+- **Tested:** `npm run typecheck`, checks and unit tests locally; the `Tests` run on GitHub.
+- **Known failures:** as v0.54.37 until the `Tests` run reports.
+- **Unverified:** on screen by hand.
+- **Committed:** v0.54.38.
+- **Next bounded task:** read the `Tests` run.
+
 ## v0.54.37: PDF pictures no longer lost at random (2026-11-06)
 
 - **Implemented:** a worker per open PDF (`closePdf`); `drawnFromFile`, `ThumbRecord.notKept`; the middle-button guard from the press.

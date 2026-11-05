@@ -3010,7 +3010,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const inFolder = new Map<string, number>();
     for (const e of ents) inFolder.set(meta(e).folderIds[0] ?? "", (inFolder.get(meta(e).folderIds[0] ?? "") ?? 0) + 1);
     const whereName = (id: string): string => (id ? folderPath(folders, id).join(" › ") : "No folder");
-    const where = inFolder.size === 1 ? whereName([...inFolder.keys()][0]!) : [...inFolder].sort((a, b) => b[1] - a[1]).map(([id, k]) => `${whereName(id)}: ${k} of ${n}`).join(", ");
+    const where = inFolder.size === 1 ? whereName([...inFolder.keys()][0]!) : "";
+    // (several folders: a row each, the fullest first, and the long list folded as every other)
+    const folderRows = [...inFolder].sort((x, y) => y[1] - x[1]).map(([id, k]) => `<li title="${esc(whereName(id))}: ${k} of ${n}"><span class="asset-place-name">${esc(whereName(id))}</span><span class="layer-count">${k}</span></li>`);
+    const foldersCap = capList(folderRows, DETAIL_LINKS_SHOWN, openLists.has("folders"));
     return `
       <section class="asset-sec">
         <h3>${bulk ? "Tags of these" : "Tags"}</h3>
@@ -3021,7 +3024,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         </div>
         ${chipsCap.long ? showMoreButton({ open: openLists.has("tags"), hidden: chipsCap.hidden, attrs: `data-action="show-more" data-list="tags" data-testid="asset-tags-more"` }) : ""}
         <h3 class="asset-sub">${bulk ? "Folder of these" : "Folder"}</h3>
-        <p class="asset-where" data-testid="${bulk ? "bulk-folder-now" : "asset-folder-now"}">${esc(where)}</p>
+        ${where ? `<p class="asset-where" data-testid="${bulk ? "bulk-folder-now" : "asset-folder-now"}">${esc(where)}</p>` : `<ul class="asset-places" data-testid="bulk-folder-now">${foldersCap.shown.join("")}</ul>${foldersCap.long ? showMoreButton({ open: openLists.has("folders"), hidden: foldersCap.hidden, attrs: `data-action="show-more" data-list="folders" data-testid="bulk-folders-more"` }) : ""}`}
         <button type="button" class="assets-btn" data-action="organize" data-testid="${bulk ? "bulk-organize" : "asset-organize"}" title="Move to a folder and add tags, from one list"${dis}>${ICONS.folderTree}<span>Organize…</span></button>
       </section>`;
   };

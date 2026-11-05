@@ -3,6 +3,7 @@ import { LIGHT_PRESETS, MODEL_SECTIONS, defaultLook, readLook, writeLook } from 
 import type { ModelLook } from "../assets/model-look";
 import type { FileFacts, OpenView, ViewDeps, ViewPlace } from "./file-views";
 import { ICONS } from "./icons";
+import { barButton } from "./view-bar";
 import { openMoreMenu } from "./more-menu";
 import { mountSettings } from "./setting-rows";
 import type { SettingValue } from "./setting-rows";
@@ -32,16 +33,16 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
   };
   el.innerHTML = `<div class="model-view" data-testid="model-view">
     <div class="view-bar">
-      <button type="button" class="layer-btn" data-m="fit" data-testid="model-fit" aria-label="Back to the first view" title="The camera back at the first view (or double-click the model)">${ICONS.maximize}</button>
-      <button type="button" class="layer-btn" data-m="lights" data-testid="model-lights" aria-haspopup="menu" aria-label="Lighting" title="Lighting: a classic setup">${ICONS.lightbulb}</button>
+      ${barButton("fit", ICONS.locateFixed, "Back to the first view", "The camera back at the first view (or double-click the model)")}
+      ${barButton("lights", ICONS.lightbulb, "Lighting", "Lighting: a classic setup", 'aria-haspopup="menu"')}
       <span class="view-gap"></span>
-      <button type="button" class="layer-btn" data-m="mark" data-testid="model-mark" aria-label="Bookmark this view" aria-pressed="false" title="Bookmark this view, or take its bookmark off">${ICONS.bookmark}</button>
-      <button type="button" class="layer-btn" data-m="marks" data-testid="model-marks" aria-haspopup="menu" aria-label="Go to" title="Bookmarked views">${ICONS.list}</button>
-      ${place.placeViews ? `<button type="button" class="layer-btn" data-m="turn" data-testid="model-turnaround" aria-label="Place a turnaround" title="Place a turnaround on the canvas: eight cards, this view from all around">${ICONS.rotate3d}</button>` : ""}
-      ${place.setPreview ? `<button type="button" class="layer-btn" data-m="card" data-testid="model-card" aria-label="Show this view on the card" title="Show this view on the card on the canvas (this copy only)">${ICONS.image}</button>` : ""}
+      ${barButton("mark", ICONS.bookmarkPlus, "Bookmark this view", "Bookmark this view, or take its bookmark off", 'aria-pressed="false"')}
+      ${barButton("marks", ICONS.tableOfContents, "Go to", "Bookmarked views", 'aria-haspopup="menu"')}
+      ${place.placeViews ? barButton("turn", ICONS.rotate3d, "Place a turnaround", "Place a turnaround on the canvas: eight cards, this view from all around") : ""}
+      ${place.setPreview ? barButton("card", ICONS.pictureInPicture, "Show this view on the card", "Show this view on the card on the canvas (this copy only)") : ""}
       <span class="view-gap"></span>
-      <button type="button" class="layer-btn" data-m="reset" data-testid="model-reset" aria-label="Reset the settings" title="Reset the settings of this view">${ICONS.listRestart}</button>
-      <button type="button" class="layer-btn" data-m="side" data-testid="model-side-toggle" aria-pressed="true" aria-label="Settings" title="Show or hide the settings">${ICONS.slidersHorizontal}</button>
+      ${barButton("reset", ICONS.listRestart, "Reset the settings", "Reset the settings of this view")}
+      ${barButton("side", ICONS.sliders, "Settings", "Show or hide the settings", 'aria-pressed="true"')}
     </div>
     <div class="model-main">
       <div class="model-stage is-checker" data-testid="model-stage"><canvas></canvas></div>
@@ -51,7 +52,7 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
   const root = el.querySelector<HTMLElement>(".model-view")!;
   const box = root.querySelector<HTMLElement>(".model-stage")!;
   const side = root.querySelector<HTMLElement>(".model-side")!;
-  const markBtn = root.querySelector<HTMLElement>('[data-m="mark"]')!;
+  const markBtn = root.querySelector<HTMLElement>('[data-view-act="mark"]')!;
   const stage = await ModelStage.make(root.querySelector("canvas")!);
   if (!stage) {
     el.replaceChildren();
@@ -159,8 +160,8 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
     await place.refresh();
   };
   root.addEventListener("click", (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-m]");
-    switch (b?.dataset["m"]) {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-view-act]");
+    switch (b?.dataset["viewAct"]) {
       case "fit": return toFirst();
       case "reset":
         look = defaultLook(first);

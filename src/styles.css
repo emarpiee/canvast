@@ -53,6 +53,7 @@
   --meta-label-w: 7.5rem;
   /* Sizes that follow Density too (these are Compact's): small buttons on a row, buttons on a chip, a tree's indent. */
   --row-btn: 26px; --chip-btn: 20px; --tree-indent: 20px;
+  --model-side-w: 20rem;
   /* Spacing: gaps, paddings and margins, set by Density (Settings > Appearance; these are Compact's). --sp-* are fixed lengths, for what is not spacing. */
   --s-1: 2px; --s-2: 4px; --s-4: 8px; --s-6: 12px; --s-8: 16px; --s-10: 24px; --s-12: 32px; --s-13: 40px; --s-14: 44px; --s-15: 60px;
   --view-tint: color-mix(in oklch, var(--hud-accent) 14%, var(--paper)); /* the buttons that change the view */
@@ -3097,7 +3098,7 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
 .pg-lock[aria-pressed="true"] { color: var(--hud-accent-text); }
 .pg-lock svg { width: var(--icon-sm); height: var(--icon-sm); }
 .pg-pick p { margin: 0; }
-.pattern-panel [data-pg-body] { display: grid; gap: var(--s-4); padding: var(--s-4) var(--s-6); }
+:is(.pattern-panel [data-pg-body], .model-side) { display: grid; align-content: start; gap: var(--s-4); padding: var(--s-4) var(--s-6); }
 .pg-line { grid-template-columns: 5.25rem minmax(0, 1fr); }
 .pg-check { display: flex; align-items: center; gap: var(--s-4); grid-column: 1 / -1; color: var(--hud-fg); cursor: pointer; }
 .pg-seg { padding: 0; }
@@ -3179,10 +3180,14 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 
 /* A file in a view of its own (ui/file-views.ts), in the library's viewer and in the panel on a canvas alike. */
 :is(.pdf-view, .model-view) { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--hud-bg); color: var(--hud-fg); }
-.view-bar { flex: none; display: flex; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-4); min-height: var(--bar-h); border-bottom: 1px solid var(--hud-border); }
+.view-bar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); padding: var(--s-2) var(--s-4); min-height: var(--bar-h); border-bottom: 1px solid var(--hud-border); }
+.view-bar .layer-btn { flex: none; width: var(--ctl); height: var(--ctl); border-radius: var(--ctl-r); opacity: 1; }
+.view-bar .layer-btn svg { width: var(--icon-md); height: var(--icon-md); }
+.view-bar .layer-btn[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
+.view-field { display: inline-flex; align-items: center; gap: var(--s-4); font: var(--font-meta); color: var(--hud-muted); }
 .view-gap { width: var(--s-8); }
-.pdf-at { width: calc(var(--ctl) * 2); height: var(--field-h); }
-.pdf-count { color: var(--hud-muted); font-size: var(--text-sm); white-space: nowrap; }
+.pdf-at { width: calc(var(--ctl) * 2); }
+.pdf-count { color: var(--hud-muted); font: var(--font-meta); white-space: nowrap; }
 .pdf-pages { flex: 1; min-height: 0; overflow: auto; padding: var(--s-8); display: flex; flex-direction: column; align-items: center; gap: var(--s-8); position: relative; }
 .pdf-pages:focus { outline: none; }
 .pdf-page { flex: none; position: relative; background: var(--paper); box-shadow: var(--hud-lift); overflow: clip; }
@@ -3195,9 +3200,9 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .model-stage { flex: 1; min-width: 0; position: relative; cursor: grab; touch-action: none; }
 .model-stage:active { cursor: grabbing; }
 .model-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.model-side { flex: none; width: calc(var(--ctl) * 12); overflow-y: auto; border-left: 1px solid var(--hud-border); }
+.model-side { flex: none; box-sizing: border-box; width: var(--model-side-w); overflow-y: auto; border-left: 1px solid var(--hud-border); }
 .model-side[hidden] { display: none; }
 .model-stage.is-mirrored canvas { transform: scaleX(-1); }
-.pdf-find { width: calc(var(--ctl) * 5); height: var(--field-h); }
+.adj-num.pdf-find { width: calc(var(--ctl) * 5); text-align: left; }
 .pdf-link { position: absolute; padding: 0; background: none; border: none; cursor: pointer; z-index: 1; }
 ::highlight(canvast-find) { background: var(--hud-accent); color: transparent; }

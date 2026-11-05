@@ -626,7 +626,7 @@ A PDF or a 3D model shows as its picture in the library and opens in a view of i
 | | PDF | 3D model (GLB, glTF, STL, OBJ, PLY) |
 | --- | --- | --- |
 | In the library and details | Its first page | Its first view |
-| Moving around | Page buttons, a page number, Page Up and Down, Home, End; zoom | Drag to turn, Shift or right drag to slide, wheel to zoom, double-click for the first view |
+| Moving around | Page buttons, a page number, Page Up and Down, Home, End; zoom with its buttons, Ctrl+wheel or Ctrl and + or - | Drag to turn, Shift or right drag to slide, wheel to zoom, double-click for the first view |
 | Remembered | The page it was left at | The view it was left at, with its lights |
 | Bookmarks | Pages, and the contents the PDF carries | Views |
 | On a card on a canvas | Its page's shape; **Show this page on the card** | **Show this view on the card** |

@@ -5,6 +5,7 @@ import { scrubNumbers } from "../colour-picker/scrub";
 import { promptDialog } from "./confirm";
 import type { FileFacts, OpenView, ViewDeps, ViewPlace } from "./file-views";
 import { ICONS } from "./icons";
+import { barButton } from "./view-bar";
 import { openMoreMenu } from "./more-menu";
 import { keepViewState, toggledMark, viewStateOf } from "./view-state";
 import type { ViewState } from "./view-state";
@@ -16,6 +17,7 @@ const ZOOM_MAX = 6;
 const MAX_PAGE_PIXELS = 16e6;
 const KEEP_MS = 600;
 const REDRAW_MS = 150;
+const WHEEL_ZOOM = 0.002;
 /** The most cards one Place pages makes. */
 const MAX_PLACED_PAGES = 200;
 
@@ -49,20 +51,20 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
   const count = pdf.numPages;
   el.innerHTML = `<div class="pdf-view" data-testid="pdf-view">
     <div class="view-bar">
-      <button type="button" class="layer-btn" data-pdf="prev" aria-label="Previous page" title="Previous page (Page Up)">${ICONS.chevronUp}</button>
-      <button type="button" class="layer-btn" data-pdf="next" aria-label="Next page" title="Next page (Page Down)">${ICONS.chevronDown}</button>
-      <label class="pdf-count">Page <input class="pdf-at" type="number" min="1" max="${count}" step="1" aria-label="Page" data-testid="pdf-page" /></label><span class="pdf-count">/ ${count}</span>
+      ${barButton("prev", ICONS.pageUp, "Previous page", "Previous page (Page Up)")}
+      ${barButton("next", ICONS.pageDown, "Next page", "Next page (Page Down)")}
+      <label class="view-field">Page <input class="adj-num pdf-at" type="number" min="1" max="${count}" step="1" aria-label="Page" data-testid="pdf-page" /></label><span class="pdf-count">/ ${count}</span>
       <span class="view-gap"></span>
-      <button type="button" class="layer-btn" data-pdf="out" aria-label="Zoom out" title="Zoom out (Ctrl+-)">${ICONS.minus}</button>
-      <button type="button" class="layer-btn" data-pdf="fit" data-testid="pdf-fit" aria-label="Fit the width" title="Fit the width (Ctrl+0)">${ICONS.maximize}</button>
-      <button type="button" class="layer-btn" data-pdf="in" aria-label="Zoom in" title="Zoom in (Ctrl++)">${ICONS.plus}</button>
+      ${barButton("out", ICONS.minus, "Zoom out", "Zoom out (Ctrl+-)")}
+      ${barButton("fit", ICONS.unfoldHorizontal, "Fit the width", "Fit the width (Ctrl+0)")}
+      ${barButton("in", ICONS.plus, "Zoom in", "Zoom in (Ctrl++)")}
       <span class="view-gap"></span>
-      <input class="pdf-find" type="search" placeholder="Find" aria-label="Find in this PDF" data-testid="pdf-find" /><span class="pdf-count" data-testid="pdf-found"></span>
+      <input class="adj-num pdf-find" type="search" placeholder="Find" aria-label="Find in this PDF" data-testid="pdf-find" /><span class="pdf-count" data-testid="pdf-found"></span>
       <span class="view-gap"></span>
-      <button type="button" class="layer-btn" data-pdf="mark" data-testid="pdf-mark" aria-label="Bookmark this page" aria-pressed="false" title="Bookmark this page, or take its bookmark off">${ICONS.bookmark}</button>
-      <button type="button" class="layer-btn" data-pdf="marks" data-testid="pdf-marks" aria-haspopup="menu" aria-label="Go to" title="Bookmarks, and the contents of this PDF">${ICONS.list}</button>
-      ${place.placeViews ? `<button type="button" class="layer-btn" data-pdf="place" data-testid="pdf-place" aria-label="Place pages on the canvas" title="Place pages on the canvas: a card for each">${ICONS.layoutGrid}</button>` : ""}
-      ${place.setPreview ? `<button type="button" class="layer-btn" data-pdf="card" data-testid="pdf-card" aria-label="Show this page on the card" title="Show this page on the card on the canvas (this copy only)">${ICONS.image}</button>` : ""}
+      ${barButton("mark", ICONS.bookmarkPlus, "Bookmark this page", "Bookmark this page, or take its bookmark off", 'aria-pressed="false"')}
+      ${barButton("marks", ICONS.tableOfContents, "Go to", "Bookmarks, and the contents of this PDF", 'aria-haspopup="menu"')}
+      ${place.placeViews ? barButton("place", ICONS.grid2x2Plus, "Place pages on the canvas", "Place pages on the canvas: a card for each") : ""}
+      ${place.setPreview ? barButton("card", ICONS.pictureInPicture, "Show this page on the card", "Show this page on the card on the canvas (this copy only)") : ""}
     </div>
     <div class="pdf-pages" tabindex="0" data-testid="pdf-pages"></div>
   </div>`;
@@ -70,7 +72,7 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
   scrubNumbers(root.querySelector<HTMLElement>(".view-bar")!);
   const pages = root.querySelector<HTMLElement>(".pdf-pages")!;
   const input = root.querySelector<HTMLInputElement>(".pdf-at")!;
-  const markBtn = root.querySelector<HTMLElement>('[data-pdf="mark"]')!;
+  const markBtn = root.querySelector<HTMLElement>('[data-view-act="mark"]')!;
   const finder = root.querySelector<HTMLInputElement>(".pdf-find")!;
   const found = root.querySelector<HTMLElement>('[data-testid="pdf-found"]')!;
   let zoom: number | "fit" = "fit";
@@ -303,6 +305,21 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     else zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, scaleOf(first.w) * ZOOM_STEP ** dir));
     layout();
   };
+  // Ctrl+wheel: zooms about the pointer. (In the viewer and in the panel alike: neither the page nor the canvas behind gets it.)
+  pages.addEventListener("wheel", (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const was = scaleOf(first.w);
+    const next = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, was * Math.exp(-e.deltaY * WHEEL_ZOOM)));
+    if (next === was) return;
+    const r = pages.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, k = next / was;
+    const left = (pages.scrollLeft + x) * k - x, top = (pages.scrollTop + y) * k - y;
+    zoom = next;
+    layout();
+    pages.scrollLeft = left;
+    pages.scrollTop = top;
+  }, { passive: false });
   const mark = (): ViewState["marks"][number] => ({ at: String(current), label: `Page ${current}` });
   const toggleMark = async (): Promise<void> => {
     state = toggledMark(state, mark(), Number);
@@ -337,8 +354,8 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     place.placeViews?.(items);
   };
   root.addEventListener("click", (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-pdf]");
-    switch (b?.dataset["pdf"]) {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-view-act]");
+    switch (b?.dataset["viewAct"]) {
       case "prev": return show(current - 1);
       case "next": return show(current + 1);
       case "out": return setZoom(-1);
@@ -353,7 +370,7 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
       }
       case "marks":
         return void outline().then((contents) => {
-          const items = [...state.marks.map((m) => ({ label: m.label, hint: "Bookmark", icon: ICONS.bookmark, run: () => show(Number(m.at)) })), ...contents.map((c) => ({ label: c.label, hint: `Page ${c.page}`, icon: ICONS.list, run: () => show(c.page) }))];
+          const items = [...state.marks.map((m) => ({ label: m.label, hint: "Bookmark", icon: ICONS.bookmark, run: () => show(Number(m.at)) })), ...contents.map((c) => ({ label: c.label, hint: `Page ${c.page}`, icon: ICONS.tableOfContents, run: () => show(c.page) }))];
           openMoreMenu(b, items.length ? items : [{ label: "No bookmarks yet", hint: "Bookmark a page with the button beside this", icon: ICONS.bookmark, run: () => undefined }], "Go to");
         });
     }

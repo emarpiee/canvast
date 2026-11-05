@@ -1170,7 +1170,7 @@ test("several picked: each tag with how many have it, removed from all or added 
   await p.keyboard.press("Escape");
   await pick(p, hashes[0]!);
   await all();
-  await expect(p.getByTestId("bulk-folder-now")).toContainText("Mix: 2 of 4");
+  await expect(p.getByTestId("bulk-folder-now").locator("li").filter({ hasText: "Mix" })).toContainText("2");
   expect(app.consoleErrors).toEqual([]);
 });
 

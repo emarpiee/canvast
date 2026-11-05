@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.54.38 — File views follow the theme (2026-11-06)
+
+- **Fixed:** a 3D view's settings have the same spacing as the Pattern panel, from the Density setting, and the bars of PDF and 3D views have controls of the usual size, in one shared button.
+- **Fixed:** the folders of several selected items are rows with their counts, the long list folded, not one long paragraph.
+- **Added:** Ctrl+wheel zooms a PDF about the pointer, in the viewer and in the panel on a canvas.
+- **Changed:** those bars' icons say what they do, each its own: pages, fit, bookmarks, contents, placing, the card, the first view, the settings.
+
 ## 0.54.37 — PDF pictures no longer lost at random (2026-11-06)
 
 - **Fixed:** a PDF's picture could fail and leave its plain card, and closing one PDF could stop another that was open, because they shared one worker. Each open PDF now has its own, gone when it closes, and a thumbnail that could not be drawn is not kept.

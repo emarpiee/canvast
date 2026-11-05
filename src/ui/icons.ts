@@ -259,6 +259,14 @@ import bookmark from "lucide-static/icons/bookmark.svg";
 import bookOpen from "lucide-static/icons/book-open.svg";
 import lightbulb from "lucide-static/icons/lightbulb.svg";
 import rotate3d from "lucide-static/icons/rotate-3d.svg";
+import slidersIconPv from "lucide-static/icons/sliders.svg";
+import pipIconPv from "lucide-static/icons/picture-in-picture-2.svg";
+import fileDownIconPv from "lucide-static/icons/file-down.svg";
+import fileUpIconPv from "lucide-static/icons/file-up.svg";
+import grid2x2PlusIcon from "lucide-static/icons/grid-2x2-plus.svg";
+import unfoldHorizontalIcon from "lucide-static/icons/unfold-horizontal.svg";
+import tableOfContentsIcon from "lucide-static/icons/table-of-contents.svg";
+import locateFixedIcon from "lucide-static/icons/locate-fixed.svg";
 import chevronDown from "lucide-static/icons/chevron-down.svg";
 import chevronRight from "lucide-static/icons/chevron-right.svg";
 import chevronLeft from "lucide-static/icons/chevron-left.svg";
@@ -557,6 +565,14 @@ export const ICONS = {
   bookOpen: clean(bookOpen),
   lightbulb: clean(lightbulb),
   rotate3d: clean(rotate3d),
+  sliders: clean(slidersIconPv),
+  pictureInPicture: clean(pipIconPv),
+  pageDown: clean(fileDownIconPv),
+  pageUp: clean(fileUpIconPv),
+  grid2x2Plus: clean(grid2x2PlusIcon),
+  unfoldHorizontal: clean(unfoldHorizontalIcon),
+  tableOfContents: clean(tableOfContentsIcon),
+  locateFixed: clean(locateFixedIcon),
   bookmarkPlus: clean(bookmarkPlus),
   bookmarkCheck: clean(bookmarkCheck),
   chevronDown: clean(chevronDown),

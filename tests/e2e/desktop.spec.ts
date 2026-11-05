@@ -1112,7 +1112,7 @@ test("a hidden PDF opens in its view in hidden mode, with nothing of it readable
     await expect(card).toHaveCount(1);
     await card.dblclick();
     await expect(page.locator('.pdf-page[data-page="1"] .textLayer')).toContainText(word);
-    await page.getByTestId("pdf-mark").click();
+    await page.getByTestId("view-mark").click();
     await page.waitForTimeout(800);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     // Nothing of it is plain on the disk: not its file, its words or its name.
