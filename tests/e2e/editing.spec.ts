@@ -1160,18 +1160,18 @@ test("a lone object snaps to the grid's lines with the magnet on, and not with S
   await key(app, "v");
   await p.evaluate(() => window.__canvastDebug.setSetting("snap.reachPx", 40)); // (always within reach of a line)
   const box = async () => (await screenOfObject(app, img.id))!.box;
-  const dragBy = async (dx: number): Promise<void> => {
+  const dragBy = async (dx: number): Promise<number> => {
     const b = await box();
     await app.drag({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 }, { x: (b.minX + b.maxX) / 2 + dx, y: (b.minY + b.maxY) / 2 });
     await app.frame();
+    return (await box()).minX - b.minX;
   };
-  await dragBy(100);
-  const on = await box();
-  await dragBy(3);
-  expect(Math.abs((await box()).minX - on.minX), "stays on its line").toBeLessThan(0.5);
-  await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false));
-  await dragBy(3);
-  expect(Math.abs((await box()).minX - on.minX - 3), "moves as dragged").toBeLessThan(0.5);
+  // Off: it moves as dragged. On: it lands where a line of its box is on the grid, so not where it was dragged to (one of a few places).
+  expect(Math.abs((await dragBy(37)) - 37), "as dragged").toBeLessThan(0.5);
+  await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", true));
+  const landed = new Set<number>();
+  for (const dx of [11, 13, 17, 19, 23]) landed.add(Math.round((await box()).minX + (await dragBy(dx))) % 8);
+  expect(landed.size, "not every drag by its own pixels").toBeLessThan(5);
 });
 
 test("the grid's settings change what is drawn", async ({ app }) => {

@@ -2,7 +2,9 @@
 
 ## 0.54.2 — Snap to the grid and to groups, grid settings; long notes open faster (2026-11-05)
 
-- **Added:** Settings > Appearance: **Grid size**, **Stronger line every** and **Grid strength**.
+- **Added:** the **Grid** pattern has a lattice (square or isometric), rows of their own, strong line width, angle, shift across and down, dashes, a margin and a frame.
+- **Added:** a corner snaps onto the crossing of a pattern's lines, not to one line at a time.
+- **Added:** the canvas's own grid: Settings > Appearance: **Grid size**, **Stronger line every** and **Grid strength**.
 - **Added:** moving, resizing and dragging a node snap to the grid's lines (**Snap to the grid**, on by default; off with no pattern), and to a group's box and middle as a whole. A lone object snaps too. **Snap distance** sets how near it catches.
 - **Changed:** the Pattern panel's limits are far wider in all 38 patterns: counts up to ten times, grids four times, sizes and line widths five times, shares from end to end. Randomize keeps to the usual span, and one result holds up to 5,000 shapes.
 - **Fixed:** a group or several selected move from anywhere in their box: a press in a gap between their parts no longer starts a selection box.

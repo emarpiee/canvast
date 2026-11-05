@@ -1549,6 +1549,18 @@ export function attachTools(
         refs.push(...sh.refs, ...sh.midRefs);
         for (const s of sh.straight) straight.add(segs.push(s) - 1);
         segs.push(...sh.curved);
+        // A level or upright line (a grid pattern's, a shape's side) catches on its own axis: so a corner holds on a crossing of two, not on one at a time.
+        if (po.obj.kind === "path") sh.straight.forEach((s, i) => {
+          const r = sh.midRefs[i];
+          if (!r || ctx.tx.length >= MAX_SNAP_TARGETS) return;
+          const upright = Math.abs(s[0] - s[2]) < 0.5, level = Math.abs(s[1] - s[3]) < 0.5;
+          if (upright === level) return;
+          const at = cornerIn(r, frame);
+          ctx.groupLines.set(ctx.tx.length, { x: [at.x, at.x, at.x], y: [at.y, at.y, at.y] });
+          ctx.tx.push(upright ? [s[0], s[0], s[0]] : [NaN, NaN, NaN]);
+          ctx.ty.push(level ? [s[1], s[1], s[1]] : [NaN, NaN, NaN]);
+          ctx.objs.push(po.obj);
+        });
       }
       if (chosen.has(po.obj.id)) {
         box = box ? { minX: Math.min(box.minX, b.minX), minY: Math.min(box.minY, b.minY), maxX: Math.max(box.maxX, b.maxX), maxY: Math.max(box.maxY, b.maxY) } : { ...b };
