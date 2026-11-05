@@ -2,7 +2,7 @@
 
 ## 0.54.23 — One question before a hidden item is copied (2026-11-05)
 
-- **Fixed:** copying a hidden item could ask "Copy a hidden item" twice at once.
+- **Changed:** a question about copying a hidden item that is still on its way out answers a copy pressed in that moment, rather than a second one opening over it.
 
 ## 0.54.22 — Copied files on every system (2026-11-05)
 

@@ -42,7 +42,7 @@ Unverified / Committed / Next bounded task**.
 - **Implemented:** `hiddenFine` shares one open question.
 - **Tested:** `npm run typecheck`, checks and unit tests locally; `desktop.spec` on GitHub's `Tests` run.
 - **Known failures:** none known until that run reports. The middle-button pan test failed once on 8513873 and passed on 00e9dc3, its code unchanged.
-- **Unverified:** why two asks came from one press; real pastes on Windows and macOS.
+- **Unverified:** real pastes on Windows and macOS. The two dialogs a test saw were one on its way out and a new one, not two asks from one press.
 - **Committed:** v0.54.23.
 - **Next bounded task:** read the `Tests` run; the owner's choice on the hidden copy timer.
 

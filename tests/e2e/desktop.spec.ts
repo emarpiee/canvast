@@ -2178,7 +2178,7 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await clear();
     await page.keyboard.press("Control+c");
     await page.getByTestId("confirm-cancel").click();
-    await page.waitForTimeout(500);
+    await expect(page.getByTestId("confirm-dialog")).toHaveCount(0); // (a dialog leaves the page a moment after it closes, and until then its answer stands)
     expect((await out()).file).toBe("");
     await page.keyboard.press("Control+c");
     await page.getByTestId("confirm-ok").click();
