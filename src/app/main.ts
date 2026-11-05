@@ -1,3 +1,4 @@
+import { setSnapPx } from "../interaction/snap";
 import { deleteEverywhere } from "../ui/delete-everywhere";
 import type { CatalogEntry } from "../assets/asset-catalog";
 import { copyItemsAsFiles, copyItemsToClipboard, type CopyDeps } from "./copy-items";
@@ -36,7 +37,7 @@ import { imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPla
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
-import { renderFrame } from "../render/canvas2d-renderer";
+import { renderFrame, gridStep, setGridLook } from "../render/canvas2d-renderer";
 import type { Theme } from "../render/canvas2d-renderer";
 import { batchRuns, drawObjects, drawOverlays, drawCropGhost } from "../render/scene-renderer";
 import { strokeLineWidth } from "../render/draw-objects";
@@ -329,6 +330,10 @@ async function start(): Promise<void> {
   editor.ignoreFilling = settings.get("select.ignoreFilling");
   editor.lassoFilter = settings.get("lasso.filter");
   editor.snap = settings.get("snap.enabled");
+  editor.gridStep = (cam) => (settings.get("snap.grid") ? gridStep(cam, settings.get("ui.pattern")) : null);
+  const applyGridLook = (): void => setGridLook({ min: { fine: 16, normal: 32, coarse: 64 }[settings.get("grid.size")], major: { none: 0, "2": 1, "4": 2, "8": 3 }[settings.get("grid.major")], opacity: settings.get("grid.opacity") / 100 });
+  applyGridLook();
+  setSnapPx(settings.get("snap.reachPx"));
   editor.alignBox = settings.get("select.alignBox");
   editor.layersOpen = settings.get("ui.layersOpen");
   editor.bookmarksOpen = settings.get("ui.bookmarksOpen");
@@ -2293,6 +2298,15 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         return;
       case "ui.hints":
         hintLine.current?.refresh();
+        return;
+      case "grid.size":
+      case "grid.major":
+      case "grid.opacity":
+        applyGridLook();
+        invalidate();
+        return;
+      case "snap.reachPx":
+        setSnapPx(settings.get(key));
         return;
       case "ui.pattern":
       case "ui.names":

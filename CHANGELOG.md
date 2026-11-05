@@ -1,7 +1,10 @@
 # Changelog
 
-## 0.54.2 — Long notes open faster; a picture arriving late shows in an open note (2026-11-05)
+## 0.54.2 — Snap to the grid and to groups, grid settings; long notes open faster (2026-11-05)
 
+- **Added:** Settings > Appearance: **Grid size**, **Stronger line every** and **Grid strength**.
+- **Added:** moving, resizing and dragging a node snap to the grid's lines (**Snap to the grid**, on by default; off with no pattern), and to a group's box and middle as a whole. A lone object snaps too. **Snap distance** sets how near it catches.
+- **Fixed:** a group or several selected move from anywhere in their box: a press in a gap between their parts no longer starts a selection box.
 - **Fixed:** long notes open and save faster: writing a note out took far longer than its length.
 - **Fixed:** a note opened before a picture it links to has arrived (from a sync tool) shows it when it does, with nothing to reopen.
 - **Fixed:** the details panel looks up a note's links once per change, not once per drawing.

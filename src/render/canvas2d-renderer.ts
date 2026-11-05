@@ -89,6 +89,17 @@ export function firstLineOffset(centerCoord: D.Dyadic, g: number, half: number, 
   return half + offset - steps * spacing;
 }
 
+/** The settings of the patterns: how big a square is at least (CSS px), a stronger line every 2^major squares (0: none), and how strong it all is. */
+let gridLook = { min: 32, major: 0, opacity: 1 };
+export const setGridLook = (look: typeof gridLook): void => void (gridLook = look);
+
+/** The lines things snap to: their spacing as a power of two, in the camera's frame; null with no pattern. The multi-scale grid's first clear tier. */
+export function gridStep(cam: Camera, pattern: Pattern): number | null {
+  if (pattern === "none") return null;
+  const g = Math.ceil(Math.log2(gridLook.min) - (cam.zi + cam.zf));
+  return pattern === "scale" && g % 2 !== 0 ? g + 1 : g;
+}
+
 function drawGrid(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, theme: Theme): number {
   const z = cam.zi + cam.zf;
   // Smallest even G whose on-screen spacing is at least GRID_MIN_PX.
@@ -102,7 +113,7 @@ function drawGrid(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, them
   for (; ; g += 2) {
     const spacing = 2 ** (g + z);
     if (spacing > GRID_MAX_PX || spacing > 4 * Math.max(vp.width, vp.height)) break;
-    const alpha = GRID_TIER_ALPHA * smoothstep(GRID_MIN_PX, GRID_FADE_PX, spacing);
+    const alpha = gridLook.opacity * GRID_TIER_ALPHA * smoothstep(GRID_MIN_PX, GRID_FADE_PX, spacing);
     if (alpha <= 0.002) continue;
     ctx.globalAlpha = alpha;
     for (let x = firstLineOffset(cam.center.x, g, vp.width / 2, cam); x <= vp.width; x += spacing) {
@@ -118,19 +129,17 @@ function drawGrid(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, them
   return lines;
 }
 
-/** The regular grid keeps its squares between this many and twice this many CSS px as the zoom changes. */
-const REGULAR_MIN_PX = 32;
-
 /**
  * One spacing at a time: a power of two chosen so squares stay between 32 and 64 px, with the next finer spacing fading in and the
  * coarser one fading out across each doubling, so the grid never jumps. Lines (or dots at the crossings) are placed from the exact
  * remainder of the camera centre, like every other mark, so they are right at any depth.
  */
 function drawRegularGrid(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, theme: Theme, dots: boolean): number {
+  const REGULAR_MIN_PX = gridLook.min; // (squares stay between this many and twice this many CSS px as the zoom changes)
   const z = cam.zi + cam.zf;
   const g = Math.ceil(Math.log2(REGULAR_MIN_PX) - z);
   const s = 2 ** (g + z);
-  const base = dots ? 0.55 : 0.15;
+  const base = (dots ? 0.55 : 0.15) * gridLook.opacity;
   const tiers = [
     { g: g + 1, a: base * (1 - smoothstep(REGULAR_MIN_PX, 2 * REGULAR_MIN_PX, s)) },
     { g, a: base },
@@ -158,6 +167,26 @@ function drawRegularGrid(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewpor
       for (const x of xs) ctx.fillRect(Math.round(x), 0, 1, vp.height);
       for (const y of ys) ctx.fillRect(0, Math.round(y), vp.width, 1);
       marks += xs.length + ys.length;
+    }
+  }
+  if (gridLook.major) {
+    const gm = g + gridLook.major;
+    const spacing = 2 ** (gm + z);
+    ctx.globalAlpha = Math.min(1, base * 2.5);
+    const xs: number[] = [];
+    for (let x = firstLineOffset(cam.center.x, gm, vp.width / 2, cam); x <= vp.width; x += spacing) xs.push(x);
+    const ys: number[] = [];
+    for (let y = firstLineOffset(cam.center.y, gm, vp.height / 2, cam); y <= vp.height; y += spacing) ys.push(y);
+    if (dots) {
+      ctx.beginPath();
+      for (const x of xs) for (const y of ys) {
+        ctx.moveTo(Math.round(x) + 2.4, Math.round(y));
+        ctx.arc(Math.round(x), Math.round(y), 2.4, 0, Math.PI * 2);
+      }
+      ctx.fill();
+    } else {
+      for (const x of xs) ctx.fillRect(Math.round(x), 0, 1, vp.height);
+      for (const y of ys) ctx.fillRect(0, Math.round(y), vp.width, 1);
     }
   }
   ctx.globalAlpha = 1;

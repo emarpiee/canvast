@@ -454,7 +454,8 @@ Keep a large canvas in order, and reach things that lie under others.
   - Ratio presets: `16:9`, `A4 portrait`, a number, or a size in px (`2000 x 1920` becomes `25 : 24`).
   - Each object on a sheet has pins per axis (left, right, both, centre or scale) that decide what it does when the sheet is resized; *Scale contents* resizes everything with it.
 - **Masks:** a clipping mask (a sheet of any shape), a mask by opacity or brightness, or a brush mask painted in black and white with the Pen. Masks can be inverted, selected on their own and released. A click on a mask selects it as one unit; a double click goes inside.
-- **Snapping:** moving, resizing, turning, dragging a node and dragging a gradient's handles snap to other things, with guide lines (the magnet button turns it off).
+- **Moving a group:** a group or several selected move from anywhere in their box, gaps too; press outside it to draw a selection box.
+- **Snapping:** moving, resizing, turning, dragging a node and dragging a gradient's handles snap to other things, with guide lines (the magnet button turns it off). Moving, resizing and dragging a node also snap to the grid's lines as shown, and to a group's box and middle as a whole. *Snap to the grid* and *Snap distance* are in Settings > Drawing.
   - Boxes line up by their sides and middles.
   - Shapes snap by their geometry: a corner onto another corner or the middle of a side (a ring marks it), a corner onto any side (curves too), a straight side flush along a nearly parallel one (the side is drawn).
   - Turning brings a corner round to another, or a side parallel to a nearby one.

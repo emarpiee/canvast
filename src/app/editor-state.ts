@@ -1,3 +1,4 @@
+import type { Camera } from "../core/camera";
 import type { Dyadic } from "../core/dyadic";
 import type { Frame } from "../core/frames";
 import { expressExactIn, levelsBetween } from "../core/frames";
@@ -156,6 +157,8 @@ export class EditorState {
   alignBox = false;
   /** Snapping while moving (interaction/snap.ts). */
   snap = true;
+  /** The spacing of the grid lines to snap to, as a power of two in the camera's frame; null: none. */
+  gridStep: (cam: Camera) => number | null = () => null;
   /** Guide lines (screen px) shown while a move is snapped to something. */
   /** Snap guides in screen px: lines up with a box (x, y), a corner it went to (pt), a side it went onto (seg: x0, y0, x1, y1). */
   guides: { x?: number; y?: number; pt?: readonly [number, number]; seg?: readonly [number, number, number, number] } | null = null;

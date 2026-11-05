@@ -105,6 +105,8 @@ interface SnapContext {
   tx: Array<[number, number, number]>;
   ty: Array<[number, number, number]>;
   objs: CanvasObject[];
+  /** A group's box among the candidates: its exact lines, by the candidate's place. */
+  groupLines: Map<number, ExactLines>;
   /** The shapes themselves (ADR 0171): corners and sides of the others, and the moving corners (px at the start) and straight sides. */
   shape: { targets: SnapTargets; refs: CornerRef[]; src: number[]; srcRefs: CornerRef[]; srcSegs: Seg[] };
 }
@@ -1173,7 +1175,7 @@ export function attachTools(
         const near = (v: number, key: 0 | 1): number | null => {
           let best: number | null = null;
           for (const n of others) if (Math.abs(n.p[key] - v) <= SNAP_PX && (best === null || Math.abs(n.p[key] - v) < Math.abs(best - v))) best = n.p[key];
-          return best;
+          return nearerOf(v, best, gridScreen(v, key === 0 ? "x" : "y"));
         };
         const sx = near(at.x, 0);
         const sy = near(at.y, 1);
@@ -1499,8 +1501,16 @@ export function attachTools(
   const pressBecomesDrag = (gp: Extract<Gesture, { kind: "press" }>, s: ScreenPoint, alt = false): void => {
     const t = gp.target;
     // Only what is already selected moves: a press-and-slide on anything else (a shape, a path, a stroke, like a picture) draws the selection box.
-    const draggable = t && editor.selection.has(t.id) && !editor.readOnly;
-    if (t && draggable) {
+    // A group or several selected are moved from anywhere in their box: the gaps between their parts too, whatever lies under them.
+    const corners = editor.selectionBoxOnScreen?.frame.corners;
+    const inBox = !!corners && corners.every((c, i) => {
+      const n = corners[(i + 1) % corners.length]!;
+      return (n[0] - c[0]) * (gp.start.y - c[1]) - (n[1] - c[1]) * (gp.start.x - c[0]) >= 0;
+    });
+    const hasGaps = editor.selection.size > 1 || [...editor.selection].some((id) => { const o = doc.get(id); return !!o && isContainer(o); });
+    const inGaps = !gp.additive && !editor.readOnly && hasGaps && inBox;
+    const draggable = (!!t && editor.selection.has(t.id) && !editor.readOnly) || inGaps;
+    if (draggable) {
       // Alt held as the drag starts: the drag carries a copy (placed exactly on the original) and the original stays.
       if (alt && !editor.blockEdit()) duplicateSelection(doc, editor, view, 0);
       // A sheet always carries what is on it, picked with it or not.
@@ -1522,7 +1532,7 @@ export function attachTools(
     const chosen = new Set(ids);
     let box: ScreenBox | null = null;
     let ex: { minX: D.Dyadic; minY: D.Dyadic; maxX: D.Dyadic; maxY: D.Dyadic } | null = null;
-    const ctx: SnapContext = { box: undefined as unknown as ScreenBox, src: undefined as unknown as ExactLines, tx: [], ty: [], objs: [], shape: undefined as unknown as SnapContext["shape"] };
+    const ctx: SnapContext = { box: undefined as unknown as ScreenBox, src: undefined as unknown as ExactLines, tx: [], ty: [], objs: [], groupLines: new Map(), shape: undefined as unknown as SnapContext["shape"] };
     const tp: number[] = [], refs: CornerRef[] = [], segs: Seg[] = [], straight = new Set<number>();
     const src: number[] = [], srcRefs: CornerRef[] = [], srcSegs: Seg[] = [];
     const onScreen = (b: ScreenBox): boolean => [b.minX, b.minY, b.maxX, b.maxY].every((v) => Math.abs(v) < 1e7);
@@ -1557,11 +1567,57 @@ export function attachTools(
         ctx.objs.push(po.obj);
       }
     }
-    if (!box || !ex || !ctx.objs.length) return null;
+    // A group is a target as a whole too: its box's edges and middle, as one object has (what moves out of it leaves it).
+    const groups = new Map<string, { o: CanvasObject; b: ScreenBox; min: WorldPoint; max: WorldPoint }>();
+    for (const po of vis) {
+      if (chosen.has(po.obj.id) || po.cover || !onScreen(po.box)) continue;
+      for (const id of po.obj.groups ?? []) {
+        const e = boundsIn(po.obj, frame);
+        const had = groups.get(id);
+        groups.set(id, !had ? { o: po.obj, b: { ...po.box }, min: e.min, max: e.max } : {
+          o: had.o,
+          b: { minX: Math.min(had.b.minX, po.box.minX), minY: Math.min(had.b.minY, po.box.minY), maxX: Math.max(had.b.maxX, po.box.maxX), maxY: Math.max(had.b.maxY, po.box.maxY) },
+          min: { x: D.cmp(e.min.x, had.min.x) < 0 ? e.min.x : had.min.x, y: D.cmp(e.min.y, had.min.y) < 0 ? e.min.y : had.min.y },
+          max: { x: D.cmp(e.max.x, had.max.x) > 0 ? e.max.x : had.max.x, y: D.cmp(e.max.y, had.max.y) > 0 ? e.max.y : had.max.y },
+        });
+      }
+    }
+    for (const g2 of groups.values()) {
+      ctx.groupLines.set(ctx.objs.length, exactLines(g2.min, g2.max));
+      ctx.tx.push([g2.b.minX, (g2.b.minX + g2.b.maxX) / 2, g2.b.maxX]);
+      ctx.ty.push([g2.b.minY, (g2.b.minY + g2.b.maxY) / 2, g2.b.maxY]);
+      ctx.objs.push(g2.o);
+    }
+    if (!box || !ex) return null;
     ctx.shape = { targets: snapTargets(tp, segs, straight), refs, src, srcRefs, srcSegs };
     ctx.box = box;
     ctx.src = exactLines({ x: ex.minX, y: ex.minY }, { x: ex.maxX, y: ex.maxY });
     return ctx;
+  };
+
+  /** The nearest grid line to a line on the screen, within reach (a screen position); null when there is none or snapping to it is off. */
+  const gridScreen = (v: number, axis: "x" | "y"): number | null => {
+    const q = editor.gridStep(view.camera);
+    if (q === null) return null;
+    const p = world({ x: axis === "x" ? v : 0, y: axis === "y" ? v : 0 } as ScreenPoint)[axis];
+    const d = D.toNumber(D.sub(D.roundTo(p, q), p)) * 2 ** (view.camera.zi + view.camera.zf);
+    return Math.abs(d) <= SNAP_PX ? v + d : null;
+  };
+  /** Of a line of something and a grid line, the one nearer to `v`. */
+  const nearerOf = (v: number, a: number | null, b: number | null): number | null => (a === null ? b : b === null || Math.abs(a - v) <= Math.abs(b - v) ? a : b);
+  /** For a moving box: the move that puts the nearest of its three lines exactly on a grid line. */
+  const gridMove = (lines: readonly D.Dyadic[], moved: D.Dyadic): { move: D.Dyadic; dist: number; by: number; line: number } | null => {
+    const q = editor.gridStep(view.camera);
+    if (q === null) return null;
+    const px = 2 ** (view.camera.zi + view.camera.zf);
+    let best: { move: D.Dyadic; dist: number; by: number; line: number } | null = null;
+    lines.forEach((l, line) => {
+      const at2 = D.add(l, moved);
+      const on = D.roundTo(at2, q);
+      const by = D.toNumber(D.sub(on, at2)) * px;
+      if (Math.abs(by) <= SNAP_PX && (!best || Math.abs(by) < best.dist)) best = { move: D.sub(on, l), dist: Math.abs(by), by, line };
+    });
+    return best;
   };
 
   const updateMove = (at: ScreenPoint): void => {
@@ -1583,7 +1639,9 @@ export function attachTools(
       const sh = sn.shape;
       const moved = sh.src.map((v, i) => v + (i % 2 ? oy : ox));
       const movedSegs = sh.srcSegs.map(([a, b2, c, d]): Seg => [a + ox, b2 + oy, c + ox, d + oy]);
-      const hit = shapeSnap(sh.targets, moved, movedSegs, Math.min(hx?.dist ?? Infinity, hy?.dist ?? Infinity));
+      const gx = g.frame === view.frame ? gridMove(sn.src.x, dx) : null;
+      const gy = g.frame === view.frame ? gridMove(sn.src.y, dy) : null;
+      const hit = shapeSnap(sh.targets, moved, movedSegs, Math.min(hx?.dist ?? Infinity, hy?.dist ?? Infinity, gx?.dist ?? Infinity, gy?.dist ?? Infinity));
       if (hit) {
         editor.guides = hit.guides;
         if (hit.target !== null) {
@@ -1601,14 +1659,22 @@ export function attachTools(
         editor.changed();
         return;
       }
-      // The alignment is exact: target line minus where the moving line started.
-      if (hx) {
-        const t = linesOf(sn.objs[hx.target]!, g.frame);
+      // The alignment is exact: target line minus where the moving line started. What is nearer holds: another's line, or the grid's.
+      const lineX = [b.minX + ox, (b.minX + b.maxX) / 2 + ox, b.maxX + ox];
+      const lineY = [b.minY + oy, (b.minY + b.maxY) / 2 + oy, b.maxY + oy];
+      if (gx && (!hx || gx.dist < hx.dist)) {
+        dx = gx.move;
+        editor.guides = { x: lineX[gx.line]! + gx.by };
+      } else if (hx) {
+        const t = sn.groupLines.get(hx.target) ?? linesOf(sn.objs[hx.target]!, g.frame);
         dx = D.sub(t.x[hx.line]!, sn.src.x[hx.source]!);
         editor.guides = { x: sn.tx[hx.target]![hx.line]! };
       }
-      if (hy) {
-        const t = linesOf(sn.objs[hy.target]!, g.frame);
+      if (gy && (!hy || gy.dist < hy.dist)) {
+        dy = gy.move;
+        editor.guides = { ...editor.guides, y: lineY[gy.line]! + gy.by };
+      } else if (hy) {
+        const t = sn.groupLines.get(hy.target) ?? linesOf(sn.objs[hy.target]!, g.frame);
         dy = D.sub(t.y[hy.line]!, sn.src.y[hy.source]!);
         editor.guides = { ...editor.guides, y: sn.ty[hy.target]![hy.line]! };
       }
@@ -1652,14 +1718,14 @@ export function attachTools(
         const ey = fixed.y + k * sy;
         const hx = moveX && sx !== 0 ? bestSnap([ex, ex, ex], sn.tx) : null;
         const hy = moveY && sy !== 0 ? bestSnap([ey, ey, ey], sn.ty) : null;
-        if (hx && (!hy || hx.dist <= hy.dist)) {
-          const t = sn.tx[hx.target]![hx.line]!;
-          k = (t - fixed.x) / sx;
-          editor.guides = { x: t };
-        } else if (hy) {
-          const t = sn.ty[hy.target]![hy.line]!;
-          k = (t - fixed.y) / sy;
-          editor.guides = { y: t };
+        const tx = moveX && sx !== 0 ? nearerOf(ex, hx ? sn.tx[hx.target]![hx.line]! : null, gridScreen(ex, "x")) : null;
+        const ty = moveY && sy !== 0 ? nearerOf(ey, hy ? sn.ty[hy.target]![hy.line]! : null, gridScreen(ey, "y")) : null;
+        if (tx !== null && (ty === null || Math.abs(tx - ex) <= Math.abs(ty - ey))) {
+          k = (tx - fixed.x) / sx;
+          editor.guides = { x: tx };
+        } else if (ty !== null) {
+          k = (ty - fixed.y) / sy;
+          editor.guides = { y: ty };
         }
       }
       kx = ky = k;
@@ -1669,15 +1735,15 @@ export function attachTools(
       if (sn) {
         const hx = moveX ? bestSnap([px, px, px], sn.tx) : null;
         const hy = moveY ? bestSnap([py, py, py], sn.ty) : null;
-        if (hx && sx !== 0) {
-          const t = sn.tx[hx.target]![hx.line]!;
-          kx = (t - fixed.x) / sx;
-          editor.guides = { x: t };
+        const tx = moveX && sx !== 0 ? nearerOf(px, hx ? sn.tx[hx.target]![hx.line]! : null, gridScreen(px, "x")) : null;
+        const ty = moveY && sy !== 0 ? nearerOf(py, hy ? sn.ty[hy.target]![hy.line]! : null, gridScreen(py, "y")) : null;
+        if (tx !== null) {
+          kx = (tx - fixed.x) / sx;
+          editor.guides = { x: tx };
         }
-        if (hy && sy !== 0) {
-          const t = sn.ty[hy.target]![hy.line]!;
-          ky = (t - fixed.y) / sy;
-          editor.guides = { ...editor.guides, y: t };
+        if (ty !== null) {
+          ky = (ty - fixed.y) / sy;
+          editor.guides = { ...editor.guides, y: ty };
         }
       }
     }

@@ -1153,3 +1153,48 @@ test("Size menu: vectors take a size too, a short stroke the width of a long one
   await app.frame();
   expect(Math.abs((await width(a!)) - long)).toBeLessThan(2);
 });
+
+test("a lone object snaps to the grid's lines with the magnet on, and not with Snap to the grid off", async ({ app }) => {
+  const p = app.page;
+  const img = await importImage(app);
+  await key(app, "v");
+  await p.evaluate(() => window.__canvastDebug.setSetting("snap.reachPx", 40)); // (always within reach of a line)
+  const box = async () => (await screenOfObject(app, img.id))!.box;
+  const dragBy = async (dx: number): Promise<void> => {
+    const b = await box();
+    await app.drag({ x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 }, { x: (b.minX + b.maxX) / 2 + dx, y: (b.minY + b.maxY) / 2 });
+    await app.frame();
+  };
+  await dragBy(100);
+  const on = await box();
+  await dragBy(3);
+  expect(Math.abs((await box()).minX - on.minX), "stays on its line").toBeLessThan(0.5);
+  await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false));
+  await dragBy(3);
+  expect(Math.abs((await box()).minX - on.minX - 3), "moves as dragged").toBeLessThan(0.5);
+});
+
+test("the grid's settings change what is drawn", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.setSetting("ui.pattern", "grid"));
+  for (const [k, v] of [["grid.size", "fine"], ["grid.major", "4"], ["grid.opacity", 40]] as const) await p.evaluate(([a, b]) => window.__canvastDebug.setSetting(a as "grid.size", b as "fine"), [k, v] as const);
+  await app.frame();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("two selected move from a gap between them, in their box", async ({ app }) => {
+  const a = await importImage(app);
+  await key(app, "h");
+  await app.drag({ x: 500, y: 300 }, { x: 800, y: 300 });
+  const b = await importImage(app);
+  await key(app, "v");
+  await key(app, "Control+a");
+  await app.frame();
+  const boxOf = async (id: string) => (await screenOfObject(app, id))!.box;
+  const [x0, y0] = [await boxOf(a.id), await boxOf(b.id)];
+  const gap = { x: (Math.min(x0.maxX, y0.maxX) + Math.max(x0.minX, y0.minX)) / 2, y: (x0.minY + x0.maxY) / 2 };
+  await app.drag(gap, { x: gap.x, y: gap.y + 80 });
+  await app.frame();
+  expect(Math.abs((await boxOf(a.id)).minY - x0.minY - 80), "moved").toBeLessThan(8);
+  expect(Math.abs((await boxOf(b.id)).minY - y0.minY - 80), "moved").toBeLessThan(8);
+});
