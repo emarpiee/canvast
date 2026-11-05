@@ -1310,6 +1310,7 @@ test("a note on full screen covers the panel beside it: nothing of the panel sho
   await p.getByTestId("assets-import-input").setInputFiles({ name: "dated.md", mimeType: "text/markdown", buffer: Buffer.from("---\ncreated: 2024-09-02T12:48\n---\n# Dated\n") });
   await p.locator('[data-testid="asset-card"]').dblclick();
   await expect(page(p).locator("h1")).toHaveText("Dated");
+  if (!(await p.getByTestId("asset-download").isVisible())) await p.locator(".viewer-details").click(); // (the details panel, if it is closed)
   const icon = p.locator(".asset-field .field-type:disabled").first();
   await expect(icon).toBeVisible();
   const box = (await icon.boundingBox())!;
