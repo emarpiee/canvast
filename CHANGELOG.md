@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.8 — Reset one pattern setting (2026-11-05)
+
+- **Added:** in the Pattern panel, double-clicking a setting's name, or its slider, resets that setting alone.
+
 ## 0.54.7 — Undo and redo in the Pattern panel (2026-11-05)
 
 - **Changed:** in the Pattern panel, a change after a pause is its own undo step, instead of the whole session being one; a slider's drag stays one step.

@@ -383,3 +383,20 @@ test("Grid pattern: a shape's corner lands on a crossing of its lines, on both a
   await landsOn(a, 5, 5);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Pattern: double-clicking a setting resets that one, not the others", async ({ app }) => {
+  const p = app.page;
+  await p.click("[data-pattern-panel]");
+  await choose(app, "tides");
+  const num = (k: string) => p.locator(`[data-k="${k}"] input[type=number]`);
+  const other = await num("layers").inputValue();
+  await setNumber(app, "layers", String(Number(other) + 2));
+  const first = p.locator('[data-k]:has(input[type=range])').nth(1);
+  const k = (await first.getAttribute("data-k"))!;
+  const was = await num(k).inputValue();
+  await setNumber(app, k, String(Number(was) + 1));
+  await first.locator(".adj-label").dblclick({ position: { x: 2, y: 4 } });
+  await expect(num(k)).toHaveValue(was);
+  if (k !== "layers") await expect(num("layers")).toHaveValue(String(Number(other) + 2));
+  expect(app.consoleErrors).toEqual([]);
+});

@@ -141,6 +141,13 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
         if (on) locks().add(s.k); else locks().delete(s.k);
         (e.currentTarget as HTMLElement).setAttribute("aria-pressed", String(on));
       });
+      r.querySelector(".adj-label, .pg-check")?.setAttribute("title", "Double-click to reset");
+      r.addEventListener("dblclick", (e) => {
+        const on = e.target as HTMLElement;
+        if (on.closest("[data-lock]") || !on.closest(".adj-label, .pg-check, input[type=range]")) return;
+        set(s.k, s.def);
+        build();
+      });
       if (s.t === "range") {
         const range = r.querySelector<HTMLInputElement>("input[type=range]")!, num = r.querySelector<HTMLInputElement>("input[type=number]")!;
         range.addEventListener("input", () => { num.value = range.value; set(s.k, Number(range.value)); });
