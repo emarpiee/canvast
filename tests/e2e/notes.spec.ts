@@ -1155,6 +1155,7 @@ test("a note's Links card lists what it links to, pictures too, and links that f
   await expect(page(p).locator("h1")).toHaveText("Note");
   await expect(p.getByTestId("asset-backlinks")).toContainText("No notes link here.");
   await expect(out.locator("[data-count]")).toHaveText("3");
+  expect(app.consoleErrors).toEqual([]); // (the note written out the same by the faster walk)
 });
 
 test("a picture dragged to another place in a note is one step of undo", async ({ app }) => {
