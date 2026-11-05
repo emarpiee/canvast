@@ -1825,6 +1825,8 @@ test("a note's pictures are found by their files: pasted ones (the disk's name n
   await expect(entry("out.md")).toBeAttached({ timeout: 15_000 });
   // (its folder comes a moment after the item, and its links are read from there)
   await expect.poll(() => page.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.find((e) => e.name === "out.md")?.folderIds?.length ?? 0), { timeout: 15_000 }).toBeGreaterThan(0);
+  // (the note's picture is taken in on its own: a note opened before it has only its link)
+  await expect.poll(() => page.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.some((e) => /^orig/.test(e.name) && e.present)), { timeout: 15_000 }).toBe(true);
   await entry("out.md").dblclick();
   await expect.poll(shown).toEqual([true, true, true, true, true]);
   // Made rich text: a file of that kind, in its place.
