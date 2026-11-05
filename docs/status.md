@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.11: fewer guides (2026-11-05)
+
+- **Implemented:** Figure Proportion and Face Proportion removed; 29 guides.
+- **Tested:** typecheck, checks and unit tests locally; `Tests` on GitHub.
+- **Known failures:** none known until that run reports.
+- **Unverified:** in the app by hand.
+- **Committed:** v0.54.11.
+- **Next bounded task:** read the `Tests` run.
+
 ## v0.54.10: Guides (2026-11-05)
 
 - **Implemented:** 31 guides in `src/gen` (`guides.ts`, `guide-kit.ts`), the tabs in the Pattern panel (`ui/tabs.ts`, shared with Styles), sheets with no fill, ADR.

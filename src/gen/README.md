@@ -2,7 +2,7 @@
 
 Vector pattern generators for the web, with no dependencies and no link to the app they were made in (canvast). A generator is a pure function: the same settings and the same seed always give the same shapes. It makes plain vector shapes (Bézier paths with a fill and an outline, gradients included), and `toSvg` writes them as a standalone SVG. It runs anywhere JavaScript runs: a browser, a worker, Node, a server. It is small (about 36 KiB minified for all 39 generators), touches no page, and works from `file://`.
 
-* **69 generators**: 38 patterns in six families and 31 guides (`guide: true`) in six more (below), each with settings of its own that it declares as data: ranges, choices, switches and colours, in titled sections. A form can be built from them without knowing the generator (the demo page does).
+* **67 generators**: 38 patterns in six families and 29 guides (`guide: true`) in six more (below), each with settings of its own that it declares as data: ranges, choices, switches and colours, in titled sections. A form can be built from them without knowing the generator (the demo page does).
 * **A seed** for repeatable results (a regular pattern is exact until its *Looseness* is raised, and only then does the seed move things about), and **random settings** (`randomValues`) that stay inside the middle of each range, with colours that go together.
 * **Sizes are fractions of the box**, so a result looks the same at any size and ratio; an exact cell size or line height (Grid, Pixel Grid, Baseline Grid) is in the box's own units.
 * **Guides** are generators for laying out and composing work. They start with no background (`bg` is `""`, and the setting stays), and `randomValues` keeps their own settings, changing only their look.
@@ -86,7 +86,7 @@ Without a bundler: `npm run build:patterns` (in canvast) writes `dist-patterns/`
 | Layout (guides) | Grid (`grid`), Column Grid (`column-grid`), Modular Grid (`modular-grid`), Baseline Grid (`baseline-grid`), Van de Graaf Canon (`van-de-graaf`), Bleed and Crop Marks (`crop-marks`) |
 | Perspective (guides) | Isometric Grid (`isometric-grid`), Dimetric Grid (`dimetric-grid`), Triangle Grid (`triangle-grid`), Perspective (`perspective`), Fisheye Grid (`fisheye-grid`) |
 | Geometry (guides) | Hex Grid (`hex-grid`), Polar Grid (`polar-grid`), Radial Symmetry (`radial-symmetry`), Logo Construction Circles (`logo-circles`), Sacred Circles (`sacred-circles`) |
-| Art study (guides) | Pixel Grid (`pixel-grid`), Comic Panels (`comic-panels`), Figure Proportion (`figure-proportion`), Face Proportion (`face-proportion`) |
+| Art study (guides) | Pixel Grid (`pixel-grid`), Comic Panels (`comic-panels`) |
 
 ## Files
 

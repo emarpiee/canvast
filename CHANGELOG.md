@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.11 — Fewer guides (2026-11-05)
+
+- **Removed:** the **Figure Proportion** and **Face Proportion** guides.
+
 ## 0.54.10 — Guides (2026-11-05)
 
 - **Added:** the Pattern panel has two tabs, **Patterns** and **Guides**. Each keeps its last choice, and the panel remembers the tab.

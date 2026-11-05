@@ -459,36 +459,11 @@ export const comicPanels = guide("comic-panels", "Comic Panels", "Art study", "P
   });
 }, { frame: false });
 
-export const figureProportion = guide("figure-proportion", "Figure Proportion", "Art study", "A standing figure measured in heads, a common drawing convention", [R("heads", "Heads tall", 5, 10, 8, 0.5), T("halves", "Half heads", false), T("masses", "Head and masses", true), R("shoulders", "Shoulders", 100, 400, 233), R("hips", "Hips", 100, 400, 150)], (p, { n, b }) => {
-  const k = n("heads"), head = p.h / k;
-  p.line(p.cx, p.y0, p.cx, p.y1, true);
-  for (let i = 0; i <= Math.ceil(k); i++) { const y = Math.min(p.y0 + i * head, p.y1); p.line(p.x0, y, p.x1, y, i === 0 || i === 1 || Math.abs(i - k / 2) < 0.5); }
-  if (b("halves")) for (let i = 0; i < Math.floor(k); i++) { const y = p.y0 + (i + 0.5) * head; p.line(p.cx - head, y, p.cx + head, y); }
-  if (b("masses")) {
-    p.poly(Array.from({ length: 36 }, (_, i): P => { const a = (i * Math.PI) / 18; return [p.cx + 0.375 * head * Math.cos(a), p.y0 + head / 2 + (head / 2) * Math.sin(a)]; }));
-    const [sw, hw] = [(n("shoulders") / 100) * head, (n("hips") / 100) * head], shoulder = p.y0 + head * 1.5, hip = p.y0 + (k / 2) * head;
-    p.poly([[p.cx - sw / 2, shoulder], [p.cx + sw / 2, shoulder], [p.cx + hw / 2, hip], [p.cx - hw / 2, hip]]);
-  }
-}, { frame: false });
-
-export const faceProportion = guide("face-proportion", "Face Proportion", "Art study", "A head built on a ball and its plane, with the thirds of the face, a common drawing convention", [T("thirds", "Thirds", true), T("fifths", "Fifths", true), T("eyeLine", "Eye line", true), T("outline", "Jaw", true)], (p, { b }) => {
-  // A ball, its side plane cut at a third above and below the middle: hairline, brow, nose and chin are evenly apart.
-  const r = Math.min((3 * p.h) / 7, p.w / 2.2), top = p.cy - (7 * r) / 6, cy = top + r, d = (2 * r) / 3;
-  const [hair, brow, nose, chin] = [cy - d, cy, cy + d, cy + 2 * d];
-  p.circle(p.cx, cy, r, true);
-  const half = Math.sqrt(r * r - d * d) * 0.82;
-  p.line(p.cx, top, p.cx, chin);
-  if (b("thirds")) for (const y of [hair, brow, nose, chin]) p.line(p.cx - r, y, p.cx + r, y, y === brow);
-  if (b("eyeLine")) p.line(p.cx - r, (top + chin) / 2, p.cx + r, (top + chin) / 2);
-  if (b("fifths")) for (let i = 0; i <= 5; i++) { const x = p.cx - half + (i / 5) * 2 * half; p.line(x, hair, x, chin); }
-  if (b("outline")) p.curve([[p.cx - r * 0.75, cy + d / 2], [p.cx - r * 0.7, nose], [p.cx - r * 0.42, nose + d * 0.78], [p.cx, chin], [p.cx + r * 0.42, nose + d * 0.78], [p.cx + r * 0.7, nose], [p.cx + r * 0.75, cy + d / 2]], true);
-}, { frame: false });
-
 export const GUIDES: readonly Generator[] = [
   goldenRatio, goldenSpiral, fibonacciGrid, rootRectangles, modularScale,
   ruleOfThirds, dynamicSymmetry, harmonicArmature, rabatment, diagonalGrid, safeMarks,
   grid, columnGrid, modularGrid, baselineGrid, vanDeGraaf, cropMarks,
   isometricGrid, dimetricGrid, triangleGrid, perspective, fisheyeGrid,
   hexGrid, polarGrid, radialSymmetry, logoCircles, sacredCircles,
-  pixelGrid, comicPanels, figureProportion, faceProportion,
+  pixelGrid, comicPanels,
 ];

@@ -103,9 +103,9 @@ describe("pattern generators (ADR 0162)", () => {
     const ends = (s: { n: readonly number[] }) => [s.n[0]!, s.n[1]!, s.n[s.n.length - NODE]!, s.n[s.n.length - NODE + 1]!] as const;
     const PHI = (1 + Math.sqrt(5)) / 2;
 
-    it("are 31, each starting with no background and able to have one", () => {
+    it("are 29, each starting with no background and able to have one", () => {
       const guides = GENERATORS.filter((g) => g.guide);
-      expect(guides).toHaveLength(31);
+      expect(guides).toHaveLength(29);
       for (const g of guides) {
         const bg = settingsOf(g).find((s) => s.k === "bg")!;
         expect(bg.t === "colour" && bg.def === "" && bg.hide === true && bg.shown === "#ffffff", g.id).toBe(true);
@@ -199,13 +199,9 @@ describe("pattern generators (ADR 0162)", () => {
       expect(all("modular-grid", { cols: 3, rows: 2 })).toHaveLength(6);
     });
 
-    it("Comic Panels: Random follows the seed; Face Proportion: its thirds are even", () => {
+    it("Comic Panels: Random follows the seed", () => {
       const v = { ...defaultValues(G("comic-panels")), layout: "random" };
       expect(generate(G("comic-panels"), v, 4, 900, 600)).toEqual(generate(G("comic-panels"), v, 4, 900, 600));
-      const levels = all("face-proportion", { fifths: false, eyeLine: false, outline: false }).filter((s) => s.n.length === 2 * NODE && s.n[1] === s.n[NODE + 1]).map((s) => s.n[1]!).sort((a, b) => a - b);
-      expect(levels).toHaveLength(4);
-      expect(levels[1]! - levels[0]!).toBeCloseTo(levels[2]! - levels[1]!, 6);
-      expect(levels[3]! - levels[2]!).toBeCloseTo(levels[2]! - levels[1]!, 6);
     });
   });
 
