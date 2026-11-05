@@ -1519,6 +1519,8 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 }
 /* The [[ and # lists: as wide as their names (up to a readable width), never wider than the window. */
 .sun-editor-editable.se-theme-canvast .__se__t-code, .sun-editor.se-theme-canvast .__se__t-code { color: var(--hud-fg); background-color: var(--hud-hover); } /* (the editor's own is one fixed grey) */
+/* A long note: what is off the page is laid out when it comes near, so opening one does not wait for all of it. */
+.sun-editor-editable > * { content-visibility: auto; contain-intrinsic-size: auto calc(3 * var(--text-md)); }
 ::highlight(canvast-code-keyword) { color: var(--code-keyword); }
 ::highlight(canvast-code-string) { color: var(--code-string); }
 ::highlight(canvast-code-comment) { color: var(--code-comment); }

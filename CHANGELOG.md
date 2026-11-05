@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.32 — Long notes open faster (2026-11-05)
+
+- **Fixed:** a note's blocks off the page are laid out when they come near, so a long note does not wait for all of it on opening.
+- **Fixed:** the code colours' lists grew by copying at each word, which was slow in a note with much code.
+
 ## 0.54.31 — Density reaches everything on an edge (2026-11-05)
 
 - **Fixed:** Dense, Compact and Comfortable now reach the viewer's top bar and the room under it, the bars and panels placed against an edge, the canvas's small controls and the layer rows' buttons, which kept fixed sizes.

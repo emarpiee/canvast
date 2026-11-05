@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.32: long notes open faster (2026-11-05)
+
+- **Implemented:** `content-visibility: auto` on a note's blocks; code colours' lists by pushing.
+- **Tested:** `npm run typecheck`, checks and unit tests locally; `notes.spec` on GitHub's `Tests` run; the time measured with a temporary profile, 300 KB note, before: about 4.5 s of work.
+- **Known failures:** none known until that run reports.
+- **Unverified:** page numbers and the scrollbar in a long note until it has been scrolled.
+- **Committed:** v0.54.32.
+- **Next bounded task:** read the `Tests` run and the profile.
+
 ## v0.54.31: density reaches everything on an edge (2026-11-05)
 
 - **Implemented:** offsets from an edge in `--edge`, `--near`, `--s-*`, not fixed `--sp-*`; a few controls and icons by their tokens.
