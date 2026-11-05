@@ -1090,7 +1090,7 @@ test("the lag monitor logs counts beside the processes' use, outside the workspa
     await page.getByTestId("import-input").setInputFiles({ name: "secretname.png", mimeType: "image/png", buffer: makePng(40, 40, () => [1, 2, 3, 255]) });
     const path = await page.evaluate(() => (window as unknown as { canvastDesktop?: { lagFile?(): Promise<string> } }).canvastDesktop?.lagFile?.());
     expect(path, "where it logs").toBeTruthy();
-    expect(path!.startsWith(ws)).toBe(false);
+    expect(path!.startsWith(`${ws}/`)).toBe(false);
     await expect.poll(() => (existsSync(path!) ? readFileSync(path!, "utf8") : ""), { timeout: 20_000 }).toContain('"procs"');
     const text = readFileSync(path!, "utf8");
     expect(JSON.parse(text.trim().split("\n")[0]!)).toHaveProperty("freeMB");
@@ -1108,26 +1108,26 @@ test("a library folder deleted outside the app stays deleted, while it runs and 
     await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f1", "Going"));
     await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f2", "Staying"));
     await page.evaluate(() => window.__canvastDebug.flushStorage());
-    await expect.poll(() => existsSync(join(ws, "library/Going")), { timeout: 20_000 }).toBe(true);
+    await expect.poll(() => existsSync(join(ws, "library/going")), { timeout: 20_000 }).toBe(true);
     await page.waitForTimeout(500);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
-    rmSync(join(ws, "library/Going"), { recursive: true });
+    rmSync(join(ws, "library/going"), { recursive: true });
     await expect.poll(names, { timeout: 20_000 }).toEqual(["Staying"]);
     await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f3", "Another"));
     await page.evaluate(() => window.__canvastDebug.flushStorage());
-    await expect.poll(() => existsSync(join(ws, "library/Another")), { timeout: 20_000 }).toBe(true);
-    expect(existsSync(join(ws, "library/Going"))).toBe(false);
+    await expect.poll(() => existsSync(join(ws, "library/another")), { timeout: 20_000 }).toBe(true);
+    expect(existsSync(join(ws, "library/going"))).toBe(false);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
   } finally {
     await app.close();
   }
   // While it is closed.
-  rmSync(join(ws, "library/Staying"), { recursive: true });
+  rmSync(join(ws, "library/staying"), { recursive: true });
   ({ app, page } = await launch(ws));
   try {
     await expect.poll(names, { timeout: 20_000 }).toEqual(["Another"]);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
-    expect([existsSync(join(ws, "library/Going")), existsSync(join(ws, "library/Staying"))]).toEqual([false, false]);
+    expect([existsSync(join(ws, "library/going")), existsSync(join(ws, "library/staying"))]).toEqual([false, false]);
   } finally {
     await app.close();
   }
