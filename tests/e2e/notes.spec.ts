@@ -1306,6 +1306,7 @@ test("in the library's viewer the arrows go to the next note unless the cursor i
 
 test("a note on full screen covers the panel beside it: nothing of the panel shows through", async ({ app }) => {
   const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.setSetting("notes.autoDates", true)); // (an automatic date's icon is the disabled, translucent one)
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles({ name: "dated.md", mimeType: "text/markdown", buffer: Buffer.from("---\ncreated: 2024-09-02T12:48\n---\n# Dated\n") });
   await p.locator('[data-testid="asset-card"]').dblclick();
