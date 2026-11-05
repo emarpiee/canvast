@@ -100,3 +100,29 @@ for (const theme of ["light", "dark"] as const) {
     expect(found).toEqual([]);
   });
 }
+
+test("code in a note: every colour keeps 4.5:1 on a code block, and inline code on the page, in both themes", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "code.md", mimeType: "text/markdown", buffer: Buffer.from("```python\ndef f(): pass\n```\n\nSome `code` here\n") });
+  await p.locator('[data-testid="asset-card"][title="code.md"]').dblclick();
+  await expect(p.locator(".sun-editor-editable pre")).toBeVisible();
+  for (const theme of ["light", "dark"] as const) {
+    await p.evaluate((t) => window.__canvastDebug.setSetting("ui.theme", t), theme);
+    await p.waitForTimeout(100);
+    // (what a highlight paints cannot be read from the page: each colour is tried in a line of the block itself)
+    await p.evaluate(() => {
+      const pre = document.querySelector(".sun-editor-editable pre")!;
+      pre.querySelectorAll("[data-probe]").forEach((n) => n.remove());
+      for (const g of ["keyword", "string", "comment", "number", "function", "tag"]) {
+        const s = document.createElement("span");
+        s.dataset["probe"] = g;
+        s.style.color = `var(--code-${g})`;
+        s.textContent = ` ${g}`;
+        pre.append(s);
+      }
+    });
+    expect(await lowContrast(p, ".sun-editor-editable pre"), theme).toEqual([]);
+    expect(await lowContrast(p, ".sun-editor-editable p"), theme).toEqual([]);
+  }
+});

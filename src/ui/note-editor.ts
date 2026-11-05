@@ -2,6 +2,7 @@ import { ICONS } from "./icons";
 import { scrubNumbers } from "../colour-picker/scrub";
 import suneditor, { helper, interfaces } from "suneditor";
 import { htmlMarkdown, markdownHtml, pastedHtml, pastedMarkdown } from "../notes/note-markdown";
+import { dropCode, paintCode } from "../notes/code-colours";
 import { copyPlainText } from "../app/system-clipboard";
 import { align, anchor, audio, audioGallery, autocomplete, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
 import type { SunEditor } from "suneditor/types";
@@ -414,7 +415,7 @@ function fasterCode(editor: { $: { html: unknown } }): void {
   };
 }
 
-export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; text: string; style: NoteStyle; host: NoteHost; /** A sign typed over selected words goes round them (Settings). */ wrapSelection?: boolean; /** The note's name (no extension), for {{title}}. */ title: string; /** The whole place it is shown in (else the library's viewer). */ root?: HTMLElement | null }): Promise<NoteEditor> {
+export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; text: string; style: NoteStyle; host: NoteHost; /** A sign typed over selected words goes round them (Settings). */ wrapSelection?: boolean; /** Code blocks in a language are coloured (Settings). */ codeColours?: boolean; /** The note's name (no extension), for {{title}}. */ title: string; /** The whole place it is shown in (else the library's viewer). */ root?: HTMLElement | null }): Promise<NoteEditor> {
   const { host } = opts;
   /** Each address shown in the note for a library item → the link written in the file for it. */
   const links = new Map<string, string>();
@@ -735,6 +736,17 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     }
   };
   window.addEventListener("keydown", keys, true);
+  // Colours in code blocks, as they change in any way (typing, undo, a language chosen, a paste). Nothing here touches the note.
+  const codePage = el.querySelector(".sun-editor-editable");
+  let codeTimer: ReturnType<typeof setTimeout> | undefined;
+  const codeWatch = new MutationObserver(() => {
+    clearTimeout(codeTimer);
+    codeTimer = setTimeout(() => void (codePage && paintCode(el, codePage)), 120);
+  });
+  if (opts.codeColours && opts.kind !== "txt" && codePage) {
+    codeWatch.observe(codePage, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["class"] });
+    void paintCode(el, codePage);
+  }
   // A sign typed over selected words goes round them rather than replacing them, and they stay selected, so a second sign goes round too.
   let wrapped: { sign: string; words: string } | null = null;
   el.querySelector(".sun-editor-editable")?.addEventListener("beforeinput", (ev) => {
@@ -1027,6 +1039,9 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       }
     },
     destroy() {
+      codeWatch.disconnect();
+      clearTimeout(codeTimer);
+      dropCode(el);
       window.removeEventListener("keydown", keys, true);
       window.removeEventListener("pointerdown", pressed, true);
       strays.disconnect();

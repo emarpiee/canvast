@@ -1,6 +1,6 @@
 {
   "name": "canvast",
-  "version": "0.54.29",
+  "version": "0.54.30",
   "private": true,
   "description": "canvast — an offline-first endless canvas that ships as a single HTML file",
   "type": "module",
@@ -54,6 +54,7 @@
     "esbuild": "0.28.2",
     "gsap": "3.12.5",
     "lucide-static": "1.48.0",
+    "prismjs": "1.30.0",
     "suneditor": "3.4.1",
     "typescript": "7.0.2",
     "vitest": "5.0.4"

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.30 — Colours in notes' code (2026-11-05)
+
+- **Added:** code blocks with a language are coloured, in all 21 languages the code block offers. It is painted over the words, so the note, the cursor, undo and what is saved do not change. **Colour code in notes** in Settings > Notes turns it off.
+- **Fixed:** inline code in a note follows the theme: it was one fixed grey.
+
 ## 0.54.29 — Code comes off again (2026-11-05)
 
 - **Fixed:** in a note, **Code** and the signs for formats did not take a format off when a whole line was selected; they go by all the words selected.

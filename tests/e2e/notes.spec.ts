@@ -1256,3 +1256,26 @@ test("selected words: a sign typed over them goes round them, a format in a note
   await expect(para(3).locator("em")).toHaveCount(0);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a code block with a language is coloured over its words, and the note is as it was", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "code.md", mimeType: "text/markdown", buffer: Buffer.from("```python\ndef f():\n    return 'x'\n```\n") });
+  await p.locator('[data-testid="asset-card"][title="code.md"]').dblclick();
+  await expect(page(p).locator("pre")).toContainText("return");
+  const seen = (group: string) => p.evaluate((g) => {
+    const h = (CSS as unknown as { highlights?: Map<string, Iterable<Range>> }).highlights;
+    return h ? [...(h.get(`canvast-code-${g}`) ?? [])].map((r) => r.toString()) : null;
+  }, group);
+  if ((await seen("keyword")) === null) return; // (a browser with no highlights keeps it plain)
+  await expect.poll(() => seen("keyword")).toEqual(["def", "return"]);
+  expect(await seen("string")).toEqual(["'x'"]);
+  expect(await page(p).locator("pre span").count(), "nothing added to the note").toBe(0);
+  // Typing changes them.
+  await page(p).locator("pre").click();
+  await p.keyboard.press("Control+End");
+  await p.keyboard.press("Enter");
+  await p.keyboard.type("import os");
+  await expect.poll(() => seen("keyword")).toContain("import");
+  expect(app.consoleErrors).toEqual([]);
+});
