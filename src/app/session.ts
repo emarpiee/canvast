@@ -458,7 +458,10 @@ export class Session {
         const item: NoteMeta = { tags: e.tags ?? [], note: e.note ?? "", fields: e.fields ?? [] };
         if (sameMeta(fileMeta(kind, text) ?? NO_META, item)) continue;
         const written = withFileMeta(kind, text, item);
-        if (written !== text) await this.saveVersion(hash, new File([stampNote(kind, written, e.importedAt, Date.now())], e.name, { type: rec.type }));
+        if (written !== text) {
+          this.ownWrites++;
+          await this.saveVersion(hash, new File([stampNote(kind, written, e.importedAt, Date.now())], e.name, { type: rec.type })).finally(() => void this.ownWrites--);
+        }
       } catch (err) {
         console.warn(`canvast: the properties of a note could not be written into its file: ${(err as Error).message}`);
       }
@@ -647,7 +650,10 @@ export class Session {
           if (stayed && !moved.has(stayed.hash)) out = relinkNote(kind, out, { oldWiki: null, newWiki: "", oldPath: p, newPath: libraryLink(await this.itemPath(stayed, listing.folders)) });
         }
       }
-      if (out !== text) await this.saveVersion(e.hash, new File([out], e.name, { type: rec.type }));
+      if (out !== text) {
+        this.ownWrites++;
+        await this.saveVersion(e.hash, new File([out], e.name, { type: rec.type })).finally(() => void this.ownWrites--);
+      }
     }
   }
 
@@ -709,8 +715,10 @@ export class Session {
   }
 
   /** Told when an item gets a new version (a note saved, a file changed outside the app): its old hash and its new one. */
-  private readonly versionFns = new Set<(from: string, to: string) => void>();
-  onVersion(fn: (from: string, to: string) => void): void {
+  /** The app itself is writing a note's links or properties: a version from this is no change made elsewhere. */
+  private ownWrites = 0;
+  private readonly versionFns = new Set<(from: string, to: string, own: boolean) => void>();
+  onVersion(fn: (from: string, to: string, own: boolean) => void): void {
     this.versionFns.add(fn);
   }
 
@@ -921,7 +929,7 @@ export class Session {
    */
   async followAsset(from: string, to: string, size: { w: number; h: number }): Promise<void> {
     if (from === to) return;
-    for (const fn of this.versionFns) fn(from, to);
+    for (const fn of this.versionFns) fn(from, to, this.ownWrites > 0);
     await this.adoptNoteProps(to);
     if (!this.repo) return;
     await this.persistence.flush();

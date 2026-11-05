@@ -147,6 +147,8 @@ Remove the app the way you installed it (`sudo apt remove canvast`, `sudo dnf re
 
 ### What the desktop app keeps on this computer
 
+**Temporary:** this build keeps a lag monitor's log in `lag-monitor/` beside the app's settings: each 5 seconds, each process's use of the processor and memory and counts of what the app did. It holds no file names or contents, is never sent anywhere, and stops at 20 MB; the last 3 logs stay.
+
 Outside your workspace folders, in the app's data folder (above):
 
 | What | Where | Holds |

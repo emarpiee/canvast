@@ -13,6 +13,8 @@ import { anyNoteDirty, leaveAllNotes } from "../ui/note-session";
 import { mountFilePanel } from "../ui/file-panel";
 import type { FilePanelDeps } from "../ui/file-panel";
 import { viewKindNamed } from "../ui/file-views";
+import { startLagMonitor } from "./lag-monitor";
+import { lagCount } from "../core/lag-counters";
 import type { CardActions } from "../ui/file-views";
 import { ViewState } from "./view-state";
 import { newNoteFile } from "../notes/note-file";
@@ -799,6 +801,7 @@ async function start(): Promise<void> {
   let appView: AppView = "canvas";
   let contextUpdate: () => void = () => undefined;
   const draw = (): void => {
+    lagCount("frames");
     scheduled = false;
     // Assets view covers the canvas: rendering is suspended (frame waiters still resolve).
     if (appView === "canvas") {
@@ -2158,6 +2161,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     redrawNoteCards();
     wantNoteSync();
   };
+  startLagMonitor(() => ({ view: appView, objects: doc.size }), (text) => {
+    editor.message = text;
+    editor.changed();
+  });
   notePanelReady({ session, assets, settings, fonts: libraryFonts, importFiles: (files) => assetsView.importFiles(files), showInLibrary: (h) => (setView("assets"), void assetsView.reveal([h])), hidden: hiddenModeOn });
   // Alt+Shift+Left and Alt+Shift+Right: previous and next view (ADR 0116), on the canvas. (Alt with an arrow alone pans, as ever.)
   window.addEventListener("keydown", (e) => {

@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { writeFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./harness";
 import { makePng } from "./png";
@@ -561,7 +562,12 @@ test("a large 3D model (over 64 MB, read off the page): a picture in the library
     const v = [x, y, 0, x + 0.001, y, 0, x, y + 0.001, Math.sin(x * 9)];
     v.forEach((c, j) => big.writeFloatLE(c, at + 12 + j * 4));
   }
-  const c = await importModel(p, "big.stl", big);
+  const file = test.info().outputPath("big.stl");
+  writeFileSync(file, big);
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles(file);
+  const c = p.locator('[data-testid="asset-card"][title="big.stl"]');
+  await expect(c).toHaveCount(1, { timeout: 60_000 });
   await expect.poll(() => c.locator(".asset-thumb img").evaluate((i: HTMLImageElement) => i.naturalWidth), { timeout: 60_000 }).toBeGreaterThan(0);
   await c.dblclick();
   await expect(modelView(p)).toBeVisible({ timeout: 60_000 });

@@ -98,11 +98,13 @@ export class OpenNote {
     if (!followed.has(deps.session)) {
       followed.add(deps.session);
       // A new version of an open note (its properties written by a library change, the file saved elsewhere): it stays open.
-      deps.session.onVersion((from, to) => {
+      deps.session.onVersion((from, to, own) => {
         for (const n of open)
           if (n.hash === from && n.deps.session === deps.session) {
             n.hash = to;
             n.place.moved(from, to);
+            // (the app wrote it, following a moved file: no one's other work to warn about at the next save)
+            if (own) void deps.assets.record(to).then((r) => r?.blob.text()).then((text) => void (text !== undefined && (n.base = wordsOf(n.kind, text))));
           }
       });
       // A picture a note links to may arrive after the note (a sync tool writes them one by one).

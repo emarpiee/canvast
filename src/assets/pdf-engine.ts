@@ -7,6 +7,8 @@ export const PDF_CARD_EDGE = 1600;
 /** A PDF that takes longer than this for one picture keeps its plain card (a damaged file must not hold up an import). */
 const PICTURE_MS = 20_000;
 
+import { lagCount } from "../core/lag-counters";
+
 type PdfJs = typeof import("pdfjs-dist");
 let lib: Promise<{ m: PdfJs; factory: unknown; workerUrl: string }> | null = null;
 /** The library, set up at the first PDF. */
@@ -37,6 +39,7 @@ export const closePdf = (doc: PDFDocumentProxy): void => closers.get(doc)?.();
  * first of them closed, and one being closed refuses the next.
  */
 export async function openPdf(bytes: Uint8Array, password?: string): Promise<PDFDocumentProxy> {
+  lagCount("pdfOpens");
   const { m, factory, workerUrl } = await pdfJs();
   const port = new Worker(workerUrl);
   const worker = new m.PDFWorker({ port } as unknown as ConstructorParameters<PdfJs["PDFWorker"]>[0]);

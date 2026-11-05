@@ -25,6 +25,8 @@ const bridge: DesktopBridge = {
   write: (path, bytes, opts) => ipcRenderer.invoke("canvast:write", path, bytes, opts?.durable !== false),
   syncFiles: (paths) => ipcRenderer.invoke("canvast:syncFiles", paths),
   openFile: (path) => ipcRenderer.invoke("canvast:openFile", path),
+  lagSample: (json) => ipcRenderer.send("canvast:lagSample", json),
+  lagFile: () => ipcRenderer.invoke("canvast:lagFile"),
   openCopy: (name, bytes) => ipcRenderer.invoke("canvast:openCopy", name, bytes),
   copyFiles: (files, copies, also) => ipcRenderer.invoke("canvast:copyFiles", files, copies, also),
   startDrag: (files) => ipcRenderer.send("canvast:startDrag", files),

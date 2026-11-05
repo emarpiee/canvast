@@ -302,7 +302,7 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
   });
   const setZoom = (dir: 1 | -1 | 0): void => {
     if (dir === 0) zoom = "fit";
-    else zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, scaleOf(first.w) * ZOOM_STEP ** dir));
+    else zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, scaleOf((sizes.get(current) ?? first).w) * ZOOM_STEP ** dir));
     layout();
   };
   // Ctrl+wheel: zooms about the pointer. (In the viewer and in the panel alike: neither the page nor the canvas behind gets it.)
@@ -310,7 +310,7 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
     e.stopPropagation();
-    const was = scaleOf(first.w);
+    const was = scaleOf((sizes.get(current) ?? first).w); // (at Fit, each page has its own: the one in view stays as it is)
     const next = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, was * Math.exp(-e.deltaY * WHEEL_ZOOM)));
     if (next === was) return;
     const r = pages.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, k = next / was;

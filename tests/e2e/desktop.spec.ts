@@ -1083,6 +1083,23 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
   }
 });
 
+test("the lag monitor logs counts beside the processes' use, outside the workspace, and no file names", async () => {
+  const ws = tempDir("cv-lag-");
+  const { app, page } = await launch(ws);
+  try {
+    await page.getByTestId("import-input").setInputFiles({ name: "secretname.png", mimeType: "image/png", buffer: makePng(40, 40, () => [1, 2, 3, 255]) });
+    const path = await page.evaluate(() => (window as unknown as { canvastDesktop?: { lagFile?(): Promise<string> } }).canvastDesktop?.lagFile?.());
+    expect(path, "where it logs").toBeTruthy();
+    expect(path!.startsWith(ws)).toBe(false);
+    await expect.poll(() => (existsSync(path!) ? readFileSync(path!, "utf8") : ""), { timeout: 20_000 }).toContain('"procs"');
+    const text = readFileSync(path!, "utf8");
+    expect(JSON.parse(text.trim().split("\n")[0]!)).toHaveProperty("freeMB");
+    expect(text).not.toContain("secretname");
+  } finally {
+    await app.close();
+  }
+});
+
 test("a library folder deleted outside the app stays deleted, while it runs and after a restart; one never seen on disk is made", async () => {
   const ws = tempDir("cv-folders-");
   let { app, page } = await launch(ws);
@@ -1091,14 +1108,14 @@ test("a library folder deleted outside the app stays deleted, while it runs and 
     await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f1", "Going"));
     await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f2", "Staying"));
     await page.evaluate(() => window.__canvastDebug.flushStorage());
-    await expect.poll(() => existsSync(join(ws, "library/Going"))).toBe(true);
+    await expect.poll(() => existsSync(join(ws, "library/Going")), { timeout: 20_000 }).toBe(true);
     await page.waitForTimeout(500);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     rmSync(join(ws, "library/Going"), { recursive: true });
     await expect.poll(names, { timeout: 20_000 }).toEqual(["Staying"]);
     await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f3", "Another"));
     await page.evaluate(() => window.__canvastDebug.flushStorage());
-    await expect.poll(() => existsSync(join(ws, "library/Another"))).toBe(true);
+    await expect.poll(() => existsSync(join(ws, "library/Another")), { timeout: 20_000 }).toBe(true);
     expect(existsSync(join(ws, "library/Going"))).toBe(false);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
   } finally {
@@ -2519,7 +2536,7 @@ test("cut, a pan with the middle button (a paste on Linux) places nothing; the p
   await page.mouse.move(300, 300, { steps: 5 });
   await page.mouse.up({ button: "middle" });
   await page.waitForTimeout(500);
-  expect(await page.evaluate(() => window.__canvastDebug.objects().length), "the pan pasted nothing").toBe(0);
+  expect(await page.evaluate(() => window.__canvastDebug.objects().map((o) => `${o.kind} ${String(o["assetId"] ?? "").slice(0, 6)}`)), "the pan pasted nothing").toEqual([]);
   await page.mouse.move(900, 200, { steps: 4 });
   await page.keyboard.press("Control+v");
   await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);

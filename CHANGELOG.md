@@ -2,6 +2,9 @@
 
 ## 0.54.40 — Line art of 3D models (2026-11-06)
 
+- **Added:** a temporary lag monitor in the desktop app: a small log, outside the workspace, of each process's use of the processor and memory and of what the app did; no file names, nothing sent.
+- **Fixed:** a note no longer warns "Changed in another app" when the app itself rewrote its links.
+- **Fixed:** line art's shader compiles, so Lines shows. Zooming a PDF keeps the page in view at its size, when its pages differ.
 - **Added:** Lines in a 3D view: line art of the outer outline and inner forms, over the model or alone, with width, colour, outline and inner detail, also on cards.
 - **Added:** Place the lines: this view's line art on the canvas as editable paths, worked out in the background, which copy and export as vectors.
 

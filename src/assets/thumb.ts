@@ -8,6 +8,7 @@ import { fillTextCentred, makeCard } from "./card";
 import { externalFolder } from "../storage/external-folder";
 import { artCardPicture, isArtFile } from "./art-preview";
 import { makeFileCard } from "./card";
+import { lagCount } from "../core/lag-counters";
 import { drawnFromFile } from "./adapters";
 import { chipOf, describeFile, isCard, isFontFile, isModelFile, isPdfFile } from "./file-kind";
 
@@ -22,6 +23,7 @@ const THUMB_QUALITY = 0.6;
  * where the browser cannot encode WebP.
  */
 export async function makeThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
+  lagCount("thumbs");
   // A file shown as a card has no stored picture: the library draws a fixed tile for it (ADR 0089), so there is nothing to make.
   if (isFontFile(rec)) return makeFontThumb(rec);
   if (noteKindOf(rec.name) && !tooBigForNote(rec.name, rec.blob.size)) return makeNoteThumb(rec);

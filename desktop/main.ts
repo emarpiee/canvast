@@ -10,8 +10,9 @@ import { COPY_MARK, clipboardEntries, type ClipboardAlso } from "./clipboard-ent
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, net, protocol, session, shell, clipboard, ClipboardItem } from "electron";
 import { execFile } from "node:child_process";
 import { createHash, randomBytes, randomUUID, scrypt } from "node:crypto";
-import { createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, watch, writeFileSync } from "node:fs";
+import { appendFile, createReadStream, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, watch, writeFileSync } from "node:fs";
 import { lstat, mkdir, open, type FileHandle, readFile, readdir, realpath, rename, rm, rmdir, stat, unlink, utimes, writeFile } from "node:fs/promises";
+import { freemem, loadavg } from "node:os";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { cleanWholeName } from "../src/doc/file-names";
 import { BOARDS_DIR, isSafeRelativePath } from "../src/storage/workspace-names";
@@ -685,6 +686,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     own(e);
     return dropOpened();
   });
+  startLagLog();
   ipcMain.handle("canvast:openFile", async (e, rel: string) => {
     own(e);
     return shell.openPath(await inside(root, rel));
@@ -1244,6 +1246,33 @@ app.on("will-quit", (e) => {
   e.preventDefault();
   void forgetHiddenCopy().finally(() => app.exit());
 });
+
+// A temporary monitor (src/app/lag-monitor.ts): each few seconds, each process's use of the processor and memory, the machine's, and what the page reported. Counts only, kept
+// beside the app's own settings, outside the workspace; its size is limited and only the last few logs stay. Remove it when the cause of the lag is found.
+const LAG_EVERY_MS = 5000, LAG_MAX_BYTES = 20 * 2 ** 20, LAG_KEEP = 3;
+let lagPath = "", lagBytes = 0, lagPage = "", lagPageAt = 0;
+function startLagLog(): void {
+  if (lagPath) return;
+  const dir = join(app.getPath("userData"), "lag-monitor");
+  mkdirSync(dir, { recursive: true });
+  for (const old of readdirSync(dir).filter((n) => n.endsWith(".jsonl")).sort().slice(0, -(LAG_KEEP - 1))) rmSync(join(dir, old), { force: true });
+  lagPath = join(dir, `lag-${new Date().toISOString().replace(/[:.]/g, "-")}.jsonl`);
+  ipcMain.on("canvast:lagSample", (_e, json: unknown) => {
+    if (typeof json === "string" && json.length < 20_000) {
+      lagPage = json;
+      lagPageAt = Date.now();
+    }
+  });
+  ipcMain.handle("canvast:lagFile", () => lagPath);
+  setInterval(() => {
+    if (lagBytes > LAG_MAX_BYTES) return;
+    const procs = app.getAppMetrics().map((m) => ({ type: m.type, cpu: Math.round(m.cpu.percentCPUUsage * 10) / 10, mb: Math.round(m.memory.workingSetSize / 1024) }));
+    const line = `${JSON.stringify({ at: new Date().toISOString(), procs, load: loadavg()[0], freeMB: Math.round(freemem() / 2 ** 20), pageSilentS: lagPageAt ? Math.round((Date.now() - lagPageAt) / 1000) : null, page: lagPage ? (JSON.parse(lagPage) as unknown) : null })}\n`;
+    lagPage = "";
+    lagBytes += line.length;
+    appendFile(lagPath, line, () => undefined);
+  }, LAG_EVERY_MS).unref();
+}
 
 void app.whenReady().then(async () => {
   if (!existsSync(HTML)) {

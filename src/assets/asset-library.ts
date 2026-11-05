@@ -9,6 +9,7 @@ import { BlankPictureError, decodeAudio, decodeVideo } from "./video";
 import { GifFrames } from "./gif";
 import { probeMp4 } from "./mp4-probe";
 import { makeFileCardFrom } from "./adapters";
+import { lagCount } from "../core/lag-counters";
 import { MAX_IMPORT_BYTES } from "../storage/disk-file";
 import { externalFolder } from "../storage/external-folder";
 import { artCardPicture, isArtFile } from "./art-preview";
@@ -666,6 +667,7 @@ export class AssetLibrary {
   }
 
   private async load(hash: string, edge = 0): Promise<void> {
+    lagCount("pictureLoads");
     const key = hash + (edge ? reducedKey(edge) : "");
     try {
       const rec = await this.record(hash.split("#")[0]!);
