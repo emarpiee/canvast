@@ -1086,3 +1086,28 @@ test("the colours of a big selection: seven chips, then one \"+N\" button that l
   await row.locator("[data-sel-more]").click();
   await expect(p.locator(".pop-menu [role=menuitem]")).toHaveCount(2);
 });
+
+test("Reset size on several keeps their layout: each is its own size again, and they spread apart as they grow", async ({ app }) => {
+  const p = app.page;
+  const a = await importImage(app);
+  const b = await importImage(app);
+  await key(app, "v");
+  const boxOf = async (id: string) => (await screenOfObject(app, id))!.box;
+  const b0 = await boxOf(b.id);
+  await app.drag({ x: (b0.minX + b0.maxX) / 2, y: (b0.minY + b0.maxY) / 2 }, { x: (b0.minX + b0.maxX) / 2 + 200, y: (b0.minY + b0.maxY) / 2 + 60 });
+  await app.frame();
+  const gap = async (): Promise<number> => {
+    const [x, y] = [await boxOf(a.id), await boxOf(b.id)];
+    return Math.hypot((x.minX + x.maxX) / 2 - (y.minX + y.maxX) / 2, (x.minY + x.maxY) / 2 - (y.minY + y.maxY) / 2);
+  };
+  const before = await gap();
+  expect(before).toBeGreaterThan(100);
+  await p.evaluate(() => window.__canvastDebug.jump(-2)); // (zoomed out: each a quarter of the size, the gap too)
+  await app.frame();
+  await key(app, "Control+a");
+  await p.getByRole("button", { name: /Reset size/ }).click();
+  await app.frame();
+  expect(Math.abs((await gap()) - before), "as far apart as they were at their size").toBeLessThan(2);
+  const x = await boxOf(a.id);
+  expect(Math.abs(x.maxX - x.minX - (a as unknown as { pixelW: number }).pixelW), "its own size").toBeLessThan(1);
+});

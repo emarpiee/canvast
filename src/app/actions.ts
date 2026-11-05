@@ -554,7 +554,7 @@ export function resetProportions(doc: DocumentStore, editor: EditorState): numbe
 export function sizeResets(doc: DocumentStore, editor: EditorState, view: ViewState, noteWidth: (o: ImageObject) => number | null): ImageObject[] {
   const cam = view.camera;
   const f = 2 ** cam.zf; // (CSS px per local unit at `unit`, as imageAt places)
-  return selected(doc, editor).flatMap((o): ImageObject[] => {
+  const plans = selected(doc, editor).flatMap((o) => {
     if (o.kind !== "image" || o.locked) return [];
     const unit = -(cam.zi + levelsBetween(o.frame ?? doc.space.world, view.frame)); // (it stays in its own frame: this zoom, as that frame counts it)
     const c = cropOf(o);
@@ -564,10 +564,26 @@ export function sizeResets(doc: DocumentStore, editor: EditorState, view: ViewSt
     const page = nw && o.page ? { pixelW: NOTE_PAGE_PIXEL_W } : {};
     const h = (nw && o.page ? (nw * o.pixelH) / NOTE_PAGE_PIXEL_W : nw ? (nw * c.h) / c.w : c.h) / f;
     const k = 2 ** (o.unit - unit); // (the old size in the new unit)
-    if (Math.abs((o.w * k) / w - 1) < 0.002 && Math.abs((o.h * k) / h - 1) < 0.002 && (!o.page || !nw || o.pixelW === NOTE_PAGE_PIXEL_W)) return [];
-    // The middle stays: the old corner plus half the old size, less half the new size.
-    const at = (a: D.Dyadic, old: number, now: number): D.Dyadic => D.sub(D.add(a, D.shift(D.fromNumber(old / 2), o.unit)), D.shift(D.fromNumber(now / 2), unit));
-    return [normalizeUnit({ ...o, ...page, unit, w, h, anchor: { x: at(o.anchor.x, o.w, w), y: at(o.anchor.y, o.h, h) } }) as ImageObject];
+    const same = Math.abs((o.w * k) / w - 1) < 0.002 && Math.abs((o.h * k) / h - 1) < 0.002 && (!o.page || !nw || o.pixelW === NOTE_PAGE_PIXEL_W);
+    const middle = (a: D.Dyadic, old: number): D.Dyadic => D.add(a, D.shift(D.fromNumber(old / 2), o.unit));
+    return [{ o, unit, w, h, page, same, grows: Math.log2(w / o.w) + unit - o.unit, mx: middle(o.anchor.x, o.w), my: middle(o.anchor.y, o.h) }];
+  });
+  if (plans.every((p) => p.same)) return [];
+  // Several together keep their layout: the middles spread from the group's middle by as much as the one that grows most, so what did not overlap does not, and each kind of gap stays in proportion.
+  const inFrame = new Map<unknown, typeof plans>();
+  for (const p of plans) inFrame.set(p.o.frame ?? doc.space.world, [...(inFrame.get(p.o.frame ?? doc.space.world) ?? []), p]);
+  const centreOf = (values: D.Dyadic[]): D.Dyadic => {
+    const sorted = [...values].sort(D.cmp);
+    return D.shift(D.add(sorted[0]!, sorted[sorted.length - 1]!), -1);
+  };
+  return [...inFrame.values()].flatMap((group) => {
+    const grows = Math.max(...group.map((p) => p.grows));
+    const whole = Math.floor(grows);
+    const part = D.fromNumber(2 ** (grows - whole));
+    const spread = (at: D.Dyadic, centre: D.Dyadic): D.Dyadic => (group.length < 2 ? at : D.add(centre, D.shift(D.mul(D.sub(at, centre), part), whole)));
+    const cx = centreOf(group.map((p) => p.mx));
+    const cy = centreOf(group.map((p) => p.my));
+    return group.map(({ o, unit, w, h, page, mx, my }) => normalizeUnit({ ...o, ...page, unit, w, h, anchor: { x: D.sub(spread(mx, cx), D.shift(D.fromNumber(w / 2), unit)), y: D.sub(spread(my, cy), D.shift(D.fromNumber(h / 2), unit)) } }) as ImageObject);
   });
 }
 
