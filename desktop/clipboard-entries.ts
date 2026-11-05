@@ -7,13 +7,17 @@ const raw = (format: string): string => `electron application/osclipboard;format
 
 const SVG_FORMAT: Readonly<Partial<Record<NodeJS.Platform, string>>> = { darwin: "public.svg-image" };
 
+/** A mark among the formats of a copy: what says later that the clipboard still holds that copy, and nothing has been copied since. */
+export const COPY_MARK = "web application/x.canvast-copy";
+
 export interface ClipboardAlso {
   readonly svg?: unknown;
   readonly png?: unknown;
   readonly text?: unknown;
+  readonly mark?: unknown;
 }
 
-export function clipboardEntries(urls: readonly string[], { svg, png, text }: ClipboardAlso, platform: NodeJS.Platform): Record<string, string | Blob> {
+export function clipboardEntries(urls: readonly string[], { svg, png, text, mark }: ClipboardAlso, platform: NodeJS.Platform): Record<string, string | Blob> {
   return {
     ...(urls.length ? { "text/uri-list": urls.join("\r\n") } : {}),
     // (file managers of GNOME read their own list, a word and then the addresses)
@@ -21,5 +25,6 @@ export function clipboardEntries(urls: readonly string[], { svg, png, text }: Cl
     ...(typeof svg === "string" ? { [raw(SVG_FORMAT[platform] ?? "image/svg+xml")]: svg } : {}),
     ...(png instanceof Uint8Array ? { "image/png": new Blob([new Uint8Array(png)], { type: "image/png" }) } : {}),
     ...(typeof text === "string" ? { "text/plain": text } : {}),
+    ...(typeof mark === "string" ? { [COPY_MARK]: mark } : {}),
   };
 }

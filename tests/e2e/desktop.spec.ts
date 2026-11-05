@@ -2204,6 +2204,21 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await expect.poll(() => out().then((o) => o.file)).toMatch(/secret\.mp4$/);
     expect((await out()).text).not.toMatch(/^canvast: \d+ object/);
     await page.getByTestId("view-assets").click();
+    // Its time up: off the clipboard with its readable copy; what was copied since is left alone.
+    await page.evaluate(() => window.__canvastDebug.setSetting("library.hiddenCopySeconds", 2));
+    await secret.click();
+    await clear();
+    await page.keyboard.press("Control+c");
+    await expect.poll(() => fileHas("placed-mark")).toBe(true);
+    const timed = (await out()).file;
+    await expect.poll(() => existsSync(timed), { timeout: 8000 }).toBe(false);
+    await expect.poll(() => out().then((o) => o.file)).toBe("");
+    await page.keyboard.press("Control+c");
+    await expect.poll(() => fileHas("placed-mark")).toBe(true);
+    await app.evaluate(({ clipboard }) => clipboard.writeText("copied since"));
+    await page.waitForTimeout(3000);
+    expect((await out()).text).toBe("copied since");
+    await page.evaluate(() => window.__canvastDebug.setSetting("library.hiddenCopySeconds", 0));
     // Out again and locked: the card is gone, Ctrl+C has nothing to take, and its readable copy is deleted.
     await page.getByTestId("hidden-mode-exit").click();
     await expect(secret).toHaveCount(0);

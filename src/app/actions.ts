@@ -2726,9 +2726,9 @@ export async function renderedStill(doc: DocumentStore, editor: EditorState, ass
 }
 
 /** The picked still as a PNG with its crop and adjustments baked in, on the system clipboard. */
-export async function copyRenderedPicture(doc: DocumentStore, editor: EditorState, assets: AssetLibrary): Promise<void> {
+export async function copyRenderedPicture(doc: DocumentStore, editor: EditorState, assets: AssetLibrary, hidden = false): Promise<void> {
   const png = await renderedStill(doc, editor, assets);
-  if (png && (await writeSystemClipboard({ image: png })) === "image") {
+  if (png && (await writeSystemClipboard({ image: png, hidden })) === "image") {
     forgetCopiedPicture();
     editor.message = "Copied the picture as it looks now (crop and adjustments baked in).";
   } else editor.message = "Could not copy the picture to the clipboard.";

@@ -115,7 +115,9 @@ export interface DesktopBridge {
    */
   openCopy(name: string, bytes: Uint8Array | string): Promise<string>;
   /** Real files on the system clipboard: `files` in the workspace, and `copies` written like `openCopy`'s (hidden items). `also`: the same thing as pictures or words, for a program that takes those. How many. */
-  copyFiles(files: readonly string[], copies: ReadonlyArray<{ name: string; bytes: Uint8Array | string }>, also?: { svg?: string; png?: Uint8Array; text?: string }): Promise<number>;
+  copyFiles(files: readonly string[], copies: ReadonlyArray<{ name: string; bytes: Uint8Array | string }>, also?: { svg?: string; png?: Uint8Array; text?: string; hidden?: boolean }): Promise<number>;
+  /** The copy of hidden items last made leaves the clipboard, unless something else was copied since, and its readable copies are deleted. Whether it left. */
+  forgetHiddenCopy(): Promise<boolean>;
   /** A real file drag out of the app, of these files of the workspace. Starts while the pointer is held. */
   startDrag(files: readonly string[]): void;
   /** The window's frame: `saved` is for the next start, `window` what this window has. */

@@ -496,6 +496,7 @@ Copy to other apps, or export a sheet, a picture or selected shapes, and get wha
 | A shape with a picture or objects fill, or anything mixed | It as drawn, at most 1024 px on the long side |
 
 - The picture goes alone, with no text beside it (an app offered both often takes the text). Copied texts carry their words too.
+- A copied hidden item leaves the clipboard after 30 seconds, or the time set in Settings > Privacy (0 keeps it), and on locking or closing. Something copied since is left alone; a clipboard history of your system may keep its own copy.
 - `Ctrl/⌘+X` puts the text only (the shape is gone before a picture could be drawn).
 - Browsers cannot put files on the clipboard, so there a file goes as its picture or its name, and audio or a PDF stays in canvast.
 

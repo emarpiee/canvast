@@ -32,6 +32,7 @@ const bridge: DesktopBridge = {
   setFrame: (mode) => ipcRenderer.invoke("canvast:setFrame", mode),
   windowAct: (act) => ipcRenderer.send("canvast:windowAct", act),
   dropOpened: () => ipcRenderer.invoke("canvast:dropOpened"),
+  forgetHiddenCopy: () => ipcRenderer.invoke("canvast:forgetHiddenCopy"),
   showFile: (path) => ipcRenderer.invoke("canvast:showFile", path),
   sizes: (paths) => ipcRenderer.invoke("canvast:sizes", paths),
   remove: (path, how) => ipcRenderer.invoke("canvast:remove", path, how ?? "trash"),

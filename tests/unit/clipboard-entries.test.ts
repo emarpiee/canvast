@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clipboardEntries } from "../../desktop/clipboard-entries";
+import { COPY_MARK, clipboardEntries } from "../../desktop/clipboard-entries";
 
 describe("what a copy offers on each system", () => {
   const URLS = ["file:///a/one.png", "file:///a/two%20b.mp4"];
@@ -21,6 +21,7 @@ describe("what a copy offers on each system", () => {
   });
 
   it("takes only what it knows the shape of: this comes over from the page", () => {
-    expect(clipboardEntries([], { svg: 1, png: "not bytes", text: {} }, "linux")).toEqual({});
+    expect(clipboardEntries([], { svg: 1, png: "not bytes", text: {}, mark: 1 }, "linux")).toEqual({});
+    expect(clipboardEntries([], { mark: "abc" }, "win32")).toEqual({ [COPY_MARK]: "abc" });
   });
 });

@@ -77,6 +77,7 @@ export async function copyItemsToClipboard(deps: CopyDeps, ents: readonly Catalo
   }
   // The desktop app: their real files too, for whatever pastes files. (A browser cannot put a file on the clipboard.)
   const bridge = desktopBridge();
+  const hidden = ents.some((e) => meta(e).hidden);
   const kinds = ents.map((e) => clipboardFor(e.name, e.type));
   // Several real files: as Copy file, and nothing beside them, for a program given one picture would take that and leave the rest.
   if (bridge && ents.length > 1 && !kinds.every(isWords)) {
@@ -105,7 +106,7 @@ export async function copyItemsToClipboard(deps: CopyDeps, ents: readonly Catalo
       return null;
     }
     const text = parts.join(NOTES_BETWEEN);
-    if (files ? (await writeSystemClipboard({ text, files })) === "failed" : !(await copyPlainText(text))) {
+    if ((await writeSystemClipboard({ text, ...(files ? { files } : {}), hidden })) === "failed") {
       deps.say("Could not copy to the clipboard.");
       return null;
     }
@@ -116,7 +117,7 @@ export async function copyItemsToClipboard(deps: CopyDeps, ents: readonly Catalo
   const at = kinds.findIndex(isPicture);
   const single = ents.length === 1 && kinds[0] === "thumb";
   if (at < 0 && !single) {
-    if (files) deps.say((await writeSystemClipboard({ text: names, files })) === "failed" ? "Could not copy to the clipboard." : `Copied “${ents[0]!.name}”.`);
+    if (files) deps.say((await writeSystemClipboard({ text: names, files, hidden })) === "failed" ? "Could not copy to the clipboard." : `Copied “${ents[0]!.name}”.`);
     else if (await copyPlainText(names)) onlyName();
     else deps.say("Could not copy to the clipboard.");
     return null;
@@ -124,7 +125,7 @@ export async function copyItemsToClipboard(deps: CopyDeps, ents: readonly Catalo
   const first = ents[single ? 0 : at]!;
   const source = single ? await deps.thumb(first.hash).catch(() => undefined) : await deps.file(first.hash).catch(() => undefined);
   const svg = source && kinds[single ? 0 : at] === "vector" ? await source.text().catch(() => undefined) : undefined;
-  const done = await writeSystemClipboard({ ...(source ? { image: asPng(source) } : {}), text: names, ...(svg ? { svg } : {}), ...(files ? { files } : {}) });
+  const done = await writeSystemClipboard({ ...(source ? { image: asPng(source) } : {}), text: names, ...(svg ? { svg } : {}), ...(files ? { files } : {}), hidden });
   if (done === "failed") deps.say("Could not copy to the clipboard.");
   else if (done === "text") onlyName();
   else {
@@ -164,11 +165,7 @@ export async function copyItemsAsFiles(deps: CopyDeps, ents: readonly CatalogEnt
   if (!ents.length || !(await hiddenFine(ents))) return;
   const { files, copies, n } = await filesOf(deps, bridge, ents);
   if (!n) return deps.say(ents.some((e) => meta(e).hidden) ? "Could not read it: are the hidden items locked?" : "Its file is not in the workspace folder yet: try again in a moment.");
-  try {
-    await bridge.copyFiles(files, copies);
-  } catch {
-    return deps.say("Could not copy to the clipboard.");
-  }
+  if ((await writeSystemClipboard({ files: { files, copies }, hidden: ents.some((e) => meta(e).hidden) })) === "failed") return deps.say("Could not copy to the clipboard.");
   const left = ents.length - n;
   deps.say(`Copied ${plural(n, "file")}${left ? `, not the other ${left} (not in the workspace folder yet)` : ""}.`);
 }

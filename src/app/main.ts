@@ -63,7 +63,7 @@ import { typeOfName } from "../storage/workspace-names";
 import { openLockScreen } from "../ui/lock-screen";
 import { renderedPicture } from "../render/adjust-image";
 import { freeNameIn } from "../doc/file-names";
-import { MAX_COPIED_SVG, onePerPicture, svgCopy, writeSystemClipboard, type ClipboardFiles } from "./system-clipboard";
+import { MAX_COPIED_SVG, onHiddenCopyNotice, onePerPicture, setHiddenCopySeconds, svgCopy, writeSystemClipboard, type ClipboardFiles } from "./system-clipboard";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
 import { syncIndex } from "../scene/spatial-index";
@@ -337,6 +337,11 @@ async function start(): Promise<void> {
   const applyGridLook = (): void => setGridLook({ min: { fine: 16, normal: 32, coarse: 64 }[settings.get("grid.size")], major: { none: 0, "2": 1, "4": 2, "8": 3 }[settings.get("grid.major")], opacity: settings.get("grid.opacity") / 100 });
   applyGridLook();
   setSnapPx(settings.get("snap.reachPx"));
+  setHiddenCopySeconds(settings.get("library.hiddenCopySeconds"));
+  onHiddenCopyNotice((text) => {
+    editor.message = text;
+    editor.changed();
+  });
   editor.alignBox = settings.get("select.alignBox");
   editor.layersOpen = settings.get("ui.layersOpen");
   editor.bookmarksOpen = settings.get("ui.bookmarksOpen");
@@ -2315,6 +2320,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       case "snap.reachPx":
         setSnapPx(settings.get(key));
         return;
+      case "library.hiddenCopySeconds":
+        setHiddenCopySeconds(settings.get(key));
+        return;
       case "ui.pattern":
       case "ui.names":
         invalidate();
@@ -2581,7 +2589,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   // A picture of the copied things (PNG: one still at full size with its crop and adjustments, else at most 1024 px) next to the text (alone when the text would only say "N objects"), for other apps; the text stays what copySelection set,
   // which is how a paste here knows the objects are still ours. Best effort: a browser without the clipboard picture API keeps the text.
   const copySize = (t: ExportTarget, long: number): { w: number; h: number } => ({ w: Math.max(1, Math.round(t.ratio >= 1 ? long : long * t.ratio)), h: Math.max(1, Math.round(t.ratio >= 1 ? long / t.ratio : long)) });
-  const copyPicture = async (t: ExportTarget, withText: boolean, svg?: string, svgFile?: string, files?: ClipboardFiles): Promise<void> => {
+  const copyPicture = async (t: ExportTarget, withText: boolean, svg?: string, svgFile?: string, files?: ClipboardFiles, hidden = false): Promise<void> => {
     const text = copiedText();
     if (text === null) return;
     const { w, h } = copySize(t, t.original ? Math.min(4096, Math.max(t.original.w, t.original.h)) : 1024);
@@ -2595,7 +2603,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     // (the words go beside the picture only for copied texts: otherwise a program that takes text would paste the SVG or a count and not the picture)
     // (a line saying how many objects is for a paste here: it never takes the place of a picture that failed)
     const words = isPlaceholderText(text) ? {} : { text, withText };
-    const done = await writeSystemClipboard({ image: png, ...words, ...(svg ? { svg } : {}), ...(svgFile ? { svgFile } : {}), ...(files ? { files } : {}) });
+    const done = await writeSystemClipboard({ image: png, ...words, ...(svg ? { svg } : {}), ...(svgFile ? { svgFile } : {}), ...(files ? { files } : {}), hidden });
     if (done === "failed") copyOnCanvas.say("Could not copy to the clipboard.");
     else if (lockedOut) copyOnCanvas.say("A hidden item copies as a padlock outside hidden mode.");
   };
@@ -2612,7 +2620,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       forgetCopiedPicture();
       return copyOnCanvas.say(done === "failed" ? "Could not copy to the clipboard." : "A hidden item copies as a padlock outside hidden mode.");
     }
-    if (await hiddenFine(await selectedFiles())) await copyRenderedPicture(doc, editor, filesAssets);
+    const chosen = await selectedFiles();
+    if (await hiddenFine(chosen)) await copyRenderedPicture(doc, editor, filesAssets, chosen.some((e) => meta(e).hidden));
   };
   /** The library files of the things selected that file actions may reach: not a text's font, not a padlock. */
   const selectedHashes = (): string[] =>
@@ -2669,6 +2678,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     const found = bridge ? await selectedFiles() : one;
     const whole = found.filter((e) => objs.some((o) => (o as { assetId?: string } | undefined)?.assetId === e.hash && asImported(o)));
     const fine = await hiddenFine(found);
+    const anyHidden = fine && found.some((e) => meta(e).hidden);
     const ents = fine ? whole : whole.filter((e) => !meta(e).hidden);
     const real = bridge && ents.length ? await filesOf(copyOnCanvas, bridge, ents) : undefined;
     // Pictures with their edits: among several, each as a new file as it looks now, since its own file does not show them. (A video's or a GIF's edits stay out.)
@@ -2710,10 +2720,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       if (!files?.n && !made && !svgs.length) return;
       const shapeFiles = made ? [{ name: svgs[0]?.name ?? t?.name ?? "selection", text: made }] : svgs;
       const all = { files: files?.files ?? [], copies: [...(files?.copies ?? []), ...shapeFiles.map((f) => svgCopy(freeNameIn(taken, `${f.name}.svg`), f.text))] };
-      if ((await writeSystemClipboard({ files: all })) === "failed") copyOnCanvas.say("Could not copy to the clipboard.");
+      if ((await writeSystemClipboard({ files: all, hidden: anyHidden })) === "failed") copyOnCanvas.say("Could not copy to the clipboard.");
       return;
     }
-    await copyPicture(t, withText, made ?? own, made ? (svgs[0]?.name ?? t.name) : undefined, files);
+    await copyPicture(t, withText, made ?? own, made ? (svgs[0]?.name ?? t.name) : undefined, files, anyHidden);
   };
   // Copy and cut take the selected objects (text fields and the text editor keep their own).
   for (const kind of ["copy", "cut"] as const) {

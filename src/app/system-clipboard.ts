@@ -4,6 +4,7 @@
  * no text: a program that is offered a picture and text beside it often takes the text, so the picture would not paste. Text goes with a picture only when the caller says the text is the point too (copied texts), and is the
  * fallback when the picture cannot be written. Best effort: the browser may refuse; the result says what landed.
  */
+import { plural } from "../doc/plural";
 import { desktopBridge } from "../storage/desktop-bridge";
 
 export type ClipboardResult = "image" | "files" | "text" | "failed";
@@ -26,6 +27,8 @@ export interface ClipboardParts {
   readonly svgFile?: string;
   /** In the desktop app: real files too. A browser cannot put a file on the clipboard. */
   readonly files?: ClipboardFiles;
+  /** It holds hidden items: it leaves the clipboard again, after the time Settings > Privacy gives. */
+  readonly hidden?: boolean;
 }
 
 /** Past this an SVG stays off the clipboard: most of it would be embedded images. */
@@ -35,7 +38,42 @@ const SVG_TYPE = "image/svg+xml";
 /** An SVG as a readable copy for `copyFiles`, by this name. */
 export const svgCopy = (name: string, svg: string): { name: string; bytes: Uint8Array } => ({ name: /\.svg$/i.test(name) ? name : `${name}.svg`, bytes: new TextEncoder().encode(svg) });
 
+/** How long a copied hidden item stays (Settings > Privacy; 0: it stays), and how to say what became of it. */
+let hiddenSeconds = 30;
+let sayHidden: (text: string) => void = () => undefined;
+export const setHiddenCopySeconds = (seconds: number): void => void (hiddenSeconds = seconds);
+export const onHiddenCopyNotice = (say: (text: string) => void): void => void (sayHidden = say);
+let hiddenTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** A browser's clipboard can be read only with the focus, and is cleared the same way: if it still holds what was written. */
+async function clearInBrowser(text: string | undefined, size: number | undefined): Promise<boolean> {
+  if (!document.hasFocus()) return false;
+  const [item] = await navigator.clipboard.read();
+  const png = item?.types.includes("image/png") ? await item.getType("image/png") : null;
+  const words = item?.types.includes("text/plain") ? await (await item.getType("text/plain")).text() : null;
+  if ((png ? png.size !== size : size !== undefined) || (!png && words !== text)) return false;
+  await navigator.clipboard.writeText("");
+  return true;
+}
+
+/** Copy, and when it holds hidden items, start their time. */
 export async function writeSystemClipboard(p: ClipboardParts): Promise<ClipboardResult> {
+  const done = await writeNow(p);
+  if (!p.hidden || done === "failed") return done;
+  clearTimeout(hiddenTimer);
+  const seconds = hiddenSeconds;
+  if (seconds <= 0) return done;
+  const size = desktopBridge() || !p.image ? undefined : (await Promise.resolve(p.image).catch(() => undefined))?.size;
+  // (after the message of the copy itself)
+  setTimeout(() => sayHidden(`Copied. It leaves the clipboard in ${plural(seconds, "second")}.`), 50);
+  hiddenTimer = setTimeout(() => {
+    const bridge = desktopBridge();
+    void (bridge ? bridge.forgetHiddenCopy() : clearInBrowser(p.text, size)).then((gone) => gone && sayHidden("The copied hidden item left the clipboard."), () => undefined);
+  }, seconds * 1000);
+  return done;
+}
+
+async function writeNow(p: ClipboardParts): Promise<ClipboardResult> {
   const bridge = desktopBridge();
   const svgNow = p.svg && p.svg.length <= MAX_COPIED_SVG ? p.svg : undefined;
   const own = svgNow && p.svgFile ? [svgCopy(p.svgFile, svgNow)] : [];
@@ -44,7 +82,7 @@ export async function writeSystemClipboard(p: ClipboardParts): Promise<Clipboard
     // Every way a program may want it: one that takes files gets the files, one that takes pictures or words those. (The words go beside a picture only as below.)
     // Through the app itself: the page may no longer have the focus when a picture is ready, and a page without it is refused.
     const image = await Promise.resolve(p.image).catch(() => undefined);
-    const also = { ...(svgNow ? { svg: svgNow } : {}), ...(image ? { png: new Uint8Array(await image.arrayBuffer()) } : {}), ...(p.text && (!image || p.withText) ? { text: p.text } : {}) };
+    const also = { ...(svgNow ? { svg: svgNow } : {}), ...(image ? { png: new Uint8Array(await image.arrayBuffer()) } : {}), ...(p.text && (!image || p.withText) ? { text: p.text } : {}), ...(p.hidden ? { hidden: true } : {}) };
     if (await bridge.copyFiles(files, copies, also).catch(() => 0)) return image ? "image" : "files";
   }
   if (p.image && typeof ClipboardItem !== "undefined") {

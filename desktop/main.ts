@@ -6,7 +6,7 @@
  * two workspaces never share boards or a library. The folder is the one passed with `--workspace=<path>`, else the last
  * one opened, else the one chosen in the start dialog (recent ones, open a folder, a new workspace).
  */
-import { clipboardEntries, type ClipboardAlso } from "./clipboard-entries";
+import { COPY_MARK, clipboardEntries, type ClipboardAlso } from "./clipboard-entries";
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, net, protocol, session, shell, clipboard, ClipboardItem } from "electron";
 import { execFile } from "node:child_process";
 import { createHash, randomBytes, randomUUID, scrypt } from "node:crypto";
@@ -300,7 +300,24 @@ async function walkFiles(dir: string, at: string): Promise<Array<{ path: string;
 const OPENED_DIR = join(app.getPath("temp"), `canvast-opened-${createHash("sha256").update(app.getPath("userData")).digest("hex").slice(0, 12)}`);
 /** Readable copies the page wrote a part at a time: the only paths it can name to `openCopy` and `copyFiles`. */
 const copiedByStream = new Set<string>();
-const dropOpened = (): Promise<void> => rm(OPENED_DIR, { recursive: true, force: true });
+/** The copy of hidden items last put on the clipboard: its mark, and its readable copies. */
+let hiddenCopy: { mark: string; made: string[] } | null = null;
+const dropMade = (made: readonly string[]): Promise<unknown> => Promise.all(made.map((f) => rm(dirname(f), { recursive: true, force: true }).catch(() => undefined)));
+/** That copy goes: off the clipboard unless something else was copied since, and its readable copies always. Whether it left the clipboard. */
+async function forgetHiddenCopy(): Promise<boolean> {
+  const copy = hiddenCopy;
+  if (!copy) return false;
+  hiddenCopy = null;
+  await dropMade(copy.made);
+  const [item] = await clipboard.read().catch(() => []);
+  if (!item?.types.includes(COPY_MARK) || (await (await item.getType(COPY_MARK) as Blob).text()) !== copy.mark) return false;
+  clipboard.clear();
+  return true;
+}
+const dropOpened = async (): Promise<void> => {
+  await forgetHiddenCopy();
+  await rm(OPENED_DIR, { recursive: true, force: true });
+};
 void dropOpened(); // (left by a crash)
 
 async function writeAtomic(full: string, bytes: Uint8Array, durable = true): Promise<void> {
@@ -608,9 +625,11 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     own(e);
     if (!Array.isArray(rels) || !Array.isArray(copies)) throw new Error("not files to copy");
     const fulls = await Promise.all(rels.map((r) => inside(root, String(r))));
+    const made: string[] = [];
     for (const c of copies as Array<{ name?: unknown; bytes?: unknown }>) {
       if (typeof c?.bytes === "string" && copiedByStream.has(c.bytes)) {
         fulls.push(c.bytes);
+        made.push(c.bytes);
         continue;
       }
       if (typeof c?.name !== "string" || !(c.bytes instanceof Uint8Array)) throw new Error("not a file to copy");
@@ -619,11 +638,19 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
       const file = join(dir, cleanWholeName(basename(c.name), "file"));
       await writeFile(file, c.bytes, { mode: 0o600 });
       fulls.push(file);
+      made.push(file);
     }
     // (as file managers read files: a list of addresses for most, the same list after a word for those of GNOME)
     const urls = fulls.map((f) => pathToFileURL(f).href);
-    const { svg, png, text } = (also ?? {}) as ClipboardAlso;
-    await clipboard.write([new ClipboardItem(clipboardEntries(urls, { svg, png, text }, process.platform))]);
+    const { svg, png, text, hidden } = (also ?? {}) as ClipboardAlso & { hidden?: unknown };
+    const mark = hidden === true ? randomUUID() : undefined;
+    await clipboard.write([new ClipboardItem(clipboardEntries(urls, { svg, png, text, ...(mark ? { mark } : {}) }, process.platform))]);
+    if (mark) {
+      // (the one before it is over: its readable copies go, and the clipboard already holds this)
+      const before = hiddenCopy;
+      hiddenCopy = { mark, made };
+      if (before) await dropMade(before.made);
+    }
     return fulls.length || (svg !== undefined || png !== undefined || text !== undefined ? 1 : 0); // (how many things went)
   });
   // A real file drag out of the app (only the workspace's own files: a hidden item's is encrypted, and is not asked for). The picture under the pointer is a plain tile.
@@ -649,6 +676,10 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     if (act === "minimize") win.minimize();
     else if (act === "maximize") (win.isMaximized() ? win.unmaximize() : win.maximize());
     else if (act === "close") win.close();
+  });
+  ipcMain.handle("canvast:forgetHiddenCopy", (e) => {
+    own(e);
+    return forgetHiddenCopy();
   });
   ipcMain.handle("canvast:dropOpened", (e) => {
     own(e);
@@ -1206,7 +1237,13 @@ app.on("web-contents-created", (_e, contents) => {
 });
 
 app.on("window-all-closed", () => app.quit());
-app.on("will-quit", () => void rmSync(OPENED_DIR, { recursive: true, force: true }));
+app.on("will-quit", (e) => {
+  rmSync(OPENED_DIR, { recursive: true, force: true });
+  if (!hiddenCopy) return;
+  // (a copied hidden item does not outlive the app on the clipboard)
+  e.preventDefault();
+  void forgetHiddenCopy().finally(() => app.exit());
+});
 
 void app.whenReady().then(async () => {
   if (!existsSync(HTML)) {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.25 — Copied hidden items leave the clipboard (2026-11-05)
+
+- **Added:** a copied hidden item leaves the clipboard after a time you set: Settings > Privacy, **Clear copied hidden items after**, 30 seconds at first, 0 to keep it. Its readable copy is deleted then too. Locking the hidden items or closing the app clears it at once, and something copied since is left alone. In a browser it clears only while the page has the focus.
+
 ## 0.54.24 — A file for each copied shape (2026-11-05)
 
 - **Changed:** in the desktop app, several shapes copied go as a file for each, and a group as one file, named by the shape or numbered, not merged into one `selection.svg`. Past 500 they go as one file, and it says so.

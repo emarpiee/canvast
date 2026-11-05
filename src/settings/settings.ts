@@ -64,6 +64,7 @@ export const SETTINGS = {
   "library.hiddenWord": { scope: "device", default: "hidden:", validate: text(40), effect: "immediate" } as Def<string>,
   "library.hiddenRemember": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   /** Hidden mode stays on when the library is left (it still ends with Exit, the word deleted, locking, or closing the app). */
+  "library.hiddenCopySeconds": { scope: "device", default: 30, validate: range(0, 3600), effect: "immediate" } as Def<number>,
   "library.hiddenStay": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   /** The desktop build (ADR 0177): where a file the app deletes from the workspace folder goes. */
   "storage.deleteTo": { scope: "device", default: "trash", validate: oneOf("trash", "system", "erase"), effect: "immediate" } as Def<"trash" | "system" | "erase">,
