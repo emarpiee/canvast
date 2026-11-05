@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.45 — A PDF's words can be selected (2026-11-06)
+
+- **Fixed:** a PDF's words can be selected and copied: the app's rule that its own words are not selectable reached them too.
+- **Fixed:** what Find marks in a PDF, and a selection there, is see-through, so the words show under it; it hid them.
+
 ## 0.54.44 — Bookmarks can be renamed; Ctrl+S on a card (2026-11-06)
 
 - **Added:** a bookmark of a PDF or a 3D view has a ⋯ to rename or delete it, in the view's list and in the details.

@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.45: a PDF's words can be selected (2026-11-06)
+
+- **Implemented:** the text layer is `data-selectable`; `--text-found` and `--text-chosen` see-through.
+- **Tested:** local checks; `file-views.spec` on GitHub selects a word.
+- **Known failures:** none known until the `Tests` run reports.
+- **Unverified:** on screen by hand.
+- **Committed:** v0.54.45.
+- **Next bounded task:** read the `Tests` run.
+
 ## v0.54.44: bookmarks can be renamed; Ctrl+S on a card (2026-11-06)
 
 - **Implemented:** `MenuItem.more`; `markActions` and `MarksChange` in `src/ui/view-state.ts`; the views' keys in the panel.

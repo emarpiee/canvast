@@ -27,6 +27,9 @@
   --canvas-builder-soft: color-mix(in oklch, var(--canvas-selection) 33%, transparent);
   --canvas-builder-off: color-mix(in oklch, var(--canvas-danger) 60%, transparent);
   --canvas-danger-wash: oklch(0.55 0.19 25 / 0.18);
+  /* (over a page's own pixels: see-through, so the words show under it) */
+  --text-found: color-mix(in oklch, var(--hud-accent) 35%, transparent);
+  --text-chosen: color-mix(in oklch, var(--hud-accent) 28%, transparent);
   --canvas-guide: oklch(0.62 calc(0.2 * var(--vivid)) calc(var(--hue) + 157));
   --hud-bg: oklch(0.99 calc(0.006 * var(--vivid)) var(--hue) / 0.92);
   --paper: oklch(0.995 calc(0.004 * var(--vivid)) var(--hue)); /* an opaque surface: the notes editor's page and dialogs */
@@ -3194,7 +3197,7 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .pdf-page canvas { display: block; width: 100%; height: 100%; }
 .textLayer { position: absolute; inset: 0; overflow: clip; line-height: 1; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; caret-color: CanvasText; z-index: 0; }
 .textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0 0; }
-.textLayer ::selection { background: var(--hud-hover); color: transparent; }
+.textLayer ::selection { background: var(--text-chosen); color: transparent; }
 .textLayer br::selection { background: transparent; }
 .model-main { flex: 1; min-height: 0; display: flex; }
 .model-stage { flex: 1; min-width: 0; position: relative; cursor: grab; touch-action: none; }
@@ -3205,7 +3208,7 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .model-stage.is-mirrored canvas { transform: scaleX(-1); }
 .adj-num.pdf-find { width: calc(var(--ctl) * 5); text-align: left; }
 .pdf-link { position: absolute; padding: 0; background: none; border: none; cursor: pointer; z-index: 1; }
-::highlight(canvast-find) { background: var(--hud-accent); color: transparent; }
+::highlight(canvast-find) { background: var(--text-found); color: transparent; }
 .pop-menu-row { display: flex; align-items: center; gap: var(--s-2); }
 .pop-menu-row > button[data-i] { flex: 1; min-width: 0; }
 .pop-menu-row > .more-btn { flex: none; opacity: 1; width: var(--row-btn); min-height: 0; height: var(--row-btn); padding: 0; justify-content: center; }

@@ -143,6 +143,7 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     s.task = null;
     const layer = document.createElement("div");
     layer.className = "textLayer";
+    layer.dataset["selectable"] = ""; // (the app's words are not selectable; a page's are)
     s.el.style.setProperty("--total-scale-factor", String(k));
     s.el.style.setProperty("--scale-round-x", "1px");
     s.el.style.setProperty("--scale-round-y", "1px");

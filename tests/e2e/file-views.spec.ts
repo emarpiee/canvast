@@ -61,6 +61,10 @@ test("a PDF: its first page in the library, its shape on a card; it opens in the
   await expect(view(p).locator('.pdf-page[data-page="1"][data-drawn]')).toBeVisible();
   await expect.poll(() => inked(p, 1)).toBe(true);
   await expect(view(p).locator('.pdf-page[data-page="1"] .textLayer')).toContainText("Alpha");
+  // Its words can be selected, as anywhere a page has them.
+  const word = view(p).locator('.pdf-page[data-page="1"] .textLayer span').first();
+  await word.dblclick();
+  await expect.poll(() => p.evaluate(() => getSelection()?.toString() ?? "")).toContain("Alpha");
   // Pages have their own sizes once read.
   await p.getByTestId("pdf-page").fill("2");
   await p.getByTestId("pdf-page").press("Enter");
