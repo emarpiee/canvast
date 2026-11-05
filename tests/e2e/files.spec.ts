@@ -66,7 +66,7 @@ test("any file imports: a 3D model becomes a card on the canvas and in the libra
   await p.locator('[data-testid="asset-card"][aria-label^="robot.glb"]').click();
   const info = p.getByTestId("asset-file-info");
   await expect(info).toContainText("3D model");
-  await expect(info).toContainText("Blender");
+  await expect(info).toContainText("Open it");
   await expect(p.getByTestId("asset-open-tab")).toHaveCount(0);
   await expect(p.locator(".asset-facts .ext-chip")).toHaveText("GLB");
   await p.locator('[data-testid="asset-card"][aria-label^="notes.txt"]').click();

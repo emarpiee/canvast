@@ -41,7 +41,7 @@ const importPdf = async (p: Page): Promise<void> => {
 /** The details beside the viewer, shown (they may still be opening or closing as the viewer opens). */
 const detailsShown = (p: Page) =>
   expect(async () => {
-    await detailsShown(p);
+    if (!(await p.getByTestId("asset-place").isVisible())) await p.locator(".viewer-details").click();
     await expect(p.getByTestId("asset-place")).toBeVisible({ timeout: 1000 });
   }).toPass();
 /** Whether a page's picture has ink on it. */
