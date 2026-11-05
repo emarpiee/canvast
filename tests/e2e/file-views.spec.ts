@@ -76,6 +76,21 @@ test("a PDF: its first page in the library, its shape on a card; it opens in the
   await p.keyboard.up("Control");
   await expect.poll(pageW).toBeLessThan(wide);
   await p.getByTestId("view-fit").click();
+  // Zoomed past the view, all of the page can be scrolled to: both edges.
+  await p.keyboard.down("Control");
+  await p.mouse.wheel(0, -600);
+  await p.keyboard.up("Control");
+  await expect.poll(async () => p.getByTestId("pdf-pages").evaluate((e) => e.scrollWidth > e.clientWidth)).toBe(true);
+  const edges = () => p.getByTestId("pdf-pages").evaluate((e) => {
+    e.scrollLeft = 0;
+    const page = e.querySelector('.pdf-page[data-page="2"]')!.getBoundingClientRect(), box = e.getBoundingClientRect();
+    const left = page.left >= box.left;
+    e.scrollLeft = e.scrollWidth;
+    const after = e.querySelector('.pdf-page[data-page="2"]')!.getBoundingClientRect();
+    return [left, after.right <= box.right];
+  });
+  expect(await edges()).toEqual([true, true]);
+  await p.getByTestId("view-fit").click();
   // A bookmark, in the details and off again.
   await p.getByTestId("view-mark").click();
   await expect(p.getByTestId("view-mark")).toHaveAttribute("aria-pressed", "true");

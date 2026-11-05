@@ -3188,9 +3188,9 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .view-gap { width: var(--s-8); }
 .pdf-at { width: calc(var(--ctl) * 2); }
 .pdf-count { color: var(--hud-muted); font: var(--font-meta); white-space: nowrap; }
-.pdf-pages { flex: 1; min-height: 0; overflow: auto; padding: var(--s-8); display: flex; flex-direction: column; align-items: center; gap: var(--s-8); position: relative; }
+.pdf-pages { flex: 1; min-height: 0; overflow: auto; padding: var(--s-8); display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-8); position: relative; }
 .pdf-pages:focus { outline: none; }
-.pdf-page { flex: none; position: relative; background: var(--paper); box-shadow: var(--hud-lift); overflow: clip; }
+.pdf-page { flex: none; margin-inline: auto; /* (centred while it fits; wider than the view it starts at the left edge, so all of it can be scrolled to) */ position: relative; background: var(--paper); box-shadow: var(--hud-lift); overflow: clip; }
 .pdf-page canvas { display: block; width: 100%; height: 100%; }
 .textLayer { position: absolute; inset: 0; overflow: clip; line-height: 1; text-size-adjust: none; forced-color-adjust: none; transform-origin: 0 0; caret-color: CanvasText; z-index: 0; }
 .textLayer :is(span, br) { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0 0; }
