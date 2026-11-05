@@ -202,67 +202,24 @@ export const grid: Generator = {
   id: "grid", label: "Grid", family: "Lines", about: "Lines in a lattice with stronger lines now and then",
   sections: [
     { title: "Colour", items: [C("line", "Lines", "#5f7a99"), C("major", "Strong lines", "#ffffff", true)] },
-    { title: "Grid", items: [Ch("lattice", "Lattice", [["square", "Square"], ["iso", "Isometric"]], "square"), R("cols", "Across", 2, 60, 16), R("rows", "Down (0: squares)", 0, 60, 0), R("weight", "Line width", 1, 20, 3), R("every", "Strong every", 0, 12, 4), R("strong", "Strong width", 50, 500, 180, 10), T("rowsToo", "Rows too", true), R("angle", "Angle", 0, 180, 0), R("shiftX", "Shift across", 0, 100, 0), R("shiftY", "Shift down", 0, 100, 0), R("dash", "Dashes", 0, 100, 0), R("margin", "Margin", 0, 45, 0), T("frame", "Frame", false), LOOSE] },
+    { title: "Grid", items: [R("cols", "Across", 2, 60, 16), Ch("cells", "Cells", [["square", "Square"], ["equal", "Equal"], ["rows", "By rows"]], "square"), R("rows", "Rows", 2, 60, 16), R("weight", "Line width", 1, 20, 3), R("every", "Strong every", 0, 12, 4), T("rowsToo", "Rows too", true), LOOSE] },
   ],
   run(v, rng, w, h) {
-    const { n, b, c, s: pick } = reader(v);
-    const cellX = w / n("cols"), cellY = n("rows") > 0 ? h / n("rows") : cellX;
-    const off = (cell: number): number => (rng() - 0.5) * cell * 0.6 * (n("jitter") / 100); // (looseness: each line off its place)
-    const minor: SubPath[] = [], major: SubPath[] = [], wd = (n("weight") / 100) * cellX * 0.5;
-    const e = n("every");
-    const m = (n("margin") / 100) * Math.min(w, h);
-    const [x0, y0, x1, y1] = [m, m, w - m, h - m];
-    const [cx, cy, reach] = [w / 2, h / 2, Math.hypot(w, h)];
-    const turn = (n("angle") * Math.PI) / 180;
-    /** A line's piece inside the box (with its margin), or null. */
-    const inBox = (ax: number, ay: number, bx: number, by: number): [P, P] | null => {
-      let [t0, t1] = [0, 1];
-      const [dx, dy] = [bx - ax, by - ay];
-      for (const [p, q] of [[-dx, ax - x0], [dx, x1 - ax], [-dy, ay - y0], [dy, y1 - ay]] as const) {
-        if (p === 0) {
-          if (q < 0) return null;
-        } else if (p < 0) t0 = Math.max(t0, q / p);
-        else t1 = Math.min(t1, q / p);
-      }
-      return t0 < t1 ? [[ax + t0 * dx, ay + t0 * dy], [ax + t1 * dx, ay + t1 * dy]] : null;
-    };
-    /** The lines whose normal is at `phi`, `cell` apart, shifted, and which of them are strong by their number. */
-    const family = (phi: number, cell: number, first: number, count: number, shift: number): void => {
-      const [nx, ny, tx, ty] = [Math.cos(phi), Math.sin(phi), -Math.sin(phi), Math.cos(phi)];
-      for (let i = first; i <= count; i++) {
-        const at = i * cell + shift + off(cell);
-        const piece = inBox(cx + nx * at + tx * -reach, cy + ny * at + ty * -reach, cx + nx * at + tx * reach, cy + ny * at + ty * reach);
-        if (!piece) continue;
-        const to = e > 0 && c("major") && ((i % e) + e) % e === 0 ? major : minor;
-        const dash = (n("dash") / 100) * cell;
-        if (dash <= 0) {
-          to.push(poly(piece, false));
-          continue;
-        }
-        const [[ax, ay], [bx, by]] = piece;
-        const len = Math.hypot(bx - ax, by - ay);
-        // (cut by steps, not by length, at a size the shape limit can hold)
-        const step = Math.max(dash * 2, len / 400);
-        for (let d = 0; d < len; d += step) {
-          const end = Math.min(len, d + step / 2);
-          to.push(poly([[ax + ((bx - ax) * d) / len, ay + ((by - ay) * d) / len], [ax + ((bx - ax) * end) / len, ay + ((by - ay) * end) / len]], false));
-        }
-      }
-    };
-    // Numbered from the box's own corner when it is upright, so that line 0 is its edge; turned, from its middle.
-    const span = (cell: number, size: number, shift: number): [number, number, number] => (turn === 0 ? [0, Math.floor((size + 1e-6) / cell), shift * cell - size / 2] : [-Math.ceil(reach / cell), Math.ceil(reach / cell), shift * cell]);
-    const lattice = (phi: number, cell: number, size: number, shift: number): void => {
-      const [first, count, at] = span(cell, size, shift);
-      family(phi, cell, first, count, at);
-    };
-    lattice(turn, cellX, w, n("shiftX") / 100);
-    if (pick("lattice") === "iso") {
-      const [first, count] = [-Math.ceil(reach / cellX), Math.ceil(reach / cellX)];
-      family(turn + Math.PI / 3, cellX, first, count, (n("shiftY") / 100) * cellX);
-      family(turn - Math.PI / 3, cellX, first, count, (n("shiftY") / 100) * cellX);
-    } else if (b("rowsToo")) lattice(turn + Math.PI / 2, cellY, h, n("shiftY") / 100);
-    if (b("frame")) minor.push(poly([[x0, y0], [x1, y0], [x1, y1], [x0, y1]]));
-    return [line(minor, c("line")!, wd, "Lines"), ...(major.length ? [line(major, c("major")!, (wd * n("strong")) / 100, "Strong lines")] : [])];
+    const { n, s, b, c } = reader(v);
+    const off = (): number => (rng() - 0.5) * cell * 0.6 * (n("jitter") / 100); // (looseness: each line off its place)
+    const cell = w / n("cols"), minor: SubPath[] = [], major: SubPath[] = [], wd = (n("weight") / 100) * cell * 0.5;
+    // Square cells as many rows as fit; Equal as many rows as columns; By rows the Rows setting.
+    const cellY = s("cells") === "square" ? cell : h / n(s("cells") === "equal" ? "cols" : "rows");
+    const add = (i: number, sub: SubPath): void => void ((n("every") > 0 && c("major") && i % n("every") === 0 ? major : minor).push(sub));
+    for (let i = 0; i <= n("cols"); i++) {
+      const o = off();
+      add(i, poly([[i * cell + o, 0], [i * cell + o, h]], false));
+    }
+    if (b("rowsToo")) for (let j = 0; j * cellY <= h + 1e-6; j++) {
+      const o = off();
+      add(j, poly([[0, j * cellY + o], [w, j * cellY + o]], false));
+    }
+    return [line(minor, c("line")!, wd, "Lines"), ...(major.length ? [line(major, c("major")!, wd * 1.8, "Strong lines")] : [])];
   },
 };
 

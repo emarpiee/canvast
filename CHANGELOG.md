@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.4 — The Grid pattern is simple again, with rows (2026-11-05)
+
+- **Removed:** the Grid pattern's lattice, strong width, angle, shift, dashes, margin and frame, which never reached a release.
+- **Added:** the **Grid** pattern's **Cells**: Square (as before, the default), Equal (as many rows as columns) or By rows (the **Rows** setting).
+
 ## 0.54.3 — Moving snaps on both axes (2026-11-05)
 
 - **Fixed:** an object moved onto a level or upright line, a side of a shape or a pattern's, now snaps on the other axis too: one edge landing no longer stopped the other from snapping. For one object, a group and several selected.
@@ -9,7 +14,6 @@
 
 ## 0.54.2 — Snap to the grid and to groups, grid settings; long notes open faster (2026-11-05)
 
-- **Added:** the **Grid** pattern has a lattice (square or isometric), rows of their own, strong line width, angle, shift across and down, dashes, a margin and a frame.
 - **Added:** a corner snaps onto the crossing of a pattern's lines, not to one line at a time.
 - **Added:** the canvas's own grid: Settings > Appearance: **Grid size**, **Stronger line every** and **Grid strength**.
 - **Added:** moving, resizing and dragging a node snap to the grid's lines (**Snap to the grid**, on by default; off with no pattern), and to a group's box and middle as a whole. A lone object snaps too. **Snap distance** sets how near it catches.

@@ -61,6 +61,14 @@ describe("pattern generators (ADR 0162)", () => {
     }
   }, 60_000); // (the slowest test of the unit suite: every generator at the extremes, which shares the machine with the other workers)
 
+  it("Grid: rows follow its Cells choice, and square cells are the default", () => {
+    const g = GENERATORS.find((x) => x.id === "grid")!;
+    const lines = (o: Record<string, string | number>): number => generate(g, { ...defaultValues(g), bg: "", every: 0, ...o }, 1, 800, 400)[0]!.sub.length;
+    expect(lines({})).toBe(17 + 9); // (16 across of 50: 8 rows fit)
+    expect(lines({ cells: "equal" })).toBe(17 + 17);
+    expect(lines({ cells: "rows", rows: 5 })).toBe(17 + 6);
+  });
+
   it("a different seed changes the shapes of the generators that use chance", () => {
     for (const id of ["tides", "drift", "confetti", "cells", "flow", "maze", "ribbons", "contours"]) {
       const g = GENERATORS.find((x) => x.id === id)!;

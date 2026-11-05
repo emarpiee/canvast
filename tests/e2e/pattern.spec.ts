@@ -334,7 +334,7 @@ test("Grid pattern: a shape's corner lands on a crossing of its lines, on both a
   expect(cell).toBeGreaterThan(24);
   const square = async (x: number, y: number): Promise<string> => {
     await p.keyboard.press("u");
-    await app.drag({ x, y }, { x: x + cell / 2, y: y + cell / 2 });
+    await app.drag({ x, y }, { x: x + 1.4 * cell, y: y + 1.4 * cell }); // (big enough that its middle is not on a handle)
     await app.frame();
     return (await objs(app)).at(-1)!.id;
   };
@@ -353,13 +353,13 @@ test("Grid pattern: a shape's corner lands on a crossing of its lines, on both a
   };
   await landsOn(a, 3, 3);
   // Two selected move as one: the corner of their box lands the same way.
-  const c = await square(sheet.minX + 9.2 * cell, sheet.minY + 2.2 * cell);
+  await square(sheet.minX + 9.2 * cell, sheet.minY + 4.2 * cell);
   await p.keyboard.press("v");
   await p.keyboard.down("Shift");
-  await p.mouse.click(sheet.minX + 3.25 * cell, sheet.minY + 3.25 * cell);
+  await p.mouse.click(sheet.minX + 3.7 * cell, sheet.minY + 3.7 * cell);
   await p.keyboard.up("Shift");
   await app.frame();
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toHaveLength(2);
-  await landsOn(c, 7, 5);
+  await landsOn(a, 5, 5);
   expect(app.consoleErrors).toEqual([]);
 });
