@@ -13,7 +13,6 @@ import type { AssetRecord } from "../assets/asset-library";
 import { MAX_IMPORT_BYTES, storedStub } from "../assets/asset-library";
 import type { DeleteMode, DesktopBridge, LibraryOp } from "./desktop-bridge";
 import type { DesktopLibrary } from "./desktop-library";
-import { lagCount } from "../core/lag-counters";
 import { DiskFile, hashOf, pipeInto, writeProven } from "./disk-file";
 import { externalFolder } from "./external-folder";
 import type { HiddenVault } from "./hidden-store";
@@ -543,7 +542,6 @@ export class LibraryMirror {
    * False when a file could not be moved or written (it is tried again with the next change).
    */
   async write(only?: ReadonlySet<string>): Promise<boolean> {
-    lagCount("libraryWrites");
     await this.finishMove();
     await this.dropFoldersDeletedOutside();
     // Some items changed, in a library too big for `library.json`: only they are read, placed and written (with their parts).
@@ -842,7 +840,6 @@ export class LibraryMirror {
    * folder of its folder. A copy of a file the library has is left alone. Whether anything changed.
    */
   async scan(): Promise<boolean> {
-    lagCount("libraryScans");
     const dropped = await this.dropFoldersDeletedOutside();
     return (await this.scanFiles()) || dropped;
   }

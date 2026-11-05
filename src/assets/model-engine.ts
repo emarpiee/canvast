@@ -1,5 +1,4 @@
 import type { AnimationClip, AnimationMixer, Light, Material, Mesh, MeshNormalMaterial, MeshToonMaterial, Object3D, OrthographicCamera, PerspectiveCamera, PlaneGeometry, Scene, ShaderMaterial, WebGLRenderTarget, WebGLRenderer } from "three";
-import { lagCount } from "../core/lag-counters";
 import { extOf } from "./file-kind";
 import { defaultLook, readLook } from "./model-look";
 import type { ModelLook } from "./model-look";
@@ -79,7 +78,6 @@ export async function linesInWorker(input: TraceInput): Promise<LinesResult> {
 
 /** A model's objects from its file. Throws on what cannot be read. */
 export async function readModel(bytes: Uint8Array, name: string): Promise<ReadModel> {
-  lagCount("modelReads");
   const T = await three();
   const ext = extOf(name);
   if (ext === "STL" || ext === "PLY" || ext === "OBJ") {
@@ -327,7 +325,6 @@ export class ModelStage {
 
   /** Draws, the canvas being `w` × `h` CSS px at `scale` pixels each. */
   draw(look: ModelLook, w: number, h: number, scale = 1): void {
-    lagCount("modelDraws");
     const T = this.T;
     const size = `${w}x${h}@${scale}`;
     if (size !== this.shownSize) {

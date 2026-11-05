@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.42 — The lag monitor is gone (2026-11-06)
+
+- **Removed:** the temporary lag monitor. A log it wrote stays in `lag-monitor/` beside the app's settings until it is deleted.
+
 ## 0.54.41 — Placed lines are the lines shown (2026-11-06)
 
 - **Added:** Reach in a 3D view's Lines: how far it looks for a change, apart from how wide lines are drawn, so thin lines keep their inner detail.

@@ -108,9 +108,6 @@ export interface DesktopBridge {
   sizes(paths: string[]): Promise<Array<number | null>>;
   /** Open a file of the workspace folder in the system's default app for its kind. An error in plain words, or "" when it opened. */
   openFile(path: string): Promise<string>;
-  /** The temporary lag monitor (app/lag-monitor.ts): one sample of what the page did; where the log is. */
-  lagSample?(json: string): void;
-  lagFile?(): Promise<string>;
   /**
    * A hidden item opened in the system's app: its readable copy written into this app's own temporary folder (readable by this user
    * only) and opened there (the answer as `openFile`'s). `dropOpened` deletes every such copy: when the hidden items are locked, and

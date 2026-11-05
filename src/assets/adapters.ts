@@ -1,4 +1,3 @@
-import { lagCount } from "../core/lag-counters";
 import { CARD_SCALE, noteCardSize, notePicture } from "../notes/note-preview";
 import { noteKindOf, tooBigForNote } from "../notes/note-file";
 import { isFontFile, isModelFile, isPdfFile } from "./file-kind";
@@ -45,7 +44,6 @@ const PICTURE_KINDS: ReadonlyArray<{ claims(name: string): boolean; picture(name
 
 /** What can be drawn of a file from its bytes, null when nothing could be. */
 export async function drawnFromFile(name: string, chip: string, /** Read only by what needs it: a kind may still hold the file open. */ read: () => Promise<Uint8Array>, o: PictureOptions = {}): Promise<ImageBitmap | null> {
-  lagCount("filePictures");
   try {
     return (await PICTURE_KINDS.find((k) => k.claims(name))?.picture(name, chip, read, o)) ?? null;
   } catch {

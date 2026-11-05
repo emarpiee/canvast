@@ -1083,23 +1083,6 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
   }
 });
 
-test("the lag monitor logs counts beside the processes' use, outside the workspace, and no file names", async () => {
-  const ws = tempDir("cv-lag-");
-  const { app, page } = await launch(ws);
-  try {
-    await page.getByTestId("import-input").setInputFiles({ name: "secretname.png", mimeType: "image/png", buffer: makePng(40, 40, () => [1, 2, 3, 255]) });
-    const path = await page.evaluate(() => (window as unknown as { canvastDesktop?: { lagFile?(): Promise<string> } }).canvastDesktop?.lagFile?.());
-    expect(path, "where it logs").toBeTruthy();
-    expect(path!.startsWith(`${ws}/`)).toBe(false);
-    await expect.poll(() => (existsSync(path!) ? readFileSync(path!, "utf8") : ""), { timeout: 20_000 }).toContain('"procs"');
-    const text = readFileSync(path!, "utf8");
-    expect(JSON.parse(text.trim().split("\n")[0]!)).toHaveProperty("freeMB");
-    expect(text).not.toContain("secretname");
-  } finally {
-    await app.close();
-  }
-});
-
 test("a library folder deleted outside the app stays deleted, while it runs and after a restart; one never seen on disk is made", async () => {
   const ws = tempDir("cv-folders-");
   let { app, page } = await launch(ws);
