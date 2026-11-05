@@ -2103,14 +2103,16 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await expect.poll(() => fileHas("placed-mark")).toBe(true);
     expect((await out()).file).toMatch(/placed\.svg$/);
     expect((await out()).svg).toBe(true);
-    // Several, a picture and a shape: both files, and pasted back here the objects, with nothing imported.
+    // Several, a picture and two shapes: a file each, and pasted back here the objects, with nothing imported.
     const items = () => page.evaluate(async () => (await window.__canvastDebug.assetListing()).entries.length);
     const had = await items();
     await page.keyboard.press("Control+a");
     await clear();
     await page.keyboard.press("Control+c");
-    await expect.poll(() => out().then((o) => o.file.split(/\r?\n/).length)).toBe(2);
+    await expect.poll(() => out().then((o) => o.file.split(/\r?\n/).length)).toBe(3);
     expect((await out()).file).toMatch(/placed\.svg/);
+    expect((await out()).file).toMatch(/\/shape\.svg/);
+    expect((await out()).file).toMatch(/\/shape-2\.svg/);
     // The shapes' own file keeps their proportions (not those of everything selected).
     const shapesFile = readFileSync((await out()).file.split(/\r?\n/).find((f) => !f.includes("placed"))!, "utf8");
     const [, boxW, boxH, wide, high] = /viewBox="0 0 (\S+) (\S+)" width="([\d.]+)[^"]*" height="([\d.]+)/.exec(shapesFile)!;
@@ -2247,6 +2249,47 @@ test("Copy on the canvas: a flipped picture alone goes as a PNG, and among sever
     const edited = got.find((f) => f.endsWith("changed-edited.png"))!;
     expect(readFileSync(edited).subarray(1, 4).toString()).toBe("PNG");
     expect((await out()).png).toBe(false);
+  } finally {
+    await app.close();
+  }
+});
+
+test("Copy of shapes: a file for each, a group is one, and one thing alone goes with its picture", async () => {
+  const ws = tempDir("cv-copy-shapes-");
+  const { app, page } = await launch(ws, "userdata", true);
+  const out = () => app.evaluate(async ({ clipboard }) => {
+    const [item] = await clipboard.read();
+    return { png: !!item?.types.includes("image/png"), files: item?.types.includes("text/uri-list") ? (await (await item.getType("text/uri-list") as Blob).text()).trim().split(/\r?\n/) : [] };
+  });
+  const draw = async (x: number): Promise<void> => {
+    await page.keyboard.press("u");
+    await page.mouse.move(x, 300);
+    await page.mouse.down();
+    await page.mouse.move(x + 100, 380, { steps: 3 });
+    await page.mouse.up();
+    await page.keyboard.press("v");
+  };
+  const copied = async (n: number): Promise<{ png: boolean; files: string[] }> => {
+    await app.evaluate(({ clipboard }) => clipboard.clear());
+    await page.keyboard.press("Control+c");
+    await expect.poll(() => out().then((o) => o.files.length)).toBe(n);
+    return out();
+  };
+  try {
+    await draw(300);
+    await draw(450);
+    await page.keyboard.press("Control+a");
+    const two = await copied(2);
+    expect(two.files.map((f) => f.split("/").at(-1)).sort()).toEqual(["shape-2.svg", "shape.svg"]);
+    expect(two.png).toBe(false);
+    await page.keyboard.press("Control+g");
+    const group = await copied(1);
+    expect(group.files[0]).toMatch(/group\.svg$/);
+    expect(group.png, "one thing alone: its picture too").toBe(true);
+    await draw(600);
+    await page.keyboard.press("Control+a");
+    const both = await copied(2);
+    expect(both.files.map((f) => f.split("/").at(-1)).sort()).toEqual(["group.svg", "shape.svg"]);
   } finally {
     await app.close();
   }

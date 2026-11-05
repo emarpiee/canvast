@@ -62,6 +62,7 @@ import { askCurrentPassword, askPassword, forgetHiddenPassword, hiddenModeOn, hi
 import { typeOfName } from "../storage/workspace-names";
 import { openLockScreen } from "../ui/lock-screen";
 import { renderedPicture } from "../render/adjust-image";
+import { freeNameIn } from "../doc/file-names";
 import { MAX_COPIED_SVG, onePerPicture, svgCopy, writeSystemClipboard, type ClipboardFiles } from "./system-clipboard";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
@@ -2649,6 +2650,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     },
   };
   /** What a copy on the canvas puts out: one note card is its words, so it pastes into a note elsewhere (and still as the card here); the rest a picture. */
+  /** Past this, shapes go as one file rather than a file each (temporary files, written at each copy). */
+  const MAX_SVG_FILES = 500;
   const copyOut = async (t: ExportTarget | null, withText: boolean, svg?: string): Promise<void> => {
     const one = editor.selection.size === 1 ? await selectedFiles() : [];
     if (one[0] && noteKindOf(one[0].name)) {
@@ -2670,6 +2673,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     const real = bridge && ents.length ? await filesOf(copyOnCanvas, bridge, ents) : undefined;
     // Pictures with their edits: among several, each as a new file as it looks now, since its own file does not show them. (A video's or a GIF's edits stay out.)
     const edited: Array<{ name: string; bytes: Uint8Array }> = [];
+    // (no two files that go together of one name: pasted into one folder, they would meet)
+    const taken = new Set(ents.map((e) => e.name));
     if (bridge && objs.length > 1) {
       for (const o of objs) {
         if (o?.kind !== "image" || o.media || asImported(o)) continue;
@@ -2677,26 +2682,38 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         if (!e || (meta(e).hidden && !fine)) continue;
         const rec = await assets.record(o.assetId).catch(() => undefined);
         const png = rec && (await renderedPicture(rec.blob, o).catch(() => null));
-        if (png) edited.push({ name: `${e.name.replace(/\.[^.]*$/, "")}-edited.png`, bytes: new Uint8Array(await png.arrayBuffer()) });
+        if (png) edited.push({ name: freeNameIn(taken, `${e.name.replace(/\.[^.]*$/, "")}-edited.png`), bytes: new Uint8Array(await png.arrayBuffer()) });
       }
     }
     const files = real || edited.length ? { files: real?.files ?? [], copies: [...(real?.copies ?? []), ...edited], n: (real?.n ?? 0) + edited.length } : undefined;
     const lone = one[0] && ents[0]?.hash === one[0].hash && clipboardFor(one[0].name, one[0].type) === "vector" ? one[0] : undefined;
     const own = lone ? await (await copyOnCanvas.file(lone.hash))?.text().catch(() => undefined) : undefined;
-    // Shapes among other things: an SVG of the shapes alone, at their own proportions.
-    const shapes = bridge && t && !t.vectors ? objs.filter((o): o is PathObject => o?.kind === "path" && !isContainer(o) && !isTexture(o.fill) && !isTexture(o.stroke)) : [];
-    const theirs = shapes.length ? buildTarget(doc, shapes, null) : null;
-    const some = theirs ? svgOfTarget(doc, theirs, { w: String(copySize(theirs, 1000).w), h: String(copySize(theirs, 1000).h) }) : null;
-    const made = svg ?? some ?? undefined;
+    // Shapes: a file for each, or for each group, at its own proportions. (What is on a sheet stays with the sheet.)
+    const loose = bridge && !objs.some((o) => isContainer(o)) ? objs.filter((o): o is PathObject => o?.kind === "path" && !o.hidden && !o.locked && !isTexture(o.fill) && !isTexture(o.stroke)) : [];
+    const units = new Map<string, PathObject[]>();
+    for (const o of loose) {
+      const key = o.groups?.[0] ?? o.id; // (its outermost group)
+      units.set(key, [...(units.get(key) ?? []), o]);
+    }
+    const tooMany = units.size > MAX_SVG_FILES;
+    const parts = tooMany ? [loose] : [...units.values()];
+    const svgs = parts.flatMap((part) => {
+      const theirs = part.length ? buildTarget(doc, part, null) : null;
+      const text = theirs && svgOfTarget(doc, theirs, { w: String(copySize(theirs, 1000).w), h: String(copySize(theirs, 1000).h) });
+      return text && text.length <= MAX_COPIED_SVG ? [{ name: tooMany ? "selection" : part.length > 1 ? "group" : (part[0]!.name ?? "shape"), text }] : [];
+    });
+    const made = svgs.length > 1 ? undefined : (svgs[0]?.text ?? svg ?? undefined);
     markCopiedPicture(); // (from now: a paste here is the objects, even before the copy is on the clipboard)
+    if (tooMany) copyOnCanvas.say(`More than ${MAX_SVG_FILES} shapes go as one file.`);
     // Several real files: those alone, as Copy file gives them, for a program given one picture would take that and leave the rest.
-    if ((files?.n ?? 0) + (made ? 1 : 0) > 1 || !t) {
-      if (!files?.n && !made) return;
-      const all = { files: files?.files ?? [], copies: [...(files?.copies ?? []), ...(made && t ? [svgCopy(t.name, made)] : [])] };
+    if ((files?.n ?? 0) + (svgs.length > 1 ? svgs.length : made ? 1 : 0) > 1 || !t) {
+      if (!files?.n && !made && !svgs.length) return;
+      const shapeFiles = made ? [{ name: svgs[0]?.name ?? t?.name ?? "selection", text: made }] : svgs;
+      const all = { files: files?.files ?? [], copies: [...(files?.copies ?? []), ...shapeFiles.map((f) => svgCopy(freeNameIn(taken, `${f.name}.svg`), f.text))] };
       if ((await writeSystemClipboard({ files: all })) === "failed") copyOnCanvas.say("Could not copy to the clipboard.");
       return;
     }
-    await copyPicture(t, withText, made ?? own, made ? t.name : undefined, files);
+    await copyPicture(t, withText, made ?? own, made ? (svgs[0]?.name ?? t.name) : undefined, files);
   };
   // Copy and cut take the selected objects (text fields and the text editor keep their own).
   for (const kind of ["copy", "cut"] as const) {

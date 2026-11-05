@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.24 — A file for each copied shape (2026-11-05)
+
+- **Changed:** in the desktop app, several shapes copied go as a file for each, and a group as one file, named by the shape or numbered, not merged into one `selection.svg`. Past 500 they go as one file, and it says so.
+
 ## 0.54.23 — One question before a hidden item is copied (2026-11-05)
 
 - **Changed:** a question about copying a hidden item that is still on its way out answers a copy pressed in that moment, rather than a second one opening over it.

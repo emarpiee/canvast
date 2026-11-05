@@ -486,7 +486,7 @@ Keep a large canvas in order, and reach things that lie under others.
 
 Copy to other apps, or export a sheet, a picture or selected shapes, and get what you see.
 
-**Copy to other apps.** `Ctrl/⌘+C` keeps the real objects for pasting back here, and also puts a PNG picture on the system clipboard, with the SVG beside it for vector shapes and SVG files, where the browser allows it; Which it takes is up to the program you paste into. In the desktop app the real files go too, of any kind and any number, for a program that takes files (a cropped, flipped or adjusted picture goes as its PNG only):
+**Copy to other apps.** `Ctrl/⌘+C` keeps the real objects for pasting back here, and also puts a PNG picture on the system clipboard, with the SVG beside it for vector shapes and SVG files, where the browser allows it; Which it takes is up to the program you paste into. In the desktop app the real files go too, of any kind and any number, for a program that takes files (a cropped, flipped or adjusted picture goes as its PNG alone, or among several as a new file; each shape or group is an SVG file of its own):
 
 | You copy | The PNG is |
 | --- | --- |
