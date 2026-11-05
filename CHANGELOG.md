@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.34 — Two signs make bold again in Firefox (2026-11-05)
+
+- **Fixed:** in Firefox, a second `*` typed over selected words of a note made them plain instead of bold, since 0.54.32. The words of a selection are now read from the note, not from what is laid out, also when checking that a whole note is selected.
+
 ## 0.54.33 — Arrows go to the next note again (2026-11-05)
 
 - **Fixed:** in the library's viewer, with the cursor out of a note's words, the arrow keys and the viewer's other keys work again; a note took them all since 0.53.3. With a picture or other item in the note selected, its keys are still the note's.

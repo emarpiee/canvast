@@ -756,7 +756,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   el.querySelector(".sun-editor-editable")?.addEventListener("beforeinput", (ev) => {
     const e = ev as InputEvent, sign = e.data ?? "", sel = window.getSelection();
     if (!opts.wrapSelection || e.inputType !== "insertText" || e.isComposing || !sel || sel.isCollapsed) return;
-    const words = sel.toString();
+    const words = sel.getRangeAt(0).toString(); // (the range's words, as a selection's are what is laid out: not yet, in Firefox, in a block off the page or just changed)
     const rich = opts.kind !== "txt" && !(sel.anchorNode && helper.dom.query.getParentElement(sel.anchorNode, "pre"));
     const close = rich && WRAP_FORMATS.has(sign) ? null : (WRAP_PAIRS[sign] ?? (WRAP_FORMATS.has(sign) ? sign : undefined));
     if (close === undefined || !words.trim()) return;
@@ -784,7 +784,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       sel.removeAllRanges();
       sel.addRange(inner);
     }
-    wrapped = { sign, words: window.getSelection()?.toString() ?? words };
+    wrapped = { sign, words: sel.rangeCount ? sel.getRangeAt(0).toString() : words };
     dirty = true;
     $.history.push(false);
   });
@@ -962,7 +962,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     const sel = getSelection();
     const area = editor.$.frameContext.get("wysiwyg") as HTMLElement;
     if (!sel || sel.isCollapsed || !area.contains(sel.anchorNode) || !area.contains(sel.focusNode)) return false;
-    return bare(sel.toString()) === bare(area.textContent ?? "") && (bare(area.textContent ?? "") !== "" || !!area.querySelector("img, video, audio"));
+    return bare(sel.getRangeAt(0).toString()) === bare(area.textContent ?? "") && (bare(area.textContent ?? "") !== "" || !!area.querySelector("img, video, audio"));
   };
   const wholeNow = (): string | null => {
     if (opts.kind === "txt" || !wholeSelected()) return null;

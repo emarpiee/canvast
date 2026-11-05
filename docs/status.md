@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.34: two signs make bold again in Firefox (2026-11-05)
+
+- **Implemented:** the words of a selection in a note are read from its range, which does not depend on the blocks being laid out.
+- **Tested:** the failing test, 20 times in Firefox on GitHub: 20 failed before the fix, 20 passed after; the whole-note check is covered by the `Tests` run.
+- **Known failures:** none known until the `Tests` run reports.
+- **Unverified:** copying the whole of a very long note in Firefox.
+- **Committed:** v0.54.34.
+- **Next bounded task:** read the `Tests` run.
+
 ## v0.54.33: arrows go to the next note again (2026-11-05)
 
 - **Implemented:** in the library's viewer a note takes keys off its words only with something of it selected.
