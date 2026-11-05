@@ -27,7 +27,6 @@
 - **Added:** a font in the viewer has the background button of see-through pictures, kept the same way, and a button that changes its sample sentence, kept too, in the details as well. It has more room around it. A font's preview in the details and its card on a canvas show that same sentence, background and letter colour.
 - **Added:** a box under a font's samples in the viewer to type in and see it in that font; what is typed goes from font to font and is dropped when the viewer closes.
 - **Added:** a fifth background for see-through pictures and fonts, the theme's own colour, which follows a change of theme. The background button shows the one in use, and the viewer's floating buttons stay visible under the pointer on any background.
-- **Fixed:** long notes open and save faster: writing a note out took far longer than its length.
 - **Fixed:** Reset size works at any zoom: past a certain zoom it offered nothing for what was placed before. Several reset together keep their layout and do not run into each other.
 - **Added:** a **Size** menu on the Actions bar, with Reset size and the width or height of the smallest, medium or largest of the selected. Their layout is kept.
 - **Changed:** Reset size, in that menu, is there for any picture or note; when it would change nothing it is greyed out and says why.
