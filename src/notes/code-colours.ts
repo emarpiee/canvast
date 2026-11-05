@@ -142,7 +142,9 @@ export async function paintCode(owner: object, page: Element): Promise<void> {
       const range = document.createRange();
       range.setStart(from[0], from[1]);
       range.setEnd(to[0], to[1]);
-      byGroup.set(group, [...(byGroup.get(group) ?? []), range]);
+      const list = byGroup.get(group);
+      if (list) list.push(range);
+      else byGroup.set(group, [range]);
     }
   }
   painted.set(owner, byGroup);
