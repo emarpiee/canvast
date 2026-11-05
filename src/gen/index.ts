@@ -22,7 +22,7 @@ export type { SvgOptions } from "./svg";
 export const GENERATORS: readonly Generator[] = [...WAVES, ...BLOBS, ...SOFT, ...LINES, ...TILES, ...FIELDS, ...EXTRA];
 
 /** The most shapes one pattern is made of (one path may hold many sub-paths). */
-export const MAX_SHAPES = 600;
+export const MAX_SHAPES = 5000;
 
 const BG = C("bg", "Background", "#0b1f33", true);
 
@@ -60,7 +60,7 @@ export function randomValues(g: Generator, rng: Rng): Values {
   const out: Values = {};
   for (const s of all) {
     out[s.k] =
-      s.t === "range" ? Math.min(s.max, Math.max(s.min, s.min + Math.round(((0.15 + 0.7 * ((rng() + rng()) / 2)) * (s.max - s.min)) / s.step) * s.step))
+      s.t === "range" ? Math.min(s.usual[1], Math.max(s.usual[0], s.usual[0] + Math.round(((0.15 + 0.7 * ((rng() + rng()) / 2)) * (s.usual[1] - s.usual[0])) / s.step) * s.step))
       : s.t === "toggle" ? rng.chance(0.5)
       : s.t === "choice" ? rng.pick(s.opts)[0]
       : cols[ci++]!;

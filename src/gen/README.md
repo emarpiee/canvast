@@ -68,7 +68,7 @@ Without a bundler: `npm run build:patterns` (in canvast) writes `dist-patterns/`
 | `sectionsOf(g)`, `settingsOf(g)` | The settings in sections, or as one list |
 | `generatorById(id)` | One generator, or `undefined` |
 | `makeRng(seed)`, `makeNoise(seed)` | The seeded random source (`rng()`, `.range`, `.int`, `.pick`, `.chance`) and 2D value noise, for your own use |
-| `MAX_SHAPES` | The most shapes one result holds (600) |
+| `MAX_SHAPES` | The most shapes one result holds (5000) |
 
 ## The generators
 

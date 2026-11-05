@@ -19,7 +19,8 @@ const sound = (shapes: readonly GenShape[], w: number, h: number): void => {
     for (const p of s.sub) {
       expect(p.n.length % NODE).toBe(0);
       expect(p.n.length).toBeGreaterThan(0);
-      for (const v of p.n) expect(Number.isFinite(v) && Math.abs(v) < 20 * Math.max(w, h)).toBe(true);
+      // (one check per path: at a setting's far end a path holds millions of numbers)
+      expect(p.n.every((v) => Number.isFinite(v) && Math.abs(v) < 20 * Math.max(w, h))).toBe(true);
     }
   }
 };
@@ -52,7 +53,10 @@ describe("pattern generators (ADR 0162)", () => {
       for (const pick of ["min", "max"] as const) {
         const v = defaultValues(g);
         for (const s of settingsOf(g)) if (s.t === "range") v[s.k] = s[pick];
-        sound(generate(g, v, 3, 900, 600), 900, 600);
+        const t = performance.now();
+        const shapes = generate(g, v, 3, 900, 600);
+        expect(performance.now() - t, `${g.id} all at ${pick}: a typed value must not hang the panel`).toBeLessThan(20_000);
+        sound(shapes, 900, 600);
       }
     }
   }, 60_000); // (the slowest test of the unit suite: every generator at the extremes, which shares the machine with the other workers)
@@ -69,7 +73,7 @@ describe("pattern generators (ADR 0162)", () => {
     expect(generate(g, { ...defaultValues(g), bg: "" }, 1, 100, 100).some((s) => s.name === "Background")).toBe(false);
     expect(generate(g, defaultValues(g), 1, 100, 100)[0]!.name).toBe("Background");
     const c = cleanValues(g, { crests: 999, amp: "x", bg: "red", flip: 3 });
-    expect(c["crests"]).toBe(10);
+    expect(c["crests"]).toBe(100);
     expect(c["amp"]).toBe(14);
     expect(c["bg"]).toBe("#0b1f33");
     expect(c["flip"]).toBe(false);

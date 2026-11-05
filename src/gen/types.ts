@@ -11,7 +11,7 @@ export type Values = Record<string, number | string | boolean>;
 type Base = { readonly k: string; readonly label: string };
 export type Setting = Base &
   (
-    | { readonly t: "range"; readonly min: number; readonly max: number; readonly step: number; readonly def: number }
+    | { readonly t: "range"; readonly min: number; readonly max: number; readonly step: number; readonly def: number; /** The usual span, which Randomize keeps to (the whole span can be slow or empty). */ readonly usual: readonly [number, number] }
     | { readonly t: "choice"; readonly opts: readonly (readonly [string, string])[]; readonly def: string }
     | { readonly t: "toggle"; readonly def: boolean }
     /** A colour "#rrggbb"; with `hide`, "" means none (the eye of the panel). */
