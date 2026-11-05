@@ -26,10 +26,13 @@ const MAX_JOINED = 5_000_000;
 const NOTES_BETWEEN = "\n\n---\n\n";
 
 let hiddenAsked = false;
+let asking: Promise<boolean> | null = null;
 /** The system's clipboard is outside the app: asked once a session before a hidden item goes there. */
 export async function hiddenFine(ents: readonly CatalogEntry[]): Promise<boolean> {
   if (hiddenAsked || !ents.some((e) => meta(e).hidden)) return true;
-  if (!(await confirmDialog({ title: "Copy a hidden item", lines: ["It goes on the system's clipboard, readable, where other programs and clipboard managers can see and keep it."], confirmLabel: "Copy it", danger: false }))) return false;
+  // (one question at a time, whichever route asks: all that ask have the one answer)
+  asking ??= confirmDialog({ title: "Copy a hidden item", lines: ["It goes on the system's clipboard, readable, where other programs and clipboard managers can see and keep it."], confirmLabel: "Copy it", danger: false }).finally(() => { asking = null; });
+  if (!(await asking)) return false;
   hiddenAsked = true;
   return true;
 }

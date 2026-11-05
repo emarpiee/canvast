@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.23 — One question before a hidden item is copied (2026-11-05)
+
+- **Fixed:** copying a hidden item could ask "Copy a hidden item" twice at once.
+
 ## 0.54.22 — Copied files on every system (2026-11-05)
 
 - **Fixed:** in the desktop app, Copy and Copy file wrote real files under Linux's name for them, so on Windows and macOS they would not have pasted as files. They now use Electron's own name, which it maps to each system's; this is checked in unit tests, and not yet on Windows or macOS themselves.

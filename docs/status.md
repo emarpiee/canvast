@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.23: one question before a hidden item is copied (2026-11-05)
+
+- **Implemented:** `hiddenFine` shares one open question.
+- **Tested:** `npm run typecheck`, checks and unit tests locally; `desktop.spec` on GitHub's `Tests` run.
+- **Known failures:** none known until that run reports. The middle-button pan test failed once on 8513873 and passed on 00e9dc3, its code unchanged.
+- **Unverified:** why two asks came from one press; real pastes on Windows and macOS.
+- **Committed:** v0.54.23.
+- **Next bounded task:** read the `Tests` run; the owner's choice on the hidden copy timer.
+
 ## v0.54.22: copied files on every system (2026-11-05)
 
 - **Implemented:** `desktop/clipboard-entries.ts`, the names of what a copy offers, per system.
