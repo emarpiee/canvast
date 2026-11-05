@@ -22,7 +22,7 @@ export function settingRowHtml(s: Setting, v: SettingValue, extra = "", /** Uniq
 
 /** Makes a row work. `get` reads a value now, `set` changes it; `reset` is its double-click. */
 export function bindSettingRow(r: HTMLElement, s: Setting, get: (k: string) => SettingValue, set: (k: string, v: SettingValue) => void, reset: () => void): void {
-  r.querySelector(".adj-label, .pg-check")?.setAttribute("title", "Double-click to reset");
+  r.querySelector(".adj-label, .pg-check")?.setAttribute("title", `${s.tip ? `${s.tip} ` : ""}Double-click to reset`);
   r.addEventListener("dblclick", (e) => {
     const on = e.target as HTMLElement;
     if (on.closest("[data-lock]") || !on.closest(".adj-label, .pg-check, input[type=range]")) return;

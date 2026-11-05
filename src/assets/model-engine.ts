@@ -3,7 +3,7 @@ import { lagCount } from "../core/lag-counters";
 import { extOf } from "./file-kind";
 import { defaultLook, readLook } from "./model-look";
 import type { ModelLook } from "./model-look";
-import type { LinesInput, LinesResult } from "./model-lines";
+import type { LinesResult, TraceInput } from "./model-lines";
 
 // three.js, for what the app draws of a 3D model: one `ModelStage` draws a model with a look on its canvas, in a view and for a card alike.
 
@@ -63,14 +63,14 @@ async function readInWorker(bytes: Uint8Array, ext: string): Promise<WorkerPart[
 }
 
 /** The lines of a view, worked out off the page. */
-export async function linesInWorker(input: LinesInput): Promise<LinesResult> {
+export async function linesInWorker(input: TraceInput): Promise<LinesResult> {
   workerUrl ??= import("./model-inside").then(({ workerText }) => URL.createObjectURL(new Blob([workerText], { type: "text/javascript" })));
   const worker = new Worker(await workerUrl);
   try {
     return await new Promise<LinesResult>((done, failed) => {
       worker.onmessage = (e: MessageEvent<{ result?: LinesResult; error?: string }>) => (e.data.result ? done(e.data.result) : failed(new Error(e.data.error ?? "its lines could not be read")));
       worker.onerror = () => failed(new Error("its lines could not be read"));
-      worker.postMessage({ lines: input }, [input.position.buffer as ArrayBuffer, ...(input.depth ? [input.depth.buffer as ArrayBuffer] : [])]);
+      worker.postMessage({ lines: input }, [input.mask.buffer as ArrayBuffer]);
     });
   } finally {
     worker.terminate();
@@ -395,9 +395,9 @@ export class ModelStage {
   }
 
   /** Renders the surface's direction and depth into `seen`, at this canvas's size. */
-  private renderSeen(camera: PerspectiveCamera | OrthographicCamera): WebGLRenderTarget {
+  private renderSeen(camera: PerspectiveCamera | OrthographicCamera, at?: { x: number; y: number }): WebGLRenderTarget {
     const T = this.T;
-    const size = this.gl.getDrawingBufferSize(new T.Vector2());
+    const size = at ?? this.gl.getDrawingBufferSize(new T.Vector2());
     if (!this.seen || this.seen.width !== size.x || this.seen.height !== size.y) {
       this.seen?.depthTexture?.dispose();
       this.seen?.dispose();
@@ -418,8 +418,17 @@ export class ModelStage {
 
   /** Line art over what is on the canvas: where depth or the surface's direction jumps between neighbouring pixels. Its cost follows the picture, not the triangles. */
   private drawLines(look: ModelLook, camera: PerspectiveCamera | OrthographicCamera, only: boolean): void {
+    const quad = this.lineQuadFor(look, camera, this.renderSeen(camera));
+    const auto = this.gl.autoClear;
+    if (only) this.gl.clear();
+    this.gl.autoClear = false;
+    this.gl.render(quad.scene, quad.camera);
+    this.gl.autoClear = auto;
+  }
+
+  /** The pass that finds lines, set for this look and what was seen. */
+  private lineQuadFor(look: ModelLook, camera: PerspectiveCamera | OrthographicCamera, seen: WebGLRenderTarget): { scene: Scene; camera: OrthographicCamera; mesh: Mesh<PlaneGeometry, ShaderMaterial> } {
     const T = this.T;
-    const seen = this.renderSeen(camera);
     if (!this.lineQuad) {
       const mesh = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({
         transparent: true,
@@ -445,72 +454,32 @@ export class ModelStage {
     (u["colour"]!.value as { set(c: string): void }).set(look["linesColour"] as string);
     u["outline"]!.value = look["linesOutline"];
     u["inner"]!.value = look["linesInner"];
-    const auto = this.gl.autoClear;
-    if (only) this.gl.clear();
-    this.gl.autoClear = false;
-    this.gl.render(this.lineQuad.scene, this.lineQuad.camera);
-    this.gl.autoClear = auto;
+    return this.lineQuad;
   }
 
-  /** What the real lines of this view are worked out from, as last drawn: the triangles as they stand in the world, and the depth seen. */
-  linesInput(w: number, h: number): Omit<LinesInput, "creaseDeg" | "shortest" | "simplify" | "most"> | null {
+  /** The line art of the view last drawn, as a mask of `w` × `h` (the same shape as the canvas): the very lines it shows. Top row first; flipped when the view is mirrored. */
+  linesMask(look: ModelLook, w: number, h: number): Uint8Array | null {
     const T = this.T, camera = this.lastCamera;
     if (!camera || !this.model) return null;
-    this.scene.updateMatrixWorld(true);
-    let count = 0;
-    const meshes: Mesh[] = [];
-    this.model.traverse((o) => {
-      const m = o as Mesh;
-      if (m.isMesh) {
-        meshes.push(m);
-        count += m.geometry.index?.count ?? m.geometry.getAttribute("position")?.count ?? 0;
-      }
-    });
-    const position = new Float32Array(count * 3), v = new T.Vector3();
-    let at = 0;
-    for (const m of meshes) {
-      const index = m.geometry.index, n = index?.count ?? m.geometry.getAttribute("position").count;
-      const posed = !!(m as unknown as { isSkinnedMesh?: boolean }).isSkinnedMesh || !!m.morphTargetInfluences;
-      const pos = m.geometry.getAttribute("position");
-      for (let i = 0; i < n; i++) {
-        const c = index ? index.getX(i) : i;
-        if (posed) m.getVertexPosition(c, v);
-        else v.fromBufferAttribute(pos, c);
-        v.applyMatrix4(m.matrixWorld);
-        position[at++] = v.x;
-        position[at++] = v.y;
-        position[at++] = v.z;
-      }
-    }
-    // Depth, as bytes the page can read.
-    const seen = this.renderSeen(camera);
+    const seen = this.renderSeen(camera, { x: w, y: h });
+    const quad = this.lineQuadFor(look, camera, seen);
     const target = new T.WebGLRenderTarget(w, h, { minFilter: T.NearestFilter, magFilter: T.NearestFilter });
-    const quad = new T.Mesh(new T.PlaneGeometry(2, 2), new T.ShaderMaterial({
-      uniforms: { depth: { value: seen.depthTexture } },
-      depthTest: false,
-      depthWrite: false,
-      vertexShader: "varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }",
-      fragmentShader: "uniform sampler2D depth; varying vec2 vUv; void main() { float d = texture2D(depth, vUv).x; vec3 e = fract(d * vec3(1.0, 255.0, 65025.0)); e -= e.yzz * vec3(1.0 / 255.0, 1.0 / 255.0, 0.0); gl_FragColor = vec4(e, 1.0); }",
-    }));
-    const scene = new T.Scene();
-    scene.add(quad);
+    const clear = this.gl.getClearColor(new T.Color()), alpha = this.gl.getClearAlpha(), auto = this.gl.autoClear;
     this.gl.setRenderTarget(target);
-    this.gl.render(scene, new T.OrthographicCamera());
+    this.gl.setClearColor(0x000000, 0);
+    this.gl.clear();
+    this.gl.autoClear = false;
+    this.gl.render(quad.scene, quad.camera);
+    this.gl.autoClear = auto;
     const bytes = new Uint8Array(w * h * 4);
     this.gl.readRenderTargetPixels(target, 0, 0, w, h, bytes);
     this.gl.setRenderTarget(null);
+    this.gl.setClearColor(clear, alpha);
     target.dispose();
-    quad.geometry.dispose();
-    quad.material.dispose();
-    const depth = new Float32Array(w * h);
+    const mask = new Uint8Array(w * h), mirror = !!look["mirror"];
     for (let y = 0; y < h; y++)
-      for (let x = 0; x < w; x++) {
-        const s = ((h - 1 - y) * w + x) * 4;
-        depth[y * w + x] = bytes[s]! / 255 + bytes[s + 1]! / 255 / 255 + bytes[s + 2]! / 255 / 65025;
-      }
-    const eye = camera.getWorldPosition(new T.Vector3()), dir = camera.getWorldDirection(new T.Vector3());
-    const vp = new T.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
-    return { position, viewProj: [...vp.elements], camera: [eye.x, eye.y, eye.z], flatDir: camera === this.ortho ? [dir.x, dir.y, dir.z] : null, w, h, depth };
+      for (let x = 0; x < w; x++) mask[y * w + (mirror ? w - 1 - x : x)] = bytes[((h - 1 - y) * w + x) * 4 + 3]! > 127 ? 1 : 0;
+    return mask;
   }
 
   /** The canvas's size in pixels. */

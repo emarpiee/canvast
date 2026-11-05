@@ -17,6 +17,9 @@ const KEEP_MS = 600;
 const TURNAROUND = 8;
 /** The most lines placed at once, the longest first. */
 const MAX_LINES = 40_000;
+/** Lines are found at this many times the canvas's size, up to a longer side of this many pixels. */
+const LINES_FINER = 2;
+const LINES_MAX_EDGE = 4096;
 
 /** A 3D model in its view: turned, zoomed and lit by hand; what it shows can be kept (its place is kept by itself), bookmarked, or shown on a card on a canvas. */
 export async function openModelView(el: HTMLElement, file: FileFacts, deps: ViewDeps, place: ViewPlace): Promise<OpenView> {
@@ -66,7 +69,7 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
   const hash = file.hash;
   const first = firstLook(file.name);
   let state: ViewState = viewStateOf(await deps.session.catalog?.entry(hash).catch(() => undefined));
-  let look: ModelLook = readLook(state.at, first);
+  let look: ModelLook = readLook(place.startAt ?? state.at, first);
   let closed = false;
   let frame = 0;
   const paint = (): void => {
@@ -165,17 +168,18 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
     keep();
     await place.refresh();
   };
-  /** The line art of this view, as real paths, worked out off the page. */
+  /** The line art of this view, as real paths: the lines it shows, followed along their middles, off the page. */
   const placeLines = async (): Promise<void> => {
-    const { w, h } = stage.pixels;
-    const input = stage.linesInput(w, h);
-    if (!input) return;
+    const { w: cw, h: ch } = stage.pixels;
+    // (finer than the screen: a line's path is then smoother than its pixels)
+    const k = Math.min(LINES_MAX_EDGE / Math.max(cw, ch), Math.max(1, LINES_FINER));
+    const w = Math.round(cw * k), h = Math.round(ch * k);
+    const mask = stage.linesMask(look, w, h);
+    if (!mask) return;
     deps.session.editor.message = "Finding the lines of this view…";
     deps.session.editor.changed();
     try {
-      // The sliders of the live lines, as an angle: more inner detail, gentler creases count.
-      const creaseDeg = 80 - 70 * (look["linesInner"] as number);
-      const { lines, dropped } = await linesInWorker({ ...input, creaseDeg, shortest: look["linesShortest"] as number, simplify: 0.6, most: MAX_LINES });
+      const { lines, dropped } = await linesInWorker({ mask, w, h, shortest: (look["linesShortest"] as number) * k, simplify: 0.8, most: MAX_LINES });
       if (closed) return;
       if (!lines.length) {
         deps.session.editor.message = "No lines were found in this view.";

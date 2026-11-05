@@ -51,7 +51,7 @@ export const MODEL_SECTIONS: readonly Section[] = [
       { ...C("linesColour", "Colour", "#111111"), when: ["linesShow", "over", "only"] },
       { ...R("linesOutline", "Outline", 0, 1, 0.01, 0.5), when: ["linesShow", "over", "only"] },
       { ...R("linesInner", "Inner detail", 0, 1, 0.01, 0.35), when: ["linesShow", "over", "only"] },
-      R("linesShortest", "Shortest line", 0, 100, 1, 6),
+      { ...R("linesShortest", "Min. placed", 0, 100, 1, 6), when: ["linesShow", "over", "only"], tip: "Place the lines leaves out lines shorter than this many pixels; what shows here does not change." },
     ],
   },
   { title: "Background", items: [C("bg", "Colour", "#2b2b2f", true)] },
@@ -71,7 +71,7 @@ export const defaultLook = (over: ModelLook = {}): ModelLook => ({ ...Object.fro
 export function readLook(text: string | undefined, over: ModelLook = {}): ModelLook {
   const look = defaultLook(over);
   try {
-    const got = JSON.parse(text ?? "{}") as Record<string, unknown>;
+    const got = JSON.parse(text || "{}") as Record<string, unknown>;
     for (const s of SETTINGS) {
       const v = got[s.k];
       if (s.t === "range" && typeof v === "number" && Number.isFinite(v)) look[s.k] = Math.max(s.min, Math.min(s.max, v));

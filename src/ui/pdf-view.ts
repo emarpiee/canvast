@@ -78,7 +78,8 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
   let zoom: number | "fit" = "fit";
   const hash = file.hash;
   let state: ViewState = viewStateOf(await deps.session.catalog?.entry(hash).catch(() => undefined));
-  let current = Math.max(1, Math.min(count, Number(state.at) || 1));
+  // (a card showing a page of its own opens there; else where the file was left)
+  let current = Math.max(1, Math.min(count, (Number(place.startAt) > 1 ? Number(place.startAt) : Number(state.at)) || 1));
   let closed = false;
 
   const slots: Slot[] = [];

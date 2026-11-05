@@ -37,9 +37,18 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.41: placed lines are the lines shown (2026-11-06)
+
+- **Implemented:** `traceLines` in `src/assets/model-lines.ts` from the view's own line mask; `ViewPlace.startAt`.
+- **Tested:** unit tests of the tracing; the `Tests` run on GitHub.
+- **Known failures:** none known until the `Tests` run reports.
+- **Unverified:** how clean the paths are on a dense scan; on screen by hand.
+- **Committed:** v0.54.41.
+- **Next bounded task:** read the `Tests` run.
+
 ## v0.54.40: line art of 3D models (2026-11-06)
 
-- **Implemented:** `src/assets/model-lines.ts` (outline and crease edges for a view, hidden ones removed, joined and simplified); live edges by a shader in `ModelStage`; `placeLinesBeside`.
+- **Implemented:** `src/assets/model-lines.ts` (the mask of the lines a view shows, thinned and followed into paths); live edges by a shader in `ModelStage`; `placeLinesBeside`.
 - **Tested:** unit tests of the lines on a cube; a browser test on GitHub; local checks.
 - **Known failures:** those of the last `Tests` run are being read.
 - **Unverified:** how clean the lines are on a real dense scan; on screen by hand.

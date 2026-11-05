@@ -1715,6 +1715,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   /** Shows what is in a file's view on one card (doc/model.ts `preview`): its width kept, its height following the new picture; one step of undo. */
   function cardActions(from: ImageObject): CardActions {
     return {
+      startAt: from.preview ?? "",
       setPreview: (preview, size) => {
         const o = doc.get(from.id);
         if (o?.kind !== "image" || editor.blockEdit()) return;

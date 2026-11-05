@@ -630,6 +630,7 @@ A PDF or a 3D model shows as its picture in the library and opens in a view of i
 | In the library and details | Its first page | Its first view |
 | Moving around | Page buttons, a page number, Page Up and Down, Home, End; zoom with its buttons, Ctrl+wheel or Ctrl and + or - | Drag to turn, Shift or right drag to slide, wheel to zoom, double-click for the first view |
 | Remembered | The page it was left at | The view it was left at, with its lights |
+| Opened from a card | At the page that card shows | At the view that card shows |
 | Bookmarks | Pages, and the contents the PDF carries | Views |
 | On a card on a canvas | Its page's shape; **Show this page on the card** | **Show this view on the card** |
 | Several cards at once | **Place pages**: a card for each page typed, such as `1-4, 9` | **Place a turnaround**: eight cards, from all around |
@@ -643,7 +644,7 @@ Bookmarks are in the view's bar and in the details. What a card shows belongs to
 - **Reset:** double-click a setting's name for that one, the button on a group for the group, or the one in the bar for all, as in the Pattern panel.
 - **Lighting** in the bar sets the lights to a classic setup: Rembrandt, loop, butterfly, split, rim, three-point, even.
 - **Lights stand still** round the model while the camera turns, as lamps in a room.
-- **Lines** draws line art, the outer outline and the inner forms, over the model or alone, with its width, colour and how much outline and inner detail show. **Place the lines** puts this view's line art on the canvas as paths to edit, which copy and export like any shape. A dense scan gives many short lines: raise *Shortest line* or lower *Inner detail*. Placed lines come from the model's edges and live ones from the picture, so they are alike, not the same.
+- **Lines** draws line art, the outer outline and the inner forms, over the model or alone, with its width, colour and how much outline and inner detail show. **Place the lines** puts this view's line art on the canvas as paths to edit, which copy and export like any shape. They are the lines the view shows, followed along their middles, as one line width. A dense scan gives many short lines: raise *Min. placed*, the shortest line placed (it changes only what is placed), or lower *Inner detail*.
 - **Tones** shows the light in 2 to 5 flat steps of value, to read shadow shapes. **Mirror** flips the picture, to check a drawing against it.
 
 ### Art files

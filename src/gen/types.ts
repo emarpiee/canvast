@@ -13,6 +13,8 @@ type Base = {
   readonly label: string;
   /** Randomize leaves it as it is: it changes what kind of picture this is, not its look. */
   readonly steady?: true;
+  /** A few more words on what it does, in the tip of its name. */
+  readonly tip?: string;
   /** Shown only while the choice `when[0]` is one of the others. */
   readonly when?: readonly string[];
 };
