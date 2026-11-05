@@ -2589,7 +2589,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       .then((b) => b ?? renderExport({ doc, index, assets: filesAssets, theme }, t, w, h, "transparent").then((c) => new Promise<Blob>((ok, no) => c.toBlob((x) => (x ? ok(x) : no(new Error("no picture"))), "image/png"))))
       .then((b) => (markCopiedPicture(), b));
     // (the words go beside the picture only for copied texts: otherwise a program that takes text would paste the SVG or a count and not the picture)
-    await writeSystemClipboard({ image: png, text, withText: withText && !isPlaceholderText(text), ...(svg ? { svg } : {}) });
+    await writeSystemClipboard({ image: png, text, withText: withText && !isPlaceholderText(text), ...(svg ? { svg, name: t.name } : {}) });
   };
   /** A hidden item is a padlock outside hidden mode: no file action reaches it there, whatever the password state. */
   const hiddenInReach = (): boolean => hiddenModeOn() && (storage?.hidden ? storage.hidden.isOpen() : true);

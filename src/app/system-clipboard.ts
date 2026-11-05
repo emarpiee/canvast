@@ -4,6 +4,8 @@
  * no text: a program that is offered a picture and text beside it often takes the text, so the picture would not paste. Text goes with a picture only when the caller says the text is the point too (copied texts), and is the
  * fallback when the picture cannot be written. Best effort: the browser may refuse; the result says what landed.
  */
+import { desktopBridge } from "../storage/desktop-bridge";
+
 export type ClipboardResult = "image" | "text" | "failed";
 
 export interface ClipboardParts {
@@ -14,6 +16,8 @@ export interface ClipboardParts {
   readonly withText?: boolean;
   /** The same picture as vectors, where the browser can put them there (a browser that cannot gives the PNG). */
   readonly svg?: string;
+  /** What the SVG is called, as a file. */
+  readonly name?: string;
 }
 
 /** Past this an SVG stays off the clipboard: most of it would be embedded images. */
@@ -25,6 +29,15 @@ export async function writeSystemClipboard(p: ClipboardParts): Promise<Clipboard
     try {
       // The picture is made first and written as a plain Blob: Firefox refuses a ClipboardItem that holds a promise (NotAllowedError), Chromium takes either.
       const image = await p.image;
+      // In the desktop app the SVG is a real file too: a program that takes files gets it as a file, one that takes pictures its SVG or PNG.
+      const bridge = desktopBridge();
+      if (bridge && p.svg && p.svg.length <= MAX_COPIED_SVG) {
+        const file = p.name || "vector";
+        const done = await bridge
+          .copyFiles([], [{ name: /\.svg$/i.test(file) ? file : `${file}.svg`, bytes: new TextEncoder().encode(p.svg) }], { svg: p.svg, png: new Uint8Array(await image.arrayBuffer()) })
+          .catch(() => 0);
+        if (done) return "image";
+      }
       const parts = { "image/png": image, ...(p.withText && p.text ? { "text/plain": new Blob([p.text], { type: "text/plain" }) } : {}) };
       const svg = p.svg && p.svg.length <= MAX_COPIED_SVG && ClipboardItem.supports?.(SVG_TYPE) ? new Blob([p.svg], { type: SVG_TYPE }) : null;
       // (refused with its SVG, the picture still goes)

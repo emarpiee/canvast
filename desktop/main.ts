@@ -603,7 +603,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     return process.env["CANVAST_NO_OPEN"] === "1" ? "" : shell.openPath(file); // (tests: the copy is made, no app is started)
   });
   // Real files on the system clipboard, of any kind: the workspace's own, and readable copies of hidden items (made as for opening them, deleted the same way).
-  ipcMain.handle("canvast:copyFiles", async (e, rels: unknown, copies: unknown) => {
+  ipcMain.handle("canvast:copyFiles", async (e, rels: unknown, copies: unknown, also: unknown) => {
     own(e);
     if (!Array.isArray(rels) || !Array.isArray(copies)) throw new Error("not files to copy");
     const fulls = await Promise.all(rels.map((r) => inside(root, String(r))));
@@ -622,7 +622,14 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     // (as file managers read files: a list of addresses for most, the same list after a word for those of GNOME)
     const urls = fulls.map((f) => pathToFileURL(f).href);
     const raw = (format: string): string => `electron application/osclipboard;format="${format}"`;
-    await clipboard.write([new ClipboardItem({ [raw("text/uri-list")]: new Blob([`${urls.join("\r\n")}\r\n`]), [raw("x-special/gnome-copied-files")]: new Blob([`copy\n${urls.join("\n")}`]) })]);
+    // (a vector picture goes every way a program may want it: the file, its SVG, its PNG)
+    const { svg, png } = (also ?? {}) as { svg?: unknown; png?: unknown };
+    await clipboard.write([new ClipboardItem({
+      [raw("text/uri-list")]: new Blob([`${urls.join("\r\n")}\r\n`]),
+      [raw("x-special/gnome-copied-files")]: new Blob([`copy\n${urls.join("\n")}`]),
+      ...(typeof svg === "string" ? { [raw("image/svg+xml")]: new Blob([svg]) } : {}),
+      ...(png instanceof Uint8Array ? { [raw("image/png")]: new Blob([png]) } : {}),
+    })]);
     return fulls.length;
   });
   // A real file drag out of the app (only the workspace's own files: a hidden item's is encrypted, and is not asked for). The picture under the pointer is a plain tile.

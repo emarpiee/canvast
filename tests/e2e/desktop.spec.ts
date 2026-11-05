@@ -2065,7 +2065,8 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
   /** What another program would be offered, and the SVG if there is one. */
   const out = () => app.evaluate(async ({ clipboard }) => {
     const [item] = await clipboard.read();
-    return { types: [...(item?.types ?? [])], svg: item?.types.includes("image/svg+xml") ? await (await item.getType("image/svg+xml") as Blob).text() : "" };
+    const read = async (t: string): Promise<string> => (item?.types.includes(t) ? await (await item.getType(t) as Blob).text() : "");
+    return { types: [...(item?.types ?? [])], svg: await read("image/svg+xml"), file: decodeURIComponent((await read("text/uri-list")).trim().replace(/^file:\/\//, "")) };
   });
   try {
     // On the canvas: a shape, and an SVG picture with its own file.
@@ -2109,6 +2110,10 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await page.keyboard.press("Control+c");
     await expect.poll(() => out().then((o) => o.svg)).toContain("shelf-mark");
     expect((await out()).types).toContain("image/png");
+    // A real file too, with its own name, for a program that takes files.
+    const shelfFile = (await out()).file;
+    expect(shelfFile).toMatch(/shelf\.svg$/);
+    expect(readFileSync(shelfFile, "utf8")).toContain("shelf-mark");
     // Hidden, in hidden mode: it asks; declined, nothing goes; agreed, it goes as itself.
     await page.keyboard.press("Escape");
     await page.evaluate(() => window.__canvastDebug.hiddenOp("lock"));
@@ -2127,9 +2132,13 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await page.keyboard.press("Control+c");
     await page.getByTestId("confirm-ok").click();
     await expect.poll(() => out().then((o) => o.svg)).toContain("placed-mark");
-    // Out again and locked: the card is gone, and Ctrl+C has nothing to take.
+    const readable = (await out()).file;
+    expect(readFileSync(readable, "utf8")).toContain("placed-mark");
+    // Out again and locked: the card is gone, Ctrl+C has nothing to take, and its readable copy is deleted.
     await page.getByTestId("hidden-mode-exit").click();
     await expect(secret).toHaveCount(0);
+    await page.evaluate(() => window.__canvastDebug.hiddenOp("lock"));
+    await expect.poll(() => existsSync(readable)).toBe(false);
     await clear();
     await page.keyboard.press("Control+c");
     await page.waitForTimeout(500);

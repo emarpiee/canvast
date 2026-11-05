@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.17 — Copied vectors are a real file too (2026-11-05)
+
+- **Fixed:** in the desktop app, copied vectors go on the clipboard as a real `.svg` file as well as SVG and PNG, so a program takes whichever it can use. A hidden item's readable copy is deleted when the hidden items are locked, as with **Copy file**.
+
 ## 0.54.16 — Ctrl+C keeps vectors (2026-11-05)
 
 - **Fixed:** Copy of vector shapes on the canvas, of an SVG picture placed as it was imported, and of an SVG in the library puts the SVG on the clipboard beside its PNG, so a program that can keep vectors gets them; it had gone out as an image alone since 0.45.2. A browser that cannot put an SVG there gives the PNG.

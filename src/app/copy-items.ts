@@ -94,7 +94,7 @@ export async function copyItemsToClipboard(deps: CopyDeps, ents: readonly Catalo
   const first = ents[single ? 0 : at]!;
   const source = single ? await deps.thumb(first.hash).catch(() => undefined) : await deps.file(first.hash).catch(() => undefined);
   const svg = source && kinds[single ? 0 : at] === "vector" ? await source.text().catch(() => undefined) : undefined;
-  const done = await writeSystemClipboard({ ...(source ? { image: asPng(source) } : {}), text: names, ...(svg ? { svg } : {}) });
+  const done = await writeSystemClipboard({ ...(source ? { image: asPng(source) } : {}), text: names, ...(svg ? { svg, name: first.name } : {}) });
   if (done === "failed") deps.say("Could not copy to the clipboard.");
   else if (done === "text") onlyName();
   else {
