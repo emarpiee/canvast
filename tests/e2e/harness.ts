@@ -168,7 +168,7 @@ export async function rowAction(page: Page, kind: "board" | "canvas", name: stri
   await page.getByRole("menuitem", { name: `${action} ${kind} ${name}` }).click();
 }
 
-type GroupMenu = "alignmenu" | "arrangemenu" | "boolmenu" | "maskmenu" | "pathmenu" | "sheetmenu" | "exportmenu" | "statemenu";
+type GroupMenu = "alignmenu" | "arrangemenu" | "boolmenu" | "maskmenu" | "pathmenu" | "sheetmenu" | "exportmenu" | "statemenu" | "sizemenu";
 
 /** Give the pen a colour through the colour picker of the Properties bar (it has no row of colours any more): type the hex, close the picker. */
 /** New shapes have no outline: a test about outlines first gives the next shapes the one they used to get, 2 px of the ink (slider 25). */

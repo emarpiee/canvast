@@ -1,5 +1,5 @@
 import * as D from "../../src/core/dyadic";
-import { LIMITS, distance, expect, recordMetric, reps, setPenColour, test } from "./harness";
+import { LIMITS, chooseInMenu, distance, expect, recordMetric, reps, setPenColour, test } from "./harness";
 import type { App } from "./harness";
 import { makePng } from "./png";
 import { blockyFixture } from "./png";
@@ -879,22 +879,21 @@ test("Reset rotation and Reset proportions in the selection bar put a turned or 
   expect(Math.abs(b3.maxX - b1.maxX)).toBeLessThan(1); // one undo step puts the stretch back
   await key(app, "Control+z");
   // Reset size: zoomed in since it was placed, it is one pixel of the file for one of the screen again, about its middle; one undo step.
-  const unresize = p.getByRole("button", { name: /Reset size/ });
-  await expect(unresize).toBeVisible();
-  await unresize.click();
+  await chooseInMenu(p, "sizemenu", "size:reset");
   await app.frame();
   const b4 = await box();
   const pw = (img as unknown as { pixelW: number; pixelH: number });
   expect(Math.abs(b4.maxX - b4.minX - pw.pixelW), "file pixels").toBeLessThan(1);
   expect(Math.abs(b4.maxY - b4.minY - pw.pixelH), "file pixels").toBeLessThan(1);
   expect(Math.abs((b4.minX + b4.maxX) / 2 - (b0.minX + b0.maxX) / 2), "same middle").toBeLessThan(1);
-  await expect(unresize).toBeDisabled();
-  await expect(unresize).toHaveAttribute("title", /already has that size/);
+  await p.locator('[data-ctx="sizemenu"]').click();
+  await expect(p.locator('.pop-menu [data-id="size:reset"]')).toBeDisabled();
+  await expect(p.locator('.pop-menu [data-id="size:reset"]')).toContainText("already has that size");
+  await p.keyboard.press("Escape");
   // Also from another frame than the one it was placed in (past 32 levels the camera changes frame).
   await p.evaluate(() => window.__canvastDebug.jump(40));
   await app.frame();
-  await expect(unresize).toBeEnabled();
-  await unresize.click();
+  await chooseInMenu(p, "sizemenu", "size:reset");
   await app.frame();
   const b5 = await box();
   expect(Math.abs(b5.maxX - b5.minX - pw.pixelW), "file pixels, from another frame").toBeLessThan(1);
@@ -1105,9 +1104,32 @@ test("Reset size on several keeps their layout: each is its own size again, and 
   await p.evaluate(() => window.__canvastDebug.jump(-2)); // (zoomed out: each a quarter of the size, the gap too)
   await app.frame();
   await key(app, "Control+a");
-  await p.getByRole("button", { name: /Reset size/ }).click();
+  await chooseInMenu(p, "sizemenu", "size:reset");
   await app.frame();
   expect(Math.abs((await gap()) - before), "as far apart as they were at their size").toBeLessThan(2);
   const x = await boxOf(a.id);
   expect(Math.abs(x.maxX - x.minX - (a as unknown as { pixelW: number }).pixelW), "its own size").toBeLessThan(1);
+});
+
+test("Size menu: the selected take the width of the middle one, in proportion, as one step", async ({ app }) => {
+  const p = app.page;
+  const small = await importImage(app);
+  await p.evaluate(() => window.__canvastDebug.jump(-1)); // (each placed at this zoom is twice as big on the canvas)
+  const mid = await importImage(app);
+  await p.evaluate(() => window.__canvastDebug.jump(-1));
+  const big = await importImage(app);
+  await p.evaluate(() => window.__canvastDebug.jump(2));
+  await app.frame();
+  await key(app, "v");
+  const width = async (id: string) => { const b = (await screenOfObject(app, id))!.box; return b.maxX - b.minX; };
+  const target = await width(mid.id);
+  expect(target).toBeGreaterThan((await width(small.id)) * 1.5);
+  expect(target).toBeLessThan((await width(big.id)) / 1.5);
+  await key(app, "Control+a");
+  await chooseInMenu(p, "sizemenu", "size:w:medium");
+  await app.frame();
+  for (const id of [small.id, mid.id, big.id]) expect(Math.abs((await width(id)) - target)).toBeLessThan(1);
+  await key(app, "Control+z");
+  await app.frame();
+  expect(await width(big.id)).toBeGreaterThan(target * 1.5);
 });

@@ -554,7 +554,7 @@ export function resetProportions(doc: DocumentStore, editor: EditorState): numbe
 export function sizeResets(doc: DocumentStore, editor: EditorState, view: ViewState, noteWidth: (o: ImageObject) => number | null): ImageObject[] {
   const cam = view.camera;
   const f = 2 ** cam.zf; // (CSS px per local unit at `unit`, as imageAt places)
-  const plans = selected(doc, editor).flatMap((o) => {
+  const plans = selected(doc, editor).flatMap((o): SizePlan[] => {
     if (o.kind !== "image" || o.locked) return [];
     const unit = -(cam.zi + levelsBetween(o.frame ?? doc.space.world, view.frame)); // (it stays in its own frame: this zoom, as that frame counts it)
     const c = cropOf(o);
@@ -565,12 +565,32 @@ export function sizeResets(doc: DocumentStore, editor: EditorState, view: ViewSt
     const h = (nw && o.page ? (nw * o.pixelH) / NOTE_PAGE_PIXEL_W : nw ? (nw * c.h) / c.w : c.h) / f;
     const k = 2 ** (o.unit - unit); // (the old size in the new unit)
     const same = Math.abs((o.w * k) / w - 1) < 0.002 && Math.abs((o.h * k) / h - 1) < 0.002 && (!o.page || !nw || o.pixelW === NOTE_PAGE_PIXEL_W);
-    const middle = (a: D.Dyadic, old: number): D.Dyadic => D.add(a, D.shift(D.fromNumber(old / 2), o.unit));
-    return [{ o, unit, w, h, page, same, grows: Math.log2(w / o.w) + unit - o.unit, mx: middle(o.anchor.x, o.w), my: middle(o.anchor.y, o.h) }];
+    return [{ o, unit, w, h, page, same, grows: Math.log2(w / o.w) + unit - o.unit, mx: middleOf(o.anchor.x, o.w, o.unit), my: middleOf(o.anchor.y, o.h, o.unit) }];
   });
-  if (plans.every((p) => p.same)) return [];
-  // Several together keep their layout: the middles spread from the group's middle by as much as the one that grows most, so what did not overlap does not, and each kind of gap stays in proportion.
-  const inFrame = new Map<unknown, typeof plans>();
+  return plans.every((p) => p.same) ? [] : keptLayout(doc, plans);
+}
+
+/** One selected item's new size, in its own frame, and its middle now. */
+interface SizePlan {
+  o: ImageObject;
+  unit: number;
+  w: number;
+  h: number;
+  page: { pixelW?: number };
+  /** Its size changes by 2 to this power. */
+  grows: number;
+  same: boolean;
+  mx: D.Dyadic;
+  my: D.Dyadic;
+}
+const middleOf = (a: D.Dyadic, size: number, unit: number): D.Dyadic => D.add(a, D.shift(D.fromNumber(size / 2), unit));
+
+/**
+ * The new objects. Several together keep their layout: the middles spread from the group's middle by as much as the one that grows most, so what did not overlap
+ * does not, and the gaps stay in proportion. One keeps its own middle.
+ */
+function keptLayout(doc: DocumentStore, plans: readonly SizePlan[]): ImageObject[] {
+  const inFrame = new Map<unknown, SizePlan[]>();
   for (const p of plans) inFrame.set(p.o.frame ?? doc.space.world, [...(inFrame.get(p.o.frame ?? doc.space.world) ?? []), p]);
   const centreOf = (values: D.Dyadic[]): D.Dyadic => {
     const sorted = [...values].sort(D.cmp);
@@ -585,6 +605,33 @@ export function sizeResets(doc: DocumentStore, editor: EditorState, view: ViewSt
     const cy = centreOf(group.map((p) => p.my));
     return group.map(({ o, unit, w, h, page, mx, my }) => normalizeUnit({ ...o, ...page, unit, w, h, anchor: { x: D.sub(spread(mx, cx), D.shift(D.fromNumber(w / 2), unit)), y: D.sub(spread(my, cy), D.shift(D.fromNumber(h / 2), unit)) } }) as ImageObject);
   });
+}
+
+export type SizeAxis = "w" | "h";
+export type SizePick = "smallest" | "medium" | "largest";
+
+/** The selected pictures and note cards with the width or height of the smallest, the middle or the largest of them, keeping each one's proportions and their layout. */
+export function sizeMatches(doc: DocumentStore, editor: EditorState, view: ViewState, axis: SizeAxis, pick: SizePick): ImageObject[] {
+  const pics = selected(doc, editor).filter((o): o is ImageObject => o.kind === "image" && !o.locked);
+  if (pics.length < 2) return [];
+  // (sizes compared as log2 in the camera's frame: items can be at any depth)
+  const logOf = (o: ImageObject): number => Math.log2(axis === "w" ? o.w : o.h) + o.unit + levelsBetween(o.frame ?? doc.space.world, view.frame);
+  const logs = pics.map(logOf).sort((a, b) => a - b);
+  const target = logs[pick === "smallest" ? 0 : pick === "largest" ? logs.length - 1 : Math.floor((logs.length - 1) / 2)]!;
+  const plans = pics.map((o): SizePlan => {
+    const grows = target - logOf(o);
+    return { o, unit: o.unit, w: o.w * 2 ** grows, h: o.h * 2 ** grows, page: {}, grows, same: Math.abs(grows) < 0.003, mx: middleOf(o.anchor.x, o.w, o.unit), my: middleOf(o.anchor.y, o.h, o.unit) };
+  });
+  return plans.every((p) => p.same) ? [] : keptLayout(doc, plans);
+}
+
+/** Give the selected the same width or height (`sizeMatches`): one undo step. */
+export function matchSize(doc: DocumentStore, editor: EditorState, view: ViewState, axis: SizeAxis, pick: SizePick): void {
+  if (editor.blockEdit()) return;
+  const next = sizeMatches(doc, editor, view, axis, pick);
+  if (!next.length) return;
+  doc.commit(doc.transaction(axis === "w" ? `Width of the ${pick}` : `Height of the ${pick}`, next));
+  editor.changed();
 }
 
 /** Why Reset size has nothing to do: its button says so. */
