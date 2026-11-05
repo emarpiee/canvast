@@ -1089,14 +1089,15 @@ test("the colours of a big selection: seven chips, then one \"+N\" button that l
 test("Reset size on several keeps their layout: each is its own size again, and they spread apart as they grow", async ({ app }) => {
   const p = app.page;
   const a = await importImage(app);
-  const b = await importImage(app);
+  await importImage(app);
+  const bId = (await p.evaluate(() => window.__canvastDebug.objects().map((o) => o.id))).find((id) => id !== a.id)!;
   await key(app, "v");
   const boxOf = async (id: string) => (await screenOfObject(app, id))!.box;
-  const b0 = await boxOf(b.id);
+  const b0 = await boxOf(bId);
   await app.drag({ x: (b0.minX + b0.maxX) / 2, y: (b0.minY + b0.maxY) / 2 }, { x: (b0.minX + b0.maxX) / 2 + 200, y: (b0.minY + b0.maxY) / 2 + 60 });
   await app.frame();
   const gap = async (): Promise<number> => {
-    const [x, y] = [await boxOf(a.id), await boxOf(b.id)];
+    const [x, y] = [await boxOf(a.id), await boxOf(bId)];
     return Math.hypot((x.minX + x.maxX) / 2 - (y.minX + y.maxX) / 2, (x.minY + x.maxY) / 2 - (y.minY + y.maxY) / 2);
   };
   const before = await gap();
@@ -1113,11 +1114,15 @@ test("Reset size on several keeps their layout: each is its own size again, and 
 
 test("Size menu: the selected take the width of the middle one, in proportion, as one step", async ({ app }) => {
   const p = app.page;
-  const small = await importImage(app);
+  const idsNow = () => p.evaluate(() => window.__canvastDebug.objects().map((o) => o.id));
+  await importImage(app);
+  const small = { id: (await idsNow())[0]! };
   await p.evaluate(() => window.__canvastDebug.jump(-1)); // (each placed at this zoom is twice as big on the canvas)
-  const mid = await importImage(app);
+  await importImage(app);
+  const mid = { id: (await idsNow()).find((id) => id !== small.id)! };
   await p.evaluate(() => window.__canvastDebug.jump(-1));
-  const big = await importImage(app);
+  await importImage(app);
+  const big = { id: (await idsNow()).find((id) => id !== small.id && id !== mid.id)! };
   await p.evaluate(() => window.__canvastDebug.jump(2));
   await app.frame();
   await key(app, "v");
