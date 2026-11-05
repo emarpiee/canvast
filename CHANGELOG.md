@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.15 — A setting changed right after Generate stays (2026-11-05)
+
+- **Fixed:** in the Pattern panel, a setting changed within half a second of Generate could go back to its last value.
+
 ## 0.54.14 — 26 more guides, and easier settings (2026-11-05)
 
 - **Added:** 26 guides: Silver Ratio, Paper Sizes, Aspect Ratio Frames; Golden Triangles, Rule of Odds, Leading Lines, Visual Weight Quadrants; Manuscript Grid, Hierarchical Grid, Bento Grid, Device Frames; Cabinet and Cavalier, Curvilinear Perspective, Ground Plane, Cube Lattice; Rhombus Grid, Islamic Star Grid, Penrose Tiling, Voronoi Guide, Concentric Polygons, Spirograph Construction; Isometric Pixel Grid, Tile and Sprite Sheet, Storyboard Frames, Value Scale, Color Wheel.

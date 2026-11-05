@@ -243,7 +243,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     if (!f) loaded = null;
     else if (leftOf) { /* (left for the other tab) */ }
     // A pattern made earlier is picked, or undo or redo brought another version of it: its settings come into the panel, and changes replace it.
-    else if (generatorById(f.id) && (f.gid !== loaded || (changed && !queued && (f.id !== gen.id || f.seed !== seed || JSON.stringify(cleanValues(gen, f.v)) !== JSON.stringify(cleanValues(gen, values)))))) {
+    else if (generatorById(f.id) && !queued && (f.gid !== loaded || (changed && (f.id !== gen.id || f.seed !== seed || JSON.stringify(cleanValues(gen, f.v)) !== JSON.stringify(cleanValues(gen, values)))))) {
       loaded = f.gid;
       gen = generatorById(f.id)!;
       values = cleanValues(gen, f.v);

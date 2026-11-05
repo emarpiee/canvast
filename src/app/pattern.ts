@@ -210,7 +210,7 @@ export function makePattern(doc: DocumentStore, editor: EditorState, view: ViewS
     fresh.push(host);
   }
 
-  const gid = again ? editing! : newObjectId();
+  const gid = editing !== null && (again || old.length === 0) ? editing : newObjectId(); // (taken back and made again, it is still the same pattern)
   const grouped = patternPieces(doc, g, { id: g.id, gid, seed, v: cleanValues(g, values) }, { ...host, frame, anchor, unit } as PathObject, box, again ? old : null, z0 + 2);
 
   const tx = doc.transaction(`Pattern: ${g.label}`, [...fresh, ...grouped], again ? old.map((o) => o.id) : []);

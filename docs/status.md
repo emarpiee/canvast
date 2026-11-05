@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.15: a setting changed right after Generate stays (2026-11-05)
+
+- **Implemented:** a pattern taken back and made again keeps its group id; the panel takes nothing in while a change is queued.
+- **Tested:** typecheck and unit tests locally; `pattern.spec.ts` in Firefox, read on GitHub's `Tests` run.
+- **Known failures:** the Firefox failure in `pattern.spec.ts` until that run says otherwise.
+- **Unverified:** in the app by hand.
+- **Committed:** v0.54.15.
+- **Next bounded task:** read the `Tests` run; the owner's choice for Ctrl+C.
+
 ## v0.54.14: 26 more guides, and easier settings (2026-11-05)
 
 - **Implemented:** 55 guides; `guides-more.ts`; helpers moved to `guide-kit.ts`; the settings changes in the changelog. Perspective's drag handles are not built: they would need a new canvas tool.
