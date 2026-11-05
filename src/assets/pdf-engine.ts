@@ -39,7 +39,7 @@ export const closePdf = (doc: PDFDocumentProxy): void => closers.get(doc)?.();
 export async function openPdf(bytes: Uint8Array, password?: string): Promise<PDFDocumentProxy> {
   const { m, factory, workerUrl } = await pdfJs();
   const port = new Worker(workerUrl);
-  const worker = new m.PDFWorker({ port });
+  const worker = new m.PDFWorker({ port } as unknown as ConstructorParameters<PdfJs["PDFWorker"]>[0]);
   const stop = (): void => {
     worker.destroy();
     port.terminate();
