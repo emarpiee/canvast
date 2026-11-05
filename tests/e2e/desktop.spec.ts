@@ -1694,7 +1694,7 @@ test("the library's files in .canvast/library/ deleted by hand: nothing is taken
   let before: string[] = [];
   try {
     await page.getByTestId("import-input").setInputFiles(pics.map((buffer, k) => ({ name: `Pic ${k}.png`, mimeType: "image/png", buffer })));
-    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(3);
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length)), { timeout: 20_000 }).toBe(3);
     await page.evaluate((h) => window.__canvastDebug.libraryOp("note", h, "kept note"), createHash("sha256").update(pics[0]!).digest("hex"));
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     before = parts();

@@ -2782,7 +2782,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const editing = inspector.dataset["hash"] === selected && act instanceof HTMLElement && inspector.contains(act) && act.dataset["prop"] ? (act as HTMLInputElement | HTMLTextAreaElement) : null;
     const kept = editing && { prop: editing.dataset["prop"]!, value: editing.value, start: editing.selectionStart, end: editing.selectionEnd, top: editing.scrollTop };
     const itemBox = inspector.dataset["hash"] === selected && act instanceof HTMLInputElement && act.classList.contains("field-item-input") ? { prop: act.closest<HTMLElement>(".field-list")!.dataset["prop"]!, value: act.value } : null;
-    if (inspector.dataset["hash"] !== selected) blankField = null;
+    if (blankField !== selected) blankField = null; // (the new row of another item goes; this item's stays, also when it was added before the details had caught up with it)
     inspector.dataset["hash"] = selected!;
     const instances = e?.instances ?? m!.instances;
     const where = session.current && session.tree ? crumbOf(session.current.canvasId) : "the open canvas";
