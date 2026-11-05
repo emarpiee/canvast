@@ -556,20 +556,22 @@ test("idle, nothing keeps working: the library, the viewer on a PDF or a model, 
 test("a large 3D model (over 64 MB, read off the page): a picture in the library, it opens, and the page keeps working meanwhile", async ({ app }) => {
   const p = app.page;
   test.skip(test.info().project.name !== "chromium" || !(await hasGl(p)), "one large file, once");
-  const n = 1_400_000;
-  const big = Buffer.alloc(84 + n * 50);
-  big.writeUInt32LE(n, 80);
+  // (a text STL: over 64 MB with few enough triangles for a machine with no graphics card)
+  const n = 260_000, pad = " ".repeat(150);
+  const rows: string[] = ["solid big"];
   for (let i = 0; i < n; i++) {
-    const at = 84 + i * 50, x = (i % 1200) / 1200, y = Math.floor(i / 1200) / 1200;
-    const v = [x, y, 0, x + 0.001, y, 0, x, y + 0.001, Math.sin(x * 9)];
-    v.forEach((c, j) => big.writeFloatLE(c, at + 12 + j * 4));
+    const x = (i % 500) / 500, y = Math.floor(i / 500) / 500, z = Math.sin(x * 9).toFixed(5);
+    rows.push(`facet normal 0 0 1${pad}\nouter loop\nvertex ${x} ${y} 0\nvertex ${x + 0.002} ${y} 0\nvertex ${x} ${y + 0.002} ${z}\nendloop\nendfacet`);
   }
+  rows.push("endsolid big");
+  const big = Buffer.from(rows.join("\n"));
+  expect(big.length).toBeGreaterThan(64 * 2 ** 20);
   const file = test.info().outputPath("big.stl");
   writeFileSync(file, big);
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles(file);
   const c = p.locator('[data-testid="asset-card"][title="big.stl"]');
-  await expect(c).toHaveCount(1, { timeout: 60_000 });
+  await expect(c).toHaveCount(1, { timeout: 120_000 });
   await expect.poll(() => c.locator(".asset-thumb img").evaluate((i: HTMLImageElement) => i.naturalWidth), { timeout: 60_000 }).toBeGreaterThan(0);
   await c.dblclick();
   await expect(modelView(p)).toBeVisible({ timeout: 60_000 });

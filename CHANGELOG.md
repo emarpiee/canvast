@@ -3,6 +3,7 @@
 ## 0.54.41 — Placed lines are the lines shown (2026-11-06)
 
 - **Added:** Reach in a 3D view's Lines: how far it looks for a change, apart from how wide lines are drawn, so thin lines keep their inner detail.
+- **Fixed:** a library folder deleted outside the app leaves the library at once while the app runs (it waited for the next save).
 - **Fixed:** thumbnails made in the background wait for the library to be open and the page to be quiet, one at a time, and notes' are made only when shown. They took a quarter of a processor for a minute after opening a large library, even on a canvas.
 - **Fixed:** Place the lines now follows the very lines the view shows, not the model's edges, which showed lines behind the surface and differed from the view.
 - **Changed:** a PDF or a 3D model opened from a card on a canvas starts at what that card shows. In the library it opens where it was left.

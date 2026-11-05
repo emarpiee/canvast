@@ -724,6 +724,13 @@ export class LibraryMirror {
    * changed (imports report themselves).
    */
   async scanPaths(paths: readonly string[]): Promise<{ changed: string[]; imported: boolean } | null> {
+    // (a folder deleted is a change no file reports: whatever was said to have changed, it is looked for)
+    const dropped = await this.dropFoldersDeletedOutside();
+    const found = await this.scanThesePaths(paths);
+    return found && dropped ? { ...found, imported: true } : found;
+  }
+
+  private async scanThesePaths(paths: readonly string[]): Promise<{ changed: string[]; imported: boolean } | null> {
     const lib = [...new Set(paths.filter((p) => p.startsWith("library/") && usable(p) && !externalFolder.claimed(p)))];
     if (paths.includes("library") || lib.length > 500) return null;
     if (!lib.length) return { changed: [], imported: false };
