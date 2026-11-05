@@ -28,7 +28,7 @@
 - **Added:** a box under a font's samples in the viewer to type in and see it in that font; what is typed goes from font to font and is dropped when the viewer closes.
 - **Added:** a fifth background for see-through pictures and fonts, the theme's own colour, which follows a change of theme. The background button shows the one in use, and the viewer's floating buttons stay visible under the pointer on any background.
 - **Fixed:** Reset size works at any zoom: past a certain zoom it offered nothing for what was placed before. Several reset together keep their layout and do not run into each other.
-- **Added:** a **Size** menu on the Actions bar, with Reset size and the width or height of the smallest, medium or largest of the selected. Their layout is kept.
+- **Added:** a **Size** menu on the Actions bar, with Reset size and the width or height of the smallest, medium or largest of the selected, pictures, notes, shapes, strokes and text alike. Their layout is kept.
 - **Changed:** Reset size, in that menu, is there for any picture or note; when it would change nothing it is greyed out and says why.
 - **Changed:** the README is in two parts, for users and for developers, with a section for each big feature, tables and pictures first and the full wording after them; new pictures of the sidebar, several items selected, art files and the Trash.
 - **Changed:** the library's list has the same thumbnail slider as the grid, in the same place, with its own size: its rows and thumbnails grow with it. The slider is longer, and the list's columns button moved to the left of the grid and list buttons so that nothing shifts.

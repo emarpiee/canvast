@@ -1133,3 +1133,21 @@ test("Size menu: the selected take the width of the middle one, in proportion, a
   await app.frame();
   expect(await width(big.id)).toBeGreaterThan(target * 1.5);
 });
+
+test("Size menu: vectors take a size too, a short stroke the width of a long one", async ({ app }) => {
+  const p = app.page;
+  await key(app, "p");
+  await app.drag({ x: 400, y: 200 }, { x: 440, y: 200 });
+  await key(app, "p");
+  await app.drag({ x: 400, y: 400 }, { x: 640, y: 400 });
+  await app.frame();
+  const [a, b] = await p.evaluate(() => window.__canvastDebug.objects().map((o) => o.id));
+  await key(app, "v");
+  const width = async (id: string) => { const x = (await screenOfObject(app, id))!.box; return x.maxX - x.minX; };
+  const long = await width(b!);
+  expect(await width(a!)).toBeLessThan(long / 2);
+  await key(app, "Control+a");
+  await chooseInMenu(p, "sizemenu", "size:w:largest");
+  await app.frame();
+  expect(Math.abs((await width(a!)) - long)).toBeLessThan(2);
+});
