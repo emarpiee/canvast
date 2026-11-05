@@ -78,7 +78,7 @@ test("any file imports: a 3D model becomes a card on the canvas and in the libra
   await p.locator('[data-testid="asset-card"][aria-label^="robot.glb"]').click();
   await p.getByTestId("asset-preview").click();
   await expect(p.getByTestId("slide-view")).toBeVisible();
-  await expect(p.locator('[data-testid="slide-view"] figcaption')).toContainText("No preview for this kind of file");
+  await expect(p.locator('[data-testid="slide-view"] figcaption')).toContainText("could not be opened");
   await p.keyboard.press("Escape");
   expect(app.consoleErrors).toEqual([]);
 });

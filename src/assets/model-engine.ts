@@ -72,6 +72,17 @@ function free(root: Object3D): void {
   });
 }
 
+let graphics: boolean | null = null;
+/** Asked once of a canvas of its own, as the library would say so as an error each time. */
+function hasGraphics(): boolean {
+  if (graphics === null) {
+    const gl = document.createElement("canvas").getContext("webgl2");
+    graphics = !!gl;
+    gl?.getExtension("WEBGL_lose_context")?.loseContext();
+  }
+  return graphics;
+}
+
 /** A model, a look and a camera on a canvas. Drawn only when asked. */
 export class ModelStage {
   private readonly T: Three;
@@ -105,6 +116,7 @@ export class ModelStage {
 
   /** Null when this browser or machine has no 3D graphics. */
   static async make(canvas = document.createElement("canvas")): Promise<ModelStage | null> {
+    if (!hasGraphics()) return null;
     const T = await three();
     try {
       return new ModelStage(T, canvas);

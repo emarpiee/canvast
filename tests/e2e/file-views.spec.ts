@@ -38,6 +38,12 @@ const importPdf = async (p: Page): Promise<void> => {
   await p.getByTestId("assets-import-input").setInputFiles({ name: "book.pdf", mimeType: "application/pdf", buffer: PDF });
   await expect(card(p)).toHaveCount(1, { timeout: 15_000 });
 };
+/** The details beside the viewer, shown (they may still be opening or closing as the viewer opens). */
+const detailsShown = (p: Page) =>
+  expect(async () => {
+    await detailsShown(p);
+    await expect(p.getByTestId("asset-place")).toBeVisible({ timeout: 1000 });
+  }).toPass();
 /** Whether a page's picture has ink on it. */
 const inked = (p: Page, page: number) =>
   view(p).locator(`.pdf-page[data-page="${page}"] canvas`).evaluate((c: HTMLCanvasElement) => c.width > 0 && c.getContext("2d")!.getImageData(0, 0, c.width, c.height).data.some((v, i) => i % 4 === 0 && v < 128));
@@ -63,7 +69,7 @@ test("a PDF: its first page in the library, its shape on a card; it opens in the
   // A bookmark, in the details and off again.
   await p.getByTestId("pdf-mark").click();
   await expect(p.getByTestId("pdf-mark")).toHaveAttribute("aria-pressed", "true");
-  if (!(await p.getByTestId("asset-bookmarks").isVisible())) await p.locator(".viewer-details").click();
+  await detailsShown(p);
   await expect(p.getByTestId("asset-bookmarks")).toContainText("Page 2");
   // Keys: the pages' own, and the arrows stay the viewer's.
   await p.getByTestId("pdf-pages").click();
@@ -90,7 +96,8 @@ test("a PDF's card on a canvas has its page's shape, opens in the panel, and a c
   const p = app.page;
   await importPdf(p);
   await card(p).dblclick();
-  if (!(await p.getByTestId("asset-place").isVisible())) await p.locator(".viewer-details").click();
+  await expect(view(p)).toBeVisible();
+  await detailsShown(p);
   await p.getByTestId("asset-place").click();
   const pics = () => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "image") as unknown as Array<{ id: string; w: number; h: number; pixelW: number; pixelH: number; preview?: string }>);
   await expect.poll(async () => (await pics()).length).toBe(1);
@@ -196,7 +203,7 @@ test("a 3D model: a picture in the library, a view that turns, is lit and keeps 
   await expect(p.locator('[data-testid="model-side"] [data-k="keyAround"] input[type=number]')).toHaveValue("-90");
   // A bookmark in the details, as a PDF's.
   await p.getByTestId("model-mark").click();
-  if (!(await p.getByTestId("asset-bookmarks").isVisible())) await p.locator(".viewer-details").click();
+  await detailsShown(p);
   await expect(p.getByTestId("asset-bookmarks")).toContainText("View 1");
   // Left and opened again: as it was. (The arrows stay the viewer's: no second item here, so it stays.)
   await p.waitForTimeout(800);
@@ -206,7 +213,7 @@ test("a 3D model: a picture in the library, a view that turns, is lit and keeps 
   await expect(modelView(p)).toBeVisible();
   await expect.poll(yaw).toBe(turned);
   // On a canvas: the panel, and this view on this card, with no background.
-  if (!(await p.getByTestId("asset-place").isVisible())) await p.locator(".viewer-details").click();
+  await detailsShown(p);
   await p.getByTestId("asset-place").click();
   const pic = () => p.evaluate(() => window.__canvastDebug.objects().find((o) => o.kind === "image") as unknown as { w: number; h: number; preview?: string } | undefined);
   await expect.poll(async () => !!(await pic())).toBe(true);

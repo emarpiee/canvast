@@ -237,7 +237,7 @@ const DRAG_STACK = 5;
 /** The library sidebar's sections, in their default order (the order can be changed by dragging them). */
 const SIDE_SECTIONS = ["folders", "types", "tags", "ctags", "saved"] as const;
 /** The details panel's sections, in their default order (moved the same way). */
-const DETAIL_SECTIONS = ["file", "marks", "organize", "notes", "links", "where"] as const;
+const DETAIL_SECTIONS = ["file", "organize", "notes", "links", "where"] as const;
 
 /** The library's filters as they are before any is chosen (the reset button goes back to these). */
 const NO_FILTERS = { usage: "all", sort: "newest", reversed: false, scope: "all" } as const;
@@ -1156,6 +1156,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       viewer.classList.remove("is-note");
       slideImg.hidden = false;
       slideCaption.textContent = `${name}. This ${kind.noun} could not be opened: ${(e as Error).message}.`;
+      // (its file's card, and why it is not more)
+      slideImg.hidden = true;
+      slideTile.innerHTML = fileTile({ name, type: blob.type });
+      slideTile.hidden = false;
       slideCaption.classList.add("is-note");
       return;
     }
@@ -2837,8 +2841,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     keepDetails();
     // (in the order they were put in: `sortableSections`)
     const detail: Record<(typeof DETAIL_SECTIONS)[number], () => string> = {
-      file: () => `${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays ${noteKindOf(e.name) === "rich" ? "a rich text note (HTML) that other apps open too" : "plain text other apps read"}. Tag it <em>template</em> to offer it in Insert ▸ Template of every note.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>${isArtFile(e.name) ? "An art file" : "No preview for this file"}</h3><p class="asset-note">${isAutoCopy(e.name) ? `${AUTO_COPY_NOTE} ` : ""}${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as ${isArtFile(e.name) ? "the picture it keeps, when it keeps one" : "a card"}. ${esc(d.todo)}</p></section>`; })() : ""}`,
-      marks: () => (e ? marksHtml(e) : ""),
+      file: () => `${e ? marksHtml(e) : ""}${e && noteKindOf(e.name) ? `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>A note</h3><p class="asset-note">Open it (double-click) to read and write it in the notes editor. Its file stays ${noteKindOf(e.name) === "rich" ? "a rich text note (HTML) that other apps open too" : "plain text other apps read"}. Tag it <em>template</em> to offer it in Insert ▸ Template of every note.</p></section>` : e && isCard(e) && !isFontFile(e) ? (() => { const d = describeFile(e.name, e.type); return `<section class="asset-sec asset-file" data-testid="asset-file-info"><h3>${isArtFile(e.name) ? "An art file" : "No preview for this file"}</h3><p class="asset-note">${isAutoCopy(e.name) ? `${AUTO_COPY_NOTE} ` : ""}${esc(d.category)} (${esc(d.chip)}). It is kept exactly as it is and shown as ${isArtFile(e.name) ? "the picture it keeps, when it keeps one" : "a card"}. ${esc(d.todo)}</p></section>`; })() : ""}`,
       organize: () => (e ? organizeHtml(e) : ""),
       notes: () => (e ? notesHtml(e) : ""),
       links: () => `<section class="asset-sec" data-testid="asset-backlinks" hidden><h3>Linked from <span class="layer-count" data-count></span></h3><ul class="asset-places"></ul></section><section class="asset-sec" data-testid="asset-outlinks" hidden><h3>Links <span class="layer-count" data-count></span></h3><ul class="asset-places"></ul></section>`,
