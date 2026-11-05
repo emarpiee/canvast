@@ -8,6 +8,7 @@ import { createGradientEditor, type GradientValue } from "../colour-picker/gradi
 import type { Gradient, Paint } from "../doc/paint";
 import { angleOf, asKind, gradientFrom, isGradient, linearAt, solidOf } from "../doc/paint";
 import { isTexture, newTexture, withSource } from "../doc/texture";
+import { groupHeadHtml } from "./setting-rows";
 import type { TexturePaint } from "../doc/texture";
 import { createTextureEditor, textureHooks } from "./texture-editor";
 import { esc } from "./format";
@@ -807,6 +808,12 @@ export function openFontOptionsPopover(anchor: HTMLElement, o: FontOptions): voi
       set(Number(range.value), false);
     });
     range.addEventListener("change", () => set(Number(range.value), true));
+    const name = pop.querySelector<HTMLElement>(`label[for="fo-${a.tag}"]`)!;
+    name.title = "Double-click to reset";
+    name.addEventListener("dblclick", () => {
+      num.value = String(a.def);
+      set(a.def, true);
+    });
   }
   document.body.appendChild(pop);
   place(pop, anchor);
@@ -896,7 +903,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   };
   const groupChanged = (name: string): boolean => GROUP_FIELDS[name]!.some((k) => (typeof cur[k] === "number" ? cur[k] !== 0 : k === "dropColor" || k === "innerColor" ? false : !!cur[k]));
   /** The heading of a group, with the button that puts the whole group back. */
-  const head = (name: string): string => `<div class="adj-group-head"><h4>${name}</h4><button type="button" class="layer-btn adj-reset" data-group-reset="${name}" aria-label="Reset ${name.toLowerCase()}" title="Reset ${name.toLowerCase()}" ${groupChanged(name) ? "" : "disabled"}>${ICONS.listRestart}</button></div>`;
+  const head = (name: string): string => groupHeadHtml(name, groupChanged(name));
   const syncResets = (): void => {
     for (const b of pop.querySelectorAll<HTMLButtonElement>("[data-group-reset]")) b.disabled = !groupChanged(b.dataset["groupReset"]!);
   };

@@ -35,13 +35,17 @@ export const MODEL_SECTIONS: readonly Section[] = [
   {
     title: "Model",
     items: [
-      { t: "choice", k: "surface", label: "Surface", opts: [["own", "Its own"], ["clay", "Clay"], ["flat", "One colour"], ["wire", "Wireframe"]], def: "own" },
+      { t: "choice", k: "surface", label: "Surface", opts: [["own", "Its own"], ["clay", "Clay"], ["tones", "Tones"], ["flat", "One colour"], ["wire", "Wireframe"]], def: "own" },
+      { t: "range", k: "tones", label: "Tones", min: 2, max: 5, step: 1, def: 3, usual: [2, 5], when: ["surface", "tones"] },
       C("colour", "Colour", "#c8c3ba"),
       { t: "choice", k: "up", label: "Up", opts: [["y", "Y"], ["z", "Z"]], def: "y" },
       { t: "toggle", k: "shadows", label: "Shadows", def: true },
+      { t: "toggle", k: "mirror", label: "Mirror", def: false },
     ],
   },
   { title: "Background", items: [C("bg", "Colour", "#2b2b2f", true)] },
+  // (what a model's animations let it be posed in: drawn by the view from the model's own clips)
+  { title: "Pose", items: [R("clip", "Animation", 0, 999, 1, 0), R("poseTime", "Time", 0, 3600, 0.01, 0)] },
   light("key", "Main light", "sun", 3, -35, 40, "#fff4e6"),
   light("fill", "Fill light", "sun", 0.8, 50, 10, "#dfe8ff"),
   light("rim", "Back light", "off", 2, 160, 30, "#ffffff"),

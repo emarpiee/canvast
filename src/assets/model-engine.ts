@@ -1,4 +1,4 @@
-import type { BufferGeometry, Light, Material, Mesh, Object3D, OrthographicCamera, PerspectiveCamera, Scene, WebGLRenderer } from "three";
+import type { AnimationClip, AnimationMixer, BufferGeometry, Light, MeshToonMaterial, Material, Mesh, Object3D, OrthographicCamera, PerspectiveCamera, Scene, WebGLRenderer } from "three";
 import { extOf } from "./file-kind";
 import { defaultLook, readLook } from "./model-look";
 import type { ModelLook } from "./model-look";
@@ -13,7 +13,7 @@ const three = (): Promise<Three> => (lib ??= import("three"));
 export const MODEL_CARD_EDGE = 1600;
 /** The shape of a new model card. */
 const CARD_RATIO = 4 / 3;
-/** Past this a model keeps its plain card, and asks before it opens: reading one is done on the page. */
+/** Past this a model does not open: reading one is done on the page. */
 export const MAX_MODEL_BYTES = 256 * 2 ** 20;
 
 /** The look a model starts with: an STL is usually made with Z up, the rest with Y up. */
@@ -29,8 +29,14 @@ function dataUrlBytes(url: string): ArrayBuffer | null {
   return out.buffer;
 }
 
+/** What a file holds: its objects, and the animations they can be posed in. */
+export interface ReadModel {
+  root: Object3D;
+  clips: AnimationClip[];
+}
+
 /** A model's objects from its file. Throws on what cannot be read. */
-export async function readModel(bytes: Uint8Array, name: string): Promise<Object3D> {
+export async function readModel(bytes: Uint8Array, name: string): Promise<ReadModel> {
   const T = await three();
   const data = bytes.slice().buffer as ArrayBuffer;
   const ext = extOf(name);
@@ -38,9 +44,9 @@ export async function readModel(bytes: Uint8Array, name: string): Promise<Object
     if (!g.getAttribute("normal")) g.computeVertexNormals();
     return new T.Mesh(g, new T.MeshStandardMaterial({ color: g.getAttribute("color") ? 0xffffff : 0xc8c3ba, roughness: 0.75, vertexColors: !!g.getAttribute("color"), side: T.DoubleSide }));
   };
-  if (ext === "STL") return mesh(new (await import("three/examples/jsm/loaders/STLLoader.js")).STLLoader().parse(data));
-  if (ext === "PLY") return mesh(new (await import("three/examples/jsm/loaders/PLYLoader.js")).PLYLoader().parse(data));
-  if (ext === "OBJ") return new (await import("three/examples/jsm/loaders/OBJLoader.js")).OBJLoader().parse(new TextDecoder().decode(bytes));
+  if (ext === "STL") return { root: mesh(new (await import("three/examples/jsm/loaders/STLLoader.js")).STLLoader().parse(data)), clips: [] };
+  if (ext === "PLY") return { root: mesh(new (await import("three/examples/jsm/loaders/PLYLoader.js")).PLYLoader().parse(data)), clips: [] };
+  if (ext === "OBJ") return { root: new (await import("three/examples/jsm/loaders/OBJLoader.js")).OBJLoader().parse(new TextDecoder().decode(bytes)), clips: [] };
   const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
   const loader = new GLTFLoader();
   // (the page may not fetch, so pictures are read by an image element, and buffers from the file's own text; what lies in other files cannot be reached)
@@ -57,7 +63,7 @@ export async function readModel(bytes: Uint8Array, name: string): Promise<Object
     };
     return { name: "canvast-inside" };
   });
-  return new Promise<Object3D>((done, failed) => loader.parse(ext === "GLB" ? data : new TextDecoder().decode(bytes), "", (g) => done(g.scene), failed));
+  return new Promise<ReadModel>((done, failed) => loader.parse(ext === "GLB" ? data : new TextDecoder().decode(bytes), "", (g) => done({ root: g.scene, clips: g.animations }), failed));
 }
 
 /** Frees what a model holds on the graphics card. */
@@ -93,7 +99,14 @@ export class ModelStage {
   private model: Object3D | null = null;
   private lights: Light[] = [];
   private readonly own = new Map<Mesh, Material | Material[]>();
-  private readonly plain: { clay: Material; flat: Material; wire: Material & { color: { set(c: string): void } } };
+  private readonly plain: { clay: Material; flat: Material; wire: Material; tones: MeshToonMaterial };
+  private clips: AnimationClip[] = [];
+  private mixer: AnimationMixer | null = null;
+  private shownTones = 0;
+  private shownClip = -1;
+  /** What the lights and the canvas were made for: made again only when it changes (a shadow map and a canvas's pixels are costly to make, and a drag draws each frame). */
+  private shownLights = "";
+  private shownSize = "";
   private readonly persp: PerspectiveCamera;
   private readonly ortho: OrthographicCamera;
   private shownSurface = "";
@@ -111,7 +124,7 @@ export class ModelStage {
     const clay = new T.MeshStandardMaterial({ roughness: 0.85, side: T.DoubleSide });
     const flat = new T.MeshBasicMaterial({ side: T.DoubleSide });
     const wire = new T.MeshBasicMaterial({ wireframe: true });
-    this.plain = { clay, flat, wire };
+    this.plain = { clay, flat, wire, tones: new T.MeshToonMaterial({ side: T.DoubleSide }) };
   }
 
   /** Null when this browser or machine has no 3D graphics. */
@@ -126,10 +139,13 @@ export class ModelStage {
   }
 
   /** Shows a model, in the middle, a unit across. The model is freed with the stage or the next one. */
-  setModel(model: Object3D): void {
+  setModel({ root: model, clips }: ReadModel): void {
     if (this.model) (this.holder.remove(this.model), free(this.model));
     this.own.clear();
     this.shownSurface = "";
+    this.clips = clips;
+    this.shownClip = -1;
+    this.mixer = clips.length ? new this.T.AnimationMixer(model) : null;
     const T = this.T;
     const box = new T.Box3().setFromObject(model);
     const c = box.getCenter(new T.Vector3());
@@ -153,6 +169,9 @@ export class ModelStage {
   /** Lights stand round the model as lamps in a room: at a value of 0, in front of it, whatever the camera does. */
   private setLights(look: ModelLook): void {
     const T = this.T;
+    const made = JSON.stringify(["key", "fill", "rim"].flatMap((k) => ["Type", "Colour", "Power", "Around", "Height"].map((n) => look[`${k}${n}`])).concat(look["ambientColour"]!, look["ambientPower"]!, look["shadows"]!));
+    if (made === this.shownLights) return;
+    this.shownLights = made;
     for (const l of this.lights) (this.scene.remove(l), l.dispose());
     this.lights = [];
     const ambient = new T.AmbientLight(look["ambientColour"] as string, look["ambientPower"] as number);
@@ -188,19 +207,44 @@ export class ModelStage {
   /** Draws, the canvas being `w` × `h` CSS px at `scale` pixels each. */
   draw(look: ModelLook, w: number, h: number, scale = 1): void {
     const T = this.T;
-    this.gl.setPixelRatio(scale);
-    this.gl.setSize(w, h, false);
+    const size = `${w}x${h}@${scale}`;
+    if (size !== this.shownSize) {
+      this.shownSize = size;
+      this.gl.setPixelRatio(scale);
+      this.gl.setSize(w, h, false);
+    }
     const bg = look["bg"] as string;
     this.gl.setClearColor(bg || 0x000000, bg ? 1 : 0);
     // Which way is up.
     this.holder.rotation.set(look["up"] === "z" ? -Math.PI / 2 : 0, 0, 0);
     // The surface.
     const surface = look["surface"] as string;
-    const { clay, flat, wire } = this.plain;
-    for (const m of [clay, flat, wire] as unknown as Array<{ color: { set(c: string): void } }>) m.color.set(look["colour"] as string);
+    const { clay, flat, wire, tones } = this.plain;
+    for (const m of [clay, flat, wire, tones] as unknown as Array<{ color: { set(c: string): void } }>) m.color.set(look["colour"] as string);
+    if (surface === "tones" && look["tones"] !== this.shownTones) {
+      // Light falls into this many flat steps of value.
+      this.shownTones = look["tones"] as number;
+      tones.gradientMap?.dispose();
+      const steps = Uint8Array.from({ length: this.shownTones }, (_, i) => Math.round((255 * (i + 0.5)) / this.shownTones));
+      const map = new T.DataTexture(steps, this.shownTones, 1, T.RedFormat);
+      map.minFilter = map.magFilter = T.NearestFilter;
+      map.needsUpdate = true;
+      tones.gradientMap = map;
+      tones.needsUpdate = true;
+    }
     if (surface !== this.shownSurface) {
       this.shownSurface = surface;
-      for (const [m, mat] of this.own) m.material = surface === "own" ? mat : surface === "clay" ? clay : surface === "flat" ? flat : wire;
+      for (const [m, mat] of this.own) m.material = surface === "own" ? mat : surface === "clay" ? clay : surface === "tones" ? tones : surface === "flat" ? flat : wire;
+    }
+    // The pose: one moment of one of its animations.
+    if (this.mixer) {
+      const c = Math.min(this.clips.length - 1, look["clip"] as number);
+      if (c !== this.shownClip) {
+        this.mixer.stopAllAction();
+        this.mixer.clipAction(this.clips[c]!).play();
+        this.shownClip = c;
+      }
+      this.mixer.setTime(Math.min(look["poseTime"] as number, this.clips[c]!.duration * 0.9999)); // (at its very end it would loop back to its start)
     }
     this.setLights(look);
     // The camera, in spherical steps round the middle: the model is a unit across, fitted at a zoom of 1.
@@ -238,29 +282,55 @@ export class ModelStage {
     this.plain.clay.dispose();
     this.plain.flat.dispose();
     this.plain.wire.dispose();
+    this.plain.tones.gradientMap?.dispose();
+    this.plain.tones.dispose();
     this.gl.dispose();
     this.gl.forceContextLoss();
   }
 }
 
-/** The stage that draws cards and thumbnails, one at a time. */
-let cardStage: Promise<ModelStage | null> | null = null;
+/** The stage that draws cards and thumbnails, one at a time; its model stays read a little, for a card's next size, and it all goes when it falls idle. */
+let cardStage: { stage: ModelStage | null; hash: string; timer: ReturnType<typeof setTimeout> } | null = null;
 let queue: Promise<unknown> = Promise.resolve();
+const CARD_STAGE_IDLE_MS = 15_000;
+/** Past this a model has a plain card (it can still be opened): reading one is done on the page. */
+const MAX_CARD_MODEL_BYTES = 64 * 2 ** 20;
+const dropCardStage = (): void => {
+  cardStage?.stage?.dispose();
+  if (cardStage) clearTimeout(cardStage.timer);
+  cardStage = null;
+};
 
 /** A card's pixel size from a view of width over height. */
 export const modelCardFit = (ratio: number): { w: number; h: number } => (ratio >= 1 ? { w: MODEL_CARD_EDGE, h: Math.max(1, Math.round(MODEL_CARD_EDGE / ratio)) } : { w: Math.max(1, Math.round(MODEL_CARD_EDGE * ratio)), h: MODEL_CARD_EDGE });
 
 /** The picture of a model with a look, at `size` or else with its longer side `edge`. Null when it cannot be read or drawn. */
-export function modelPicture(bytes: Uint8Array, name: string, o: { size?: { w: number; h: number } | undefined; edge?: number | undefined; preview?: string | undefined }): Promise<ImageBitmap | null> {
-  if (bytes.length > MAX_MODEL_BYTES) return Promise.resolve(null);
+export function modelPicture(read: () => Promise<Uint8Array>, name: string, o: { hash?: string | undefined; size?: { w: number; h: number } | undefined; edge?: number | undefined; preview?: string | undefined }): Promise<ImageBitmap | null> {
   const run = async (): Promise<ImageBitmap | null> => {
-    const stage = await (cardStage ??= ModelStage.make());
+    if (!cardStage) cardStage = { stage: await ModelStage.make(), hash: "", timer: setTimeout(() => undefined, 0) };
+    const held = cardStage;
+    clearTimeout(held.timer);
+    held.timer = setTimeout(dropCardStage, CARD_STAGE_IDLE_MS);
+    const stage = held.stage;
     if (!stage) return null;
+    if (!o.hash || held.hash !== o.hash) {
+      const bytes = await read();
+      if (bytes.length > MAX_CARD_MODEL_BYTES) return null;
+      stage.setModel(await readModel(bytes, name));
+      held.hash = o.hash ?? "";
+    }
     const edge = o.edge ?? MODEL_CARD_EDGE;
     const size = o.size ?? { w: edge, h: Math.round(edge / CARD_RATIO) };
-    stage.setModel(await readModel(bytes, name));
-    stage.draw(o.preview ? readLook(o.preview, firstLook(name)) : defaultLook(firstLook(name)), size.w, size.h);
-    return createImageBitmap(stage.canvas, { premultiplyAlpha: "none" });
+    const look = o.preview ? readLook(o.preview, firstLook(name)) : defaultLook(firstLook(name));
+    stage.draw(look, size.w, size.h);
+    if (!look["mirror"]) return createImageBitmap(stage.canvas, { premultiplyAlpha: "none" });
+    const flipped = document.createElement("canvas");
+    flipped.width = size.w;
+    flipped.height = size.h;
+    const g = flipped.getContext("2d")!;
+    g.scale(-1, 1);
+    g.drawImage(stage.canvas, -size.w, 0);
+    return createImageBitmap(flipped);
   };
   const done = queue.then(run, run).catch(() => null);
   queue = done;

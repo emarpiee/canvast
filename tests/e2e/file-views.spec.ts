@@ -116,8 +116,24 @@ test("a PDF's card on a canvas has its page's shape, opens in the panel, and a c
   const now = (await pics())[0]!;
   expect(now.w).toBeCloseTo(one.w, 3);
   expect(now.w / now.h).toBeCloseTo(4 / 3, 2);
+  // A copy shows what its card shows (Ctrl+D, as Alt+drag and paste make theirs), and so does a saved canvas; idle, nothing keeps drawing.
+  await panel.locator("[data-close]").click();
+  await p.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await p.keyboard.press("Control+d");
+  await expect.poll(async () => (await pics()).map((o) => o.preview)).toEqual(["2", "2"]);
+  expect((await pics())[1]!.pixelW).toBe(now.pixelW);
+  if (test.info().project.name.startsWith("chromium")) {
+    await p.waitForTimeout(1500); // (its picture being drawn)
+    const cdp = await p.context().newCDPSession(p);
+    await cdp.send("Performance.enable");
+    const busy = async (): Promise<number> => (await cdp.send("Performance.getMetrics")).metrics.find((m) => m.name === "TaskDuration")!.value;
+    const was = await busy();
+    await p.waitForTimeout(3000);
+    expect((await busy()) - was, "seconds of work in 3 idle seconds").toBeLessThan(0.6);
+  }
+  await p.keyboard.press("Control+z");
+  await expect.poll(async () => (await pics()).length).toBe(1);
   // One step of undo; the picture is drawn from that page.
-  await p.locator("canvas").first().click({ position: { x: 5, y: 5 } });
   await p.keyboard.press("Control+z");
   await expect.poll(async () => (await pics())[0]!.preview).toBeUndefined();
   expect(app.consoleErrors).toEqual([]);
@@ -127,19 +143,23 @@ test("a PDF's card on a canvas has its page's shape, opens in the panel, and a c
 const STL = Buffer.from(`solid cube\n${[[0, 0, 0, 1, 0, 0, 1, 1, 0], [0, 0, 0, 1, 1, 0, 0, 1, 0], [0, 0, 1, 1, 0, 1, 1, 1, 1], [0, 0, 1, 1, 1, 1, 0, 1, 1], [0, 0, 0, 1, 0, 0, 1, 0, 1], [0, 0, 0, 1, 0, 1, 0, 0, 1]].map((t) => `facet normal 0 0 1\nouter loop\nvertex ${t.slice(0, 3).join(" ")}\nvertex ${t.slice(3, 6).join(" ")}\nvertex ${t.slice(6).join(" ")}\nendloop\nendfacet`).join("\n")}\nendsolid cube\n`);
 
 /** One triangle as a .glb with a picture inside it, read without a fetch (the page's rules forbid one). */
-function makeGlb(): Buffer {
+function makeGlb(moving = false): Buffer {
   const pos = Buffer.from(new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]).buffer);
   const uv = Buffer.from(new Float32Array([0, 0, 1, 0, 0, 1]).buffer);
   const png = makePng(2, 2, () => [200, 40, 40, 255]);
+  const when = Buffer.from(new Float32Array([0, 1]).buffer);
+  const where = Buffer.from(new Float32Array([0, 0, 0, 0.5, 0.5, 0]).buffer);
   const pad = (b: Buffer, fill = 0): Buffer => Buffer.concat([b, Buffer.alloc((4 - (b.length % 4)) % 4, fill)]);
-  const bin = pad(Buffer.concat([pos, uv, pad(png)]));
+  const animAt = 60 + pad(png).length;
+  const bin = pad(Buffer.concat([pos, uv, pad(png), ...(moving ? [when, where] : [])]));
   const json = pad(Buffer.from(JSON.stringify({
     asset: { version: "2.0" }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0 }],
     meshes: [{ primitives: [{ attributes: { POSITION: 0, TEXCOORD_0: 1 }, material: 0 }] }],
     materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }], textures: [{ source: 0 }],
     images: [{ bufferView: 2, mimeType: "image/png" }],
-    accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: "VEC3", min: [0, 0, 0], max: [1, 1, 0] }, { bufferView: 1, componentType: 5126, count: 3, type: "VEC2" }],
-    bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 36 }, { buffer: 0, byteOffset: 36, byteLength: 24 }, { buffer: 0, byteOffset: 60, byteLength: png.length }],
+    accessors: [{ bufferView: 0, componentType: 5126, count: 3, type: "VEC3", min: [0, 0, 0], max: [1, 1, 0] }, { bufferView: 1, componentType: 5126, count: 3, type: "VEC2" }, ...(moving ? [{ bufferView: 3, componentType: 5126, count: 2, type: "SCALAR", min: [0], max: [1] }, { bufferView: 4, componentType: 5126, count: 2, type: "VEC3" }] : [])],
+    bufferViews: [{ buffer: 0, byteOffset: 0, byteLength: 36 }, { buffer: 0, byteOffset: 36, byteLength: 24 }, { buffer: 0, byteOffset: 60, byteLength: png.length }, ...(moving ? [{ buffer: 0, byteOffset: animAt, byteLength: 8 }, { buffer: 0, byteOffset: animAt + 8, byteLength: 24 }] : [])],
+    ...(moving ? { animations: [{ name: "Walk", samplers: [{ input: 2, output: 3, interpolation: "LINEAR" }], channels: [{ sampler: 0, target: { node: 0, path: "translation" } }] }] } : {}),
     buffers: [{ byteLength: bin.length }],
   })), 0x20);
   const head = Buffer.alloc(12);
@@ -187,6 +207,18 @@ test("a 3D model: a picture in the library, a view that turns, is lit and keeps 
   await expect(modelView(p)).toBeVisible();
   await expect(p.locator('[data-testid="model-stage"][data-drawn]')).toBeVisible();
   await expect.poll(() => painted(p)).toBeGreaterThan(0.01);
+  // Resets, as a pattern's: a name's double-click, a group's button, the whole.
+  const focal = p.locator('[data-testid="model-side"] [data-k="focal"] input[type=number]');
+  await focal.fill("120");
+  await expect(focal).toHaveValue("120");
+  await p.locator('[data-testid="model-side"] [data-k="focal"] .adj-label').dblclick();
+  await expect(focal).toHaveValue("50");
+  await focal.fill("120");
+  await p.locator('[data-testid="model-side"] [data-group-reset="Camera"]').click();
+  await expect(focal).toHaveValue("50");
+  await focal.fill("120");
+  await p.getByTestId("model-reset").click();
+  await expect(focal).toHaveValue("50");
   // A drag turns it: the number in the settings follows.
   const yaw = () => p.locator('[data-testid="model-side"] [data-k="yaw"] input[type=number]').inputValue();
   const before = await yaw();
@@ -239,5 +271,244 @@ test("a .glb with its picture inside opens without a fetch, a broken file stays 
   const bad = await importModel(p, "bad.glb", Buffer.from("this is no model"));
   await bad.dblclick();
   await expect(p.locator('[data-testid="slide-view"] figcaption')).toContainText("could not be opened");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+/** A black square in JPEG 2000, as a scanned page has: read by a decoder inside the file. */
+const JP2 = Buffer.from("AAAADGpQICANCocKAAAAFGZ0eXBqcDIgAAAAAGpwMiAAAAAtanAyaAAAABZpaGRyAAAAEAAAABAAAw8HAAAAAAAPY29scgEAAAAAABAAAAClanAyY/9P/1EALwAAAAAAEAAAABAAAAAAAAAAAAAAABAAAAAQAAAAAAAAAAAAAw8BAQ8BAQ8BAf9SAAwAAAABAQQEBAAB/1wAEECAiIiQiIiQiIiQiIiQ/2QAJQABQ3JlYXRlZCBieSBPcGVuSlBFRyB2ZXJzaW9uIDIuNS40/5AACgAAAAAAIQAB/5Pf+JAIB4CAgICAgICAgICAgICA/9k=", "base64");
+
+/** A PDF of one page drawn from a JPEG 2000 picture. */
+function scannedPdf(): Buffer {
+  const parts: Buffer[] = [];
+  let at = 0;
+  const put = (x: Buffer | string): void => {
+    const b = typeof x === "string" ? Buffer.from(x, "latin1") : x;
+    parts.push(b);
+    at += b.length;
+  };
+  put("%PDF-1.5\n");
+  const off: number[] = [];
+  const obj = (n: number, body: Buffer | string): void => {
+    off[n] = at;
+    put(`${n} 0 obj\n`);
+    put(body);
+    put("\nendobj\n");
+  };
+  const draw = "q 200 0 0 200 20 20 cm /Im0 Do Q";
+  obj(1, "<< /Type /Catalog /Pages 2 0 R >>");
+  obj(2, "<< /Type /Pages /Count 1 /Kids [3 0 R] >>");
+  obj(3, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 240 240] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>");
+  obj(4, Buffer.concat([Buffer.from(`<< /Type /XObject /Subtype /Image /Width 16 /Height 16 /Filter /JPXDecode /Length ${JP2.length} >>\nstream\n`), JP2, Buffer.from("\nendstream")]));
+  obj(5, `<< /Length ${draw.length} >>\nstream\n${draw}\nendstream`);
+  const xref = at;
+  put(`xref\n0 6\n0000000000 65535 f \n${[1, 2, 3, 4, 5].map((n) => `${String(off[n]).padStart(10, "0")} 00000 n \n`).join("")}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
+  return Buffer.concat(parts);
+}
+
+/** A PDF with a password (the standard handler, 40 bits): a page with no stream, so nothing else needs enciphering. */
+function lockedPdf(password: string): Buffer {
+  const PAD = Buffer.from("28BF4E5E4E758A4164004E56FFFA01082E2E00B6D0683E802F0CA9FE6453697A", "hex");
+  const rc4 = (key: Buffer, data: Buffer): Buffer => {
+    const s = Array.from({ length: 256 }, (_, i) => i);
+    for (let i = 0, j = 0; i < 256; i++) {
+      j = (j + s[i]! + key[i % key.length]!) & 255;
+      [s[i], s[j]] = [s[j]!, s[i]!];
+    }
+    let i = 0, j = 0;
+    return Buffer.from(data.map((b) => {
+      i = (i + 1) & 255;
+      j = (j + s[i]!) & 255;
+      [s[i], s[j]] = [s[j]!, s[i]!];
+      return b ^ s[(s[i]! + s[j]!) & 255]!;
+    }));
+  };
+  const pad = Buffer.concat([Buffer.from(password, "latin1"), PAD]).subarray(0, 32);
+  const O = rc4(createHash("md5").update(PAD).digest().subarray(0, 5), PAD); // (an owner's password of nothing)
+  const id = Buffer.from("00112233445566778899aabbccddeeff", "hex");
+  const P = Buffer.alloc(4);
+  P.writeInt32LE(-4);
+  const U = rc4(createHash("md5").update(Buffer.concat([pad, O, P, id])).digest().subarray(0, 5), PAD);
+  const objs = ["", "<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Count 1 /Kids [3 0 R] >>", "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] >>", `<< /Filter /Standard /V 1 /R 2 /O <${O.toString("hex")}> /U <${U.toString("hex")}> /P -4 >>`];
+  let out = "%PDF-1.4\n";
+  const at: number[] = [];
+  for (let i = 1; i < objs.length; i++) {
+    at[i] = out.length;
+    out += `${i} 0 obj\n${objs[i]}\nendobj\n`;
+  }
+  const xref = out.length;
+  out += `xref\n0 ${objs.length}\n0000000000 65535 f \n`;
+  for (let i = 1; i < objs.length; i++) out += `${String(at[i]).padStart(10, "0")} 00000 n \n`;
+  out += `trailer\n<< /Size ${objs.length} /Root 1 0 R /Encrypt 4 0 R /ID [<${id.toString("hex")}> <${id.toString("hex")}>] >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, "latin1");
+}
+
+const openPdfNamed = async (p: Page, name: string, buffer: Buffer): Promise<void> => {
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name, mimeType: "application/pdf", buffer });
+  const c = p.locator(`[data-testid="asset-card"][title="${name}"]`);
+  await expect(c).toHaveCount(1, { timeout: 15_000 });
+  await c.dblclick();
+};
+
+test("a scanned page (JPEG 2000) is drawn by the decoder inside the file", async ({ app }) => {
+  const p = app.page;
+  await openPdfNamed(p, "scan.pdf", scannedPdf());
+  await expect(view(p).locator('.pdf-page[data-page="1"][data-drawn]')).toBeVisible();
+  await expect.poll(() => inked(p, 1)).toBe(true);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a PDF with a password asks for it, says when it is wrong, and stays a card if it is not given", async ({ app }) => {
+  const p = app.page;
+  await openPdfNamed(p, "locked.pdf", lockedPdf("open sesame"));
+  await p.getByTestId("prompt-input").fill("wrong");
+  await p.getByTestId("prompt-ok").click();
+  await expect(p.getByTestId("prompt-dialog")).toContainText("not the one");
+  await p.getByTestId("prompt-input").fill("open sesame");
+  await p.getByTestId("prompt-ok").click();
+  await expect(p.getByTestId("pdf-page")).toHaveValue("1");
+  await p.keyboard.press("Escape");
+  await expect(view(p)).toBeHidden();
+  await p.locator('[data-testid="asset-card"][title="locked.pdf"]').dblclick();
+  await p.getByTestId("prompt-dialog").getByRole("button", { name: "Cancel" }).click();
+  await expect(p.locator('[data-testid="slide-view"] figcaption')).toContainText("has a password");
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a long PDF: only what is near is drawn; find goes to the page; the library's search finds its words", async ({ app }) => {
+  const p = app.page;
+  const many = makePdf(Array.from({ length: 300 }, (_, i) => ({ w: 300, h: 400, word: i === 249 ? "Needle" : `Page${i + 1}` })));
+  await openPdfNamed(p, "long.pdf", many);
+  await expect(view(p).locator('.pdf-page[data-page="1"][data-drawn]')).toBeVisible();
+  await p.getByTestId("pdf-pages").click();
+  await p.keyboard.press("End");
+  await expect(p.getByTestId("pdf-page")).toHaveValue("300");
+  await expect(view(p).locator('.pdf-page[data-page="300"][data-drawn]')).toBeVisible();
+  await expect.poll(() => view(p).locator(".pdf-page[data-drawn]").count()).toBeLessThan(12);
+  await p.keyboard.press("Control+f");
+  await expect(p.getByTestId("pdf-find")).toBeFocused();
+  await p.getByTestId("pdf-find").fill("needle");
+  await expect(p.getByTestId("pdf-found")).toHaveText("Page 250", { timeout: 30_000 });
+  await expect(p.getByTestId("pdf-page")).toHaveValue("250");
+  await p.getByTestId("pdf-find").fill("nowhere at all");
+  await expect(p.getByTestId("pdf-found")).toHaveText("Not found", { timeout: 30_000 });
+  await p.getByTestId("pdf-pages").click();
+  await p.keyboard.press("Escape");
+  await expect(view(p)).toBeHidden();
+  await p.getByTestId("assets-search").fill("needle");
+  await expect(p.locator('[data-testid="asset-card"][title="long.pdf"]')).toHaveCount(1, { timeout: 30_000 });
+  await p.getByTestId("assets-search").fill("nothingofthiskind");
+  await expect(p.locator('[data-testid="asset-card"]')).toHaveCount(0);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("on a canvas: pages placed as cards, one step of undo; the panel closes and opens again", async ({ app }) => {
+  const p = app.page;
+  await importPdf(p);
+  await card(p).dblclick();
+  await expect(view(p)).toBeVisible();
+  await detailsShown(p);
+  await p.getByTestId("asset-place").click();
+  const pics = () => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "image") as unknown as Array<{ preview?: string; w: number; h: number }>);
+  await expect.poll(async () => (await pics()).length).toBe(1);
+  const box = (await p.locator("canvas").first().boundingBox())!;
+  await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
+  const panel = p.getByTestId("note-panel");
+  await expect(panel.getByTestId("pdf-view")).toBeVisible();
+  await panel.getByTestId("pdf-place").click();
+  await p.getByTestId("prompt-input").fill("2-3, 99");
+  await p.getByTestId("prompt-ok").click();
+  await expect.poll(async () => (await pics()).map((o) => o.preview ?? "")).toEqual(["", "2", "3"]);
+  const made = await pics();
+  expect(made[1]!.w / made[1]!.h).toBeCloseTo(4 / 3, 2);
+  expect(made[2]!.w / made[2]!.h).toBeCloseTo(3 / 4, 2);
+  await panel.locator("[data-close]").click();
+  await expect(panel).toBeHidden();
+  await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(panel.getByTestId("pdf-view")).toBeVisible();
+  await expect(panel.locator(".pdf-page[data-drawn]").first()).toBeVisible();
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a 3D model's study tools: tones in flat steps, a mirror, a pose from its animation, a turnaround of eight cards", async ({ app }) => {
+  const p = app.page;
+  test.skip(!(await hasGl(p)), "no 3D graphics in this browser here");
+  const c = await importModel(p, "moving.glb", makeGlb(true));
+  await c.dblclick();
+  await expect(modelView(p)).toBeVisible();
+  const side = p.getByTestId("model-side");
+  // A surface in steps of value: its row appears with it.
+  await expect(side.locator('[data-k="tones"]')).toHaveCount(0);
+  await side.locator('[data-k="surface"] [data-v="tones"]').click();
+  await side.locator('[data-k="tones"] input[type=number]').fill("2");
+  await expect.poll(() => painted(p)).toBeGreaterThan(0.001);
+  // Mirror.
+  await side.locator('[data-k="mirror"] input').check();
+  await expect(p.getByTestId("model-stage")).toHaveClass(/is-mirrored/);
+  await side.locator('[data-k="mirror"] input').uncheck();
+  // The pose moves the model.
+  const look = () => p.getByTestId("model-stage").locator("canvas").evaluate((x: HTMLCanvasElement) => x.toDataURL());
+  await expect.poll(() => side.locator('[data-k="clip"]').count()).toBe(1);
+  await p.waitForTimeout(200);
+  const at0 = await look();
+  await side.locator('[data-k="poseTime"] input[type=number]').fill("1");
+  await expect.poll(look).not.toBe(at0);
+  // On a canvas: eight cards, each from its own side.
+  await detailsShown(p);
+  await p.getByTestId("asset-place").click();
+  const pics = () => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "image") as unknown as Array<{ preview?: string }>);
+  await expect.poll(async () => (await pics()).length).toBe(1);
+  const box = (await p.locator("canvas").first().boundingBox())!;
+  await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
+  const panel = p.getByTestId("note-panel");
+  await expect(panel.getByTestId("model-view")).toBeVisible();
+  await panel.getByTestId("model-turnaround").click();
+  await expect.poll(async () => (await pics()).length).toBe(9);
+  const yaws = (await pics()).slice(1).map((o) => (JSON.parse(o.preview!) as { yaw?: number }).yaw ?? 35);
+  expect(new Set(yaws).size).toBe(8);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("idle, nothing keeps working: the library, the viewer on a PDF or a model, the canvas with their cards and copies, the panel", async ({ app }) => {
+  const p = app.page;
+  test.skip(!test.info().project.name.startsWith("chromium") || !(await hasGl(p)), "measured in Chromium, which reports it");
+  const cdp = await p.context().newCDPSession(p);
+  await cdp.send("Performance.enable");
+  const busy = async (): Promise<number> => (await cdp.send("Performance.getMetrics")).metrics.find((m) => m.name === "TaskDuration")!.value;
+  /** Seconds of the page's work over three seconds of doing nothing, after what was asked has settled. */
+  const idle = async (where: string): Promise<void> => {
+    await p.waitForTimeout(2000);
+    const was = await busy();
+    await p.waitForTimeout(3000);
+    expect((await busy()) - was, `seconds of work in 3 idle seconds: ${where}`).toBeLessThan(0.6);
+  };
+  await importPdf(p);
+  const model = await importModel(p, "cube.stl", STL);
+  await expect.poll(() => card(p).locator(".asset-thumb img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
+  await idle("the library with a PDF and a model");
+  await card(p).dblclick();
+  await expect(view(p).locator('.pdf-page[data-page="1"][data-drawn]')).toBeVisible();
+  await idle("the viewer on a PDF");
+  await p.keyboard.press("Escape");
+  await expect(view(p)).toBeHidden();
+  await model.dblclick();
+  await expect(p.locator('[data-testid="model-stage"][data-drawn]')).toBeVisible();
+  await idle("the viewer on a model");
+  await detailsShown(p);
+  await p.getByTestId("asset-place").click();
+  const pics = () => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "image") as unknown as Array<{ preview?: string }>);
+  await expect.poll(async () => (await pics()).length).toBe(1);
+  const box = (await p.locator("canvas").first().boundingBox())!;
+  await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
+  const panel = p.getByTestId("note-panel");
+  await expect(panel.getByTestId("model-view")).toBeVisible();
+  await idle("the panel on a model");
+  await panel.getByTestId("model-card").click();
+  await panel.locator("[data-close]").click();
+  await p.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await p.keyboard.press("Control+d");
+  await expect.poll(async () => (await pics()).length).toBe(2);
+  expect(new Set((await pics()).map((o) => o.preview)).size).toBe(1);
+  await idle("the canvas with a card showing a view and its copy");
   expect(app.consoleErrors).toEqual([]);
 });

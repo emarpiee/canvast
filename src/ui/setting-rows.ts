@@ -1,4 +1,5 @@
-import type { Setting } from "../gen/types";
+import { scrubNumbers } from "../colour-picker/scrub";
+import type { Section, Setting } from "../gen/types";
 import { openColourPopover } from "./colour-popover";
 import { esc } from "./format";
 import { ICONS } from "./icons";
@@ -11,8 +12,8 @@ export type SettingValue = number | string | boolean;
  * The rows of settings of a panel, whatever they set (a pattern's, a 3D view's): a range and its number, a tick, a choice or a colour. `extra` goes beside
  * its name (a lock). Double-click on the name or the range: its usual value.
  */
-export function settingRowHtml(s: Setting, v: SettingValue, extra = ""): string {
-  if (s.t === "range") return `<div class="adj-row" data-k="${s.k}"><label class="adj-label" for="pg-n-${s.k}">${esc(s.label)}${extra}</label><input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)}"><input type="number" class="adj-num" id="pg-n-${s.k}" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)} value"></div>`;
+export function settingRowHtml(s: Setting, v: SettingValue, extra = "", /** Unique among the panels that can be open together. */ idPrefix = "pg-n-"): string {
+  if (s.t === "range") return `<div class="adj-row" data-k="${s.k}"><label class="adj-label" for="${idPrefix}${s.k}">${esc(s.label)}${extra}</label><input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)}"><input type="number" class="adj-num" id="${idPrefix}${s.k}" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)} value"></div>`;
   if (s.t === "toggle") return `<div class="adj-row pg-line" data-k="${s.k}"><label class="pg-check"><input type="checkbox"${v ? " checked" : ""}> <span>${esc(s.label)}</span>${extra}</label></div>`;
   if (s.t === "choice") return `<div class="adj-row pg-line" data-k="${s.k}"><span class="adj-label">${esc(s.label)}${extra}</span><div class="adj-layers pg-seg" role="group" aria-label="${esc(s.label)}">${s.opts.map(([o, l]) => `<button type="button" data-v="${o}" aria-pressed="${o === v}">${esc(l)}</button>`).join("")}</div></div>`;
   const none = v === "";
@@ -53,4 +54,59 @@ export function bindSettingRow(r: HTMLElement, s: Setting, get: (k: string) => S
     sw.addEventListener("click", () => openColourPopover(sw, { name: s.label, value: last, onInput: (h) => { last = h.slice(0, 7); set(s.k, last); paint(); } }));
     r.querySelector("[data-eye]")?.addEventListener("click", () => { set(s.k, get(s.k) === "" ? last : ""); paint(); });
   }
+}
+
+/** The title of a group of settings, with its Reset (one look: the Adjust panel's, a pattern's and a 3D view's). */
+export const groupHeadHtml = (name: string, changed: boolean): string =>
+  `<div class="adj-group-head"><h4>${esc(name)}</h4><button type="button" class="layer-btn adj-reset" data-group-reset="${esc(name)}" aria-label="Reset ${esc(name.toLowerCase())}" title="Reset ${esc(name.toLowerCase())}"${changed ? "" : " disabled"}>${ICONS.listRestart}</button></div>`;
+
+/**
+ * A panel's settings in their groups: each row with its double-click and each group with its Reset, the numbers draggable. It is the whole of what a
+ * panel of settings does, whatever it sets: the panel says what its values are and what a change or a reset does. Draw again with `build`.
+ */
+export function mountSettings(host: HTMLElement, o: {
+  sections(): readonly Section[];
+  get(k: string): SettingValue;
+  set(k: string, v: SettingValue): void;
+  /** Values back to their usual ones (several at once: one change). */
+  reset(keys: readonly Setting[]): void;
+  /** Beside a name (a lock). */
+  extra?(s: Setting): string;
+  /** After a row is made. */
+  bound?(r: HTMLElement, s: Setting): void;
+  idPrefix?: string;
+}): { build(): void; syncResets(): void } {
+  const shown = (s: Setting): boolean => !s.when || s.when.slice(1).includes(o.get(s.when[0]!) as string);
+  const items = (sec: Section): readonly Setting[] => sec.items.filter(shown);
+  const changed = (sec: Section): boolean => sec.items.some((s) => o.get(s.k) !== s.def);
+  const syncResets = (): void => {
+    for (const sec of o.sections()) {
+      const b = [...host.querySelectorAll<HTMLButtonElement>("[data-group-reset]")].find((x) => x.dataset["groupReset"] === sec.title);
+      if (b) b.disabled = !changed(sec);
+    }
+  };
+  const build = (): void => {
+    host.innerHTML = o.sections().map((sec) => `<div class="adj-group">${groupHeadHtml(sec.title, changed(sec))}${items(sec).map((s) => settingRowHtml(s, o.get(s.k), o.extra?.(s) ?? "", o.idPrefix)).join("")}</div>`).join("");
+    const all = o.sections().flatMap((x) => x.items);
+    for (const r of host.querySelectorAll<HTMLElement>("[data-k]")) {
+      const s = all.find((x) => x.k === r.dataset["k"])!;
+      o.bound?.(r, s);
+      bindSettingRow(r, s, o.get, (k, v) => {
+        o.set(k, v);
+        syncResets();
+      }, () => {
+        o.reset([s]);
+        build();
+      });
+    }
+  };
+  host.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-group-reset]");
+    const sec = b && o.sections().find((x) => x.title === b.dataset["groupReset"]);
+    if (!sec) return;
+    o.reset(sec.items);
+    build();
+  });
+  if (!host.closest("[data-scrub-root]")) scrubNumbers(host); // (drag a number to change it, as everywhere; rows made again later are marked on the first pointer over)
+  return { build, syncResets };
 }

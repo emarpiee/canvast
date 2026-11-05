@@ -100,7 +100,7 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 
 - **Layers.** Floating elements use the `--z-*` tokens in `:root` (ADR 0096), never a number: `--z-item` and `--z-item-bar`/`--z-item-pop` for what belongs to a canvas item (a player's picture and bar, the selection bar), `--z-edge` for the bars and panels on the edges, which are always above anything on the canvas.
 
-- **File views.** A kind of file that opens in a view of its own (notes, PDFs, 3D models) is one row of `src/ui/file-views.ts` (its view, for the library's viewer and the panel on a canvas alike) and one of `PICTURE_KINDS` in `src/assets/adapters.ts` (its picture on a card and thumbnail); what a card shows of it is `ImageObject.preview`, its place and bookmarks `CatalogEntry.viewer` (`src/ui/view-state.ts`). Settings rows are `src/ui/setting-rows.ts`. Nothing else needs to know the kind.
+- **File views.** A kind of file that opens in a view of its own (notes, PDFs, 3D models) is one row of `src/ui/file-views.ts` (its view, for the library's viewer and the panel on a canvas alike) and one of `PICTURE_KINDS` in `src/assets/adapters.ts` (its picture on a card and thumbnail); what a card shows of it is `ImageObject.preview`, its place and bookmarks `CatalogEntry.viewer` (`src/ui/view-state.ts`). Settings are `mountSettings` of `src/ui/setting-rows.ts` (rows, a double-click to reset one, a group's Reset, draggable numbers). Nothing else needs to know the kind.
 
 - **Panels (ADR 0156).** A floating panel is built with `panelHtml` (`src/ui/panel.ts`): optional header, optional strip under it, a scrolling body, optional footer. Leave out the parts it does not need; do not write layout CSS for them.
 

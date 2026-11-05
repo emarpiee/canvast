@@ -13,6 +13,7 @@ import { anyNoteDirty, leaveAllNotes } from "../ui/note-session";
 import { mountFilePanel } from "../ui/file-panel";
 import type { FilePanelDeps } from "../ui/file-panel";
 import { viewKindNamed } from "../ui/file-views";
+import type { CardActions } from "../ui/file-views";
 import { ViewState } from "./view-state";
 import { newNoteFile } from "../notes/note-file";
 import { cleanFileName } from "../doc/rename-rules";
@@ -37,7 +38,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, buildTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
+import { placeCardViews, imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, buildTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -902,7 +903,7 @@ async function start(): Promise<void> {
   // here, or while hidden mode is on outside the library (Stay in hidden mode); and, in the desktop app, while their key is open. What makes a file uses `filesAssets`, and a capture of the screen is drawn with
   // padlocks first (`padlocked`), so nothing readable of them leaves the app.
   // The file panel (file-panel.ts): made once the library view is, which it imports through.
-  let notePanel: { open(hash: string, setPreview?: (preview: string, size: { w: number; h: number }) => void): Promise<boolean>; close(): Promise<boolean>; closeHidden(): void } = { open: async () => false, close: async () => true, closeHidden: () => undefined };
+  let notePanel: { open(hash: string, card?: CardActions): Promise<boolean>; close(): Promise<boolean>; closeHidden(): void } = { open: async () => false, close: async () => true, closeHidden: () => undefined };
   const syncReveal = (): void => {
     const on = ((settings.get("library.hiddenRemember") && hiddenRemembered()) || hiddenModeOn()) && (storage?.hidden ? storage.hidden.isOpen() : true);
     if (on === assets.revealing) return;
@@ -1093,7 +1094,7 @@ async function start(): Promise<void> {
   let makeNoteFiles: () => Promise<void> = async () => undefined;
   attachTools(canvas, view, doc, index, editor, { edgePanSpeed: () => (settings.get("nav.edgePanOn") ? settings.get("nav.edgePan") / 100 : 0), editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h, id) => {
         const o = doc.get(id);
-        void notePanel.open(h, o?.kind === "image" ? previewSetter(o) : undefined);
+        void notePanel.open(h, o?.kind === "image" ? cardActions(o) : undefined);
       }, newNote: (at, w) => void newNoteAt(at, w), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),
     navigate: (dir) =>
       void stepToNeighbour(doc, view, editor, dir, settings.get("nav.mode"), settings.get("nav.arrive") === "focus", (o, unit) => {
@@ -1709,13 +1710,21 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     editor.changed();
   };
   /** Shows what is in a file's view on one card (doc/model.ts `preview`): its width kept, its height following the new picture; one step of undo. */
-  function previewSetter(from: ImageObject): (preview: string, size: { w: number; h: number }) => void {
-    return (preview, size) => {
-      const o = doc.get(from.id);
-      if (o?.kind !== "image" || editor.blockEdit()) return;
-      const { crop: _crop, ...rest } = o;
-      doc.commit(doc.transaction("Card preview", [{ ...rest, preview, pixelW: size.w, pixelH: size.h, h: (o.w * size.h) / size.w }]));
-      editor.changed();
+  function cardActions(from: ImageObject): CardActions {
+    return {
+      setPreview: (preview, size) => {
+        const o = doc.get(from.id);
+        if (o?.kind !== "image" || editor.blockEdit()) return;
+        const { crop: _crop, ...rest } = o;
+        doc.commit(doc.transaction("Card preview", [{ ...rest, preview, pixelW: size.w, pixelH: size.h, h: (o.w * size.h) / size.w }]));
+        editor.changed();
+      },
+      placeViews: (items) => {
+        const o = doc.get(from.id);
+        if (o?.kind !== "image" || editor.blockEdit()) return;
+        editor.select(placeCardViews(doc, o, items).map((c) => c.id));
+        editor.changed();
+      },
     };
   }
   const fileKinds = new Map<string, { card: boolean; open: boolean; svg: boolean; note: boolean; view: boolean }>();
@@ -1856,7 +1865,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       makeNoteFiles: () => void makeNoteFiles(),
       editNote: () => {
         const o = doc.get([...editor.selection][0] ?? "");
-        if (o?.kind === "image") void notePanel.open(o.assetId, previewSetter(o));
+        if (o?.kind === "image") void notePanel.open(o.assetId, cardActions(o));
       },
       openFile: () => {
         const o = [...editor.selection].map((id) => doc.get(id)).find((x) => x?.kind === "image");
@@ -2073,8 +2082,18 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   };
   // A PDF imported before its pages were drawn has a card of the plain card's shape: its cards on a canvas take the shape of the first page. No undo step (as above).
   const pdfShapes = new Map<string, { w: number; h: number } | null>();
+  let pdfSyncing = false;
   const syncOldPdfCards = async (): Promise<void> => {
-    if (!session.catalog || session.readOnly) return;
+    if (!session.catalog || session.readOnly || pdfSyncing) return;
+    pdfSyncing = true;
+    try {
+      await syncPdfCardsNow();
+    } finally {
+      pdfSyncing = false;
+    }
+  };
+  const syncPdfCardsNow = async (): Promise<void> => {
+    if (!session.catalog) return;
     let changed = false;
     for (const o of [...doc.all()]) {
       if (o.kind !== "image" || o.preview || o.pixelW !== FILE_CARD_W || o.pixelH !== FILE_CARD_H) continue;

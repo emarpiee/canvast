@@ -296,3 +296,4 @@ One icon per function: two buttons that do different things never share an icon,
 | `folder-tree` | Organize: move to a folder and add tags, from one list (library) |
 | `book-open` | Open a file in the panel on a canvas (a PDF, the Actions bar) |
 | `lightbulb` | Lighting of a 3D model: its classic setups |
+| `rotate-3d` | Place a turnaround of a 3D model on the canvas |

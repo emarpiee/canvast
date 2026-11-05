@@ -630,14 +630,18 @@ A PDF or a 3D model shows as its picture in the library and opens in a view of i
 | Remembered | The page it was left at | The view it was left at, with its lights |
 | Bookmarks | Pages, and the contents the PDF carries | Views |
 | On a card on a canvas | Its page's shape; **Show this page on the card** | **Show this view on the card** |
+| Several cards at once | **Place pages**: a card for each page typed, such as `1-4, 9` | **Place a turnaround**: eight cards, from all around |
+| Finding | Ctrl+F in it; the library's search finds its words too | |
 
 Bookmarks are in the view's bar and in the details. What a card shows belongs to that card, so copies can show different pages or views; it is one step of undo, and nothing new is stored.
 
 #### More about 3D views
 
-- **Settings:** camera (around, height, zoom, lens and focal length), surface (its own, clay, one colour, wireframe), which way is up, shadows, background (a colour or none, so a card can be see-through), and three lights (sun, point, spot or off, each with a colour, strength and direction), with light all around.
+- **Settings:** camera (around, height, zoom, lens and focal length), surface (its own, clay, tones, one colour, wireframe), which way is up, shadows, a mirror, a pose (the animation and moment, when the file has animations), background (a colour or none, so a card can be see-through), and three lights (sun, point, spot or off, each with a colour, strength and direction), with light all around.
+- **Reset:** double-click a setting's name for that one, the button on a group for the group, or the one in the bar for all, as in the Pattern panel.
 - **Lighting** in the bar sets the lights to a classic setup: Rembrandt, loop, butterfly, split, rim, three-point, even.
 - **Lights stand still** round the model while the camera turns, as lamps in a room.
+- **Tones** shows the light in 2 to 5 flat steps of value, to read shadow shapes. **Mirror** flips the picture, to check a drawing against it.
 
 ### Art files
 
@@ -1322,8 +1326,8 @@ What canvast does not do today, for both versions, then each. **The limits that 
 
 | Area | Limitation |
 | --- | --- |
-| PDF | Password-protected PDFs stay cards; forms and notes in a PDF are not shown or filled, links in it are not followed, no search inside; a font a PDF does not carry comes from the system, and East Asian text that needs one may not show |
-| 3D | GLB, glTF, STL, OBJ and PLY only, one file each: what lies in another file (an OBJ's materials, a glTF's textures), compressed glTF and animation are not read; a model over 256 MB stays a card |
+| PDF | Forms are shown but not filled; links to the web are not opened; a password is asked each time and a card shows no picture of such a PDF; a font a PDF does not carry comes from the system, and East Asian text that needs one may not show |
+| 3D | GLB, glTF, STL, OBJ and PLY only, one file each: what lies in another file (an OBJ's materials, a glTF's textures) and compressed glTF are not read; a model over 256 MB stays a card |
 | Text | No Indic shaping; other computers can wrap missing characters differently |
 | Vector networks | One fill for the whole network |
 | ⚠️ Notes | No autosave and no version history: a saved note replaces the file |
@@ -1344,8 +1348,8 @@ What canvast does not do today, for both versions, then each. **The limits that 
 
 | Area | Limitation |
 | --- | --- |
-| PDF | A PDF with a password stays a card. Forms and notes in a PDF are not shown or filled, its links are not followed, and it has no search inside. A font a PDF does not carry comes from the system, and East Asian text that needs one may not show |
-| 3D | Only GLB, glTF, STL, OBJ and PLY are read, one file each: an OBJ's materials, a glTF's textures in other files, compressed glTF and animation are not. A model over 256 MB stays a card. Without 3D graphics in the browser or machine a model stays a card |
+| PDF | Forms are shown but not filled, and links to the web are not opened (links inside a PDF are followed). A PDF's password is asked each time it opens and kept nowhere, and its card shows no picture. A font a PDF does not carry comes from the system, and East Asian text that needs one may not show. The library's search reads PDFs up to 128 MB and 2000 pages |
+| 3D | Only GLB, glTF, STL, OBJ and PLY are read, one file each: an OBJ's materials, a glTF's textures in other files and compressed glTF are not. A model over 256 MB stays a card. Without 3D graphics in the browser or machine a model stays a card |
 | Text | Complex scripts that need Indic shaping are not supported; OpenType positioning goes no further than kerning. Characters missing from the interface font fall back to a system font: their width then comes from the browser, so such text can wrap differently on another computer and pixelates at extreme depth |
 | Vector networks | One fill for the whole network (no fill per region) |
 | Note zoom | Only a note's text grows; pictures keep their size |

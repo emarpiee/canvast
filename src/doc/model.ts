@@ -759,6 +759,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       ...(s["media"] !== undefined ? { media: s["media"] as MediaState } : {}),
       ...(s["crop"] !== undefined ? { crop: s["crop"] as Crop } : {}),
       ...(s["page"] === true ? { page: true as const } : {}),
+      ...(typeof s["preview"] === "string" && s["preview"] ? { preview: s["preview"] } : {}),
       ...(s["flipX"] === true ? { flipX: true as const } : {}),
       ...(s["flipY"] === true ? { flipY: true as const } : {}),
       ...(s["radius"] !== undefined ? { radius: s["radius"] as number | number[] } : {}),

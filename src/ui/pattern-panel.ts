@@ -2,7 +2,7 @@ import type { EditorState } from "../app/editor-state";
 import { GENERATORS, cleanValues, defaultValues, generate, generatorById, makeRng, randomValues, sectionsOf } from "../gen";
 import type { Generator, Setting, Values } from "../gen";
 import { thumbSvg } from "./pattern-thumb";
-import { bindSettingRow, settingRowHtml } from "./setting-rows";
+import { mountSettings } from "./setting-rows";
 import { esc } from "./format";
 import { ICONS } from "./icons";
 import { liveNumber } from "./live";
@@ -121,9 +121,24 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
   };
   const locks = (): Set<string> => frozen.get(gen.id) ?? frozen.set(gen.id, new Set()).get(gen.id)!;
 
+  const settingRows = mountSettings(body, {
+    sections: () => sectionsOf(gen),
+    get: (k) => values[k]!,
+    set,
+    reset: (keys) => {
+      for (const s of keys) values[s.k] = s.def;
+      kept.set(gen.id, values);
+      again();
+      paintReadout();
+    },
+    extra: (s) => lock(s),
+    bound: (r, s) => r.querySelector("[data-lock]")!.addEventListener("click", (e) => {
+      const on = !locks().has(s.k);
+      if (on) locks().add(s.k); else locks().delete(s.k);
+      (e.currentTarget as HTMLElement).setAttribute("aria-pressed", String(on));
+    }),
+  });
   const lock = (s: Setting): string => `<button type="button" class="pg-lock" data-lock aria-pressed="${locks().has(s.k)}" aria-label="Keep ${esc(s.label)} when randomizing" title="Keep ${esc(s.label.toLowerCase())} when randomizing">${ICONS.snowflake}</button>`;
-  const row = (s: Setting): string => (s.when && !s.when.slice(1).includes(values[s.when[0]!] as string) ? "" : settingRowHtml(s, values[s.k]!, lock(s)));
-
   // Small pictures of the generators, made when the grid is first opened, one at a time so the panel stays responsive.
   const thumbs = new Map<string, string>();
   let thumbing = false;
@@ -154,19 +169,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
     q("[data-pg-cur]").innerHTML = thumbs.get(gen.id) ?? "";
     q("[data-pg-about]").textContent = gen.about;
     seedBox.value = String(seed);
-    body.innerHTML = sectionsOf(gen).map((sec) => `<div class="adj-group"><h4>${esc(sec.title)}</h4>${sec.items.map(row).join("")}</div>`).join("");
-    for (const r of body.querySelectorAll<HTMLElement>("[data-k]")) {
-      const s = sectionsOf(gen).flatMap((x) => x.items).find((x) => x.k === r.dataset["k"])!;
-      r.querySelector("[data-lock]")!.addEventListener("click", (e) => {
-        const on = !locks().has(s.k);
-        if (on) locks().add(s.k); else locks().delete(s.k);
-        (e.currentTarget as HTMLElement).setAttribute("aria-pressed", String(on));
-      });
-      bindSettingRow(r, s, (k) => values[k]!, set, () => {
-        set(s.k, s.def);
-        build();
-      });
-    }
+    settingRows.build();
   };
 
   /** The other tab: its last generator comes in, and what is on the canvas stays as it is (the next Generate is a new result). */

@@ -2,7 +2,7 @@ import { openBatchRename } from "./batch-rename";
 import { esc } from "./format";
 import { ICONS } from "./icons";
 import { viewKindOf } from "./file-views";
-import type { FileViewKind, OpenView, ViewDeps, ViewPlace } from "./file-views";
+import type { CardActions, FileViewKind, OpenView, ViewDeps, ViewPlace } from "./file-views";
 import { OpenNote } from "./note-session";
 import { panelHtml } from "./panel";
 
@@ -27,7 +27,7 @@ export function mountFilePanel(
   deps: FilePanelDeps,
   /** Where a file opens (Settings > Notes): the dock's panel, or the window centred over the canvas. */
   mode: () => "panel" | "window",
-): { open(hash: string, setPreview?: ViewPlace["setPreview"]): Promise<boolean>; close(): Promise<boolean>; closeHidden(): void; readonly hash: string | null } {
+): { open(hash: string, card?: CardActions): Promise<boolean>; close(): Promise<boolean>; closeHidden(): void; readonly hash: string | null } {
   let el = hosts.panel; // (the host of the file open now)
   let note: OpenView | null = null;
   let kind: FileViewKind | null = null;
@@ -61,7 +61,7 @@ export function mountFilePanel(
     refresh: async () => undefined,
     hidden: () => deps.hidden(),
   };
-  const open = async (hash: string, setPreview?: ViewPlace["setPreview"], /** Opened again: the note became another kind. */ fresh = false): Promise<boolean> => {
+  const open = async (hash: string, card?: CardActions, /** Opened again: the note became another kind. */ fresh = false): Promise<boolean> => {
     const rec = await deps.assets.record(hash).catch(() => undefined);
     const k = rec ? await viewKindOf({ hash, name: rec.name, blob: rec.blob }) : null;
     if (!rec || !k) return false;
@@ -87,7 +87,7 @@ export function mountFilePanel(
     el.querySelector("[data-rename]")?.addEventListener("click", () => void rename());
     el.hidden = false;
     try {
-      note = await k.open(el.querySelector<HTMLElement>(".viewer-note > div")!, { hash, name: name0, blob: rec.blob }, deps, { ...place, ...(setPreview ? { setPreview } : {}) });
+      note = await k.open(el.querySelector<HTMLElement>(".viewer-note > div")!, { hash, name: name0, blob: rec.blob }, deps, { ...place, ...card });
     } catch (err) {
       shut();
       deps.session.editor.message = `This ${k.noun} could not be opened (“${rec.name}”): ${(err as Error).message}.`;
@@ -117,7 +117,7 @@ export function mountFilePanel(
       if (e.key === "F2" && !e.ctrlKey && !e.altKey && !e.metaKey) (e.preventDefault(), void rename());
     });
   return {
-    open: (hash, setPreview) => open(hash, setPreview),
+    open: (hash, card) => open(hash, card),
     close: leave,
     // Hidden items are no longer shown (hidden mode ended, the hidden items locked): a hidden note open here closes, its changes saved (OpenNote.close).
     closeHidden: () => void (hiddenOpen && shut()),

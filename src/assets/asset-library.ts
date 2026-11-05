@@ -322,7 +322,7 @@ export class AssetLibrary {
         duration = undefined;
         return;
       }
-      img = await makeFileCardFrom(file.name ?? "", describeFile(file.name ?? "", type).chip, new Uint8Array(bytes));
+      img = await makeFileCardFrom(file.name ?? "", describeFile(file.name ?? "", type).chip, async () => new Uint8Array(bytes));
       size = { w: img.width, h: img.height }; // (400 × 300, but a note's page is as tall as the note)
       duration = undefined;
     };
@@ -594,7 +594,7 @@ export class AssetLibrary {
         // (a picture that does not decode: the file's own card)
       }
     }
-    return makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, new Uint8Array(await rec.blob.arrayBuffer()), { size, hash: rec.hash, layoutW, preview });
+    return makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, async () => new Uint8Array(await rec.blob.arrayBuffer()), { size, hash: rec.hash, layoutW, preview });
   }
 
   /** `key` is the hash, or `hash#ms` for the picture of a video at a time (doc/model.ts rasterKey). */
@@ -675,6 +675,8 @@ export class AssetLibrary {
       } else if (edge && Math.max(...Object.values(pageOf(hash) ?? { w: rec.pixelW, h: rec.pixelH })) > edge) {
         await this.ensureReduced(rec, edge, hash);
       } else {
+        // (asked for smaller than it is: the whole of it serves from now on, or the copy asked for would never come and the view would keep drawing)
+        if (edge) this.noReduced.add(hash);
         await this.ensureDecoded(rec, hash);
       }
     } catch {
@@ -697,6 +699,7 @@ export class AssetLibrary {
       bmp = isCard(rec) ? await this.cardOf(rec, { w: Math.max(1, Math.round(full.w * s)), h: Math.max(1, Math.round(full.h * s)) }, full.w / CARD_SCALE, previewOf(of)) : await createImageBitmap(rec.blob, { resizeWidth: Math.max(1, Math.round(rec.pixelW * s)), resizeHeight: Math.max(1, Math.round(rec.pixelH * s)), resizeQuality: "medium" });
     } catch {
       this.noReduced.add(rec.hash); // this browser cannot decode at a size: use the full image from now on
+      this.noReduced.add(of); // (asked for by its own key: without this the copy would be asked for without end)
       return this.ensureDecoded(rec, of);
     }
     this.decoded.set(key, makeSource(bmp, full.w));

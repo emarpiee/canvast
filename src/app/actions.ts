@@ -763,6 +763,24 @@ export function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "t
   return homeObject(normalizeUnit(img), doc.space) as ImageObject;
 }
 
+/** New cards of a file, each showing its own page or view, in rows beside `from` (their width its width); one step of undo. */
+export function placeCardViews(doc: DocumentStore, from: ImageObject, items: ReadonlyArray<{ preview: string; size: { w: number; h: number } }>): ImageObject[] {
+  const { crop: _crop, name: _name, ...rest } = from;
+  const across = Math.ceil(Math.sqrt(items.length));
+  const gap = from.w * 0.08;
+  const rowH = (row: number): number => Math.max(...items.slice(row * across, (row + 1) * across).map((i) => (from.w * i.size.h) / i.size.w));
+  let top = 0;
+  const made = items.map((it, i) => {
+    const row = Math.floor(i / across);
+    if (i > 0 && i % across === 0) top += rowH(row - 1) + gap;
+    const dx = (from.w + gap) * (1 + i % across);
+    const moved = translate({ ...rest, id: newObjectId(), z: doc.topZ() + 1 + i, preview: it.preview, pixelW: it.size.w, pixelH: it.size.h, h: (from.w * it.size.h) / it.size.w } as ImageObject, D.shift(D.fromNumber(dx), from.unit), D.shift(D.fromNumber(top), from.unit));
+    return homeObject(moved, doc.space) as ImageObject;
+  });
+  doc.commit(doc.transaction(items.length === 1 ? "Place a card" : `Place ${items.length} cards`, made));
+  return made;
+}
+
 /**
  * Place one new instance of a stored asset at the viewport centre (shifted by
  * `offsetPx`), at the current scale: 1 source pixel = 1 CSS px, shrunk to fit.

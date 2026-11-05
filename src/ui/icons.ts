@@ -258,6 +258,7 @@ import swatchBookSvg from "lucide-static/icons/swatch-book.svg";
 import bookmark from "lucide-static/icons/bookmark.svg";
 import bookOpen from "lucide-static/icons/book-open.svg";
 import lightbulb from "lucide-static/icons/lightbulb.svg";
+import rotate3d from "lucide-static/icons/rotate-3d.svg";
 import chevronDown from "lucide-static/icons/chevron-down.svg";
 import chevronRight from "lucide-static/icons/chevron-right.svg";
 import chevronLeft from "lucide-static/icons/chevron-left.svg";
@@ -555,6 +556,7 @@ export const ICONS = {
   bookmark: clean(bookmark),
   bookOpen: clean(bookOpen),
   lightbulb: clean(lightbulb),
+  rotate3d: clean(rotate3d),
   bookmarkPlus: clean(bookmarkPlus),
   bookmarkCheck: clean(bookmarkCheck),
   chevronDown: clean(chevronDown),

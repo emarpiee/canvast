@@ -23,26 +23,27 @@ export interface PictureOptions {
  * The kinds of file whose card is drawn from their bytes. A new kind of file is one row here (and one in ui/file-views.ts, to open it). A kind that
  * answers null leaves the file's plain card.
  */
-const PICTURE_KINDS: ReadonlyArray<{ claims(name: string): boolean; picture(name: string, chip: string, bytes: Uint8Array, o: PictureOptions): Promise<ImageBitmap | null> }> = [
+const PICTURE_KINDS: ReadonlyArray<{ claims(name: string): boolean; picture(name: string, chip: string, read: () => Promise<Uint8Array>, o: PictureOptions): Promise<ImageBitmap | null> }> = [
   {
     // A note: its page, as big as the note when it is a new card, else laid out at the card's own size.
     claims: (name) => !!noteKindOf(name),
-    picture: async (name, _chip, bytes, o) => {
+    picture: async (name, _chip, read, o) => {
+      const bytes = await read();
       if (tooBigForNote(name, bytes.length)) return null;
       const text = new TextDecoder().decode(bytes);
       const page = await (async () => { const s = o.size ?? (await noteCardSize(name, text, o.hash)); return notePicture(name, text, s.w, s.h, o.hash, o.layoutW ?? s.w / CARD_SCALE); })().catch(() => null);
       return page ? createImageBitmap(page) : null;
     },
   },
-  { claims: (name) => isFontFile({ type: "", name }), picture: (_name, chip, bytes) => fontCard(chip, bytes).catch(() => null) },
-  { claims: (name) => isPdfFile({ name }), picture: (_name, _chip, bytes, o) => pdfPicture(bytes, { page: Number(o.preview) || 1, size: o.size, edge: o.edge }) },
-  { claims: isModelFile, picture: (name, _chip, bytes, o) => modelPicture(bytes, name, o) },
+  { claims: (name) => isFontFile({ type: "", name }), picture: async (_name, chip, read) => fontCard(chip, await read()).catch(() => null) },
+  { claims: (name) => isPdfFile({ name }), picture: (_name, _chip, read, o) => pdfPicture(read, { hash: o.hash, page: Number(o.preview) || 1, size: o.size, edge: o.edge }) },
+  { claims: isModelFile, picture: (name, _chip, read, o) => modelPicture(read, name, o) },
 ];
 
 /** The card of a file, with what can be drawn from its bytes. Never fails: the plain card is the fallback. */
-export async function makeFileCardFrom(name: string, chip: string, bytes: Uint8Array, o: PictureOptions = {}): Promise<ImageBitmap> {
+export async function makeFileCardFrom(name: string, chip: string, /** Read only by what needs it: a kind may still hold the file open. */ read: () => Promise<Uint8Array>, o: PictureOptions = {}): Promise<ImageBitmap> {
   try {
-    const drawn = await PICTURE_KINDS.find((k) => k.claims(name))?.picture(name, chip, bytes, o);
+    const drawn = await PICTURE_KINDS.find((k) => k.claims(name))?.picture(name, chip, read, o);
     if (drawn) return drawn;
   } catch {
     // (the plain card)

@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.36: PDF and 3D tools, less work when idle (2026-11-05)
+
+- **Implemented:** tones, mirror, pose, turnaround; Place pages, find, links, passwords, PDF words in the library's search; `ImageObject.preview` kept by copies and saves; an end to the redraw that a copy's size started; `mountSettings`; resets in the 3D view, texture fills and font axes.
+- **Tested:** `file-views.spec`, `scrub-audit.spec`, `pattern.spec` in Chromium and Firefox on GitHub, with an idle-work measurement in Chromium; a hidden PDF on desktop; unit tests locally.
+- **Known failures:** a desktop note test (`a note's pictures are found`) fails now and then: being compared against the code before the viewers.
+- **Unverified:** 3D in Firefox (no 3D graphics on the test machines); on screen by hand.
+- **Committed:** v0.54.36.
+- **Next bounded task:** read the `Tests` run.
+
 ## v0.54.35: PDFs and 3D models open in views of their own (2026-11-05)
 
 - **Implemented:** `src/ui/file-views.ts`, `file-panel.ts`, `view-state.ts`, `pdf-view.ts`, `model-view.ts`, `setting-rows.ts`; `src/assets/pdf-engine.ts`, `model-engine.ts`, `model-look.ts`; `PICTURE_KINDS`; `ImageObject.preview`; `CatalogEntry.viewer`.

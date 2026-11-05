@@ -2,20 +2,34 @@ import { MAX_MODEL_BYTES, ModelStage, firstLook, modelCardFit, readModel } from 
 import { LIGHT_PRESETS, MODEL_SECTIONS, defaultLook, readLook, writeLook } from "../assets/model-look";
 import type { ModelLook } from "../assets/model-look";
 import type { FileFacts, OpenView, ViewDeps, ViewPlace } from "./file-views";
-import { esc } from "./format";
 import { ICONS } from "./icons";
 import { openMoreMenu } from "./more-menu";
-import { bindSettingRow, settingRowHtml } from "./setting-rows";
+import { mountSettings } from "./setting-rows";
+import type { SettingValue } from "./setting-rows";
+import type { Section, Setting } from "../gen/types";
 import { keepViewState, toggledMark, viewStateOf } from "./view-state";
 import type { ViewState } from "./view-state";
 
 const KEEP_MS = 600;
-const SETTINGS = MODEL_SECTIONS.flatMap((s) => s.items);
+/** The cards of a turnaround. */
+const TURNAROUND = 8;
 
 /** A 3D model in its view: turned, zoomed and lit by hand; what it shows can be kept (its place is kept by itself), bookmarked, or shown on a card on a canvas. */
 export async function openModelView(el: HTMLElement, file: FileFacts, deps: ViewDeps, place: ViewPlace): Promise<OpenView> {
   if (file.blob.size > MAX_MODEL_BYTES) throw new Error("it is too large to open here");
   const model = await readModel(new Uint8Array(await file.blob.arrayBuffer()), file.name);
+  // The rows of its pose, from what its file holds; none when it has no animations.
+  const poseRows = (l: ModelLook): Section | null => {
+    if (!model.clips.length) return null;
+    const c = Math.min(model.clips.length - 1, l["clip"] as number);
+    return {
+      title: "Pose",
+      items: [
+        { t: "choice", k: "clip", label: "Animation", opts: model.clips.map((m, i) => [String(i), m.name || `Animation ${i + 1}`] as const), def: "0" },
+        { t: "range", k: "poseTime", label: "Time", min: 0, max: Math.max(0.01, Math.round(model.clips[c]!.duration * 100) / 100), step: 0.01, def: 0, usual: [0, 1] },
+      ],
+    };
+  };
   el.innerHTML = `<div class="model-view" data-testid="model-view">
     <div class="view-bar">
       <button type="button" class="layer-btn" data-m="fit" data-testid="model-fit" aria-label="Back to the first view" title="The camera back at the first view (or double-click the model)">${ICONS.maximize}</button>
@@ -23,8 +37,10 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
       <span class="view-gap"></span>
       <button type="button" class="layer-btn" data-m="mark" data-testid="model-mark" aria-label="Bookmark this view" aria-pressed="false" title="Bookmark this view, or take its bookmark off">${ICONS.bookmark}</button>
       <button type="button" class="layer-btn" data-m="marks" data-testid="model-marks" aria-haspopup="menu" aria-label="Go to" title="Bookmarked views">${ICONS.list}</button>
+      ${place.placeViews ? `<button type="button" class="layer-btn" data-m="turn" data-testid="model-turnaround" aria-label="Place a turnaround" title="Place a turnaround on the canvas: eight cards, this view from all around">${ICONS.rotate3d}</button>` : ""}
       ${place.setPreview ? `<button type="button" class="layer-btn" data-m="card" data-testid="model-card" aria-label="Show this view on the card" title="Show this view on the card on the canvas (this copy only)">${ICONS.image}</button>` : ""}
       <span class="view-gap"></span>
+      <button type="button" class="layer-btn" data-m="reset" data-testid="model-reset" aria-label="Reset the settings" title="Reset the settings of this view">${ICONS.listRestart}</button>
       <button type="button" class="layer-btn" data-m="side" data-testid="model-side-toggle" aria-pressed="true" aria-label="Settings" title="Show or hide the settings">${ICONS.slidersHorizontal}</button>
     </div>
     <div class="model-main">
@@ -49,6 +65,7 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
   let closed = false;
   let frame = 0;
   const paint = (): void => {
+    box.classList.toggle("is-mirrored", !!look["mirror"]);
     if (closed || frame) return;
     frame = requestAnimationFrame(() => {
       frame = 0;
@@ -66,20 +83,24 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
     clearTimeout(keepTimer);
     keepTimer = setTimeout(keep, KEEP_MS);
   };
-  const build = (): void => {
-    side.innerHTML = MODEL_SECTIONS.map((sec) => `<div class="adj-group"><h4>${esc(sec.title)}</h4>${sec.items.map((s) => settingRowHtml(s, look[s.k]!)).join("")}</div>`).join("");
-    for (const r of side.querySelectorAll<HTMLElement>("[data-k]")) {
-      const s = SETTINGS.find((x) => x.k === r.dataset["k"])!;
-      bindSettingRow(r, s, (k) => look[k]!, (k, v) => {
-        look = { ...look, [k]: v };
-        changed();
-      }, () => {
-        look = { ...look, [s.k]: defaultLook(first)[s.k]! };
-        build();
-        changed();
-      });
-    }
-  };
+  // (a choice's values are words: the animation is kept as its number)
+  const sections = (): readonly Section[] => MODEL_SECTIONS.flatMap((sec) => (sec.title === "Pose" ? (poseRows(look) ? [poseRows(look)!] : []) : [sec]));
+  const usual = (s: Setting): SettingValue => defaultLook(first)[s.k]!;
+  const rows = mountSettings(side, {
+    sections,
+    get: (k) => (k === "clip" ? String(look[k]) : look[k]!),
+    set: (k, v) => {
+      look = { ...look, [k]: k === "clip" ? Number(v) : v };
+      changed();
+      if (k === "surface" || k === "clip") build(); // (what it shows or hides, the length of the time)
+    },
+    reset: (keys) => {
+      look = { ...look, ...Object.fromEntries(keys.map((s) => [s.k, usual(s)])) };
+      changed();
+    },
+    idPrefix: "model-n-",
+  });
+  const build = (): void => rows.build();
   /** The numbers of the camera shown, after a drag. */
   const showCamera = (): void => {
     for (const k of ["yaw", "pitch", "zoom", "panX", "panY"]) for (const i of side.querySelectorAll<HTMLInputElement>(`[data-k="${k}"] input`)) i.value = String(look[k]);
@@ -99,9 +120,11 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
     drag.x = e.clientX;
     drag.y = e.clientY;
     if (drag.pan) {
+      // (mirrored, what is seen moves the other way: a drag still follows the hand)
+      const side = look["mirror"] ? -1 : 1;
       const k = 1.6 / (Math.max(1, Math.min(box.clientWidth, box.clientHeight)) * (look["zoom"] as number));
-      look = { ...look, panX: (look["panX"] as number) - dx * k, panY: (look["panY"] as number) + dy * k };
-    } else look = { ...look, yaw: Math.round(wrap((look["yaw"] as number) - dx * 0.4) * 10) / 10, pitch: Math.round(Math.max(-89, Math.min(89, (look["pitch"] as number) + dy * 0.4)) * 10) / 10 };
+      look = { ...look, panX: (look["panX"] as number) - side * dx * k, panY: (look["panY"] as number) + dy * k };
+    } else look = { ...look, yaw: Math.round(wrap((look["yaw"] as number) - (look["mirror"] ? -dx : dx) * 0.4) * 10) / 10, pitch: Math.round(Math.max(-89, Math.min(89, (look["pitch"] as number) + dy * 0.4)) * 10) / 10 };
     showCamera();
     changed();
   });
@@ -139,6 +162,10 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-m]");
     switch (b?.dataset["m"]) {
       case "fit": return toFirst();
+      case "reset":
+        look = defaultLook(first);
+        build();
+        return changed();
       case "lights":
         return openMoreMenu(b, LIGHT_PRESETS.map((p) => ({ label: p.label, hint: p.hint, icon: ICONS.lightbulb, run: () => {
           look = { ...look, ...p.look };
@@ -148,6 +175,10 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
       case "mark": return void toggleMark();
       case "marks":
         return openMoreMenu(b, state.marks.length ? state.marks.map((m) => ({ label: m.label, hint: "A bookmarked view", icon: ICONS.bookmark, run: () => go(m.at) })) : [{ label: "No bookmarks yet", hint: "Bookmark a view with the button beside this", icon: ICONS.bookmark, run: () => undefined }], "Go to");
+      case "turn": {
+        const fit = modelCardFit(box.clientWidth / Math.max(1, box.clientHeight));
+        return place.placeViews?.(Array.from({ length: TURNAROUND }, (_, i) => ({ preview: writeLook({ ...look, yaw: wrap((look["yaw"] as number) + (360 * i) / TURNAROUND) }) || "{}", size: fit })));
+      }
       case "card": return place.setPreview?.(writeLook(look) || "{}", modelCardFit(box.clientWidth / Math.max(1, box.clientHeight)));
       case "side": {
         side.hidden = !side.hidden;

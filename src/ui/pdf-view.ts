@@ -1,5 +1,8 @@
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from "pdfjs-dist";
-import { PDF_CARD_EDGE, openPdf, pageFit, pageSize, pdfTextLayer } from "../assets/pdf-engine";
+import { PDF_CARD_EDGE, needsPassword, openPdf, pageFit, pageSize, pageWords, pdfTextLayer } from "../assets/pdf-engine";
+import { pageList } from "../assets/pdf-pages";
+import { scrubNumbers } from "../colour-picker/scrub";
+import { promptDialog } from "./confirm";
 import type { FileFacts, OpenView, ViewDeps, ViewPlace } from "./file-views";
 import { ICONS } from "./icons";
 import { openMoreMenu } from "./more-menu";
@@ -12,6 +15,9 @@ const ZOOM_MAX = 6;
 /** The most pixels one page's picture takes: past it the page is a little soft at the highest zooms, rather than the memory gone. */
 const MAX_PAGE_PIXELS = 16e6;
 const KEEP_MS = 600;
+const REDRAW_MS = 150;
+/** The most cards one Place pages makes. */
+const MAX_PLACED_PAGES = 200;
 
 /** A page's place on show. */
 interface Slot {
@@ -25,29 +31,48 @@ interface Slot {
 
 /** A PDF in its view: its pages one under another, drawn when they come near and let go when they leave, their words selectable. */
 export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDeps, place: ViewPlace): Promise<OpenView> {
-  const doc: PDFDocumentProxy = await openPdf(new Uint8Array(await file.blob.arrayBuffer()));
-  const first = pageSize(await doc.getPage(1));
-  const count = doc.numPages;
+  const bytes = new Uint8Array(await file.blob.arrayBuffer());
+  // A password is asked for each time and kept nowhere.
+  let doc: PDFDocumentProxy | null = null;
+  for (let tried: string | undefined; !doc; ) {
+    try {
+      doc = await openPdf(bytes, tried);
+    } catch (e) {
+      if (!needsPassword(e)) throw e;
+      const given = await promptDialog({ title: "This PDF has a password", lines: [tried === undefined ? `Type the password of “${file.name}” to read it.` : "That password is not the one. Try again."], value: "", confirmLabel: "Open", secret: true });
+      if (given === null) throw new Error("it has a password");
+      tried = given;
+    }
+  }
+  const pdf = doc;
+  const first = pageSize(await pdf.getPage(1));
+  const count = pdf.numPages;
   el.innerHTML = `<div class="pdf-view" data-testid="pdf-view">
     <div class="view-bar">
       <button type="button" class="layer-btn" data-pdf="prev" aria-label="Previous page" title="Previous page (Page Up)">${ICONS.chevronUp}</button>
       <button type="button" class="layer-btn" data-pdf="next" aria-label="Next page" title="Next page (Page Down)">${ICONS.chevronDown}</button>
-      <input class="pdf-at" type="number" min="1" max="${count}" step="1" aria-label="Page" data-testid="pdf-page" /><span class="pdf-count">/ ${count}</span>
+      <label class="pdf-count">Page <input class="pdf-at" type="number" min="1" max="${count}" step="1" aria-label="Page" data-testid="pdf-page" /></label><span class="pdf-count">/ ${count}</span>
       <span class="view-gap"></span>
       <button type="button" class="layer-btn" data-pdf="out" aria-label="Zoom out" title="Zoom out (Ctrl+-)">${ICONS.minus}</button>
       <button type="button" class="layer-btn" data-pdf="fit" data-testid="pdf-fit" aria-label="Fit the width" title="Fit the width (Ctrl+0)">${ICONS.maximize}</button>
       <button type="button" class="layer-btn" data-pdf="in" aria-label="Zoom in" title="Zoom in (Ctrl++)">${ICONS.plus}</button>
       <span class="view-gap"></span>
+      <input class="pdf-find" type="search" placeholder="Find" aria-label="Find in this PDF" data-testid="pdf-find" /><span class="pdf-count" data-testid="pdf-found"></span>
+      <span class="view-gap"></span>
       <button type="button" class="layer-btn" data-pdf="mark" data-testid="pdf-mark" aria-label="Bookmark this page" aria-pressed="false" title="Bookmark this page, or take its bookmark off">${ICONS.bookmark}</button>
       <button type="button" class="layer-btn" data-pdf="marks" data-testid="pdf-marks" aria-haspopup="menu" aria-label="Go to" title="Bookmarks, and the contents of this PDF">${ICONS.list}</button>
+      ${place.placeViews ? `<button type="button" class="layer-btn" data-pdf="place" data-testid="pdf-place" aria-label="Place pages on the canvas" title="Place pages on the canvas: a card for each">${ICONS.layoutGrid}</button>` : ""}
       ${place.setPreview ? `<button type="button" class="layer-btn" data-pdf="card" data-testid="pdf-card" aria-label="Show this page on the card" title="Show this page on the card on the canvas (this copy only)">${ICONS.image}</button>` : ""}
     </div>
     <div class="pdf-pages" tabindex="0" data-testid="pdf-pages"></div>
   </div>`;
   const root = el.querySelector<HTMLElement>(".pdf-view")!;
+  scrubNumbers(root.querySelector<HTMLElement>(".view-bar")!);
   const pages = root.querySelector<HTMLElement>(".pdf-pages")!;
   const input = root.querySelector<HTMLInputElement>(".pdf-at")!;
   const markBtn = root.querySelector<HTMLElement>('[data-pdf="mark"]')!;
+  const finder = root.querySelector<HTMLInputElement>(".pdf-find")!;
+  const found = root.querySelector<HTMLElement>('[data-testid="pdf-found"]')!;
   let zoom: number | "fit" = "fit";
   const hash = file.hash;
   let state: ViewState = viewStateOf(await deps.session.catalog?.entry(hash).catch(() => undefined));
@@ -73,10 +98,13 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     s.el.style.width = `${z.w * k}px`;
     s.el.style.height = `${z.h * k}px`;
   };
+  const pagesRead = new Map<number, PDFPageProxy>();
   const release = (s: Slot): void => {
     s.turn++;
     s.task?.cancel();
     s.task = null;
+    pagesRead.get(s.n)?.cleanup(); // (what the page's drawing held: it is read again when it comes back)
+    pagesRead.delete(s.n);
     if (s.canvas) (s.canvas.width = s.canvas.height = 0);
     s.canvas = null;
     s.el.replaceChildren();
@@ -86,11 +114,12 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     const turn = ++s.turn;
     let page: PDFPageProxy;
     try {
-      page = await doc.getPage(s.n);
+      page = await pdf.getPage(s.n);
     } catch {
       return;
     }
     if (closed || turn !== s.turn) return;
+    pagesRead.set(s.n, page);
     const z = pageSize(page);
     sizes.set(s.n, z);
     sized(s);
@@ -120,8 +149,93 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     s.el.dataset["drawn"] = "1";
     const TextLayer = await pdfTextLayer();
     if (closed || turn !== s.turn) return;
-    void new TextLayer({ textContentSource: page.streamTextContent(), container: layer, viewport: page.getViewport({ scale: k }) }).render().catch(() => undefined);
+    void new TextLayer({ textContentSource: page.streamTextContent(), container: layer, viewport: page.getViewport({ scale: k }) }).render().then(paintFound, () => undefined);
+    void addLinks(page, s, turn, k);
   };
+  /** A PDF's links, over its page: to a page in it, gone to; to the web, said (canvast does not go online). */
+  const addLinks = async (page: PDFPageProxy, s: Slot, turn: number, k: number): Promise<void> => {
+    const notes = await page.getAnnotations().catch(() => []);
+    if (closed || turn !== s.turn) return;
+    const viewport = page.getViewport({ scale: k });
+    for (const a of notes as Array<{ subtype: string; rect: number[]; url?: string; dest?: unknown }>) {
+      if (a.subtype !== "Link" || (!a.url && !a.dest)) continue;
+      const [x1, y1] = viewport.convertToViewportPoint(a.rect[0]!, a.rect[1]!) as [number, number];
+      const [x2, y2] = viewport.convertToViewportPoint(a.rect[2]!, a.rect[3]!) as [number, number];
+      const link = document.createElement("button");
+      link.type = "button";
+      link.className = "pdf-link";
+      link.setAttribute("aria-label", a.url ? `Link to ${a.url}` : "Link to a page");
+      link.title = a.url ?? "Go to this page";
+      Object.assign(link.style, { left: `${Math.min(x1, x2)}px`, top: `${Math.min(y1, y2)}px`, width: `${Math.abs(x2 - x1)}px`, height: `${Math.abs(y2 - y1)}px` });
+      link.addEventListener("click", () => void follow(a.url, a.dest));
+      s.el.append(link);
+    }
+  };
+  const follow = async (url: string | undefined, dest: unknown): Promise<void> => {
+    if (url) {
+      deps.session.editor.message = `Links to the web are not opened from a PDF (canvast does not go online): ${url}`;
+      return deps.session.editor.changed();
+    }
+    const target = typeof dest === "string" ? await pdf.getDestination(dest).catch(() => null) : (dest as Awaited<ReturnType<PDFDocumentProxy["getDestination"]>>);
+    const ref = target?.[0] as number | Parameters<PDFDocumentProxy["getPageIndex"]>[0] | undefined;
+    const at = typeof ref === "number" ? ref : ref ? await pdf.getPageIndex(ref).catch(() => null) : null;
+    if (at !== null) show(at + 1);
+  };
+  // ---- find: each page's words read once, the page found shown, what matches marked in its words where the browser can
+  const words = new Map<number, string>();
+  const wordsOf = async (n: number): Promise<string> => {
+    if (!words.has(n)) words.set(n, (await pageWords(await pdf.getPage(n)).catch(() => "")).toLowerCase());
+    return words.get(n)!;
+  };
+  let finding = 0;
+  const paintFound = (): void => {
+    const marks = (CSS as unknown as { highlights?: Map<string, unknown> }).highlights;
+    const Highlight = (window as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight;
+    if (!marks || !Highlight) return;
+    const q = finder.value.trim().toLowerCase();
+    const ranges: Range[] = [];
+    // shortcut: words split across two runs of the page's text are found (the page is shown) but not marked; join the runs if it matters.
+    if (q) for (const s of near) for (const t of s.el.querySelectorAll(".textLayer span")) {
+      const node = t.firstChild;
+      if (node?.nodeType !== Node.TEXT_NODE) continue;
+      const text = node.textContent!.toLowerCase();
+      for (let i = text.indexOf(q); i >= 0; i = text.indexOf(q, i + q.length)) {
+        const r = document.createRange();
+        r.setStart(node, i);
+        r.setEnd(node, i + q.length);
+        ranges.push(r);
+      }
+    }
+    marks.set("canvast-find", new Highlight(...ranges));
+  };
+  const find = async (dir: 1 | -1, from: number): Promise<void> => {
+    const turn = ++finding, q = finder.value.trim().toLowerCase();
+    if (!q) {
+      found.textContent = "";
+      return paintFound();
+    }
+    found.textContent = "…";
+    for (let i = 0; i < count; i++) {
+      const n = ((from - 1 + dir * i + count * 2) % count) + 1;
+      const has = (await wordsOf(n)).includes(q);
+      if (closed || turn !== finding) return;
+      if (has) {
+        show(n);
+        found.textContent = `Page ${n}`;
+        return paintFound();
+      }
+    }
+    found.textContent = "Not found";
+    paintFound();
+  };
+  finder.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      void find(e.shiftKey ? -1 : 1, current + (e.shiftKey ? -1 : found.textContent?.startsWith("Page") ? 1 : 0));
+    }
+  });
+  finder.addEventListener("input", () => void find(1, current));
   const near = new Set<Slot>();
   const watcher = new IntersectionObserver(
     (seen) => {
@@ -138,12 +252,16 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     },
     { root: pages, rootMargin: "100% 0px" },
   );
-  /** All sized again, and what is near drawn again at the new size, the same page staying in view. */
+  /** All sized again at once, the same page staying in view, and what is near drawn again when the size has settled (a panel being dragged wider changes it each frame). */
+  let redrawTimer: ReturnType<typeof setTimeout> | undefined;
   const layout = (): void => {
     const keep = current;
     for (const s of slots) sized(s);
-    for (const s of near) void draw(s);
     show(keep);
+    clearTimeout(redrawTimer);
+    redrawTimer = setTimeout(() => {
+      for (const s of near) void draw(s);
+    }, REDRAW_MS);
   };
   const show = (n: number): void => {
     const s = slots[Math.max(1, Math.min(count, n)) - 1]!;
@@ -197,15 +315,26 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     const walk = async (items: Awaited<ReturnType<PDFDocumentProxy["getOutline"]>> | undefined, depth: number): Promise<void> => {
       for (const it of items ?? []) {
         if (out.length >= 200) return;
-        const dest = typeof it.dest === "string" ? await doc.getDestination(it.dest).catch(() => null) : it.dest;
+        const dest = typeof it.dest === "string" ? await pdf.getDestination(it.dest).catch(() => null) : it.dest;
         const ref = dest?.[0] as number | Parameters<PDFDocumentProxy["getPageIndex"]>[0] | undefined;
-        const at = typeof ref === "number" ? ref : ref ? await doc.getPageIndex(ref).catch(() => null) : null;
+        const at = typeof ref === "number" ? ref : ref ? await pdf.getPageIndex(ref).catch(() => null) : null;
         if (at !== null) out.push({ label: `${"  ".repeat(depth)}${it.title}`, page: at + 1 });
         await walk(it.items, depth + 1);
       }
     };
-    await walk(await doc.getOutline().catch(() => null) ?? undefined, 0);
+    await walk(await pdf.getOutline().catch(() => null) ?? undefined, 0);
     return out;
+  };
+  const placePages = async (): Promise<void> => {
+    const asked = await promptDialog({ title: "Place pages on the canvas", lines: [`A card for each page, of ${count}: for example 1-4, 9`], value: `${current}`, confirmLabel: "Place" });
+    if (asked === null) return;
+    const list = pageList(asked, count).slice(0, MAX_PLACED_PAGES);
+    if (!list.length) {
+      deps.session.editor.message = "No such pages.";
+      return deps.session.editor.changed();
+    }
+    const items = await Promise.all(list.map(async (n) => ({ preview: String(n), size: pageFit(pageSize(await pdf.getPage(n)), PDF_CARD_EDGE) })));
+    place.placeViews?.(items);
   };
   root.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-pdf]");
@@ -216,6 +345,8 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
       case "in": return setZoom(1);
       case "fit": return setZoom(0);
       case "mark": return void toggleMark();
+      case "place":
+        return void placePages();
       case "card": {
         const z = sizes.get(current) ?? first;
         return place.setPreview?.(String(current), pageFit(z, PDF_CARD_EDGE));
@@ -243,15 +374,23 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     close: () => {
       closed = true;
       clearTimeout(keepTimer);
+      clearTimeout(redrawTimer);
       keep();
       watcher.disconnect();
       resized.disconnect();
       for (const s of slots) release(s);
       el.replaceChildren();
-      void doc.loadingTask.destroy();
+      finding++;
+      (CSS as unknown as { highlights?: Map<string, unknown> }).highlights?.delete("canvast-find");
+      void pdf.loadingTask.destroy();
     },
     zoom: setZoom,
     key: (e) => {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "f" || e.key === "F")) {
+        finder.focus();
+        finder.select();
+        return true;
+      }
       if (e.ctrlKey || e.metaKey || e.altKey || (e.target as HTMLElement).closest("input")) return false;
       if (e.key === "PageDown") show(current + 1);
       else if (e.key === "PageUp") show(current - 1);

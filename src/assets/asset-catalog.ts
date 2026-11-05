@@ -299,6 +299,8 @@ export interface MetaChange {
   thumb?: string | null;
   /** See `CatalogEntry.viewer`; "": nothing. */
   viewer?: string;
+  /** The picture of a file card, once its real shape is known. */
+  cardSize?: { w: number; h: number };
 }
 
 /** The two passwords: of the Hidden items, and of the whole workspace (asked when the app opens). */
@@ -515,6 +517,7 @@ export class AssetCatalog implements CatalogStore {
         if (change.favorite !== undefined) next.favorite = change.favorite;
         if (change.thumb !== undefined) next.thumb = change.thumb;
         if (change.viewer !== undefined) (change.viewer ? (next.viewer = change.viewer) : delete next.viewer);
+        if (change.cardSize) ((next.pixelW = change.cardSize.w), (next.pixelH = change.cardSize.h));
         if (change.hidden !== undefined) next.hidden = change.hidden;
         // Shown again from a hidden folder: that folder and the ones above it are shown again too (their other items stay hidden).
         if (change.hidden === false && m.folderIds.length) {

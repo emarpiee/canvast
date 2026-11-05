@@ -7,7 +7,7 @@ import { esc } from "./format";
 import { scrubNumbers } from "../colour-picker/scrub";
 import { ICONS } from "./icons";
 import type { TextureMode, TextureSource, TexturePaint, TextureVary, TileAlign, TileType } from "../doc/texture";
-import { MAX_SCALE, MAX_SPACING, MAX_VARY_JITTER, MAX_VARY_ROTATION, MAX_VARY_SIZE, MAX_VARY_SKIP, MIN_SCALE, TEXTURE_MODES, TILE_ALIGNS, TILE_TYPES, noVary } from "../doc/texture";
+import { MAX_SCALE, MAX_SPACING, MAX_VARY_JITTER, MAX_VARY_ROTATION, MAX_VARY_SIZE, MAX_VARY_SKIP, MIN_SCALE, TEXTURE_MODES, TILE_ALIGNS, TILE_TYPES, noVary , newTexture } from "../doc/texture";
 
 /** What the app gives the editor: the person's choices on the canvas and in files, and words for a source. */
 export interface TextureHooks {
@@ -117,9 +117,9 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
   let t = o.value;
   const shows = (f: { tiled?: true; objects?: true; image?: true }): boolean => (!f.objects || o.kind === "objects") && (!f.image || o.kind === "image");
   const number = (f: Field, extra = ""): string =>
-    shows(f) ? `<div class="adj-row" data-tex-row="${f.key}"${f.tiled ? " data-tiled" : ""}><label class="adj-label" for="tex-${f.key}">${f.label}</label>${extra || "<span></span>"}<input type="number" class="adj-num" id="tex-${f.key}" data-tex-num="${f.key}" min="${f.min}" max="${f.max}" step="${f.step}" aria-label="${f.label}"></div>` : "";
+    shows(f) ? `<div class="adj-row" data-tex-row="${f.key}"${f.tiled ? " data-tiled" : ""}><label class="adj-label" title="Double-click to reset" for="tex-${f.key}">${f.label}</label>${extra || "<span></span>"}<input type="number" class="adj-num" id="tex-${f.key}" data-tex-num="${f.key}" min="${f.min}" max="${f.max}" step="${f.step}" aria-label="${f.label}"></div>` : "";
   const select = (c: Choice): string =>
-    shows(c) ? `<div class="adj-row" data-tex-row="${c.key}"${c.tiled ? " data-tiled" : ""}><label class="adj-label" for="tex-${c.key}">${c.label}</label><select id="tex-${c.key}" data-tex-sel="${c.key}" aria-label="${c.label}">${c.items.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</select><span></span></div>` : "";
+    shows(c) ? `<div class="adj-row" data-tex-row="${c.key}"${c.tiled ? " data-tiled" : ""}><label class="adj-label" title="Double-click to reset" for="tex-${c.key}">${c.label}</label><select id="tex-${c.key}" data-tex-sel="${c.key}" aria-label="${c.label}">${c.items.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("")}</select><span></span></div>` : "";
   const vary = [VARY_CHOICES[0]!, ...VARY_FIELDS.slice(0, -1)].map((f) => ("items" in f ? select(f) : number(f))).join("") + select(VARY_CHOICES[1]!) + select(VARY_CHOICES[2]!)
     + number(VARY_FIELDS.at(-1)!, `<button type="button" class="tex-newseed" data-tex-newseed aria-label="New seed" title="New seed: the same settings, other copies">${ICONS.shuffle}</button>`);
   el.innerHTML = `
@@ -130,7 +130,7 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
       <p class="op-note" data-tex-note role="status"></p>
     </div>
     <div class="tex-fields">
-      <div class="tex-random"><button type="button" class="colour-save" data-tex-random title="Randomize the options: scale, turn, place, space, grid and how each copy varies">${ICONS.dice5}<span>Randomize</span></button></div>
+      <div class="tex-random"><button type="button" class="colour-save" data-tex-random title="Randomize the options: scale, turn, place, space, grid and how each copy varies">${ICONS.dice5}<span>Randomize</span></button><button type="button" class="colour-save" data-tex-reset data-testid="tex-reset" title="Reset the options; or double-click one's name for that one">${ICONS.listRestart}<span>Reset</span></button></div>
       ${select(CHOICES[0]!)}
       ${FIELDS.map((f) => number(f)).join("")}
       ${select(CHOICES[1]!)}
@@ -179,6 +179,17 @@ export function createTextureEditor(o: TextureEditorOptions): { el: HTMLElement;
   // Randomize: any mode (a picture), scale, turn, place, space, grid and align; one undo step.
   const pickOf = <T>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)]!;
   const between = (lo: number, hi: number): number => lo + Math.random() * (hi - lo);
+  // Reset: as a new texture of this source; a double-click on a name: only that setting.
+  const usual = (now: TexturePaint): TexturePaint => newTexture(now.src, hooks?.avg(now.src) ?? "#808080");
+  q("[data-tex-reset]").addEventListener("click", () => void (t && change(usual(t), true)));
+  el.addEventListener("dblclick", (e) => {
+    const key = (e.target as HTMLElement).closest(".adj-label") && (e.target as HTMLElement).closest<HTMLElement>("[data-tex-row]")?.dataset["texRow"];
+    if (!key || !t) return;
+    const field = [...FIELDS, ...VARY_FIELDS].find((f) => f.key === key);
+    const choice = SELECTS.find((c) => c.key === key);
+    if (field) change(field.set(t, field.get(usual(t))), true);
+    else if (choice) change(choice.set(t, choice.get(usual(t))), true);
+  });
   q("[data-tex-random]").addEventListener("click", () => {
     if (!t) return;
     const mode: TextureMode = o.kind === "image" ? pickOf(TEXTURE_MODES) : "tile";

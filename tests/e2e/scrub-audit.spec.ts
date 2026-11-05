@@ -77,6 +77,22 @@ test("audit: every number field of the app scrubs (lists the ones that do not)",
     await scan(`Settings: ${(await tab.innerText()).trim()}`);
   }
   const seen = new Set<string>();
+  // A PDF's and a 3D model's views (their settings, where this machine has 3D graphics).
+  await p.keyboard.press("Escape");
+  await p.getByTestId("view-assets").click();
+  const tinyPdf = "%PDF-1.4\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Count 1 /Kids [3 0 R] >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n";
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "audit.pdf", mimeType: "application/pdf", buffer: Buffer.from(tinyPdf, "latin1") });
+  await p.locator('[data-testid="asset-card"][title="audit.pdf"]').dblclick({ timeout: 15_000 });
+  await expect(p.getByTestId("pdf-page")).toBeVisible();
+  await scan("a PDF's view");
+  await p.keyboard.press("Escape");
+  if (await p.evaluate(() => !!document.createElement("canvas").getContext("webgl2"))) {
+    await p.getByTestId("assets-import-input").setInputFiles({ name: "audit.stl", mimeType: "model/stl", buffer: Buffer.from("solid a\nfacet normal 0 0 1\nouter loop\nvertex 0 0 0\nvertex 1 0 0\nvertex 0 1 0\nendloop\nendfacet\nendsolid a\n") });
+    await p.locator('[data-testid="asset-card"][title="audit.stl"]').dblclick({ timeout: 15_000 });
+    await expect(p.getByTestId("model-side")).toBeVisible();
+    await scan("a 3D model's view");
+    await p.keyboard.press("Escape");
+  }
   const unique = found.filter((f) => !seen.has(`${f.where}|${f.label}`) && seen.add(`${f.where}|${f.label}`));
   console.log(`SCRUB AUDIT, fields looked at: ${Object.entries(checked).map(([k, n]) => `${k}: ${n}`).join("; ")}`);
   console.log(`SCRUB AUDIT: ${unique.length} number field(s) cannot be dragged:\n${unique.map((f) => `  ${f.where} — ${f.label} (${f.kind})`).join("\n")}`);

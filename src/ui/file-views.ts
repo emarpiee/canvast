@@ -1,5 +1,5 @@
 import { isModelFile, isPdfFile } from "../assets/file-kind";
-import { noteKindOf, opensAsNote } from "../notes/note-file";
+import { noteKindOf, opensAsNote, tooBigForNote } from "../notes/note-file";
 import { OpenNote } from "./note-session";
 import type { NoteDeps, NotePlace } from "./note-session";
 import type { ViewMark } from "./view-state";
@@ -13,7 +13,11 @@ import type { ViewMark } from "./view-state";
 export type ViewPlace = NotePlace & {
   /** The object on a canvas it was opened from can show what is in view (doc/model.ts `preview`). */
   setPreview?(preview: string, size: { w: number; h: number }): void;
+  /** Cards of this file put on the canvas, one showing each (a PDF's pages, a model's turnaround). */
+  placeViews?(items: ReadonlyArray<{ preview: string; size: { w: number; h: number } }>): void;
 };
+/** What a place on a canvas can do with the card it was opened from. */
+export type CardActions = Pick<ViewPlace, "setPreview" | "placeViews">;
 export type ViewDeps = NoteDeps;
 
 /** A file open in its view. */
@@ -55,6 +59,9 @@ export interface FileViewKind {
   named(name: string): boolean;
   /** Whether this file opens here. */
   claims(file: FileFacts): Promise<boolean> | boolean;
+  /** Its words, for the library's search; absent, or the file `tooBig`: it is found by its name. */
+  words?(blob: Blob, name: string): Promise<string>;
+  tooBig?(name: string, size: number): boolean;
   open(el: HTMLElement, file: FileFacts, deps: ViewDeps, place: ViewPlace): Promise<OpenView>;
 }
 
@@ -65,6 +72,11 @@ const KINDS: readonly FileViewKind[] = [
     marks: false,
     named: (name) => !!noteKindOf(name),
     claims: (f) => opensAsNote(f.name, f.blob),
+    words: async (blob, name) => {
+      const text = await blob.text();
+      return noteKindOf(name) === "rich" ? (new DOMParser().parseFromString(text, "text/html").body.textContent ?? "") : text;
+    },
+    tooBig: tooBigForNote,
     open: (el, f, deps, place) => OpenNote.open(el, f.hash, f.name, f.blob, deps, place),
   },
   {
@@ -73,6 +85,8 @@ const KINDS: readonly FileViewKind[] = [
     marks: true,
     named: (name) => isPdfFile({ name }),
     claims: (f) => isPdfFile(f),
+    words: async (blob) => (await import("../assets/pdf-engine")).pdfWords(new Uint8Array(await blob.arrayBuffer())),
+    tooBig: (_name, size) => size > 128 * 2 ** 20,
     open: async (el, f, deps, place) => (await import("./pdf-view")).openPdfView(el, f, deps, place),
   },
   {

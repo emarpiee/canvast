@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.54.36 — PDF and 3D tools, less work when idle (2026-11-05)
+
+- **Added:** in a PDF, Ctrl+F finds in it, links inside it are followed, a password is asked for, and **Place pages** puts a card for each page on the canvas; the library's search finds a PDF's words.
+- **Added:** for 3D study, **Tones** shows light in 2 to 5 flat steps of value, **Mirror** flips the picture, a pose can be chosen from a file's animations, and **Place a turnaround** puts eight cards from all around on the canvas.
+- **Fixed:** a card's chosen page or view was lost by its copies (Alt+drag, Duplicate, paste) and when the canvas was opened again, and such a copy kept the view drawing without end, using the processor while nothing was happening. Any picture asked for smaller than it is now ends that wait.
+- **Fixed:** a PDF imported earlier takes its first page's shape in the library and on its cards.
+- **Fixed:** the view no longer works when nothing is happening: background thumbnails skip PDFs and 3D models until their cards show, pictures of them are drawn one at a time from a file kept open a moment, a 3D drag no longer makes its lights and canvas again each frame, a PDF redraws only when its size settles, and PDFs are read for the search when the page is quiet.
+- **Changed:** settings rows, a double-click to reset one, a group's Reset and draggable numbers are one shared piece for the Pattern panel and the 3D view; the Adjust panel has the same group header. A 3D view, a texture fill and a font's axes gain resets; a PDF's page and a 3D view's numbers can be dragged.
+
 ## 0.54.35 — PDFs and 3D models open in views of their own (2026-11-05)
 
 - **Added:** PDFs show their first page in the library and the details, and their card on a canvas takes the page's shape. They open in a reader, in the viewer and in the panel on a canvas: pages, zoom, selectable words, the page it was left at, bookmarks (also in the details) and the PDF's own contents.

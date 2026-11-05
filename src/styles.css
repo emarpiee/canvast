@@ -3197,3 +3197,7 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .model-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .model-side { flex: none; width: calc(var(--ctl) * 12); overflow-y: auto; border-left: 1px solid var(--hud-border); }
 .model-side[hidden] { display: none; }
+.model-stage.is-mirrored canvas { transform: scaleX(-1); }
+.pdf-find { width: calc(var(--ctl) * 5); height: var(--field-h); }
+.pdf-link { position: absolute; padding: 0; background: none; border: none; cursor: pointer; z-index: 1; }
+::highlight(canvast-find) { background: var(--hud-accent); color: transparent; }

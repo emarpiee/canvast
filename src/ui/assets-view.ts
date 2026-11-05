@@ -21,7 +21,7 @@ import { itemsIn, justifiedLayout, listLayout, nearestInRow, rowOf, squaresLayou
 import { newNoteName, storeFrame } from "../app/frames";
 import { artFullPicture, isArtFile } from "../assets/art-preview";
 import { externalFolder } from "../storage/external-folder";
-import { AUTO_COPY_NOTE, chipOf, describeFile, extOf, hasThumb, isAutoCopy, isCard, isFontFile } from "../assets/file-kind";
+import { isModelFile, isPdfFile, AUTO_COPY_NOTE, chipOf, describeFile, extOf, hasThumb, isAutoCopy, isCard, isFontFile } from "../assets/file-kind";
 import { FILE_CARD_NOTE } from "../assets/card";
 import { FONT_SAMPLES, fontSampleHtml, showFont } from "./font-specimen";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actions";
@@ -58,6 +58,9 @@ import { confirmDialog } from "./confirm";
 import { runExport, runExportFiles, runExportFolder } from "./archive-ui";
 import { openLibraryPicker } from "./library-picker";
 import { viewKindNamed, viewKindOf } from "./file-views";
+import { placeCardViews } from "../app/actions";
+import { FILE_CARD_H, FILE_CARD_W } from "../assets/card";
+import { PDF_CARD_EDGE, pageFit } from "../assets/pdf-engine";
 import { keepViewState, viewStateOf } from "./view-state";
 import type { FileViewKind, OpenView, ViewDeps, ViewPlace } from "./file-views";
 
@@ -890,6 +893,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         if (!rec) throw new Error("missing");
         const made = await makeThumb(rec);
         if (made) {
+          // A PDF imported before its pages were drawn: its item takes its first page's shape.
+          if (isPdfFile(rec) && rec.pixelW === FILE_CARD_W && rec.pixelH === FILE_CARD_H && !session.readOnly) {
+            const fit = pageFit({ w: made.w, h: made.h }, PDF_CARD_EDGE);
+            void session.catalog?.updateMeta(hash, { cardSize: fit }).catch(() => undefined);
+          }
           if (!noteKindOf(rec.name)) void session.catalog?.putThumb(made).catch(() => undefined);
           return URL.createObjectURL(made.blob);
         }
@@ -977,13 +985,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const noteWords = new Map<string, string>();
   let readingWords = false;
   const ensureNoteWords = (entries: readonly CatalogListing["entries"][number][]): void => {
-    const todo = readingWords ? [] : entries.filter((e) => e.present && noteKindOf(e.name) && !tooBigForNote(e.name, e.size) && !noteWords.has(e.hash) && meta(e).hidden === hiddenMode);
+    const readable = (e: CatalogListing["entries"][number]): boolean => { const k = viewKindNamed(e.name); return !!k?.words && !k.tooBig?.(e.name, e.size); };
+    const todo = readingWords ? [] : entries.filter((e) => e.present && readable(e) && !noteWords.has(e.hash) && meta(e).hidden === hiddenMode);
     if (!todo.length) return;
     readingWords = true;
     void (async () => {
       for (const e of todo) {
-        const text = (await (await assets.record(e.hash).catch(() => undefined))?.blob.text()) ?? "";
-        noteWords.set(e.hash, (noteKindOf(e.name) === "rich" ? (new DOMParser().parseFromString(text, "text/html").body.textContent ?? "") : text).toLowerCase());
+        // (a search given up leaves the rest for the next one; a PDF is read when the page is quiet, one at a time)
+        if (!search.value.trim()) break;
+        const rec = await assets.record(e.hash).catch(() => undefined);
+        const text = rec ? await viewKindNamed(e.name)!.words!(rec.blob, e.name).catch(() => "") : "";
+        noteWords.set(e.hash, text.toLowerCase());
+        if (isPdfFile(e)) {
+          render();
+          await new Promise((go) => (typeof requestIdleCallback === "function" ? requestIdleCallback(go, { timeout: 1000 }) : setTimeout(go, 100)));
+        }
       }
       readingWords = false;
       render();
@@ -1091,6 +1107,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     },
     refresh: () => refresh(),
     hidden: () => hiddenMode,
+    // (from the library, a first card is placed for them to stand beside)
+    placeViews: (items) => {
+      const hash = note?.hash;
+      if (!hash) return;
+      void leaveNote().then(async (ok) => {
+        if (!ok) return;
+        const id = await session.placeAsset(hash);
+        const o = id ? session.doc.get(id) : undefined;
+        if (o?.kind !== "image") return;
+        closeSlide();
+        showCanvas();
+        session.editor.select(placeCardViews(session.doc, o, items).map((c) => c.id));
+        session.editor.changed();
+      });
+    },
   };
   /** The link cards of the item described: what links to it (Linked from) and, for a note, what it links to (Links). Each row opens in the viewer. */
   let lastLinks: { hash: string; hiddenMode: boolean; cards: LinkCards } | null = null;
@@ -2051,6 +2082,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const have = new Set(await session.catalog.thumbHashes().catch(() => []));
     for (const e of listing.entries) {
       if (have.has(e.hash) || !e.present || !hasThumb(e) || meta(e).hidden || thumbUrls.has(e.hash)) continue;
+      if (isPdfFile(e) || isModelFile(e.name)) continue; // (each takes reading and drawing a whole file: made when its card comes into view)
       thumbFor(e.hash, always, false).then((url) => keepThumbUrl(e.hash, url), () => undefined);
     }
   };

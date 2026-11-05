@@ -134,7 +134,7 @@ async function encodeThumb(hash: string, c: HTMLCanvasElement): Promise<ThumbRec
 
 /** The thumbnail of a file whose card is drawn from its bytes (assets/adapters.ts): that picture, smaller. */
 async function makePictureThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
-  const bmp = await makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, new Uint8Array(await rec.blob.arrayBuffer()), { edge: THUMB_PX });
+  const bmp = await makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, async () => new Uint8Array(await rec.blob.arrayBuffer()), { edge: THUMB_PX, hash: rec.hash });
   const c = document.createElement("canvas");
   c.width = bmp.width;
   c.height = bmp.height;

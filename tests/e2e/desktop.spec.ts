@@ -1083,6 +1083,47 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
   }
 });
 
+test("a hidden PDF opens in its view in hidden mode, with nothing of it readable on the disk", async () => {
+  const ws = tempDir("canvast-ws-");
+  const word = "HiddenWordInsideThePdf";
+  const text = `BT /F1 20 Tf 10 50 Td (${word}) Tj ET`;
+  const objs = ["", "<< /Type /Catalog /Pages 2 0 R >>", "<< /Type /Pages /Count 1 /Kids [3 0 R] >>", "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 300 100] /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /Contents 4 0 R >>", `<< /Length ${text.length} >>\nstream\n${text}\nendstream`];
+  let out = "%PDF-1.4\n";
+  const at: number[] = [];
+  for (let i = 1; i < objs.length; i++) {
+    at[i] = out.length;
+    out += `${i} 0 obj\n${objs[i]}\nendobj\n`;
+  }
+  const xref = out.length;
+  out += `xref\n0 5\n0000000000 65535 f \n${[1, 2, 3, 4].map((n) => `${String(at[n]).padStart(10, "0")} 00000 n \n`).join("")}trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  const { app, page } = await launch(ws);
+  try {
+    await page.getByTestId("import-input").setInputFiles({ name: "secret.pdf", mimeType: "application/pdf", buffer: Buffer.from(out, "latin1") });
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(1);
+    const hash = await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries[0]!.hash));
+    await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"));
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), hash);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await page.getByTestId("view-assets").click();
+    await page.getByTestId("assets-search").fill("hidden:");
+    await page.getByTestId("prompt-input").fill("pw");
+    await page.getByTestId("prompt-ok").click();
+    const card = page.locator(`[data-testid="asset-card"][data-hash="${hash}"]`);
+    await expect(card).toHaveCount(1);
+    await card.dblclick();
+    await expect(page.locator('.pdf-page[data-page="1"] .textLayer')).toContainText(word);
+    await page.getByTestId("pdf-mark").click();
+    await page.waitForTimeout(800);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    // Nothing of it is plain on the disk: not its file, its words or its name.
+    await expect.poll(() => files(ws).filter((f) => f.endsWith(".pdf"))).toEqual([]);
+    expect(files(ws).filter((f) => readFileSync(join(ws, f)).includes(word))).toEqual([]);
+    expect(files(ws).filter((f) => f === "library.json" || f.endsWith("/library.json")).filter((f) => readFileSync(join(ws, f)).includes("secret.pdf"))).toEqual([]);
+  } finally {
+    await app.close();
+  }
+});
+
 test("a hidden item's picture is not read while locked, so after a restart its card shows in hidden mode; its thumbnail is kept encrypted", async () => {
   const ws = tempDir("canvast-ws-");
   const pic = (k: number) => makePng(600, 400, (x, y) => [(x * k) % 256, y % 256, 120, 255]); // (bigger than a thumbnail: one is made)
