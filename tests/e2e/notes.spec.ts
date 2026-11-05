@@ -1203,3 +1203,33 @@ test("Ctrl+F in an open note finds in that note with the focus off its words, in
   await p.keyboard.press("Control+f");
   await expect.poll(inFind).toBe(true);
 });
+
+test("selected words: a sign typed over them goes round them, a format in a note that has them; the floating bar's Code", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles([{ name: "signs.md", mimeType: "text/markdown", buffer: Buffer.from("first\n\nsecond\n\nthird\n") }, { name: "plain.txt", mimeType: "text/plain", buffer: Buffer.from("words\n") }]);
+  await p.locator('[data-testid="asset-card"][title="signs.md"]').dblclick();
+  const para = (n: number) => page(p).locator("p").nth(n);
+  await expect(para(2)).toHaveText("third");
+  await para(0).selectText();
+  await p.keyboard.type('"');
+  await expect(para(0)).toHaveText('"first"');
+  await p.keyboard.type("(");
+  await expect(para(0), "still selected: another goes round it").toHaveText('("first")');
+  await para(1).selectText();
+  await p.keyboard.type("*");
+  await expect(para(1).locator("em")).toHaveText("second");
+  await p.keyboard.type("*");
+  await expect(para(1).locator("strong"), "twice: bold").toHaveText("second");
+  await expect(para(1).locator("em")).toHaveCount(0);
+  await para(2).selectText();
+  await p.keyboard.type("`");
+  await expect(para(2).locator("code")).toHaveText("third");
+  // The floating bar's button takes it off and puts it back.
+  const code = note(p).locator('[data-command="noteCode"]:visible').first();
+  await para(2).selectText();
+  await expect(code).toBeVisible();
+  await code.click();
+  await expect(para(2).locator("code")).toHaveCount(0);
+  expect(app.consoleErrors).toEqual([]);
+});

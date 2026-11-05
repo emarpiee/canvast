@@ -157,6 +157,7 @@ export const SETTINGS = {
   "ui.corners": { scope: "device", default: "round", validate: oneOf("round", "sharp"), effect: "immediate" } as Def<"round" | "sharp">,
   "ui.density": { scope: "device", default: "compact", validate: oneOf("comfortable", "compact", "dense"), effect: "immediate" } as Def<"comfortable" | "compact" | "dense">,
   "notes.writeProps": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
+  "notes.wrapSelection": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.saveOnClose": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.saveAs": { scope: "device", default: "ask", validate: oneOf("ask", "file", "rich"), effect: "immediate" } as Def<"ask" | "file" | "rich">,
   "notes.cardShows": { scope: "device", default: "whole", validate: oneOf("part", "whole"), effect: "immediate" } as Def<"part" | "whole">,

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.26 — Code in the notes bar, signs round selected words (2026-11-05)
+
+- **Added:** the notes editor's floating bar has **Code**, the editor's own Code text style with one press.
+- **Added:** a sign typed over selected words in a note goes round them instead of replacing them, and they stay selected: `"` `'` `(` `[` `{` `<` `=` `%` and curly quotes. In a note with formats, `` ` `` is code, `*` and `_` are italic (twice: bold), `~` is strikethrough; in a plain text note they are signs too. **Signs wrap selected words** in Settings > Notes turns it off.
+
 ## 0.54.25 — Copied hidden items leave the clipboard (2026-11-05)
 
 - **Added:** a copied hidden item leaves the clipboard after a time you set: Settings > Privacy, **Clear copied hidden items after**, 30 seconds at first, 0 to keep it. Its readable copy is deleted then too. Locking the hidden items or closing the app clears it at once, and something copied since is left alone. In a browser it clears only while the page has the focus.

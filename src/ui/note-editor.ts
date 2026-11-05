@@ -1,6 +1,6 @@
 import { ICONS } from "./icons";
 import { scrubNumbers } from "../colour-picker/scrub";
-import suneditor, { helper } from "suneditor";
+import suneditor, { helper, interfaces } from "suneditor";
 import { htmlMarkdown, markdownHtml, pastedHtml, pastedMarkdown } from "../notes/note-markdown";
 import { copyPlainText } from "../app/system-clipboard";
 import { align, anchor, audio, audioGallery, autocomplete, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
@@ -151,7 +151,7 @@ const SIMPLE_BUTTONS: SunEditor.UI.ButtonList = [
   "|",
   ["fullScreen"],
 ];
-const SUB_BUTTONS = [["bold", "italic", "underline", "strike", "subscript", "superscript"], "|", ["fontColor", "backgroundColor"], "|", ["link", "removeFormat"]];
+const SUB_BUTTONS = [["bold", "italic", "underline", "strike", "noteCode", "subscript", "superscript"], "|", ["fontColor", "backgroundColor"], "|", ["link", "removeFormat"]];
 const hIcon = (n: number): string => `<svg width="17" height="17" viewBox="0 0 24 24"><text x="1" y="18" font-size="15" font-weight="700" fill="currentColor">H${n}</text></svg>`;
 const line = (tag: string) => ($: SunEditor.Deps): void => void $.format.setLine(document.createElement(tag));
 
@@ -189,7 +189,7 @@ function presetOptions(style: NoteStyle): SunEditor.InitOptions {
     case "bottom":
       return { mode: "classic:bottom", statusbar: false, buttonList: SIMPLE_BUTTONS, subToolbar: { mode: "balloon", buttonList: SUB_BUTTONS } };
     case "balloon":
-      return { mode: "balloon", buttonList: [["bold", "italic", "underline", "strike"], "|", ["fontColor", "backgroundColor"], "|", ["removeFormat"], "|", ["link"]] };
+      return { mode: "balloon", buttonList: [["bold", "italic", "underline", "strike", "noteCode"], "|", ["fontColor", "backgroundColor"], "|", ["removeFormat"], "|", ["link"]] };
     case "notion":
       return {
         buttonList: [["undo", "redo"], ["-right", ":File-text.File", ...FILE_TOOLS], ["-right", ":View-text.View", ...VIEW_TOOLS]],
@@ -198,7 +198,7 @@ function presetOptions(style: NoteStyle): SunEditor.InitOptions {
           menu: ["blockStyle", "list", "blockquote", "codeBlock", "fontColor", "backgroundColor", "align", "removeFormat", { title: "Duplicate", icon: "copy", action: ($, { block }) => (block.after(block.cloneNode(true)), $.history.push(false)) }, "copy", { title: "Delete", icon: "delete", action: ($, { block }) => (block.remove(), $.history.push(false)) }],
           onPlusClick: ($, { block }) => $.plugins["slashCommand"].open(block),
         },
-        subToolbar: { mode: "balloon", buttonList: [["blockStyle"], "|", ["bold", "italic", "underline", "strike"], "|", ["fontColor", "backgroundColor"], "|", ["link", "removeFormat"], "|", ["align"]] },
+        subToolbar: { mode: "balloon", buttonList: [["blockStyle"], "|", ["bold", "italic", "underline", "strike", "noteCode"], "|", ["fontColor", "backgroundColor"], "|", ["link", "removeFormat"], "|", ["align"]] },
       };
   }
 }
@@ -226,6 +226,41 @@ function libraryGallery<T extends GalleryClass>(base: T, choose: (kind: AttachKi
 }
 
 // (SunEditor offers a file pasted or dropped to every plugin that takes it: a picture, video or sound is its own plugin's, not also a file's)
+/** A format of the selected words on or off, as the editor's own buttons do it. */
+function toggleInline($: SunEditor.Deps, tag: string, names: readonly string[], className = ""): void {
+  const here = $.selection.getNode();
+  const on = !!here && names.some((n) => helper.dom.query.getParentElement(here, n));
+  if (on) return void $.inline.apply(null, { stylesToModify: className ? [`.${className}`] : [], nodesToRemove: names.map((n) => n.toUpperCase()), strictRemove: true });
+  const el = document.createElement(tag);
+  if (className) el.className = className;
+  $.inline.apply(el, { stylesToModify: className ? [`.${className}`] : [], strictRemove: true });
+}
+/** The words as code: the same element and class as the editor's own Code text style, with one press. */
+const toggleCode = ($: SunEditor.Deps): void => toggleInline($, "code", ["code"], "__se__t-code");
+
+class NoteCode extends interfaces.PluginCommand {
+  static override key = "noteCode";
+  static override className = "";
+  constructor(kernel: ConstructorParameters<typeof interfaces.PluginCommand>[0]) {
+    super(kernel);
+    this.title = "Code";
+    this.icon = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m8 7-5 5 5 5"/><path d="m16 7 5 5-5 5"/></svg>`;
+  }
+  active(element: Node | null, target: HTMLElement): boolean {
+    const on = /^code$/i.test(element?.nodeName ?? "");
+    target.classList.toggle("active", on);
+    return on;
+  }
+  override action(): void {
+    toggleCode(this.$);
+  }
+}
+
+/** What a sign typed over selected words puts round them, in the sign's own order. */
+const WRAP_PAIRS: Readonly<Record<string, string>> = { '"': '"', "'": "'", "(": ")", "[": "]", "{": "}", "<": ">", "“": "”", "‘": "’", "«": "»", "=": "=", "%": "%" };
+/** The signs that are formats in a note that has them: Markdown's for code, emphasis (twice: strong) and strikethrough. */
+const WRAP_FORMATS: ReadonlySet<string> = new Set(["`", "*", "_", "~"]);
+
 class NoteFileUpload extends fileUpload {
   override onFilePasteAndDrop(a: Parameters<fileUpload["onFilePasteAndDrop"]>[0]): void {
     if (!/^(image|video|audio)\//.test(a.file.type)) super.onFilePasteAndDrop(a);
@@ -319,7 +354,7 @@ function fasterCode(editor: { $: { html: unknown } }): void {
   };
 }
 
-export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; text: string; style: NoteStyle; host: NoteHost; /** The note's name (no extension), for {{title}}. */ title: string; /** The whole place it is shown in (else the library's viewer). */ root?: HTMLElement | null }): Promise<NoteEditor> {
+export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; text: string; style: NoteStyle; host: NoteHost; /** A sign typed over selected words goes round them (Settings). */ wrapSelection?: boolean; /** The note's name (no extension), for {{title}}. */ title: string; /** The whole place it is shown in (else the library's viewer). */ root?: HTMLElement | null }): Promise<NoteEditor> {
   const { host } = opts;
   /** Each address shown in the note for a library item → the link written in the file for it. */
   const links = new Map<string, string>();
@@ -513,7 +548,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   const content: SunEditor.InitOptions = {
     // (not math, embeds or PDF export: they need a server or another library)
     plugins: [
-      ...[align, anchor, NoteAudio, backgroundColor, blockquote, blockStyle, codeBlock, drawing, NoteFileUpload, NoteFont, fontColor, fontSize, hr, NoteImage, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, NoteSlash, table, template, textStyle, NoteVideo, NoteAutocomplete],
+      ...[NoteCode, align, anchor, NoteAudio, backgroundColor, blockquote, blockStyle, codeBlock, drawing, NoteFileUpload, NoteFont, fontColor, fontSize, hr, NoteImage, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, NoteSlash, table, template, textStyle, NoteVideo, NoteAutocomplete],
       ...[imageGallery, videoGallery, audioGallery, fileGallery, fileBrowser].map((g) => libraryGallery(g as GalleryClass, choose)),
     ],
     font: { items: fonts },
@@ -630,6 +665,43 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     }
   };
   window.addEventListener("keydown", keys, true);
+  // A sign typed over selected words goes round them rather than replacing them, and they stay selected, so a second sign goes round too.
+  let wrapped: { sign: string; words: string } | null = null;
+  el.querySelector(".sun-editor-editable")?.addEventListener("beforeinput", (ev) => {
+    const e = ev as InputEvent, sign = e.data ?? "", sel = window.getSelection();
+    if (!opts.wrapSelection || e.inputType !== "insertText" || e.isComposing || !sel || sel.isCollapsed) return;
+    const words = sel.toString();
+    const rich = opts.kind !== "txt" && !(sel.anchorNode && helper.dom.query.getParentElement(sel.anchorNode, "pre"));
+    const close = rich && WRAP_FORMATS.has(sign) ? null : (WRAP_PAIRS[sign] ?? (WRAP_FORMATS.has(sign) ? sign : undefined));
+    if (close === undefined || !words.trim()) return;
+    e.preventDefault();
+    const $ = editor.$;
+    if (close === null) {
+      const again = wrapped?.sign === sign && wrapped.words === words;
+      if (sign === "`") toggleCode($);
+      else if (sign === "~") toggleInline($, "del", ["del", "s", "strike"]);
+      else if (again) {
+        // (a second one: italic becomes bold, as ** does in Markdown)
+        toggleInline($, "em", ["em", "i"]);
+        toggleInline($, "strong", ["strong", "b"]);
+      } else toggleInline($, "em", ["em", "i"]);
+    } else {
+      const range = sel.getRangeAt(0), start = document.createTextNode(sign), end = document.createTextNode(close);
+      const after = range.cloneRange(), before = range.cloneRange();
+      after.collapse(false);
+      after.insertNode(end);
+      before.collapse(true);
+      before.insertNode(start);
+      const inner = document.createRange();
+      inner.setStartAfter(start);
+      inner.setEndBefore(end);
+      sel.removeAllRanges();
+      sel.addRange(inner);
+    }
+    wrapped = { sign, words: window.getSelection()?.toString() ?? words };
+    dirty = true;
+    $.history.push(false);
+  });
   // A task box is ticked with a click: its `checked` attribute is what the file keeps (`- [x]`), one step of undo.
   // Ctrl+click (⌘ on a Mac) on a link opens what it points at; a plain click puts the cursor in it, to edit.
   const follow = (e: MouseEvent): void => {

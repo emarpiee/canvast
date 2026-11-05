@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.26: Code in the notes bar, signs round selected words (2026-11-05)
+
+- **Implemented:** `NoteCode` plugin, `toggleInline`, a `beforeinput` handler in the notes editor (SunEditor has no such feature), `notes.wrapSelection`.
+- **Tested:** `npm run typecheck`, checks and unit tests locally; `notes.spec` on GitHub's `Tests` run.
+- **Known failures:** none known until that run reports.
+- **Unverified:** on screen by hand; input methods that compose text.
+- **Committed:** v0.54.26.
+- **Next bounded task:** read the `Tests` run.
+
 ## v0.54.25: copied hidden items leave the clipboard (2026-11-05)
 
 - **Implemented:** `library.hiddenCopySeconds`; a mark among a copy's formats says it is still there; `forgetHiddenCopy` in the desktop app.
