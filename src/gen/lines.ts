@@ -2,7 +2,7 @@ import { ellipse, merged, poly, regular, rotated, solid, line, star as starPts, 
 import type { P } from "./geom";
 import { C, Ch, LOOSE, R, T, reader } from "./kit";
 import type { Rng } from "./rng";
-import type { Generator, GenShape, Values } from "./types";
+import type { Generator, GenShape, Setting, Values } from "./types";
 import { mix } from "./rng";
 import type { SubPath } from "./core";
 
@@ -198,28 +198,47 @@ export const stars: Generator = {
   },
 };
 
+/** A setting Randomize leaves off, for what changes the kind of picture, not its look. */
+const offInRandom = (k: string, label: string, max: number): Setting => {
+  const r = R(k, label, 0, max, 0);
+  return r.t === "range" ? { ...r, usual: [0, 0] } : r;
+};
 export const grid: Generator = {
   id: "grid", label: "Grid", family: "Lines", about: "Lines in a lattice with stronger lines now and then",
   sections: [
     { title: "Colour", items: [C("line", "Lines", "#5f7a99"), C("major", "Strong lines", "#ffffff", true)] },
-    { title: "Grid", items: [R("cols", "Across", 2, 60, 16), Ch("cells", "Cells", [["square", "Square"], ["equal", "Equal"], ["rows", "By rows"]], "square"), R("rows", "Rows", 2, 60, 16), R("weight", "Line width", 1, 20, 3), R("every", "Strong every", 0, 12, 4), T("rowsToo", "Rows too", true), LOOSE] },
+    { title: "Grid", items: [R("cols", "Across", 2, 60, 16), Ch("cells", "Cells", [["square", "Square"], ["equal", "Equal"], ["rows", "By rows"]], "square"), R("rows", "Rows", 2, 60, 16), R("weight", "Line width", 1, 20, 3), R("every", "Strong every", 0, 12, 4), R("strong", "Strong width", 100, 500, 180, 10), T("rowsToo", "Rows too", true), LOOSE] },
+    { title: "Layout", items: [offInRandom("margin", "Margin", 45), T("frame", "Frame", false), offInRandom("shiftX", "Shift across", 100), offInRandom("shiftY", "Shift down", 100), offInRandom("dash", "Dashes", 100), offInRandom("angle", "Angle", 90)] },
   ],
   run(v, rng, w, h) {
     const { n, s, b, c } = reader(v);
+    const m = (n("margin") / 100) * Math.min(w, h), a = rad(n("angle"));
+    const { cx, cy, d } = geo(w, h), extra = a && !m ? d : 0; // (turned with no margin: past the box on all sides, for it to stay covered)
     const off = (): number => (rng() - 0.5) * cell * 0.6 * (n("jitter") / 100); // (looseness: each line off its place)
-    const cell = w / n("cols"), minor: SubPath[] = [], major: SubPath[] = [], wd = (n("weight") / 100) * cell * 0.5;
-    // Square cells as many rows as fit; Equal as many rows as columns; By rows the Rows setting.
-    const cellY = s("cells") === "square" ? cell : h / n(s("cells") === "equal" ? "cols" : "rows");
-    const add = (i: number, sub: SubPath): void => void ((n("every") > 0 && c("major") && i % n("every") === 0 ? major : minor).push(sub));
-    for (let i = 0; i <= n("cols"); i++) {
-      const o = off();
-      add(i, poly([[i * cell + o, 0], [i * cell + o, h]], false));
-    }
-    if (b("rowsToo")) for (let j = 0; j * cellY <= h + 1e-6; j++) {
-      const o = off();
-      add(j, poly([[0, j * cellY + o], [w, j * cellY + o]], false));
-    }
-    return [line(minor, c("line")!, wd, "Lines"), ...(major.length ? [line(major, c("major")!, wd * 1.8, "Strong lines")] : [])];
+    const cell = (w - 2 * m) / n("cols"), minor: SubPath[] = [], major: SubPath[] = [], wd = (n("weight") / 100) * cell * 0.5;
+    // Square: as many rows as fit; Equal: as many rows as columns; By rows: the Rows setting.
+    const cellY = s("cells") === "square" ? cell : (h - 2 * m) / n(s("cells") === "equal" ? "cols" : "rows");
+    const turned = (p: P[]): P[] => (a ? rotated(p, cx, cy, a) : p);
+    const add = (i: number, x0: number, y0: number, x1: number, y1: number): void => {
+      const to = n("every") > 0 && c("major") && i % n("every") === 0 ? major : minor;
+      const len = Math.hypot(x1 - x0, y1 - y0), step = Math.max((n("dash") / 100) * cell, len / 400); // (the limit: a very fine dash on a long line)
+      if (!n("dash")) return void to.push(poly(turned([[x0, y0], [x1, y1]]), false));
+      for (let t = 0; t < len; t += step) {
+        const e = Math.min(len, t + step / 2);
+        to.push(poly(turned([[x0 + ((x1 - x0) * t) / len, y0 + ((y1 - y0) * t) / len], [x0 + ((x1 - x0) * e) / len, y0 + ((y1 - y0) * e) / len]]), false));
+      }
+    };
+    /** Each line's place along an axis of `size`, `step` apart, from the margin, shifted by a share of a step. */
+    const lines = (step: number, size: number, shift: number, draw: (i: number, at: number) => void): void => {
+      for (let i = -Math.ceil(extra / step) - (shift ? 1 : 0); m + i * step + shift * step <= size - m + extra + 1e-6; i++) {
+        const at = m + i * step + shift * step;
+        if (at >= m - extra - 1e-6) draw(i, at + off());
+      }
+    };
+    lines(cell, w, n("shiftX") / 100, (i, x) => add(i, x, m - extra, x, h - m + extra));
+    if (b("rowsToo")) lines(cellY, h, n("shiftY") / 100, (j, y) => add(j, m - extra, y, w - m + extra, y));
+    if (b("frame")) minor.push(poly(turned([[m, m], [w - m, m], [w - m, h - m], [m, h - m]])));
+    return [line(minor, c("line")!, wd, "Lines"), ...(major.length ? [line(major, c("major")!, (wd * n("strong")) / 100, "Strong lines")] : [])];
   },
 };
 

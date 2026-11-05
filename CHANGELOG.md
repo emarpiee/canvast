@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.5 — More for the Grid pattern (2026-11-05)
+
+- **Added:** the **Grid** pattern's **Strong width**, and a **Layout** section: **Margin**, **Frame**, **Shift across**, **Shift down**, **Dashes** and **Angle**. All leave the default grid as it was, and Randomize leaves margin, shifts, dashes and angle off.
+
 ## 0.54.4 — The Grid pattern is simple again, with rows (2026-11-05)
 
 - **Removed:** the Grid pattern's lattice, strong width, angle, shift, dashes, margin and frame, which never reached a release.

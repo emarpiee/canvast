@@ -67,6 +67,12 @@ describe("pattern generators (ADR 0162)", () => {
     expect(lines({})).toBe(17 + 9); // (16 across of 50: 8 rows fit)
     expect(lines({ cells: "equal" })).toBe(17 + 17);
     expect(lines({ cells: "rows", rows: 5 })).toBe(17 + 6);
+    expect(generate(g, { ...defaultValues(g), bg: "", every: 0, frame: true }, 1, 800, 400)[0]!.sub.length).toBe(17 + 9 + 1);
+    expect(lines({ dash: 50 })).toBeGreaterThan(17 + 9);
+    expect(lines({ margin: 25, cols: 4 })).toBe(5 + 2); // (inside the margin: 600 wide, 200 high, cells of 150)
+    expect(lines({ shiftX: 50, shiftY: 50 })).toBe(16 + 8); // (half a cell along: one line fewer each way)
+    // Randomize stays a plain grid: what changes the kind of picture stays off.
+    for (const k of ["margin", "shiftX", "shiftY", "dash", "angle"]) expect(randomValues(g, makeRng(7))[k]).toBe(0);
   });
 
   it("a different seed changes the shapes of the generators that use chance", () => {

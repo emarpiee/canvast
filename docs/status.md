@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.5: more for the Grid pattern (2026-11-05)
+
+- **Implemented:** Strong width and a Layout section (Margin, Frame, Shift across and down, Dashes, Angle), in Grid's own code; Randomize leaves what changes the kind of picture off.
+- **Tested:** typecheck, checks and unit tests locally; `Tests` on GitHub.
+- **Known failures:** none known until that run reports.
+- **Unverified:** on screen by hand.
+- **Committed:** v0.54.5.
+- **Next bounded task:** read the `Tests` run.
+
 ## v0.54.4: the Grid pattern is simple again, with rows (2026-11-05)
 
 - **Implemented:** Grid back to its own short code, plus Cells (Square, Equal, By rows) and Rows.
