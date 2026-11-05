@@ -21,6 +21,7 @@ for (const m of html.matchAll(/\b(?:import\s*\(|importScripts\s*\(|fetch\s*\(|ne
 // Every absolute URL left in the file must be a known one: an XML namespace, or text a person reads (a licence, a credit in a comment). A new one fails
 // until it is looked at and added here: it could be something fetched.
 const KNOWN = [
+  /^https:\/\/opensource\.org\/licenses\/MIT/, // (the same licence comment)
   /^https:\/\/lea\.verou\.me/, // (the author in the licence comment of the code colouring)
   /^https?:\/\/www\.w3\.org\//, // XML namespaces (SVG, XLink)
   /^https:\/\/github\.com\/rsms\/inter$/, // the Inter licence text
