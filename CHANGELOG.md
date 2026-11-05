@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.28 — A shorter setting (2026-11-05)
+
+- **Changed:** **Signs wrap selected words** says what it does on one line, with the signs under its More.
+
 ## 0.54.27 — Format the word under the cursor (2026-11-05)
 
 - **Added:** in a note, `Ctrl+B`, `Ctrl+I`, `Ctrl+U` and **Code** with the cursor inside a word and nothing selected format the whole word, and inside text already in that format remove it from all of it; the cursor stays where it was. At the edge of a word they do what they did.

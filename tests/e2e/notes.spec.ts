@@ -1215,7 +1215,7 @@ test("selected words: a sign typed over them goes round them, a format in a note
   await p.keyboard.type('"');
   await expect(para(0)).toHaveText('"first"');
   await p.keyboard.type("(");
-  await expect(para(0), "still selected: another goes round it").toHaveText('("first")');
+  await expect(para(0), "the word stays selected: another goes round it").toHaveText('"(first)"');
   await para(1).selectText();
   await p.keyboard.type("*");
   await expect(para(1).locator("em")).toHaveText("second");
