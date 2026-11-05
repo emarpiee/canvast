@@ -31,6 +31,8 @@ export interface ContextActions {
   /** Give the selected pictures and note cards the size they are placed at (at this zoom), and whether that changes any. */
   resetSize(): void;
   canResetSize(): boolean;
+  /** Why it would change nothing, in words. */
+  resetSizeBlock(): string;
   /** What the selection can be reset from. */
   resettable(): { turned: boolean; stretched: boolean; bakeable: boolean };
   /** The one selected item is a file the app cannot show (kept as a card): its asset, and whether a tab can open it (ADR 0078). */
@@ -434,7 +436,11 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("unrotate").hidden = !reset.turned;
     q("baserot").hidden = !reset.bakeable;
     q("unstretch").hidden = !reset.stretched;
-    q("unresize").hidden = !actions.canResetSize();
+    // (always there for a picture or a note, so that it can be found: when it would change nothing, it says why)
+    const unresize = q("unresize");
+    unresize.hidden = !sel.some((o) => o!.kind === "image");
+    unresize.disabled = !actions.canResetSize();
+    unresize.title = unresize.disabled ? `Reset size: not now, ${actions.resetSizeBlock()}` : unresize.getAttribute("aria-label")!;
     // with two or more kinds picked, the kind chosen in the Properties bar shows only its tools (All, or none chosen: everything)
     const kinds = new Set(sel.map((o) => (isContainer(o) ? "sheet" : o!.kind === "path" ? "shape" : o!.kind === "image" ? "picture" : o!.kind))); // (as the Properties bar tells them apart)
     const only = kinds.size > 1 && editor.subject && editor.subject !== "all" ? (BAR_KINDS[editor.subject] ?? null) : null;

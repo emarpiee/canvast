@@ -570,6 +570,14 @@ export function sizeResets(doc: DocumentStore, editor: EditorState, view: ViewSt
   });
 }
 
+/** Why Reset size has nothing to do: its button says so. */
+export function sizeResetBlock(doc: DocumentStore, editor: EditorState, view: ViewState): string {
+  const pics = selected(doc, editor).filter((o) => o.kind === "image");
+  if (pics.some((o) => o.locked)) return "it is locked";
+  if (pics.some((o) => (o.frame ?? doc.space.world) !== view.frame)) return "it is at another depth of the canvas: zoom to where it was placed";
+  return "it already has that size at this zoom";
+}
+
 /** Give the selected pictures their placed size back (`sizeResets`): one undo step. Returns how many changed. */
 export function resetSize(doc: DocumentStore, editor: EditorState, view: ViewState, noteWidth: (o: ImageObject) => number | null): number {
   if (editor.blockEdit()) return 0;

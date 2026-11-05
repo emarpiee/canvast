@@ -28,6 +28,7 @@
 - **Added:** a box under a font's samples in the viewer to type in and see it in that font; what is typed goes from font to font and is dropped when the viewer closes.
 - **Added:** a fifth background for see-through pictures and fonts, the theme's own colour, which follows a change of theme. The background button shows the one in use, and the viewer's floating buttons stay visible under the pointer on any background.
 - **Fixed:** long notes open and save faster: writing a note out took far longer than its length.
+- **Changed:** Reset size is always on the Actions bar for a picture or a note; when it would change nothing it is greyed out and says why.
 - **Changed:** the README is in two parts, for users and for developers, with a section for each big feature, tables and pictures first and the full wording after them; new pictures of the sidebar, several items selected, art files and the Trash.
 - **Changed:** the library's list has the same thumbnail slider as the grid, in the same place, with its own size: its rows and thumbnails grow with it. The slider is longer, and the list's columns button moved to the left of the grid and list buttons so that nothing shifts.
 - **Added:** Details in the details panel show the file's type, size, pixels, time of import, place on disk and whole hash, a JPEG's channels and colour sampling, all lined up. They open from the file's line, with an info icon at its right end, in one card.

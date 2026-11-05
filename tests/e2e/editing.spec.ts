@@ -888,7 +888,8 @@ test("Reset rotation and Reset proportions in the selection bar put a turned or 
   expect(Math.abs(b4.maxX - b4.minX - pw.pixelW), "file pixels").toBeLessThan(1);
   expect(Math.abs(b4.maxY - b4.minY - pw.pixelH), "file pixels").toBeLessThan(1);
   expect(Math.abs((b4.minX + b4.maxX) / 2 - (b0.minX + b0.maxX) / 2), "same middle").toBeLessThan(1);
-  await expect(unresize).toBeHidden();
+  await expect(unresize).toBeDisabled();
+  await expect(unresize).toHaveAttribute("title", /already has that size/);
   await key(app, "Control+z");
   await app.frame();
   expect(Math.abs((await box()).maxX - b0.maxX)).toBeLessThan(1);
