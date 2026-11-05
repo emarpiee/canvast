@@ -814,7 +814,7 @@ async function start(): Promise<void> {
   };
 
   const session = new Session(storage, doc, view, editor, assets);
-  session.settingsHook = { snapshot: (withPrivacy) => Object.fromEntries(Object.entries(settings.snapshot()).filter(([k]) => (withPrivacy || !PRIVACY_KEYS.includes(k)))), privacySet: () => PRIVACY_KEYS.some((k) => settings.isSet(k as never)), restore: (s) => settings.restore(s), restorable: (s) => settings.restorable(s), getAuto: () => settings.get("storage.autoIndex"), setAuto: (on) => void settings.set("storage.autoIndex", on), workspace: () => settings.workspaceValues(), adopt: (from) => void settings.adoptWorkspace(from) };
+  session.settingsHook = { snapshot: (withPrivacy) => Object.fromEntries(Object.entries(settings.snapshot()).filter(([k]) => (withPrivacy || !PRIVACY_KEYS.includes(k)))), privacySet: () => PRIVACY_KEYS.some((k) => settings.isSet(k as never)), restore: (s) => settings.restore(s), restorable: (s) => settings.restorable(s), getAuto: () => settings.get("storage.autoIndex"), setAuto: (on) => void settings.set("storage.autoIndex", on), workspace: () => settings.workspaceValues(), adopt: (from) => void settings.adoptWorkspace(from), localAt: () => settings.workspaceAt() };
   // A workspace setting changed here (not one just taken from the workspace) is kept in the workspace: once for many at a time (an import).
   let wsSettingsDue = false;
   settings.subscribe((key) => {

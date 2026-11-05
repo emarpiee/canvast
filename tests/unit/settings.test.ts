@@ -72,13 +72,18 @@ describe("settings (workspace scope)", () => {
     s.set("pen.widthPx", 8); // device
     s.set("notes.folder", "Journal"); // workspace
     s.set("library.keepFileNames", false);
-    expect(s.workspaceValues()).toEqual({ "notes.folder": "Journal", "library.keepFileNames": false });
+    const { "@at": at, ...values } = s.workspaceValues();
+    expect(values).toEqual({ "notes.folder": "Journal", "library.keepFileNames": false });
+    expect(at).toBeGreaterThan(0); // (when they changed here: an older copy read back never covers them)
+    s.set("pen.widthPx", 9);
+    expect(s.workspaceAt()).toBe(at); // (a device setting is not the workspace's)
     const heard: Array<[string, boolean]> = [];
     s.subscribe((k) => heard.push([k, s.adopting]));
     // Another device's: one changed, one back to the default (absent), an invalid one ignored, a device setting never taken.
-    const changed = s.adoptWorkspace({ "notes.folder": "Diary", "storage.trashDays": "nope", "pen.widthPx": 20 });
+    const changed = s.adoptWorkspace({ "notes.folder": "Diary", "storage.trashDays": "nope", "pen.widthPx": 20, "@at": 5 });
+    expect(s.workspaceAt()).toBe(5); // (taken: the time of what it has now)
     expect(changed.sort()).toEqual(["library.keepFileNames", "notes.folder"]);
-    expect([s.get("notes.folder"), s.get("library.keepFileNames"), s.get("storage.trashDays"), s.get("pen.widthPx")]).toEqual(["Diary", true, "0", 8]);
+    expect([s.get("notes.folder"), s.get("library.keepFileNames"), s.get("storage.trashDays"), s.get("pen.widthPx")]).toEqual(["Diary", true, "0", 9]);
     expect(heard.every(([, adopting]) => adopting)).toBe(true);
     expect(s.adopting).toBe(false);
     expect(s.adoptWorkspace({ "notes.folder": "Diary" })).toEqual([]); // the same: nothing told
@@ -89,7 +94,7 @@ describe("settings (workspace scope)", () => {
     expect(s.set("library.pinned", JSON.stringify(["f1", "f2"]))).toBe(true);
     expect(s.set("library.pinned", "[1]")).toBe(false);
     expect(s.set("search.saved.hidden", JSON.stringify([{ q: "cat", m: "all", u: 1 }]))).toBe(true);
-    expect(Object.keys(s.workspaceValues())).toEqual(["library.pinned"]);
+    expect(Object.keys(s.workspaceValues()).sort()).toEqual(["@at", "library.pinned"]);
     const { PRIVACY_KEYS } = await import("../../src/settings/settings");
     expect(PRIVACY_KEYS).toContain("search.saved.hidden");
   });

@@ -1,3 +1,4 @@
+import { WS_AT } from "../settings/settings";
 import type { CardLook } from "../ui/file-views";
 import { sha256Hex } from "../assets/sha256";
 import { stampNote } from "../notes/note-dates";
@@ -1166,7 +1167,7 @@ export class Session {
   }
 
   /** The settings, which travel in a workspace backup and come back on import; those of the workspace are kept in it (set by the app). */
-  settingsHook: { snapshot(withPrivacy: boolean): Record<string, unknown>; privacySet(): boolean; restore(from: unknown): number; restorable(from: unknown): number; getAuto(): boolean; setAuto(on: boolean): void; workspace(): Record<string, unknown>; adopt(from: Record<string, unknown>): void } | null = null;
+  settingsHook: { snapshot(withPrivacy: boolean): Record<string, unknown>; privacySet(): boolean; restore(from: unknown): number; restorable(from: unknown): number; getAuto(): boolean; setAuto(on: boolean): void; workspace(): Record<string, unknown>; adopt(from: Record<string, unknown>): void; localAt(): number } | null = null;
 
   /**
    * The workspace's settings, as kept in it: taken here. A workspace that has none yet (made before they were kept there, or by an
@@ -1177,7 +1178,9 @@ export class Session {
     if (!h || !this.repo) return;
     const kept = await this.repo.settings().catch(() => undefined);
     this.settingsRead = true;
-    if (kept && typeof kept === "object" && !Array.isArray(kept)) h.adopt(kept as Record<string, unknown>);
+    // (newer here: changed just before the app closed or reloaded, before the workspace kept it; then this device's go there)
+    const at = kept && typeof kept === "object" && !Array.isArray(kept) ? (kept as Record<string, unknown>)[WS_AT] : undefined;
+    if (kept && typeof kept === "object" && !Array.isArray(kept) && !(h.localAt() > (typeof at === "number" ? at : 0))) h.adopt(kept as Record<string, unknown>);
     else if (!this.readOnly) await this.saveWorkspaceSettings(h.workspace());
   }
   /** Whether the workspace's settings were read: none is written before, so a change at start-up never covers the workspace's. */

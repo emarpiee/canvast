@@ -451,11 +451,14 @@ export class WorkspaceMirror {
    * changed with them. What the file lacks stays as it is here. Whether any changed.
    */
   private async adoptShared(fileWs: WorkspaceFile): Promise<boolean> {
+    if (this.treeDirty) return false; // (this device's are newer, not written yet: the file is an older version of them, perhaps its own)
     const styles = await this.repo.styles().catch(() => undefined);
     const settings = await this.repo.settings().catch(() => undefined);
     const newStyles = Array.isArray(fileWs.styles) && JSON.stringify(fileWs.styles) !== JSON.stringify(styles ?? []);
     const s = fileWs.settings;
-    const newSettings = !!s && typeof s === "object" && !Array.isArray(s) && JSON.stringify(s) !== JSON.stringify(settings);
+    const at = (v: unknown): number => (v && typeof v === "object" && typeof (v as Record<string, unknown>)["@at"] === "number" ? ((v as Record<string, unknown>)["@at"] as number) : 0);
+    // (only newer ones: an older version read back, this device's own write a moment ago, never covers what was changed since)
+    const newSettings = !!s && typeof s === "object" && !Array.isArray(s) && (settings === undefined || at(s) > at(settings));
     if (!newStyles && !newSettings) return false;
     const tx = this.db.transaction("meta", "readwrite");
     if (newStyles) tx.objectStore("meta").put(fileWs.styles, "styles");

@@ -175,6 +175,8 @@ export interface DebugHook {
   /** Organize the library as its panel does, with the library's undo: a new folder (`id`, `name`, parent id or ""), file an item (`hash`, folder id or "" for none), rename an item or a folder, undo, redo. */
   /** Each open note as markdown or text, and whether that keeps all of it (what Save asks about). */
   notesAsText(): Array<{ name: string; text: string; keepsAll: boolean }>;
+  /** The desktop library mirror's kept state (its folders, the folders seen on disk), for a failing test to say. */
+  libraryState(): Promise<unknown>;
   libraryOp(op: "createFolder" | "file" | "rename" | "note" | "renameFolder" | "hide" | "hideFolder" | "showFolder" | "undo" | "redo", ...args: string[]): Promise<void>;
   /** The Hidden password as Settings and the Hidden list use it: set (or remove, with no password), check (which opens the desktop build's key), lock; the result, and the key's state after. */
   hiddenOp(op: "set" | "check" | "lock", password?: string, current?: string): Promise<{ ok: boolean; state: string }>;
@@ -648,6 +650,7 @@ export function installDebugHook(
       await writer.flush();
       return session.catalog!.list();
     },
+    libraryState: async () => (await desktopLib()?.calls.meta("libraryMirror")) ?? null,
     catalogEntries: () => (desktopLib() ? desktopLib()!.entries() : readAll<CatalogEntry>("assetCatalog")),
     thumbRecords: async () => (await readAll<ThumbRecord>("thumbs")).map((t) => ({ hash: t.hash, type: t.blob.type, bytes: t.blob.size, w: t.w, h: t.h })),
     storedAssetHashes: async () => {

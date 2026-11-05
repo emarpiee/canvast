@@ -273,11 +273,16 @@ export type SettingKey = keyof typeof SETTINGS;
 export type SettingValue<K extends SettingKey> = (typeof SETTINGS)[K]["default"];
 
 const DEVICE_KEY = "canvast.settings";
+/** When a workspace setting last changed on this device, or the time of the workspace's settings it last took (ms). */
+const WS_AT_KEY = "canvast.settings.wsAt";
+/** The time of a workspace's settings, as kept with them. */
+export const WS_AT = "@at";
 const LEGACY_VIEW_KEY = "canvast.view";
 
 export class SettingsStore {
   private readonly values = new Map<string, unknown>();
   private readonly listeners = new Set<(key: SettingKey) => void>();
+  private wsAt = 0;
 
   constructor(private readonly storage: Pick<Storage, "getItem" | "setItem" | "removeItem"> | null = safeLocalStorage()) {
     let raw: Record<string, unknown> = {};
@@ -297,6 +302,32 @@ export class SettingsStore {
       const v = (SETTINGS[key] as Def<unknown>).validate(raw[key]);
       if (v !== undefined) this.values.set(key, v);
     }
+    try {
+      const at = Number(storage?.getItem(WS_AT_KEY));
+      if (Number.isFinite(at) && at > 0) this.wsAt = at;
+    } catch {
+      // none
+    }
+  }
+
+  /** A workspace setting changed here: its time, so this device's newer values are not covered by older ones read back. */
+  private touched(key: SettingKey): void {
+    if ((SETTINGS[key] as Def<unknown>).scope !== "workspace" || this.adopting) return;
+    this.setWsAt(Date.now());
+  }
+
+  private setWsAt(at: number): void {
+    this.wsAt = at;
+    try {
+      this.storage?.setItem(WS_AT_KEY, String(at));
+    } catch {
+      // kept for this session
+    }
+  }
+
+  /** When this device's workspace settings last changed, or the time of the workspace's it last took. */
+  workspaceAt(): number {
+    return this.wsAt;
   }
 
   /** The settings whose value is not the default, as "key = value" (the diagnostic report lists them). */
@@ -318,6 +349,7 @@ export class SettingsStore {
       const v = (SETTINGS[key] as Def<unknown>).validate((from as Record<string, unknown>)[key]);
       if (v === undefined || v === (SETTINGS[key] as Def<unknown>).default) continue;
       this.values.set(key, v);
+      this.touched(key);
       n++;
     }
     if (n) {
@@ -350,6 +382,7 @@ export class SettingsStore {
     if (v === undefined) return false;
     if (this.get(key) === v) return true;
     this.values.set(key, v);
+    this.touched(key);
     this.save();
     for (const fn of this.listeners) fn(key);
     return true;
@@ -358,13 +391,14 @@ export class SettingsStore {
   /** Back to the default (a stored value is removed). */
   reset(key: SettingKey): void {
     if (!this.values.delete(key)) return;
+    this.touched(key);
     this.save();
     for (const fn of this.listeners) fn(key);
   }
 
   /** The workspace's settings that are not the default, to keep in the workspace. */
   workspaceValues(): Record<string, unknown> {
-    return Object.fromEntries([...this.values].filter(([k]) => (SETTINGS[k as SettingKey] as Def<unknown>).scope === "workspace"));
+    return { ...Object.fromEntries([...this.values].filter(([k]) => (SETTINGS[k as SettingKey] as Def<unknown>).scope === "workspace")), [WS_AT]: this.wsAt };
   }
 
   /** True while `adoptWorkspace` tells its changes: they came from the workspace, nothing needs writing back. */
@@ -375,6 +409,8 @@ export class SettingsStore {
    * Returns the keys that changed.
    */
   adoptWorkspace(from: Record<string, unknown>): SettingKey[] {
+    const at = from[WS_AT];
+    this.setWsAt(typeof at === "number" && Number.isFinite(at) ? at : 0);
     const changed: SettingKey[] = [];
     for (const key of Object.keys(SETTINGS) as SettingKey[]) {
       const def = SETTINGS[key] as Def<unknown>;

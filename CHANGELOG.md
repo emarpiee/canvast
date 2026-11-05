@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.49 — Workspace settings keep the newest (2026-11-06)
+
+- **Fixed:** a workspace setting changed just before the app closed or reloaded could be replaced by the older copy kept in the workspace; changes now carry their time, and only newer settings replace this device's.
+- **Fixed:** on desktop, two settings changed in quick succession could undo the second, and a style saved just then could be lost: nothing is read back from the folder while this device still has to write it.
+
 ## 0.54.48 — Where settings are kept, in the manual (2026-11-06)
 
 - **Changed:** the README says which settings are kept on the device (in the app's data folder) and their limits in the workspace.

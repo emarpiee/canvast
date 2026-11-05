@@ -1111,7 +1111,13 @@ test("a library folder deleted outside the app stays deleted, while it runs and 
     await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f9", "Another moment"));
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     rmSync(join(ws, "library/going"), { recursive: true });
-    await expect.poll(names, { timeout: 20_000 }).toEqual(["Another moment", "Staying"]);
+    try {
+      await expect.poll(names, { timeout: 20_000 }).toEqual(["Another moment", "Staying"]);
+    } catch (e) {
+      // (what the app had kept, and what is on the disk, said with the failure)
+      const state = await page.evaluate(() => window.__canvastDebug.libraryState());
+      throw new Error(`${(e as Error).message}\nkept: ${JSON.stringify(state)}\nlibrary/: ${JSON.stringify(readdirSync(join(ws, "library")))}`);
+    }
     await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f3", "Another"));
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     await expect.poll(() => existsSync(join(ws, "library/another")), { timeout: 20_000 }).toBe(true);
