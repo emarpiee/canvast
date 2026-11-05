@@ -17,6 +17,8 @@ export interface PictureOptions {
   hash?: string | undefined;
   /** A note's page width (a smaller copy keeps the full card's). */
   layoutW?: number | undefined;
+  /** The file's size, when known: a file too large for a picture is then not read at all. */
+  fileSize?: number | undefined;
 }
 
 /**

@@ -101,6 +101,8 @@ export interface LibraryIndex {
 /** What this device last wrote or read of the library's folders, as JSON (the library's meta "libraryMirror"; each item's is its seen mark). */
 interface LibraryState {
   folders: string;
+  /** The library folders' places this device has seen on disk: one of them gone was deleted there, and is not made again. Kept per device. */
+  dirs?: string[];
 }
 const STATE_KEY = "libraryMirror";
 /** The library file being moved (meta "libraryMoving"), so a move cut short is finished at start-up. */
@@ -325,7 +327,8 @@ export class LibraryMirror {
 
   /** At start-up: what another device changed in the library's files is taken (new items, names, tags, folders, where each file is). */
   async start(): Promise<void> {
-    this.state = { folders: (await this.metaOf<LibraryState>(STATE_KEY))?.folders ?? "" };
+    const kept = await this.metaOf<LibraryState>(STATE_KEY);
+    this.state = { folders: kept?.folders ?? "", ...(kept?.dirs ? { dirs: kept.dirs } : {}) };
     await this.finishMove();
     await this.reread();
   }
@@ -540,6 +543,7 @@ export class LibraryMirror {
    */
   async write(only?: ReadonlySet<string>): Promise<boolean> {
     await this.finishMove();
+    await this.dropFoldersDeletedOutside();
     // Some items changed, in a library too big for `library.json`: only they are read, placed and written (with their parts).
     const some = only && this.lastText === "-" ? only : undefined;
     // (what changed since the last write, before this one marks it written: the hidden ones among them may need a new place)
@@ -670,6 +674,11 @@ export class LibraryMirror {
       for (let d = this.keepNames() ? await diskDir(names, tidy) : tidy; d.includes("/"); d = parentOf(d)) wanted.add(d);
     }
     for (const d of wanted) await this.bridge.makeFolder(d);
+    const dirsNow = [...wanted].sort();
+    if (JSON.stringify(dirsNow) !== JSON.stringify(this.state.dirs ?? [])) {
+      this.state.dirs = dirsNow;
+      await this.setMeta(STATE_KEY, this.state);
+    }
     for (const d of [...emptied, ...this.dirs]) {
       for (let p = d; p.startsWith("library/") && !wanted.has(p); p = parentOf(p)) if (!(await this.bridge.removeEmptyFolder(p))) break;
     }
@@ -824,6 +833,43 @@ export class LibraryMirror {
    * folder of its folder. A copy of a file the library has is left alone. Whether anything changed.
    */
   async scan(): Promise<boolean> {
+    const dropped = await this.dropFoldersDeletedOutside();
+    return (await this.scanFiles()) || dropped;
+  }
+
+  /**
+   * A library folder this device has seen on disk and that is no longer there was deleted, in a file manager or by a sync tool: the decision stands. It leaves the
+   * library, its items stay (their files gone with it, they show as missing; a file moved elsewhere is found by its content). A place never seen here is
+   * only not made yet (a folder from another device, a new one), and with `library/` itself gone nothing is concluded (a drive not there).
+   */
+  private async dropFoldersDeletedOutside(): Promise<boolean> {
+    const seen = new Set(this.state.dirs ?? []);
+    if (!seen.size || !(await this.bridge.exists("library"))) return false;
+    return this.lib.serial(async () => {
+      const folders = await this.lib.folders();
+      const gone = new Set<string>();
+      for (const f of visibleFolders(folders)) {
+        const names = folderPath(folders, f.id);
+        const places = [libraryDir(names, "", ""), `library/${names.map((n) => keptPart(n)).join("/")}`];
+        if (!places.some((d) => seen.has(d))) continue;
+        let there = false;
+        for (const d of places) there ||= await this.bridge.exists(d);
+        if (!there) gone.add(f.id);
+      }
+      if (!gone.size) return false;
+      for (const id of [...gone]) for (const f of folders) if (f.parentId === id) gone.add(f.id);
+      const ops: Array<Parameters<DesktopLibrary["apply"]>[0][number]> = [{ t: "meta", k: FOLDERS_KEY, v: folders.filter((f) => !gone.has(f.id)) }];
+      for (const e of await this.lib.entries()) {
+        const ids = e.folderIds ?? [];
+        if (ids.some((x) => gone.has(x))) ops.push({ t: "entry", hash: e.hash, v: { ...e, folderIds: ids.filter((x) => !gone.has(x)) } });
+      }
+      await this.lib.apply(ops);
+      this.onNotice?.(`${gone.size === 1 ? "A library folder was" : `${gone.size} library folders were`} deleted outside the app, and ${gone.size === 1 ? "has" : "have"} left the library.`);
+      return true;
+    });
+  }
+
+  private async scanFiles(): Promise<boolean> {
     // Items whose file is there but not of their size: saved again outside the app while it was closed (or unwatched).
     const absent = await this.lib.calls.absent();
     const changedFiles: string[] = [];

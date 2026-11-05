@@ -71,7 +71,7 @@ export async function openModelView(el: HTMLElement, file: FileFacts, deps: View
     frame = requestAnimationFrame(() => {
       frame = 0;
       if (closed) return;
-      stage.draw(look, Math.max(1, box.clientWidth), Math.max(1, box.clientHeight), Math.min(devicePixelRatio || 1, 2));
+      stage.draw(look, Math.max(1, box.clientWidth), Math.max(1, box.clientHeight), stage.heavy ? 1 : Math.min(devicePixelRatio || 1, 2));
       box.dataset["drawn"] = "1";
     });
   };

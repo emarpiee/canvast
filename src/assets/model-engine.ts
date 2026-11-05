@@ -1,4 +1,4 @@
-import type { AnimationClip, AnimationMixer, BufferGeometry, Light, MeshToonMaterial, Material, Mesh, Object3D, OrthographicCamera, PerspectiveCamera, Scene, WebGLRenderer } from "three";
+import type { AnimationClip, AnimationMixer, Light, MeshToonMaterial, Material, Mesh, Object3D, OrthographicCamera, PerspectiveCamera, Scene, WebGLRenderer } from "three";
 import { extOf } from "./file-kind";
 import { defaultLook, readLook } from "./model-look";
 import type { ModelLook } from "./model-look";
@@ -13,8 +13,10 @@ const three = (): Promise<Three> => (lib ??= import("three"));
 export const MODEL_CARD_EDGE = 1600;
 /** The shape of a new model card. */
 const CARD_RATIO = 4 / 3;
-/** Past this a model does not open: reading one is done on the page. */
-export const MAX_MODEL_BYTES = 256 * 2 ** 20;
+/** Past this a model does not open: all of it has to be in memory, and on the graphics card. */
+export const MAX_MODEL_BYTES = 2 ** 30;
+/** A file that has more triangles than this is drawn at one pixel to a pixel while it is turned. */
+const HEAVY_TRIANGLES = 2_000_000;
 
 /** The look a model starts with: an STL is usually made with Z up, the rest with Y up. */
 export const firstLook = (name: string): ModelLook => (extOf(name) === "STL" ? { up: "z" } : {});
@@ -35,18 +37,47 @@ export interface ReadModel {
   clips: AnimationClip[];
 }
 
+interface WorkerPart {
+  position: Float32Array;
+  normal: Float32Array;
+  color?: Float32Array;
+  index?: Uint32Array | Uint16Array;
+}
+let workerUrl: Promise<string> | null = null;
+/** Reads a file off the page, in a worker of its own that goes when it is done. The bytes are given to it. */
+async function readInWorker(bytes: Uint8Array, ext: string): Promise<WorkerPart[]> {
+  workerUrl ??= import("./model-inside").then(({ workerText }) => URL.createObjectURL(new Blob([workerText], { type: "text/javascript" })));
+  const worker = new Worker(await workerUrl);
+  const data = bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength ? bytes.buffer : bytes.slice().buffer;
+  try {
+    return await new Promise<WorkerPart[]>((done, failed) => {
+      worker.onmessage = (e: MessageEvent<{ parts?: WorkerPart[]; error?: string }>) => (e.data.parts ? done(e.data.parts) : failed(new Error(e.data.error ?? "it could not be read")));
+      worker.onerror = () => failed(new Error("it could not be read"));
+      worker.postMessage({ data, ext }, [data as ArrayBuffer]);
+    });
+  } finally {
+    worker.terminate();
+  }
+}
+
 /** A model's objects from its file. Throws on what cannot be read. */
 export async function readModel(bytes: Uint8Array, name: string): Promise<ReadModel> {
   const T = await three();
-  const data = bytes.slice().buffer as ArrayBuffer;
   const ext = extOf(name);
-  const mesh = (g: BufferGeometry): Mesh => {
-    if (!g.getAttribute("normal")) g.computeVertexNormals();
-    return new T.Mesh(g, new T.MeshStandardMaterial({ color: g.getAttribute("color") ? 0xffffff : 0xc8c3ba, roughness: 0.75, vertexColors: !!g.getAttribute("color"), side: T.DoubleSide }));
-  };
-  if (ext === "STL") return { root: mesh(new (await import("three/examples/jsm/loaders/STLLoader.js")).STLLoader().parse(data)), clips: [] };
-  if (ext === "PLY") return { root: mesh(new (await import("three/examples/jsm/loaders/PLYLoader.js")).PLYLoader().parse(data)), clips: [] };
-  if (ext === "OBJ") return { root: new (await import("three/examples/jsm/loaders/OBJLoader.js")).OBJLoader().parse(new TextDecoder().decode(bytes)), clips: [] };
+  if (ext === "STL" || ext === "PLY" || ext === "OBJ") {
+    const parts = await readInWorker(bytes, ext);
+    const root = new T.Group();
+    for (const p of parts) {
+      const g = new T.BufferGeometry();
+      g.setAttribute("position", new T.BufferAttribute(p.position, 3));
+      g.setAttribute("normal", new T.BufferAttribute(p.normal, 3));
+      if (p.color) g.setAttribute("color", new T.BufferAttribute(p.color, 3));
+      if (p.index) g.setIndex(new T.BufferAttribute(p.index, 1));
+      root.add(new T.Mesh(g, new T.MeshStandardMaterial({ color: p.color ? 0xffffff : 0xc8c3ba, roughness: 0.75, vertexColors: !!p.color, side: T.DoubleSide })));
+    }
+    return { root, clips: [] };
+  }
+  const data = (bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength ? bytes.buffer : bytes.slice().buffer) as ArrayBuffer;
   const { GLTFLoader } = await import("three/examples/jsm/loaders/GLTFLoader.js");
   const loader = new GLTFLoader();
   // (the page may not fetch, so pictures are read by an image element, and buffers from the file's own text; what lies in other files cannot be reached)
@@ -107,6 +138,9 @@ export class ModelStage {
   /** What the lights and the canvas were made for: made again only when it changes (a shadow map and a canvas's pixels are costly to make, and a drag draws each frame). */
   private shownLights = "";
   private shownSize = "";
+  private shownPose = "";
+  /** A model of so many triangles that a drag should not also draw each at two pixels to one. */
+  heavy = false;
   private readonly persp: PerspectiveCamera;
   private readonly ortho: OrthographicCamera;
   private shownSurface = "";
@@ -116,6 +150,7 @@ export class ModelStage {
     this.gl = new T.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
     this.gl.shadowMap.enabled = true;
     this.gl.shadowMap.type = T.PCFSoftShadowMap;
+    this.gl.shadowMap.autoUpdate = false; // (shadows lie on the model: they change with the lights or the pose, not as the camera turns)
     this.scene = new T.Scene();
     this.holder = new T.Group();
     this.scene.add(this.holder);
@@ -141,7 +176,10 @@ export class ModelStage {
   /** Shows a model, in the middle, a unit across. The model is freed with the stage or the next one. */
   setModel({ root: model, clips }: ReadModel): void {
     if (this.model) (this.holder.remove(this.model), free(this.model));
+    this.mixer?.stopAllAction();
+    this.mixer?.uncacheRoot(this.mixer.getRoot());
     this.own.clear();
+    this.gl.shadowMap.needsUpdate = true;
     this.shownSurface = "";
     this.clips = clips;
     this.shownClip = -1;
@@ -155,13 +193,16 @@ export class ModelStage {
     model.position.sub(c);
     g.scale.setScalar(k);
     g.add(model);
+    let triangles = 0;
     model.traverse((o) => {
       const m = o as Mesh;
       if (m.isMesh) {
+        triangles += (m.geometry.index?.count ?? m.geometry.getAttribute("position")?.count ?? 0) / 3;
         this.own.set(m, m.material);
         m.castShadow = m.receiveShadow = true;
       }
     });
+    this.heavy = triangles > HEAVY_TRIANGLES;
     this.model = g;
     this.holder.add(g);
   }
@@ -172,7 +213,13 @@ export class ModelStage {
     const made = JSON.stringify(["key", "fill", "rim"].flatMap((k) => ["Type", "Colour", "Power", "Around", "Height"].map((n) => look[`${k}${n}`])).concat(look["ambientColour"]!, look["ambientPower"]!, look["shadows"]!));
     if (made === this.shownLights) return;
     this.shownLights = made;
-    for (const l of this.lights) (this.scene.remove(l), l.dispose());
+    this.gl.shadowMap.needsUpdate = true;
+    for (const l of this.lights) {
+      this.scene.remove(l);
+      const target = (l as Light & { target?: Object3D }).target;
+      if (target) this.scene.remove(target);
+      l.dispose();
+    }
     this.lights = [];
     const ambient = new T.AmbientLight(look["ambientColour"] as string, look["ambientPower"] as number);
     this.lights.push(ambient);
@@ -216,7 +263,11 @@ export class ModelStage {
     const bg = look["bg"] as string;
     this.gl.setClearColor(bg || 0x000000, bg ? 1 : 0);
     // Which way is up.
-    this.holder.rotation.set(look["up"] === "z" ? -Math.PI / 2 : 0, 0, 0);
+    const upX = look["up"] === "z" ? -Math.PI / 2 : 0;
+    if (this.holder.rotation.x !== upX) {
+      this.holder.rotation.set(upX, 0, 0);
+      this.gl.shadowMap.needsUpdate = true;
+    }
     // The surface.
     const surface = look["surface"] as string;
     const { clay, flat, wire, tones } = this.plain;
@@ -234,6 +285,7 @@ export class ModelStage {
     }
     if (surface !== this.shownSurface) {
       this.shownSurface = surface;
+      this.gl.shadowMap.needsUpdate = true;
       for (const [m, mat] of this.own) m.material = surface === "own" ? mat : surface === "clay" ? clay : surface === "tones" ? tones : surface === "flat" ? flat : wire;
     }
     // The pose: one moment of one of its animations.
@@ -244,7 +296,12 @@ export class ModelStage {
         this.mixer.clipAction(this.clips[c]!).play();
         this.shownClip = c;
       }
-      this.mixer.setTime(Math.min(look["poseTime"] as number, this.clips[c]!.duration * 0.9999)); // (at its very end it would loop back to its start)
+      const pose = `${c}@${look["poseTime"]}`;
+      if (pose !== this.shownPose) {
+        this.shownPose = pose;
+        this.mixer.setTime(Math.min(look["poseTime"] as number, this.clips[c]!.duration * 0.9999)); // (at its very end it would loop back to its start)
+        this.gl.shadowMap.needsUpdate = true;
+      }
     }
     this.setLights(look);
     // The camera, in spherical steps round the middle: the model is a unit across, fitted at a zoom of 1.
@@ -294,7 +351,7 @@ let cardStage: { stage: ModelStage | null; hash: string; timer: ReturnType<typeo
 let queue: Promise<unknown> = Promise.resolve();
 const CARD_STAGE_IDLE_MS = 15_000;
 /** Past this a model has a plain card (it can still be opened): reading one is done on the page. */
-const MAX_CARD_MODEL_BYTES = 64 * 2 ** 20;
+const MAX_CARD_MODEL_BYTES = 2 ** 29;
 const dropCardStage = (): void => {
   cardStage?.stage?.dispose();
   if (cardStage) clearTimeout(cardStage.timer);
@@ -305,7 +362,8 @@ const dropCardStage = (): void => {
 export const modelCardFit = (ratio: number): { w: number; h: number } => (ratio >= 1 ? { w: MODEL_CARD_EDGE, h: Math.max(1, Math.round(MODEL_CARD_EDGE / ratio)) } : { w: Math.max(1, Math.round(MODEL_CARD_EDGE * ratio)), h: MODEL_CARD_EDGE });
 
 /** The picture of a model with a look, at `size` or else with its longer side `edge`. Null when it cannot be read or drawn. */
-export function modelPicture(read: () => Promise<Uint8Array>, name: string, o: { hash?: string | undefined; size?: { w: number; h: number } | undefined; edge?: number | undefined; preview?: string | undefined }): Promise<ImageBitmap | null> {
+export function modelPicture(read: () => Promise<Uint8Array>, name: string, o: { hash?: string | undefined; fileSize?: number | undefined; size?: { w: number; h: number } | undefined; edge?: number | undefined; preview?: string | undefined }): Promise<ImageBitmap | null> {
+  if ((o.fileSize ?? 0) > MAX_CARD_MODEL_BYTES) return Promise.resolve(null); // (known without reading it)
   const run = async (): Promise<ImageBitmap | null> => {
     if (!cardStage) cardStage = { stage: await ModelStage.make(), hash: "", timer: setTimeout(() => undefined, 0) };
     const held = cardStage;

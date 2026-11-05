@@ -1083,6 +1083,39 @@ test("hidden items and sync tools: a conflict copy of hidden.json is joined, a l
   }
 });
 
+test("a library folder deleted outside the app stays deleted, while it runs and after a restart; one never seen on disk is made", async () => {
+  const ws = tempDir("cv-folders-");
+  let { app, page } = await launch(ws);
+  const names = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.folders.map((f) => f.name).sort()));
+  try {
+    await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f1", "Going"));
+    await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f2", "Staying"));
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await expect.poll(() => existsSync(join(ws, "library/Going"))).toBe(true);
+    await page.waitForTimeout(500);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    rmSync(join(ws, "library/Going"), { recursive: true });
+    await expect.poll(names, { timeout: 20_000 }).toEqual(["Staying"]);
+    await page.evaluate(() => window.__canvastDebug.libraryOp("createFolder", "f3", "Another"));
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await expect.poll(() => existsSync(join(ws, "library/Another"))).toBe(true);
+    expect(existsSync(join(ws, "library/Going"))).toBe(false);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+  } finally {
+    await app.close();
+  }
+  // While it is closed.
+  rmSync(join(ws, "library/Staying"), { recursive: true });
+  ({ app, page } = await launch(ws));
+  try {
+    await expect.poll(names, { timeout: 20_000 }).toEqual(["Another"]);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    expect([existsSync(join(ws, "library/Going")), existsSync(join(ws, "library/Staying"))]).toEqual([false, false]);
+  } finally {
+    await app.close();
+  }
+});
+
 test("a hidden PDF opens in its view in hidden mode, with nothing of it readable on the disk", async () => {
   const ws = tempDir("canvast-ws-");
   const word = "HiddenWordInsideThePdf";
@@ -1877,7 +1910,7 @@ test("a note's pictures are found by their files: pasted ones (the disk's name n
   await page.keyboard.press("Control+s");
   await page.getByTestId("choose-dialog").getByRole("button", { name: "Save" }).click();
   await expect.poll(() => files(ws).filter((f) => /out\./.test(f)), { timeout: 15_000, message: "the note saved as rich text" }).toEqual(["library/ext/out.note.html"]).catch(async (e: Error) => {
-    throw new Error(`\${e.message}\nDialogs open: \${JSON.stringify(await page.locator("dialog[open]").allInnerTexts())}; bar says: \${await page.evaluate(() => document.querySelector(".hud-message, [role=status]")?.textContent ?? "")}`);
+    throw new Error(`${e.message}\nDialogs open: ${JSON.stringify(await page.locator("dialog[open]").allInnerTexts())}; bar says: ${await page.evaluate(() => document.querySelector(".hud-message, [role=status]")?.textContent ?? "")}`);
   });
   await app.close();
 });

@@ -31,6 +31,12 @@ const result = await build({
   plugins: [{
     name: "pdf-worker",
     setup(b) {
+      // The model reader's worker likewise: three.js' file readers, off the page.
+      b.onResolve({ filter: /^virtual:model-worker$/ }, () => ({ path: resolve(root, "src/assets/model-worker.ts"), namespace: "model-worker" }));
+      b.onLoad({ filter: /./, namespace: "model-worker" }, async (args) => {
+        const r = await build({ entryPoints: [args.path], bundle: true, format: "iife", target: ["es2020"], minify: true, write: false, legalComments: "none", define: { "import.meta.url": '""' }, logLevel: "error" });
+        return { contents: r.outputFiles[0].text, loader: "text" };
+      });
       b.onLoad({ filter: /pdf\.worker\.min\.mjs$/ }, async (args) => {
         const r = await build({ entryPoints: [args.path], bundle: true, format: "iife", target: ["es2020"], minify: true, write: false, legalComments: "none", define: { "import.meta.url": '""' }, logLevel: "error" });
         return { contents: r.outputFiles[0].text, loader: "text" };

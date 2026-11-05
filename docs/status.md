@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.39: deleted folders stay deleted, large 3D models open (2026-11-06)
+
+- **Implemented:** `LibraryState.dirs` and `dropFoldersDeletedOutside`; `src/assets/model-worker.ts`; shadow map on demand; size known before reading.
+- **Tested:** a desktop test of folders deleted while running and closed; a browser test of a 70 MB STL; local checks and unit tests.
+- **Known failures:** those of the last `Tests` run are being read.
+- **Unverified:** glTF and GLB are still read on the page; a file near the limits; on screen by hand.
+- **Committed:** v0.54.39.
+- **Next bounded task:** read the `Tests` run.
+
 ## v0.54.38: file views follow the theme (2026-11-06)
 
 - **Implemented:** `src/ui/view-bar.ts`; the Pattern panel's spacing shared with the 3D settings; new icons in the registry.

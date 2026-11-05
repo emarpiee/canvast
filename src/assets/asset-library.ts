@@ -322,7 +322,7 @@ export class AssetLibrary {
         duration = undefined;
         return;
       }
-      img = await makeFileCardFrom(file.name ?? "", describeFile(file.name ?? "", type).chip, async () => new Uint8Array(bytes));
+      img = await makeFileCardFrom(file.name ?? "", describeFile(file.name ?? "", type).chip, async () => new Uint8Array(bytes.slice(0)));
       size = { w: img.width, h: img.height }; // (400 × 300, but a note's page is as tall as the note)
       duration = undefined;
     };
@@ -594,7 +594,7 @@ export class AssetLibrary {
         // (a picture that does not decode: the file's own card)
       }
     }
-    return makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, async () => new Uint8Array(await rec.blob.arrayBuffer()), { size, hash: rec.hash, layoutW, preview });
+    return makeFileCardFrom(rec.name, describeFile(rec.name, rec.type).chip, async () => new Uint8Array(await rec.blob.arrayBuffer()), { size, hash: rec.hash, layoutW, preview, fileSize: rec.blob.size });
   }
 
   /** `key` is the hash, or `hash#ms` for the picture of a video at a time (doc/model.ts rasterKey). */

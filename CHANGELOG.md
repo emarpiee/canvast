@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.54.39 — Deleted folders stay deleted, large 3D models open (2026-11-06)
+
+- **Fixed:** a library folder deleted outside the app came back at every save and start. It now leaves the library; its items stay, shown as missing if their files went with it.
+- **Fixed:** a large 3D model opens and has a picture: up to 1 GB to open and 512 MB for a picture (they were 256 and 64 MB), and a file too large is no longer read into memory just to find that out.
+- **Fixed:** STL, PLY and OBJ files are read in a worker, so the page keeps working. Shadows are drawn only when the lights, the pose or the surface change, not at each frame of a drag; a model of over 2 million triangles draws one pixel to a pixel; light targets and animation data are let go.
+
 ## 0.54.38 — File views follow the theme (2026-11-06)
 
 - **Fixed:** a 3D view's settings have the same spacing as the Pattern panel, from the Density setting, and the bars of PDF and 3D views have controls of the usual size, in one shared button.

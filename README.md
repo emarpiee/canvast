@@ -1181,6 +1181,7 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 | A file in `library/` renamed or moved | Finds it again by its content; the item takes its new folder and name, and the links to it in notes follow |
 | A file in `library/` saved again by the program it is worked on in (a painting, a scene, a document: any kind of file) | Follows it: the item becomes the new version where it lies, keeping its name, folder, tags, note, fields and favourite, and every picture or card of it on any canvas shows the new version. A file still being saved (its size not yet still) is taken a moment later. The file is never written over or removed by this |
 | A new file in `library/` | Imports it where it lies, into the library folder of its folder (made if needed) |
+| A library folder deleted from `library/` | Stays deleted: it leaves the library, and its items stay, shown as missing when their files went with it. Only a place this device has seen on disk counts, so a folder from another device is made, and with `library/` itself gone nothing is concluded |
 | A file deleted from `library/` | Shows the item as missing. Deleting such an item, or any item, removes its file only when the file still holds what the item does: a file that changed (someone's newer work) is left where it is |
 | A file still being written (temporary, partial download) | Leaves it alone |
 | A canvas file that does not read whole (damaged, or still arriving) | Opens the workspace anyway, keeps showing this device's copy of that canvas, says so once, and reads the file again when it changes. It never writes over that file: delete it, or put a good copy back, to have this device's version written again |
@@ -1327,7 +1328,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Area | Limitation |
 | --- | --- |
 | PDF | Forms are shown but not filled; links to the web are not opened; a password is asked each time and a card shows no picture of such a PDF; a font a PDF does not carry comes from the system, and East Asian text that needs one may not show |
-| 3D | GLB, glTF, STL, OBJ and PLY only, one file each: what lies in another file (an OBJ's materials, a glTF's textures) and compressed glTF are not read; a model over 256 MB stays a card |
+| 3D | GLB, glTF, STL, OBJ and PLY only, one file each: what lies in another file (an OBJ's materials, a glTF's textures) and compressed glTF are not read; a model over 1 GB does not open, and over 512 MB has a plain card |
 | Text | No Indic shaping; other computers can wrap missing characters differently |
 | Vector networks | One fill for the whole network |
 | ⚠️ Notes | No autosave and no version history: a saved note replaces the file |
@@ -1349,7 +1350,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Area | Limitation |
 | --- | --- |
 | PDF | Forms are shown but not filled, and links to the web are not opened (links inside a PDF are followed). A PDF's password is asked each time it opens and kept nowhere, and its card shows no picture. A font a PDF does not carry comes from the system, and East Asian text that needs one may not show. The library's search reads PDFs up to 128 MB and 2000 pages |
-| 3D | Only GLB, glTF, STL, OBJ and PLY are read, one file each: an OBJ's materials, a glTF's textures in other files and compressed glTF are not. A model over 256 MB stays a card. Without 3D graphics in the browser or machine a model stays a card |
+| 3D | Only GLB, glTF, STL, OBJ and PLY are read, one file each: an OBJ's materials, a glTF's textures in other files and compressed glTF are not. A model over 1 GB does not open, and one over 512 MB has a plain card. Without 3D graphics in the browser or machine a model stays a card |
 | Text | Complex scripts that need Indic shaping are not supported; OpenType positioning goes no further than kerning. Characters missing from the interface font fall back to a system font: their width then comes from the browser, so such text can wrap differently on another computer and pixelates at extreme depth |
 | Vector networks | One fill for the whole network (no fill per region) |
 | Note zoom | Only a note's text grows; pictures keep their size |
