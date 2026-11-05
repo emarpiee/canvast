@@ -138,14 +138,14 @@ export function drawObjects(
         const edge = po.obj.media ? 0 : Math.max(po.obj.pixelW, po.obj.pixelH);
         const key = rasterKey(po.obj);
         const src = assets.get(key, shown, edge);
-        if (!src || !assets.wantedReady(key, shown, edge)) pending = true;
+        if (!assets.isLocked(key) && (!src || !assets.wantedReady(key, shown, edge))) pending = true; // (a padlock is all there will be: nothing to wait for)
         drawImageObject(c, t.inner, t.vvp, dpr, src, theme.imagePlaceholder, 0.5);
         if (!src && assets.isLocked(key)) drawLockMark(c, t.inner, dpr, theme.imageLocked);
       }
       c.restore();
     } else if (po.cover) {
       const src = po.obj.kind === "image" ? assets.get(rasterKey(po.obj)) : null;
-      if (po.obj.kind === "image" && !src) pending = true;
+      if (po.obj.kind === "image" && !src && !assets.isLocked(rasterKey(po.obj))) pending = true;
       drawCover(c, po, vp, src, theme.imagePlaceholder);
     } else if (po.obj.kind === "stroke") drawStroke(c, po, vp);
     else if (po.obj.kind === "text") drawText(c, po, vp, dpr);
@@ -157,7 +157,7 @@ export function drawObjects(
       const edge = po.obj.media ? 0 : Math.max(po.obj.pixelW, po.obj.pixelH);
       const key = rasterKey(po.obj);
       const src = assets.get(key, shown, edge);
-      if (!src || !assets.wantedReady(key, shown, edge)) pending = true;
+      if (!assets.isLocked(key) && (!src || !assets.wantedReady(key, shown, edge))) pending = true; // (a padlock is all there will be: nothing to wait for)
       drawImageObject(c, po, vp, dpr, src, theme.imagePlaceholder);
       if (!src && assets.isLocked(key)) drawLockMark(c, po, dpr, theme.imageLocked);
     }

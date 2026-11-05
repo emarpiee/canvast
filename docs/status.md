@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.21: copy fixes: stretched shapes, Copy as picture of a padlock (2026-11-05)
+
+- **Implemented:** the shapes' SVG from their own target; `copyAsShown` for Copy as picture.
+- **Tested:** `npm run typecheck`, checks and unit tests locally; two temporary desktop runs reproduced no failure by Ctrl+C or the menu's copy command; `desktop.spec`, read on GitHub's `Tests` run.
+- **Known failures:** none known until that run reports.
+- **Unverified:** that Copy as picture is what the owner pressed.
+- **Committed:** v0.54.21.
+- **Next bounded task:** read the `Tests` run; the owner's choice on the hidden copy timer.
+
 ## v0.54.20: the desktop app type-checks again (2026-11-05)
 
 - **Implemented:** the PNG for the clipboard as a plain array; a test's assertion corrected.

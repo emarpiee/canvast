@@ -2111,6 +2111,10 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await page.keyboard.press("Control+c");
     await expect.poll(() => out().then((o) => o.file.split(/\r?\n/).length)).toBe(2);
     expect((await out()).file).toMatch(/placed\.svg/);
+    // The shapes' own file keeps their proportions (not those of everything selected).
+    const shapesFile = readFileSync((await out()).file.split(/\r?\n/).find((f) => !f.includes("placed"))!, "utf8");
+    const [, boxW, boxH, wide, high] = /viewBox="0 0 (\S+) (\S+)" width="([\d.]+)[^"]*" height="([\d.]+)/.exec(shapesFile)!;
+    expect(Number(wide) / Number(high)).toBeCloseTo(Number(boxW) / Number(boxH), 1);
     expect((await out()).png, "several files go alone: given one picture, a program would leave the rest").toBe(false);
     await page.keyboard.press("Control+v");
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(6);
@@ -2126,6 +2130,16 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await page.waitForTimeout(1000);
     expect((await out()).svg).toBe(false);
     expect((await out()).file).not.toContain("placed");
+    expect((await out()).png, "it goes as a padlock").toBe(true);
+    // The Actions bar's Copy as picture too: a padlock, not a failure to read its file.
+    await page.evaluate(() => window.__canvastDebug.hiddenOp("lock"));
+    await clear();
+    await page.locator('[data-ctx="copypng"]').first().click();
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.blur()); // (away from the app before it is ready: it still lands)
+    await expect.poll(() => out().then((o) => o.png)).toBe(true);
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.focus());
+    await expect(page.getByTestId("toast")).toContainText("padlock");
+    await page.evaluate(() => window.__canvastDebug.hiddenOp("check", "pw"));
     // In the library: an SVG goes as itself.
     await page.getByTestId("view-assets").click();
     await page.getByTestId("assets-import-input").setInputFiles({ name: "shelf.svg", mimeType: "image/svg+xml", buffer: MARK("shelf-mark") });
@@ -2194,6 +2208,39 @@ test("Copy of vectors reaches other programs as SVG and PNG; a hidden SVG asks f
     await page.keyboard.press("Control+c");
     await page.waitForTimeout(500);
     expect((await out()).file).toBe("");
+  } finally {
+    await app.close();
+  }
+});
+
+test("Copy on the canvas: a flipped picture alone goes as a PNG, and among several as a new file as it looks", async () => {
+  const ws = tempDir("cv-copy-edited-");
+  const { app, page } = await launch(ws, "userdata", true);
+  const out = () => app.evaluate(async ({ clipboard }) => {
+    const [item] = await clipboard.read();
+    return { png: !!item?.types.includes("image/png"), files: item?.types.includes("text/uri-list") ? decodeURIComponent(await (await item.getType("text/uri-list") as Blob).text()).trim().split(/\r?\n/).map((f) => f.replace(/^file:\/\//, "")) : [] };
+  });
+  try {
+    for (const [name, seed] of [["plain.png", 40], ["changed.png", 200]] as const) {
+      const before = await page.evaluate(() => window.__canvastDebug.objects().length);
+      await page.getByTestId("import-input").setInputFiles({ name, mimeType: "image/png", buffer: makePng(60, 40, (x) => [x * 4, seed, 90, 255]) });
+      await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(before + 1);
+    }
+    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/")).length, { timeout: 15_000 }).toBe(2);
+    await page.getByRole("button", { name: "Flip horizontally" }).click(); // (the last one, still selected)
+    await app.evaluate(({ clipboard }) => clipboard.clear());
+    await page.keyboard.press("Control+c");
+    await expect.poll(() => out().then((o) => o.png)).toBe(true);
+    expect((await out()).files).toEqual([]);
+    await page.keyboard.press("Control+a");
+    await app.evaluate(({ clipboard }) => clipboard.clear());
+    await page.keyboard.press("Control+c");
+    await expect.poll(() => out().then((o) => o.files.length)).toBe(2);
+    const got = (await out()).files;
+    expect(got.some((f) => f.endsWith("plain.png"))).toBe(true);
+    const edited = got.find((f) => f.endsWith("changed-edited.png"))!;
+    expect(readFileSync(edited).subarray(1, 4).toString()).toBe("PNG");
+    expect((await out()).png).toBe(false);
   } finally {
     await app.close();
   }

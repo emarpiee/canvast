@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.54.21 — Copy fixes: stretched shapes, Copy as picture of a padlock (2026-11-05)
+
+- **Fixed:** shapes copied with other things went into their SVG file stretched to the proportions of everything selected.
+- **Fixed:** **Copy as picture** of a locked hidden item failed; it copies as a padlock, as any copy of it does. In reach, it asks first, as any copy of a hidden item does.
+- **Fixed:** among several things copied on the canvas, a cropped, flipped or adjusted picture was left out; it goes as a new file as it looks now, named `…-edited.png`. A video's or a GIF's edits are still left out.
+- **Fixed:** in the desktop app a copy no longer fails if you leave the window before it is ready, and a padlock no longer waits about three seconds for a picture that will not come.
+
 ## 0.54.20 — The desktop app type-checks again (2026-11-05)
 
 - **Fixed:** a type error in the desktop app's clipboard code, which stopped the CI check; nothing changes for use.

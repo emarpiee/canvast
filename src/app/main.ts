@@ -34,7 +34,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
+import { imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, buildTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -61,6 +61,7 @@ import { openBatchRename } from "../ui/batch-rename";
 import { askCurrentPassword, askPassword, forgetHiddenPassword, hiddenModeOn, hiddenRemembered, onHiddenRemembered } from "../ui/hidden-access";
 import { typeOfName } from "../storage/workspace-names";
 import { openLockScreen } from "../ui/lock-screen";
+import { renderedPicture } from "../render/adjust-image";
 import { MAX_COPIED_SVG, onePerPicture, svgCopy, writeSystemClipboard, type ClipboardFiles } from "./system-clipboard";
 import { LANDMARKS } from "../scene/landmarks";
 import { DocumentStore } from "../doc/document-store";
@@ -1383,7 +1384,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     copyAdjust: () => void copyAdjustments(doc, editor),
     pasteAdjust: () => pasteAdjustments(doc, editor),
     canPasteAdjust: () => canPasteAdjustments(),
-    copyRendered: () => void copyRenderedPicture(doc, editor, filesAssets),
+    copyRendered: () => void copyAsShown(),
     bake: () => void bakePicture(doc, editor, filesAssets, (shot) => storeFrame(assets, session, settings, shot)),
     selectedShape: () => {
       const o = selectedShape(doc, editor);
@@ -1799,7 +1800,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       },
       copyAdjust: () => void copyAdjustments(doc, editor),
       pasteAdjust: () => pasteAdjustments(doc, editor),
-      copyRendered: () => void copyRenderedPicture(doc, editor, filesAssets),
+      copyRendered: () => void copyAsShown(),
       bake: () => void bakePicture(doc, editor, filesAssets, (shot) => storeFrame(assets, session, settings, shot)),
       svgPicture: () => {
         const ids = [...editor.selection];
@@ -2585,7 +2586,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     const { w, h } = copySize(t, t.original ? Math.min(4096, Math.max(t.original.w, t.original.h)) : 1024);
     // one still picture goes as it looks with its crop and adjustments at full size; a GIF or video as the frame shown; the rest as drawn
     // (not a hidden one out of reach: what makes a file shows that as a padlock. One that cannot be made is drawn instead.)
-    const lockedOut = !hiddenInReach() && [...editor.selection].some((id) => assets.isHidden((doc.get(id) as { assetId?: string } | undefined)?.assetId ?? ""));
+    const lockedOut = hiddenOutOfReach();
     const still = t.original && !lockedOut ? renderedStill(doc, editor, filesAssets).catch(() => null) : Promise.resolve(null);
     const png = still
       .then((b) => b ?? renderExport({ doc, index, assets: filesAssets, theme }, t, w, h, "transparent").then((c) => new Promise<Blob>((ok, no) => c.toBlob((x) => (x ? ok(x) : no(new Error("no picture"))), "image/png"))))
@@ -2599,6 +2600,19 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   };
   /** A hidden item is a padlock outside hidden mode: no file action reaches it there, whatever the password state. */
   const hiddenInReach = (): boolean => hiddenModeOn() && (storage?.hidden ? storage.hidden.isOpen() : true);
+  const hiddenOutOfReach = (): boolean => !hiddenInReach() && [...editor.selection].some((id) => assets.isHidden((doc.get(id) as { assetId?: string } | undefined)?.assetId ?? ""));
+  /** Copy as picture: as it looks now. A hidden one out of reach is a padlock, as any copy of it is; one in reach asks first, as any copy of it does. */
+  const copyAsShown = async (): Promise<void> => {
+    const t = exportTargets(doc, editor)[0];
+    if (hiddenOutOfReach() && t) {
+      const { w, h } = copySize(t, 1024);
+      const png = renderExport({ doc, index, assets: filesAssets, theme }, t, w, h, "transparent").then((c) => new Promise<Blob>((ok, no) => c.toBlob((x) => (x ? ok(x) : no(new Error("no picture"))), "image/png")));
+      const done = await writeSystemClipboard({ image: png });
+      forgetCopiedPicture();
+      return copyOnCanvas.say(done === "failed" ? "Could not copy to the clipboard." : "A hidden item copies as a padlock outside hidden mode.");
+    }
+    if (await hiddenFine(await selectedFiles())) await copyRenderedPicture(doc, editor, filesAssets);
+  };
   /** The library files of the things selected that file actions may reach: not a text's font, not a padlock. */
   const selectedHashes = (): string[] =>
     [...new Set([...editor.selection].flatMap((id) => {
@@ -2650,15 +2664,29 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     const objs = [...editor.selection].map((id) => doc.get(id));
     const bridge = desktopBridge();
     const found = bridge ? await selectedFiles() : one;
-    const whole = found.filter((e) => objs.every((o) => (o as { assetId?: string } | undefined)?.assetId !== e.hash || asImported(o)));
-    const fine = await hiddenFine(whole);
+    const whole = found.filter((e) => objs.some((o) => (o as { assetId?: string } | undefined)?.assetId === e.hash && asImported(o)));
+    const fine = await hiddenFine(found);
     const ents = fine ? whole : whole.filter((e) => !meta(e).hidden);
-    const files = bridge && ents.length ? await filesOf(copyOnCanvas, bridge, ents) : undefined;
+    const real = bridge && ents.length ? await filesOf(copyOnCanvas, bridge, ents) : undefined;
+    // Pictures with their edits: among several, each as a new file as it looks now, since its own file does not show them. (A video's or a GIF's edits stay out.)
+    const edited: Array<{ name: string; bytes: Uint8Array }> = [];
+    if (bridge && objs.length > 1) {
+      for (const o of objs) {
+        if (o?.kind !== "image" || o.media || asImported(o)) continue;
+        const e = found.find((x) => x.hash === o.assetId);
+        if (!e || (meta(e).hidden && !fine)) continue;
+        const rec = await assets.record(o.assetId).catch(() => undefined);
+        const png = rec && (await renderedPicture(rec.blob, o).catch(() => null));
+        if (png) edited.push({ name: `${e.name.replace(/\.[^.]*$/, "")}-edited.png`, bytes: new Uint8Array(await png.arrayBuffer()) });
+      }
+    }
+    const files = real || edited.length ? { files: real?.files ?? [], copies: [...(real?.copies ?? []), ...edited], n: (real?.n ?? 0) + edited.length } : undefined;
     const lone = one[0] && ents[0]?.hash === one[0].hash && clipboardFor(one[0].name, one[0].type) === "vector" ? one[0] : undefined;
     const own = lone ? await (await copyOnCanvas.file(lone.hash))?.text().catch(() => undefined) : undefined;
-    // Shapes among other things: an SVG of the shapes alone, in the box of them all, so they keep their places.
+    // Shapes among other things: an SVG of the shapes alone, at their own proportions.
     const shapes = bridge && t && !t.vectors ? objs.filter((o): o is PathObject => o?.kind === "path" && !isContainer(o) && !isTexture(o.fill) && !isTexture(o.stroke)) : [];
-    const some = shapes.length ? svgOfTarget(doc, { ...t!, vectors: shapes }, { w: String(copySize(t!, 1000).w), h: String(copySize(t!, 1000).h) }) : null;
+    const theirs = shapes.length ? buildTarget(doc, shapes, null) : null;
+    const some = theirs ? svgOfTarget(doc, theirs, { w: String(copySize(theirs, 1000).w), h: String(copySize(theirs, 1000).h) }) : null;
     const made = svg ?? some ?? undefined;
     markCopiedPicture(); // (from now: a paste here is the objects, even before the copy is on the clipboard)
     // Several real files: those alone, as Copy file gives them, for a program given one picture would take that and leave the rest.

@@ -625,13 +625,12 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     // (what is copied goes every way a program may want it: the files, an SVG, a PNG, words)
     const { svg, png, text } = (also ?? {}) as { svg?: unknown; png?: unknown; text?: unknown };
     await clipboard.write([new ClipboardItem({
-      [raw("text/uri-list")]: new Blob([`${urls.join("\r\n")}\r\n`]),
-      [raw("x-special/gnome-copied-files")]: new Blob([`copy\n${urls.join("\n")}`]),
+      ...(urls.length ? { [raw("text/uri-list")]: new Blob([`${urls.join("\r\n")}\r\n`]), [raw("x-special/gnome-copied-files")]: new Blob([`copy\n${urls.join("\n")}`]) } : {}),
       ...(typeof svg === "string" ? { [raw("image/svg+xml")]: new Blob([svg]) } : {}),
       ...(png instanceof Uint8Array ? { [raw("image/png")]: new Blob([new Uint8Array(png)]) } : {}),
       ...(typeof text === "string" ? { [raw("text/plain")]: new Blob([text]) } : {}),
     })]);
-    return fulls.length;
+    return fulls.length || (svg !== undefined || png !== undefined || text !== undefined ? 1 : 0); // (how many things went)
   });
   // A real file drag out of the app (only the workspace's own files: a hidden item's is encrypted, and is not asked for). The picture under the pointer is a plain tile.
   ipcMain.removeAllListeners("canvast:startDrag");

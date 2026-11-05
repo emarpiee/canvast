@@ -40,8 +40,9 @@ export async function writeSystemClipboard(p: ClipboardParts): Promise<Clipboard
   const svgNow = p.svg && p.svg.length <= MAX_COPIED_SVG ? p.svg : undefined;
   const own = svgNow && p.svgFile ? [svgCopy(p.svgFile, svgNow)] : [];
   const copies = [...(p.files?.copies ?? []), ...own], files = p.files?.files ?? [];
-  if (bridge && files.length + copies.length > 0) {
+  if (bridge && (files.length + copies.length > 0 || p.image)) {
     // Every way a program may want it: one that takes files gets the files, one that takes pictures or words those. (The words go beside a picture only as below.)
+    // Through the app itself: the page may no longer have the focus when a picture is ready, and a page without it is refused.
     const image = await Promise.resolve(p.image).catch(() => undefined);
     const also = { ...(svgNow ? { svg: svgNow } : {}), ...(image ? { png: new Uint8Array(await image.arrayBuffer()) } : {}), ...(p.text && (!image || p.withText) ? { text: p.text } : {}) };
     if (await bridge.copyFiles(files, copies, also).catch(() => 0)) return image ? "image" : "files";
