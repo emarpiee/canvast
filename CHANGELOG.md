@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.29 — Code comes off again (2026-11-05)
+
+- **Fixed:** in a note, **Code** and the signs for formats did not take a format off when a whole line was selected; they go by all the words selected.
+
 ## 0.54.28 — A shorter setting (2026-11-05)
 
 - **Changed:** **Signs wrap selected words** says what it does on one line, with the signs under its More.

@@ -228,8 +228,14 @@ function libraryGallery<T extends GalleryClass>(base: T, choose: (kind: AttachKi
 // (SunEditor offers a file pasted or dropped to every plugin that takes it: a picture, video or sound is its own plugin's, not also a file's)
 /** A format of the selected words on or off, as the editor's own buttons do it. */
 function toggleInline($: SunEditor.Deps, tag: string, names: readonly string[], className = ""): void {
-  const here = $.selection.getNode();
-  const on = !!here && names.some((n) => helper.dom.query.getParentElement(here, n));
+  // On when all the words selected are in it: where the selection begins may be outside, as when a whole line is selected.
+  const sel = window.getSelection();
+  const range = sel?.rangeCount ? sel.getRangeAt(0) : null;
+  const root = range?.commonAncestorContainer;
+  const walker = root && document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const texts: Node[] = root?.nodeType === Node.TEXT_NODE ? [root] : [];
+  while (walker?.nextNode()) if (range?.intersectsNode(walker.currentNode) && walker.currentNode.textContent) texts.push(walker.currentNode);
+  const on = texts.length > 0 && texts.every((t) => names.some((n) => helper.dom.query.getParentElement(t, n)));
   if (on) return void $.inline.apply(null, { stylesToModify: className ? [`.${className}`] : [], nodesToRemove: names.map((n) => n.toUpperCase()), strictRemove: true });
   const el = document.createElement(tag);
   if (className) el.className = className;
