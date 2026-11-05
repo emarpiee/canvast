@@ -37,14 +37,14 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
-## v0.54.1: the thumbnail slider in the list too (2026-11-05)
+## v0.54.1: a Size menu, links both ways in notes, text files as notes, a better font preview (2026-11-05)
 
-- **Implemented:** `ui.listThumb`, `applyThumbSize` (row height and thumbnail from the slider); a longer slider; the columns button before the layout buttons; `src/ui/window-frame.ts` as a row that comes from the top edge; shared status bar height.
-- **Tested:** `assets.spec.ts` extended, on GitHub.
-- **Known failures:** a library drag once left the app stuck on a real desktop; its cause is not proven (the likeliest, a source card removed as the grid scrolled, is prevented now).
-- **Unverified:** the look on screen; the row on a real desktop and Wayland.
+- **Implemented:** the list's thumbnail slider; one scrollbar, one checkbox, one arrow, one focus ring; the window row without a drag area; the Links card, an always-there Linked from and Go to link; text files as plain text notes, spaces and line ends kept; note zoom by text size; the font preview's background, sample and type box, shared with the details and the canvas card; the Size menu, with layouts kept (`spreadFor`); import into the folder open in the sidebar.
+- **Tested:** the whole suite on GitHub; `spreadFor` in unit tests; the file manager drop confirmed on a real desktop.
+- **Known failures:** a linear note write-out lost a hidden note's edit under test, cause not found, so it was taken out and long notes stay slow. Firefox failed once each on a date property and a tag into YAML (5 s polls), and the desktop note pictures test twice before it waited for the picture; watch for repeats.
+- **Unverified:** the cause of the library drag that once left the app stuck; the look of the Size menu and of a font's previews by eye.
 - **Committed:** v0.54.1.
-- **Next bounded task:** the README's new layout.
+- **Next bounded task:** why the linear write-out lost an edit, then long notes again.
 
 ## v0.54.0: drag items out of the app; a window with no frame (2026-11-05)
 

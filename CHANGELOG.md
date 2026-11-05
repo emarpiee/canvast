@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.54.1 — The thumbnail slider in the list too; the window's row comes from the top edge (2026-11-05)
+## 0.54.1 — A Size menu, links both ways in notes, text files as notes, a better font preview (2026-11-05)
 
 - **Changed:** with Window frame off, the window's name and buttons are a row that floats over the app, from the very top edge when the pointer reaches it. It takes no room, it comes also when the pointer leaves over the top of the window, and clicks at the top of a window no longer go astray.
 - **Fixed:** with Window frame off, the row is there from the first moment and stays in front of the opening, lock and busy screens, with the workspace's name and the window's buttons. Before, it came only after unlocking, and no dialog let it through.
@@ -25,7 +25,7 @@
 - **Added:** `kind:typeface` finds fonts, as `kind:font` does.
 - **Fixed:** files imported into the library, dropped from a file manager or by Import or paste, go into the folder, tag or favourites open in the sidebar. A file the library already had stays where it is.
 - **Added:** a font in the viewer has the background button of see-through pictures, kept the same way, and a button that changes its sample sentence, kept too, in the details as well. It has more room around it. A font's preview in the details and its card on a canvas show that same sentence, background and letter colour.
-- **Added:** a box under a font's samples in the viewer to type in and see it in that font; what is typed goes from font to font and is dropped when the viewer closes.
+- **Added:** a box under a font's samples in the viewer to type in and see it in that font; what is typed stays.
 - **Added:** a fifth background for see-through pictures and fonts, the theme's own colour, which follows a change of theme. The background button shows the one in use, and the viewer's floating buttons stay visible under the pointer on any background.
 - **Fixed:** Reset size works at any zoom: past a certain zoom it offered nothing for what was placed before. Several reset together keep their layout: they move apart only as far as it takes to keep the gaps they had.
 - **Added:** a **Size** menu on the Actions bar, with Reset size and the width or height of the smallest, medium or largest of the selected, pictures, notes, shapes, strokes and text alike. Their layout is kept.
