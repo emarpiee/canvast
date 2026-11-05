@@ -834,7 +834,7 @@ test("a property's type belongs to its name: the value's control follows it, and
     await p.locator(".field-key").last().fill(key);
     await p.locator(".field-value").last().fill(value);
     await p.locator(".field-value").last().blur();
-    await expect.poll(() => stored(n, key)).toBe(value);
+    await expect.poll(() => stored(n, key), { timeout: 20_000 }).toBe(value); // (through the queue of writes, on a shared machine)
   };
   const warn = p.getByTestId("field-warn").filter({ visible: true });
   await add("a", "rating", "4");

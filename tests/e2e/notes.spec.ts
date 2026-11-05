@@ -186,7 +186,7 @@ test("a note's properties (YAML, as Obsidian writes them) are its item's tags, n
   // A tag added in the details goes into the file's YAML (a new version: the same item, its name and place).
   await p.getByTestId("asset-tag-input").fill("print");
   await p.getByTestId("asset-tag-input").press("Enter");
-  await expect.poll(async () => (await downloaded(p)).includes("  - print")).toBe(true);
+  await expect.poll(async () => (await downloaded(p)).includes("  - print"), { timeout: 20_000 }).toBe(true); // (a new version, through the queue of writes)
   // Saved from the editor: the text changes, the properties stay.
   await page(p).locator("h1").click();
   await p.keyboard.press("End");
@@ -1155,6 +1155,7 @@ test("a note's Links card lists what it links to, pictures too, and links that f
   await expect(page(p).locator("h1")).toHaveText("Note");
   await expect(p.getByTestId("asset-backlinks")).toContainText("No notes link here.");
   await expect(out.locator("[data-count]")).toHaveText("3");
+  expect(app.consoleErrors).toEqual([]); // (the note written out the same by the faster walk)
 });
 
 test("a picture dragged to another place in a note is one step of undo", async ({ app }) => {

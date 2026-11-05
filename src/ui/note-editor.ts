@@ -30,6 +30,8 @@ export interface NoteItem {
 export interface NoteHost {
   /** The whole note as a markdown file, properties and these words; null when it has none to carry. */
   whole(words: string, pasted: readonly Prop[]): string | null;
+  /** Read the library's list again: what the note's links point at may have arrived since it opened. */
+  reread(): Promise<void>;
   /** Read again what `whole` needs: the file and the item's properties. */
   refreshWhole(): Promise<void>;
   /** The folder of the note in the library (its links are relative to it). */
@@ -77,6 +79,8 @@ export interface NoteEditor {
   current(): string;
   /** The note was saved (`as` this content, else as it is now): what was typed since stays a change. */
   saved(as?: string): void;
+  /** Show the pictures that could not be found when the note opened, if they have arrived. Changes nothing in the note. */
+  retryPictures(): Promise<void>;
   destroy(): void;
 }
 
@@ -283,6 +287,38 @@ const localFiles = (files: unknown): File[] | null => {
  * Open a note in the notes editor (SunEditor) inside `el`. Its links to library items are shown from the library (pictures, videos,
  * sounds, files) and written back as they were, or, for what is added, as a path relative to the note; files added go into the library.
  */
+/**
+ * SunEditor writes out a note by a walk that tests its whole text so far at every closing tag, so a long note takes far longer than its length: seconds on opening
+ * and at each save. For the compact form it asks for itself (no line breaks or indents to work out) the same walk, in order and without that. Its own stays for the
+ * code view. With #debug (every test) both run, so that a difference shows as an error.
+ */
+function fasterCode(editor: { $: { html: unknown } }): void {
+  const html = editor.$.html as { _convertToCode(h: string | Node, comp: boolean): string };
+  const own = html._convertToCode.bind(html);
+  html._convertToCode = (h, comp) => {
+    if (!comp || typeof h === "string") return own(h, comp);
+    const parts: string[] = [];
+    const walk = (at: Node): void => {
+      for (const n of at.childNodes) {
+        if (n.nodeType === Node.COMMENT_NODE) parts.push(`\n<!-- ${(n.textContent ?? "").trim()} -->`);
+        else if (n.nodeType === Node.TEXT_NODE) {
+          if (!/^(OL|UL)$/i.test(n.parentElement?.nodeName ?? "")) parts.push(helper.converter.htmlToEntity(/^\n+$/.test((n as Text).data) ? "" : (n as Text).data));
+        } else if (!n.childNodes.length) parts.push((n as Element).outerHTML);
+        else {
+          const shell = (n.cloneNode(false) as Element).outerHTML;
+          parts.push(shell.slice(0, shell.indexOf(">") + 1));
+          walk(n);
+          parts.push(`</${n.nodeName.toLowerCase()}>`);
+        }
+      }
+    };
+    if (h) walk(h); // (its own takes no page too: asked after the editor closed, which a save on closing can be, it says nothing and does not throw)
+    const out = parts.join("").trim();
+    if (location.hash.includes("debug") && out !== own(h, comp)) console.error("canvast: a note written out differently by the faster walk");
+    return out;
+  };
+}
+
 export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; text: string; style: NoteStyle; host: NoteHost; /** The note's name (no extension), for {{title}}. */ title: string; /** The whole place it is shown in (else the library's viewer). */ root?: HTMLElement | null }): Promise<NoteEditor> {
   const { host } = opts;
   /** Each address shown in the note for a library item → the link written in the file for it. */
@@ -698,6 +734,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
 
   /** The editor's HTML without what only says what is selected now. */
   const settled = (h: string): string => h.replace(/ ?\b(?:se-component-selected|se-figure-selected)\b/g, "").replace(/ data-se-index="[^"]*"/g, "");
+  fasterCode(editor);
   savedHtml = settled(editor.$.html.get());
   const initialHtml = savedHtml;
   /** The file's words as they are now, and how the editor writes them: what a save does not change keeps the file's own spelling. */
@@ -726,6 +763,7 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       box.hidden = true;
       el.append(box);
       twin = suneditor.create(box.appendChild(document.createElement("div")), { ...content, buttonList: [], statusbar: false });
+      fasterCode(twin);
     }
     twin.$.html.set(twin.$.html.clean(h, { forceFormat: true, whitelist: null, blacklist: null }));
     // (attributes in one order: the editor writes a picture's in the order it set them)
@@ -833,6 +871,18 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
       savedHtml = typed ? as : now;
       dirty = typed;
       if (lastMd) ((fileBody = lastMd.text), (canon0 = lastMd.canon), (lastMd = null)); // (what the file says now)
+    },
+    async retryPictures() {
+      const broken = [...(page()?.querySelectorAll<HTMLImageElement>("img") ?? [])].filter((i) => i.complete && !i.naturalWidth && !/^(blob|data):/.test(i.getAttribute("src") ?? ""));
+      if (!broken.length) return;
+      await host.reread();
+      for (const i of broken) {
+        const link = i.getAttribute("src")!;
+        const target = linkTarget(link, host.dir);
+        const found = target && (await host.find(target));
+        const url = found && (await urlOf(found, link));
+        if (url && i.isConnected) i.setAttribute("src", url);
+      }
     },
     destroy() {
       window.removeEventListener("keydown", keys, true);

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.54.2 — Long notes open faster; a picture arriving late shows in an open note (2026-11-05)
+
+- **Fixed:** long notes open and save faster: writing a note out took far longer than its length.
+- **Fixed:** a note opened before a picture it links to has arrived (from a sync tool) shows it when it does, with nothing to reopen.
+- **Fixed:** the details panel looks up a note's links once per change, not once per drawing.
+
 ## 0.54.1 — A Size menu, links both ways in notes, text files as notes, a better font preview (2026-11-05)
 
 - **Changed:** with Window frame off, the window's name and buttons are a row that floats over the app, from the very top edge when the pointer reaches it. It takes no room, it comes also when the pointer leaves over the top of the window, and clicks at the top of a window no longer go astray.

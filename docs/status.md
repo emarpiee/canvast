@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.2: long notes open faster; a picture arriving late shows in an open note (2026-11-05)
+
+- **Implemented:** `fasterCode` in `ui/note-editor.ts` (a linear write-out); `retryPictures`; one link lookup at a time in the details.
+- **Tested:** on GitHub; with `#debug` both write-outs run and a difference is an error.
+- **Known failures:** none known. Firefox's two saved-change tests failed once each at 5 s and now allow 20 s: watch for a repeat.
+- **Unverified:** the gain on a real long note; the cause of the library drag that once left the app stuck.
+- **Committed:** v0.54.2.
+- **Next bounded task:** snapping to the grid and for all objects; grid settings.
+
 ## v0.54.1: a Size menu, links both ways in notes, text files as notes, a better font preview (2026-11-05)
 
 - **Implemented:** the list's thumbnail slider; one scrollbar, one checkbox, one arrow, one focus ring; the window row without a drag area; the Links card, an always-there Linked from and Go to link; text files as plain text notes, spaces and line ends kept; note zoom by text size; the font preview's background, sample and type box, shared with the details and the canvas card; the Size menu, with layouts kept (`spreadFor`); import into the folder open in the sidebar.

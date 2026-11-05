@@ -104,6 +104,10 @@ export class OpenNote {
             n.place.moved(from, to);
           }
       });
+      // A picture a note links to may arrive after the note (a sync tool writes them one by one).
+      deps.session.subscribeAssets(() => {
+        for (const n of open) if (n.deps.session === deps.session) void n.editor?.retryPictures().catch(() => undefined);
+      });
     }
     return note;
   }
@@ -128,8 +132,9 @@ export class OpenNote {
     const { session, assets, fonts } = this.deps;
     const hash = this.hash;
     const listing = await session.catalog?.list().catch(() => null);
-    const folders = listing?.folders ?? [];
-    const all: CatalogEntry[] = (listing?.entries ?? []).filter((x) => x.present && (this.place.hidden() || !meta(x).hidden));
+    let folders = listing?.folders ?? [];
+    const shownOf = (l: typeof listing): CatalogEntry[] => (l?.entries ?? []).filter((x) => x.present && (this.place.hidden() || !meta(x).hidden));
+    const all: CatalogEntry[] = shownOf(listing);
     const pathOf = (x: Pick<CatalogEntry, "hash" | "name" | "folderIds">): Promise<string[]> => session.itemPath(x, folders);
     const item = (x: CatalogEntry): NoteItem => ({ hash: x.hash, name: x.name, type: x.type });
     const fits = (kind: AttachKind | "any", x: CatalogEntry): boolean => kind === "any" || kind === "file" || (x.type.startsWith(`${kind}/`) && !x.card);
@@ -147,6 +152,12 @@ export class OpenNote {
     const dir = (await pathOf(self ?? { hash, name: this.name, folderIds: [] })).slice(0, -1);
     const host: NoteHost = {
       dir,
+      async reread() {
+        const now = await session.catalog?.list().catch(() => null);
+        if (!now) return;
+        folders = now.folders;
+        all.splice(0, all.length, ...shownOf(now));
+      },
       async find(t) {
         const x = "hash" in t ? all.find((y) => y.hash === t.hash) : await session.itemAtPath(t, all, folders);
         return x ? item(x) : null;

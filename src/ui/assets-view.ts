@@ -1112,9 +1112,20 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const lost = cards.missing.map((m) => `<li class="asset-link-missing" title="Nothing in the library has this name">${ICONS.fileIcon}<span class="asset-place-name">${esc(m)}</span></li>`);
     fill("asset-outlinks", isNote, cards.to.length + cards.missing.length, "out", [...cards.to.map(rowOf), ...lost], "This note links to nothing.");
   };
+  // (the details draw many times over one change: one lookup at a time, and one more after it for what came meanwhile)
+  let linksBusy = false;
+  let linksNext: string | null = null;
   const fillLinks = async (hash: string, again = false): Promise<void> => {
     if (lastLinks?.hash === hash && lastLinks.hiddenMode === hiddenMode && inspector.dataset["hash"] === hash) paintLinks(hash, lastLinks.cards); // (at once, so a card does not go and come back)
+    if (linksBusy) return void (linksNext = hash);
+    linksBusy = true;
     const cards = await session.linkCards(hash, hiddenMode).catch(() => null);
+    linksBusy = false;
+    if (linksNext !== null) {
+      const next = linksNext;
+      linksNext = null;
+      void fillLinks(next);
+    }
     if (inspector.dataset["hash"] !== hash) return; // (the details moved on: they have their own)
     if (!cards) {
       if (!again) window.setTimeout(() => void fillLinks(hash, true), LINKS_RETRY_MS); // (the storage busy, right after a save)
