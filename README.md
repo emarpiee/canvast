@@ -309,7 +309,7 @@ Everything you draw is vector, so it stays sharp at every magnification.
 
 #### Pattern
 
-38 vector patterns in six families and 29 guides in six more, each with its own settings and seed.
+38 vector patterns in six families and 55 guides in six more, each with its own settings and seed.
 
 ![The Pattern panel: the Contours generator on a sheet, with its colours, settings and seed](docs/screenshots/pattern.webp)
 
@@ -334,15 +334,15 @@ Everything you draw is vector, so it stays sharp at every magnification.
 - **Names on the canvas:** a sheet, picture, video or file card shows its name above its top-left corner; any other item shows its layer name while selected. Where the names of selected items would overlap (a group selected whole, a sheet and what is on it), only the outermost is written, as design tools write the name of a frame or group and not of every layer in it.
 - **Pattern** (the mountain button) makes vector patterns. The **Grid** pattern has square cells, as many rows as columns, a number of rows of its own, or an exact cell size, and says what the settings come to. Its Layout section adds a margin, a frame, shifts, a dash length and an angle. Randomize keeps its layout and changes its look. Sliders and numbers go far past the usual span (a very high count can make a heavy pattern); Randomize stays within the usual one.
   - **Two tabs:** **Patterns** and **Guides**. Each keeps its last choice, and the panel remembers the tab.
-  - **29 guides** for laying out and composing work, which start with no background so they sit over your work, on a sheet with no fill; *Background* is still there. Randomize changes a guide's look and keeps what it is. They are real objects, so lock them to keep them from catching clicks.
+  - **55 guides** for laying out and composing work, which start with no background so they sit over your work, on a sheet with no fill; *Background* is still there. Randomize changes a guide's look and keeps what it is. They are real objects, so lock them to keep them from catching clicks.
     | Family | Guides |
     | --- | --- |
-    | Proportion | Golden Ratio, Golden Spiral, Fibonacci Grid, Root Rectangles, Modular Scale |
-    | Composition | Rule of Thirds, Dynamic Symmetry, Harmonic Armature, Rabatment, Diagonal Grid, Center and Safe Marks |
-    | Layout | Grid, Column Grid, Modular Grid, Baseline Grid, Van de Graaf Canon, Bleed and Crop Marks |
-    | Perspective | Isometric Grid, Dimetric Grid, Triangle Grid, Perspective, Fisheye Grid |
-    | Geometry | Hex Grid, Polar Grid, Radial Symmetry, Logo Construction Circles, Sacred Circles |
-    | Art study | Pixel Grid, Comic Panels |
+    | Proportion | Golden Ratio, Golden Spiral, Fibonacci Grid, Root Rectangles, Modular Scale, Silver Ratio, Paper Sizes, Aspect Ratio Frames |
+    | Composition | Rule of Thirds, Dynamic Symmetry, Harmonic Armature, Rabatment, Diagonal Grid, Center and Safe Marks, Golden Triangles, Rule of Odds, Leading Lines, Visual Weight Quadrants |
+    | Layout | Grid, Column Grid, Modular Grid, Baseline Grid, Van de Graaf Canon, Bleed and Crop Marks, Manuscript Grid, Hierarchical Grid, Bento Grid, Device Frames |
+    | Perspective | Isometric Grid, Dimetric Grid, Triangle Grid, Perspective, Fisheye Grid, Cabinet and Cavalier, Curvilinear Perspective, Ground Plane, Cube Lattice |
+    | Geometry | Hex Grid, Polar Grid, Radial Symmetry, Logo Construction Circles, Sacred Circles, Rhombus Grid, Islamic Star Grid, Penrose Tiling, Voronoi Guide, Concentric Polygons, Spirograph Construction |
+    | Art study | Pixel Grid, Comic Panels, Isometric Pixel Grid, Tile and Sprite Sheet, Storyboard Frames, Value Scale, Color Wheel |
   - **38 patterns** in six families (Waves, Blobs, Soft, Lines, Tiles, Fields), shown as small pictures: Ripple, Tides, Drift, Bubbles, Glow, Grain, Stripes, Halftone, Tiles, Contours, Cells, Flow, Marble, Maze and more. Each has its own settings (counts, sizes, angles, colours, solid or outline) and a background you can hide.
   - **Where it goes:** select a sheet (the result goes on it) or a closed shape (it becomes the clipping mask that holds the result; its fill and outline come back on *Release*), or let it make a new sheet. With several sheets or shapes selected, it makes one pattern on each.
   - **Resetting:** double-click a setting's name or slider to reset that one; the Reset button resets them all.

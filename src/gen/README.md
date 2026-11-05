@@ -2,9 +2,9 @@
 
 Vector pattern generators for the web, with no dependencies and no link to the app they were made in (canvast). A generator is a pure function: the same settings and the same seed always give the same shapes. It makes plain vector shapes (Bézier paths with a fill and an outline, gradients included), and `toSvg` writes them as a standalone SVG. It runs anywhere JavaScript runs: a browser, a worker, Node, a server. It is small (about 36 KiB minified for all 39 generators), touches no page, and works from `file://`.
 
-* **67 generators**: 38 patterns in six families and 29 guides (`guide: true`) in six more (below), each with settings of its own that it declares as data: ranges, choices, switches and colours, in titled sections. A form can be built from them without knowing the generator (the demo page does).
+* **93 generators**: 38 patterns in six families and 55 guides (`guide: true`) in six more (below), each with settings of its own that it declares as data: ranges, choices, switches and colours, in titled sections. A form can be built from them without knowing the generator (the demo page does).
 * **A seed** for repeatable results (a regular pattern is exact until its *Looseness* is raised, and only then does the seed move things about), and **random settings** (`randomValues`) that stay inside the middle of each range, with colours that go together.
-* **Sizes are fractions of the box**, so a result looks the same at any size and ratio; an exact cell size or line height (Grid, Pixel Grid, Baseline Grid) is in the box's own units.
+* **Sizes are fractions of the box**, so a result looks the same at any size and ratio; an exact size (a cell, a column, a tile, a line height) is in the box's own units.
 * **Guides** are generators for laying out and composing work. They start with no background (`bg` is `""`, and the setting stays), and `randomValues` keeps their own settings, changing only their look.
 * **Held to what is valid:** `cleanValues` holds every value to its range, choice or colour, so any stored or typed settings are safe to pass in. A result is at most 5000 shapes (`MAX_SHAPES`), and several shapes of one colour are one path.
 
@@ -81,19 +81,19 @@ Without a bundler: `npm run build:patterns` (in canvast) writes `dist-patterns/`
 | Lines | Stripes (`stripes`): Parallel bands, straight or tilted; Chevrons (`chevrons`): Zigzag bands; Dots (`dots`): A grid of dots, regular or loose; Checks (`checks`): A checkerboard, straight or turned; Rings (`rings`): Concentric circles; Rays (`rays`): A sunburst from one point; Spiral (`spiral`): A spiral line; Orbits (`orbits`): Rings with dots travelling on them; Confetti (`confetti`): Small shapes thrown at random; Stars (`stars`): Scattered stars and sparkles; Halftone (`halftone`): Dots that grow along a direction, like print; Strands (`strands`): Many fine wavy lines side by side |
 | Tiles | Tiles (`tiles`): Hexagons, triangles or squares; Bricks (`bricks`): Offset rows of bricks; Scales (`scales`): Overlapping fish scales; Weave (`weave`): Bands woven over and under |
 | Fields | Contours (`contours`): Map-like lines of equal height; Cells (`cells`): Irregular cells that fit together; Cracks (`cracks`): The seams between irregular cells; Facets (`triangulate`): A low-poly field of triangles; Flow (`flow`): Lines that follow a wind; Branches (`branches`): A tree or a bolt of lightning; Maze (`maze`): A random maze of walls; Ribbons (`ribbons`): Flowing swooshes across the sheet; Marble (`marble`): Flowing veins like polished stone |
-| Proportion (guides) | Golden Ratio (`golden-ratio`), Golden Spiral (`golden-spiral`), Fibonacci Grid (`fibonacci-grid`), Root Rectangles (`root-rectangles`), Modular Scale (`modular-scale`) |
-| Composition (guides) | Rule of Thirds (`rule-of-thirds`), Dynamic Symmetry (`dynamic-symmetry`), Harmonic Armature (`harmonic-armature`), Rabatment (`rabatment`), Diagonal Grid (`diagonal-grid`), Center and Safe Marks (`safe-marks`) |
-| Layout (guides) | Grid (`grid`), Column Grid (`column-grid`), Modular Grid (`modular-grid`), Baseline Grid (`baseline-grid`), Van de Graaf Canon (`van-de-graaf`), Bleed and Crop Marks (`crop-marks`) |
-| Perspective (guides) | Isometric Grid (`isometric-grid`), Dimetric Grid (`dimetric-grid`), Triangle Grid (`triangle-grid`), Perspective (`perspective`), Fisheye Grid (`fisheye-grid`) |
-| Geometry (guides) | Hex Grid (`hex-grid`), Polar Grid (`polar-grid`), Radial Symmetry (`radial-symmetry`), Logo Construction Circles (`logo-circles`), Sacred Circles (`sacred-circles`) |
-| Art study (guides) | Pixel Grid (`pixel-grid`), Comic Panels (`comic-panels`) |
+| Proportion (guides) | Golden Ratio (`golden-ratio`), Golden Spiral (`golden-spiral`), Fibonacci Grid (`fibonacci-grid`), Root Rectangles (`root-rectangles`), Modular Scale (`modular-scale`), Silver Ratio (`silver-ratio`), Paper Sizes (`paper-sizes`), Aspect Ratio Frames (`aspect-frames`) |
+| Composition (guides) | Rule of Thirds (`rule-of-thirds`), Dynamic Symmetry (`dynamic-symmetry`), Harmonic Armature (`harmonic-armature`), Rabatment (`rabatment`), Diagonal Grid (`diagonal-grid`), Center and Safe Marks (`safe-marks`), Golden Triangles (`golden-triangles`), Rule of Odds (`rule-of-odds`), Leading Lines (`leading-lines`), Visual Weight Quadrants (`weight-quadrants`) |
+| Layout (guides) | Grid (`grid`), Column Grid (`column-grid`), Modular Grid (`modular-grid`), Baseline Grid (`baseline-grid`), Van de Graaf Canon (`van-de-graaf`), Bleed and Crop Marks (`crop-marks`), Manuscript Grid (`manuscript-grid`), Hierarchical Grid (`hierarchical-grid`), Bento Grid (`bento-grid`), Device Frames (`device-frames`) |
+| Perspective (guides) | Isometric Grid (`isometric-grid`), Dimetric Grid (`dimetric-grid`), Triangle Grid (`triangle-grid`), Perspective (`perspective`), Fisheye Grid (`fisheye-grid`), Cabinet and Cavalier (`oblique-grid`), Curvilinear Perspective (`curvilinear`), Ground Plane (`ground-plane`), Cube Lattice (`cube-lattice`) |
+| Geometry (guides) | Hex Grid (`hex-grid`), Polar Grid (`polar-grid`), Radial Symmetry (`radial-symmetry`), Logo Construction Circles (`logo-circles`), Sacred Circles (`sacred-circles`), Rhombus Grid (`rhombus-grid`), Islamic Star Grid (`islamic-stars`), Penrose Tiling (`penrose`), Voronoi Guide (`voronoi-guide`), Concentric Polygons (`concentric-polygons`), Spirograph Construction (`spirograph`) |
+| Art study (guides) | Pixel Grid (`pixel-grid`), Comic Panels (`comic-panels`), Isometric Pixel Grid (`iso-pixel-grid`), Tile and Sprite Sheet (`tile-sheet`), Storyboard Frames (`storyboard`), Value Scale (`value-scale`), Color Wheel (`colour-wheel`) |
 
 ## Files
 
 | File | What it is |
 | --- | --- |
 | `index.ts` | The API above: the registry, `generate`, the value helpers |
-| `guides.ts`, `guide-kit.ts` | The guides, and what they share: colours, look and a pen |
+| `guides.ts`, `guides-more.ts`, `guide-kit.ts` | The guides, and what they share: colours, look, a pen and a few helpers |
 | `types.ts` | `Generator`, `Setting`, `Section`, `GenShape`, `Values` |
 | `core.ts` | The few shared shapes (sub-path, paint, node helpers, colour parser), written out so nothing is imported from outside this folder |
 | `rng.ts`, `geom.ts`, `kit.ts` | Seeded random and noise, colour helpers; shape helpers (rectangle, ellipse, smooth curve, polygon); short builders for the settings |

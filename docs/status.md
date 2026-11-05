@@ -37,6 +37,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.14: 26 more guides, and easier settings (2026-11-05)
+
+- **Implemented:** 55 guides; `guides-more.ts`; helpers moved to `guide-kit.ts`; the settings changes in the changelog. Perspective's drag handles are not built: they would need a new canvas tool.
+- **Tested:** typecheck, checks and unit tests locally, with geometry checked where there is a right answer; `Tests` on GitHub.
+- **Known failures:** none known until that run reports.
+- **Unverified:** in the app by hand. The 26 new guides were looked at once as a drawn sheet, at default settings.
+- **Committed:** v0.54.14.
+- **Next bounded task:** read the `Tests` run; remind the owner of the backlog.
+
 ## v0.54.13: a typed pattern setting stays (2026-11-05)
 
 - **Implemented:** the panel takes stored settings only when they change.

@@ -81,7 +81,7 @@ function clip(poly0: P[], a: P, b: P): P[] {
   return out;
 }
 
-function voronoi(rng: Rng, count: number, relax: number, w: number, h: number): P[][] {
+export function voronoi(rng: Rng, count: number, relax: number, w: number, h: number): P[][] {
   let sites: P[] = Array.from({ length: count }, (): P => [rng() * w, rng() * h]);
   let cells: P[][] = [];
   for (let it = 0; it <= relax; it++) {

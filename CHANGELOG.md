@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.54.14 — 26 more guides, and easier settings (2026-11-05)
+
+- **Added:** 26 guides: Silver Ratio, Paper Sizes, Aspect Ratio Frames; Golden Triangles, Rule of Odds, Leading Lines, Visual Weight Quadrants; Manuscript Grid, Hierarchical Grid, Bento Grid, Device Frames; Cabinet and Cavalier, Curvilinear Perspective, Ground Plane, Cube Lattice; Rhombus Grid, Islamic Star Grid, Penrose Tiling, Voronoi Guide, Concentric Polygons, Spirograph Construction; Isometric Pixel Grid, Tile and Sprite Sheet, Storyboard Frames, Value Scale, Color Wheel.
+- **Changed:** every guide can have one margin or one across and another down. Grid and Pixel Grid can count strong lines apart across and down.
+- **Changed:** Golden Ratio has **From**; Golden Spiral has **First square**, **Turn** and **Rotate** in place of flips; Root Rectangles has **Direction** and **Align**; Rule of Thirds and Diagonal Grid have parts across and down, and Diagonal Grid a **Direction**.
+- **Changed:** Column and Modular Grid, Isometric, Dimetric, Triangle and Hex Grid can be set by count or by an exact size; Modular Grid can have a gutter down of its own; the lattices can shift; Hex Grid has **Gap**.
+- **Changed:** Perspective's points can leave the horizon; Polar Grid and Radial Symmetry can fit inside or go past the edges; Polar Grid has **Spoke start**; Comic Panels has a layout of your own and gutters across and down; Fisheye Grid has a centre and a strength down of their own.
+
 ## 0.54.13 — A typed pattern setting stays (2026-11-05)
 
 - **Fixed:** in the Pattern panel, a setting not yet made could go back to its last value; only undo and redo now bring stored settings back.

@@ -103,9 +103,9 @@ describe("pattern generators (ADR 0162)", () => {
     const ends = (s: { n: readonly number[] }) => [s.n[0]!, s.n[1]!, s.n[s.n.length - NODE]!, s.n[s.n.length - NODE + 1]!] as const;
     const PHI = (1 + Math.sqrt(5)) / 2;
 
-    it("are 29, each starting with no background and able to have one", () => {
+    it("are 55, each starting with no background and able to have one", () => {
       const guides = GENERATORS.filter((g) => g.guide);
-      expect(guides).toHaveLength(29);
+      expect(guides).toHaveLength(55);
       for (const g of guides) {
         const bg = settingsOf(g).find((s) => s.k === "bg")!;
         expect(bg.t === "colour" && bg.def === "" && bg.hide === true && bg.shown === "#ffffff", g.id).toBe(true);
@@ -216,6 +216,64 @@ describe("pattern generators (ADR 0162)", () => {
       expect(G("pixel-grid").readout!({ ...defaultValues(G("pixel-grid")), size: 16 }, 160, 80)).toBe("10 across, 5 down · cell 16 × 16");
       expect(G("column-grid").readout!({ ...defaultValues(G("column-grid")), cols: 2, gutter: 0 }, 800, 400)).toBe("2 across · column 400");
       expect(all("modular-grid", { cols: 3, rows: 2 })).toHaveLength(6);
+    });
+
+    it("their settings do what they say", () => {
+      const of = (id: string, o: Record<string, string | number | boolean>) => all(id, o);
+      // Margins apart: the box is smaller one way only.
+      const frame = generate(G("golden-ratio"), { ...defaultValues(G("golden-ratio")), frame: true, marginKind: "apart", margin: 10, marginY: 0, axis: "x" }, 1, 900, 600).find((x) => x.name === "Lines")!.sub.at(-1)!;
+      expect(frame.n[0]).toBeCloseTo(60, 6);
+      expect(frame.n[1]).toBeCloseTo(0.5 * ((3 / 100) * (900 / 16) * 0.5), 6); // (just inside the edge)
+      // Golden Ratio from one side: one line.
+      expect(uprights(of("golden-ratio", { axis: "x", from: "start" }))[0]!).toBeCloseTo(900 / PHI, 6);
+      expect(uprights(of("golden-ratio", { axis: "x", from: "end" }))[0]!).toBeCloseTo(900 - 900 / PHI, 6);
+      // Golden Spiral: starts where it is told, and stays a spiral.
+      const start = (o: Record<string, string>) => { const c = of("golden-spiral", { fit: "fill", showSquares: false, ...o }).at(-1)!; return [Math.round(c.n[0]!) + 0, Math.round(c.n[1]!) + 0]; }; // (+ 0: no minus zero)
+      expect(start({})).toEqual([0, 600]);
+      expect(start({ first: "end" })).toEqual([900, 0]);
+      expect(start({ turn: "ccw" })).toEqual([0, 0]);
+      expect(start({ first: "end", turn: "ccw" })).toEqual([900, 600]);
+      // Parts apart.
+      expect(of("rule-of-thirds", { parts: 3, partsY: 5, points: false })).toHaveLength(2 + 4);
+      expect(of("diagonal-grid", { across: 3, down: 2, way: "one" })).toHaveLength(6 + 1);
+      // Column Grid by size: exact, as many as fit.
+      expect(G("column-grid").readout!({ ...defaultValues(G("column-grid")), by: "size", cell: 100, gapSize: 20 }, 900, 600)).toBe("7 across · column 100");
+      // Hex by size, Comic your own rows.
+      expect(of("comic-panels", { layout: "own", row1: 1, row2: 3, row3: 0, row4: 0, bands: false })).toHaveLength(4);
+      // Fisheye off centre: its centre lines stay straight only through the centre.
+      const fish = (o: Record<string, number>) => of("fisheye-grid", { cols: 4, rows: 4, ...o })[1]!;
+      expect(fish({ centreX: 50 }).n[32 * NODE]).not.toBe(fish({ centreX: 20 }).n[32 * NODE]);
+      expect(fish({ bulge: 0, bulgeKind: "apart" as never, bulgeY: 200 }).n[32 * NODE]).toBeCloseTo(225, 6); // (Strength down bends only down)
+    });
+
+    it("the new guides: geometry that has a right answer", () => {
+      const xs = uprights(all("silver-ratio", { axis: "x" }));
+      expect((900 - xs[0]!) / xs[0]!).toBeCloseTo(1 + Math.SQRT2, 6);
+      expect(xs[1]!).toBeCloseTo(900 - xs[0]!, 6);
+      // Paper: every halving keeps the ratio of the A series.
+      const sheet = generate(G("paper-sizes"), { ...defaultValues(G("paper-sizes")), paper: 1 }, 1, 2000, 1000).flatMap((x) => x.sub).find((x) => x.closed)!;
+      expect((sheet.n[NODE]! - sheet.n[0]!) / (sheet.n[2 * NODE + 1]! - sheet.n[1]!)).toBeCloseTo(Math.SQRT2, 6);
+      // Golden Triangles: the perpendiculars meet the diagonal square.
+      const tri = all("golden-triangles", {});
+      expect(tri).toHaveLength(3);
+      const dir = (s: { n: readonly number[] }) => { const [a, b, c, d] = ends(s); return [c - a, d - b] as const; };
+      const [dx, dy] = dir(tri[2]!), [ex, ey] = dir(tri[0]!);
+      expect((dx * ex + dy * ey) / (Math.hypot(dx, dy) * Math.hypot(ex, ey))).toBeCloseTo(0, 6);
+      // Penrose: each level makes the same number of each tile, as the golden ratio says (of lines, two per triangle).
+      expect(all("penrose", { penrose: 1 })).toHaveLength(2 * 20);
+      expect(all("penrose", { penrose: 2 })).toHaveLength(2 * 50);
+      // Isometric pixels are 2:1.
+      const slopes = new Set(all("iso-pixel-grid", { every: 0 }).map((s) => { const [a, b, c, d] = ends(s); return Math.round((Math.abs(d - b) / Math.abs(c - a)) * 1000) / 1000; }));
+      expect([...slopes]).toEqual([0.5]);
+      // Sheets, scales and frames.
+      expect(G("tile-sheet").readout!({ ...defaultValues(G("tile-sheet")), cellW: 96, cellH: 96, pad: 4 }, 1000, 500)).toBe("10 across, 5 down");
+      const steps = generate(G("value-scale"), { ...defaultValues(G("value-scale")), valueSteps: 3, separators: false }, 1, 900, 600).map((x) => x.fill).filter(Boolean);
+      expect(steps).toEqual(["#000000", "#808080", "#ffffff"]);
+      expect(all("concentric-polygons", { rings: 4, spokes: false })).toHaveLength(4);
+      expect(all("colour-wheel", { harmony: "triad" }).length).toBe(2);
+      const bento = (seed: number) => JSON.stringify(generate(G("bento-grid"), defaultValues(G("bento-grid")), seed, 900, 600));
+      expect(bento(1)).toBe(bento(1));
+      expect(bento(1)).not.toBe(bento(2));
     });
 
     it("Comic Panels: Random follows the seed", () => {
