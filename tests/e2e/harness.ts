@@ -214,3 +214,15 @@ export async function contextChoose(page: Page, x: number, y: number, name: stri
   await page.getByRole("menuitem", { name }).click();
 }
 export const pathWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "pathmenu", id);
+
+/**
+ * After a backup is picked for import: a workspace backup asks how to import it (update this workspace, or add new boards); this answers
+ * it, "add" by default (what an import did before the choice). Another backup goes straight to its confirmation.
+ */
+export async function importMode(p: Page, mode: "add" | "update" = "add"): Promise<void> {
+  const choose = p.getByTestId("choose-dialog").filter({ hasText: "How to import" });
+  await expect(choose.or(p.getByTestId("confirm-dialog")).first()).toBeVisible({ timeout: 30_000 });
+  if (!(await choose.isVisible())) return;
+  await choose.locator(`input[value="${mode}"]`).check();
+  await choose.getByTestId("choose-ok").click();
+}

@@ -5,7 +5,7 @@ import { pathToFileURL } from "node:url";
 import { chromium, firefox, test } from "@playwright/test";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { buildDir } from "./build-dir";
-import { exportWith, expect, outlineShapes } from "./harness";
+import { exportWith, expect, outlineShapes, importMode } from "./harness";
 import { makePng } from "./png";
 
 /**
@@ -121,6 +121,7 @@ async function exportWorkspace(p: Page): Promise<{ name: string; bytes: Buffer }
 async function importWorkspace(p: Page, name: string, bytes: Buffer): Promise<void> {
   if (await p.getByTestId("set-export-full").isHidden()) await p.getByTestId("save-status").click();
   await p.getByTestId("set-import-input").setInputFiles({ name, mimeType: "application/zip", buffer: bytes });
+  await importMode(p);
   const dlg = p.getByTestId("confirm-dialog");
   await expect(dlg).toBeVisible();
   await p.getByTestId("toast").evaluate((t) => (t.textContent = ""));

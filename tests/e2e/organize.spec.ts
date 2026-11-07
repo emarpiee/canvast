@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import type { Page } from "@playwright/test";
-import { APP_URL, expect, test } from "./harness";
+import { APP_URL, expect, test, importMode } from "./harness";
 import { blockyFixture, makePng } from "./png";
 import { readZip } from "../../src/storage/zip";
 
@@ -597,6 +597,7 @@ test("tags, favourites, folders, notes and fields travel in archives and merge o
   for (let i = 0; i < 2; i++) {
     if (await q.getByTestId("set-export-full").isHidden()) await q.getByTestId("save-status").click();
     await q.getByTestId("set-import-input").setInputFiles({ name: dl.suggestedFilename(), mimeType: "application/zip", buffer: bytes });
+    await importMode(q);
     await q.getByTestId("confirm-ok").click();
     await expect(q.getByTestId("toast")).toContainText("Imported");
   }

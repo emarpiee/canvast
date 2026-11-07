@@ -12,7 +12,7 @@ import type { AssetRecord } from "../assets/asset-library";
 import { MAX_IMPORT_BYTES } from "../assets/asset-library";
 import type { CatalogEntry } from "../assets/asset-catalog";
 import type { AssetField, AssetFolder } from "../assets/asset-catalog";
-import { MAX_FIELDS, entryFromRecord, fieldParts, folderPath, meta, normalizeFields, normalizeNote, normalizeTags } from "../assets/asset-catalog";
+import { MAX_FIELDS, entryFromRecord, fieldParts, folderPath, meta, normalizeFields, normalizeNote, normalizeTags, visibleFolders } from "../assets/asset-catalog";
 import { sha256Hex } from "../assets/sha256";
 import type { StyleItem } from "../assets/styles";
 import { cleanStyles } from "../assets/styles";
@@ -205,6 +205,10 @@ export interface AssetOrganization {
 export interface Manifest {
   format: typeof ARCHIVE_FORMAT;
   version: number;
+  /** The workspace it was made from (0.54.61): an import updates the one whose boards and canvases it holds, by their ids. */
+  workspaceId?: string;
+  /** Every library folder (0.54.61), empty ones too, by path; a hidden one marked (not the desktop app's: they are in the key file, sealed). */
+  folders?: Array<{ path: string[]; hidden?: true }>;
   app: string;
   exportedAt: number;
   scope: ExportScope["kind"];
@@ -429,6 +433,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     boards,
     assets,
     missingAssets,
+    ...(scope.kind === "workspace" ? { workspaceId: ws.id, folders: await foldersOut(await libraryIn(tx, snap).folders(), !scope.skipHidden && !sealedHooks.key) } : {}),
     ...(scope.kind === "workspace" ? { styles: (((await req(tx.objectStore("meta").get("styles") as IDBRequest<unknown>)) as unknown[] | undefined) ?? []).slice(0, 5000) } : {}),
     ...(since !== undefined ? { incremental: { since } } : {}),
     ...(noBytes ? { libraryFile: true as const } : {}),
@@ -519,6 +524,8 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
 // ---- import -----------------------------------------------------------
 
 export interface PlannedCanvas {
+  /** Its id where it was made: an update replaces the canvas of that id. */
+  id?: string;
   name: string;
   objects: CanvasObject[];
   view: StoredView | null;
@@ -529,9 +536,15 @@ export interface PlannedCanvas {
 
 export interface ImportPlan {
   scope: ExportScope["kind"];
+  /** "add": new boards beside what is there (the default); "update": this workspace made as the backup is (its boards and canvases by id). */
+  mode: "add" | "update";
+  /** The workspace it was made from, when it says (0.54.61). */
+  workspaceId: string | null;
+  /** The library folders it lists (0.54.61), empty ones and hidden ones too. */
+  folders: Array<{ path: string[]; hidden: boolean }>;
   workspaceName: string;
   exportedAt: number;
-  boards: Array<{ name: string; canvases: PlannedCanvas[] }>;
+  boards: Array<{ id?: string; name: string; canvases: PlannedCanvas[] }>;
   /** Originals whose bytes matched their hash. */
   assets: AssetRecord[];
   /** Tags, favourite flag and folder paths per asset hash (merged into the library on import). */
@@ -576,6 +589,11 @@ export interface ImportResult {
   firstCanvasId: string | null;
   /** Saved styles added to the library. */
   stylesAdded: number;
+  /** An update: canvases this workspace changed since its last backup, kept beside the backup's as conflict copies. */
+  conflicts?: number;
+  /** An update: canvases not in the backup (deleted where it was made), put on a board of their own; items not in it, deleted. */
+  canvasesSetAside?: number;
+  itemsDeleted?: number;
 }
 
 /** Largest JSON part accepted, to fail fast instead of exhausting memory. */
@@ -723,8 +741,15 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
   const m = latest.m;
   const scope = m["scope"] as ExportScope["kind"];
   const problems: string[] = [];
+  const okId = (v: unknown): string | undefined => (typeof v === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(v) ? v : undefined);
   const plan: ImportPlan = {
     scope,
+    mode: "add",
+    workspaceId: okId(m["workspaceId"]) ?? null,
+    folders: (Array.isArray(m["folders"]) ? (m["folders"] as unknown[]) : []).flatMap((f) => {
+      const path = isObj(f) && Array.isArray(f["path"]) ? (f["path"] as unknown[]) : [];
+      return path.length && path.length <= 32 && path.every((n) => typeof n === "string" && n.trim() && n.length <= 200) ? [{ path: path as string[], hidden: isObj(f) && f["hidden"] === true }] : [];
+    }),
     workspaceName: str(m["workspaceName"], "workspace"),
     exportedAt: typeof m["exportedAt"] === "number" ? m["exportedAt"] : 0,
     boards: [],
@@ -759,7 +784,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
   const referenced = new Set<string>();
   for (const b of m["boards"] as unknown[]) {
     if (!isObj(b) || !Array.isArray(b["canvases"])) throw new ArchiveError("the archive manifest is damaged");
-    const board = { name: str(b["name"], "Imported board"), canvases: [] as PlannedCanvas[] };
+    const board = { ...(okId(b["id"]) ? { id: okId(b["id"])! } : {}), name: str(b["name"], "Imported board"), canvases: [] as PlannedCanvas[] };
     for (const c of b["canvases"] as unknown[]) {
       if (!isObj(c)) throw new ArchiveError("the archive manifest is damaged");
       const name = str(c["name"], "Imported canvas");
@@ -773,6 +798,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
       }
       const data = await readJson(where.entries, where.file);
       const planned = readCanvasData(data, name, problems, referenced);
+      if (okId(c["id"])) planned.id = okId(c["id"])!;
       board.canvases.push(planned);
       plan.objects += planned.objects.length;
     }
@@ -1100,8 +1126,8 @@ async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: st
     const ws = await req(tx.objectStore("workspaces").get(workspaceId) as IDBRequest<WorkspaceRecord | undefined>);
     if (!ws) throw new ArchiveError("workspace not found");
     let folders: AssetFolder[] | undefined;
-    const addCanvas = (boardId: string, c: PlannedCanvas): string => {
-      const canvas: CanvasRecord = { id: newObjectId(), boardId, name: c.name, revision: 0, objectCount: c.objects.length, updatedAt: now };
+    const addCanvas = (boardId: string, c: PlannedCanvas, id = newObjectId()): string => {
+      const canvas: CanvasRecord = { id, boardId, name: c.name, revision: 0, objectCount: c.objects.length, updatedAt: now };
       tx.objectStore("canvases").put(canvas);
       putCanvasContent(tx, canvas.id, c);
       if (c.view) tx.objectStore("canvasViews").put(c.view, canvas.id);
@@ -1110,7 +1136,12 @@ async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: st
       result.firstCanvasId ??= canvas.id;
       return canvas.id;
     };
-    if (plan.scope === "canvas") {
+    // An update (the person's choice): this workspace made as the backup is, its boards and canvases matched by id; what this workspace
+    // changed since its last backup is kept beside, and what the backup does not have, set aside, never erased (see updateBoards).
+    const update = plan.mode === "update" && plan.scope === "workspace";
+    const base = update ? ((await req(tx.objectStore("meta").get("backup") as IDBRequest<{ at?: number } | undefined>))?.at ?? 0) : 0;
+    if (update) await updateBoards(tx, ws, plan, base, now, result, addCanvas);
+    else if (plan.scope === "canvas") {
       const board = await req(tx.objectStore("boards").get(targetBoardId) as IDBRequest<BoardRecord | undefined>);
       if (!board) throw new ArchiveError("the target board was not found");
       for (const c of plan.boards.flatMap((b) => b.canvases)) board.canvasIds.push(addCanvas(board.id, c));
@@ -1134,7 +1165,16 @@ async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: st
       const e = await libraryIn(tx, snap).entry(a.hash);
       let entry: CatalogEntry = !e ? entryFromRecord(a) : e.state !== "active" ? { ...e, state: "active", deletedAt: null } : e;
       const org = plan.organization.get(a.hash);
-      if (org) {
+      if (update) {
+        // As the backup says (it was made after the changes it carries): a tag taken off, a favourite turned off, a new name or folder.
+        folders ??= [...(await libraryIn(tx, snap).folders())];
+        const { note: _n, fields: _f, thumb: _t, ...rest } = entry;
+        entry = { ...rest, name: a.name || entry.name, tags: normalizeTags(org?.tags ?? []), favorite: !!org?.favorite, hidden: !!org?.hidden, folderIds: org?.folders.length ? [resolveFolder(folders, org.folders[0]!)] : [] };
+        if (org?.note) entry.note = org.note;
+        if (org?.fields.length) entry.fields = org.fields;
+        if (org?.thumb) entry.thumb = org.thumb;
+        if (org?.viewer) entry.viewer = org.viewer;
+      } else if (org) {
         // Merge, never replace: tags are unioned, a favourite stays a favourite, folders are matched by path, a note is kept (the archive's
         // only fills an empty one), and the archive's fields this asset does not have yet (same name and value) are added after its own.
         folders ??= [...(await libraryIn(tx, snap).folders())];
@@ -1150,11 +1190,35 @@ async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: st
       }
       if (entry !== e) (snap ? libOps.push({ t: "entry", hash: entry.hash, v: entry }) : tx.objectStore("assetCatalog").put(entry));
     }
+    // The folders the backup lists, empty ones too; a hidden one hidden (the folder an item is in is made above from its path).
+    if (plan.folders.length) {
+      folders ??= [...(await libraryIn(tx, snap).folders())];
+      for (const f of plan.folders) {
+        const id = resolveFolder(folders, f.path);
+        if (f.hidden) folders = folders.map((x) => (x.id === id ? { ...x, hidden: true } : x));
+      }
+    }
+    if (update && result.canvases > 0) {
+      // Items this workspace had at its last backup that the backup does not have: deleted where it was made. Deleted here too (a
+      // desktop's file goes to .trash). A hidden one only when the backup carries hidden items; a copy of a file, as it is.
+      const inBackup = new Set([...plan.assets.map((a) => a.hash), ...plan.sealed.map((s) => s.hash)]);
+      const carriesHidden = plan.sealed.length > 0 || [...plan.organization.values()].some((o) => o.hidden);
+      for (const e of await libraryIn(tx, snap).entries()) {
+        if (e.state !== "active" || inBackup.has(e.hash) || e.hash.includes("~") || !(base > 0 && e.importedAt <= base) || (meta(e).hidden && !carriesHidden)) continue;
+        const gone: CatalogEntry = { ...e, state: "deleted", deletedAt: now };
+        snap ? libOps.push({ t: "entry", hash: e.hash, v: gone }) : tx.objectStore("assetCatalog").put(gone);
+        result.itemsDeleted = (result.itemsDeleted ?? 0) + 1;
+      }
+    }
     if (folders) (snap ? libOps.push({ t: "meta", k: "assetFolders", v: folders }) : tx.objectStore("meta").put(folders, "assetFolders"));
     // The password of the archive is taken only where this device has none: an import never replaces a password.
     if (plan.workspaceLock && !(await req(tx.objectStore("meta").get("workspaceLock") as IDBRequest<unknown>))) tx.objectStore("meta").put(plan.workspaceLock, "workspaceLock");
     if (plan.hiddenLock && !(await req(tx.objectStore("meta").get("hiddenLock") as IDBRequest<unknown>))) tx.objectStore("meta").put(plan.hiddenLock, "hiddenLock");
-    if (plan.styles.length) {
+    if (update) {
+      // an update: the saved styles are the backup's
+      tx.objectStore("meta").put(plan.styles, "styles");
+      result.stylesAdded = plan.styles.length;
+    } else if (plan.styles.length) {
       // the saved styles: the ones the library does not have yet are added (by id), none is replaced
       const have = cleanStyles(await req(tx.objectStore("meta").get("styles") as IDBRequest<unknown>));
       const ids = new Set(have.map((x) => x.id));
@@ -1177,6 +1241,107 @@ async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: st
     await committed.catch(() => undefined);
     throw e;
   }
+}
+
+/**
+ * An update's boards and canvases: each of the backup's by its id (a new one keeps its id, so the next backup matches it again), its content
+ * replaced; one this workspace changed since its last backup (`base`) is kept beside it first as a conflict copy. A canvas this workspace
+ * had at its last backup that the backup does not have was deleted where it was made: put on a board of its own ("Not in the backup"),
+ * never erased; an empty one goes. One made or changed here since is kept where it is.
+ */
+async function updateBoards(tx: IDBTransaction, ws: WorkspaceRecord, plan: ImportPlan, base: number, now: number, result: ImportResult, addCanvas: (boardId: string, c: PlannedCanvas, id?: string) => string): Promise<void> {
+  const boards = tx.objectStore("boards"), canvases = tx.objectStore("canvases");
+  const home = (await Promise.all(ws.boardIds.map((id) => req(boards.get(id) as IDBRequest<BoardRecord | undefined>)))).filter((b): b is BoardRecord => !!b);
+  const homeCanvases = new Map<string, CanvasRecord>();
+  for (const b of home) for (const id of b.canvasIds) {
+    const c = await req(canvases.get(id) as IDBRequest<CanvasRecord | undefined>);
+    if (c) homeCanvases.set(id, c);
+  }
+  const date = new Date(now).toISOString().slice(0, 10);
+  const clear = (id: string): void => {
+    tx.objectStore("objects").delete(range(id));
+    tx.objectStore("frames").delete(range(id));
+    tx.objectStore("bookmarks").delete(id);
+    tx.objectStore("canvasViews").delete(id);
+  };
+  const keepBeside = async (old: CanvasRecord): Promise<string> => {
+    const id = newObjectId();
+    for (const o of await req(tx.objectStore("objects").getAll(range(old.id)) as IDBRequest<ObjectRecord[]>)) tx.objectStore("objects").put({ ...o, canvasId: id });
+    for (const f of await req(tx.objectStore("frames").getAll(range(old.id)) as IDBRequest<FrameStoreRecord[]>)) tx.objectStore("frames").put({ ...f, canvasId: id });
+    const marks = await req(tx.objectStore("bookmarks").get(old.id) as IDBRequest<{ canvasId: string } | undefined>);
+    if (marks) tx.objectStore("bookmarks").put({ ...marks, canvasId: id });
+    const view = await req(tx.objectStore("canvasViews").get(old.id) as IDBRequest<StoredView | undefined>);
+    if (view) tx.objectStore("canvasViews").put(view, id);
+    canvases.put({ ...old, id, name: `${old.name} (conflict ${date})` } satisfies CanvasRecord);
+    result.conflicts = (result.conflicts ?? 0) + 1;
+    return id;
+  };
+  const placed = new Set<string>();
+  const out = new Map<string, BoardRecord>();
+  for (const b of plan.boards) {
+    const had = b.id && !placed.has(b.id) ? home.find((x) => x.id === b.id) : undefined;
+    const board: BoardRecord = had ? { ...had, name: b.name, canvasIds: [] } : { id: b.id && !placed.has(b.id) && !(await req(boards.get(b.id) as IDBRequest<BoardRecord | undefined>)) ? b.id : newObjectId(), workspaceId: ws.id, name: b.name, canvasIds: [], createdAt: now };
+    if (!had) result.boards++;
+    placed.add(board.id);
+    for (const c of b.canvases) {
+      const old = c.id && !placed.has(c.id) ? homeCanvases.get(c.id) : undefined;
+      if (old) {
+        if (base > 0 && old.updatedAt > base) board.canvasIds.push(await keepBeside(old));
+        clear(old.id);
+        putCanvasContent(tx, old.id, c);
+        if (c.view) tx.objectStore("canvasViews").put(c.view, old.id);
+        canvases.put({ ...old, boardId: board.id, name: c.name, revision: old.revision + 1, objectCount: c.objects.length, updatedAt: now } satisfies CanvasRecord);
+        result.canvases++;
+        result.objects += c.objects.length;
+        result.firstCanvasId ??= old.id;
+        board.canvasIds.push(old.id);
+        placed.add(old.id);
+      } else {
+        const free = c.id && !placed.has(c.id) && !(await req(canvases.get(c.id) as IDBRequest<CanvasRecord | undefined>));
+        const id = addCanvas(board.id, c, free ? c.id : undefined);
+        board.canvasIds.push(id);
+        placed.add(id);
+      }
+    }
+    out.set(board.id, board);
+  }
+  // What this workspace has that the backup does not.
+  const aside: string[] = [];
+  const order = [...out.keys()];
+  for (const hb of home) {
+    const keep: string[] = [];
+    for (const id of hb.canvasIds) {
+      if (placed.has(id)) continue;
+      const c = homeCanvases.get(id);
+      if (!c) continue;
+      if (c.objectCount === 0 && !(await req(tx.objectStore("bookmarks").get(id) as IDBRequest<unknown>))) {
+        canvases.delete(id); // (an empty canvas: a new workspace's first one, say; nothing of it is lost)
+        clear(id);
+      } else if (base > 0 && c.updatedAt <= base) aside.push(id);
+      else keep.push(id);
+    }
+    const mine = out.get(hb.id);
+    if (mine) mine.canvasIds.push(...keep);
+    else if (keep.length) {
+      out.set(hb.id, { ...hb, canvasIds: keep });
+      order.push(hb.id);
+    } else boards.delete(hb.id);
+  }
+  if (aside.length) {
+    const board: BoardRecord = { id: newObjectId(), workspaceId: ws.id, name: `Not in the backup (${date})`, canvasIds: aside, createdAt: now };
+    for (const id of aside) canvases.put({ ...homeCanvases.get(id)!, boardId: board.id });
+    out.set(board.id, board);
+    order.push(board.id);
+    result.canvasesSetAside = aside.length;
+  }
+  for (const b of out.values()) boards.put(b);
+  tx.objectStore("workspaces").put({ ...ws, boardIds: order } satisfies WorkspaceRecord);
+}
+
+/** The library folders for a backup, by path: the hidden ones only where they are not sealed in its key file and hidden items go in it. */
+async function foldersOut(all: readonly AssetFolder[], withHidden: boolean): Promise<Array<{ path: string[]; hidden?: true }>> {
+  const shown = new Set(visibleFolders(all).map((f) => f.id));
+  return all.filter((f) => withHidden || shown.has(f.id)).map((f) => ({ path: folderPath(all, f.id), ...(shown.has(f.id) ? {} : { hidden: true as const }) })).filter((f) => f.path.length > 0);
 }
 
 /** Id of the folder at `path` (names from the top), creating missing folders in `folders`. */

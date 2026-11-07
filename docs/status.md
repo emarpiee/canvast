@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.61: a backup updates a workspace (2026-11-08)
+
+- **Implemented:** `ImportPlan.mode` ("add" | "update"), `workspaceId` and `folders` in the manifest; `updateBoards` (by id, conflict copies against the last backup's time, set aside on a board "Not in the backup", empty canvases dropped); item details replaced in an update; items not in the backup deleted (imported before the last backup, a hidden one only when the backup carries hidden items, a copy never); styles replaced; workspace settings adopted. Import asks the mode (`chooseDialog`). Tests: harness `importMode`; away-and-back in archive.spec and desktop.spec.
+- **Limits:** copy-items go as their first item; an item deleted at home after the last backup but in the backup comes back.
+- **Committed:** v0.54.61.
+
 ## v0.54.60: hidden items' details come back from a new backup (2026-11-08)
 
 - **Implemented:** `MAX_KEY_FILE_BYTES` (256 MiB) for a backup's key file, read by the one import of both builds (it was 4 KiB; owner: 265 hidden items skipped in Chrome and Firefox).

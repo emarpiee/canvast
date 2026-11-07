@@ -2,7 +2,7 @@ import { createHash, scrypt as nodeScrypt } from "node:crypto";
 import { createVault, nameKeys, sealFile, sealName, sealText, useScrypt } from "../../src/storage/hidden-vault";
 import { readFile } from "node:fs/promises";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
-import { APP_URL, expect, openActions, rowAction, test } from "./harness";
+import { APP_URL, expect, openActions, rowAction, test, importMode } from "./harness";
 import { blockyFixture, makePng } from "./png";
 import { encodeGif } from "./gif";
 import { readZip, writeZip } from "../../src/storage/zip";
@@ -85,9 +85,10 @@ async function manifestOf(bytes: Buffer): Promise<Record<string, unknown> & { bo
 }
 
 /** Import through the storage panel; returns the confirmation dialog for inspection. */
-async function importArchive(p: Page, name: string, bytes: Buffer, accept = true): Promise<string> {
+async function importArchive(p: Page, name: string, bytes: Buffer, accept = true, mode: "add" | "update" = "add"): Promise<string> {
   await openPanel(p);
   await p.getByTestId("set-import-input").setInputFiles({ name, mimeType: "application/zip", buffer: bytes });
+  await importMode(p, mode);
   const dlg = p.getByTestId("confirm-dialog");
   await expect(dlg).toBeVisible();
   const text = (await dlg.textContent()) ?? "";
@@ -331,6 +332,40 @@ const hiddenDetails = (p: Page, hash: string) =>
 /** A note long enough that the hidden items' index is past the 4 KiB a key file was once read up to. */
 const LONG_NOTE = "From the life class. ".repeat(300).trim();
 
+test("away and back: a backup updates a workspace elsewhere and comes home: one set of boards, every change there, home's own change kept beside", async ({ app, browser }) => {
+  const p = app.page;
+  await importImage(p);
+  await p.evaluate((h) => window.__canvastDebug.libraryOp("note", h, "at home"), HASH);
+  await openPanel(p);
+  const home = await download(p, () => p.getByTestId("set-export-full").click());
+  const shape = (q: Page) => sess(q).then((s) => s.tree!.map((b) => [b.name, b.canvases.map((c) => c.name)]));
+  const note = (q: Page, h: string) => q.evaluate((x) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === x)?.note ?? null), h);
+  const { context, page: q } = await freshProfile(browser);
+  let away: { name: string; bytes: Buffer };
+  try {
+    // Away: an empty workspace takes the backup as it is (its ids kept), then work goes on there.
+    expect(await importArchive(q, home.name, home.bytes, true, "update")).toContain("This workspace, made as the backup is");
+    expect(await shape(q)).toEqual(await shape(p));
+    const c = (await sess(q)).tree![0]!.canvases[0]!.id;
+    await q.evaluate((id) => window.__canvastDebug.workspaceOp("renameCanvas", id, "Studies"), c);
+    await q.evaluate((h) => window.__canvastDebug.libraryOp("note", h, "changed away"), HASH);
+    await importImage(q, GREEN);
+    await openPanel(q);
+    away = await download(q, () => q.getByTestId("set-export-full").click());
+  } finally {
+    await context.close();
+  }
+  // Home, meanwhile: a canvas of its own changed since its backup.
+  await stroke(p, 300, 300);
+  await importArchive(p, away.name, away.bytes, true, "update");
+  const after = await shape(p);
+  expect(after.length).toBe(1); // (one set of boards, not the backup's beside home's)
+  expect(after[0]![1]).toEqual(expect.arrayContaining(["Studies", expect.stringMatching(/\(conflict /)]));
+  expect(await note(p, HASH)).toBe("changed away");
+  expect(await note(p, GREEN_HASH)).not.toBeNull();
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("hidden items, browser to browser: included in a backup, they come back hidden, with their note and the date they came", async ({ app, browser }) => {
   const p = app.page;
   await importImage(p, GREEN);
@@ -378,6 +413,7 @@ test("hidden items, desktop to browser: a desktop backup's sealed items, opened 
   // Imported here: the import asks their password, opens them and brings them in as hidden items.
   await openPanel(p);
   await p.getByTestId("set-import-input").setInputFiles({ name: "desktop.canvast", mimeType: "application/zip", buffer: desktop });
+  await importMode(p);
   await expect(p.getByTestId("confirm-dialog")).toContainText("1 hidden item, encrypted by the desktop app");
   await p.getByTestId("confirm-ok").click();
   await p.getByTestId("prompt-input").fill("Hidden pw");
@@ -589,6 +625,7 @@ test("an incremental backup holds only what changed, a chain of backups restores
     { name: inc.name, mimeType: "application/zip", buffer: inc.bytes },
     { name: full.name, mimeType: "application/zip", buffer: full.bytes },
   ]);
+  await importMode(q);
   const dlg = q.getByTestId("confirm-dialog");
   await expect(dlg).toBeVisible();
   expect((await dlg.textContent()) ?? "").toContain("2 files of a backup chain");
@@ -604,6 +641,7 @@ test("an incremental backup holds only what changed, a chain of backups restores
   // the incremental file alone says what it is; two of them without the full one are refused
   await openPanel(q);
   await q.getByTestId("set-import-input").setInputFiles({ name: inc.name, mimeType: "application/zip", buffer: inc.bytes });
+  await importMode(q);
   await expect(dlg).toBeVisible();
   const alone = (await dlg.textContent()) ?? "";
   expect(alone).toContain("incremental backup on its own");
@@ -615,6 +653,7 @@ test("an incremental backup holds only what changed, a chain of backups restores
     { name: inc.name, mimeType: "application/zip", buffer: inc.bytes },
     { name: "again.canvast", mimeType: "application/zip", buffer: inc.bytes },
   ]);
+  await importMode(q);
   await expect(q.getByTestId("toast")).toContainText(/Cannot import 2 backup files/);
   await other.context.close();
   expect(app.consoleErrors).toEqual([]);
@@ -636,6 +675,7 @@ test("Settings > Storage holds the backup: the last backup, a full export, the c
   await expect(p.getByTestId("set-last-backup")).toContainText("(incremental)");
   expect(((await manifestOf(inc.bytes))["incremental"] as { since: number }).since).toBe((await manifestOf(full.bytes))["exportedAt"]);
   await p.getByTestId("set-import-input").setInputFiles({ name: full.name, mimeType: "application/zip", buffer: full.bytes });
+  await importMode(p);
   await expect(p.getByTestId("confirm-dialog")).toBeVisible();
   await p.getByTestId("confirm-cancel").click();
   expect(app.consoleErrors).toEqual([]);

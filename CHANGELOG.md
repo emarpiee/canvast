@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.54.61 — A backup updates a workspace: work elsewhere, come back (2026-11-08)
+
+- **Added:** importing a workspace backup asks how: **Update this workspace** (as the backup is: boards and canvases matched by id and replaced, item details, saved styles and the workspace's settings from the backup; a canvas changed here since the last backup kept beside as a conflict copy; a canvas the backup does not have set aside on a board "Not in the backup", an item it does not have deleted) or **Add as new boards** (as before). Update comes first when the backup holds this workspace's canvases or the workspace is empty, so a backup taken elsewhere and brought back updates home, in the browser and the desktop app alike.
+- **Added:** a backup lists every library folder, empty ones too, a hidden one marked hidden (before, a folder went only with an item in it, and a hidden folder came back shown).
+- **Changed:** tests take a backup away and back, in the browser and in the desktop app.
+
 ## 0.54.60 — Hidden items' details come back from a new backup (2026-11-08)
 
 - **Fixed:** a backup made with 0.54.57 or later, with hidden items, said "N hidden items came without their key file and were skipped", in the browser and in the desktop app: the import read a key file of up to 4 KiB, and since it carries the hidden items' sealed index (their dates, tags and notes), it is as big as they are. It is read up to 256 MiB.

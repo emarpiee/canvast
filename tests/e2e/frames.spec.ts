@@ -1,4 +1,4 @@
-import { alignWith, arrangeWith, boolWith, contextChoose, expect, outlineShapes, recordMetric, setPenColour, test } from "./harness";
+import { alignWith, arrangeWith, boolWith, contextChoose, expect, outlineShapes, recordMetric, setPenColour, test, importMode } from "./harness";
 import type { App } from "./harness";
 import { blockyFixture, makePng } from "./png";
 import { readFile } from "node:fs/promises";
@@ -297,6 +297,7 @@ test("work at 2^10^12 and 10^15 saves, reopens after a reload, and travels in an
   await q.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await q.getByTestId("save-status").click();
   await q.getByTestId("set-import-input").setInputFiles({ name: "deep.canvast", mimeType: "application/zip", buffer: bytes });
+  await importMode(q);
   await q.getByTestId("confirm-ok").click();
   await expect(q.getByTestId("toast")).toContainText(/Imported/);
   // The imported canvas opens at its saved view with the same three objects in the same frames.

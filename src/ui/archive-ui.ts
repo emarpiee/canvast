@@ -193,12 +193,27 @@ export async function runImport(session: Session, picked: File | readonly File[]
   }
   const canvases = plan.boards.reduce((n, b) => n + b.canvases.length, 0);
   const count = (n: number, one: string, many = `${one}s`): string => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+  // A workspace backup can update this workspace (its boards and canvases by id) or come in beside it: an update first when the backup's
+  // canvases are here (one made here, taken away and changed) or this workspace is still empty (it keeps their ids for the way back).
+  if (plan.scope === "workspace" && !folder) {
+    const here = (session.tree?.boards ?? []).flatMap((b) => b.canvases);
+    const ids = new Set(here.map((c) => c.id));
+    const ours = plan.boards.some((b) => b.canvases.some((c) => c.id && ids.has(c.id)));
+    const empty = here.every((c) => c.objectCount === 0);
+    const choices = [
+      { value: "update", label: "Update this workspace", help: "As the backup is: its canvases replace theirs here, an item's details are the backup's. What changed here since your last backup is kept beside, as a conflict copy; what the backup does not have goes to a board of its own, or the library's deleted items." },
+      { value: "add", label: "Add as new boards", help: "Beside what is here: nothing here changes, the files and details it brings are added or merged." },
+    ];
+    const mode = await chooseDialog({ title: `How to import ${file.name}?`, lines: [ours ? "It holds canvases of this workspace." : empty ? "This workspace is empty." : "It is a backup of another workspace."], choices: ours || empty ? choices : [choices[1]!, choices[0]!], confirmLabel: "Next" });
+    if (mode === null) return;
+    plan.mode = mode === "update" ? "update" : "add";
+  }
   const facts: Array<[string, string]> = [
     ["From", `“${plan.workspaceName}”${plan.files > 1 ? `, ${plan.files} files of a backup chain` : ""}`],
     ["Exported", plan.exportedAt ? new Date(plan.exportedAt).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "at an unknown time"],
     ["Contains", [count(canvases, "canvas", "canvases"), count(plan.objects, "object"), count(plan.assets.length, "file")].join(" · ")],
     ["Checked", "All checksums and content hashes verified"],
-    ["Goes to", plan.scope === "canvas" ? "A new canvas on the open board" : plan.scope === "assets" ? "The library: its files are added to the library" : `${count(plan.boards.length, "new board")}; nothing existing is replaced`],
+    ["Goes to", plan.scope === "canvas" ? "A new canvas on the open board" : plan.scope === "assets" ? "The library: its files are added to the library" : plan.mode === "update" ? "This workspace, made as the backup is" : `${count(plan.boards.length, "new board")}; nothing existing is replaced`],
     ...(folder ? [["Originals", "Its files are the ones in the library folder"] as [string, string]] : []),
   ];
   const settings = session.settingsHook?.restorable(plan.settings) ?? 0;
@@ -226,11 +241,16 @@ export async function runImport(session: Session, picked: File | readonly File[]
       return;
     }
     const restored = session.settingsHook?.restore(plan.settings) ?? 0;
+    // (an update: the workspace's settings are the backup's; this device's own stay as they are)
+    if (plan.mode === "update") session.settingsHook?.adopt({ ...plan.settings, "@at": Date.now() });
     const opened = hidden ? await importBackupHidden(session, plan, hidden.key, saving) : null;
     const result =
       (restored ? `${plural(restored, "setting")} restored. ` : "") + `Imported ${plural(r.canvases, "canvas", "canvases")} and ${plural(r.objects, "object")}; ${plural(r.assetsAdded, "new file")} stored.` +
       (r.stylesAdded ? ` ${plural(r.stylesAdded, "saved style")} added.` : "") +
       (r.stillMissing ? ` ${plural(r.stillMissing, "file")} ${be(r.stillMissing)} still missing.` : "") +
+      (r.conflicts ? ` ${plural(r.conflicts, "canvas", "canvases")} changed here since your last backup ${were(r.conflicts)} kept beside, as conflict copies.` : "") +
+      (r.canvasesSetAside ? ` ${plural(r.canvasesSetAside, "canvas", "canvases")} not in the backup ${were(r.canvasesSetAside)} put on the board “Not in the backup”.` : "") +
+      (r.itemsDeleted ? ` ${plural(r.itemsDeleted, "item")} not in the backup ${were(r.itemsDeleted)} deleted.` : "") +
       (opened ? ` ${plural(opened.n, "hidden item")} opened${opened.left ? `; ${plural(opened.left, "hidden item")} did not open or ${be(opened.left)} too big for the browser, and ${were(opened.left)} left out` : ""}.` : sealedHere(plan) ? ` ${plural(plan.sealed.length, "hidden item")} left out (encrypted by the desktop app).` : "");
     // The desktop build: the import's files are written into the workspace folder first (the busy screen shows how far), then the
     // app starts again on what it now holds, and says the result.

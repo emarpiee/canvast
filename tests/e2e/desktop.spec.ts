@@ -7,6 +7,7 @@ import { createHash, scryptSync } from "node:crypto";
 import { buildDir } from "./build-dir";
 import { makeFakeMp4 } from "./mp4";
 import { makePng } from "./png";
+import { importMode } from "./harness";
 import { readZip, writeZip } from "../../src/storage/zip";
 
 // The desktop build (ADR 0177): the snapshot's own desktop shell (test-snap builds it into <snapshot>/desktop), on a
@@ -539,6 +540,59 @@ test("a big library (past the size library.json is kept for) writes only what ch
 /** A note long enough that the hidden items' index is past the 4 KiB a key file was once read up to (it was then skipped). */
 const LONG_NOTE = "From the life class. ".repeat(300).trim();
 
+test("away and back on the desktop: a backup updates another workspace folder and comes home: one set of boards, the changes made there, home's own change kept beside", async () => {
+  const pic = makePng(4, 3, () => [20, 120, 220, 255]);
+  const hash = createHash("sha256").update(pic).digest("hex");
+  const shape = (page: Page) => page.evaluate(() => window.__canvastDebug.session().tree!.map((b) => [b.name, b.canvases.map((c) => c.name)]));
+  const note = (page: Page) => page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.note ?? null), hash);
+  const importAs = async (app: ElectronApplication, page: Page, buffer: Buffer): Promise<void> => {
+    await page.getByTestId("save-status").click();
+    await page.getByTestId("set-import-input").setInputFiles({ name: "backup.canvast", mimeType: "application/zip", buffer });
+    await importMode(page, "update");
+    await Promise.all([page.waitForEvent("load", { timeout: 30_000 }), page.getByTestId("confirm-ok").click()]);
+    await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
+    await expect(page.getByTestId("toast")).toContainText(/Imported/);
+  };
+  const homeWs = tempDir("cv-home-");
+  let { app, page } = await launch(homeWs);
+  let homeBackup: Buffer;
+  try {
+    await page.getByTestId("import-input").setInputFiles({ name: "Ref.png", mimeType: "image/png", buffer: pic });
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(1);
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("note", h, "at home"), hash);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    homeBackup = await exportBackup(app, page, `${homeWs}-home.canvast`);
+  } finally {
+    await app.close();
+  }
+  const awayWs = tempDir("cv-away-");
+  ({ app, page } = await launch(awayWs, "away-userdata"));
+  let awayBackup: Buffer;
+  try {
+    await importAs(app, page, homeBackup);
+    const id = await page.evaluate(() => window.__canvastDebug.session().tree![0]!.canvases[0]!.id);
+    await page.evaluate((c) => window.__canvastDebug.workspaceOp("renameCanvas", c, "Studies"), id);
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("note", h, "changed away"), hash);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    awayBackup = await exportBackup(app, page, `${awayWs}-away.canvast`);
+  } finally {
+    await app.close();
+  }
+  ({ app, page } = await launch(homeWs));
+  try {
+    // Home, meanwhile: its canvas changed since its backup.
+    await page.getByTestId("import-input").setInputFiles({ name: "Other.png", mimeType: "image/png", buffer: makePng(2, 2, () => [200, 200, 20, 255]) });
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(2);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await importAs(app, page, awayBackup);
+    await expect.poll(() => shape(page).then((t) => t.length)).toBe(1);
+    expect((await shape(page))[0]![1]).toEqual(expect.arrayContaining(["Studies", expect.stringMatching(/\(conflict /)]));
+    await expect.poll(() => note(page)).toBe("changed away");
+  } finally {
+    await app.close();
+  }
+});
+
 test("hidden items, browser to desktop: a browser backup's hidden item (readable, marked hidden) comes in hidden, with its note and the date it came", async () => {
   const pic = makePng(5, 3, () => [200, 60, 120, 255]);
   const hash = createHash("sha256").update(pic).digest("hex");
@@ -567,6 +621,7 @@ test("hidden items, browser to desktop: a browser backup's hidden item (readable
     expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"))).ok).toBe(true);
     await page.getByTestId("save-status").click();
     await page.getByTestId("set-import-input").setInputFiles({ name: "browser.canvast", mimeType: "application/zip", buffer: made });
+    await importMode(page);
     await Promise.all([page.waitForEvent("load", { timeout: 30_000 }), page.getByTestId("confirm-ok").click()]);
     await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
     expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("check", "pw"))).ok).toBe(true);
@@ -645,6 +700,7 @@ test("a backup exported from Settings and imported into a workspace folder: writ
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.session().tree?.length ?? 0)).toBe(1);
     await page.getByTestId("save-status").click();
     await page.getByTestId("set-import-input").setInputFiles({ name: "backup.canvast", mimeType: "application/zip", buffer: Buffer.from(backup, "base64") });
+    await importMode(page);
     // Imported, its files written into the folder, then the app starts again on it and says the result.
     await Promise.all([page.waitForEvent("load", { timeout: 30_000 }), page.getByTestId("confirm-ok").click()]);
     await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
@@ -727,6 +783,7 @@ test("a backup of many files: the busy screen shows how far its files are writte
     await page.getByTestId("view-canvas").click();
     await page.getByTestId("save-status").click();
     await page.getByTestId("set-import-input").setInputFiles({ name: "backup.canvast", mimeType: "application/zip", buffer: backup });
+    await importMode(page);
     // (on a fast disk the screen may come and go in a moment: what it said is collected as it changes, across the reload)
     const said: string[] = [];
     page.on("console", (m) => m.text().startsWith("busy: ") && said.push(m.text().slice(6)));
@@ -1503,6 +1560,7 @@ test("a file past what the page can hold (300 MiB): imported by the button, hidd
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.session().tree?.length ?? 0)).toBe(1);
     await page.getByTestId("save-status").click();
     await page.getByTestId("set-import-input").setInputFiles(backup);
+    await importMode(page);
     await Promise.all([page.waitForEvent("load", { timeout: 120_000 }), page.getByTestId("confirm-ok").click({ timeout: 120_000 })]);
     await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
     await expect.poll(listing, { timeout: 60_000 }).toEqual([item]);
