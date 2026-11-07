@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.54 — Copies stored on desktop (2026-11-08)
+
+- **Fixed:** a copy found in `library/` was not stored on desktop: the app's main process refused its key, so 0.54.53 listed no copies there.
+
 ## 0.54.53 — Copies are items of their own (2026-11-08)
 
 - **Added:** on desktop, a copy of a file the library has, put in `library/` from outside (another folder, any name), is an item of its own: its own card, name, folder, tags and notes, never removed for being a copy. Before, it was left on disk with no item. Its details list the other items with the same file, and `is:copy` finds them.

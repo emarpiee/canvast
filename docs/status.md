@@ -37,6 +37,11 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.54: copies stored on desktop (2026-11-08)
+
+- **Implemented:** the main process takes copy keys (`HASH` in `desktop/main.ts` as `ITEM_KEY_RE`). Found by the desktop test on GitHub (the copy was never listed).
+- **Committed:** v0.54.54.
+
 ## v0.54.53: copies are items of their own (2026-11-08)
 
 - **Implemented:** item keys `<hash>~<n>` (`ITEM_KEY_RE`, `copyKey`, `contentOf`); `LibraryMirror.addCopy` in `scanThesePaths` and `scanFiles`; content checks (verify, follow, seal, unseal, write) by `contentOf`; place and backups by content; details `asset-copies` (icon `fileCopies`).

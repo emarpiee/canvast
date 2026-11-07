@@ -844,7 +844,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     }
     return (absentCache = out);
   };
-  const HASH = /^[0-9a-f]{64}$/;
+  const HASH = /^[0-9a-f]{64}(~[1-9][0-9]{0,5})?$/; // (an item: its content's hash, or a copy's `<hash>~<n>`, as ITEM_KEY_RE)
   const hashes = (a: unknown): string[] => (Array.isArray(a) ? a.filter((h): h is string => typeof h === "string" && HASH.test(h)) : []);
   // (what the page sends is checked: kinds, hashes and values; no SQL from the page)
   const opOf = (o: unknown): LibraryOp | null => {
