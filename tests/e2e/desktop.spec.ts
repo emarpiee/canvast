@@ -655,6 +655,25 @@ test("hidden items, browser to desktop: a browser backup's hidden item (readable
   } finally {
     await app.close();
   }
+  // Into an empty workspace, with no Hidden password yet: one is set in the import (typed twice), and they are encrypted then, not when the
+  // hidden list is first opened.
+  const empty = tempDir("cv-empty-");
+  ({ app, page } = await launch(empty));
+  try {
+    await page.getByTestId("save-status").click();
+    await page.getByTestId("set-import-input").setInputFiles({ name: "browser.canvast", mimeType: "application/zip", buffer: made });
+    await importMode(page);
+    await page.getByTestId("confirm-ok").click();
+    await page.getByTestId("prompt-input").fill("new pw");
+    await page.getByTestId("prompt-ok").click();
+    await page.getByTestId("prompt-input").fill("new pw");
+    await Promise.all([page.waitForEvent("load", { timeout: 60_000 }), page.getByTestId("prompt-ok").click()]);
+    await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
+    expect(files(empty).filter((f) => f.startsWith(".hidden/") && !f.startsWith(".hidden/thumbnails/") && !f.endsWith(".name"))).toHaveLength(1 + MANY.length);
+    expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("check", "new pw"))).ok).toBe(true);
+  } finally {
+    await app.close();
+  }
 });
 
 test("a backup exported from Settings and imported into a workspace folder: written as folders and files; Rebuild from the folder reads it all again", async () => {
