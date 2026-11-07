@@ -280,7 +280,13 @@ export class Library {
       }
       const was = this.seenOf(it.hash);
       if (was === v) return; // (nothing new from the folder)
-      if (changedHere(it.hash, was)) return; // changed here too: this device's stays
+      if (changedHere(it.hash, was)) {
+        // changed here too: this device's stays, but for when it came, which only goes earlier (an item recovered here from its hidden
+        // file a moment ago, dated now, takes the date the index says)
+        const mine = this.entry(it.hash);
+        if (mine && it.importedAt > 0 && it.importedAt < mine.importedAt) this.one({ t: "entry", hash: it.hash, v: { ...mine, importedAt: it.importedAt } }, mark);
+        return;
+      }
       const rec = this.rec(it.hash);
       const ops: LibraryOp[] = [{ t: "entry", hash: it.hash, v: entryOf(it, this.entry(it.hash)) }, { t: "seen", hash: it.hash, v }];
       if (it.file && (!rec || rec.ext)) {

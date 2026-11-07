@@ -138,6 +138,12 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   const folderWriting: FolderWriting = {
     subscribe: (fn) => (writingFns.add(fn), () => void writingFns.delete(fn)),
     now: () => writingNow,
+    sealPending: async () => {
+      mirror.library();
+      await mirror.flush();
+      const sealed = new Set((await lib.recs("sealed")).map((r) => r.hash));
+      return (await lib.entries("hidden")).filter((e) => e.state === "active" && !sealed.has(e.hash)).length;
+    },
   };
   const tree = (): void => mirror.tree();
   const canvases = (r: { canvases: string[] }): void => r.canvases.forEach((id) => mirror.canvas(id));

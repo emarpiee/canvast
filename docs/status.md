@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.63: an import finishes its encryption; dates kept (2026-11-08)
+
+- **Implemented:** `FolderWriting.sealPending` (write again, count hidden items not sealed), looped by the desktop import before its restart; `importedAt` only goes earlier in `applyRest` and the library sync (`take`, changed here).
+- **Tested:** browser to desktop with 25 hidden items, each its own date: all sealed before the restart, all dates after it; desktop to desktop: a shown item's date.
+- **Committed:** v0.54.63.
+
 ## v0.54.62: hidden items keep their details through every import (2026-11-08)
 
 - **Implemented:** `INDEXED_KEY` (blank only what the sealed index holds); the Hidden password asked at a desktop import that brings readable hidden items; temp files `.tmp-<uuid>` beside the file; `ImportPlan.unchangedIds`; hidden folders found in `hiddenFolders` (`fileInFolders`).

@@ -1169,6 +1169,9 @@ async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: st
       }
       const e = await libraryIn(tx, snap).entry(a.hash);
       let entry: CatalogEntry = !e ? entryFromRecord(a) : e.state !== "active" ? { ...e, state: "active", deletedAt: null } : e;
+      // (when it came into the library only ever goes earlier: one taken in a moment ago, by the folder's scan or as a recovered hidden file,
+      // takes the backup's date; one here long before keeps its own)
+      if (e && a.importedAt > 0 && a.importedAt < entry.importedAt) entry = { ...entry, importedAt: a.importedAt };
       const org = plan.organization.get(a.hash);
       if (update) {
         // As the backup says (it was made after the changes it carries): a tag taken off, a favourite turned off, a new name or folder.

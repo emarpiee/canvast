@@ -263,7 +263,18 @@ export async function runImport(session: Session, picked: File | readonly File[]
     if (session.storage?.folderWriting) {
       saving.update(null, "Writing the files into the workspace folder");
       await session.storage.flush(); // (its progress shows on this screen)
-      sayAfterReload(result);
+      // Every hidden item encrypted before the app starts again (the key is open now): a write that stopped half-way (one file it could not
+      // write) is done again, while each pass gets further; not left for after the start, when it would begin again on its own.
+      let left = 0;
+      if (session.storage.hidden?.isOpen()) {
+        left = await session.storage.folderWriting.sealPending();
+        for (let tries = 0; left > 0 && tries < 8; tries++) {
+          const now = await session.storage.folderWriting.sealPending();
+          if (now >= left) break;
+          left = now;
+        }
+      }
+      sayAfterReload(left ? `${result} ${plural(left, "hidden item")} could not be encrypted yet: ${left === 1 ? "it is" : "they are"} tried again when the Hidden items are opened.` : result);
       stayUnlockedOnReload(); // (the person was in the workspace already: the start after the import does not ask for the password)
       location.reload(); // (the screen stays until the app starts again)
       return;

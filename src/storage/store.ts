@@ -363,6 +363,8 @@ export interface FolderWriting {
   subscribe(fn: (done: number, total: number, encrypting?: boolean | "placing") => void): () => void;
   /** The write going on now, if any. */
   now(): { done: number; total: number } | null;
+  /** Writes the library again (hidden items encrypted, with the key open) and says how many hidden items are still not encrypted. */
+  sealPending(): Promise<number>;
 }
 
 /** The browser build's library folder: which originals are kept there, and moving them in and out. */
