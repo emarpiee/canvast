@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.52: Missing row, is:copy and is:samename, saved searches section (2026-11-08)
+
+- **Implemented:** scope `missing` (`inScope`, `SideCounts.missing`, desktop `counts`); `twinsOf`/`contentOf` and `Extra.copy`/`samename`; `renamed`/`moved` and in-place `keep` in `search/saved.ts`; sidebar rows with counts, look icon and the shared ⋯ (`SideKind` "saved"). Icon `fileMissing`.
+- **Tested:** unit (filters, twins, saved order and names); E2E extended (assets: Missing row; organize: count and rename). GitHub run pending.
+- **Committed:** v0.54.52. Next: copies as their own items (its own commit).
+
 ## v0.54.51: no made-up file endings (2026-11-08)
 
 - **Implemented:** `tidyName` and `diskExt` (`workspace-names.ts`): a tidied name keeps the file's ending on disk; `fileExt` makes one only from a type that names its kind of file, else none.

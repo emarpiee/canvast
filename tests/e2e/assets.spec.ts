@@ -434,6 +434,12 @@ test("a lost original is shown as missing and is restored everywhere by importin
   // The card still shows what the asset looked like, marked as missing.
   await expect.poll(() => card(p, HASH).locator("img").evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   await expect(card(p, HASH)).toContainText("File missing");
+  // The sidebar's Missing row lists it, with its count (as is:missing).
+  const missingRow = p.locator('[data-scope="missing"]');
+  await expect(missingRow.locator(".side-n")).toHaveText("1");
+  await missingRow.click();
+  await expect(card(p, HASH)).toBeVisible();
+  await p.locator('[data-scope="all"]').click();
   // Its slide view shows the thumbnail and says why.
   await card(p, HASH).dblclick();
   await expect(p.getByTestId("slide-view").locator("figcaption")).toContainText("The file is missing or damaged");

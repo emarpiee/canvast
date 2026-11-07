@@ -22,7 +22,7 @@ export const LIBRARY_ROWS: readonly { keys: string; does: string; example: strin
   { keys: "ratio:  orientation:", does: "shape of the picture", example: "ratio:16x9" },
   { keys: "colour:", does: "the colour that fills most of it", example: "colour:blue" },
   { keys: "kind:", does: "picture, video, audio, gif, font, file; note, vector, document, archive, 3d, preset, icon, art", example: "kind:note" },
-  { keys: "is:", does: "favourite, used, unused, missing, filed, unfiled, tagged, untagged, thumbed (has a custom thumbnail), unthumbed, trash (the workspace's .trash folder, by name)", example: "is:unused" },
+  { keys: "is:", does: "favourite, used, unused, missing, filed, unfiled, tagged, untagged, thumbed (has a custom thumbnail), unthumbed, copy (its file is also elsewhere in the library), samename (another item has its name), trash (the workspace's .trash folder, by name)", example: "is:unused" },
   { keys: "uses>  canvases>", does: "how often it is placed", example: "uses>2" },
   { keys: "date:  date>  date<", does: "the day it was added (2026-10, today, week, month)", example: "date:week" },
   { keys: "on:  folder:", does: "a canvas it is on, a folder it is in", example: "on:moodboard" },

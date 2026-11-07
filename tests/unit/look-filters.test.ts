@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { dateSpan, parseFilter, parseSeconds, type Extra } from "../../src/assets/filters";
 import { colourName, hamming, lookOf, similarGroups } from "../../src/assets/look";
-import { propValues, sortListed, type ListedEntry } from "../../src/assets/library-match";
+import { propValues, sortListed, twinsOf, type ListedEntry } from "../../src/assets/library-match";
 
 const grid = (f: (x: number, y: number) => [number, number, number, number], n = 32): Uint8ClampedArray => {
   const out = new Uint8ClampedArray(n * n * 4);
@@ -102,6 +102,9 @@ describe("library keywords", () => {
     expect(t("is:unthumbed")).toBe(true);
     expect(t("is:filed")).toBe(true);
     expect(t("is:missing", { present: false })).toBe(true);
+    expect(t("is:copy", item, { ...extra, copy: () => true })).toBe(true);
+    expect(t("is:copy")).toBe(false);
+    expect(t("is:samename", item, { ...extra, samename: () => true })).toBe(true);
     expect(parseFilter("is:nonsense")).toBeNull();
     expect(t("kind:video")).toBe(true);
     expect(t("kind:font", { name: "a.ttf", type: "font/ttf", card: true })).toBe(true);
@@ -173,5 +176,14 @@ describe("library keywords", () => {
     expect(t("duration>1m", {}, { ...extra, duration: () => undefined })).toBe("unknown");
     expect(t("duration>1m", {}, { ...extra, duration: () => null })).toBe(false);
     expect(parseFilter("duration>1m")!.needsDuration).toBe(true);
+  });
+});
+
+describe("what is in the library twice (is:copy, is:samename)", () => {
+  it("counts the same content under any name and the same name with any content, each side apart", () => {
+    const e = (hash: string, name: string, hidden = false) => ({ hash, name, state: "active", type: "image/png", ...(hidden ? { hidden: true } : {}) }) as never;
+    const t = twinsOf([e("a", "Cat.png"), e("a~2", "kitty.png"), e("b", "cat.png"), e("c", "dog.png"), e("c~2", "x.png", true)]);
+    expect([...t.contents]).toEqual(["sa"]); // (a hidden copy makes no shown item a copy)
+    expect([...t.names]).toEqual(["scat.png"]);
   });
 });

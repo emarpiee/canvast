@@ -56,6 +56,7 @@ import arrowUpSvg from "lucide-static/icons/arrow-up.svg";
 import arrowDownSvg from "lucide-static/icons/arrow-down.svg";
 import linkSvg from "lucide-static/icons/link.svg";
 import unlinkSvg from "lucide-static/icons/unlink.svg";
+import fileQuestionMarkSvg from "lucide-static/icons/file-question-mark.svg";
 import shrinkSvg from "lucide-static/icons/shrink.svg";
 import cropSvg from "lucide-static/icons/crop.svg";
 import flipHorizontalSvg from "lucide-static/icons/flip-horizontal-2.svg";
@@ -688,6 +689,7 @@ export const ICONS = {
   arrowDown: clean(arrowDownSvg),
   link: clean(linkSvg),
   unlink: clean(unlinkSvg),
+  fileMissing: clean(fileQuestionMarkSvg),
   shrink: clean(shrinkSvg),
   crop: clean(cropSvg),
   flipHorizontal: clean(flipHorizontalSvg),

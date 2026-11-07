@@ -1016,6 +1016,16 @@ test("properties: a column, a sort, typed search, suggested values; a saved sear
   await p.getByTestId("side-saved").locator("button", { hasText: "kind:picture" }).first().click();
   await expect(p.getByTestId("assets-sort")).toHaveValue("name");
   await expect(head).toBeVisible();
+  // Its row: how many it finds, and its ⋯ renames it (its words stay what it searches for).
+  const savedRow = p.getByTestId("side-saved").locator(".side-row", { hasText: "kind:picture" });
+  await expect(savedRow.locator(".side-n")).toHaveText("3");
+  await savedRow.getByRole("button", { name: /^More actions for saved search/ }).click();
+  await p.locator('.pop-menu [role="menuitem"]', { hasText: "Rename" }).click();
+  await p.getByTestId("prompt-input").fill("Pictures");
+  await p.getByTestId("prompt-ok").click();
+  await expect(p.getByTestId("side-saved").locator(".side-label")).toHaveText(["Pictures"]);
+  await p.getByTestId("side-saved").locator("button", { hasText: "Pictures" }).click();
+  await expect(search).toHaveValue("kind:picture");
   // Kept over a restart; unticked, it is gone.
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");

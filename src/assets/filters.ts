@@ -3,7 +3,7 @@
  * `ratio>1.5` or `ratio:16x9`, `orientation:portrait`, `colour:red` or `colour:#2563eb`. Size words compare pixel sizes and the file size;
  * a colour word needs the picture's look (read from its thumbnail), which may not be known yet.
  *
- * Keywords about the item in the library: `is:hidden|missing|favourite|used|unused|filed|unfiled|tagged|untagged|thumbed|unthumbed`, `uses>2` (times placed),
+ * Keywords about the item in the library: `is:hidden|missing|favourite|used|unused|filed|unfiled|tagged|untagged|thumbed|unthumbed|copy|samename`, `uses>2` (times placed),
  * `canvases>1`, `date:2026-10` (the day it was added, also `date>2026-01-01`, `date:today|yesterday|week|month|year`), `on:board` (the name of
  * a canvas it is placed on), `folder:refs` (a folder of its path), `description:word` (or `note:`), `property:source`, `property:source=web` and
  * `property:created>2025-01` or `property:rating>=4` (or `field:`), `kind:picture|video|audio|gif|font|file` and `duration>30s` (`1m`, `1h`,
@@ -33,6 +33,10 @@ export interface Extra {
   readonly tags: number;
   /** It has a custom thumbnail. */
   readonly thumbed?: boolean;
+  /** Its file's content is in the library more than once (in another place, under any name). */
+  readonly copy?: () => boolean;
+  /** Another item has its name (any content). */
+  readonly samename?: () => boolean;
   readonly folders: readonly string[];
   readonly note: string;
   readonly fields: ReadonlyArray<{ readonly key: string; readonly value: string }>;
@@ -186,6 +190,8 @@ const IS: Record<string, (s: Subject, x: Extra) => boolean> = {
   untagged: (_s, x) => x.tags === 0,
   thumbed: (_s, x) => !!x.thumbed,
   unthumbed: (_s, x) => !x.thumbed,
+  copy: (_s, x) => !!x.copy?.(),
+  samename: (_s, x) => !!x.samename?.(),
   trash: () => false, // (the Trash has files, not items: the library's view lists them instead)
 };
 

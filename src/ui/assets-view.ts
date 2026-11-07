@@ -28,7 +28,7 @@ import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actio
 import { LIBRARY_ROWS, searchHelpButton, wireSearchHelp } from "./search-help";
 import { ASSETS_RECENT, rememberSearch } from "../search/history";
 import type { SearchWay } from "../search/history";
-import { byUse, parseSaved, sameSearch, withLook, type SavedLook } from "../search/saved";
+import { forget as forgetSaved, moved, parseSaved, renamed, sameSearch, withLook, type SavedLook, type SavedSearch } from "../search/saved";
 import { paintRecent, paintSaveToggle, saveToggleHtml, wireRecent, wireSaveToggle, type SavedStore } from "./search-recent";
 import { evalQuery, parseQuery, type Query } from "../search/query";
 import { countSide as countSideOf, inScope as inScopeOf, libraryPaging, matcher, pickedKeys, propValue, propValues, sortListed, togglePicked, type LibraryQuery, type SideCounts, type SortKey, type UsageFilter } from "../assets/library-match";
@@ -659,7 +659,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let generation = 0;
   /** What being put in a place of the sidebar changes on an item. */
   const scopeChange = (k: string, label: string): MetaChange => (k.startsWith("folder:") ? { addFolders: [k.slice(7)] } : k === "unfiled" ? { clearFolder: true } : k === "favorites" ? { favorite: true } : { addTags: [label] });
-  /** Sidebar scope: "all", "favorites", "unfiled", "folder:<id>" or "tag:<lowercased tag>". */
+  /** Sidebar scope: "all", "favorites", "unfiled", "missing", "folder:<id>" or "tag:<lowercased tag>". */
   let scope = ui.filters.scope === "hidden" ? "all" : ui.filters.scope; // (the filters are kept with the library's layout: a restart opens the library as it was left)
   /**
    * Custom thumbnail of `hashes` (their own category: uploaded once, chosen again from Thumbnails; or a picture of the library; or their
@@ -813,7 +813,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let canvasTags = new Map<string, { label: string; objects: number; canvases: Set<string>; assets: Set<string> }>();
   let assetCanvasTags: Array<{ tag: string; canvases: string[] }> = [];
   /** The row whose "more" menu is open in the sidebar. */
-  type SideKind = "folder" | "tag" | "ctag" | "style";
+  type SideKind = "folder" | "tag" | "ctag" | "style" | "saved";
   interface SideRow { attr: string; value: string; label: string; hint: string; icon: string; aria: string; danger?: boolean }
   const sideRows = new Map<string, { label: string; items: MenuItem[] }>();
   /** The tags of the sidebar's tree as they are spelled, by key (a row shows only the last part of a path), and those with tags nested under them. */
@@ -2146,6 +2146,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           duration: (h) => durations.get(h),
           look: (h) => looks.get(h),
           words: (h) => noteWords.get(h),
+          all: () => listing?.entries ?? [],
           unknown: (f) => {
             if (f.needsLook) wantsLooks = true;
             if (f.needsDuration) wantsDurations = true;
@@ -2417,6 +2418,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (scope === "all") return hiddenMode ? "All hidden items" : "All items";
     if (scope === "favorites") return "Favourites";
     if (scope === "unfiled") return "Unfiled";
+    if (scope === "missing") return "Missing";
     if (scope === "similar") return "Similar images";
     if (scope.startsWith("folder:")) return listing!.folders.find((f) => `folder:${f.id}` === scope)?.name ?? "Folder";
     if (/^(ext|tag):/.test(scope) && /[|&]/.test(scope)) return [...pickedKeys(scope)].map((k) => (k.startsWith("ext:") ? `.${k.slice(4).toUpperCase()}` : `#${tagCounts?.get(k.slice(4))?.label ?? k.slice(4)}`)).join(", ");
@@ -2571,11 +2573,26 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       sideCounts = {
         of: l,
         counts: p
-          ? { hidden: p.hidden, shown: p.shown, favourites: p.favourites, unfiled: p.unfiled, tags: new Map(p.tags.map(([k, label, n]) => [k, { label, n }])), tagsUnder: new Map(p.tagsUnder), types: new Map(p.types), folders: new Map(p.folders) }
+          ? { hidden: p.hidden, shown: p.shown, favourites: p.favourites, missing: p.missing, unfiled: p.unfiled, tags: new Map(p.tags.map(([k, label, n]) => [k, { label, n }])), tagsUnder: new Map(p.tagsUnder), types: new Map(p.types), folders: new Map(p.folders) }
           : countSideOf(l.entries, allFolders, hiddenMode),
       };
     }
     return sideCounts.counts;
+  };
+  /** How many items a saved search finds now (null when the library is listed a page at a time: counted only on its own page). */
+  let savedCounts: { of: CatalogListing | null; hidden: boolean; n: Map<string, number> } | null = null;
+  const savedCount = (q: string, m: SearchWay): number | null => {
+    if (!listing || pagesNow()) return null;
+    if (savedCounts?.of !== listing || savedCounts.hidden !== hiddenMode) savedCounts = { of: listing, hidden: hiddenMode, n: new Map() };
+    const key = `${m}|${q}`;
+    let n = savedCounts.n.get(key);
+    if (n === undefined) {
+      const words = searchWords(q);
+      n = 0;
+      for (const e of listing.entries) if (inScopeOf(withUsage(e), "all", {}, hiddenMode) && matchesQuery(e, words, "all", m === "bookmark" ? "all" : m)) n++;
+      savedCounts.n.set(key, n);
+    }
+    return n;
   };
   let lastSideHtml = "";
   const renderSide = (): void => {
@@ -2590,7 +2607,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const tagCounts = counts.tags;
     const typeCounts = counts.types;
     const ro = session.readOnly;
-    const kindWord = { folder: "folder", tag: "tag", ctag: "canvas tag", style: "style" } as const;
+    const kindWord = { folder: "folder", tag: "tag", ctag: "canvas tag", style: "style", saved: "saved search" } as const;
     /** A row's "more" button: it opens the shared menu with these rows, and a right click on the row does too. */
     const more = (kind: SideKind, id: string, name: string, items: SideRow[]): string => {
       if (ro) return "";
@@ -2734,11 +2751,25 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           ...(own ? [{ attr: "data-ctag-action", value: "delete", label: "Delete", hint: nested ? "Canvases and nested tags stay" : "The canvases stay", icon: ICONS.trash2, aria: `Delete canvas tag ${label}`, danger: true }] : []),
         ]),
     });
-    // Saved searches, one click away, each with the look it was saved with.
-    const savedRows = byUse(parseSaved(settings.get(savedKey())) ?? []).map((s) => ({
-      active: false,
-      html: `<li class="side-row"><button type="button" class="side-item" data-saved-search="${esc(s.q)}" data-saved-way="${s.m}" title="Search for ${esc(s.q)}">${ICONS.savedSearch}<span class="side-label">${esc(s.q)}</span></button><button type="button" class="side-mini" data-saved-look="${esc(s.q)}" data-saved-way="${s.m}" aria-label="Update ${esc(s.q)} to the layout, columns and sort shown now" title="Update it to the layout, columns and sort shown now"${ro ? " hidden" : ""}>${ICONS.refresh}</button></li>`,
-    }));
+    // Saved searches, one click away, each with the look it was saved with: in the person's order, with a name of their own and how many each finds.
+    const savedList = parseSaved(settings.get(savedKey())) ?? [];
+    const savedRows = savedList.map((s, at) => {
+      const label = s.n || s.q;
+      const id = `${s.m}|${s.q}`;
+      const n = savedCount(s.q, s.m);
+      const icon = s.look ? (s.look.layout === "list" ? ICONS.layoutList : ICONS.layoutGrid) : ICONS.savedSearch; // (what it opens to)
+      const rows: SideRow[] = [
+        { attr: "data-saved-action", value: "rename", label: "Rename", hint: "A name of its own; its words stay its search", icon: ICONS.textCursorInput, aria: `Rename saved search ${label}` },
+        { attr: "data-saved-action", value: "look", label: "Update", hint: "To the layout, columns and sort shown now", icon: ICONS.refresh, aria: `Update ${label} to the layout shown now` },
+        ...(at > 0 ? [{ attr: "data-saved-action", value: "up", label: "Move up", hint: "Earlier in the list", icon: ICONS.arrowUp, aria: `Move ${label} up` }] : []),
+        ...(at < savedList.length - 1 ? [{ attr: "data-saved-action", value: "down", label: "Move down", hint: "Later in the list", icon: ICONS.arrowDown, aria: `Move ${label} down` }] : []),
+        { attr: "data-saved-action", value: "delete", label: "Delete", hint: "Not saved any more; nothing else changes", icon: ICONS.trash2, aria: `Delete saved search ${label}`, danger: true },
+      ];
+      return {
+        active: false,
+        html: `<li class="side-row"><button type="button" class="side-item" data-saved-search="${esc(s.q)}" data-saved-way="${s.m}" title="${s.n ? `${esc(s.n)}: ` : ""}Search for ${esc(s.q)}">${icon}<span class="side-label">${esc(label)}</span>${n === null ? "" : `<span class="side-n">${n}</span>`}</button><button type="button" class="side-mini" data-saved-look="${esc(s.q)}" data-saved-way="${s.m}" aria-label="Update ${esc(s.q)} to the layout, columns and sort shown now" title="Update it to the layout, columns and sort shown now"${ro ? " hidden" : ""}>${ICONS.refresh}</button>${more("saved", id, label, rows)}</li>`,
+      };
+    });
     const scopeName = scopeNameOf(tagCounts);
     side.dataset["open"] = String(sideOpen);
     const html = `
@@ -2749,6 +2780,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           ${item("favorites", "Favourites", counts.favourites, { icon: ICONS.star })}
           ${item("unfiled", "Unfiled", counts.unfiled, { icon: ICONS.folderX })}
           ${pagesNow() ? "" : item("similar", "Similar images", similar().reduce((n, g) => n + g.length, 0), { icon: ICONS.copyCheck })}
+          ${counts.missing || scope === "missing" ? item("missing", "Missing", counts.missing, { icon: ICONS.fileMissing }) : ""}
           ${desktopBridge() ? item("trash", "Trash", trashCount, { icon: ICONS.trashBin }) : ""}
         </ul>
         ${section(
@@ -4291,6 +4323,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b) return;
     if (b.dataset["savedLook"] !== undefined) return lookSaved(b.dataset["savedWay"] ?? "all", b.dataset["savedLook"]);
+    if (b.dataset["savedAction"]) return void savedAction(b.dataset["savedAction"], b.dataset["id"] ?? "");
     if (b.dataset["savedSearch"] !== undefined) return useSearch(b.dataset["savedWay"] ?? "all", b.dataset["savedSearch"]);
     if (b.hasAttribute("data-side-toggle")) {
       sideOpen = !sideOpen;
@@ -5043,7 +5076,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     paintSaveToggle(saveBtn, search.value, way, savedSearches);
   };
   const viewKey = (m: string, q: string): string => `${m}|${q.trim()}`;
-  const savedNow = (): ReturnType<typeof byUse> => parseSaved(savedSearches.get()) ?? [];
+  const savedNow = (): SavedSearch[] => parseSaved(savedSearches.get()) ?? [];
   /** The look of the library now (its layout, columns and sort): kept with a saved search in the settings, so it travels with it. */
   const keepLook = (m: SearchWay, q: string): void => savedSearches.set(JSON.stringify(withLook(savedNow(), q, m, { layout: ui.layout, order: [...ui.order], hidden: [...ui.hidden], sort: sortSel.value, reversed })));
   /** Saved or unsaved: a saved search keeps the look of the library now, which comes back with it. */
@@ -5055,6 +5088,26 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     renderSide();
   };
   /** A saved search takes the look shown now. */
+  /** A saved search's ⋯: rename, update its look, move it, delete it (`id` is `<way>|<words>`). */
+  const savedAction = async (action: string, id: string): Promise<void> => {
+    const bar = id.indexOf("|");
+    const m = id.slice(0, bar) as SearchWay, q = id.slice(bar + 1);
+    const list = parseSaved(savedSearches.get()) ?? [];
+    const s = list.find((x) => sameSearch(x, q, m));
+    if (!s) return;
+    if (action === "look") return lookSaved(m, q);
+    if (action === "rename") {
+      const name = await promptDialog({ title: "Rename saved search", lines: [`It still searches for “${q}”. Leave it empty to show those words again.`], value: s.n ?? q, confirmLabel: "Rename" });
+      if (name !== null) savedSearches.set(JSON.stringify(renamed(parseSaved(savedSearches.get()) ?? [], q, m, name)));
+      return;
+    }
+    if (action === "up" || action === "down") return void savedSearches.set(JSON.stringify(moved(list, q, m, action === "up" ? -1 : 1)));
+    if (action === "delete") {
+      savedSearches.set(JSON.stringify(forgetSaved(list, q, m)));
+      session.editor.message = `“${s.n || q}” is not saved any more.`;
+      session.editor.changed();
+    }
+  };
   const lookSaved = (m: string, q: string): void => {
     keepLook(m as SearchWay, q);
     delete ui.views[viewKey(m, q)];

@@ -55,6 +55,27 @@ export interface MatchContext {
   words?: (hash: string) => string | undefined;
   /** Told when a word needs what is not known yet (a look, a length): the item does not match until it is. */
   unknown?: (f: Filter) => void;
+  /** Every item of the library, for `is:copy` and `is:samename` (counted once, when a search first asks). */
+  all?: () => Iterable<CatalogEntry>;
+}
+
+/** The content an item's file has: its hash (a copy of a file elsewhere is `<hash>~<n>`, the same content; `#` is taken by a raster's key). */
+export const contentOf = (key: string): string => key.split("~")[0]!;
+
+/**
+ * What is in the library more than once, each among the items of its own side (shown or hidden: a hidden item never makes a shown one
+ * a copy or a namesake): contents, and names (without case).
+ */
+export function twinsOf(entries: Iterable<CatalogEntry>): { contents: Set<string>; names: Set<string> } {
+  const seenC = new Set<string>(), seenN = new Set<string>(), contents = new Set<string>(), names = new Set<string>();
+  for (const e of entries) {
+    if (e.state !== "active") continue;
+    const side = meta(e).hidden ? "h" : "s";
+    const c = `${side}${contentOf(e.hash)}`, n = `${side}${e.name.toLowerCase()}`;
+    (seenC.has(c) ? contents : seenC).add(c);
+    (seenN.has(n) ? names : seenN).add(n);
+  }
+  return { contents, names };
 }
 
 /** The search and usage filter, made once for a query (the lower-case forms of each item are kept with it). */
@@ -74,7 +95,11 @@ export function matcher(ctx: MatchContext): (e: ListedEntry, query: Query | null
     }
     return l;
   };
+  let twins: ReturnType<typeof twinsOf> | null = null;
+  const twinsNow = (): ReturnType<typeof twinsOf> => (twins ??= twinsOf(ctx.all?.() ?? []));
   const extraOf = (e: ListedEntry, m: ReturnType<typeof meta>): Extra => ({
+    copy: () => twinsNow().contents.has(`${m.hidden ? "h" : "s"}${contentOf(e.hash)}`),
+    samename: () => twinsNow().names.has(`${m.hidden ? "h" : "s"}${e.name.toLowerCase()}`),
     hidden: m.hidden,
     favorite: m.favorite,
     tags: m.tags.length,
@@ -140,6 +165,7 @@ export function inScope(e: ListedEntry, scope: string, sets: { inFolders?: Has |
   if (scope === "similar") return !!sets.similar?.has(e.hash);
   if (scope === "favorites") return m.favorite;
   if (scope === "unfiled") return m.folderIds.length === 0;
+  if (scope === "missing") return e.present === false;
   if (scope.startsWith("folder:")) return !!sets.inFolders && m.folderIds.some((id) => sets.inFolders!.has(id));
   // File types and tags, one or several (`ext:png|jpg&tag:cat|dog`): any of the types, and any of the tags.
   if (scope.startsWith("ext:") || scope.startsWith("tag:")) {
@@ -226,6 +252,8 @@ export interface SideCounts {
   hidden: number;
   shown: number;
   favourites: number;
+  /** Items whose file is gone (`is:missing`). */
+  missing: number;
   unfiled: number;
   tags: Map<string, { label: string; n: number }>;
   /** How many items a tag finds: those with it or a tag nested under it, each once (a parent that is only a path is here too). */
@@ -234,7 +262,7 @@ export interface SideCounts {
   folders: Map<string, number>;
 }
 export function countSide(entries: Iterable<CatalogEntry>, folders: readonly AssetFolder[], hiddenMode = false): SideCounts {
-  const c: SideCounts = { hidden: 0, shown: 0, favourites: 0, unfiled: 0, tags: new Map(), tagsUnder: new Map(), types: new Map(), folders: new Map() };
+  const c: SideCounts = { hidden: 0, shown: 0, favourites: 0, missing: 0, unfiled: 0, tags: new Map(), tagsUnder: new Map(), types: new Map(), folders: new Map() };
   const parentOf = new Map(folders.map((f) => [f.id, f.parentId]));
   for (const e of entries) {
     const m = meta(e);
@@ -243,6 +271,7 @@ export function countSide(entries: Iterable<CatalogEntry>, folders: readonly Ass
     if (m.hidden !== hiddenMode) continue; // (what is hidden is counted in hidden mode only, and only it is)
     if (m.favorite) c.favourites++;
     if (!m.folderIds.length) c.unfiled++;
+    if ((e as { present?: boolean }).present === false) c.missing++;
     for (const t of m.tags) {
       const k = t.toLowerCase();
       const tc = c.tags.get(k);

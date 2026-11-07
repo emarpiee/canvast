@@ -114,7 +114,7 @@ export interface BackupStore {
 export interface LibraryPages {
   query(q: LibraryQuery): Promise<{ hashes: string; ratios: Float32Array; total: number; bytes: number }>;
   /** The sidebar's counts; of the hidden items in hidden mode (`hidden`). */
-  counts(hidden?: boolean): Promise<{ hidden: number; shown: number; favourites: number; unfiled: number; tags: Array<[string, string, number]>; tagsUnder: Array<[string, number]>; types: Array<[string, number]>; folders: Array<[string, number]> }>;
+  counts(hidden?: boolean): Promise<{ hidden: number; shown: number; favourites: number; missing: number; unfiled: number; tags: Array<[string, string, number]>; tagsUnder: Array<[string, number]>; types: Array<[string, number]>; folders: Array<[string, number]> }>;
   fieldKeys(hidden?: boolean): Promise<string[]>;
   /** The values a property has across the items, the most used first. */
   fieldValues(key: string, hidden?: boolean): Promise<string[]>;

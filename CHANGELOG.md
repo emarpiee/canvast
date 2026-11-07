@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.54.52 — Missing, copies and namesakes, saved searches in the sidebar (2026-11-08)
+
+- **Added:** **Missing** in the library's sidebar: the items whose file is gone, with their count, as `is:missing`; shown while there are some.
+- **Added:** search keywords `is:copy` (its file's content is also elsewhere in the library, under any name) and `is:samename` (another item has its name, whatever its content).
+- **Added:** saved searches in the sidebar show how many items each finds, open with an icon of their layout, and have a ⋯: Rename (a name of their own), Update, Move up, Move down, Delete.
+- **Changed:** the sidebar keeps saved searches in your order: a new one goes last and using one does not move it (the search box still lists them newest first).
+
 ## 0.54.51 — No made-up file endings (2026-11-08)
 
 - **Fixed:** with Keep file names off, a file whose ending the app does not know (a program's backup `art.kra~`, `x.sketchbook`) was renamed with an ending made up from its type, such as `art.kra.octetstr`, one more file at every save in Krita. A tidied name now keeps the file's own ending as it is on disk; a file with none gets none.

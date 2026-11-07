@@ -189,6 +189,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `shrink` | Fit the sheet to what is on it |
 | `link` | Attach the picked objects to another object |
 | `unlink` | Detach the picked objects |
+| `fileMissing` | Library sidebar: Missing, the items whose file is gone |
 | `arrow-up` | Move a board or canvas up in its list; Move a bookmark up |
 | `arrow-down` | Move a board or canvas down in its list; Move a bookmark down |
 | `scissors` | Eraser: cut parts out of strokes |
