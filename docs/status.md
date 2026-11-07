@@ -37,6 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.57: the frameless window moves by its row (2026-11-08)
+
+- **Implemented:** `canvast:windowMove` (start, move, end with the pointer's screen place; `setPosition` from where it started); the title's pointer capture; `ozone-platform=x11` when the frame is off on Wayland with a DISPLAY. Desktop frame test drags the title.
+- **Implemented (hidden import):** PBKDF2 of `scryptJs` made from HMAC (Firefox: OperationError from its PBKDF2 for 1 KiB with a 1 KiB salt); hidden 25 at a time.
+- **Unverified:** on the owner's KDE Wayland desktop (XWayland look, the drag itself); Firefox opening, on the owner's backup.
+- **Committed:** v0.54.57.
+
 ## v0.54.56: window icons; the hidden items' check says why (2026-11-08)
 
 - **Implemented:** `minus` and `square` on the window row (owner's choice over unique icons); the import tells a wrong password from a check that failed (its error).

@@ -4,9 +4,22 @@
  * (ROMix with Salsa20/8) is here, and gives the page a moment now and then so it stays drawn. N = 2^17, r = 8 takes 128 MiB.
  */
 
+/**
+ * PBKDF2-HMAC-SHA256 with one round, as scrypt uses it: block i is HMAC(password, salt ‖ i), i from 1 (RFC 8018). Made from WebCrypto's
+ * HMAC, not its PBKDF2: Firefox refused (OperationError) the 1 KiB that scrypt asks of it, with a 1 KiB salt.
+ */
 async function pbkdf2(password: Uint8Array<ArrayBuffer>, salt: Uint8Array<ArrayBuffer>, bytes: number): Promise<Uint8Array<ArrayBuffer>> {
-  const base = await crypto.subtle.importKey("raw", password, "PBKDF2", false, ["deriveBits"]);
-  return new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt, iterations: 1 }, base, bytes * 8));
+  // (HMAC takes a key of any length but none: an empty password is one zero byte's worth, as HMAC pads it the same)
+  const key = await crypto.subtle.importKey("raw", password.length ? password : new Uint8Array(1), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const out = new Uint8Array(bytes);
+  const block = new Uint8Array(salt.length + 4);
+  block.set(salt);
+  for (let i = 1, at = 0; at < bytes; i++, at += 32) {
+    new DataView(block.buffer).setUint32(salt.length, i);
+    const t = new Uint8Array(await crypto.subtle.sign("HMAC", key, block));
+    out.set(t.subarray(0, Math.min(32, bytes - at)), at);
+  }
+  return out;
 }
 
 const rotl = (a: number, b: number): number => (a << b) | (a >>> (32 - b));

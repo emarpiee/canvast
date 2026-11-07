@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.54.57 — The frameless window moves by its row (2026-11-08)
+
+- **Added:** with Window frame off, dragging the row's title moves the window, and a double-click maximises or restores it. The app moves the window as the pointer goes (no drag area, which took the mouse from the app on KDE Wayland). On a Wayland desktop it then runs through XWayland, as only there can an app move its own window; with the System frame it stays native Wayland.
+- **Fixed:** Firefox could not open a desktop backup's hidden items ("the operation failed"): its PBKDF2 refused what scrypt asks of it; the one round scrypt needs is now made from HMAC, the same result everywhere.
+- **Fixed:** opening a desktop backup's hidden items in the browser was slow: each file was hidden in a write of its own; now 25 at a time, and the screen says how far it is.
+
 ## 0.54.56 — Window buttons; a hidden items' check that says why (2026-11-08)
 
 - **Changed:** the window row's minimize and maximize buttons use the common icons: a line and a square.

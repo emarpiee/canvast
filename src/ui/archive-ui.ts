@@ -251,6 +251,9 @@ export async function runImport(session: Session, picked: File | readonly File[]
   }
 }
 
+/** How many opened hidden items are hidden in one write. */
+const HIDE_BATCH = 25;
+
 /** Hidden items a desktop backup carries still encrypted, where the desktop app is not here to put them into its folder (the browser). */
 const sealedHere = (plan: ImportPlan): boolean => plan.sealed.length > 0 && !sealedHooks.write && !!plan.hiddenKey;
 
@@ -279,17 +282,25 @@ async function askBackupHidden(session: Session, plan: ImportPlan): Promise<{ ke
 async function importBackupHidden(session: Session, plan: ImportPlan, key: CryptoKey, p: Progress): Promise<{ n: number; left: number }> {
   let n = 0, left = 0, at = 0;
   const filed: Array<{ hash: string; path: string[] }> = [];
+  // (hidden a few at a time, in one write each: one write per file made a big import slow; the busy screen covers the library meanwhile)
+  let unhidden: string[] = [];
+  const hideNow = async (): Promise<void> => {
+    if (unhidden.length) await session.catalog?.updateMetaEach(unhidden.map((hash) => ({ hash, change: { hidden: true } })));
+    unhidden = [];
+  };
   for await (const it of openBackupItems(plan, key)) {
-    p.update(at++ / plan.sealed.length, "opening the hidden items");
+    p.update(at++ / plan.sealed.length, `opening the hidden items (${at} of ${plan.sealed.length})`);
     if (!it || it.bytes.length > MAX_IMPORT_BYTES || !session.assets) {
       left++;
       continue;
     }
     const { record } = await session.assets.importFileDetailed(new File([it.bytes], it.name, { type: typeOfName(it.name) }), false);
-    await session.catalog?.updateMeta(record.hash, { hidden: true }); // (hidden at once: never listed with the shown items)
+    unhidden.push(record.hash);
     filed.push({ hash: record.hash, path: it.folders });
     n++;
+    if (unhidden.length >= HIDE_BATCH) await hideNow();
   }
+  await hideNow();
   await fileInFolders(session, filed, true);
   return { n, left };
 }

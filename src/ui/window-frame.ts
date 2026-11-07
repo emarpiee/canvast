@@ -42,6 +42,27 @@ export async function mountWindowRow(): Promise<void> {
     const act = (e.target as HTMLElement).closest<HTMLElement>("[data-win]")?.dataset["win"];
     if (act === "minimize" || act === "maximize" || act === "close") bridge.windowAct(act);
   });
+  // A drag on the title moves the window (the window follows the pointer, moved by the app); a double-click maximizes or restores it.
+  const title = row.querySelector<HTMLElement>(".win-title")!;
+  let dragging = false;
+  const endMove = (): void => {
+    if (!dragging) return;
+    dragging = false;
+    bridge.windowMove("end");
+  };
+  title.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || e.detail > 1) return;
+    dragging = true;
+    title.setPointerCapture(e.pointerId);
+    bridge.windowMove("start", e.screenX, e.screenY);
+  });
+  title.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    if (!(e.buttons & 1)) return endMove(); // (a release the page did not see: the window stops following)
+    bridge.windowMove("move", e.screenX, e.screenY);
+  });
+  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) title.addEventListener(type, endMove);
+  title.addEventListener("dblclick", () => bridge.windowAct("maximize"));
   let timer = 0;
   let heldUntil = 0;
   let pinned = false;

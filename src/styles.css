@@ -1119,7 +1119,7 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 .win-row:popover-open { display: flex; }
 .win-row { position: fixed; inset: 0 0 auto; width: auto; margin: 0; overflow: hidden; align-items: center; gap: var(--gap); height: var(--bar-h); box-sizing: border-box; padding: var(--pad) var(--edge); color: var(--hud-fg); background: var(--paper); border: 0; border-bottom: 1px solid var(--hud-border); box-shadow: var(--hud-lift); visibility: hidden; transform: translateY(-100%); transition: transform var(--dur-fast) var(--ease-out), visibility var(--dur-fast); }
 .win-row.is-shown { visibility: visible; transform: none; }
-.win-title { flex: 1; min-width: 0; overflow: hidden; font: var(--font-control); text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.win-title { cursor: grab; touch-action: none; flex: 1; min-width: 0; overflow: hidden; font: var(--font-control); text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .win-row button { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--ctl); height: var(--ctl); padding: 0; color: inherit; background: transparent; border: 0; border-radius: var(--ctl-r, var(--r-md)); cursor: pointer; }
 .win-row button:hover { background: var(--hud-hover); }
 .win-row button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: -2px; }

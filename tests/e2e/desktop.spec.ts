@@ -2103,6 +2103,15 @@ test("the window frame off: a row from the top edge has the window's buttons and
     await expect(page.getByTestId("win-maximize")).toBeVisible();
     await expect(page.getByTestId("win-close")).toBeVisible();
     expect(await row.evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"))).not.toBe("drag");
+    // A drag on its title moves the window (the app moves it, from the pointer's place on the screen).
+    const at = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getPosition());
+    const before = await at();
+    const t = (await page.locator(".win-title").boundingBox())!;
+    await page.mouse.move(t.x + t.width / 2, t.y + t.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(t.x + t.width / 2 + 60, t.y + t.height / 2 + 40, { steps: 4 });
+    await page.mouse.up();
+    await expect.poll(at).not.toEqual(before);
     await page.getByTestId("win-maximize").focus(); // (a button clicked keeps the focus: that must not keep the row)
     await page.mouse.move(400, 300);
     await expect(row).not.toHaveClass(/is-shown/);
