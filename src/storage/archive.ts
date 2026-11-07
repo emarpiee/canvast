@@ -808,7 +808,8 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
     }
     if (board.canvases.length) plan.boards.push(board);
   }
-  if (scope !== "assets" && plan.boards.length === 0) throw new ArchiveError("the archive contains no canvases");
+  // (an incremental one whose canvases did not change, only the library's items, lists them all the same: it is not empty)
+  if (scope !== "assets" && plan.boards.length === 0 && !plan.unchangedIds.length) throw new ArchiveError("the archive contains no canvases");
 
   // the originals: each one's list entry from the newest file, its bytes from the newest file that holds them
   const listed = new Map<string, { a: Record<string, unknown>; at: { entries: Map<string, ZipEntry>; file: string } | null }>();

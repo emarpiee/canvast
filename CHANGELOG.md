@@ -7,6 +7,7 @@
 - **Fixed:** "ENAMETOOLONG" writing hidden files: a write's temporary file was named after the file, and a long encrypted name with `.tmp-…` went past 255 bytes. It has a short name of its own now.
 - **Fixed:** an update from an incremental backup set aside the canvases it lists as unchanged, and could delete items it does not list; it keeps them.
 - **Fixed:** importing hidden items into hidden folders made a second hidden folder of the same name at each import.
+- **Fixed:** an incremental backup with no canvas changed (only names, notes or files of the library) was refused as "containing no canvases"; it imports, and updates.
 
 ## 0.54.61 — A backup updates a workspace: work elsewhere, come back (2026-11-08)
 

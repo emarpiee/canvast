@@ -714,6 +714,7 @@ test("the workspace menu exports the whole workspace as a backup or as plain fil
   await q.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await q.getByTestId("view-canvas").click();
   await q.getByTestId("nav-import-input").setInputFiles({ name: bk.suggestedFilename(), mimeType: "application/zip", buffer: bytes });
+  await importMode(q);
   await q.getByTestId("confirm-ok").click();
   await expect(q.getByTestId("toast")).toContainText("Imported");
   await q.getByTestId("view-assets").click();
