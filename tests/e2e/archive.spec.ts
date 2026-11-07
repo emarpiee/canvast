@@ -378,7 +378,7 @@ test("damaged and hostile archives are refused or reported, and nothing partial 
   const sealedHash = "ab".repeat(32);
   const sealedZip = await rebuild((m) => { m["version"] = 7; m["sealed"] = [{ hash: sealedHash, file: `assets/${HASH}` }]; });
   const desktopOnly = await importArchive(p, "desktop-hidden.canvast", sealedZip, false); // (the note is in the question; cancelled)
-  expect(desktopOnly).toContain("1 hidden item was encrypted by the desktop app and is left out here: import this backup in the desktop app");
+  expect(desktopOnly).toContain("1 hidden item came without its key file and was skipped"); // (with its key file, the browser asks its password: sealed-open.test.ts)
   expect((await sess(p)).tree!.length).toBe(4);
   expect(app.consoleErrors).toEqual([]);
 
