@@ -378,7 +378,7 @@ test("away and back: a backup updates a workspace elsewhere and comes home: one 
   expect(after.length).toBe(1); // (one set of boards, not the backup's beside home's)
   expect(after[0]![1]).toEqual(expect.arrayContaining(["Studies", expect.stringMatching(/\(conflict /)]));
   expect(await note(p, HASH)).toBe("changed away");
-  expect(await note(p, GREEN_HASH)).not.toBeNull();
+  expect(await p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.some((e) => e.hash === h && e.state === "active")), GREEN_HASH)).toBe(true); // (the picture added away)
   expect(await hiddenDetails(p, SECRET_HASH)).toEqual([[true, "", expect.any(Number)]]);
   expect(app.consoleErrors).toEqual([]);
 });
