@@ -8,6 +8,7 @@ import { buildDir } from "./build-dir";
 import { makeFakeMp4 } from "./mp4";
 import { makePng } from "./png";
 import { importMode } from "./harness";
+import { makeLock } from "../../src/assets/hidden-lock";
 import { readZip, writeZip } from "../../src/storage/zip";
 
 // The desktop build (ADR 0177): the snapshot's own desktop shell (test-snap builds it into <snapshot>/desktop), on a
@@ -671,6 +672,32 @@ test("hidden items, browser to desktop: a browser backup's hidden item (readable
     await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
     expect(files(empty).filter((f) => f.startsWith(".hidden/") && !f.startsWith(".hidden/thumbnails/") && !f.endsWith(".name"))).toHaveLength(1 + MANY.length);
     expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("check", "new pw"))).ok).toBe(true);
+  } finally {
+    await app.close();
+  }
+  // A backup that brings its Hidden password (the owner's): asked once and checked against it, it becomes this workspace's, and they are
+  // encrypted with it in the import; the hidden list then opens with it, every date as it was.
+  const z = await readZip(new Blob([new Uint8Array(made)]));
+  const man = JSON.parse(await z.get("manifest.json")!.data.text()) as Record<string, unknown>;
+  man["hiddenLock"] = await makeLock("from backup");
+  const locked = Buffer.from(await (await writeZip([...z.values()].map((e) => ({ name: e.name, data: e.name === "manifest.json" ? new Blob([JSON.stringify(man)]) : e.data })))).arrayBuffer());
+  const third = tempDir("cv-with-lock-");
+  ({ app, page } = await launch(third));
+  try {
+    await page.getByTestId("save-status").click();
+    await page.getByTestId("set-import-input").setInputFiles({ name: "browser.canvast", mimeType: "application/zip", buffer: locked });
+    await importMode(page);
+    await page.getByTestId("confirm-ok").click();
+    await page.getByTestId("prompt-input").fill("not it");
+    await page.getByTestId("prompt-ok").click();
+    await expect(page.getByTestId("prompt-dialog")).toContainText("not the backup's Hidden password");
+    await page.getByTestId("prompt-input").fill("from backup");
+    await Promise.all([page.waitForEvent("load", { timeout: 60_000 }), page.getByTestId("prompt-ok").click()]);
+    await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
+    expect(files(third).filter((f) => f.startsWith(".hidden/") && !f.startsWith(".hidden/thumbnails/") && !f.endsWith(".name"))).toHaveLength(1 + MANY.length);
+    expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("check", "from backup"))).ok).toBe(true);
+    const dates = await page.evaluate((hs) => window.__canvastDebug.assetListing().then((l) => hs.map((h) => l.entries.find((e) => e.hash === h)?.importedAt)), MANY_HASHES);
+    expect(dates).toEqual(MANY_HASHES.map((_, k) => at - (k + 1) * 60_000));
   } finally {
     await app.close();
   }

@@ -19,6 +19,7 @@ import { fmtBytes } from "./format";
 import { busyProgress } from "./busy-screen";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { safeName } from "../storage/files-zip";
+import { checkLock } from "../assets/hidden-lock";
 
 /** Export, download and import of `.canvast` archives (ADR 0008). Results are reported through the editor message. */
 
@@ -237,9 +238,13 @@ export async function runImport(session: Session, picked: File | readonly File[]
   // (with no Hidden password here yet, an empty workspace's, one is set now, typed twice: else they waited for the hidden list to be
   // opened, and were encrypted then, while it was browsed)
   const readable = [...plan.organization.values()].filter((o) => o.hidden).length;
+  let backupHidden: string | null = null;
   if (readable && session.storage?.hidden && (await session.storage.hidden.state()) !== "open") {
     tell(session, `${plural(readable, "hidden item")} in this backup ${readable === 1 ? "is" : "are"} not encrypted: ${readable === 1 ? "it is" : "they are"} encrypted in this import, with the Hidden items' password.`);
-    await readyForHidden(session, true);
+    // (the backup's own Hidden password, where this workspace has none: asked once and checked against it, as the browser's import does;
+    // it becomes this workspace's with the import, and opens the key that encrypts them)
+    if (plan.hiddenLock && !(await session.hasPassword("hidden"))) backupHidden = await askBackupLock(plan.hiddenLock);
+    if (backupHidden === null) await readyForHidden(session, true);
   }
   const saving = busyProgress(session.editor, folder ? "Opening the library" : `Importing ${file.name}`, ["Keep the app open until it ends."]);
   saving.update(null, "saving into the workspace");
@@ -249,6 +254,7 @@ export async function runImport(session: Session, picked: File | readonly File[]
       saving.done();
       return;
     }
+    if (backupHidden !== null) await session.checkPassword("hidden", backupHidden); // (the backup's lock is this workspace's now: its key made and opened)
     const restored = session.settingsHook?.restore(plan.settings) ?? 0;
     // (an update: the workspace's settings are the backup's; this device's own stay as they are)
     if (plan.mode === "update") session.settingsHook?.adopt({ ...plan.settings, "@at": Date.now() });
@@ -289,6 +295,16 @@ export async function runImport(session: Session, picked: File | readonly File[]
     }
   } catch (e) {
     saving.fail(`Import failed; nothing was changed: ${(e as Error).message}`);
+  }
+}
+
+/** The Hidden password a backup carries (its kept form), asked until it is the one (null: Cancel). */
+async function askBackupLock(lock: string): Promise<string | null> {
+  for (let wrong = false; ; ) {
+    const typed = await promptDialog({ title: "The Hidden items' password", lines: [wrong ? "That is not the backup's Hidden password. Try again, or Cancel to set one of this workspace's." : "This backup brings its Hidden items' password: enter it, and it becomes this workspace's too. Its hidden items are encrypted with it in this import."], value: "", confirmLabel: "Use it", secret: true });
+    if (!typed) return null;
+    if (await checkLock(lock, typed)) return typed;
+    wrong = true;
   }
 }
 

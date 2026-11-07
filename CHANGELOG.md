@@ -3,7 +3,7 @@
 ## 0.54.63 — An import finishes its encryption; dates kept (2026-11-08)
 
 - **Fixed:** a desktop import of a browser's backup with many hidden items could start the app again before they were all encrypted, and the rest was encrypted after the start, on a screen of its own. The import writes again until every one is (it says if any could not be), all on its own screen.
-- **Fixed:** into a desktop workspace with no Hidden password yet (an empty one), a backup's readable hidden items were encrypted only when the hidden list was first opened, while it was browsed. The import now asks to set the password (typed twice) and encrypts them on its own screen.
+- **Fixed:** into a desktop workspace with no Hidden password yet (an empty one), a backup's readable hidden items were encrypted only when the hidden list was first opened, while it was browsed. The import now asks for the backup's own Hidden password when it brings one (once, checked against it; it becomes this workspace's, as the browser's import offers), else to set one (typed twice), and encrypts them on its own screen.
 - **Fixed:** when an item came into the library only ever goes earlier: an item taken in or recovered here a moment before its backup's or index's date arrived (dated now) takes that date, so Newest is the same as where the backup was made.
 
 ## 0.54.62 — Hidden items keep their details through every import (2026-11-08)
