@@ -1,3 +1,4 @@
+import { openBackupKey } from "../storage/sealed-open";
 import { openNotesAsText } from "../ui/note-session";
 import type { DesktopCatalog, DesktopLibrary } from "../storage/desktop-library";
 import { externalFolder } from "../storage/external-folder";
@@ -175,6 +176,8 @@ export interface DebugHook {
   /** Organize the library as its panel does, with the library's undo: a new folder (`id`, `name`, parent id or ""), file an item (`hash`, folder id or "" for none), rename an item or a folder, undo, redo. */
   /** Each open note as markdown or text, and whether that keeps all of it (what Save asks about). */
   notesAsText(): Array<{ name: string; text: string; keepsAll: boolean }>;
+  /** Whether a desktop backup's key file opens with a password here (the browser's scrypt): true, false, or the error it threw. */
+  backupKeyOpens(keyText: string, password: string): Promise<boolean | string>;
   /** The desktop library mirror's kept state (its folders, the folders seen on disk), for a failing test to say. */
   libraryState(): Promise<unknown>;
   libraryOp(op: "createFolder" | "file" | "rename" | "note" | "renameFolder" | "hide" | "hideFolder" | "showFolder" | "undo" | "redo", ...args: string[]): Promise<void>;
@@ -649,6 +652,13 @@ export function installDebugHook(
     assetListing: async () => {
       await writer.flush();
       return session.catalog!.list();
+    },
+    backupKeyOpens: async (keyText, password) => {
+      try {
+        return !!(await openBackupKey({ hiddenKey: keyText }, password));
+      } catch (e) {
+        return `${(e as Error).name}: ${(e as Error).message}`;
+      }
     },
     libraryState: async () => (await desktopLib()?.calls.meta("libraryMirror")) ?? null,
     catalogEntries: () => (desktopLib() ? desktopLib()!.entries() : readAll<CatalogEntry>("assetCatalog")),

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.56 — Window buttons; a hidden items' check that says why (2026-11-08)
+
+- **Changed:** the window row's minimize and maximize buttons use the common icons: a line and a square.
+- **Fixed:** importing a desktop backup in the browser said "not their password" also when their password could not be checked at all; it now says why.
+
 ## 0.54.55 — The browser opens a desktop backup's hidden items (2026-11-08)
 
 - **Added:** importing a desktop backup in the browser asks the Hidden password of its hidden items, then brings them in as hidden items, in hidden folders of their names. Before, they were always left out. The password is stretched as the desktop app does (scrypt), in the page: a few seconds and about 128 MB of memory. If the browser has no Hidden password yet, it offers to use the same one.

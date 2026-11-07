@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.56: window icons; the hidden items' check says why (2026-11-08)
+
+- **Implemented:** `minus` and `square` on the window row (owner's choice over unique icons); the import tells a wrong password from a check that failed (its error).
+- **Known failures:** owner: the browser refused the right Hidden password of a desktop backup; not reproduced (Node opens a desktop vault with the same code). The next try shows the error.
+- **Committed:** v0.54.56.
+
 ## v0.54.55: the browser opens a desktop backup's hidden items (2026-11-08)
 
 - **Implemented:** `scryptJs` (`src/storage/scrypt.ts`, RFC 7914, the vault's fallback where no native scrypt is set); `sealed-open.ts` (`openBackupKey`, `openBackupItems`: bytes checked by hash, names and folders from the encrypted path and `.name` files); the browser's import keeps sealed items with their key, asks the password, imports them hidden (`fileInFolders(..., hidden)`, hidden folders of their own); offers the same Hidden password when the browser has none.

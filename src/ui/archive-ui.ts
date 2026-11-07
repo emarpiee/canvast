@@ -257,20 +257,21 @@ const sealedHere = (plan: ImportPlan): boolean => plan.sealed.length > 0 && !sea
 /** Their Hidden password, asked until it opens their key (null: left out). Stretching it takes a few seconds in the browser. */
 async function askBackupHidden(session: Session, plan: ImportPlan): Promise<{ key: CryptoKey; password: string } | null> {
   const n = plan.sealed.length;
-  for (let wrong = false; ; ) {
+  for (let wrong: string | null = null; ; ) {
     const typed = await promptDialog({
       title: "Hidden items in this backup",
-      lines: [wrong ? "That is not their password. Try again, or Cancel to leave them out." : `${plural(n, "hidden item")} ${were(n)} encrypted by the desktop app. Enter their Hidden password to bring ${n === 1 ? "it" : "them"} in, or Cancel to leave ${n === 1 ? "it" : "them"} out.`],
+      lines: [wrong ?? `${plural(n, "hidden item")} ${were(n)} encrypted by the desktop app. Enter their Hidden password to bring ${n === 1 ? "it" : "them"} in, or Cancel to leave ${n === 1 ? "it" : "them"} out.`],
       value: "",
       confirmLabel: "Open",
       secret: true,
     });
     if (!typed) return null;
     const p = busyProgress(session.editor, "Opening the hidden items", ["Their password is checked: a few seconds."]);
-    const key = await openBackupKey(plan, typed).catch(() => null);
+    // (a password that does not open the key, and a check that could not be made, are told apart: the second says why)
+    const key = await openBackupKey(plan, typed).catch((e: unknown) => e as Error);
     p.done();
-    if (key) return { key, password: typed };
-    wrong = true;
+    if (key instanceof CryptoKey) return { key, password: typed };
+    wrong = key instanceof Error ? `Their password could not be checked here: ${key.message || key.name}. Try again, or Cancel to leave them out.` : "That is not their password. Try again, or Cancel to leave them out.";
   }
 }
 

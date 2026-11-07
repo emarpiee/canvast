@@ -161,8 +161,6 @@ import fileArchiveIcon from "lucide-static/icons/file-archive.svg";
 import pinIcon from "lucide-static/icons/pin.svg";
 import anchorIcon from "lucide-static/icons/anchor.svg";
 import eclipseIcon from "lucide-static/icons/eclipse.svg";
-import minimize2Icon from "lucide-static/icons/minimize-2.svg";
-import maximize2Icon from "lucide-static/icons/maximize-2.svg";
 import pinOffIcon from "lucide-static/icons/pin-off.svg";
 import folderUpIcon from "lucide-static/icons/folder-up.svg";
 import fileImageIcon from "lucide-static/icons/file-image.svg";
@@ -448,8 +446,6 @@ export const ICONS = {
   pin: clean(pinIcon),
   anchor: clean(anchorIcon),
   eclipse: clean(eclipseIcon),
-  minimize2: clean(minimize2Icon),
-  maximize2: clean(maximize2Icon),
   pinOff: clean(pinOffIcon),
   folderUp: clean(folderUpIcon),
   fileImage: clean(fileImageIcon),

@@ -1,4 +1,5 @@
-import { createHash } from "node:crypto";
+import { createHash, scrypt as nodeScrypt } from "node:crypto";
+import { createVault, useScrypt } from "../../src/storage/hidden-vault";
 import { readFile } from "node:fs/promises";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { APP_URL, expect, openActions, rowAction, test } from "./harness";
@@ -310,6 +311,18 @@ test("a canvas bigger than one read slice (objects are read and written 2000 at 
   expect(back.objects).toHaveLength(4000);
   expect(back.objects).toEqual((await dump(p, id)).objects);
   await other.context.close();
+});
+
+test("a desktop backup's hidden items: their key, locked with native scrypt as the desktop app does, opens here with the same password", async ({ app }) => {
+  // (the desktop app stretches the Hidden password in its main process, with Node's scrypt; the browser does it in the page)
+  useScrypt((pw, salt, N, r, p) => new Promise((ok, bad) => nodeScrypt(Buffer.from(pw, "utf8"), Buffer.from(salt), 32, { N, r, p, maxmem: 256 * N * r + 2 ** 24 }, (e, k) => (e ? bad(e) : ok(new Uint8Array(k))))));
+  const password = "Pässwörd 2026! ";
+  const { record } = await createVault(password);
+  useScrypt(null);
+  const keyText = JSON.stringify(record, null, 1);
+  const opens = (pw: string) => app.page.evaluate(([k, w]) => window.__canvastDebug.backupKeyOpens(k!, w!), [keyText, pw]);
+  expect(await opens(password)).toBe(true);
+  expect(await opens("not it")).toBe(false);
 });
 
 test("damaged and hostile archives are refused or reported, and nothing partial is written", async ({ app, browser }) => {

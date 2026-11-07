@@ -34,8 +34,8 @@ export async function mountWindowRow(): Promise<void> {
   row.popover = "manual";
   row.innerHTML = `
     <span class="win-title"></span>
-    <button type="button" data-win="minimize" data-testid="win-minimize" aria-label="Minimize the window" title="Minimize">${ICONS.minimize2}</button>
-    <button type="button" data-win="maximize" data-testid="win-maximize" aria-label="Maximize or restore the window" title="Maximize or restore">${ICONS.maximize2}</button>
+    <button type="button" data-win="minimize" data-testid="win-minimize" aria-label="Minimize the window" title="Minimize">${ICONS.minus}</button>
+    <button type="button" data-win="maximize" data-testid="win-maximize" aria-label="Maximize or restore the window" title="Maximize or restore">${ICONS.squareIcon}</button>
     <button type="button" data-win="close" data-testid="win-close" aria-label="Close the window" title="Close">${ICONS.x}</button>`;
   row.querySelector(".win-title")!.textContent = `${workspace?.name ?? ""} — canvast ${__CANVAST_VERSION__}`;
   row.addEventListener("click", (e) => {
