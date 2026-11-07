@@ -85,14 +85,29 @@ export function extOfBytes(b: Uint8Array): string {
 /** The kind folders of `library/` (an item in no library folder is in one of these). */
 export const KIND_FOLDERS: ReadonlySet<string> = new Set(["images", "vectors", "icons", "art_sources", "presets", "3d", "video", "audio", "fonts", "notes", "documents", "archives", "other"]);
 
-/** A file's extension for its name and type: its own, else one from the type, else "bin". */
+/** A file's extension for its name and type: its own, else one from a picture's, a sound's, a video's, a font's, a text's or a PDF's type, else none (""). */
 export function fileExt(name: string, type: string): string {
   const own = extOf(name).toLowerCase();
   if (own) return own;
-  const sub = /^[a-z]+\/([a-z0-9.+-]+)$/.exec(type)?.[1] ?? "";
+  // (only a type that names its kind of file: "application/octet-stream" says nothing, and once made files "….octetstr")
+  const sub = /^(?:image|video|audio|font|text)\/([a-z0-9.+-]+)$|^application\/(pdf)$/.exec(type);
   const known: Record<string, string> = { jpeg: "jpg", "svg+xml": "svg", plain: "txt", quicktime: "mov", mpeg: "mp3", "x-wav": "wav" };
-  const ext = (known[sub] ?? sub).replace(/[^a-z0-9]/g, "").slice(0, 8);
-  return ext || "bin";
+  const s = sub?.[1] ?? sub?.[2] ?? "";
+  const ext = (known[s] ?? s).replace(/[^a-z0-9]/g, "").slice(0, 8);
+  return ext;
+}
+
+/** The ending a file has on disk, as it is (lower case): `art.kra~` → `kra~`, `x.sketchbook` → `sketchbook`; "" when it has none. */
+export const diskExt = (path: string): string => /[^/]\.([^./\s]{1,16})$/.exec(path)?.[1]?.toLowerCase() ?? "";
+
+/**
+ * Tidy names (Keep file names off): the item's name in the naming convention, and the file's own ending as it is on disk, never one made
+ * up (a program's backup `art.kra~` stays `art.kra~`). A file not on disk yet takes its name's, else its type's (`fileExt`).
+ */
+export function tidyName(name: string, file: string | null, type: string, note = false): { base: string; ext: string } {
+  const ext = (note && fileExt(name, type)) || (file ? diskExt(file) : "") || diskExt(name) || fileExt(name, type);
+  const stem = name.toLowerCase().endsWith(`.${ext}`) ? name.slice(0, -ext.length - 1) : name.replace(/\.[A-Za-z0-9]{1,8}$/, "");
+  return { base: safeBase(stem), ext };
 }
 
 /**
@@ -102,7 +117,8 @@ export function fileExt(name: string, type: string): string {
 export async function libraryPath(name: string, type: string, taken: (path: string) => Promise<boolean>): Promise<string> {
   const keep = nameRules.keep();
   const kept = keep ? keptFile(name, "", type) : null;
-  return freePath(`library/${kindFolder(type, name)}`, kept ? kept.base : nameBase(name), kept ? kept.ext : fileExt(name, type), taken);
+  const tidy = tidyName(name, null, type);
+  return freePath(`library/${kindFolder(type, name)}`, kept ? kept.base : tidy.base, kept ? kept.ext : tidy.ext, taken);
 }
 
 /** Settings > Keep file names as written: a new file takes its name as written, else its tidy name. */

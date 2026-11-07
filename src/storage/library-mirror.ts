@@ -23,7 +23,7 @@ import { sha256Hex } from "../assets/sha256";
 import { done, idbGet, req } from "./idb";
 import { noteKindOf } from "../notes/note-file";
 import { MAX_BASE, UNFINISHED_FILE, cutBytes, isClashOf, numberedName, splitName } from "../doc/file-names";
-import { KIND_FOLDERS, MAX_LIBRARY_DIR, extOfBytes, fileExt, fitsPlace, freePath, isFolderOf, isSafeRelativePath, keptBase, keptFile, keptFits, keptPart, libraryDir, nameBase, safeBase } from "./workspace-names";
+import { KIND_FOLDERS, MAX_LIBRARY_DIR, extOfBytes, fileExt, fitsPlace, tidyName, freePath, isFolderOf, isSafeRelativePath, keptBase, keptFile, keptFits, keptPart, libraryDir, nameBase, safeBase } from "./workspace-names";
 import type { FolderFile, TrashFile } from "./store";
 
 export const LIBRARY_JSON = ".canvast/library.json";
@@ -590,8 +590,9 @@ export class LibraryMirror {
       const names = id && folderOk.has(id) ? folderPath(folders, id) : [];
       const tidyDir = libraryDir(names, e.type, e.name);
       // (a sealed file's own is .bin; a note made rich text in its place, plan.md → plan.note.html, is a file of its new kind)
-      const tidyExt = (noteKindOf(e.name) && fileExt(e.name, e.type)) || (rec.file && !sealed && extOfPath(rec.file)) || fileExt(rec.name, e.type);
-      const tidyBase = nameBase(e.name);
+      const tidy = tidyName(e.name, rec.file && !sealed ? rec.file : null, e.type, !!noteKindOf(e.name));
+      const tidyExt = tidy.ext;
+      const tidyBase = tidy.base;
       // Two settings, each on its own. Keep file names: a file named as its item is stays so, and a library folder may be written either way. Sort files:
       // a file in no folder goes in its kind's folder; else one in the library's root stays there. A file tidied before fits too: turning a setting on
       // renames nothing that fits. A hidden item's place is its own business.
@@ -1531,7 +1532,8 @@ export class LibraryMirror {
   async importBig(file: Blob & { name?: string }): Promise<{ hash: string; path: string | null }> {
     const name = file.name ?? "";
     const kept = this.keepNames() ? keptFile(name, "", file.type) : null;
-    const target = await this.freeTarget(libraryDir([], file.type, name), kept ? kept.base : nameBase(name), kept ? kept.ext : fileExt(name, file.type), new Set());
+    const tidy = tidyName(name, null, file.type);
+    const target = await this.freeTarget(libraryDir([], file.type, name), kept ? kept.base : tidy.base, kept ? kept.ext : tidy.ext, new Set());
     const stream = this.bridge.stream;
     try {
       const id = await stream.begin(target);
@@ -1560,7 +1562,8 @@ export class LibraryMirror {
       while (next < batch.length) {
         const a = batch[next++]!;
         const kept = this.keepNames() ? keptFile(a.name, "", a.type) : null;
-        const target = await this.freeTarget(libraryDir([], a.type, a.name), kept ? kept.base : nameBase(a.name), kept ? kept.ext : fileExt(a.name, a.type), taken);
+        const tidy = tidyName(a.name, null, a.type);
+        const target = await this.freeTarget(libraryDir([], a.type, a.name), kept ? kept.base : tidy.base, kept ? kept.ext : tidy.ext, taken);
         try {
           if (a.size > MAX_IMPORT_BYTES) await writeProven(this.bridge.stream, await this.bridge.stream.begin(target), a.blob, a.hash);
           else {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.51 — No made-up file endings (2026-11-08)
+
+- **Fixed:** with Keep file names off, a file whose ending the app does not know (a program's backup `art.kra~`, `x.sketchbook`) was renamed with an ending made up from its type, such as `art.kra.octetstr`, one more file at every save in Krita. A tidied name now keeps the file's own ending as it is on disk; a file with none gets none.
+
 ## 0.54.50 — Folders deleted outside, at last (2026-11-07)
 
 - **Fixed:** a library folder deleted outside the app came back, every time: the check for it asked whether the folder was there as a file, so it always concluded the library itself was not there, and did nothing. It now asks for a folder.

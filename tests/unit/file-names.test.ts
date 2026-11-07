@@ -4,7 +4,7 @@ import type { CatalogEntry } from "../../src/assets/asset-catalog";
 import { propValues } from "../../src/assets/library-match";
 import { dateWords } from "../../src/doc/date-words";
 import { encodeLinkPart, wikiKeyOf, wikiTarget } from "../../src/notes/note-file";
-import { isFolderOf, keptFile, keptFits } from "../../src/storage/workspace-names";
+import { fileExt, isFolderOf, keptFile, keptFits, tidyName } from "../../src/storage/workspace-names";
 
 describe("the rules of file and folder names", () => {
   it("what a system refuses goes, in every style, on every system", () => {
@@ -123,5 +123,20 @@ describe("the other shared rules", () => {
     expect(wikiTarget("Dir/Plan.md#head")).toEqual({ name: "plan", dirs: ["dir"] });
     for (const part of ["Mix (RGB) One.png", "it's!*.md", "日本語 ファイル", "a b/c"]) expect(decodeURIComponent(encodeLinkPart(part))).toBe(part);
     expect(encodeLinkPart("a (b)")).toBe("a%20%28b%29");
+  });
+});
+
+describe("a tidy name keeps the file's own ending, never one made up", () => {
+  it("keeps a program's backup's ending, an unknown or long one, and tidies only the name", () => {
+    const octet = "application/octet-stream";
+    expect(tidyName("art.kra~", "library/refs/art.kra~", octet)).toEqual({ base: "art", ext: "kra~" });
+    expect(tidyName("art.kra~", null, octet)).toEqual({ base: "art", ext: "kra~" });
+    expect(tidyName("My Scene.sketchbook", "library/My Scene.sketchbook", octet)).toEqual({ base: "my_scene", ext: "sketchbook" });
+    expect(tidyName("Root Pic.PNG", "library/Root Pic.PNG", "image/png")).toEqual({ base: "root_pic", ext: "png" });
+    expect(tidyName("Photo", "library/images/photo.jpg", "image/jpeg")).toEqual({ base: "photo", ext: "jpg" }); // (its file's, as before)
+    // A type that does not say what file it is gives no ending of its own (once "octetstr"); one that does, its own.
+    expect(fileExt("README", octet)).toBe("");
+    expect(tidyName("README", null, octet)).toEqual({ base: "readme", ext: "" });
+    expect(fileExt("shot", "image/png")).toBe("png");
   });
 });

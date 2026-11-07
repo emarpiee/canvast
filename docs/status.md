@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.51: no made-up file endings (2026-11-08)
+
+- **Implemented:** `tidyName` and `diskExt` (`workspace-names.ts`): a tidied name keeps the file's ending on disk; `fileExt` makes one only from a type that names its kind of file, else none.
+- **Tested:** unit (`file-names.test.ts`). v0.54.50 run: 37 of 38 green (folder test passes); the middle-button pan failed again (backlog).
+- **Committed:** v0.54.51.
+
 ## v0.54.50: folders deleted outside; settings read first on a new device (2026-11-07)
 
 - **Implemented:** bridge `folderExists` (`canvast:folderExists`), used by `dropFoldersDeletedOutside`; `adoptShared(fileWs, atStart)`.
