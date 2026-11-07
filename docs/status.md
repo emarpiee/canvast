@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.60: hidden items' details come back from a new backup (2026-11-08)
+
+- **Implemented:** `MAX_KEY_FILE_BYTES` (256 MiB) for a backup's key file, read by the one import of both builds (it was 4 KiB; owner: 265 hidden items skipped in Chrome and Firefox).
+- **Tested:** archive.spec (browser to browser; desktop to browser, the desktop's format made with its own vault code), desktop.spec (browser to desktop; desktop to desktop with a note past 4 KiB).
+- **Committed:** v0.54.60.
+
 ## v0.54.59: the frameless window moves by its row, on Wayland too (2026-11-08)
 
 - **Implemented:** `.win-title` `-webkit-app-region: drag` while the row shows and is not a popover; buttons `no-drag`; row and edge leave the top layer while no modal is open (`--z-window`), popovers again in a modal. `canvast:windowMove` removed. Desktop frame test checks the drag area, its buttons and that the row is not in the top layer.

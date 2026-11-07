@@ -47,6 +47,9 @@ import { ZipError, readZip, verifyEntry, writeZip } from "./zip";
  * overwrites anything. Object ids are kept (they are namespaced per canvas).
  * Originals are deduplicated by hash.
  */
+/** The most a backup's key file of hidden items may hold: its key and their sealed index (about 1 KiB an item). */
+const MAX_KEY_FILE_BYTES = 256 * 2 ** 20;
+
 export const ARCHIVE_FORMAT = "canvast-archive";
 export const ARCHIVE_VERSION = 7;
 
@@ -879,7 +882,8 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
     }
     if (plan.hiddenKey === null && typeof pm["hiddenKey"] === "string") {
       const ke = parts[i]!.entries.get(pm["hiddenKey"]);
-      const text = ke && ke.size < 4096 ? await ke.data.text() : null;
+      // (it holds the hidden items' sealed index since 0.54.57: their dates, tags and notes, so as big as they are; 4 KiB took only the key)
+      const text = ke && ke.size <= MAX_KEY_FILE_BYTES ? await ke.data.text() : null;
       if (text && readVault(text)) plan.hiddenKey = text;
     }
   }

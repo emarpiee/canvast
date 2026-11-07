@@ -7,6 +7,7 @@ import { createHash, scryptSync } from "node:crypto";
 import { buildDir } from "./build-dir";
 import { makeFakeMp4 } from "./mp4";
 import { makePng } from "./png";
+import { readZip, writeZip } from "../../src/storage/zip";
 
 // The desktop build (ADR 0177): the snapshot's own desktop shell (test-snap builds it into <snapshot>/desktop), on a
 // fresh workspace folder, with a hidden window.
@@ -535,6 +536,50 @@ test("a big library (past the size library.json is kept for) writes only what ch
   }
 });
 
+/** A note long enough that the hidden items' index is past the 4 KiB a key file was once read up to (it was then skipped). */
+const LONG_NOTE = "From the life class. ".repeat(300).trim();
+
+test("hidden items, browser to desktop: a browser backup's hidden item (readable, marked hidden) comes in hidden, with its note and the date it came", async () => {
+  const pic = makePng(5, 3, () => [200, 60, 120, 255]);
+  const hash = createHash("sha256").update(pic).digest("hex");
+  const at = 1_700_000_000_000;
+  // A backup as the browser makes one: the item's file readable in it, with what the library says of it (hidden, its note and date).
+  const src = tempDir("cv-browser-");
+  let { app, page } = await launch(src);
+  let made: Buffer;
+  try {
+    await page.getByTestId("view-assets").click();
+    await page.getByTestId("assets-import-input").setInputFiles({ name: "Secret Plan.png", mimeType: "image/png", buffer: pic });
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(1);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await page.getByTestId("view-canvas").click();
+    const plain = await exportBackup(app, page, `${src}-plain.canvast`);
+    const z = await readZip(new Blob([new Uint8Array(plain)]));
+    const man = JSON.parse(await z.get("manifest.json")!.data.text()) as { assets: Array<Record<string, unknown>> };
+    Object.assign(man.assets.find((a) => a["hash"] === hash)!, { hidden: true, note: LONG_NOTE, importedAt: at });
+    made = Buffer.from(await (await writeZip([...z.values()].map((e) => ({ name: e.name, data: e.name === "manifest.json" ? new Blob([JSON.stringify(man)]) : e.data })))).arrayBuffer());
+  } finally {
+    await app.close();
+  }
+  const ws = tempDir("cv-from-browser-");
+  ({ app, page } = await launch(ws));
+  try {
+    expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"))).ok).toBe(true);
+    await page.getByTestId("save-status").click();
+    await page.getByTestId("set-import-input").setInputFiles({ name: "browser.canvast", mimeType: "application/zip", buffer: made });
+    await Promise.all([page.waitForEvent("load", { timeout: 30_000 }), page.getByTestId("confirm-ok").click()]);
+    await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
+    expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("check", "pw"))).ok).toBe(true);
+    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).map((e) => [!!e.hidden, e.note ?? "", e.importedAt])), hash), { timeout: 15_000 }).toEqual([[true, LONG_NOTE, at]]);
+    // (sealed in .hidden/, nothing readable of it left in the folder)
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(".hidden/") && !f.startsWith(".hidden/thumbnails/")).length, { timeout: 15_000 }).toBe(1);
+    expect(files(ws).filter((f) => f.startsWith("library/") && f.endsWith(".png"))).toEqual([]);
+  } finally {
+    await app.close();
+  }
+});
+
 test("a backup exported from Settings and imported into a workspace folder: written as folders and files; Rebuild from the folder reads it all again", async () => {
   let secretHash = "", secretAt = 0; // (the hidden item's, kept to compare after the import)
   const src = tempDir("canvast-ws-");
@@ -559,7 +604,7 @@ test("a backup exported from Settings and imported into a workspace folder: writ
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(2);
     // Its note and the date it came: in the backup too (the hidden items' index, sealed, with their key).
     secretHash = createHash("sha256").update(secret).digest("hex");
-    await page.evaluate((h) => window.__canvastDebug.libraryOp("note", h, "for later"), secretHash);
+    await page.evaluate(([h, n]) => window.__canvastDebug.libraryOp("note", h!, n!), [secretHash, LONG_NOTE]);
     secretAt = await page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)!.importedAt), secretHash);
     // With an uploaded custom thumbnail, hidden with it (sealed in .hidden/thumbnails/): it goes in the backup as it is sealed.
     await page.locator(`[data-testid="asset-card"][data-hash="${createHash("sha256").update(secret).digest("hex")}"]`).click();
@@ -640,7 +685,7 @@ test("a backup exported from Settings and imported into a workspace folder: writ
     expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("check", "pw"))).ok).toBe(true);
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, !!e.hidden, e.present]).sort())), { timeout: 15_000 }).toEqual([["Green Leaf.png", false, true], ["Secret Plan.png", true, true]]);
     expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), createHash("sha256").update(secret).digest("hex"))).toEqual(Array.from(secret));
-    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).map((e) => [e.note, e.importedAt])), secretHash), { timeout: 15_000 }).toEqual([["for later", secretAt]]);
+    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).map((e) => [e.note, e.importedAt])), secretHash), { timeout: 15_000 }).toEqual([[LONG_NOTE, secretAt]]);
     // Settings > Storage > Rebuild from the folder: the working copy goes, the app reloads, and reads it all again from the folder (settings kept).
     await page.evaluate(() => window.__canvastDebug.setSetting("ui.density", "dense"));
     await page.getByTestId("save-status").click();

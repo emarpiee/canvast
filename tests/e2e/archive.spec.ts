@@ -1,5 +1,5 @@
 import { createHash, scrypt as nodeScrypt } from "node:crypto";
-import { createVault, useScrypt } from "../../src/storage/hidden-vault";
+import { createVault, nameKeys, sealFile, sealName, sealText, useScrypt } from "../../src/storage/hidden-vault";
 import { readFile } from "node:fs/promises";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { APP_URL, expect, openActions, rowAction, test } from "./harness";
@@ -323,6 +323,69 @@ test("a desktop backup's hidden items: their key, locked with native scrypt as t
   const opens = (pw: string) => app.page.evaluate(([k, w]) => window.__canvastDebug.backupKeyOpens(k!, w!), [keyText, pw]);
   expect(await opens(password)).toBe(true);
   expect(await opens("not it")).toBe(false);
+});
+
+/** A hidden item's details as the library has them: hidden, its note and when it came. */
+const hiddenDetails = (p: Page, hash: string) =>
+  p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).map((e) => [!!e.hidden, e.note ?? "", e.importedAt])), hash);
+/** A note long enough that the hidden items' index is past the 4 KiB a key file was once read up to. */
+const LONG_NOTE = "From the life class. ".repeat(300).trim();
+
+test("hidden items, browser to browser: included in a backup, they come back hidden, with their note and the date they came", async ({ app, browser }) => {
+  const p = app.page;
+  await importImage(p, GREEN);
+  expect((await p.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"))).ok).toBe(true);
+  await p.evaluate(([h, n]) => window.__canvastDebug.libraryOp("note", h!, n!).then(() => window.__canvastDebug.libraryOp("hide", h!, "1")), [GREEN_HASH, LONG_NOTE]);
+  const at = ((await hiddenDetails(p, GREEN_HASH))[0] as [boolean, string, number])[2];
+  await openPanel(p);
+  const file = await download(p, async () => {
+    await p.getByTestId("set-export-full").click();
+    await p.getByRole("radio", { name: /Include them/ }).check();
+    await p.getByTestId("choose-ok").click();
+    await p.getByTestId("prompt-input").fill("pw");
+    await p.getByTestId("prompt-ok").click();
+    await p.getByTestId("choose-ok").click(); // (passwords and privacy settings: left out)
+  });
+  const { context, page: q } = await freshProfile(browser);
+  try {
+    await importArchive(q, file.name, file.bytes);
+    await expect.poll(() => hiddenDetails(q, GREEN_HASH)).toEqual([[true, LONG_NOTE, at]]);
+  } finally {
+    await context.close();
+  }
+});
+
+test("hidden items, desktop to browser: a desktop backup's sealed items, opened with their password, come back hidden with their name, folder, note and date", async ({ app }) => {
+  const p = app.page;
+  await importImage(p);
+  await openPanel(p);
+  const plain = await download(p, () => p.getByTestId("set-export-full").click());
+  // The desktop app's backup of a hidden item, made with its own code: sealed file, encrypted path, key file with the sealed index.
+  useScrypt((pw, salt, N, r, q) => new Promise((ok, bad) => nodeScrypt(Buffer.from(pw, "utf8"), Buffer.from(salt), 32, { N, r, p: q, maxmem: 256 * N * r + 2 ** 24 }, (e, k) => (e ? bad(e) : ok(new Uint8Array(k))))));
+  const { record, key } = await createVault("Hidden pw");
+  useScrypt(null);
+  const keys = await nameKeys(key);
+  const at = 1_700_000_000_000;
+  const index = await sealText(key, JSON.stringify([{ hash: GREEN_HASH, name: "Secret Plan.png", type: "image/png", size: GREEN.length, pixelW: 4, pixelH: 4, importedAt: at, note: LONG_NOTE, tags: [], hidden: true }]));
+  const sealedAt = `.hidden/${(await sealName(keys, "Plans")).seg}/${(await sealName(keys, "Secret Plan.png")).seg}`;
+  const z = await readZip(new Blob([new Uint8Array(plain.bytes)]));
+  const man = JSON.parse(await z.get("manifest.json")!.data.text()) as Record<string, unknown>;
+  Object.assign(man, { version: 7, sealed: [{ hash: GREEN_HASH, file: `sealed/${GREEN_HASH}.bin`, at: sealedAt }], hiddenKey: "hidden-key.json" });
+  const entries = [...z.values()].map((e) => ({ name: e.name, data: e.name === "manifest.json" ? new Blob([JSON.stringify(man)]) : e.data }));
+  entries.push({ name: `sealed/${GREEN_HASH}.bin`, data: new Blob([await sealFile(key, new Uint8Array(GREEN) as Uint8Array<ArrayBuffer>, { hash: GREEN_HASH })]) });
+  entries.push({ name: "hidden-key.json", data: new Blob([JSON.stringify({ ...record, index }, null, 1)]) });
+  const desktop = Buffer.from(await (await writeZip(entries)).arrayBuffer());
+  // Imported here: the import asks their password, opens them and brings them in as hidden items.
+  await openPanel(p);
+  await p.getByTestId("set-import-input").setInputFiles({ name: "desktop.canvast", mimeType: "application/zip", buffer: desktop });
+  await expect(p.getByTestId("confirm-dialog")).toContainText("1 hidden item, encrypted by the desktop app");
+  await p.getByTestId("confirm-ok").click();
+  await p.getByTestId("prompt-input").fill("Hidden pw");
+  await p.getByTestId("prompt-ok").click();
+  await expect(p.getByTestId("toast")).toContainText(/1 hidden item opened/, { timeout: 60_000 });
+  await expect.poll(() => hiddenDetails(p, GREEN_HASH)).toEqual([[true, LONG_NOTE, at]]);
+  const folder = await p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => { const e = l.entries.find((x) => x.hash === h)!; const f = l.folders.find((x) => x.id === e.folderIds?.[0]); return [e.name, f?.name, !!f?.hidden]; }), GREEN_HASH);
+  expect(folder).toEqual(["Secret Plan.png", "Plans", true]);
 });
 
 test("damaged and hostile archives are refused or reported, and nothing partial is written", async ({ app, browser }) => {

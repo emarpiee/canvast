@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.60 — Hidden items' details come back from a new backup (2026-11-08)
+
+- **Fixed:** a backup made with 0.54.57 or later, with hidden items, said "N hidden items came without their key file and were skipped", in the browser and in the desktop app: the import read a key file of up to 4 KiB, and since it carries the hidden items' sealed index (their dates, tags and notes), it is as big as they are. It is read up to 256 MiB.
+- **Changed:** tests take hidden items through backups in all four ways: browser to browser, desktop to browser, browser to desktop, desktop to desktop, each with a note past the old 4 KiB and the date they came.
+
 ## 0.54.59 — The frameless window moves by its row, on Wayland too (2026-11-08)
 
 - **Changed:** with Window frame off, the row's title is a drag area, as an app's own title bar: the desktop moves the window, on X11 and on Wayland, with nothing to set up. The row is the page's own element while no dialog is open (in the top layer, a drag area once took the mouse from the whole app); in a dialog it has none. The title drag of 0.54.57, made by the app, is gone.
