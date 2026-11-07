@@ -37,6 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.53: copies are items of their own (2026-11-08)
+
+- **Implemented:** item keys `<hash>~<n>` (`ITEM_KEY_RE`, `copyKey`, `contentOf`); `LibraryMirror.addCopy` in `scanThesePaths` and `scanFiles`; content checks (verify, follow, seal, unseal, write) by `contentOf`; place and backups by content; details `asset-copies` (icon `fileCopies`).
+- **Tested:** desktop outside-changes test (a copy becomes an item, `is:copy` lists both). GitHub run pending.
+- **Limits:** desktop only (the browser has no folder to find copies in); a copy placed on a canvas references the first item, so deleting the first item leaves those cards missing; a backup keeps the first item's details only; older app versions on another device skip copy items in the library files.
+- **Committed:** v0.54.53, its own commit.
+
 ## v0.54.52: Missing row, is:copy and is:samename, saved searches section (2026-11-08)
 
 - **Implemented:** scope `missing` (`inScope`, `SideCounts.missing`, desktop `counts`); `twinsOf`/`contentOf` and `Extra.copy`/`samename`; `renamed`/`moved` and in-place `keep` in `search/saved.ts`; sidebar rows with counts, look icon and the shared ⋯ (`SideKind` "saved"). Icon `fileMissing`.

@@ -1,3 +1,4 @@
+import { contentOf } from "../assets/library-match";
 import { WS_AT } from "../settings/settings";
 import type { CardLook } from "../ui/file-views";
 import { sha256Hex } from "../assets/sha256";
@@ -857,7 +858,8 @@ export class Session {
       return null;
     }
     const tags = withTags ? ((await this.catalog?.entry(hash).catch(() => undefined))?.tags ?? []) : [];
-    const r = await withGifFrames(rec);
+    // (a copy of a file elsewhere in the library is placed as its content: a canvas names contents, which every version of the app reads)
+    const r = await withGifFrames({ ...rec, hash: contentOf(rec.hash) });
     return placeImage(card ? { ...r, pixelW: card.size.w, pixelH: card.size.h } : r, this.doc, this.view, 0, "Place item", tags, card?.preview).id;
   }
 
@@ -889,7 +891,7 @@ export class Session {
     for (const [i, h] of hashes.entries()) {
       progress?.update(i / hashes.length, `${i + 1} of ${hashes.length}`);
       const rec = await this.assets.record(h);
-      if (rec) recs.push(await withGifFrames(rec));
+      if (rec) recs.push(await withGifFrames({ ...rec, hash: contentOf(rec.hash) }));
     }
     progress?.done();
     if (recs.length < hashes.length) this.tell(`${hashes.length - recs.length} of the files are missing and were not placed.`);

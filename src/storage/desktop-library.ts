@@ -3,6 +3,7 @@
  * (`desktop/library-db.ts`), reached through `LibraryCalls`; thumbnails, the password locks and the canvases (which items use) stay
  * in the page's IndexedDB. `DesktopCatalog` is the browser build's `AssetCatalog` on that storage, operation for operation.
  */
+import { ITEM_KEY_RE } from "../assets/library-match";
 import { isFontFile } from "../assets/file-kind";
 import type { AssetFolder, AssetLocation, CatalogEntry, CatalogListing, GcReport, MetaChange, MetaSnapshot, PasswordKind, ThumbRecord } from "../assets/asset-catalog";
 import { AssetInUseError, CatalogInputError, FOLDERS_KEY, entryFromRecord, folderName, folderSubtree, meta, normalizeFields, normalizeNote, normalizeTags, usageOf, listedFolders, inHiddenFolder, unhiddenFolders } from "../assets/asset-catalog";
@@ -673,7 +674,7 @@ export async function moveIdbLibrary(db: IDBDatabase, lib: DesktopLibrary): Prom
   const ops: LibraryOp[] = [
     ...entries.map(putEntry),
     ...stubs.map((r, i): LibraryOp => ({ t: "rec", hash: stubKeys[i]!, v: { ...r, hash: stubKeys[i]! } })),
-    ...Object.entries(seen).flatMap(([hash, v]): LibraryOp[] => (/^[0-9a-f]{64}$/.test(hash) ? [{ t: "seen", hash, v }] : [])),
+    ...Object.entries(seen).flatMap(([hash, v]): LibraryOp[] => (ITEM_KEY_RE.test(hash) ? [{ t: "seen", hash, v }] : [])),
   ];
   for (let at = 0; at < ops.length; at += 5000) await lib.apply(ops.slice(at, at + 5000));
   await lib.apply([

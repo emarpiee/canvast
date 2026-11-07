@@ -61,6 +61,10 @@ export interface MatchContext {
 
 /** The content an item's file has: its hash (a copy of a file elsewhere is `<hash>~<n>`, the same content; `#` is taken by a raster's key). */
 export const contentOf = (key: string): string => key.split("~")[0]!;
+/** An item's key: its content's hash, or a copy's `<hash>~<n>`. */
+export const ITEM_KEY_RE = /^[0-9a-f]{64}(~[1-9][0-9]{0,5})?$/;
+/** The key of the `n`th copy (from 2) of a content. */
+export const copyKey = (hash: string, n: number): string => `${hash}~${n}`;
 
 /**
  * What is in the library more than once, each among the items of its own side (shown or hidden: a hidden item never makes a shown one

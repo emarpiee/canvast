@@ -1,3 +1,4 @@
+import { contentOf } from "../assets/library-match";
 import { externalFolder } from "./external-folder";
 import { storedStub } from "../assets/asset-library";
 import type { SerializedCamera } from "../core/camera";
@@ -296,7 +297,8 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   if (!ws) throw new ArchiveError("workspace not found");
   const boards: ManifestBoard[] = [];
   const canvasFiles: Array<{ file: string; json: BlobPart[] }> = [];
-  const hashes = new Set<string>(scope.kind === "assets" ? scope.hashes : []);
+  // (a copy of a file elsewhere in the library goes as its content, once: a backup keeps each content one time)
+  const hashes = new Set<string>(scope.kind === "assets" ? scope.hashes.map(contentOf) : []);
   const since = scope.kind === "workspace" ? scope.since : undefined;
   const noBytes = scope.kind === "workspace" && scope.noBytes === true;
   let objects = 0;
@@ -343,7 +345,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   }
   if (scope.kind === "workspace") {
     // A full backup also keeps library assets that nothing uses yet.
-    for (const e of await libraryIn(tx, snap).entries()) if (e.state === "active") hashes.add(e.hash);
+    for (const e of await libraryIn(tx, snap).entries()) if (e.state === "active") hashes.add(contentOf(e.hash));
   }
   if (scope.skipHidden) for (const h of await hiddenSet(tx, snap)) hashes.delete(h);
   const hiddenLock = scope.kind === "workspace" && scope.withPrivacy && !noBytes ? await req(tx.objectStore("meta").get("hiddenLock") as IDBRequest<unknown>) : undefined;

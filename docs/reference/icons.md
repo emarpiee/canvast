@@ -225,6 +225,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `search` | Search the canvas |
 | `search-check` | A saved search in the library's sidebar |
 | `files` | Copy file: an item's real file on the clipboard |
+| `fileCopies` | Details: the other items with the same file (copies elsewhere in the library) |
 | `trash` | The Trash in the library's sidebar: the workspace's `.trash` folder |
 | `archive-restore` | Restore a file from the Trash |
 | `letter-text` | A property's type: Text |

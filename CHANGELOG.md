@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.53 — Copies are items of their own (2026-11-08)
+
+- **Added:** on desktop, a copy of a file the library has, put in `library/` from outside (another folder, any name), is an item of its own: its own card, name, folder, tags and notes, never removed for being a copy. Before, it was left on disk with no item. Its details list the other items with the same file, and `is:copy` finds them.
+- **Changed:** placing a copy on a canvas places its content, as the first item of it; a backup keeps each content once, with the first item's details.
+
 ## 0.54.52 — Missing, copies and namesakes, saved searches in the sidebar (2026-11-08)
 
 - **Added:** **Missing** in the library's sidebar: the items whose file is gone, with their count, as `is:missing`; shown while there are some.

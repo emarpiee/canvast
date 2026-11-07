@@ -1299,6 +1299,18 @@ test("library files changed outside the app: a renamed or moved file is found by
       ["Loomis Hands.png", "anatomy", true, 1],
       ["Pose One.png", "poses", true, 0],
     ]);
+    // A copy of a file the library has, put in another folder under another name: an item of its own, and never removed for it.
+    writeFileSync(join(ws, "library/poses/Hand Copy.png"), red);
+    await expect.poll(listing, { timeout: 10_000 }).toEqual([
+      ["Hand Copy.png", "poses", true, 0],
+      ["Loomis Hands.png", "anatomy", true, 1],
+      ["Pose One.png", "poses", true, 0],
+    ]);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/") && f.endsWith(".png")).sort(), { timeout: 10_000 }).toEqual(["library/anatomy/loomis_hands.png", "library/poses/hand_copy.png", "library/poses/pose_one.png"]);
+    await page.getByTestId("view-assets").click();
+    await page.getByTestId("assets-search").fill("is:copy");
+    await expect(page.locator('[data-testid="asset-card"]')).toHaveCount(2);
   } finally {
     await app.close();
   }
@@ -1914,7 +1926,7 @@ test("a note's pictures are found by their files: pasted ones (the disk's name n
   await page.locator('[data-testid="asset-card"][title="note.md"]').first().dblclick();
   await expect.poll(shown).toEqual([true, true, true, true]);
   await page.getByTestId("slide-view").locator('[data-act="close"]').click();
-  // From outside the app: however the link is written, and a copy of a file the library has (no item of its own).
+  // From outside the app: however the link is written, and a copy of a file the library has (an item of its own).
   mkdirSync(join(ws, "library/ext"), { recursive: true });
   writeFileSync(join(ws, "library/ext/orig (2).png"), png(90));
   writeFileSync(join(ws, "library/ext/copy.png"), png(90));

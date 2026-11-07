@@ -25,6 +25,7 @@ import { noteKindOf } from "../notes/note-file";
 import { MAX_BASE, UNFINISHED_FILE, cutBytes, isClashOf, numberedName, splitName } from "../doc/file-names";
 import { KIND_FOLDERS, MAX_LIBRARY_DIR, extOfBytes, fileExt, fitsPlace, tidyName, freePath, isFolderOf, isSafeRelativePath, keptBase, keptFile, keptFits, keptPart, libraryDir, nameBase, safeBase } from "./workspace-names";
 import type { FolderFile, TrashFile } from "./store";
+import { ITEM_KEY_RE, contentOf, copyKey } from "../assets/library-match";
 
 export const LIBRARY_JSON = ".canvast/library.json";
 export const LIBRARY_JSON_FORMAT = "canvast-library";
@@ -115,7 +116,7 @@ const MOVING_KEY = "libraryMoving";
 /** Where a deleted file goes in `.trash/`, by what it was. */
 const TRASH_SHOWN = ".trash/library";
 const TRASH_SEALED = ".trash/.hidden";
-const HASH_RE = /^[0-9a-f]{64}$/;
+const HASH_RE = ITEM_KEY_RE; // (an item: its content's hash, or a copy of it elsewhere, `<hash>~<n>`)
 
 /** What a write of the library works from. */
 interface LibraryRead {
@@ -711,7 +712,7 @@ export class LibraryMirror {
     for (const [i, e] of items.entries()) {
       const got = await this.bridge.hash(recs.get(e.hash)!.file!);
       if (got === null) missing.push(e.name);
-      else if (got !== e.hash) damaged.push(e.name);
+      else if (got !== contentOf(e.hash)) damaged.push(e.name);
       onStep(i + 1, items.length);
     }
     return { checked: items.length, missing, damaged };
@@ -757,8 +758,11 @@ export class LibraryMirror {
         if (rec.ext && rec.file && !isHiddenFile(rec.file) && rec.file !== path && !(await this.bridge.exists(rec.file))) {
           await this.relink(hash, await this.lib.entry(hash), rec.file, path);
           changed.push(hash);
+        } else {
+          const copy = await this.addCopy(hash, path);
+          if (copy) changed.push(copy);
         }
-        continue; // (a copy of a file the library has: left alone)
+        continue;
       }
       found.push({ path, name: path.slice(path.lastIndexOf("/") + 1), folderId: await this.folderFor(parentOf(path)), size: sizes[k]!, hash: async () => hash, read: async () => {
         const bytes = await this.bridge.read(path);
@@ -777,6 +781,31 @@ export class LibraryMirror {
    * canvas follow it (`importFiles` does that, told by `follows`), and the old item goes. A file still being written (its size not yet
    * still) waits for the next look. Whether any was taken.
    */
+  /**
+   * A file with the content of an item, put in `library/` by the person or another program: an item of its own (a copy), with its own
+   * name, folder, tags and the rest, never removed for being a copy. Not one the app is writing or moving (the item's own file is not
+   * elsewhere then), nor bytes the library keeps only in its storage or sealed. Its key, or null when it is not a copy.
+   */
+  private async addCopy(hash: string, path: string): Promise<string | null> {
+    const rec = await this.lib.rec(hash);
+    if (!rec?.ext || !rec.file || isHiddenFile(rec.file) || rec.file === path || !(await this.bridge.exists(rec.file))) return null;
+    const folderId = await this.folderFor(parentOf(path));
+    return this.lib.serial(async () => {
+      const e = await this.lib.entry(hash);
+      if (!e || e.state !== "active" || (await this.lib.calls.byFile(path)) !== null) return null;
+      let n = 2;
+      while (n < 1_000_000 && (await this.lib.entry(copyKey(hash, n)))) n++;
+      const key = copyKey(hash, n);
+      const { tags: _t, favorite: _f, hidden: _h, note: _n, fields: _fl, thumb: _th, viewer: _v, folderIds: _fo, ...rest } = e;
+      const entry: CatalogEntry = { ...rest, hash: key, name: path.slice(path.lastIndexOf("/") + 1), importedAt: Date.now(), deletedAt: null, ...(folderId ? { folderIds: [folderId] } : {}) };
+      await this.lib.apply([
+        { t: "entry", hash: key, v: entry },
+        { t: "rec", hash: key, v: storedStub({ ...rec, hash: key, ext: 1, file: path, name: entry.name }) },
+      ]);
+      return key;
+    });
+  }
+
   /** The readable file of an item in `library/` (not a hidden item's), or null. */
   async fileOf(hash: string): Promise<string | null> {
     const rec = await this.lib.rec(hash);
@@ -795,7 +824,7 @@ export class LibraryMirror {
       const [size] = await this.bridge.sizes([path]);
       if (size === null || size === undefined) continue;
       const hash = await this.bridge.hash(path);
-      if (!hash || hash === old) continue; // (the same content: nothing changed)
+      if (!hash || hash === contentOf(old)) continue; // (the same content: nothing changed)
       if (!inApp) {
         await new Promise((r) => setTimeout(r, SETTLE_MS));
         const [again] = await this.bridge.sizes([path]);
@@ -904,8 +933,8 @@ export class LibraryMirror {
           await this.relink(hash, await this.lib.entry(hash), rec.file, f.path);
           relinked.add(hash); // (a second copy of it is not relinked too)
           changed = true;
-        }
-        continue; // a copy of a file the library has, or bytes it keeps otherwise: left alone
+        } else if (await this.addCopy(hash, f.path)) changed = true;
+        continue;
       }
       const name = f.path.slice(f.path.lastIndexOf("/") + 1);
       found2.push({ path: f.path, name, folderId: await this.folderFor(parentOf(f.path)), size: f.size, hash: async () => hash, read: async () => {
@@ -1445,11 +1474,11 @@ export class LibraryMirror {
     const big = await this.bigSize(file);
     if (big) {
       const opened = await this.vault.openAt(this.rawAt(file, big));
-      return !!opened && (await hashOf(opened.file).catch(() => null)) === hash;
+      return !!opened && (await hashOf(opened.file).catch(() => null)) === contentOf(hash);
     }
     const sealed = await this.bridge.read(file);
     const bytes = sealed && (await this.vault.open(sealed as Uint8Array<ArrayBuffer>));
-    return !!bytes && (await sha256Hex(bytes.buffer)) === hash;
+    return !!bytes && (await sha256Hex(bytes.buffer)) === contentOf(hash);
   }
 
   /** Move an item's file to the first free place for its name (a sealed one is opened back into it). */
@@ -1465,12 +1494,12 @@ export class LibraryMirror {
           // (a part at a time: its chunks are checked as they are opened, and its hash read from the disk before it is put in its place)
           const opened = await this.vault.openAt(this.rawAt(from, big));
           if (!opened) throw new Error("a hidden file did not open with the key");
-          await writeProven(this.bridge.stream, await this.bridge.stream.begin(target), opened.file, m.hash);
+          await writeProven(this.bridge.stream, await this.bridge.stream.begin(target), opened.file, contentOf(m.hash));
         } else {
           const sealed = await this.bridge.read(from);
           const bytes = sealed && (await this.vault.open(sealed as Uint8Array<ArrayBuffer>));
-          if (!bytes || (await sha256Hex(bytes.buffer)) !== m.hash) throw new Error("a hidden file did not open with the key");
-          await externalFolder.write(m.hash, new Blob([bytes]), target);
+          if (!bytes || (await sha256Hex(bytes.buffer)) !== contentOf(m.hash)) throw new Error("a hidden file did not open with the key");
+          await externalFolder.write(contentOf(m.hash), new Blob([bytes]), target);
         }
         await this.setFile(m.hash, (r) => r.ext === 1 && r.file === from, target);
         await this.bridge.erase(from);
@@ -1513,7 +1542,7 @@ export class LibraryMirror {
         return null;
       }
       await this.bridge.write(target, new Uint8Array(await rec.blob.arrayBuffer()), { durable: false });
-      if ((await this.bridge.hash(target)) !== m.hash) throw new Error(`${target} was not written whole`);
+      if ((await this.bridge.hash(target)) !== contentOf(m.hash)) throw new Error(`${target} was not written whole`);
       return { hash: m.hash, file: target, size: rec.blob.size };
     } catch (e) {
       externalFolder.release(target);
@@ -1603,7 +1632,7 @@ export class LibraryMirror {
     await freePath(m.dir, m.base, m.ext, async (p) => {
       if (taken.has(p.toLowerCase()) || externalFolder.claimed(p)) return true; // (another item's)
       if (!(await this.bridge.exists(p))) return false; // the first free name: nothing was written for it
-      if ((await this.bridge.hash(p)) !== m.hash) return true;
+      if ((await this.bridge.hash(p)) !== contentOf(m.hash)) return true;
       found = p;
       return false;
     });
@@ -1643,10 +1672,10 @@ export class LibraryMirror {
       if (!rec.ext || !rec.file) throw new Error(`“${rec.name}” has no file in the workspace folder`);
       await this.setMeta(MOVING_KEY, { hash, from: rec.file, to: name } satisfies Moving);
       const writing = (id = await stream.begin(name));
-      await this.vault.sealTo(this.rawAt(rec.file, rec.size), { hash }, (b) => stream.append(writing, b));
+      await this.vault.sealTo(this.rawAt(rec.file, rec.size), { hash: contentOf(hash) }, (b) => stream.append(writing, b));
       const written = await stream.finish(writing);
       const back = await this.vault.openAt(new DiskFile((from, to) => stream.read(writing, from, to), written.size));
-      if (!back || back.file.size !== rec.size || (await hashOf(back.file)) !== hash) throw new Error("the sealed file did not open back the same");
+      if (!back || back.file.size !== rec.size || (await hashOf(back.file)) !== contentOf(hash)) throw new Error("the sealed file did not open back the same");
       await stream.commit(writing);
       id = null;
       await this.setFile(hash, (r) => r.ext === 1 && r.file === rec.file, name);
@@ -1674,13 +1703,13 @@ export class LibraryMirror {
     if (rec.size > MAX_IMPORT_BYTES) return this.sealBig(rec, hash, name, failed);
     try {
       const bytes = rec.ext ? await this.bridge.read(rec.file ?? "") : new Uint8Array(await rec.blob.arrayBuffer());
-      if (!bytes || (await sha256Hex((bytes as Uint8Array<ArrayBuffer>).slice().buffer)) !== hash) throw new Error("the file is not what the library says");
+      if (!bytes || (await sha256Hex((bytes as Uint8Array<ArrayBuffer>).slice().buffer)) !== contentOf(hash)) throw new Error("the file is not what the library says");
       await this.setMeta(MOVING_KEY, { hash, from: rec.ext ? rec.file! : "", to: name } satisfies Moving);
       // (only its content's hash inside: its name and folders are its path; tags, notes… are in the sealed index, so a change of them never writes the file)
-      await this.bridge.write(name, await this.vault.seal(bytes as Uint8Array<ArrayBuffer>, { hash }));
+      await this.bridge.write(name, await this.vault.seal(bytes as Uint8Array<ArrayBuffer>, { hash: contentOf(hash) }));
       const back = await this.bridge.read(name);
       const opened = back && (await this.vault.open(back as Uint8Array<ArrayBuffer>));
-      if (!opened || (await sha256Hex(opened.buffer)) !== hash) {
+      if (!opened || (await sha256Hex(opened.buffer)) !== contentOf(hash)) {
         await this.bridge.erase(name);
         throw new Error("the sealed file did not open back the same");
       }

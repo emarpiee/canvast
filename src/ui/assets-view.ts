@@ -31,7 +31,7 @@ import type { SearchWay } from "../search/history";
 import { forget as forgetSaved, moved, parseSaved, renamed, sameSearch, withLook, type SavedLook, type SavedSearch } from "../search/saved";
 import { paintRecent, paintSaveToggle, saveToggleHtml, wireRecent, wireSaveToggle, type SavedStore } from "./search-recent";
 import { evalQuery, parseQuery, type Query } from "../search/query";
-import { countSide as countSideOf, inScope as inScopeOf, libraryPaging, matcher, pickedKeys, propValue, propValues, sortListed, togglePicked, type LibraryQuery, type SideCounts, type SortKey, type UsageFilter } from "../assets/library-match";
+import { contentOf, countSide as countSideOf, inScope as inScopeOf, libraryPaging, matcher, pickedKeys, propValue, propValues, sortListed, togglePicked, type LibraryQuery, type SideCounts, type SortKey, type UsageFilter } from "../assets/library-match";
 import { LOOK_SIZE, lookOf, similarGroups, type Look } from "../assets/look";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
@@ -2946,7 +2946,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       organize: () => (e ? organizeHtml(e) : ""),
       notes: () => (e ? notesHtml(e) : ""),
       links: () => `<section class="asset-sec" data-testid="asset-backlinks" hidden><h3>Linked from <span class="layer-count" data-count></span></h3><ul class="asset-places"></ul></section><section class="asset-sec" data-testid="asset-outlinks" hidden><h3>Links <span class="layer-count" data-count></span></h3><ul class="asset-places"></ul></section>`,
-      where: () => `<section class="asset-sec asset-where">
+      where: () => `${copiesHtml(e)}<section class="asset-sec asset-where">
         <h3 data-testid="asset-usage">${instances ? `Used on ${plural(places.length || (e?.canvases ?? m!.canvases), "canvas", "canvases")} <span class="asset-place-total">(${plural(instances, "time")})</span>` : "Where it is used"}</h3>
         ${instances ? `<ul class="asset-places" data-testid="asset-places">${placeRows}</ul>
           ${placesCap.long ? showMoreButton({ open: placesAll, hidden: placesCap.hidden, attrs: `data-action="show-more" data-list="places" data-testid="asset-places-more"` }) : ""}` : `<p class="asset-note">Not used on any canvas.</p>`}
@@ -3251,6 +3251,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
 
   /** The bookmarks of a file whose view has them (a PDF's pages). */
+  /** The other items with this one's content (copies of its file elsewhere in the library, any name): each a row that shows it. */
+  const copiesHtml = (e: CatalogEntry | null | undefined): string => {
+    if (!e || !listing || pagesNow()) return "";
+    const c = contentOf(e.hash);
+    const others = listing.entries.filter((x) => x.hash !== e.hash && x.state === "active" && contentOf(x.hash) === c && meta(x).hidden === meta(e).hidden);
+    if (!others.length) return "";
+    const where = (x: CatalogEntry): string => {
+      const id = meta(x).folderIds[0];
+      return id ? folderPath(listing!.folders, id).join(" › ") : "Unfiled";
+    };
+    const rows = others.map((x) => `<li><button type="button" class="asset-link-row assets-link" data-action="go-copy" data-hash="${x.hash}" title="Show ${esc(x.name)}">${ICONS.fileCopies}<span class="asset-place-name">${esc(x.name)}</span><span class="asset-place-total">${esc(where(x))}</span></button></li>`);
+    return `<section class="asset-sec" data-testid="asset-copies"><h3>Same file as ${plural(others.length, "other item")}</h3><ul class="asset-places">${rows.join("")}</ul></section>`;
+  };
   const marksHtml = (e: CatalogEntry): string => {
     if (!viewKindNamed(e.name)?.marks) return "";
     const { marks } = viewStateOf(e);
@@ -3674,6 +3687,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         keys[keys.length - 1]?.focus();
         break;
       }
+      case "go-copy":
+        void view.reveal([b.dataset["hash"]!]);
+        break;
       case "go-mark": {
         // Opens at it, when it is not open.
         const hash = inspector.dataset["hash"], at = b.dataset["at"]!;
