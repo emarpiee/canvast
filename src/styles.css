@@ -71,6 +71,7 @@
   --z-item-pop: 7;
   --z-edge: 10;
   --z-pop: 60; /* menus and popovers opened from a button: above the edge bars, the panels and the Settings view */
+  --z-window: 70; /* the frameless window's row and its top edge, over everything of the page (in a modal, they are in its top layer) */
   /* Animation (Settings > Performance): every duration and curve here, so one setting changes them all. --anim-speed and --anim-move are set by the settings (none: the durations below are made 0 by the rule at the end of this block). */
   --anim-speed: 1;
   --anim-move: 1;
@@ -1116,10 +1117,15 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 /* (both in the top layer, as popovers: the bare look of one is undone here) */
 .win-edge { position: fixed; inset: 0 0 auto; width: auto; height: var(--edge); margin: 0; padding: 0; background: transparent; border: 0; }
 @media (hover: none) { .win-edge { height: var(--sp-6); } }
-.win-row:popover-open { display: flex; }
+.win-row:popover-open, .win-row:not([popover]) { display: flex; }
+/* (not in the top layer while no modal is open: a page's own element, as a title bar is, so its drag area is where it shows) */
+.win-row:not([popover]), .win-edge:not([popover]) { z-index: var(--z-window); }
+/* The title moves the window, the desktop's own way (on Wayland too); only while the row shows, and never from a modal's top layer. */
+.win-row.is-shown:not([popover]) .win-title { -webkit-app-region: drag; }
+.win-row button { -webkit-app-region: no-drag; }
 .win-row { position: fixed; inset: 0 0 auto; width: auto; margin: 0; overflow: hidden; align-items: center; gap: var(--gap); height: var(--bar-h); box-sizing: border-box; padding: var(--pad) var(--edge); color: var(--hud-fg); background: var(--paper); border: 0; border-bottom: 1px solid var(--hud-border); box-shadow: var(--hud-lift); visibility: hidden; transform: translateY(-100%); transition: transform var(--dur-fast) var(--ease-out), visibility var(--dur-fast); }
 .win-row.is-shown { visibility: visible; transform: none; }
-.win-title { cursor: grab; touch-action: none; flex: 1; min-width: 0; overflow: hidden; font: var(--font-control); text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+.win-title { flex: 1; min-width: 0; overflow: hidden; font: var(--font-control); text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .win-row button { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--ctl); height: var(--ctl); padding: 0; color: inherit; background: transparent; border: 0; border-radius: var(--ctl-r, var(--r-md)); cursor: pointer; }
 .win-row button:hover { background: var(--hud-hover); }
 .win-row button:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: -2px; }

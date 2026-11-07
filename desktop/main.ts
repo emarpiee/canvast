@@ -685,21 +685,6 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     else if (act === "maximize") (win.isMaximized() ? win.unmaximize() : win.maximize());
     else if (act === "close") win.close();
   });
-  // With no frame, the window moves by its row's title: the page says when a drag starts, moves and ends, and the window follows the
-  // pointer from where it was (the pointer's place on the screen, as the page has it). No drag area (-webkit-app-region): on KDE Wayland one took the mouse from
-  // the whole app. An app moves its own window on X11 only: on Wayland the desktop moves it (setPosition does nothing there).
-  let moveFrom: { cx: number; cy: number; x: number; y: number } | null = null;
-  ipcMain.removeAllListeners("canvast:windowMove");
-  ipcMain.on("canvast:windowMove", (e, act: unknown, sx: unknown, sy: unknown) => {
-    if (e.sender !== win.webContents || win.isDestroyed()) return;
-    const at = typeof sx === "number" && typeof sy === "number" && Number.isFinite(sx) && Number.isFinite(sy) && Math.abs(sx) < 1e6 && Math.abs(sy) < 1e6;
-    if (act === "start" && at) {
-      if (win.isMaximized() || win.isFullScreen()) return void (moveFrom = null);
-      const [x, y] = win.getPosition();
-      moveFrom = { cx: sx, cy: sy, x: x!, y: y! };
-    } else if (act === "move" && at && moveFrom) win.setPosition(Math.round(moveFrom.x + sx - moveFrom.cx), Math.round(moveFrom.y + sy - moveFrom.cy));
-    else moveFrom = null;
-  });
   ipcMain.handle("canvast:forgetHiddenCopy", (e) => {
     own(e);
     return forgetHiddenCopy();
@@ -1267,9 +1252,6 @@ app.on("will-quit", (e) => {
   e.preventDefault();
   void forgetHiddenCopy().finally(() => app.exit());
 });
-
-// (Running through XWayland when the frame is off, so the row's title could move the window there too, stopped the app from starting
-// on a Wayland desktop (0.54.57): the app stays native. On Wayland a window is moved by the desktop: Meta and drag on KDE.)
 
 void app.whenReady().then(async () => {
   if (!existsSync(HTML)) {

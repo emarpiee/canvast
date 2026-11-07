@@ -13,8 +13,9 @@ const REACH_PX = 8;
 
 /**
  * The desktop window with no frame (Settings > Appearance > Window frame): a row with the window's name and its buttons, floating over the top of the app, which comes
- * when the pointer reaches the very top edge and goes when it leaves. It takes no room from anything. It has no drag area (`-webkit-app-region`): with one, while the row showed, the mouse moved the window instead of reaching the
- * app, and the page saw no pointer to hide the row by. So the window moves by the desktop's own way.
+ * when the pointer reaches the very top edge and goes when it leaves. It takes no room from anything. Its title is a drag area
+ * (`-webkit-app-region`), as an app's own title bar is: the desktop moves the window, on X11 and on Wayland. So the row is the page's own
+ * element while no modal is open: in the top layer (a popover), a drag area once took the whole window on KDE Wayland.
  * It is there from the first moment and above everything: a modal makes all outside itself inert, so the row moves into the newest modal, in the top layer so that
  * nothing of the modal's look reaches it. In front of a modal that cannot be closed (the start, the lock and the busy screens) it stays, so that the workspace's name
  * and the window's buttons are never out of reach, and it goes only after them.
@@ -27,11 +28,9 @@ export async function mountWindowRow(): Promise<void> {
   const edge = document.createElement("div");
   edge.className = "win-edge";
   edge.dataset["testid"] = "win-edge";
-  edge.popover = "manual";
   const row = document.createElement("div");
   row.className = "win-row";
   row.dataset["testid"] = "win-row";
-  row.popover = "manual";
   row.innerHTML = `
     <span class="win-title"></span>
     <button type="button" data-win="minimize" data-testid="win-minimize" aria-label="Minimize the window" title="Minimize">${ICONS.minus}</button>
@@ -42,27 +41,6 @@ export async function mountWindowRow(): Promise<void> {
     const act = (e.target as HTMLElement).closest<HTMLElement>("[data-win]")?.dataset["win"];
     if (act === "minimize" || act === "maximize" || act === "close") bridge.windowAct(act);
   });
-  // A drag on the title moves the window (the window follows the pointer, moved by the app); a double-click maximizes or restores it.
-  const title = row.querySelector<HTMLElement>(".win-title")!;
-  let dragging = false;
-  const endMove = (): void => {
-    if (!dragging) return;
-    dragging = false;
-    bridge.windowMove("end");
-  };
-  title.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0 || e.detail > 1) return;
-    dragging = true;
-    title.setPointerCapture(e.pointerId);
-    bridge.windowMove("start", e.screenX, e.screenY);
-  });
-  title.addEventListener("pointermove", (e) => {
-    if (!dragging) return;
-    if (!(e.buttons & 1)) return endMove(); // (a release the page did not see: the window stops following)
-    bridge.windowMove("move", e.screenX, e.screenY);
-  });
-  for (const type of ["pointerup", "pointercancel", "lostpointercapture"]) title.addEventListener(type, endMove);
-  title.addEventListener("dblclick", () => bridge.windowAct("maximize"));
   let timer = 0;
   let heldUntil = 0;
   let pinned = false;
@@ -105,7 +83,17 @@ export async function mountWindowRow(): Promise<void> {
     const top = [...document.querySelectorAll<HTMLDialogElement>("dialog[open]")].at(-1);
     const host = top ?? document.body;
     if (row.parentElement !== host) host.append(edge, row);
-    for (const part of [edge, row]) if (!part.matches(":popover-open")) part.showPopover();
+    // With no modal, the row and its edge are the page's own elements (a title bar's drag area is only right there: in the top layer it
+    // once took the whole window on KDE Wayland). In a modal, everything outside it is inert: they go into its top layer, with no drag area.
+    for (const part of [edge, row]) {
+      if (top) {
+        if (!part.hasAttribute("popover")) part.popover = "manual";
+        if (!part.matches(":popover-open")) part.showPopover();
+      } else if (part.hasAttribute("popover")) {
+        if (part.matches(":popover-open")) part.hidePopover();
+        part.removeAttribute("popover");
+      }
+    }
     const held = top?.dataset["locked"] !== undefined;
     if (held === pinned) return;
     pinned = held;

@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.59: the frameless window moves by its row, on Wayland too (2026-11-08)
+
+- **Implemented:** `.win-title` `-webkit-app-region: drag` while the row shows and is not a popover; buttons `no-drag`; row and edge leave the top layer while no modal is open (`--z-window`), popovers again in a modal. `canvast:windowMove` removed. Desktop frame test checks the drag area, its buttons and that the row is not in the top layer.
+- **Unverified:** on the owner's KDE Wayland desktop (whether the earlier whole-window capture came from the top layer).
+- **Committed:** v0.54.59.
+
 ## v0.54.58: the desktop app starts again on Wayland (2026-11-08)
 
 - **Implemented:** the `ozone-platform=x11` switch removed (the owner's app did not start, a fatal error, with the frame off on Wayland). The title drag stays for X11.

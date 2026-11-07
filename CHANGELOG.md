@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.59 — The frameless window moves by its row, on Wayland too (2026-11-08)
+
+- **Changed:** with Window frame off, the row's title is a drag area, as an app's own title bar: the desktop moves the window, on X11 and on Wayland, with nothing to set up. The row is the page's own element while no dialog is open (in the top layer, a drag area once took the mouse from the whole app); in a dialog it has none. The title drag of 0.54.57, made by the app, is gone.
+
 ## 0.54.58 — The desktop app starts again on Wayland (2026-11-08)
 
 - **Fixed:** with Window frame off, the desktop app did not start on a Wayland desktop (a fatal error): 0.54.57 ran it through XWayland so its row could move the window. It stays native now; the row's title moves the window on X11, and on Wayland the desktop's own way does (Meta and drag on KDE).

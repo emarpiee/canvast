@@ -126,8 +126,6 @@ export interface DesktopBridge {
   frame(): Promise<{ saved: WindowFrame; window: WindowFrame }>;
   setFrame(mode: WindowFrame): Promise<void>;
   windowAct(act: "minimize" | "maximize" | "close"): void;
-  /** A drag on the window row's title (window frame off): the window follows the pointer from "start" to "end". */
-  windowMove(act: "start" | "move" | "end", screenX?: number, screenY?: number): void;
   dropOpened(): Promise<void>;
   /** Show a file of the workspace folder in the system's file manager (its folder opened, the file selected). */
   showFile(path: string): Promise<void>;

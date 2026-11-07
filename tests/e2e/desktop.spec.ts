@@ -2096,7 +2096,7 @@ test("the window frame off: a row from the top edge has the window's buttons and
     await expect(page.getByTestId("win-close")).toHaveCount(0); // (a window's frame cannot change: at the next start)
     await app.close();
     ({ app, page } = await launch(ws, "userdata", true));
-    // It shows for a moment at the start, goes, comes from the very top edge, and goes when the pointer leaves. It never makes a drag area, which took the mouse from the app.
+    // It shows for a moment at the start, goes, comes from the very top edge, and goes when the pointer leaves.
     const row = page.getByTestId("win-row");
     await expect(row).toHaveClass(/is-shown/);
     await expect(page.getByTestId("win-close")).toBeVisible();
@@ -2108,16 +2108,12 @@ test("the window frame off: a row from the top edge has the window's buttons and
     await expect(page.getByTestId("win-minimize")).toBeVisible();
     await expect(page.getByTestId("win-maximize")).toBeVisible();
     await expect(page.getByTestId("win-close")).toBeVisible();
-    expect(await row.evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"))).not.toBe("drag");
-    // A drag on its title moves the window (the app moves it, from the pointer's place on the screen).
-    const at = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getPosition());
-    const before = await at();
-    const t = (await page.locator(".win-title").boundingBox())!;
-    await page.mouse.move(t.x + t.width / 2, t.y + t.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(t.x + t.width / 2 + 60, t.y + t.height / 2 + 40, { steps: 4 });
-    await page.mouse.up();
-    await expect.poll(at).not.toEqual(before);
+    expect(await row.evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"))).not.toBe("drag"); // (the row itself never)
+    // Its title is a drag area, as an app's title bar is (the desktop moves the window): only while it shows, never its buttons, and the row is
+    // the page's own element then, not in the top layer, where a drag area once took the whole window.
+    expect(await row.evaluate((e) => e.matches(":popover-open"))).toBe(false);
+    expect(await page.locator(".win-title").evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"))).toBe("drag");
+    expect(await page.getByTestId("win-close").evaluate((e) => getComputedStyle(e).getPropertyValue("-webkit-app-region"))).toBe("no-drag");
     await page.getByTestId("win-maximize").focus(); // (a button clicked keeps the focus: that must not keep the row)
     await page.mouse.move(400, 300);
     await expect(row).not.toHaveClass(/is-shown/);
