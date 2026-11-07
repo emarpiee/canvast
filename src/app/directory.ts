@@ -87,13 +87,15 @@ export async function fileInFolders(session: Session, items: ReadonlyArray<{ has
   if (!catalog || !items.length) return;
   const made = new Map<string, string>(); // "a/b" → folder id
   const listing = await catalog.list();
+  // (the hidden folders are listed apart: a hidden item's folder of that name is found there, not made again at every import)
+  const known = [...listing.folders, ...(listing.hiddenFolders ?? [])];
   const idOf = async (c: CatalogStore, path: readonly string[]): Promise<string> => {
     let parent: string | null = null;
     for (let i = 0; i < path.length; i++) {
       const key = path.slice(0, i + 1).join("/").toLowerCase();
       let id = made.get(key);
       if (!id) {
-        const have = listing.folders.find((f) => f.parentId === parent && !!f.hidden === hidden && f.name.toLowerCase() === path[i]!.toLowerCase());
+        const have = known.find((f) => f.parentId === parent && !!f.hidden === hidden && f.name.toLowerCase() === path[i]!.toLowerCase());
         id = have?.id ?? newObjectId();
         if (!have) {
           const nid = id;
@@ -101,7 +103,7 @@ export async function fileInFolders(session: Session, items: ReadonlyArray<{ has
           const name = path[i]!;
           await c.createFolder(name, p, nid);
           if (hidden) await c.hideFolder(nid);
-          listing.folders.push({ id: nid, name, parentId: p, ...(hidden ? { hidden: true } : {}) });
+          known.push({ id: nid, name, parentId: p, ...(hidden ? { hidden: true } : {}) });
         }
         made.set(key, id);
       }

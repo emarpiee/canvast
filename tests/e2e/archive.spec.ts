@@ -420,7 +420,7 @@ test("hidden items, desktop to browser: a desktop backup's sealed items, opened 
   await p.getByTestId("prompt-ok").click();
   await expect(p.getByTestId("toast")).toContainText(/1 hidden item opened/, { timeout: 60_000 });
   await expect.poll(() => hiddenDetails(p, GREEN_HASH)).toEqual([[true, LONG_NOTE, at]]);
-  const folder = await p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => { const e = l.entries.find((x) => x.hash === h)!; const f = l.folders.find((x) => x.id === e.folderIds?.[0]); return [e.name, f?.name, !!f?.hidden]; }), GREEN_HASH);
+  const folder = await p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => { const e = l.entries.find((x) => x.hash === h)!; const f = [...l.folders, ...(l.hiddenFolders ?? [])].find((x) => x.id === e.folderIds?.[0]); return [e.name, f?.name, !!f?.hidden]; }), GREEN_HASH);
   expect(folder).toEqual(["Secret Plan.png", "Plans", true]);
 });
 
