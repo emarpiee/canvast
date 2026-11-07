@@ -369,7 +369,10 @@ test("away and back: a backup updates a workspace elsewhere and comes home: one 
     await context.close();
   }
   // Home, meanwhile: a canvas of its own changed since its backup.
+  await p.getByTestId("view-canvas").click();
+  const drawn = (await objects(p)).length;
   await stroke(p, 300, 300);
+  expect((await objects(p)).length).toBe(drawn + 1);
   await importArchive(p, away.name, away.bytes, true, "update");
   const after = await shape(p);
   expect(after.length).toBe(1); // (one set of boards, not the backup's beside home's)
@@ -696,8 +699,7 @@ test("an incremental backup holds only what changed, a chain of backups restores
     { name: inc.name, mimeType: "application/zip", buffer: inc.bytes },
     { name: "again.canvast", mimeType: "application/zip", buffer: inc.bytes },
   ]);
-  await importMode(q);
-  await expect(q.getByTestId("toast")).toContainText(/Cannot import 2 backup files/);
+  await expect(q.getByTestId("toast")).toContainText(/Cannot import 2 backup files/); // (refused before any question)
   await other.context.close();
   expect(app.consoleErrors).toEqual([]);
 });
