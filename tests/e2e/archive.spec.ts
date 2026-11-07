@@ -336,8 +336,21 @@ test("away and back: a backup updates a workspace elsewhere and comes home: one 
   const p = app.page;
   await importImage(p);
   await p.evaluate((h) => window.__canvastDebug.libraryOp("note", h, "at home"), HASH);
+  // A hidden item at home, left out of the backup (the default): coming back, it is not taken for one deleted away.
+  const SECRET = makePng(3, 3, () => [90, 20, 160, 255]);
+  const SECRET_HASH = createHash("sha256").update(SECRET).digest("hex");
+  await p.getByTestId("view-assets").click();
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "secret.png", mimeType: "image/png", buffer: SECRET });
+  await expect.poll(() => p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.some((e) => e.hash === h)), SECRET_HASH)).toBe(true);
+  expect((await p.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"))).ok).toBe(true);
+  await p.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), SECRET_HASH);
+  await p.getByTestId("view-canvas").click();
   await openPanel(p);
-  const home = await download(p, () => p.getByTestId("set-export-full").click());
+  const home = await download(p, async () => {
+    await p.getByTestId("set-export-full").click();
+    await p.getByTestId("choose-ok").click(); // (hidden items: left out)
+    await p.getByTestId("choose-ok").click(); // (passwords and privacy settings: left out)
+  });
   const shape = (q: Page) => sess(q).then((s) => s.tree!.map((b) => [b.name, b.canvases.map((c) => c.name)]));
   const note = (q: Page, h: string) => q.evaluate((x) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === x)?.note ?? null), h);
   const { context, page: q } = await freshProfile(browser);
@@ -363,7 +376,25 @@ test("away and back: a backup updates a workspace elsewhere and comes home: one 
   expect(after[0]![1]).toEqual(expect.arrayContaining(["Studies", expect.stringMatching(/\(conflict /)]));
   expect(await note(p, HASH)).toBe("changed away");
   expect(await note(p, GREEN_HASH)).not.toBeNull();
+  expect(await hiddenDetails(p, SECRET_HASH)).toEqual([[true, "", expect.any(Number)]]);
   expect(app.consoleErrors).toEqual([]);
+});
+
+test("an update from an incremental backup keeps the canvases it lists as unchanged where they are, and deletes no item", async ({ app }) => {
+  const p = app.page;
+  await importImage(p);
+  const first = (await sess(p)).tree![0]!;
+  await p.evaluate((b) => window.__canvastDebug.workspaceOp("newCanvas", b, "Second"), first.id);
+  await expect.poll(() => sess(p).then((s) => s.tree![0]!.canvases.length)).toBe(2);
+  await openPanel(p);
+  await download(p, () => p.getByTestId("set-export-full").click());
+  await p.evaluate((c) => window.__canvastDebug.workspaceOp("renameCanvas", c, "Renamed"), first.canvases[0]!.id);
+  await openPanel(p);
+  const inc = await download(p, () => p.getByTestId("set-export-changes").click());
+  const before = await sess(p).then((s) => s.tree!.map((b) => [b.name, b.canvases.map((c) => c.name)]));
+  await importArchive(p, inc.name, inc.bytes, true, "update");
+  expect(await sess(p).then((s) => s.tree!.map((b) => [b.name, b.canvases.map((c) => c.name)]))).toEqual(before);
+  expect(await p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).length), HASH)).toBe(1);
 });
 
 test("hidden items, browser to browser: included in a backup, they come back hidden, with their note and the date they came", async ({ app, browser }) => {
@@ -419,9 +450,21 @@ test("hidden items, desktop to browser: a desktop backup's sealed items, opened 
   await p.getByTestId("prompt-input").fill("Hidden pw");
   await p.getByTestId("prompt-ok").click();
   await expect(p.getByTestId("toast")).toContainText(/1 hidden item opened/, { timeout: 60_000 });
+  // (this browser has no Hidden password yet: it offers the one typed; not taken here)
+  await expect(p.getByTestId("confirm-dialog")).toContainText("no Hidden items password yet");
+  await p.getByTestId("confirm-cancel").click();
   await expect.poll(() => hiddenDetails(p, GREEN_HASH)).toEqual([[true, LONG_NOTE, at]]);
   const folder = await p.evaluate((h) => window.__canvastDebug.assetListing().then((l) => { const e = l.entries.find((x) => x.hash === h)!; const f = [...l.folders, ...(l.hiddenFolders ?? [])].find((x) => x.id === e.folderIds?.[0]); return [e.name, f?.name, !!f?.hidden]; }), GREEN_HASH);
   expect(folder).toEqual(["Secret Plan.png", "Plans", true]);
+  // Imported again: the hidden folder of that name is used again, never a second one.
+  await openPanel(p);
+  await p.getByTestId("set-import-input").setInputFiles({ name: "desktop.canvast", mimeType: "application/zip", buffer: desktop });
+  await importMode(p);
+  await p.getByTestId("confirm-ok").click();
+  await p.getByTestId("prompt-input").fill("Hidden pw");
+  await p.getByTestId("prompt-ok").click();
+  await expect(p.getByTestId("toast")).toContainText(/1 hidden item opened/, { timeout: 60_000 });
+  expect(await p.evaluate(() => window.__canvastDebug.assetListing().then((l) => [...l.folders, ...(l.hiddenFolders ?? [])].filter((f) => f.name === "Plans").length))).toBe(1);
 });
 
 test("damaged and hostile archives are refused or reported, and nothing partial is written", async ({ app, browser }) => {

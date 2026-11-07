@@ -322,7 +322,9 @@ void dropOpened(); // (left by a crash)
 
 async function writeAtomic(full: string, bytes: Uint8Array, durable = true): Promise<void> {
   await mkdir(dirname(full), { recursive: true });
-  const tmp = `${full}.tmp-${randomUUID()}`; // (one of its own: two writes of a file in the same millisecond shared one, and one failed)
+  // (one of its own: two writes of a file in the same millisecond shared one, and one failed; named apart from the file's name, which with
+  // `.tmp-` and an id after it went past the 255 bytes a name may have: a hidden file's long encrypted name did, ENAMETOOLONG)
+  const tmp = join(dirname(full), `.tmp-${randomUUID()}`);
   const fh = await open(tmp, "w");
   try {
     await fh.writeFile(bytes);
@@ -453,7 +455,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
   const streams = new Map<string, { tmp: string; target: string; fh: FileHandle | null; replace: boolean; copy: boolean }>();
   const begun = async (target: string, replace: boolean, copy = false): Promise<string> => {
     await mkdir(dirname(target), { recursive: true, ...(copy ? { mode: 0o700 } : {}) });
-    const tmp = `${target}.tmp-${randomUUID()}`;
+    const tmp = join(dirname(target), `.tmp-${randomUUID()}`); // (see writeAtomic: the target's own name may be long)
     const id = randomUUID();
     streams.set(id, { tmp, target, fh: await open(tmp, "w", copy ? 0o600 : 0o666), replace, copy });
     return id;

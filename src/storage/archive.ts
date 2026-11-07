@@ -542,6 +542,8 @@ export interface ImportPlan {
   workspaceId: string | null;
   /** The library folders it lists (0.54.61), empty ones and hidden ones too. */
   folders: Array<{ path: string[]; hidden: boolean }>;
+  /** Canvases it lists that did not change since the backup it goes on from (an incremental one): an update keeps them as they are. */
+  unchangedIds: string[];
   workspaceName: string;
   exportedAt: number;
   boards: Array<{ id?: string; name: string; canvases: PlannedCanvas[] }>;
@@ -745,6 +747,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
   const plan: ImportPlan = {
     scope,
     mode: "add",
+    unchangedIds: [],
     workspaceId: okId(m["workspaceId"]) ?? null,
     folders: (Array.isArray(m["folders"]) ? (m["folders"] as unknown[]) : []).flatMap((f) => {
       const path = isObj(f) && Array.isArray(f["path"]) ? (f["path"] as unknown[]) : [];
@@ -791,6 +794,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
       const where = typeof c["file"] === "string" ? { entries: latest.entries, file: c["file"] } : typeof c["id"] === "string" ? canvasAt(c["id"]) : null;
       if (!where) {
         if (c["file"] === undefined) {
+          if (okId(c["id"])) plan.unchangedIds.push(okId(c["id"])!);
           problems.push(`“${name}” did not change since the backup this one goes on from, and that file was not added: it is not imported.`);
           continue;
         }
@@ -1198,7 +1202,7 @@ async function applyRest(db: IDBDatabase, workspaceId: string, targetBoardId: st
         if (f.hidden) folders = folders.map((x) => (x.id === id ? { ...x, hidden: true } : x));
       }
     }
-    if (update && result.canvases > 0) {
+    if (update && result.canvases > 0 && !plan.incrementalOnly) { // (an incremental backup on its own does not list every item)
       // Items this workspace had at its last backup that the backup does not have: deleted where it was made. Deleted here too (a
       // desktop's file goes to .trash). A hidden one only when the backup carries hidden items; a copy of a file, as it is.
       const inBackup = new Set([...plan.assets.map((a) => a.hash), ...plan.sealed.map((s) => s.hash)]);
@@ -1314,6 +1318,10 @@ async function updateBoards(tx: IDBTransaction, ws: WorkspaceRecord, plan: Impor
       if (placed.has(id)) continue;
       const c = homeCanvases.get(id);
       if (!c) continue;
+      if (plan.unchangedIds.includes(id)) {
+        keep.push(id); // (an incremental backup lists it unchanged: as it is here)
+        continue;
+      }
       if (c.objectCount === 0 && !(await req(tx.objectStore("bookmarks").get(id) as IDBRequest<unknown>))) {
         canvases.delete(id); // (an empty canvas: a new workspace's first one, say; nothing of it is lost)
         clear(id);

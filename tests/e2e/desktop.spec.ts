@@ -539,6 +539,8 @@ test("a big library (past the size library.json is kept for) writes only what ch
 
 /** A note long enough that the hidden items' index is past the 4 KiB a key file was once read up to (it was then skipped). */
 const LONG_NOTE = "From the life class. ".repeat(300).trim();
+/** A name whose encrypted form is near the 255 bytes a file name may have: a temporary name made from it went past them (ENAMETOOLONG). */
+const LONG_NAME = `${"Secret Plan of the long study ".repeat(4).trim()}.png`;
 
 test("away and back on the desktop: a backup updates another workspace folder and comes home: one set of boards, the changes made there, home's own change kept beside", async () => {
   const pic = makePng(4, 3, () => [20, 120, 220, 255]);
@@ -603,7 +605,7 @@ test("hidden items, browser to desktop: a browser backup's hidden item (readable
   let made: Buffer;
   try {
     await page.getByTestId("view-assets").click();
-    await page.getByTestId("assets-import-input").setInputFiles({ name: "Secret Plan.png", mimeType: "image/png", buffer: pic });
+    await page.getByTestId("assets-import-input").setInputFiles({ name: LONG_NAME, mimeType: "image/png", buffer: pic });
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length))).toBe(1);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     await page.getByTestId("view-canvas").click();
@@ -619,17 +621,29 @@ test("hidden items, browser to desktop: a browser backup's hidden item (readable
   ({ app, page } = await launch(ws));
   try {
     expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"))).ok).toBe(true);
+    await page.evaluate(() => window.__canvastDebug.setSetting("library.hiddenNamesOff", true)); // (blanked while locked: they must come back)
+    await page.evaluate(() => window.__canvastDebug.hiddenOp("lock"));
     await page.getByTestId("save-status").click();
     await page.getByTestId("set-import-input").setInputFiles({ name: "browser.canvast", mimeType: "application/zip", buffer: made });
     await importMode(page);
-    await Promise.all([page.waitForEvent("load", { timeout: 30_000 }), page.getByTestId("confirm-ok").click()]);
+    await page.getByTestId("confirm-ok").click();
+    // Readable in the backup, locked here: its password is asked, and it is encrypted in the import, before the app starts again.
+    await page.getByTestId("prompt-input").fill("pw");
+    await Promise.all([page.waitForEvent("load", { timeout: 60_000 }), page.getByTestId("prompt-ok").click()]);
     await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
+    expect(files(ws).filter((f) => f.startsWith(".hidden/") && !f.startsWith(".hidden/thumbnails/") && !f.endsWith(".name"))).toHaveLength(1);
+    expect(files(ws).filter((f) => f.startsWith("library/") && f.endsWith(".png"))).toEqual([]);
     expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("check", "pw"))).ok).toBe(true);
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).map((e) => [!!e.hidden, e.note ?? "", e.importedAt])), hash), { timeout: 15_000 }).toEqual([[true, LONG_NOTE, at]]);
-    // (sealed in .hidden/, nothing readable of it left in the folder)
-    await page.evaluate(() => window.__canvastDebug.flushStorage());
-    await expect.poll(() => files(ws).filter((f) => f.startsWith(".hidden/") && !f.startsWith(".hidden/thumbnails/")).length, { timeout: 15_000 }).toBe(1);
-    expect(files(ws).filter((f) => f.startsWith("library/") && f.endsWith(".png"))).toEqual([]);
+    expect(await page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.hash === h)?.name), hash)).toBe(LONG_NAME);
+  } finally {
+    await app.close();
+  }
+  // Started again (locked: its details blanked here), then opened: all of them back from the sealed index.
+  ({ app, page } = await launch(ws));
+  try {
+    expect((await page.evaluate(() => window.__canvastDebug.hiddenOp("check", "pw"))).ok).toBe(true);
+    await expect.poll(() => page.evaluate((h) => window.__canvastDebug.assetListing().then((l) => l.entries.filter((e) => e.hash === h).map((e) => [e.name, !!e.hidden, e.note ?? "", e.importedAt])), hash), { timeout: 15_000 }).toEqual([[LONG_NAME, true, LONG_NOTE, at]]);
   } finally {
     await app.close();
   }

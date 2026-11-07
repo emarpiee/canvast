@@ -52,6 +52,8 @@ export const libraryTesting = { compatMax: COMPAT_MAX_ITEMS };
 export const HIDDEN_ORPHAN_WAIT = { ms: 30_000 };
 /** Hidden items (hashes) and folders (`folder:<id>`) blanked in this device's cache while locked (app storage `meta`). */
 const BLANK_KEY = "hiddenBlanked";
+/** The hidden items the sealed index held when it was last written here: only those may be blanked (their details come back from it). */
+const INDEXED_KEY = "hiddenIndexed";
 /** Sealed files a backup put into `.hidden/`, taken in without that wait (app storage `meta`). */
 const NO_WAIT_KEY = "hiddenNoWait";
 
@@ -482,7 +484,10 @@ export class LibraryMirror {
   blankHidden(): Promise<void> {
     return this.lib.serial(async () => {
       const blanked = new Set((await this.metaOf<string[]>(BLANK_KEY)) ?? []);
-      const hidden = (await this.lib.entries("hidden")).filter((e) => !blanked.has(e.hash));
+      // (only what the sealed index holds: one sealed after its last write, the key locked or the app stopped before the next, has its
+      // details nowhere else, and blanked it lost them for good: an import of many hidden items, sealing a while after it)
+      const indexed = new Set((await this.metaOf<string[]>(INDEXED_KEY)) ?? []);
+      const hidden = (await this.lib.entries("hidden")).filter((e) => !blanked.has(e.hash) && indexed.has(e.hash));
       const { recs } = await this.lib.rows(hidden.map((e) => e.hash));
       const ops: LibraryOp[] = [];
       for (const e of hidden) {
@@ -1829,7 +1834,10 @@ export class LibraryMirror {
     const index = JSON.stringify([...this.hiddenItems.values()].sort((a, b) => (a.hash < b.hash ? -1 : 1)));
     const sealedFolders = JSON.stringify(folders.filter((f) => !shown.includes(f)));
     const sealing = !!this.vault.dataKey && !blank;
-    if (sealing && (index !== this.lastIndex || sealedFolders !== this.lastFolders || this.vault.indexWaiting) && (index !== "[]" || sealedFolders !== "[]" || (await this.vault.state()) !== "none")) await this.vault.writeIndex(index, sealedFolders);
+    if (sealing && (index !== this.lastIndex || sealedFolders !== this.lastFolders || this.vault.indexWaiting) && (index !== "[]" || sealedFolders !== "[]" || (await this.vault.state()) !== "none")) {
+      await this.vault.writeIndex(index, sealedFolders);
+      await this.setMeta(INDEXED_KEY, [...this.hiddenItems.keys()]);
+    }
     if (this.vault.dataKey) (this.lastIndex = index), (this.lastFolders = sealedFolders);
     // (the folders are now what the files say: with the hidden ones only when the sealed index was written; a folder hidden while locked
     // is not in it yet, and stays this device's until it is, instead of being dropped when the key opens an older index)

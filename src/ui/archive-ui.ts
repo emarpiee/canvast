@@ -7,7 +7,7 @@ import { beginProgress } from "../app/progress";
 import type { Progress } from "../app/progress";
 import { be, plural, were } from "../doc/plural";
 import type { ExportScope } from "../storage/archive";
-import { scopeWithHiddenChoice, scopeWithPrivacyChoice } from "./hidden-access";
+import { askHiddenPassword, scopeWithHiddenChoice, scopeWithPrivacyChoice } from "./hidden-access";
 import { ARCHIVE_EXTENSION, ArchiveError, sealedHooks, type ImportPlan } from "../storage/archive";
 import { openBackupIndex, openBackupItems, openBackupKey } from "../storage/sealed-open";
 import type { MetaChange } from "../assets/asset-catalog";
@@ -232,6 +232,12 @@ export async function runImport(session: Session, picked: File | readonly File[]
   const ok = await confirmDialog({ title: folder ? "Open the library of this folder?" : `Import ${file.name}?`, lines: [], facts, list: { title: "Also in this file", items: carried }, warnings, confirmLabel: folder ? "Open library" : "Import", danger: false });
   if (!ok) return;
   const hidden = sealedHere(plan) ? await askBackupHidden(session, plan) : null;
+  // The desktop app: hidden items a browser's backup brings readable are encrypted in this import, on its screen, when the Hidden items are
+  // opened now (their password asked first); not a while after, when they are opened next (the details could be blanked meanwhile).
+  const readable = [...plan.organization.values()].filter((o) => o.hidden).length;
+  if (readable && session.storage?.hidden && (await session.storage.hidden.state()) === "locked") {
+    await askHiddenPassword(session, `${plural(readable, "hidden item")} in this backup ${readable === 1 ? "is" : "are"} not encrypted. Enter the Hidden items' password to encrypt ${readable === 1 ? "it" : "them"} in this import (Cancel: when the Hidden items are opened next).`);
+  }
   const saving = busyProgress(session.editor, folder ? "Opening the library" : `Importing ${file.name}`, ["Keep the app open until it ends."]);
   saving.update(null, "saving into the workspace");
   try {

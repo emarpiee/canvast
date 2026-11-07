@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.54.62 — Hidden items keep their details through every import (2026-11-08)
+
+- **Fixed:** hidden items from a browser's backup lost their names, notes and tags on the desktop when *Keep hidden items' names off this device while locked* was on: they were encrypted a while after the import, and a lock before the sealed index was written blanked them with nothing to fill them in from. Only what the sealed index holds is blanked now.
+- **Fixed:** the desktop app encrypts a backup's readable hidden items in the import itself, on its screen (their password asked first), not when the Hidden items are opened next.
+- **Fixed:** "ENAMETOOLONG" writing hidden files: a write's temporary file was named after the file, and a long encrypted name with `.tmp-…` went past 255 bytes. It has a short name of its own now.
+- **Fixed:** an update from an incremental backup set aside the canvases it lists as unchanged, and could delete items it does not list; it keeps them.
+- **Fixed:** importing hidden items into hidden folders made a second hidden folder of the same name at each import.
+
 ## 0.54.61 — A backup updates a workspace: work elsewhere, come back (2026-11-08)
 
 - **Added:** importing a workspace backup asks how: **Update this workspace** (as the backup is: boards and canvases matched by id and replaced, item details, saved styles and the workspace's settings from the backup; a canvas changed here since the last backup kept beside as a conflict copy; a canvas the backup does not have set aside on a board "Not in the backup", an item it does not have deleted) or **Add as new boards** (as before). Update comes first when the backup holds this workspace's canvases or the workspace is empty, so a backup taken elsewhere and brought back updates home, in the browser and the desktop app alike.
