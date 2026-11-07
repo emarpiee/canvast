@@ -1353,6 +1353,7 @@ test("library files changed outside the app: a renamed or moved file is found by
   ({ app, page } = await launch(ws));
   try {
     await expect.poll(listing, { timeout: 15_000 }).toEqual([
+      ["Hand Copy.png", "poses", true, 0], // (the copy stays an item of its own)
       ["Loomis Hands.png", "anatomy", true, 1],
       ["Pose One.png", "poses", true, 0],
       ["huge_art.kra", "poses", false, 0], // (their files removed above: missing)
