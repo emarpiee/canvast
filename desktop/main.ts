@@ -687,7 +687,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
   });
   // With no frame, the window moves by its row's title: the page says when a drag starts, moves and ends, and the window follows the
   // pointer from where it was (the pointer's place on the screen, as the page has it). No drag area (-webkit-app-region): on KDE Wayland one took the mouse from
-  // the whole app. An app moves its own window on X11 only: see the start, which runs it through XWayland then.
+  // the whole app. An app moves its own window on X11 only: on Wayland the desktop moves it (setPosition does nothing there).
   let moveFrom: { cx: number; cy: number; x: number; y: number } | null = null;
   ipcMain.removeAllListeners("canvast:windowMove");
   ipcMain.on("canvast:windowMove", (e, act: unknown, sx: unknown, sy: unknown) => {
@@ -1268,9 +1268,8 @@ app.on("will-quit", (e) => {
   void forgetHiddenCopy().finally(() => app.exit());
 });
 
-// With the window frame off, the app runs through XWayland on a Wayland desktop: there an app cannot move its own window (Wayland leaves
-// that to the desktop), and its row's title moves it (`canvast:windowMove`). The System frame stays native Wayland.
-if (process.platform === "linux" && readFrame() === "off" && process.env["DISPLAY"] && (process.env["XDG_SESSION_TYPE"] === "wayland" || process.env["WAYLAND_DISPLAY"])) app.commandLine.appendSwitch("ozone-platform", "x11");
+// (Running through XWayland when the frame is off, so the row's title could move the window there too, stopped the app from starting
+// on a Wayland desktop (0.54.57): the app stays native. On Wayland a window is moved by the desktop: Meta and drag on KDE.)
 
 void app.whenReady().then(async () => {
   if (!existsSync(HTML)) {

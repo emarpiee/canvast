@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.54.58 — The desktop app starts again on Wayland (2026-11-08)
+
+- **Fixed:** with Window frame off, the desktop app did not start on a Wayland desktop (a fatal error): 0.54.57 ran it through XWayland so its row could move the window. It stays native now; the row's title moves the window on X11, and on Wayland the desktop's own way does (Meta and drag on KDE).
+
 ## 0.54.57 — The frameless window moves by its row (2026-11-08)
 
 - **Added:** with Window frame off, dragging the row's title moves the window, and a double-click maximises or restores it. The app moves the window as the pointer goes (no drag area, which took the mouse from the app on KDE Wayland). On a Wayland desktop it then runs through XWayland, as only there can an app move its own window; with the System frame it stays native Wayland.
