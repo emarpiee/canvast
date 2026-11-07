@@ -40,6 +40,7 @@ Unverified / Committed / Next bounded task**.
 ## v0.54.57: the frameless window moves by its row (2026-11-08)
 
 - **Implemented:** `canvast:windowMove` (start, move, end with the pointer's screen place; `setPosition` from where it started); the title's pointer capture; `ozone-platform=x11` when the frame is off on Wayland with a DISPLAY. Desktop frame test drags the title.
+- **Implemented (backup index):** `keyText` carries the sealed index and hidden folders; `adoptKey` keeps a same-key file that brings an index (its copy is merged on unlock); `openBackupIndex` and `MetaChange.importedAt` in the browser. Desktop backup test checks a hidden item's note and date.
 - **Implemented (hidden import):** PBKDF2 of `scryptJs` made from HMAC (Firefox: OperationError from its PBKDF2 for 1 KiB with a 1 KiB salt); hidden 25 at a time.
 - **Unverified:** on the owner's KDE Wayland desktop (XWayland look, the drag itself); Firefox opening, on the owner's backup.
 - **Committed:** v0.54.57.

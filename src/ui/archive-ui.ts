@@ -9,7 +9,8 @@ import { be, plural, were } from "../doc/plural";
 import type { ExportScope } from "../storage/archive";
 import { scopeWithHiddenChoice, scopeWithPrivacyChoice } from "./hidden-access";
 import { ARCHIVE_EXTENSION, ArchiveError, sealedHooks, type ImportPlan } from "../storage/archive";
-import { openBackupItems, openBackupKey } from "../storage/sealed-open";
+import { openBackupIndex, openBackupItems, openBackupKey } from "../storage/sealed-open";
+import type { MetaChange } from "../assets/asset-catalog";
 import { fileInFolders } from "../app/directory";
 import { typeOfName } from "../storage/workspace-names";
 import { MAX_IMPORT_BYTES } from "../assets/asset-library";
@@ -283,9 +284,11 @@ async function importBackupHidden(session: Session, plan: ImportPlan, key: Crypt
   let n = 0, left = 0, at = 0;
   const filed: Array<{ hash: string; path: string[] }> = [];
   // (hidden a few at a time, in one write each: one write per file made a big import slow; the busy screen covers the library meanwhile)
-  let unhidden: string[] = [];
+  // (what the backup's index says of each: its date, tags, note, fields and favourite)
+  const said = await openBackupIndex(plan, key);
+  let unhidden: Array<{ hash: string; change: MetaChange }> = [];
   const hideNow = async (): Promise<void> => {
-    if (unhidden.length) await session.catalog?.updateMetaEach(unhidden.map((hash) => ({ hash, change: { hidden: true } })));
+    if (unhidden.length) await session.catalog?.updateMetaEach(unhidden);
     unhidden = [];
   };
   for await (const it of openBackupItems(plan, key)) {
@@ -295,7 +298,8 @@ async function importBackupHidden(session: Session, plan: ImportPlan, key: Crypt
       continue;
     }
     const { record } = await session.assets.importFileDetailed(new File([it.bytes], it.name, { type: typeOfName(it.name) }), false);
-    unhidden.push(record.hash);
+    const was = said.get(it.hash);
+    unhidden.push({ hash: record.hash, change: { hidden: true, ...(was ? { importedAt: was.importedAt, ...(was.tags.length ? { addTags: was.tags } : {}), ...(was.note ? { note: was.note } : {}), ...(was.fields.length ? { fields: was.fields } : {}), ...(was.favorite ? { favorite: true } : {}) } : {}) } });
     filed.push({ hash: record.hash, path: it.folders });
     n++;
     if (unhidden.length >= HIDE_BATCH) await hideNow();

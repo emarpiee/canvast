@@ -238,12 +238,15 @@ export class HiddenVault implements HiddenStore {
   }
 
   private fromSpare = false;
-  /** The vault's key as its spare is written (no index), for a backup: null when there is none. */
+  /**
+   * The vault's key for a backup, with its index and hidden folders, sealed as in `hidden.json` (0.54.57): the dates, tags, notes and the
+   * rest of the hidden items come back with their files, here (as a vault, or a copy joined to this one) and in the browser. Null: none.
+   */
   async keyText(): Promise<string | null> {
     const record = (await this.vault())?.record;
     if (!record) return null;
-    const { format, version, kdf, key, check } = record;
-    return JSON.stringify({ format, version, kdf, key, ...(check ? { check } : {}) }, null, 1);
+    const { format, version, kdf, key, check, index, folders } = record;
+    return JSON.stringify({ format, version, kdf, key, ...(check ? { check } : {}), ...(index ? { index } : {}), ...(folders ? { folders } : {}) }, null, 1);
   }
 
   /**
@@ -260,8 +263,8 @@ export class HiddenVault implements HiddenStore {
       this.changed();
       return;
     }
-    if (mine.record.key === theirs.key) return;
-    if (this.key && (await holdsKey(theirs, this.key))) return; // (the same key under another password: nothing to join)
+    // (the same key: nothing to join, unless it brings an index, which the copy gives: its items' dates, tags and notes)
+    if (!theirs.index && (mine.record.key === theirs.key || (this.key && (await holdsKey(theirs, this.key))))) return;
     const at = `.canvast/hidden (backup ${new Date().toISOString().slice(0, 10)} ${Math.random().toString(36).slice(2, 6)}).json`;
     await this.bridge.write(at, new TextEncoder().encode(JSON.stringify(theirs, null, 1)));
   }

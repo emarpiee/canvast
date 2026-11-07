@@ -5,7 +5,8 @@
  */
 import { sha256Hex } from "../assets/sha256";
 import type { ImportPlan } from "./archive";
-import { SEALED_DIR_RE, nameKeys, openFile, openName, openVault, readVault } from "./hidden-vault";
+import { SEALED_DIR_RE, nameKeys, openFile, openName, openText, openVault, readVault } from "./hidden-vault";
+import { readItem, type LibraryItem } from "./library-mirror";
 
 export interface OpenedHidden {
   hash: string;
@@ -55,4 +56,21 @@ async function placeOf(at: string, nameAt: (seg: string, longAt: string) => Prom
     folders.push((await nameAt(part, `${dir}/.name`)) ?? part);
   }
   return { name: await nameAt(file, `${at}.name`), folders };
+}
+
+/** What the backup's index says of its hidden items (their dates, tags, notes, fields, favourite), by hash: empty for a backup made before it carried one. */
+export async function openBackupIndex(plan: Pick<ImportPlan, "hiddenKey">, key: CryptoKey): Promise<Map<string, LibraryItem>> {
+  const record = plan.hiddenKey ? readVault(plan.hiddenKey) : null;
+  const text = record?.index ? await openText(key, record.index).catch(() => null) : null;
+  const out = new Map<string, LibraryItem>();
+  try {
+    const list = text ? (JSON.parse(text) as unknown) : [];
+    for (const raw of Array.isArray(list) ? list : []) {
+      const it = readItem(raw);
+      if (it) out.set(it.hash, it);
+    }
+  } catch {
+    // (an index that does not read: the items come without it)
+  }
+  return out;
 }
