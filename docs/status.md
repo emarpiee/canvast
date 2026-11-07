@@ -37,6 +37,12 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.50: folders deleted outside; settings read first on a new device (2026-11-07)
+
+- **Implemented:** bridge `folderExists` (`canvast:folderExists`), used by `dropFoldersDeletedOutside`; `adoptShared(fileWs, atStart)`.
+- **Tested:** the folder test printed its kept state (dirs held `library/going`, gone on disk): the check never went on. Two-device test.
+- **Committed:** v0.54.50.
+
 ## v0.54.49: workspace settings keep the newest (2026-11-06)
 
 - **Implemented:** `@at` time with the workspace's settings (`SettingsStore.workspaceAt`, `canvast.settings.wsAt`); the session and the mirror take only newer ones; the mirror reads nothing back while its tree write is pending. Debug `libraryState` for the folder test.

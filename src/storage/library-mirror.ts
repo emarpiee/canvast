@@ -852,7 +852,7 @@ export class LibraryMirror {
    */
   async dropFoldersDeletedOutside(): Promise<boolean> {
     const seen = new Set(this.state.dirs ?? []);
-    if (!seen.size || !(await this.bridge.exists("library"))) return false;
+    if (!seen.size || !(await this.bridge.folderExists("library"))) return false; // (a folder: `exists` is for files, so this never went on before)
     return this.lib.serial(async () => {
       const folders = await this.lib.folders();
       const gone = new Set<string>();
@@ -861,7 +861,7 @@ export class LibraryMirror {
         const places = [libraryDir(names, "", ""), `library/${names.map((n) => keptPart(n)).join("/")}`];
         if (!places.some((d) => seen.has(d))) continue;
         let there = false;
-        for (const d of places) there ||= await this.bridge.exists(d);
+        for (const d of places) there ||= await this.bridge.folderExists(d);
         if (!there) gone.add(f.id);
       }
       if (!gone.size) return false;

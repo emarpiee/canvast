@@ -9,6 +9,7 @@ const bridge: DesktopBridge = {
   workspace: () => ipcRenderer.invoke("canvast:workspace"),
   read: (path) => ipcRenderer.invoke("canvast:read", path),
   exists: (path) => ipcRenderer.invoke("canvast:exists", path),
+  folderExists: (path) => ipcRenderer.invoke("canvast:folderExists", path),
   part: (path, from, to) => ipcRenderer.invoke("canvast:part", path, from, to),
   head: (path) => ipcRenderer.invoke("canvast:head", path),
   stream: {

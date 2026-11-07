@@ -578,6 +578,14 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
       return false;
     }
   });
+  ipcMain.handle("canvast:folderExists", async (e, rel: string) => {
+    own(e);
+    try {
+      return (await stat(await inside(root, rel))).isDirectory();
+    } catch {
+      return false;
+    }
+  });
   ipcMain.handle("canvast:write", async (e, rel: string, bytes: Uint8Array, durable: unknown = true) => {
     own(e);
     forgetWalked(String(rel));

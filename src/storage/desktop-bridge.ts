@@ -99,6 +99,8 @@ export interface DesktopBridge {
   head(path: string): Promise<string | null>;
   /** Whether a file is there. */
   exists(path: string): Promise<boolean>;
+  /** Whether a folder is there (`exists` answers for files only). */
+  folderExists(path: string): Promise<boolean>;
   /**
    * Write a file whole: a temporary file is written, flushed and renamed over it, so it is never half written. Folders are made.
    * `durable: false` does not wait for the disk to confirm it (many files at once): `syncFiles` does that later, for all of them.

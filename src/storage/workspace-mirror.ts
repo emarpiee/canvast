@@ -186,7 +186,7 @@ export class WorkspaceMirror {
     await this.mergeTreeCopies(fileWs); // (written back below, with the tree)
     const tree = JSON.stringify(fileWs.boards);
     if (tree !== this.state.tree) await this.adoptTree(fileWs);
-    await this.adoptShared(fileWs);
+    await this.adoptShared(fileWs, true);
     this.placed = fileWs.boards;
     this.state.tree = tree;
     await this.reconcile(fileWs.boards);
@@ -450,8 +450,10 @@ export class WorkspaceMirror {
    * The styles and settings of the file, when they differ from this device's (another device changed them), whether or not boards
    * changed with them. What the file lacks stays as it is here. Whether any changed.
    */
-  private async adoptShared(fileWs: WorkspaceFile): Promise<boolean> {
-    if (this.treeDirty) return false; // (this device's are newer, not written yet: the file is an older version of them, perhaps its own)
+  private async adoptShared(fileWs: WorkspaceFile, atStart = false): Promise<boolean> {
+    // (while running: this device's are newer when it still has them to write, and the file an older version, perhaps its own. At
+    // start-up the folder comes first: a new device has made a workspace of its own by then, which is no change of anyone's)
+    if (this.treeDirty && !atStart) return false;
     const styles = await this.repo.styles().catch(() => undefined);
     const settings = await this.repo.settings().catch(() => undefined);
     const newStyles = Array.isArray(fileWs.styles) && JSON.stringify(fileWs.styles) !== JSON.stringify(styles ?? []);

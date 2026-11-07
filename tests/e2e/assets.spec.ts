@@ -2394,6 +2394,9 @@ test("Extract frame follows Settings > Media and playback: name template and sty
     const s = { "frame.format": "webp", "frame.name": "{name}_{position}", "frame.nameStyle": "kebab", "frame.folder": "Stills", "frame.tagFrame": false, "frame.tagSource": true, "frame.tagsCustom": "ref, client x", "frame.place": false };
     for (const [k, v] of Object.entries(s)) window.__canvastDebug.setSetting(k, v);
   });
+  await p.reload(); // (and kept over a reload)
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await toAssets(p);
   await p.getByTestId("asset-card").first().click();
   await p.getByTestId("asset-preview").click();
   const viewer = p.getByTestId("slide-view");

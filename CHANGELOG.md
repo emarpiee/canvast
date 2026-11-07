@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.50 — Folders deleted outside, at last (2026-11-07)
+
+- **Fixed:** a library folder deleted outside the app came back, every time: the check for it asked whether the folder was there as a file, so it always concluded the library itself was not there, and did nothing. It now asks for a folder.
+- **Fixed:** a new device opening a workspace folder could write its own default settings over the workspace's: the folder's settings are now always read first at start-up.
+
 ## 0.54.49 — Workspace settings keep the newest (2026-11-06)
 
 - **Fixed:** a workspace setting changed just before the app closed or reloaded could be replaced by the older copy kept in the workspace; changes now carry their time, and only newer settings replace this device's.
