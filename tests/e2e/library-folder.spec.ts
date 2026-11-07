@@ -84,7 +84,7 @@ test("files move into the folder and back from the storage panel, each one prove
   await expect(p.getByRole("button", { name: "Choose another folder…" })).toBeDisabled(); // (files in it would show as missing)
   await p.getByRole("button", { name: "Move back to browser" }).click();
   await expect.poll(() => record(p, hash)).toEqual({ ext: 0, blob: PNG.length });
-  expect(await p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([]);
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.testFolderFiles())).toEqual([]); // (the folder's copy goes after the record says so)
 });
 
 test("erasing an original from the library (garbage collection) removes its file from the folder", async ({ app }) => {
