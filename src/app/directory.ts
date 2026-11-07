@@ -2,6 +2,7 @@ import type { Session } from "./session";
 import { newObjectId } from "../doc/model";
 import { sha256Hex } from "../assets/sha256";
 import type { CatalogStore } from "../storage/store";
+import type { MetaChange } from "../assets/asset-catalog";
 
 /**
  * Importing a folder (ADR 0134): a folder dropped on the window, or chosen with Import folder, brings in every file inside it (to a
@@ -66,25 +67,41 @@ export function filesOfPicker(list: FileList | null): File[] {
 
 /** Put the files that came from folders in library folders of the same names (nested the same way), after they were imported. */
 export async function fileByFolders(session: Session, files: readonly File[]): Promise<void> {
-  const catalog = session.catalog;
   const wanted = files.filter((f) => folderPathOf(f).length);
-  if (!catalog || !wanted.length) return;
+  if (!session.catalog || !wanted.length) return;
+  const imported = new Set((await session.catalog.list()).entries.map((e) => e.hash));
+  const items: Array<{ hash: string; path: string[] }> = [];
+  for (const f of wanted) {
+    const hash = await sha256Hex(await f.arrayBuffer());
+    if (imported.has(hash)) items.push({ hash, path: folderPathOf(f) }); // (one not imported, a type it does not take, is left out)
+  }
+  await fileInFolders(session, items);
+}
+
+/**
+ * Items put in the library folders their path of names says (made when missing), in one organize. `hidden`: the items are hidden, and so
+ * are their folders, which are their own (a shown folder of the same name is never used, nor hidden with them).
+ */
+export async function fileInFolders(session: Session, items: ReadonlyArray<{ hash: string; path: readonly string[] }>, hidden = false): Promise<void> {
+  const catalog = session.catalog;
+  if (!catalog || !items.length) return;
   const made = new Map<string, string>(); // "a/b" → folder id
   const listing = await catalog.list();
-  const idOf = async (c: CatalogStore, path: string[]): Promise<string> => {
+  const idOf = async (c: CatalogStore, path: readonly string[]): Promise<string> => {
     let parent: string | null = null;
     for (let i = 0; i < path.length; i++) {
       const key = path.slice(0, i + 1).join("/").toLowerCase();
       let id = made.get(key);
       if (!id) {
-        const have = listing.folders.find((f) => f.parentId === parent && f.name.toLowerCase() === path[i]!.toLowerCase());
+        const have = listing.folders.find((f) => f.parentId === parent && !!f.hidden === hidden && f.name.toLowerCase() === path[i]!.toLowerCase());
         id = have?.id ?? newObjectId();
         if (!have) {
           const nid = id;
           const p = parent;
           const name = path[i]!;
           await c.createFolder(name, p, nid);
-          listing.folders.push({ id: nid, name, parentId: p });
+          if (hidden) await c.hideFolder(nid);
+          listing.folders.push({ id: nid, name, parentId: p, ...(hidden ? { hidden: true } : {}) });
         }
         made.set(key, id);
       }
@@ -92,15 +109,10 @@ export async function fileByFolders(session: Session, files: readonly File[]): P
     }
     return parent!;
   };
-  const imported = new Set(listing.entries.map((e) => e.hash));
   // One organize for the whole batch: the library is told (and redrawn) once, not once per file; the files are filed in one write.
   await session.organize(async (c) => {
-    const changes: Array<{ hash: string; change: { addFolders: string[] } }> = [];
-    for (const f of wanted) {
-      const hash = await sha256Hex(await f.arrayBuffer());
-      if (!imported.has(hash)) continue; // not imported (a type it does not take)
-      changes.push({ hash, change: { addFolders: [await idOf(c, folderPathOf(f))] } });
-    }
+    const changes: Array<{ hash: string; change: MetaChange }> = [];
+    for (const it of items) changes.push({ hash: it.hash, change: { ...(it.path.length ? { addFolders: [await idOf(c, it.path)] } : {}), ...(hidden ? { hidden: true } : {}) } });
     if (changes.length) await c.updateMetaEach(changes);
   });
 }

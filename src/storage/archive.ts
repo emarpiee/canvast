@@ -904,9 +904,10 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
       if (e && e.size <= 21 * 2 ** 20) plan.sealedThumbnails.push({ name: n, data: e.data.slice(0, e.size) });
     }
   }
-  if (plan.sealed.length && (!plan.hiddenKey || !sealedHooks.write)) {
+  // (where the desktop app is not, they stay in the plan with their key file: the import asks their password and opens them, `sealed-open.ts`)
+  if (plan.sealed.length && !plan.hiddenKey) {
     const n = plan.sealed.length;
-    problems.push(!sealedHooks.write ? `${plural(n, "hidden item")} ${were(n)} encrypted by the desktop app and ${n === 1 ? "is" : "are"} left out here: import this backup in the desktop app, where the Hidden items' password opens ${n === 1 ? "it" : "them"}.` : `${plural(n, "hidden item")} came without ${n === 1 ? "its" : "their"} key file and ${were(n)} skipped.`);
+    problems.push(`${plural(n, "hidden item")} came without ${n === 1 ? "its" : "their"} key file and ${were(n)} skipped.`);
     plan.sealed = [];
   }
   const sealedHashes = new Set(plan.sealed.map((s) => s.hash));

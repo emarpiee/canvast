@@ -37,6 +37,13 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.54.55: the browser opens a desktop backup's hidden items (2026-11-08)
+
+- **Implemented:** `scryptJs` (`src/storage/scrypt.ts`, RFC 7914, the vault's fallback where no native scrypt is set); `sealed-open.ts` (`openBackupKey`, `openBackupItems`: bytes checked by hash, names and folders from the encrypted path and `.name` files); the browser's import keeps sealed items with their key, asks the password, imports them hidden (`fileInFolders(..., hidden)`, hidden folders of their own); offers the same Hidden password when the browser has none.
+- **Tested:** unit (scrypt against RFC 7914 and Node; sealed items opened, wrong password, damaged file). The import dialog itself is not covered by an E2E test.
+- **Limits:** tags, notes and properties of hidden items are not in a backup; files over 256 MiB are left out in the browser; hidden items there are not encrypted.
+- **Committed:** v0.54.55.
+
 ## v0.54.54: copies stored on desktop (2026-11-08)
 
 - **Implemented:** the main process takes copy keys (`HASH` in `desktop/main.ts` as `ITEM_KEY_RE`). Found by the desktop test on GitHub (the copy was never listed).

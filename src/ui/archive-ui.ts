@@ -8,8 +8,12 @@ import type { Progress } from "../app/progress";
 import { be, plural, were } from "../doc/plural";
 import type { ExportScope } from "../storage/archive";
 import { scopeWithHiddenChoice, scopeWithPrivacyChoice } from "./hidden-access";
-import { ARCHIVE_EXTENSION, ArchiveError } from "../storage/archive";
-import { chooseDialog, confirmDialog } from "./confirm";
+import { ARCHIVE_EXTENSION, ArchiveError, sealedHooks, type ImportPlan } from "../storage/archive";
+import { openBackupItems, openBackupKey } from "../storage/sealed-open";
+import { fileInFolders } from "../app/directory";
+import { typeOfName } from "../storage/workspace-names";
+import { MAX_IMPORT_BYTES } from "../assets/asset-library";
+import { chooseDialog, confirmDialog, promptDialog } from "./confirm";
 import { fmtBytes } from "./format";
 import { busyProgress } from "./busy-screen";
 import { desktopBridge } from "../storage/desktop-bridge";
@@ -201,6 +205,7 @@ export async function runImport(session: Session, picked: File | readonly File[]
     ...(plan.libraryFile ? [{ name: "A library index", text: "Your canvases and the library's names, tags and folders, without the files." }] : []),
     ...(plan.workspaceLock ? [{ name: "The workspace password", text: "Used only if this device has none; the app then asks for it when it opens." }] : []),
     ...(plan.hiddenLock ? [{ name: "The Hidden items password", text: "Used only if this device has none." }] : []),
+    ...(sealedHere(plan) ? [{ name: `${count(plan.sealed.length, "hidden item")}, encrypted by the desktop app`, text: "Their Hidden password is asked next; without it they are left out. Here they are kept as this browser keeps its own hidden items: not encrypted." }] : []),
     ...(settings ? [{ name: "Your settings", text: `${count(settings, "setting")} you have not changed on this device (theme, shortcuts, panel layout) ${settings === 1 ? "is" : "are"} restored; the others stay as they are here.` }] : []),
   ];
   const warnings = [
@@ -210,6 +215,7 @@ export async function runImport(session: Session, picked: File | readonly File[]
   ];
   const ok = await confirmDialog({ title: folder ? "Open the library of this folder?" : `Import ${file.name}?`, lines: [], facts, list: { title: "Also in this file", items: carried }, warnings, confirmLabel: folder ? "Open library" : "Import", danger: false });
   if (!ok) return;
+  const hidden = sealedHere(plan) ? await askBackupHidden(session, plan) : null;
   const saving = busyProgress(session.editor, folder ? "Opening the library" : `Importing ${file.name}`, ["Keep the app open until it ends."]);
   saving.update(null, "saving into the workspace");
   try {
@@ -219,10 +225,12 @@ export async function runImport(session: Session, picked: File | readonly File[]
       return;
     }
     const restored = session.settingsHook?.restore(plan.settings) ?? 0;
+    const opened = hidden ? await importBackupHidden(session, plan, hidden.key, saving) : null;
     const result =
       (restored ? `${plural(restored, "setting")} restored. ` : "") + `Imported ${plural(r.canvases, "canvas", "canvases")} and ${plural(r.objects, "object")}; ${plural(r.assetsAdded, "new file")} stored.` +
       (r.stylesAdded ? ` ${plural(r.stylesAdded, "saved style")} added.` : "") +
-      (r.stillMissing ? ` ${plural(r.stillMissing, "file")} ${be(r.stillMissing)} still missing.` : "");
+      (r.stillMissing ? ` ${plural(r.stillMissing, "file")} ${be(r.stillMissing)} still missing.` : "") +
+      (opened ? ` ${plural(opened.n, "hidden item")} opened${opened.left ? `; ${plural(opened.left, "hidden item")} did not open or ${be(opened.left)} too big for the browser, and ${were(opened.left)} left out` : ""}.` : sealedHere(plan) ? ` ${plural(plan.sealed.length, "hidden item")} left out (encrypted by the desktop app).` : "");
     // The desktop build: the import's files are written into the workspace folder first (the busy screen shows how far), then the
     // app starts again on what it now holds, and says the result.
     if (session.storage?.folderWriting) {
@@ -234,9 +242,55 @@ export async function runImport(session: Session, picked: File | readonly File[]
       return;
     }
     saving.done(result);
+    if (hidden && opened?.n && !(await session.hasPassword("hidden"))) {
+      const same = await confirmDialog({ title: "A password for the Hidden items here?", lines: ["This browser has no Hidden items password yet. Use the one you just typed?"], confirmLabel: "Use it", danger: false });
+      if (same) await session.setPassword("hidden", hidden.password);
+    }
   } catch (e) {
     saving.fail(`Import failed; nothing was changed: ${(e as Error).message}`);
   }
+}
+
+/** Hidden items a desktop backup carries still encrypted, where the desktop app is not here to put them into its folder (the browser). */
+const sealedHere = (plan: ImportPlan): boolean => plan.sealed.length > 0 && !sealedHooks.write && !!plan.hiddenKey;
+
+/** Their Hidden password, asked until it opens their key (null: left out). Stretching it takes a few seconds in the browser. */
+async function askBackupHidden(session: Session, plan: ImportPlan): Promise<{ key: CryptoKey; password: string } | null> {
+  const n = plan.sealed.length;
+  for (let wrong = false; ; ) {
+    const typed = await promptDialog({
+      title: "Hidden items in this backup",
+      lines: [wrong ? "That is not their password. Try again, or Cancel to leave them out." : `${plural(n, "hidden item")} ${were(n)} encrypted by the desktop app. Enter their Hidden password to bring ${n === 1 ? "it" : "them"} in, or Cancel to leave ${n === 1 ? "it" : "them"} out.`],
+      value: "",
+      confirmLabel: "Open",
+      secret: true,
+    });
+    if (!typed) return null;
+    const p = busyProgress(session.editor, "Opening the hidden items", ["Their password is checked: a few seconds."]);
+    const key = await openBackupKey(plan, typed).catch(() => null);
+    p.done();
+    if (key) return { key, password: typed };
+    wrong = true;
+  }
+}
+
+/** The backup's hidden items opened and imported as hidden items, in hidden library folders of their own names. */
+async function importBackupHidden(session: Session, plan: ImportPlan, key: CryptoKey, p: Progress): Promise<{ n: number; left: number }> {
+  let n = 0, left = 0, at = 0;
+  const filed: Array<{ hash: string; path: string[] }> = [];
+  for await (const it of openBackupItems(plan, key)) {
+    p.update(at++ / plan.sealed.length, "opening the hidden items");
+    if (!it || it.bytes.length > MAX_IMPORT_BYTES || !session.assets) {
+      left++;
+      continue;
+    }
+    const { record } = await session.assets.importFileDetailed(new File([it.bytes], it.name, { type: typeOfName(it.name) }), false);
+    await session.catalog?.updateMeta(record.hash, { hidden: true }); // (hidden at once: never listed with the shown items)
+    filed.push({ hash: record.hash, path: it.folders });
+    n++;
+  }
+  await fileInFolders(session, filed, true);
+  return { n, left };
 }
 
 /** Write the library index into the library folder: the workspace without the bytes of the originals (ADR 0159). */

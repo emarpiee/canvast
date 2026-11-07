@@ -109,7 +109,7 @@ export async function scopeWithHiddenChoice(session: Session, scope: ExportScope
     choices: [
       { value: "leave", label: "Leave them out", help: "The export has no trace of them. Pictures on a canvas that use them show as missing when it is imported." },
       session.storage?.hidden
-        ? { value: "include", label: "Include them", help: "They go into the file still encrypted, with their key: only the Hidden password opens them, in the desktop app." }
+        ? { value: "include", label: "Include them", help: "They go into the file still encrypted, with their key: only the Hidden password opens them, in the desktop app or in the browser." }
         : { value: "include", label: "Include them", help: "They stay hidden when imported. The file is not encrypted: anyone who has it can open it." },
     ],
     confirmLabel: "Export",

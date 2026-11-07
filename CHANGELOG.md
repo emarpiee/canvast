@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.54.55 — The browser opens a desktop backup's hidden items (2026-11-08)
+
+- **Added:** importing a desktop backup in the browser asks the Hidden password of its hidden items, then brings them in as hidden items, in hidden folders of their names. Before, they were always left out. The password is stretched as the desktop app does (scrypt), in the page: a few seconds and about 128 MB of memory. If the browser has no Hidden password yet, it offers to use the same one.
+- **Changed:** in the browser, hidden items are kept as the browser keeps its own: not encrypted. The import says so.
+
 ## 0.54.54 — Copies stored on desktop (2026-11-08)
 
 - **Fixed:** a copy found in `library/` was not stored on desktop: the app's main process refused its key, so 0.54.53 listed no copies there.

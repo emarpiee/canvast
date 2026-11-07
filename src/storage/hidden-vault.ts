@@ -5,6 +5,7 @@
  * encrypted again. WebCrypto only; nothing here touches storage.
  */
 import { DiskFile, WINDOW } from "./disk-file";
+import { scryptJs } from "./scrypt";
 
 export const VAULT_FORMAT = "canvast-hidden";
 /** PBKDF2 rounds of a version 1 vault (read, and upgraded to scrypt when opened). */
@@ -22,7 +23,7 @@ export type Kdf =
 export type KdfChoice = { name: "PBKDF2"; iterations: number } | { name: "scrypt"; N: number; r: number; p: number };
 const SCRYPT: KdfChoice = { name: "scrypt", ...SCRYPT_DEFAULT };
 
-/** scrypt, where it is done: natively, in the desktop app's main process (WebCrypto has no memory-hard function). */
+/** scrypt, where it is done: natively, in the desktop app's main process (WebCrypto has no memory-hard function); else `scryptJs`. */
 export type Scrypt = (password: string, salt: Uint8Array, N: number, r: number, p: number) => Promise<Uint8Array>;
 let scrypt: Scrypt | null = null;
 /** Set where scrypt is done (the desktop bridge; Node's in tests). */
@@ -63,8 +64,8 @@ const B64_RE = /^[A-Za-z0-9+/]*={0,2}$/;
 async function passwordKey(password: string, kdf: Kdf): Promise<CryptoKey> {
   const salt = unb64(kdf.salt);
   if (kdf.name === "scrypt") {
-    if (!scrypt) throw new Error("scrypt is not available here");
-    const raw = new Uint8Array(await scrypt(password, salt, kdf.N, kdf.r, kdf.p));
+    // (natively where it is set, the desktop app's main process; else in JavaScript: the browser opening a desktop backup's hidden items)
+    const raw = new Uint8Array(await (scrypt ?? scryptJs)(password, salt, kdf.N, kdf.r, kdf.p));
     try {
       return await crypto.subtle.importKey("raw", raw, "AES-KW", false, ["wrapKey", "unwrapKey"]);
     } finally {
