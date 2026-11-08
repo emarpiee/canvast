@@ -3,7 +3,7 @@
  * (kept in the app's own settings folder, never in the workspace), and the page's `canvast:share` call to start, stop and manage it.
  * Sharing is off at every start; so is sharing the hidden items.
  */
-import { app, ipcMain } from "electron";
+import { app, ipcMain, shell } from "electron";
 import type { BrowserWindow, IpcMainInvokeEvent } from "electron";
 import { randomBytes } from "node:crypto";
 import { chmodSync, readFileSync, writeFileSync } from "node:fs";
@@ -15,6 +15,7 @@ import { guestPage, pathAllowed, startShare } from "./share-server";
 import { answerFinds } from "./share-find";
 import { hostname } from "node:os";
 import type { ShareCall, ShareDevice, ShareServer } from "./share-server";
+import type { DavEntry, DavRoot } from "./share-dav";
 
 /** The event a read call gets when a guest makes it (the handlers' own check lets it through). */
 export const SHARED = { sender: null } as unknown as IpcMainInvokeEvent;
@@ -55,13 +56,50 @@ export interface ShareStatus {
   code: string;
   addresses: string[];
   fingerprint: string;
+  /** The file managers' folder: its address on this computer, and its password. */
+  dav: { url: string; password: string } | null;
   devices: Array<{ id: string; name: string; added: number; seen: number | null; active: boolean }>;
+}
+
+/** A list read again only after a few seconds (a file manager asks for it at every step). */
+function cached(read: () => Promise<DavEntry[]>, ms = 3000): () => Promise<DavEntry[]> {
+  let at = 0;
+  let last: Promise<DavEntry[]> = Promise.resolve([]);
+  return () => {
+    if (Date.now() - at > ms) {
+      at = Date.now();
+      last = read().catch(() => []);
+    }
+    return last;
+  };
 }
 
 export function installShare(win: BrowserWindow, html: string, workspaceName: string): void {
   let stopFind: (() => void) | null = null;
   const saved = load();
   const answers = new Map<string, (ok: boolean) => void>();
+  // The hidden items are opened by the page (it holds their key while they are open): asked there, and answered back.
+  const davAsks = new Map<string, (v: unknown) => void>();
+  const askPage = (op: "list" | "read", arg?: unknown): Promise<unknown> =>
+    new Promise((ok) => {
+      if (win.isDestroyed()) return ok(null);
+      const id = randomBytes(8).toString("hex");
+      davAsks.set(id, ok);
+      setTimeout(() => davAsks.delete(id) && ok(null), 30_000);
+      win.webContents.send("canvast:davAsk", { id, op, arg });
+    });
+  const call = (ch: string, ...a: unknown[]): Promise<unknown> => SHARE_CALLS.get(ch)!(...a);
+  const dav: Record<string, DavRoot> = {
+    Library: {
+      list: cached(async () => ((await call("canvast:tree", "library")) as Array<{ path: string; size: number }>).map((f) => ({ path: f.path.replace(/^library\//, ""), size: f.size }))),
+      read: (p, from, to) => call("canvast:part", `library/${p}`, from, to) as Promise<Uint8Array | null>,
+    },
+    Hidden: {
+      localOnly: true,
+      list: cached(async () => ((await askPage("list")) as DavEntry[] | null) ?? []),
+      read: async (p, from, to) => ((await askPage("read", { path: p, from, to })) as Uint8Array | null) ?? null,
+    },
+  };
   const status = (): ShareStatus => {
     const active = new Set(server?.active() ?? []);
     return {
@@ -71,6 +109,7 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
       code: server?.code ?? "",
       addresses: server?.addresses ?? [],
       fingerprint: saved.cert?.fingerprint ?? "",
+      dav: server ? { url: `davs://127.0.0.1:${server.port}/dav/`, password: server.davPassword } : null,
       devices: (saved.devices ?? []).map((d) => ({ id: d.id, name: d.name, added: d.added, seen: d.seen ?? null, active: active.has(d.id) })),
     };
   };
@@ -98,6 +137,7 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
         },
       },
       changed: push,
+      dav,
       page: async () => guestPage(await readFile(html, "utf8")) ?? "<!doctype html><title>canvast</title><p>This version of canvast cannot be shared.</p>",
     });
   ipcMain.handle("canvast:share", async (e, op: unknown, arg: unknown) => {
@@ -143,6 +183,15 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
         if (typeof a?.id === "string") answers.delete(a.id);
         return null;
       }
+      case "davAnswer": {
+        const a = arg as { id?: unknown; value?: unknown } | null;
+        if (typeof a?.id === "string") davAsks.get(a.id)?.(a.value ?? null);
+        if (typeof a?.id === "string") davAsks.delete(a.id);
+        return null;
+      }
+      case "openDav":
+        if (server) await shell.openExternal(`davs://canvast@127.0.0.1:${server.port}/dav/`);
+        return null;
       case "view":
         // The host's view, for guests that follow it.
         server?.send("view", arg);

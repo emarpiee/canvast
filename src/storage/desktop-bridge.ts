@@ -82,14 +82,18 @@ export interface ShareStatus {
   addresses: string[];
   /** The certificate's SHA-256, as a guest's browser shows it. */
   fingerprint: string;
+  /** The folder for file managers (WebDAV) on this computer, and its password (new at each start). */
+  dav: { url: string; password: string } | null;
   devices: Array<{ id: string; name: string; added: number; seen: number | null; active: boolean }>;
 }
 export interface ShareCalls {
   /** start, stop, status; hidden (on: boolean); remove (a device's id); answer ({ id, ok }); view (the host's view, for guests that follow it). */
-  call(op: "status" | "start" | "stop" | "hidden" | "remove" | "answer" | "view", arg?: unknown): Promise<ShareStatus | null>;
+  call(op: "status" | "start" | "stop" | "hidden" | "remove" | "answer" | "view" | "davAnswer" | "openDav", arg?: unknown): Promise<ShareStatus | null>;
   onStatus(fn: (st: ShareStatus) => void): void;
   /** A device asks to connect (it typed the code): answer with `call("answer", …)`. */
   onAsk(fn: (ask: { id: string; name: string; address: string }) => void): void;
+  /** The file managers' folder asks for the hidden items (`list`, or `read` a part of one): answer with `call("davAnswer", { id, value })`. */
+  onDav(fn: (ask: { id: string; op: "list" | "read"; arg?: { path: string; from: number; to: number } }) => void): void;
 }
 
 /** Where a deleted file of the workspace folder goes. */

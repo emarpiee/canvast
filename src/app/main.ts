@@ -2,7 +2,7 @@ import { setSnapPx } from "../interaction/snap";
 import { followHost, sendView } from "./follow";
 import { readOnlyLine, readOnlyWhy } from "../storage/guest-page";
 import { guestBridge } from "./guest";
-import { installShareAsk } from "../ui/share-panel";
+import { installShareAsk, installShareFolder } from "../ui/share-panel";
 import { deleteEverywhere } from "../ui/delete-everywhere";
 import type { CatalogEntry } from "../assets/asset-catalog";
 import { copyItemsAsFiles, copyItemsToClipboard, filesOf, hiddenFine, sayingProgress, type CopyDeps } from "./copy-items";
@@ -850,6 +850,7 @@ async function start(): Promise<void> {
   const share = desktopBridge()?.share;
   if (share) installShareAsk(share);
   if (share) sendView(view, session, share); // (for guests that follow: ADR 0184)
+  if (share && storage?.hiddenFiles) installShareFolder(share, storage.hiddenFiles);
   desktopBridge()?.onClosing(async () => {
     if (!opened) return; // (still locked or starting: nothing was changed, so nothing waits to be written)
     // A note open with changes not saved: Save them, Don't save, or Cancel (the window stays).

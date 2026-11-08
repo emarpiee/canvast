@@ -78,6 +78,7 @@ const bridge: DesktopBridge = {
     call: (op, arg) => ipcRenderer.invoke("canvast:share", op, arg),
     onStatus: (fn) => void ipcRenderer.on("canvast:shareStatus", (_e, st) => fn(st)),
     onAsk: (fn) => void ipcRenderer.on("canvast:shareAsk", (_e, ask) => fn(ask)),
+    onDav: (fn) => void ipcRenderer.on("canvast:davAsk", (_e, ask) => fn(ask)),
   },
   hash: (path) => ipcRenderer.invoke("canvast:hash", path),
   libraryChanges: () => ipcRenderer.invoke("canvast:libraryChanges"),

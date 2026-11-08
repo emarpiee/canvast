@@ -2900,6 +2900,24 @@ test("sharing (ADR 0184): hidden items reach a guest only when shared, encrypted
     await page.getByTestId("share-on").check();
     const code = (await page.getByTestId("share-code").textContent())!.trim();
     const { port } = (await page.evaluate(() => window.canvastDesktop!.share!.call("status"))) as { port: number };
+    // The folder for file managers (on this computer): the library, and the hidden items decrypted as they are read.
+    const davSt = (await page.evaluate(() => window.canvastDesktop!.share!.call("status"))) as { dav: { password: string } };
+    const dav = (method: string, path: string, headers: Record<string, string> = {}): Promise<{ status: number; body: Buffer }> =>
+      new Promise((ok, fail) => {
+        const req = httpsRequest({ host: "127.0.0.1", port, path, method, rejectUnauthorized: false, headers: { ...headers, authorization: `Basic ${Buffer.from(`me:${davSt.dav.password}`).toString("base64")}` } }, (res) => {
+          const parts: Buffer[] = [];
+          res.on("data", (b: Buffer) => parts.push(b));
+          res.on("end", () => ok({ status: res.statusCode ?? 0, body: Buffer.concat(parts) }));
+        });
+        req.on("error", fail);
+        req.end();
+      });
+    expect((await dav("PROPFIND", "/dav/Library/", { depth: "1" })).body.toString()).toContain("Open.png");
+    await expect.poll(async () => (await dav("PROPFIND", "/dav/Hidden/", { depth: "1" })).body.toString(), { timeout: 15_000 }).toContain("Secret.png");
+    const got = await dav("GET", "/dav/Hidden/Secret.png");
+    expect(got.status).toBe(200);
+    expect(got.body.equals(secret), "decrypted as read: the original bytes").toBe(true);
+    expect((await dav("PUT", "/dav/Library/x.png")).status).toBe(403);
     const g = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
     await g.goto(`https://127.0.0.1:${port}/#debug`);
     await g.getByTestId("prompt-input").fill(code);

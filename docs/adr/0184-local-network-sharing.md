@@ -56,7 +56,11 @@ The downloaded `canvast.html` makes no request (`check:offline`). The page a hos
 3. Browser guest: the remote bridge, the read-only storage mode, the in-page library index, hidden items end to end.
 4. Desktop guest: connect, discovery (mDNS), pinning.
 5. Live updates and Follow.
-6. (Optional) A WebDAV view of the library for file managers.
+6. A WebDAV folder for file managers (owner's go, 2026-11-09).
+
+### The file managers' folder (WebDAV)
+
+`/dav/` on the same server, read-only (OPTIONS, PROPFIND, GET and HEAD with ranges; every other method refused), signed in with a password made at each start of sharing. *Library* is the workspace's `library/` as it is on disk. *Hidden* is there only for a request from this computer itself, while the page has the hidden items open: the page lists them from the sealed index (their folders and names) and decrypts a part of one only when it is read (`openAt`, 1 MiB chunks). A file manager's own thumbnails are outside canvast's control (said in the README).
 
 ## Consequences
 

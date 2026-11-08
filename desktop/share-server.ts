@@ -10,6 +10,8 @@ import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { networkInterfaces } from "node:os";
 import type { SelfCert } from "./self-cert";
+import { davHandle } from "./share-dav";
+import type { DavRoot } from "./share-dav";
 
 /** A guest the host allowed. Only a hash of its token is kept. */
 export interface ShareDevice {
@@ -41,6 +43,8 @@ export interface ShareOptions {
   page?: () => Promise<string>;
   /** Told when a guest connects, leaves or is removed. */
   changed?: () => void;
+  /** The folder file managers open at `/dav/` (its roots), signed in with `davPassword`. */
+  dav?: Readonly<Record<string, DavRoot>>;
   /** At most this many requests at once from one device. */
   perDevice?: number;
 }
@@ -49,6 +53,8 @@ export interface ShareServer {
   port: number;
   /** The six digits a guest types to pair (new at each start). */
   code: string;
+  /** The file managers' password for `/dav/` (new at each start). */
+  davPassword: string;
   addresses: string[];
   fingerprint: string;
   /** The devices with a request open now (connected). */
@@ -129,6 +135,7 @@ export function guestPage(html: string): string | null {
 
 export async function startShare(o: ShareOptions): Promise<ShareServer> {
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  const davPassword = randomBytes(9).toString("base64url");
   let devices = o.devices.load();
   let wrongCodes = 0;
   const busy = new Map<string, number>();
@@ -226,6 +233,7 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
         return res.end(o.page ? await o.page() : "<!doctype html><title>canvast</title><p>A canvast workspace is shared here. Open it in canvast.</p>");
       }
+      if (o.dav && (url.pathname === "/dav" || url.pathname.startsWith("/dav/"))) return davHandle(req, res, o.dav, davPassword);
       if (req.method === "GET" && url.pathname === "/hello") return json(res, 200, { app: "canvast", fingerprint: o.cert.fingerprint });
       if (req.method === "POST" && url.pathname === "/pair") return pair(req, res);
       const dev = deviceOf(req);
@@ -257,6 +265,7 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
   return {
     port: (server.address() as AddressInfo).port,
     code,
+    davPassword,
     addresses: o.host && o.host !== "0.0.0.0" ? [o.host] : lanAddresses(),
     fingerprint: o.cert.fingerprint,
     active: () => [...new Set(streams.values())],

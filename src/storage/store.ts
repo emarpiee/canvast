@@ -355,6 +355,16 @@ export interface Storage {
   flush(): Promise<void>;
   /** The desktop build: how far a long write of files into the workspace folder is (an import's files); null in the browser. */
   readonly folderWriting: FolderWriting | null;
+  /** The desktop build: the hidden items as readable files, for the file managers' folder of sharing (ADR 0184); absent elsewhere. */
+  readonly hiddenFiles?: HiddenFiles;
+}
+
+/** The hidden items as files at readable paths (their library folders and names), each decrypted a part at a time. */
+export interface HiddenFiles {
+  /** Every hidden item's path and size; null while the hidden items are locked. */
+  list(): Promise<Array<{ path: string; size: number; at: number }> | null>;
+  /** Bytes `from` to `to` of one of them (decrypted only there); null when it is not one, or they are locked. */
+  read(path: string, from: number, to: number): Promise<Uint8Array | null>;
 }
 
 /** How far the files being written into the workspace folder are: `done` of `total` after each file; `total` 0 when it ended. */

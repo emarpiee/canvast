@@ -4,12 +4,21 @@
  * connect is answered from anywhere in the app.
  */
 import type { ShareCalls, ShareStatus } from "../storage/desktop-bridge";
+import type { HiddenFiles } from "../storage/store";
 import { confirmDialog } from "./confirm";
 import { ICONS } from "./icons";
 import { plural } from "../doc/plural";
 
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const when = (t: number | null): string => (t ? new Date(t).toLocaleString() : "never");
+
+/** The file managers' folder asks for hidden items: answered from this page, which holds their key while they are open (once, at start). */
+export function installShareFolder(share: ShareCalls, files: HiddenFiles): void {
+  share.onDav((a) => {
+    const value = a.op === "list" ? files.list() : a.arg ? files.read(a.arg.path, a.arg.from, a.arg.to) : Promise.resolve(null);
+    void value.catch(() => null).then((v) => share.call("davAnswer", { id: a.id, value: v }));
+  });
+}
 
 /** Ask the person whether a device may connect, whenever one asks (once, at start). */
 export function installShareAsk(share: ShareCalls): void {
@@ -40,7 +49,9 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SwitchRo
         st.on
           ? `<dl data-testid="share-facts"><dt>Address</dt><dd>${urls.map((u) => `<code>${esc(u)}</code>`).join("<br>") || "No network found"}</dd>
           <dt>Code</dt><dd><strong data-testid="share-code">${esc(st.code)}</strong></dd>
-          <dt>Fingerprint</dt><dd><code>${esc(st.fingerprint)}</code></dd></dl>
+          <dt>Fingerprint</dt><dd><code>${esc(st.fingerprint)}</code></dd>
+          ${st.dav ? `<dt>Folder</dt><dd><code data-testid="share-dav-url">${esc(st.dav.url)}</code><br>Password: <code data-testid="share-dav-password">${esc(st.dav.password)}</code><br><button type="button" class="set-done" data-share-open-dav data-testid="share-open-dav">Open in the file manager</button></dd>` : ""}</dl>
+          <p class="set-help">The folder shows your library's files to file managers, read-only (on another computer, with this computer's address). On this computer only, and while the Hidden items are open, it also has a Hidden folder: each file is decrypted only as it is read. A file manager may keep thumbnails of what it shows.</p>
           <p class="set-help">A guest opens the address and types the code, and you are asked to allow the device. A browser warns once about the certificate: it is this computer's own; its fingerprint is the one above. Sharing stops when the app closes.</p>`
           : ""
       }
@@ -64,6 +75,7 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SwitchRo
     if (t.matches("[data-share-hidden]")) void share.call("hidden", t.checked).then((st) => st && draw(st));
   });
   host.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement).closest("[data-share-open-dav]")) void share.call("openDav");
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-share-remove]");
     if (b) void share.call("remove", b.dataset["shareRemove"]).then((st) => st && draw(st));
   });

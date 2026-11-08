@@ -151,3 +151,52 @@ describe("a typed host address", () => {
     expect(parseAddress("evil.com:1/../x")).toBeNull();
   });
 });
+
+describe("the folder for file managers (WebDAV)", () => {
+  it("lists folders and files, reads a range, needs its password and refuses every change", async () => {
+    const files: Record<string, Uint8Array> = { "Refs/hand.png": new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]), "top.txt": new TextEncoder().encode("hello") };
+    const reads: Array<[number, number]> = [];
+    server = await startShare({
+      cert,
+      host: "127.0.0.1",
+      calls: new Map(),
+      hidden: () => false,
+      ask: async () => true,
+      devices: { load: () => [], save: () => {} },
+      dav: {
+        Library: {
+          list: async () => Object.entries(files).map(([path, b]) => ({ path, size: b.length, at: 1_700_000_000_000 })),
+          read: async (p, from, to) => (reads.push([from, to]), files[p]!.slice(from, to)),
+        },
+      },
+    });
+    const dav = (method: string, path: string, headers: Record<string, string> = {}, pw: string | null = server!.davPassword): Promise<{ status: number; text: string; headers: Record<string, unknown> }> =>
+      new Promise((ok, fail) => {
+        const req = request({ host: "127.0.0.1", servername: "localhost", port: server!.port, method, path, ca: cert.cert, headers: { ...headers, ...(pw !== null ? { authorization: `Basic ${Buffer.from(`me:${pw}`).toString("base64")}` } : {}) } }, (res) => {
+          const parts: Buffer[] = [];
+          res.on("data", (b: Buffer) => parts.push(b));
+          res.on("end", () => ok({ status: res.statusCode ?? 0, text: Buffer.concat(parts).toString("latin1"), headers: res.headers }));
+        });
+        req.on("error", fail);
+        req.end();
+      });
+    expect((await dav("PROPFIND", "/dav/", { depth: "1" }, null)).status).toBe(401);
+    expect((await dav("PROPFIND", "/dav/", { depth: "1" }, "wrong")).status).toBe(401);
+    const top = await dav("PROPFIND", "/dav/", { depth: "1" });
+    expect(top.status).toBe(207);
+    expect(top.text).toContain("<d:href>/dav/Library/</d:href>");
+    const lib = await dav("PROPFIND", "/dav/Library/", { depth: "1" });
+    expect(lib.text).toContain("<d:href>/dav/Library/Refs/</d:href>");
+    expect(lib.text).toContain("<d:href>/dav/Library/top.txt</d:href>");
+    expect(lib.text).toContain("<d:getcontentlength>5</d:getcontentlength>");
+    expect(lib.text).not.toContain("hand.png"); // (one level at a time)
+    const part = await dav("GET", "/dav/Library/Refs/hand.png", { range: "bytes=2-4" });
+    expect(part.status).toBe(206);
+    expect([...Buffer.from(part.text, "latin1")]).toEqual([3, 4, 5]);
+    expect(part.headers["content-range"]).toBe("bytes 2-4/10");
+    expect(reads.at(-1)).toEqual([2, 5]); // (only that part is read)
+    for (const m of ["PUT", "DELETE", "MKCOL", "MOVE", "COPY", "PROPPATCH", "LOCK"]) expect((await dav(m, "/dav/Library/top.txt")).status, m).toBe(403);
+    expect((await dav("GET", "/dav/Library/../../etc/passwd")).status).not.toBe(200);
+    expect((await dav("GET", "/dav/Hidden/x")).status).toBe(404);
+  });
+});

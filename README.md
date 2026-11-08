@@ -1241,6 +1241,7 @@ The desktop app can let others on the same network look at the open workspace, i
 - **Follow the host:** in a guest's read-only bar, it goes where you are, on your canvas, as you move; moving the view yourself stops it.
 - **Hidden items:** only with **Share hidden items too**. Their files go out encrypted, as they are in the folder; a guest needs your Hidden password, and its own browser or app opens them. Your computer never decrypts them for a guest.
 - **Allowed devices** are listed in *Settings > Sharing*, with whether each is connected; **Remove** stops one at once. Sharing is off at every start of the app.
+- **A folder for file managers:** *Settings > Sharing* shows `davs://127.0.0.1:<port>/dav/` and a password (new each time sharing starts); **Open in the file manager** opens it (Dolphin, Nautilus and others read WebDAV). *Library* holds your library's files in their folders, read-only; on another computer use its address instead of `127.0.0.1`. On this computer only, while the Hidden items are open, a *Hidden* folder holds them too, each decrypted only as it is read.
 - **The desktop app as a guest** checks the fingerprint the first time (compare it with the sharing computer's *Settings > Sharing*) and then accepts only that certificate.
 
 ---
@@ -1496,6 +1497,8 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | --- | --- |
 | Sharing | Read-only, on the local network only (no internet, no relay). A browser guest sees a certificate warning once: the sharing computer makes its own certificate |
 | Sharing | ⚠️ Anyone with the code still needs your Allow, but an allowed device sees the whole workspace until you remove it. Hidden items are shared only when you turn that on, and stay encrypted on the way |
+| Sharing | ⚠️ A file manager showing the *Hidden* folder may keep its own thumbnails of what it shows (outside canvast, unencrypted, often in `~/.cache/thumbnails`); turn thumbnails off for remote folders in it, or clear them |
+| Sharing | The file managers' folder is read-only: nothing can be copied into it, renamed or deleted there |
 | Sharing | Finding shared computers uses one UDP broadcast (port 47321); a network that blocks it needs the address typed. A guest's browser keeps what it saw in its own storage, like any site |
 | Platform | Linux only; other systems are out of scope for now |
 | Outside changes | Watching the folder is verified on Linux only; a `.cvst` copied in is not taken in |

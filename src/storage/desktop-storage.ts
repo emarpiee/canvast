@@ -11,9 +11,10 @@ import { externalFolder } from "./external-folder";
 import { openBrowserStorage } from "./idb-storage";
 import { DesktopCatalog, DesktopLibrary, DesktopOriginals, moveIdbLibrary } from "./desktop-library";
 import type { IdbBackups, IdbStorage } from "./idb-storage";
-import type { CustomThumbStore, FolderHandlers, FolderSync, FolderWriting, OpenHooks } from "./store";
+import type { CustomThumbStore, FolderHandlers, FolderSync, FolderWriting, HiddenFiles, OpenHooks } from "./store";
 import { sha256Hex } from "../assets/sha256";
-import { LIBRARY_DIR, LIBRARY_JSON } from "./library-mirror";
+import { LIBRARY_DIR, LIBRARY_JSON, readFolders, readItem } from "./library-mirror";
+import { DiskFile } from "./disk-file";
 import { WORKSPACE_FILE, WorkspaceMirror, watched } from "./workspace-mirror";
 import { BOARDS_DIR, WORKSPACE_NAMING, nameRules } from "./workspace-names";
 import { HIDDEN_JSON, HiddenVault, isHiddenCopy } from "./hidden-store";
@@ -335,7 +336,47 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     const path = `${HIDDEN_THUMBS}/${name}.bin`;
     if (HEX.test(name) && !(await bridge.exists(path))) await bridge.write(path, new Uint8Array(await data.arrayBuffer()));
   };
-  return { ...storage, resetAll, workspace, backups, catalog, originals, customThumbs, libraryFolder: null, workspaceFolder: ws.path, hidden, folderSync, folderWriting, flush: () => mirror.flush() };
+  // The hidden items as files (Settings > Sharing's folder for file managers, on this computer only): their paths from the sealed index,
+  // each read through the key a part at a time.
+  let hiddenAt = new Map<string, { file: string; size: number }>();
+  const hiddenFiles: HiddenFiles = {
+    async list() {
+      if (!hidden.isOpen()) return null;
+      const index = await hidden.readIndex();
+      if (!index) return [];
+      const folders = new Map(readFolders(index.folders).map((f) => [f.id, f]));
+      const folderPath = (id: string | null): string => {
+        const names: string[] = [];
+        for (let f = id ? folders.get(id) : undefined, n = 0; f && n < 1000; f = f.parentId ? folders.get(f.parentId) : undefined, n++) names.unshift(f.name);
+        return names.map((n) => n.replace(/[/\\]/g, "_")).join("/");
+      };
+      const next = new Map<string, { file: string; size: number }>();
+      const out: Array<{ path: string; size: number; at: number }> = [];
+      for (const it of index.items.map(readItem)) {
+        if (!it?.file) continue;
+        const dir = folderPath(it.folderId);
+        const base = it.name.replace(/[/\\]/g, "_") || it.hash;
+        let path = dir ? `${dir}/${base}` : base;
+        for (let k = 2; next.has(path); k++) path = (dir ? `${dir}/` : "") + base.replace(/(\.[^.]*)?$/, ` (${k})$1`);
+        next.set(path, { file: it.file, size: it.size });
+        out.push({ path, size: it.size, at: it.importedAt });
+      }
+      hiddenAt = next;
+      return out;
+    },
+    async read(path, from, to) {
+      const it = hiddenAt.get(path);
+      if (!it || !hidden.isOpen()) return null;
+      const [rawSize] = await raw.sizes([it.file]);
+      if (rawSize == null) return null;
+      const opened = await hidden.openAt(new DiskFile((a, b) => raw.part(it.file, a, b).then((x) => x ?? new Uint8Array()), rawSize));
+      if (opened) return new Uint8Array(await opened.file.slice(from, to).arrayBuffer());
+      // (a file sealed whole, before chunking: opened whole, once read)
+      const whole = await hidden.open(((await raw.read(it.file)) ?? new Uint8Array()) as Uint8Array<ArrayBuffer>);
+      return whole ? whole.slice(from, to) : null;
+    },
+  };
+  return { ...storage, resetAll, workspace, backups, catalog, originals, customThumbs, libraryFolder: null, workspaceFolder: ws.path, hidden, folderSync, folderWriting, hiddenFiles, flush: () => mirror.flush() };
 }
 
 /** This device's id in the workspace folder (`.canvast/devices/<id>.json`), made once and kept. */
