@@ -27,8 +27,10 @@ interface Saved {
   /** The code guests type, and the file managers' password: kept until the person asks for new ones. */
   code?: string;
   davPassword?: string;
-  /** Start sharing when the app opens (off by default; the hidden items are never shared at a start). */
+  /** Start sharing when the app opens (off by default; the hidden items are never shared at a start): the parts that were on. */
   autoStart?: boolean;
+  guestsOn?: boolean;
+  davOn?: boolean;
   /** The devices' own logins to the folder, and the shared password turned off. */
   davLogins?: DavLogin[];
   davSharedOff?: boolean;
@@ -63,6 +65,8 @@ function logEvent(e: ShareEvent): void {
 }
 
 let server: ShareServer | null = null;
+/** What is shared now: with guests, and the file managers' folder (the server runs while either is on). */
+const parts = { guests: false, dav: false };
 let hidden = false;
 
 /** The folder changed (as the page is told): guests are told too, without the paths they may not read. */
@@ -73,6 +77,8 @@ export function shareChanged(paths: readonly string[]): void {
 
 export interface ShareStatus {
   on: boolean;
+  guests: boolean;
+  davOn: boolean;
   hidden: boolean;
   port: number;
   code: string;
@@ -153,6 +159,8 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
     const active = new Set(server?.active() ?? []);
     return {
       on: !!server,
+      guests: parts.guests,
+      davOn: parts.dav,
       hidden,
       autoStart: saved.autoStart === true,
       log: recent.slice(0, 15),
@@ -195,6 +203,7 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
       changed: push,
       davLogins: () => saved.davLogins ?? [],
       davShared: () => saved.davSharedOff !== true,
+      parts: () => parts,
       log: (e) => {
         logEvent(e);
         push();
@@ -204,23 +213,53 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
     });
   const begin = async (): Promise<void> => {
     if (server) return;
-    // The same port as last time when it is free, so a guest's address stays the same.
+    // The same port as last time when it is free, so the addresses stay the same.
     server = await start(saved.port ?? 0).catch(() => start(0));
     saved.port = server.port;
     keep(saved);
+    logEvent({ at: Date.now(), what: `Sharing started on port ${server.port}`, who: "", address: "" });
+  };
+  const end = async (): Promise<void> => {
+    if (!server) return;
+    logEvent({ at: Date.now(), what: "Sharing stopped", who: "", address: "" });
+    await server.close();
+    server = null;
+    hidden = false;
+  };
+  /** Turn a part on or off: the server runs while one is; guests are found on the network only while they are shared. */
+  const setPart = async (part: "guests" | "dav", on: boolean): Promise<void> => {
+    if (parts[part] !== on) logEvent({ at: Date.now(), what: `${part === "guests" ? "Sharing with guests" : "Folder for file managers"} ${on ? "on" : "off"}`, who: "", address: "" });
+    parts[part] = on;
+    if (part === "guests") saved.guestsOn = on;
+    else saved.davOn = on;
+    keep(saved);
+    if (parts.guests || parts.dav) await begin();
+    else await end();
+    if (part === "guests" && !on) {
+      server?.dropGuests();
+      hidden = false;
+    }
+    stopFind?.();
+    stopFind = null;
     const s = server;
-    stopFind = answerFinds(() => ({ name: `${hostname()} · ${workspaceName}`, port: s.port, fingerprint: s.fingerprint }));
-    logEvent({ at: Date.now(), what: `Sharing started on port ${s.port}`, who: "", address: "" });
+    if (s && parts.guests) stopFind = answerFinds(() => ({ name: `${hostname()} · ${workspaceName}`, port: s.port, fingerprint: s.fingerprint }));
   };
   // (Settings > Sharing: started with the app when the person asked for it; the hidden items never are)
-  if (saved.autoStart) void begin().then(push, (err: unknown) => logEvent({ at: Date.now(), what: `Sharing could not start: ${(err as Error).message}`, who: "", address: "" }));
+  if (saved.autoStart && (saved.guestsOn || saved.davOn))
+    void (async () => {
+      if (saved.guestsOn) await setPart("guests", true);
+      if (saved.davOn) await setPart("dav", true);
+    })().then(push, (err: unknown) => logEvent({ at: Date.now(), what: `Sharing could not start: ${(err as Error).message}`, who: "", address: "" }));
   ipcMain.handle("canvast:share", async (e, op: unknown, arg: unknown) => {
     if (e.sender !== win.webContents) throw new Error("not this window");
     switch (op) {
       case "status":
         return status();
       case "start":
-        await begin();
+      case "stop":
+      case "guests":
+      case "dav":
+        await setPart(op === "dav" ? "dav" : "guests", op === "start" || ((op === "guests" || op === "dav") && arg === true));
         push();
         return status();
       case "davAdd": {
@@ -268,15 +307,6 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
         logEvent({ at: Date.now(), what: "Log opened", who: "", address: "" });
         await shell.openPath(logFile());
         return null;
-      case "stop":
-        if (server) logEvent({ at: Date.now(), what: "Sharing stopped", who: "", address: "" });
-        await server?.close();
-        stopFind?.();
-        stopFind = null;
-        server = null;
-        hidden = false;
-        push();
-        return status();
       case "hidden":
         hidden = arg === true;
         server?.send("changed", [".canvast/hidden.json"]); // (guests look for the hidden items again)
@@ -291,13 +321,15 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
         keep(saved);
         if (server) {
           // (taken at once: the server starts again on the same port; guests already allowed stay allowed)
+          const port = server.port;
           await server.close();
           stopFind?.();
-          server = await start(server.port).catch(() => start(0));
+          stopFind = null;
+          server = await start(port).catch(() => start(0));
           const s = server;
           saved.port = s.port;
           keep(saved);
-          stopFind = answerFinds(() => ({ name: `${hostname()} · ${workspaceName}`, port: s.port, fingerprint: s.fingerprint }));
+          if (parts.guests) stopFind = answerFinds(() => ({ name: `${hostname()} · ${workspaceName}`, port: s.port, fingerprint: s.fingerprint }));
         }
         push();
         return status();

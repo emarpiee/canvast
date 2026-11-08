@@ -306,3 +306,17 @@ describe("a device's own folder login", () => {
     expect(did).toEqual(["put new.txt", "trash old.txt"]);
   });
 });
+
+describe("guests and the folder, each on its own", () => {
+  it("answer only while their part is on", async () => {
+    const parts = { guests: true, dav: false };
+    server = await startShare({ cert, host: "127.0.0.1", parts: () => parts, calls: new Map(), hidden: () => false, ask: async () => true, devices: { load: () => [], save: () => {} }, dav: { Library: { list: async () => [], read: async () => null } } });
+    expect((await send(server.port, "GET", "/hello")).status).toBe(200);
+    expect((await send(server.port, "PROPFIND", "/dav/")).status).toBe(404);
+    parts.guests = false;
+    parts.dav = true;
+    expect((await send(server.port, "GET", "/hello")).status).toBe(404);
+    expect((await send(server.port, "POST", "/pair", { code: server.code })).status).toBe(404);
+    expect((await send(server.port, "PROPFIND", "/dav/")).status).toBe(401); // (on: it asks for a login)
+  });
+});

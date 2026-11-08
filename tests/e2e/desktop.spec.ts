@@ -2885,6 +2885,13 @@ test("sharing (ADR 0184): a browser guest pairs, sees the host's library and can
   }
 });
 
+const httpsGet = (port: number, path: string): Promise<{ status: number }> =>
+  new Promise((ok, fail) => {
+    const req = httpsRequest({ host: "127.0.0.1", port, path, method: "GET", rejectUnauthorized: false }, (res) => (res.resume(), res.on("end", () => ok({ status: res.statusCode ?? 0 }))));
+    req.on("error", fail);
+    req.end();
+  });
+
 test("sharing (ADR 0184): hidden items reach a guest only when shared, encrypted; the guest opens them with the Hidden password", async () => {
   const ws = tempDir("cv-guest-hidden-");
   const { app, page } = await launch(ws, "userdata", true); // (file names as given)
@@ -2907,7 +2914,9 @@ test("sharing (ADR 0184): hidden items reach a guest only when shared, encrypted
     await page.getByTestId("share-on").check();
     const code = (await page.getByTestId("share-code").textContent())!.trim();
     const { port } = (await page.evaluate(() => window.canvastDesktop!.share!.call("status"))) as { port: number };
-    // The folder for file managers (on this computer): the library, and the hidden items decrypted as they are read.
+    // The folder for file managers (on this computer): the library, and the hidden items decrypted as they are read. Its own switch.
+    expect((await httpsGet(port, "/dav/")).status, "off until its switch is on").toBe(404);
+    await page.getByTestId("share-dav-on").check();
     const davSt = (await page.evaluate(() => window.canvastDesktop!.share!.call("status"))) as { dav: { password: string } };
     const dav = (method: string, path: string, headers: Record<string, string> = {}): Promise<{ status: number; body: Buffer }> =>
       new Promise((ok, fail) => {

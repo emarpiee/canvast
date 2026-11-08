@@ -66,6 +66,8 @@ export interface ShareOptions {
   log?: (e: ShareEvent) => void;
   /** The folder file managers open at `/dav/` (its roots), signed in with `davPassword`. */
   dav?: Readonly<Record<string, DavRoot>>;
+  /** Which parts answer now: guests (the app's page, pairing, reads) and the file managers' folder. Both, when absent. */
+  parts?: () => { guests: boolean; dav: boolean };
   /** The devices' own logins to the folder, and whether the shared password (read only) is on. */
   davLogins?: () => readonly DavLogin[];
   davShared?: () => boolean;
@@ -90,6 +92,8 @@ export interface ShareServer {
   davClients(): DavClient[];
   /** Take a device off: its token stops working at once. */
   remove(id: string): void;
+  /** End every guest's connection (sharing with guests turned off). */
+  dropGuests(): void;
   /** Send an event to every connected guest (live changes, the host's view). */
   send(event: string, data: unknown): void;
   close(): Promise<void>;
@@ -294,11 +298,14 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
       const url = new URL(req.url ?? "/", "https://x");
       res.setHeader("x-content-type-options", "nosniff");
       res.setHeader("referrer-policy", "no-referrer");
+      const parts = o.parts?.() ?? { guests: true, dav: true };
+      const isDav = url.pathname === "/dav" || url.pathname.startsWith("/dav/");
+      if (isDav ? !parts.dav : !parts.guests) return json(res, 404, { error: isDav ? "The folder for file managers is off." : "Sharing with guests is off." });
       if (req.method === "GET" && url.pathname === "/") {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
         return res.end(o.page ? await o.page() : "<!doctype html><title>canvast</title><p>A canvast workspace is shared here. Open it in canvast.</p>");
       }
-      if (o.dav && (url.pathname === "/dav" || url.pathname.startsWith("/dav/"))) return davHandle(req, res, o.dav, { logins: () => o.davLogins?.() ?? [], shared: () => (o.davShared?.() ?? true ? davPassword : null) }, davSeen);
+      if (o.dav && isDav) return davHandle(req, res, o.dav, { logins: () => o.davLogins?.() ?? [], shared: () => (o.davShared?.() ?? true ? davPassword : null) }, davSeen);
       if (req.method === "GET" && url.pathname === "/hello") return json(res, 200, { app: "canvast", fingerprint: o.cert.fingerprint });
       if (req.method === "POST" && url.pathname === "/pair") return pair(req, res);
       const dev = deviceOf(req);
@@ -345,6 +352,9 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
       o.devices.save(devices);
       for (const [res, d] of streams) if (d === id) res.end();
       o.changed?.();
+    },
+    dropGuests() {
+      for (const res of streams.keys()) res.end();
     },
     send(event, data) {
       const line = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
