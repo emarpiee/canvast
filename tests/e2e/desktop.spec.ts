@@ -2873,6 +2873,8 @@ test("sharing (ADR 0184): a browser guest pairs, sees the host's library and can
     await g.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 60_000 });
     await expect(g.getByTestId("prompt-input")).toHaveCount(0);
     // Removed by the host: the next start asks for the code again.
+    await page.getByTestId("save-status").click();
+    await page.getByRole("tab", { name: "Sharing" }).click();
     await page.getByRole("button", { name: /^Remove / }).click();
     await g.reload();
     await expect(g.getByTestId("prompt-input")).toBeVisible({ timeout: 30_000 });
@@ -2916,7 +2918,13 @@ test("sharing (ADR 0184): hidden items reach a guest only when shared, encrypted
         req.on("error", fail);
         req.end();
       });
-    expect((await dav("PROPFIND", "/dav/Library/", { depth: "1" })).body.toString()).toContain("Open.png");
+    // (in the folder its kind sorts it into, or at the top)
+    const listed = async (path: string): Promise<string> => {
+      const text = (await dav("PROPFIND", path, { depth: "1" })).body.toString();
+      const subs = [...text.matchAll(/<d:href>([^<]+\/)<\/d:href>/g)].map((m) => m[1]!).filter((h) => h !== path);
+      return text + (await Promise.all(subs.map((h) => dav("PROPFIND", h, { depth: "1" }).then((r) => r.body.toString())))).join("");
+    };
+    expect(await listed("/dav/Library/")).toContain("Open.png");
     await expect.poll(async () => (await dav("PROPFIND", "/dav/Hidden/", { depth: "1" })).body.toString(), { timeout: 15_000 }).toContain("Secret.png");
     const got = await dav("GET", "/dav/Hidden/Secret.png");
     expect(got.status).toBe(200);

@@ -62,7 +62,7 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SwitchRo
           ? `<ul class="share-devices">${st.devices
               .map(
                 (d) => `<li class="share-device"><span class="share-dot${d.active ? " is-on" : ""}" title="${d.active ? "Connected now" : "Not connected"}"></span><span class="share-name">${esc(d.name)}</span><span class="set-help">Allowed ${esc(when(d.added))} · last seen ${esc(when(d.seen))}</span>
-                <button type="button" class="set-reset" data-share-remove="${esc(d.id)}" aria-label="Remove ${esc(d.name)}" title="Remove: it can no longer connect">${ICONS.trash2}</button></li>`,
+                <button type="button" class="set-reset" data-share-remove="${esc(d.id)}" aria-label="Remove ${esc(d.name)}" title="Remove: it can no longer connect">${ICONS.x}</button></li>`,
               )
               .join("")}</ul>`
           : `<p class="set-help">None yet.</p>`
