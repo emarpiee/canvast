@@ -25,11 +25,33 @@ export class HostError extends Error {
 /** One read call to the host: bytes, or the JSON value it answered. */
 export type HostCall = (ch: string, ...args: unknown[]) => Promise<unknown>;
 
+/** What this page asked its host, by call (how many, bytes, time): `#debug` shows it, and tests read it. */
+export const hostStats: Record<string, { n: number; bytes: number; ms: number }> = {};
+
 export function hostCalls(origin: string, token: string): HostCall {
   return async (ch, ...args) => {
+    const t0 = performance.now();
+    const key = ch === "canvast:lib" ? `lib.${String(args[0])}` : ch.slice(8);
     const res = await fetch(`${origin}/call`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ ch, args }) });
-    if (res.headers.get("content-type")?.startsWith("application/octet-stream")) return new Uint8Array(await res.arrayBuffer());
-    const body = (await res.json().catch(() => ({}))) as { v?: unknown; error?: string };
+    const done = (bytes: number): void => {
+      const s = (hostStats[key] ??= { n: 0, bytes: 0, ms: 0 });
+      s.n++;
+      s.bytes += bytes;
+      s.ms += performance.now() - t0;
+    };
+    if (res.headers.get("content-type")?.startsWith("application/octet-stream")) {
+      const b = new Uint8Array(await res.arrayBuffer());
+      done(b.byteLength);
+      return b;
+    }
+    const text = await res.text();
+    done(text.length);
+    let body: { v?: unknown; error?: string } = {};
+    try {
+      body = JSON.parse(text) as typeof body;
+    } catch {
+      /* not JSON */
+    }
     if (!res.ok) throw new HostError(body.error ?? `the host answered ${res.status}`, res.status);
     return body.v ?? null;
   };
@@ -59,6 +81,21 @@ export class GuestLibrary implements LibraryCalls {
   }
 
   private lib = <T>(op: string, ...args: unknown[]): Promise<T> => this.host("canvast:lib", op, ...args) as Promise<T>;
+  /** Whole lists the storage asks for again and again: kept a moment, and forgotten when the host says something changed. */
+  private kept = new Map<string, { at: number; v: Promise<unknown> }>();
+  private keptLib = <T>(op: string, ...args: unknown[]): Promise<T> => {
+    const key = JSON.stringify([op, args]);
+    const k = this.kept.get(key);
+    if (k && performance.now() - k.at < 5000) return k.v as Promise<T>;
+    const v = this.lib<T>(op, ...args);
+    this.kept.set(key, { at: performance.now(), v });
+    v.catch(() => this.kept.delete(key));
+    return v;
+  };
+  /** The host's library changed: ask again. */
+  forget(): void {
+    this.kept.clear();
+  }
   private local = (hash: string): boolean => this.mine.has(hash);
 
   async get(hashes: readonly string[]): Promise<Array<[string, CatalogEntry | null, AssetRecord | null, string | null]>> {
@@ -68,12 +105,12 @@ export class GuestLibrary implements LibraryCalls {
   }
   async entries(which: "all" | "active" | "deleted" | "hidden" = "all"): Promise<string> {
     const mine = [...this.mine.values()].filter((e) => which === "all" || which === "hidden" || (which === "active" ? e.state === "active" : e.state === "deleted"));
-    const theirs = which === "hidden" ? [] : (JSON.parse(await this.lib<string>("entries", which)) as CatalogEntry[]).filter((e) => !this.local(e.hash));
+    const theirs = which === "hidden" ? [] : (JSON.parse(await this.keptLib<string>("entries", which)) as CatalogEntry[]).filter((e) => !this.local(e.hash));
     return JSON.stringify([...theirs, ...mine]);
   }
   async recs(which: "all" | "sealed" = "all"): Promise<string> {
     const mine = [...this.myRecs.values()];
-    const theirs = which === "sealed" ? [] : (JSON.parse(await this.lib<string>("recs", which)) as AssetRecord[]).filter((r) => !this.local(r.hash));
+    const theirs = which === "sealed" ? [] : (JSON.parse(await this.keptLib<string>("recs", which)) as AssetRecord[]).filter((r) => !this.local(r.hash));
     return JSON.stringify([...theirs, ...mine]);
   }
   async byFile(file: string): Promise<string | null> {
@@ -82,7 +119,7 @@ export class GuestLibrary implements LibraryCalls {
   }
   async meta(key: string): Promise<unknown> {
     if (this.metas.has(key)) return this.metas.get(key);
-    return this.lib("meta", key);
+    return this.keptLib("meta", key);
   }
   async apply(ops: readonly LibraryOp[]): Promise<void> {
     for (const op of ops) {
@@ -135,7 +172,7 @@ export class GuestLibrary implements LibraryCalls {
     return hashes.map((h) => byHash.get(h)).filter((e): e is CatalogEntry & { present: boolean } => !!e);
   }
   async absent(): Promise<string[]> {
-    return this.lib("absent");
+    return this.keptLib("absent");
   }
   async orphans(): Promise<string> {
     return "[]";
@@ -169,6 +206,7 @@ export function remoteBridge(origin: string, token: string): DesktopBridge {
   const host = hostCalls(origin, token);
   const call = <T>(ch: string, ...args: unknown[]): Promise<T> => host(`canvast:${ch}`, ...args) as Promise<T>;
   const nothing = async (): Promise<void> => {};
+  const lib = new GuestLibrary(host);
   return {
     workspace: () => call("workspace").then((w) => (w ? { path: `${origin}/`, name: (w as { name: string }).name } : null)),
     read: (p) => call("read", p),
@@ -211,8 +249,12 @@ export function remoteBridge(origin: string, token: string): DesktopBridge {
     // The host keeps its library in step with the folder: nothing to look at here.
     libraryChanges: async () => [],
     libraryLookDone: nothing,
-    onChanged: (fn) => hostEvents(origin, token).addEventListener("changed", (e) => fn(JSON.parse((e as MessageEvent<string>).data) as string[])),
-    lib: new GuestLibrary(host),
+    onChanged: (fn) =>
+      hostEvents(origin, token).addEventListener("changed", (e) => {
+        lib.forget();
+        fn(JSON.parse((e as MessageEvent<string>).data) as string[]);
+      }),
+    lib,
     thumb: async (hash) => {
       const t = (await call<{ b64: string; type: string; w: number; h: number; face?: string } | null>("thumb", hash).catch(() => null));
       return t ? { bytes: Uint8Array.from(atob(t.b64), (c) => c.charCodeAt(0)), type: t.type, w: t.w, h: t.h, ...(t.face ? { face: t.face } : {}) } : null;

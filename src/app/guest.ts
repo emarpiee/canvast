@@ -3,7 +3,7 @@
  * this site's storage, and reads the workspace through the host. Removed by the host, it pairs again.
  */
 import type { DesktopBridge } from "../storage/desktop-bridge";
-import { hostCalls, isGuestPage, remoteBridge } from "../storage/remote-bridge";
+import { hostCalls, hostStats, isGuestPage, remoteBridge } from "../storage/remote-bridge";
 import { promptDialog } from "../ui/confirm";
 
 const TOKEN = "canvast.guest.token";
@@ -40,5 +40,6 @@ export async function guestBridge(): Promise<DesktopBridge | null> {
       localStorage.setItem(TOKEN, token);
     } else problem = body.error ?? "The computer that shares this workspace did not answer.";
   }
+  (window as unknown as { __canvastHostStats: typeof hostStats }).__canvastHostStats = hostStats; // (what this page asked its host: tests and #debug)
   return remoteBridge(location.origin, token);
 }

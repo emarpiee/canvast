@@ -2951,3 +2951,41 @@ test("sharing (ADR 0184): hidden items reach a guest only when shared, encrypted
     await app.close();
   }
 });
+
+test("sharing (ADR 0184): a guest's library of 120 pictures shows its thumbnails within 30 s, from the host's thumbnails, not the originals", async () => {
+  const ws = tempDir("cv-guest-speed-");
+  const { app, page } = await launch(ws, "userdata", true);
+  const browser = await chromium.launch();
+  try {
+    await page.getByTestId("view-assets").click();
+    const pics = Array.from({ length: 120 }, (_, i) => ({ name: `pic ${i}.png`, mimeType: "image/png", buffer: makePng(64, 48, (x, y) => [(i * 7) % 256, (x * 4) % 256, (y * 5) % 256, 255]) }));
+    await page.getByTestId("assets-import-input").setInputFiles(pics);
+    await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length)), { timeout: 60_000 }).toBe(120);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await page.getByTestId("view-canvas").click();
+    await page.getByTestId("save-status").click();
+    await page.getByRole("tab", { name: "Sharing" }).click();
+    await page.getByTestId("share-on").check();
+    const code = (await page.getByTestId("share-code").textContent())!.trim();
+    const { port } = (await page.evaluate(() => window.canvastDesktop!.share!.call("status"))) as { port: number };
+    const g = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
+    g.on("pageerror", (e) => console.log(`guest page error: ${e.message}`));
+    await g.goto(`https://127.0.0.1:${port}/#debug`);
+    await g.getByTestId("prompt-input").fill(code);
+    await g.getByTestId("prompt-ok").click();
+    await page.getByTestId("confirm-dialog").filter({ hasText: /see this workspace\?/ }).getByTestId("confirm-ok").click();
+    await g.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 60_000 });
+    const t0 = Date.now();
+    await g.getByTestId("view-assets").click();
+    const shown = () => g.locator('[data-testid="asset-card"] img').evaluateAll((imgs) => imgs.filter((i) => (i as HTMLImageElement).naturalWidth > 0).length);
+    await expect.poll(shown, { timeout: 30_000 }).toBeGreaterThanOrEqual(20);
+    const ms = Date.now() - t0;
+    const stats = await g.evaluate(() => (window as unknown as { __canvastHostStats: Record<string, { n: number; bytes: number; ms: number }> }).__canvastHostStats);
+    console.log(`guest library: ${await shown()} thumbnails in ${ms} ms; calls: ${JSON.stringify(stats)}`);
+    // The originals are not read to draw thumbnails: the host's own are used.
+    expect(stats["read"]?.n ?? 0, "originals read whole").toBeLessThan(5);
+  } finally {
+    await browser.close();
+    await app.close();
+  }
+});
