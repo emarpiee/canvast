@@ -2,6 +2,7 @@ import { _electron as electron, expect, test } from "@playwright/test";
 import type { ElectronApplication, Page } from "@playwright/test";
 import { appendFileSync, cpSync, createReadStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { request as httpsRequest } from "node:https";
 import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
 import { createHash, scryptSync } from "node:crypto";
@@ -2766,4 +2767,57 @@ test("cut, a pan with the middle button (a paste on Linux) places nothing; the p
   const canvasTop = (await page.locator("canvas").first().boundingBox())!;
   expect(Math.abs((c.minX + c.maxX) / 2 - (bar.x + bar.width / 2 - canvasTop.x))).toBeLessThan(4);
   await app.close();
+});
+
+test("sharing (ADR 0184): on in Settings, a guest pairs with the code and the host's Allow, reads files, never hidden ones unless shared; removed, it stops", async () => {
+  const ws = tempDir("cv-share-");
+  mkdirSync(join(ws, "library"), { recursive: true });
+  writeFileSync(join(ws, "library", "shared.png"), makePng(4, 4, () => [10, 200, 30, 255]));
+  const { app, page } = await launch(ws);
+  const call = (port: number, path: string, body: unknown, token?: string): Promise<{ status: number; bytes: Buffer; fingerprint: string }> =>
+    new Promise((ok, fail) => {
+      const req = httpsRequest({ host: "127.0.0.1", port, path, method: "POST", rejectUnauthorized: false, headers: token ? { authorization: `Bearer ${token}` } : {} }, (res) => {
+        const parts: Buffer[] = [];
+        res.on("data", (b: Buffer) => parts.push(b));
+        res.on("end", () => ok({ status: res.statusCode ?? 0, bytes: Buffer.concat(parts), fingerprint: (res.socket as import("node:tls").TLSSocket).getPeerCertificate().fingerprint256 }));
+      });
+      req.on("error", fail);
+      req.end(JSON.stringify(body));
+    });
+  try {
+    await page.getByTestId("save-status").click();
+    await page.getByRole("tab", { name: "Sharing" }).click();
+    await expect(page.getByTestId("share-hidden")).toBeDisabled();
+    await page.getByTestId("share-on").check();
+    const code = (await page.getByTestId("share-code").textContent())!.trim();
+    expect(code).toMatch(/^\d{6}$/);
+    const st = (await page.evaluate(() => window.canvastDesktop!.share!.call("status"))) as { port: number; fingerprint: string };
+    // A guest: the code, then the host is asked; Allow.
+    const pairing = call(st.port, "/pair", { code, name: "Test laptop" });
+    const ask = page.getByTestId("confirm-dialog").filter({ hasText: "Let Test laptop see this workspace?" });
+    await expect(ask).toBeVisible();
+    await ask.getByTestId("confirm-ok").click();
+    const paired = await pairing;
+    expect(paired.status).toBe(200);
+    expect(paired.fingerprint, "the certificate is the one Settings shows").toBe(st.fingerprint);
+    const token = String((JSON.parse(paired.bytes.toString()) as { token: string }).token);
+    await expect(page.getByTestId("share-devices")).toContainText("Test laptop");
+    // Reads only; hidden items' files only when shared.
+    const file = await call(st.port, "/call", { ch: "canvast:read", args: ["library/shared.png"] }, token);
+    expect(file.status).toBe(200);
+    expect(file.bytes.equals(readFileSync(join(ws, "library", "shared.png")))).toBe(true);
+    expect((await call(st.port, "/call", { ch: "canvast:write", args: ["library/x.png", [1]] }, token)).status).toBe(403);
+    expect((await call(st.port, "/call", { ch: "canvast:read", args: [".canvast/hidden.json"] }, token)).status).toBe(403);
+    expect((await call(st.port, "/call", { ch: "canvast:read", args: ["../outside.txt"] }, token)).status).toBe(400); // (the main process's own path rule)
+    await page.getByTestId("share-hidden").check();
+    expect((await call(st.port, "/call", { ch: "canvast:read", args: [".canvast/hidden.json"] }, token)).status).not.toBe(403);
+    // Removed: refused at once.
+    await page.getByRole("button", { name: "Remove Test laptop" }).click();
+    expect((await call(st.port, "/call", { ch: "canvast:read", args: ["library/shared.png"] }, token)).status).toBe(401);
+    // Off: nothing listens.
+    await page.getByTestId("share-on").uncheck();
+    await expect(call(st.port, "/hello", null)).rejects.toThrow();
+  } finally {
+    await app.close();
+  }
 });

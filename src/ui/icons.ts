@@ -143,6 +143,7 @@ import puzzleSvg from "lucide-static/icons/puzzle.svg";
 import paintRollerSvg from "lucide-static/icons/paint-roller.svg";
 import mousePointerClickSvg from "lucide-static/icons/mouse-pointer-click.svg";
 import networkSvg from "lucide-static/icons/network.svg";
+import radioTower from "lucide-static/icons/radio-tower.svg";
 import unplugSvg from "lucide-static/icons/unplug.svg";
 import stampSvg from "lucide-static/icons/stamp.svg";
 import featherSvg from "lucide-static/icons/feather.svg";
@@ -419,6 +420,7 @@ export const ICONS = {
   stickyNote: clean(stickyNoteSvg),
   stamp: clean(stampSvg),
   network: clean(networkSvg),
+  tabSharing: clean(radioTower),
   unplug: clean(unplugSvg),
   slice: clean(sliceSvg),
   puzzle: clean(puzzleSvg),

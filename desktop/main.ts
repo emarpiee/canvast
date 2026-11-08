@@ -27,6 +27,7 @@ for (const out of [process.stdout, process.stderr]) out.on("error", () => undefi
 import type { LibraryQuery } from "./library-index";
 import type { LibraryOp } from "../src/storage/desktop-bridge";
 import { pathToFileURL } from "node:url";
+import { SHARED, SHARE_CALLS, installShare, shareChanged } from "./share-host";
 
 const SCHEME = "app";
 const ORIGIN = `${SCHEME}://canvast`;
@@ -409,7 +410,12 @@ function moveCaches(root: string, partition: string, same: boolean): void {
 
 function installFileCalls(win: BrowserWindow, root: string, partition: string): void {
   const own = (e: Electron.IpcMainInvokeEvent): void => {
-    if (e.sender !== win.webContents) throw new Error("not this window");
+    if (e !== SHARED && e.sender !== win.webContents) throw new Error("not this window");
+  };
+  // A read call: the page's, and a guest's of the sharing server (ADR 0184) with the same rules; only these are given to it.
+  const readCall = (ch: string, fn: (e: Electron.IpcMainInvokeEvent, ...a: never[]) => unknown): void => {
+    ipcMain.handle(ch, fn as (e: Electron.IpcMainInvokeEvent, ...a: unknown[]) => unknown);
+    SHARE_CALLS.set(ch, async (...a) => (fn as (e: Electron.IpcMainInvokeEvent, ...a: unknown[]) => unknown)(SHARED, ...a));
   };
   // An export outside the workspace: only into a folder the person chose in the system's dialog (tests name one), never inside the
   // workspace, and only at safe relative paths under the folder made there. Each file is read back and its SHA-256 answered.
@@ -441,7 +447,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     await writeAtomic(full, args[2]);
     return createHash("sha256").update(await readFile(full)).digest("hex");
   });
-  ipcMain.handle("canvast:read", async (e, rel: string) => {
+  readCall("canvast:read", async (e, rel: string) => {
     own(e);
     try {
       return new Uint8Array(await readFile(await inside(root, rel)));
@@ -540,7 +546,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     }
     throw new Error("a write call the app does not know");
   });
-  ipcMain.handle("canvast:part", async (e, rel: string, from: unknown, to: unknown) => {
+  readCall("canvast:part", async (e, rel: string, from: unknown, to: unknown) => {
     own(e);
     if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || (from as number) < 0 || (to as number) < (from as number) || (to as number) - (from as number) > 64 * 2 ** 20) throw new Error("not a part of a file");
     try {
@@ -557,7 +563,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
       throw err;
     }
   });
-  ipcMain.handle("canvast:head", async (e, rel: string) => {
+  readCall("canvast:head", async (e, rel: string) => {
     own(e);
     try {
       const fh = await open(await inside(root, rel), "r");
@@ -572,7 +578,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
       return null;
     }
   });
-  ipcMain.handle("canvast:exists", async (e, rel: string) => {
+  readCall("canvast:exists", async (e, rel: string) => {
     own(e);
     try {
       return (await stat(await inside(root, rel))).isFile();
@@ -580,7 +586,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
       return false;
     }
   });
-  ipcMain.handle("canvast:folderExists", async (e, rel: string) => {
+  readCall("canvast:folderExists", async (e, rel: string) => {
     own(e);
     try {
       return (await stat(await inside(root, rel))).isDirectory();
@@ -596,7 +602,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
   });
   // Many files' sizes at once (whether the library's files are still there), without reading them. A link is not followed (lstat), so a
   // path can only ever say something about the workspace folder itself.
-  ipcMain.handle("canvast:sizes", async (e, rels: unknown) => {
+  readCall("canvast:sizes", async (e, rels: unknown) => {
     own(e);
     if (!Array.isArray(rels)) throw new Error("paths expected");
     return Promise.all(
@@ -771,7 +777,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
       return false;
     }
   });
-  ipcMain.handle("canvast:tree", async (e, rel: string) => {
+  readCall("canvast:tree", async (e, rel: string) => {
     own(e);
     return (await walkFiles(await inside(root, rel), rel)).map(({ path, size }) => ({ path, size }));
   });
@@ -861,7 +867,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     return { t, hash, v } as LibraryOp;
   };
   const WHERE = { all: "1", active: "state = 'active'", deleted: "state = 'deleted'", hidden: "hidden = 1" } as const;
-  ipcMain.handle("canvast:lib", async (e, op: unknown, ...args: unknown[]) => {
+  readCall("canvast:lib", async (e, op: unknown, ...args: unknown[]) => {
     own(e);
     const l = library();
     switch (op) {
@@ -950,7 +956,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
         throw new Error("not a library call");
     }
   });
-  ipcMain.handle("canvast:canvasFiles", async (e) => {
+  readCall("canvast:canvasFiles", async (e) => {
     own(e);
     const out: string[] = [];
     const boards = join(root, ...BOARDS_DIR.split("/"));
@@ -969,7 +975,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     const key = await new Promise<Buffer>((done, fail) => scrypt(Buffer.from(password, "utf8"), Buffer.from(salt), 32, { N, r, p, maxmem: 256 * N * r + 2 ** 24 }, (err, k) => (err ? fail(err) : done(k))));
     return new Uint8Array(key);
   });
-  ipcMain.handle("canvast:hash", async (e, rel: string) => {
+  readCall("canvast:hash", async (e, rel: string) => {
     own(e);
     try {
       const h = createHash("sha256");
@@ -979,7 +985,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
       return null;
     }
   });
-  ipcMain.handle("canvast:list", async (e, rel: string) => {
+  readCall("canvast:list", async (e, rel: string) => {
     own(e);
     try {
       return (await readdir(await inside(root, rel), { withFileTypes: true })).filter((d) => d.isFile()).map((d) => d.name);
@@ -1006,6 +1012,7 @@ function watchFolder(win: BrowserWindow, root: string): void {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
         if (!win.isDestroyed()) win.webContents.send("canvast:changed", [...pending]);
+        shareChanged([...pending]);
         pending.clear();
       }, 1000);
     });
@@ -1165,8 +1172,10 @@ async function openWindow(workspace: string): Promise<void> {
   win.setMenuBarVisibility(false); // (no bar and no Alt to bring it back, as Alt is one of the canvas's keys; its keys still work, and the workspace switcher has its commands)
   // The page asks which workspace it is in; only this window's own page is answered.
   ipcMain.handle("canvast:workspace", (e) => (e.sender === win.webContents ? { path: workspace, name: basename(workspace) } : null));
+  SHARE_CALLS.set("canvast:workspace", async () => ({ path: "", name: basename(workspace) }));
   installFileCalls(win, await realpath(workspace), partition);
   watchFolder(win, await realpath(workspace));
+  installShare(win);
   // Closing waits (up to 15 s) for the page to write what is not in the folder yet (ADR 0177: files follow edits by a moment).
   // While files are still being written the page may hold the close to ask first, and keep the window open.
   let closing = false;

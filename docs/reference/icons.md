@@ -311,3 +311,4 @@ One icon per function: two buttons that do different things never share an icon,
 | `square-split-horizontal` | Split a path into its separate pieces |
 | `arrow-down-wide-narrow` | Library sidebar sort: the most first (file types) |
 | `arrow-down-1-0` | Library sidebar sort: in your order (saved searches) |
+| `radio-tower` | Settings tab: Sharing (this workspace on the local network) |

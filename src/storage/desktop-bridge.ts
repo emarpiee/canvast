@@ -71,6 +71,27 @@ export interface LibraryCalls {
   onProgress(fn: (done: number, total: number) => void): void;
 }
 
+/** What the host's page sees of sharing (ADR 0184; `desktop/share-host.ts`). */
+export interface ShareStatus {
+  on: boolean;
+  /** Hidden items' encrypted files are shared too. */
+  hidden: boolean;
+  port: number;
+  /** The six digits a guest types. */
+  code: string;
+  addresses: string[];
+  /** The certificate's SHA-256, as a guest's browser shows it. */
+  fingerprint: string;
+  devices: Array<{ id: string; name: string; added: number; seen: number | null; active: boolean }>;
+}
+export interface ShareCalls {
+  /** start, stop, status; hidden (on: boolean); remove (a device's id); answer ({ id, ok }); view (the host's view, for guests that follow it). */
+  call(op: "status" | "start" | "stop" | "hidden" | "remove" | "answer" | "view", arg?: unknown): Promise<ShareStatus | null>;
+  onStatus(fn: (st: ShareStatus) => void): void;
+  /** A device asks to connect (it typed the code): answer with `call("answer", …)`. */
+  onAsk(fn: (ask: { id: string; name: string; address: string }) => void): void;
+}
+
 /** Where a deleted file of the workspace folder goes. */
 export type DeleteMode = "trash" | "system" | "erase";
 
@@ -183,6 +204,8 @@ export interface DesktopBridge {
   list(path: string): Promise<string[]>;
   /** The library's own storage (SQLite, in the main process). */
   lib: LibraryCalls;
+  /** Sharing this workspace on the local network (ADR 0184): absent on a guest. */
+  share?: ShareCalls;
   /**
    * An export written outside the workspace: `begin` asks for a folder (the system's dialog, never inside the workspace) and makes
    * `name` in it; `write` puts a file at a relative path under it and answers the SHA-256 of what was read back; `end` forgets it.

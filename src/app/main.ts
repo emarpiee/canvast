@@ -1,4 +1,5 @@
 import { setSnapPx } from "../interaction/snap";
+import { installShareAsk } from "../ui/share-panel";
 import { deleteEverywhere } from "../ui/delete-everywhere";
 import type { CatalogEntry } from "../assets/asset-catalog";
 import { copyItemsAsFiles, copyItemsToClipboard, filesOf, hiddenFine, sayingProgress, type CopyDeps } from "./copy-items";
@@ -840,6 +841,9 @@ async function start(): Promise<void> {
   // The desktop build: before its window closes, the last edits reach the workspace folder (ADR 0177).
   // While files are still being written into the folder (an import's), closing asks first: the rest are written at the next start.
   let opened = false; // (the workspace is open: past the lock screen, its session started)
+  // A device asking to see this workspace (Settings > Sharing) is answered from anywhere in the app.
+  const share = desktopBridge()?.share;
+  if (share) installShareAsk(share);
   desktopBridge()?.onClosing(async () => {
     if (!opened) return; // (still locked or starting: nothing was changed, so nothing waits to be written)
     // A note open with changes not saved: Save them, Don't save, or Cancel (the window stays).
