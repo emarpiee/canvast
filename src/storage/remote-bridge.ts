@@ -92,6 +92,24 @@ export class GuestLibrary implements LibraryCalls {
     v.catch(() => this.kept.delete(key));
     return v;
   };
+  /** Items asked for in the same moment (each card asks for its own) go to the host in one call. */
+  private batch: { hashes: Set<string>; done: Promise<Map<string, [string, CatalogEntry | null, AssetRecord | null, string | null]>> } | null = null;
+  private async getSoon(hashes: readonly string[]): Promise<Array<[string, CatalogEntry | null, AssetRecord | null, string | null]>> {
+    if (!this.batch) {
+      const hs = new Set<string>();
+      const done = new Promise<void>((r) => setTimeout(r, 15)).then(async () => {
+        this.batch = null;
+        const rows = await this.lib<Array<[string, CatalogEntry | null, AssetRecord | null, string | null]>>("get", [...hs]);
+        return new Map(rows.map((r) => [r[0], r]));
+      });
+      this.batch = { hashes: hs, done };
+    }
+    const b = this.batch;
+    for (const h of hashes) b.hashes.add(h);
+    const got = await b.done;
+    return hashes.flatMap((h) => (got.has(h) ? [got.get(h)!] : []));
+  }
+
   /** The host's library changed: ask again. */
   forget(): void {
     this.kept.clear();
@@ -100,7 +118,7 @@ export class GuestLibrary implements LibraryCalls {
 
   async get(hashes: readonly string[]): Promise<Array<[string, CatalogEntry | null, AssetRecord | null, string | null]>> {
     const remote = hashes.filter((h) => !this.local(h));
-    const there = remote.length ? await this.lib<Array<[string, CatalogEntry | null, AssetRecord | null, string | null]>>("get", remote) : [];
+    const there = remote.length ? await this.getSoon(remote) : [];
     return [...there, ...hashes.filter((h) => this.local(h)).map((h): [string, CatalogEntry | null, AssetRecord | null, string | null] => [h, this.mine.get(h) ?? null, this.myRecs.get(h) ?? null, null])];
   }
   async entries(which: "all" | "active" | "deleted" | "hidden" = "all"): Promise<string> {
