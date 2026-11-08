@@ -14,7 +14,7 @@ import type { LinkCards, LinkRow } from "../app/session";
 import type { Session, AssetPlace } from "../app/session";
 import { plural } from "../doc/plural";
 import { openBatchRename } from "./batch-rename";
-import { askHiddenPassword, readyForHidden, setHiddenMode } from "./hidden-access";
+import { askHiddenPassword, lockHidden, readyForHidden, setHiddenMode } from "./hidden-access";
 import { renamedTag, tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { mountSuggest } from "./search-suggest";
 import type { SuggestSources } from "../search/suggest";
@@ -335,7 +335,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     </div>
     <footer class="hud-bottom assets-statusbar" data-testid="assets-statusbar">
       <div class="hud-readout assets-readout" aria-live="off">
-        <span class="assets-hidden-bar" data-testid="hidden-mode-bar" role="status" title="Hidden mode: only hidden items are listed, and what you do here is done to them" hidden>${ICONS.eyeClosed}<span class="assets-hidden-label">Hidden mode</span><button type="button" data-action="hidden-stay" data-testid="hidden-mode-stay" aria-pressed="false" aria-label="Stay in hidden mode when leaving the library" title="Stay in hidden mode when leaving the library (also in Settings > Privacy)">${ICONS.anchor}</button><button type="button" data-action="exit-hidden" data-testid="hidden-mode-exit" aria-label="Exit hidden mode" title="Exit hidden mode">Exit</button></span>
+        <span class="assets-hidden-bar" data-testid="hidden-mode-bar" role="status" title="Hidden mode: only hidden items are listed, and what you do here is done to them" hidden>${ICONS.eyeClosed}<span class="assets-hidden-label">Hidden mode</span><button type="button" data-action="hidden-stay" data-testid="hidden-mode-stay" aria-pressed="false" aria-label="Stay in hidden mode when leaving the library" title="Stay in hidden mode when leaving the library (also in Settings > Privacy)">${ICONS.anchor}</button><button type="button" data-action="exit-hidden" data-testid="hidden-mode-exit" aria-label="Exit hidden mode" title="Exit hidden mode: the hidden items leave this screen, still unlocked (devices they are shared with can open them)">Exit</button><button type="button" data-action="lock-hidden" data-testid="hidden-mode-lock" aria-label="Lock the hidden items" title="Lock: nothing opens the hidden items, here or on a shared device, until the password is typed again" hidden>Lock</button></span>
         <span class="assets-count" data-testid="assets-count"></span>
         <span class="assets-picked" data-testid="assets-picked" hidden></span>
         <span class="assets-total" data-testid="assets-total"></span>
@@ -5189,6 +5189,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const stayBtn = hiddenBar.querySelector<HTMLButtonElement>('[data-action="hidden-stay"]')!;
   const paintHiddenMode = (): void => {
     hiddenBar.hidden = !hiddenMode;
+    hiddenBar.querySelector<HTMLElement>('[data-action="lock-hidden"]')!.hidden = !session.storage?.hidden; // (a key to lock: desktop)
     stayBtn.setAttribute("aria-pressed", String(settings.get("library.hiddenStay")));
     root.classList.toggle("is-hidden-mode", hiddenMode);
   };
@@ -5240,6 +5241,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     void refresh().then(() => was && visible && (scroller.scrollTop = was.top));
   };
   hiddenBar.querySelector('[data-action="exit-hidden"]')!.addEventListener("click", exitHidden);
+  hiddenBar.querySelector('[data-action="lock-hidden"]')!.addEventListener("click", () => void lockHidden(session)); // (hidden mode ends with it: below)
   stayBtn.addEventListener("click", () => {
     settings.set("library.hiddenStay", !settings.get("library.hiddenStay"));
     paintHiddenMode();

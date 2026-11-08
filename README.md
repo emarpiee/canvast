@@ -1287,6 +1287,16 @@ For a workspace that is shown in a public place, an item of the Library can be *
 - Outside it, nothing hidden is listed, counted or suggested anywhere. To begin it, type the **opening word** in the library's search box (`hidden:` by default; change it, or empty it to turn this off, in Settings > Privacy); the password is asked for if there is one.
 - In hidden mode the Library is the same view with every function (folders, *Unfiled*, *Favourites*, tags, file types, *Similar images*, search, sorts, layouts, the viewer and slideshow, rename, descriptions and properties, filing, bulk actions), over the hidden items only. The folders listed are the hidden ones and those holding hidden items; the counts are of hidden items. A chip at the start of the status bar (*Hidden mode*, with a pin and *Exit*; on a phone, the eye and *Exit*) says it is on.
 - A folder made in hidden mode is hidden. **Unhide folder** (a folder's ⋯ menu in hidden mode) shows the folder, its subfolders and every item in them again, also the items in it that were hidden one by one, and the folders above it.
+- **Exit and Lock are not the same** (desktop app):
+
+  | | Exit (hidden mode) | Lock |
+  | --- | --- | --- |
+  | Hidden items on this screen | Leave it | Leave it |
+  | The key in memory | Kept: the items stay unlocked | Removed |
+  | Devices they are shared with (Sharing) | Can still open them | Cannot, until the password is typed again |
+  | Where | **Exit** on the hidden mode chip | **Lock** on that chip, **Lock now** in Settings > Privacy, *Lock hidden items* (command palette), or closing the app |
+
+  *Remember the Hidden password* only spares typing it again when hidden mode begins; it never locks or unlocks.
 - It ends with **Exit** on that chip, when the hidden items are locked, or when you leave the library, unless the chip's pin (or *Stay in hidden mode when leaving the library*, Settings > Privacy) keeps it on until then. While hidden mode stays on outside the library, hidden items placed on canvases show their pictures on the screen (files, copies and screenshots keep the padlock). The library is then as it was before (its list, search and scroll), and the hidden items' pictures are dropped from memory. With *Remember the Hidden password until the tab closes* (Settings > Privacy) it begins again without the password until the tab is closed or reloaded.
 
 | | |
@@ -1327,7 +1337,7 @@ Whether an item is hidden is data of the item, so it travels in any export that 
 - Its name, tags, note and fields are kept only in an encrypted index (`.canvast/hidden.json`); its thumbnail is stored only encrypted with the same key, in the app's own cache on each device (made once there, so the Library does not open the whole file again each time), and opened only while the hidden items are.
 - The password, stretched with **scrypt** (128 MiB of memory for each guess, so guessing it on many machines at once is costly), wraps one random key, so changing the password never re-encrypts a file. It cannot be removed while any item is hidden. A workspace from before 0.50.52 (PBKDF2) is upgraded the next time the password is given.
 - The Hidden password is checked only by its vault: no cheaper form of it is written into the workspace folder.
-- Once given (to begin hidden mode, or when hiding), the key stays in memory until the app closes or you choose **Lock hidden items** (command palette). It is held so that no code in the page can read it out; changing the password therefore asks for the current one.
+- Once given (to begin hidden mode, or when hiding), the key stays in memory until the app closes or you lock them (**Lock** in hidden mode, **Lock now** in Settings > Privacy, or *Lock hidden items* in the command palette); leaving hidden mode does not lock them. It is held so that no code in the page can read it out; changing the password therefore asks for the current one.
 - A spare of the wrapped key is kept in `.canvast/keys/hidden.json`: if `hidden.json` is lost or damaged, the same password still opens every hidden file, and the app writes `hidden.json` again.
 - The files and folders stand on their own: `.hidden/` copied anywhere, with the key file and the password, gives back every file with its name and folders (`scripts/hidden-items.mjs decrypt`), even with the index lost; only the tags, notes, fields and favourites are in the index. A file renamed or moved inside `.hidden/` outside the app (a file manager, a sync tool) is found again by the content hash inside it, and its item takes the name and folder its new place says.
 - Hiding several files at once shows *Encrypting N of M files* from five files on.

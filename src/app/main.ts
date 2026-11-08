@@ -66,7 +66,7 @@ import { syncScroll } from "../ui/bar";
 import { parseHex, rgbToOklch } from "../colour-picker/colour";
 import { canvasItems, mountContextMenu } from "../ui/context-menu";
 import { openBatchRename } from "../ui/batch-rename";
-import { askCurrentPassword, askPassword, forgetHiddenPassword, hiddenModeOn, hiddenRemembered, onHiddenRemembered } from "../ui/hidden-access";
+import { HIDDEN_LOCKED, askCurrentPassword, askPassword, forgetHiddenPassword, hiddenModeOn, hiddenRemembered, lockHidden, onHiddenRemembered } from "../ui/hidden-access";
 import { typeOfName } from "../storage/workspace-names";
 import { openLockScreen } from "../ui/lock-screen";
 import { renderedPicture } from "../render/adjust-image";
@@ -2310,11 +2310,12 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       : {}),
     password: async (kind, action) => {
       const what = kind === "workspace" ? "workspace" : "Hidden items";
-      const state = async (note = "", only = false): Promise<{ has: boolean; text: string }> => {
+      const state = async (note = "", only = false): Promise<{ has: boolean; text: string; open: boolean }> => {
         const has = await session.hasPassword(kind);
-        return { has, text: only && note ? note : `${note ? `${note} ` : ""}${has ? "A password is set." : kind === "workspace" ? "No password is set: the app opens without asking." : "No password is set: anyone can open the Hidden items."}` };
+        return { has, open: kind === "hidden" && !!storage?.hidden?.isOpen(), text: only && note ? note : `${note ? `${note} ` : ""}${has ? "A password is set." : kind === "workspace" ? "No password is set: the app opens without asking." : "No password is set: anyone can open the Hidden items."}` };
       };
       if (action === "status") return state();
+      if (action === "lock") return state(lockHidden(session) ? HIDDEN_LOCKED : "", true);
       if (session.readOnly) return state("Another tab is editing, so the password cannot change here.");
       const current = await askCurrentPassword(session, kind, "Enter the current password.");
       if (current === null) return state("Not changed.");
@@ -2541,7 +2542,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
             { group: "Workspace", title: "Check library files (quick)", words: "verify damaged missing size fast folder", run: () => checkLibraryFiles(true) },
           ]
         : []),
-      ...(storage?.hidden ? [{ group: "Workspace", title: "Lock hidden items", words: "encrypt password hide close", enabled: () => !!storage.hidden?.isOpen(), run: () => { storage.hidden!.lock(); editor.message = "Hidden items are locked: the password opens them again."; editor.changed(); } }] : []),
+      ...(storage?.hidden ? [{ group: "Workspace", title: "Lock hidden items", words: "encrypt password hide close", enabled: () => !!storage.hidden?.isOpen(), run: () => { lockHidden(session); editor.message = HIDDEN_LOCKED; editor.changed(); } }] : []),
     ];
     // the keys shown are the ones in use now (Settings > Shortcuts)
     const TITLE_COMMAND: Record<string, string> = { Undo: "edit.undo", Redo: "edit.redo", Duplicate: "edit.duplicate", "Delete the selection": "edit.delete", "Select everything": "edit.selectAll", Group: "edit.group", Ungroup: "edit.ungroup", "Bring to front": "edit.front", "Send to back": "edit.back", "Zoom in": "view.zoomIn", "Zoom out": "view.zoomOut", "Return to the origin": "view.home", "Fit the selection in view": "view.focus", "Previous view": "view.back", "Next view": "view.forward", Shortcuts: "find.help" };

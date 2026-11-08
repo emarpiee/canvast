@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.55.5 — Lock the hidden items from where you are (2026-11-09)
+
+- **Added:** **Lock** on the hidden mode chip and **Lock now** in Settings > Privacy (desktop app), beside *Lock hidden items* in the command palette.
+- **Changed:** the hidden mode chip, Settings > Privacy and the README say what Exit and Lock each do: Exit takes the hidden items off this screen and keeps them unlocked (shared devices can still open them); Lock removes the key.
+
 ## 0.55.4 — Why the folder refused a sign-in (2026-11-09)
 
 - **Changed:** a refused sign-in to the folder for file managers is in the activity with the user name tried (never the password) and why: a device login's wrong password, or a user name that is no login with a password that is not the shared one.

@@ -2990,8 +2990,11 @@ test("sharing (ADR 0184): hidden items reach a guest only when shared, encrypted
       });
     expect((await phone("PROPFIND", "/dav/")).body).toContain("/dav/Hidden/");
     await expect.poll(async () => (await phone("PROPFIND", "/dav/Hidden/")).body, { timeout: 15_000 }).toContain("Secret.png");
-    // Locked on the host: the folder says so, in a note, and the activity tells it.
-    await page.evaluate(() => window.__canvastDebug.hiddenOp("lock"));
+    // Locked on the host (Settings > Privacy, Lock now): the folder says so, in a note, and the activity tells it.
+    await page.getByRole("tab", { name: "Privacy" }).click();
+    await page.getByTestId("hidden-pw-lock").click();
+    await expect(page.getByTestId("hidden-pw-lock")).toBeHidden();
+    await page.getByRole("tab", { name: "Sharing" }).click();
     await expect.poll(async () => (await phone("PROPFIND", "/dav/Hidden/")).body, { timeout: 15_000 }).toContain("Locked");
     expect(((await page.evaluate(() => window.canvastDesktop!.share!.call("status"))) as { log: Array<{ what: string }> }).log.map((e) => e.what)).toContain("Folder: hidden items asked for, but they are locked on this computer");
     expect(await page.evaluate(() => window.__canvastDebug.hiddenOp("check", "pw"))).toEqual({ ok: true, state: "open" });

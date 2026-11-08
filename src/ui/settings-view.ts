@@ -311,7 +311,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
       ...(DESKTOP
         ? [{ key: "library.hiddenNamesOff", label: "Keep hidden items' names off this device while locked", help: "On: this device clears hidden names, tags and notes when locked.", more: "On: when the Hidden items are locked (and when the app starts), this device's own copy of their names, tags and notes, and of hidden folders' names, is cleared; the encrypted files keep them, and opening the Hidden items brings them back. Off (the default): this device keeps them, so the Hidden list opens at once.", control: { kind: "toggle" } } as Row]
         : []),
-      { key: "library.hiddenRemember", label: "Remember the Hidden password until the tab closes", help: "On: the password is asked once, not each time hidden mode begins.", more: "Off (the default): hidden mode asks for the password each time it begins. On: after the password is given once, hidden mode begins without it until this tab is closed or reloaded. Hidden mode itself always ends when you leave the library. Exporting hidden items always asks.", control: { kind: "toggle" } },
+      { key: "library.hiddenRemember", label: "Remember the Hidden password until the tab closes", help: "On: the password is asked once, not each time hidden mode begins.", more: "Off (the default): hidden mode asks for the password each time it begins. On: after the password is given once, hidden mode begins without it until this tab is closed or reloaded. Hidden mode itself always ends when you leave the library. Neither locks the hidden items: Lock now (Password for the Hidden items, below) does. Exporting hidden items always asks.", control: { kind: "toggle" } },
       { key: "library.hiddenCopySeconds", label: "Clear copied hidden items after", help: "A hidden item you copy leaves the clipboard after this long. 0: it stays.", more: "Locking the hidden items or closing the app clears it too, and something you copied since is left alone. Anything already pasted stays where you put it, and a clipboard history of your system may have kept its own copy. In a browser it clears only while the page has the focus.", control: { kind: "range", min: 0, max: 600, step: 5, unit: "s" } },
       { key: "library.hiddenStay", label: "Stay in hidden mode when leaving the library", help: "On: hidden mode stays on after you leave the library.", more: "Off (the default): hidden mode ends when you leave the library. On: it stays on until you exit it (Exit in the status bar, or deleting the word), the hidden items are locked, or the app closes. The pin in hidden mode's status bar sets this too.", control: { kind: "toggle" } },
     ],
@@ -384,7 +384,7 @@ export interface BackupHooks {
   /** Start from scratch: the warning, the suggestions before it, and the deletion. */
   reset(): Promise<void>;
   /** A password (of the Hidden items or of the whole workspace): whether there is one, and change it (null removes it). Resolves with a sentence to show. */
-  password(kind: "hidden" | "workspace", action: "status" | "set" | "remove"): Promise<{ has: boolean; text: string }>;
+  password(kind: "hidden" | "workspace", action: "status" | "set" | "remove" | "lock"): Promise<{ has: boolean; text: string; open?: boolean }>;
   /** The desktop app: how the workspace splits its library's files (16, 256 or 4,096), and splitting them another way (asks first). */
   librarySplit?: { get(): Promise<{ split: 1 | 2 | 3; items: number }>; set(split: 1 | 2 | 3): Promise<boolean> };
 }
@@ -396,12 +396,13 @@ const DEVICE_DATA_CARD = `<div class="set-info set-card" data-device-data><h3>Wh
              <li><strong>The list of recent workspaces</strong> (workspaces.json, partitions.json): their folders' paths.</li>
              <li><strong>Hidden items opened in another app</strong>: readable copies in the system's temporary folder (canvast-opened-…), deleted when the hidden items are locked, when the app closes, and at the next start.</li></ul>
              <p class="set-help">Working copies of workspaces this computer no longer opens are removed after a month. For full privacy:</p>
-             <ul class="set-list"><li>Turn on <em>Keep hidden items' names off this device while locked</em> (above).</li><li>Leave <em>Remember the Hidden password</em> off.</li><li>Lock the hidden items (command palette: Lock hidden items) before you leave the computer; closing the app locks them.</li><li>Avoid <em>Open in default app</em> for hidden items: the other app may keep its own copy, thumbnail or recent-files entry.</li><li>Use your system's disk encryption: the working copy and the temporary folder are on this disk.</li><li>A backup keeps hidden items encrypted; a ZIP of files or an exported folder does not.</li></ul></div>`;
+             <ul class="set-list"><li>Turn on <em>Keep hidden items' names off this device while locked</em> (above).</li><li>Leave <em>Remember the Hidden password</em> off.</li><li>Lock the hidden items (Lock now, below) before you leave the computer: leaving hidden mode does not lock them; closing the app does.</li><li>Avoid <em>Open in default app</em> for hidden items: the other app may keep its own copy, thumbnail or recent-files entry.</li><li>Use your system's disk encryption: the working copy and the temporary folder are on this disk.</li><li>A backup keeps hidden items encrypted; a ZIP of files or an exported folder does not.</li></ul></div>`;
 
+const LOCK_TIP = "Lock the hidden items: nothing opens them, here or on a shared device, until the password is typed again.";
 const pwCard = (kind: "hidden" | "workspace", title: string, help: string): string => `<div class="set-info set-card" data-pw-card="${kind}"><h3>${esc(title)}</h3>
              <p class="set-help">${esc(help)}</p>
              <p data-pw-state role="status">…</p>
-             <div class="storage-actions"><button type="button" data-pw="set" data-kind="${kind}" data-testid="${kind}-pw-set">Set a password…</button><button type="button" data-pw="remove" data-kind="${kind}" data-testid="${kind}-pw-remove" hidden>Remove the password…</button></div></div>`;
+             <div class="storage-actions"><button type="button" data-pw="set" data-kind="${kind}" data-testid="${kind}-pw-set">Set a password…</button><button type="button" data-pw="remove" data-kind="${kind}" data-testid="${kind}-pw-remove" hidden>Remove the password…</button>${kind === "hidden" ? `<button type="button" data-pw="lock" data-kind="hidden" data-testid="hidden-pw-lock" title="${esc(LOCK_TIP)}" hidden>Lock now</button>` : ""}</div></div>`;
 
 export function mountSettingsView(root: HTMLElement, settings: SettingsStore, keymap: Keymap, onClose: () => void, backup?: BackupHooks): { show(tab?: string): void; hide(): void } {
   const tabButton = (t: Tab): string => `<button type="button" role="tab" id="set-tab-${t.id}" aria-controls="set-panel-${t.id}" data-tab="${t.id}"><span class="set-tab-icon" aria-hidden="true">${ICONS[TAB_ICON[t.id] ?? "tabAbout"]}</span><span class="set-tab-label">${esc(t.label)}</span><span class="set-hits" aria-hidden="true"></span></button>`;
@@ -423,7 +424,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
         (t.id === "privacy"
           ? (DESKTOP
               ? pwCard("workspace", "Password for the workspace", "Asked when the app opens: nothing of the workspace is shown until it is given. It keeps people at your screen out; it does not encrypt your data, so someone who can open the workspace folder, or an exported file, is not stopped. It cannot be recovered: to change or remove it you enter the old one.") +
-                pwCard("hidden", "Password for the Hidden items", "Hidden items are encrypted with it in the workspace folder: their files, names, tags and notes cannot be read without it. It is asked before the Hidden items open and before an export that includes them (an exported file is not encrypted). It cannot be recovered: if it is lost, so are the hidden items. It cannot be removed while items are hidden.") +
+                pwCard("hidden", "Password for the Hidden items", "Hidden items are encrypted with it in the workspace folder: their files, names, tags and notes cannot be read without it. It is asked before the Hidden items open and before an export that includes them (an exported file is not encrypted). It cannot be recovered: if it is lost, so are the hidden items. It cannot be removed while items are hidden. Unlocked, they stay unlocked until Lock now or closing the app: leaving hidden mode only takes them off this screen, and devices they are shared with can still open them.") +
                 DEVICE_DATA_CARD
               : pwCard("workspace", "Password for the workspace", "Asked when the app opens: nothing of the workspace is read or shown until it is given. It keeps people at your screen out; it does not encrypt your data, so someone with access to this browser's storage or to an exported file is not stopped. It cannot be recovered: to change or remove it you enter the old one.") +
                 pwCard("hidden", "Password for the Hidden items", "A password asked before the Hidden items open and before an export that includes them. The same limits apply: it does not encrypt the files. It cannot be recovered either."))
@@ -650,18 +651,20 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     }
   };
   /** A password card of Privacy: show whether there is a password, or change it and show the result. */
-  const passwordCard = async (kind: "hidden" | "workspace", action: "status" | "set" | "remove"): Promise<void> => {
+  const passwordCard = async (kind: "hidden" | "workspace", action: "status" | "set" | "remove" | "lock"): Promise<void> => {
     if (!backup) return;
     const r = await backup.password(kind, action);
     const card = root.querySelector<HTMLElement>(`[data-pw-card="${kind}"]`)!;
     card.querySelector<HTMLElement>("[data-pw-state]")!.textContent = r.text;
     card.querySelector<HTMLElement>('[data-pw="set"]')!.textContent = r.has ? "Change the password…" : "Set a password…";
     card.querySelector<HTMLElement>('[data-pw="remove"]')!.hidden = !r.has;
+    const lock = card.querySelector<HTMLElement>('[data-pw="lock"]');
+    if (lock) lock.hidden = !r.open;
   };
   root.addEventListener("click", (e) => {
     const pw = (e.target as HTMLElement).closest<HTMLElement>("[data-pw]");
     if (pw && backup) {
-      void passwordCard(pw.dataset["kind"] as "hidden" | "workspace", pw.dataset["pw"] as "set" | "remove");
+      void passwordCard(pw.dataset["kind"] as "hidden" | "workspace", pw.dataset["pw"] as "set" | "remove" | "lock");
       return;
     }
     if (backup && (e.target as HTMLElement).closest("[data-reset-all]")) {

@@ -28,6 +28,18 @@ export function setHiddenMode(on: boolean): void {
 }
 const verifiedAt: Record<PasswordKind, number> = { hidden: -Infinity, workspace: -Infinity };
 
+/**
+ * Lock the hidden items (desktop): their key leaves memory, so nothing opens them, here or on a device they are shared with, until the
+ * password is typed again. Hidden mode is only what this screen shows. One action for the command palette, the hidden mode bar and Settings.
+ */
+export const HIDDEN_LOCKED = "Hidden items are locked: the password opens them again.";
+export function lockHidden(session: Session): boolean {
+  const h = session.storage?.hidden;
+  if (!h?.isOpen()) return false;
+  h.lock();
+  return true;
+}
+
 /** Forget the Hidden list's password given in this tab (the password was changed or removed, or remembering was turned off). */
 export function forgetHiddenPassword(): void {
   setRemembered(false);
