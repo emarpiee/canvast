@@ -57,7 +57,7 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SwitchRo
           ? `<dl data-testid="share-facts"><dt>Address</dt><dd>${urls.map((u) => `<code>${esc(u)}</code>`).join("<br>") || "No network found"}</dd>
           <dt>Code</dt><dd><strong data-testid="share-code">${esc(st.code)}</strong></dd>
           <dt>Fingerprint</dt><dd><code>${esc(st.fingerprint)}</code></dd>
-          ${st.dav ? `<dt>Folder</dt><dd><code data-testid="share-dav-url">${esc(st.dav.url)}</code><br>Password: <code data-testid="share-dav-password">${esc(st.dav.password)}</code><br><button type="button" class="set-done" data-share-open-dav data-testid="share-open-dav">Open in the file manager</button></dd>` : ""}</dl>
+          ${st.dav ? `<dt>Folder</dt><dd><code data-testid="share-dav-url">${esc(st.dav.url)}</code> (this computer)${st.dav.others.map((u) => `<br><code>${esc(u)}</code> (other devices: Library only)`).join("")}<br>Password: <code data-testid="share-dav-password">${esc(st.dav.password)}</code><br><button type="button" class="set-done" data-share-open-dav data-testid="share-open-dav">Open in the file manager</button></dd>` : ""}</dl>
           <p class="set-help">The folder shows your library's files to file managers, read-only (on another computer, with this computer's address). On this computer only, and while the Hidden items are open, it also has a Hidden folder: each file is decrypted only as it is read. A file manager may keep thumbnails of what it shows.</p>
           <p class="set-help">A guest opens the address and types the code, and you are asked to allow the device. A browser warns once about the certificate: it is this computer's own; its fingerprint is the one above. Sharing stops when the app closes.</p>`
           : ""

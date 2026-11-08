@@ -83,7 +83,7 @@ export interface ShareStatus {
   /** The certificate's SHA-256, as a guest's browser shows it. */
   fingerprint: string;
   /** The folder for file managers (WebDAV) on this computer, and its password (new at each start). */
-  dav: { url: string; password: string } | null;
+  dav: { url: string; others: string[]; password: string } | null;
   devices: Array<{ id: string; name: string; added: number; seen: number | null; active: boolean }>;
 }
 export interface ShareCalls {
