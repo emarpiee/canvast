@@ -204,6 +204,12 @@ export interface DesktopBridge {
   list(path: string): Promise<string[]>;
   /** The library's own storage (SQLite, in the main process). */
   lib: LibraryCalls;
+  /** Connecting to a workspace another computer shares (ADR 0184): found on the network, or typed; its fingerprint confirmed, then opened in a window of its own. */
+  guest?: {
+    find(): Promise<Array<{ name: string; address: string; port: number; fingerprint: string }>>;
+    check(address: string): Promise<{ address: string; port: number; fingerprint: string; known: boolean } | { error: string }>;
+    open(host: { address: string; port: number; fingerprint: string }): Promise<null>;
+  };
   /** Sharing this workspace on the local network (ADR 0184): absent on a guest. */
   share?: ShareCalls;
   /**

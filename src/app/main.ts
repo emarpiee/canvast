@@ -1,4 +1,5 @@
 import { setSnapPx } from "../interaction/snap";
+import { followHost, sendView } from "./follow";
 import { readOnlyLine, readOnlyWhy } from "../storage/remote-bridge";
 import { guestBridge } from "./guest";
 import { installShareAsk } from "../ui/share-panel";
@@ -848,6 +849,7 @@ async function start(): Promise<void> {
   // A device asking to see this workspace (Settings > Sharing) is answered from anywhere in the app.
   const share = desktopBridge()?.share;
   if (share) installShareAsk(share);
+  if (share) sendView(view, session, share); // (for guests that follow: ADR 0184)
   desktopBridge()?.onClosing(async () => {
     if (!opened) return; // (still locked or starting: nothing was changed, so nothing waits to be written)
     // A note open with changes not saved: Save them, Don't save, or Cancel (the window stays).
@@ -1708,6 +1710,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   applyZen(); // the button beside Home exists now
   if (debug) mountDevPanel(document.getElementById("hud")!, view, doc, () => pruneSelection(doc, editor), (n) => notices.push(n));
   const markNav = mountNavigator(document.getElementById("workspace")!, session, () => setView("canvas"));
+  const followButton = document.querySelector<HTMLButtonElement>('[data-testid="follow-host"]');
+  if (followButton) followHost(view, session, canvas, followButton);
 
   /** Save the picked paths as an SVG picture in the library (the same file "Save as SVG" writes). */
   const saveSvgToLibrary = async (): Promise<void> => {

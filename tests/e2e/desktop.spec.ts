@@ -2854,6 +2854,17 @@ test("sharing (ADR 0184): a browser guest pairs, sees the host's library and can
     await g.getByTestId("view-assets").click();
     await expect(g.locator('[data-testid="asset-card"][title="Shared Picture.png"]')).toHaveCount(1, { timeout: 30_000 });
     await expect(page.getByTestId("share-devices")).toContainText(/on Linux/);
+    // Follow the host: where the host goes, the guest goes; moving the view itself stops it.
+    await g.getByTestId("view-canvas").click();
+    await page.getByTestId("view-canvas").click();
+    await g.getByTestId("follow-host").click();
+    await expect(g.getByTestId("follow-host")).toHaveAttribute("aria-pressed", "true");
+    const there = { cx: "5p0", cy: "-3p0", zi: 2, zf: 0, pz: 2 };
+    await page.evaluate((c) => window.__canvastDebug.setCamera(c), there);
+    await expect.poll(() => g.evaluate(() => window.__canvastDebug.camera()), { timeout: 10_000 }).toMatchObject({ cx: "5p0", cy: "-3p0", zi: 2 });
+    await g.mouse.move(600, 420);
+    await g.mouse.wheel(0, 100);
+    await expect(g.getByTestId("follow-host")).toHaveAttribute("aria-pressed", "false");
     // A reload keeps the pairing (no code asked).
     await g.reload();
     await g.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 60_000 });

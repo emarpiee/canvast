@@ -127,3 +127,27 @@ describe("sharing server", () => {
     expect((await send(server.port, "POST", "/pair", { code: server.code })).status).toBe(429);
   });
 });
+
+describe("finding hosts", () => {
+  it("a host that shares answers a guest's question with its name, port and fingerprint; stopped, it is silent", async () => {
+    const { answerFinds, findHosts } = await import("../../desktop/share-find");
+    const port = 47_000 + Math.floor(Math.random() * 900);
+    const stop = answerFinds(() => ({ name: "Studio · Art", port: 4433, fingerprint: "AA:BB" }), port);
+    await new Promise((r) => setTimeout(r, 100));
+    const found = await findHosts(400, port, "127.0.0.1");
+    expect(found).toEqual([{ name: "Studio · Art", address: "127.0.0.1", port: 4433, fingerprint: "AA:BB" }]);
+    stop();
+    expect(await findHosts(300, port, "127.0.0.1")).toEqual([]);
+  });
+});
+
+describe("a typed host address", () => {
+  it("takes what Settings > Sharing shows, with or without https://, and refuses anything else", async () => {
+    const { parseAddress } = await import("../../desktop/share-find");
+    expect(parseAddress("192.168.1.5:47000")).toEqual({ address: "192.168.1.5", port: 47000 });
+    expect(parseAddress("https://192.168.1.5:47000/")).toEqual({ address: "192.168.1.5", port: 47000 });
+    expect(parseAddress("192.168.1.5")).toBeNull();
+    expect(parseAddress("192.168.1.5:99999")).toBeNull();
+    expect(parseAddress("evil.com:1/../x")).toBeNull();
+  });
+});

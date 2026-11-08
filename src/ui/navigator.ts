@@ -30,7 +30,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
     </div>
     <div class="readonly-banner" role="alert" data-testid="readonly-banner" hidden>
       <span>${esc(readOnlyLine())}</span>
-      ${isGuestPage() ? "" : `<button type="button" data-action="take-over">Take over</button>`}
+      ${isGuestPage() ? `<button type="button" data-testid="follow-host" aria-pressed="false" title="Go where the host is, on its canvas, as it moves; moving the view yourself stops it">Follow the host</button>` : `<button type="button" data-action="take-over">Take over</button>`}
     </div>`;
   const crumb = root.querySelector<HTMLButtonElement>(".nav-crumb")!;
   const crumbText = root.querySelector<HTMLElement>(".nav-crumb-text")!;
@@ -316,7 +316,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
       e.stopPropagation();
     }
   });
-  banner.querySelector("button")?.addEventListener("click", () => void session.takeOver());
+  banner.querySelector('[data-action="take-over"]')?.addEventListener("click", () => void session.takeOver());
 
   session.subscribe(render);
   render();

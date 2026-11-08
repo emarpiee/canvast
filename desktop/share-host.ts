@@ -12,6 +12,8 @@ import { join } from "node:path";
 import { makeSelfCert } from "./self-cert";
 import type { SelfCert } from "./self-cert";
 import { guestPage, pathAllowed, startShare } from "./share-server";
+import { answerFinds } from "./share-find";
+import { hostname } from "node:os";
 import type { ShareCall, ShareDevice, ShareServer } from "./share-server";
 
 /** The event a read call gets when a guest makes it (the handlers' own check lets it through). */
@@ -56,7 +58,8 @@ export interface ShareStatus {
   devices: Array<{ id: string; name: string; added: number; seen: number | null; active: boolean }>;
 }
 
-export function installShare(win: BrowserWindow, html: string): void {
+export function installShare(win: BrowserWindow, html: string, workspaceName: string): void {
+  let stopFind: (() => void) | null = null;
   const saved = load();
   const answers = new Map<string, (ok: boolean) => void>();
   const status = (): ShareStatus => {
@@ -108,11 +111,15 @@ export function installShare(win: BrowserWindow, html: string): void {
           server = await start(saved.port ?? 0).catch(() => start(0));
           saved.port = server.port;
           keep(saved);
+          const s = server;
+          stopFind = answerFinds(() => ({ name: `${hostname()} · ${workspaceName}`, port: s.port, fingerprint: s.fingerprint }));
         }
         push();
         return status();
       case "stop":
         await server?.close();
+        stopFind?.();
+        stopFind = null;
         server = null;
         hidden = false;
         push();
@@ -144,5 +151,8 @@ export function installShare(win: BrowserWindow, html: string): void {
         throw new Error("not a sharing call");
     }
   });
-  win.on("closed", () => void server?.close());
+  win.on("closed", () => {
+    stopFind?.();
+    void server?.close();
+  });
 }

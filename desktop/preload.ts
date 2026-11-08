@@ -69,6 +69,11 @@ const bridge: DesktopBridge = {
   tree: (path) => ipcRenderer.invoke("canvast:tree", path),
   canvasFiles: () => ipcRenderer.invoke("canvast:canvasFiles"),
   onChanged: (fn) => void ipcRenderer.on("canvast:changed", (_e, paths: string[]) => fn(paths)),
+  guest: {
+    find: () => ipcRenderer.invoke("canvast:guest", "find"),
+    check: (address) => ipcRenderer.invoke("canvast:guest", "check", address),
+    open: (host) => ipcRenderer.invoke("canvast:guest", "open", host),
+  },
   share: {
     call: (op, arg) => ipcRenderer.invoke("canvast:share", op, arg),
     onStatus: (fn) => void ipcRenderer.on("canvast:shareStatus", (_e, st) => fn(st)),

@@ -164,6 +164,12 @@ export class GuestLibrary implements LibraryCalls {
   }
 }
 
+let events: EventSource | null = null;
+/** The host's events (one stream per page): `changed` (paths of the folder), `view` (where the host is, for Follow). */
+export function hostEvents(origin: string, token: string): EventSource {
+  return (events ??= new EventSource(`${origin}/events?token=${encodeURIComponent(token)}`));
+}
+
 /** The bridge of a guest of the host at `origin` (its page's own address), paired with `token`. */
 export function remoteBridge(origin: string, token: string): DesktopBridge {
   const host = hostCalls(origin, token);
@@ -211,10 +217,7 @@ export function remoteBridge(origin: string, token: string): DesktopBridge {
     // The host keeps its library in step with the folder: nothing to look at here.
     libraryChanges: async () => [],
     libraryLookDone: nothing,
-    onChanged: (fn) => {
-      const events = new EventSource(`${origin}/events?token=${encodeURIComponent(token)}`);
-      events.addEventListener("changed", (e) => fn(JSON.parse((e as MessageEvent<string>).data) as string[]));
-    },
+    onChanged: (fn) => hostEvents(origin, token).addEventListener("changed", (e) => fn(JSON.parse((e as MessageEvent<string>).data) as string[])),
     lib: new GuestLibrary(host),
     exportTo: { begin: async () => null, write: readOnly, end: nothing },
   };

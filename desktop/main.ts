@@ -28,6 +28,7 @@ import type { LibraryQuery } from "./library-index";
 import type { LibraryOp } from "../src/storage/desktop-bridge";
 import { pathToFileURL } from "node:url";
 import { SHARED, SHARE_CALLS, installShare, shareChanged } from "./share-host";
+import { installGuestCalls } from "./guest-window";
 
 const SCHEME = "app";
 const ORIGIN = `${SCHEME}://canvast`;
@@ -1175,7 +1176,8 @@ async function openWindow(workspace: string): Promise<void> {
   SHARE_CALLS.set("canvast:workspace", async () => ({ path: "", name: basename(workspace) }));
   installFileCalls(win, await realpath(workspace), partition);
   watchFolder(win, await realpath(workspace));
-  installShare(win, HTML);
+  installShare(win, HTML, basename(workspace));
+  installGuestCalls(win);
   // Closing waits (up to 15 s) for the page to write what is not in the folder yet (ADR 0177: files follow edits by a moment).
   // While files are still being written the page may hold the close to ask first, and keep the window open.
   let closing = false;

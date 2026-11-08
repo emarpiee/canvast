@@ -1227,6 +1227,22 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 
 **Bringing a browser workspace in:** export a full backup in the browser and import it in the desktop app. One screen shows the import and how many files are written into the folder; then the app starts again on them and says what was imported, without asking for the workspace password again (it was given before the import).
 
+### Sharing on the local network (desktop app)
+
+The desktop app can let others on the same network look at the open workspace, in a browser or in their own desktop app. They cannot change anything.
+
+| Step | On the computer that shares | On the guest's |
+| --- | --- | --- |
+| 1 | *Settings > Sharing*: turn on **Share on the local network**. It shows an address, a six-digit code and a fingerprint | Open the address in a browser (it warns once about the certificate), or in the desktop app: *Switch workspace > Connect to a shared workspace…* (computers sharing on the network are listed) |
+| 2 | | Type the code |
+| 3 | You are asked *Let … see this workspace?*: **Allow** | The workspace opens, read-only |
+
+- **What guests see:** every board, canvas and library item, live as you change them, read a part at a time (a big video plays from the middle without the rest).
+- **Follow the host:** in a guest's read-only bar, it goes where you are, on your canvas, as you move; moving the view yourself stops it.
+- **Hidden items:** only with **Share hidden items too**. Their files go out encrypted, as they are in the folder; a guest needs your Hidden password, and its own browser or app opens them. Your computer never decrypts them for a guest.
+- **Allowed devices** are listed in *Settings > Sharing*, with whether each is connected; **Remove** stops one at once. Sharing is off at every start of the app.
+- **The desktop app as a guest** checks the fingerprint the first time (compare it with the sharing computer's *Settings > Sharing*) and then accepts only that certificate.
+
 ---
 ## Privacy and security
 
@@ -1235,7 +1251,7 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 To report a security problem, see [SECURITY.md](SECURITY.md).
 
 - The page's Content Security Policy is `default-src 'none'` with `connect-src 'none'`: it cannot make network requests, even if code tried. Only inline script and style are allowed, images come from `blob:` and `data:`, and workers (if any) from `blob:`. WebAssembly may compile (`'wasm-unsafe-eval'`), only for the decoders of scanned PDFs that are inside the file; it runs no text as code.
-- canvast has no runtime dependencies and makes no network requests (the [online copy](#trying-it-online) is fetched once, as the page itself, and then makes none either). The interface font is supplied from memory, so no font source is allowed either. `npm run check:offline` and the end-to-end suite both verify this on every build. The desktop app is the same page in Electron: it opens no connection either (its updates are fetched by an AppImage updater, not by the app).
+- canvast has no runtime dependencies and makes no network requests (the [online copy](#trying-it-online) is fetched once, as the page itself, and then makes none either). The interface font is supplied from memory, so no font source is allowed either. `npm run check:offline` and the end-to-end suite both verify this on every build. The desktop app is the same page in Electron: it opens no connection either (its updates are fetched by an AppImage updater, not by the app), except while you share the workspace ([Sharing on the local network](#sharing-on-the-local-network-desktop-app)): then it listens on the local network over HTTPS, answers only devices you allowed, and only with reads. The page it gives a browser guest is the same file with its policy opened to that computer only (`connect-src 'self'`).
 - In a browser, imports are limited to files of at most 256 MiB, and each is decoded before being stored; a backup's item past that is skipped, and said. Files that fail to decode are rejected with a message.
 - In the desktop app, a bigger file comes in as a card (its name, kind and size, and the picture an art file keeps), by import or put into `library/`: it opens in the system's app for its kind and does not play in the app. It is read and written a part at a time, so it needs no memory of its size but room on the disk: hiding it, showing it again or bringing it back from a backup keeps a second copy until the new one is proven by its SHA-256. A backup or a ZIP with one in it is written where you choose in a save dialog, after being read through once to check it, so it takes as long as reading it three times. A hidden item's card shows no picture while the Hidden items are locked. `scripts/hidden-items.mjs` opens hidden files of any size; to encrypt with it, a file must be under 2 GiB.
 - Archives are verified completely (structure, checksums and content hashes) before anything is written.
@@ -1449,7 +1465,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Area | Limitation |
 | --- | --- |
 | Rendering | Canvas 2D only, on the main thread; no GPU or WebGL path, no workers |
-| Collaboration | None. There is no network by design |
+| Collaboration | Only looking: the desktop app shares a workspace read-only on the local network. Nobody can edit together; the single file never connects anywhere |
 
 ### The browser version
 
@@ -1478,6 +1494,9 @@ What canvast does not do today, for both versions, then each. **The limits that 
 
 | Area | Limitation |
 | --- | --- |
+| Sharing | Read-only, on the local network only (no internet, no relay). A browser guest sees a certificate warning once: the sharing computer makes its own certificate |
+| Sharing | ⚠️ Anyone with the code still needs your Allow, but an allowed device sees the whole workspace until you remove it. Hidden items are shared only when you turn that on, and stay encrypted on the way |
+| Sharing | Finding shared computers uses one UDP broadcast (port 47321); a network that blocks it needs the address typed. A guest's browser keeps what it saw in its own storage, like any site |
 | Platform | Linux only; other systems are out of scope for now |
 | Outside changes | Watching the folder is verified on Linux only; a `.cvst` copied in is not taken in |
 | ⚠️ Canvas files | Written about 2 s after editing pauses; another device waits for that |
@@ -1596,7 +1615,7 @@ The colour picker can be built alone with `npm run build:picker`, and the patter
 
 ## API and file formats
 
-canvast has no network API, by design: it never opens a connection. Other programs work with it through its files, which are documented and versioned, and through the entry points below. Each format names itself (`format`) and its `version`; a newer version than an app reads is refused, never half-read.
+canvast has no network API: it never opens a connection, apart from the desktop app's read-only sharing while you turn it on (ADR 0184). Other programs work with it through its files, which are documented and versioned, and through the entry points below. Each format names itself (`format`) and its `version`; a newer version than an app reads is refused, never half-read.
 
 ### File formats
 
