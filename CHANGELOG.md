@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.4 — Why the folder refused a sign-in (2026-11-09)
+
+- **Changed:** a refused sign-in to the folder for file managers is in the activity with the user name tried (never the password) and why: a device login's wrong password, or a user name that is no login with a password that is not the shared one.
+
 ## 0.55.3 — Sharing on the local network, its settings tidied (2026-11-09)
 
 - **Added:** sharing on the local network (desktop app, branch `lan-sharing`): read-only guests in a browser or the app, the folder for file managers (WebDAV) with a login per device and its rights, the activity, starting with the app.

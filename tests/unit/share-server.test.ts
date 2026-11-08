@@ -256,7 +256,7 @@ describe("the sharing log", () => {
       });
     expect(await davGet("nope")).toBe(401);
     expect(await davGet(server.davPassword)).toBe(200);
-    expect(events).toEqual(["Wrong code | Phone | 127.0.0.1", "Allowed | Phone | 127.0.0.1", "Folder: wrong user name or password | Xplore | 127.0.0.1", "Folder: signed in (Xplore) | Shared password | 127.0.0.1", "Folder: opened Library/a.txt | Shared password | 127.0.0.1"]);
+    expect(events).toEqual(["Wrong code | Phone | 127.0.0.1", "Allowed | Phone | 127.0.0.1", "Folder: not signed in: user name “me” is no device's login, and the password is not the shared one | Xplore | 127.0.0.1", "Folder: signed in (Xplore) | Shared password | 127.0.0.1", "Folder: opened Library/a.txt | Shared password | 127.0.0.1"]);
     expect(server.davClients()).toMatchObject([{ who: "Shared password", app: "Xplore", address: "127.0.0.1", opened: 1 }]);
   });
 });
@@ -266,6 +266,7 @@ describe("a device's own folder login", () => {
     const files = new Map<string, Uint8Array>([["old.txt", new Uint8Array([1])]]);
     const did: string[] = [];
     const rights = { add: true, edit: false, move: false, delete: false, hidden: false };
+    const said: string[] = [];
     server = await startShare({
       cert,
       host: "127.0.0.1",
@@ -274,6 +275,7 @@ describe("a device's own folder login", () => {
       ask: async () => true,
       devices: { load: () => [], save: () => {} },
       davLogins: () => [{ id: "1", name: "Phone", user: "phone", password: "phone-password", rights, added: 0 }],
+      log: (e) => void said.push(e.what),
       dav: {
         Library: {
           list: async () => [...files].map(([path, b]) => ({ path, size: b.length })),
@@ -294,6 +296,9 @@ describe("a device's own folder login", () => {
         r.end(body);
       });
     const me = ["phone", "phone-password"] as const;
+    // A login's user name with the shared password: refused, and the activity says whose login it was.
+    expect(await dav("PROPFIND", "/dav/", "Phone", server.davPassword)).toBe(401);
+    expect(said).toContain("Folder: not signed in: wrong password for Phone's login (user name “Phone”)");
     expect(await dav("PUT", "/dav/Library/new.txt", ...me, {}, "hi")).toBe(201);
     expect(await dav("PUT", "/dav/Library/old.txt", ...me, {}, "x")).toBe(403); // (no Edit)
     expect(await dav("DELETE", "/dav/Library/old.txt", ...me)).toBe(403);

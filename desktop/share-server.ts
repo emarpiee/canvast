@@ -186,7 +186,7 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
   const appOf = (req: IncomingMessage): string => (req.headers["user-agent"] ?? "a WebDAV app").split(/[ /(]/)[0]!.slice(0, 40) || "a WebDAV app";
   const davSeen = (req: IncomingMessage, who: string | null, what: "wrong password" | "request" | "opened" | "changed", detail?: string): void => {
     const app = appOf(req);
-    if (what === "wrong password") return say("Folder: wrong user name or password", app, req);
+    if (what === "wrong password") return say(`Folder: not signed in: ${detail ?? "wrong user name or password"}`, app, req);
     const name = who ?? app;
     const key = `${addr(req)}|${name}|${app}`;
     let c = davClients.get(key);

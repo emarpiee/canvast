@@ -73,18 +73,33 @@ export const isLocal = (req: IncomingMessage): boolean => /^(?:127\.|::1$|::ffff
 export type DavSeen = (req: IncomingMessage, who: string | null, what: "wrong password" | "request" | "opened" | "changed", detail?: string) => void;
 
 /** The login a request signs in with: a device's own, or the shared password's (read only); null when none. */
-export function signIn(req: IncomingMessage, auth: DavAuth): { name: string; rights: DavRights } | null {
+/** The user name and password a request signs in with (Basic), or null. */
+function basic(req: IncomingMessage): { user: string; pw: string } | null {
   const given = /^Basic (.+)$/.exec(req.headers.authorization ?? "")?.[1];
   if (!given) return null;
   const text = Buffer.from(given, "base64").toString("utf8");
   const at = text.indexOf(":");
-  const user = at < 0 ? "" : text.slice(0, at).toLowerCase();
-  const pw = at < 0 ? text : text.slice(at + 1);
-  if (!pw) return null;
+  return { user: at < 0 ? "" : text.slice(0, at), pw: at < 0 ? text : text.slice(at + 1) };
+}
+
+export function signIn(req: IncomingMessage, auth: DavAuth): { name: string; rights: DavRights } | null {
+  const b = basic(req);
+  if (!b?.pw) return null;
+  const { pw } = b;
+  const user = b.user.toLowerCase();
   const login = auth.logins().find((l) => l.user.toLowerCase() === user);
   if (login) return same(pw, login.password) ? { name: login.name, rights: login.rights } : null;
   const shared = auth.shared();
   return shared && same(pw, shared) ? { name: "Shared password", rights: READ_ONLY } : null;
+}
+
+/** Why a sign-in was refused, for the activity: the user name tried, never the password. */
+export function refusedWhy(req: IncomingMessage, auth: DavAuth): string {
+  const user = basic(req)?.user ?? "";
+  const login = auth.logins().find((l) => l.user.toLowerCase() === user.toLowerCase());
+  // (a login's user name is checked against its own password only, never the shared one)
+  if (login) return `wrong password for ${login.name}'s login (user name “${user}”)`;
+  return `user name “${user.slice(0, 40)}” is no device's login, and the password is not the shared one${auth.shared() ? "" : " (turned off)"}`;
 }
 
 /** The parts of a `/dav/…` path; null when it tries to leave it. */
@@ -112,7 +127,7 @@ const body = (req: IncomingMessage, max: number): Promise<Uint8Array> =>
 export async function davHandle(req: IncomingMessage, res: ServerResponse, roots: Readonly<Record<string, DavRoot>>, auth: DavAuth, seen: DavSeen = () => {}): Promise<void> {
   const me = signIn(req, auth);
   if (!me) {
-    if (req.headers.authorization) seen(req, null, "wrong password"); // (a first request without one is how every client asks which sign-in it needs)
+    if (req.headers.authorization) seen(req, null, "wrong password", refusedWhy(req, auth)); // (a first request without one is how every client asks which sign-in it needs)
     res.writeHead(401, { "www-authenticate": 'Basic realm="canvast", charset="UTF-8"' });
     return void res.end();
   }
