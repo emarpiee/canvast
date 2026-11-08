@@ -653,8 +653,13 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   /** A password card of Privacy: show whether there is a password, or change it and show the result. */
   const passwordCard = async (kind: "hidden" | "workspace", action: "status" | "set" | "remove" | "lock"): Promise<void> => {
     if (!backup) return;
-    const r = await backup.password(kind, action);
     const card = root.querySelector<HTMLElement>(`[data-pw-card="${kind}"]`)!;
+    if (action === "lock") {
+      // (at once: locking writes what waits first, which can take a moment)
+      card.querySelector<HTMLElement>('[data-pw="lock"]')!.hidden = true;
+      card.querySelector<HTMLElement>("[data-pw-state]")!.textContent = "Locking: writing what waits first…";
+    }
+    const r = await backup.password(kind, action);
     card.querySelector<HTMLElement>("[data-pw-state]")!.textContent = r.text;
     card.querySelector<HTMLElement>('[data-pw="set"]')!.textContent = r.has ? "Change the password…" : "Set a password…";
     card.querySelector<HTMLElement>('[data-pw="remove"]')!.hidden = !r.has;

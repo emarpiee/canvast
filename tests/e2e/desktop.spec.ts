@@ -2993,6 +2993,7 @@ test("sharing (ADR 0184): hidden items reach a guest only when shared, encrypted
     // Locked on the host (Settings > Privacy, Lock now): the folder says so, in a note, and the activity tells it.
     await page.getByRole("tab", { name: "Privacy" }).click();
     await page.getByTestId("hidden-pw-lock").click();
+    await expect(page.locator('[data-pw-card="hidden"] [data-pw-state]')).toContainText("locked", { timeout: 20_000 }); // (it writes what waits first)
     await expect(page.getByTestId("hidden-pw-lock")).toBeHidden();
     await page.getByRole("tab", { name: "Sharing" }).click();
     await expect.poll(async () => (await phone("PROPFIND", "/dav/Hidden/")).body, { timeout: 15_000 }).toContain("Locked");

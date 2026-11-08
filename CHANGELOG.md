@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.9 — Locking shows itself at once (2026-11-09)
+
+- **Fixed:** *Lock now* goes away when pressed and says *Locking: writing what waits first…* until the key is gone; it says locked only once it is.
+
 ## 0.55.8 — Lock now says it is done (2026-11-09)
 
 - **Fixed:** *Lock now* stayed on in Settings > Privacy after it was pressed: locking writes what waits first, and the card is now drawn once the key is gone.

@@ -39,7 +39,7 @@ export async function lockHidden(session: Session): Promise<boolean> {
   h.lock();
   // (it writes what waits first, then forgets the key: done when it is gone, up to 15 s)
   for (let i = 0; h.isOpen() && i < 300; i++) await new Promise((r) => setTimeout(r, 50));
-  return true;
+  return !h.isOpen(); // (said locked only once it is)
 }
 
 /** Forget the Hidden list's password given in this tab (the password was changed or removed, or remembering was turned off). */
