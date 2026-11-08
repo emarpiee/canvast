@@ -259,6 +259,111 @@ function extOfBytes(b) {
   return "bin";
 }
 
+/** A sealed file's library folders and name, as its place and its own name in .hidden/ say them (opened with any of `vaults`' keys). */
+function namers(workspace, vaults) {
+  /** The library folders a sealed file's place in .hidden/ says (each folder's name opened; a long one from its `.name`), or null when it says none. */
+  const dirFolders = async (file) => {
+    const parts = file.split("/").slice(1, -1);
+    if (!parts.length) return null;
+    const names = [];
+    for (let i = 0; i < parts.length; i++) {
+      let name = null;
+      for (const v of vaults) {
+        if (parts[i].startsWith("0")) {
+          const at = join(workspace, ".hidden", ...parts.slice(0, i + 1), ".name");
+          try {
+            name = existsSync(at) ? new TextDecoder().decode((await openFile(v.key, new Uint8Array(readFileSync(at)))).bytes) : null;
+          } catch {
+            name = null;
+          }
+        } else name = await openName(v.names, parts[i]);
+        if (name) break;
+      }
+      if (!name) return null;
+      names.push(name);
+    }
+    return names;
+  };
+  /** A sealed file's name, as its own (encrypted) file name says it (a long one from its `.name`), or null (a random one, of before). */
+  const fileName = async (file) => {
+    const seg = file.slice(file.lastIndexOf("/") + 1);
+    if (!SEALED_DIR_RE.test(seg)) return null;
+    for (const v of vaults) {
+      try {
+        const name = seg.startsWith("0")
+          ? existsSync(join(workspace, `${file}.name`)) ? new TextDecoder().decode((await openFile(v.key, new Uint8Array(readFileSync(join(workspace, `${file}.name`))))).bytes) : null
+          : await openName(v.names, seg);
+        if (name) return name;
+      } catch {
+        // another key
+      }
+    }
+    return null;
+  };
+  return { dirFolders, fileName };
+}
+
+/**
+ * The hidden items as a folder that is read a part at a time (the standalone tools' folder for file managers): their paths (library
+ * folders and names, as `decrypt` writes them) and sizes, and any part of one, decrypted as it is read; nothing is written anywhere.
+ */
+export async function hiddenFolder(workspace, password) {
+  const file = existsSync(join(workspace, HIDDEN_JSON)) ? HIDDEN_JSON : LOOSE_JSON;
+  const vault = await openVault(workspace, password, file);
+  vault.names = await nameKeys(vault.key);
+  const { dirFolders, fileName } = namers(workspace, [vault]);
+  const at = new Map();
+  const list = [];
+  for (const item of await readIndex(vault.record, vault.key)) {
+    if (!HIDDEN_FILE_RE.test(item.file ?? "") || !existsSync(join(workspace, item.file))) continue;
+    const dir = ((await dirFolders(item.file)) ?? []).map((p) => safePart(p, "Folder"));
+    const base = safePart((await fileName(item.file)) ?? item.name, "untitled");
+    let path = [...dir, base].join("/");
+    for (let k = 2; at.has(path); k++) path = [...dir, base.replace(/(\.[^.]*)?$/, ` (${k})$1`)].join("/");
+    at.set(path, { file: join(workspace, item.file), size: item.size, head: null });
+    list.push({ path, size: item.size, at: item.importedAt });
+  }
+  /** A version 2 file's header (where its chunks start, their size, their nonces), read once; null for a version 1 file. */
+  const headOf = async (f) => {
+    if (f.head !== null) return f.head;
+    const fd = openSync(f.file, "r");
+    try {
+      const first = Buffer.alloc(24);
+      readSync(fd, first, 0, 24, 0);
+      if (!first.subarray(0, 8).equals(MAGIC)) return (f.head = false);
+      const len = first.readUInt32LE(20);
+      const top = Buffer.alloc(len);
+      readSync(fd, top, 0, len, 24);
+      const h = JSON.parse(new TextDecoder().decode(await subtle.decrypt({ name: "AES-GCM", iv: first.subarray(8, 20), additionalData: MAGIC }, vault.key, top)));
+      const start = 24 + len, whole = h.chunk + 16;
+      return (f.head = { chunk: h.chunk, prefix: unb64(h.prefix), start, whole, n: Math.max(1, Math.ceil((statSync(f.file).size - start) / whole)) });
+    } finally {
+      closeSync(fd);
+    }
+  };
+  const read = async (path, from, to) => {
+    const f = at.get(path);
+    if (!f || !existsSync(f.file)) return null;
+    const h = await headOf(f);
+    if (!h) return (await openFile(vault.key, new Uint8Array(readFileSync(f.file)))).bytes.slice(from, to);
+    const fd = openSync(f.file, "r");
+    try {
+      const parts = [];
+      const first = Math.floor(from / h.chunk), last = Math.min(h.n - 1, Math.floor(Math.max(from, to - 1) / h.chunk));
+      for (let i = first; i <= last; i++) {
+        const sealed = Buffer.alloc(h.whole);
+        const got = readSync(fd, sealed, 0, h.whole, h.start + i * h.whole);
+        parts.push(Buffer.from(await subtle.decrypt({ name: "AES-GCM", iv: nonce(h.prefix, i, i === h.n - 1) }, vault.key, sealed.subarray(0, got))));
+      }
+      const all = Buffer.concat(parts);
+      return new Uint8Array(all.subarray(from - first * h.chunk, to - first * h.chunk));
+    } finally {
+      closeSync(fd);
+    }
+  };
+  return { list: () => list, read };
+}
+
 /**
  * Decrypt every hidden item of `workspace` into `out`: those of hidden.json and of each copy beside it the password opens, then every
  * sealed file of .hidden/ no entry named that one of their keys opens (as recovered-<hash>.<ext>). Returns how many were written.
@@ -303,45 +408,7 @@ export async function decryptHidden(workspace, out, password, { flat = false, la
     return null;
   };
   for (const v of vaults) v.names = await nameKeys(v.key);
-  /** The library folders a sealed file's place in .hidden/ says (each folder's name opened; a long one from its `.name`), or null when it says none. */
-  const dirFolders = async (file) => {
-    const parts = file.split("/").slice(1, -1);
-    if (!parts.length) return null;
-    const names = [];
-    for (let i = 0; i < parts.length; i++) {
-      let name = null;
-      for (const v of vaults) {
-        if (parts[i].startsWith("0")) {
-          const at = join(workspace, ".hidden", ...parts.slice(0, i + 1), ".name");
-          try {
-            name = existsSync(at) ? new TextDecoder().decode((await openFile(v.key, new Uint8Array(readFileSync(at)))).bytes) : null;
-          } catch {
-            name = null;
-          }
-        } else name = await openName(v.names, parts[i]);
-        if (name) break;
-      }
-      if (!name) return null;
-      names.push(name);
-    }
-    return names;
-  };
-  /** A sealed file's name, as its own (encrypted) file name says it (a long one from its `.name`), or null (a random one, of before). */
-  const fileName = async (file) => {
-    const seg = file.slice(file.lastIndexOf("/") + 1);
-    if (!SEALED_DIR_RE.test(seg)) return null;
-    for (const v of vaults) {
-      try {
-        const name = seg.startsWith("0")
-          ? existsSync(join(workspace, `${file}.name`)) ? new TextDecoder().decode((await openFile(v.key, new Uint8Array(readFileSync(join(workspace, `${file}.name`))))).bytes) : null
-          : await openName(v.names, seg);
-        if (name) return name;
-      } catch {
-        // another key
-      }
-    }
-    return null;
-  };
+  const { dirFolders, fileName } = namers(workspace, vaults);
   /** Where a file goes: its folders in .hidden/ (they are what the app keeps up to date), else its header's, or the top (`flat`). */
   const whereOf = async (file, item) => {
     if (flat) return "";
@@ -470,10 +537,10 @@ export async function encryptHidden(workspace, files, password) {
 }
 
 /** The password, typed without being shown (or read from stdin when it is not a terminal). */
-async function askPassword() {
+export async function askPassword(prompt = "Hidden items password: ") {
   const { stdin, stderr } = process;
   if (!stdin.isTTY) return (await new Promise((ok) => { let s = ""; stdin.on("data", (d) => (s += d)).on("end", () => ok(s)); })).replace(/\r?\n$/, "");
-  stderr.write("Hidden items password: ");
+  stderr.write(prompt);
   stdin.setRawMode(true);
   stdin.resume();
   return new Promise((ok) => {
@@ -495,7 +562,8 @@ async function askPassword() {
   });
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// (run as itself: not when bundled into the standalone tools, where every module has the bundle's own address)
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url) && basename(fileURLToPath(import.meta.url)) === "hidden-items.mjs") {
   const args = process.argv.slice(2);
   // The simple way: no folders named, so the one this script is in holds .hidden/ and hidden.json; the files go to output/ beside them.
   if (!args.length || (args.length === 1 && args[0] === "decrypt")) {

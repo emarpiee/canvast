@@ -28,6 +28,8 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:unit
       - run: npm run build
+      # (the standalone tools build, and answer --help)
+      - run: npm run build:tools && node dist-tools/canvast-tools.mjs --help
       - run: npm run check:offline
       - run: npm run check:names
       - run: npm run check:tokens

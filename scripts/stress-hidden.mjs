@@ -423,9 +423,27 @@ if (BIG > 0) {
       req.on("error", fail);
       req.end();
     });
+  // (each file's place in Hidden, as the folder lists it: found by its name, folder by folder)
+  const listing = (path) =>
+    new Promise((ok, fail) => {
+      const req = httpsRequest({ host: "127.0.0.1", port: st.port, path, method: "PROPFIND", rejectUnauthorized: false, headers: { depth: "1", authorization: `Basic ${Buffer.from(`me:${st.dav.password}`).toString("base64")}` } }, (res) => {
+        let b = "";
+        res.on("data", (d) => (b += d));
+        res.on("end", () => ok([...b.matchAll(/<d:href>([^<]+)<\/d:href>/g)].map((m) => m[1]).filter((h) => h !== path)));
+      });
+      req.on("error", fail);
+      req.end();
+    });
+  const places = new Map();
+  for (let dirs = ["/dav/Hidden/"]; dirs.length; ) {
+    const next = [];
+    for (const d of dirs) for (const h of await listing(d)) h.endsWith("/") ? next.push(h) : places.set(decodeURIComponent(h.slice(h.lastIndexOf("/") + 1)), decodeURI(h));
+    dirs = next;
+  }
+  console.log(`  the folder lists ${places.size} hidden files`);
   for (const [k, size] of SIZES.entries()) {
     const f = size.files[0];
-    const path = `/dav/Hidden/big/s${k}/${f.name}`;
+    const path = places.get(f.name) ?? `/dav/Hidden/${f.name}`;
     const head = await get(path, "bytes=0-1048575");
     const mid = await get(path, `bytes=${Math.floor(f.bytes / 2)}-${Math.floor(f.bytes / 2) + MB - 1}`);
     let whole = { ms: 0, hash: "", bytes: 0 };

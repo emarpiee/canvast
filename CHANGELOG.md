@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.55.7 — canvast tools: share, decrypt and encrypt without the app (2026-11-09)
+
+- **Added:** `canvast-tools.mjs`, one file for Node.js 20 or later, attached to every release: a menu in plain words (or one-line commands) to open your hidden items, hide files into a workspace, and share any folder with other devices on your network as a folder for file managers (WebDAV over HTTPS: a workspace's Library, and its Hidden items decrypted only as they are read; or any other folder), read only unless you allow changes, with one login per run or saved devices with their own rights.
+- **Changed:** the README starts with notes from the developer.
+
 ## 0.55.6 — Clean after a crash, never a file of yours (2026-11-09)
 
 - **Fixed:** the start-up sweep of half-written files took any file whose name ended in `.tmp-` and letters (`notes.tmp-2`) for one of the app's and deleted it after ten minutes; only the app's own names (`.tmp-` and an id) are swept now.

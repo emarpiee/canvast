@@ -29,6 +29,25 @@
 - **Yours, on your machine.** In the browser everything is saved in the browser's own storage; in the desktop app, in a folder you choose, as plain files any sync or backup tool can see. Nothing is uploaded, ever. Back up to a single `.canvast` file whenever you like.
 - **Made for projects, with a Library for what they use.** Storyboards, mood boards, references, sketches: from a small board to a very large one. Pictures, video and files you place are kept in the Library, where you can tag, sort into folders, search and reuse them. In the browser the library lives in the browser's storage, which has a size limit; the desktop app keeps it on your disk (see [Limitations](#limitations)).
 - **One file, or a desktop app.** Copy `canvast.html` anywhere (a folder, a USB stick) and open it, or install the desktop app on Linux (see [Installation](#installation)).
+
+## Notes from the developer
+
+canvast was first built for one person's way of working: mine. I collect references, sketch, plan stories and keep everything in plain folders that sync between my devices, and no app did all of it the way I wanted, offline and without an account. Most of what is here exists because I needed it, in the order I needed it.
+
+It turned out useful enough that I am happy to share it with everyone, free. Some choices still show where it came from: the desktop app is made for Linux first (where I work), and new features follow my own work first. Ideas, bug reports and questions are welcome in the [issues](https://github.com/emarpiee/canvast/issues), and the [Limitations](#limitations) say plainly what it does not do yet.
+
+canvast was planned and built with [Claude Code](https://claude.com/claude-code).
+
+I do not believe that images made by generative AI are art, and by the same measure this project, its branding included, is not art either. I treat AI as a tool. It can make an artist's workflow better, and it can build the tools artists use to make their art. It should not be the one making the art for them.
+
+The idea grew out of [Kambas](https://github.com/emarpiee/obsidian-kambas), my Obsidian plugin that extends Canvas with image controls. Shipping the app as a single HTML file was inspired by the one-file tools of [iamsingle.app](https://iamsingle.app/) and [Anton Burmistrov](https://antonburmistrov.com/).
+
+canvast is open source in the first place: anyone is welcome to fork it and build a better version of it.
+
+Apps, sites and references that help with creative work, which I use or recommend: [Tools and resources for artists](docs/creative-tools.md).
+
+---
+
 ## Contents
 
 | For users | For developers |
@@ -1249,6 +1268,56 @@ The desktop app can let others on the same network look at the open workspace, i
 - **Folder logins:** the shared password only reads (it can be turned off). A device's user name signs in with its own password only, never the shared one; a refused sign-in is in the activity with the user name tried. **Add a device…** gives a device its own user name and password, a name you choose (renamed any time) and its own rights, each a switch: **Add** (on at first), **Edit**, **Move and rename**, **Delete** (into the workspace's `.trash`), **See hidden items** (while they are open here, decrypted on this computer and sent to that device over the encrypted connection). What a device adds or changes is taken in by the app as any file changed in the workspace folder. **Remove** stops its login at once.
 - **The desktop app as a guest** checks the fingerprint the first time (compare it with the sharing computer's *Settings > Sharing*) and then accepts only that certificate.
 
+
+### canvast tools: without the app
+
+**`canvast-tools.mjs`** is one file that works on any computer with [Node.js](https://nodejs.org) 20 or later (Linux, macOS, Windows), with nothing to install. Download it from the [latest release](https://github.com/emarpiee/canvast/releases/latest/download/canvast-tools.mjs), open a terminal in its folder and run `node canvast-tools.mjs`: a menu asks what to do, in plain words. Drag a folder or a file into the terminal when it asks for one.
+
+```
+canvast tools
+  1) Open my hidden items (decrypt them into a folder)
+  2) Hide files into a workspace (encrypt)
+  3) Share a folder with another device (phone, laptop)
+  4) Saved devices for sharing
+  5) Help
+  0) Quit
+```
+
+| Choice | What it does | Changes your files? |
+| --- | --- | --- |
+| **Open my hidden items** | Decrypts a workspace's hidden items into a new folder, with their names and library folders (as [Decrypting and encrypting outside the app](#decrypting-and-encrypting-outside-the-app)) | No: it only writes the new folder |
+| **Hide files into a workspace** | Encrypts files into the workspace's `.hidden` folder; canvast lists them as hidden items. Close canvast on that workspace first | Yes: only `.hidden` and `hidden.json` |
+| **Share a folder** | Shares **any folder** with devices on your network, as a folder their file manager opens (WebDAV over HTTPS): a canvast workspace (its *Library*, and *Hidden* if you choose) or any other folder of yours | Only if you allow changes |
+| **Saved devices** | Devices with their own name, user name, password and rights, kept between runs | No |
+
+#### Sharing a folder with the tools
+
+1. Choose **3**, drag the folder in.
+2. A workspace with hidden items asks whether to share them too (then the Hidden password). A plain folder has no such question.
+3. Answer whether other devices may change files (*no* by default).
+4. With saved devices, choose who signs in: one login for this run, your saved devices, or both.
+5. The tool shows the address for other devices, the user name and password, and the certificate's fingerprint. On the phone, add a WebDAV server with that address (`https://…`), user name and password; accept the certificate once. **Ctrl+C** stops sharing.
+
+- **Read only by default.** With changes allowed, a device can add, replace, move and delete; deleted files go to a `.trash` folder inside the shared folder (a workspace's own `.trash`), never away for good.
+- **Hidden items** are decrypted only as they are read, a part at a time, in the tool's memory: nothing readable is written. Only a login allowed to see them (this run's, when you chose to share them, or a saved device with *See hidden items*) sees *Hidden*.
+- **What is never shared:** names starting with a dot (`.git`, settings; `--dotfiles` shares them), links that point outside the folder, and anything outside it.
+- **One login per run** gets a new password each time (`--password` sets your own). **Saved devices** keep theirs; they are kept in your user settings folder (`~/.config/canvast-tools/` on Linux, `~/Library/Application Support/canvast-tools/` on a Mac, `%APPDATA%\canvast-tools` on Windows), readable by you only, never in a shared folder. The certificate is kept there too, so a device trusts it once.
+- **The window shows** who signed in, from where and with which app, the files opened and changed, and refused sign-ins (with the user name tried, never the password).
+- The same sharing code as the desktop app's *folder for file managers*: what one does, the other does.
+
+#### The tools as one-line commands
+
+```sh
+node canvast-tools.mjs decrypt ~/Art/my-workspace ~/decrypted        # --flat: every file at the top
+node canvast-tools.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
+node canvast-tools.mjs share ~/Photos                                 # read only, a new password
+node canvast-tools.mjs share ~/Art/my-workspace --hidden --write      # Hidden too; devices may change files
+node canvast-tools.mjs share ~/Photos --devices --port 8484           # saved devices sign in too
+node canvast-tools.mjs devices                                        # add, rename, change or delete saved devices
+node canvast-tools.mjs --help
+```
+
+⚠️ Anyone on your network with a password can read what is shared (hidden items too, when you share them), and their device may keep copies or thumbnails of what it opened. Stop sharing when you are done.
 ---
 ## Privacy and security
 
@@ -1365,7 +1434,7 @@ All binary values in the vault are base64. The SHA-256 of a decrypted file is it
 
 ### Decrypting and encrypting outside the app
 
-`scripts/hidden-items.mjs` does both with nothing but Node.js 20 or later (no install step, no dependencies). Close canvast on that workspace first. It asks for the Hidden password without showing it (or reads it from a pipe).
+The [canvast tools](#canvast-tools-without-the-app) do this from a menu. `scripts/hidden-items.mjs`, the same code as a script of its own, does both with nothing but Node.js 20 or later (no install step, no dependencies). Close canvast on that workspace first. It asks for the Hidden password without showing it (or reads it from a pipe).
 
 #### The simple way to decrypt
 
@@ -1702,6 +1771,7 @@ Open `dist/canvast.html` directly. Developer tools (frame times, camera internal
 | `npm run package:appimage`, `package:deb`, `package:rpm`, `package:tar` | One format only, checked the same way (the AppImage needs `zsyncmake`, the `.rpm` needs `rpmbuild`) |
 | `npm run build:all` | Everything a person can try: the single file, the desktop shell and all the packages |
 | `npm run build:appimage` | The single file and the AppImage only |
+| `npm run build:tools` | The standalone tools, `dist-tools/canvast-tools.mjs` (from `scripts/tools/`, with the app's sharing code) |
 | `npm run build:picker` · `npm run build:patterns` | The standalone modules (see [Standalone modules](#standalone-modules)) |
 
 ### Reproducible build
@@ -1758,7 +1828,7 @@ Shared machines vary in speed, so a failure there in a test that measures time i
 `npm run release` publishes a version. Run it after the version is bumped, `CHANGELOG.md` has its `## X.Y.Z — Title (date)` section, and everything is pushed.
 
 1. It builds and checks `dist/canvast.html`.
-2. It creates (or updates) the GitHub release `vX.Y.Z` with the file and its SHA-256, and marks it **Latest**.
+2. It creates (or updates) the GitHub release `vX.Y.Z` with the file and its SHA-256, and the [canvast tools](#canvast-tools-without-the-app) built from the same commit (`canvast-tools.mjs`), and marks it **Latest**.
 3. It reads the release back to confirm it is the latest and serves the same file.
 4. Publishing starts the `Release packages` workflow (`.github/workflows/release-packages.yml`). On an x86_64 and an ARM machine it builds the app from the tag, checks that its single file is the one released (the build is reproducible), makes the packages with `npm run package:desktop` (which checks each), and adds them with their SHA-256 and the AppImage's `.zsync`. No package is uploaded from the developer's machine; the workflow can also be run by hand for a tag.
 5. When `Release packages` ends, the `Try it online` workflow (`.github/workflows/pages.yml`) checks the released `canvast.html` against its SHA-256 and puts it on GitHub Pages as the [online copy](#trying-it-online). It can be run by hand to publish the latest release again.
@@ -1820,20 +1890,6 @@ The made files are kept in `docs/brand/`: the board (`canvast-brand-guidelines.c
 | **Support the developer** | If canvast helps your work, you can support its development through [PayPal](https://paypal.me/emarpiee) |
 
 Everyone taking part follows the [code of conduct](CODE_OF_CONDUCT.md).
-
----
-
-## Notes from the developer
-
-canvast was planned and built with [Claude Code](https://claude.com/claude-code).
-
-I do not believe that images made by generative AI are art, and by the same measure this project, its branding included, is not art either. I treat AI as a tool. It can make an artist's workflow better, and it can build the tools artists use to make their art. It should not be the one making the art for them.
-
-The idea grew out of [Kambas](https://github.com/emarpiee/obsidian-kambas), my Obsidian plugin that extends Canvas with image controls. Shipping the app as a single HTML file was inspired by the one-file tools of [iamsingle.app](https://iamsingle.app/) and [Anton Burmistrov](https://antonburmistrov.com/).
-
-canvast is open source in the first place: anyone is welcome to fork it and build a better version of it.
-
-Apps, sites and references that help with creative work, which I use or recommend: [Tools and resources for artists](docs/creative-tools.md).
 
 ---
 

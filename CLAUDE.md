@@ -109,6 +109,16 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 
 - **File and folder names (ADR 0180).** Every rule is in `src/doc/file-names.ts`: call it, never write a regex of your own (`npm run check:name-rules`). A newer rule never renames a file already on a disk.
 
+## Standalone tools
+
+Tools that work without the app (decrypting, encrypting, sharing a folder) are **one** program, `scripts/tools/canvast-tools.mjs`, built into one file (`npm run build:tools`, `dist-tools/canvast-tools.mjs`) and attached to every release. A new tool is a choice in it, not a new script.
+
+- **For regular users first:** run with nothing, it shows a numbered menu in plain words; it asks for folders (dragged into the terminal: `cleanPath`) and passwords (not shown); it says what it will do and asks *Go?* before writing anything.
+- **Also one-line commands** for the same actions, with `--help`.
+- **It never changes a person's files** unless that is the action (and then only what it says); it never deletes for good (into `.trash`); its own settings live in the user's settings folder, never in a folder it works on.
+- **Node.js 20 or later only, nothing to install**, Linux, macOS and Windows. It reuses the app's code (imported, bundled by esbuild) rather than copying it.
+- **Errors and progress in plain words**, with what to do next. Each action has a test (`tests/unit/canvast-tools.test.ts`), and the README's *canvast tools* section shows it.
+
 ## Architecture (big picture)
 
 - **Exact world coordinates** (ADR 0001): positions are `Dyadic` numbers (BigInt mantissa · 2^exponent, `src/core/dyadic.ts`); the camera (`src/core/camera.ts`) is a centre plus an integer-quantized log2 zoom, so zoom/pan are exactly reversible at any depth. Never introduce plain-float world coordinates; convert to doubles only relative to the camera/cell for drawing.

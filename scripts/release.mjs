@@ -57,7 +57,9 @@ const title = `canvast ${version}`; // (the page title is the version; the notes
 if (dry) { say(`\n--dry-run: would publish ${tag} “${title}” as the latest release of ${repo}.\n\n${notes}`); rmSync(dir, { recursive: true }); process.exit(0); }
 
 // 4. Create it (or, if the tag already has a release, replace its file and notes), always as the latest
-const assets = [file, join(root, "dist/canvast.html.sha256")];
+// The standalone tools (one file for Node.js, built from this commit): beside the app, for anyone without it.
+run("npm", ["run", "build:tools", "--silent"], { stdio: ["ignore", "ignore", "inherit"] });
+const assets = [file, join(root, "dist/canvast.html.sha256"), join(root, "dist-tools/canvast-tools.mjs")];
 const exists = releases.some((r) => r.tagName === tag);
 if (exists) {
   const at = run("git", ["rev-list", "-n", "1", tag]);
