@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.55.13 — Delete goes to the trash, at once (2026-11-09)
+
+- **Changed:** in the desktop app, a library item you delete has its file moved into the workspace's `.trash` at once, with no other step: it is no longer kept in the library folder while undo could need it (`.trash` is the way back). *Delete library files at once* is gone from Settings > Storage: that is what it always does now.
+- **Fixed:** deleting a library item whose file had changed since it came in (a note edited in the app or in another program, a picture rewritten by one) left its file where it was and took it in again at the next start, as a new item; it goes into the workspace's `.trash` now. A file another item names stays.
+
 ## 0.55.12 — A delete leaves the keyboard in the list (2026-11-09)
 
 - **Fixed:** after deleting items in the library, the search box took the focus and opened its menu; the first card in view (or the list) has it now.

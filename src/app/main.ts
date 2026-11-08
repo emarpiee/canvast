@@ -842,7 +842,7 @@ async function start(): Promise<void> {
   };
   // (desktop only: the browser has no trash to send a file to, so the setting does nothing there even when a backup brought it)
   session.writeNoteFiles = () => settings.get("notes.writeProps");
-  session.deleteAtOnce = () => !!desktopBridge() && settings.get("storage.deleteAtOnce");
+  session.deleteAtOnce = () => !!desktopBridge(); // (the desktop app: a deleted item's file goes into .trash at once, the trash being the way back)
   // The desktop build: before its window closes, the last edits reach the workspace folder (ADR 0177).
   // While files are still being written into the folder (an import's), closing asks first: the rest are written at the next start.
   let opened = false; // (the workspace is open: past the lock screen, its session started)

@@ -561,8 +561,12 @@ export class DesktopCatalog implements CatalogStore {
         } else {
           // Its file into the trash first; only then its records go. A file that could not be moved keeps its item (deleted, tried again
           // at the next collection): records dropped first left the file behind, and the next start took it in again as a new item.
+          // (the item's own file, as it is now: edited since it came in, a note say, it is still what the person deleted; into the trash,
+          // so nothing is lost. A file another item names now is that item's, and stays.)
           const r = recs.get(e.hash);
-          if (r?.ext && !(await externalFolder.remove(e.hash, r.file ?? e.hash))) {
+          const file = r?.ext ? (r.file ?? e.hash) : null;
+          const other = file ? await this.lib.calls.byFile(file) : null;
+          if (file && (!other || other === e.hash) && !(await externalFolder.remove(e.hash, file, true))) {
             report.retained.push(e.hash);
             this.onNotice?.(`“${e.name}” is deleted from the library, but its file could not be moved to the trash yet (it may be open in another program): it is tried again later.`);
             continue;

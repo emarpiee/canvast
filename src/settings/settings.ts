@@ -80,7 +80,6 @@ export const SETTINGS = {
   /** The desktop build (ADR 0177): where a file the app deletes from the workspace folder goes. */
   "storage.deleteTo": { scope: "workspace", default: "trash", validate: oneOf("trash", "system", "erase"), effect: "immediate" } as Def<"trash" | "system" | "erase">,
   // The desktop app: a file deleted from the library leaves the folder at once, even while undo on the open canvas could still bring an instance back.
-  "storage.deleteAtOnce": { scope: "workspace", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "storage.trashDays": { scope: "workspace", default: "0", validate: oneOf("0", "30", "90", "365"), effect: "immediate" } as Def<"0" | "30" | "90" | "365">,
   "library.keepFileNames": { scope: "workspace", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "library.sortFiles": { scope: "workspace", default: false, validate: bool, effect: "immediate" } as Def<boolean>,

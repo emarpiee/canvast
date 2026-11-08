@@ -342,14 +342,6 @@ const TRASH_DAYS_ROW: Row = {
   control: { kind: "select", options: [["0", "Never"], ["30", "30 days"], ["90", "90 days"], ["365", "A year"]] },
 };
 
-/** The desktop app: a library file goes as soon as it is deleted instead of when undo no longer needs it. */
-const DELETE_AT_ONCE_ROW: Row = {
-  key: "storage.deleteAtOnce",
-  label: "Delete library files at once",
-  help: "A file deleted from the library leaves the folder at once.", more: "A file deleted from the library leaves the folder at once (where the setting above sends it), even while undo on the open canvas could still put a picture of it back. Undoing then shows the picture as missing until its file is back in the library folder.",
-  control: { kind: "toggle" },
-};
-
 const fmt = (n: number): string => String(Math.round(n * 100) / 100);
 
 function controlHtml(row: Row, id: string): string {
@@ -443,7 +435,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
             ? `<div class="set-info set-card" data-folder-card><h3>Workspace folder</h3><div data-folder-host></div>
              <p class="set-help">Your boards, canvases and library are files in this folder: back it up, sync it or copy it like any folder.</p>
              <div class="storage-actions"><button type="button" data-switch-workspace data-testid="set-switch-workspace" aria-haspopup="menu">${ICONS.arrowLeftRight}<span>Switch workspace…</span></button></div>
-             ${rowHtml(DELETE_TO_ROW)}${rowHtml(TRASH_DAYS_ROW)}${rowHtml(DELETE_AT_ONCE_ROW)}
+             ${rowHtml(DELETE_TO_ROW)}${rowHtml(TRASH_DAYS_ROW)}
              <div class="set-row" data-row="library-split"><div class="set-words"><label for="set-library-split"><span class="set-label" id="set-library-split-l">Library files</span><span class="set-help" id="set-library-split-h">How many files hold the library's names, tags, folders and notes.</span></label><details class="set-more"><summary>More</summary><p>How .canvast/library/ splits the library's names, tags, folders and notes into files. More files: each is smaller, so a sync tool uploads less for each edit. Changing it writes them all again once. Update the app on every device first: versions before 0.52.4 read only 256. <span data-library-split-size></span></p></details></div>
               <div class="set-control"><select id="set-library-split" data-library-split data-testid="set-library-split" aria-labelledby="set-library-split-l" aria-describedby="set-library-split-h"><option value="1">16 files</option><option value="2">256 files</option><option value="3">4,096 files</option></select></div><span class="set-scope" title="Where this setting is kept">This workspace</span></div></div>
            <div class="set-info set-card" data-storage><h3>Working copy</h3><p>The app also keeps a working copy of the workspace on this device, so every change is safe at once; the folder follows a moment after editing pauses.</p>
@@ -748,7 +740,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     if (!n) return;
     n.innerHTML = `<span>${esc(text)}</span> <button type="button" class="set-reset" data-key-yes>${esc(yes)}</button> <button type="button" class="set-reset" data-key-no>Cancel</button>`;
   };
-  const all = [...SETTINGS_TABS.flatMap((t) => t.rows ?? []), ...(DESKTOP ? [DELETE_TO_ROW, TRASH_DAYS_ROW, DELETE_AT_ONCE_ROW] : [])];
+  const all = [...SETTINGS_TABS.flatMap((t) => t.rows ?? []), ...(DESKTOP ? [DELETE_TO_ROW, TRASH_DAYS_ROW] : [])];
   /** Show the stored values in the controls (never while one is being typed into: only called on a change). */
   const refresh = (): void => {
     renderKeys();

@@ -127,14 +127,12 @@ test("library files are readable files under library/: the same bytes once, -2 o
     await expect.poll(() => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.instances, e.present]).sort())), { timeout: 10_000 }).toEqual([[1, true], [2, true]]);
     expect(await page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.missing.length))).toBe(0);
     expect(existsSync(join(ws, ".trash"))).toBe(false);
-    // Deleted everywhere: the file stays while undo on the open canvas could bring its picture back...
+    // Deleted everywhere: its file goes into .trash at once (the way back), even while undo on the canvas could put a picture back.
     const hashOf = (n: number) => page.evaluate((k) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.instances === k)!.hash), n);
     const blueHash = await hashOf(1);
-    expect(await page.evaluate((h) => window.__canvastDebug.deleteEverywhere([h]), blueHash)).toBe(1);
-    expect(files(ws).filter((f) => f.startsWith("library/"))).toContain("library/images/hand_study-loomis-2.png");
-    // ...unless Settings > Storage says "Delete library files at once": then it goes to .trash with the next delete.
     const redHash = await hashOf(2);
-    await page.evaluate(() => window.__canvastDebug.setSetting("storage.deleteAtOnce", true));
+    expect(await page.evaluate((h) => window.__canvastDebug.deleteEverywhere([h]), blueHash)).toBe(1);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(".trash/"))).toEqual([".trash/library/images/hand_study-loomis-2.png"]);
     expect(await page.evaluate((h) => window.__canvastDebug.deleteEverywhere([h]), redHash)).toBe(1);
     await expect.poll(() => files(ws).filter((f) => f.startsWith("library/") || f.startsWith(".trash/")).sort()).toEqual([".trash/library/images/hand_study-loomis-2.png", ".trash/library/images/hand_study-loomis.png"]);
   } finally {
@@ -3115,15 +3113,18 @@ test("deleted library items stay deleted after a restart: an unused one goes to 
   const pic = (c: number) => makePng(4, 4, () => [c, 40, 200 - c, 255]);
   try {
     await page.getByTestId("view-assets").click();
-    await page.getByTestId("assets-import-input").setInputFiles([{ name: "keep.png", mimeType: "image/png", buffer: pic(10) }, { name: "gone.png", mimeType: "image/png", buffer: pic(90) }]);
+    await page.getByTestId("assets-import-input").setInputFiles([{ name: "keep.png", mimeType: "image/png", buffer: pic(10) }, { name: "gone.png", mimeType: "image/png", buffer: pic(90) }, { name: "edited.md", mimeType: "text/markdown", buffer: Buffer.from("# Edited\n\nfirst words\n") }]);
     await page.getByTestId("view-canvas").click();
     await page.getByTestId("import-input").setInputFiles({ name: "placed.png", mimeType: "image/png", buffer: pic(170) });
-    await expect.poll(listing, { timeout: 30_000 }).toEqual(["gone.png", "keep.png", "placed.png"]);
+    await expect.poll(listing, { timeout: 30_000 }).toEqual(["edited.md", "gone.png", "keep.png", "placed.png"]);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
     const hashOf = (name: string) => page.evaluate((n) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === n)!.hash), name);
-    expect(await page.evaluate((h) => window.__canvastDebug.deleteEverywhere(h), [await hashOf("gone.png"), await hashOf("placed.png")])).toBe(2);
+    // A note edited outside the app just before (its file no longer what the item was made from): still the file the person deletes.
+    const note = files(ws).find((f) => f.startsWith("library/") && f.endsWith("edited.md"))!;
+    appendFileSync(join(ws, note), "words added in another app\n");
+    expect(await page.evaluate((h) => window.__canvastDebug.deleteEverywhere(h), [await hashOf("gone.png"), await hashOf("placed.png"), await hashOf("edited.md")])).toBe(3);
     await expect.poll(listing).toEqual(["keep.png"]);
-    await expect.poll(trashed, { message: "the unused one goes to .trash at once" }).toContain("gone.png");
+    await expect.poll(trashed, { message: "the unused ones go to .trash at once, the edited note too" }).toEqual(expect.arrayContaining(["gone.png", "edited.md"]));
     await page.evaluate(() => window.__canvastDebug.flushStorage());
   } finally {
     await app.close();
@@ -3132,7 +3133,7 @@ test("deleted library items stay deleted after a restart: an unused one goes to 
   for (const round of [1, 2]) {
     ({ app, page } = await launch(ws));
     try {
-      await expect.poll(trashed, { message: `round ${round}: the placed one goes to .trash once no undo needs it`, timeout: 30_000 }).toEqual(["gone.png", "placed.png"]);
+      await expect.poll(trashed, { message: `round ${round}: the placed one goes to .trash once no undo needs it`, timeout: 30_000 }).toEqual(["edited.md", "gone.png", "placed.png"]);
       for (let i = 0; i < 4; i++) {
         expect(await listing(), `round ${round}: nothing deleted came back`).toEqual(["keep.png"]);
         expect(inLibrary()).toEqual(["keep.png"]);

@@ -388,10 +388,11 @@ class ExternalFolder {
    * Remove the file of an erased original. Nothing to do when it is not there, or when it no longer holds the original: a file changed
    * or replaced outside the app (by another program, a sync tool) is someone's work now, never the app's to remove.
    */
-  async remove(hash: string, file = hash): Promise<boolean> {
+  async remove(hash: string, file = hash, asked = false): Promise<boolean> {
     if (!this.dir || this.status !== "ready" || !this.naming.valid(hash, file)) return false;
     try {
-      if (!isHiddenFile(file) && !(await this.holds(hash, file))) return true; // (not the original any more: someone's work, left, never the app's)
+      // (not the original any more: someone's work, left, never the app's; unless the person deleted its item: then its file goes, into the trash)
+      if (!asked && !isHiddenFile(file) && !(await this.holds(hash, file))) return true;
       await this.dir.removeEntry(file);
       return true;
     } catch (e) {

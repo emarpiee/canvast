@@ -334,7 +334,7 @@ export class Session {
   }
 
   /** Hashes the open document can still bring back without storage: its objects and undo/redo states. */
-  /** The desktop app's "Delete library files at once": undo history no longer keeps a deleted original (set by the app). */
+  /** The desktop app: a deleted item's file goes into .trash at once (undo history does not keep it; .trash is the way back). Set by the app. */
   deleteAtOnce: () => boolean = () => false;
 
   gcRoots(): Set<string> {
