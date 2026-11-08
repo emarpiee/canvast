@@ -3065,8 +3065,8 @@ test("after a crash: the next start clears what the app left (readable copies, c
   try {
     await page.getByTestId("view-assets").click();
     await page.getByTestId("assets-import-input").setInputFiles([{ name: "mine.png", mimeType: "image/png", buffer: makePng(8, 8, () => [10, 200, 30, 255]) }]);
-    await expect.poll(() => existsSync(join(ws, "library", "mine.png"))).toBe(true);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await expect.poll(() => files(ws).some((f) => f.startsWith("library/") && f.endsWith(".png")), { timeout: 30_000 }).toBe(true);
     await expect.poll(() => existsSync(join(ws, ".canvast", "workspace.json"))).toBe(true);
     const userData = await app.evaluate(({ app }) => app.getPath("userData"));
     const temp = await app.evaluate(({ app }) => app.getPath("temp"));

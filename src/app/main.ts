@@ -2315,7 +2315,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         return { has, open: kind === "hidden" && !!storage?.hidden?.isOpen(), text: only && note ? note : `${note ? `${note} ` : ""}${has ? "A password is set." : kind === "workspace" ? "No password is set: the app opens without asking." : "No password is set: anyone can open the Hidden items."}` };
       };
       if (action === "status") return state();
-      if (action === "lock") return state(lockHidden(session) ? HIDDEN_LOCKED : "", true);
+      if (action === "lock") return state((await lockHidden(session)) ? HIDDEN_LOCKED : "", true);
       if (session.readOnly) return state("Another tab is editing, so the password cannot change here.");
       const current = await askCurrentPassword(session, kind, "Enter the current password.");
       if (current === null) return state("Not changed.");
@@ -2542,7 +2542,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
             { group: "Workspace", title: "Check library files (quick)", words: "verify damaged missing size fast folder", run: () => checkLibraryFiles(true) },
           ]
         : []),
-      ...(storage?.hidden ? [{ group: "Workspace", title: "Lock hidden items", words: "encrypt password hide close", enabled: () => !!storage.hidden?.isOpen(), run: () => { lockHidden(session); editor.message = HIDDEN_LOCKED; editor.changed(); } }] : []),
+      ...(storage?.hidden ? [{ group: "Workspace", title: "Lock hidden items", words: "encrypt password hide close", enabled: () => !!storage.hidden?.isOpen(), run: () => void lockHidden(session).then(() => { editor.message = HIDDEN_LOCKED; editor.changed(); }) }] : []),
     ];
     // the keys shown are the ones in use now (Settings > Shortcuts)
     const TITLE_COMMAND: Record<string, string> = { Undo: "edit.undo", Redo: "edit.redo", Duplicate: "edit.duplicate", "Delete the selection": "edit.delete", "Select everything": "edit.selectAll", Group: "edit.group", Ungroup: "edit.ungroup", "Bring to front": "edit.front", "Send to back": "edit.back", "Zoom in": "view.zoomIn", "Zoom out": "view.zoomOut", "Return to the origin": "view.home", "Fit the selection in view": "view.focus", "Previous view": "view.back", "Next view": "view.forward", Shortcuts: "find.help" };

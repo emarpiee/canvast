@@ -33,10 +33,12 @@ const verifiedAt: Record<PasswordKind, number> = { hidden: -Infinity, workspace:
  * password is typed again. Hidden mode is only what this screen shows. One action for the command palette, the hidden mode bar and Settings.
  */
 export const HIDDEN_LOCKED = "Hidden items are locked: the password opens them again.";
-export function lockHidden(session: Session): boolean {
+export async function lockHidden(session: Session): Promise<boolean> {
   const h = session.storage?.hidden;
   if (!h?.isOpen()) return false;
   h.lock();
+  // (it writes what waits first, then forgets the key: done when it is gone, up to 15 s)
+  for (let i = 0; h.isOpen() && i < 300; i++) await new Promise((r) => setTimeout(r, 50));
   return true;
 }
 

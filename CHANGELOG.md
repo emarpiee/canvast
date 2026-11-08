@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.55.8 — Lock now says it is done (2026-11-09)
+
+- **Fixed:** *Lock now* stayed on in Settings > Privacy after it was pressed: locking writes what waits first, and the card is now drawn once the key is gone.
+- **Fixed:** canvast tools: the password question was drawn over and could show what was typed on newer Node.js; Enter picks the tool's own folder; only the file to run is named `canvast-tools.mjs`.
+
 ## 0.55.7 — canvast tools: share, decrypt and encrypt without the app (2026-11-09)
 
 - **Added:** `canvast-tools.mjs`, one file for Node.js 20 or later, attached to every release: a menu in plain words (or one-line commands) to open your hidden items, hide files into a workspace, and share any folder with other devices on your network as a folder for file managers (WebDAV over HTTPS: a workspace's Library, and its Hidden items decrypted only as they are read; or any other folder), read only unless you allow changes, with one login per run or saved devices with their own rights.
