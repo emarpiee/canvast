@@ -405,7 +405,7 @@ const pwCard = (kind: "hidden" | "workspace", title: string, help: string): stri
 export function mountSettingsView(root: HTMLElement, settings: SettingsStore, keymap: Keymap, onClose: () => void, backup?: BackupHooks): { show(tab?: string): void; hide(): void } {
   const tabButton = (t: Tab): string => `<button type="button" role="tab" id="set-tab-${t.id}" aria-controls="set-panel-${t.id}" data-tab="${t.id}"><span class="set-tab-icon" aria-hidden="true">${ICONS[TAB_ICON[t.id] ?? "tabAbout"]}</span><span class="set-tab-label">${esc(t.label)}</span><span class="set-hits" aria-hidden="true"></span></button>`;
   const tabsHtml = TAB_GROUPS.map(
-    ([title, ids]) => `<div class="set-tabs-h" role="presentation">${esc(title)}</div>${ids.map((id) => tabButton(SETTINGS_TABS.find((t) => t.id === id)!)).join("")}`,
+    ([title, ids]) => `<div class="set-tabs-h" role="presentation">${esc(title)}</div>${ids.flatMap((id) => SETTINGS_TABS.filter((t) => t.id === id)).map(tabButton).join("")}`,
   ).join("");
   const panelsHtml = SETTINGS_TABS.map((t) => {
     const rowHtml = (r: Row): string => {
