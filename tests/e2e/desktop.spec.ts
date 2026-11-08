@@ -2878,3 +2878,45 @@ test("sharing (ADR 0184): a browser guest pairs, sees the host's library and can
     await app.close();
   }
 });
+
+test("sharing (ADR 0184): hidden items reach a guest only when shared, encrypted; the guest opens them with the Hidden password", async () => {
+  const ws = tempDir("cv-guest-hidden-");
+  const { app, page } = await launch(ws);
+  const browser = await chromium.launch();
+  const secret = makePng(6, 6, () => [20, 20, 220, 255]);
+  const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
+  try {
+    await page.getByTestId("view-assets").click();
+    await page.getByTestId("assets-import-input").setInputFiles([{ name: "Secret.png", mimeType: "image/png", buffer: secret }, { name: "Open.png", mimeType: "image/png", buffer: makePng(6, 6, () => [220, 20, 20, 255]) }]);
+    await expect(page.locator('[data-testid="asset-card"][title="Open.png"]')).toHaveCount(1);
+    expect(await page.evaluate(() => window.__canvastDebug.hiddenOp("set", "pw"))).toEqual({ ok: true, state: "open" });
+    await page.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), sha(secret));
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    const sealed = files(ws).filter((f) => f.startsWith(".hidden/"));
+    expect(sealed).toHaveLength(1);
+    const sealedBytes = readFileSync(join(ws, sealed[0]!));
+    await page.getByTestId("save-status").click();
+    await page.getByRole("tab", { name: "Sharing" }).click();
+    await page.getByTestId("share-on").check();
+    const code = (await page.getByTestId("share-code").textContent())!.trim();
+    const { port } = (await page.evaluate(() => window.canvastDesktop!.share!.call("status"))) as { port: number };
+    const g = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
+    await g.goto(`https://127.0.0.1:${port}/#debug`);
+    await g.getByTestId("prompt-input").fill(code);
+    await g.getByTestId("prompt-ok").click();
+    await page.getByTestId("confirm-dialog").filter({ hasText: /see this workspace\?/ }).getByTestId("confirm-ok").click();
+    await g.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 60_000 });
+    const guestList = () => g.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => [e.name, !!e.hidden]).sort()));
+    // Not shared: the guest has the shown item only, and the password opens nothing.
+    await expect.poll(guestList, { timeout: 30_000 }).toEqual([["Open.png", false]]);
+    expect((await g.evaluate(() => window.__canvastDebug.hiddenOp("check", "pw"))).ok).toBe(false);
+    // Shared: the guest opens them itself, with the password.
+    await page.getByTestId("share-hidden").check();
+    expect(await g.evaluate(() => window.__canvastDebug.hiddenOp("check", "pw"))).toEqual({ ok: true, state: "open" });
+    await expect.poll(guestList, { timeout: 30_000 }).toEqual([["Open.png", false], ["Secret.png", true]]);
+    expect(readFileSync(join(ws, sealed[0]!)).equals(sealedBytes), "the host's encrypted file is as it was").toBe(true);
+  } finally {
+    await browser.close();
+    await app.close();
+  }
+});
