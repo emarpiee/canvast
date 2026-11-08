@@ -578,7 +578,7 @@ Every file, with its size, type and usage. Search it, filter it and sort it.
 
 An item is in one folder and can have many tags. Both show as trees in the sidebar.
 
-![The library sidebar: a search box over the folder tree, with a pinned folder first and the sort and collapse buttons on the header](docs/screenshots/sidebar.webp)
+![The library sidebar: the folder tree with a pinned folder first, the tags tree, and Saved searches with their counts; each section has its sort button in its head](docs/screenshots/sidebar.webp)
 
 | Feature | How |
 | --- | --- |
@@ -625,6 +625,10 @@ Double-click a card to see it large, with a filmstrip, zoom, pan and a slideshow
 ### PDFs and 3D models
 
 A PDF or a 3D model shows as its picture in the library and opens in a view of its own: in the viewer, and in the [panel on a canvas](#notes-on-a-canvas) with a double-click on its card.
+
+![A PDF open in the library's viewer: its first page at full width, the page box and zoom above it, the details panel beside it](docs/screenshots/pdf-view.webp)
+
+![A 3D model (a ring) open in the library's viewer, lit, with its camera, model, lines, background and light settings beside it](docs/screenshots/model-view.webp)
 
 | | PDF | 3D model (GLB, glTF, STL, OBJ, PLY) |
 | --- | --- | --- |
@@ -1070,6 +1074,9 @@ The first tab to open a workspace edits it. Other tabs are read-only, follow its
 - **Export a backup** (Settings > Storage) downloads one `.canvast` file holding every board, canvas, object and view, plus every file once, and your settings (the workspace's and this device's: theme, shortcuts, panel layout). When you import it, only the settings this device has not set itself are restored; the ones you changed here are kept, and the import dialog says how many it will restore.
 - A board, a canvas or a single library item can be exported on its own, with only the files it uses.
 - **Import archive…** (or drop a `.canvast` file on the page) verifies every checksum first, asks how to import a workspace backup, shows what it contains and any problems, and only then writes, in a single transaction. Files you already have are not stored twice.
+
+  ![The How to import question over Settings > Storage: Update this workspace, chosen, and Add as new boards, each with what it does](docs/screenshots/import-choice.webp)
+
   - **Update this workspace** (first when the backup holds this workspace's canvases, or this workspace is empty): this workspace is made as the backup is. Its boards and canvases are matched by their ids and replaced; an item's details (name, tags, favourite, folder, note, properties) are the backup's; the saved styles and the workspace's settings are the backup's. A canvas changed here since your last backup is kept beside, as *(conflict …)*; a canvas this workspace had at its last backup that the backup does not have is put on a board *Not in the backup*, never erased; such an item is deleted (on desktop its file goes to `.trash`).
   - **Add as new boards**: beside what is here; nothing here changes, and an item's details are merged (tags added, a note only filling an empty one).
 - **Working elsewhere and coming back:** export a backup at home; elsewhere, import it with *Update* into the browser file or the desktop app (an empty workspace keeps its ids); work; export again; at home import that one with *Update*. The same backup goes between the browser and the desktop app either way. Export at home just before leaving, so a change made at home meanwhile is known as one.
