@@ -33,7 +33,7 @@ const KNOWN = [
   /^https:\/\/github\.com\/rsms\/inter$/, // the Inter licence text
   /^https:\/\/scripts\.sil\.org\/OFL$/, // the Inter licence text
   /^https:\/\/bottosson\.github\.io\/posts\/colorpicker\/$/, // a credit in the colour picker's code
-  /^https:\/\/\$\{a\}:\$\{\w+\.port\}$/, // Settings > Sharing shows the host's own address (only text; the page connects nowhere)
+  /^https:\/\/\$\{\w+\}:\$\{\w+\.port\}$/, // Settings > Sharing shows the host's own address (only text; the page connects nowhere)
   /^https:\/\/\\u2026$/, // the placeholder "https://…" in the link dialog's text
   /^https:\/\/github\.com\/emarpiee\/canvast$/, // canvast's own licence notice: where its source is
   /^https:\/\/fsf\.org\/$/, // the GNU GPL text

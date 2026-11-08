@@ -1,6 +1,6 @@
 import { NOTE_STYLES } from "../notes/note-file";
 import { mountSharing } from "./share-panel";
-import type { SwitchRow } from "./share-panel";
+import type { SettingRow } from "./share-panel";
 import { DOCK_PANEL_IDS } from "../settings/panels";
 import type { SettingKey, SettingValue, SettingsStore } from "../settings/settings";
 import { openColourPopover } from "./colour-popover";
@@ -23,9 +23,9 @@ import { desktopBridge } from "../storage/desktop-bridge";
 import { openWorkspaceSwitcher } from "./workspace-switch";
 
 /** The desktop build (ADR 0177): the workspace is a folder, so what Settings says about storage, privacy and the page differs. */
-/** A switch row for something that is not a stored setting (Sharing's), with the settings rows' look. */
-const switchRowHtml: SwitchRow = (o) =>
-  `<div class="set-row"><div class="set-words"><label for="${o.id}"><span class="set-label">${o.label}</span><span class="set-help">${o.help}</span></label></div><div class="set-control"><input type="checkbox" id="${o.id}" ${o.attrs} ${o.on ? "checked" : ""} ${o.disabled ? "disabled" : ""}></div></div>`;
+/** A row for something that is not a stored setting (Sharing's), with the settings rows' look. */
+const plainRowHtml: SettingRow = (o) =>
+  `<div class="set-row"><div class="set-words">${o.id ? `<label for="${o.id}">` : "<div>"}<span class="set-label">${o.label}</span><span class="set-help">${o.help}</span>${o.id ? "</label>" : "</div>"}</div><div class="set-control">${o.control}</div></div>`;
 const DESKTOP = !!desktopBridge();
 /** A setting's words as the desktop build needs them (it has an app window, not a tab or an address). */
 const forDesktop = (text: string): string =>
@@ -431,7 +431,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
              <p class="set-note" data-dev-note role="status" hidden>Reload to apply the change. <button type="button" class="set-done" data-reload>Reload now</button></p></div>`
           : "")
       : t.id === "sharing"
-        ? `<div data-share-host></div>`
+        ? ""
       : t.id === "shortcuts"
         ? `<div class="set-info set-keys"><p>Every shortcut can be changed, to one key or to several together (Ctrl+Shift+F, Alt+Q). Press <strong>Change</strong>, then the keys you want; <strong>Add</strong> gives the command another key; the <strong>×</strong> takes a key away; Escape cancels. You are warned when a key is already used, or when the browser or the system may take it.</p>
            <p><button type="button" class="set-reset" data-keys-reset-all>Reset every shortcut</button></p>
@@ -505,9 +505,9 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     cancelCapture();
     if (id === "storage") void storage();
     if (id === "sharing") {
-      const host = root.querySelector<HTMLElement>("[data-share-host]");
+      const host = root.querySelector<HTMLElement>('[data-panel="sharing"]');
       const share = desktopBridge()?.share;
-      if (host && share) mountSharing(host, share, switchRowHtml);
+      if (host && share) mountSharing(host, share, plainRowHtml);
     }
     if (id === "privacy") for (const k of ["workspace", "hidden"] as const) void passwordCard(k, "status");
     if (id === "about") showErrors();

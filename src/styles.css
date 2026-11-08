@@ -952,8 +952,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .set-reset { font: inherit; font-size: var(--text-sm); color: inherit; height: var(--row-btn); background: none; border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
 .set-reset:disabled { opacity: 0.35; cursor: default; }
 .set-info { max-width: 640px; }
-.set-info dl { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: var(--s-4) var(--s-6); }
-.set-info dd { min-width: 0; overflow-wrap: anywhere; } /* (a long code or address wraps, never widens the panel) */
+.set-info dl { display: grid; grid-template-columns: 200px 1fr; gap: var(--s-4) var(--s-6); }
 .set-info dt { color: var(--hud-muted); }
 .set-info dd { margin: 0; }
 #settings-view button:disabled { opacity: 0.4; cursor: default; }
@@ -3216,8 +3215,3 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .pop-menu-row > .more-btn { flex: none; opacity: 1; width: var(--row-btn); min-height: 0; height: var(--row-btn); padding: 0; justify-content: center; }
 .pop-menu.is-child { z-index: 61; }
 
-/* Settings > Sharing (ADR 0184): the allowed devices, each with whether it is connected now */
-.share-devices { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-2); }
-.share-device { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: var(--s-4); }
-.share-dot { width: var(--s-6); height: var(--s-6); border-radius: var(--r-dot); background: var(--hud-muted); }
-.share-dot.is-on { background: var(--hud-accent); }
