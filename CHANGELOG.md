@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.10 — The password card shows the latest answer (2026-11-09)
+
+- **Fixed:** in Settings > Privacy, the status asked when the tab opened could answer after *Lock now* and show the hidden items unlocked again; only the latest answer is drawn now.
+
 ## 0.55.9 — Locking shows itself at once (2026-11-09)
 
 - **Fixed:** *Lock now* goes away when pressed and says *Locking: writing what waits first…* until the key is gone; it says locked only once it is.

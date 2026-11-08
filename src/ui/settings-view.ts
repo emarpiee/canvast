@@ -651,6 +651,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     }
   };
   /** A password card of Privacy: show whether there is a password, or change it and show the result. */
+  const pwTurn: Partial<Record<"hidden" | "workspace", number>> = {};
   const passwordCard = async (kind: "hidden" | "workspace", action: "status" | "set" | "remove" | "lock"): Promise<void> => {
     if (!backup) return;
     const card = root.querySelector<HTMLElement>(`[data-pw-card="${kind}"]`)!;
@@ -659,7 +660,10 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
       card.querySelector<HTMLElement>('[data-pw="lock"]')!.hidden = true;
       card.querySelector<HTMLElement>("[data-pw-state]")!.textContent = "Locking: writing what waits first…";
     }
+    // (only the latest call draws the card: a status asked when the tab opened may answer after a lock pressed since)
+    const turn = (pwTurn[kind] = (pwTurn[kind] ?? 0) + 1);
     const r = await backup.password(kind, action);
+    if (turn !== pwTurn[kind]) return;
     card.querySelector<HTMLElement>("[data-pw-state]")!.textContent = r.text;
     card.querySelector<HTMLElement>('[data-pw="set"]')!.textContent = r.has ? "Change the password…" : "Set a password…";
     card.querySelector<HTMLElement>('[data-pw="remove"]')!.hidden = !r.has;
