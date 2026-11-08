@@ -206,22 +206,20 @@ export const toolFolder = () => dirname(fileURLToPath(import.meta.url));
 export const cleanPaths = (s) => [...s.matchAll(/'([^']*)'|"([^"]*)"|((?:\\ |\S)+)/g)].map((m) => cleanPath(m[1] ?? m[2] ?? m[3]));
 
 function terminal() {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: !!process.stdin.isTTY });
-  let muted = false;
-  const write = rl._writeToOutput?.bind(rl);
-  if (write) rl._writeToOutput = (s) => (muted ? s.includes("\n") && write("\n") : write(s));
+  const open = () => readline.createInterface({ input: process.stdin, output: process.stdout, terminal: !!process.stdin.isTTY });
+  let rl = open();
   const ask = async (q, fallback = "") => ((await rl.question(q)).trim() || fallback);
   const yes = async (q, def = false) => {
     const a = (await ask(`${q} ${def ? "(Y/n)" : "(y/N)"} `)).toLowerCase();
     return a ? a.startsWith("y") : def;
   };
+  // (a password: typed without being shown, by the same reader as the script's own; the menu's reader is set aside meanwhile)
   const secret = async (q) => {
-    process.stdout.write(q);
-    muted = true;
+    rl.close();
     try {
-      return await rl.question("");
+      return await askPassword(q);
     } finally {
-      muted = false;
+      rl = open();
     }
   };
   /** A folder: dragged in, or this tool's own folder with Enter when it fits (the tool kept in the folder it works on); `b` goes back. */
@@ -236,7 +234,7 @@ function terminal() {
       console.log(`  ${existsSync(p) ? why : "That folder is not there."} Try again, or b to go back.`);
     }
   };
-  return { rl, ask, yes, secret, folder };
+  return { get rl() { return rl; }, ask, yes, secret, folder };
 }
 
 async function decryptFlow(t) {
