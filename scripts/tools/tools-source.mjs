@@ -200,11 +200,13 @@ export function cleanPath(s) {
   if (p.startsWith("file://")) p = fileURLToPath(p);
   return resolve(p.replace(/\\ /g, " "));
 }
+/** The folder this tool is in (kept there to work on that folder: Enter picks it). */
+export const toolFolder = () => dirname(fileURLToPath(import.meta.url));
 /** Several dragged paths on one line. */
 export const cleanPaths = (s) => [...s.matchAll(/'([^']*)'|"([^"]*)"|((?:\\ |\S)+)/g)].map((m) => cleanPath(m[1] ?? m[2] ?? m[3]));
 
 function terminal() {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: !!process.stdin.isTTY });
   let muted = false;
   const write = rl._writeToOutput?.bind(rl);
   if (write) rl._writeToOutput = (s) => (muted ? s.includes("\n") && write("\n") : write(s));
@@ -222,13 +224,16 @@ function terminal() {
       muted = false;
     }
   };
+  /** A folder: dragged in, or this tool's own folder with Enter when it fits (the tool kept in the folder it works on); `b` goes back. */
   const folder = async (q, ok, why) => {
+    const here = toolFolder();
+    const fits = existsSync(here) && ok(here);
     for (;;) {
-      const a = await ask(q);
-      if (!a) return null;
-      const p = cleanPath(a);
+      const a = await ask(`${q}${fits ? `\n  (or press Enter for this tool's own folder: ${here})` : ""}\n  (b to go back)\n> `);
+      if (a.toLowerCase() === "b" || (!a && !fits)) return null;
+      const p = a ? cleanPath(a) : here;
       if (existsSync(p) && ok(p)) return p;
-      console.log(`  ${existsSync(p) ? why : "That folder is not there."} Try again, or press Enter to go back.`);
+      console.log(`  ${existsSync(p) ? why : "That folder is not there."} Try again, or b to go back.`);
     }
   };
   return { rl, ask, yes, secret, folder };
@@ -236,7 +241,7 @@ function terminal() {
 
 async function decryptFlow(t) {
   console.log("\nOpen your hidden items: they are decrypted into a new folder. Nothing in the workspace is changed.");
-  const ws = await t.folder("Drag the workspace folder (or the folder with .hidden and hidden.json) here, then press Enter: ", hasHidden, "No hidden items there (a .hidden folder and hidden.json).");
+  const ws = await t.folder("Drag the workspace folder (or the folder with .hidden and hidden.json) here, then press Enter.", hasHidden, "No hidden items there (a .hidden folder and hidden.json).");
   if (!ws) return;
   const out = cleanPath(await t.ask(`Where to put them [${ws}-decrypted]: `, `${ws}-decrypted`));
   console.log(`\n  From: ${ws}\n  To:   ${out}`);
@@ -255,7 +260,7 @@ async function decryptFlow(t) {
 
 async function encryptFlow(t) {
   console.log("\nHide files into a workspace: each is encrypted into its .hidden folder and listed with its hidden items.\n  Close canvast on that workspace first. The files you pick stay where they are: delete them yourself after.");
-  const ws = await t.folder("Drag the workspace folder here, then press Enter: ", isWorkspace, "That is not a canvast workspace (no .canvast/workspace.json).");
+  const ws = await t.folder("Drag the workspace folder here, then press Enter.", isWorkspace, "That is not a canvast workspace (no .canvast/workspace.json).");
   if (!ws) return;
   const files = cleanPaths(await t.ask("Drag the files to hide (one or more), then press Enter: ")).filter((f) => existsSync(f));
   if (!files.length) return console.log("  No files found.");
@@ -281,7 +286,7 @@ function printShare(s, folder, write) {
 
 async function shareFlow(t) {
   console.log("\nShare a folder with another device on this network (a phone, a laptop), as a folder its file manager opens.");
-  const folder = await t.folder("Drag the folder to share here, then press Enter: ", (p) => lstatSync(p).isDirectory(), "That is a file, not a folder.");
+  const folder = await t.folder("Drag the folder to share here, then press Enter.", (p) => lstatSync(p).isDirectory(), "That is a file, not a folder.");
   if (!folder) return;
   let hiddenPassword = null;
   if (hasHidden(folder) && (await t.yes(`This ${isWorkspace(folder) ? "workspace" : "folder"} has hidden items. Share them too (decrypted as they are read, for devices allowed to)?`))) {

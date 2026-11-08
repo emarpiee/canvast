@@ -1290,7 +1290,7 @@ canvast tools
 
 #### Sharing a folder with the tools
 
-1. Choose **3**, drag the folder in.
+1. Choose **3**, drag the folder in, or press **Enter** to share the folder the tool itself is in (keep `canvast-tools.mjs` in a workspace or any folder to share it in one step). The same goes for opening and hiding hidden items: **Enter** picks the tool's own folder when it fits; **b** goes back.
 2. A workspace with hidden items asks whether to share them too (then the Hidden password). A plain folder has no such question.
 3. Answer whether other devices may change files (*no* by default).
 4. With saved devices, choose who signs in: one login for this run, your saved devices, or both.
