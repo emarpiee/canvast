@@ -36,15 +36,13 @@ canvast was first built for one person's way of working: mine. I collect referen
 
 It turned out useful enough that I am happy to share it with everyone, free. Some choices still show where it came from: the desktop app is made for Linux first (where I work), and new features follow my own work first. Ideas, bug reports and questions are welcome in the [issues](https://github.com/emarpiee/canvast/issues), and the [Limitations](#limitations) say plainly what it does not do yet.
 
-canvast was planned and built with [Claude Code](https://claude.com/claude-code).
+The idea grew out of [Kambas](https://github.com/emarpiee/obsidian-kambas), my Obsidian plugin that extends Canvas with image controls: at some point I wanted more than a plugin could give, so I started over as an app of its own. Shipping it as a single HTML file came from the one-file tools of [iamsingle.app](https://iamsingle.app/) and [Anton Burmistrov](https://antonburmistrov.com/), which I admire for how little they ask of you.
 
-I do not believe that images made by generative AI are art, and by the same measure this project, its branding included, is not art either. I treat AI as a tool. It can make an artist's workflow better, and it can build the tools artists use to make their art. It should not be the one making the art for them.
+I planned and built canvast with [Claude Code](https://claude.com/claude-code), and I want to be clear about where I stand on that. I do not believe that images made by generative AI are art, and by the same measure this project, its branding included, is not art either. I treat AI as a tool: it can make an artist's workflow better, and it can build the tools artists use to make their art, but it should not be the one making the art for them.
 
-The idea grew out of [Kambas](https://github.com/emarpiee/obsidian-kambas), my Obsidian plugin that extends Canvas with image controls. Shipping the app as a single HTML file was inspired by the one-file tools of [iamsingle.app](https://iamsingle.app/) and [Anton Burmistrov](https://antonburmistrov.com/).
+canvast is open source first of all, so if it almost fits your way of working, you are welcome to fork it and build a better version of it.
 
-canvast is open source in the first place: anyone is welcome to fork it and build a better version of it.
-
-Apps, sites and references that help with creative work, which I use or recommend: [Tools and resources for artists](docs/creative-tools.md).
+And if you are looking for more, these are the apps, sites and references that help with my creative work, which I use or recommend: [Tools and resources for artists](docs/creative-tools.md).
 
 ---
 
