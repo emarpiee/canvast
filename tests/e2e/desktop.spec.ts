@@ -2773,7 +2773,7 @@ test("sharing (ADR 0184): on in Settings, a guest pairs with the code and the ho
   const ws = tempDir("cv-share-");
   mkdirSync(join(ws, "library"), { recursive: true });
   writeFileSync(join(ws, "library", "shared.png"), makePng(4, 4, () => [10, 200, 30, 255]));
-  const { app, page } = await launch(ws);
+  const { app, page } = await launch(ws, "userdata", true); // (file names as given)
   const call = (port: number, path: string, body: unknown, token?: string): Promise<{ status: number; bytes: Buffer; fingerprint: string }> =>
     new Promise((ok, fail) => {
       const req = httpsRequest({ host: "127.0.0.1", port, path, method: "POST", rejectUnauthorized: false, headers: token ? { authorization: `Bearer ${token}` } : {} }, (res) => {
@@ -2825,7 +2825,7 @@ test("sharing (ADR 0184): on in Settings, a guest pairs with the code and the ho
 
 test("sharing (ADR 0184): a browser guest pairs, sees the host's library and canvas read-only, stays paired after a reload, and pairs again once removed", async () => {
   const ws = tempDir("cv-guest-");
-  const { app, page } = await launch(ws);
+  const { app, page } = await launch(ws, "userdata", true); // (file names as given)
   const browser = await chromium.launch();
   try {
     await page.getByTestId("view-assets").click();
@@ -2840,6 +2840,7 @@ test("sharing (ADR 0184): a browser guest pairs, sees the host's library and can
     const { port } = (await page.evaluate(() => window.canvastDesktop!.share!.call("status"))) as { port: number };
     const ctx = await browser.newContext({ ignoreHTTPSErrors: true }); // (the host's own certificate: a browser warns once)
     const g = await ctx.newPage();
+    g.on("pageerror", (e) => console.log(`guest page error: ${e.message}\n${e.stack ?? ""}`));
     const pair = async (): Promise<void> => {
       await g.getByTestId("prompt-input").fill(code);
       await g.getByTestId("prompt-ok").click();
@@ -2883,7 +2884,7 @@ test("sharing (ADR 0184): a browser guest pairs, sees the host's library and can
 
 test("sharing (ADR 0184): hidden items reach a guest only when shared, encrypted; the guest opens them with the Hidden password", async () => {
   const ws = tempDir("cv-guest-hidden-");
-  const { app, page } = await launch(ws);
+  const { app, page } = await launch(ws, "userdata", true); // (file names as given)
   const browser = await chromium.launch();
   const secret = makePng(6, 6, () => [20, 20, 220, 255]);
   const sha = (b: Buffer) => createHash("sha256").update(b).digest("hex");
@@ -2922,6 +2923,7 @@ test("sharing (ADR 0184): hidden items reach a guest only when shared, encrypted
     expect(got.body.equals(secret), "decrypted as read: the original bytes").toBe(true);
     expect((await dav("PUT", "/dav/Library/x.png")).status).toBe(403);
     const g = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
+    g.on("pageerror", (e) => console.log(`guest page error: ${e.message}\n${e.stack ?? ""}`));
     await g.goto(`https://127.0.0.1:${port}/#debug`);
     await g.getByTestId("prompt-input").fill(code);
     await g.getByTestId("prompt-ok").click();
