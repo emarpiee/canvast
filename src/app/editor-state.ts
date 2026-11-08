@@ -1,5 +1,5 @@
 import type { Camera } from "../core/camera";
-import { readOnlyLine } from "../storage/remote-bridge";
+import { readOnlyLine } from "../storage/guest-page";
 import type { Dyadic } from "../core/dyadic";
 import type { Frame } from "../core/frames";
 import { expressExactIn, levelsBetween } from "../core/frames";

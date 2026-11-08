@@ -1,5 +1,5 @@
 import * as D from "../core/dyadic";
-import { readOnlyWhy } from "../storage/remote-bridge";
+import { readOnlyWhy } from "../storage/guest-page";
 import { LOG10_2 } from "../core/dyadic";
 import { approxIn, depthOf } from "../core/frames";
 import type { ViewState } from "./view-state";

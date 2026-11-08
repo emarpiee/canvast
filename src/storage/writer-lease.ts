@@ -12,7 +12,7 @@
  * 3. Neither available: the tab assumes it is the writer, and conflicts are
  *    caught by the revision check.
  */
-import { isGuestPage } from "./remote-bridge";
+import { isGuestPage } from "./guest-page";
 
 export type LeaseState = "acquiring" | "writer" | "readonly";
 export type LeaseMechanism = "web-locks" | "local-heartbeat" | "none";

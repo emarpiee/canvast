@@ -1,5 +1,5 @@
 import type { Session } from "../app/session";
-import { readOnlyWhy } from "../storage/remote-bridge";
+import { readOnlyWhy } from "../storage/guest-page";
 import { plural } from "../doc/plural";
 import { esc } from "./format";
 import { LIBRARY_FILE, externalFolder, folderSupported } from "../storage/external-folder";

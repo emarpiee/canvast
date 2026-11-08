@@ -1,5 +1,5 @@
 import { groundFill } from "../assets/card";
-import { readOnlyWhy } from "../storage/remote-bridge";
+import { readOnlyWhy } from "../storage/guest-page";
 import { sectionOrder, sortableSections } from "./sortable-sections";
 import { fileInLibrary } from "../app/library-filing";
 import { beginProgress } from "../app/progress";

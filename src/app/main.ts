@@ -1,6 +1,6 @@
 import { setSnapPx } from "../interaction/snap";
 import { followHost, sendView } from "./follow";
-import { readOnlyLine, readOnlyWhy } from "../storage/remote-bridge";
+import { readOnlyLine, readOnlyWhy } from "../storage/guest-page";
 import { guestBridge } from "./guest";
 import { installShareAsk } from "../ui/share-panel";
 import { deleteEverywhere } from "../ui/delete-everywhere";

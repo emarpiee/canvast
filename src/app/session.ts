@@ -1,5 +1,5 @@
 import { contentOf } from "../assets/library-match";
-import { readOnlyLine } from "../storage/remote-bridge";
+import { readOnlyLine } from "../storage/guest-page";
 import { WS_AT } from "../settings/settings";
 import type { CardLook } from "../ui/file-views";
 import { sha256Hex } from "../assets/sha256";

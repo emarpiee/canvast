@@ -1,5 +1,5 @@
 import type { Session } from "../app/session";
-import { isGuestPage, readOnlyLine, readOnlyWhy } from "../storage/remote-bridge";
+import { isGuestPage, readOnlyLine, readOnlyWhy } from "../storage/guest-page";
 import { boardFilterHtml, boardFilterState, wireBoardFilter } from "./board-filter";
 import { plural } from "../doc/plural";
 import { confirmDialog } from "./confirm";
