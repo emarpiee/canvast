@@ -22,6 +22,23 @@ export interface ShareDevice {
   seen?: number;
 }
 
+/** One line of the sharing log. */
+export interface ShareEvent {
+  at: number;
+  what: string;
+  /** The device or app. */
+  who: string;
+  address: string;
+}
+/** An app using the file managers' folder (by its address and its name). */
+export interface DavClient {
+  address: string;
+  app: string;
+  first: number;
+  last: number;
+  opened: number;
+}
+
 /** A read call of the main process: what the page's bridge would get. */
 export type ShareCall = (...args: unknown[]) => Promise<unknown>;
 
@@ -43,6 +60,8 @@ export interface ShareOptions {
   page?: () => Promise<string>;
   /** Told when a guest connects, leaves or is removed. */
   changed?: () => void;
+  /** Each thing that happened (the host keeps the log). */
+  log?: (e: ShareEvent) => void;
   /** The folder file managers open at `/dav/` (its roots), signed in with `davPassword`. */
   dav?: Readonly<Record<string, DavRoot>>;
   /** The code and the file managers' password, kept by the host (made here when absent). */
@@ -62,6 +81,8 @@ export interface ShareServer {
   fingerprint: string;
   /** The devices with a request open now (connected). */
   active(): string[];
+  /** The apps that used the file managers' folder since sharing started, the latest first. */
+  davClients(): DavClient[];
   /** Take a device off: its token stops working at once. */
   remove(id: string): void;
   /** Send an event to every connected guest (live changes, the host's view). */
@@ -149,6 +170,27 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
   const waiting = new Map<string, Array<() => void>>();
   const streams = new Map<ServerResponse, string>();
   const perDevice = o.perDevice ?? 12;
+  const addr = (req: IncomingMessage): string => (req.socket.remoteAddress ?? "").replace(/^::ffff:/, "");
+  const say = (what: string, who: string, req: IncomingMessage | null): void => o.log?.({ at: Date.now(), what, who, address: req ? addr(req) : "" });
+  // The file managers' folder: who uses it (a client is its address and its app), and what it opened.
+  const davClients = new Map<string, DavClient>();
+  const appOf = (req: IncomingMessage): string => (req.headers["user-agent"] ?? "a WebDAV app").split(/[ /(]/)[0]!.slice(0, 40) || "a WebDAV app";
+  const davSeen = (req: IncomingMessage, what: "wrong password" | "request" | "opened", path?: string): void => {
+    const app = appOf(req);
+    if (what === "wrong password") return say("Folder: wrong password", app, req);
+    const key = `${addr(req)}|${app}`;
+    let c = davClients.get(key);
+    if (!c) {
+      c = { address: addr(req), app, first: Date.now(), last: Date.now(), opened: 0 };
+      davClients.set(key, c);
+      say("Folder: signed in", app, req);
+    }
+    c.last = Date.now();
+    if (what === "opened") {
+      c.opened++;
+      say(`Folder: opened ${path}`, app, req);
+    } else o.changed?.();
+  };
 
   const json = (res: ServerResponse, status: number, body: unknown): void => {
     res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
@@ -223,11 +265,16 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
     if (typeof b?.code !== "string" || !same(b.code, code)) {
       wrongCodes++;
       wrongAt = Date.now();
+      say("Wrong code", typeof b?.name === "string" ? b.name.slice(0, 60) : "A device", req);
       return json(res, 403, { error: "That is not the code the host shows." });
     }
     const name = typeof b.name === "string" && b.name.trim() ? b.name.trim().slice(0, 60) : "A device";
     const ok = await Promise.race([o.ask({ name, address: req.socket.remoteAddress ?? "" }), new Promise<boolean>((r) => setTimeout(() => r(false), 120_000))]);
-    if (!ok) return json(res, 403, { error: "The host did not allow this device." });
+    if (!ok) {
+      say("Not allowed", name, req);
+      return json(res, 403, { error: "The host did not allow this device." });
+    }
+    say("Allowed", name, req);
     const token = randomBytes(32).toString("base64url");
     const dev: ShareDevice = { id: randomBytes(8).toString("hex"), name, tokenHash: sha(token), added: Date.now() };
     devices = [...devices, dev];
@@ -245,7 +292,7 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
         return res.end(o.page ? await o.page() : "<!doctype html><title>canvast</title><p>A canvast workspace is shared here. Open it in canvast.</p>");
       }
-      if (o.dav && (url.pathname === "/dav" || url.pathname.startsWith("/dav/"))) return davHandle(req, res, o.dav, davPassword);
+      if (o.dav && (url.pathname === "/dav" || url.pathname.startsWith("/dav/"))) return davHandle(req, res, o.dav, davPassword, davSeen);
       if (req.method === "GET" && url.pathname === "/hello") return json(res, 200, { app: "canvast", fingerprint: o.cert.fingerprint });
       if (req.method === "POST" && url.pathname === "/pair") return pair(req, res);
       const dev = deviceOf(req);
@@ -255,10 +302,13 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
       if (req.method === "GET" && url.pathname === "/events") {
         res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-store", connection: "keep-alive" });
         res.write(": hello\n\n");
+        const first = ![...streams.values()].includes(dev.id);
         streams.set(res, dev.id);
+        if (first) say("Connected", dev.name, req);
         o.changed?.();
         req.on("close", () => {
           streams.delete(res);
+          if (![...streams.values()].includes(dev.id)) say("Left", dev.name, req);
           o.changed?.();
         });
         return;
@@ -281,7 +331,10 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
     addresses: o.host && o.host !== "0.0.0.0" ? [o.host] : lanAddresses(),
     fingerprint: o.cert.fingerprint,
     active: () => [...new Set(streams.values())],
+    davClients: () => [...davClients.values()].sort((a, b) => b.last - a.last),
     remove(id) {
+      const gone = devices.find((d) => d.id === id);
+      if (gone) say("Removed", gone.name, null);
       devices = devices.filter((d) => d.id !== id);
       o.devices.save(devices);
       for (const [res, d] of streams) if (d === id) res.end();

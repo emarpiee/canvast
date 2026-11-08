@@ -82,13 +82,19 @@ export interface ShareStatus {
   addresses: string[];
   /** The certificate's SHA-256, as a guest's browser shows it. */
   fingerprint: string;
+  /** Sharing starts with the app. */
+  autoStart: boolean;
+  /** The latest of the sharing log, the newest first. */
+  log: Array<{ at: number; what: string; who: string; address: string }>;
+  /** The apps that used the folder for file managers since sharing started. */
+  davClients: Array<{ address: string; app: string; first: number; last: number; opened: number }>;
   /** The folder for file managers (WebDAV) on this computer, and its password (new at each start). */
   dav: { url: string; others: string[]; password: string } | null;
   devices: Array<{ id: string; name: string; added: number; seen: number | null; active: boolean }>;
 }
 export interface ShareCalls {
   /** start, stop, status; hidden (on: boolean); remove (a device's id); answer ({ id, ok }); view (the host's view, for guests that follow it). */
-  call(op: "status" | "start" | "stop" | "hidden" | "remove" | "answer" | "view" | "davAnswer" | "openDav" | "newCode" | "newDavPassword" | "setDavPassword", arg?: unknown): Promise<ShareStatus | null>;
+  call(op: "status" | "start" | "stop" | "hidden" | "remove" | "answer" | "view" | "davAnswer" | "openDav" | "newCode" | "newDavPassword" | "setDavPassword" | "autoStart" | "openLog", arg?: unknown): Promise<ShareStatus | null>;
   onStatus(fn: (st: ShareStatus) => void): void;
   /** A device asks to connect (it typed the code): answer with `call("answer", …)`. */
   onAsk(fn: (ask: { id: string; name: string; address: string }) => void): void;

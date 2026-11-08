@@ -32,13 +32,18 @@ const typeOf = (name: string): string => TYPES[/\.([^.]+)$/.exec(name)?.[1]?.toL
 export const isLocal = (req: IncomingMessage): boolean => /^(?:127\.|::1$|::ffff:127\.)/.test(req.socket.remoteAddress ?? "");
 
 /** Handle a request under `/dav/`. */
-export async function davHandle(req: IncomingMessage, res: ServerResponse, roots: Readonly<Record<string, DavRoot>>, password: string): Promise<void> {
+/** What the folder tells the host: a sign-in that failed, a request signed in, a file opened (its path). */
+export type DavSeen = (req: IncomingMessage, what: "wrong password" | "request" | "opened", path?: string) => void;
+
+export async function davHandle(req: IncomingMessage, res: ServerResponse, roots: Readonly<Record<string, DavRoot>>, password: string, seen: DavSeen = () => {}): Promise<void> {
   const given = /^Basic (.+)$/.exec(req.headers.authorization ?? "")?.[1];
   const pw = given ? Buffer.from(given, "base64").toString("utf8").replace(/^[^:]*:/, "") : "";
   if (!pw || pw.length !== password.length || !timingSafeEqual(Buffer.from(pw), Buffer.from(password))) {
+    if (given) seen(req, "wrong password"); // (a first request without a password is how every client asks which sign-in it needs)
     res.writeHead(401, { "www-authenticate": 'Basic realm="canvast", charset="UTF-8"' });
     return void res.end();
   }
+  seen(req, "request");
   const url = new URL(req.url ?? "/", "https://x");
   const parts = url.pathname.replace(/^\/dav\/?/, "").split("/").filter(Boolean).map((p) => decodeURIComponent(p));
   if (parts.some((p) => p === ".." || p === "." || p.includes("\0"))) return void res.writeHead(400).end();
@@ -103,6 +108,7 @@ export async function davHandle(req: IncomingMessage, res: ServerResponse, roots
   const head = { "content-type": typeOf(file.path), "accept-ranges": "bytes", "content-length": to - from, ...(range ? { "content-range": `bytes ${from}-${to - 1}/${file.size}` } : {}) };
   res.writeHead(range ? 206 : 200, head);
   if (method === "HEAD") return void res.end();
+  if (from === 0) seen(req, "opened", `${rootName}/${file.path}`); // (a file read from its start: one opening, not each part of it)
   for (let at = from; at < to; ) {
     const part = await root!.read(file.path, at, Math.min(to, at + MAX_PART));
     if (!part?.length) break;

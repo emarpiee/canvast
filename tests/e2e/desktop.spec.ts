@@ -2803,6 +2803,7 @@ test("sharing (ADR 0184): on in Settings, a guest pairs with the code and the ho
     expect(paired.fingerprint, "the certificate is the one Settings shows").toBe(st.fingerprint);
     const token = String((JSON.parse(paired.bytes.toString()) as { token: string }).token);
     await expect(page.getByTestId("share-devices")).toContainText("Test laptop");
+    await expect(page.getByTestId("share-log")).toContainText("Allowed"); // (the log says who, and from where)
     // Reads only; hidden items' files only when shared.
     const file = await call(st.port, "/call", { ch: "canvast:read", args: ["library/shared.png"] }, token);
     expect(file.status).toBe(200);

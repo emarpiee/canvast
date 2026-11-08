@@ -7,6 +7,7 @@ import type { ShareCalls, ShareStatus } from "../storage/desktop-bridge";
 import type { HiddenFiles } from "../storage/store";
 import { confirmDialog, promptDialog } from "./confirm";
 import { ICONS } from "./icons";
+import { capList, showMoreButton } from "./show-more";
 import { plural } from "../doc/plural";
 
 const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -44,6 +45,7 @@ export function installShareAsk(share: ShareCalls): void {
 export type SettingRow = (o: { id?: string; label: string; help: string; control: string }) => string;
 
 let shown: ((st: ShareStatus) => void) | null = null;
+let logOpen = false;
 
 /** The tab's cards, in its panel (`host`, after its heading), kept up to date while it is shown. */
 export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingRow): void {
@@ -70,6 +72,7 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingR
       `<div class="set-card" data-testid="share-card"><h3>Share this workspace</h3>
       ${row({ id: "share-on", label: "Share on the local network", help: "Others on this network can look at your boards, canvases and library, in a browser or the app. They cannot change anything. Sharing stops when the app closes.", control: check("share-on", 'data-share-on data-testid="share-on"', st.on) })}
       ${live}
+      ${row({ id: "share-auto", label: "Start sharing when the app opens", help: "Off: you turn it on each time. The hidden items are never shared at a start: you turn that on yourself.", control: check("share-auto", 'data-share-auto data-testid="share-auto"', st.autoStart) })}
       ${row({ id: "share-hidden", label: "Share hidden items too", help: "Their files go out encrypted, as they are in the folder; a guest needs your Hidden password to open them.", control: check("share-hidden", 'data-share-hidden data-testid="share-hidden"', st.hidden, !st.on) })}</div>
       <div class="set-card" data-testid="share-devices"><h3>Allowed devices</h3>
       ${
@@ -83,17 +86,45 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingR
           )
           .join("") || `<p class="set-help">None yet.</p>`
       }
-      <p class="set-help">${plural(st.devices.filter((d) => d.active).length, "device")} connected now.</p></div>`,
+      <p class="set-help">${plural(st.devices.filter((d) => d.active).length, "device")} connected now.</p></div>
+      <div class="set-card" data-testid="share-dav-clients"><h3>Apps using the folder</h3>
+      ${
+        st.davClients
+          .map((c) =>
+            row({
+              label: esc(c.app),
+              help: `${Date.now() - c.last < 120_000 ? "Using it now" : `Last seen ${esc(when(c.last))}`} · ${esc(c.address)} · since ${esc(when(c.first))} · ${plural(c.opened, "file")} opened`,
+              control: "",
+            }),
+          )
+          .join("") || `<p class="set-help">None since sharing started.</p>`
+      }</div>
+      <div class="set-card" data-testid="share-log"><h3>Activity</h3>
+      ${(() => {
+        const cap = capList(st.log, 5, logOpen);
+        return (
+          cap.shown.map((e) => row({ label: esc(e.what), help: `${esc(new Date(e.at).toLocaleString())}${e.who ? ` · ${esc(e.who)}` : ""}${e.address ? ` · ${esc(e.address)}` : ""}`, control: "" })).join("") +
+          (cap.long ? showMoreButton({ open: logOpen, hidden: cap.hidden, attrs: "data-share-log-more" }) : "") +
+          (st.log.length ? "" : `<p class="set-help">Nothing yet.</p>`)
+        );
+      })()}
+      ${row({ label: "The whole log", help: "Every event with its time, device and address, in a file in the app's settings folder (the latest megabyte, and one older file).", control: `<button type="button" class="set-done" data-share-open-log>Open the log file</button>` })}</div>`,
     );
   };
   host.addEventListener("change", (e) => {
     const t = e.target as HTMLInputElement;
     if (t.matches("[data-share-on]")) void share.call(t.checked ? "start" : "stop").then((st) => st && draw(st));
+    if (t.matches("[data-share-auto]")) void share.call("autoStart", t.checked).then((st) => st && draw(st));
     if (t.matches("[data-share-hidden]")) void share.call("hidden", t.checked).then((st) => st && draw(st));
   });
   host.addEventListener("click", (e) => {
     const at = e.target as HTMLElement;
     if (at.closest("[data-share-open-dav]")) void share.call("openDav");
+    if (at.closest("[data-share-open-log]")) void share.call("openLog");
+    if (at.closest("[data-share-log-more]")) {
+      logOpen = !logOpen;
+      void share.call("status").then((st) => st && draw(st));
+    }
     if (at.closest("[data-share-new-code]")) void share.call("newCode").then((st) => st && draw(st));
     if (at.closest("[data-share-new-dav]")) void share.call("newDavPassword").then((st) => st && draw(st));
     if (at.closest("[data-share-set-dav]"))

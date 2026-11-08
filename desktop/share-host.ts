@@ -6,7 +6,7 @@
 import { app, ipcMain, shell } from "electron";
 import type { BrowserWindow, IpcMainInvokeEvent } from "electron";
 import { randomBytes } from "node:crypto";
-import { chmodSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { makeSelfCert } from "./self-cert";
@@ -14,7 +14,7 @@ import type { SelfCert } from "./self-cert";
 import { guestPage, newCode, newDavPassword, pathAllowed, startShare } from "./share-server";
 import { answerFinds } from "./share-find";
 import { hostname } from "node:os";
-import type { ShareCall, ShareDevice, ShareServer } from "./share-server";
+import type { DavClient, ShareCall, ShareDevice, ShareEvent, ShareServer } from "./share-server";
 import type { DavEntry, DavRoot } from "./share-dav";
 
 /** The event a read call gets when a guest makes it (the handlers' own check lets it through). */
@@ -27,6 +27,8 @@ interface Saved {
   /** The code guests type, and the file managers' password: kept until the person asks for new ones. */
   code?: string;
   davPassword?: string;
+  /** Start sharing when the app opens (off by default; the hidden items are never shared at a start). */
+  autoStart?: boolean;
   devices?: ShareDevice[];
   port?: number;
 }
@@ -41,6 +43,20 @@ function load(): Saved {
 function keep(s: Saved): void {
   writeFileSync(file(), JSON.stringify(s), { mode: 0o600 });
   chmodSync(file(), 0o600); // (its private key: this user only)
+}
+
+/** The sharing log: a file in the app's settings folder (one older file kept past 1 MiB), the latest lines in memory for Settings. */
+const logFile = (): string => join(app.getPath("userData"), "share-log.txt");
+const recent: ShareEvent[] = [];
+function logEvent(e: ShareEvent): void {
+  recent.unshift(e);
+  recent.length = Math.min(recent.length, 50);
+  try {
+    if ((statSync(logFile(), { throwIfNoEntry: false })?.size ?? 0) > 1 << 20) renameSync(logFile(), `${logFile()}.1`);
+    appendFileSync(logFile(), `${new Date(e.at).toISOString()}\t${e.what}\t${e.who}\t${e.address}\n`, { mode: 0o600 });
+  } catch {
+    /* the log is a help, never a reason to stop sharing */
+  }
 }
 
 let server: ShareServer | null = null;
@@ -59,6 +75,11 @@ export interface ShareStatus {
   code: string;
   addresses: string[];
   fingerprint: string;
+  autoStart: boolean;
+  /** The latest of the log, the newest first. */
+  log: ShareEvent[];
+  /** The apps that used the file managers' folder since sharing started. */
+  davClients: DavClient[];
   /** The file managers' folder: its address on this computer, and its password. */
   dav: { url: string; others: string[]; password: string } | null;
   devices: Array<{ id: string; name: string; added: number; seen: number | null; active: boolean }>;
@@ -110,6 +131,9 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
     return {
       on: !!server,
       hidden,
+      autoStart: saved.autoStart === true,
+      log: recent.slice(0, 15),
+      davClients: server?.davClients() ?? [],
       port: server?.port ?? 0,
       code: server?.code ?? "",
       addresses: server?.addresses ?? [],
@@ -144,26 +168,45 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
         },
       },
       changed: push,
+      log: (e) => {
+        logEvent(e);
+        push();
+      },
       dav,
       page: async () => guestPage(await readFile(html, "utf8")) ?? "<!doctype html><title>canvast</title><p>This version of canvast cannot be shared.</p>",
     });
+  const begin = async (): Promise<void> => {
+    if (server) return;
+    // The same port as last time when it is free, so a guest's address stays the same.
+    server = await start(saved.port ?? 0).catch(() => start(0));
+    saved.port = server.port;
+    keep(saved);
+    const s = server;
+    stopFind = answerFinds(() => ({ name: `${hostname()} · ${workspaceName}`, port: s.port, fingerprint: s.fingerprint }));
+    logEvent({ at: Date.now(), what: `Sharing started on port ${s.port}`, who: "", address: "" });
+  };
+  // (Settings > Sharing: started with the app when the person asked for it; the hidden items never are)
+  if (saved.autoStart) void begin().then(push, (err: unknown) => logEvent({ at: Date.now(), what: `Sharing could not start: ${(err as Error).message}`, who: "", address: "" }));
   ipcMain.handle("canvast:share", async (e, op: unknown, arg: unknown) => {
     if (e.sender !== win.webContents) throw new Error("not this window");
     switch (op) {
       case "status":
         return status();
       case "start":
-        if (!server) {
-          // The same port as last time when it is free, so a guest's address stays the same.
-          server = await start(saved.port ?? 0).catch(() => start(0));
-          saved.port = server.port;
-          keep(saved);
-          const s = server;
-          stopFind = answerFinds(() => ({ name: `${hostname()} · ${workspaceName}`, port: s.port, fingerprint: s.fingerprint }));
-        }
+        await begin();
         push();
         return status();
+      case "autoStart":
+        saved.autoStart = arg === true;
+        keep(saved);
+        push();
+        return status();
+      case "openLog":
+        logEvent({ at: Date.now(), what: "Log opened", who: "", address: "" });
+        await shell.openPath(logFile());
+        return null;
       case "stop":
+        if (server) logEvent({ at: Date.now(), what: "Sharing stopped", who: "", address: "" });
         await server?.close();
         stopFind?.();
         stopFind = null;

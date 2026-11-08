@@ -232,3 +232,31 @@ describe("a kept code and password", () => {
     }
   });
 });
+
+describe("the sharing log", () => {
+  it("says wrong codes, allowed devices, and the folder's apps with what they opened", async () => {
+    const events: string[] = [];
+    server = await startShare({
+      cert,
+      host: "127.0.0.1",
+      calls: new Map(),
+      hidden: () => false,
+      ask: async () => true,
+      devices: { load: () => [], save: () => {} },
+      log: (e) => events.push(`${e.what} | ${e.who} | ${e.address}`),
+      dav: { Library: { list: async () => [{ path: "a.txt", size: 2 }], read: async () => new Uint8Array([1, 2]) } },
+    });
+    await send(server.port, "POST", "/pair", { code: server.code === "000000" ? "111111" : "000000", name: "Phone" });
+    await send(server.port, "POST", "/pair", { code: server.code, name: "Phone" });
+    const davGet = (pw: string): Promise<number> =>
+      new Promise((ok, fail) => {
+        const r = request({ host: "127.0.0.1", servername: "localhost", port: server!.port, path: "/dav/Library/a.txt", ca: cert.cert, headers: { "user-agent": "Xplore/4.40", authorization: `Basic ${Buffer.from(`me:${pw}`).toString("base64")}` } }, (res) => (res.resume(), res.on("end", () => ok(res.statusCode ?? 0))));
+        r.on("error", fail);
+        r.end();
+      });
+    expect(await davGet("nope")).toBe(401);
+    expect(await davGet(server.davPassword)).toBe(200);
+    expect(events).toEqual(["Wrong code | Phone | 127.0.0.1", "Allowed | Phone | 127.0.0.1", "Folder: wrong password | Xplore | 127.0.0.1", "Folder: signed in | Xplore | 127.0.0.1", "Folder: opened Library/a.txt | Xplore | 127.0.0.1"]);
+    expect(server.davClients()).toMatchObject([{ app: "Xplore", address: "127.0.0.1", opened: 1 }]);
+  });
+});
