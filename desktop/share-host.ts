@@ -290,7 +290,7 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
           logEvent({ at: Date.now(), what: "Folder login removed", who: login.name, address: "" });
         } else if (typeof a?.name === "string" && a.name.trim()) login.name = a.name.trim().slice(0, 60);
         else if (a?.newPassword === true) login.password = newDavPassword();
-        else if (typeof a?.right === "string" && a.right in login.rights) {
+        else if (typeof a?.right === "string" && ["add", "edit", "move", "delete", "hidden"].includes(a.right)) {
           login.rights = { ...login.rights, [a.right]: a.on === true } as DavRights;
           logEvent({ at: Date.now(), what: `Folder right “${a.right}” ${a.on === true ? "given" : "taken away"}`, who: login.name, address: "" });
         }

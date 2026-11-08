@@ -1,5 +1,5 @@
 import { contentOf } from "../assets/library-match";
-import { readOnlyLine } from "../storage/guest-page";
+import { isGuestPage, readOnlyLine } from "../storage/guest-page";
 import { WS_AT } from "../settings/settings";
 import type { CardLook } from "../ui/file-views";
 import { sha256Hex } from "../assets/sha256";
@@ -1162,6 +1162,7 @@ export class Session {
   async checkPassword(kind: PasswordKind, password: string): Promise<boolean> {
     const hidden = kind === "hidden" ? this.storage?.hidden : null;
     if (hidden && (await hidden.state()) !== "none") return hidden.unlock(password);
+    if (hidden && isGuestPage()) return false; // (a guest never makes a key: none from the host means its hidden items are not shared)
     const lock = await this.catalog?.lock(kind).catch(() => null);
     const ok = !lock || (await checkLock(lock, password));
     // (a password set before the key, or brought by a backup: its key is made now; not while another device's key is on its way)

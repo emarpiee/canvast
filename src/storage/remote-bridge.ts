@@ -31,7 +31,7 @@ export const hostStats: Record<string, { n: number; bytes: number; ms: number }>
 export function hostCalls(origin: string, token: string): HostCall {
   return async (ch, ...args) => {
     const t0 = performance.now();
-    const key = ch === "canvast:lib" ? `lib.${String(args[0])}` : ch.slice(8);
+    const key = ch === "canvast:lib" ? `lib.${String(args[0])}` : ch === "canvast:read" && String(args[0]).startsWith("library/") ? "read.library" : ch.slice(8);
     const res = await fetch(`${origin}/call`, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ ch, args }) });
     const done = (bytes: number): void => {
       const s = (hostStats[key] ??= { n: 0, bytes: 0, ms: 0 });

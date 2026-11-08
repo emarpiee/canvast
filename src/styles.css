@@ -927,8 +927,6 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 #settings-view[hidden] { display: none; }
 .set-head { display: flex; align-items: center; gap: var(--s-6); max-width: 960px; width: 100%; margin: 0 auto var(--s-6); }
 .set-title { margin: 0; font-size: var(--text-3xl); font-weight: 600; flex: 1; }
-.set-done { font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; height: var(--list-h); padding: 0 var(--s-6); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
-.set-done:hover, .set-reset:hover:not(:disabled) { border-color: var(--hud-accent); }
 .set-body { display: flex; gap: var(--s-10); max-width: 960px; width: 100%; margin: 0 auto; min-height: 0; flex: 1; }
 .set-tabs { display: flex; flex-direction: column; gap: var(--s-1); width: 210px; flex: none; }
 .set-tabs button { text-align: left; font: inherit; color: inherit; padding: var(--s-4) var(--s-6); background: none; border: 0; border-radius: var(--r-sm); cursor: pointer; }
@@ -961,8 +959,6 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
   .set-tabs { width: auto; flex-direction: row; flex-wrap: wrap; }
   .set-row { grid-template-columns: 1fr; gap: var(--s-4); }
 }
-.set-keyrow { grid-template-columns: minmax(0, 1fr) minmax(280px, 1.6fr); }
-.set-keyrow .set-control { flex-wrap: wrap; justify-content: flex-end; gap: var(--s-4); }
 .set-chip { display: inline-flex; align-items: center; gap: var(--s-1); }
 .set-chip-x { padding: 0 var(--s-2); color: var(--hud-muted); background: transparent; border: 0; cursor: pointer; font: var(--text-md) var(--font-ui); }
 .set-chip-x:hover { color: var(--hud-fg); }
@@ -2593,14 +2589,15 @@ dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
 .set-control output { opacity: 1; color: var(--hud-muted); }
 /* The shortcut keys: the same rows as every other tab, the whole width. */
 .set-keys, .set-info.set-keys { max-width: none; }
-.set-keyrow { grid-template-columns: minmax(0, 1fr) 220px auto auto; }
+.set-keyrow { grid-template-columns: minmax(0, 1fr) auto; } /* (its keys and buttons are its one control, on one line) */
+.set-keyrow .set-control { flex-wrap: nowrap; }
 .set-keys h3 { font-size: var(--text-xl); font-weight: var(--weight-semibold); }
 .set-info { max-width: none; }
 .set-info dt { opacity: 1; color: var(--hud-muted); }
 @media (max-width: 720px) {
   .set-tabs { align-self: stretch; width: auto; flex-direction: row; flex-wrap: wrap; }
   .set-row, .set-keyrow, .set-row.is-plain { grid-template-columns: 1fr; }
-  .set-row.is-plain .set-control { flex-wrap: wrap; }
+  .set-row.is-plain .set-control, .set-keyrow .set-control { flex-wrap: wrap; }
   .set-card { padding: var(--s-6) var(--s-6); }
 }
 .set-panels > section[hidden] { display: none; }

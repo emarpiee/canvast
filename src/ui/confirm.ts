@@ -98,7 +98,12 @@ export interface ListDialogOptions {
 }
 
 /** Modal holding a list that can grow (devices, logins, activity, errors): it scrolls by itself, and Close ends it. */
+const listsOpen = new Map<string, { refresh: () => void; close: () => void; open: () => boolean }>();
+
+/** (one dialog of a kind at a time: asked again while it is open, the open one is drawn again and kept) */
 export function listDialog(o: ListDialogOptions): { refresh: () => void; close: () => void; open: () => boolean } {
+  const already = listsOpen.get(o.testid);
+  if (already?.open()) return (already.refresh(), already);
   const dlg = makeModal({
     className: "confirm list-dialog",
     testid: o.testid,
@@ -122,7 +127,9 @@ export function listDialog(o: ListDialogOptions): { refresh: () => void; close: 
   refresh();
   showModal(dlg, () => void (open = false));
   dlg.querySelector<HTMLButtonElement>("[data-list-close]")!.focus();
-  return { refresh, close, open: () => open };
+  const handle = { refresh, close, open: () => open };
+  listsOpen.set(o.testid, handle);
+  return handle;
 }
 
 export interface ChooseOptions extends DialogSummary {

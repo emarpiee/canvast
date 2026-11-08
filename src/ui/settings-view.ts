@@ -494,6 +494,9 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   const noneEl = root.querySelector<HTMLElement>(".set-none")!;
   const panels = [...root.querySelectorAll<HTMLElement>('[role="tabpanel"]')];
   let current = "drawing";
+  // A tab's panel is wired (its listeners) once; a later visit only draws it again. Wiring at every visit stacked the listeners: one press, two dialogs.
+  const wired = new Map<string, () => void>();
+  const once = (id: string, wire: () => () => void): (() => void) => wired.get(id) ?? (wired.set(id, wire()), wired.get(id)!);
   const select = (id: string, focus = false): void => {
     current = id;
     for (const t of tabs) {
@@ -508,7 +511,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     if (id === "sharing") {
       const host = root.querySelector<HTMLElement>('[data-panel="sharing"]');
       const share = desktopBridge()?.share;
-      if (host && share) mountSharing(host, share, plainRowHtml);
+      if (host && share) once(id, () => mountSharing(host, share, plainRowHtml))();
     }
     if (id === "privacy") for (const k of ["workspace", "hidden"] as const) void passwordCard(k, "status");
     if (id === "about") showErrors();

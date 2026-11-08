@@ -48,8 +48,8 @@ export type SettingRow = (o: { id?: string; label: string; help: string; control
 type Dialog = { refresh: () => void; open: () => boolean };
 let shown: ((st: ShareStatus) => void) | null = null;
 
-/** The tab's rows, in its panel (`host`, the tab's section), kept up to date while it is shown. */
-export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingRow): void {
+/** The tab's rows, in its panel (`host`, the tab's section), kept up to date while it is shown. Wired once: it returns what draws it again. */
+export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingRow): () => void {
   const title = host.querySelector("h2")?.outerHTML ?? "";
   const check = (id: string, attrs: string, on: boolean, disabled = false): string => `<input type="checkbox" id="${id}" ${attrs} ${on ? "checked" : ""} ${disabled ? "disabled" : ""}>`;
   const code = (s: string): string => `<code>${esc(s)}</code>`;
@@ -228,5 +228,5 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingR
   });
   if (!shown) share.onStatus((st) => shown?.(st)); // (one listener, whichever panel is shown)
   shown = update;
-  void share.call("status").then(update);
+  return () => void share.call("status").then(update);
 }

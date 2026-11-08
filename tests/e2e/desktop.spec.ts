@@ -2830,8 +2830,11 @@ test("sharing (ADR 0184): on in Settings, a guest pairs with the code and the ho
     await page.getByTestId("share-logins").click();
     await expect(page.getByTestId("share-logins-dialog").locator(".set-row")).toHaveCount(20);
     await page.getByTestId("share-logins-dialog-close").click();
-    // Removed: refused at once.
+    // Removed: refused at once. (After another tab and back: one press, one dialog.)
+    await page.getByRole("tab", { name: "About" }).click();
+    await page.getByRole("tab", { name: "Sharing" }).click();
     await page.getByTestId("share-guests").click();
+    await expect(page.locator('[data-testid="share-guests-dialog"]')).toHaveCount(1);
     await page.getByRole("button", { name: "Remove Test laptop" }).click();
     await page.getByTestId("share-guests-dialog-close").click();
     expect((await call(st.port, "/call", { ch: "canvast:read", args: ["library/shared.png"] }, token)).status).toBe(401);
@@ -3016,7 +3019,7 @@ test("sharing (ADR 0184): a guest's library of 120 pictures shows its thumbnails
     const stats = await g.evaluate(() => (window as unknown as { __canvastHostStats: Record<string, { n: number; bytes: number; ms: number }> }).__canvastHostStats);
     console.log(`guest library: ${await shown()} thumbnails in ${ms} ms; calls: ${JSON.stringify(stats)}`);
     // The originals are not read to draw thumbnails: the host's own are used.
-    expect(stats["read"]?.n ?? 0, "originals read whole").toBeLessThan(5);
+    expect(stats["read.library"]?.n ?? 0, "originals read whole").toBeLessThan(5);
   } finally {
     await browser.close();
     await app.close();
