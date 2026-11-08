@@ -103,6 +103,8 @@ export async function readyForHidden(session: Session, hiding: boolean): Promise
 export async function scopeWithHiddenChoice(session: Session, scope: ExportScope): Promise<ExportScope | null> {
   const n = await session.hiddenInExport(scope);
   if (!n) return scope;
+  // (the browser's: encrypted with its Hidden password, as the desktop app's are; with none set, they can only go in readable)
+  const browserLock = !session.storage?.hidden && (await session.hasPassword("hidden"));
   const choice = await chooseDialog({
     title: "Hidden items",
     lines: [`${plural(n, "hidden item")} would be in this export. Include ${n === 1 ? "it" : "them"}, with ${n === 1 ? "its" : "their"} files and names?`],
@@ -110,13 +112,20 @@ export async function scopeWithHiddenChoice(session: Session, scope: ExportScope
       { value: "leave", label: "Leave them out", help: "The export has no trace of them. Pictures on a canvas that use them show as missing when it is imported." },
       session.storage?.hidden
         ? { value: "include", label: "Include them", help: "They go into the file still encrypted, with their key: only the Hidden password opens them, in the desktop app or in the browser." }
-        : { value: "include", label: "Include them", help: "They stay hidden when imported. The file is not encrypted: anyone who has it can open it." },
+        : browserLock
+          ? { value: "include", label: "Include them", help: "They go into the file encrypted with the Hidden password, as the desktop app's: it opens them, in the browser or the desktop app." }
+          : { value: "include", label: "Include them", help: "They stay hidden when imported. With no Hidden password set, the file is not encrypted: anyone who has it can open it." },
     ],
     confirmLabel: "Export",
   });
   if (choice === null) return null;
-  if (choice === "include" && !(await askHiddenPassword(session, "Enter the password to include the hidden items."))) return null;
-  return { ...scope, skipHidden: choice === "leave" };
+  if (choice === "leave") return { ...scope, skipHidden: true };
+  if (browserLock) {
+    const password = await askCurrentPassword(session, "hidden", "Enter the Hidden password: the hidden items are encrypted with it in the backup.");
+    return password === null ? null : { ...scope, skipHidden: false, sealWith: password };
+  }
+  if (!(await askHiddenPassword(session, "Enter the password to include the hidden items."))) return null;
+  return { ...scope, skipHidden: false };
 }
 
 /**

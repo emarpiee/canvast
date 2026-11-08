@@ -18,7 +18,9 @@ import type { StyleItem } from "../assets/styles";
 import { cleanStyles } from "../assets/styles";
 import { done, req } from "./idb";
 import type { LibraryOp } from "./desktop-bridge";
-import { SEALED_NAME_RE, isFileV2, isHiddenFile, readVault } from "./hidden-vault";
+import { itemOf } from "./library-mirror";
+import { numberedName } from "../doc/file-names";
+import { SEALED_NAME_RE, createVault, isFileV2, isHiddenFile, keyCheck, nameKeys, readVault, sealFile, sealName, sealText } from "./hidden-vault";
 import type { Bookmark } from "./bookmarks";
 import { readBookmarks } from "./bookmarks";
 import type { BoardRecord, CanvasRecord, FrameStoreRecord, ObjectRecord, StoredView, WorkspaceRecord } from "./workspace-repo";
@@ -92,6 +94,11 @@ export type ExportScope = (
 ) & {
   /** Leave out the originals hidden in the library, and their names and tags (what the person chose when asked, or always for the library index). */
   skipHidden?: boolean;
+  /**
+   * The browser's Hidden password, when its hidden items go in: they are encrypted with it as the desktop app keeps them (sealed files, their
+   * encrypted names and folders, a key file with their sealed index), so a backup carries nothing readable of them, and either app opens them.
+   */
+  sealWith?: string;
   /** A workspace backup that also carries the passwords (of the Hidden items and of the workspace) and the privacy settings (set by the app from Settings > Privacy). */
   withPrivacy?: boolean;
 };
@@ -367,6 +374,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   const kept: Array<{ input: ZipInput; hash: string; size: number; type: string; file: string | undefined }> = [];
   let folders: AssetFolder[] | undefined;
   const sortedHashes = [...hashes].sort();
+  const sealHere: Array<{ r: AssetRecord; entry: CatalogEntry | null; folders: string[]; folderIds: string[] }> = [];
   for (const [i, hash] of sortedHashes.entries()) {
     progress?.("Reading the library", i, sortedHashes.length);
     const r = await libraryIn(tx, snap).rec(hash);
@@ -396,6 +404,11 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     const m = entry ? meta(entry) : { tags: [], favorite: false, hidden: false, folderIds: [], note: "", fields: [], thumb: null };
     folders ??= await libraryIn(tx, snap).folders();
     const allFolders = folders;
+    // (the browser's hidden items, with its Hidden password: encrypted after the last read of the database, below, as the desktop app's)
+    if (scope.sealWith && !sealedHooks.key && m.hidden && !noBytes) {
+      sealHere.push({ r, entry: entry ?? null, folders: m.folderIds.length ? folderPath(allFolders, m.folderIds[0]!) : [], folderIds: m.folderIds.slice(0, 1) });
+      continue;
+    }
     assets.push({
       hash,
       name: entry?.name ?? r.name,
@@ -403,7 +416,8 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
       size: r.ext ? r.size : r.blob.size,
       pixelW: r.pixelW,
       pixelH: r.pixelH,
-      importedAt: r.importedAt,
+      // (when it came into the library is its item's, what Newest sorts by: the stored record's can differ, and gave another order there)
+      importedAt: entry?.importedAt ?? r.importedAt,
       ...(r.card ? { card: true } : {}),
       ...(r.duration !== undefined ? { duration: r.duration } : {}),
       ...(r.frames !== undefined ? { frames: r.frames } : {}),
@@ -487,6 +501,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   }
   if (sealedNames.length) manifest.sealedNames = sealedNames;
   if (keyText) assetBlobs.push({ name: "hidden-key.json", data: new Blob([keyText], { type: "application/json" }) });
+  if (sealHere.length) await sealForBackup(sealHere, scope.sealWith!, folders ?? [], sealed, sealedNames, assetBlobs, manifest, progress);
   // Originals kept in the library folder are read now, after the last read of the database (the manifest's styles) (ADR 0159). A backup that
   // cannot hold one says so and stops: it never leaves an original out.
   for (const [i, k] of kept.entries()) {
@@ -1348,6 +1363,61 @@ async function updateBoards(tx: IDBTransaction, ws: WorkspaceRecord, plan: Impor
   }
   for (const b of out.values()) boards.put(b);
   tx.objectStore("workspaces").put({ ...ws, boardIds: order } satisfies WorkspaceRecord);
+}
+
+/**
+ * The browser's hidden items, encrypted for a backup as the desktop app keeps them in `.hidden/`: a new key wrapped by the Hidden password
+ * (scrypt), each file sealed with its content hash, its place an encrypted path of its folders and name (a long one's `.name` beside it),
+ * and a key file holding their sealed index (dates, tags, notes and the rest) and folders. Nothing of them is readable in the backup.
+ */
+async function sealForBackup(items: ReadonlyArray<{ r: AssetRecord; entry: CatalogEntry | null; folders: string[]; folderIds: string[] }>, password: string, all: readonly AssetFolder[], sealed: Array<{ hash: string; file: string; at?: string }>, sealedNames: Array<{ at: string; file: string }>, blobs: ZipInput[], manifest: Manifest, progress?: ProgressFn): Promise<void> {
+  progress?.("Encrypting the hidden items", 0, items.length);
+  const { record, key } = await createVault(password);
+  const keys = await nameKeys(key);
+  const enc = new TextEncoder();
+  // (a long name's `.name`, as the desktop app writes it: the name in NFC, sealed, marked a file's or a folder's)
+  const sealedName = async (text: string, kind: "fileName" | "folderName"): Promise<Blob> => new Blob([await sealFile(key, enc.encode(text.normalize("NFC")) as Uint8Array<ArrayBuffer>, { kind })]);
+  const segOf = async (name: string, kind: "fileName" | "folderName", longAt: (seg: string) => string): Promise<string> => {
+    const s = await sealName(keys, name);
+    if (s.long) {
+      const at = longAt(s.seg);
+      if (!sealedNames.some((n) => n.at === at)) {
+        const file = `sealed-names/${sealedNames.length}.bin`;
+        blobs.push({ name: file, data: await sealedName(name, kind) });
+        sealedNames.push({ at, file });
+      }
+    }
+    return s.seg;
+  };
+  const index: unknown[] = [];
+  const folderIds = new Set<string>();
+  const used = new Set<string>();
+  for (const [k, it] of items.entries()) {
+    progress?.("Encrypting the hidden items", k, items.length);
+    let dir = ".hidden";
+    for (const name of it.folders) dir = `${dir}/${await segOf(name, "folderName", (seg) => `${dir}/${seg}/.name`)}`;
+    // (two of one name in one folder: the later one numbered, as the desktop app's `hiddenPath` does)
+    const e = it.entry;
+    const whole = e?.name || it.r.name || it.r.hash.slice(0, 12);
+    const dot = whole.lastIndexOf(".");
+    const [stem, ext] = dot > 0 ? [whole.slice(0, dot), whole.slice(dot)] : [whole, ""];
+    let name = whole;
+    for (let n = 2; used.has(`${dir}\n${name.toLowerCase()}`); n++) name = numberedName(stem, n, ext);
+    used.add(`${dir}\n${name.toLowerCase()}`);
+    const at = `${dir}/${await segOf(name, "fileName", (seg) => `${dir}/${seg}.name`)}`;
+    const bytes = new Uint8Array(await it.r.blob.arrayBuffer()) as Uint8Array<ArrayBuffer>;
+    const file = `sealed/${it.r.hash}.bin`;
+    blobs.push({ name: file, data: new Blob([await sealFile(key, bytes, { hash: it.r.hash })]) });
+    sealed.push({ hash: it.r.hash, file, at });
+    for (let id: string | null | undefined = it.folderIds[0]; id && !folderIds.has(id); id = all.find((f) => f.id === id)?.parentId) folderIds.add(id);
+    // (its entry in the sealed index as the desktop app makes one, `itemOf`: its place and name are the sealed file's)
+    index.push({ ...itemOf(e ?? entryFromRecord(it.r), it.r), file: at, name, hidden: true, state: "active" });
+  }
+  const folders = all.filter((f) => folderIds.has(f.id)).map((f) => ({ ...f, hidden: true as const }));
+  const keyFile = { ...record, check: await keyCheck(key), index: await sealText(key, JSON.stringify(index)), ...(folders.length ? { folders: await sealText(key, JSON.stringify(folders)) } : {}) };
+  blobs.push({ name: "hidden-key.json", data: new Blob([JSON.stringify(keyFile, null, 1)], { type: "application/json" }) });
+  Object.assign(manifest, { sealed, hiddenKey: "hidden-key.json", ...(sealedNames.length ? { sealedNames } : {}) });
+  progress?.("Encrypting the hidden items", items.length, items.length);
 }
 
 /** The library folders for a backup, by path: the hidden ones only where they are not sealed in its key file and hidden items go in it. */

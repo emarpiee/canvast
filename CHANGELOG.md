@@ -2,6 +2,9 @@
 
 ## 0.54.63 — An import finishes its encryption; dates kept (2026-11-08)
 
+- **Changed:** a backup made in the browser encrypts its hidden items with the Hidden password, as the desktop app's do (sealed files, encrypted names and folders, a key file with their sealed index): nothing of them is readable in it, and either app opens them with that password. The desktop app then has nothing to encrypt at the import. With no Hidden password set in the browser, they go in readable, as before, and the export says so.
+- **Fixed:** a backup said when each item came from its stored file's record, not from the item itself (what Newest sorts by), so the order could differ where it was imported.
+
 - **Fixed:** a desktop import of a browser's backup with many hidden items could start the app again before they were all encrypted, and the rest was encrypted after the start, on a screen of its own. The import writes again until every one is (it says if any could not be), all on its own screen.
 - **Fixed:** into a desktop workspace with no Hidden password yet (an empty one), a backup's readable hidden items were encrypted only when the hidden list was first opened, while it was browsed. The import now asks for the backup's own Hidden password when it brings one (once, checked against it; it becomes this workspace's, as the browser's import offers), else to set one (typed twice), and encrypts them on its own screen.
 - **Fixed:** when an item came into the library only ever goes earlier: an item taken in or recovered here a moment before its backup's or index's date arrived (dated now) takes that date, so Newest is the same as where the backup was made.

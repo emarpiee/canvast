@@ -415,9 +415,19 @@ test("hidden items, browser to browser: included in a backup, they come back hid
     await p.getByTestId("prompt-ok").click();
     await p.getByTestId("choose-ok").click(); // (passwords and privacy settings: left out)
   });
+  // Encrypted in the backup, as the desktop app's: nothing readable of it (no bytes, no note), a sealed file and a key file.
+  const z = await readZip(new Blob([new Uint8Array(file.bytes)]));
+  expect([z.has(`sealed/${GREEN_HASH}.bin`), z.has("hidden-key.json"), z.has(`assets/${GREEN_HASH}`)]).toEqual([true, true, false]);
+  expect(file.bytes.includes(Buffer.from("From the life class"))).toBe(false);
   const { context, page: q } = await freshProfile(browser);
   try {
-    await importArchive(q, file.name, file.bytes);
+    await openPanel(q);
+    await q.getByTestId("set-import-input").setInputFiles({ name: file.name, mimeType: "application/zip", buffer: file.bytes });
+    await importMode(q);
+    await q.getByTestId("confirm-ok").click();
+    await q.getByTestId("prompt-input").fill("pw");
+    await q.getByTestId("prompt-ok").click();
+    await expect(q.getByTestId("toast")).toContainText(/1 hidden item opened/, { timeout: 60_000 });
     await expect.poll(() => hiddenDetails(q, GREEN_HASH)).toEqual([[true, LONG_NOTE, at]]);
   } finally {
     await context.close();
