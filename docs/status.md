@@ -37,6 +37,10 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.55.0: release of 0.54.49 to 0.54.63 (2026-11-08)
+
+- **Committed:** v0.55.0, released (releases end in .0 from now: the owner's rule; patch versions are the pushes between).
+
 ## v0.54.63: browser backups encrypt hidden items; an import finishes its encryption; dates kept (2026-11-08)
 
 - **Implemented (browser backups):** `ExportScope.sealWith` (the Hidden password, asked at Include); `sealForBackup` (createVault, sealFile per item with its hash, `sealName` paths and `.name` files as the desktop writes them, `itemOf` index, sealed hidden folders); `importedAt` from the item, not its record. archive.spec browser to browser checks the backup has nothing readable.

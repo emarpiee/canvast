@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.55.0 — Backups that travel, hidden items encrypted everywhere (2026-11-08)
+
+Everything since 0.54.48, in one release (0.54.49 to 0.54.63).
+
+- **Added:** importing a workspace backup can **update this workspace** (boards and canvases by id, changes made elsewhere taken, this workspace's own change kept as a conflict copy, what the backup lacks set aside) or add new boards: work elsewhere in the browser or the desktop app, come back with the backup.
+- **Added:** a browser's backup encrypts its hidden items with the Hidden password, as the desktop app's; the browser opens a desktop backup's hidden items with their password; their dates, tags and notes travel in both directions.
+- **Added:** settings that shape the workspace's files are kept in the workspace and shared by every device; the rest stay on the device.
+- **Added:** copies of a file put in other folders of the library are items of their own (desktop); `is:copy`, `is:samename`; a **Missing** row in the library's sidebar; saved searches with counts, names of their own and a ⋯ menu.
+- **Added:** with Window frame off, the window moves by its row's title (drag area), on Wayland too; minimize and maximize show the common icons.
+- **Changed:** every library folder goes in a backup, empty and hidden ones too; an item's date added is its own in a backup.
+- **Fixed:** library folders deleted outside the app came back.
+- **Fixed:** a file whose ending the app did not know was renamed with a made-up one (`.octetstr`).
+- **Fixed:** hidden items lost their details, or were encrypted only later, when imported into the desktop app; a write of a hidden file with a long name failed (ENAMETOOLONG).
+- **Fixed:** a new device could write its default settings over the workspace's; a quick change of a setting could be undone by an older copy.
+
 ## 0.54.63 — An import finishes its encryption; dates kept (2026-11-08)
 
 - **Changed:** a backup made in the browser encrypts its hidden items with the Hidden password, as the desktop app's do (sealed files, encrypted names and folders, a key file with their sealed index): nothing of them is readable in it, and either app opens them with that password. The desktop app then has nothing to encrypt at the import. With no Hidden password set in the browser, they go in readable, as before, and the export says so.
