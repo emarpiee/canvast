@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { makePng } from "../e2e/png";
 // @ts-expect-error (plain JavaScript, no types)
-import { cleanPath, cleanPaths, shareFolder } from "../../scripts/tools/canvast-tools.mjs";
+import { cleanPath, cleanPaths, shareFolder } from "../../scripts/tools/tools-source.mjs";
 // @ts-expect-error (plain JavaScript, no types)
 import { encryptHidden, hiddenFolder } from "../../scripts/hidden-items.mjs";
 

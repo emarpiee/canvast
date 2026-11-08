@@ -5,6 +5,8 @@
 //   node canvast-tools.mjs encrypt <workspace> <file>…
 //   node canvast-tools.mjs share <folder> [--hidden] [--write] [--devices | --only-devices] [--port N] [--password P] [--dotfiles]
 //   node canvast-tools.mjs devices              the saved devices that may sign in to a shared folder
+// ⚠️ This is the tools' SOURCE: it needs the rest of the repository and does not run on its own. The file to run (or give anyone) is
+// the built one, dist-tools/canvast-tools.mjs (`npm run build:tools`), or canvast-tools.mjs from a release.
 // The released file is built from this one and the app's own code (desktop/share-dav.ts, desktop/self-cert.ts) by
 // scripts/tools/build-tools.mjs; decrypting and encrypting are scripts/hidden-items.mjs's.
 import { randomBytes, randomUUID } from "node:crypto";

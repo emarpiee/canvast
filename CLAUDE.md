@@ -111,7 +111,7 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 
 ## Standalone tools
 
-Tools that work without the app (decrypting, encrypting, sharing a folder) are **one** program, `scripts/tools/canvast-tools.mjs`, built into one file (`npm run build:tools`, `dist-tools/canvast-tools.mjs`) and attached to every release. A new tool is a choice in it, not a new script.
+Tools that work without the app (decrypting, encrypting, sharing a folder) are **one** program, `scripts/tools/tools-source.mjs` (needs the repository: never run or copy it alone), built into one file (`npm run build:tools`, `dist-tools/canvast-tools.mjs`) and attached to every release. A new tool is a choice in it, not a new script.
 
 - **For regular users first:** run with nothing, it shows a numbered menu in plain words; it asks for folders (dragged into the terminal: `cleanPath`) and passwords (not shown); it says what it will do and asks *Go?* before writing anything.
 - **Also one-line commands** for the same actions, with `--help`.
