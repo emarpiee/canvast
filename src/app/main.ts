@@ -2309,19 +2309,62 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         }
       : {}),
     password: async (kind, action) => {
+      /** New key: asked for, then the files sealed again in the background, with its progress; what to say on the card. */
+      const newHiddenKey = async (): Promise<string> => {
+        const hidden = storage?.hidden;
+        if (!hidden?.newKey) return "";
+        if (session.readOnly) return "Another tab is editing, so the key cannot change here.";
+        const go = await confirmDialog({
+          title: "A new key for the hidden items?",
+          lines: [
+            "Every hidden file is encrypted again with a new key, one at a time, each checked before the old one goes. It takes about as long as hiding them did, and runs in the background; you can keep working.",
+            "Afterwards, copies of .canvast/hidden.json from before (backups, a sync tool's history) and the old password with them open nothing. Make a new backup once it is done.",
+            "Your password stays the same. Stopped half-way (the app closed), it goes on the next time the hidden items are opened.",
+          ],
+          confirmLabel: "Continue",
+          danger: false,
+        });
+        if (!go) return "Not changed.";
+        const password = await promptDialog({ title: "New key: your Hidden password", lines: ["The new key is locked with it."], value: "", confirmLabel: "Make a new key", secret: true });
+        if (!password) return "Not changed.";
+        const p = beginProgress(editor, "newkey", "Encrypting the hidden items with the new key");
+        hidden.onSealAgain = (done, all) => {
+          p.update(all ? done / all : null, `${done} of ${all}`);
+          if (done === all) {
+            hidden.onSealAgain = null;
+            p.done("Every hidden item is encrypted with the new key.");
+          }
+        };
+        try {
+          if (!(await hidden.newKey(password))) {
+            hidden.onSealAgain = null;
+            p.fail("That is not the Hidden password, so nothing changed.");
+            return "That is not the Hidden password, so nothing changed.";
+          }
+        } catch (e) {
+          hidden.onSealAgain = null;
+          p.fail(`No new key: ${(e as Error).message}`);
+          return `No new key: ${(e as Error).message}`;
+        }
+        return "A new key is made: the hidden files are being encrypted with it (see the progress at the bottom).";
+      };
       const what = kind === "workspace" ? "workspace" : "Hidden items";
-      const state = async (note = "", only = false): Promise<{ has: boolean; text: string; open: boolean }> => {
+      const state = async (note = "", only = false): Promise<{ has: boolean; text: string; open: boolean; rekey: boolean }> => {
         const has = await session.hasPassword(kind);
-        return { has, open: kind === "hidden" && !!storage?.hidden?.isOpen(), text: only && note ? note : `${note ? `${note} ` : ""}${has ? "A password is set." : kind === "workspace" ? "No password is set: the app opens without asking." : "No password is set: anyone can open the Hidden items."}` };
+        return { has, open: kind === "hidden" && !!storage?.hidden?.isOpen(), rekey: kind === "hidden" && has && !!storage?.hidden?.newKey, text: only && note ? note : `${note ? `${note} ` : ""}${has ? "A password is set." : kind === "workspace" ? "No password is set: the app opens without asking." : "No password is set: anyone can open the Hidden items."}` };
       };
       if (action === "status") return state();
       if (action === "lock") return state((await lockHidden(session)) ? HIDDEN_LOCKED : "", true);
+      if (action === "newkey") return state(await newHiddenKey(), true);
       if (session.readOnly) return state("Another tab is editing, so the password cannot change here.");
       const current = await askCurrentPassword(session, kind, "Enter the current password.");
       if (current === null) return state("Not changed.");
       if (kind === "hidden") forgetHiddenPassword();
       if (action === "remove") return (await session.setPassword(kind, null)) ? state("The password was removed.", true) : state();
-      const first = await promptDialog({ title: `New password for the ${what}`, lines: ["It cannot be recovered. Keep it somewhere safe."], value: "", confirmLabel: "Next", secret: true });
+      // (changing the Hidden password locks the same key again: older copies of hidden.json still open with the old one, as in other tools of this kind)
+      const changing = kind === "hidden" && !!storage?.hidden && (await session.hasPassword("hidden"));
+      const lines = ["It cannot be recovered. Keep it somewhere safe.", ...(changing ? ["Copies of .canvast/hidden.json from before (in backups, or a sync tool's history) still open your hidden items with the old password. Delete them, or use New key in Settings > Privacy afterwards: then they open nothing."] : [])];
+      const first = await promptDialog({ title: `New password for the ${what}`, lines, value: "", confirmLabel: "Next", secret: true });
       if (!first) return state("Not changed.");
       const again = await promptDialog({ title: `New password for the ${what}`, lines: ["Type it again."], value: "", confirmLabel: "Set the password", secret: true });
       if (again !== first) return state("The two did not match, so nothing changed.");

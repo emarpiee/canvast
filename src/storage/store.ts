@@ -232,6 +232,15 @@ export interface HiddenStore {
   lock(): void;
   /** Told when it opens or locks. */
   subscribe(fn: () => void): () => void;
+  /**
+   * New key (desktop): a new key under the same password (checked), every hidden file sealed again with it in the background; copies of
+   * the key file from before then open nothing. False: not the password.
+   */
+  newKey?(password: string): Promise<boolean>;
+  /** Whether a New key is still sealing files again. */
+  sealingAgain?(): Promise<boolean>;
+  /** Told how far that is (done of all). */
+  onSealAgain?: ((done: number, all: number) => void) | null;
 }
 
 /** A file found in the desktop build's `library/` that no library item has: imported where it lies (ADR 0177, "Changes from outside the app"). */

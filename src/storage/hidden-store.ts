@@ -6,8 +6,8 @@
 import type { DesktopBridge } from "./desktop-bridge";
 import type { HiddenState, HiddenStore } from "./store";
 import type { VaultRecord } from "./hidden-vault";
-import { DiskFile, MAX_IMPORT_BYTES, hashOf } from "./disk-file";
-import { SEALED_COPY_RE, createVault, holdsKey, keyCheck, needsUpgrade, openBytes, openFile, openFileAt, openText, openVault, readVault, rewrapVault, sameKey, sealBytes, sealFile, sealFileTo, sealText } from "./hidden-vault";
+import { DiskFile, WINDOW } from "./disk-file";
+import { SEALED_COPY_RE, chunkDigests, createVault, holdsKey, keyCheck, needsUpgrade, openBytes, openFile, openFileAt, openText, openVault, readVault, rewrapVault, sameChunks, sameKey, sealBytes, sealFile, sealFileTo, sealText } from "./hidden-vault";
 
 export const HIDDEN_JSON = ".canvast/hidden.json";
 /**
@@ -155,6 +155,44 @@ export class HiddenVault implements HiddenStore {
       this.own = next;
     }
     this.changed();
+  }
+
+  /** Where New key keeps the record of the key it replaces, until every file is sealed again with the new one. */
+  private static readonly BEFORE_NEW_KEY = ".canvast/hidden (before new key).json";
+  /** Told how far sealing the files again with a new key is (done of all), and when it is through (done === all). */
+  onSealAgain: ((done: number, all: number) => void) | null = null;
+
+  /**
+   * New key (Settings > Privacy): a new random key, locked with the password (checked first), the hidden items' index and folders sealed
+   * with it. The record of the old key is kept beside `hidden.json` as a copy: the files are sealed again with the new key by the next
+   * write of the index (each proven, then the copy erased; stopped half-way, it goes on at the next opening), and their names in `.hidden/`
+   * follow. After that, copies of `hidden.json` from before, and the old password with them, open nothing. Whether the password was right.
+   */
+  async newKey(password: string): Promise<boolean> {
+    const found = await this.vault();
+    if (!this.key || !found) throw new Error("the Hidden items are locked");
+    if (found.spare) throw new Error("hidden.json is not there (only its spare): open the Hidden items once so it is written again, then try again");
+    if ((await this.copies()).length) throw new Error("another copy of hidden.json is still being joined: open the Hidden items, wait for it to finish, then try again");
+    const old = await openVault(found.record, password);
+    if (!old) return false;
+    const record = found.record;
+    // (the copy first: a stop after it and before hidden.json leaves both keys known, and the next opening joins them)
+    await this.bridge.write(HiddenVault.BEFORE_NEW_KEY, new TextEncoder().encode(JSON.stringify(record, null, 1)));
+    const made = await createVault(password);
+    const index = record.index ? await openText(old, record.index) : null;
+    const folders = record.folders ? await openText(old, record.folders) : null;
+    const next: VaultRecord = { ...made.record, check: await keyCheck(made.key), ...(index !== null ? { index: await sealText(made.key, index) } : {}), ...(folders !== null ? { folders: await sealText(made.key, folders) } : {}) };
+    await this.save(next);
+    await this.keepSpare(next).catch(() => undefined);
+    this.key = made.key;
+    this.own = next;
+    this.others.set(HiddenVault.BEFORE_NEW_KEY, old);
+    this.changed(); // (the library reads the index again, joins the copy and writes it: that seals every file again)
+    return true;
+  }
+  /** Whether New key is still sealing files again with the new key (its copy of the old record is there). */
+  async sealingAgain(): Promise<boolean> {
+    return this.bridge.exists(HiddenVault.BEFORE_NEW_KEY);
   }
 
   async remove(): Promise<boolean> {
@@ -310,12 +348,16 @@ export class HiddenVault implements HiddenStore {
   /** Seal each file of `.hidden/` that only `other` opens again with this key, read back to prove it. Whether all were. */
   private async sealAgain(other: CryptoKey): Promise<boolean> {
     // (in their folders too; the folders' names, sealed with the other key, are moved by the next write to this key's names)
-    for (const { path } of await this.bridge.tree(".hidden")) {
-      if (!SEALED_COPY_RE.test(path)) continue;
+    const all = (await this.bridge.tree(".hidden")).filter(({ path }) => SEALED_COPY_RE.test(path));
+    let done = 0;
+    for (const { path } of all) {
+      this.onSealAgain?.(done++, all.length);
       const [size] = await this.bridge.sizes([path]);
-      if (size && size > MAX_IMPORT_BYTES) {
-        if (!(await this.sealBigAgain(path, size, other))) return false;
-        continue;
+      // (past a window, a part at a time: memory stays flat; a file of the first version, one sealed piece, is read whole below)
+      if (size && size > WINDOW) {
+        const done = await this.sealBigAgain(path, size, other);
+        if (done === false) return false;
+        if (done === true) continue;
       }
       const bytes = (await this.bridge.read(path)) as Uint8Array<ArrayBuffer> | null;
       if (!bytes || !this.key || (await openFile(this.key, bytes))) continue;
@@ -327,6 +369,7 @@ export class HiddenVault implements HiddenStore {
       const again = back && (await openFile(this.key, back))?.bytes;
       if (!again || again.length !== plain.length || again.some((v, i) => v !== plain[i])) return false;
     }
+    this.onSealAgain?.(all.length, all.length);
     return true;
   }
 
@@ -337,20 +380,21 @@ export class HiddenVault implements HiddenStore {
   }
 
   /** `sealAgain` for one file too big to read into the page: written beside itself and read back before it takes the old one's place. Whether it did. */
-  private async sealBigAgain(path: string, size: number, other: CryptoKey): Promise<boolean> {
+  private async sealBigAgain(path: string, size: number, other: CryptoKey): Promise<boolean | "whole"> {
     if (!this.key) return false;
     const raw = new DiskFile(async (from, to) => (await this.bridge.part(path, from, to)) ?? new Uint8Array(0), size);
     if (await openFileAt(this.key, raw)) return true;
     const opened = await openFileAt(other, raw);
-    if (!opened) return true;
-    const hash = await hashOf(opened.file);
+    if (!opened) return "whole"; // (not one that opens in parts: the caller reads it whole)
     const stream = this.bridge.stream;
     const id = await stream.begin(path, true);
     try {
-      await sealFileTo(this.key, opened.file, opened.item ?? {}, (b) => stream.append(id, b));
+      // (proven chunk by chunk against what was read from the old copy, itself checked chunk by chunk by its own tags as it was opened)
+      const digests = chunkDigests();
+      await sealFileTo(this.key, opened.file, opened.item ?? {}, (b) => stream.append(id, b), undefined, digests.seen);
       const written = await stream.finish(id);
       const back = await openFileAt(this.key, new DiskFile((from, to) => stream.read(id, from, to), written.size));
-      if (!back || (await hashOf(back.file)) !== hash) throw new Error("did not open back the same");
+      if (!back || back.file.size !== opened.file.size || !(await sameChunks(back.file, await digests.all()))) throw new Error("did not open back the same");
       await stream.commit(id);
       return true;
     } catch {
@@ -360,9 +404,9 @@ export class HiddenVault implements HiddenStore {
   }
 
   /** Seal a file of any size into `put`, a part at a time: the same file `seal` makes. */
-  async sealTo(src: Blob | DiskFile, item: object, put: (bytes: Uint8Array<ArrayBuffer>) => Promise<void>): Promise<void> {
+  async sealTo(src: Blob | DiskFile, item: object, put: (bytes: Uint8Array<ArrayBuffer>) => Promise<void>, seen?: (i: number, plain: Uint8Array<ArrayBuffer>) => void): Promise<void> {
     if (!this.key) throw new Error("the Hidden items are locked");
-    return sealFileTo(this.key, src, item, put);
+    return sealFileTo(this.key, src, item, put, undefined, seen);
   }
 
   /** A sealed file of any size opened where it lies, read as far as is asked; null while locked, when no key opens it, or for a version 1 file. */

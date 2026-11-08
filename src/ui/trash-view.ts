@@ -24,6 +24,8 @@ export interface TrashDeps {
   readOnly(): boolean;
   /** The library's own tile for a file with no picture. */
   tile(name: string): string;
+  /** The library's own picture of a file (its thumbnail, made as the library makes one: a note's page, a PDF's, a video's frame…), or null. */
+  picture(path: string, name: string): Promise<Blob | null>;
 }
 
 export interface TrashView {
@@ -51,9 +53,10 @@ export function mountTrashView(deps: TrashDeps): TrashView {
   let anchor: string | null = null;
   const urls = new Map<string, string>();
   const fit = (): TrashFile[] => files.filter((f) => words.every((w) => f.name.toLowerCase().includes(w)));
-  const urlOf = async (path: string): Promise<string | null> => {
+  /** A file's picture as the library draws it, made once (as it scrolls into view): every kind the library shows, not only pictures. */
+  const urlOf = async (path: string, name: string): Promise<string | null> => {
     if (urls.has(path)) return urls.get(path)!;
-    const blob = await deps.read(path).catch(() => null);
+    const blob = await deps.picture(path, name).catch(() => null);
     if (!blob) return null;
     const url = URL.createObjectURL(blob);
     urls.set(path, url);
@@ -63,18 +66,23 @@ export function mountTrashView(deps: TrashDeps): TrashView {
     for (const s of seen) {
       if (!s.isIntersecting) continue;
       seeing.unobserve(s.target);
-      const img = s.target as HTMLImageElement;
-      // (the card takes the picture's shape, as the library's do)
-      img.addEventListener("load", () => img.closest<HTMLElement>(".asset-cell")?.style.setProperty("--ar", String(img.naturalWidth / Math.max(1, img.naturalHeight) || 1)), { once: true });
-      void urlOf(img.dataset["path"]!).then((url) => {
-        if (url && img.isConnected) img.src = url;
+      const slot = s.target as HTMLElement;
+      void urlOf(slot.dataset["path"]!, slot.dataset["name"]!).then((url) => {
+        if (!url || !slot.isConnected) return;
+        // (the card takes the picture's shape, as the library's do; the tile stays for what has none)
+        const img = document.createElement("img");
+        img.alt = "";
+        img.draggable = false;
+        img.addEventListener("load", () => slot.closest<HTMLElement>(".asset-cell")?.style.setProperty("--ar", String(img.naturalWidth / Math.max(1, img.naturalHeight) || 1)), { once: true });
+        img.src = url;
+        slot.replaceChildren(img);
       });
     }
   }, { root: box, rootMargin: "400px" });
 
   const cardHtml = (f: TrashFile): string => `<div class="asset-cell" role="listitem" style="--ar: ${PICTURE.test(f.name) ? 1.33 : 1}">
       <button type="button" class="asset-card" data-testid="trash-card" data-path="${esc(f.path)}" aria-pressed="${picked.has(f.path)}" aria-label="${esc(f.name)}, ${fmtBytes(f.size)}" title="${esc(f.name)}">
-        <span class="asset-thumb thumb-slot">${PICTURE.test(f.name) ? `<img alt="" draggable="false" data-path="${esc(f.path)}">` : deps.tile(f.name)}</span>
+        <span class="asset-thumb thumb-slot" data-path="${esc(f.path)}" data-name="${esc(f.name)}">${deps.tile(f.name)}</span>
         <span class="asset-info"><span class="asset-name">${esc(f.name)}</span><span class="asset-size">${fmtBytes(f.size)}</span></span>
       </button></div>`;
   const draw = (): void => {
@@ -83,7 +91,7 @@ export function mountTrashView(deps: TrashDeps): TrashView {
     box.innerHTML = list.length
       ? `<div class="assets-grid" role="list" data-testid="trash-grid">${list.slice(0, shown).map(cardHtml).join("")}</div>${list.length > shown ? showMoreButton({ attrs: 'data-trash="more"', label: `Show ${plural(Math.min(PAGE, list.length - shown), "more file")}` }) : ""}`
       : `<p class="asset-note" data-testid="trash-empty">${files.length ? "No file in the trash has that name." : "The trash is empty. It lists this workspace's .trash folder, not your system's trash."}</p>`;
-    for (const img of box.querySelectorAll("img[data-path]")) seeing.observe(img);
+    for (const slot of box.querySelectorAll(".thumb-slot[data-path]")) seeing.observe(slot);
     drawDetails();
   };
   const showPicks = (): void => {
@@ -112,11 +120,13 @@ export function mountTrashView(deps: TrashDeps): TrashView {
     const f = on[0]!;
     const was = f.path.startsWith(".trash/library/") ? f.path.slice(".trash/".length, f.path.lastIndexOf("/")) : "";
     details.innerHTML = `<div class="asset-insp-head"><h2 title="${esc(f.name)}">${esc(f.name)}</h2></div>
-      ${PICTURE.test(f.name) ? `<div class="asset-preview-box"><span class="asset-preview"><img alt="" data-trash-preview></span></div>` : ""}
+      <div class="asset-preview-box" hidden><span class="asset-preview"><img alt="" data-trash-preview></span></div>
       <p class="asset-note">${fmtBytes(f.size)}${was ? ` · was in ${esc(was)}` : ""}</p>${actionsHtml()}`;
     const img = details.querySelector<HTMLImageElement>("[data-trash-preview]");
-    if (img) void urlOf(f.path).then((url) => {
-      if (url && img.isConnected) img.src = url;
+    if (img) void urlOf(f.path, f.name).then((url) => {
+      if (!url || !img.isConnected) return;
+      img.src = url;
+      img.closest<HTMLElement>(".asset-preview-box")!.hidden = false;
     });
   }
 

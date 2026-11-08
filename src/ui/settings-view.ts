@@ -376,7 +376,7 @@ export interface BackupHooks {
   /** Start from scratch: the warning, the suggestions before it, and the deletion. */
   reset(): Promise<void>;
   /** A password (of the Hidden items or of the whole workspace): whether there is one, and change it (null removes it). Resolves with a sentence to show. */
-  password(kind: "hidden" | "workspace", action: "status" | "set" | "remove" | "lock"): Promise<{ has: boolean; text: string; open?: boolean }>;
+  password(kind: "hidden" | "workspace", action: "status" | "set" | "remove" | "lock" | "newkey"): Promise<{ has: boolean; text: string; open?: boolean; rekey?: boolean }>;
   /** The desktop app: how the workspace splits its library's files (16, 256 or 4,096), and splitting them another way (asks first). */
   librarySplit?: { get(): Promise<{ split: 1 | 2 | 3; items: number }>; set(split: 1 | 2 | 3): Promise<boolean> };
 }
@@ -390,11 +390,12 @@ const DEVICE_DATA_CARD = `<div class="set-info set-card" data-device-data><h3>Wh
              <p class="set-help">Working copies of workspaces this computer no longer opens are removed after a month. For full privacy:</p>
              <ul class="set-list"><li>Turn on <em>Keep hidden items' names off this device while locked</em> (above).</li><li>Leave <em>Remember the Hidden password</em> off.</li><li>Lock the hidden items (Lock now, below) before you leave the computer: leaving hidden mode does not lock them; closing the app does.</li><li>Avoid <em>Open in default app</em> for hidden items: the other app may keep its own copy, thumbnail or recent-files entry.</li><li>Use your system's disk encryption: the working copy and the temporary folder are on this disk.</li><li>A backup keeps hidden items encrypted; a ZIP of files or an exported folder does not.</li></ul></div>`;
 
+const NEW_KEY_TIP = "A new key for the hidden items, every file encrypted again with it: old copies of hidden.json and the old password then open nothing.";
 const LOCK_TIP = "Lock the hidden items: nothing opens them, here or on a shared device, until the password is typed again.";
 const pwCard = (kind: "hidden" | "workspace", title: string, help: string): string => `<div class="set-info set-card" data-pw-card="${kind}"><h3>${esc(title)}</h3>
              <p class="set-help">${esc(help)}</p>
              <p data-pw-state role="status">…</p>
-             <div class="storage-actions"><button type="button" data-pw="set" data-kind="${kind}" data-testid="${kind}-pw-set">Set a password…</button><button type="button" data-pw="remove" data-kind="${kind}" data-testid="${kind}-pw-remove" hidden>Remove the password…</button>${kind === "hidden" ? `<button type="button" data-pw="lock" data-kind="hidden" data-testid="hidden-pw-lock" title="${esc(LOCK_TIP)}" hidden>Lock now</button>` : ""}</div></div>`;
+             <div class="storage-actions"><button type="button" data-pw="set" data-kind="${kind}" data-testid="${kind}-pw-set">Set a password…</button><button type="button" data-pw="remove" data-kind="${kind}" data-testid="${kind}-pw-remove" hidden>Remove the password…</button>${kind === "hidden" ? `<button type="button" data-pw="lock" data-kind="hidden" data-testid="hidden-pw-lock" title="${esc(LOCK_TIP)}" hidden>Lock now</button><button type="button" data-pw="newkey" data-kind="hidden" data-testid="hidden-pw-newkey" title="${esc(NEW_KEY_TIP)}" hidden>New key…</button>` : ""}</div></div>`;
 
 export function mountSettingsView(root: HTMLElement, settings: SettingsStore, keymap: Keymap, onClose: () => void, backup?: BackupHooks): { show(tab?: string): void; hide(): void } {
   const tabButton = (t: Tab): string => `<button type="button" role="tab" id="set-tab-${t.id}" aria-controls="set-panel-${t.id}" data-tab="${t.id}"><span class="set-tab-icon" aria-hidden="true">${ICONS[TAB_ICON[t.id] ?? "tabAbout"]}</span><span class="set-tab-label">${esc(t.label)}</span><span class="set-hits" aria-hidden="true"></span></button>`;
@@ -644,7 +645,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   };
   /** A password card of Privacy: show whether there is a password, or change it and show the result. */
   const pwTurn: Partial<Record<"hidden" | "workspace", number>> = {};
-  const passwordCard = async (kind: "hidden" | "workspace", action: "status" | "set" | "remove" | "lock"): Promise<void> => {
+  const passwordCard = async (kind: "hidden" | "workspace", action: "status" | "set" | "remove" | "lock" | "newkey"): Promise<void> => {
     if (!backup) return;
     const card = root.querySelector<HTMLElement>(`[data-pw-card="${kind}"]`)!;
     if (action === "lock") {
@@ -661,11 +662,13 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     card.querySelector<HTMLElement>('[data-pw="remove"]')!.hidden = !r.has;
     const lock = card.querySelector<HTMLElement>('[data-pw="lock"]');
     if (lock) lock.hidden = !r.open;
+    const rekey = card.querySelector<HTMLElement>('[data-pw="newkey"]');
+    if (rekey) rekey.hidden = !r.rekey;
   };
   root.addEventListener("click", (e) => {
     const pw = (e.target as HTMLElement).closest<HTMLElement>("[data-pw]");
     if (pw && backup) {
-      void passwordCard(pw.dataset["kind"] as "hidden" | "workspace", pw.dataset["pw"] as "set" | "remove" | "lock");
+      void passwordCard(pw.dataset["kind"] as "hidden" | "workspace", pw.dataset["pw"] as "set" | "remove" | "lock" | "newkey");
       return;
     }
     if (backup && (e.target as HTMLElement).closest("[data-reset-all]")) {

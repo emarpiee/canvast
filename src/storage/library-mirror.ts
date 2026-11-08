@@ -13,11 +13,11 @@ import type { AssetRecord } from "../assets/asset-library";
 import { MAX_IMPORT_BYTES, storedStub } from "../assets/asset-library";
 import type { DeleteMode, DesktopBridge, LibraryOp } from "./desktop-bridge";
 import type { DesktopLibrary } from "./desktop-library";
-import { DiskFile, hashOf, pipeInto, writeProven } from "./disk-file";
+import { DiskFile, WINDOW, hashOf, pipeInto, writeProven } from "./disk-file";
 import { externalFolder } from "./external-folder";
 import type { HiddenVault } from "./hidden-store";
 import { RECOVERED_PREFIX } from "./hidden-store";
-import { FILE_MAGIC, SEALED_COPY_RE, SEALED_DIR_RE, SEALED_NAME_RE, hiddenFileName, isHiddenFile, nameKeys, openName, sealName } from "./hidden-vault";
+import { FILE_MAGIC, SEALED_COPY_RE, SEALED_DIR_RE, SEALED_NAME_RE, chunkDigests, hiddenFileName, isHiddenFile, nameKeys, openName, sameChunks, sealName } from "./hidden-vault";
 import type { NameKeys } from "./hidden-vault";
 import { sha256Hex } from "../assets/sha256";
 import { done, idbGet, req } from "./idb";
@@ -1499,7 +1499,8 @@ export class LibraryMirror {
         // Shown again: opened, proven, written to its place, and only then the sealed file erased.
         const from = m.from!;
         await this.setMeta(MOVING_KEY, { hash: m.hash, from, to: target } satisfies Moving);
-        const big = await this.bigSize(from);
+        const [sealedSize] = await this.bridge.sizes([from]);
+        const big = sealedSize && sealedSize > WINDOW ? sealedSize : null; // (past a window: a part at a time, never held whole)
         if (big) {
           // (a part at a time: its chunks are checked as they are opened, and its hash read from the disk before it is put in its place)
           const opened = await this.vault.openAt(this.rawAt(from, big));
@@ -1680,12 +1681,17 @@ export class LibraryMirror {
     let id: string | null = null;
     try {
       if (!rec.ext || !rec.file) throw new Error(`“${rec.name}” has no file in the workspace folder`);
+      // Proven three ways, each at native speed: the file is the item's (its SHA-256 read by the main process, before and after, so it
+      // did not change meanwhile); the copy on disk opens with the key, chunk by chunk, into exactly the bytes that were read and sealed.
+      if ((await this.bridge.hash(rec.file)) !== contentOf(hash)) throw new Error("the file is not what the library says");
       await this.setMeta(MOVING_KEY, { hash, from: rec.file, to: name } satisfies Moving);
       const writing = (id = await stream.begin(name));
-      await this.vault.sealTo(this.rawAt(rec.file, rec.size), { hash: contentOf(hash) }, (b) => stream.append(writing, b));
+      const digests = chunkDigests();
+      await this.vault.sealTo(this.rawAt(rec.file, rec.size), { hash: contentOf(hash) }, (b) => stream.append(writing, b), digests.seen);
       const written = await stream.finish(writing);
       const back = await this.vault.openAt(new DiskFile((from, to) => stream.read(writing, from, to), written.size));
-      if (!back || back.file.size !== rec.size || (await hashOf(back.file)) !== contentOf(hash)) throw new Error("the sealed file did not open back the same");
+      if (!back || back.file.size !== rec.size || !(await sameChunks(back.file, await digests.all()))) throw new Error("the sealed file did not open back the same");
+      if ((await this.bridge.hash(rec.file)) !== contentOf(hash)) throw new Error("the file changed while it was being hidden");
       await stream.commit(writing);
       id = null;
       await this.setFile(hash, (r) => r.ext === 1 && r.file === rec.file, name);
@@ -1710,7 +1716,8 @@ export class LibraryMirror {
     const rec = await this.recOf(hash);
     if (!rec || isHiddenFile(rec.file)) return;
     const name = await this.hiddenPath(hash);
-    if (rec.size > MAX_IMPORT_BYTES) return this.sealBig(rec, hash, name, failed);
+    // (a file past a window is sealed a part at a time, never held whole: memory stays flat at any size)
+    if (rec.ext && rec.file && rec.size > WINDOW) return this.sealBig(rec, hash, name, failed);
     try {
       const bytes = rec.ext ? await this.bridge.read(rec.file ?? "") : new Uint8Array(await rec.blob.arrayBuffer());
       if (!bytes || (await sha256Hex((bytes as Uint8Array<ArrayBuffer>).slice().buffer)) !== contentOf(hash)) throw new Error("the file is not what the library says");

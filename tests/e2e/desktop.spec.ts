@@ -1015,6 +1015,27 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     cpSync(join(process.cwd(), "scripts", "hidden-items.mjs"), join(simple, "hidden-items.mjs"));
     execFileSync(process.execPath, [join(simple, "hidden-items.mjs")], { input: "pw2\n", cwd: tmpdir() });
     expect(readFileSync(join(simple, "output", "Secret Folder", "Secret Plan.png")).equals(secret)).toBe(true);
+    // New key (Settings > Privacy): every file sealed again with a new key, its name and folder too; the item opens as before; a copy of
+    // hidden.json from before, with the password it took, opens nothing any more.
+    const before = readFileSync(join(ws, ".canvast", "hidden.json"));
+    const sealedBefore = files(ws).filter((f) => f.startsWith(".hidden/") && !f.endsWith(".name"));
+    await page.getByTestId("view-canvas").click();
+    await page.getByTestId("save-status").click();
+    await page.getByRole("tab", { name: "Privacy" }).click();
+    await page.getByTestId("hidden-pw-newkey").click();
+    await page.getByTestId("confirm-ok").click();
+    await page.getByTestId("prompt-input").fill("pw2");
+    await page.getByTestId("prompt-ok").click();
+    await expect.poll(() => existsSync(join(ws, ".canvast", "hidden (before new key).json")), { message: "done: the old key's record goes", timeout: 60_000 }).toBe(false);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith(".hidden/") && !f.endsWith(".name")), { timeout: 30_000 }).not.toEqual(sealedBefore); // (named with the new key)
+    expect(await page.evaluate((h) => window.__canvastDebug.originalBytes(h), hash)).toEqual(Array.from(secret));
+    expect(await decryptHidden(ws, `${ws}-newkey`, "pw2")).toBe(1);
+    const old = `${ws}-oldcopy`;
+    mkdirSync(join(old, ".canvast"), { recursive: true });
+    cpSync(join(ws, ".hidden"), join(old, ".hidden"), { recursive: true });
+    writeFileSync(join(old, ".canvast", "hidden.json"), before);
+    expect(await decryptHidden(old, `${old}-out`, "pw2"), "the old key file opens nothing now").toBe(0);
+    await page.locator("[data-done]").click(); // (back to the canvas)
     // Locked (from the command palette): the picture on the canvas leaves memory and is drawn with a padlock; the password opens it again.
     await page.keyboard.press("Control+k");
     await page.locator(".palette-input").fill("lock hidden");
@@ -2171,8 +2192,8 @@ test("the Trash is a state of the library: this workspace's .trash for the mode,
   try {
     await page.getByTestId("view-assets").click();
     const png = (seed: number) => makePng(60, 40, () => [seed, 90, 40, 255]);
-    await page.getByTestId("assets-import-input").setInputFiles([{ name: "keep.png", mimeType: "image/png", buffer: png(10) }, { name: "gone.png", mimeType: "image/png", buffer: png(60) }, { name: "also.png", mimeType: "image/png", buffer: png(90) }, { name: "secret.png", mimeType: "image/png", buffer: png(120) }]);
-    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/")).length, { timeout: 15_000 }).toBe(4);
+    await page.getByTestId("assets-import-input").setInputFiles([{ name: "keep.png", mimeType: "image/png", buffer: png(10) }, { name: "gone.png", mimeType: "image/png", buffer: png(60) }, { name: "also.png", mimeType: "image/png", buffer: png(90) }, { name: "secret.png", mimeType: "image/png", buffer: png(120) }, { name: "words.md", mimeType: "text/markdown", buffer: Buffer.from("# Words\n\nA note in the trash.\n") }]);
+    await expect.poll(() => files(ws).filter((f) => f.startsWith("library/")).length, { timeout: 15_000 }).toBe(5);
     const hashOf = (n: string) => page.evaluate((n) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === n)!.hash), n);
     const trash = page.locator('[data-scope="trash"]');
     const cards = page.getByTestId("trash-card");
@@ -2263,6 +2284,12 @@ test("the Trash is a state of the library: this workspace's .trash for the mode,
     await expect.poll(() => page.evaluate((h) => window.__canvastDebug.originalBytes(h), secret), { timeout: 15_000 }).toEqual(Array.from(png(120)));
     await page.getByTestId("assets-search").fill("");
     await page.getByTestId("hidden-mode-exit").click();
+    // A note in the trash shows the picture the library gave it (its page), not only a tile: every kind, as in the library.
+    await page.evaluate((h) => window.__canvastDebug.deleteEverywhere(h), [await hashOf("words.md")]);
+    await expect.poll(() => files(ws).some((f) => f.startsWith(".trash/library/") && f.endsWith("words.md")), { timeout: 15_000 }).toBe(true);
+    await page.locator('[data-scope="trash"]').click();
+    const note = page.locator('[data-testid="trash-card"][title="words.md"]');
+    await expect.poll(() => note.locator(".thumb-slot img").evaluateAll((l) => l.filter((i) => (i as HTMLImageElement).naturalWidth > 0).length), { timeout: 15_000 }).toBe(1);
   } finally {
     await app.close();
   }

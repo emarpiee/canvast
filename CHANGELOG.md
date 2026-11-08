@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.55.14 — Hidden items faster, New key, previews in the trash (2026-11-09)
+
+- **Changed:** hiding and showing hidden items is faster and keeps memory flat: every file past 16 MiB is sealed and opened a part at a time, and each copy is proven chunk by chunk with the platform's own SHA-256 (it was a SHA-256 written in JavaScript, about ten times slower), with the file itself checked by the main process before and after.
+- **Added:** **New key** (Settings > Privacy): a new random key under the same password, every hidden file encrypted again with it in the background (each checked, their encrypted names too; stopped half-way, it goes on at the next opening), so old copies of `hidden.json` and the old password open nothing.
+- **Added:** changing the Hidden password says that copies of `hidden.json` from before still open with the old password, and points to New key.
+- **Added:** the Trash shows each file with the picture the library gives its kind (a note's page, a PDF's, a video's frame, an art file's picture), not only pictures.
+- **Changed:** the canvast tools and `scripts/hidden-items.mjs` encrypt files of any size a part at a time (they read a file whole, up to 2 GiB).
+
 ## 0.55.13 — Delete goes to the trash, at once (2026-11-09)
 
 - **Changed:** in the desktop app, a library item you delete has its file moved into the workspace's `.trash` at once, with no other step: it is no longer kept in the library folder while undo could need it (`.trash` is the way back). *Delete library files at once* is gone from Settings > Storage: that is what it always does now.

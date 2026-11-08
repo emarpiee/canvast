@@ -40,6 +40,8 @@ import type { AssetField, AssetFolder, CatalogEntry, CatalogListing, MetaChange 
 import type { LibraryPages } from "../storage/store";
 import { MAX_FIELD_KEY, MAX_FIELD_VALUE, MAX_NOTE, MAX_TAG_TEXT, folderClash, folderName, folderPath, folderSubtree, hiddenModeFolders, meta, usageOf, visibleFolders } from "../assets/asset-catalog";
 import { artTile, THUMB_PX, makeThumb, shrinkPicture } from "../assets/thumb";
+import { typeOfName } from "../storage/workspace-names";
+import type { AssetRecord } from "../assets/asset-library";
 import { newObjectId } from "../doc/model";
 import { ICONS } from "./icons";
 import { clearRect, MENU_GAP, moreButton, openMoreMenu, pressAs } from "./more-menu";
@@ -363,6 +365,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     details: root.querySelector<HTMLElement>(".asset-inspector")!,
     list: () => trashSync()?.trashList(hiddenMode) ?? Promise.resolve([]),
     read: (path) => trashSync()?.trashRead(path) ?? Promise.resolve(null),
+    // (the library's own thumbnail of the file, as for an item: the same code for every kind; a picture it cannot shrink, an SVG, as it is)
+    picture: async (path, name) => {
+      const blob = await (trashSync()?.trashRead(path) ?? Promise.resolve(null));
+      if (!blob) return null;
+      const rec = { hash: path, name, type: typeOfName(name), blob, size: blob.size, pixelW: 0, pixelH: 0 } as unknown as AssetRecord;
+      const t = await makeThumb(rec).catch(() => null);
+      return t?.blob ?? (/\.(png|jpe?g|webp|gif|avif|bmp|svg)$/i.test(name) ? blob : null);
+    },
     restore: (path) => trashSync()!.trashRestore(path),
     erase: (path) => trashSync()!.trashErase(path),
     say: (m) => {

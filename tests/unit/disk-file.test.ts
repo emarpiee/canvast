@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { sha256Hex } from "../../src/assets/sha256";
 import { DiskFile, Sha256, asBlob, hashOf, joined, writeProven, type FileStream } from "../../src/storage/disk-file";
-import { FILE_CHUNK, openFile, openFileAt, sealFile, sealFileTo } from "../../src/storage/hidden-vault";
+import { FILE_CHUNK, chunkDigests, openFile, openFileAt, sameChunks, sealFile, sealFileTo } from "../../src/storage/hidden-vault";
 import { readZip, verifyEntry, writeZip } from "../../src/storage/zip";
 
 const bytesOf = (n: number, seed = 7): Uint8Array<ArrayBuffer> => Uint8Array.from({ length: n }, (_, i) => (i * 31 + seed + (i >> 8)) & 255);
@@ -26,6 +26,27 @@ describe("a file too big for the page", () => {
       expect(cut.hex(), `${n} cut`).toBe(want);
     }
     expect(await hashOf(onDisk(bytesOf(70_000)))).toBe(await sha256Hex(bytesOf(70_000).buffer));
+  });
+
+  it("a sealed copy is proven chunk by chunk against what was sealed (the platform's SHA-256), and one changed byte fails it", async () => {
+    const k = await key();
+    for (const [n, chunk] of [[0, 1024], [1, 1024], [1024, 1024], [1025, 1024], [5000, 1024], [70_000, 4096]] as const) {
+      const src = bytesOf(n, n);
+      const digests = chunkDigests();
+      const parts: Uint8Array[] = [];
+      await sealFileTo(k, onDisk(src), { hash: "x" }, async (b) => void parts.push(b), chunk, digests.seen);
+      const sealed = new Uint8Array(await new Blob(parts as BlobPart[]).arrayBuffer());
+      const opened = (await openFileAt(k, onDisk(sealed)))!;
+      const all = await digests.all();
+      expect(await sameChunks(opened.file, all, chunk), `${n}`).toBe(true);
+      // (what was sealed, read from another source of the same length but one byte off: not the same)
+      if (n) {
+        const other = src.slice();
+        other[Math.floor(n / 2)]! ^= 1;
+        expect(await sameChunks(onDisk(other), all, chunk), `${n} changed`).toBe(false);
+      }
+      expect(await sameChunks(onDisk(src.slice(0, Math.max(0, n - chunk))), all, chunk), `${n} short`).toBe(n === 0);
+    }
   });
 
   it("stands in for a Blob, and refuses to become one", async () => {

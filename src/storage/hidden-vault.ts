@@ -301,7 +301,7 @@ export async function openFile(key: CryptoKey, sealed: Uint8Array<ArrayBuffer>):
  * Seal a file of any size into `put`, a part at a time, as the same version 2 file `sealFile` makes: nothing but a chunk is held. `src` is
  * read in windows, so a chunk may straddle two of them.
  */
-export async function sealFileTo(key: CryptoKey, src: Blob | DiskFile, item: object, put: (bytes: Uint8Array<ArrayBuffer>) => Promise<void>, chunk = FILE_CHUNK): Promise<void> {
+export async function sealFileTo(key: CryptoKey, src: Blob | DiskFile, item: object, put: (bytes: Uint8Array<ArrayBuffer>) => Promise<void>, chunk = FILE_CHUNK, seen?: (i: number, plain: Uint8Array<ArrayBuffer>) => void): Promise<void> {
   const prefix = crypto.getRandomValues(new Uint8Array(7));
   const hiv = crypto.getRandomValues(new Uint8Array(12));
   const header = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: hiv, additionalData: MAGIC }, key, enc.encode(JSON.stringify({ v: 2, chunk, prefix: b64(prefix), item }))));
@@ -319,6 +319,7 @@ export async function sealFileTo(key: CryptoKey, src: Blob | DiskFile, item: obj
     const count = Math.max(1, Math.ceil(bytes.length / chunk));
     const sealed = await Promise.all(Array.from({ length: count }, async (_, k) => {
       const i = at + k;
+      seen?.(i, bytes.subarray(k * chunk, Math.min(bytes.length, (k + 1) * chunk)));
       return new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: streamNonce(prefix, i, i === n - 1) }, key, bytes.subarray(k * chunk, Math.min(bytes.length, (k + 1) * chunk))));
     }));
     const out = new Uint8Array(sealed.reduce((s, c) => s + c.length, 0));
@@ -327,6 +328,30 @@ export async function sealFileTo(key: CryptoKey, src: Blob | DiskFile, item: obj
     await put(out);
     at += count;
   }
+}
+
+/** Each `chunk` of what was sealed, as `sealFileTo` saw it: its SHA-256 (the platform's, at native speed), to prove a copy against. */
+export function chunkDigests(): { seen: (i: number, plain: Uint8Array<ArrayBuffer>) => void; all: () => Promise<ArrayBuffer[]> } {
+  const d: Array<Promise<ArrayBuffer>> = [];
+  return { seen: (i, plain) => void (d[i] = crypto.subtle.digest("SHA-256", plain)), all: () => Promise.all(d) };
+}
+
+/**
+ * Whether `file` (a sealed copy opened where it lies, decrypted as it is read) holds, chunk by chunk, what was sealed: each chunk's
+ * SHA-256 against `digests`. A window at a time, the chunks of one hashed at once; every chunk is opened, so every tag is checked too.
+ */
+export async function sameChunks(file: Blob | DiskFile, digests: readonly ArrayBuffer[], chunk = FILE_CHUNK): Promise<boolean> {
+  if (Math.max(1, Math.ceil(file.size / chunk)) !== digests.length) return false;
+  const reach = Math.max(1, Math.floor(WINDOW / chunk)) * chunk;
+  const same = (a: ArrayBuffer, b: ArrayBuffer): boolean => a.byteLength === b.byteLength && new Uint8Array(a).every((x, k) => x === new Uint8Array(b)[k]);
+  for (let from = 0, i = 0; from < Math.max(1, file.size); from += reach) {
+    const bytes = new Uint8Array(await file.slice(from, Math.min(file.size, from + reach)).arrayBuffer());
+    const n = Math.max(1, Math.ceil(bytes.length / chunk));
+    const got = await Promise.all(Array.from({ length: n }, (_, k) => crypto.subtle.digest("SHA-256", bytes.subarray(k * chunk, Math.min(bytes.length, (k + 1) * chunk)))));
+    for (const g of got) if (!same(g, digests[i++]!)) return false;
+    if (file.size === 0) break;
+  }
+  return true;
 }
 
 /**
