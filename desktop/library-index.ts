@@ -9,7 +9,14 @@ import { FOLDERS_KEY } from "../src/assets/asset-catalog";
 import { countSide, inScope, matcher, propValues, sortListed } from "../src/assets/library-match";
 import type { ListedEntry, SortKey, UsageFilter, Way } from "../src/assets/library-match";
 import { parseQuery } from "../src/search/query";
-import type { Library } from "./library-db";
+import type { LibraryOp } from "../src/storage/desktop-bridge";
+
+/** What the index reads: the active entries (as JSON), a meta value, and each change as it is made. The SQLite library (main process) is one; a guest's hidden items (ADR 0184) another. */
+export interface IndexedLibrary {
+  readonly listeners: Array<(op: LibraryOp) => void>;
+  meta(key: string): unknown;
+  activeJson(): Iterable<string>;
+}
 
 /** What the view lists: its scope, search, usage filter and sort, and what only the page knows (where items are used, canvas tags). */
 export interface LibraryQuery {
@@ -51,7 +58,7 @@ export class LibraryIndex {
   private side: { version: number; hidden: boolean; counts: ReturnType<typeof countSide> } | null = null;
   private usedBefore: string[] = [];
 
-  constructor(private readonly lib: Library) {
+  constructor(private readonly lib: IndexedLibrary) {
     lib.listeners.push((op) => {
       if (op.t === "meta" && op.k === FOLDERS_KEY) this.version++; // (folder sorts and counts)
       if (op.t !== "entry" || !this.items) return;
@@ -66,7 +73,7 @@ export class LibraryIndex {
   private all(): Map<string, ListedEntry> {
     if (this.items) return this.items;
     const items = new Map<string, ListedEntry>();
-    for (const [json] of this.lib.db.prepare("SELECT json FROM entries WHERE state = 'active'").raw().iterate() as IterableIterator<[string]>) {
+    for (const json of this.lib.activeJson()) {
       const e = JSON.parse(json) as ListedEntry; // (the parsed entry itself takes the listing's fields: a million are not copied)
       e.instances = 0;
       e.canvases = 0;

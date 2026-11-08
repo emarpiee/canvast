@@ -1,4 +1,5 @@
 import type { Session } from "../app/session";
+import { readOnlyWhy } from "../storage/remote-bridge";
 import { plural } from "../doc/plural";
 import { esc } from "./format";
 import { LIBRARY_FILE, externalFolder, folderSupported } from "../storage/external-folder";
@@ -30,7 +31,7 @@ export function mountLibraryFolderCard(host: HTMLElement, session: Session): () 
     const { inFolder, inBrowser, bareNames } = await folder.counts();
     /** A button; `blocked` (a reason) or a read-only tab turns it off, with the reason as its title. */
     const btn = (action: string, label: string, blocked = ""): string => {
-      const why = session.readOnly ? "Read-only: another tab is editing" : blocked;
+      const why = session.readOnly ? `Read-only: ${readOnlyWhy()}` : blocked;
       return `<button type="button" data-folder="${action}"${why ? ` disabled title="${esc(why)}"` : ""}>${label}</button>`;
     };
     /** One action: its button (short) and what it does beside it. */

@@ -1,4 +1,5 @@
 import type { Session } from "../app/session";
+import { isGuestPage, readOnlyLine, readOnlyWhy } from "../storage/remote-bridge";
 import { boardFilterHtml, boardFilterState, wireBoardFilter } from "./board-filter";
 import { plural } from "../doc/plural";
 import { confirmDialog } from "./confirm";
@@ -28,8 +29,8 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
       <div class="nav-menu" role="menu" data-testid="workspace-menu" hidden></div>
     </div>
     <div class="readonly-banner" role="alert" data-testid="readonly-banner" hidden>
-      <span>Read-only — this workspace is open for editing in another tab.</span>
-      <button type="button" data-action="take-over">Take over</button>
+      <span>${esc(readOnlyLine())}</span>
+      ${isGuestPage() ? "" : `<button type="button" data-action="take-over">Take over</button>`}
     </div>`;
   const crumb = root.querySelector<HTMLButtonElement>(".nav-crumb")!;
   const crumbText = root.querySelector<HTMLElement>(".nav-crumb-text")!;
@@ -116,7 +117,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
          }
          <button type="button" data-action="export-workspace" data-testid="nav-export-workspace">${ICONS.hardDriveDownload}<span>Export a backup (.canvast)</span></button>
          <button type="button" data-action="export-files-workspace" data-testid="nav-export-files">${ICONS.fileArchive}<span>Export all files as ZIP</span></button>
-         <button type="button" data-action="import-archive" data-testid="nav-import"${session.readOnly ? ' disabled title="Read-only: another tab is editing"' : ""}>${ICONS.arrowDownToLine}<span>Import a file…</span></button>
+         <button type="button" data-action="import-archive" data-testid="nav-import"${session.readOnly ? ` disabled title="Read-only: ${readOnlyWhy()}"` : ""}>${ICONS.arrowDownToLine}<span>Import a file…</span></button>
          <input type="file" multiple accept="${ARCHIVE_ACCEPT}" hidden data-testid="nav-import-input">
          ${canSwitchWorkspace() ? `<button type="button" data-action="switch-workspace" data-testid="nav-switch-workspace" aria-haspopup="menu">${ICONS.arrowLeftRight}<span>Switch workspace…</span></button>` : ""}
        </section>`;
@@ -315,7 +316,7 @@ export function mountNavigator(root: HTMLElement, session: Session, openCanvasVi
       e.stopPropagation();
     }
   });
-  banner.querySelector("button")!.addEventListener("click", () => void session.takeOver());
+  banner.querySelector("button")?.addEventListener("click", () => void session.takeOver());
 
   session.subscribe(render);
   render();

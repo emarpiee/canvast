@@ -1,4 +1,4 @@
-import { _electron as electron, expect, test } from "@playwright/test";
+import { _electron as electron, chromium, expect, test } from "@playwright/test";
 import type { ElectronApplication, Page } from "@playwright/test";
 import { appendFileSync, cpSync, createReadStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
@@ -2818,6 +2818,52 @@ test("sharing (ADR 0184): on in Settings, a guest pairs with the code and the ho
     await page.getByTestId("share-on").uncheck();
     await expect(call(st.port, "/hello", null)).rejects.toThrow();
   } finally {
+    await app.close();
+  }
+});
+
+test("sharing (ADR 0184): a browser guest pairs, sees the host's library and canvas read-only, stays paired after a reload, and pairs again once removed", async () => {
+  const ws = tempDir("cv-guest-");
+  const { app, page } = await launch(ws);
+  const browser = await chromium.launch();
+  try {
+    await page.getByTestId("view-assets").click();
+    await page.getByTestId("assets-import-input").setInputFiles({ name: "Shared Picture.png", mimeType: "image/png", buffer: makePng(8, 8, () => [200, 40, 40, 255]) });
+    await expect(page.locator('[data-testid="asset-card"][title="Shared Picture.png"]')).toHaveCount(1);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await page.getByTestId("save-status").click();
+    await page.getByRole("tab", { name: "Sharing" }).click();
+    await page.getByTestId("share-on").check();
+    const code = (await page.getByTestId("share-code").textContent())!.trim();
+    const { port } = (await page.evaluate(() => window.canvastDesktop!.share!.call("status"))) as { port: number };
+    const ctx = await browser.newContext({ ignoreHTTPSErrors: true }); // (the host's own certificate: a browser warns once)
+    const g = await ctx.newPage();
+    const pair = async (): Promise<void> => {
+      await g.getByTestId("prompt-input").fill(code);
+      await g.getByTestId("prompt-ok").click();
+      const ask = page.getByTestId("confirm-dialog").filter({ hasText: /see this workspace\?/ });
+      await expect(ask).toBeVisible();
+      await ask.getByTestId("confirm-ok").click();
+      await g.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 60_000 });
+    };
+    await g.goto(`https://127.0.0.1:${port}/#debug`);
+    await pair();
+    // Read-only, said as a guest's; the host's library is there.
+    await expect(g.getByTestId("readonly-banner")).toContainText("shared with you");
+    await expect(g.getByTestId("readonly-banner").getByRole("button", { name: "Take over" })).toHaveCount(0);
+    await g.getByTestId("view-assets").click();
+    await expect(g.locator('[data-testid="asset-card"][title="Shared Picture.png"]')).toHaveCount(1, { timeout: 30_000 });
+    await expect(page.getByTestId("share-devices")).toContainText(/on Linux/);
+    // A reload keeps the pairing (no code asked).
+    await g.reload();
+    await g.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 60_000 });
+    await expect(g.getByTestId("prompt-input")).toHaveCount(0);
+    // Removed by the host: the next start asks for the code again.
+    await page.getByRole("button", { name: /^Remove / }).click();
+    await g.reload();
+    await expect(g.getByTestId("prompt-input")).toBeVisible({ timeout: 30_000 });
+  } finally {
+    await browser.close();
     await app.close();
   }
 });

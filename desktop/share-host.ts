@@ -7,10 +7,11 @@ import { app, ipcMain } from "electron";
 import type { BrowserWindow, IpcMainInvokeEvent } from "electron";
 import { randomBytes } from "node:crypto";
 import { chmodSync, readFileSync, writeFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { makeSelfCert } from "./self-cert";
 import type { SelfCert } from "./self-cert";
-import { pathAllowed, startShare } from "./share-server";
+import { guestPage, pathAllowed, startShare } from "./share-server";
 import type { ShareCall, ShareDevice, ShareServer } from "./share-server";
 
 /** The event a read call gets when a guest makes it (the handlers' own check lets it through). */
@@ -55,7 +56,7 @@ export interface ShareStatus {
   devices: Array<{ id: string; name: string; added: number; seen: number | null; active: boolean }>;
 }
 
-export function installShare(win: BrowserWindow): void {
+export function installShare(win: BrowserWindow, html: string): void {
   const saved = load();
   const answers = new Map<string, (ok: boolean) => void>();
   const status = (): ShareStatus => {
@@ -94,6 +95,7 @@ export function installShare(win: BrowserWindow): void {
         },
       },
       changed: push,
+      page: async () => guestPage(await readFile(html, "utf8")) ?? "<!doctype html><title>canvast</title><p>This version of canvast cannot be shared.</p>",
     });
   ipcMain.handle("canvast:share", async (e, op: unknown, arg: unknown) => {
     if (e.sender !== win.webContents) throw new Error("not this window");

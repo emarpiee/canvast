@@ -12,6 +12,8 @@
  * 3. Neither available: the tab assumes it is the writer, and conflicts are
  *    caught by the revision check.
  */
+import { isGuestPage } from "./remote-bridge";
+
 export type LeaseState = "acquiring" | "writer" | "readonly";
 export type LeaseMechanism = "web-locks" | "local-heartbeat" | "none";
 
@@ -51,8 +53,12 @@ export class WriterLease {
     for (const fn of this.listeners) fn();
   }
 
-  /** Try to become the writer; resolves with the resulting state. */
+  /** Try to become the writer; resolves with the resulting state. A guest of a shared workspace never writes (ADR 0184). */
   async acquire(): Promise<LeaseState> {
+    if (isGuestPage()) {
+      this.set("readonly");
+      return this.state;
+    }
     if (this.mechanism === "web-locks") {
       const got = await this.requestLock({ ifAvailable: true });
       if (!got) {
@@ -75,6 +81,7 @@ export class WriterLease {
 
   /** Become the writer even if another tab holds the lease (it turns read-only). */
   async takeOver(): Promise<void> {
+    if (isGuestPage()) return;
     if (this.mechanism === "web-locks") await this.requestLock({ steal: true });
     else if (this.mechanism === "local-heartbeat") this.startHeartbeat();
     else this.set("writer");

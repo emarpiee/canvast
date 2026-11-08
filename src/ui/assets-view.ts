@@ -1,4 +1,5 @@
 import { groundFill } from "../assets/card";
+import { readOnlyWhy } from "../storage/remote-bridge";
 import { sectionOrder, sortableSections } from "./sortable-sections";
 import { fileInLibrary } from "../app/library-filing";
 import { beginProgress } from "../app/progress";
@@ -2943,7 +2944,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             aria-label="Show ${plural(p.ids.length, "instance")} on ${esc(p.boardName)} › ${esc(p.canvasName)}" title="Show it on this canvas">${ICONS.locate}</button></li>`,
       )
       .join("");
-    const ro = session.readOnly ? " disabled title=\"Read-only: another tab is editing\"" : "";
+    const ro = session.readOnly ? ` disabled title="Read-only: ${readOnlyWhy()}"` : "";
     const fav = e ? meta(e).favorite : false;
     const hid = e ? meta(e).hidden : false;
     keepDetails();

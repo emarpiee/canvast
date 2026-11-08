@@ -61,7 +61,9 @@ export interface ShareServer {
 }
 
 /** The library's reading ops a guest may use (the rest write, or answer what only the host's page needs). */
-const LIB_READS = new Set(["get", "entries", "recs", "byFile", "meta", "listed", "absent"]);
+const LIB_READS = new Set(["get", "entries", "recs", "byFile", "meta", "listed", "absent", "query", "counts", "fieldKeys", "fieldValues"]);
+/** Whether a library call asks about the hidden items (their lists are a guest's own, from the index it opens). */
+const asksHidden = (op: string, a: readonly unknown[]): boolean => (op === "query" ? (a[0] as { hidden?: unknown } | null)?.hidden === true : op === "counts" || op === "fieldKeys" ? a[0] === true : op === "fieldValues" ? a[1] === true : false);
 /** Paths of the hidden items (their files, names, index and key): shared only when the host says so. */
 const HIDDEN_PATH = /^(?:\.hidden(?:\/|$)|\.canvast\/(?:hidden[^/]*\.json|keys(?:\/|$)))/i;
 /** Never shared: deleted files, the app's own temporary files. */
@@ -100,6 +102,8 @@ export function withoutHidden(op: string, args: readonly unknown[], out: unknown
   }
   if (op === "get") return (out as Array<[string, unknown, unknown, unknown]>).filter(([, e, r]) => !hiddenEntry(e) && !hiddenRec(r));
   if (op === "listed") return (out as unknown[]).filter((e) => !hiddenEntry(e));
+  if (op === "counts" && out && typeof out === "object") return { ...(out as object), hidden: 0 };
+  if (op === "query" && out && typeof out === "object") return { ...(out as object), ratios: Array.from((out as { ratios: ArrayLike<number> }).ratios ?? []) };
   if (op === "byFile") return typeof args[0] === "string" && /^\.hidden\//.test(args[0]) ? null : out;
   if (op === "meta" && args[0] === FOLDERS_KEY && Array.isArray(out)) {
     // (a hidden folder and everything inside it)
@@ -112,6 +116,15 @@ export function withoutHidden(op: string, args: readonly unknown[], out: unknown
     return folders.filter((f) => !hiddenUnder(f));
   }
   return out;
+}
+
+/**
+ * The app as a guest's browser gets it: the same single file, marked as a guest's, its own security policy opened to this host only
+ * (the file as downloaded connects nowhere: `check:offline`). Null when the policy is not the one expected (nothing is served).
+ */
+export function guestPage(html: string): string | null {
+  if (!/connect-src 'none'/.test(html)) return null;
+  return html.replace("connect-src 'none'", "connect-src 'self'").replace(/<head>/i, '<head><meta name="canvast-guest" content="1">');
 }
 
 export async function startShare(o: ShareOptions): Promise<ShareServer> {
@@ -162,6 +175,7 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
     const hidden = o.hidden();
     if (ch === "canvast:lib") {
       if (typeof args[0] !== "string" || !LIB_READS.has(args[0])) return json(res, 403, { error: "the library is read-only here" });
+      if (asksHidden(args[0], args.slice(1))) return json(res, 403, { error: "hidden items' lists are opened by the guest" });
     } else if (ch === "canvast:sizes") {
       if (!Array.isArray(args[0]) || !(args[0] as unknown[]).every((p) => pathAllowed(p, hidden))) return json(res, 403, { error: "not shared" });
     } else if (ch !== "canvast:canvasFiles" && ch !== "canvast:workspace" && !pathAllowed(args[0], hidden)) {

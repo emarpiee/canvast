@@ -219,6 +219,11 @@ function canonFolders(folders: readonly AssetFolder[]): string {
 }
 
 /** The entry an item from the file makes (what this device had of it, `prev`, gives only its deletion time). */
+/** The record of an item whose file is in the folder (`ext`), as the folder's item says it. */
+export function recStubOf(it: LibraryItem & { file: string }, name = it.name): AssetRecord {
+  return { hash: it.hash, type: it.type, size: it.size, name, pixelW: it.pixelW, pixelH: it.pixelH, importedAt: it.importedAt, ...(it.card ? { card: true } : {}), ...(it.duration !== undefined ? { duration: it.duration } : {}), ...(it.frames !== undefined ? { frames: it.frames } : {}), ext: 1, file: it.file } as unknown as AssetRecord;
+}
+
 export function entryOf(it: LibraryItem, prev: CatalogEntry | undefined): CatalogEntry {
   return {
     hash: it.hash,

@@ -1,4 +1,5 @@
 import type { Camera } from "../core/camera";
+import { readOnlyLine } from "../storage/remote-bridge";
 import type { Dyadic } from "../core/dyadic";
 import type { Frame } from "../core/frames";
 import { expressExactIn, levelsBetween } from "../core/frames";
@@ -274,7 +275,7 @@ export class EditorState {
   /** Returns true (and tells the user) when an edit must not happen. */
   blockEdit(): boolean {
     if (!this.readOnly) return false;
-    this.message = "Read-only: this workspace is open for editing in another tab. Use “Take over” to edit here.";
+    this.message = readOnlyLine();
     this.changed();
     return true;
   }

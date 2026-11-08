@@ -1,4 +1,5 @@
 import * as D from "../core/dyadic";
+import { readOnlyWhy } from "../storage/remote-bridge";
 import { LOG10_2 } from "../core/dyadic";
 import { approxIn, depthOf } from "../core/frames";
 import type { ViewState } from "./view-state";
@@ -37,7 +38,7 @@ function plainSave(state: string): string {
     case "saving":
       return "Saving…";
     case "readonly":
-      return "View only: another tab is editing";
+      return `View only: ${readOnlyWhy()}`;
     case "conflict":
       return "Not saved: changed in another tab";
     case "unavailable":

@@ -1175,7 +1175,7 @@ async function openWindow(workspace: string): Promise<void> {
   SHARE_CALLS.set("canvast:workspace", async () => ({ path: "", name: basename(workspace) }));
   installFileCalls(win, await realpath(workspace), partition);
   watchFolder(win, await realpath(workspace));
-  installShare(win);
+  installShare(win, HTML);
   // Closing waits (up to 15 s) for the page to write what is not in the folder yet (ADR 0177: files follow edits by a moment).
   // While files are still being written the page may hold the close to ask first, and keep the window open.
   let closing = false;

@@ -1,4 +1,5 @@
 import { contentOf } from "../assets/library-match";
+import { readOnlyLine } from "../storage/remote-bridge";
 import { WS_AT } from "../settings/settings";
 import type { CardLook } from "../ui/file-views";
 import { sha256Hex } from "../assets/sha256";
@@ -1387,7 +1388,7 @@ export class Session {
   private guardWrite(): boolean {
     if (!this.repo) return false;
     if (this.readOnly) {
-      this.tell("Read-only: this workspace is open for editing in another tab. Use “Take over” to edit here.");
+      this.tell(readOnlyLine());
       return false;
     }
     return true;

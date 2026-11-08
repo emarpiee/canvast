@@ -3,7 +3,7 @@ import { request } from "node:https";
 import { afterEach, describe, expect, it } from "vitest";
 import { makeSelfCert } from "../../desktop/self-cert";
 import type { ShareCall, ShareDevice, ShareServer } from "../../desktop/share-server";
-import { pathAllowed, startShare } from "../../desktop/share-server";
+import { guestPage, pathAllowed, startShare } from "../../desktop/share-server";
 
 const cert = makeSelfCert();
 
@@ -15,6 +15,16 @@ describe("self-signed certificate", () => {
     expect(x.subjectAltName).toContain("DNS:localhost");
     expect(cert.fingerprint).toBe(x.fingerprint256);
     expect(new Date(x.validTo).getTime()).toBeGreaterThan(Date.now() + 9 * 365 * 86_400_000);
+  });
+});
+
+describe("the page a guest gets", () => {
+  it("is the app with its policy opened to this host only, and marked as a guest's", () => {
+    const page = guestPage(`<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; connect-src 'none'"></head></html>`)!;
+    expect(page).toContain("connect-src 'self'");
+    expect(page).not.toContain("connect-src 'none'");
+    expect(page).toContain('<meta name="canvast-guest" content="1">');
+    expect(guestPage("<html><head></head></html>"), "a page whose policy is not the expected one is not served").toBeNull();
   });
 });
 
@@ -101,6 +111,8 @@ describe("sharing server", () => {
     // The library never tells a hidden item's details, shared or not (a guest opens the encrypted index itself).
     const entries = JSON.parse(String(jsonOf(await send(port, "POST", "/call", { ch: "canvast:lib", args: ["entries", "all"] }, token))["v"])) as Array<{ name: string }>;
     expect(entries.map((e) => e.name)).toEqual(["plain.png"]);
+    expect((await send(port, "POST", "/call", { ch: "canvast:lib", args: ["counts", true] }, token)).status).toBe(403);
+    expect((await send(port, "POST", "/call", { ch: "canvast:lib", args: ["query", { hidden: true }] }, token)).status).toBe(403);
     const folders = jsonOf(await send(port, "POST", "/call", { ch: "canvast:lib", args: ["meta", "assetFolders"] }, token))["v"] as Array<{ name: string }>;
     expect(folders.map((f) => f.name)).toEqual(["Shown"]);
     // Removed: its token stops at once.

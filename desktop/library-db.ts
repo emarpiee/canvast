@@ -12,7 +12,7 @@ import type { AssetRecord } from "../src/assets/asset-library";
 import type { LibraryItem } from "../src/storage/library-mirror";
 import type { LibraryOp } from "../src/storage/desktop-bridge";
 export type { LibraryOp };
-import { LIBRARY_INDEX, LIBRARY_JSON, LIBRARY_JSON_FORMAT, PART_SPLIT, entryOf, itemOf, libraryJsonText, libraryPartText, partKey, partPath, readItem, seen } from "../src/storage/library-mirror";
+import { LIBRARY_INDEX, LIBRARY_JSON, LIBRARY_JSON_FORMAT, PART_SPLIT, entryOf, recStubOf, itemOf, libraryJsonText, libraryPartText, partKey, partPath, readItem, seen } from "../src/storage/library-mirror";
 import { isHiddenFile } from "../src/storage/hidden-vault";
 
 export type LibraryDb = InstanceType<typeof Database>;
@@ -87,6 +87,11 @@ export class Library {
   split(): 1 | 2 | 3 {
     const v = this.meta(PART_SPLIT);
     return v === 1 || v === 3 ? v : 2;
+  }
+
+  /** Every active entry's JSON, read a row at a time (the library index reads them once). */
+  *activeJson(): Iterable<string> {
+    for (const [json] of this.db.prepare("SELECT json FROM entries WHERE state = 'active'").raw().iterate() as IterableIterator<[string]>) yield json;
   }
 
   meta(k: string): unknown {
@@ -274,7 +279,7 @@ export class Library {
       if (fresh && !mark) {
         this.one({ t: "entry", hash: it.hash, v: entryOf(it, undefined) }, false);
         this.one({ t: "seen", hash: it.hash, v }, false);
-        if (it.file) this.one({ t: "rec", hash: it.hash, v: { hash: it.hash, type: it.type, size: it.size, name: it.name, pixelW: it.pixelW, pixelH: it.pixelH, importedAt: it.importedAt, ...(it.card ? { card: true } : {}), ...(it.duration !== undefined ? { duration: it.duration } : {}), ...(it.frames !== undefined ? { frames: it.frames } : {}), ext: 1, file: it.file } as unknown as AssetRecord }, false);
+        if (it.file) this.one({ t: "rec", hash: it.hash, v: recStubOf({ ...it, file: it.file }) }, false);
         took = true;
         return;
       }
@@ -290,8 +295,7 @@ export class Library {
       const rec = this.rec(it.hash);
       const ops: LibraryOp[] = [{ t: "entry", hash: it.hash, v: entryOf(it, this.entry(it.hash)) }, { t: "seen", hash: it.hash, v }];
       if (it.file && (!rec || rec.ext)) {
-        const stub = { hash: it.hash, type: it.type, size: it.size, name: rec?.name ?? it.name, pixelW: it.pixelW, pixelH: it.pixelH, importedAt: it.importedAt, ...(it.card ? { card: true } : {}), ...(it.duration !== undefined ? { duration: it.duration } : {}), ...(it.frames !== undefined ? { frames: it.frames } : {}), ext: 1, file: it.file };
-        ops.push({ t: "rec", hash: it.hash, v: stub as unknown as AssetRecord });
+        ops.push({ t: "rec", hash: it.hash, v: recStubOf({ ...it, file: it.file }, rec?.name ?? it.name) });
       }
       for (const op of ops) this.one(op, mark);
       took = true;

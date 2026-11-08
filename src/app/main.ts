@@ -1,4 +1,6 @@
 import { setSnapPx } from "../interaction/snap";
+import { readOnlyLine, readOnlyWhy } from "../storage/remote-bridge";
+import { guestBridge } from "./guest";
 import { installShareAsk } from "../ui/share-panel";
 import { deleteEverywhere } from "../ui/delete-everywhere";
 import type { CatalogEntry } from "../assets/asset-catalog";
@@ -216,7 +218,7 @@ const SAVE_TEXT: Record<SaveState, string> = {
   committed: "Saved",
   queued: "Unsaved changes…",
   saving: "Saving…",
-  readonly: "Read-only (another tab is editing)",
+  readonly: `Read-only (${readOnlyWhy()})`,
   conflict: "Not saved — changed in another tab; reload to continue",
   error: "Save failed — changes are only in memory",
   unavailable: "Storage unavailable — changes are only in memory",
@@ -509,7 +511,9 @@ async function start(): Promise<void> {
       noteFileKeep: () => (settings.get("notes.renameOnSave") ? settings.get("notes.nameStyle") === "kept" : null),
       onFileRules: (changed) => void settings.subscribe((key) => (key === "library.keepFileNames" || key === "library.sortFiles") && changed()),
     };
-    storage = desktop ? await openDesktopStorage(desktop, opts) : await openBrowserStorage(opts);
+    // (a page a host serves reads the host's workspace through it: ADR 0184)
+    const guest = desktop ? null : await guestBridge();
+    storage = desktop ? await openDesktopStorage(desktop, opts) : guest ? await openDesktopStorage(guest, opts) : await openBrowserStorage(opts);
     startStep("storage opened");
     // (the library folder's link is loaded too, before anything is drawn: an await later in this function lets a frame run early)
   } catch (e) {
@@ -1266,7 +1270,7 @@ async function start(): Promise<void> {
       gradients: () => session.styles.of("gradient").map((s) => ({ name: s.name, stops: (s.data as Gradient).stops })),
       save: async (name: string, a: Adjust) => {
         if (!(await session.styles.add("adjustment", name, a))) {
-          editor.message = session.readOnly ? "Read-only: this workspace is open for editing in another tab." : "Nothing to save: no adjustment is set.";
+          editor.message = session.readOnly ? readOnlyLine() : "Nothing to save: no adjustment is set.";
           editor.changed();
         }
       },
@@ -1300,7 +1304,7 @@ async function start(): Promise<void> {
     hasTarget: () => patternTargetLabel(doc, editor, patternSession) !== "A new sheet" && patternTargets(doc, editor).length < 2,
     saveStyle: (g, values, seed) => {
       void session.styles.add("pattern", "", { id: g.id, seed, v: values }).then((made) => {
-        editor.message = made ? `Saved the pattern style “${made.name}”. It is in the Styles panel.` : session.readOnly ? "Read-only: this workspace is open for editing in another tab." : "The pattern could not be saved as a style.";
+        editor.message = made ? `Saved the pattern style “${made.name}”. It is in the Styles panel.` : session.readOnly ? readOnlyLine() : "The pattern could not be saved as a style.";
         editor.changed();
       });
     },
