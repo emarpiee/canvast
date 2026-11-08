@@ -229,3 +229,42 @@ export async function importMode(p: Page, mode: "add" | "update" = "add"): Promi
   await choose.locator(`input[value="${mode}"]`).check();
   await choose.getByTestId("choose-ok").click();
 }
+
+/**
+ * Every visible settings row of a panel, checked as one design: its controls end at the row's right edge, sit on one line, and each
+ * button, field and select is the standard control height (`--ctl`). Answers what is wrong, by row name (empty when nothing is).
+ */
+export function settingsRowProblems(panel: ReturnType<Page["locator"]>): Promise<string[]> {
+  return panel.evaluate((root) => {
+    const probe = document.createElement("div");
+    probe.style.height = "var(--ctl)";
+    root.appendChild(probe);
+    const ctl = probe.getBoundingClientRect().height;
+    probe.remove();
+    const out: string[] = [];
+    const visible = (el: Element): boolean => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden";
+    };
+    for (const row of root.querySelectorAll<HTMLElement>(".set-row")) {
+      if (!visible(row)) continue;
+      const name = row.querySelector(".set-label")?.textContent?.trim() ?? "(a row)";
+      const control = row.querySelector<HTMLElement>(":scope > .set-control");
+      if (!control) continue;
+      if (control.querySelector("input.set-hue")) continue; // (the hue slider takes a line of its own, by design)
+      const kids = [...control.children].filter(visible);
+      if (!kids.length) continue;
+      const box = control.getBoundingClientRect();
+      const last = kids.at(-1)!.getBoundingClientRect();
+      if (Math.abs(box.right - last.right) > 2) out.push(`${name}: its controls do not end at the right edge (${Math.round(box.right - last.right)} px short)`);
+      const mids = kids.map((k) => k.getBoundingClientRect()).map((r) => r.top + r.height / 2);
+      if (Math.max(...mids) - Math.min(...mids) > 4) out.push(`${name}: its controls are on more than one line`);
+      for (const k of kids) {
+        const sized = k.matches("button, select, input[type=text], input[type=password], input:not([type])");
+        const h = k.getBoundingClientRect().height;
+        if (sized && Math.abs(h - ctl) > 1) out.push(`${name}: “${(k.textContent || k.getAttribute("aria-label") || k.tagName).trim().slice(0, 30)}” is ${Math.round(h)} px high, not ${Math.round(ctl)}`);
+      }
+    }
+    return out;
+  });
+}

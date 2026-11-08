@@ -74,6 +74,7 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 
 - **DRY first: one shared component per thing.** Context menus, modals and dialogs, docks, panels, notices, settings rows, cards, trees and rules (names, dates) each have one implementation. Before writing UI, look for the shared component and call it; if it almost fits, extend it with an option; never copy it or restyle a copy. A second copy found while working is folded into the shared one in the same pass. `npm run check:components` guards this.
 - **A long list in a card** shows its first rows and `showMoreButton` / `capList` (`src/ui/show-more.ts`). Panels and dialogs that scroll on their own do not need it.
+- **A settings page never grows with use.** A list that grows with what people do (devices, logins, activity, errors) is a row with its count and a button that opens it in `listDialog` (`src/ui/confirm.ts`); the page keeps fixed rows. A panel drawn again on updates goes through `redraw()` (`src/ui/redraw.ts`): unchanged markup is left alone, and the scroll and the focused field are kept. Every settings row's controls end at its right edge, on one line, at `--ctl` (`settingsRowProblems` in `tests/e2e/harness.ts` checks every tab).
 
 - **Every menu row has an icon, a name and a very short description** (`MenuItem.icon`, `label`, `hint`), in every context menu and action menu.
 

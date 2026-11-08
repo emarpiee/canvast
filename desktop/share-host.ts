@@ -175,8 +175,13 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
       devices: (saved.devices ?? []).map((d) => ({ id: d.id, name: d.name, added: d.added, seen: d.seen ?? null, active: active.has(d.id) })),
     };
   };
+  // The page is told at most every half second (a file manager makes many requests a second: one update for all of them).
+  let pushing: ReturnType<typeof setTimeout> | null = null;
   const push = (): void => {
-    if (!win.isDestroyed()) win.webContents.send("canvast:shareStatus", status());
+    pushing ??= setTimeout(() => {
+      pushing = null;
+      if (!win.isDestroyed()) win.webContents.send("canvast:shareStatus", status());
+    }, 500);
   };
   const start = async (port: number): Promise<ShareServer> =>
     startShare({

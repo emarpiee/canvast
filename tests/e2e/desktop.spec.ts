@@ -9,7 +9,7 @@ import { createHash, scryptSync } from "node:crypto";
 import { buildDir } from "./build-dir";
 import { makeFakeMp4 } from "./mp4";
 import { makePng } from "./png";
-import { importMode } from "./harness";
+import { importMode, settingsRowProblems } from "./harness";
 import { makeLock } from "../../src/assets/hidden-lock";
 import { readZip, writeZip } from "../../src/storage/zip";
 
@@ -2802,8 +2802,13 @@ test("sharing (ADR 0184): on in Settings, a guest pairs with the code and the ho
     expect(paired.status).toBe(200);
     expect(paired.fingerprint, "the certificate is the one Settings shows").toBe(st.fingerprint);
     const token = String((JSON.parse(paired.bytes.toString()) as { token: string }).token);
-    await expect(page.getByTestId("share-devices")).toContainText("Test laptop");
-    await expect(page.getByTestId("share-log")).toContainText("Allowed"); // (the log says who, and from where)
+    await page.getByTestId("share-guests").click();
+    await expect(page.getByTestId("share-guests-dialog")).toContainText("Test laptop");
+    await page.getByTestId("share-guests-dialog-close").click();
+    await expect(page.getByTestId("share-log")).toContainText("Allowed"); // (the latest event, and the dialog with all of them)
+    await page.getByTestId("share-activity").click();
+    await expect(page.getByTestId("share-activity-dialog")).toContainText("Test laptop");
+    await page.getByTestId("share-activity-dialog-close").click();
     // Reads only; hidden items' files only when shared.
     const file = await call(st.port, "/call", { ch: "canvast:read", args: ["library/shared.png"] }, token);
     expect(file.status).toBe(200);
@@ -2813,8 +2818,22 @@ test("sharing (ADR 0184): on in Settings, a guest pairs with the code and the ho
     expect((await call(st.port, "/call", { ch: "canvast:read", args: ["../outside.txt"] }, token)).status).toBe(400); // (the main process's own path rule)
     await page.getByTestId("share-hidden").check();
     expect((await call(st.port, "/call", { ch: "canvast:read", args: [".canvast/hidden.json"] }, token)).status).not.toBe(403);
+    // The page never grows with use: 20 folder logins later it has the same rows, every row in the one design; the list is in a dialog.
+    const panel = page.locator('[data-panel="sharing"]');
+    await page.getByTestId("share-dav-on").check();
+    const rows = await panel.locator(".set-row").count();
+    for (let i = 0; i < 20; i++) await page.evaluate((n) => window.canvastDesktop!.share!.call("davAdd", `Device ${n}`), i);
+    await page.evaluate(() => window.canvastDesktop!.share!.call("status")); // (drawn from the next status)
+    await expect(panel.getByText("20 devices:")).toBeVisible();
+    expect(await panel.locator(".set-row").count()).toBe(rows);
+    expect(await settingsRowProblems(panel)).toEqual([]);
+    await page.getByTestId("share-logins").click();
+    await expect(page.getByTestId("share-logins-dialog").locator(".set-row")).toHaveCount(20);
+    await page.getByTestId("share-logins-dialog-close").click();
     // Removed: refused at once.
+    await page.getByTestId("share-guests").click();
     await page.getByRole("button", { name: "Remove Test laptop" }).click();
+    await page.getByTestId("share-guests-dialog-close").click();
     expect((await call(st.port, "/call", { ch: "canvast:read", args: ["library/shared.png"] }, token)).status).toBe(401);
     // Off: nothing listens.
     await page.getByTestId("share-on").uncheck();
@@ -2857,7 +2876,9 @@ test("sharing (ADR 0184): a browser guest pairs, sees the host's library and can
     await expect(g.getByTestId("readonly-banner").getByRole("button", { name: "Take over" })).toHaveCount(0);
     await g.getByTestId("view-assets").click();
     await expect(g.locator('[data-testid="asset-card"][title="Shared Picture.png"]')).toHaveCount(1, { timeout: 30_000 });
-    await expect(page.getByTestId("share-devices")).toContainText(/on Linux/);
+    await page.getByTestId("share-guests").click();
+    await expect(page.getByTestId("share-guests-dialog")).toContainText(/on Linux/);
+    await page.getByTestId("share-guests-dialog-close").click();
     // Follow the host: where the host goes, the guest goes; moving the view itself stops it.
     await g.getByTestId("view-canvas").click();
     await page.getByTestId("view-canvas").click();
@@ -2876,7 +2897,9 @@ test("sharing (ADR 0184): a browser guest pairs, sees the host's library and can
     // Removed by the host: the next start asks for the code again.
     await page.getByTestId("save-status").click();
     await page.getByRole("tab", { name: "Sharing" }).click();
+    await page.getByTestId("share-guests").click();
     await page.getByRole("button", { name: /^Remove / }).click();
+    await page.getByTestId("share-guests-dialog-close").click();
     await g.reload();
     await expect(g.getByTestId("prompt-input")).toBeVisible({ timeout: 30_000 });
   } finally {

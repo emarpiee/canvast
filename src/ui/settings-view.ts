@@ -1,5 +1,6 @@
 import { NOTE_STYLES } from "../notes/note-file";
 import { mountSharing } from "./share-panel";
+import { listDialog } from "./confirm";
 import type { SettingRow } from "./share-panel";
 import { DOCK_PANEL_IDS } from "../settings/panels";
 import type { SettingKey, SettingValue, SettingsStore } from "../settings/settings";
@@ -25,7 +26,7 @@ import { openWorkspaceSwitcher } from "./workspace-switch";
 /** The desktop build (ADR 0177): the workspace is a folder, so what Settings says about storage, privacy and the page differs. */
 /** A row for something that is not a stored setting (Sharing's), with the settings rows' look. */
 const plainRowHtml: SettingRow = (o) =>
-  `<div class="set-row"><div class="set-words">${o.id ? `<label for="${o.id}">` : "<div>"}<span class="set-label">${o.label}</span><span class="set-help">${o.help}</span>${o.id ? "</label>" : "</div>"}</div><div class="set-control">${o.control}</div></div>`;
+  `<div class="set-row is-plain"><div class="set-words"><label${o.id ? ` for="${o.id}"` : ""}><span class="set-label">${o.label}</span><span class="set-help">${o.help}</span></label></div><div class="set-control">${o.control}</div></div>`;
 const DESKTOP = !!desktopBridge();
 /** A setting's words as the desktop build needs them (it has an app window, not a tab or an address). */
 const forDesktop = (text: string): string =>
@@ -474,7 +475,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
           ? `<div class="set-info set-card"><h3 class="about-title"><span class="about-logo">${logoSvg()}</span>canvast <span data-testid="about-version">${esc(typeof __CANVAST_VERSION__ === "string" ? __CANVAST_VERSION__ : "dev")}</span></h3><p>${DESKTOP ? "An endless canvas that works offline: the desktop app, on a workspace folder. Drawing uses Canvas 2D." : "An endless canvas that works offline, in one file. Drawing uses the browser's Canvas 2D (the browser decides whether the graphics card helps)."}</p></div>
              <div class="set-info set-card"><h3>${DESKTOP ? "What this app can use" : "This browser"}</h3><dl data-testid="about-capabilities">${capabilities().map((c) => `<dt>${c.ok ? "✓" : "✗"} ${esc(c.name)}</dt><dd>${esc(c.note)}</dd>`).join("")}</dl></div>
              <div class="set-info set-card"><h3>Errors this session</h3><ul class="set-errors" data-testid="about-errors"></ul>
-               <div class="storage-actions"><button type="button" data-about="report" data-testid="about-report">Save a diagnostic report</button><button type="button" data-about="clear" data-testid="about-clear">Clear the list</button></div>
+               <div class="storage-actions"><button type="button" data-about="report" data-testid="about-report">Save a diagnostic report</button><button type="button" data-about="all" data-testid="about-all" hidden>Show all…</button><button type="button" data-about="clear" data-testid="about-clear">Clear the list</button></div>
                <p class="set-help">The report is a text file with the version, this browser, the numbers above and the errors. It holds no canvas content. canvast sends nothing: you send the file if you choose to.</p></div>
              <div class="set-info set-card"><h3>Licences</h3><details><summary>Software this app is built from</summary><pre class="set-licences" data-testid="about-licences">${esc(NOTICES)}</pre></details></div>`
         : `<div class="set-info set-card"><p>canvast works entirely on this device. It makes no network requests: the page is one file and its security policy refuses every connection.</p>
@@ -515,13 +516,22 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   const showErrors = (): void => {
     const ul = root.querySelector<HTMLElement>("[data-testid=about-errors]");
     if (!ul) return;
-    ul.innerHTML = errorLog().length ? errorLog().map((e) => `<li><time>${new Date(e.at).toLocaleTimeString()}</time> ${esc(e.what)}</li>`).join("") : "<li>none</li>";
+    // (the latest only: the whole list, up to 100, opens in a dialog, so the page never grows with it)
+    const latest = errorLog().at(-1);
+    ul.innerHTML = latest ? errorLine(latest) : "<li>none</li>";
+    const all = root.querySelector<HTMLButtonElement>("[data-about=all]");
+    if (all) {
+      all.hidden = errorLog().length < 2;
+      all.textContent = `Show all ${errorLog().length}…`;
+    }
   };
+  const errorLine = (e: { at: number; what: string }): string => `<li><time>${new Date(e.at).toLocaleTimeString()}</time> ${esc(e.what)}</li>`;
   onErrorLog(showErrors);
   root.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-about]");
     if (!b) return;
     if (b.dataset["about"] === "clear") clearErrorLog();
+    else if (b.dataset["about"] === "all") listDialog({ title: "Errors this session", testid: "about-errors-dialog", lines: ["The newest first."], body: () => `<ul class="set-errors">${[...errorLog()].reverse().map(errorLine).join("")}</ul>` });
     else {
       const blob = new Blob([diagnosticReport(backup ? { "Settings changed from the defaults": settings.changedKeys() } : {})], { type: "text/plain" });
       const a = document.createElement("a");

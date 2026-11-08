@@ -86,6 +86,45 @@ export function confirmDialog(opts: ConfirmOptions): Promise<boolean> {
   });
 }
 
+export interface ListDialogOptions {
+  title: string;
+  lines?: string[];
+  testid: string;
+  /** Its list (made again by `refresh`): a page's list that can grow is shown here, never on the page itself. */
+  body: () => string;
+  /** A click or a change inside it; `refresh` draws the list again. */
+  onClick?: (target: HTMLElement, refresh: () => void, close: () => void) => void;
+  onChange?: (target: HTMLInputElement, refresh: () => void) => void;
+}
+
+/** Modal holding a list that can grow (devices, logins, activity, errors): it scrolls by itself, and Close ends it. */
+export function listDialog(o: ListDialogOptions): { refresh: () => void; close: () => void; open: () => boolean } {
+  const dlg = makeModal({
+    className: "confirm list-dialog",
+    testid: o.testid,
+    titleId: `${o.testid}-title`,
+    html: `
+    <h2 id="${o.testid}-title">${esc(o.title)}</h2>
+    ${(o.lines ?? []).map((l) => `<p>${esc(l)}</p>`).join("")}
+    <div data-list-body></div>
+    <div class="confirm-actions"><button type="button" class="is-primary" data-list-close data-testid="${o.testid}-close">Close</button></div>`,
+  });
+  const body = dlg.querySelector<HTMLElement>("[data-list-body]")!;
+  let open = true;
+  const refresh = (): void => void (open && (body.innerHTML = o.body()));
+  const close = (): void => dlg.close();
+  dlg.addEventListener("click", (e) => {
+    const t = e.target as HTMLElement;
+    if (t.closest("[data-list-close]")) return close();
+    o.onClick?.(t, refresh, close);
+  });
+  dlg.addEventListener("change", (e) => o.onChange?.(e.target as HTMLInputElement, refresh));
+  refresh();
+  showModal(dlg, () => void (open = false));
+  dlg.querySelector<HTMLButtonElement>("[data-list-close]")!.focus();
+  return { refresh, close, open: () => open };
+}
+
 export interface ChooseOptions extends DialogSummary {
   title: string;
   lines: string[];

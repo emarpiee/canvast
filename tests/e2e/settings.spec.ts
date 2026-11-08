@@ -1,4 +1,4 @@
-import { APP_URL, expect, test } from "./harness";
+import { APP_URL, expect, settingsRowProblems, test } from "./harness";
 
 /** The Settings view (ADR 0048): tabs, rows that write the shared store, scope and reset, theme, and what is remembered. */
 
@@ -508,4 +508,24 @@ test("a workspace password: the app asks for it when it opens, a wrong one is re
   await expect(lock).toHaveCount(0);
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   expect(app.consoleErrors).toEqual([]);
+});
+
+test("every settings tab: each row's controls end at the right edge, on one line, at the standard height; About shows only its latest error", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-settings").click();
+  const problems: string[] = [];
+  for (const tab of await p.locator('#settings-view [role="tab"]').all()) {
+    await tab.click();
+    const id = await tab.getAttribute("data-tab");
+    problems.push(...(await settingsRowProblems(p.locator(`[data-panel="${id}"]`))).map((x) => `${id}: ${x}`));
+  }
+  expect(problems).toEqual([]);
+  // A list that grows is never the page's: About shows the latest error, the rest in a dialog.
+  await p.evaluate(() => {
+    for (let i = 0; i < 30; i++) window.dispatchEvent(new ErrorEvent("error", { message: `Many ${i}` }));
+  });
+  await p.locator('[data-tab="about"]').click();
+  await expect(p.getByTestId("about-errors").locator("li")).toHaveCount(1);
+  await p.getByTestId("about-all").click();
+  await expect.poll(() => p.getByTestId("about-errors-dialog").locator("li").count()).toBeGreaterThanOrEqual(30);
 });
