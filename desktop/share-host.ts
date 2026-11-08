@@ -111,7 +111,7 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
       code: server?.code ?? "",
       addresses: server?.addresses ?? [],
       fingerprint: saved.cert?.fingerprint ?? "",
-      dav: server ? { url: `davs://127.0.0.1:${server.port}/dav/`, others: server.addresses.map((a) => `davs://${a}:${server!.port}/dav/`), password: server.davPassword } : null,
+      dav: server ? { url: `davs://127.0.0.1:${server.port}/dav/`, others: server.addresses.map((a) => `https://${a}:${server!.port}/dav/`), password: server.davPassword } : null,
       devices: (saved.devices ?? []).map((d) => ({ id: d.id, name: d.name, added: d.added, seen: d.seen ?? null, active: active.has(d.id) })),
     };
   };

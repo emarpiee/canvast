@@ -60,7 +60,7 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingR
         (st.dav
           ? row({
               label: "Folder for file managers",
-              help: `${code(st.dav.url)} on this computer${st.dav.others.length ? `; ${st.dav.others.map(code).join(" ")} from other devices (Library only)` : ""}. Password ${`<code data-testid="share-dav-password">${esc(st.dav.password)}</code>`}. Read-only. On this computer, while the Hidden items are open, it has them too, each decrypted only as it is read; a file manager may keep thumbnails of what it shows.`,
+              help: `${code(st.dav.url)} on this computer${st.dav.others.length ? `; ${st.dav.others.map(code).join(" ")} from other devices, as a WebDAV server (Library only; Linux file managers write davs:// for https://)` : ""}. Password ${`<code data-testid="share-dav-password">${esc(st.dav.password)}</code>`}. Read-only. On this computer, while the Hidden items are open, it has them too, each decrypted only as it is read; a file manager may keep thumbnails of what it shows.`,
               control: `<button type="button" class="set-done" data-share-open-dav data-testid="share-open-dav">Open in the file manager</button>`,
             })
           : "")
