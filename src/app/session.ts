@@ -382,7 +382,7 @@ export class Session {
     this.gcPending = true;
     const report = await this.collectGarbage();
     const erased = !!report?.swept.includes(hash);
-    this.tell(erased ? "Deleted from the library. The file was erased." : "Deleted from the library. The file is kept until undo history no longer needs it.");
+    this.tell(erased ? (this.storage?.workspaceFolder ? "Deleted from the library. The file went to the workspace's .trash." : "Deleted from the library. The file was erased.") : "Deleted from the library. The file is kept until undo history no longer needs it.");
     this.post({ kind: "assets" });
     this.emitAssets();
     return { erased };

@@ -838,6 +838,16 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   type SideFind = keyof typeof sideFind;
   let sideFindHidden = false;
   const scroller = root.querySelector<HTMLElement>(".assets-scroll")!;
+  /**
+   * After an action that took away the focused card (a delete): the keyboard stays in the list, on the first card in view, or the list
+   * itself, never the search box (focusing it opens its menu, as if the person had asked to search).
+   */
+  const focusList = (): void => {
+    const first = [...scroller.querySelectorAll<HTMLElement>('[data-testid="asset-card"]')].find((c) => c.getBoundingClientRect().bottom > scroller.getBoundingClientRect().top);
+    if (first) return first.focus({ preventScroll: true });
+    if (scroller.tabIndex < 0) scroller.tabIndex = -1;
+    scroller.focus({ preventScroll: true });
+  };
   /** A thumbnail being read or made: who still wants it (a card that scrolled away does not), and whether it is for the screen or the background. */
   type ThumbJob = { p: Promise<string>; wants: Array<() => boolean>; urgent: boolean; failed?: boolean; custom: string | null };
   const thumbs = new Map<string, ThumbJob>();
@@ -3633,12 +3643,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const gone = group.filter((h) => entryOf(h)?.instances === 0);
         void confirmDialog({
           title: `Delete ${gone.length} item${gone.length === 1 ? "" : "s"} from the library?`,
-          lines: ["Their files are erased from this browser's storage once nothing can use them any more. Items in use are kept."],
+          lines: [desktopBridge() ? "Their files go to the workspace's .trash once nothing can use them any more. Items in use are kept." : "Their files are erased from this browser's storage once nothing can use them any more. Items in use are kept."],
           confirmLabel: `Delete ${gone.length}`,
         }).then(async (ok) => {
           if (ok) await session.deleteAssets(gone);
           await refresh();
-          search.focus();
+          focusList();
         });
         break;
       }
@@ -3826,7 +3836,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const canvases = new Set(hashes.length === 1 ? places.map((pl) => pl.canvasId) : []).size || ents.reduce((t, x) => Math.max(t, x.canvases), 0);
         void deleteEverywhere(session, { hashes, name: ents[0]?.name, uses: ents.reduce((t, x) => t + x.instances, 0), canvases, places: places.map((pl) => `${pl.boardName} › ${pl.canvasName}`) }).then(async () => {
           await refresh();
-          search.focus();
+          focusList();
         });
         break;
       }
@@ -3834,12 +3844,12 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         const e = entryOf(hash);
         void confirmDialog({
           title: `Delete “${e?.name || "Untitled"}” from the library?`,
-          lines: [`Its file (${fmtBytes(e?.size ?? 0)}) is erased from this browser's storage once nothing can use it any more.`],
+          lines: [desktopBridge() ? `Its file (${fmtBytes(e?.size ?? 0)}) goes to the workspace's .trash once nothing can use it any more.` : `Its file (${fmtBytes(e?.size ?? 0)}) is erased from this browser's storage once nothing can use it any more.`],
           confirmLabel: "Delete item",
         }).then(async (ok) => {
           if (ok) await session.deleteAsset(hash);
           await refresh();
-          search.focus();
+          focusList();
         });
         break;
       }

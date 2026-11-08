@@ -252,6 +252,7 @@ test("deleting from the library erases only unused originals, and undo history k
   await expect(card(p, GREEN_HASH)).toHaveCount(0);
   await expect(p.getByTestId("assets-status")).toHaveText("Deleted from the library. The file was erased.");
   expect(await stored(p)).toEqual([]);
+  await expect(p.getByTestId("assets-search"), "a delete leaves the keyboard in the list, never in the search box (its menu would open)").not.toBeFocused();
 
   // An original whose last instance was deleted is still needed by undo.
   await toCanvas(p);

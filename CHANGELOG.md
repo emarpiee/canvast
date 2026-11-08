@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.55.12 — A delete leaves the keyboard in the list (2026-11-09)
+
+- **Fixed:** after deleting items in the library, the search box took the focus and opened its menu; the first card in view (or the list) has it now.
+- **Fixed:** the desktop app said a deleted item's file was erased from the browser's storage; it says it goes to the workspace's `.trash`.
+
 ## 0.55.11 — Deleted stays deleted (2026-11-09)
 
 - **Fixed:** library items deleted in the desktop app could come back after a restart, as new items. Erasing one dropped what the device remembered of it before the library's files in the folder were written without it (a restart in between took it for an item added elsewhere), and dropped its records before its file was moved to the trash, ignoring a move that failed (the file left behind was taken in again). Now its file goes to the trash first, its records only then, and the device remembers it until the folder no longer lists it; a file that cannot be moved keeps its item deleted, says so and is tried again.
