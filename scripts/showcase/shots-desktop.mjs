@@ -27,6 +27,7 @@ const settle = async (ms = 600) => { await frame(); await p.waitForTimeout(ms); 
 // The showcase, imported: written into the folder, then the app starts again on it
 await p.getByTestId("save-status").click();
 await p.getByTestId("set-import-input").setInputFiles(resolve(archive));
+await p.getByTestId("choose-ok").click(); // (How to import: the default way)
 await Promise.all([p.waitForEvent("load", { timeout: 120000 }), p.getByTestId("confirm-ok").click()]);
 await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 60000 });
 await p.addStyleTag({ content: ".hud-dev,.hud-debug{display:none!important}" });

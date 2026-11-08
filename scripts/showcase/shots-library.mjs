@@ -48,7 +48,11 @@ for (const q of ["kind:picture", "#reference"]) {
   await p.getByRole("button", { name: "Save this search" }).filter({ visible: true }).click();
 }
 await p.getByTestId("assets-search").fill("");
+await p.getByTestId("assets-search").press("Escape");
 await p.getByTestId("side-saved").waitFor();
+await p.locator('[data-sec-toggle="ctags"]').click(); // (empty here: folded, so the saved searches show)
+await p.locator('[data-sec-toggle="types"]').click();
+await p.getByTestId("side-saved").scrollIntoViewIfNeeded();
 await p.getByTestId("folder-tree").getByRole("button", { name: /^Lighting/ }).first().hover();
 await p.waitForTimeout(400);
 await p.screenshot({ path: `${out}/sidebar.png`, clip: { x: 0, y: 50, width: 480, height: 850 } });

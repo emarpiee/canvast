@@ -13,7 +13,7 @@ p.on("pageerror", (e) => console.log("PAGEERROR", String(e)));
 await p.goto("file://" + process.cwd() + "/dist/canvast.html#debug");
 await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
 await p.addStyleTag({ content: ".hud-dev,.hud-debug{display:none!important}" });
-const shot = async (name) => { await p.mouse.move(1430, 890); await p.waitForTimeout(800); await p.screenshot({ path: `${out}/${name}.png` }); console.log("shot", name); };
+const shot = async (name) => { await p.evaluate(() => { for (const b of document.querySelectorAll(".notice-close")) b.click(); }); await p.mouse.move(1430, 890); await p.waitForTimeout(800); await p.screenshot({ path: `${out}/${name}.png` }); console.log("shot", name); };
 
 /** A short paper: a title, a heading and lines of text on each page, as Helvetica. */
 function makePdf(pages) {
@@ -53,7 +53,12 @@ function makeTorus(R = 1, r = 0.38, n = 64, m = 32) {
   const f = [];
   for (let i = 0; i < n; i++) for (let j = 0; j < m; j++) {
     const [a, b, c, d] = [at(i, j), at(i + 1, j), at(i + 1, j + 1), at(i, j + 1)];
-    for (const t of [[a, b, c], [a, c, d]]) f.push(`facet normal 0 0 0\nouter loop\n${t.map((q) => `vertex ${q.map((x) => x.toFixed(5)).join(" ")}`).join("\n")}\nendloop\nendfacet`);
+    for (const t of [[a, b, c], [a, c, d]]) {
+      const [u, v] = [t[1].map((x, k) => x - t[0][k]), t[2].map((x, k) => x - t[0][k])];
+      const nn = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+      const l = Math.hypot(...nn) || 1;
+      f.push(`facet normal ${nn.map((x) => (x / l).toFixed(5)).join(" ")}\nouter loop\n${t.map((q) => `vertex ${q.map((x) => x.toFixed(5)).join(" ")}`).join("\n")}\nendloop\nendfacet`);
+    }
   }
   return Buffer.from(`solid torus\n${f.join("\n")}\nendsolid torus\n`);
 }

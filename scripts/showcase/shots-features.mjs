@@ -36,6 +36,7 @@ const ws = (op, ...a) => H(([op, a]) => window.__canvastDebug.workspaceOp(op, ..
 // The showcase, and a few more boards so the board and canvas menu shows its search and folding
 await p.getByTestId("save-status").click();
 await p.getByTestId("set-import-input").setInputFiles(resolve(archive));
+await p.getByTestId("choose-ok").click(); // (How to import: the default way)
 await p.getByTestId("confirm-ok").click();
 await p.getByTestId("toast").filter({ hasText: /Imported/ }).waitFor();
 await p.keyboard.press("Escape");

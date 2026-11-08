@@ -29,6 +29,7 @@ const blur = () => p.evaluate(() => document.activeElement?.blur());
 // The app's default theme colour (Viridian, the logo's colour): nothing is set in Settings > Appearance
 await p.getByTestId("save-status").click();
 await p.getByTestId("set-import-input").setInputFiles(resolve(archive));
+await p.getByTestId("choose-ok").click(); // (How to import: the default way)
 await p.getByTestId("confirm-ok").click();
 await p.getByTestId("toast").filter({ hasText: /Imported/ }).waitFor();
 await p.keyboard.press("Escape");
