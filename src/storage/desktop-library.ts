@@ -104,6 +104,8 @@ interface JournalSnapshot extends MetaSnapshot {
 const putFolders = (folders: AssetFolder[]): LibraryOp => ({ t: "meta", k: FOLDERS_KEY, v: folders });
 
 export class DesktopCatalog implements CatalogStore {
+  /** Told in plain words what the person should know (a deleted item's file that could not be moved to the trash yet). */
+  onNotice: ((text: string) => void) | null = null;
   /**
    * The hidden items' key: a hidden item's thumbnail is stored encrypted with it (made once, never readable on disk), and read only
    * while it is open (ADR 0177).
@@ -550,7 +552,6 @@ export class DesktopCatalog implements CatalogStore {
       const deleted = await this.lib.entries("deleted");
       const { recs } = await this.lib.rows(deleted.map((e) => e.hash));
       const ops: LibraryOp[] = [];
-      const files = new Map<string, string>();
       for (const e of deleted) {
         if ((await this.uses(e.hash)) > 0) {
           ops.push(putEntry({ ...e, state: "active", deletedAt: null }));
@@ -558,9 +559,16 @@ export class DesktopCatalog implements CatalogStore {
         } else if (roots.has(e.hash)) {
           report.retained.push(e.hash);
         } else {
+          // Its file into the trash first; only then its records go. A file that could not be moved keeps its item (deleted, tried again
+          // at the next collection): records dropped first left the file behind, and the next start took it in again as a new item.
           const r = recs.get(e.hash);
-          if (r?.ext) files.set(e.hash, r.file ?? e.hash);
-          ops.push({ t: "entry", hash: e.hash, v: null }, { t: "rec", hash: e.hash, v: null }, { t: "seen", hash: e.hash, v: null });
+          if (r?.ext && !(await externalFolder.remove(e.hash, r.file ?? e.hash))) {
+            report.retained.push(e.hash);
+            this.onNotice?.(`“${e.name}” is deleted from the library, but its file could not be moved to the trash yet (it may be open in another program): it is tried again later.`);
+            continue;
+          }
+          // (its "seen" mark stays until the library's files in the folder no longer list it, or the next start would take it for an item added elsewhere)
+          ops.push({ t: "entry", hash: e.hash, v: null }, { t: "rec", hash: e.hash, v: null });
           report.swept.push(e.hash);
           report.bytesFreed += e.size;
         }
@@ -571,7 +579,6 @@ export class DesktopCatalog implements CatalogStore {
         for (const h of report.swept) (tx.objectStore("assets").delete(h), tx.objectStore("thumbs").delete(h));
         await done(tx);
       }
-      for (const h of report.swept) if (files.has(h)) await externalFolder.remove(h, files.get(h));
       return report;
     });
   }

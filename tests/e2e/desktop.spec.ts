@@ -3105,3 +3105,41 @@ test("after a crash: the next start clears what the app left (readable copies, c
     await app.close();
   }
 });
+
+test("deleted library items stay deleted after a restart: an unused one goes to .trash at once, a placed one once undo no longer needs it; neither comes back", async () => {
+  const ws = tempDir("cv-del-restart-");
+  let { app, page } = await launch(ws);
+  const listing = () => page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => e.name).sort()));
+  const inLibrary = () => files(ws).filter((f) => f.startsWith("library/")).map((f) => f.slice(f.lastIndexOf("/") + 1)).sort();
+  const trashed = () => files(ws).filter((f) => f.startsWith(".trash/library/")).map((f) => f.slice(f.lastIndexOf("/") + 1)).sort();
+  const pic = (c: number) => makePng(4, 4, () => [c, 40, 200 - c, 255]);
+  try {
+    await page.getByTestId("view-assets").click();
+    await page.getByTestId("assets-import-input").setInputFiles([{ name: "keep.png", mimeType: "image/png", buffer: pic(10) }, { name: "gone.png", mimeType: "image/png", buffer: pic(90) }]);
+    await page.getByTestId("view-canvas").click();
+    await page.getByTestId("import-input").setInputFiles({ name: "placed.png", mimeType: "image/png", buffer: pic(170) });
+    await expect.poll(listing, { timeout: 30_000 }).toEqual(["gone.png", "keep.png", "placed.png"]);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    const hashOf = (name: string) => page.evaluate((n) => window.__canvastDebug.assetListing().then((l) => l.entries.find((e) => e.name === n)!.hash), name);
+    expect(await page.evaluate((h) => window.__canvastDebug.deleteEverywhere(h), [await hashOf("gone.png"), await hashOf("placed.png")])).toBe(2);
+    await expect.poll(listing).toEqual(["keep.png"]);
+    await expect.poll(trashed, { message: "the unused one goes to .trash at once" }).toContain("gone.png");
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+  } finally {
+    await app.close();
+  }
+  // Started again (twice): what was deleted stays deleted, its file in .trash, never taken in again as a new item.
+  for (const round of [1, 2]) {
+    ({ app, page } = await launch(ws));
+    try {
+      await expect.poll(trashed, { message: `round ${round}: the placed one goes to .trash once no undo needs it`, timeout: 30_000 }).toEqual(["gone.png", "placed.png"]);
+      for (let i = 0; i < 4; i++) {
+        expect(await listing(), `round ${round}: nothing deleted came back`).toEqual(["keep.png"]);
+        expect(inLibrary()).toEqual(["keep.png"]);
+        await page.waitForTimeout(1500);
+      }
+    } finally {
+      await app.close();
+    }
+  }
+});

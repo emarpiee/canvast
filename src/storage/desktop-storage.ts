@@ -127,6 +127,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   (storage.backups as IdbBackups).library = lib;
   mirror.onError = (text) => opts.onNotice?.(text);
   hidden.onNotice = (text) => opts.onNotice?.(text);
+  desktopCatalog.onNotice = (text) => opts.onNotice?.(text);
   // Settings > Privacy: hidden items' names out of this device's cache while locked. What waits is written before the key goes; once
   // locked (and at start-up, locked), the names are blanked; opening fills them in again from the sealed index.
   hidden.beforeLock = () => mirror.flush();

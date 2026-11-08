@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.55.11 — Deleted stays deleted (2026-11-09)
+
+- **Fixed:** library items deleted in the desktop app could come back after a restart, as new items. Erasing one dropped what the device remembered of it before the library's files in the folder were written without it (a restart in between took it for an item added elsewhere), and dropped its records before its file was moved to the trash, ignoring a move that failed (the file left behind was taken in again). Now its file goes to the trash first, its records only then, and the device remembers it until the folder no longer lists it; a file that cannot be moved keeps its item deleted, says so and is tried again.
+- **Added:** a test deletes an unused and a placed item, restarts the app twice and checks that neither comes back and both files are in `.trash`.
+
 ## 0.55.10 — The password card shows the latest answer (2026-11-09)
 
 - **Fixed:** in Settings > Privacy, the status asked when the tab opened could answer after *Lock now* and show the hidden items unlocked again; only the latest answer is drawn now.
