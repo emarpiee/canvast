@@ -27,6 +27,8 @@ const b64 = (b) => Buffer.from(b).toString("base64");
 const HIDDEN_JSON = ".canvast/hidden.json";
 /** The spare of the vault's key (no index), kept beside it by the app. */
 const KEY_SPARE = ".canvast/keys/hidden.json";
+/** hidden.json put loose beside .hidden/ (the simple way: everything in one folder with this script), read when .canvast/ has none. */
+const LOOSE_JSON = "hidden.json";
 /** A folder of .hidden/: a library folder's name, encrypted (base32; `0…` keeps a long name in its `.name`). */
 const SEALED_DIR_RE = /^0?[a-z2-7]{26,}$/;
 const HIDDEN_FILE_RE = /^\.hidden\/(?:(?:0?[a-z2-7]{26,})\/)*(?:0?[a-z2-7]{26,}|[0-9a-f]{32}\.bin)$/;
@@ -265,7 +267,8 @@ export async function decryptHidden(workspace, out, password, { flat = false, la
   const vaults = [];
   let failed = null;
   // hidden.json, the copies a sync tool left beside it, and the spare of its key (when hidden.json is lost: files then come out as recovered-…).
-  for (const file of [HIDDEN_JSON, ...hiddenCopies(workspace), KEY_SPARE]) {
+  const loose = !existsSync(join(workspace, HIDDEN_JSON)) && existsSync(join(workspace, LOOSE_JSON)) ? [LOOSE_JSON] : [];
+  for (const file of [HIDDEN_JSON, ...loose, ...hiddenCopies(workspace), KEY_SPARE]) {
     if (!existsSync(join(workspace, file))) continue;
     try {
       vaults.push(await openVault(workspace, password, file));
@@ -493,8 +496,19 @@ async function askPassword() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [mode, workspace, ...rest] = process.argv.slice(2);
-  const usage = "usage: node scripts/hidden-items.mjs decrypt <workspace folder> <output folder> [--flat]\n       node scripts/hidden-items.mjs encrypt <workspace folder> <file>…";
+  const args = process.argv.slice(2);
+  // The simple way: no folders named, so the one this script is in holds .hidden/ and hidden.json; the files go to output/ beside them.
+  if (!args.length || (args.length === 1 && args[0] === "decrypt")) {
+    const here = dirname(fileURLToPath(import.meta.url));
+    if (!existsSync(join(here, ".hidden")) || !(existsSync(join(here, LOOSE_JSON)) || existsSync(join(here, HIDDEN_JSON)))) {
+      const has = (ok) => (ok ? "✓ found" : "✗ missing");
+      console.error(`Put these in one folder, then run this again:\n  hidden-items.mjs  ✓ (this script)\n  .hidden           ${has(existsSync(join(here, ".hidden")))} (the folder)\n  hidden.json       ${has(existsSync(join(here, LOOSE_JSON)) || existsSync(join(here, HIDDEN_JSON)))}\nFolder: ${here}`);
+      process.exit(2);
+    }
+    args.splice(0, args.length, "decrypt", here, join(here, "output"));
+  }
+  const [mode, workspace, ...rest] = args;
+  const usage = "usage: node hidden-items.mjs                (the simple way: .hidden and hidden.json in this script's folder)\n       node scripts/hidden-items.mjs decrypt <workspace folder> <output folder> [--flat]\n       node scripts/hidden-items.mjs encrypt <workspace folder> <file>…";
   const flat = mode === "decrypt" && rest.includes("--flat");
   if (flat) rest.splice(rest.indexOf("--flat"), 1);
   if (!workspace || !rest.length || (mode !== "decrypt" && mode !== "encrypt") || (mode === "decrypt" && rest.length !== 1)) {

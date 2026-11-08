@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.2 — Decrypt the hidden items the simple way (2026-11-09)
+
+- **Added:** `node hidden-items.mjs` with no arguments decrypts the `.hidden` folder and `hidden.json` that sit in the script's own folder into `output/` beside them; `hidden.json` may be loose beside `.hidden`. A missing file is named in plain words.
+
 ## 0.55.1 — One look for every sidebar list; Space let go elsewhere (2026-11-08)
 
 - **Changed:** Saved searches in the library's sidebar are rows like the folders': an icon, the name, a count chip and a ⋯ shown under the pointer (always on touch screens); *Update* moved into the ⋯.

@@ -1333,7 +1333,25 @@ All binary values in the vault are base64. The SHA-256 of a decrypted file is it
 
 ### Decrypting and encrypting outside the app
 
-`scripts/hidden-items.mjs` does both with nothing but Node.js 20 or later (no install step, no dependencies). Close canvast on that workspace first. It asks for the Hidden password without showing it (or reads it from a pipe):
+`scripts/hidden-items.mjs` does both with nothing but Node.js 20 or later (no install step, no dependencies). Close canvast on that workspace first. It asks for the Hidden password without showing it (or reads it from a pipe).
+
+#### The simple way to decrypt
+
+1. Put three things in one folder: the script `hidden-items.mjs`, the `.hidden` folder, and `hidden.json` (from `.canvast/`, put loose beside `.hidden`). Folders starting with a dot are hidden in file managers: `Ctrl+H` shows them.
+2. Open a terminal in that folder (in most file managers: right-click, *Open Terminal Here*).
+3. Run `node hidden-items.mjs` and type the Hidden items password (nothing shows as you type).
+
+Your files come out in `output/` in the same folder, with their names and library folders; nothing else is changed. If something is missing, the script lists what it found and what it did not.
+
+```
+my-folder/
+├── hidden-items.mjs
+├── .hidden/
+└── hidden.json
+```
+
+#### With folders named
+
 
 ```sh
 # Every hidden item's file, under its name in the library and in its library folders, with hidden-items.json (names, tags, notes,

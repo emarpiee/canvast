@@ -1,6 +1,7 @@
 import { _electron as electron, expect, test } from "@playwright/test";
 import type { ElectronApplication, Page } from "@playwright/test";
-import { appendFileSync, createReadStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, createReadStream, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync, truncateSync, utimesSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { basename, join, relative } from "node:path";
 import { createHash, scryptSync } from "node:crypto";
@@ -1007,6 +1008,14 @@ test("hidden items are encrypted: sealed into .hidden/ with nothing readable lef
     expect(JSON.parse(readFileSync(join(`${ws}-out`, "hidden-items.json"), "utf8"))[0]).toMatchObject({ name: "Secret Plan.png", hidden: true, writtenAs: "Secret Folder/Secret Plan.png" });
     expect(await decryptHidden(ws, `${ws}-flat`, "pw2", { flat: true })).toBe(1);
     expect(readFileSync(join(`${ws}-flat`, "Secret Plan.png")).equals(secret)).toBe(true);
+    // The simple way: the script, .hidden and a loose hidden.json in one folder, run with no arguments (the password piped in).
+    const simple = `${ws}-simple`;
+    mkdirSync(simple);
+    cpSync(join(ws, ".hidden"), join(simple, ".hidden"), { recursive: true });
+    cpSync(join(ws, ".canvast", "hidden.json"), join(simple, "hidden.json"));
+    cpSync(join(process.cwd(), "scripts", "hidden-items.mjs"), join(simple, "hidden-items.mjs"));
+    execFileSync(process.execPath, [join(simple, "hidden-items.mjs")], { input: "pw2\n", cwd: tmpdir() });
+    expect(readFileSync(join(simple, "output", "Secret Folder", "Secret Plan.png")).equals(secret)).toBe(true);
     // Locked (from the command palette): the picture on the canvas leaves memory and is drawn with a padlock; the password opens it again.
     await page.keyboard.press("Control+k");
     await page.locator(".palette-input").fill("lock hidden");
