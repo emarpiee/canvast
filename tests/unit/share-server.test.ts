@@ -200,3 +200,24 @@ describe("the folder for file managers (WebDAV)", () => {
     expect((await dav("GET", "/dav/Hidden/x")).status).toBe(404);
   });
 });
+
+describe("many requests at once", () => {
+  it("wait their turn instead of being refused", async () => {
+    let now = 0;
+    let most = 0;
+    let saved: ShareDevice[] = [];
+    server = await startShare({
+      cert,
+      host: "127.0.0.1",
+      perDevice: 1,
+      calls: new Map<string, ShareCall>([["canvast:exists", async () => (now++, (most = Math.max(most, now)), await new Promise((r) => setTimeout(r, 50)), now--, true)]]),
+      hidden: () => false,
+      ask: async () => true,
+      devices: { load: () => saved, save: (l) => void (saved = l) },
+    });
+    const token = String(jsonOf(await send(server.port, "POST", "/pair", { code: server.code, name: "x" }))["token"]);
+    const all = await Promise.all([1, 2, 3].map(() => send(server!.port, "POST", "/call", { ch: "canvast:exists", args: ["library/a.png"] }, token)));
+    expect(all.map((r) => r.status)).toEqual([200, 200, 200]);
+    expect(most, "one at a time").toBe(1);
+  });
+});

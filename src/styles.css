@@ -952,7 +952,8 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .set-reset { font: inherit; font-size: var(--text-sm); color: inherit; height: var(--row-btn); background: none; border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
 .set-reset:disabled { opacity: 0.35; cursor: default; }
 .set-info { max-width: 640px; }
-.set-info dl { display: grid; grid-template-columns: 200px 1fr; gap: var(--s-4) var(--s-6); }
+.set-info dl { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: var(--s-4) var(--s-6); }
+.set-info dd { min-width: 0; overflow-wrap: anywhere; } /* (a long code or address wraps, never widens the panel) */
 .set-info dt { color: var(--hud-muted); }
 .set-info dd { margin: 0; }
 #settings-view button:disabled { opacity: 0.4; cursor: default; }

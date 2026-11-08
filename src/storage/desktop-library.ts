@@ -124,9 +124,24 @@ export class DesktopCatalog implements CatalogStore {
     return (await req(tx.objectStore("thumbs").getAllKeys())) as string[];
   }
 
+  /** A guest's (ADR 0184): the host's thumbnail, asked for when this page has none (kept here then). */
+  remoteThumb: ((hash: string) => Promise<ThumbRecord | null>) | null = null;
+
+  /** A thumbnail as stored, never a hidden item's (those are stored encrypted): what a host gives its guests. */
+  async plainThumb(hash: string): Promise<ThumbRecord | undefined> {
+    const tx = this.db.transaction("thumbs", "readonly");
+    const rec = await req(tx.objectStore("thumbs").get(hash) as IDBRequest<(ThumbRecord & { sealed?: string }) | undefined>);
+    return rec && rec.sealed === undefined ? rec : undefined;
+  }
+
   async thumb(hash: string): Promise<ThumbRecord | undefined> {
     const tx = this.db.transaction("thumbs", "readonly");
     const rec = await req(tx.objectStore("thumbs").get(hash) as IDBRequest<(ThumbRecord & { sealed?: string }) | undefined>);
+    if (!rec && this.remoteThumb) {
+      const got = await this.remoteThumb(hash).catch(() => null);
+      if (got) await this.putThumb(got).catch(() => undefined);
+      return got ?? undefined;
+    }
     if (rec?.sealed === undefined) return rec;
     // (a hidden item's: opened with the key, or none while it is locked)
     const bytes = this.vault?.isOpen() ? await this.vault.open(new Uint8Array(await rec.blob.arrayBuffer())).catch(() => null) : null;

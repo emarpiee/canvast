@@ -80,7 +80,7 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
   const answers = new Map<string, (ok: boolean) => void>();
   // The hidden items are opened by the page (it holds their key while they are open): asked there, and answered back.
   const davAsks = new Map<string, (v: unknown) => void>();
-  const askPage = (op: "list" | "read", arg?: unknown): Promise<unknown> =>
+  const askPage = (op: "list" | "read" | "thumb", arg?: unknown): Promise<unknown> =>
     new Promise((ok) => {
       if (win.isDestroyed()) return ok(null);
       const id = randomBytes(8).toString("hex");
@@ -89,6 +89,8 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
       win.webContents.send("canvast:davAsk", { id, op, arg });
     });
   const call = (ch: string, ...a: unknown[]): Promise<unknown> => SHARE_CALLS.get(ch)!(...a);
+  // A guest's thumbnails: the host's page has them (never a hidden item's), so a guest does not read every original to draw its own.
+  SHARE_CALLS.set("canvast:thumb", async (hash) => (typeof hash === "string" && /^[0-9a-f]{64}(?:~\d+)?$/.test(hash) ? askPage("thumb", hash) : null));
   const dav: Record<string, DavRoot> = {
     Library: {
       list: cached(async () => ((await call("canvast:tree", "library")) as Array<{ path: string; size: number }>).map((f) => ({ path: f.path.replace(/^library\//, ""), size: f.size }))),

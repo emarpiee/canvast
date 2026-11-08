@@ -101,6 +101,11 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   const lib = new DesktopLibrary(raw.lib);
   await moveIdbLibrary(storage.db, lib);
   const desktopCatalog = new DesktopCatalog(storage.db, lib);
+  const remoteThumb = raw.thumb?.bind(raw);
+  if (remoteThumb) desktopCatalog.remoteThumb = async (hash) => {
+    const t = await remoteThumb(hash);
+    return t ? { hash, blob: new Blob([t.bytes as Uint8Array<ArrayBuffer>], { type: t.type }), w: t.w, h: t.h, face: t.face } : null;
+  };
   const hidden = new HiddenVault(bridge, async () => (await desktopCatalog.pages.counts()).hidden); // (counted in the main process)
   desktopCatalog.vault = hidden;
   const mirror = new WorkspaceMirror(storage.db, lib, storage.workspace, bridge, deviceId(), hidden, deleteTo);
@@ -376,7 +381,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
       return whole ? whole.slice(from, to) : null;
     },
   };
-  return { ...storage, resetAll, workspace, backups, catalog, originals, customThumbs, libraryFolder: null, workspaceFolder: ws.path, hidden, folderSync, folderWriting, hiddenFiles, flush: () => mirror.flush() };
+  return { ...storage, resetAll, workspace, backups, catalog, originals, customThumbs, libraryFolder: null, workspaceFolder: ws.path, hidden, folderSync, folderWriting, hiddenFiles, sharedThumb: async (hash) => (await desktopCatalog.plainThumb(hash)) ?? null, flush: () => mirror.flush() };
 }
 
 /** This device's id in the workspace folder (`.canvast/devices/<id>.json`), made once and kept. */

@@ -850,7 +850,7 @@ async function start(): Promise<void> {
   const share = desktopBridge()?.share;
   if (share) installShareAsk(share);
   if (share) sendView(view, session, share); // (for guests that follow: ADR 0184)
-  if (share && storage?.hiddenFiles) installShareFolder(share, storage.hiddenFiles);
+  if (share && storage?.hiddenFiles && storage.sharedThumb) installShareFolder(share, storage.hiddenFiles, storage.sharedThumb.bind(storage));
   desktopBridge()?.onClosing(async () => {
     if (!opened) return; // (still locked or starting: nothing was changed, so nothing waits to be written)
     // A note open with changes not saved: Save them, Don't save, or Cancel (the window stays).

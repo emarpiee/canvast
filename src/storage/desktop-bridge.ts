@@ -93,7 +93,7 @@ export interface ShareCalls {
   /** A device asks to connect (it typed the code): answer with `call("answer", …)`. */
   onAsk(fn: (ask: { id: string; name: string; address: string }) => void): void;
   /** The file managers' folder asks for the hidden items (`list`, or `read` a part of one): answer with `call("davAnswer", { id, value })`. */
-  onDav(fn: (ask: { id: string; op: "list" | "read"; arg?: { path: string; from: number; to: number } }) => void): void;
+  onDav(fn: (ask: { id: string; op: "list" | "read" | "thumb"; arg?: { path: string; from: number; to: number } | string }) => void): void;
 }
 
 /** Where a deleted file of the workspace folder goes. */
@@ -208,6 +208,8 @@ export interface DesktopBridge {
   list(path: string): Promise<string[]>;
   /** The library's own storage (SQLite, in the main process). */
   lib: LibraryCalls;
+  /** A guest's (ADR 0184): the host's thumbnail of an item (never a hidden one's), or null. */
+  thumb?(hash: string): Promise<{ bytes: Uint8Array; type: string; w: number; h: number; face?: string } | null>;
   /** Connecting to a workspace another computer shares (ADR 0184): found on the network, or typed; its fingerprint confirmed, then opened in a window of its own. */
   guest?: {
     find(): Promise<Array<{ name: string; address: string; port: number; fingerprint: string }>>;

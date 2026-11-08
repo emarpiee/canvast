@@ -13,9 +13,16 @@ const esc = (s: string): string => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeA
 const when = (t: number | null): string => (t ? new Date(t).toLocaleString() : "never");
 
 /** The file managers' folder asks for hidden items: answered from this page, which holds their key while they are open (once, at start). */
-export function installShareFolder(share: ShareCalls, files: HiddenFiles): void {
+export function installShareFolder(share: ShareCalls, files: HiddenFiles, thumb: (hash: string) => Promise<{ blob: Blob; w: number; h: number; face?: string | undefined } | null>): void {
   share.onDav((a) => {
-    const value = a.op === "list" ? files.list() : a.arg ? files.read(a.arg.path, a.arg.from, a.arg.to) : Promise.resolve(null);
+    const value =
+      a.op === "thumb"
+        ? thumb(String(a.arg)).then(async (t) => (t ? { b64: btoa(Array.from(new Uint8Array(await t.blob.arrayBuffer()), (c) => String.fromCharCode(c)).join("")), type: t.blob.type, w: t.w, h: t.h, ...(t.face ? { face: t.face } : {}) } : null))
+        : a.op === "list"
+          ? files.list()
+          : a.arg && typeof a.arg === "object"
+            ? files.read(a.arg.path, a.arg.from, a.arg.to)
+            : Promise.resolve(null);
     void value.catch(() => null).then((v) => share.call("davAnswer", { id: a.id, value: v }));
   });
 }

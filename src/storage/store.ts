@@ -357,6 +357,8 @@ export interface Storage {
   readonly folderWriting: FolderWriting | null;
   /** The desktop build: the hidden items as readable files, for the file managers' folder of sharing (ADR 0184); absent elsewhere. */
   readonly hiddenFiles?: HiddenFiles;
+  /** The desktop build: an item's thumbnail as stored here, never a hidden item's (for guests of sharing, ADR 0184). */
+  sharedThumb?(hash: string): Promise<{ blob: Blob; w: number; h: number; face?: string | undefined } | null>;
 }
 
 /** The hidden items as files at readable paths (their library folders and names), each decrypted a part at a time. */

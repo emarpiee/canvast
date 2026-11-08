@@ -213,6 +213,10 @@ export function remoteBridge(origin: string, token: string): DesktopBridge {
     libraryLookDone: nothing,
     onChanged: (fn) => hostEvents(origin, token).addEventListener("changed", (e) => fn(JSON.parse((e as MessageEvent<string>).data) as string[])),
     lib: new GuestLibrary(host),
+    thumb: async (hash) => {
+      const t = (await call<{ b64: string; type: string; w: number; h: number; face?: string } | null>("thumb", hash).catch(() => null));
+      return t ? { bytes: Uint8Array.from(atob(t.b64), (c) => c.charCodeAt(0)), type: t.type, w: t.w, h: t.h, ...(t.face ? { face: t.face } : {}) } : null;
+    },
     exportTo: { begin: async () => null, write: readOnly, end: nothing },
   };
 }

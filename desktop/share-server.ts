@@ -139,8 +139,9 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
   let devices = o.devices.load();
   let wrongCodes = 0;
   const busy = new Map<string, number>();
+  const waiting = new Map<string, Array<() => void>>();
   const streams = new Map<ServerResponse, string>();
-  const perDevice = o.perDevice ?? 8;
+  const perDevice = o.perDevice ?? 12;
 
   const json = (res: ServerResponse, status: number, body: unknown): void => {
     res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
@@ -185,12 +186,12 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
       if (asksHidden(args[0], args.slice(1))) return json(res, 403, { error: "hidden items' lists are opened by the guest" });
     } else if (ch === "canvast:sizes") {
       if (!Array.isArray(args[0]) || !(args[0] as unknown[]).every((p) => pathAllowed(p, hidden))) return json(res, 403, { error: "not shared" });
-    } else if (ch !== "canvast:canvasFiles" && ch !== "canvast:workspace" && !pathAllowed(args[0], hidden)) {
+    } else if (ch !== "canvast:canvasFiles" && ch !== "canvast:workspace" && ch !== "canvast:thumb" && !pathAllowed(args[0], hidden)) {
       return json(res, 403, { error: "not shared" });
     }
-    const n = busy.get(dev.id) ?? 0;
-    if (n >= perDevice) return json(res, 429, { error: "too many at once" });
-    busy.set(dev.id, n + 1);
+    // At most `perDevice` at once from one device: the rest wait their turn (a library view asks for many at once).
+    while ((busy.get(dev.id) ?? 0) >= perDevice) await new Promise<void>((r) => (waiting.get(dev.id) ?? waiting.set(dev.id, []).get(dev.id)!).push(r));
+    busy.set(dev.id, (busy.get(dev.id) ?? 0) + 1);
     try {
       let out = await fn(...args);
       if (ch === "canvast:lib") out = withoutHidden(args[0] as string, args.slice(1), out);
@@ -203,6 +204,7 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
       json(res, 400, { error: e instanceof Error ? e.message : String(e) });
     } finally {
       busy.set(dev.id, (busy.get(dev.id) ?? 1) - 1);
+      waiting.get(dev.id)?.shift()?.();
     }
   }
 
