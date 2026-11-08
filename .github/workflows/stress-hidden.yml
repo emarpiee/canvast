@@ -14,6 +14,9 @@ on:
       seed:
         description: Seed (empty for a new one; a failed run's seed runs it again)
         default: ""
+      big:
+        description: Big files instead of the scale part (0 off; 1 = about 15 GB from 50 KB to 2 GB, beside the small items above)
+        default: "0"
 
 permissions:
   contents: read
@@ -21,7 +24,7 @@ permissions:
 jobs:
   stress:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,7 +38,11 @@ jobs:
       - run: xvfb-run -a npm run test:snap -- --project=desktop tests/e2e/desktop.spec.ts -g sandboxed
         env:
           ELECTRON_DISABLE_SANDBOX: "1"
-      - run: set -o pipefail; xvfb-run -a node scripts/stress-hidden.mjs --items ${{ inputs.items }} --rounds ${{ inputs.rounds }} ${{ inputs.seed && format('--seed {0}', inputs.seed) || '' }} --dir "$RUNNER_TEMP/stress" | tee stress.txt
+      # (big files need the machine's larger disk, at /mnt)
+      - run: |
+          sudo mkdir -p /mnt/stress && sudo chown "$(id -u)" /mnt/stress
+          df -h "$RUNNER_TEMP" /mnt
+      - run: set -o pipefail; xvfb-run -a node scripts/stress-hidden.mjs --items ${{ inputs.items }} --rounds ${{ inputs.rounds }} --big ${{ inputs.big }} ${{ inputs.seed && format('--seed {0}', inputs.seed) || '' }} --dir "${{ inputs.big != '0' && '/mnt/stress' || format('{0}/stress', runner.temp) }}" | tee stress.txt
         env:
           ELECTRON_DISABLE_SANDBOX: "1"
           STRESS_KEEP: ${{ runner.temp }}/stress-keep

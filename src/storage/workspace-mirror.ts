@@ -90,6 +90,9 @@ export function canvasHead(text: string | null): { id: string; revision: number;
 
 const stamp = (d = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`;
 
+/** Where a move parks a board folder or a canvas file between its two steps (see `unpark`). */
+const PARK = ".canvast/moving";
+
 export class WorkspaceMirror {
   private readonly dirty = new Set<string>();
   private treeDirty = false;
@@ -183,6 +186,7 @@ export class WorkspaceMirror {
     this.libraryDirty = await this.lib.pendingWrite();
     const fileWs = await this.readWorkspaceFile();
     if (!fileWs) return this.everything(); // a new workspace folder: all of it is written
+    await this.unpark(fileWs);
     await this.mergeTreeCopies(fileWs); // (written back below, with the tree)
     const tree = JSON.stringify(fileWs.boards);
     if (tree !== this.state.tree) await this.adoptTree(fileWs);
@@ -863,7 +867,7 @@ export class WorkspaceMirror {
     const oldFile = new Map(before.flatMap((b) => b.canvases.map((c) => [c.id, c.file] as const)));
     const newFile = new Map(next.flatMap((b) => b.canvases.map((c) => [c.id, c.file] as const)));
     // Moves go through a parking place first, so swapped names (a → b while b → a) never meet.
-    const park = (id: string): string => `.canvast/moving/${id}`;
+    const park = (id: string): string => `${PARK}/${id}`;
     const boardMoves = [...newFolder].filter(([id, f]) => oldFolder.has(id) && oldFolder.get(id) !== f);
     for (const [id] of boardMoves) await this.moveIfThere(oldFolder.get(id)!, park(id));
     for (const [id, f] of boardMoves) await this.moveIfThere(park(id), f);
@@ -905,6 +909,21 @@ export class WorkspaceMirror {
     await this.bridge.write(WORKSPACE_FILE, encode(JSON.stringify(ws, null, 1)));
     this.placed = next;
     this.state.tree = JSON.stringify(next);
+  }
+
+  /**
+   * A crash between a move's two steps leaves a board's folder or a canvas's file parked in `.canvast/moving/`. Each goes back where
+   * `workspace.json` (written after the moves) still says it is, or into `.trash/` when that place is taken or unknown: nothing is deleted.
+   */
+  private async unpark(fileWs: WorkspaceFile): Promise<void> {
+    const parked = new Set((await this.bridge.tree(PARK).catch(() => [])).map((f) => f.path.slice(PARK.length + 1).split("/")[0]!).filter(Boolean));
+    if (!parked.size) return;
+    const places = new Map<string, string>(fileWs.boards.flatMap((b) => [[b.id, b.folder] as const, ...b.canvases.map((c) => [c.id, c.file] as const)]));
+    for (const id of parked) {
+      const to = places.get(id);
+      const free = !!to && !(await this.bridge.exists(to)) && !(await this.bridge.folderExists(to));
+      await (free ? this.bridge.rename(`${PARK}/${id}`, to) : this.bridge.remove(`${PARK}/${id}`, "trash")).catch(() => undefined);
+    }
   }
 
   private async moveIfThere(from: string, to: string): Promise<void> {

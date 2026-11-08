@@ -259,7 +259,8 @@ async function inside(root: string, rel: string): Promise<string> {
  * another device's included (the stress run shortens the wait).
  */
 const STALE_TMP_MS = Number(process.env["CANVAST_STALE_TMP_MS"] ?? 10 * 60_000);
-const TMP_RE = /\.tmp-[0-9a-z-]+$/i; // (a write's own name beside its file: see writeAtomic)
+// (a write's own name, exactly: `.tmp-` and a UUID, see writeAtomic. A person's own file named `notes.tmp-2` is never taken for one)
+const TMP_RE = /(?:^|\/)\.tmp-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const staleTmp = (name: string, mtimeMs: number): boolean => TMP_RE.test(name) && Date.now() - mtimeMs >= STALE_TMP_MS;
 async function sweepTemps(dir: string): Promise<void> {
   for (const ent of await readdir(dir, { withFileTypes: true }).catch(() => [])) {

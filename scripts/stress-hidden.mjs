@@ -10,10 +10,17 @@
 //    into a folder, lock and open) started, the app killed (SIGKILL, every process) at a random moment, started again and opened. After
 //    each round, on disk: no item lost (each is a readable file in library/ or a sealed file the password opens, with its bytes), no
 //    sealed file that does not open, nothing unknown, no temporary file of a cut-off write left. Exits 1 when any round failed.
+// 3. Big files (`--big K`, off at 0): K × about 15 GB of files from 50 KB to 2 GB (many of hundreds of MB, a few of GBs) beside
+//    `--items` small ones: taken in, hidden one size at a time, locked, the app restarted and opened, each size read back through the
+//    folder for file managers (the first megabyte, a part in the middle, the whole file: what a viewer or a file manager does), the big
+//    ones shown again, the rest decrypted by the outside tool. Per size: time, MB/s, the app's peak memory and the disk used beyond the
+//    files; every byte checked by SHA-256.
 // Never point --dir inside a synced folder.
 import { _electron as electron } from "@playwright/test";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { closeSync, createReadStream, cpSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, rmSync, statfsSync, statSync, writeSync } from "node:fs";
+import { request as httpsRequest } from "node:https";
+import { randomFillSync } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join, relative, resolve, sep } from "node:path";
 import { decryptHidden } from "./hidden-items.mjs";
@@ -24,6 +31,7 @@ const opt = (name, fallback) => (args.includes(name) ? args[args.indexOf(name) +
 const N = Number(opt("--items", 10_000));
 const ROUNDS = Number(opt("--rounds", 30));
 const M = Number(opt("--kill-items", 300));
+const BIG = Number(opt("--big", 0));
 const SEED = Number(opt("--seed", Date.now() % 1e9));
 const root = resolve(opt("--dir", join(tmpdir(), "canvast-stress-hidden")));
 const build = resolve(opt("--build", join("test-builds", readdirSync("test-builds").filter((d) => existsSync(join("test-builds", d, "desktop"))).sort().pop() ?? "")));
@@ -41,6 +49,11 @@ const rand = () => {
 };
 const pick = (list, n) => [...list].sort(() => rand() - 0.5).slice(0, n);
 const sha = (b) => createHash("sha256").update(b).digest("hex");
+/** A file's SHA-256, read a part at a time (files of GBs). */
+const shaFile = (p) => new Promise((ok, fail) => {
+  const h = createHash("sha256");
+  createReadStream(p).on("data", (b) => h.update(b)).on("end", () => ok(h.digest("hex"))).on("error", fail);
+});
 const secs = (ms) => `${(ms / 1000).toFixed(1)} s`;
 
 // ---- the app ----
@@ -165,7 +178,7 @@ let failed = false;
 console.log(`seed ${SEED}`);
 
 // ---- 1. scale ----
-{
+if (N > 0 && !BIG) {
   const ws = join(root, `scale-${N}`);
   rmSync(`${ws}-data`, { recursive: true, force: true });
   const { items, folders } = makeWorkspace(ws, N, { perFolder: 100, nest: 4 });
@@ -241,7 +254,7 @@ console.log(`seed ${SEED}`);
 // ---- 2. crashes ----
 const crashes = [];
 let traced = false;
-{
+if (ROUNDS > 0) {
   const ws = join(root, `crash-${M}`);
   rmSync(`${ws}-data`, { recursive: true, force: true });
   const { items, folders } = makeWorkspace(ws, M, { perFolder: 30, nest: 3 });
@@ -305,6 +318,148 @@ let traced = false;
   await s.app.close();
   if (!args.includes("--keep")) for (const d of [ws, `${ws}-data`]) rmSync(d, { recursive: true, force: true });
 }
+
+// ---- 3. big files ----
+const bigRows = [];
+if (BIG > 0) {
+  const MB = 2 ** 20;
+  /** The sizes, and how many of each (times K). */
+  const SIZES = [[0.05, 200], [1, 40], [10, 20], [50, 10], [100, 10], [200, 8], [300, 6], [500, 4], [1024, 4], [2048, 2]].map(([mb, n]) => ({ mb, n: Math.max(1, Math.round(n * BIG)), name: mb < 1 ? "50 KB" : mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB` }));
+  const ws = join(root, "big");
+  rmSync(`${ws}-data`, { recursive: true, force: true });
+  const { items } = makeWorkspace(ws, N, { perFolder: 500, nest: 2 });
+  const used = () => {
+    const f = statfsSync(root);
+    return (f.blocks - f.bfree) * f.bsize;
+  };
+  // Each file different (its number in every block), written a block at a time and hashed as written.
+  const block = Buffer.alloc(8 * MB);
+  randomFillSync(block);
+  const t0 = performance.now();
+  for (const [k, size] of SIZES.entries()) {
+    size.files = [];
+    const dir = join(ws, "library", "big", `s${k}`);
+    mkdirSync(dir, { recursive: true });
+    for (let i = 0; i < size.n; i++) {
+      const bytes = Math.round(size.mb * MB);
+      const name = `s${k}-${String(i).padStart(3, "0")}.dat`;
+      const h = createHash("sha256");
+      const fd = openSync(join(dir, name), "w");
+      for (let at = 0; at < bytes; ) {
+        const n = Math.min(block.length, bytes - at);
+        block.writeUInt32LE(k * 1000 + i, 0);
+        block.writeUInt32LE(at / block.length, 4);
+        writeSync(fd, block, 0, n);
+        h.update(block.subarray(0, n));
+        at += n;
+      }
+      closeSync(fd);
+      size.files.push({ name, file: join(dir, name), bytes, hash: h.digest("hex") });
+    }
+  }
+  const total = SIZES.reduce((a, s) => a + s.files.reduce((b, f) => b + f.bytes, 0), 0);
+  const count = N + SIZES.reduce((a, s) => a + s.n, 0);
+  const gb = (b) => `${(b / 2 ** 30).toFixed(1)} GB`;
+  console.log(`big files: ${count.toLocaleString()} items, ${gb(total)} written in ${secs(performance.now() - t0)}; disk free ${gb(statfsSync(root).bavail * statfsSync(root).bsize)}`);
+  const rate = (bytes, ms) => `${((bytes / MB) / (ms / 1000)).toFixed(0)} MB/s`;
+  /** `measured`, and the disk used beyond what it was before: the copies held while files are sealed or shown. */
+  const withDisk = async (app, fn) => {
+    const base = used();
+    let peak = 0;
+    const timer = setInterval(() => (peak = Math.max(peak, used() - base)), 200);
+    try {
+      return { ...(await measured(app, fn)), disk: peak };
+    } finally {
+      clearInterval(timer);
+    }
+  };
+  const row = (what, size, bytes, m) => {
+    bigRows.push([what, size, secs(m.time), rate(bytes, m.time), `${Math.round(m.peak)} MB`, m.disk === undefined ? "" : gb(Math.max(0, m.disk))]);
+    console.log(`${what} ${size}: ${secs(m.time)}, ${rate(bytes, m.time)}, peak memory ${Math.round(m.peak)} MB${m.disk === undefined ? "" : `, disk beyond the files ${gb(Math.max(0, m.disk))}`}`);
+  };
+  const readable = () => filesUnder(join(ws, "library", "big")).length;
+  let s = await launch(ws);
+  const listed = () => s.page.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.length));
+  row("take in (start, every file read once)", "all", total, await withDisk(s.app, () => until(listed, count)));
+  if (!(await s.hid("set", PW)).ok) throw new Error("the Hidden password was not set");
+  // Hidden one size at a time, the small ones by their folders.
+  const small = await withDisk(s.app, async () => {
+    for (const f of items.length ? [...new Set(items.map((i) => i.folderId))] : []) await s.lib("hideFolder", f);
+    await s.flush();
+  });
+  row(`hide ${N.toLocaleString()} small items`, "tiny", items.reduce((a, i) => a + i.size, 0), small);
+  for (const size of SIZES) {
+    const before = readable();
+    const m = await withDisk(s.app, async () => {
+      for (const f of size.files) await s.lib("hide", f.hash, "1");
+      await s.flush();
+      await until(() => Promise.resolve(readable()), before - size.n);
+    });
+    row(`hide ${size.n} ×`, size.name, size.n * size.files[0].bytes, m);
+  }
+  if (readable()) (failed = true), console.error(`FAILED: ${readable()} big files still readable after hiding`);
+  await s.hid("lock");
+  await s.app.close();
+  s = await launch(ws);
+  const hiddenCount = () => s.hiddenCount();
+  const opened = await measured(s.app, async () => {
+    await s.hid("check", PW);
+    await until(hiddenCount, count);
+  });
+  bigRows.push([`restart, open, until the ${count.toLocaleString()} hidden items are listed`, "all", secs(opened.time), "", `${Math.round(opened.peak)} MB`, ""]);
+  // Read back through the folder (decrypted as read): the first megabyte (what starts a viewer), a part in the middle (a jump), then
+  // the whole file, compared with what was written.
+  await s.page.evaluate(() => window.canvastDesktop.share.call("dav", true));
+  const st = await s.page.evaluate(() => window.canvastDesktop.share.call("status"));
+  const get = (path, range) =>
+    new Promise((ok, fail) => {
+      const t = performance.now();
+      let first = 0, bytes = 0;
+      const h = createHash("sha256");
+      const req = httpsRequest({ host: "127.0.0.1", port: st.port, path: encodeURI(path), rejectUnauthorized: false, headers: { authorization: `Basic ${Buffer.from(`me:${st.dav.password}`).toString("base64")}`, ...(range ? { range } : {}) } }, (res) => {
+        res.on("data", (b) => ((first ||= performance.now() - t), (bytes += b.length), h.update(b)));
+        res.on("end", () => ok({ status: res.statusCode, first, ms: performance.now() - t, bytes, hash: h.digest("hex") }));
+      });
+      req.on("error", fail);
+      req.end();
+    });
+  for (const [k, size] of SIZES.entries()) {
+    const f = size.files[0];
+    const path = `/dav/Hidden/big/s${k}/${f.name}`;
+    const head = await get(path, "bytes=0-1048575");
+    const mid = await get(path, `bytes=${Math.floor(f.bytes / 2)}-${Math.floor(f.bytes / 2) + MB - 1}`);
+    let whole = { ms: 0, hash: "", bytes: 0 };
+    const m = await measured(s.app, async () => void (whole = await get(path)));
+    if (whole.hash !== f.hash) (failed = true), console.error(`FAILED: ${path} read back ${whole.bytes} bytes that are not the file's (status ${head.status})`);
+    bigRows.push([`read through the folder: first MB ${Math.round(head.first)} ms, a MB in the middle ${Math.round(mid.ms)} ms, whole`, size.name, secs(whole.ms), rate(f.bytes, whole.ms), `${Math.round(m.peak)} MB`, ""]);
+    console.log(`read ${size.name}: first MB ${Math.round(head.first)} ms, middle MB ${Math.round(mid.ms)} ms, whole ${secs(whole.ms)} (${rate(f.bytes, whole.ms)}), peak ${Math.round(m.peak)} MB`);
+  }
+  // The big ones shown again (decrypted into library/), one size at a time, each file checked.
+  for (const [k, size] of SIZES.entries()) {
+    if (size.mb < 100) continue;
+    const m = await withDisk(s.app, async () => {
+      for (const f of size.files) await s.lib("hide", f.hash, "");
+      await s.flush();
+      await until(() => Promise.resolve(filesUnder(join(ws, "library", "big", `s${k}`)).filter((p) => !p.includes(".tmp-")).length), size.n);
+    });
+    row(`show ${size.n} ×`, size.name, size.n * size.files[0].bytes, m);
+    const back = new Set(await Promise.all(filesUnder(join(ws, "library", "big", `s${k}`)).map(shaFile)));
+    if (!size.files.every((f) => back.has(f.hash))) (failed = true), console.error(`FAILED: ${size.name}: a file shown again is not its bytes`);
+    rmSync(join(ws, "library", "big", `s${k}`), { recursive: true, force: true }); // (checked: room for the next size)
+  }
+  await s.app.close();
+  // The rest by the outside tool.
+  const rest = SIZES.filter((x) => x.mb < 100);
+  const restBytes = rest.reduce((a, x) => a + x.n * x.files[0].bytes, 0) + items.reduce((a, i) => a + i.size, 0);
+  const t = performance.now();
+  const disk = await onDisk(ws);
+  bigRows.push([`outside tool: decrypt what is still hidden (${N.toLocaleString()} small items and the files under 100 MB)`, "", secs(performance.now() - t), rate(restBytes, performance.now() - t), "", ""]);
+  const want = [...items.map((i) => i.hash), ...rest.flatMap((x) => x.files.map((f) => f.hash))];
+  const lost = want.filter((h) => !disk.sealed.has(h));
+  if (lost.length || disk.damaged.length) (failed = true), console.error(`FAILED: the outside tool: ${lost.length} lost, ${disk.damaged.length} damaged`);
+  if (!args.includes("--keep")) for (const d of [ws, `${ws}-data`]) rmSync(d, { recursive: true, force: true });
+}
+if (bigRows.length) console.log(`\n| big files | size | time | speed | peak memory | disk beyond the files |\n| --- | --- | --- | --- | --- | --- |\n${bigRows.map((r) => `| ${r.join(" | ")} |`).join("\n")}`);
 
 console.log(`\nseed ${SEED}\n\n| ${N.toLocaleString()} hidden items | time | CPU | peak memory |\n| --- | --- | --- | --- |\n${rows.map((r) => `| ${r.join(" | ")} |`).join("\n")}`);
 console.log(`\n| round | action | killed after | cut off | lost | damaged | unknown | readable and sealed | temporary files |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |\n${crashes.map((r) => `| ${r.join(" | ")} |`).join("\n")}`);

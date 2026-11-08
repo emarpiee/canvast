@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.55.6 — Clean after a crash, never a file of yours (2026-11-09)
+
+- **Fixed:** the start-up sweep of half-written files took any file whose name ended in `.tmp-` and letters (`notes.tmp-2`) for one of the app's and deleted it after ten minutes; only the app's own names (`.tmp-` and an id) are swept now.
+- **Fixed:** a board or canvas left half moved by a crash (`.canvast/moving/`) goes back where `workspace.json` says at the next start, or into `.trash` when that place is taken; it was left there.
+- **Added:** a test plants what a crash leaves (a hidden item's readable copy, a cut-off write, a half move) beside the person's own files and checks the next start clears the first and keeps every one of the others as it was.
+- **Added:** `Stress hidden` with `--big`: about 15 GB of files from 50 KB to 2 GB beside thousands of small ones, hidden, opened, read back, shown and decrypted, timed per size.
+
 ## 0.55.5 — Lock the hidden items from where you are (2026-11-09)
 
 - **Added:** **Lock** on the hidden mode chip and **Lock now** in Settings > Privacy (desktop app), beside *Lock hidden items* in the command palette.

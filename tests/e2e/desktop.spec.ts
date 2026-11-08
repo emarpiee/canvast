@@ -3057,3 +3057,50 @@ test("sharing (ADR 0184): a guest's library of 120 pictures shows its thumbnails
     await app.close();
   }
 });
+
+test("after a crash: the next start clears what the app left (readable copies, cut-off writes, a move half done) and touches no file of the person's", async () => {
+  const ws = tempDir("cv-crash-left-");
+  let { app, page } = await launch(ws, "userdata", true);
+  const sha = (f: string): string => createHash("sha256").update(readFileSync(f)).digest("hex");
+  try {
+    await page.getByTestId("view-assets").click();
+    await page.getByTestId("assets-import-input").setInputFiles([{ name: "mine.png", mimeType: "image/png", buffer: makePng(8, 8, () => [10, 200, 30, 255]) }]);
+    await expect.poll(() => existsSync(join(ws, "library", "mine.png"))).toBe(true);
+    await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await expect.poll(() => existsSync(join(ws, ".canvast", "workspace.json"))).toBe(true);
+    const userData = await app.evaluate(({ app }) => app.getPath("userData"));
+    const temp = await app.evaluate(({ app }) => app.getPath("temp"));
+    await app.close();
+    // What a crash leaves: a hidden item's readable copy (opened in its app), a write cut off (old), a canvas parked in a move, and
+    // something parked that workspace.json does not know. Beside them, the person's own files, some with names much like those.
+    const opened = join(temp, `canvast-opened-${createHash("sha256").update(userData).digest("hex").slice(0, 12)}`, "x");
+    mkdirSync(opened, { recursive: true });
+    writeFileSync(join(opened, "secret.png"), "readable");
+    const old = new Date(Date.now() - 3_600_000);
+    const cutOff = join(ws, "library", ".tmp-0f8fad5b-d9cb-469f-a165-70867728950e");
+    writeFileSync(cutOff, "half");
+    const theirs = ["notes.tmp-2", ".tmp-keep", "draft.tmp"].map((n) => join(ws, "library", n));
+    for (const f of [cutOff, ...theirs]) (writeFileSync(f, f === cutOff ? "half" : "the person's"), utimesSync(f, old, old));
+    const wsFile = JSON.parse(readFileSync(join(ws, ".canvast", "workspace.json"), "utf8")) as { boards: Array<{ canvases: Array<{ id: string; file: string }> }> };
+    const canvas = wsFile.boards[0]!.canvases[0]!;
+    expect(existsSync(join(ws, canvas.file)), "the canvas's file, written on closing").toBe(true);
+    const canvasBytes = readFileSync(join(ws, canvas.file));
+    mkdirSync(join(ws, ".canvast", "moving", "unknown-id"), { recursive: true });
+    renameSync(join(ws, canvas.file), join(ws, ".canvast", "moving", canvas.id));
+    writeFileSync(join(ws, ".canvast", "moving", "unknown-id", "x.cvst"), "{}");
+    const before = Object.fromEntries(files(ws, join(ws, "library")).map((f) => [f, sha(join(ws, f))]));
+    delete before[relative(ws, cutOff)];
+    // The next start.
+    ({ app, page } = await launch(ws, "userdata", true));
+    await expect.poll(() => existsSync(opened), { message: "the readable copy is gone", timeout: 30_000 }).toBe(false);
+    await expect.poll(() => existsSync(cutOff), { message: "the cut-off write is gone", timeout: 30_000 }).toBe(false);
+    await expect.poll(() => existsSync(join(ws, canvas.file)), { message: "the parked canvas is back", timeout: 30_000 }).toBe(true);
+    expect(readFileSync(join(ws, canvas.file)).equals(canvasBytes)).toBe(true);
+    expect(existsSync(join(ws, ".canvast", "moving", canvas.id))).toBe(false);
+    expect(files(ws, join(ws, ".trash")).some((f) => f.endsWith("x.cvst")), "what is not known goes to the trash, not away").toBe(true);
+    const after = Object.fromEntries(files(ws, join(ws, "library")).map((f) => [f, sha(join(ws, f))]));
+    expect(after, "every file of the person's as it was").toEqual(before);
+  } finally {
+    await app.close();
+  }
+});
