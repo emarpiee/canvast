@@ -2966,6 +2966,33 @@ test("sharing (ADR 0184): hidden items reach a guest only when shared, encrypted
     expect(got.status).toBe(200);
     expect(got.body.equals(secret), "decrypted as read: the original bytes").toBe(true);
     expect((await dav("PUT", "/dav/Library/x.png")).status).toBe(403);
+    // Another device, as a person sets it up: Add a device…, See hidden items on in its dialog; it signs in with its own login from the network.
+    await page.getByTestId("share-dav-add").click();
+    await page.getByTestId("prompt-input").fill("Phone");
+    await page.getByTestId("prompt-ok").click();
+    await page.getByTestId("share-login-dialog").locator("[data-dav-right=hidden]").check();
+    await page.getByTestId("share-login-dialog-close").click();
+    const net = (await page.evaluate(() => window.canvastDesktop!.share!.call("status"))) as { addresses: string[]; davLogins: Array<{ user: string; password: string; rights: { hidden: boolean } }> };
+    expect(net.davLogins.map((l) => l.rights.hidden)).toEqual([true]);
+    expect(net.addresses.length, "a network address to come from").toBeGreaterThan(0);
+    const phone = (method: string, path: string): Promise<{ status: number; body: string }> =>
+      new Promise((ok, fail) => {
+        const auth = Buffer.from(`${net.davLogins[0]!.user}:${net.davLogins[0]!.password}`).toString("base64");
+        const req = httpsRequest({ host: net.addresses[0], port, path, method, rejectUnauthorized: false, headers: { depth: "1", authorization: `Basic ${auth}` } }, (res) => {
+          let b = "";
+          res.on("data", (d: Buffer) => (b += d.toString()));
+          res.on("end", () => ok({ status: res.statusCode ?? 0, body: b }));
+        });
+        req.on("error", fail);
+        req.end();
+      });
+    expect((await phone("PROPFIND", "/dav/")).body).toContain("/dav/Hidden/");
+    await expect.poll(async () => (await phone("PROPFIND", "/dav/Hidden/")).body, { timeout: 15_000 }).toContain("Secret.png");
+    // Locked on the host: the folder says so, in a note, and the activity tells it.
+    await page.evaluate(() => window.__canvastDebug.hiddenOp("lock"));
+    await expect.poll(async () => (await phone("PROPFIND", "/dav/Hidden/")).body, { timeout: 15_000 }).toContain("Locked");
+    expect(((await page.evaluate(() => window.canvastDesktop!.share!.call("status"))) as { log: Array<{ what: string }> }).log.map((e) => e.what)).toContain("Folder: hidden items asked for, but they are locked on this computer");
+    expect(await page.evaluate(() => window.__canvastDebug.hiddenOp("check", "pw"))).toEqual({ ok: true, state: "open" });
     const g = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
     g.on("pageerror", (e) => console.log(`guest page error: ${e.message}\n${e.stack ?? ""}`));
     await g.goto(`https://127.0.0.1:${port}/#debug`);

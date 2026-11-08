@@ -127,14 +127,24 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
       if (win.isDestroyed()) return ok(null);
       const id = randomBytes(8).toString("hex");
       davAsks.set(id, ok);
-      setTimeout(() => davAsks.delete(id) && ok(null), 30_000);
+      setTimeout(() => davAsks.delete(id) && ok(undefined), 30_000); // (undefined: the page did not answer; null: it cannot)
       win.webContents.send("canvast:davAsk", { id, op, arg });
     });
   const call = (ch: string, ...a: unknown[]): Promise<unknown> => SHARE_CALLS.get(ch)!(...a);
   // A guest's thumbnails: the host's page has them (never a hidden item's), so a guest does not read every original to draw its own.
-  SHARE_CALLS.set("canvast:thumb", async (hash) => (typeof hash === "string" && /^[0-9a-f]{64}(?:~\d+)?$/.test(hash) ? askPage("thumb", hash) : null));
+  SHARE_CALLS.set("canvast:thumb", async (hash) => (typeof hash === "string" && /^[0-9a-f]{64}(?:~\d+)?$/.test(hash) ? ((await askPage("thumb", hash)) ?? null) : null));
   const libList = cached(async () => ((await call("canvast:tree", "library")) as Array<{ path: string; size: number }>).map((f) => ({ path: f.path.replace(/^library\//, ""), size: f.size })));
-  const hiddenList = cached(async () => ((await askPage("list")) as DavEntry[] | null) ?? []);
+  // The hidden items as the page lists them; while they are locked there, one note saying so, so a file manager's empty folder is not a mystery.
+  // Each change of what the folder gets (listed, locked, no answer) is in the activity.
+  const LOCKED = { path: "Locked - open the hidden items on the host computer.txt", text: new TextEncoder().encode("The hidden items are locked on the computer sharing this folder.\nOpen them there (the Hidden password), then refresh this folder.\n") };
+  let hiddenSaid = "";
+  const hiddenList = cached(async () => {
+    const got = (await askPage("list")) as DavEntry[] | null | undefined;
+    const said = got ? `Folder: hidden items listed (${got.length})` : got === null ? "Folder: hidden items asked for, but they are locked on this computer" : "Folder: hidden items asked for, but the app's page did not answer";
+    if (said !== hiddenSaid) logEvent({ at: Date.now(), what: said, who: "", address: "" });
+    hiddenSaid = said;
+    return got ?? [{ path: LOCKED.path, size: LOCKED.text.length }];
+  });
   const write = (ch: string, ...a: unknown[]): Promise<unknown> => WRITE_CALLS.get(ch)!(...a);
   const dav: Record<string, DavRoot> = {
     Library: {
@@ -152,7 +162,7 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
     Hidden: {
       hidden: true,
       list: hiddenList.list,
-      read: async (p, from, to) => ((await askPage("read", { path: p, from, to })) as Uint8Array | null) ?? null,
+      read: async (p, from, to) => (p === LOCKED.path ? LOCKED.text.slice(from, to) : (((await askPage("read", { path: p, from, to })) as Uint8Array | null) ?? null)),
     },
   };
   const status = (): ShareStatus => {

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.55.3 — Sharing on the local network, its settings tidied (2026-11-09)
+
+- **Added:** sharing on the local network (desktop app, branch `lan-sharing`): read-only guests in a browser or the app, the folder for file managers (WebDAV) with a login per device and its rights, the activity, starting with the app.
+- **Changed:** Settings > Sharing keeps fixed rows: devices, logins, apps and activity open in a dialog; About shows the latest error and *Show all*.
+- **Changed:** the folder's *Hidden*, while the hidden items are locked on the host, holds a note saying so; the activity tells when it was listed, locked, or not answered.
+- **Fixed:** in Settings, one press opened a dialog once per visit to the Sharing tab; a list dialog now opens once.
+- **Fixed:** Settings jumped to the top while sharing was on (every status redrew the page).
+- **Fixed:** the Sharing tab's buttons and the shortcut rows are at the standard height, on one line, ending at the right edge (checked on every tab).
+- **Fixed:** a guest's Hidden password opened nothing but said yes while hidden items were not shared.
+
 ## 0.55.2 — Decrypt the hidden items the simple way (2026-11-09)
 
 - **Added:** `node hidden-items.mjs` with no arguments decrypts the `.hidden` folder and `hidden.json` that sit in the script's own folder into `output/` beside them; `hidden.json` may be loose beside `.hidden`. A missing file is named in plain words.
