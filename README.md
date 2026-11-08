@@ -66,9 +66,9 @@ Everything you need to install canvast, use it and keep your work safe.
 | **Organizing** | Layers, groups, sheets that clip, masks, snapping, align and arrange, tags, Reveal for things under others. [Organizing](#organizing) |
 | **Notes** | A notes editor for markdown, text and rich text notes, in the library and beside the canvas: Obsidian-style `[[links]]`, properties and `#tags` that can be searched, sorted and shown as columns, templates, layouts, cards on a canvas that lay out their page at the size you give them. [Notes](#notes) |
 | **PDFs and 3D models** | Page pictures and a reader with bookmarks; a 3D view with lights, for reference; a card on a canvas shows the page or view you choose. [PDFs and 3D models](#pdfs-and-3d-models) |
-| **Library** | Every imported file once, with folders, tags, favourites, descriptions and properties, similar-image search, a viewer and safe deletion. [The Library](#the-library) |
+| **Library** | Every imported file once, with folders, tags, favourites, descriptions and properties, similar-image search, saved searches, missing files and copies found, a viewer and safe deletion. [The Library](#the-library) |
 | **Privacy** | Hidden items and passwords; in the desktop app hidden files are encrypted, and can be decrypted outside the app. [Privacy and security](#privacy-and-security) |
-| **Export** | PNG, WebP, JPEG, SVG and PDF from sheets and selections; `.canvast` backups of everything. [Exporting](#exporting), [Backups](#backups) |
+| **Export** | PNG, WebP, JPEG, SVG and PDF from sheets and selections; `.canvast` backups of everything, hidden items encrypted, that restore a workspace or update one after work elsewhere, between the browser and the desktop app either way. [Exporting](#exporting), [Backups](#backups) |
 | **Your data** | Saved as you work, verified, never uploaded; in the desktop app a plain folder that any sync tool can carry. [Your data](#your-data-saving-backups-the-workspace-folder) |
 
 ## Installation
@@ -1077,7 +1077,7 @@ The first tab to open a workspace edits it. Other tabs are read-only, follow its
 - A `.canvast` file is a standard, uncompressed ZIP you can open with any unzip tool. Do not re-compress it.
 - Backups made in one browser import into another (tested between Chromium and Firefox).
 - Incremental backups are available after the first full one.
-- A backup asks what to do with hidden items and with the passwords and privacy settings (see [Hidden items and passwords](#hidden-items-and-passwords)); by default they stay out of it. In the desktop app, hidden items included in a backup go into it **still encrypted**, with their key file: nothing of them is readable in it, and importing it in the desktop app brings them back once the Hidden items are opened with their password. The browser asks their Hidden password when it imports such a backup (stretching it takes a few seconds and about 128 MB of memory there), then brings them in as hidden items in hidden folders of their names; there they are kept as the browser keeps its own hidden items, not encrypted. Without the password they are left out. Their date added, tags, note, properties and favourite come too: a backup carries the hidden items' index, sealed with their key, in both apps (a backup made before version 0.54.57 has only their files, names and folders: export it again).
+- A backup asks what to do with hidden items and with the passwords and privacy settings (see [Hidden items and passwords](#hidden-items-and-passwords)); by default they stay out of it. In the desktop app, hidden items included in a backup go into it **still encrypted**, with their key file: nothing of them is readable in it, and importing it in the desktop app brings them back once the Hidden items are opened with their password. The browser asks their Hidden password when it imports such a backup (stretching it takes a few seconds and about 128 MB of memory there), then brings them in as hidden items in hidden folders of their names; there they are kept as the browser keeps its own hidden items, not encrypted. Without the password they are left out. Hidden items a backup brings readable (made in a browser with no Hidden password, or before version 0.54.63) are encrypted by the desktop app in the import itself: it asks for the Hidden password first (the backup's own when it brings one and this workspace has none, else this workspace's, or a new one typed twice), and starts again only when every one is encrypted. Their date added, tags, note, properties and favourite come too: a backup carries the hidden items' index, sealed with their key, in both apps (a backup made before version 0.54.57 has only their files, names and folders: export it again).
 
 The browser does not say whether a download finished, so keep your backups somewhere safe.
 
@@ -1204,6 +1204,7 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 | A file in `library/` renamed or moved | Finds it again by its content; the item takes its new folder and name, and the links to it in notes follow |
 | A file in `library/` saved again by the program it is worked on in (a painting, a scene, a document: any kind of file) | Follows it: the item becomes the new version where it lies, keeping its name, folder, tags, note, fields and favourite, and every picture or card of it on any canvas shows the new version. A file still being saved (its size not yet still) is taken a moment later. The file is never written over or removed by this |
 | A new file in `library/` | Imports it where it lies, into the library folder of its folder (made if needed) |
+| A copy of a library file put in another folder (the same content, any name) | Makes it an item of its own, never removed for being a copy; its details list the others, and `is:copy` finds them |
 | A library folder deleted from `library/` | Stays deleted: it leaves the library, and its items stay, shown as missing when their files went with it. Only a place this device has seen on disk counts, so a folder from another device is made, and with `library/` itself gone nothing is concluded |
 | A file deleted from `library/` | Shows the item as missing. Deleting such an item, or any item, removes its file only when the file still holds what the item does: a file that changed (someone's newer work) is left where it is |
 | A file still being written (temporary, partial download) | Leaves it alone |
@@ -1401,7 +1402,8 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Dense scenes | Zooming shows a scaled image, exact about 150 ms after you stop |
 | Far zoom-out | Too-small content is a soft mark you cannot select |
 | Very large documents | A million objects: about 940 MB and 6 s to load |
-| Large libraries | From 20,000 items on desktop, listed in pages; no *Similar images* |
+| Large libraries | From 20,000 items on desktop, listed in pages; no *Similar images*, no counts on saved searches, no list of an item's copies in its details |
+| Copies of a file (desktop) | A copy found in another folder is an item of its own on desktop only; placed on a canvas it is its first item, and a backup carries it as its first item (not its own name, folder or tags) |
 | Frame rate | Measured on one desktop machine only |
 
 #### Scale and precision limits, in full
