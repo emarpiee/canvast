@@ -899,7 +899,7 @@ test("switching workspace from the app: the recent ones (a gone one left out), t
       await expect(page.locator(".pop-menu")).toBeVisible();
     };
     await openSwitcher();
-    expect(await items()).toEqual([`current:${ws.split("/").pop()}`, `recent:Switch to the workspace ${other.split("/").pop()}`, "open:Open a folder…", "new:New workspace…", "clear:Clear the recent list"]);
+    expect(await items()).toEqual([`current:${ws.split("/").pop()}`, `recent:Switch to the workspace ${other.split("/").pop()}`, "open:Open a folder…", "new:New workspace…", "connect:Connect to a shared workspace…", "clear:Clear the recent list"]);
     // An edit made a moment ago is in the folder before the app leaves for the other workspace.
     await page.keyboard.press("Escape");
     const t = await page.evaluate(() => window.__canvastDebug.session().tree!);
@@ -2777,9 +2777,10 @@ test("sharing (ADR 0184): on in Settings, a guest pairs with the code and the ho
   const call = (port: number, path: string, body: unknown, token?: string): Promise<{ status: number; bytes: Buffer; fingerprint: string }> =>
     new Promise((ok, fail) => {
       const req = httpsRequest({ host: "127.0.0.1", port, path, method: "POST", rejectUnauthorized: false, headers: token ? { authorization: `Bearer ${token}` } : {} }, (res) => {
+        const fingerprint = (res.socket as import("node:tls").TLSSocket).getPeerCertificate().fingerprint256; // (read while the connection is open)
         const parts: Buffer[] = [];
         res.on("data", (b: Buffer) => parts.push(b));
-        res.on("end", () => ok({ status: res.statusCode ?? 0, bytes: Buffer.concat(parts), fingerprint: (res.socket as import("node:tls").TLSSocket).getPeerCertificate().fingerprint256 }));
+        res.on("end", () => ok({ status: res.statusCode ?? 0, bytes: Buffer.concat(parts), fingerprint }));
       });
       req.on("error", fail);
       req.end(JSON.stringify(body));
@@ -2831,6 +2832,7 @@ test("sharing (ADR 0184): a browser guest pairs, sees the host's library and can
     await page.getByTestId("assets-import-input").setInputFiles({ name: "Shared Picture.png", mimeType: "image/png", buffer: makePng(8, 8, () => [200, 40, 40, 255]) });
     await expect(page.locator('[data-testid="asset-card"][title="Shared Picture.png"]')).toHaveCount(1);
     await page.evaluate(() => window.__canvastDebug.flushStorage());
+    await page.getByTestId("view-canvas").click(); // (the storage status is on the canvas's bar)
     await page.getByTestId("save-status").click();
     await page.getByRole("tab", { name: "Sharing" }).click();
     await page.getByTestId("share-on").check();
@@ -2895,6 +2897,7 @@ test("sharing (ADR 0184): hidden items reach a guest only when shared, encrypted
     const sealed = files(ws).filter((f) => f.startsWith(".hidden/"));
     expect(sealed).toHaveLength(1);
     const sealedBytes = readFileSync(join(ws, sealed[0]!));
+    await page.getByTestId("view-canvas").click(); // (the storage status is on the canvas's bar)
     await page.getByTestId("save-status").click();
     await page.getByRole("tab", { name: "Sharing" }).click();
     await page.getByTestId("share-on").check();

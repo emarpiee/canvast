@@ -90,7 +90,10 @@ export const test = base.extend<{ app: App }>({
     });
     page.on("pageerror", (e) => consoleErrors.push(String(e) + "\n" + (e.stack ?? "")));
     await page.goto(APP_URL);
-    await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+    // (an app that never starts says why: the page's errors so far)
+    await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined").catch((e: Error) => {
+      throw new Error(`${e.message}\nThe page's errors: ${consoleErrors.join("\n") || "none"}`);
+    });
     // (a drag in a test goes by the pixels it says: the grid catching it is tested on its own)
     await page.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false));
     await page.evaluate(() => window.__canvastDebug.nextFrame());
