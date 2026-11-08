@@ -88,7 +88,7 @@ export interface ShareStatus {
 }
 export interface ShareCalls {
   /** start, stop, status; hidden (on: boolean); remove (a device's id); answer ({ id, ok }); view (the host's view, for guests that follow it). */
-  call(op: "status" | "start" | "stop" | "hidden" | "remove" | "answer" | "view" | "davAnswer" | "openDav", arg?: unknown): Promise<ShareStatus | null>;
+  call(op: "status" | "start" | "stop" | "hidden" | "remove" | "answer" | "view" | "davAnswer" | "openDav" | "newCode" | "newDavPassword" | "setDavPassword", arg?: unknown): Promise<ShareStatus | null>;
   onStatus(fn: (st: ShareStatus) => void): void;
   /** A device asks to connect (it typed the code): answer with `call("answer", …)`. */
   onAsk(fn: (ask: { id: string; name: string; address: string }) => void): void;

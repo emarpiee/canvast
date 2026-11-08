@@ -5,7 +5,7 @@
  */
 import type { ShareCalls, ShareStatus } from "../storage/desktop-bridge";
 import type { HiddenFiles } from "../storage/store";
-import { confirmDialog } from "./confirm";
+import { confirmDialog, promptDialog } from "./confirm";
 import { ICONS } from "./icons";
 import { plural } from "../doc/plural";
 
@@ -55,13 +55,13 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingR
     const urls = st.addresses.map((a) => `https://${a}:${st.port}`);
     const live = st.on
       ? row({ label: "Address", help: `${urls.map(code).join(" ") || "No network found"}. A guest opens it in a browser, or in the app (Switch workspace > Connect to a shared workspace).`, control: "" }) +
-        row({ label: "Code", help: "The guest types it; then you are asked to allow the device. New each time sharing starts.", control: `<strong data-testid="share-code">${esc(st.code)}</strong>` }) +
+        row({ label: "Code", help: "The guest types it; then you are asked to allow the device. It stays the same until you ask for a new one; devices already allowed stay allowed.", control: `<strong data-testid="share-code">${esc(st.code)}</strong> <button type="button" class="set-done" data-share-new-code>New code</button>` }) +
         row({ label: "Fingerprint", help: `${code(st.fingerprint)}. A browser warns once about this computer's own certificate: its fingerprint is this one.`, control: "" }) +
         (st.dav
           ? row({
               label: "Folder for file managers",
-              help: `${code(st.dav.url)} on this computer${st.dav.others.length ? `; ${st.dav.others.map(code).join(" ")} from other devices, as a WebDAV server (Library only; Linux file managers write davs:// for https://)` : ""}. Password ${`<code data-testid="share-dav-password">${esc(st.dav.password)}</code>`}. Read-only. On this computer, while the Hidden items are open, it has them too, each decrypted only as it is read; a file manager may keep thumbnails of what it shows.`,
-              control: `<button type="button" class="set-done" data-share-open-dav data-testid="share-open-dav">Open in the file manager</button>`,
+              help: `${code(st.dav.url)} on this computer${st.dav.others.length ? `; ${st.dav.others.map(code).join(" ")} from other devices, as a WebDAV server (Library only; Linux file managers write davs:// for https://)` : ""}. Password ${`<code data-testid="share-dav-password">${esc(st.dav.password)}</code>`} (kept until you change it). Read-only. On this computer, while the Hidden items are open, it has them too, each decrypted only as it is read; a file manager may keep thumbnails of what it shows.`,
+              control: `<button type="button" class="set-done" data-share-open-dav data-testid="share-open-dav">Open in the file manager</button> <button type="button" class="set-done" data-share-set-dav>Set a password…</button> <button type="button" class="set-done" data-share-new-dav>New password</button>`,
             })
           : "")
       : "";
@@ -92,7 +92,14 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingR
     if (t.matches("[data-share-hidden]")) void share.call("hidden", t.checked).then((st) => st && draw(st));
   });
   host.addEventListener("click", (e) => {
-    if ((e.target as HTMLElement).closest("[data-share-open-dav]")) void share.call("openDav");
+    const at = e.target as HTMLElement;
+    if (at.closest("[data-share-open-dav]")) void share.call("openDav");
+    if (at.closest("[data-share-new-code]")) void share.call("newCode").then((st) => st && draw(st));
+    if (at.closest("[data-share-new-dav]")) void share.call("newDavPassword").then((st) => st && draw(st));
+    if (at.closest("[data-share-set-dav]"))
+      void promptDialog({ title: "Password for the file managers' folder", lines: ["At least 8 characters. File managers and apps ask for it (any user name). It stays until you change it."], value: "", confirmLabel: "Set", secret: true }).then(
+        (pw) => pw !== null && void share.call("setDavPassword", pw).then((st) => st && draw(st), (err: Error) => void confirmDialog({ title: "Not set", lines: [err.message.replace(/^.*Error: /, "")], confirmLabel: "OK", danger: false })),
+      );
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-share-remove]");
     if (b) void share.call("remove", b.dataset["shareRemove"]).then((st) => st && draw(st));
   });

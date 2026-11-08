@@ -45,6 +45,9 @@ export interface ShareOptions {
   changed?: () => void;
   /** The folder file managers open at `/dav/` (its roots), signed in with `davPassword`. */
   dav?: Readonly<Record<string, DavRoot>>;
+  /** The code and the file managers' password, kept by the host (made here when absent). */
+  code?: string;
+  davPassword?: string;
   /** At most this many requests at once from one device. */
   perDevice?: number;
 }
@@ -133,9 +136,13 @@ export function guestPage(html: string): string | null {
   return html.replace("connect-src 'none'", "connect-src 'self'").replace(/<head>/i, '<head><meta name="canvast-guest" content="1">');
 }
 
+export const newCode = (): string => String(randomInt(0, 1_000_000)).padStart(6, "0");
+export const newDavPassword = (): string => randomBytes(9).toString("base64url");
+
 export async function startShare(o: ShareOptions): Promise<ShareServer> {
-  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  const davPassword = randomBytes(9).toString("base64url");
+  const code = o.code ?? newCode();
+  const davPassword = o.davPassword ?? newDavPassword();
+  let wrongAt = 0;
   let devices = o.devices.load();
   let wrongCodes = 0;
   const busy = new Map<string, number>();
@@ -210,9 +217,12 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
 
   async function pair(req: IncomingMessage, res: ServerResponse): Promise<void> {
     const b = (await body(req)) as { code?: unknown; name?: unknown } | null;
-    if (wrongCodes >= PAIR_TRIES) return json(res, 429, { error: "Too many wrong codes: ask the host to share again for a new code." });
+    // (five wrong codes: none is taken for a minute)
+    if (wrongCodes >= PAIR_TRIES && Date.now() - wrongAt < 60_000) return json(res, 429, { error: "Too many wrong codes: try again in a minute." });
+    if (wrongCodes >= PAIR_TRIES) wrongCodes = 0;
     if (typeof b?.code !== "string" || !same(b.code, code)) {
       wrongCodes++;
+      wrongAt = Date.now();
       return json(res, 403, { error: "That is not the code the host shows." });
     }
     const name = typeof b.name === "string" && b.name.trim() ? b.name.trim().slice(0, 60) : "A device";

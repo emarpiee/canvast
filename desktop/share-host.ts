@@ -11,7 +11,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { makeSelfCert } from "./self-cert";
 import type { SelfCert } from "./self-cert";
-import { guestPage, pathAllowed, startShare } from "./share-server";
+import { guestPage, newCode, newDavPassword, pathAllowed, startShare } from "./share-server";
 import { answerFinds } from "./share-find";
 import { hostname } from "node:os";
 import type { ShareCall, ShareDevice, ShareServer } from "./share-server";
@@ -24,6 +24,9 @@ export const SHARE_CALLS = new Map<string, ShareCall>();
 
 interface Saved {
   cert?: SelfCert;
+  /** The code guests type, and the file managers' password: kept until the person asks for new ones. */
+  code?: string;
+  davPassword?: string;
   devices?: ShareDevice[];
   port?: number;
 }
@@ -121,6 +124,8 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
   const start = async (port: number): Promise<ShareServer> =>
     startShare({
       cert: (saved.cert ??= makeSelfCert()),
+      code: (saved.code ??= newCode()),
+      davPassword: (saved.davPassword ??= newDavPassword()),
       port,
       calls: SHARE_CALLS,
       hidden: () => hidden,
@@ -168,8 +173,29 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
         return status();
       case "hidden":
         hidden = arg === true;
+        server?.send("changed", [".canvast/hidden.json"]); // (guests look for the hidden items again)
         push();
         return status();
+      case "newCode":
+      case "newDavPassword":
+      case "setDavPassword": {
+        if (op === "setDavPassword" && (typeof arg !== "string" || arg.length < 8 || arg.length > 200)) throw new Error("A password of at least 8 characters.");
+        if (op === "newCode") saved.code = newCode();
+        else saved.davPassword = op === "setDavPassword" ? (arg as string) : newDavPassword();
+        keep(saved);
+        if (server) {
+          // (taken at once: the server starts again on the same port; guests already allowed stay allowed)
+          await server.close();
+          stopFind?.();
+          server = await start(server.port).catch(() => start(0));
+          const s = server;
+          saved.port = s.port;
+          keep(saved);
+          stopFind = answerFinds(() => ({ name: `${hostname()} · ${workspaceName}`, port: s.port, fingerprint: s.fingerprint }));
+        }
+        push();
+        return status();
+      }
       case "remove":
         if (typeof arg !== "string") throw new Error("a device id expected");
         if (server) server.remove(arg);

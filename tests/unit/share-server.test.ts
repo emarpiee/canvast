@@ -221,3 +221,14 @@ describe("many requests at once", () => {
     expect(most, "one at a time").toBe(1);
   });
 });
+
+describe("a kept code and password", () => {
+  it("are the ones the server takes, across starts", async () => {
+    for (let i = 0; i < 2; i++) {
+      server = await startShare({ cert, host: "127.0.0.1", code: "424242", davPassword: "my-own-password", calls: new Map(), hidden: () => false, ask: async () => true, devices: { load: () => [], save: () => {} } });
+      expect([server.code, server.davPassword]).toEqual(["424242", "my-own-password"]);
+      await server.close();
+      server = null;
+    }
+  });
+});

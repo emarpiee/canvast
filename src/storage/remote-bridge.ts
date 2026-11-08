@@ -205,18 +205,20 @@ export function hostEvents(origin: string, token: string): EventSource {
 export function remoteBridge(origin: string, token: string): DesktopBridge {
   const host = hostCalls(origin, token);
   const call = <T>(ch: string, ...args: unknown[]): Promise<T> => host(`canvast:${ch}`, ...args) as Promise<T>;
+  // A path the host does not share (hidden items while they are not shared) is as if it were not there; shared later, it is read then.
+  const orNot = <T>(ch: string, none: T, ...args: unknown[]): Promise<T> => call<T>(ch, ...args).catch((e: unknown) => (e instanceof HostError && e.status === 403 ? none : Promise.reject(e)));
   const nothing = async (): Promise<void> => {};
   const lib = new GuestLibrary(host);
   return {
     workspace: () => call("workspace").then((w) => (w ? { path: `${origin}/`, name: (w as { name: string }).name } : null)),
-    read: (p) => call("read", p),
-    part: (p, from, to) => call("part", p, from, to),
-    head: (p) => call("head", p),
-    exists: (p) => call("exists", p),
-    folderExists: (p) => call("folderExists", p),
+    read: (p) => orNot("read", null, p),
+    part: (p, from, to) => orNot("part", null, p, from, to),
+    head: (p) => orNot("head", null, p),
+    exists: (p) => orNot("exists", false, p),
+    folderExists: (p) => orNot("folderExists", false, p),
     sizes: (paths) => call("sizes", paths),
-    tree: (p) => call("tree", p),
-    list: (p) => call("list", p),
+    tree: (p) => orNot("tree", [], p),
+    list: (p) => orNot("list", [], p),
     hash: (p) => call("hash", p),
     canvasFiles: () => call("canvasFiles"),
     // Writes: left undone (the storage's own bookkeeping stays in this page).
