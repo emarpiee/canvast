@@ -1010,7 +1010,8 @@ test("properties: a column, a sort, typed search, suggested values; a saved sear
   await expect.poll(names).toEqual(["b.png", "a.png", "c.png"]);
   // Its button updates it to the look now; the look is in the settings, so it comes back on a device that has only those.
   await p.getByTestId("assets-sort").selectOption("name");
-  await p.getByTestId("side-saved").getByRole("button", { name: /^Update kind:picture/ }).click();
+  await p.getByTestId("side-saved").getByRole("button", { name: /^More actions for saved search/ }).click();
+  await p.locator('.pop-menu [role="menuitem"]', { hasText: "Update" }).click();
   await p.evaluate(() => localStorage.removeItem("canvast.assets.ui"));
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");

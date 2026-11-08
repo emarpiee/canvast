@@ -447,3 +447,23 @@ test("the command palette: recents first, a command that takes a value, canvases
   await expect.poll(zoom).not.toEqual(before);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Space held pans; a Space whose release went to another window lets go once its repeats stop", async ({ app }) => {
+  const p = app.page;
+  await p.keyboard.press("v");
+  expect(await p.evaluate(() => window.__canvastDebug.tool())).toBe("select");
+  const repeat = (): Promise<void> => p.evaluate(() => void window.dispatchEvent(new KeyboardEvent("keydown", { key: " ", code: "Space", repeat: true })));
+  await p.keyboard.down(" ");
+  await repeat();
+  await expect(p.locator(".is-hand")).toHaveCount(1);
+  const before = await app.camera();
+  await app.drag({ x: 380, y: 260 }, { x: 480, y: 300 }, 5);
+  expect(await app.camera(), "held: a drag pans").not.toEqual(before);
+  // (no keyup and no more repeats: the key was let go in another window)
+  await p.waitForTimeout(1200);
+  const after = await app.camera();
+  await app.drag({ x: 380, y: 260 }, { x: 480, y: 300 }, 5);
+  expect(await app.camera(), "let go: a drag is the tool's again").toEqual(after);
+  await expect(p.locator(".is-hand")).toHaveCount(0);
+  await p.keyboard.up(" ");
+});

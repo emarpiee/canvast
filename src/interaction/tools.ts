@@ -396,6 +396,17 @@ export function attachTools(
     },
   );
   let spaceDown = false;
+  // A held Space repeats its keydown; when its keyup went to another window (focus moved while it was down), the repeats stop: no repeat for a while means it is up.
+  let spaceAt = 0;
+  let spaceRepeats = false; // (only where the system repeats keys: without repeats a long hold is no sign)
+  const releaseSpace = (): void => {
+    spaceDown = false;
+    el.classList.remove("is-hand");
+  };
+  const spaceHeld = (): boolean => {
+    if (spaceDown && spaceRepeats && performance.now() - spaceAt > 1000) releaseSpace();
+    return spaceDown;
+  };
   let cycleIndex = 0;
   /** Last position of every pointer that is down, for handing touches to navigation. */
   const active = new Map<number, { p: ScreenPoint; touch: boolean; s0: ScreenPoint }>();
@@ -591,7 +602,7 @@ export function attachTools(
     editor.changed();
   };
 
-  const effectiveTool = (): Tool => (spaceDown ? "hand" : editor.tool);
+  const effectiveTool = (): Tool => (spaceHeld() ? "hand" : editor.tool);
 
   // ---- pen --------------------------------------------------------------
   const penPoint = (s: ScreenPoint, e?: PointerEvent, last?: { t: number; p: ScreenPoint }): void => {
@@ -2595,6 +2606,8 @@ export function attachTools(
     } else if (e.key === "#" || e.key === "@") {
       hooks.openSearch(e.key);
     } else if (e.key === " ") {
+      spaceAt = performance.now();
+      if (e.repeat) spaceRepeats = true;
       if (!spaceDown) {
         spaceDown = true;
         el.classList.add("is-hand");
@@ -2648,10 +2661,7 @@ export function attachTools(
 
   const onKeyUp = (e: KeyboardEvent): void => {
     if (e.key === "Control" || e.key === "Meta") reveal.key(false);
-    if (e.key === " ") {
-      spaceDown = false;
-      el.classList.remove("is-hand");
-    }
+    if (e.key === " ") releaseSpace();
   };
 
   el.addEventListener("pointerdown", onPointerDown);
@@ -2692,10 +2702,10 @@ export function attachTools(
   });
   window.addEventListener("keydown", onKeyDown);
   window.addEventListener("keyup", onKeyUp);
-  window.addEventListener("blur", () => {
-    spaceDown = false;
-    el.classList.remove("is-hand");
-  });
+  // Away from the window (or back to it) a key's release may never come here: Space is up until its keydown comes again.
+  window.addEventListener("blur", releaseSpace);
+  window.addEventListener("focus", releaseSpace);
+  document.addEventListener("visibilitychange", releaseSpace);
   return () => {
     el.removeEventListener("pointerdown", onPointerDown);
     edgePan.stop();
@@ -2707,6 +2717,9 @@ export function attachTools(
     el.removeEventListener("pointerleave", onLeave);
     window.removeEventListener("keydown", onKeyDown);
     window.removeEventListener("keyup", onKeyUp);
+    window.removeEventListener("blur", releaseSpace);
+    window.removeEventListener("focus", releaseSpace);
+    document.removeEventListener("visibilitychange", releaseSpace);
     unsubscribe();
   };
 }

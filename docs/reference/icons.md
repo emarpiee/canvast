@@ -309,3 +309,5 @@ One icon per function: two buttons that do different things never share an icon,
 | `sliders` | Show or hide a 3D view's settings |
 | `signature` | Place a 3D view's line art on the canvas as paths |
 | `square-split-horizontal` | Split a path into its separate pieces |
+| `arrow-down-wide-narrow` | Library sidebar sort: the most first (file types) |
+| `arrow-down-1-0` | Library sidebar sort: in your order (saved searches) |

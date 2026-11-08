@@ -183,6 +183,27 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await expect(tagOrder).toHaveText(["#style", "#ink", "#alpha"]);
   await sortTags.click();
   await expect(tagOrder).toHaveText(["#alpha", "#style", "#ink"]);
+  for (const q of ["kind:picture", "#alpha"]) {
+    await p.getByTestId("assets-search").fill(q);
+    await p.getByRole("button", { name: "Save this search" }).filter({ visible: true }).click();
+  }
+  await p.getByTestId("assets-search").fill("");
+  await expect(p.getByTestId("side-saved").locator(".side-label")).toHaveText(["kind:picture", "#alpha"]);
+  await p.getByTestId("side-sort-saved").click();
+  await expect(p.getByTestId("side-saved").locator(".side-label")).toHaveText(["#alpha", "kind:picture"]);
+  // Every list of the sidebar is a folder's list: a sort button once it has two rows, a count chip on each row, its ⋯ only under the pointer (a new list fails here).
+  for (const sec of await p.locator("[data-sec]").all()) {
+    const id = await sec.getAttribute("data-sec");
+    const rows = sec.locator(".side-row:not(.side-show-row)").filter({ has: p.locator(".side-item") });
+    if ((await rows.count()) < 2) continue;
+    await expect(sec.locator(".side-head [data-side-sort]"), `the ${id} list has a sort button`).toHaveCount(1);
+    for (const row of await rows.all()) await expect(row.locator(".side-n"), `each row of ${id} shows its count`).toHaveCount(1);
+    const dots = sec.locator(".side-row .side-more:not(.side-pin)").first();
+    if (await dots.count()) {
+      await p.mouse.move(1, 1);
+      await expect(dots, `the ${id} list's ⋯ waits for the pointer`).toHaveCSS("opacity", "0");
+    }
+  }
   await sortFolders.click();
   await sortFolders.click();
   await p.reload();

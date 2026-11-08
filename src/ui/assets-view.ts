@@ -162,13 +162,16 @@ const DETAIL_LINKS_SHOWN = 5;
 const LINKS_RETRY_MS = 800;
 /** A list of the sidebar (folders, file types, tags) shows this many rows before a "Show more" button. */
 /** What a sidebar list's sort button goes through, in order. */
-const SIDE_SORTS = { folders: ["az", "za", "new", "old"], tag: ["az", "za"], ctag: ["az", "za"] } as const;
-type SideSort = (typeof SIDE_SORTS.folders)[number];
+/** The orders of the sidebar's lists (each list's sort button goes through them): the first is the one it starts in. */
+const SIDE_SORTS = { folders: ["az", "za", "new", "old"], tag: ["az", "za"], ctag: ["az", "za"], types: ["many", "az", "za"], saved: ["own", "az", "za", "many"] } as const;
+type SideSort = (typeof SIDE_SORTS)[keyof typeof SIDE_SORTS][number];
 const SIDE_SORT_LOOK: Record<SideSort, { word: string; icon: string }> = {
   az: { word: "A to Z", icon: ICONS.arrowDownAZ },
   za: { word: "Z to A", icon: ICONS.arrowDownZA },
   new: { word: "newest first", icon: ICONS.calendarDays },
   old: { word: "oldest first", icon: ICONS.calendarArrowUp },
+  many: { word: "the most first", icon: ICONS.sortMost },
+  own: { word: "in your order", icon: ICONS.sortOwn },
 };
 /** The most items dragged out of the app at once (each is looked up when the pointer goes down). */
 const MAX_DRAG_OUT = 1000;
@@ -462,7 +465,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   // What the user chose to hide (the details panel, the viewer's controls) is remembered on this device.
   const UI_KEY = "canvast.assets.ui";
-  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; tagsInline: boolean; sideSort: Record<keyof typeof SIDE_SORTS, SideSort>; pinned: string[]; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; listThumb: number; fontSample: number; fontTry: string; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", tagsInline: false, sideSort: { folders: "az", tag: "az", ctag: "az" }, pinned: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, listThumb: 96, fontSample: 0, fontTry: "", sheetH: null, sideW: null, inspW: null };
+  const ui: { details: boolean; bar: boolean; layout: "grid" | "list"; order: ColumnId[]; hidden: ColumnId[]; closed: string[]; folded: string[]; chooser: ChooserView; tagsInline: boolean; sideSort: Record<keyof typeof SIDE_SORTS, SideSort>; pinned: string[]; expanded: string[]; sections: string[]; detailSections: string[]; views: Record<string, SavedLook>; filters: { usage: string; sort: string; reversed: boolean; scope: string }; colW: Partial<Record<ColumnId, number>>; thumb: number | null; listThumb: number; fontSample: number; fontTry: string; sheetH: number | null; sideW: number | null; inspW: number | null } = { details: true, bar: true, layout: "grid", order: [...DEFAULT_COLUMN_ORDER], hidden: [...DEFAULT_HIDDEN], closed: [], folded: [], chooser: "tree", tagsInline: false, sideSort: { folders: "az", tag: "az", ctag: "az", types: "many", saved: "own" }, pinned: [], expanded: [], sections: [...SIDE_SECTIONS], detailSections: [...DETAIL_SECTIONS], views: {}, filters: { ...NO_FILTERS }, colW: {}, thumb: null, listThumb: 96, fontSample: 0, fontTry: "", sheetH: null, sideW: null, inspW: null };
   try {
     const saved = JSON.parse(localStorage.getItem(UI_KEY) ?? "{}") as Partial<typeof ui>;
     if (typeof saved.details === "boolean") ui.details = saved.details;
@@ -2615,14 +2618,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return `<button type="button" class="side-more" data-side-more data-kind="${kind}" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for ${kindWord[kind]} ${esc(name)}" title="More">${ICONS.ellipsis}</button>`;
     };
     const picked = pickedKeys(scope);
-    const item = (key: string, label: string, n: number, opts: { depth?: number; icon?: string; extra?: string; cls?: string; before?: string; title?: string } = {}): string =>
-      `<li class="side-row ${opts.cls ?? ""}" style="--depth:${opts.depth ?? 0}">${opts.before ?? ""}<button type="button" class="side-item${(TRASH_WORD.test(search.value) ? key === "trash" : scope === key || picked.has(key)) ? " is-active" : ""}" data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}" title="${opts.title ?? label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : ""}">
-        ${opts.icon ?? ""}<span class="side-label">${label}</span><span class="side-n${opts.before !== undefined ? " layer-count" : ""}">${n}</span></button>${opts.extra ?? ""}</li>`;
+    const item = (key: string, label: string, n: number | null, opts: { depth?: number; icon?: string; extra?: string; cls?: string; before?: string; title?: string; /** What the row does, in place of choosing a scope. */ attrs?: string } = {}): string =>
+      `<li class="side-row ${opts.cls ?? ""}" style="--depth:${opts.depth ?? 0}">${opts.before ?? ""}<button type="button" class="side-item${(TRASH_WORD.test(search.value) ? key === "trash" : scope === key || picked.has(key)) ? " is-active" : ""}" ${opts.attrs ?? `data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}"`} title="${opts.title ?? label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : ""}">
+        ${opts.icon ?? ""}<span class="side-label">${label}</span>${n === null ? "" : `<span class="side-n${opts.before !== undefined ? " layer-count" : ""}">${n}</span>`}</button>${opts.extra ?? ""}</li>`;
     const nameInput = (value: string, label: string): string =>
       `<li class="side-row"><input class="side-name" data-testid="folder-name-input" value="${esc(value)}" aria-label="${label}" maxlength="120"></li>`;
     const subtreeCount = (id: string): number => counts.folders.get(id) ?? 0;
     const findBox = (id: SideFind, noun: string): string => `<input type="search" class="side-find" data-side-find="${id}" data-testid="side-find-${id}" value="${esc(sideFind[id])}" placeholder="Search ${noun}" aria-label="Search ${noun}" maxlength="120">`;
-    const sortBtn = (id: SideFind): string => {
+    const sortBtn = (id: keyof typeof SIDE_SORTS): string => {
       const ways: readonly SideSort[] = SIDE_SORTS[id];
       const now = ui.sideSort[id];
       const next = ways[(ways.indexOf(now) + 1) % ways.length]!;
@@ -2753,21 +2756,25 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     });
     // Saved searches, one click away, each with the look it was saved with: in the person's order, with a name of their own and how many each finds.
     const savedList = parseSaved(settings.get(savedKey())) ?? [];
-    const savedRows = savedList.map((s, at) => {
+    const savedWay = ui.sideSort.saved;
+    const savedShown = savedWay === "own" ? savedList : [...savedList].sort((a, b) => savedWay === "many" ? (savedCount(b.q, b.m) ?? 0) - (savedCount(a.q, a.m) ?? 0) || (a.n || a.q).localeCompare(b.n || b.q) : savedWay === "za" ? (b.n || b.q).localeCompare(a.n || a.q) : (a.n || a.q).localeCompare(b.n || b.q));
+    const savedRows = savedShown.map((s) => {
+      const at = savedList.indexOf(s);
       const label = s.n || s.q;
       const id = `${s.m}|${s.q}`;
-      const n = savedCount(s.q, s.m);
-      const icon = s.look ? (s.look.layout === "list" ? ICONS.layoutList : ICONS.layoutGrid) : ICONS.savedSearch; // (what it opens to)
       const rows: SideRow[] = [
         { attr: "data-saved-action", value: "rename", label: "Rename", hint: "A name of its own; its words stay its search", icon: ICONS.textCursorInput, aria: `Rename saved search ${label}` },
         { attr: "data-saved-action", value: "look", label: "Update", hint: "To the layout, columns and sort shown now", icon: ICONS.refresh, aria: `Update ${label} to the layout shown now` },
-        ...(at > 0 ? [{ attr: "data-saved-action", value: "up", label: "Move up", hint: "Earlier in the list", icon: ICONS.arrowUp, aria: `Move ${label} up` }] : []),
-        ...(at < savedList.length - 1 ? [{ attr: "data-saved-action", value: "down", label: "Move down", hint: "Later in the list", icon: ICONS.arrowDown, aria: `Move ${label} down` }] : []),
+        // (moved only in your order: in another order its place is not where it shows)
+        ...(savedWay === "own" && at > 0 ? [{ attr: "data-saved-action", value: "up", label: "Move up", hint: "Earlier in the list", icon: ICONS.arrowUp, aria: `Move ${label} up` }] : []),
+        ...(savedWay === "own" && at < savedList.length - 1 ? [{ attr: "data-saved-action", value: "down", label: "Move down", hint: "Later in the list", icon: ICONS.arrowDown, aria: `Move ${label} down` }] : []),
         { attr: "data-saved-action", value: "delete", label: "Delete", hint: "Not saved any more; nothing else changes", icon: ICONS.trash2, aria: `Delete saved search ${label}`, danger: true },
       ];
+      // A row as every list of the sidebar has one (the folders' own): its icon, its name, how many it finds, its ⋯ when the pointer is on it.
+      const look = s.look ? ` · opens as ${s.look.layout === "list" ? "a list" : "thumbnails"}` : "";
       return {
         active: false,
-        html: `<li class="side-row"><button type="button" class="side-item" data-saved-search="${esc(s.q)}" data-saved-way="${s.m}" title="${s.n ? `${esc(s.n)}: ` : ""}Search for ${esc(s.q)}">${icon}<span class="side-label">${esc(label)}</span>${n === null ? "" : `<span class="side-n">${n}</span>`}</button><button type="button" class="side-mini" data-saved-look="${esc(s.q)}" data-saved-way="${s.m}" aria-label="Update ${esc(s.q)} to the layout, columns and sort shown now" title="Update it to the layout, columns and sort shown now"${ro ? " hidden" : ""}>${ICONS.refresh}</button>${more("saved", id, label, rows)}</li>`,
+        html: item(`saved:${id}`, esc(label), savedCount(s.q, s.m), { icon: ICONS.savedSearch, cls: "tree-row", attrs: `data-saved-search="${esc(s.q)}" data-saved-way="${s.m}"`, title: `${s.n ? `${esc(s.n)}: ` : ""}Search for ${esc(s.q)}${look}`, extra: more("saved", id, label, rows) }),
       };
     });
     const scopeName = scopeNameOf(tagCounts);
@@ -2795,11 +2802,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         ${section(
           "types",
           "File types",
-          "",
+          typeCounts.size > 1 ? sortBtn("types") : "",
           `<ul class="tag-cloud type-cloud" data-testid="type-list">
             ${
               capped("types", [...typeCounts]
-                .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+                .sort((a, b) => (ui.sideSort.types === "many" ? b[1] - a[1] : 0) || (ui.sideSort.types === "za" ? b[0].localeCompare(a[0]) : a[0].localeCompare(b[0])))
                 .map(([k, n]) => ({ html: item(`ext:${k}`, `.${esc(k.toUpperCase())}`, n, { cls: "is-tag is-type" }).replace("<button ", `<button title="Files ending in .${esc(k)}. Search .${esc(k)} to find them (Ctrl+click: add to the filter)" `), active: picked.has(`ext:${k}`) }))) || `<li class="side-empty">No files yet.</li>`
             }
           </ul>`,
@@ -2820,7 +2827,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
             ${canvasTagSection.rows || `<li class="side-empty">${canvasTagSection.empty ?? "No tags on canvases yet. Tag items on a canvas (Layers panel)."}</li>`}
           </ul>`,
         )}
-        ${savedRows.length ? section("saved", "Saved searches", "", `<ul class="side-list" data-testid="side-saved">${capped("saved", savedRows)}</ul>`) : ""}
+        ${savedRows.length ? section("saved", "Saved searches", savedRows.length > 1 ? sortBtn("saved") : "", `<ul class="side-list" data-testid="side-saved">${capped("saved", savedRows)}</ul>`) : ""}
       </div>`;
     // Drawn again only when something in it changed (a redraw for a pick or a look read leaves it, its scroll and its input alone).
     if (html + ui.sections.join() === lastSideHtml && side.firstElementChild) return;
@@ -4338,7 +4345,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   side.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b) return;
-    if (b.dataset["savedLook"] !== undefined) return lookSaved(b.dataset["savedWay"] ?? "all", b.dataset["savedLook"]);
     if (b.dataset["savedAction"]) return void savedAction(b.dataset["savedAction"], b.dataset["id"] ?? "");
     if (b.dataset["savedSearch"] !== undefined) return useSearch(b.dataset["savedWay"] ?? "all", b.dataset["savedSearch"]);
     if (b.hasAttribute("data-side-toggle")) {

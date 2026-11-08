@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.55.1 — One look for every sidebar list; Space let go elsewhere (2026-11-08)
+
+- **Changed:** Saved searches in the library's sidebar are rows like the folders': an icon, the name, a count chip and a ⋯ shown under the pointer (always on touch screens); *Update* moved into the ⋯.
+- **Added:** sort buttons for Saved searches (your order, A to Z, Z to A, the most found first) and File types (the most first, A to Z, Z to A), as Folders and Tags have; a test checks that every sidebar list follows the folders' look.
+- **Fixed:** the grab cursor and Space panning could stay on after Space was let go in another window; Space is now let go when the window loses or gains focus, or once its key repeats stop.
+
 ## 0.55.0 — Backups that travel, hidden items encrypted everywhere (2026-11-08)
 
 Everything since 0.54.48, in one release (0.54.49 to 0.54.63).

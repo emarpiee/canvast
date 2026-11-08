@@ -1295,11 +1295,6 @@ body:has(.assets-place-zone:not([hidden])) :is(#nav, .view-settings, .assets-bar
 .side-n { color: var(--hud-muted); font-variant-numeric: tabular-nums; }
 .side-head { display: flex; align-items: center; justify-content: space-between; margin: var(--s-8) 0 var(--s-2); padding: 0 var(--s-6); }
 .side-head h2 { margin: 0; font-size: var(--text-sm); font-weight: 600; color: var(--hud-muted); }
-.side-mini { font: inherit; font-size: var(--text-sm); color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-sm); padding: var(--s-1) var(--s-4); cursor: pointer; }
-.side-mini:hover { color: var(--hud-fg); background: var(--hud-hover); }
-.side-mini:disabled { opacity: 0.4; cursor: default; }
-.side-row .side-mini { opacity: 0; }
-.side-row:hover .side-mini, .side-row:focus-within .side-mini { opacity: 1; }
 .side-name { flex: 1; min-width: 0; font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-accent); border-radius: var(--r-sm); padding: var(--s-2) var(--s-4); }
 .side-empty { padding: var(--s-2) var(--s-6); color: var(--hud-muted); font-size: var(--text-sm); }
 /* a long list: its first rows, then one full-width button for the rest (and back) */

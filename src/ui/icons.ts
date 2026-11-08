@@ -217,6 +217,8 @@ import heading3 from "lucide-static/icons/heading-3.svg";
 import pilcrow from "lucide-static/icons/pilcrow.svg";
 import list from "lucide-static/icons/list.svg";
 import listOrdered from "lucide-static/icons/list-ordered.svg";
+import arrowDownWideNarrow from "lucide-static/icons/arrow-down-wide-narrow.svg";
+import arrowDown10 from "lucide-static/icons/arrow-down-1-0.svg";
 import copy from "lucide-static/icons/copy.svg";
 import bringToFront from "lucide-static/icons/bring-to-front.svg";
 import activity from "lucide-static/icons/activity.svg";
@@ -518,6 +520,8 @@ export const ICONS = {
   pilcrow: clean(pilcrow),
   list: clean(list),
   listOrdered: clean(listOrdered),
+  sortMost: clean(arrowDownWideNarrow),
+  sortOwn: clean(arrowDown10),
   copy: clean(copy),
   check: clean(check),
   pointerBan: clean(pointerBan),
