@@ -2838,8 +2838,10 @@ test("sharing (ADR 0184): on in Settings, a guest pairs with the code and the ho
     await page.getByRole("button", { name: "Remove Test laptop" }).click();
     await page.getByTestId("share-guests-dialog-close").click();
     expect((await call(st.port, "/call", { ch: "canvast:read", args: ["library/shared.png"] }, token)).status).toBe(401);
-    // Off: nothing listens.
+    // Guests off: the folder is still on, so the server answers it only; both off: nothing listens.
     await page.getByTestId("share-on").uncheck();
+    expect((await call(st.port, "/hello", null)).status).toBe(404);
+    await page.getByTestId("share-dav-on").uncheck();
     await expect(call(st.port, "/hello", null)).rejects.toThrow();
   } finally {
     await app.close();
