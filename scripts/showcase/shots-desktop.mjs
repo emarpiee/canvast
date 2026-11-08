@@ -2,7 +2,7 @@
 // folder's files listed (printed, for the README's workspace folder section). Run from the repo root after `npm run desktop`'s build
 // (dist-desktop/): node scripts/showcase/shots-desktop.mjs <showcase.canvast> <outDir>
 import { _electron as electron } from "@playwright/test";
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -12,6 +12,9 @@ const root = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "cv-desk-"));
 const ws = "/tmp/My art";
 if (existsSync(ws)) throw new Error(`${ws} is in the way: remove it first`);
 mkdirSync(ws);
+// (the window frame off: its row is the last picture; the others are of the page, which a frame is not part of)
+mkdirSync(`${root}/data`, { recursive: true });
+writeFileSync(`${root}/data/window.json`, JSON.stringify({ frame: "off" }));
 const app = await electron.launch({ args: [resolve("dist-desktop"), `--workspace=${ws}`, `--user-data-dir=${root}/data`], env: { ...process.env, CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug" } });
 const p = await app.firstWindow();
 await p.setViewportSize({ width: 1440, height: 900 });
@@ -58,6 +61,15 @@ await p.mouse.move(700, 880);
 await settle(800);
 await p.screenshot({ path: `${out}/trash.png` });
 console.log("shot trash");
+
+// The window's own row, with the frame off: from the very top edge, its title (which moves the window) and its buttons
+await p.getByTestId("view-canvas").click();
+await p.mouse.move(700, 300);
+await p.mouse.move(700, 1);
+await p.getByTestId("win-close").waitFor();
+await settle(400);
+await p.screenshot({ path: `${out}/window-row.png`, clip: { x: 0, y: 0, width: 1440, height: 200 } });
+console.log("shot window-row");
 await app.close();
 
 // The folder as a file manager shows it (dot-folders included), a few files per folder

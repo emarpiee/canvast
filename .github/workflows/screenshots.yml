@@ -27,7 +27,7 @@ jobs:
           ELECTRON_DISABLE_SANDBOX: "1"
         run: |
           mkdir -p shots
-          for s in shots shots-privacy shots-more shots-features shots-desktop shots-notes shots-library; do
+          for s in shots shots-privacy shots-more shots-features shots-desktop shots-notes shots-library shots-views; do
             echo "== $s"
             xvfb-run -a node "scripts/showcase/$s.mjs" showcase.canvast shots/ || echo "FAILED $s"
           done

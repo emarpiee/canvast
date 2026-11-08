@@ -42,10 +42,16 @@ await p.screenshot({ path: `${out}/organize.png` });
 console.log("shot organize");
 await p.getByTestId("choice-cancel").click();
 
-// The sidebar: a folder pinned, the pointer on its row
+// The sidebar: a folder pinned, saved searches, the pointer on a folder's row
+for (const q of ["kind:picture", "#reference"]) {
+  await p.getByTestId("assets-search").fill(q);
+  await p.getByRole("button", { name: "Save this search" }).filter({ visible: true }).click();
+}
+await p.getByTestId("assets-search").fill("");
+await p.getByTestId("side-saved").waitFor();
 await p.getByTestId("folder-tree").getByRole("button", { name: /^Lighting/ }).first().hover();
 await p.waitForTimeout(400);
-await p.screenshot({ path: `${out}/sidebar.png`, clip: { x: 0, y: 50, width: 480, height: 620 } });
+await p.screenshot({ path: `${out}/sidebar.png`, clip: { x: 0, y: 50, width: 480, height: 850 } });
 console.log("shot sidebar");
 
 // Several selected: their tags and folders together, in the details panel
