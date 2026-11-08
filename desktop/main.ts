@@ -27,7 +27,7 @@ for (const out of [process.stdout, process.stderr]) out.on("error", () => undefi
 import type { LibraryQuery } from "./library-index";
 import type { LibraryOp } from "../src/storage/desktop-bridge";
 import { pathToFileURL } from "node:url";
-import { SHARED, SHARE_CALLS, installShare, shareChanged } from "./share-host";
+import { SHARED, SHARE_CALLS, WRITE_CALLS, installShare, shareChanged } from "./share-host";
 import { installGuestCalls } from "./guest-window";
 
 const SCHEME = "app";
@@ -418,6 +418,11 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     ipcMain.handle(ch, fn as (e: Electron.IpcMainInvokeEvent, ...a: unknown[]) => unknown);
     SHARE_CALLS.set(ch, async (...a) => (fn as (e: Electron.IpcMainInvokeEvent, ...a: unknown[]) => unknown)(SHARED, ...a));
   };
+  // A file change: the page's, and a device's through the sharing folder when its login allows it (never a guest's /call).
+  const writeCall = (ch: string, fn: (e: Electron.IpcMainInvokeEvent, ...a: never[]) => unknown): void => {
+    ipcMain.handle(ch, fn as (e: Electron.IpcMainInvokeEvent, ...a: unknown[]) => unknown);
+    WRITE_CALLS.set(ch, async (...a) => (fn as (e: Electron.IpcMainInvokeEvent, ...a: unknown[]) => unknown)(SHARED, ...a));
+  };
   // An export outside the workspace: only into a folder the person chose in the system's dialog (tests name one), never inside the
   // workspace, and only at safe relative paths under the folder made there. Each file is read back and its SHA-256 answered.
   const exports = new Map<string, string>();
@@ -595,7 +600,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
       return false;
     }
   });
-  ipcMain.handle("canvast:write", async (e, rel: string, bytes: Uint8Array, durable: unknown = true) => {
+  writeCall("canvast:write", async (e, rel: string, bytes: Uint8Array, durable: unknown = true) => {
     own(e);
     forgetWalked(String(rel));
     if (!(bytes instanceof Uint8Array)) throw new Error("bytes expected");
@@ -731,7 +736,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
       }
     }
   });
-  ipcMain.handle("canvast:remove", async (e, rel: string, how: unknown = "trash") => {
+  writeCall("canvast:remove", async (e, rel: string, how: unknown = "trash") => {
     own(e);
     forgetWalked(String(rel));
     const full = await inside(root, rel);
@@ -746,7 +751,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
     if (!Number.isInteger(days) || (days as number) < 1) return 0;
     return emptyOldTrash(root, days as number);
   });
-  ipcMain.handle("canvast:rename", async (e, from: string, to: string) => {
+  writeCall("canvast:rename", async (e, from: string, to: string) => {
     own(e);
     forgetWalked(String(from));
     forgetWalked(String(to));
@@ -765,7 +770,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
       if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
     }
   });
-  ipcMain.handle("canvast:makeFolder", async (e, rel: string) => {
+  writeCall("canvast:makeFolder", async (e, rel: string) => {
     own(e);
     await mkdir(await inside(root, rel), { recursive: true });
   });

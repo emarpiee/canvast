@@ -15,7 +15,7 @@ import { guestPage, newCode, newDavPassword, pathAllowed, startShare } from "./s
 import { answerFinds } from "./share-find";
 import { hostname } from "node:os";
 import type { DavClient, ShareCall, ShareDevice, ShareEvent, ShareServer } from "./share-server";
-import type { DavEntry, DavRoot } from "./share-dav";
+import type { DavEntry, DavLogin, DavRights, DavRoot } from "./share-dav";
 
 /** The event a read call gets when a guest makes it (the handlers' own check lets it through). */
 export const SHARED = { sender: null } as unknown as IpcMainInvokeEvent;
@@ -29,6 +29,9 @@ interface Saved {
   davPassword?: string;
   /** Start sharing when the app opens (off by default; the hidden items are never shared at a start). */
   autoStart?: boolean;
+  /** The devices' own logins to the folder, and the shared password turned off. */
+  davLogins?: DavLogin[];
+  davSharedOff?: boolean;
   devices?: ShareDevice[];
   port?: number;
 }
@@ -80,23 +83,32 @@ export interface ShareStatus {
   log: ShareEvent[];
   /** The apps that used the file managers' folder since sharing started. */
   davClients: DavClient[];
+  /** The devices' own logins to the folder (their passwords shown to the host, as the shared one), and whether the shared password is on. */
+  davLogins: DavLogin[];
+  davShared: boolean;
   /** The file managers' folder: its address on this computer, and its password. */
   dav: { url: string; others: string[]; password: string } | null;
   devices: Array<{ id: string; name: string; added: number; seen: number | null; active: boolean }>;
 }
 
-/** A list read again only after a few seconds (a file manager asks for it at every step). */
-function cached(read: () => Promise<DavEntry[]>, ms = 3000): () => Promise<DavEntry[]> {
+/** A list read again only after a few seconds (a file manager asks for it at every step), or at once after a change (`forget`). */
+function cached(read: () => Promise<DavEntry[]>, ms = 3000): { list: () => Promise<DavEntry[]>; forget: () => void } {
   let at = 0;
   let last: Promise<DavEntry[]> = Promise.resolve([]);
-  return () => {
-    if (Date.now() - at > ms) {
-      at = Date.now();
-      last = read().catch(() => []);
-    }
-    return last;
+  return {
+    list: () => {
+      if (Date.now() - at > ms) {
+        at = Date.now();
+        last = read().catch(() => []);
+      }
+      return last;
+    },
+    forget: () => void (at = 0),
   };
 }
+
+/** The main process's file changes the folder makes for a device allowed to (the same handlers, and path rules, as the page's). */
+export const WRITE_CALLS = new Map<string, ShareCall>();
 
 export function installShare(win: BrowserWindow, html: string, workspaceName: string): void {
   let stopFind: (() => void) | null = null;
@@ -115,14 +127,25 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
   const call = (ch: string, ...a: unknown[]): Promise<unknown> => SHARE_CALLS.get(ch)!(...a);
   // A guest's thumbnails: the host's page has them (never a hidden item's), so a guest does not read every original to draw its own.
   SHARE_CALLS.set("canvast:thumb", async (hash) => (typeof hash === "string" && /^[0-9a-f]{64}(?:~\d+)?$/.test(hash) ? askPage("thumb", hash) : null));
+  const libList = cached(async () => ((await call("canvast:tree", "library")) as Array<{ path: string; size: number }>).map((f) => ({ path: f.path.replace(/^library\//, ""), size: f.size })));
+  const hiddenList = cached(async () => ((await askPage("list")) as DavEntry[] | null) ?? []);
+  const write = (ch: string, ...a: unknown[]): Promise<unknown> => WRITE_CALLS.get(ch)!(...a);
   const dav: Record<string, DavRoot> = {
     Library: {
-      list: cached(async () => ((await call("canvast:tree", "library")) as Array<{ path: string; size: number }>).map((f) => ({ path: f.path.replace(/^library\//, ""), size: f.size }))),
+      list: libList.list,
       read: (p, from, to) => call("canvast:part", `library/${p}`, from, to) as Promise<Uint8Array | null>,
+      // (what a device adds or changes is a file changed outside the app: the app takes it in as it does any such file)
+      writes: {
+        put: async (p, bytes) => void (await write("canvast:write", `library/${p}`, bytes)),
+        mkdir: async (p) => void (await write("canvast:makeFolder", `library/${p}`)),
+        remove: async (p) => void (await write("canvast:remove", `library/${p}`, "trash")),
+        move: async (from, to) => void (await write("canvast:rename", `library/${from}`, `library/${to}`)),
+      },
+      changed: libList.forget,
     },
     Hidden: {
-      localOnly: true,
-      list: cached(async () => ((await askPage("list")) as DavEntry[] | null) ?? []),
+      hidden: true,
+      list: hiddenList.list,
       read: async (p, from, to) => ((await askPage("read", { path: p, from, to })) as Uint8Array | null) ?? null,
     },
   };
@@ -134,6 +157,8 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
       autoStart: saved.autoStart === true,
       log: recent.slice(0, 15),
       davClients: server?.davClients() ?? [],
+      davLogins: saved.davLogins ?? [],
+      davShared: saved.davSharedOff !== true,
       port: server?.port ?? 0,
       code: server?.code ?? "",
       addresses: server?.addresses ?? [],
@@ -168,6 +193,8 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
         },
       },
       changed: push,
+      davLogins: () => saved.davLogins ?? [],
+      davShared: () => saved.davSharedOff !== true,
       log: (e) => {
         logEvent(e);
         push();
@@ -194,6 +221,42 @@ export function installShare(win: BrowserWindow, html: string, workspaceName: st
         return status();
       case "start":
         await begin();
+        push();
+        return status();
+      case "davAdd": {
+        const name = typeof arg === "string" ? arg.trim().slice(0, 60) : "";
+        if (!name) throw new Error("A name for the device.");
+        const list = saved.davLogins ?? [];
+        const base = name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "device";
+        let user = base;
+        for (let k = 2; list.some((l) => l.user === user); k++) user = `${base}-${k}`;
+        saved.davLogins = [...list, { id: randomBytes(8).toString("hex"), name, user, password: newDavPassword(), rights: { add: true, edit: false, move: false, delete: false, hidden: false }, added: Date.now() }];
+        keep(saved);
+        logEvent({ at: Date.now(), what: `Folder login added (${user})`, who: name, address: "" });
+        push();
+        return status();
+      }
+      case "davLogin": {
+        // (rename, a right on or off, a new password, or removed)
+        const a = arg as { id?: unknown; name?: unknown; right?: unknown; on?: unknown; newPassword?: unknown; remove?: unknown } | null;
+        const login = (saved.davLogins ?? []).find((l) => l.id === a?.id);
+        if (!login) throw new Error("No such login.");
+        if (a?.remove === true) {
+          saved.davLogins = (saved.davLogins ?? []).filter((l) => l !== login);
+          logEvent({ at: Date.now(), what: "Folder login removed", who: login.name, address: "" });
+        } else if (typeof a?.name === "string" && a.name.trim()) login.name = a.name.trim().slice(0, 60);
+        else if (a?.newPassword === true) login.password = newDavPassword();
+        else if (typeof a?.right === "string" && a.right in login.rights) {
+          login.rights = { ...login.rights, [a.right]: a.on === true } as DavRights;
+          logEvent({ at: Date.now(), what: `Folder right “${a.right}” ${a.on === true ? "given" : "taken away"}`, who: login.name, address: "" });
+        }
+        keep(saved);
+        push();
+        return status();
+      }
+      case "davShared":
+        saved.davSharedOff = arg !== true;
+        keep(saved);
         push();
         return status();
       case "autoStart":

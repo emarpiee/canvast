@@ -256,7 +256,53 @@ describe("the sharing log", () => {
       });
     expect(await davGet("nope")).toBe(401);
     expect(await davGet(server.davPassword)).toBe(200);
-    expect(events).toEqual(["Wrong code | Phone | 127.0.0.1", "Allowed | Phone | 127.0.0.1", "Folder: wrong password | Xplore | 127.0.0.1", "Folder: signed in | Xplore | 127.0.0.1", "Folder: opened Library/a.txt | Xplore | 127.0.0.1"]);
-    expect(server.davClients()).toMatchObject([{ app: "Xplore", address: "127.0.0.1", opened: 1 }]);
+    expect(events).toEqual(["Wrong code | Phone | 127.0.0.1", "Allowed | Phone | 127.0.0.1", "Folder: wrong user name or password | Xplore | 127.0.0.1", "Folder: signed in (Xplore) | Shared password | 127.0.0.1", "Folder: opened Library/a.txt | Shared password | 127.0.0.1"]);
+    expect(server.davClients()).toMatchObject([{ who: "Shared password", app: "Xplore", address: "127.0.0.1", opened: 1 }]);
+  });
+});
+
+describe("a device's own folder login", () => {
+  it("does what its rights allow and nothing else; the shared password only reads", async () => {
+    const files = new Map<string, Uint8Array>([["old.txt", new Uint8Array([1])]]);
+    const did: string[] = [];
+    const rights = { add: true, edit: false, move: false, delete: false, hidden: false };
+    server = await startShare({
+      cert,
+      host: "127.0.0.1",
+      calls: new Map(),
+      hidden: () => false,
+      ask: async () => true,
+      devices: { load: () => [], save: () => {} },
+      davLogins: () => [{ id: "1", name: "Phone", user: "phone", password: "phone-password", rights, added: 0 }],
+      dav: {
+        Library: {
+          list: async () => [...files].map(([path, b]) => ({ path, size: b.length })),
+          read: async (p) => files.get(p) ?? null,
+          writes: {
+            put: async (p, b) => void (files.set(p, b), did.push(`put ${p}`)),
+            mkdir: async (p) => void did.push(`mkdir ${p}`),
+            remove: async (p) => void (files.delete(p), did.push(`trash ${p}`)),
+            move: async (a, b) => void did.push(`move ${a} ${b}`),
+          },
+        },
+      },
+    });
+    const dav = (method: string, path: string, user: string, pw: string, headers: Record<string, string> = {}, body?: string): Promise<number> =>
+      new Promise((ok, fail) => {
+        const r = request({ host: "127.0.0.1", servername: "localhost", port: server!.port, method, path, ca: cert.cert, headers: { ...headers, authorization: `Basic ${Buffer.from(`${user}:${pw}`).toString("base64")}` } }, (res) => (res.resume(), res.on("end", () => ok(res.statusCode ?? 0))));
+        r.on("error", fail);
+        r.end(body);
+      });
+    const me = ["phone", "phone-password"] as const;
+    expect(await dav("PUT", "/dav/Library/new.txt", ...me, {}, "hi")).toBe(201);
+    expect(await dav("PUT", "/dav/Library/old.txt", ...me, {}, "x")).toBe(403); // (no Edit)
+    expect(await dav("DELETE", "/dav/Library/old.txt", ...me)).toBe(403);
+    expect(await dav("MOVE", "/dav/Library/old.txt", ...me, { destination: "/dav/Library/moved.txt" })).toBe(403);
+    expect(await dav("PUT", "/dav/Library/.hidden-ish", ...me, {}, "x")).toBe(403); // (a name starting with a dot)
+    expect(await dav("PUT", "/dav/Library/x.txt", "phone", "wrong", {}, "x")).toBe(401);
+    expect(await dav("PUT", "/dav/Library/y.txt", "anyone", server.davPassword, {}, "x")).toBe(403); // (the shared password only reads)
+    rights.delete = true;
+    expect(await dav("DELETE", "/dav/Library/old.txt", ...me)).toBe(204);
+    expect(did).toEqual(["put new.txt", "trash old.txt"]);
   });
 });

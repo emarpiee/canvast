@@ -62,8 +62,8 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingR
         (st.dav
           ? row({
               label: "Folder for file managers",
-              help: `${code(st.dav.url)} on this computer${st.dav.others.length ? `; ${st.dav.others.map(code).join(" ")} from other devices, as a WebDAV server (Library only; Linux file managers write davs:// for https://)` : ""}. Password ${`<code data-testid="share-dav-password">${esc(st.dav.password)}</code>`} (kept until you change it). Read-only. On this computer, while the Hidden items are open, it has them too, each decrypted only as it is read; a file manager may keep thumbnails of what it shows.`,
-              control: `<button type="button" class="set-done" data-share-open-dav data-testid="share-open-dav">Open in the file manager</button> <button type="button" class="set-done" data-share-set-dav>Set a password…</button> <button type="button" class="set-done" data-share-new-dav>New password</button>`,
+              help: `${code(st.dav.url)} on this computer${st.dav.others.length ? `; ${st.dav.others.map(code).join(" ")} from other devices, as a WebDAV server (Linux file managers write davs:// for https://)` : ""}. Sign in with a login below. On this computer, while the Hidden items are open, it has them too, each decrypted only as it is read; a file manager may keep thumbnails of what it shows.`,
+              control: `<button type="button" class="set-done" data-share-open-dav data-testid="share-open-dav">Open in the file manager</button>`,
             })
           : "")
       : "";
@@ -74,6 +74,31 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingR
       ${live}
       ${row({ id: "share-auto", label: "Start sharing when the app opens", help: "Off: you turn it on each time. The hidden items are never shared at a start: you turn that on yourself.", control: check("share-auto", 'data-share-auto data-testid="share-auto"', st.autoStart) })}
       ${row({ id: "share-hidden", label: "Share hidden items too", help: "Their files go out encrypted, as they are in the folder; a guest needs your Hidden password to open them.", control: check("share-hidden", 'data-share-hidden data-testid="share-hidden"', st.hidden, !st.on) })}</div>
+      <div class="set-card" data-testid="share-dav-logins"><h3>Folder logins</h3>
+      ${row({
+        id: "share-dav-shared",
+        label: "Shared password (read only)",
+        help: st.dav ? `Any user name, password <code data-testid="share-dav-password">${esc(st.dav.password)}</code> (kept until you change it). It can only look.` : "Any user name and this password can only look. Shown while sharing.",
+        control: `${check("share-dav-shared", 'data-share-dav-shared data-testid="share-dav-shared"', st.davShared)} <button type="button" class="set-done" data-share-set-dav>Set a password…</button> <button type="button" class="set-done" data-share-new-dav>New password</button>`,
+      })}
+      ${row({ label: "A device of its own", help: "Its own user name and password, a name you give it, and its own rights (adding only, at first).", control: `<button type="button" class="set-done" data-share-dav-add data-testid="share-dav-add">Add a device…</button>` })}</div>
+      ${st.davLogins
+        .map((l) => {
+          const right = (key: keyof typeof l.rights, label: string, help: string): string =>
+            row({ id: `dav-${l.id}-${key}`, label, help, control: check(`dav-${l.id}-${key}`, `data-dav-id="${esc(l.id)}" data-dav-right="${key}"`, l.rights[key]) });
+          return `<div class="set-card" data-testid="share-dav-login"><h3>${esc(l.name)}</h3>
+          ${row({
+            label: "Sign in",
+            help: `User name <code>${esc(l.user)}</code>, password <code>${esc(l.password)}</code>.`,
+            control: `<button type="button" class="set-done" data-dav-id="${esc(l.id)}" data-dav-act="password">New password</button> <button type="button" class="set-done" data-dav-id="${esc(l.id)}" data-dav-act="rename">Rename…</button> <button type="button" class="set-reset" data-dav-id="${esc(l.id)}" data-dav-act="remove" aria-label="Remove ${esc(l.name)}" title="Remove: its login stops working">${ICONS.x}</button>`,
+          })}
+          ${right("add", "Add", "New files and folders in Library.")}
+          ${right("edit", "Edit", "Replace a file's contents, or a file moved or copied over it.")}
+          ${right("move", "Move and rename", "Files and folders, within Library.")}
+          ${right("delete", "Delete", "Into the workspace's trash (.trash), never for good.")}
+          ${right("hidden", "See hidden items", "While the Hidden items are open here: each file is decrypted on this computer and sent to this device over the encrypted connection. Its file manager may keep copies or thumbnails.")}</div>`;
+        })
+        .join("")}
       <div class="set-card" data-testid="share-devices"><h3>Allowed devices</h3>
       ${
         st.devices
@@ -92,8 +117,8 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingR
         st.davClients
           .map((c) =>
             row({
-              label: esc(c.app),
-              help: `${Date.now() - c.last < 120_000 ? "Using it now" : `Last seen ${esc(when(c.last))}`} · ${esc(c.address)} · since ${esc(when(c.first))} · ${plural(c.opened, "file")} opened`,
+              label: esc(c.who),
+              help: `${Date.now() - c.last < 120_000 ? "Using it now" : `Last seen ${esc(when(c.last))}`} · ${esc(c.app)} · ${esc(c.address)} · since ${esc(when(c.first))} · ${plural(c.opened, "file")} opened`,
               control: "",
             }),
           )
@@ -114,6 +139,8 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingR
   host.addEventListener("change", (e) => {
     const t = e.target as HTMLInputElement;
     if (t.matches("[data-share-on]")) void share.call(t.checked ? "start" : "stop").then((st) => st && draw(st));
+    if (t.matches("[data-share-dav-shared]")) void share.call("davShared", t.checked).then((st) => st && draw(st));
+    if (t.matches("[data-dav-right]")) void share.call("davLogin", { id: t.dataset["davId"], right: t.dataset["davRight"], on: t.checked }).then((st) => st && draw(st));
     if (t.matches("[data-share-auto]")) void share.call("autoStart", t.checked).then((st) => st && draw(st));
     if (t.matches("[data-share-hidden]")) void share.call("hidden", t.checked).then((st) => st && draw(st));
   });
@@ -121,6 +148,21 @@ export function mountSharing(host: HTMLElement, share: ShareCalls, row: SettingR
     const at = e.target as HTMLElement;
     if (at.closest("[data-share-open-dav]")) void share.call("openDav");
     if (at.closest("[data-share-open-log]")) void share.call("openLog");
+    if (at.closest("[data-share-dav-add]"))
+      void promptDialog({ title: "Add a device to the folder", lines: ["A name for it (Phone, Laptop…). It gets its own user name and password; it can add files at first, and you choose the rest."], value: "", confirmLabel: "Add" }).then(
+        (name) => name?.trim() && void share.call("davAdd", name).then((st) => st && draw(st)),
+      );
+    const dav = at.closest<HTMLElement>("[data-dav-act]");
+    if (dav) {
+      const id = dav.dataset["davId"];
+      const act = dav.dataset["davAct"];
+      if (act === "password") void share.call("davLogin", { id, newPassword: true }).then((st) => st && draw(st));
+      if (act === "remove") void share.call("davLogin", { id, remove: true }).then((st) => st && draw(st));
+      if (act === "rename")
+        void promptDialog({ title: "Rename this device", lines: ["The name shown here and in the log. Its user name stays."], value: dav.closest(".set-card")?.querySelector("h3")?.textContent ?? "", confirmLabel: "Rename" }).then(
+          (name) => name?.trim() && void share.call("davLogin", { id, name }).then((st) => st && draw(st)),
+        );
+    }
     if (at.closest("[data-share-log-more]")) {
       logOpen = !logOpen;
       void share.call("status").then((st) => st && draw(st));

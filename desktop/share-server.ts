@@ -11,7 +11,7 @@ import type { AddressInfo } from "node:net";
 import { networkInterfaces } from "node:os";
 import type { SelfCert } from "./self-cert";
 import { davHandle } from "./share-dav";
-import type { DavRoot } from "./share-dav";
+import type { DavLogin, DavRoot } from "./share-dav";
 
 /** A guest the host allowed. Only a hash of its token is kept. */
 export interface ShareDevice {
@@ -33,6 +33,8 @@ export interface ShareEvent {
 /** An app using the file managers' folder (by its address and its name). */
 export interface DavClient {
   address: string;
+  /** The login's name (a device's, or "Shared password"), and the app's. */
+  who: string;
   app: string;
   first: number;
   last: number;
@@ -64,6 +66,9 @@ export interface ShareOptions {
   log?: (e: ShareEvent) => void;
   /** The folder file managers open at `/dav/` (its roots), signed in with `davPassword`. */
   dav?: Readonly<Record<string, DavRoot>>;
+  /** The devices' own logins to the folder, and whether the shared password (read only) is on. */
+  davLogins?: () => readonly DavLogin[];
+  davShared?: () => boolean;
   /** The code and the file managers' password, kept by the host (made here when absent). */
   code?: string;
   davPassword?: string;
@@ -175,23 +180,24 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
   // The file managers' folder: who uses it (a client is its address and its app), and what it opened.
   const davClients = new Map<string, DavClient>();
   const appOf = (req: IncomingMessage): string => (req.headers["user-agent"] ?? "a WebDAV app").split(/[ /(]/)[0]!.slice(0, 40) || "a WebDAV app";
-  const davSeen = (req: IncomingMessage, what: "wrong password" | "request" | "opened", path?: string): void => {
+  const davSeen = (req: IncomingMessage, who: string | null, what: "wrong password" | "request" | "opened" | "changed", detail?: string): void => {
     const app = appOf(req);
-    if (what === "wrong password") return say("Folder: wrong password", app, req);
-    const key = `${addr(req)}|${app}`;
+    if (what === "wrong password") return say("Folder: wrong user name or password", app, req);
+    const name = who ?? app;
+    const key = `${addr(req)}|${name}|${app}`;
     let c = davClients.get(key);
     if (!c) {
-      c = { address: addr(req), app, first: Date.now(), last: Date.now(), opened: 0 };
+      c = { address: addr(req), who: name, app, first: Date.now(), last: Date.now(), opened: 0 };
       davClients.set(key, c);
-      say("Folder: signed in", app, req);
+      say(`Folder: signed in (${app})`, name, req);
     }
     c.last = Date.now();
     if (what === "opened") {
       c.opened++;
-      say(`Folder: opened ${path}`, app, req);
-    } else o.changed?.();
+      say(`Folder: opened ${detail}`, name, req);
+    } else if (what === "changed") say(`Folder: ${detail}`, name, req);
+    else o.changed?.();
   };
-
   const json = (res: ServerResponse, status: number, body: unknown): void => {
     res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
     res.end(JSON.stringify(body));
@@ -292,7 +298,7 @@ export async function startShare(o: ShareOptions): Promise<ShareServer> {
         res.writeHead(200, { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" });
         return res.end(o.page ? await o.page() : "<!doctype html><title>canvast</title><p>A canvast workspace is shared here. Open it in canvast.</p>");
       }
-      if (o.dav && (url.pathname === "/dav" || url.pathname.startsWith("/dav/"))) return davHandle(req, res, o.dav, davPassword, davSeen);
+      if (o.dav && (url.pathname === "/dav" || url.pathname.startsWith("/dav/"))) return davHandle(req, res, o.dav, { logins: () => o.davLogins?.() ?? [], shared: () => (o.davShared?.() ?? true ? davPassword : null) }, davSeen);
       if (req.method === "GET" && url.pathname === "/hello") return json(res, 200, { app: "canvast", fingerprint: o.cert.fingerprint });
       if (req.method === "POST" && url.pathname === "/pair") return pair(req, res);
       const dev = deviceOf(req);
