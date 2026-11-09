@@ -21,7 +21,7 @@ type Base = {
 export type Setting = Base &
   (
     | { readonly t: "range"; readonly min: number; readonly max: number; readonly step: number; readonly def: number; /** The usual span, which Randomize keeps to (the whole span can be slow or empty). */ readonly usual: readonly [number, number] }
-    | { readonly t: "choice"; readonly opts: readonly (readonly [string, string])[]; readonly def: string }
+    | { readonly t: "choice"; readonly opts: readonly (readonly [string, string])[]; readonly def: string; /** A dropdown however few there are: its names do not fit side by side. */ readonly dropdown?: true }
     | { readonly t: "toggle"; readonly def: boolean }
     /** A colour "#rrggbb"; with `hide`, "" means none (the eye of the panel). */
     | { readonly t: "colour"; readonly def: string; readonly hide?: true; /** The colour it takes when a hidden default is shown. */ readonly shown?: string }

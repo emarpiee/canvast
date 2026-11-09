@@ -3104,7 +3104,7 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
 .pg-lock[aria-pressed="true"] { color: var(--hud-accent-text); }
 .pg-lock svg { width: var(--icon-sm); height: var(--icon-sm); }
 .pg-pick p { margin: 0; }
-:is(.pattern-panel [data-pg-body], .model-side) { display: grid; align-content: start; gap: var(--s-4); padding: var(--s-4) var(--s-6); }
+:is(.pattern-panel [data-pg-body], .balloon-panel [data-bl-rows], .model-side) { display: grid; align-content: start; gap: var(--s-4); padding: var(--s-4) var(--s-6); }
 .pg-line { grid-template-columns: 5.25rem minmax(0, 1fr); }
 .pg-check { display: flex; align-items: center; gap: var(--s-4); grid-column: 1 / -1; color: var(--hud-fg); cursor: pointer; }
 .pg-seg { padding: 0; }

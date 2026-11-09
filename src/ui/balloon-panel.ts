@@ -21,7 +21,7 @@ const SECTIONS: readonly Section[] = [
     R("seed", "Seed", 1, 999, 1),
   ] },
   { title: "Tail", items: [
-    Ch("tail", "Kind", TAIL_KINDS, "point"),
+    Ch("tail", "Kind", TAIL_KINDS, "point", true),
     R("tailW", "Base width", 1, 100, 22),
     when("tail", ["curved"], R("bend", "Bend", -100, 100, 28)),
     R("shift", "Base shift", -68, 68, 0),
@@ -63,13 +63,13 @@ function applied(p: Readonly<Record<string, SettingValue>>, s: BalloonSpec, box:
 /** The Speech balloon panel: the numbers of the selected balloons, in the shared rows. */
 export function mountBalloonPanel(host: HTMLElement, editor: EditorState, actions: BalloonActions): { toggle(): void } {
   const panel = document.createElement("aside");
-  panel.className = "layers-panel adjust-panel";
+  panel.className = "layers-panel adjust-panel balloon-panel";
   panel.setAttribute("aria-label", "Speech balloon");
   panel.dataset["testid"] = "balloon-panel";
   panel.hidden = true;
-  panel.innerHTML = panelHtml({ title: "Speech balloon", body: `<p class="adj-note" data-bl-none>Select a speech balloon.</p><div data-bl-rows></div>` });
+  panel.innerHTML = panelHtml({ title: "Speech balloon", body: `<div data-bl-rows></div>` });
   host.append(panel);
-  const rowsEl = panel.querySelector<HTMLElement>("[data-bl-rows]")!, none = panel.querySelector<HTMLElement>("[data-bl-none]")!;
+  const rowsEl = panel.querySelector<HTMLElement>("[data-bl-rows]")!;
   let values: Record<string, SettingValue> = {};
   let drawn = "";
   let pending: Record<string, SettingValue> = {};
@@ -102,9 +102,11 @@ export function mountBalloonPanel(host: HTMLElement, editor: EditorState, action
   const sync = (): void => {
     if (panel.hidden || timer) return;
     const cur = actions.selected();
-    none.hidden = !!cur;
-    rowsEl.hidden = !cur;
-    if (!cur) return;
+    if (!cur) {
+      drawn = "";
+      rowsEl.innerHTML = `<p class="adj-note">Select a speech balloon.</p>`;
+      return;
+    }
     values = shown(cur.box, cur.spec);
     const now = JSON.stringify(values);
     if (now !== drawn) {

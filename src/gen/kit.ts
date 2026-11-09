@@ -20,7 +20,7 @@ export const R = (k: string, label: string, min: number, max: number, def: numbe
 };
 export const C = (k: string, label: string, def: string, hide?: true): Setting => ({ k, label, t: "colour", def, ...(hide ? { hide } : {}) });
 export const T = (k: string, label: string, def: boolean): Setting => ({ k, label, t: "toggle", def });
-export const Ch = (k: string, label: string, opts: readonly (readonly [string, string])[], def: string): Setting => ({ k, label, t: "choice", opts, def });
+export const Ch = (k: string, label: string, opts: readonly (readonly [string, string])[], def: string, dropdown?: true): Setting => ({ k, label, t: "choice", opts, def, ...(dropdown ? { dropdown } : {}) });
 
 /** A setting Randomize leaves as it is. */
 export const steady = (s: Setting): Setting => ({ ...s, steady: true });
