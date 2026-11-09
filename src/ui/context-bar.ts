@@ -52,6 +52,8 @@ export interface ContextActions {
   releaseSheet(): void;
   canReleaseSheet(): boolean;
   putOnSheet(): void;
+  canSheetEach(): boolean;
+  sheetEach(): void;
   fitSheet(): void;
   canFitSheet(): boolean;
   /** Attach the picked objects to the object clicked next, and detach them (ADR 0109). */
@@ -248,6 +250,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
         // Put on a sheet, release it, fit it to what is on it: one menu that stays open; only what applies to the pick is listed
         const items = (): MenuItem[] => [
           { id: "puton", label: "Put on a sheet", hint: "On a new sheet (Ctrl+Alt+G)", icon: ICONS.sheetSelection, run: () => actions.putOnSheet() },
+          ...(actions.canSheetEach() ? [{ id: "eachsheet", label: "Put each on its own sheet", hint: "A sheet for each selected item", icon: ICONS.sheetEach, run: () => actions.sheetEach() }] : []),
           ...(actions.canReleaseSheet() ? [{ id: "unsheet", label: "Release the sheet", hint: "Keeps what is on it", icon: ICONS.releaseSheet, run: () => actions.releaseSheet() }] : []),
           ...(actions.canFitSheet() ? [{ id: "fitsheet", label: "Fit the sheet to its contents", hint: "The sheet shrinks or grows to what is on it", icon: ICONS.shrink, run: () => actions.fitSheet() }] : []),
         ];

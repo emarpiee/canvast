@@ -743,3 +743,21 @@ test("a sheet's handle resizes it from its far corner at any zoom, also where th
     await key(app, "Delete");
   }
 });
+
+test("several selected items: a sheet each, one undo step; and in Export, each on its own", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await drag(app, [300, 300], [400, 380]);
+  await drag(app, [500, 300], [600, 380]);
+  await key(app, "v");
+  await key(app, "Control+a");
+  await sheetWith(p, "eachsheet");
+  await expect.poll(async () => (await objs(app)).filter((o) => o.container).length).toBe(2);
+  await key(app, "Control+z");
+  await expect.poll(async () => (await objs(app)).filter((o) => o.container).length).toBe(0);
+  await key(app, "Control+a");
+  await exportWith(p, "exportpic");
+  await p.getByTestId("export-each").click();
+  await expect(p.locator("[data-mini]")).toHaveCount(2);
+  await expect(p.getByTestId("export-together")).toBeVisible();
+});

@@ -28,7 +28,7 @@ import { assetOf, deserializeObject, newObjectId, serializeObject } from "../doc
 import type { SerializedObject } from "../doc/model";
 import { retargeted } from "../storage/workspace-repo";
 import type { GcReport } from "../assets/asset-catalog";
-import type { ObjectId, TextObject } from "../doc/model";
+import type { CanvasObject, ObjectId, TextObject } from "../doc/model";
 import { expressObjectIn } from "../doc/model";
 import { unionBounds } from "../doc/edit-ops";
 import { changeTagOnCanvas, placeImage, placeImages } from "./actions";
@@ -910,6 +910,22 @@ export class Session {
    * step; on the others for good), a text using one as its font keeps its words in the default font; then they are deleted as usual (the
    * originals are erased once nothing, undo included, can need them). Returns how many were deleted.
    */
+  /** Hidden items keep no name on any canvas: the file names their placed items took are taken off, and a name typed by hand stays. */
+  async forgetPlacedNames(hashes: readonly string[]): Promise<void> {
+    if (this.readOnly || !this.catalog || !this.repo || !hashes.length) return;
+    const names = new Map<string, string>();
+    for (const h of hashes) names.set(h, (await this.catalog.entry(h).catch(() => undefined))?.name ?? "");
+    await this.persistence.flush();
+    // (the open canvas's history too, so an undo cannot bring a name back)
+    this.doc.remap((o) => {
+      if (o.kind === "text" || o.name === undefined || !("assetId" in o) || !names.has(o.assetId) || !(o.autoName || o.name === names.get(o.assetId))) return o;
+      const { name: _n, autoName: _a, ...rest } = o;
+      return rest as CanvasObject;
+    });
+    const canvases = await this.repo.forgetPlacedNames(names);
+    for (const id of canvases) if (id !== this.current?.canvasId) this.post({ kind: "commit", canvasId: id, revision: -1 });
+  }
+
   async deleteAssetsEverywhere(hashes: readonly string[]): Promise<number> {
     if (!this.guardWrite() || !this.catalog || !this.repo) return 0;
     const set = new Set(hashes);

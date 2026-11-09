@@ -24,6 +24,10 @@ import { ICONS } from "./icons";
 export interface ExportDeps {
   /** What is exported: one target, or one for each of several sheets (they leave together, as a ZIP or the pages of a PDF). */
   readonly targets: readonly ExportTarget[];
+  /** Several things selected: each of them on its own (the other way to export them). */
+  readonly each?: readonly ExportTarget[];
+  /** Shown each on its own: all of them as one picture (the other way back). */
+  readonly together?: readonly ExportTarget[];
   /** A target drawn at `w` × `h` px. */
   render(t: ExportTarget, w: number, h: number, bg: Background): Promise<HTMLCanvasElement>;
   /** The vectors of a target as SVG text of this size (width and height as SVG writes them), or null when it cannot be. */
@@ -77,7 +81,23 @@ const decimals = (u: Unit): number => (u === "px" ? 0 : u === "in" ? 2 : 1);
 const shown = (v: number, u: Unit): string => String(Number(v.toFixed(decimals(u))));
 const PREVIEW_PX = 320;
 
+function openEach(deps: ExportDeps): void {
+  const { each, ...rest } = deps;
+  openExportDialog({ ...rest, targets: each!, together: deps.targets });
+}
+
+function openTogether(deps: ExportDeps): void {
+  const { together, ...rest } = deps;
+  openDialog({ ...rest, targets: together!, each: deps.targets });
+}
+
 export function openExportDialog(deps: ExportDeps): void {
+  // (a PDF of several things is a page for each, unless asked for as one picture)
+  if (deps.each?.length && loadPrefs().format === "pdf") return openEach(deps);
+  openDialog(deps);
+}
+
+function openDialog(deps: ExportDeps): void {
   let ts = [...deps.targets]; // (in the order the pictures leave: the pages of a PDF, the files of a ZIP; the person can change it)
   const t = ts[0]!;
   const multi = ts.length > 1;
@@ -88,6 +108,10 @@ export function openExportDialog(deps: ExportDeps): void {
   const startW = t.ratio >= 1 ? 1920 : 1920 * t.ratio;
   const exact = multi ? undefined : sizeSuggestions(t.ratio, 8).find((s) => s.exact);
   let widthPx = t.original && !multi ? t.original.w : (exact?.w ?? (multi ? 1080 : startW));
+  const noun = ts.every((x) => x.kind === "sheet") ? "sheets" : "items";
+  // (several pictures leave at their own pixels, each page its picture's shape, until a width is set)
+  const firstWidth = widthPx;
+  const ownSizes = (): boolean => multi && ts.every((x) => x.original) && widthPx === firstWidth;
   // A size the shape is made for is taken whole (2480 × 3508 for A4), not worked out from a ratio that may differ in the last digit.
   let whole: { w: number; h: number } | null = multi ? null : t.original ? { w: t.original.w, h: t.original.h } : exact ? { w: exact.w, h: exact.h } : null;
   let nameTouched = false;
@@ -100,7 +124,7 @@ export function openExportDialog(deps: ExportDeps): void {
     titleId: "ex-title",
     html: `
     <header class="ex-head">
-      <h2 id="ex-title">Export <span class="ex-what">${multi ? `${ts.length} sheets` : esc(t.name)}</span></h2>
+      <h2 id="ex-title">Export <span class="ex-what">${multi ? `${ts.length} ${noun}` : esc(t.name)}</span></h2>
       <button type="button" class="ex-x" data-ex="close" aria-label="Close">${ICONS.x}</button>
     </header>
     <div class="ex-body">
@@ -110,7 +134,8 @@ export function openExportDialog(deps: ExportDeps): void {
           <span class="ex-dim ex-dim-w" data-ex-dim-w></span>
           <span class="ex-dim ex-dim-h" data-ex-dim-h></span>
         </div>`}
-        <p class="ex-shape" data-testid="export-shape">${multi ? `<strong>${ts.length} sheets</strong> <span>· each at this width, its own shape</span>` : `Shape <strong>${esc(formatRatio(t.ratio))}</strong>${preset ? ` <span>· ${esc(preset.short)}</span>` : ""}`}</p>
+        ${deps.each?.length ? `<button type="button" class="adj-map-edit" data-ex="each" data-testid="export-each">Each on its own (${deps.each.length} pages or files)</button>` : deps.together ? `<button type="button" class="adj-map-edit" data-ex="together" data-testid="export-together">All as one picture</button>` : ""}
+        <p class="ex-shape" data-testid="export-shape">${multi ? `<strong>${ts.length} ${noun}</strong> <span>· ${ownSizes() ? "each at its own pixels, until you set a width" : "each at this width, its own shape"}</span>` : `Shape <strong>${esc(formatRatio(t.ratio))}</strong>${preset ? ` <span>· ${esc(preset.short)}</span>` : ""}`}</p>
       </div>
       <div class="ex-panel">
         <section class="ex-sec" aria-label="Size">
@@ -169,7 +194,7 @@ export function openExportDialog(deps: ExportDeps): void {
 
   const px = (): { w: number; h: number; capped: boolean } => (whole && whole.w === widthPx ? { ...whole, capped: false } : clampSize(widthPx, widthPx / t.ratio));
   /** The pixel size of target `i` at the width chosen: its own height from its own shape (the first one's is `px()`). */
-  const sizeOf = (i: number): { w: number; h: number } => (i === 0 && !multi ? px() : clampSize(widthPx, widthPx / ts[i]!.ratio));
+  const sizeOf = (i: number): { w: number; h: number } => (i === 0 && !multi ? px() : ownSizes() ? clampSize(ts[i]!.original!.w, ts[i]!.original!.h) : clampSize(widthPx, widthPx / ts[i]!.ratio));
   const ext = (): string => (prefs.format === "svg" ? "svg" : prefs.format === "pdf" ? "pdf" : SHOT_FORMATS[prefs.format].ext);
 
   const refreshName = (): void => {
@@ -508,6 +533,10 @@ export function openExportDialog(deps: ExportDeps): void {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-ex]");
     if (!b) return;
     const k = b.dataset["ex"];
+    if (k === "each" || k === "together") {
+      dlg.close();
+      return k === "each" ? openEach(deps) : openTogether(deps);
+    }
     if (k === "close") dlg.close();
     else if (k === "download" || k === "copy" || k === "library") void run(k);
   });

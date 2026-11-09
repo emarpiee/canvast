@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.55.43 — Each selected item as its own page (2026-11-09)
+
+- **Added:** *Each on its own* in Export: several selected items, sheets or not, become one page of a PDF each, or one file each in a ZIP. With PDF chosen it is the way it opens. Pictures keep their own pixels until a width is set.
+- **Added:** *Put each on its own sheet* in the Sheets menu. A picture's sheet is exactly its size and has no fill.
+
+## 0.55.42 — A hidden item keeps no name on a canvas (2026-11-09)
+
+- **Fixed:** an item placed while shown and hidden later kept its file name as its layer name, in the canvas file too; hiding it takes that name off on every canvas. A name typed by hand stays.
+
 ## 0.55.41 — A placed item takes the file's name of that moment (2026-11-09)
 
 - **Fixed:** an item placed after its file was renamed in another program had the old name as its layer name. A newly placed item now keeps the file's name at that moment; a hidden item's name is not stored.

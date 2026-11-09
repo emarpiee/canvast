@@ -168,6 +168,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     saveBookmarks: (_r, id) => mirror.canvas(id),
     changeObjectTag: canvases,
     removeAssetInstances: canvases,
+    forgetPlacedNames: (ids) => ids.forEach((id) => mirror.canvas(id)),
     retargetAssetInstances: canvases,
     formatStoredTags: () => mirror.everything(),
     saveCamera: () => mirror.device(),

@@ -495,7 +495,7 @@ Keep a large canvas in order, and reach things that lie under others.
 - **Layers panel:** group and nest, rename, hide, lock, re-stack, set opacity and blend mode, rotate. An item placed from the library takes the file's name at that moment as its layer name, and keeps it when the file is renamed later; a hidden item's name is not stored. Select with `Ctrl` (toggle) and `Shift` (range).
 - **Sheets** (`C`): a sheet clips what it holds and has a ratio rather than a size (see [Shapes, sheets and masks](docs/reference/shapes-sheets-masks.md)).
   - Drawing a sheet over objects puts the ones wholly inside it on the sheet, in one undo step (ones it only crosses stay out).
-  - *Put the selection on a sheet*, *Fit to contents*, *Release* and *Turn on its side*.
+  - *Put the selection on a sheet*, *Put each on its own sheet* (a picture's sheet is exactly its size, with no fill), *Fit to contents*, *Release* and *Turn on its side*.
   - Ratio presets: `16:9`, `A4 portrait`, a number, or a size in px (`2000 x 1920` becomes `25 : 24`).
   - Each object on a sheet has pins per axis (left, right, both, centre or scale) that decide what it does when the sheet is resized; *Scale contents* resizes everything with it.
 - **Masks:** a clipping mask (a sheet of any shape), a mask by opacity or brightness, or a brush mask painted in black and white with the Pen. Masks can be inverted, selected on their own and released. A click on a mask selects it as one unit; a double click goes inside.
@@ -550,7 +550,7 @@ Copy to other apps, or export a sheet, a picture or selected shapes, and get wha
 | Formats | PNG, WebP, JPEG, SVG and PDF. What is on a sheet that clips is cut to the sheet in every format. PNG, JPEG and WebP carry their resolution |
 | Background | Transparent, white or black |
 | Result | Download it, copy it, or keep it in the library |
-| Several sheets | One ZIP, or one multi-page PDF whose pages you can reorder |
+| Several items | Selected sheets, or with *Each on its own* any selected items (pictures at their own pixels): one ZIP, or one multi-page PDF whose pages you can reorder. Otherwise a selection is one picture |
 | Vectors | Plain shapes are true vectors in PDF and SVG; masks are SVG masks; picture and pattern fills are embedded pictures clipped to the shape |
 
 ![Export dialog for the Earth, a clipping mask](docs/screenshots/export.webp)
@@ -1363,7 +1363,7 @@ For a workspace that is shown in a public place, an item of the Library can be *
 #### Hiding
 
 - A hidden item is left out of *All items*, every folder, tag and file type, the counts and totals, searches and their suggestions, *Similar images*, and the pickers that list the library (a texture fill's picture, the fonts).
-- Where it is already placed on a canvas, its picture shows a padlock at once (with or without a password) until it is shown again, and it is named *Hidden item* there (its label, the Layers panel): its name shows only with its picture. A canvas file holds no name of an item placed while it was hidden. A hidden video or sound does not play. With *Remember the Hidden password* on (Settings > Privacy), once the password is given its picture shows on the canvas until the tab or app closes, the hidden items are locked, or remembering is turned off. That is the screen only: exports, copies, pattern fills, baked pictures, screenshots and bookmark pictures still draw the padlock, so nothing readable of it leaves the app.
+- Where it is already placed on a canvas, its picture shows a padlock at once (with or without a password) until it is shown again, and it is named *Hidden item* there (its label, the Layers panel): its name shows only with its picture. Canvas files hold no name of a hidden item: the file name a placed item took as its layer name goes when the item is hidden (a name you typed yourself stays). A hidden video or sound does not play. With *Remember the Hidden password* on (Settings > Privacy), once the password is given its picture shows on the canvas until the tab or app closes, the hidden items are locked, or remembering is turned off. That is the screen only: exports, copies, pattern fills, baked pictures, screenshots and bookmark pictures still draw the padlock, so nothing readable of it leaves the app.
 - Hiding does not move, delete or change the file. In hidden mode, the same button shows the item again.
 - **Hide folder** (a library folder's ⋯ menu) hides the folder, its subfolders and every item in them. An item filed into a hidden folder later is hidden with it, and a folder made inside one is hidden too. Showing one item again shows its folder (and the ones above it) again; its other items stay hidden. In the desktop app a hidden folder's name is kept only encrypted, and its real folder leaves `library/`.
 
@@ -1611,7 +1611,6 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | ⚠️ Hidden items: deleted file | Deleting the readable file does not overwrite its disk blocks |
 | ⚠️ Hidden items: while locked | An item hidden while locked stays readable until the password is given |
 | ⚠️ Hidden items: this device | The app's cache keeps names and tags, unless *Keep hidden items' names off this device while locked* is on |
-| ⚠️ Hidden items: placed names | An item placed from the library while shown keeps its file name as its layer name, also in the canvas file, after it is hidden later |
 | ⚠️ Hidden items: what shows | Canvas files and backups name content hashes; how many, how deep and how big can be seen in `.hidden/` |
 | ⚠️ Hidden items: browser backups | A backup made in the browser includes hidden items encrypted with its Hidden password (as the desktop app's); with no Hidden password set there, they go in readable |
 | ⚠️ Hidden items: lost keys | Losing both `.canvast/hidden.json` and its spare loses every hidden item: keep backups |

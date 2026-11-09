@@ -562,6 +562,29 @@ export class WorkspaceRepo implements WorkspaceStore {
     }
   }
 
+  /** The file names placed items keep as layer names, taken off these items on every canvas (they have been hidden): `names` is each one's name now. A name typed by hand stays. */
+  async forgetPlacedNames(names: ReadonlyMap<string, string>): Promise<string[]> {
+    const tx = this.db.transaction(["objects", "canvases"], "readwrite", { durability: "strict" });
+    const committed = done(tx);
+    const store = tx.objectStore("objects");
+    const touched = new Set<string>();
+    for (const [hash, now] of names) {
+      for (const rec of await req(store.index("assetId").getAll(hash) as IDBRequest<ObjectRecord[]>)) {
+        const d = rec.data as SerializedObject & { name?: string; autoName?: true; kind?: string };
+        if (d.kind === "text" || d.name === undefined || !(d.autoName || d.name === now)) continue;
+        const { name: _n, autoName: _a, ...rest } = d;
+        store.put({ ...rec, data: rest as SerializedObject } satisfies ObjectRecord);
+        touched.add(rec.canvasId);
+      }
+    }
+    for (const id of touched) {
+      const canvas = await req(tx.objectStore("canvases").get(id) as IDBRequest<CanvasRecord | undefined>);
+      if (canvas) tx.objectStore("canvases").put({ ...canvas, revision: canvas.revision + 1, updatedAt: Date.now() });
+    }
+    await committed;
+    return [...touched];
+  }
+
   /** Every in-canvas tag of the workspace (ADR 0062), read from the objects' "tags" index. */
   async tagIndex(): Promise<Map<string, TagUse>> {
     const out = new Map<string, TagUse>();

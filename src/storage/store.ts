@@ -73,6 +73,7 @@ export interface WorkspaceStore {
   tagsOfAssetInstances(hash: string): Promise<Array<{ canvasId: string; tags: string[] }>>;
   changeObjectTag(key: string, target: string | null, skip: string | null): Promise<{ canvases: string[]; objects: number }>;
   removeAssetInstances(hashes: readonly string[], skip: string | null): Promise<{ canvases: string[]; objects: number }>;
+  forgetPlacedNames(names: ReadonlyMap<string, string>): Promise<string[]>;
   /** Point every instance of library asset `from` at `to` (its file changed outside the app and became `to`), on every canvas but `skip`; `size`: `to`'s pixels. */
   retargetAssetInstances(from: string, to: string, size: { w: number; h: number }, skip: string | null): Promise<{ canvases: string[]; objects: number }>;
   formatStoredTags(): Promise<void>;

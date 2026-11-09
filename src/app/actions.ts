@@ -1,3 +1,4 @@
+import { plural } from "../doc/plural";
 import { biggestClosed, fittedInShape, fittedOnPath, subArea, textsInShapes } from "../doc/text-in-shape";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { levelsBetween } from "../core/frames";
@@ -406,7 +407,7 @@ export function renameLayer(doc: DocumentStore, editor: EditorState, key: string
   const one = doc.get(key);
   if (one) {
     if ((one.name ?? "") === clean) return;
-    const { name: _n, ...rest } = one;
+    const { name: _n, autoName: _a, ...rest } = one;
     doc.commit(doc.transaction("Rename layer", [(clean ? { ...rest, name: clean } : rest) as CanvasObject]));
     return;
   }
@@ -756,7 +757,7 @@ export function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "t
     z,
     opacity: 1,
     attachmentTargetId: null,
-    ...(rec.placedName && rec.placedName.length <= MAX_NAME_LENGTH ? { name: rec.placedName } : {}),
+    ...(rec.placedName && rec.placedName.length <= MAX_NAME_LENGTH ? { name: rec.placedName, autoName: true as const } : {}),
     assetId: rec.hash,
     w: wPx / f,
     h: hPx / f,
@@ -1970,6 +1971,24 @@ export function exportTargets(doc: DocumentStore, editor: EditorState): ExportTa
   return one ? [one] : [];
 }
 
+/** The selected things, each on its own: what is on a selected sheet goes with the sheet, and a group is one thing. Top to bottom, then left to right. */
+function selectedUnits(doc: DocumentStore, editor: EditorState): CanvasObject[][] {
+  const units = new Map<string, CanvasObject[]>();
+  for (const o of rootsOf(selected(doc, editor).filter((x) => !x.hidden && !isMaskObject(x)))) {
+    const key = o.groups?.[0] ?? o.id;
+    (units.get(key) ?? units.set(key, []).get(key)!).push(o);
+  }
+  const top = (u: readonly CanvasObject[]) => worldBounds(u[0]!);
+  return [...units.values()].sort((a, b) => D.cmp(top(a).min.y, top(b).min.y) || D.cmp(top(a).min.x, top(b).min.x));
+}
+
+/** Each selected thing as an export of its own (a page of a PDF, a file of a ZIP); none when there are not several. */
+export function exportEachTargets(doc: DocumentStore, editor: EditorState): ExportTarget[] {
+  const units = selectedUnits(doc, editor);
+  if (units.length < 2) return [];
+  return units.map((u) => buildTarget(doc, u, u.length === 1 && isContainer(u[0]!) && !u[0]!.rot ? u[0]! : null)).filter((t): t is ExportTarget => t !== null);
+}
+
 /** The sheets that cut an object: those it is on that hide what lies outside them, innermost first (what the canvas does when it draws it). */
 const clipSheetsOf = (doc: DocumentStore) => (o: CanvasObject): PathObject[] => ancestorsOf((id) => doc.get(id), o).filter((a) => a.container.clip);
 
@@ -2183,20 +2202,28 @@ export function sheetSelection(doc: DocumentStore, editor: EditorState): void {
   const picked = selected(doc, editor).filter((o) => !o.locked);
   const roots = rootsOf(picked);
   if (!roots.length) return;
+  const made = sheetAround(doc, roots, doc.ordered(), "#ffffff");
+  if (!made) {
+    editor.message = "Those objects have no size to put on a sheet.";
+    editor.changed();
+    return;
+  }
+  doc.commit(doc.transaction("Put on a sheet", [made.sheet, ...made.inside]));
+  editor.select([made.sheet.id, ...picked.map((o) => o.id)]);
+  editor.changed();
+}
+
+/** A new sheet exactly round these objects, and the objects on it (nothing is committed); null when they have no size. */
+function sheetAround(doc: DocumentStore, roots: readonly CanvasObject[], all: readonly CanvasObject[], fill: string | null): { sheet: PathObject; inside: CanvasObject[] } | null {
   const f0 = roots[0]!.frame ?? doc.space.world;
   // (deep in a zoom, near objects can be filed in different frames: the box is taken in the first one's, and they stay where they are filed)
   const b = unionBounds(roots.map((o) => expressObjectIn(o, f0)))!;
   const unit = roots[0]!.unit;
   const w = D.toNumber(D.shift(D.sub(b.max.x, b.min.x), -unit));
   const h = D.toNumber(D.shift(D.sub(b.max.y, b.min.y), -unit));
-  if (!(w > 0 && h > 0 && Number.isFinite(w + h))) {
-    editor.message = "Those objects have no size to put on a sheet.";
-    editor.changed();
-    return;
-  }
+  if (!(w > 0 && h > 0 && Number.isFinite(w + h))) return null;
   const parents = new Set(roots.map((o) => o.parent));
   const parent = parents.size === 1 ? [...parents][0] : undefined;
-  const all = doc.ordered();
   const lowest = Math.min(...roots.map((o) => o.z));
   const below = [...all].filter((o) => o.z < lowest).pop();
   const body0: PathObject = {
@@ -2209,7 +2236,7 @@ export function sheetSelection(doc: DocumentStore, editor: EditorState): void {
     opacity: 1,
     attachmentTargetId: null,
     sub: drawnSubs("rect", 0, 0, w, h, 6, 5),
-    fill: "#ffffff",
+    fill,
     stroke: null,
     width: Math.max(Math.min(w, h) / 100, Number.MIN_VALUE),
     shape: "rect",
@@ -2219,10 +2246,24 @@ export function sheetSelection(doc: DocumentStore, editor: EditorState): void {
   };
   const params = drawnParams("rect", 0, 0, w, h, 6, 5);
   const body = homeObject(normalizeUnit(params ? { ...body0, params } : body0), doc.space) as PathObject;
-  const placed = below ? (placeAbove(all, [body], below)[0] ?? body) : body;
-  const inside = roots.map((o) => ({ ...o, parent: body.id }) as CanvasObject);
-  doc.commit(doc.transaction("Put on a sheet", [placed, ...inside]));
-  editor.select([placed.id, ...picked.map((o) => o.id)]);
+  const sheet = (below ? (placeAbove(all, [body], below)[0] ?? body) : body) as PathObject;
+  return { sheet, inside: roots.map((o) => ({ ...o, parent: sheet.id }) as CanvasObject) };
+}
+
+const unitsForSheets = (doc: DocumentStore, editor: EditorState): CanvasObject[][] => selectedUnits(doc, editor).filter((u) => !u.some((o) => o.locked || isContainer(o)));
+export const canSheetEach = (doc: DocumentStore, editor: EditorState): boolean => unitsForSheets(doc, editor).length >= 2;
+
+/** Each selected thing on a sheet of its own, exactly its size: one undo step. A picture's sheet has no fill, so nothing of the sheet can show at its edge. */
+export function sheetEach(doc: DocumentStore, editor: EditorState): void {
+  if (editor.blockEdit()) return;
+  const made: Array<{ sheet: PathObject; inside: CanvasObject[] }> = [];
+  for (const u of unitsForSheets(doc, editor)) {
+    const m = sheetAround(doc, u, [...doc.ordered(), ...made.map((x) => x.sheet)], u.every((o) => o.kind === "image") ? null : "#ffffff");
+    if (m) made.push(m);
+  }
+  if (!made.length) return;
+  doc.commit(doc.transaction(`Put ${plural(made.length, "item")} on a sheet each`, made.flatMap((m) => [m.sheet, ...m.inside])));
+  editor.select(made.map((m) => m.sheet.id));
   editor.changed();
 }
 

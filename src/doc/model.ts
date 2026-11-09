@@ -79,6 +79,8 @@ interface ObjectBase {
   readonly groups?: readonly string[];
   /** Layer name shown in the Layers panel (ADR 0047); absent = the automatic label. */
   readonly name?: string;
+  /** The name is the file's, taken when the item was placed (not typed): it goes when the item is hidden. */
+  readonly autoName?: true;
   /** Names of the groups this object is in, by group id (ADR 0047); absent = none named. */
   readonly groupNames?: Readonly<Record<string, string>>;
   /** Which of its groups are boolean groups (ADR 0103), and the operation of each; a member and the result of such a group both carry it. */
@@ -739,6 +741,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
     ...(s["constraint"] !== undefined ? { constraint: s["constraint"] as { h: "left"; v: "top" } } : {}),
     ...(s["groups"] !== undefined ? { groups: s["groups"] as string[] } : {}),
     ...(s["name"] !== undefined ? { name: s["name"] as string } : {}),
+    ...(s["autoName"] === true ? { autoName: true as const } : {}),
     ...(s["groupNames"] !== undefined ? { groupNames: s["groupNames"] as Record<string, string> } : {}),
     ...(s["boolOps"] !== undefined ? { boolOps: s["boolOps"] as Record<string, BoolOp> } : {}),
     ...(s["adjust"] !== undefined ? { adjust: s["adjust"] as Adjust } : {}),

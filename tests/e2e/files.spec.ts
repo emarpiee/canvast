@@ -299,4 +299,7 @@ test("an item placed from the library keeps the file's name of that moment as it
   await p.getByTestId("view-canvas").click();
   await p.evaluate((h) => window.__canvastDebug.placeFromLibrary(h), hash!);
   await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.objects())).at(-1)?.["name"]).toBe("green.png");
+  // hidden later: no name of it stays on the canvas
+  await p.evaluate((h) => window.__canvastDebug.libraryOp("hide", h, "1"), hash!);
+  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.objects())).at(-1)?.["name"]).toBeUndefined();
 });

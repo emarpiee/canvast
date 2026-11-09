@@ -20,6 +20,7 @@ import lineShapeSvg from "lucide-static/icons/slash.svg";
 import polygonShapeSvg from "lucide-static/icons/hexagon.svg";
 import starShapeSvg from "lucide-static/icons/sparkle.svg";
 import shapeToolSvg from "lucide-static/icons/pentagon.svg";
+import sheetEachSvg from "lucide-static/icons/book-copy.svg";
 import speechBalloonSvg from "lucide-static/icons/message-circle.svg";
 import pathToolSvg from "lucide-static/icons/spline-pointer.svg";
 import nodeToolSvg from "lucide-static/icons/waypoints.svg";
@@ -662,6 +663,7 @@ export const ICONS = {
   polygonShape: clean(polygonShapeSvg),
   starShape: clean(starShapeSvg),
   shapeTool: clean(shapeToolSvg),
+  sheetEach: clean(sheetEachSvg),
   speechBalloon: clean(speechBalloonSvg),
   pathTool: clean(pathToolSvg),
   nodeTool: clean(nodeToolSvg),
