@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.17 — Speech balloons (2026-11-09)
+
+- **Added:** a Balloons tab in the Pattern panel: 12 body shapes; point, curved and zigzag tails, thought bubbles and a second tail, each with its tip; up to 6 linked balloons with a neck, pinched, line or dots connector; solid, double or dashed outlines, a shadow and a hand-drawn wobble.
+
 ## 0.55.16 — Text in shapes; text on a path repaired (2026-11-09)
 
 - **Added:** text inside a closed shape (*Path tools > Text inside the shape*): each line as wide as the shape is there.

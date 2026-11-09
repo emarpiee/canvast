@@ -47,7 +47,7 @@ export interface Generator {
   readonly label: string;
   /** One line shown under the name in the picker. */
   readonly about: string;
-  readonly family: "Waves" | "Blobs" | "Soft" | "Lines" | "Tiles" | "Fields" | "Proportion" | "Composition" | "Layout" | "Perspective" | "Geometry" | "Art study";
+  readonly family: "Waves" | "Blobs" | "Soft" | "Lines" | "Tiles" | "Fields" | "Proportion" | "Composition" | "Layout" | "Perspective" | "Geometry" | "Art study" | "Balloons";
   /** For laying out and composing work: it starts with no background, to sit over what is under it. */
   readonly guide?: true;
   /** The settings, in sections; the "Colour" section gets the Background colour in front. */

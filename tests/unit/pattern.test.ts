@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { MAX_SUBPATHS } from "../../src/doc/model";
 import { MAX_SUBPATHS as GEN_MAX_SUBPATHS } from "../../src/gen";
-import { GENERATORS, MAX_SHAPES, cleanValues, defaultValues, generate, makeRng, pathData, randomValues, settingsOf, toSvg } from "../../src/gen";
+import { GENERATORS, generatorById, MAX_SHAPES, cleanValues, defaultValues, generate, makeRng, pathData, randomValues, settingsOf, toSvg } from "../../src/gen";
 import * as D from "../../src/core/dyadic";
 import { duplicateRecords } from "../../src/doc/duplicate";
 import { deserializeObject, newObjectId, serializeObject, validateObject } from "../../src/doc/model";
@@ -104,7 +104,7 @@ describe("pattern generators (ADR 0162)", () => {
     const PHI = (1 + Math.sqrt(5)) / 2;
 
     it("are 55, each starting with no background and able to have one", () => {
-      const guides = GENERATORS.filter((g) => g.guide);
+      const guides = GENERATORS.filter((g) => g.guide && g.family !== "Balloons");
       expect(guides).toHaveLength(55);
       for (const g of guides) {
         const bg = settingsOf(g).find((s) => s.k === "bg")!;
@@ -325,5 +325,37 @@ describe("pattern generators (ADR 0162)", () => {
     const glow = GENERATORS.find((x) => x.id === "glow")!;
     expect(toSvg(generate(glow, defaultValues(glow), 5, 100, 100), 100, 100, { idPrefix: "x" })).toContain('<radialGradient id="x0"');
     expect(pathData({ n: [0, 0, 0, 0, 0, 0, 10, 0, 10, 0, 10, 0, 10, 10, 10, 10, 10, 10], closed: true })).toBe("M0 0L10 0L10 10L0 0Z");
+  });
+});
+
+describe("speech balloons", () => {
+  const G = generatorById("speech-balloon")!;
+  const make = (o: Record<string, string | number | boolean> = {}) => generate(G, { ...defaultValues(G), ...o }, 1, 800, 600);
+  const finite = (shapes: ReturnType<typeof make>): boolean => shapes.every((s) => s.sub.every((p) => p.n.length >= 12 && p.n.every(Number.isFinite)));
+  it("every body, with every tail, is one closed outline inside its box", () => {
+    for (const [body] of (settingsOf(G).find((s) => s.k === "body") as { opts: readonly (readonly [string, string])[] }).opts)
+      for (const tail of ["none", "point", "curved", "zigzag"]) {
+        const shapes = make({ body, tail });
+        expect(finite(shapes), `${body} ${tail}`).toBe(true);
+        const main = shapes.find((s) => s.name === "Balloon")!;
+        expect(main.sub).toHaveLength(1);
+        expect(main.sub[0]!.closed).toBe(true);
+      }
+  });
+  it("the tail reaches its tip; thought bubbles, a second tail and every connector make shapes", () => {
+    const tip = make({ tipX: 10, tipY: 95 }).find((s) => s.name === "Balloon")!.sub[0]!.n;
+    let near = Infinity;
+    for (let i = 0; i < tip.length; i += 6) near = Math.min(near, Math.hypot(tip[i]! - 80, tip[i + 1]! - 570));
+    expect(near).toBeLessThan(1);
+    expect(make({ tail: "bubbles" }).some((s) => s.name === "Thought bubbles")).toBe(true);
+    for (const link of ["neck", "pinch", "line", "dots"]) {
+      const s = make({ count: 3, link });
+      expect(s.filter((x) => x.name?.startsWith("Balloon ")).length, link).toBe(3);
+      expect(s.some((x) => x.name === "Connector"), link).toBe(true);
+      expect(finite(s), link).toBe(true);
+    }
+    expect(make({ style: "dashed", weight: 4 }).some((s) => s.name === "Outline")).toBe(true);
+    expect(make({ style: "double" }).some((s) => s.name === "Inner outline")).toBe(true);
+    expect(make({ shadowY: 20, shadow: "#000000" }).some((s) => s.name === "Balloon shadow")).toBe(true);
   });
 });
