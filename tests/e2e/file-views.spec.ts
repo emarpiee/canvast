@@ -505,7 +505,7 @@ test("a 3D model's study tools: tones in flat steps, a mirror, a pose from its a
   const side = p.getByTestId("model-side");
   // A surface in steps of value: its row appears with it.
   await expect(side.locator('[data-k="tones"]')).toHaveCount(0);
-  await side.locator('[data-k="surface"] [data-v="tones"]').click();
+  await side.locator('[data-k="surface"] select').selectOption("tones");
   await side.locator('[data-k="tones"] input[type=number]').fill("2");
   await expect.poll(() => painted(p)).toBeGreaterThan(0.001);
   // Mirror.
