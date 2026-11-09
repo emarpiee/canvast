@@ -57,8 +57,8 @@ const shaFile = (p) => new Promise((ok, fail) => {
 const secs = (ms) => `${(ms / 1000).toFixed(1)} s`;
 
 // ---- the app ----
-async function launch(ws) {
-  const app = await electron.launch({ args: [join(build, "desktop"), `--workspace=${ws}`, `--user-data-dir=${ws}-data`, ...(process.env.CI ? ["--no-sandbox"] : [])], env: { ...process.env, CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug", CANVAST_STALE_TMP_MS: "0" }, timeout: 600_000 });
+async function launch(ws, device = "data") {
+  const app = await electron.launch({ args: [join(build, "desktop"), `--workspace=${ws}`, `--user-data-dir=${ws}-${device}`, ...(process.env.CI ? ["--no-sandbox"] : [])], env: { ...process.env, CANVAST_HIDDEN: "1", CANVAST_HASH: "#debug", CANVAST_STALE_TMP_MS: "0" }, timeout: 600_000 });
   const page = await app.firstWindow({ timeout: 600_000 });
   page.setDefaultTimeout(1_800_000);
   await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 1_800_000, polling: 250 });
@@ -248,7 +248,7 @@ if (N > 0 && !BIG) {
   const lost = [...expected].filter((h) => !disk.sealed.has(h));
   console.log(`  decrypted ${disk.opened}, lost ${lost.length}, damaged ${disk.damaged.length}, readable left ${disk.readable.size}`);
   if (lost.length || disk.damaged.length || disk.readable.size) (failed = true), console.error("FAILED: the outside tool did not give back every item, each with its bytes");
-  if (!args.includes("--keep")) for (const d of [ws, `${ws}-data`]) rmSync(d, { recursive: true, force: true });
+  if (!args.includes("--keep")) for (const d of [ws, `${ws}-data`, `${ws}-data2`]) rmSync(d, { recursive: true, force: true });
 }
 
 // ---- 2. crashes ----
@@ -326,7 +326,7 @@ if (BIG > 0) {
   /** The sizes, and how many of each (times K). */
   const SIZES = [[0.05, 200], [1, 40], [10, 20], [50, 10], [100, 10], [200, 8], [300, 6], [500, 4], [1024, 4], [2048, 2]].map(([mb, n]) => ({ mb, n: Math.max(1, Math.round(n * BIG)), name: mb < 1 ? "50 KB" : mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB` }));
   const ws = join(root, "big");
-  rmSync(`${ws}-data`, { recursive: true, force: true });
+  for (const d of [`${ws}-data`, `${ws}-data2`]) rmSync(d, { recursive: true, force: true });
   const { items } = makeWorkspace(ws, N, { perFolder: 500, nest: 2 });
   const used = () => {
     const f = statfsSync(root);
@@ -336,6 +336,21 @@ if (BIG > 0) {
   const block = Buffer.alloc(8 * MB);
   randomFillSync(block);
   const t0 = performance.now();
+  /** A file of different content (its number in every block), a block at a time, with its SHA-256. */
+  const bigFile = (dir, name, bytes, tag) => {
+    const h = createHash("sha256");
+    const fd = openSync(join(dir, name), "w");
+    for (let at = 0; at < bytes; ) {
+      const n = Math.min(block.length, bytes - at);
+      block.writeUInt32LE(tag, 0);
+      block.writeUInt32LE(at / block.length, 4);
+      writeSync(fd, block, 0, n);
+      h.update(block.subarray(0, n));
+      at += n;
+    }
+    closeSync(fd);
+    return { name, file: join(dir, name), bytes, hash: h.digest("hex") };
+  };
   for (const [k, size] of SIZES.entries()) {
     size.files = [];
     const dir = join(ws, "library", "big", `s${k}`);
@@ -343,18 +358,7 @@ if (BIG > 0) {
     for (let i = 0; i < size.n; i++) {
       const bytes = Math.round(size.mb * MB);
       const name = `s${k}-${String(i).padStart(3, "0")}.dat`;
-      const h = createHash("sha256");
-      const fd = openSync(join(dir, name), "w");
-      for (let at = 0; at < bytes; ) {
-        const n = Math.min(block.length, bytes - at);
-        block.writeUInt32LE(k * 1000 + i, 0);
-        block.writeUInt32LE(at / block.length, 4);
-        writeSync(fd, block, 0, n);
-        h.update(block.subarray(0, n));
-        at += n;
-      }
-      closeSync(fd);
-      size.files.push({ name, file: join(dir, name), bytes, hash: h.digest("hex") });
+      size.files.push(bigFile(dir, name, bytes, k * 1000 + i));
     }
   }
   const total = SIZES.reduce((a, s) => a + s.files.reduce((b, f) => b + f.bytes, 0), 0);
@@ -410,7 +414,7 @@ if (BIG > 0) {
   // Read back through the folder (decrypted as read): the first megabyte (what starts a viewer), a part in the middle (a jump), then
   // the whole file, compared with what was written.
   await s.page.evaluate(() => window.canvastDesktop.share.call("dav", true));
-  const st = await s.page.evaluate(() => window.canvastDesktop.share.call("status"));
+  let st = await s.page.evaluate(() => window.canvastDesktop.share.call("status"));
   const get = (path, range) =>
     new Promise((ok, fail) => {
       const t = performance.now();
@@ -452,6 +456,58 @@ if (BIG > 0) {
     bigRows.push([`read through the folder: first MB ${Math.round(head.first)} ms, a MB in the middle ${Math.round(mid.ms)} ms, whole`, size.name, secs(whole.ms), rate(f.bytes, whole.ms), `${Math.round(m.peak)} MB`, ""]);
     console.log(`read ${size.name}: first MB ${Math.round(head.first)} ms, middle MB ${Math.round(mid.ms)} ms, whole ${secs(whole.ms)} (${rate(f.bytes, whole.ms)}), peak ${Math.round(m.peak)} MB`);
   }
+  // A new device: its own empty app data, the same folder (as a synced folder gives it). Opens the hidden items with the password, reads the
+  // big ones, then writes new ones of the sizes in everyday use, and reads those back.
+  await s.app.close();
+  const NEW_DEVICE = [["700 MB", 700, 2], ["1 GB", 1024, 2], ["2 GB", 2048, 1]];
+  const newDir = join(ws, "library", "big", "new-device");
+  mkdirSync(newDir, { recursive: true });
+  const newFiles = NEW_DEVICE.flatMap(([name, mb, n], k) => Array.from({ length: n }, (_, i) => ({ size: name, ...bigFile(newDir, `n${k}-${i}.dat`, mb * MB, 900000 + k * 1000 + i) })));
+  s = await launch(ws, "data2");
+  const newOpen = await measured(s.app, async () => {
+    await s.hid("check", PW);
+    await until(hiddenCount, count);
+  });
+  bigRows.push([`new device: open, until the ${count.toLocaleString()} hidden items are listed`, "all", secs(newOpen.time), "", `${Math.round(newOpen.peak)} MB`, ""]);
+  await until(listed, count + newFiles.length);
+  await s.page.evaluate(() => window.canvastDesktop.share.call("dav", true));
+  st = await s.page.evaluate(() => window.canvastDesktop.share.call("status"));
+  const hiddenPlaces = async () => {
+    const found = new Map();
+    for (let dirs = ["/dav/Hidden/"]; dirs.length; ) {
+      const next = [];
+      for (const d of dirs) for (const h of await listing(d)) h.endsWith("/") ? next.push(h) : found.set(decodeURIComponent(h.slice(h.lastIndexOf("/") + 1)), decodeURI(h));
+      dirs = next;
+    }
+    return found;
+  };
+  /** Read a hidden file through the folder, compare it with what was written, and put it in the table. */
+  const readBack = async (label, f, at) => {
+    const path = at.get(f.name);
+    let whole = { ms: 0, hash: "", bytes: 0 };
+    const head = path ? await get(path, "bytes=0-1048575") : { first: 0 };
+    const m = await measured(s.app, async () => void (whole = path ? await get(path) : whole));
+    if (whole.hash !== f.hash) (failed = true), console.error(`FAILED: new device: ${f.name} read back ${whole.bytes} bytes that are not the file's`);
+    bigRows.push([`new device: ${label}: first MB ${Math.round(head.first)} ms, whole`, "", secs(whole.ms), rate(f.bytes, whole.ms), `${Math.round(m.peak)} MB`, ""]);
+  };
+  let onDevice = await hiddenPlaces();
+  for (const size of SIZES.filter((x) => x.mb >= 100)) await readBack(`read ${size.name}`, size.files[0], onDevice);
+  for (const [name] of NEW_DEVICE) {
+    const files = newFiles.filter((f) => f.size === name);
+    const m = await withDisk(s.app, async () => {
+      for (const f of files) await s.lib("hide", f.hash, "1");
+      await s.flush();
+      await until(() => Promise.resolve(filesUnder(newDir).filter((p) => files.some((f) => p.endsWith(f.name))).length), 0);
+    });
+    row(`new device: hide ${files.length} ×`, name, files.reduce((a, f) => a + f.bytes, 0), m);
+  }
+  onDevice = await hiddenPlaces();
+  for (const f of newFiles) await readBack(`read written here ${f.size}`, f, onDevice);
+  await s.app.close();
+  s = await launch(ws);
+  await s.hid("check", PW);
+  await until(listed, count + newFiles.length);
+
   // The big ones shown again (decrypted into library/), one size at a time, each file checked.
   for (const [k, size] of SIZES.entries()) {
     if (size.mb < 100) continue;
