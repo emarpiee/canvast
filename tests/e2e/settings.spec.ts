@@ -177,7 +177,7 @@ test("shortcuts: every key can be changed, to a key or a chord, with warnings; t
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await p.keyboard.press("v");
-  await p.keyboard.press("k");
+  await p.keyboard.press("j");
   expect(await tool()).toBe("pen");
   await p.keyboard.press("?");
   await panel.getByRole("button", { name: "Reset every shortcut" }).click();
