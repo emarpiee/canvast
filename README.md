@@ -76,9 +76,9 @@ Everything you need to install canvast, use it and keep your work safe.
 | Area | What you get |
 | --- | --- |
 | **Endless canvas** | No edge and no zoom limit in either direction; exact positions at any depth; bookmarks, tours, camera travel between far places, search, and stepping from item to item. [Navigating](#navigating) |
-| **Drawing** | Pressure pens, shapes, Bézier paths, node editing, vector networks, boolean shapes, fills (gradients, pictures, repeated objects with variation), outlines, 39 pattern generators, SVG in and out. [Drawing](#drawing) |
+| **Drawing** | Pressure pens, shapes, Bézier paths, node editing, vector networks, boolean shapes, fills (gradients, pictures, repeated objects with variation), outlines, speech balloons with connectors, 38 patterns and 55 guides, SVG in and out. [Drawing](#drawing) |
 | **Colour** | One OKHSL / OKHSV / OKLCH colour picker for everything, gradients, palettes (`.gpl`, `.ase`, `.aco`, `.ggr`) and linked styles. [Colour and styles](#colour-and-styles) |
-| **Text** | Rich text stored as Markdown, imported fonts (variable fonts too), text on a path, notes, sharp letters at any zoom. [Text](#text) |
+| **Text** | Rich text stored as Markdown, imported fonts (variable fonts too), text on a path and inside shapes, notes, sharp letters at any zoom. [Text](#text) |
 | **Pictures and media** | Pixel-exact pictures, non-destructive adjustments and shadows, crop, flip and masks; video, audio and GIFs play on the canvas. [Pictures, video, audio and other files](#pictures-video-audio-and-other-files) |
 | **Organizing** | Layers, groups, sheets that clip, masks, snapping, align and arrange, tags, Reveal for things under others. [Organizing](#organizing) |
 | **Notes** | A notes editor for markdown, text and rich text notes, in the library and beside the canvas: Obsidian-style `[[links]]`, properties and `#tags` that can be searched, sorted and shown as columns, templates, layouts, cards on a canvas that lay out their page at the size you give them. [Notes](#notes) |
@@ -384,22 +384,23 @@ One colour picker for everything, and saved styles that objects stay linked to.
 | | |
 | --- | --- |
 | ![The colour picker, opened from a fill: OKHSV as a ring and box, with the recent colours](docs/screenshots/colour-picker.webp) | ![The Styles panel with saved colours](docs/screenshots/styles.webp) |
-| The colour picker, opened from a fill | The Styles panel: saved colours, gradients, text styles, adjustments and patterns |
+| The colour picker, opened from a fill | The Styles panel: saved colours, gradients, text styles, adjustments, patterns and speech balloons |
 
 | Feature | What it does |
 | --- | --- |
 | **Colour picker** | OKHSL, OKHSV or OKLCH, with an eyedropper, recent and saved colours |
 | **Gradients** | Linear, radial and angular, with stops you drag on the canvas |
 | **Palettes** | Built from a colour or a picture; `.gpl`, `.ase`, `.aco` and `.ggr` files |
-| **Styles panel** | Saved colours, gradients, text styles, adjustments and patterns, which linked objects follow |
+| **Styles panel** | Saved colours, gradients, text styles, adjustments, patterns and speech balloons; linked objects follow the first ones |
 
 #### More about colour and styles
 
 - **Colour picker:** one picker for every colour. Choose OKHSL, OKHSV or OKLCH (CSS `oklch()`'s own lightness, chroma and hue); a ring and box, a plane with a hue bar, or sliders; text as hex or another format. It also has an eyedropper, recent colours and saved colours. A number changes by dragging its name left or right; with `Shift` it snaps to round steps worked out from its range (steps of 5 for 0–100, 10 for 0–255).
 - **Gradients:** linear, radial and angular, with stops you drag on the canvas, a *Randomize* button and a gradient map for pictures.
 - **Palettes:** *Palette from a colour* builds harmonies, and a palette can be taken from a picture. Palettes and gradients can be imported and exported as `.gpl`, `.ase`, `.aco` and `.ggr` files.
-- **Styles panel:** saved colours, gradients, text styles, adjustment stacks and patterns.
+- **Styles panel:** saved colours, gradients, text styles, adjustment stacks, patterns and speech balloons, as many as you like. They are kept in the workspace and go with a backup.
   - An object painted with a saved style is **linked** to it and follows when the style changes. A change by hand, or *Detach*, unlinks it.
+  - A speech balloon style goes on the selected balloons when you press its card: size, tails, paint and the look of the words. It is not linked: changing the style later does not change them.
   - A pattern style keeps a generator with its settings and seed (*Save as a style* in the Pattern panel saves or updates it). Pressing its card puts it back in the Pattern panel and makes it on what is selected (on each of several selected shapes).
   - **Copy** a colour, gradient or palette card with a long press or right click (a palette as CSS variables; a colour inside an opened palette as hex), or with *Copy hex* / *Copy as CSS* in its More menu. A long press copies without applying.
   - **Paste** CSS (a colour in any notation, or a gradient) with the pointer over the panel or nothing selected, and it is saved as a new style.
@@ -415,7 +416,8 @@ Press `T`, click and type. Text is stored as Markdown, and you can zoom into a l
 | **Formatting** | Bold, italic, links, headings, lists, any range's colour and size |
 | **Look** | Spacing, alignment, kerning, OpenType features, variable font axes |
 | **Fonts** | Import `.ttf`, `.otf`, `.woff` or `.woff2`; right-to-left text works |
-| **Text on a path** | Text follows a path; **Text to path** (`Ctrl+E`) makes outlines |
+| **Text on a path** | Text follows a path, and its changes; **Text to path** (`Ctrl+E`) makes outlines |
+| **Text in a shape** | Lines as wide as the shape; padding per side, alignment across and down, Fit to shape |
 | **Text in a shape** | Words flow inside a closed shape, each line as wide as the shape is there |
 | **Notes** (`M`) | A markdown note with a card on the canvas: see [Notes](#notes) |
 
@@ -425,9 +427,9 @@ Press `T`, click and type. Text is stored as Markdown, and you can zoom into a l
 - **Formatting:** bold, italic, underline, strikethrough, links, colour and size of any range, headings, bulleted, numbered and nested lists. Text is stored as Markdown; **Copy Markdown** is one click away.
 - **Look:** colour or gradient, outline, size, line height, letter spacing, alignment, auto or fixed width, paragraph spacing, indent, case, line limit, a set height, kerning, OpenType features and the axes of variable fonts.
 - **Fonts:** import `.ttf`, `.otf`, `.woff` or `.woff2` into the library, including variable fonts. One text may use several fonts. Right-to-left and mixed-direction text are supported.
-- **Text on a path**, and **Text to path** (`Ctrl+E`) to turn letters into editable outlines.
-- **Text in a shape:** select a text and a closed shape (a boolean shape or a group works too: the words go in its biggest piece, ), then *Path tools > Text inside the shape*. The shape sets where the words go: they follow it in the same undo step, and a text moved on its own goes back into it; its corner handles change its letter size, and each side handle changes the padding on its side. Words that do not fit go on below it. While typing, the words sit in a box in the middle of the shape, on its colour, and take the shape's flow when you finish. Deleting the shape or speech balloon leaves plain text. Holes in a shape are avoided. The speech balloon button at the start of the Properties bar opens alignment, padding for each side, overflow and *Fit to shape*. Text along a path follows the path the same way, and is plain again when the path is deleted. *Text off its path or shape* sets them straight again.
-- **Options** (*Paragraph and box* on the text's bar): on a path, where the words start, their alignment along it, the side and the distance from it; in a shape, the padding at the sides and at the top and bottom, where the words sit, whether words that do not fit are shown, and **Fit to shape**.
+- **Text on a path** (*Path tools > Text along a path*): the words follow the path when it moves or changes, in the same undo step, and are plain text again when the path is deleted. **Text to path** (`Ctrl+E`) turns letters into editable outlines.
+- **Text in a shape:** select a text and a closed shape (a boolean shape or a group works too: the words go in its biggest piece), then *Path tools > Text inside the shape*. The shape sets where the words go: they follow it in the same undo step, and a text moved on its own goes back into it; its corner handles change its letter size, and each side handle changes the padding on its side; a long first word moves down to where it fits whole. Words that do not fit go on below it. While typing, the words sit in a box in the middle of the shape, on its colour, and take the shape's flow when you finish. Deleting the shape or speech balloon leaves plain text. Holes in a shape are avoided. The speech balloon button at the start of the Properties bar opens alignment, padding for each side, overflow and *Fit to shape*. Text along a path follows the path the same way, and is plain again when the path is deleted. *Text off its path or shape* sets them straight again.
+- **Options:** *Paragraph and box*, at the start of the text's bar, has the paragraph and card settings and, on a path, where the words start, their alignment along it, the side and the distance from it. For words in a shape, the speech balloon button at the start of the bar has alignment across and down (with Justify), padding for each side, what happens to words that do not fit (a note says when some do not), and **Fit to shape**.
 - **Notes** (`M`): the Note tool makes a markdown note in the library's Notes folder, places its card where you click and opens it in the Note panel (see [Notes](#notes)). A text can still sit on a coloured card (its box options); **Make note files** turns such texts into notes.
 - **No zoom limit:** zoom into a letter as far as you like; the font's real outlines are drawn.
 
@@ -487,7 +489,7 @@ Keep a large canvas in order, and reach things that lie under others.
 
 #### More about organizing
 
-- **Layers panel:** group and nest, rename, hide, lock, re-stack, set opacity and blend mode, rotate. Select with `Ctrl` (toggle) and `Shift` (range).
+- **Layers panel:** group and nest, rename, hide, lock, re-stack, set opacity and blend mode, rotate. An item placed from the library takes the file's name at that moment as its layer name, and keeps it when the file is renamed later; a hidden item's name is not stored. Select with `Ctrl` (toggle) and `Shift` (range).
 - **Sheets** (`C`): a sheet clips what it holds and has a ratio rather than a size (see [Shapes, sheets and masks](docs/reference/shapes-sheets-masks.md)).
   - Drawing a sheet over objects puts the ones wholly inside it on the sheet, in one undo step (ones it only crosses stay out).
   - *Put the selection on a sheet*, *Fit to contents*, *Release* and *Turn on its side*.
@@ -964,7 +966,7 @@ A markdown note's YAML block is its tags, description and properties, and each p
 | **Tool rail** | Left | Undo, redo, the tools, Screenshot and Search |
 | **Properties bar** | Top | The options of the tool or the selection |
 | **Actions bar** | Bottom, or with the selection | What can be done with the selection, in menus |
-| **Panels** | Either side, or floating | Layers, Bookmarks, Tags, Styles, Adjust, Pattern |
+| **Panels** | Either side, or floating | Layers, Bookmarks, Tags, Styles, Adjust, Pattern, Speech balloon |
 | **Command palette** | `Ctrl/⌘+K` | Any command by name, and macros |
 | **Context menus** | Right click, menu key, long press | What fits where you are |
 | **Zen mode** | `Z` | Fades the bars until the pointer is over them |
@@ -980,7 +982,7 @@ A markdown note's YAML block is its tags, description and properties, and each p
 - **Actions bar:** what can be done with the selection, grouped in menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies.
   - It sits at the bottom or follows the selection (Settings).
   - When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways.
-- **Panels** (Layers, Bookmarks, Tags, Styles, Adjust, Pattern) float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back.
+- **Panels** (Layers, Bookmarks, Tags, Styles, Adjust, Pattern, Speech balloon) float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back.
 - **Command palette** (`Ctrl/⌘+K`) runs any command by name, takes a value where one is needed (`@kind` narrows the list), and records and replays **macros**.
 - **Context menus** open with a right click, the menu key, or a long press on a touch screen, at the pointer (to its left when there is no room), and list what fits where you are:
 
@@ -1097,7 +1099,7 @@ The first tab to open a workspace edits it. Other tabs are read-only, follow its
 
 ### Backups
 
-- **Advanced export** (Settings > Storage) puts only what you choose in a backup: search for items and folders and tick them, or tick *Everything*. Hidden items are asked about first, so their password is asked once. A folder brings what is inside it. With *Also the canvases*, every file a canvas shows goes too. *Saved styles* (on by default) brings the styles and the fonts and pictures they use. A partial backup can only be added, never used to update a workspace, and does not count as the last backup for *Export changes*. Links in notes to items left out stay as they are and find nothing until those items are there.
+- **Advanced export** (Settings > Storage) puts only what you choose in a backup: search for items and folders and tick them, or tick *Everything*. Hidden items are asked about first, so their password is asked once. A folder brings what is inside it, its folders too. The total size is shown as you choose. With *Also the canvases*, every file a canvas shows goes too. *Saved styles* (on by default) brings the styles and the fonts and pictures they use. A partial backup can only be added, never used to update a workspace, and does not count as the last backup for *Export changes*. Links in notes to items left out stay as they are and find nothing until those items are there.
 - **Export a backup** (Settings > Storage) downloads one `.canvast` file holding every board, canvas, object and view, plus every file once, and your settings (the workspace's and this device's: theme, shortcuts, panel layout). When you import it, only the settings this device has not set itself are restored; the ones you changed here are kept, and the import dialog says how many it will restore.
 - A board, a canvas or a single library item can be exported on its own, with only the files it uses.
 - **Import archive…** (or drop a `.canvast` file on the page) verifies every checksum first, asks how to import a workspace backup, shows what it contains and any problems, and only then writes, in a single transaction. Files you already have are not stored twice.
@@ -1489,6 +1491,11 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | PDF | Forms are shown but not filled; links to the web are not opened; a password is asked each time and a card shows no picture of such a PDF; a font a PDF does not carry comes from the system, and East Asian text that needs one may not show |
 | 3D | GLB, glTF, STL, OBJ and PLY only, one file each: what lies in another file (an OBJ's materials, a glTF's textures) and compressed glTF are not read; a model over 1 GB does not open, and over 512 MB has a plain card |
 | Text | No Indic shaping; other computers can wrap missing characters differently |
+| Partial backups | ⚠️ An Advanced export can only be added, never used to update a workspace. Links in notes to items left out find nothing until those items are there |
+| Text in a shape | While typing, the lines are straight, in a box in the shape; they take the shape's flow when you finish |
+| Text in a shape | A text moved on its own goes back into its shape; on a turned balloon the words stay upright |
+| Text on a path | A text set along a path by an older version does not follow it until it is set again |
+| Speech balloons | Connectors join balloons in the same frame; two far apart in zoom may not connect |
 | Vector networks | One fill for the whole network |
 | ⚠️ Notes | No autosave and no version history: a saved note replaces the file |
 | Notes | Markdown cannot hold fonts, sizes, alignment or layout; no math, embeds or PDF export |
@@ -1614,6 +1621,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | --- | --- |
 | Platform | Built for Linux: Windows, macOS and other systems are out of scope for now, with no packages for them or a Flatpak; watching the folder for outside changes is verified on Linux only. A `.cvst` copied in from another workspace is not taken in. A file changed in `library/` outside the app is looked at alone; a folder added or removed there makes canvast look through the whole of `library/` again. At start-up only the files that changed since the last look on this device are looked at (all of them the first time). A canvas file is written about 2 seconds after editing pauses: until then the edit is safe in the app's own storage on this device, but another device does not see it yet |
 | Hidden items in the desktop app | The files and index are encrypted, but: deleting the readable file does not overwrite the disk blocks it used; an item hidden while the key is locked stays a readable file until the password is given; the app's own cache on the device keeps hidden items' names and tags (their thumbnails only encrypted), unless *Keep hidden items' names off this device while locked* (Settings > Privacy) is on; a canvas file names the content hash of each picture placed on it (and a backup, the content hash of each hidden item); a backup made in the browser with no Hidden password set carries its hidden items readable. The names of `.hidden/`'s folders and files are encrypted, but how many there are, how deep they go and their sizes can be seen (as with other encrypting sync tools), and one name always gives the same encrypted name, so two hidden files or folders of the same name in one place can be told to share it. A name too long to encrypt into a file name (more than about 140 bytes) is kept, encrypted, in a small `.name` file beside it |
+| Hiding speed | ⚠️ Hiding a file checks it fully before the original goes, so it takes time: about 40 MB/s and showing about 50 MB/s on a GitHub test machine, up to 2 GB a file. A faster disk helps |
 | Sync tools | Tested with the copy names sync tools use (`name (1).ext`, `name.sync-conflict-….ext`), not live with each tool. The same canvas changed on two devices at once is kept as two canvases, not merged; the same library item changed on both keeps the kept file's version. A canvas copy saved by another device waits 10 minutes before this device takes it. A copy of the hidden items under another Hidden password is opened only with `hidden-items.mjs`, and a hidden file encrypted before 0.50.53 whose entry was lost comes back without its name (`recovered-…`) if it was not sealed again first. Losing both `.canvast/hidden.json` and its spare `.canvast/keys/hidden.json` loses every hidden item: keep backups |
 | Copy file | The paste has been tried in KDE's file manager on a desktop; the `File managers` workflow tries it on a virtual screen (X11) in five Linux file managers. |
 | Dragging out of the app | Hidden items cannot be dragged out: their files are encrypted, and a drag cannot stop to ask before a readable copy leaves the app, as **Copy file** does. At most 1,000 items at once. Which programs take the plain drag depends on the program. |
