@@ -96,8 +96,7 @@ export const inside = (pts: readonly P[], [x, y]: P): boolean => {
 };
 
 /** The point of the outline nearest the way to the tip from the middle, moved along the outline by `shift` (a share of the width). */
-function baseIndex(pts: readonly P[], c: P, tip: P, shift: number): number {
-  const want = Math.atan2(tip[1] - c[1], tip[0] - c[0]) + shift;
+function baseIndex(pts: readonly P[], c: P, want: number): number {
   let best = 0, gap = Infinity;
   pts.forEach((p, i) => {
     const g = Math.abs(Math.atan2(Math.sin(Math.atan2(p[1] - c[1], p[0] - c[0]) - want), Math.cos(Math.atan2(p[1] - c[1], p[0] - c[0]) - want)));
@@ -107,11 +106,11 @@ function baseIndex(pts: readonly P[], c: P, tip: P, shift: number): number {
 }
 
 /** The outline with a tail let into it: the part between its two feet taken out, the tail's two sides put in. */
-export function withTail(outline: P[], c: P, tip: P, kind: string, width: number, bend: number, shift: number, mark?: (m: TailMark) => void): P[] {
+export function withTail(outline: P[], c: P, tip: P, kind: string, width: number, bend: number, shift: number, opts: { mark?: (m: TailMark) => void; angle?: number; belly?: number } = {}): P[] {
   if (inside(outline, tip)) return outline; // (a tip inside the balloon: no tail to draw)
   const pts = evened(outline);
   const m = pts.length;
-  const k = baseIndex(pts, c, tip, shift);
+  const k = baseIndex(pts, c, opts.angle ?? Math.atan2(tip[1] - c[1], tip[0] - c[0]) + shift);
   const walk = (dir: number): number => {
     let i = k, left = width / 2, n = 0;
     while (left > 0 && n++ < m / 3) {
@@ -130,7 +129,13 @@ export function withTail(outline: P[], c: P, tip: P, kind: string, width: number
   const len = dist(mid, tip) || 1;
   const nx = -(tip[1] - mid[1]) / len, ny = (tip[0] - mid[0]) / len;
   const bow = (bend / 100) * len;
-  mark?.({ a: A, b: B, base: mid, bendAt: [(mid[0] + tip[0]) / 2 + (nx * bow) / 2, (mid[1] + tip[1]) / 2 + (ny * bow) / 2], nx, ny, len });
+  // How wide it is half way: the two sides move apart or together from a straight taper; the bend moves them both the same way, so it never changes this.
+  const curve = kind === "curved" ? bow : 0;
+  const midW = width * ((opts.belly ?? 50) / 100);
+  const toA = (A[0] - mid[0]) * nx + (A[1] - mid[1]) * ny >= 0 ? 1 : -1;
+  const apart = toA * (midW - dist(A, B) / 2);
+  const bendAt: P = [(mid[0] + tip[0]) / 2 + (nx * curve) / 2, (mid[1] + tip[1]) / 2 + (ny * curve) / 2];
+  opts.mark?.({ a: A, b: B, base: mid, bendAt, bellyAt: [bendAt[0] - (toA * nx * midW) / 2, bendAt[1] - (toA * ny * midW) / 2], nx, ny, len });
   const side = (from: P, to: P, sag: number): P[] => Array.from({ length: 14 }, (_, i) => {
     const t = (i + 1) / 14, u = 1 - t;
     const cx = (from[0] + to[0]) / 2 + nx * sag, cy = (from[1] + to[1]) / 2 + ny * sag;
@@ -148,8 +153,8 @@ export function withTail(outline: P[], c: P, tip: P, kind: string, width: number
     ring.pop();
     return ring;
   }
-  ring.push(...side(A, tip, kind === "curved" ? bow : 0));
-  ring.push(...side(tip, B, kind === "curved" ? bow * 0.55 : 0).slice(0, -1));
+  ring.push(...side(A, tip, curve + apart));
+  ring.push(...side(tip, B, curve - apart).slice(0, -1));
   return ring;
 }
 
@@ -165,8 +170,14 @@ export interface BalloonTail {
   readonly width: number;
   /** How far it bows, a share of its length in percent (a curved tail). */
   readonly bend: number;
-  /** How far its base is moved round the body from the way to the tip, in radians. */
+  /** With `follow`: how far its base is moved round the body from the way to the tip, in radians. */
   readonly shift: number;
+  /** Where its base is round the body, in radians from the middle: it stays there when the tip moves. */
+  readonly angle?: number;
+  /** The base goes round the body with the tip. */
+  readonly follow?: true;
+  /** Its width half way along, a share of its base in percent (50: a straight taper). */
+  readonly belly?: number;
 }
 
 export interface BalloonSpec {
@@ -183,16 +194,25 @@ export interface BalloonSpec {
 export type Box = readonly [number, number, number, number];
 
 /** What a tail stands on, to put its handles there. */
-export interface TailMark { a: P; b: P; base: P; bendAt: P; nx: number; ny: number; len: number }
+export interface TailMark { a: P; b: P; base: P; bendAt: P; bellyAt: P; nx: number; ny: number; len: number }
 
 /** The middle and half-sizes of a box, whichever way it was drawn or flipped. */
 export const boxShape = ([x, y, w, h]: Box): { c: P; rx: number; ry: number } => ({ c: [x + w / 2, y + h / 2], rx: Math.max(Math.abs(w) / 2, 1e-9), ry: Math.max(Math.abs(h) / 2, 1e-9) });
 
 /** A new balloon in a box: an oval with one tail going down to the left. */
-export const newBalloon = ([x, y, w, h]: Box): BalloonSpec => ({
-  body: "oval", round: 35, bumps: 12, depth: 18, sides: 6, wobble: 0, seed: 1,
-  tails: [{ tip: [x + w * 0.28, y + h * 1.4], kind: "point", width: Math.min(Math.abs(w), Math.abs(h)) * 0.22, bend: 28, shift: 0 }],
-});
+export const newBalloon = ([x, y, w, h]: Box): BalloonSpec => {
+  const tip: P = [x + w * 0.28, y + h * 1.4];
+  return {
+    body: "oval", round: 35, bumps: 12, depth: 18, sides: 6, wobble: 0, seed: 1,
+    tails: [{ tip, kind: "point", width: Math.min(Math.abs(w), Math.abs(h)) * 0.22, bend: 28, shift: 0, angle: Math.atan2(tip[1] - (y + h / 2), tip[0] - (x + w / 2)) }],
+  };
+};
+
+/** Where a tail's base is round the body now, in radians. */
+export function tailAngle(box: Box, t: BalloonTail): number {
+  const { c } = boxShape(box);
+  return !t.follow && t.angle !== undefined ? t.angle : Math.atan2(t.tip[1] - c[1], t.tip[0] - c[0]) + t.shift;
+}
 
 /** The outline, and what each tail stands on (null: its tip is inside the body, so it has no tail to draw). */
 export function balloonOutline(box: Box, s: BalloonSpec): { pts: P[]; marks: Array<TailMark | null> } {
@@ -203,7 +223,7 @@ export function balloonOutline(box: Box, s: BalloonSpec): { pts: P[]; marks: Arr
   const marks: Array<TailMark | null> = [];
   for (const t of s.tails) {
     let m: TailMark | null = null;
-    pts = withTail(pts, c, t.tip, t.kind, t.width, t.bend, t.shift, (x) => { m = x; });
+    pts = withTail(pts, c, t.tip, t.kind, t.width, t.bend, t.shift, { mark: (x) => { m = x; }, angle: tailAngle(box, t), ...(t.belly !== undefined ? { belly: t.belly } : {}) });
     marks.push(m);
   }
   return { pts, marks };
@@ -212,8 +232,8 @@ export function balloonOutline(box: Box, s: BalloonSpec): { pts: P[]; marks: Arr
 export const balloonSubs = (box: Box, s: BalloonSpec): SubPath[] => [poly(balloonOutline(box, s).pts)];
 
 /** The parts of a balloon that have a handle. */
-export type BalloonPart = "tip" | "base" | "foot" | "bend" | "body";
-export const BALLOON_LABELS: Record<BalloonPart, string> = { tip: "Tail tip", base: "Tail base", foot: "Tail width", bend: "Tail bend", body: "Body shape" };
+export type BalloonPart = "tip" | "base" | "foot" | "bend" | "belly" | "body";
+export const BALLOON_LABELS: Record<BalloonPart, string> = { tip: "Tail tip", base: "Tail base", foot: "Tail width", bend: "Tail bend", belly: "Tail middle width", body: "Body shape" };
 
 /** How far the body handle sits in from the top of the box, for a body that has something to set (null: it has nothing). */
 function bodyAmount(s: BalloonSpec, ry: number, rx: number): number | null {
@@ -222,20 +242,24 @@ function bodyAmount(s: BalloonSpec, ry: number, rx: number): number | null {
   return null;
 }
 
-/** Where each handle is, in local units. */
-export function balloonHandlePoints(box: Box, s: BalloonSpec): Array<{ part: BalloonPart; tail: number; at: P }> {
+/** Where each handle is, in local units, and the way it points or slides (a unit vector; none for one that has no direction). */
+export function balloonHandlePoints(box: Box, s: BalloonSpec): Array<{ part: BalloonPart; tail: number; at: P; dir?: P }> {
   const { c, rx, ry } = boxShape(box);
   const { marks } = balloonOutline(box, s);
-  const out: Array<{ part: BalloonPart; tail: number; at: P }> = [];
+  const out: Array<{ part: BalloonPart; tail: number; at: P; dir?: P }> = [];
   const amount = bodyAmount(s, ry, rx);
   if (amount !== null) out.push({ part: "body", tail: -1, at: [c[0], c[1] - ry + amount] });
   s.tails.forEach((t, i) => {
     const m = marks[i];
+    let dir: P = [0, 1];
     if (m) {
-      out.push({ part: "base", tail: i, at: m.base }, { part: "foot", tail: i, at: m.b });
+      const across: P = [m.nx, m.ny];
+      dir = [(t.tip[0] - m.base[0]) / (m.len || 1), (t.tip[1] - m.base[1]) / (m.len || 1)];
+      out.push({ part: "base", tail: i, at: m.base }, { part: "foot", tail: i, at: m.b, dir: across });
       if (t.kind === "curved") out.push({ part: "bend", tail: i, at: m.bendAt });
+      if (t.kind !== "zigzag") out.push({ part: "belly", tail: i, at: m.bellyAt, dir: across });
     }
-    out.push({ part: "tip", tail: i, at: t.tip });
+    out.push({ part: "tip", tail: i, at: t.tip, dir });
   });
   return out;
 }
@@ -252,13 +276,15 @@ export function balloonDragged(box: Box, s: BalloonSpec, part: BalloonPart, tail
   if (!t) return s;
   const m = balloonOutline(box, s).marks[tail];
   const put = (next: Partial<BalloonTail>): BalloonSpec => ({ ...s, tails: s.tails.map((q, i) => (i === tail ? { ...q, ...next } : q)) });
-  if (part === "tip") return put({ tip: [x, y] });
+  if (part === "tip") return put({ tip: [x, y], ...(t.follow ? {} : { angle: tailAngle(box, t) }) });
   if (!m) return s;
   if (part === "foot") return put({ width: Math.max(Math.min(rx, ry) * 0.02, 2 * Math.hypot(x - m.base[0], y - m.base[1])) });
+  if (part === "belly") return put({ belly: Math.max(0, Math.min(150, (Math.abs((x - m.bendAt[0]) * m.nx + (y - m.bendAt[1]) * m.ny) * 200) / (t.width || 1))) });
   if (part === "bend") {
     const half: P = [(m.base[0] + t.tip[0]) / 2, (m.base[1] + t.tip[1]) / 2];
     return put({ bend: Math.max(-100, Math.min(100, (((x - half[0]) * m.nx + (y - half[1]) * m.ny) * 2 * 100) / m.len)) });
   }
+  if (!t.follow) return put({ angle: Math.atan2(y - c[1], x - c[0]) });
   const from = Math.atan2(t.tip[1] - c[1], t.tip[0] - c[0]);
   const a = Math.atan2(y - c[1], x - c[0]) - from;
   return put({ shift: Math.max(-1.2, Math.min(1.2, Math.atan2(Math.sin(a), Math.cos(a)))) });
@@ -268,7 +294,7 @@ export function balloonDragged(box: Box, s: BalloonSpec, part: BalloonPart, tail
 export function scaledBalloon(s: BalloonSpec, kx: number, ky: number): BalloonSpec {
   const flip = kx * ky < 0 ? -1 : 1;
   const k = Math.sqrt(Math.abs(kx * ky));
-  return { ...s, tails: s.tails.map((t) => ({ ...t, tip: [t.tip[0] * kx, t.tip[1] * ky] as const, width: t.width * k, bend: t.bend * flip, shift: t.shift * flip })) };
+  return { ...s, tails: s.tails.map((t) => ({ ...t, tip: [t.tip[0] * kx, t.tip[1] * ky] as const, width: t.width * k, bend: t.bend * flip, shift: t.shift * flip, ...(t.angle !== undefined ? { angle: Math.atan2(Math.sin(t.angle) * ky, Math.cos(t.angle) * kx) } : {}) })) };
 }
 
 const num = (v: unknown, lo: number, hi: number): boolean => typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi;
@@ -276,5 +302,5 @@ const num = (v: unknown, lo: number, hi: number): boolean => typeof v === "numbe
 /** Whether a stored balloon can be drawn. */
 export function validBalloon(s: BalloonSpec): boolean {
   return BODIES.some(([b]) => b === s.body) && num(s.round, 0, 100) && Number.isInteger(s.bumps) && num(s.bumps, 3, 480) && num(s.depth, 0, 60) && Number.isInteger(s.sides) && num(s.sides, 3, 240) && num(s.wobble, 0, 100) && Number.isFinite(s.seed)
-    && Array.isArray(s.tails) && s.tails.length <= 32 && s.tails.every((t) => Array.isArray(t.tip) && t.tip.length === 2 && t.tip.every(Number.isFinite) && TAIL_KINDS.some(([k]) => k === t.kind) && num(t.width, 0, Infinity) && num(t.bend, -100, 100) && num(t.shift, -7, 7));
+    && Array.isArray(s.tails) && s.tails.length <= 32 && s.tails.every((t) => Array.isArray(t.tip) && t.tip.length === 2 && t.tip.every(Number.isFinite) && TAIL_KINDS.some(([k]) => k === t.kind) && num(t.width, 0, Infinity) && num(t.bend, -100, 100) && num(t.shift, -7, 7) && (t.angle === undefined || Number.isFinite(t.angle)) && (t.follow === undefined || t.follow === true) && (t.belly === undefined || num(t.belly, 0, 300)));
 }

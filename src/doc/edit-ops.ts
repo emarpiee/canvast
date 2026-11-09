@@ -106,6 +106,7 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
   if (!(kx > 0 && ky > 0 && Number.isFinite(kx) && Number.isFinite(ky))) throw new RangeError(`bad scale ${kx},${ky}`);
   if (o.kind === "path" && o.rot && kx !== ky) return stretchTurned(o, fixed, kx, ky, keepWidth, keepRadius);
   if (o.kind === "image" && o.page) [kx, ky] = pageLimited(o, kx, ky);
+  if (o.kind === "text" && kx !== ky) [kx, ky] = [Math.max(kx, o.size / o.w), 1]; // (a side handle: at least a letter wide)
   const anchor = {
     x: scaleCoord(o.anchor.x, fixed.x, D.fromNumber(kx), o.unit),
     y: scaleCoord(o.anchor.y, fixed.y, D.fromNumber(ky), o.unit),
@@ -115,7 +116,11 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
     return normalizeUnit({ ...o, anchor, points: o.points.map((v) => v * kx), width: keepWidth ? o.width : o.width * kx });
   }
   if (o.kind === "text") {
-    if (kx !== ky) throw new RangeError("text scales uniformly");
+    if (kx !== ky) {
+      // Only its box is made wider or narrower: the words wrap again at the same size.
+      const { autoWidth: _a, ...fixedWidth } = o;
+      return { ...fixedWidth, anchor, w: o.w * kx };
+    }
     return normalizeUnit({ ...o, anchor, w: o.w * kx, size: o.size * kx, ...(o.h !== undefined ? { h: o.h * kx } : {}) });
   }
   if (o.kind === "path") {

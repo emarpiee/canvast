@@ -1420,6 +1420,8 @@ export function attachTools(
         const decide = sheets ? ids.filter((id) => !ids.includes(doc.get(id)!.parent ?? "")) : ids;
         const free = decide.length > 0 && decide.every((id) => {
           const o = doc.get(id)!;
+          // (a text: its left and right handles change the width of its box, the words wrap again; a text on a path or in a shape takes its width from that)
+          if (o.kind === "text") return (h.edge === "e" || h.edge === "w") && !o.rot && sel.frame.angle === 0 && !o.onPath && !o.inShape;
           return o.kind === "path" ? same(o.rot) : o.kind === "image" && !o.rot && sel.frame.angle === 0;
         });
         g = {

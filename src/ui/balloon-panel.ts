@@ -1,5 +1,5 @@
 import type { EditorState } from "../app/editor-state";
-import { BODIES, BUMPY, TAIL_KINDS, type BalloonSpec, type BalloonTail, type Box, type TailKind } from "../doc/balloon-geometry";
+import { BODIES, BUMPY, TAIL_KINDS, boxShape, tailAngle, type BalloonSpec, type BalloonTail, type Box, type TailKind } from "../doc/balloon-geometry";
 import { Ch, R, when } from "../gen/kit";
 import type { Section } from "../gen/types";
 import { panelHtml } from "./panel";
@@ -24,7 +24,10 @@ const SECTIONS: readonly Section[] = [
     Ch("tail", "Kind", TAIL_KINDS, "point", true),
     R("tailW", "Base width", 1, 100, 22),
     when("tail", ["curved"], R("bend", "Bend", -100, 100, 28)),
-    R("shift", "Base shift", -68, 68, 0),
+    R("belly", "Middle width", 0, 150, 50),
+    Ch("base", "Base", [["locked", "Locked"], ["follows", "Follows tip"]], "locked"),
+    when("base", ["locked"], R("baseAt", "Base at", -180, 180, 0)),
+    when("base", ["follows"], R("shift", "Base shift", -68, 68, 0)),
   ] },
 ];
 
@@ -34,19 +37,28 @@ const minSide = (b: Box): number => Math.min(Math.abs(b[2]), Math.abs(b[3])) || 
 /** The numbers as the panel shows them. */
 function shown(box: Box, s: BalloonSpec): Record<string, SettingValue> {
   const t = s.tails[0];
-  return { body: s.body, round: s.round, sides: s.sides, bumps: s.bumps, depth: s.depth, wobble: s.wobble, seed: s.seed, tail: t?.kind ?? "point", tailW: t ? Math.round((t.width / minSide(box)) * 100) : 22, bend: Math.round(t?.bend ?? 28), shift: Math.round((t?.shift ?? 0) * DEG) };
+  return { body: s.body, round: s.round, sides: s.sides, bumps: s.bumps, depth: s.depth, wobble: s.wobble, seed: s.seed, tail: t?.kind ?? "point", tailW: t ? Math.round((t.width / minSide(box)) * 100) : 22, bend: Math.round(t?.bend ?? 28), shift: Math.round((t?.shift ?? 0) * DEG), belly: Math.round(t?.belly ?? 50), base: t?.follow ? "follows" : "locked", baseAt: t ? Math.round(tailAngle(box, t) * DEG) : 0 };
 }
 
 /** Only what was changed goes onto each selected balloon. */
 function applied(p: Readonly<Record<string, SettingValue>>, s: BalloonSpec, box: Box): BalloonSpec {
   const whole = (k: string): number | undefined => (p[k] === undefined ? undefined : Math.round(p[k] as number));
-  const tail = (t: BalloonTail): BalloonTail => ({
+  const tail = (t0: BalloonTail): BalloonTail => {
+    // (the base stays where it is when it is locked or let go)
+    const { follow: _f, ...fixed } = t0;
+    const { c } = boxShape(box);
+    const at = tailAngle(box, t0);
+    const t: BalloonTail = p["base"] === "locked" ? { ...fixed, angle: at, shift: 0 } : p["base"] === "follows" ? { ...t0, follow: true, shift: at - Math.atan2(t0.tip[1] - c[1], t0.tip[0] - c[0]) } : t0;
+    return {
     ...t,
+    ...(p["belly"] !== undefined ? { belly: p["belly"] as number } : {}),
+    ...(p["baseAt"] !== undefined && !t.follow ? { angle: (p["baseAt"] as number) / DEG } : {}),
     ...(p["tail"] !== undefined ? { kind: p["tail"] as TailKind } : {}),
     ...(p["tailW"] !== undefined ? { width: ((p["tailW"] as number) / 100) * minSide(box) } : {}),
     ...(p["bend"] !== undefined ? { bend: p["bend"] as number } : {}),
     ...(p["shift"] !== undefined ? { shift: (p["shift"] as number) / DEG } : {}),
-  });
+    };
+  };
   return {
     ...s,
     ...(p["body"] !== undefined ? { body: p["body"] as string } : {}),
@@ -94,7 +106,7 @@ export function mountBalloonPanel(host: HTMLElement, editor: EditorState, action
     get: (k) => values[k]!,
     set: (k, v) => {
       put({ [k]: v });
-      if (k === "body" || k === "tail") rows.build();
+      if (k === "body" || k === "tail" || k === "base") rows.build();
     },
     reset: (keys) => put(Object.fromEntries(keys.map((s) => [s.k, s.def]))),
     idPrefix: "bl-n-",

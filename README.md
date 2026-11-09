@@ -338,7 +338,7 @@ Everything you draw is vector, so it stays sharp at every magnification.
 
 - **Pen** (`P`): four pens (fine, pencil, ink, marker) with pressure, tilt and a stabilizer. Size is 0.5–128 px. A stroke is made at the current scale, so a 3 px line drawn deep in a zoom is a 3 px line there, and it stays vector-sharp at every magnification. *Thickness lock* keeps strokes the same width on screen at any zoom.
 - **Shapes** (`U`): rectangle, ellipse, line, polygon and star. Sides, points, ratio and per-corner radii stay editable after drawing.
-- **Speech balloons** (`K`): drag to draw one. Its handles set the tail tip, base, width and bend, and the rounding or bump depth; the Actions bar opens its panel for the twelve body shapes and the tail. Editing its nodes makes it an ordinary path.
+- **Speech balloons** (`K`): drag to draw one. Its handles set the tail tip, base, width, middle width and bend, and the rounding or bump depth; the tail base stays put when the tip moves unless *Base* is set to *Follows tip*. The Actions bar opens its panel for the twelve body shapes and the tail. Editing its nodes makes it an ordinary path.
 - **Paths** (`B`) and **Edit nodes** (`N`): Bézier curves with handles, snapping, a lasso for several nodes, and node editing across several paths at once. A double-click in Edit nodes selects a whole closed path with its holes, to move it as one, and *Split into pieces* makes each outline of a path its own object. *Simplify* fits a curve to a rough path; *Pen stroke to path* converts a stroke.
 - **Fill and outline**
   - Fills: solid colour; linear, radial or angular gradient; a picture; or other objects of the canvas repeated over the shape (*Objects*, which follows those objects live as you change them).
@@ -418,7 +418,7 @@ Press `T`, click and type. Text is stored as Markdown, and you can zoom into a l
 
 #### More about text
 
-- **Text** (`T`): click and type. A click makes a text as wide as its words; a drag makes a box of that width. Double-click to edit.
+- **Text** (`T`): click and type. A click makes a text as wide as its words; a drag makes a box of that width. Double-click to edit. The left and right handles change only the width of the box, and the words wrap again at the same size; the other handles scale the text.
 - **Formatting:** bold, italic, underline, strikethrough, links, colour and size of any range, headings, bulleted, numbered and nested lists. Text is stored as Markdown; **Copy Markdown** is one click away.
 - **Look:** colour or gradient, outline, size, line height, letter spacing, alignment, auto or fixed width, paragraph spacing, indent, case, line limit, a set height, kerning, OpenType features and the axes of variable fonts.
 - **Fonts:** import `.ttf`, `.otf`, `.woff` or `.woff2` into the library, including variable fonts. One text may use several fonts. Right-to-left and mixed-direction text are supported.

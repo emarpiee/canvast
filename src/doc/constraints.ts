@@ -63,7 +63,7 @@ export function planSheetScale(objs: readonly CanvasObject[], fixed: WorldPoint,
   const kids = new Map<ObjectId, CanvasObject[]>();
   for (const o of objs) {
     if (o.parent !== undefined && byId.has(o.parent)) (kids.get(o.parent) ?? kids.set(o.parent, []).get(o.parent)!).push(o);
-    else out.set(o.id, scaleAbout(o, fixed, kx, o.kind === "image" || o.kind === "path" ? ky : kx, keepWidth, keepRadius));
+    else out.set(o.id, scaleAbout(o, fixed, kx, o.kind === "stroke" ? kx : ky, keepWidth, keepRadius));
   }
   // the groups made by a pattern generator (ADR 0162): their pieces grow with the sheet while it is resized; on release the pattern is made
   // again at the new size (app/pattern.ts remadePatterns)

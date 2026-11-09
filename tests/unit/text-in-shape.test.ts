@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { scaleAbout } from "../../src/doc/edit-ops";
 import { withShapeTexts } from "../../src/doc/text-in-shape";
 import type { DerivationSource } from "../../src/doc/boolean-group";
 import type { CanvasObject } from "../../src/doc/model";
@@ -22,5 +23,15 @@ describe("a text inside a shape", () => {
   it("adds nothing when the shape is as it was, or the change has no path", () => {
     expect(withShapeTexts(src(path(0, 10), text), [path(0, 10)], []).map((o) => o.id)).toEqual(["s"]);
     expect(withShapeTexts(src(path(0, 10), text), [text], []).map((o) => o.id)).toEqual(["t"]);
+  });
+});
+
+describe("a text's box made wider or narrower", () => {
+  const t = { id: "t", kind: "text", anchor: at(10), unit: 0, w: 100, size: 20, autoWidth: true } as unknown as CanvasObject;
+  const fixed = { x: D.fromNumber(10), y: D.fromNumber(0) };
+  it("keeps its size, leaves auto width, and stays at least a letter wide", () => {
+    const wide = scaleAbout(t, fixed, 2, 1) as Extract<CanvasObject, { kind: "text" }>;
+    expect([wide.w, wide.size, wide.autoWidth]).toEqual([200, 20, undefined]);
+    expect((scaleAbout(t, fixed, 0.001, 1) as Extract<CanvasObject, { kind: "text" }>).w).toBe(20);
   });
 });

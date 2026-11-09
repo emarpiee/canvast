@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.55.25 — Speech balloon tail controls, text box width (2026-11-09)
+
+- **Changed:** a speech balloon's tail base stays where it is when the tip moves; *Base: Follows tip* in its panel brings the old way back.
+- **Added:** a *Middle width* for the tail, with its own handle.
+- **Changed:** each balloon handle has a mark of its own (tip, base, width, bend, rounding) instead of a plain dot.
+- **Fixed:** a curved tail's bend changed its width half way along.
+- **Changed:** the left and right handles of a text change only the width of its box, and the words wrap again at the same size; the other handles still scale it.
+
 ## 0.55.24 — Text in a shape updates at once; its own alignment (2026-11-09)
 
 - **Fixed:** a text in a shape showed its new place only at the next interaction; it now changes with the shape, in the same undo step.

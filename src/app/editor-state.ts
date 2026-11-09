@@ -339,7 +339,7 @@ export class EditorState {
     if (p.kind === "scale" && p.ids.includes(o.id)) {
       const f = o.frame ?? p.frame.space.world;
       const fixed = f === p.frame ? p.fixed : expressExactIn(f.space, p.frame, p.fixed, f);
-      return scaleAbout(o, fixed, p.kx, o.kind === "image" || o.kind === "path" ? p.ky : p.kx, p.keepWidth, p.keepRadius);
+      return scaleAbout(o, fixed, p.kx, o.kind === "stroke" ? p.kx : p.ky, p.keepWidth, p.keepRadius);
     }
     return o;
   }

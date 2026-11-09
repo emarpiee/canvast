@@ -296,7 +296,7 @@ export interface CornerHandles {
   balloon?: BalloonHandle[];
 }
 
-export interface BalloonHandle { part: BalloonPart; tail: number; x: number; y: number }
+export interface BalloonHandle { part: BalloonPart; tail: number; x: number; y: number; /** The way it points on screen, in radians. */ a: number }
 
 const MIN_DOT_PX = 18;
 const MAX_CORNER_DOTS = 64;
@@ -431,9 +431,11 @@ export function shapeHandles(po: ProjectedObject, expanded: boolean, editor: { g
   const q = po.obj.kind === "path" ? (po.obj as PathObject).params : undefined;
   if (q?.balloon && !po.cover) {
     const p = po.proj;
-    const balloon = balloonHandlePoints(q.box, q.balloon).map(({ part, tail, at }) => {
+    const balloon = balloonHandlePoints(q.box, q.balloon).map(({ part, tail, at, dir }) => {
       const [x, y] = outerAt(po, exactX(p, at[0]), exactY(p, at[1]));
-      return { part, tail, x, y };
+      const step = 16 / p.ppu;
+      const [ex, ey] = dir ? outerAt(po, exactX(p, at[0] + dir[0] * step), exactY(p, at[1] + dir[1] * step)) : [x + 1, y];
+      return { part, tail, x, y, a: Math.atan2(ey - y, ex - x) };
     });
     return { main: null, corners: [], centre: null, ratio: null, count: null, balloon };
   }

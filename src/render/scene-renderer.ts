@@ -49,6 +49,31 @@ export interface SceneTheme {
 export const HANDLE_SIZE_PX = 9;
 
 /** The outline of a round handle (a square one in sharp corners) of radius `r` about (x, y), to fill or stroke. */
+/** A handle that says what it does: `n` points round (x, y), the first at angle `a` from straight up; with `waist` (a share of `r`) a star. Filled and outlined as the context is set. */
+function handleGlyph(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, n: number, a: number, waist?: number): void {
+  const count = waist === undefined ? n : n * 2;
+  ctx.beginPath();
+  for (let i = 0; i < count; i++) {
+    const t = a + (i * 2 * Math.PI) / count;
+    const rr = waist !== undefined && i % 2 ? r * waist : r;
+    const px = x + Math.sin(t) * rr, py = y - Math.cos(t) * rr;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
+/** The small rounded corner drawn on a handle that sets a rounding. */
+function cornerMark(ctx: CanvasRenderingContext2D, x: number, y: number, c: number): void {
+  ctx.beginPath();
+  ctx.moveTo(x - c, y + c);
+  ctx.lineTo(x - c, y);
+  ctx.arc(x, y, c, Math.PI, 1.5 * Math.PI);
+  ctx.lineTo(x + c, y - c);
+}
+
 const dot = (ctx: CanvasRenderingContext2D, theme: SceneTheme, x: number, y: number, r: number): void => {
   if (theme.sharp) ctx.rect(x - r, y - r, 2 * r, 2 * r);
   else ctx.arc(x, y, r, 0, Math.PI * 2);
@@ -473,11 +498,7 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
       // (a small rounded corner in it, as on the main dot: this one sets this corner's radius alone)
       const c = 2.2;
       ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(d.x - c, d.y + c);
-      ctx.lineTo(d.x - c, d.y);
-      ctx.arc(d.x, d.y, c, Math.PI, 1.5 * Math.PI);
-      ctx.lineTo(d.x + c, d.y - c);
+      cornerMark(ctx, d.x, d.y, c);
       ctx.stroke();
       ctx.lineWidth = 1.25;
       ctx.strokeStyle = theme.selection;
@@ -502,59 +523,50 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
     ctx.strokeStyle = theme.handleFill;
     ctx.lineWidth = 1.5;
     ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(mx - c, my + c);
-    ctx.lineTo(mx - c, my);
-    ctx.arc(mx, my, c, Math.PI, 1.5 * Math.PI);
-    ctx.lineTo(mx + c, my - c);
+    cornerMark(ctx, mx, my, c);
     ctx.stroke();
     ctx.lineCap = "butt";
     ctx.strokeStyle = theme.selection;
   }
   const r = HANDLE_SIZE_PX / 2 + 1;
   for (const b of h.balloon ?? []) {
-    ctx.fillStyle = b.part === "tip" ? theme.selection : theme.handleFill;
-    ctx.beginPath();
-    dot(ctx, theme, b.x, b.y, b.part === "tip" ? r : r - 1);
-    ctx.fill();
-    ctx.stroke();
-  }
-  if (h.ratio) {
-    // The ratio of a star: a small four-pointed star, its points against its waist (the inner radius against the outer).
-    const [qx, qy, ro] = [h.ratio.x, h.ratio.y, r + 3];
     ctx.fillStyle = theme.handleFill;
     ctx.strokeStyle = theme.selection;
     ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    for (let i = 0; i < 8; i++) {
-      const t = (i * Math.PI) / 4;
-      const rr = i % 2 === 0 ? ro : ro * 0.42;
-      const px = qx + Math.sin(t) * rr, py = qy - Math.cos(t) * rr;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
+    if (b.part === "tip") {
+      // Where the tail points: the triangle of the handles that go somewhere, filled, as it is the one that matters most.
+      ctx.fillStyle = theme.selection;
+      handleGlyph(ctx, b.x, b.y, r + 3, 3, b.a + Math.PI / 2);
+    } else if (b.part === "base") handleGlyph(ctx, b.x, b.y, r + 1, 4, 0); // (a diamond: it slides round the body)
+    else if (b.part === "bend") handleGlyph(ctx, b.x, b.y, r + 3, 4, 0, 0.42); // (the star of a ratio)
+    else if (b.part === "body") {
+      ctx.beginPath();
+      dot(ctx, theme, b.x, b.y, HANDLE_SIZE_PX / 2 - 1);
+      ctx.fill();
+      ctx.stroke();
+      cornerMark(ctx, b.x, b.y, 2.2);
+      ctx.stroke();
+    } else {
+      // A width: two small triangles pointing apart, along the way it is dragged.
+      const dx = Math.cos(b.a) * 4.5, dy = Math.sin(b.a) * 4.5;
+      handleGlyph(ctx, b.x + dx, b.y + dy, r - 1, 3, b.a + Math.PI / 2);
+      handleGlyph(ctx, b.x - dx, b.y - dy, r - 1, 3, b.a - Math.PI / 2);
     }
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+  }
+  if (h.ratio) {
+    // The ratio of a star: a small four-pointed star, its points against its waist (the inner radius against the outer).
+    ctx.fillStyle = theme.handleFill;
+    ctx.strokeStyle = theme.selection;
+    ctx.lineWidth = 1.5;
+    handleGlyph(ctx, h.ratio.x, h.ratio.y, r + 3, 4, 0, 0.42);
   }
   if (h.count) {
     // How many corners: a triangle pointing the way round the middle that it is dragged.
     const k = h.count;
-    const a = Math.atan2(k.y - k.cy, k.x - k.cx) + Math.PI / 2;
     ctx.fillStyle = theme.handleFill;
     ctx.strokeStyle = theme.selection;
     ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    for (let i = 0; i < 3; i++) {
-      const t = a + (i * 2 * Math.PI) / 3;
-      const px = k.x + Math.sin(t) * (r + 2);
-      const py = k.y - Math.cos(t) * (r + 2);
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    handleGlyph(ctx, k.x, k.y, r + 2, 3, Math.atan2(k.y - k.cy, k.x - k.cx) + Math.PI / 2);
   }
   ctx.restore();
 }

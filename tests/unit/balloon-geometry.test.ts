@@ -20,9 +20,22 @@ describe("speech balloon geometry", () => {
     const s = newBalloon(box);
     const wide = balloonDragged(box, s, "foot", 0, [40, 200]);
     expect(wide.tails[0]!.width).toBeGreaterThan(s.tails[0]!.width);
-    expect(balloonDragged(box, s, "base", 0, [200, 100]).tails[0]!.shift).not.toBe(0);
+    expect(balloonDragged(box, s, "base", 0, [200, 100]).tails[0]!.angle).not.toBe(s.tails[0]!.angle);
     const c = { ...s, body: "cloud" };
     expect(balloonDragged(box, c, "body", -1, [100, 1e6]).depth).toBeLessThanOrEqual(60);
+  });
+  it("a locked base stays when the tip moves, a following one goes with it; the bend leaves the middle width as it is", () => {
+    const s = newBalloon(box);
+    const baseOf = (q: typeof s): readonly number[] => balloonOutline(box, q).marks[0]!.base;
+    const far: [number, number] = [320, 60];
+    expect(baseOf(balloonDragged(box, s, "tip", 0, far))).toEqual(baseOf(s));
+    const free = { ...s, tails: [{ ...s.tails[0]!, follow: true as const }] };
+    expect(baseOf(balloonDragged(box, free, "tip", 0, far))).not.toEqual(baseOf(free));
+    const gap = (bend: number): number => {
+      const m = balloonOutline(box, { ...s, tails: [{ ...s.tails[0]!, kind: "curved", bend }] }).marks[0]!;
+      return Math.hypot(m.bellyAt[0] - m.bendAt[0], m.bellyAt[1] - m.bendAt[1]);
+    };
+    expect(gap(60)).toBeCloseTo(gap(0), 9);
   });
   it("scaling moves the tip and a flip mirrors the bend; a bad balloon is refused", () => {
     const s = newBalloon(box);
