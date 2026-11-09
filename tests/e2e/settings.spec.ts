@@ -101,13 +101,13 @@ test("shortcuts: every key can be changed, to a key or a chord, with warnings; t
   await expect(panel.locator("#set-panel-shortcuts")).toBeVisible();
   await expect(panel.locator("#set-panel-shortcuts")).toContainText("Ctrl+Z");
   await expect(panel.locator('[data-key-row="view.focus"] kbd')).toHaveText("F"); // (the focus is F, not an Alt tap)
-  // Pen to K: K works on the canvas, P no longer does, the button says K.
+  // Pen to J: J works on the canvas, P no longer does, the button says J.
   await change("Pen").click();
-  await p.keyboard.press("k");
-  await expect(note).toContainText("Pen: K.");
+  await p.keyboard.press("j");
+  await expect(note).toContainText("Pen: J.");
   // A key another command has is asked about, not taken silently; Cancel leaves everything as it was.
   await change("Lasso").click();
-  await p.keyboard.press("k");
+  await p.keyboard.press("j");
   await expect(note).toContainText("already the key for Pen");
   await note.getByRole("button", { name: "Cancel" }).click();
   await expect(panel.locator('[data-key-row="tool.lasso"] kbd')).toHaveText("L");

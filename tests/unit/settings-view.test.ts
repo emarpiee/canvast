@@ -31,7 +31,7 @@ describe("tool keys (ADR 0049, 0158)", () => {
     const { TOOL_ORDER, TOOL_COMMAND } = await import("../../src/settings/shortcuts");
     const { commandById } = await import("../../src/settings/keymap");
     const keys = TOOL_ORDER.map((t) => commandById(TOOL_COMMAND[t])!.defaults[0]);
-    expect(keys).toEqual(["H", "V", "N", "P", "U", "B", "C", "L", "T", "M", "E"]);
+    expect(keys).toEqual(["H", "V", "N", "P", "U", "K", "B", "C", "L", "T", "M", "E"]);
     expect(new Set(keys).size).toBe(keys.length);
   });
 });

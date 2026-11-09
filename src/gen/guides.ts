@@ -63,7 +63,7 @@ export const goldenSpiral = guide("golden-spiral", "Golden Spiral", "Proportion"
 
 export const fibonacciGrid = guide("fibonacci-grid", "Fibonacci Grid", "Proportion", "Columns and rows sized 1, 1, 2, 3, 5, 8 and on", [AXIS, R("fib", "Steps", 2, 16, 7), T("mirror", "Mirrored", false), ...FLIPS], (p, { n, s, b }) => {
   const sizes = [1, 1];
-  while (sizes.length < n("fib")) sizes.push(sizes.at(-1)! + sizes.at(-2)!);
+  while (sizes.length < n("fib")) sizes.push(sizes[sizes.length - 1]! + sizes[sizes.length - 2]!);
   const all = sizes.slice(0, n("fib"));
   marks(p, s("axis"), shares(b("mirror") ? [...all, ...all.slice().reverse()] : all).map((f) => [f, false]));
 });

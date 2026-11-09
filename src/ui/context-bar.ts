@@ -117,8 +117,6 @@ export interface ContextActions {
   makeMask(mode: "alpha" | "luminance"): void;
   makeClippingMask(): void;
   canMakeMask(): boolean;
-  hasBalloon(): boolean;
-  toggleBalloonPanel(): void;
   /** Make the picked paths one vector network, or take a network back to a path (ADR 0146). */
   makeNetwork(): void;
   releaseNetwork(): void;
@@ -188,7 +186,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       btn("bake", ICONS.copyPlus, "Make a new picture of it as it looks now, beside it"),
       btn("vectorise", ICONS.vectorPolygon, "Turn this SVG picture into editable vector shapes, in its place (the file stays in the library)")) +
     group("Regions", btn("builderdone", ICONS.check, "Done: keep the regions as they are now (Enter)"), btn("buildercancel", ICONS.x, "Cancel the Shape builder (Esc)")) +
-    group("Edit shapes", btn("balloon", ICONS.speechBalloon, "Speech balloon and text in shape: body, tails, words, padding, alignment, connectors"), btn("pathmenu", ICONS.pathMenu, "Path tools: simplify, outline stroke, taper, vector network, divide, shape builder, text to path", 'aria-haspopup="menu" aria-expanded="false"'), btn("maskmenu", ICONS.maskMenu, "Masks: make one from the top shape, or change the one selected", 'aria-haspopup="menu" aria-expanded="false"'), btn("boolmenu", ICONS.boolMenu, "Shapes: join, intersect, subtract or exclude the selected shapes, and manage the group they make", 'aria-haspopup="menu" aria-expanded="false"'), btn("sheetmenu", ICONS.sheetMenu, "Sheets: put the selected things on a sheet, release the sheet, fit it to what is on it", 'aria-haspopup="menu" aria-expanded="false"')) +
+    group("Edit shapes", btn("pathmenu", ICONS.pathMenu, "Path tools: simplify, outline stroke, taper, vector network, divide, shape builder, text to path", 'aria-haspopup="menu" aria-expanded="false"'), btn("maskmenu", ICONS.maskMenu, "Masks: make one from the top shape, or change the one selected", 'aria-haspopup="menu" aria-expanded="false"'), btn("boolmenu", ICONS.boolMenu, "Shapes: join, intersect, subtract or exclude the selected shapes, and manage the group they make", 'aria-haspopup="menu" aria-expanded="false"'), btn("sheetmenu", ICONS.sheetMenu, "Sheets: put the selected things on a sheet, release the sheet, fit it to what is on it", 'aria-haspopup="menu" aria-expanded="false"')) +
     group("Arrange", btn("alignmenu", ICONS.alignMenu, "Align and distribute: a list of the ways to line the selected things up", 'aria-haspopup="menu" aria-expanded="false"'), btn("arrangemenu", ICONS.arrangeMenu, "Arrange in a grid: the ways to order the items, and the space between them", 'aria-haspopup="menu" aria-expanded="false"'), btn("sizemenu", ICONS.sizeMenu, "Size: reset it, or give the selected the same width or height", 'aria-haspopup="menu" aria-expanded="false"'), btn("statemenu", ICONS.stateMenu, "Initial state: save the shape as it is now, replace the saved one, or go back to it", 'aria-haspopup="menu" aria-expanded="false"'), btn("front", ICONS.bringToFront, "Bring to front"), btn("back", ICONS.sendToBack, "Send to back"), btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("baserot", ICONS.rotateCwSquare, "Apply rotation: make the current turn the shape's own, the new zero (it looks the same; its box fits it)"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
     group("Attach",
       btn("attach", ICONS.link, "Attach the selected objects to another object: they follow the object you click next when it moves", 'aria-pressed="false"'),
@@ -317,9 +315,6 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
         openMoreMenu(b, items(), "Masks", { keepOpen: true, refresh: items });
         break;
       }
-      case "balloon":
-        actions.toggleBalloonPanel();
-        break;
       case "pathmenu": {
         // The tools that make, change or take apart paths and vector shapes, in one menu that stays open; only the ones that apply to the pick are listed
         const items = (): MenuItem[] => {
@@ -444,7 +439,6 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("boolmenu").hidden = !(actions.canCombine() || cur !== null || join !== null);
     q("pathmenu").hidden = !(actions.canSimplify() || actions.canStrokeToPath() || actions.canOutlineStroke() || actions.canMakeNetwork() || actions.canReleaseNetwork() || ((actions.canDivide() || actions.canFillGaps()) && editor.builder === null && editor.gapFill === null) || actions.canOutline() || actions.canSetOnPath() || actions.canTakeOffPath());
     for (const k of ["builderdone", "buildercancel"]) q(k).hidden = editor.builder === null && editor.gapFill === null;
-    q("balloon").hidden = !actions.hasBalloon();
     q("maskmenu").hidden = !(actions.canMakeMask() || actions.canReleaseMask());
 
     const reset = actions.resettable();

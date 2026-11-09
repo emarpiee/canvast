@@ -91,6 +91,8 @@ export interface ToolbarActions {
   canPasteAdjust(): boolean;
   copyRendered(): void;
   bake(): void;
+  hasBalloon(): boolean;
+  toggleBalloonPanel(): void;
   selectedShape(): { shape: "polygon" | "star"; sides: number; tips: number; inner: number } | null;
   /** Change the sides, points or ratio of the picked polygons and stars: one undo step. */
   shapeSelected(change: { sides?: number; tips?: number; inner?: number }, final?: boolean): void;
@@ -251,6 +253,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-tips-wrap hidden>Points <input type="number" data-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
       </div>
       <div class="tb-group tb-options" data-for="select node" data-shape-props>
+        <button type="button" data-kind="picture shape stroke text" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture, shape or text: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
+        <button type="button" data-kind="picture shape stroke text" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the selected pictures">${ICONS.listRestart}</button>
         <label class="tb-count" data-kind="shape picture" data-scrub="radius" data-sel-radius-wrap hidden title="Drag the field left or right to change it">Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. Several values (one for every corner) set them each; double-click the dot on the shape to open its corners out."></label>
         <label class="tb-count" data-kind="shape" data-scrub="smooth" data-sel-smooth-wrap hidden title="Drag the field left or right to change it">Smooth <input type="number" data-sel-smooth min="0" max="100" step="5" inputmode="numeric" aria-label="Corner smoothing (%)" title="Corner smoothing: the rounded corners start farther out and blend into the line"></label>
         <label class="tb-count" data-kind="shape" data-scrub="sides" data-sel-sides-wrap hidden title="Drag the field left or right to change it">Sides <input type="number" data-sel-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
@@ -263,8 +267,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-kind="picture" data-flip="x" hidden aria-pressed="false" aria-label="Flip horizontally" title="Flip horizontally: mirror the picture left to right in its box">${ICONS.flipHorizontal}</button>
         <button type="button" data-kind="picture" data-flip="y" hidden aria-pressed="false" aria-label="Flip vertically" title="Flip vertically: mirror the picture top to bottom in its box">${ICONS.flipVertical}</button>
         <button type="button" data-kind="picture" data-unflip hidden aria-label="Reset flip" title="Reset flip: show the picture the right way round again">${ICONS.resetFlip}</button>
-        <button type="button" data-kind="picture shape stroke text" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture, shape or text: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
-        <button type="button" data-kind="picture shape stroke text" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the selected pictures">${ICONS.listRestart}</button>
         <span class="tb-count" data-kind="any" data-on-sheet hidden title="Where it is on its sheet, in per cent of the sheet: X and Y from its top-left corner, W and H of its width and height">On sheet
           <label>X <input type="number" data-on-x step="any" inputmode="decimal" aria-label="Position from the left of the sheet (per cent of its width)"></label> <label>Y <input type="number" data-on-y step="any" inputmode="decimal" aria-label="Position from the top of the sheet (per cent of its height)"></label>
           <span data-on-size><label>W <input type="number" data-on-w min="0" step="any" inputmode="decimal" aria-label="Width (per cent of the sheet's width)"></label> <label>H <input type="number" data-on-h min="0" step="any" inputmode="decimal" aria-label="Height (per cent of the sheet's height)"></label></span> %</span>
@@ -277,6 +279,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-kind="shape" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the field left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
       <div class="tb-group tb-options" data-for="text note select node" data-kind="text">
+        <button type="button" data-balloon-panel hidden aria-label="Speech balloon and text in shape" title="Speech balloon and text in shape: body, tails, words, padding, alignment, connectors">${ICONS.speechBalloon}</button>
+        <button type="button" data-text-box data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Paragraph and box options" title="Paragraph and box: space between paragraphs, first line, case, most lines, set height">${ICONS.textBox}</button>
         <button type="button" class="swatch swatch-paint" data-text-colour data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Text colour" title="Text colour: open the colour picker (with transparency)"><span data-paint-chip></span></button>
         <label class="tb-count" data-text-wrap hidden title="Font: the bundled one, or a font file from the library (import one here)"><select data-text-font aria-label="Font"></select></label>
         <button type="button" data-text-font-options data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Font options" title="Font options: kerning, the features of the font (ligatures, small capitals, numerals...) and the axes of a variable font">${ICONS.fontOptions}</button>
@@ -284,7 +288,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-text-wrap hidden title="Text size, in px at this zoom. Drag the field to change it.">Size <input type="number" data-text-size min="1" max="2000" step="any" inputmode="decimal" aria-label="Text size (px at this zoom)"></label>
         <button type="button" class="swatch swatch-paint" data-text-outline data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Text outline" title="Text outline: the colour of the line round the letters (none to take it away)"><span data-paint-chip></span></button>
         <label class="tb-count" data-text-wrap hidden title="Outline width, in px at this zoom (0: none)">Outline <input type="number" data-text-outline-w min="0" max="2000" step="any" inputmode="decimal" aria-label="Text outline width (px at this zoom)"></label>
-        <button type="button" data-text-box data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Paragraph and box options" title="Paragraph and box: space between paragraphs, first line, case, most lines, set height">${ICONS.textBox}</button>
         <label class="tb-count" data-text-wrap hidden title="Line height: a multiple of the text size. Drag the field to change it.">Line <input type="number" data-text-line min="0.5" max="5" step="0.05" aria-label="Line height"></label>
         <label class="tb-count" data-text-wrap hidden title="Letter spacing: a share of the text size. Drag the field to change it.">Letters <input type="number" data-text-track min="-50" max="200" step="1" aria-label="Letter spacing (percent of the text size)"></label>
       </div>
@@ -296,6 +299,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       </div>
       <div class="tb-group tb-options" data-for="select node" data-sel-colours data-no-command hidden role="group" aria-label="Colours of the selection"></div>
       <div class="tb-group tb-options" data-for="shape balloon path select node" data-kind="shape sheet picture">
+        <button type="button" data-balloon-panel hidden aria-label="Speech balloon and text in shape" title="Speech balloon and text in shape: body, tails, words, padding, alignment, connectors">${ICONS.speechBalloon}</button>
         <button type="button" class="swatch swatch-paint" data-kind="shape sheet" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
         <button type="button" class="swatch swatch-paint" data-paint="stroke" aria-haspopup="dialog" aria-expanded="false" aria-label="Outline" title="Outline colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Outline</b></button>
       <button type="button" class="swatch swatch-outline" data-outline-options aria-haspopup="dialog" aria-expanded="false" aria-label="Outline options" title="Outline options: width, position (inside, centre, outside), corners and ends">${ICONS.outlineOptions}</button>
@@ -547,6 +551,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       onChange: (patch, final) => actions.setTextStyle({ ...patch, ...(patch.axes && Object.keys(patch.axes).length === 0 ? { axes: null } : {}) }, final),
     });
   });
+  for (const b of root.querySelectorAll<HTMLElement>("[data-balloon-panel]")) b.addEventListener("click", () => actions.toggleBalloonPanel());
   root.querySelector<HTMLElement>("[data-text-box]")!.addEventListener("click", (e) => {
     const t = actions.selectedTextStyle();
     if (!t) return;
@@ -916,7 +921,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (document.activeElement !== sides) sides.value = String(editor.shapeSides);
     if (document.activeElement !== tips) tips.value = String(editor.shapeTips);
     const pick = editor.tool === "select" || editor.tool === "node";
-    const still = !editor.gesturing; // (not while something is being dragged: the numbers wait for it to end)
+    const still = !editor.gesturing;
+    for (const b of root.querySelectorAll<HTMLElement>("[data-balloon-panel]")) b.hidden = !(pick && still && actions.hasBalloon());
+    // (a field is left as it is while it is typed in, and while a value from one is being shown: the document has the old number until it is settled)
+    const free = (el: Element): boolean => document.activeElement !== el && editor.preview.kind !== "replace"; // (not while something is being dragged: the numbers wait for it to end)
     const shp = pick && still ? actions.selectedShape() : null;
     const crn = pick && still ? actions.selectedCorners() : null;
     const smoothing = pick && still ? actions.selectedSmoothing() : null;
@@ -932,25 +940,25 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     for (const w of root.querySelectorAll<HTMLElement>("[data-text-wrap]")) w.hidden = !txt;
     if (txt) {
       wantFonts(txt.assetId ?? "");
-      if (document.activeElement !== fontSelect) paintFonts();
+      if (free(fontSelect)) paintFonts();
       const size = root.querySelector<HTMLInputElement>("[data-text-size]")!;
-      if (document.activeElement !== size) size.value = txt.sizePx === null ? "" : String(Math.round(txt.sizePx * 100) / 100);
+      if (free(size)) size.value = txt.sizePx === null ? "" : String(Math.round(txt.sizePx * 100) / 100);
       for (const b of root.querySelectorAll<HTMLElement>("[data-text-align]")) b.setAttribute("aria-checked", String(b.dataset["textAlign"] === txt.align));
       for (const b of root.querySelectorAll<HTMLElement>("[data-text-fit]")) b.setAttribute("aria-checked", String((b.dataset["textFit"] === "width") === txt.autoWidth));
       root.querySelector<HTMLElement>("[data-text-colour] [data-paint-chip]")!.style.background = txt.gradient ? paintCss(txt.gradient) : swatchBackground(txt.color);
       root.querySelector<HTMLElement>("[data-text-outline] [data-paint-chip]")!.style.background = txt.outline ? swatchBackground(txt.outline.c) : "transparent";
       const ow = root.querySelector<HTMLInputElement>("[data-text-outline-w]")!;
-      if (document.activeElement !== ow) ow.value = txt.outline && txt.sizePx !== null ? String(Math.round(txt.outline.w * txt.sizePx * 100) / 100) : "0";
+      if (free(ow)) ow.value = txt.outline && txt.sizePx !== null ? String(Math.round(txt.outline.w * txt.sizePx * 100) / 100) : "0";
       const line = root.querySelector<HTMLInputElement>("[data-text-line]")!, track = root.querySelector<HTMLInputElement>("[data-text-track]")!;
-      if (document.activeElement !== line) line.value = String(Math.round(txt.lineHeight * 100) / 100);
-      if (document.activeElement !== track) track.value = String(Math.round(txt.tracking * 100));
+      if (free(line)) line.value = String(Math.round(txt.lineHeight * 100) / 100);
+      if (free(track)) track.value = String(Math.round(txt.tracking * 100));
     }
     const pin = pick && still ? actions.selectedPin() : null;
     root.querySelector<HTMLElement>("[data-pin-wrap]")!.hidden = !pin;
     if (pin) {
       const h = root.querySelector<HTMLSelectElement>("[data-pin-h]")!, v = root.querySelector<HTMLSelectElement>("[data-pin-v]")!;
-      if (document.activeElement !== h) h.value = pin.h;
-      if (document.activeElement !== v) v.value = pin.v;
+      if (free(h)) h.value = pin.h;
+      if (free(v)) v.value = pin.v;
     }
     const crop = root.querySelector<HTMLElement>("[data-crop]")!;
     crop.hidden = !(pick && still && actions.croppable());
@@ -981,7 +989,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       for (const f of ["[data-on-x]", "[data-on-y]", "[data-on-w]", "[data-on-h]"]) onSheet(f).dataset["scrubStep"] = "0.1"; // (a dragged pixel is a tenth of a per cent)
       for (const [f, v] of [["[data-on-x]", on.x], ["[data-on-y]", on.y], ["[data-on-w]", on.w], ["[data-on-h]", on.h]] as const) {
         const el = onSheet(f);
-        if (document.activeElement !== el) el.value = String(Math.round(v * 100) / 100);
+        if (free(el)) el.value = String(Math.round(v * 100) / 100);
       }
     }
     const ratio = pick && still ? actions.sheetRatio() : null;
@@ -996,7 +1004,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       if (!still && pick) continue;
       root.querySelector<HTMLElement>(`[data-sel-${key}-wrap]`)!.hidden = !shown;
       const input = root.querySelector<HTMLInputElement>(`[data-sel-${key}]`)!;
-      if (shown && document.activeElement !== input) input.value = value;
+      if (shown && free(input)) input.value = value;
       if (key === "radius") input.placeholder = crn?.mixed ? "Mixed" : "";
     }
     // The colours the picked shapes use, as chips (several shapes picked): one change reaches every shape that uses that colour or gradient.
@@ -1020,7 +1028,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     }
     const sw = root.querySelector<HTMLInputElement>("[data-shape-width]")!;
     const noOutline = editor.shapeStroke === null && editor.shapeKind !== "line"; // (a line gets the ink when it has no outline)
-    if (document.activeElement !== sw) sw.value = noOutline ? "0" : String(Math.max(1, sliderFromPen(editor.shapeWidthPx)));
+    if (free(sw)) sw.value = noOutline ? "0" : String(Math.max(1, sliderFromPen(editor.shapeWidthPx)));
     root.querySelector<HTMLElement>("[data-shape-out]")!.textContent = noOutline ? "None" : `${editor.shapeWidthPx} px`;
     // The paint chips show the next shape's colours, or the selected paths' (and are there only when something has them).
     const sel = editor.tool === "select" || editor.tool === "node" ? actions.selectedPaint() : null;
@@ -1040,14 +1048,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     for (const b of root.querySelectorAll<HTMLElement>("[data-width]")) b.classList.toggle("is-on", Number(b.dataset["width"]) === editor.penWidthPx);
     for (const b of root.querySelectorAll<HTMLElement>("[data-pen-only]")) b.hidden = editor.tool !== "pen"; // (the pen's own presets and zoom behaviour: not for strokes already drawn)
     const size = root.querySelector<HTMLInputElement>("[data-size]")!;
-    if (document.activeElement !== size) size.value = String(sliderFromPen(editor.penWidthPx));
+    if (free(size)) size.value = String(sliderFromPen(editor.penWidthPx));
     root.querySelector<HTMLElement>("[data-size-out]")!.textContent = `${editor.penWidthPx} px`;
     root.querySelector<HTMLElement>("[data-stab]")!.setAttribute("aria-pressed", String(editor.stabilizer.on));
     const strength = root.querySelector<HTMLInputElement>("[data-strength]")!;
     strength.hidden = !editor.stabilizer.on;
-    if (document.activeElement !== strength) strength.value = String(editor.stabilizer.strength);
+    if (free(strength)) strength.value = String(editor.stabilizer.strength);
     const es = root.querySelector<HTMLInputElement>("[data-eraser-size]")!;
-    if (document.activeElement !== es) es.value = String(editor.eraserPx);
+    if (free(es)) es.value = String(editor.eraserPx);
     root.querySelector<HTMLElement>("[data-eraser-out]")!.textContent = `${editor.eraserPx} px`;
     root.querySelector<HTMLElement>("[data-erase-groups]")!.setAttribute("aria-pressed", String(editor.eraseWholeGroups));
     root.querySelector<HTMLElement>("[data-erase-parts]")!.setAttribute("aria-pressed", String(editor.eraseParts));

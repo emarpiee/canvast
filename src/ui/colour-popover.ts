@@ -622,7 +622,7 @@ export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void
   pop.setAttribute("aria-label", "Outline options");
   const choices = <T extends string>(key: string, label: string, items: ReadonlyArray<[T, string, string]>, value: T, disabled = false): string =>
     `<div class="op-row"><span class="op-label" id="op-${key}">${label}</span><div class="paint-modes op-choices" role="radiogroup" aria-labelledby="op-${key}">${items
-      .map(([v, text, tip]) => `<button type="button" role="radio" data-${key}="${v}" aria-checked="${v === value}" title="${tip}"${disabled ? " disabled" : ""}>${text}</button>`)
+      .map(([v, text, tip]) => `<button type="button" role="radio" data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}="${v}" aria-checked="${v === value}" title="${tip}"${disabled ? " disabled" : ""}>${text}</button>`)
       .join("")}</div></div>`;
   pop.innerHTML =
     `<div class="op-row"><label class="op-label" for="op-width">Width</label><input id="op-width" class="op-width" type="number" min="0" step="0.5" inputmode="decimal" value="${o.widthPx === null ? "" : String(Math.round(o.widthPx * 100) / 100)}"><span class="op-unit">px</span></div>` +

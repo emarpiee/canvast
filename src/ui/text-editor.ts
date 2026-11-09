@@ -1,3 +1,5 @@
+import type { PathObject } from "../doc/model";
+import { flowOf } from "../text/shape-flow";
 import { copyPlainText } from "../app/system-clipboard";
 import * as D from "../core/dyadic";
 import { syncScroll } from "./bar";
@@ -169,6 +171,25 @@ export function mountTextEditor(
     box.style.fontKerning = target.kerning ? "normal" : "none";
     box.style.lineHeight = String(target.lineHeight ?? 1.3);
     box.style.letterSpacing = `${target.tracking ?? 0}em`;
+    if (target.inShape) {
+      // Words in a shape are typed in the shape: on the body's middle, as wide as its widest part less the padding, on the shape's own colour, so they read as they will.
+      const flow = flowOf(target.inShape, target.size);
+      let x0 = 0, x1 = target.w / target.size;
+      let widest = 0;
+      for (let y = 0; y < flow.height; y += 0.5) {
+        const band = flow.span(y, y + 1.3);
+        if (band && band.x1 - band.x0 > widest) ({ x0, x1 } = band), (widest = band.x1 - band.x0);
+      }
+      const fill = (doc.get(target.inShape.shape ?? "") as PathObject | undefined)?.fill;
+      box.style.left = `${s.x + x0 * em}px`;
+      box.style.width = `${(x1 - x0) * em}px`;
+      box.style.minWidth = "";
+      box.style.top = `${s.y + (flow.height * em) / 2}px`;
+      box.style.transformOrigin = "";
+      box.style.transform = "translateY(-50%)";
+      box.style.background = typeof fill === "string" ? fill : "#ffffff";
+      box.style.borderRadius = `${0.3 * em}px`;
+    }
   };
 
   /** Zoom so the text is at a readable size, with its top-left corner in view. */

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.55.32 — Bars in order, editing in the shape, path options (2026-11-09)
+
+- **Fixed:** *Along the path* and *Side* of a text along a path did nothing.
+- **Fixed:** a number dragged or typed in a bar jumped back to its old value until it was settled.
+- **Fixed:** the pattern package was built without its declarations.
+- **Changed:** words in a shape are typed in a box in the middle of the shape, on the shape's colour.
+- **Changed:** a tool's options come first in its bar: the Speech balloon button and *Paragraph and box* are at the start, and *Adjust* before the numbers of a shape or a picture.
+
 ## 0.55.31 — Shared random source (2026-11-09)
 
 - **Changed:** the seeded random source moved to the core, shared by balloons and patterns; nothing changes on screen.

@@ -1422,6 +1422,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     setArrows: (patch) => commitArrows(doc, editor, patch),
     selectionPaints: () => selectionPaints(doc, editor),
     recolourSelected: (from, to, final) => recolour(doc, editor, from, to, final),
+    hasBalloon: () => selectedBalloon(doc, editor) !== null || selectedShapeText(doc, editor) !== null || selectedLink(doc, editor) !== null,
+    toggleBalloonPanel: () => balloonPanel.toggle(),
     selectedPin: () => selectedPin(doc, editor),
     fonts: libraryFonts,
     importFont: async (file) => {
@@ -1860,8 +1862,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       makeMask: (mode) => makeMask(doc, editor, mode),
       makeClippingMask: () => makeClippingMask(doc, editor),
       canMakeMask: () => canMakeMask(doc, editor),
-      hasBalloon: () => selectedBalloon(doc, editor) !== null || selectedShapeText(doc, editor) !== null || selectedLink(doc, editor) !== null,
-      toggleBalloonPanel: () => balloonPanel.toggle(),
       changeMask: (change) => changeMask(doc, editor, change),
       selectMask: () => selectTheMask(doc, editor),
       canReleaseMask: () => canReleaseMask(doc, editor),

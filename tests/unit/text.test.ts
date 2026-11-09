@@ -334,7 +334,8 @@ describe("text objects", () => {
     expect(b.maxY).toBeGreaterThan(2 * LINE_HEIGHT * 16);
     const s = scaleAbout(o, o.anchor, 2, 2) as TextObject;
     expect(s.size * 2 ** s.unit).toBe(o.size * 2 ** o.unit * 2);
-    expect(() => scaleAbout(o, o.anchor, 2, 3)).toThrow();
+    const wide = scaleAbout(o, o.anchor, 2, 3) as TextObject; // (a side handle: the box only)
+    expect([wide.w, wide.size]).toEqual([o.w * 2, o.size]);
   });
 });
 
