@@ -1244,6 +1244,9 @@ export class Session {
     await this.persistence.flush();
     const r = await this.backups!.applyImport(this.current.workspaceId, this.current.boardId, plan, progress);
     await this.refreshTree();
+    // (the styles it brought, in the list now: the next save writes this list, and would lose them otherwise)
+    this.styles.load(await this.repo?.styles().catch(() => undefined));
+    this.post({ kind: "styles" });
     this.post({ kind: "tree" });
     this.post({ kind: "assets" });
     this.emitAssets();

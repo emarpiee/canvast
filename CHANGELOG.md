@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.37 — Restored styles appear at once (2026-11-09)
+
+- **Fixed:** styles restored from a backup appeared only after a restart, and saving a style before that restart lost them.
+
 ## 0.55.36 — Saved styles: no limit, in Advanced export (2026-11-09)
 
 - **Added:** *Saved styles* in Advanced export, on by default, with the fonts and pictures they use.

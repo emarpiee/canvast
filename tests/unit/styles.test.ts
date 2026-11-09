@@ -82,10 +82,10 @@ describe("styles (ADR 0120)", () => {
 
 describe("saved styles", () => {
   it("have no limit, and a balloon's whole look is kept", () => {
-    const many = Array.from({ length: 1200 }, (_, i) => ({ id: `s${i}`, kind: "colour", name: `C${i}`, at: 1, data: "#112233" }));
+    const many = Array.from({ length: 1200 }, (_, i) => ({ id: i.toString(16).padStart(32, "0"), kind: "colour", name: `C${i}`, at: 1, data: "#112233" }));
     expect(cleanStyles(many).length).toBe(1200);
     const data = { body: "oval", round: 35, bumps: 12, depth: 18, sides: 6, wobble: 0, seed: 1, full: { unit: 0, w: 10, h: 10, tails: [], paint: { fill: "#fff" } } };
-    expect(cleanStyles([{ id: "b1", kind: "balloon", name: "B", at: 1, data }])[0]!.data).toEqual(data);
+    expect(cleanStyles([{ id: "b".repeat(32), kind: "balloon", name: "B", at: 1, data }])[0]!.data).toEqual(data);
   });
   it("find the files they use", () => {
     const h = "a".repeat(64);
