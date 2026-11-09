@@ -35,19 +35,24 @@ export function fittedInShape(text: TextObject, path: PathObject): TextObject | 
  */
 export function withShapeTexts(src: DerivationSource, next: readonly CanvasObject[], removed: readonly ObjectId[]): CanvasObject[] {
   const paths = next.some((o) => o.kind === "path");
-  if (!paths && !next.some((o) => o.kind === "text" && o.inShape?.shape !== undefined)) return [...next];
+  if (!paths && !removed.length && !next.some((o) => o.kind === "text" && o.inShape?.shape !== undefined)) return [...next];
   const mine = new Map(next.map((o) => [o.id, o] as const));
   const out = new Map(mine);
   const gone = new Set(removed);
   const follow = (t: TextObject): void => {
     const shape = t.inShape?.shape;
-    if (shape === undefined || gone.has(shape)) return;
-    const path = mine.get(shape) ?? src.get(shape);
-    if (path?.kind !== "path") return;
+    if (shape === undefined) return;
+    const path = gone.has(shape) ? undefined : (mine.get(shape) ?? src.get(shape));
+    if (path?.kind !== "path") {
+      // Its shape is gone: plain words again, as wide as they were.
+      const { inShape: _s, ...plain } = t;
+      out.set(t.id, plain);
+      return;
+    }
     const made = fittedInShape(t, path);
     if (made && (made.w !== t.w || !D.equals(made.anchor.x, t.anchor.x) || !D.equals(made.anchor.y, t.anchor.y) || made.inShape!.n.join() !== t.inShape!.n.join())) out.set(t.id, made);
   };
-  if (paths) for (const o of src.all()) if (o.kind === "text" && !gone.has(o.id) && !mine.has(o.id) && o.inShape?.shape !== undefined && mine.has(o.inShape.shape)) follow(o);
+  if (paths || removed.length) for (const o of src.all()) if (o.kind === "text" && !gone.has(o.id) && !mine.has(o.id) && o.inShape?.shape !== undefined && (mine.has(o.inShape.shape) || gone.has(o.inShape.shape))) follow(o);
   for (const o of next) if (o.kind === "text") follow(o);
   return [...out.values()];
 }

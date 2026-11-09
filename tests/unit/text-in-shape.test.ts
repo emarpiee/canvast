@@ -20,6 +20,11 @@ describe("a text inside a shape", () => {
     expect(t.align).toBeUndefined();
     expect(t.valign).toBeUndefined();
   });
+  it("is plain words again when its shape is deleted", () => {
+    const t = withShapeTexts(src(path(0, 10), text), [], ["s"]).find((o) => o.id === "t") as Extract<CanvasObject, { kind: "text" }>;
+    expect(t.inShape).toBeUndefined();
+    expect(t.w).toBe(10);
+  });
   it("adds nothing when the shape is as it was, or the change has no path", () => {
     expect(withShapeTexts(src(path(0, 10), text), [path(0, 10)], []).map((o) => o.id)).toEqual(["s"]);
     expect(withShapeTexts(src(path(0, 10), text), [text], []).map((o) => o.id)).toEqual(["t"]);

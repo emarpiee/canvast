@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.27 — Text outlives its shape (2026-11-09)
+
+- **Fixed:** a text whose shape was deleted kept the shape's outline; it is plain text again, in the same undo step.
+
 ## 0.55.26 — Speech balloons complete (2026-11-09)
 
 - **Fixed:** padding, and other options of a text in a shape, were dropped when changed.
