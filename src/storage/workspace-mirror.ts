@@ -182,10 +182,12 @@ export class WorkspaceMirror {
 
   private async startUp(): Promise<void> {
     this.state = (await idbGet<MirrorState>(this.db, "meta", STATE_KEY).catch(() => undefined)) ?? { tree: "", canvases: {} };
+    this.onOpening?.("Reading the library", null);
     await this.lib.start(); // (first: the canvases read below may show items another device added)
     this.libraryDirty = await this.lib.pendingWrite();
     const fileWs = await this.readWorkspaceFile();
     if (!fileWs) return this.everything(); // a new workspace folder: all of it is written
+    this.onOpening?.("Reading the boards and canvases", null);
     await this.unpark(fileWs);
     await this.mergeTreeCopies(fileWs); // (written back below, with the tree)
     const tree = JSON.stringify(fileWs.boards);
@@ -212,7 +214,8 @@ export class WorkspaceMirror {
     if (!cur) return adopted;
     const records = (await this.repo.tree(cur.workspaceId)).boards.flatMap((b) => b.canvases);
     const files = new Map(boards.flatMap((b) => b.canvases.map((c) => [c.id, c.file] as const)));
-    for (const c of records) {
+    for (const [i, c] of records.entries()) {
+      this.onOpening?.(`Checking canvas ${i + 1} of ${records.length}`, (i + 1) / records.length);
       const file = files.get(c.id);
       const head = file ? canvasHead(await this.bridge.head(file)) : null;
       const known = this.state.canvases[c.id];
@@ -724,6 +727,13 @@ export class WorkspaceMirror {
   set importFiles(fn: LibraryMirror["importFiles"]) {
     this.lib.importFiles = fn;
   }
+
+  set onLooking(fn: LibraryMirror["onLooking"]) {
+    this.lib.onLooking = fn;
+  }
+
+  /** Told what opening the workspace is doing (the start screen says it). */
+  onOpening: ((detail: string, fraction: number | null) => void) | null = null;
 
   /**
    * The library changed: its items, their names, tags or folders, the library folders, or the originals stored. `hashes`: only these

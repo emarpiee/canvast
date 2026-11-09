@@ -196,6 +196,8 @@ export interface OpenHooks {
   onVersionChange?: () => void;
   /** Something the person should know about storage (a failed write to the workspace folder), in plain words. */
   onNotice?: (text: string) => void;
+  /** What opening the workspace is doing now, for the start screen; `fraction` is null when its length is not known. */
+  onOpening?: (detail: string, fraction: number | null) => void;
   /** The desktop build: where a deleted file of the workspace folder goes (Settings > Storage); `.trash/` when not given. */
   deleteTo?: () => DeleteMode;
   /** The desktop build: keep hidden items' names, tags and notes out of this device's cache while they are locked (Settings > Privacy). */
@@ -271,6 +273,8 @@ export interface FolderHandlers {
   itemMoved(moved: { hash: string; name: string; path: string }): void;
   /** Import files found in `library/` that no item has (the app can decode them). */
   importFiles(files: FolderFile[]): Promise<void>;
+  /** How many of the files found outside have been looked at (`done` equals `total` when the look is over). */
+  looking(done: number, total: number): void;
   /** Library items were relinked, added or changed: lists are drawn again. */
   libraryChanged(): void;
   /** Before canvas files are compared: edits still on their way are saved (so they count as this device's). */

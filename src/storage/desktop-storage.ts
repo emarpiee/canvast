@@ -126,6 +126,8 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
   (storage.backups as IdbBackups).writeOriginals = (batch) => mirror.writeOriginals(batch);
   (storage.backups as IdbBackups).library = lib;
   mirror.onError = (text) => opts.onNotice?.(text);
+  mirror.onOpening = (detail, fraction) => opts.onOpening?.(detail, fraction);
+  raw.lib.onProgress((done, total) => opts.onOpening?.(`Reading the library: part ${done} of ${total}`, total ? done / total : null));
   hidden.onNotice = (text) => opts.onNotice?.(text);
   desktopCatalog.onNotice = (text) => opts.onNotice?.(text);
   // Settings > Privacy: hidden items' names out of this device's cache while locked. What waits is written before the key goes; once
@@ -205,6 +207,7 @@ export async function openDesktopStorage(raw: DesktopBridge, opts: OpenHooks): P
     start(on) {
       folderOn = on;
       mirror.importFiles = (files) => on.importFiles(files);
+      mirror.onLooking = (done, total) => on.looking(done, total);
       mirror.askHiddenKey = (names) => on.hiddenNeedsKey(names);
       mirror.scanHiddenLater = () => void mirror.rescan(() => on.libraryChanged());
       mirror.onOpened = () => on.libraryChanged();

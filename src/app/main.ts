@@ -92,7 +92,7 @@ import { checkLock } from "../assets/hidden-lock";
 import { onStartStep, startStep } from "./startup-log";
 import { mountLibraryFolderCard } from "../ui/library-folder-card";
 import { confirmReset } from "../ui/reset-dialog";
-import { beginProgress } from "./progress";
+import { beginProgress, type Progress } from "./progress";
 import { be, plural } from "../doc/plural";
 import { installAutoIndex } from "../storage/auto-index";
 import { fmtBytes } from "../ui/format";
@@ -509,6 +509,7 @@ async function start(): Promise<void> {
         editor.message = text;
         editor.changed();
       },
+      onOpening: (detail, fraction) => opening?.update(fraction, detail),
       deleteTo: () => settings.get("storage.deleteTo"),
       hiddenNamesOff: () => settings.get("library.hiddenNamesOff"),
       trashDays: () => Number(settings.get("storage.trashDays")),
@@ -595,11 +596,24 @@ async function start(): Promise<void> {
   });
   // The desktop build: files that appear in library/ outside the app are imported where they lie (ADR 0177).
   if (storage?.folderSync) assets.bigImport = (file) => storage!.folderSync!.importBig(file);
+  // (a single file saved again says its result only: a bar is for a batch)
+  const OUTSIDE_BATCH = 10;
+  let lookingAt: Progress | null = null;
   storage?.folderSync?.start({
+    looking: (done, total) => {
+      if (total < OUTSIDE_BATCH) return;
+      lookingAt ??= beginProgress(editor, "outside-look", "Looking at new files in the workspace folder");
+      lookingAt.update(done / total, `${done} of ${total}`);
+      if (done < total) return;
+      lookingAt.done();
+      lookingAt = null;
+    },
     importFiles: async (files) => {
       let n = 0;
       const followed: string[] = [];
-      for (const f of files) {
+      const adding = files.length >= OUTSIDE_BATCH ? beginProgress(editor, "outside-add", "Adding new files to the library") : null;
+      for (const [i, f] of files.entries()) {
+        adding?.update(i / files.length, `${i} of ${files.length}`);
         try {
           // Too big to read into the page: taken in from its hash alone, as a card.
           const hash = f.size !== undefined && f.size > MAX_IMPORT_BYTES && f.hash ? await f.hash() : null;
@@ -621,6 +635,7 @@ async function start(): Promise<void> {
           console.warn(`canvast: ${f.path} could not be taken into the library: ${(e as Error).message}`); // (left where it is)
         }
       }
+      adding?.done();
       if (followed.length) {
         editor.message = followed.length === 1 ? `“${followed[0]}” was changed outside the app: the library and the canvases show the new version.` : `${plural(followed.length, "file")} were changed outside the app: the library and the canvases show the new versions.`;
         editor.changed();

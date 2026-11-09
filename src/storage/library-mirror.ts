@@ -306,6 +306,8 @@ export class LibraryMirror {
   lastFailed: readonly string[] = [];
   /** Imports files found in `library/` that no item has (set by the app through `Storage.folderImports`). */
   importFiles: ((files: FolderFile[]) => Promise<void>) | null = null;
+  /** Told how many of the files found outside have been looked at. */
+  onLooking: ((done: number, total: number) => void) | null = null;
   /** Told when an item could not be moved or written, in plain words. */
   /** An item took its file's name (see `nameFollowsFile`): the lists are drawn again. */
   onNamesChanged: (() => void) | null = null;
@@ -750,6 +752,7 @@ export class LibraryMirror {
     const found: FolderFile[] = [];
     const follow: string[] = [];
     for (const [k, path] of lib.entries()) {
+      this.onLooking?.(k, lib.length);
       const owner = await this.lib.calls.byFile(path);
       if (owner !== null) {
         if (sizes[k] !== null) follow.push(path); // an item's own file, maybe saved again by the program it is worked on in (gone: it shows as missing)
@@ -759,6 +762,7 @@ export class LibraryMirror {
       // in it was not said one by one) or went: all is looked through.
       if (sizes[k] === null) {
         if (await this.lib.calls.holds(path)) continue;
+        this.onLooking?.(lib.length, lib.length);
         return null;
       }
       const hash = await this.bridge.hash(path);
@@ -779,6 +783,7 @@ export class LibraryMirror {
         return bytes && new Blob([bytes as Uint8Array<ArrayBuffer>]);
       } });
     }
+    this.onLooking?.(lib.length, lib.length);
     if (found.length && this.importFiles) await this.importFiles(found);
     const followed = await this.followChanged(follow);
     return { changed, imported: found.length > 0 || followed };
@@ -934,7 +939,8 @@ export class LibraryMirror {
     const relinked = new Set<string>();
     const found2: FolderFile[] = [];
     let changed = false;
-    for (const f of fresh) {
+    for (const [k, f] of fresh.entries()) {
+      this.onLooking?.(k, fresh.length);
       const hash = await this.bridge.hash(f.path);
       if (!hash) continue;
       const rec = await this.recOf(hash);
@@ -952,6 +958,7 @@ export class LibraryMirror {
         return bytes && new Blob([bytes as Uint8Array<ArrayBuffer>]);
       } });
     }
+    this.onLooking?.(fresh.length, fresh.length);
     if (found2.length && this.importFiles) {
       await this.importFiles(found2);
       changed = true;

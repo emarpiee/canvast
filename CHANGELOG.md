@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.1 — Opening and new files say how far they are (2026-11-10)
+
+- **Added:** the start screen says what opening a workspace is doing: the library's parts and the canvases, each with its count.
+- **Added:** a progress notice while ten or more files put in the workspace folder from outside are looked at and added to the library.
+
 ## 0.56.0 — Speech balloons, sharing on the network, safer hidden items (2026-11-10)
 
 Everything since 0.55.0, in one release (0.55.1 to 0.55.44).

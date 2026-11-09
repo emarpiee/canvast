@@ -1267,7 +1267,7 @@ In the desktop app your workspace is a **folder of ordinary files** that you cho
 | A canvas file moved into another board's folder | Moves the canvas to that board |
 | A file in `library/` renamed or moved | Finds it again by its content; the item takes its new folder and name, and the links to it in notes follow |
 | A file in `library/` saved again by the program it is worked on in (a painting, a scene, a document: any kind of file) | Follows it: the item becomes the new version where it lies, keeping its name, folder, tags, note, fields and favourite, and every picture or card of it on any canvas shows the new version. A file still being saved (its size not yet still) is taken a moment later. The file is never written over or removed by this |
-| A new file in `library/` | Imports it where it lies, into the library folder of its folder (made if needed) |
+| A new file in `library/` | Imports it where it lies, into the library folder of its folder (made if needed); a batch shows a progress notice |
 | A copy of a library file put in another folder (the same content, any name) | Makes it an item of its own, never removed for being a copy; its details list the others, and `is:copy` finds them |
 | A library folder deleted from `library/` | Stays deleted: it leaves the library, and its items stay, shown as missing when their files went with it. Only a place this device has seen on disk counts, so a folder from another device is made, and with `library/` itself gone nothing is concluded |
 | A file deleted from `library/` | Shows the item as missing. Deleting such an item, or any item, removes its file only when the file still holds what the item does: a file that changed (someone's newer work) is left where it is |
