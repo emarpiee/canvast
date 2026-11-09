@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.55.24 — Text in a shape updates at once; its own alignment (2026-11-09)
+
+- **Fixed:** a text in a shape showed its new place only at the next interaction; it now changes with the shape, in the same undo step.
+- **Fixed:** a text in a shape set to the left or the top went back to the middle when the shape changed.
+- **Added:** *Across* and *Down* alignment beside the padding in the options of a text in a shape.
+
 ## 0.55.23 — Speech balloon panel layout (2026-11-09)
 
 - **Fixed:** the Speech balloon panel had no spacing of its own and its tail kinds wrapped; it now has the same layout as the Pattern panel, with the kind as a dropdown.

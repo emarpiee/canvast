@@ -1,4 +1,4 @@
-import { outlineBox } from "../text/shape-flow";
+import { biggestClosed, fittedInShape, subArea } from "../doc/text-in-shape";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { levelsBetween } from "../core/frames";
 import { isArtFile } from "../assets/art-preview";
@@ -2831,12 +2831,6 @@ export async function bakePicture(
 
 // ---- Text on a path (ADR 0131) ----------------------------------------------------------------------------------------------------
 
-const subArea = (n: readonly number[]): number => {
-  const b = outlineBox(n);
-  return (b.maxX - b.minX) * (b.maxY - b.minY);
-};
-const biggestClosed = (o: PathObject): { n: readonly number[]; closed: boolean } | null =>
-  pathSubs(o).filter((s) => s.closed && s.n.length >= 12).reduce<{ n: readonly number[]; closed: boolean } | null>((best, s) => (!best || subArea(s.n) > subArea(best.n) ? s : best), null);
 
 /** The one picked text and the one picked path a text can be put on, when exactly those two are picked (and neither is turned or in another frame). */
 function textAndPath(doc: DocumentStore, editor: EditorState): { text: TextObject; path: PathObject } | null {
@@ -2863,33 +2857,6 @@ export const canSetInShape = (doc: DocumentStore, editor: EditorState): boolean 
   const tp = textAndPath(doc, editor);
   return !!tp && biggestClosed(tp.path) !== null;
 };
-
-/** The text inside this closed shape as it is now: the shape's outline, place and width (its options kept); null when it cannot be. */
-function fittedInShape(text: TextObject, path: PathObject): TextObject | null {
-  const sub = biggestClosed(path); // (a boolean result of several pieces: the words go in the biggest)
-  if (!sub) return null;
-  const box = outlineBox(sub.n);
-  const k = 2 ** (path.unit - text.unit);
-  const n = sub.n.map((v, i) => (v - (i % 2 === 0 ? box.minX : box.minY)) * k);
-  const w = (box.maxX - box.minX) * k;
-  if (!n.every((v) => Number.isFinite(v)) || !(w > 0)) return null;
-  const { onPath: _p, autoWidth: _a, h: _h, ...rest } = text;
-  const anchor = { x: D.add(path.anchor.x, D.shift(D.fromNumber(box.minX), path.unit)), y: D.add(path.anchor.y, D.shift(D.fromNumber(box.minY), path.unit)) };
-  return { ...rest, anchor, w, align: text.inShape ? (text.align ?? "center") : "center", valign: text.inShape ? (text.valign ?? "middle") : "middle", inShape: { ...text.inShape, n, closed: true, shape: path.id } };
-}
-
-/** Texts inside a shape that has just changed follow it: moved, resized, its outline changed. */
-export function textsFollowShapes(doc: DocumentStore, changed: ReadonlySet<ObjectId>): void {
-  const next: TextObject[] = [];
-  for (const o of doc.all()) {
-    if (o.kind !== "text" || !o.inShape?.shape || !changed.has(o.inShape.shape)) continue;
-    const path = doc.get(o.inShape.shape);
-    if (path?.kind !== "path") continue;
-    const made = fittedInShape(o, path);
-    if (made && (made.w !== o.w || !D.equals(made.anchor.x, o.anchor.x) || !D.equals(made.anchor.y, o.anchor.y) || made.inShape!.n.join() !== o.inShape.n.join())) next.push(made);
-  }
-  if (next.length) doc.commit(doc.transaction("Text follows its shape", next));
-}
 
 /** Flow the picked text inside the picked closed shape: it keeps a copy of the outline, moves to the shape's box and is centred, one undo step. The shape stays where it is. */
 export function setTextInShape(doc: DocumentStore, editor: EditorState): void {

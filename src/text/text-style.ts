@@ -184,7 +184,7 @@ export function withLook(o: TextObject, look: TextLook, ppu = 0): TextObject {
     ...(outline ? { outline: { c: outline.c, w: clamp(outline.w, [0.001, 1]) } } : {}),
     ...(card ? { card: { fill: card.fill, pad: clamp(card.pad, [0, 5]), radius: clamp(card.radius, [0, 5]) } } : {}),
     ...(h !== undefined ? { h } : {}),
-    ...(h !== undefined && valign && valign !== "top" ? { valign } : {}),
+    ...((h !== undefined || o.inShape) && valign && valign !== "top" ? { valign } : {}),
     ...(paraGap !== undefined && paraGap !== BLOCK_GAP ? { paraGap } : {}),
     ...(indent ? { indent } : {}),
     ...(caps ? { caps } : {}),

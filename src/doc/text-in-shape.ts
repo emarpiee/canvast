@@ -1,0 +1,46 @@
+import * as D from "../core/dyadic";
+import { outlineBox } from "../text/shape-flow";
+import type { DerivationSource } from "./boolean-group";
+import type { CanvasObject, ObjectId, PathObject, TextObject } from "./model";
+import { pathSubs } from "./model";
+
+/** Words flowing inside a shape: the shape's outline is copied to the text, and kept up to date in the transaction that changes the shape. */
+export const subArea = (n: readonly number[]): number => {
+  const b = outlineBox(n);
+  return (b.maxX - b.minX) * (b.maxY - b.minY);
+};
+export const biggestClosed = (o: PathObject): { n: readonly number[]; closed: boolean } | null =>
+  pathSubs(o).filter((s) => s.closed && s.n.length >= 12).reduce<{ n: readonly number[]; closed: boolean } | null>((best, s) => (!best || subArea(s.n) > subArea(best.n) ? s : best), null);
+
+/** The text inside this closed shape as it is now: the shape's outline, place and width (its options kept); null when it cannot be. */
+export function fittedInShape(text: TextObject, path: PathObject): TextObject | null {
+  const sub = biggestClosed(path); // (a boolean result of several pieces: the words go in the biggest)
+  if (!sub) return null;
+  const box = outlineBox(sub.n);
+  const k = 2 ** (path.unit - text.unit);
+  const n = sub.n.map((v, i) => (v - (i % 2 === 0 ? box.minX : box.minY)) * k);
+  const w = (box.maxX - box.minX) * k;
+  if (!n.every((v) => Number.isFinite(v)) || !(w > 0)) return null;
+  const { onPath: _p, autoWidth: _a, h: _h, ...rest } = text;
+  const anchor = { x: D.add(path.anchor.x, D.shift(D.fromNumber(box.minX), path.unit)), y: D.add(path.anchor.y, D.shift(D.fromNumber(box.minY), path.unit)) };
+  // (put in for the first time: centred; after that what the person chose stays, "left" and "top" being no value at all)
+  return { ...rest, anchor, w, ...(text.inShape ? {} : { align: "center" as const, valign: "middle" as const }), inShape: { ...text.inShape, n, closed: true, shape: path.id } };
+}
+
+/** The transaction's objects with the texts inside the shapes it changes following them: moved, resized, outline changed; the same undo step. */
+export function withShapeTexts(src: DerivationSource, next: readonly CanvasObject[], removed: readonly ObjectId[]): CanvasObject[] {
+  if (!next.some((o) => o.kind === "path")) return [...next];
+  const mine = new Map(next.map((o) => [o.id, o] as const));
+  const out = new Map(mine);
+  const gone = new Set(removed);
+  const follow = (t: TextObject): void => {
+    const shape = t.inShape?.shape;
+    const path = shape === undefined ? undefined : mine.get(shape);
+    if (path?.kind !== "path") return;
+    const made = fittedInShape(t, path);
+    if (made && (made.w !== t.w || !D.equals(made.anchor.x, t.anchor.x) || !D.equals(made.anchor.y, t.anchor.y) || made.inShape!.n.join() !== t.inShape!.n.join())) out.set(t.id, made);
+  };
+  for (const o of src.all()) if (o.kind === "text" && !gone.has(o.id)) follow((mine.get(o.id) as TextObject | undefined) ?? o);
+  for (const o of next) if (o.kind === "text" && !src.get(o.id)) follow(o);
+  return [...out.values()];
+}

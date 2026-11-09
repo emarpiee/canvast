@@ -687,8 +687,9 @@ export interface TextBoxOptions {
   pathOpts: { start: number; align: "start" | "center" | "end"; flip: boolean; lift: number } | null;
   /** A text in a shape: its options (null: it is not in one). */
   shapeOpts: { padX: number; padY: number; hide: boolean } | null;
+  align: "left" | "center" | "right" | "justify";
   /** `final` false while a number is being typed or dragged (show it), true once it is settled (store it). */
-  onChange(patch: { paraGap?: number; indent?: number; caps?: TextBoxOptions["caps"]; maxLines?: number | null; heightPx?: number | null; valign?: TextBoxOptions["valign"]; card?: TextBoxOptions["card"]; pathOpts?: Partial<NonNullable<TextBoxOptions["pathOpts"]>>; shapeOpts?: Partial<NonNullable<TextBoxOptions["shapeOpts"]>>; fitShape?: boolean }, final: boolean): void;
+  onChange(patch: { align?: TextBoxOptions["align"]; paraGap?: number; indent?: number; caps?: TextBoxOptions["caps"]; maxLines?: number | null; heightPx?: number | null; valign?: TextBoxOptions["valign"]; card?: TextBoxOptions["card"]; pathOpts?: Partial<NonNullable<TextBoxOptions["pathOpts"]>>; shapeOpts?: Partial<NonNullable<TextBoxOptions["shapeOpts"]>>; fitShape?: boolean }, final: boolean): void;
   onClose?(): void;
 }
 
@@ -715,7 +716,9 @@ export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void
       num("pathLift", "Off the path", round(o.pathOpts.lift), "em", 0, "0.05")
     : "";
   const inside = o.shapeOpts
-    ? num("padX", "Padding sides", round(o.shapeOpts.padX), "em", 0, "0.05") +
+    ? choices("textAlign", "Across", [["left", "Left", "Lines start at the left of the shape"], ["center", "Middle", "Lines are centred in the shape"], ["right", "Right", "Lines end at the right of the shape"]], o.align === "justify" ? "left" : o.align) +
+      choices("valign", "Down", [["top", "Top", "From the top of the shape"], ["middle", "Middle", "In the middle of the shape"], ["bottom", "Bottom", "At the bottom of the shape"]], o.valign) +
+      num("padX", "Padding sides", round(o.shapeOpts.padX), "em", 0, "0.05") +
       num("padY", "Padding top, bottom", round(o.shapeOpts.padY), "em", 0, "0.05") +
       choices("shapeHide", "Words that do not fit", [["show", "Show", "They go on below the shape"], ["hide", "Hide", "They are left out"]], o.shapeOpts.hide ? "hide" : "show") +
       `<div class="op-row"><span class="op-label">Size</span><div class="paint-modes op-choices"><button type="button" data-shape-fit data-testid="text-fit-shape" title="The biggest size at which all the words fit inside the shape">Fit to shape</button></div></div>`
@@ -727,8 +730,8 @@ export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void
     num("indent", "First line in", String(Math.round(o.indent * 100) / 100), "em", 0, "0.1") +
     choices("caps", "Case", [["none", "Aa", "As typed"], ["upper", "AA", "UPPER CASE"], ["lower", "aa", "lower case"], ["title", "Ab", "Title Case: every word starts with a capital"], ["small", "Sc", "Small caps: lower case letters as smaller capitals"]], o.caps ?? "none") +
     num("maxLines", "Most lines", o.maxLines === null ? "0" : String(o.maxLines), "0 = all", 0, "1") +
-    num("heightPx", "Height", o.heightPx === null ? "0" : String(Math.round(o.heightPx * 100) / 100), "px, 0 = auto", 0, "any") +
-    choices("valign", "Words sit", [["top", "Top", "At the top of the height"], ["middle", "Middle", "In the middle of the height"], ["bottom", "Bottom", "At the bottom of the height"]], o.valign) +
+    (o.shapeOpts ? "" : num("heightPx", "Height", o.heightPx === null ? "0" : String(Math.round(o.heightPx * 100) / 100), "px, 0 = auto", 0, "any") +
+      choices("valign", "Words sit", [["top", "Top", "At the top of the height"], ["middle", "Middle", "In the middle of the height"], ["bottom", "Bottom", "At the bottom of the height"]], o.valign)) +
     `<div class="op-row"><span class="op-label" id="tb-card">Card</span><div class="paint-modes op-choices note-colours" role="radiogroup" aria-labelledby="tb-card"><button type="button" role="radio" data-card="none" aria-checked="${o.card === null}" title="No card behind the words">None</button>${NOTE_COLOURS.map((c) => `<button type="button" role="radio" class="note-colour" data-card="${c.fill}" aria-checked="${o.card?.fill === c.fill}" aria-label="${c.name} card" title="${c.name} card" style="background:${c.fill}"></button>`).join("")}</div></div>` +
     num("cardPad", "Card space", String(Math.round((o.card?.pad ?? NOTE_CARD.pad) * 100) / 100), "em", 0, "0.05") +
     num("cardRadius", "Card rounding", String(Math.round((o.card?.radius ?? NOTE_CARD.radius) * 100) / 100), "em", 0, "0.05");
@@ -756,7 +759,8 @@ export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button[role=radio]");
     if (!b) return;
     for (const x of b.closest("[role=radiogroup]")!.querySelectorAll("button")) x.setAttribute("aria-checked", String(x === b));
-    if (b.dataset["pathAlign"]) o.onChange({ pathOpts: { align: b.dataset["pathAlign"] as "start" | "center" | "end" } }, true);
+    if (b.dataset["textAlign"]) o.onChange({ align: b.dataset["textAlign"] as TextBoxOptions["align"] }, true);
+    else if (b.dataset["pathAlign"]) o.onChange({ pathOpts: { align: b.dataset["pathAlign"] as "start" | "center" | "end" } }, true);
     else if (b.dataset["pathSide"]) o.onChange({ pathOpts: { flip: b.dataset["pathSide"] === "b" } }, true);
     else if (b.dataset["shapeHide"]) o.onChange({ shapeOpts: { hide: b.dataset["shapeHide"] === "hide" } }, true);
     else if (b.dataset["card"]) {
