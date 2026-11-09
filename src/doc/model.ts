@@ -256,7 +256,7 @@ export interface TextObject extends ObjectBase {
   /** A curve the words run along (nodes of six numbers, local units of the text; a copy of a path's first sub-path made when the text was put on it). The text does not wrap then; a second line sits below the first. */
   readonly onPath?: { readonly n: readonly number[]; readonly closed: boolean; /** Where the words start, 0 to 1 of the curve. */ readonly start?: number; readonly align?: "start" | "center" | "end"; /** On the other side, the curve read the other way. */ readonly flip?: boolean; /** How far off the curve, in em. */ readonly lift?: number };
   /** A closed outline the words flow inside, each line as wide as the shape is there (nodes of six numbers, local units of the text, its box at 0, 0; a copy of the shape's outline made when the text was put in it). */
-  readonly inShape?: { readonly n: readonly number[]; readonly closed: boolean; /** The space kept from the outline, in em. */ readonly padX?: number; readonly padY?: number; /** Words that do not fit are not shown. */ readonly hide?: boolean };
+  readonly inShape?: { readonly n: readonly number[]; readonly closed: boolean; /** The space kept from the outline, in em. */ readonly padX?: number; readonly padY?: number; /** Words that do not fit are not shown. */ readonly hide?: boolean; /** The shape it follows. */ readonly shape?: ObjectId };
 }
 
 /**

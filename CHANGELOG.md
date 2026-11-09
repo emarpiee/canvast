@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.55.20 — Text follows its shape (2026-11-09)
+
+- **Fixed:** a text inside a shape kept the outline the shape had when the text was put in; it now follows the shape when it is moved, resized or changed.
+- **Fixed:** a pattern made or changed on a sheet redraws the whole view, so no part of the old picture is left.
+
 ## 0.55.19 — Balloons audited (2026-11-09)
 
 - **Fixed:** a balloon's tail took whole sides of a box; a balloon moved in its settings could be cut by its sheet; the heart was out of its box; the zigzag tail folded over itself; a linked balloon's tail crossed the others; linked balloons overlapped, and dots hid under them; dashes were too short to see.
