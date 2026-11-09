@@ -215,7 +215,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `pencil` | Pen |
 | `pencil-line` | Pencil |
 | `pentagon` | Shape tool |
-| `message-circle` | Speech balloon tool, its panel |
+| `message-circle` | Speech balloon tool, its panel (also for a text in a shape) |
 | `play` | Play (every media bar), Play the bookmarks as a tour, Slideshow |
 | `plus` | Zoom in |
 | `presentation` | Start the slideshow |

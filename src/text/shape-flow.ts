@@ -6,6 +6,11 @@ export interface ShapeOutline {
   readonly closed: boolean;
   readonly padX?: number;
   readonly padY?: number;
+  /** The right and the bottom, when they differ from the left (`padX`) and the top (`padY`). */
+  readonly padR?: number;
+  readonly padB?: number;
+  /** Outlines the words go round, as `n` is. */
+  readonly holes?: ReadonlyArray<readonly number[]>;
   readonly hide?: boolean;
 }
 /** Where a line may run inside a shape, in em. */
@@ -43,21 +48,25 @@ function polygon(n: readonly number[]): Float64Array {
   return p;
 }
 
+const boxes = new WeakMap<readonly number[], { minX: number; minY: number; maxX: number; maxY: number }>();
 /** The box of an outline as drawn (its curves followed, not their handles). */
 export function outlineBox(n: readonly number[]): { minX: number; minY: number; maxX: number; maxY: number } {
+  let box = boxes.get(n);
+  if (box) return box;
   const p = polygon(n);
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   for (let i = 0; i < p.length; i += 2) {
     minX = Math.min(minX, p[i]!); maxX = Math.max(maxX, p[i]!);
     minY = Math.min(minY, p[i + 1]!); maxY = Math.max(maxY, p[i + 1]!);
   }
-  return { minX, minY, maxX, maxY };
+  boxes.set(n, (box = { minX, minY, maxX, maxY }));
+  return box;
 }
 
 /** The widest stretch inside the polygon at height y (even-odd), or null. */
-function across(p: Float64Array, y: number): [number, number] | null {
+function across(ps: readonly Float64Array[], y: number): [number, number] | null {
   const xs: number[] = [];
-  for (let i = 0, j = p.length - 2; i < p.length; j = i, i += 2) {
+  for (const p of ps) for (let i = 0, j = p.length - 2; i < p.length; j = i, i += 2) {
     const y0 = p[j + 1]!, y1 = p[i + 1]!;
     if (y0 <= y !== y1 <= y) xs.push(p[j]! + ((y - y0) / (y1 - y0)) * (p[i]! - p[j]!));
   }
@@ -68,35 +77,40 @@ function across(p: Float64Array, y: number): [number, number] | null {
 }
 
 const keys = new WeakMap<readonly number[], string>();
-
-export function flowOf(shape: ShapeOutline, size: number): Flow {
-  const padX = shape.padX ?? INSET, padY = shape.padY ?? 0, hide = shape.hide === true;
-  const p = polygon(shape.n);
-  let key = keys.get(shape.n);
+/** A short fingerprint of an outline, worked out once: the key of a layout is built for every layout, and an outline is thousands of numbers. */
+function fingerprint(n: readonly number[]): string {
+  let key = keys.get(n);
   if (key === undefined) {
-    // (a short fingerprint, worked out once per outline: this key is built for every layout, and an outline is thousands of numbers)
     let h1 = 0x811c9dc5, h2 = 0x1b873593;
-    for (const v of shape.n) {
+    for (const v of n) {
       const x = Math.round(v * 4096) | 0;
       h1 = Math.imul(h1 ^ x, 16777619);
       h2 = Math.imul(h2 ^ (x >>> 3), 2654435761);
     }
-    keys.set(shape.n, (key = `${shape.n.length}:${h1 >>> 0}:${h2 >>> 0}`));
+    keys.set(n, (key = `${n.length}:${h1 >>> 0}:${h2 >>> 0}`));
   }
+  return key;
+}
+
+export function flowOf(shape: ShapeOutline, size: number): Flow {
+  const padL = shape.padX ?? INSET, padT = shape.padY ?? 0, hide = shape.hide === true;
+  const padR = shape.padR ?? padL, padB = shape.padB ?? padT;
+  const ps = [polygon(shape.n), ...(shape.holes ?? []).map(polygon)];
+  const key = [shape.n, ...(shape.holes ?? [])].map(fingerprint).join("/");
   return {
-    key: `${size}|${padX}|${padY}|${hide}|${key}`,
+    key: `${size}|${padL}|${padR}|${padT}|${padB}|${hide}|${key}`,
     hide,
     height: outlineBox(shape.n).maxY / size,
     span(top, bottom) {
       let x0 = -Infinity, x1 = Infinity;
-      for (const em of [top - padY, (top + bottom) / 2, bottom + padY]) {
-        const s = across(p, em * size);
+      for (const em of [top - padT, (top + bottom) / 2, bottom + padB]) {
+        const s = across(ps, em * size);
         if (!s) return null;
         x0 = Math.max(x0, s[0] / size);
         x1 = Math.min(x1, s[1] / size);
       }
-      x0 += padX;
-      x1 -= padX;
+      x0 += padL;
+      x1 -= padR;
       return x1 - x0 >= NARROWEST ? { x0, x1 } : null;
     },
   };

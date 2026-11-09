@@ -1,3 +1,4 @@
+import type { BalloonLook } from "../doc/balloon-geometry";
 import { tabFromKey, tabHtml } from "./tabs";
 import { copyPlainText } from "../app/system-clipboard";
 import { cleanName, freeNameIn } from "../doc/file-names";
@@ -50,6 +51,7 @@ export interface StylesDeps {
   /** Text styles: how many texts are picked (or are being edited), the look of the first one, and putting a saved look on them. */
   text: { count(): number; current(): TextLook | null; apply(look: TextLook, label: string): void };
   /** Pattern styles: putting one into the Pattern panel (and making it on what is picked). */
+  balloon: { can(): boolean; apply(look: BalloonLook): void };
   pattern: { apply(data: PatternData, label: string): void; /** What the Pattern panel holds now (to update a style from it). */ current(): PatternData };
   /** The solid colours of the picked shapes, and the main colours of the one picked picture (null: none is picked). */
   selectionColours(): string[];
@@ -92,7 +94,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   fileInput.dataset["testid"] = "styles-import";
   panel.appendChild(fileInput);
 
-  const canApply = (kind: string): boolean => (kind === "pattern" ? true : kind === "adjustment" ? deps.adjustment.can() : kind === "text" ? deps.text.count() > 0 : deps.paint.count() > 0 || (kind === "gradient" && deps.map.count() > 0));
+  const canApply = (kind: string): boolean => (kind === "pattern" ? true : kind === "balloon" ? deps.balloon.can() : kind === "adjustment" ? deps.adjustment.can() : kind === "text" ? deps.text.count() > 0 : deps.paint.count() > 0 || (kind === "gradient" && deps.map.count() > 0));
   const kindsShown = STYLE_KINDS;
 
   /** The small pictures of pattern styles, made once for each (the data of a style does not change; an update gets a new key). */
@@ -576,6 +578,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     if (item.kind === "adjustment") deps.adjustment.apply(item);
     else if (item.kind === "text") deps.text.apply(item.data as TextLook, item.name);
     else if (item.kind === "pattern") deps.pattern.apply(item.data as PatternData, item.name);
+    else if (item.kind === "balloon") deps.balloon.apply(item.data as BalloonLook);
     else applyPaint(item);
   });
   panel.addEventListener("input", (e) => {

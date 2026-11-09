@@ -3715,3 +3715,35 @@ test("speech balloon: drawn with its key; its tail tip follows the handle, in on
   await p.keyboard.press("Control+z");
   expect(((await last(app)) as B).params!.balloon!.tails[0]!.tip).toEqual(made.params!.balloon!.tails[0]!.tip);
 });
+
+test("speech balloon: a double-click makes its words, kept in the body; nothing is drawn while nothing changes", async ({ app }) => {
+  const p = app.page;
+  await key(app, "k");
+  await drag(app, [500, 300], [800, 500]);
+  await p.mouse.dblclick(650, 400);
+  await p.keyboard.type("Hello");
+  await click(app, 1000, 650);
+  const words = (await objs(app)).find((o) => o.kind === "text") as unknown as { w: number; inShape: { shape: string } };
+  const balloon = (await objs(app)).find((o) => o.shape === "balloon")!;
+  expect(words.inShape.shape).toBe(balloon.id);
+  await p.waitForTimeout(400);
+  const before = await p.evaluate(() => window.__canvastDebug.draws());
+  await p.waitForTimeout(500);
+  expect(await p.evaluate(() => window.__canvastDebug.draws()), "no frame while idle").toBe(before);
+});
+
+test("a number field of the bar keeps the focus while it is typed in", async ({ app }) => {
+  const p = app.page;
+  await key(app, "t");
+  await p.mouse.click(600, 400);
+  await p.keyboard.type("Words");
+  await key(app, "Escape");
+  await key(app, "v");
+  await click(app, 615, 400);
+  const field = p.locator("[data-text-outline-w]");
+  await field.focus();
+  await p.keyboard.type("2");
+  await expect(field).toBeFocused();
+  await p.keyboard.press("Enter");
+  await expect(field).toBeFocused();
+});

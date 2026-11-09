@@ -42,7 +42,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { balloonsToPaths, canConnectBalloons, connectBalloons, selectedBalloon, selectedLink, selectedShapeText, setBalloonLink, setShapeText } from "./actions";
+import { applyBalloonStyle, balloonsToPaths, canConnectBalloons, connectBalloons, selectedBalloon, selectedLink, selectedShapeText, setBalloonLink, setShapeText } from "./actions";
 import { canSplitPaths, splitPaths, placeCardViews, placeLinesBeside, imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, canSetInShape, setTextInShape, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, buildTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
@@ -128,6 +128,7 @@ import { linkedUpdates } from "./style-sync";
 import { PanelDock } from "../ui/panel-dock";
 import { mountAdjustPanel } from "../ui/adjust-panel";
 import { mountPatternPanel } from "../ui/pattern-panel";
+import { balloonLook, rememberBalloonLook, validLook } from "../doc/balloon-geometry";
 import { mountBalloonPanel } from "../ui/balloon-panel";
 import { makePattern, makePatternEach, newPatternSession, patternBox, patternTargetLabel, patternTargets, foundPattern, sessionPattern } from "./pattern";
 import { cleanValues, generatorById } from "../gen";
@@ -772,7 +773,11 @@ async function start(): Promise<void> {
       : [];
     const cropping = editor.cropId ? selected.find((po) => po.obj.id === editor.cropId && po.obj.kind === "image") : undefined;
     if (cropping && (!shot || shot.overlays)) drawCropGhost(ctx, cropping, assets.get(rasterKey(cropping.obj as ImageObject)), vp);
-    if (!shot || shot.overlays) drawOverlays(ctx, selected, editor, fc, vp, theme, members, labels);
+    if (!shot || shot.overlays) {
+      const words = selected.length === 1 && selected[0]!.obj.kind === "text" ? (selected[0]!.obj as TextObject).inShape?.shape : undefined;
+      const owner = words !== undefined && (doc.get(words) as PathObject | undefined)?.params?.balloon ? visibleObjects(doc, index, null, fc, vp).find((p) => p.obj.id === words) : undefined;
+      drawOverlays(ctx, selected, editor, fc, vp, theme, members, labels, owner);
+    }
     if ((editor.revealAt || editor.revealIds) && (!shot || shot.overlays)) {
       const all = (visible ??= visibleObjects(doc, index, editor, fc, vp));
       if (editor.revealIds) drawRevealOutlines(ctx, all.filter((po) => editor.revealIds!.has(po.obj.id)), theme, true);
@@ -808,7 +813,9 @@ async function start(): Promise<void> {
 
   let appView: AppView = "canvas";
   let contextUpdate: () => void = () => undefined;
+  let drawCount = 0;
   const draw = (): void => {
+    drawCount++;
     scheduled = false;
     // Assets view covers the canvas: rendering is suspended (frame waiters still resolve).
     if (appView === "canvas") {
@@ -1189,6 +1196,7 @@ async function start(): Promise<void> {
     names: assetNames,
   });
   mountStylesPanel(side, editor, session.styles, {
+    balloon: { can: () => selectedBalloon(doc, editor) !== null, apply: (look) => applyBalloonStyle(doc, editor, look) },
     pattern: {
       current: () => patternPanel.current(),
       apply: (d, label) => {
@@ -1319,7 +1327,22 @@ async function start(): Promise<void> {
   dock.add(panelEl("pattern-panel"), { id: "pattern", title: "Pattern", side: "right" });
   const balloonPanel = mountBalloonPanel(side, editor, {
     selected: () => selectedBalloon(doc, editor),
-    change: (f, final) => commitShape(doc, editor, { balloon: f }, final),
+    change: (f, final) => {
+      commitShape(doc, editor, { balloon: f }, final);
+      const cur = final ? selectedBalloon(doc, editor) : null;
+      if (cur) {
+        const look = balloonLook(cur.spec);
+        rememberBalloonLook(look);
+        settings.set("balloon.look", JSON.stringify(look));
+      }
+    },
+    saveStyle: () => {
+      const cur = selectedBalloon(doc, editor);
+      if (cur) void session.styles.add("balloon", "", balloonLook(cur.spec)).then((made) => {
+        editor.message = made ? `Saved the balloon style “${made.name}”. It is in the Styles panel.` : "The balloon could not be saved as a style.";
+        editor.changed();
+      });
+    },
     text: () => selectedShapeText(doc, editor),
     setText: (look, final) => setShapeText(doc, editor, look, final),
     link: () => selectedLink(doc, editor),
@@ -1330,6 +1353,9 @@ async function start(): Promise<void> {
       void confirmDialog({ title: "Convert to path?", lines: ["The balloon becomes an ordinary path: its nodes can be edited, and its body, tails and connectors can no longer be set."], confirmLabel: "Convert" }).then((yes) => { if (yes) balloonsToPaths(doc, editor); });
     },
   });
+  try {
+    rememberBalloonLook(validLook(JSON.parse(settings.get("balloon.look") || "null")));
+  } catch { /* (an old or broken value: the usual balloon) */ }
   dock.add(panelEl("balloon-panel"), { id: "balloon", title: "Speech balloon", side: "right" });
 const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     // Sorting by name needs the file names of the selected images (the document only has their hashes).
@@ -2916,7 +2942,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         invalidate();
         return new Promise((resolve) => frameWaiters.push(resolve));
       },
-      { doc, editor, session, renderNow, index, pictureLocked: (hash) => assets.isLocked(hash), appView: () => appView, setSetting: (k, v) => void (settings as unknown as { set(k: string, v: unknown): Promise<void> }).set(k, v), getSetting: (k) => settings.get(k as never), setView, tiles, density, quality, indexReady: () => indexSync.ready(), labels: () => labels },
+      { doc, editor, session, renderNow, index, draws: () => drawCount, pictureLocked: (hash) => assets.isLocked(hash), appView: () => appView, setSetting: (k, v) => void (settings as unknown as { set(k: string, v: unknown): Promise<void> }).set(k, v), getSetting: (k) => settings.get(k as never), setView, tiles, density, quality, indexReady: () => indexSync.ready(), labels: () => labels },
     );
   }
   resize();

@@ -227,6 +227,8 @@ export function drawOverlays(
   theme: SceneTheme,
   members: readonly ProjectedObject[] = [],
   labels: readonly ItemLabel[] = [],
+  /** The balloon whose words are the selection. */
+  owner?: ProjectedObject,
 ): void {
   if (editor.builder) drawBuilder(ctx, editor.builder, fc, vp, theme);
   if (editor.gapFill) drawGaps(ctx, editor.gapFill, fc, vp, theme);
@@ -407,7 +409,7 @@ export function drawOverlays(
 
   drawSelection(ctx, selected, editor, theme, vp);
   if (editor.tool === "node") drawNodes(ctx, selected, editor, theme);
-  if (editor.tool === "select") drawCornerHandles(ctx, selected, editor, theme);
+  if (editor.tool === "select") drawCornerHandles(ctx, selected, editor, theme, owner);
   if (editor.tool === "select" || editor.tool === "node") drawHandleLabel(ctx, editor, theme);
   // (not while the nodes are edited or a shape's corners are opened out one by one: those handles are what is being worked on)
   if (editor.tool === "select" && !(selected.length === 1 && editor.cornersOpen === selected[0]!.obj.id)) drawGradientHandles(ctx, selected, theme, editor.gradientFocus);
@@ -474,7 +476,8 @@ function drawPathNodes(ctx: CanvasRenderingContext2D, po: ProjectedObject, edito
 }
 
 /** The main corner radius dot (large, filled), one small dot per corner when the corners are opened out, and a star's ratio handle (ADR 0105). */
-function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly ProjectedObject[], editor: EditorState, theme: SceneTheme): void {
+function drawCornerHandles(ctx: CanvasRenderingContext2D, picked: readonly ProjectedObject[], editor: EditorState, theme: SceneTheme, owner?: ProjectedObject): void {
+  const selected = owner ? [owner] : picked; // (a balloon's words selected: its handles still show)
   if (selected.length !== 1 || (selected[0]!.obj.kind !== "path" && selected[0]!.obj.kind !== "image")) return;
   const po = selected[0]!;
   if (po.obj.kind === "image" && (editor.selection.size !== 1 || po.obj.locked)) return;
@@ -537,11 +540,12 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
       // Where the tail points: the triangle of the handles that go somewhere, filled, as it is the one that matters most.
       ctx.fillStyle = theme.selection;
       handleGlyph(ctx, b.x, b.y, r + 3, 3, b.a + Math.PI / 2);
-    } else if (b.part === "move") {
+    } else if (b.part === "size") handleGlyph(ctx, b.x, b.y, r + 1, 4, Math.PI / 4);
+    else if (b.part === "move") {
       ctx.fillStyle = theme.selection; // (a filled square on its corner, in the middle of the body)
       handleGlyph(ctx, b.x, b.y, r + 1, 4, Math.PI / 4);
     } else if (b.part === "base") handleGlyph(ctx, b.x, b.y, r + 1, 4, 0); // (a diamond: it slides round the body)
-    else if (b.part === "bend") handleGlyph(ctx, b.x, b.y, r + 3, 4, 0, 0.42); // (the star of a ratio)
+    else if (b.part === "bend" || b.part === "linkBend") handleGlyph(ctx, b.x, b.y, r + 3, 4, 0, 0.42); // (the star of a ratio)
     else if (b.part === "body") {
       ctx.beginPath();
       dot(ctx, theme, b.x, b.y, HANDLE_SIZE_PX / 2 - 1);

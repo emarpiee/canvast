@@ -7,7 +7,7 @@ import type { TextLook } from "../text/text-style";
 import { panelHtml } from "./panel";
 import { mountSettings, type SettingValue } from "./setting-rows";
 
-export interface ShapeTextState { padX: number; padY: number; hide: boolean; align: string; valign: string }
+export interface ShapeTextState { padX: number; padY: number; padR: number; padB: number; hide: boolean; align: string; valign: string; overflow: boolean }
 export interface BalloonActions {
   selected(): { box: Box; spec: BalloonSpec } | null;
   change(f: (s: BalloonSpec, box: Box) => BalloonSpec, final: boolean): void;
@@ -18,6 +18,7 @@ export interface BalloonActions {
   canConnect(): boolean;
   connect(): void;
   toPath(): void;
+  saveStyle(): void;
 }
 
 const BODY: Section = { title: "Body", items: [
@@ -28,6 +29,7 @@ const BODY: Section = { title: "Body", items: [
   when("body", BUMPY, R("bumps", "Bumps", 3, 48, 12)),
   when("body", BUMPY, R("depth", "Bump depth", 2, 60, 18)),
   R("wobble", "Hand-drawn", 0, 100, 0),
+  R("double", "Double line", 0, 40, 0),
   R("seed", "Seed", 1, 999, 1),
 ] };
 const tailSection = (many: number): Section => ({ title: "Tail", items: [
@@ -37,15 +39,18 @@ const tailSection = (many: number): Section => ({ title: "Tail", items: [
   when("tail", ["bubbles"], R("bubbles", "Bubbles", 1, 12, 3)),
   when("tail", ["point", "curved"], R("belly", "Middle width", 0, 150, 50)),
   when("tail", ["curved"], R("bend", "Bend", -100, 100, 28)),
+  when("tail", ["point", "curved"], R("tipRound", "Round tip", 0, 100, 0)),
   Ch("base", "Base", [["locked", "Locked"], ["follows", "Follows tip"]], "locked"),
   when("base", ["locked"], R("baseAt", "Base at", -180, 180, 0)),
   when("base", ["follows"], R("shift", "Base shift", -68, 68, 0)),
 ] });
 const TEXT: Section = { title: "Text", items: [
-  Ch("across", "Across", [["left", "Left"], ["center", "Middle"], ["right", "Right"]], "center", true),
+  Ch("across", "Across", [["left", "Left"], ["center", "Middle"], ["right", "Right"], ["justify", "Justify"]], "center", true),
   Ch("down", "Down", [["top", "Top"], ["middle", "Middle"], ["bottom", "Bottom"]], "middle", true),
-  R("padX", "Padding sides", 0, 4, 0.4, 0.05),
-  R("padY", "Padding top, bottom", 0, 4, 0, 0.05),
+  R("padX", "Padding left", 0, 4, 0.4, 0.05),
+  R("padR", "Padding right", 0, 4, 0.4, 0.05),
+  R("padY", "Padding top", 0, 4, 0, 0.05),
+  R("padB", "Padding bottom", 0, 4, 0, 0.05),
   Ch("over", "Too many words", [["show", "Show"], ["hide", "Hide"]], "show"),
 ] };
 const LINK: Section = { title: "Connector", items: [
@@ -53,7 +58,7 @@ const LINK: Section = { title: "Connector", items: [
   R("linkW", "Width", 1, 100, 22),
   R("linkBend", "Bend", -100, 100, 0),
 ] };
-const TEXT_KEYS = new Set(["across", "down", "padX", "padY", "over"]);
+const TEXT_KEYS = new Set(["across", "down", "padX", "padR", "padY", "padB", "over"]);
 const LINK_KEYS = new Set(["linkStyle", "linkW", "linkBend"]);
 
 const DEG = 180 / Math.PI;
@@ -62,7 +67,7 @@ const minSide = (b: Box): number => Math.min(Math.abs(b[2]), Math.abs(b[3])) || 
 /** The numbers as the panel shows them. */
 function shown(box: Box, s: BalloonSpec, ix: number): Record<string, SettingValue> {
   const t = s.tails[ix];
-  return { preset: "", which: String(ix), bubbles: t?.bubbles ?? 3, body: s.body, round: s.round, sides: s.sides, bumps: s.bumps, depth: s.depth, wobble: s.wobble, seed: s.seed, tail: t?.kind ?? "point", tailW: t ? Math.round((t.width / minSide(box)) * 100) : 22, bend: Math.round(t?.bend ?? 28), shift: Math.round((t?.shift ?? 0) * DEG), belly: Math.round(t?.belly ?? 50), base: t?.follow ? "follows" : "locked", baseAt: t ? Math.round(tailAngle(box, t) * DEG) : 0 };
+  return { double: s.double ?? 0, tipRound: t?.tipRound ?? 0, preset: "", which: String(ix), bubbles: t?.bubbles ?? 3, body: s.body, round: s.round, sides: s.sides, bumps: s.bumps, depth: s.depth, wobble: s.wobble, seed: s.seed, tail: t?.kind ?? "point", tailW: t ? Math.round((t.width / minSide(box)) * 100) : 22, bend: Math.round(t?.bend ?? 28), shift: Math.round((t?.shift ?? 0) * DEG), belly: Math.round(t?.belly ?? 50), base: t?.follow ? "follows" : "locked", baseAt: t ? Math.round(tailAngle(box, t) * DEG) : 0 };
 }
 
 /** Only what was changed goes onto each selected balloon. */
@@ -76,6 +81,7 @@ function applied(p: Readonly<Record<string, SettingValue>>, s: BalloonSpec, box:
     const t: BalloonTail = p["base"] === "locked" ? { ...fixed, angle: at, shift: 0 } : p["base"] === "follows" ? { ...t0, follow: true, shift: at - Math.atan2(t0.tip[1] - c[1], t0.tip[0] - c[0]) } : t0;
     return {
     ...t,
+    ...(p["tipRound"] !== undefined ? { tipRound: p["tipRound"] as number } : {}),
     ...(p["bubbles"] !== undefined ? { bubbles: Math.round(p["bubbles"] as number) } : {}),
     ...(p["belly"] !== undefined ? { belly: p["belly"] as number } : {}),
     ...(p["baseAt"] !== undefined && !t.follow ? { angle: (p["baseAt"] as number) / DEG } : {}),
@@ -91,6 +97,7 @@ function applied(p: Readonly<Record<string, SettingValue>>, s: BalloonSpec, box:
     ...(p["round"] !== undefined ? { round: p["round"] as number } : {}),
     ...(p["depth"] !== undefined ? { depth: p["depth"] as number } : {}),
     ...(p["wobble"] !== undefined ? { wobble: p["wobble"] as number } : {}),
+    ...(p["double"] !== undefined ? { double: p["double"] as number } : {}),
     ...(whole("sides") !== undefined ? { sides: whole("sides")! } : {}),
     ...(whole("bumps") !== undefined ? { bumps: whole("bumps")! } : {}),
     ...(whole("seed") !== undefined ? { seed: whole("seed")! } : {}),
@@ -108,8 +115,8 @@ export function mountBalloonPanel(host: HTMLElement, editor: EditorState, action
   const btn = (id: string, label: string, tip: string): string => `<button type="button" class="adj-map-edit" data-bl="${id}" title="${tip}">${label}</button>`;
   panel.innerHTML = panelHtml({
     title: "Speech balloon",
-    body: `<div data-bl-rows></div>`,
-    foot: `<div class="adj-foot">${btn("addtail", "Add tail", "A new tail on this balloon")}${btn("deltail", "Remove tail", "Take this tail away")}${btn("fit", "Fit text to shape", "The biggest size at which all the words fit")}${btn("connect", "Connect balloons", "Join the two selected balloons")}${btn("topath", "Convert to path", "An ordinary path, for editing its nodes")}</div>`,
+    body: `<div data-bl-rows></div><p class="adj-note" data-bl-over hidden>Some words do not fit in this shape.</p>`,
+    foot: `<div class="adj-foot">${btn("addtail", "Add tail", "A new tail on this balloon")}${btn("deltail", "Remove tail", "Take this tail away")}${btn("fit", "Fit text to shape", "The biggest size at which all the words fit")}${btn("connect", "Connect balloons", "Join the selected balloons, each to the next")}${btn("save", "Save as style", "Keep this balloon's look in the Styles panel")}${btn("topath", "Convert to path", "An ordinary path, for editing its nodes")}</div>`,
   });
   host.append(panel);
   const rowsEl = panel.querySelector<HTMLElement>("[data-bl-rows]")!, titleEl = panel.querySelector<HTMLElement>("h2")!;
@@ -121,7 +128,9 @@ export function mountBalloonPanel(host: HTMLElement, editor: EditorState, action
   let timer = 0;
   let ix = 0;
   const lookOf = (p: Readonly<Record<string, SettingValue>>): TextLook => {
-    const opts = { ...(p["padX"] !== undefined ? { padX: p["padX"] as number } : {}), ...(p["padY"] !== undefined ? { padY: p["padY"] as number } : {}), ...(p["over"] !== undefined ? { hide: p["over"] === "hide" } : {}) };
+    // (the four together: a side that was never set follows another, and must not change when that one does)
+    const anyPad = ["padX", "padR", "padY", "padB"].some((k) => p[k] !== undefined);
+    const opts = { ...(anyPad ? { padX: values["padX"] as number, padR: values["padR"] as number, padY: values["padY"] as number, padB: values["padB"] as number } : {}), ...(p["over"] !== undefined ? { hide: p["over"] === "hide" } : {}) };
     return { ...(p["across"] !== undefined ? { align: p["across"] as "left" } : {}), ...(p["down"] !== undefined ? { valign: p["down"] as "top" } : {}), ...(Object.keys(opts).length ? { shapeOpts: opts } : {}) };
   };
   const send = (p: Record<string, SettingValue>, final: boolean): void => {
@@ -179,6 +188,8 @@ export function mountBalloonPanel(host: HTMLElement, editor: EditorState, action
     b("fit").hidden = !text;
     b("connect").hidden = !actions.canConnect();
     b("topath").hidden = !cur;
+    b("save").hidden = !cur;
+    panel.querySelector<HTMLElement>("[data-bl-over]")!.hidden = !text?.overflow;
     if (!cur && !text && !link) {
       drawn = "";
       rowsEl.innerHTML = `<p class="adj-note">Select a speech balloon or a text in a shape.</p>`;
@@ -188,11 +199,11 @@ export function mountBalloonPanel(host: HTMLElement, editor: EditorState, action
     sections = [...(cur ? [BODY, ...(cur.spec.tails.length ? [tailSection(cur.spec.tails.length)] : [])] : []), ...(text ? [TEXT] : []), ...(link ? [LINK] : [])];
     values = {
       ...(cur ? shown(cur.box, cur.spec, ix) : {}),
-      ...(text ? { across: text.align === "justify" ? "left" : text.align, down: text.valign, padX: text.padX, padY: text.padY, over: text.hide ? "hide" : "show" } : {}),
+      ...(text ? { across: text.align, down: text.valign, padX: text.padX, padR: text.padR, padY: text.padY, padB: text.padB, over: text.hide ? "hide" : "show" } : {}),
       ...(link ? { linkStyle: link.style, linkW: link.width, linkBend: link.bend } : {}),
     };
     const now = JSON.stringify(values);
-    if (now !== drawn) {
+    if (now !== drawn && !rowsEl.contains(document.activeElement)) { // (never under a field that is being typed in)
       drawn = now;
       rows.build();
     }
@@ -205,6 +216,7 @@ export function mountBalloonPanel(host: HTMLElement, editor: EditorState, action
     else if (id === "fit") actions.setText({ fitShape: true }, true);
     else if (id === "connect") actions.connect();
     else if (id === "topath") actions.toPath();
+    else if (id === "save") actions.saveStyle();
   });
   panel.querySelector("[data-close]")!.addEventListener("click", () => {
     panel.hidden = true;

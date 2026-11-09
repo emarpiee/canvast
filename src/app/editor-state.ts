@@ -280,6 +280,11 @@ export class EditorState {
     return true;
   }
 
+  /** Something is being dragged on the canvas. A value typed or scrubbed in a field shows as a preview too, and is not this: the bars stay, and the field keeps the focus. */
+  get gesturing(): boolean {
+    return this.preview.kind !== "none" && this.preview.kind !== "replace";
+  }
+
   setTool(t: Tool): void {
     this.tool = t;
     this.eraser = null;

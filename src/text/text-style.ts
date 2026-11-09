@@ -33,7 +33,7 @@ export interface TextLook {
   /** A text on a path: where it starts (0 to 1), how it is aligned on the curve, which side it is on, how far off it (em). */
   readonly pathOpts?: { start?: number; align?: "start" | "center" | "end"; flip?: boolean; lift?: number } | null;
   /** A text in a shape: the space kept from the outline (em), and whether words that do not fit are left out. */
-  readonly shapeOpts?: { padX?: number; padY?: number; hide?: boolean } | null;
+  readonly shapeOpts?: { padX?: number; padY?: number; padR?: number; padB?: number; hide?: boolean } | null;
   /** Once: the size that fills the shape. */
   readonly fitShape?: boolean;
   /** Space between paragraphs in em. */
@@ -135,10 +135,16 @@ export function fitWidth(o: TextObject): TextObject {
 }
 
 /** The text with the given look fields applied: values kept in range, defaults left out of the stored form, the width refitted. */
+/** Whether a text's words go past the end of its shape (shown or left out). */
+export function overflowsShape(o: TextObject): boolean {
+  if (!o.inShape) return false;
+  return layoutOf({ ...o, inShape: { ...o.inShape, hide: false } }).height * o.size > outlineBox(o.inShape.n).maxY * (1 + 1e-6);
+}
+
 /** The biggest size at which all of a text's words fit inside its shape. */
 function fitToShape(o: TextObject): TextObject {
   const H = outlineBox(o.inShape!.n).maxY;
-  const fits = (size: number): boolean => layoutOf({ ...o, size }).height * size <= H;
+  const fits = (size: number): boolean => layoutOf({ ...o, size }).height * size <= H * (1 + 1e-9);
   let lo = o.size / 64, hi = o.size * 64;
   for (let i = 0; i < 24; i++) {
     const mid = Math.sqrt(lo * hi);

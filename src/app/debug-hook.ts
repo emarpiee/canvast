@@ -213,6 +213,8 @@ export interface DebugHook {
   /** The words beside a handle being dragged, or null. */
   /** The handles of the selected speech balloon, on screen. */
   balloonDots(): Array<{ part: string; tail: number; x: number; y: number }>;
+  /** How many frames have been drawn: it must not rise while nothing changes. */
+  draws(): number;
   handleLabel(): string | null;
   /** The nodes picked together in Edit nodes (ADR 0145): how many on each path. */
   pickedNodes(): Array<[string, number]>;
@@ -295,6 +297,8 @@ export interface DebugDeps {
   session: Session;
   renderNow: () => FrameBreakdown;
   index: FrameIndex;
+  /** How many frames have been drawn. */
+  draws(): number;
   /** Whether the canvas draws this original as locked (a hidden item's encrypted file while the Hidden items are locked). */
   pictureLocked: (hash: string) => boolean;
   appView: () => AppView;
@@ -587,6 +591,7 @@ export function installDebugHook(
       const po = visibleObjects(doc, deps.index, null, view.frameCamera, view.viewport).find((p) => editor.selection.has(p.obj.id));
       return (po && shapeHandles(po, false, editor)?.balloon) ?? [];
     },
+    draws: () => deps.draws(),
     handleLabel: () => editor.handleLabel?.text ?? null,
     pickedNodes: () => [...editor.nodeMulti].map(([id, set]) => [id, set.size] as [string, number]),
     handleGuide: () => editor.handleLabel?.guide ?? null,

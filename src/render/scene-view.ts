@@ -1,3 +1,4 @@
+import { followed, parentOf, textsInShapes } from "../doc/text-in-shape";
 import type { Viewport } from "../core/camera";
 import type { FrameCamera } from "../core/frames";
 import type { DocumentStore } from "../doc/document-store";
@@ -121,6 +122,12 @@ export function visibleObjects(
       if (o) shown.set(id, editor.previewed(o));
     }
     for (const o of previewResults(doc, shown)) derived.set(o.id, o);
+    // (the words inside a shape being changed go with it while the gesture goes on)
+    for (const t of textsInShapes(doc)) {
+      const p = shown.get(parentOf(t)!);
+      const made = p?.kind === "path" ? followed(t, p) : null;
+      if (made) derived.set(t.id, made);
+    }
   }
   const previewIds: ReadonlySet<ObjectId> = derived.size ? new Set([...previewIds0, ...derived.keys()]) : previewIds0;
   const out: ProjectedObject[] = [];

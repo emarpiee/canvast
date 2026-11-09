@@ -551,7 +551,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const t = actions.selectedTextStyle();
     if (!t) return;
     openTextBoxPopover(e.currentTarget as HTMLElement, {
-      paraGap: t.paraGap, indent: t.indent, caps: t.caps, maxLines: t.maxLines, heightPx: t.heightPx, valign: t.valign, align: t.align, card: t.card, pathOpts: t.pathOpts, shapeOpts: t.shapeOpts,
+      paraGap: t.paraGap, indent: t.indent, caps: t.caps, maxLines: t.maxLines, heightPx: t.heightPx, valign: t.valign, card: t.card, pathOpts: t.pathOpts, shapeOpts: t.shapeOpts,
       onChange: (patch, final) => actions.setTextStyle(patch, final),
     });
   });
@@ -916,7 +916,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (document.activeElement !== sides) sides.value = String(editor.shapeSides);
     if (document.activeElement !== tips) tips.value = String(editor.shapeTips);
     const pick = editor.tool === "select" || editor.tool === "node";
-    const still = editor.preview.kind === "none"; // (not while something is being dragged: the numbers wait for it to end)
+    const still = !editor.gesturing; // (not while something is being dragged: the numbers wait for it to end)
     const shp = pick && still ? actions.selectedShape() : null;
     const crn = pick && still ? actions.selectedCorners() : null;
     const smoothing = pick && still ? actions.selectedSmoothing() : null;
@@ -1024,8 +1024,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-shape-out]")!.textContent = noOutline ? "None" : `${editor.shapeWidthPx} px`;
     // The paint chips show the next shape's colours, or the selected paths' (and are there only when something has them).
     const sel = editor.tool === "select" || editor.tool === "node" ? actions.selectedPaint() : null;
-    const several = (editor.tool === "select" || editor.tool === "node") && editor.preview.kind === "none" ? actions.selectionPaints().count >= 2 : false;
-    if (editor.preview.kind === "none") {
+    const several = (editor.tool === "select" || editor.tool === "node") && !editor.gesturing ? actions.selectionPaints().count >= 2 : false;
+    if (!editor.gesturing) {
     }
     const outlineAt = several ? root.querySelector<HTMLElement>("[data-sel-colours]")! : outlineHome;
     if (outlineBtn.parentElement !== outlineAt) outlineAt.append(outlineBtn);
@@ -1064,7 +1064,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-lock]")!.setAttribute("aria-pressed", String(editor.lock !== null));
     const lockR = pq("[data-lock-radius]");
     lockR.setAttribute("aria-pressed", String(editor.lockRadius));
-    if (editor.preview.kind === "none") lockR.hidden = !(editor.tool === "select" && actions.selectedCorners() !== null); // (there when a picked shape has corners)
+    if (!editor.gesturing) lockR.hidden = !(editor.tool === "select" && actions.selectedCorners() !== null); // (there when a picked shape has corners)
     for (const b of root.querySelectorAll<HTMLElement>("[data-filter]")) {
       b.setAttribute("aria-checked", String(b.dataset["filter"] === editor.lassoFilter));
     }
@@ -1076,7 +1076,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     penSize.dataset["for"] = editor.tool === "select" && editor.selection.size > 0 && ![...editor.selection].some((id) => doc.get(id)?.kind === "stroke") ? "pen" : "pen select";
     // One row, one kind at a time (ADR 0128): when the picked items are of different kinds, chips at the start choose which kind's
     // properties the row shows; what is for another kind is switched off, never moved into a menu.
-    const picking = (editor.tool === "select" || editor.tool === "node") && editor.preview.kind === "none";
+    const picking = (editor.tool === "select" || editor.tool === "node") && !editor.gesturing;
     const kinds = picking ? [...new Set([...editor.selection].flatMap((id) => { const o = doc.get(id); return o ? [kindOf(o)] : []; }))] : [];
     // (`all`, chosen by its chip, shows only what is for any kind in this row; the Actions bar below follows the same choice)
     const chosen = editor.subject === "all" && kinds.length > 1 ? "all" : kinds.includes(editor.subject ?? "") ? editor.subject! : (kinds[0] ?? null);

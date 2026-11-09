@@ -1,11 +1,11 @@
-import { biggestClosed, fittedInShape, subArea } from "../doc/text-in-shape";
+import { biggestClosed, fittedInShape, fittedOnPath, subArea, textsInShapes } from "../doc/text-in-shape";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { levelsBetween } from "../core/frames";
 import { isArtFile } from "../assets/art-preview";
 import { beginProgress } from "./progress";
 import { withStyleLinks } from "../doc/style-links";
-import type { BalloonSpec, Box } from "../doc/balloon-geometry";
-import { newLinkObject, type BalloonLink } from "../doc/balloon-link";
+import { withBalloonLook, type BalloonLook, type BalloonSpec, type Box } from "../doc/balloon-geometry";
+import { newLinkObject, withBalloonLinks, type BalloonLink } from "../doc/balloon-link";
 import { hasCorners, paramsOf, withRadius, withShapeParams, type ShapePatch } from "../doc/shape-params";
 import { DEFAULT_INNER, type Radius } from "../doc/path";
 import { canRound, nodesIn, roundCorners } from "../doc/rounding";
@@ -19,7 +19,7 @@ import * as D from "../core/dyadic";
 import { screenToWorld } from "../core/camera";
 import type { DocumentStore } from "../doc/document-store";
 import type { BlendMode, CanvasObject, ImageObject, InitialPaint, InitialShape, MediaState, PathObject, StrokeObject, TextObject } from "../doc/model";
-import { fitWidth, withLook, lookOf, sameLook } from "../text/text-style";
+import { fitWidth, withLook, lookOf, overflowsShape, sameLook } from "../text/text-style";
 import type { TextLook } from "../text/text-style";
 import { textOutline } from "../text/outline";
 import type { GradientStop, Paint } from "../doc/paint";
@@ -1231,30 +1231,21 @@ export function selectedBalloon(doc: DocumentStore, editor: EditorState): { box:
   return o ? { box: o.params!.box as Box, spec: o.params!.balloon! } : null;
 }
 
-const inShapesAt = new WeakMap<object, TextObject[]>();
-/** Every text tied to a shape, found once per change of the document: the bars ask at every update of the interface. */
-function textsInShapes(doc: DocumentStore): TextObject[] {
-  const scan = (): TextObject[] => [...doc.all()].filter((o): o is TextObject => o.kind === "text" && o.inShape?.shape !== undefined);
-  const at = doc.lastTransaction;
-  if (!at) return scan();
-  let found = inShapesAt.get(at);
-  if (!found) inShapesAt.set(at, (found = scan()));
-  return found;
-}
-
 /** The words in the selected shapes, and the selected words that are in a shape. */
 function shapeTexts(doc: DocumentStore, editor: EditorState): TextObject[] {
   const sel = selected(doc, editor);
   const ids = new Set(sel.map((o) => o.id));
   const out = new Map<string, TextObject>();
   for (const o of sel) if (o.kind === "text" && o.inShape && !o.locked) out.set(o.id, o);
-  if (sel.some((o) => o.kind === "path")) for (const o of textsInShapes(doc)) if (!o.locked && ids.has(o.inShape!.shape!)) out.set(o.id, o);
+  if (sel.some((o) => o.kind === "path")) for (const o of textsInShapes(doc)) if (!o.locked && o.inShape && ids.has(o.inShape.shape!)) out.set(o.id, o);
   return [...out.values()];
 }
 
-export function selectedShapeText(doc: DocumentStore, editor: EditorState): { padX: number; padY: number; hide: boolean; align: string; valign: string } | null {
+export function selectedShapeText(doc: DocumentStore, editor: EditorState): { padX: number; padY: number; padR: number; padB: number; hide: boolean; align: string; valign: string; overflow: boolean } | null {
   const t = shapeTexts(doc, editor)[0];
-  return t ? { padX: t.inShape!.padX ?? 0.4, padY: t.inShape!.padY ?? 0, hide: t.inShape!.hide === true, align: t.align ?? "left", valign: t.valign ?? "top" } : null;
+  if (!t) return null;
+  const { padX = 0.4, padY = 0, padR, padB, hide } = t.inShape!;
+  return { padX, padY, padR: padR ?? padX, padB: padB ?? padY, hide: hide === true, align: t.align ?? "left", valign: t.valign ?? "top", overflow: overflowsShape(t) };
 }
 
 /** Change how the words sit in their shapes: one undo step when `final`. */
@@ -1287,25 +1278,33 @@ function selectedLinkObject(doc: DocumentStore, editor: EditorState): PathObject
 }
 export const selectedLink = (doc: DocumentStore, editor: EditorState): BalloonLink | null => selectedLinkObject(doc, editor)?.params?.link ?? null;
 
-export function setBalloonLink(doc: DocumentStore, editor: EditorState, patch: Partial<BalloonLink>): void {
+export function setBalloonLink(doc: DocumentStore, editor: EditorState, patch: Partial<BalloonLink>, final = true): void {
   const o = selectedLinkObject(doc, editor);
   if (!o || editor.blockEdit()) return;
-  doc.commit(doc.transaction("Balloon connector", [{ ...o, params: { ...o.params!, link: { ...o.params!.link!, ...patch } } }]));
+  const next: PathObject = { ...o, params: { ...o.params!, link: { ...o.params!.link!, ...patch } } };
+  if (!final) return showReplaced(editor, withBalloonLinks(doc, [next], []).next);
+  editor.preview = { kind: "none" };
+  doc.commit(doc.transaction("Balloon connector", [next]));
   editor.changed();
 }
 
-const twoBalloons = (doc: DocumentStore, editor: EditorState): PathObject[] => {
+const balloonsToJoin = (doc: DocumentStore, editor: EditorState): PathObject[] => {
   const b = selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !!o.params?.balloon);
-  return b.length === 2 && b[0]!.frame === b[1]!.frame ? b : [];
+  return b.length >= 2 && b.every((o) => o.frame === b[0]!.frame) ? b : [];
 };
-export const canConnectBalloons = (doc: DocumentStore, editor: EditorState): boolean => twoBalloons(doc, editor).length === 2;
+export const canConnectBalloons = (doc: DocumentStore, editor: EditorState): boolean => balloonsToJoin(doc, editor).length >= 2;
 
-/** Join the two selected balloons: the connector then follows them, and goes when one of them goes. */
+/** Join the selected balloons, each to the next from left to right: the connectors then follow them, and go when one of them goes. */
 export function connectBalloons(doc: DocumentStore, editor: EditorState): void {
-  const b = twoBalloons(doc, editor);
+  const b = [...balloonsToJoin(doc, editor)].sort((p, q) => D.cmp(p.anchor.x, q.anchor.x));
   if (!b.length || editor.blockEdit()) return;
-  doc.commit(doc.transaction("Connect balloons", [newLinkObject(b[0]!, b[1]!)]));
+  doc.commit(doc.transaction("Connect balloons", b.slice(1).map((o, i) => newLinkObject(b[i]!, o))));
   editor.changed();
+}
+
+/** A look saved as a style goes on every selected balloon. */
+export function applyBalloonStyle(doc: DocumentStore, editor: EditorState, look: BalloonLook): void {
+  commitShape(doc, editor, { balloon: (s) => withBalloonLook(s, look) }, true);
 }
 
 /** The selected balloons become ordinary paths, for editing their nodes: their numbers are given up. */
@@ -2977,19 +2976,13 @@ export function setTextOnPath(doc: DocumentStore, editor: EditorState): void {
   const tp = textAndPath(doc, editor);
   if (!tp || editor.blockEdit()) return;
   const { text, path } = tp;
-  const sub = pathSubs(path).find((s) => s.n.length >= 12)!;
-  // the path's local units to the text's: the path's anchor relative to the text's (exact), then the units' ratio
-  const k = 2 ** (path.unit - text.unit);
-  const dx = D.toNumber(D.shift(D.sub(path.anchor.x, text.anchor.x), -text.unit));
-  const dy = D.toNumber(D.shift(D.sub(path.anchor.y, text.anchor.y), -text.unit));
-  const n = sub.n.map((v, i) => v * k + (i % 2 === 0 ? dx : dy));
-  if (!n.every((v) => Number.isFinite(v))) {
+  const next = fittedOnPath(text, path);
+  if (!next) {
     editor.message = "The path is too far from the text to set it along.";
     editor.changed();
     return;
   }
-  const { inShape: _s, ...straight } = text;
-  doc.commit(doc.transaction("Set text on path", [{ ...straight, onPath: { n, closed: sub.closed } }]));
+  doc.commit(doc.transaction("Set text on path", [next]));
   editor.changed();
 }
 

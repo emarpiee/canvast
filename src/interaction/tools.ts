@@ -16,7 +16,8 @@ import { moveNodes, edgeBetween, deleteVertex, cellAt } from "../doc/network";
 import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
 import { nodesIn, roundCorners } from "../doc/rounding";
 import { paramsOf } from "../doc/shape-params";
-import { BALLOON_LABELS, balloonDragged, balloonOutline, type BalloonPart } from "../doc/balloon-geometry";
+import { linkDragged } from "../doc/balloon-link";
+import { BALLOON_LABELS, balloonDragged, balloonOutline, boxShape, nearOutline, withTailAt, type Box, type BalloonPart } from "../doc/balloon-geometry";
 import { DEFAULT_INNER } from "../doc/path";
 import { linkAt } from "../text/layout";
 import { pictureBox } from "../render/gradient";
@@ -55,7 +56,7 @@ import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians, cosSin, normAngle, radiansFromAngle } from "../core/angle";
 import { formatRatio } from "../app/export-size";
 import { PanGesture } from "./navigation";
-import { drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, setShapeText, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, setShapeText, setBalloonLink, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -258,11 +259,11 @@ type Gesture =
   /** Dragging a handle of a path's gradient (ADR 0100). */
   | { kind: "grad"; pointerId: number; id: ObjectId; which: "fill" | "stroke"; handle: GradHandle; g: Gradient }
   /** Dragging the corner radius dot or a star's ratio handle (ADR 0105): `r0` the radius in px and `proj0` where along the corner's bisector the press was. */
-  | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio" | "count" | "balloon"; balloon?: { part: BalloonPart; tail: number }; index: number; ax: number; ay: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number; /** Every picked corner taken along (its radius and the most it can have), by node. */ multi?: ReadonlyMap<number, { r0: number; max: number }> }
+  | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio" | "count" | "balloon"; balloon?: { part: BalloonPart; tail: number }; snap?: SnapContext | null; index: number; ax: number; ay: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number; /** Every picked corner taken along (its radius and the most it can have), by node. */ multi?: ReadonlyMap<number, { r0: number; max: number }> }
   /** Dragging a shape out (Shape tool). */
   | { kind: "shape"; pointerId: number; start: ScreenPoint }
   /** A side handle of words in a shape: the shape sets their box, so what it changes is the padding. */
-  | { kind: "textpad"; pointerId: number; start: ScreenPoint; edge: Edge; pad0: number; emPx: number; moved: boolean }
+  | { kind: "textpad"; pointerId: number; start: ScreenPoint; edge: Edge; pads: { padX: number; padY: number; padR: number; padB: number }; emPx: number; moved: boolean }
   /** A node of the path being built has been placed; dragging pulls its handles out (Path tool). */
   | { kind: "pathnode"; pointerId: number; start: ScreenPoint; dragging: boolean }
   /** A node, a handle or a segment of the selected path (Edit nodes tool); `base` is the path's geometry when the press began. */
@@ -890,6 +891,13 @@ export function attachTools(
   };
   /** What a gradient is edited on: the one picked path, or the result of a boolean group picked whole (whose paint is the group's own). */
   const gradientTarget = (): { po: ProjectedObject; o: PathObject } | null => {
+    // (a balloon's words selected: its handles are still the balloon's)
+    if (editor.selection.size === 1) {
+      const t = doc.get([...editor.selection][0]!);
+      const shape = t?.kind === "text" ? t.inShape?.shape : undefined;
+      const po = shape !== undefined && (doc.get(shape) as PathObject | undefined)?.params?.balloon ? visible().find((p) => p.obj.id === shape) : undefined;
+      if (po && po.obj.kind === "path" && !po.cover && !po.obj.locked) return { po, o: po.obj };
+    }
     const one = nodeTarget();
     if (one) return one;
     // a picture (ADR 0153): its corner radius and its outline's gradient, on its box as a rectangle path
@@ -963,7 +971,7 @@ export function attachTools(
         toggleCorners(id);
       }
     }, LONG_PRESS_MS) : 0;
-    g = { kind: "round", pointerId: e.pointerId, id, what: pick.what, ...(pick.what === "balloon" ? { balloon: { part: pick.handle.part, tail: pick.handle.tail } } : {}), index: pick.what === "corner" ? pick.dot.index : 0, ax: pick.what === "ratio" && h.ratio ? (h.ratio.x - h.ratio.cx) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, ay: pick.what === "ratio" && h.ratio ? (h.ratio.y - h.ratio.cy) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, r0: dot?.px ?? 0, proj0: along, x0: s.x, start: s, moved: false, opened: false, timer };
+    g = { kind: "round", pointerId: e.pointerId, id, what: pick.what, ...(pick.what === "balloon" ? { balloon: { part: pick.handle.part, tail: pick.handle.tail }, snap: editor.snap ? snapContext([id], view.frame) : null } : {}), index: pick.what === "corner" ? pick.dot.index : 0, ax: pick.what === "ratio" && h.ratio ? (h.ratio.x - h.ratio.cx) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, ay: pick.what === "ratio" && h.ratio ? (h.ratio.y - h.ratio.cy) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, r0: dot?.px ?? 0, proj0: along, x0: s.x, start: s, moved: false, opened: false, timer };
     const sel = editor.cornerSel;
     if (g.kind === "round" && pick.what === "corner" && sel && sel.id === id && sel.idx.size > 1 && sel.idx.has(pick.dot.index)) {
       g.multi = new Map(h.corners.filter((d) => sel.idx.has(d.index)).map((d) => [d.index, { r0: d.px, max: d.max }]));
@@ -976,9 +984,9 @@ export function attachTools(
     if (!g.moved) return;
     // Dragged in: more padding, dragged out: less.
     const inward = g.edge === "e" ? g.start.x - s.x : g.edge === "w" ? s.x - g.start.x : g.edge === "s" ? g.start.y - s.y : s.y - g.start.y;
-    const pad = Math.max(0, Math.round((g.pad0 + inward / g.emPx) * 100) / 100);
-    const across = g.edge === "e" || g.edge === "w";
-    setShapeText(doc, editor, { shapeOpts: across ? { padX: pad } : { padY: pad } }, final);
+    const side = g.edge === "e" ? "padR" : g.edge === "w" ? "padX" : g.edge === "s" ? "padB" : "padY";
+    const pad = Math.max(0, Math.round((g.pads[side] + inward / g.emPx) * 100) / 100);
+    setShapeText(doc, editor, { shapeOpts: { ...g.pads, [side]: pad } }, final);
     editor.handleLabel = final ? null : { x: s.x, y: s.y, text: `Padding ${pad}` };
   };
   const updateCorner = (s: ScreenPoint, final: boolean): void => {
@@ -995,8 +1003,22 @@ export function attachTools(
     const ppu = tgt.po.proj.ppu;
     if (g.what === "balloon" && g.balloon) {
       const { part, tail } = g.balloon;
-      const l = localOf(tgt.po, s.x, s.y);
-      if (part === "move") commitShapeNumbers(doc, editor, { balloonBox: (b) => [l.x - b[2] / 2, l.y - b[3] / 2, b[2], b[3]] }, final);
+      // (the tip, the base and the body line up with the grid and with what is in view, when Snap is on)
+      const sn = g.snap ?? null;
+      const hx = sn && part !== "foot" && part !== "bend" && part !== "belly" && !part.startsWith("link") ? bestSnap([s.x, s.x, s.x], sn.tx) : null;
+      const hy = sn && part !== "foot" && part !== "bend" && part !== "belly" && !part.startsWith("link") ? bestSnap([s.y, s.y, s.y], sn.ty) : null;
+      const sx = g.snap ? nearerOf(s.x, hx ? sn!.tx[hx.target]![hx.line]! : null, gridScreen(s.x, "x")) : null;
+      const sy = g.snap ? nearerOf(s.y, hy ? sn!.ty[hy.target]![hy.line]! : null, gridScreen(s.y, "y")) : null;
+      editor.guides = !final && (sx !== null || sy !== null) ? { ...(sx !== null ? { x: sx } : {}), ...(sy !== null ? { y: sy } : {}) } : null;
+      const l = localOf(tgt.po, sx ?? s.x, sy ?? s.y);
+      if (part === "linkW" || part === "linkBend") {
+        const q = tgt.o.params!;
+        setBalloonLink(doc, editor, linkDragged(q.box, q.link!, part, [l.x, l.y]), final);
+      } else if (part === "move") commitShapeNumbers(doc, editor, { balloonBox: (b) => [l.x - b[2] / 2, l.y - b[3] / 2, b[2], b[3]] }, final);
+      else if (part === "size") commitShapeNumbers(doc, editor, { balloonBox: (b) => {
+        const { c, rx, ry } = boxShape(b as Box);
+        return [c[0] - rx, c[1] - ry, Math.max(rx * 0.05, l.x - (c[0] - rx)), Math.max(ry * 0.05, l.y - (c[1] - ry))];
+      } }, final);
       else commitShapeNumbers(doc, editor, { balloon: (q, box) => {
         const n = balloonDragged(box, q, part, tail, [l.x, l.y]);
         return final && part === "tip" && balloonOutline(box, n).marks[tail] === null ? { ...n, tails: n.tails.filter((_, i) => i !== tail) } : n; // (let go inside the body: the tail is taken away)
@@ -1431,8 +1453,8 @@ export function attachTools(
         const words = ids.length === 1 ? doc.get(ids[0]!) : undefined;
         const wordsPo = words?.kind === "text" && words.inShape?.shape !== undefined && h.edge ? visible().find((p) => p.obj.id === words.id) : undefined;
         if (words?.kind === "text" && wordsPo && h.edge && wordsPo.proj.ppu > 0 && Number.isFinite(wordsPo.proj.ppu)) {
-          const across = h.edge === "e" || h.edge === "w";
-          g = { kind: "textpad", pointerId: e.pointerId, start: s, edge: h.edge, pad0: across ? (words.inShape!.padX ?? 0.4) : (words.inShape!.padY ?? 0), emPx: words.size * wordsPo.proj.ppu, moved: false };
+          const { padX = 0.4, padY = 0, padR, padB } = words.inShape!;
+          g = { kind: "textpad", pointerId: e.pointerId, start: s, edge: h.edge, pads: { padX, padY, padR: padR ?? padX, padB: padB ?? padY }, emPx: words.size * wordsPo.proj.ppu, moved: false };
           return;
         }
         // Free (one-axis, or both axes apart) for upright pictures and for paths, turned or not, whose turn is the box's: strokes and text keep their shape.
@@ -2592,6 +2614,15 @@ export function attachTools(
     if (hit && isContainer(hit) && !isMaskSheet(hit) && hasThingsOn(hit)) return;
     // A double-click on a path edits its nodes.
     if (hit?.kind === "path" && hit.params?.balloon) {
+      // (on its outline: one more tail; anywhere else: its words)
+      const po = visible().find((p) => p.obj.id === hit.id);
+      const at = po && localOf(po, s.x, s.y);
+      const q = hit.params;
+      if (po && at && nearOutline(q.box as Box, q.balloon!, [at.x, at.y], 10 / po.proj.ppu)) {
+        editor.select([hit.id]);
+        commitShapeNumbers(doc, editor, { balloon: (b, box) => withTailAt(box, b, [at.x, at.y]) }, true);
+        return;
+      }
       const words = balloonText(doc, hit);
       if (words) hooks.editText(words, world(s));
       return;

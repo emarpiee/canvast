@@ -31,6 +31,18 @@ describe("a text inside a shape", () => {
   });
 });
 
+describe("a text along a path", () => {
+  const line = { id: "s", kind: "path", anchor: at(5), unit: 0, sub: [{ n: [0, 0, 0, 0, 0, 0, 30, 0, 30, 0, 30, 0], closed: false }] } as unknown as CanvasObject;
+  const onIt = { id: "t", kind: "text", anchor: at(0), unit: 0, w: 10, size: 2, onPath: { n: [5, 0, 5, 0, 5, 0, 35, 0, 35, 0, 35, 0], closed: false, path: "s" } } as unknown as CanvasObject;
+  it("follows its path, and is plain when the path is deleted", () => {
+    const moved = { ...line, anchor: at(9) } as CanvasObject;
+    const t = withShapeTexts(src(line, onIt), [moved], []).find((o) => o.id === "t") as Extract<CanvasObject, { kind: "text" }>;
+    expect(t.onPath!.n[0]).toBe(9);
+    const plain = withShapeTexts(src(line, onIt), [], ["s"]).find((o) => o.id === "t") as Extract<CanvasObject, { kind: "text" }>;
+    expect(plain.onPath).toBeUndefined();
+  });
+});
+
 describe("a text's box made wider or narrower", () => {
   const t = { id: "t", kind: "text", anchor: at(10), unit: 0, w: 100, size: 20, autoWidth: true } as unknown as CanvasObject;
   const fixed = { x: D.fromNumber(10), y: D.fromNumber(0) };

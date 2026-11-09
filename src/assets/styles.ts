@@ -4,6 +4,7 @@
  * To add a kind (a colour palette, a stroke, a text style...) add one object there and offer a way to save and apply it; the storage, the
  * sidebar card of the Assets view (rows, rename, delete) and the unknown-kind safety need nothing more.
  */
+import { BODIES, validLook, type BalloonLook } from "../doc/balloon-geometry";
 import { plural } from "../doc/plural";
 import type { Adjust } from "../doc/adjust";
 import { ADJUSTMENTS, cleanAdjust, layersOf } from "../doc/adjust";
@@ -153,7 +154,17 @@ export const PATTERN_KIND: StyleKind = {
 };
 
 // Stroke styles come here as one more kind (ADR 0120).
-export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND];
+export const BALLOON_KIND: StyleKind = {
+  id: "balloon",
+  label: "Speech balloon",
+  plural: "Speech balloons",
+  empty: "None yet. Save one from the Speech balloon panel.",
+  validate: (d) => validLook(d),
+  summary: (d) => BODIES.find(([id]) => id === (d as BalloonLook).body)?.[1] ?? "Balloon",
+  look: () => ({}),
+};
+
+export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND, BALLOON_KIND];
 
 export const kindById = (id: string): StyleKind | undefined => STYLE_KINDS.find((k) => k.id === id);
 

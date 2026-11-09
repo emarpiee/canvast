@@ -1,10 +1,10 @@
 import * as D from "../core/dyadic";
-import { ellipse, poly } from "../gen/geom";
-import type { P } from "../gen/geom";
+import { circle, poly, type P } from "./balloon-geometry";
 import type { DerivationSource } from "./boolean-group";
 import type { CanvasObject, ObjectId, PathObject } from "./model";
-import { newObjectId } from "./model";
-import type { SubPath } from "./path";
+import { newObjectId, pathStyle } from "./model";
+import { paintBounds, type SubPath } from "./path";
+import { cosSin } from "../core/angle";
 
 /** Balloons joined by a connector: the connector names its two balloons and is made again in every transaction that changes them, so it always follows. */
 export type LinkStyle = "neck" | "pinched" | "line" | "dots";
@@ -18,11 +18,34 @@ export interface BalloonLink {
   readonly width: number;
   /** How far it bows, a share of its length in percent. */
   readonly bend: number;
+  /** The smaller balloon's size in local units (what `width` is a share of), kept when it is made. */
+  readonly size?: number;
   /** On the piece that covers the two outlines where a neck joins them: the connector it belongs to. */
   readonly cover?: ObjectId;
 }
 
-export const validLink = (l: BalloonLink): boolean => typeof l.a === "string" && typeof l.b === "string" && LINK_STYLES.some(([s]) => s === l.style) && Number.isFinite(l.width) && l.width >= 0 && l.width <= 200 && Number.isFinite(l.bend) && Math.abs(l.bend) <= 100;
+export const validLink = (l: BalloonLink): boolean => typeof l.a === "string" && typeof l.b === "string" && LINK_STYLES.some(([s]) => s === l.style) && Number.isFinite(l.width) && l.width >= 0 && l.width <= 200 && Number.isFinite(l.bend) && Math.abs(l.bend) <= 100 && (l.size === undefined || Number.isFinite(l.size));
+
+/** Where a connector's handles are: its box is from its first balloon's middle to its second's. */
+export function linkHandlePoints(box: readonly number[], l: BalloonLink): Array<{ part: "linkW" | "linkBend"; at: P; dir: P }> {
+  const [, , tx, ty] = box as [number, number, number, number];
+  const len = Math.hypot(tx, ty) || 1;
+  const n: P = [-ty / len, tx / len];
+  const bow = (l.bend / 100) * len;
+  const mid: P = [tx / 2 + (n[0] * bow) / 2, ty / 2 + (n[1] * bow) / 2];
+  const w = ((l.size ?? 0) * l.width) / 100;
+  return [{ part: "linkBend", at: mid, dir: n }, { part: "linkW", at: [mid[0] + (n[0] * w) / 2, mid[1] + (n[1] * w) / 2], dir: n }];
+}
+
+export function linkDragged(box: readonly number[], l: BalloonLink, part: "linkW" | "linkBend", [x, y]: P): Partial<BalloonLink> {
+  const [, , tx, ty] = box as [number, number, number, number];
+  const len = Math.hypot(tx, ty) || 1;
+  const nx = -ty / len, ny = tx / len;
+  const off = (x - tx / 2) * nx + (y - ty / 2) * ny;
+  if (part === "linkBend") return { bend: Math.max(-100, Math.min(100, ((off * 2) / len) * 100)) };
+  const bow = (l.bend / 100) * len;
+  return { width: Math.max(1, Math.min(200, (Math.abs(off - bow / 2) * 200) / (l.size || 1))) };
+}
 
 const isBalloon = (o: CanvasObject | null | undefined): o is PathObject => o?.kind === "path" && o.params?.balloon !== undefined;
 
@@ -35,7 +58,7 @@ function linkSubs(l: BalloonLink, to: P, size: number, inset: number): SubPath[]
   if (l.style === "line") return [poly(Array.from({ length: 25 }, (_, i) => at(i / 24)), false)];
   if (l.style === "dots") {
     const many = Math.max(2, Math.round(len / (w * 0.9 || 1)));
-    return Array.from({ length: many }, (_, i) => { const [x, y] = at((i + 0.5) / many); return ellipse(x, y, w / 4, w / 4); });
+    return Array.from({ length: many }, (_, i) => { const [x, y] = at((i + 0.5) / many); return circle(x, y, w / 4); });
   }
   const half = (t: number): number => Math.max(0, (w / 2) * (1 - (l.style === "pinched" ? 0.75 : 0.2) * Math.sin(Math.PI * t)) - inset);
   const steps = 24;
@@ -43,9 +66,17 @@ function linkSubs(l: BalloonLink, to: P, size: number, inset: number): SubPath[]
   return [poly([...Array.from({ length: steps + 1 }, (_, i) => side(1, i / steps)), ...Array.from({ length: steps + 1 }, (_, i) => side(-1, 1 - i / steps))])];
 }
 
+/** The middle of a balloon's body, as it is drawn (turned about the middle of the whole). */
 const centreOf = (o: PathObject): { x: D.Dyadic; y: D.Dyadic } => {
-  const [x, y, w, h] = o.params!.box;
-  return { x: D.add(o.anchor.x, D.shift(D.fromNumber(x + w / 2), o.unit)), y: D.add(o.anchor.y, D.shift(D.fromNumber(y + h / 2), o.unit)) };
+  const [bx, by, w, h] = o.params!.box;
+  let x = bx + w / 2, y = by + h / 2;
+  if (o.rot) {
+    const b = paintBounds(o.sub, pathStyle(o));
+    const px = (b.minX + b.maxX) / 2, py = (b.minY + b.maxY) / 2;
+    const { c, s } = cosSin(o.rot);
+    [x, y] = [px + (x - px) * c - (y - py) * s, py + (x - px) * s + (y - py) * c];
+  }
+  return { x: D.add(o.anchor.x, D.shift(D.fromNumber(x), o.unit)), y: D.add(o.anchor.y, D.shift(D.fromNumber(y), o.unit)) };
 };
 
 const LOOK = { kind: "path", opacity: 1, attachmentTargetId: null, shape: "balloon", name: "Balloon connector" } as const;
@@ -86,11 +117,11 @@ export function withBalloonLinks(src: DerivationSource, next: readonly CanvasObj
     const made = { ...(A.frame ? { frame: A.frame } : {}), anchor: ca, unit: A.unit };
     const line = l.style === "line";
     const { frame: _f, ...rest } = o;
-    out.set(o.id, { ...rest, ...made, z: Math.min(A.z, B.z) - 0.5, sub: linkSubs(l, to, size, 0), fill: line ? null : A.fill, stroke: A.stroke, width: A.width } as PathObject);
+    out.set(o.id, { ...rest, ...made, params: { box: [0, 0, to[0], to[1]], link: { ...l, size } }, z: Math.min(A.z, B.z) - 0.5, sub: linkSubs(l, to, size, 0), fill: line ? null : A.fill, stroke: A.stroke, width: A.width } as PathObject);
     if (l.style === "neck" || l.style === "pinched") {
       const sub = linkSubs(l, to, size, A.width * 0.75);
       const z = Math.max(A.z, B.z) + 0.5;
-      const params = { box: [0, 0, 1, 1] as const, link: { ...l, cover: o.id } };
+      const params = { box: [0, 0, to[0], to[1]] as const, link: { ...l, size, cover: o.id } };
       if (cover) { const { frame: _c, ...keep } = cover; out.set(cover.id, { ...keep, ...made, z, sub, fill: A.fill, stroke: null, width: A.width, params } as PathObject); }
       else out.set(newObjectId(), { ...LOOK, id: "", ...made, z, sub, fill: A.fill, stroke: null, width: A.width, params } as unknown as PathObject);
     } else if (cover) drop(cover.id);

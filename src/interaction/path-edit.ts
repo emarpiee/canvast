@@ -1,4 +1,5 @@
 import { balloonHandlePoints, type BalloonPart } from "../doc/balloon-geometry";
+import { linkHandlePoints } from "../doc/balloon-link";
 import type { PathObject } from "../doc/model";
 import { editSubs } from "../doc/model";
 import type { ImageObject } from "../doc/model";
@@ -429,9 +430,10 @@ export function clearSpot(x: number, y: number, dirs: ReadonlyArray<readonly [nu
  */
 export function shapeHandles(po: ProjectedObject, expanded: boolean, editor: { gradientFocus: "fill" | "stroke" | null; drawnHandles: ReadonlyArray<readonly [number, number]> }): CornerHandles | null {
   const q = po.obj.kind === "path" ? (po.obj as PathObject).params : undefined;
-  if (q?.balloon && !po.cover) {
+  if ((q?.balloon || q?.link) && !po.cover) {
     const p = po.proj;
-    const balloon = balloonHandlePoints(q.box, q.balloon).map(({ part, tail, at, dir }) => {
+    const points: Array<{ part: BalloonPart; tail: number; at: readonly [number, number]; dir?: readonly [number, number] }> = q.balloon ? balloonHandlePoints(q.box, q.balloon) : linkHandlePoints(q.box, q.link!).map((h) => ({ ...h, tail: -1 }));
+    const balloon = points.map(({ part, tail, at, dir }) => {
       const [x, y] = outerAt(po, exactX(p, at[0]), exactY(p, at[1]));
       const step = 16 / p.ppu;
       const [ex, ey] = dir ? outerAt(po, exactX(p, at[0] + dir[0] * step), exactY(p, at[1] + dir[1] * step)) : [x + 1, y];

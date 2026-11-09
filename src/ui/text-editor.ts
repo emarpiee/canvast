@@ -251,6 +251,7 @@ export function mountTextEditor(
     position();
     syncScroll(bar); // (a narrow window: the bar scrolls, by wheel too, with the other bars' cue)
     box.focus({ preventScroll: true });
+    if (t?.inShape?.shape !== undefined && t.md === "Text") queueMicrotask(() => { const all = document.createRange(); all.selectNodeContents(box); const pick = getSelection(); pick?.removeAllRanges(); pick?.addRange(all); }); // (a new balloon's words: typing replaces them)
     // Caret at the end of the last text, inside its block (formatting applies to that block).
     let end: Node = box;
     while (end.lastChild) end = end.lastChild;

@@ -256,9 +256,9 @@ export interface TextObject extends ObjectBase {
   /** A card behind the words (a note): its colour, the space round the words and the corner radius, both in em. The box includes the space; the words wrap inside it. */
   readonly card?: { readonly fill: string; readonly pad: number; readonly radius: number };
   /** A curve the words run along (nodes of six numbers, local units of the text; a copy of a path's first sub-path made when the text was put on it). The text does not wrap then; a second line sits below the first. */
-  readonly onPath?: { readonly n: readonly number[]; readonly closed: boolean; /** Where the words start, 0 to 1 of the curve. */ readonly start?: number; readonly align?: "start" | "center" | "end"; /** On the other side, the curve read the other way. */ readonly flip?: boolean; /** How far off the curve, in em. */ readonly lift?: number };
+  readonly onPath?: { readonly n: readonly number[]; readonly closed: boolean; /** The path it follows (absent on texts set along a path before this was kept). */ readonly path?: ObjectId; /** Where the words start, 0 to 1 of the curve. */ readonly start?: number; readonly align?: "start" | "center" | "end"; /** On the other side, the curve read the other way. */ readonly flip?: boolean; /** How far off the curve, in em. */ readonly lift?: number };
   /** A closed outline the words flow inside, each line as wide as the shape is there (nodes of six numbers, local units of the text, its box at 0, 0; a copy of the shape's outline made when the text was put in it). */
-  readonly inShape?: { readonly n: readonly number[]; readonly closed: boolean; /** The space kept from the outline, in em. */ readonly padX?: number; readonly padY?: number; /** Words that do not fit are not shown. */ readonly hide?: boolean; /** The shape it follows. */ readonly shape?: ObjectId };
+  readonly inShape?: { readonly n: readonly number[]; readonly closed: boolean; /** The space kept from the outline, in em. */ readonly padX?: number; readonly padY?: number; /** The right and the bottom, when not the same as the left and the top. */ readonly padR?: number; readonly padB?: number; /** Outlines the words go round. */ readonly holes?: ReadonlyArray<readonly number[]>; /** Words that do not fit are not shown. */ readonly hide?: boolean; /** The shape it follows. */ readonly shape?: ObjectId };
 }
 
 /**
@@ -684,7 +684,8 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (o.axes !== undefined && !(typeof o.axes === "object" && o.axes !== null && Object.keys(o.axes).length <= 8 && Object.entries(o.axes).every(([k, val]) => /^[A-Za-z0-9 ]{4}$/.test(k) && typeof val === "number" && Number.isFinite(val) && Math.abs(val) < 1e5))) throw new InvalidObjectError("bad axes");
     if (o.onPath !== undefined && !(Array.isArray(o.onPath.n) && o.onPath.n.length >= 12 && o.onPath.n.length % 6 === 0 && o.onPath.n.length <= 6 * 20000 && o.onPath.n.every((v) => Number.isFinite(v)) && typeof o.onPath.closed === "boolean")) throw new InvalidObjectError("bad text path");
     if (o.inShape !== undefined && !(Array.isArray(o.inShape.n) && o.inShape.n.length >= 12 && o.inShape.n.length % 6 === 0 && o.inShape.n.length <= 6 * 20000 && o.inShape.n.every((v) => Number.isFinite(v)) && o.inShape.closed === true)) throw new InvalidObjectError("bad text shape");
-    for (const v of [o.onPath?.start, o.onPath?.lift, o.inShape?.padX, o.inShape?.padY]) if (v !== undefined && !(Number.isFinite(v) && v >= 0)) throw new InvalidObjectError("bad text option");
+    if (o.inShape?.holes !== undefined && !(Array.isArray(o.inShape.holes) && o.inShape.holes.length <= 256 && o.inShape.holes.every((h) => Array.isArray(h) && h.length >= 12 && h.length % 6 === 0 && h.length <= 6 * 20000 && h.every((v) => Number.isFinite(v))))) throw new InvalidObjectError("bad text shape");
+    for (const v of [o.onPath?.start, o.onPath?.lift, o.inShape?.padX, o.inShape?.padY, o.inShape?.padR, o.inShape?.padB]) if (v !== undefined && !(Number.isFinite(v) && v >= 0)) throw new InvalidObjectError("bad text option");
   } else {
     throw new InvalidObjectError(`unknown kind ${(o as { kind: unknown }).kind}`);
   }

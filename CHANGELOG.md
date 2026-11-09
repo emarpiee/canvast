@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.55.30 — Balloons and text in shapes: fixes and the rest of the list (2026-11-09)
+
+- **Fixed:** a number field in a bar lost the focus as it was typed in: a typed value counted as a drag and hid the field for a moment.
+- **Fixed:** text along a path did not follow its path; it now does, in the same undo step, and is plain text again when the path is deleted. Paths set before this version need setting again.
+- **Fixed:** words of a turned balloon, and connectors of turned balloons, used the unturned body.
+- **Fixed:** a long first word in a shape was split when lower down it fits whole.
+- **Fixed:** the words of a shape now move with it during a drag, not only when it ends.
+- **Changed:** a balloon's handles still show when its words are selected; a text in a shape has a box as tall as the shape, so its handles sit at the shape's edges.
+- **Changed:** each side handle of a text in a shape sets the padding of its own side; the options of a text in a shape are in one place, the balloon panel.
+- **Added:** per-side padding, justified text, words that go round holes, and a note when words do not fit.
+- **Added:** for balloons: a size handle for the body alone, *Save as style*, the next balloon taking the last look, a double line, round tail tips, double-click on the outline to add a tail, snapping of the handles.
+- **Added:** connector handles for width and bend, and connecting more than two balloons.
+
 ## 0.55.29 — Side handles set padding in a shape (2026-11-09)
 
 - **Changed:** the side handles of a text in a shape change its padding: left and right the sides, top and bottom the top and bottom. Its corners still change the letter size.

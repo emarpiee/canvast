@@ -113,6 +113,7 @@ export const SETTINGS = {
   "shape.align": { scope: "device", default: "centre", validate: oneOf("inside", "centre", "outside"), effect: "immediate" } as Def<"inside" | "centre" | "outside">,
   "shape.sides": { scope: "device", default: 6, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 3 && (v as number) <= 24 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "shape.tips": { scope: "device", default: 5, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 3 && (v as number) <= 24 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
+  "balloon.look": { scope: "device", default: "", validate: text(2000), effect: "immediate" } as Def<string>,
   "key.shape": { scope: "device", default: "u", validate: letter, effect: "immediate" } as Def<string>,
   "key.sheet": { scope: "device", default: "c", validate: letter, effect: "immediate" } as Def<string>,
   "key.path": { scope: "device", default: "b", validate: letter, effect: "immediate" } as Def<string>,

@@ -427,7 +427,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     wrap.style.top = `${Math.round(top)}px`;
   };
   const update = (): void => {
-    const show = !hidden() && editor.selection.size > 0 && (editor.tool === "select" || editor.tool === "node" || editor.tool === "lasso") && editor.preview.kind === "none";
+    const show = !hidden() && editor.selection.size > 0 && (editor.tool === "select" || editor.tool === "node" || editor.tool === "lasso") && !editor.gesturing;
     if (!show) {
       if (!bar.hidden) bar.hidden = true;
       return;

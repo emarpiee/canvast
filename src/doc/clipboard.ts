@@ -66,6 +66,11 @@ function linksCopied(o: CanvasObject, copyId: ReadonlyMap<string, string>): Part
     const to = copyId.get(shape);
     return { inShape: to ? { ...rest, shape: to } : rest } as Partial<CanvasObject>;
   }
+  if (o.kind === "text" && o.onPath?.path !== undefined) {
+    const { path, ...rest } = o.onPath;
+    const to = copyId.get(path);
+    return { onPath: to ? { ...rest, path: to } : rest } as Partial<CanvasObject>;
+  }
   const l = o.kind === "path" ? o.params?.link : undefined;
   if (o.kind === "path" && l) return { params: { ...o.params!, link: { ...l, a: copyId.get(l.a) ?? l.a, b: copyId.get(l.b) ?? l.b, ...(l.cover ? { cover: copyId.get(l.cover) ?? l.cover } : {}) } } } as Partial<CanvasObject>;
   return {};

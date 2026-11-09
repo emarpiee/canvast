@@ -1,4 +1,4 @@
-import { flowOf, type Flow, type ShapeOutline } from "./shape-flow";
+import { flowOf, outlineBox, type Flow, type ShapeOutline } from "./shape-flow";
 import type { TextObject } from "../doc/model";
 import type { Font } from "./font";
 import type { BlockType } from "./markdown";
@@ -187,10 +187,11 @@ function padded(l: TextLayout, pad: number, H: number | undefined): TextLayout {
 /** The layout of the words inside the card's space (none: the whole box), with a set height and where the words sit in it. */
 function setInside(o: TextObject, pad: number): TextLayout {
   const l = layoutText(o.md, o.autoWidth || o.onPath ? Infinity : Math.max(0.5, o.w / o.size - 2 * pad), o);
-  if (o.h === undefined) return l;
+  if (o.h === undefined && !o.inShape) return l;
   // A set height: the box is that tall, and the words sit at the top, the middle or the bottom of it (never above the top).
-  const H = Math.max(0, o.h / o.size - 2 * pad);
-  const dy = o.valign === "middle" ? Math.max(0, (H - l.height) / 2) : o.valign === "bottom" ? Math.max(0, H - l.height) : 0;
+  // (in a shape its box is the shape's height, so that its handles are at the shape's edges; the words have already been placed in it)
+  const H = o.inShape ? Math.max(l.height, outlineBox(o.inShape.n).maxY / o.size) : Math.max(0, o.h! / o.size - 2 * pad);
+  const dy = o.inShape ? 0 : o.valign === "middle" ? Math.max(0, (H - l.height) / 2) : o.valign === "bottom" ? Math.max(0, H - l.height) : 0;
   const key = `${H}|${dy}`;
   let by = heights.get(l);
   if (!by) heights.set(l, (by = new Map()));
@@ -359,7 +360,7 @@ function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "li
         placed.push({ cp: g.cp, gid: g.gid, x, adv: g.adv * s, bold: g.bold, italic: g.italic, ...(g.k !== 1 ? { k: g.k } : {}), ...(g.color ? { color: g.color } : {}), ...(g.under ? { under: true as const } : {}), ...(g.strike ? { strike: true as const } : {}), ...(g.link ? { link: g.link } : {}), ...(g.face ? { face: g.face } : {}), ...(g.sub ? { sub: true as const } : {}) });
         x += g.adv * s;
       }
-      if (align === "justify" && !last && !flow && Number.isFinite(wrapEm)) x = justify(placed, glyphs.length, indent + (first ? startIn : 0), wrapEm);
+      if (align === "justify" && !last && (flow ? !!band : Number.isFinite(wrapEm))) x = justify(placed, glyphs.length, indent + (first ? startIn : 0), band ? band.x1 - band.x0 : wrapEm);
       if (flow) {
         // (in its stretch of the shape, aligned there)
         const w = band ? band.x1 - band.x0 : wrapEm;
@@ -374,10 +375,22 @@ function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "li
     let x = startIn;
     let lastSpace = -1;
     refit();
+    /** A first word too long for the stretch here: lower down, where the shape is wider, it fits whole (false: nowhere, it will be broken). */
+    const roomBelow = (need: number): boolean => {
+      if (!flow) return false;
+      const y0 = y;
+      for (; y < flow.height; y += 0.25) {
+        refit();
+        if (band && avail >= need) return true;
+      }
+      y = y0;
+      refit();
+      return false;
+    };
     for (const c of items) {
       const a = { gid: c.gid, adv: c.adv };
       const adv = a.adv * c.k * s;
-      if (c.cp !== 32 && x + adv > avail && line.some((g) => g.cp !== 32)) {
+      if (c.cp !== 32 && x + adv > avail && line.some((g) => g.cp !== 32) && !(lastSpace < 0 && roomBelow(x + adv))) {
         const carry = lastSpace >= 0 ? line.slice(lastSpace + 1) : [];
         emit(lastSpace >= 0 ? line.slice(0, lastSpace) : line);
         refit();

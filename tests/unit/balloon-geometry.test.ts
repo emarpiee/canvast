@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BODIES, balloonDragged, balloonHandlePoints, balloonOutline, newBalloon, scaledBalloon, validBalloon, type Box } from "../../src/doc/balloon-geometry";
+import { BODIES, balloonDragged, balloonHandlePoints, balloonLook, balloonOutline, balloonSubs, newBalloon, validLook, withBalloonLook, scaledBalloon, validBalloon, type Box } from "../../src/doc/balloon-geometry";
 
 const box: Box = [0, 0, 200, 100];
 describe("speech balloon geometry", () => {
@@ -14,7 +14,7 @@ describe("speech balloon geometry", () => {
   it("a tip inside the body has no tail, only its handle", () => {
     const s = balloonDragged(box, newBalloon(box), "tip", 0, [100, 50]);
     expect(balloonOutline(box, s).marks[0]).toBeNull();
-    expect(balloonHandlePoints(box, s).map((h) => h.part)).toEqual(["tip"]);
+    expect(balloonHandlePoints(box, s).map((h) => h.part)).toEqual(["move", "size", "tip"]);
   });
   it("handles: the width grows with its foot, the base moves round the body, the depth stays in range", () => {
     const s = newBalloon(box);
@@ -36,6 +36,17 @@ describe("speech balloon geometry", () => {
       return Math.hypot(m.bellyAt[0] - m.bendAt[0], m.bellyAt[1] - m.bendAt[1]);
     };
     expect(gap(60)).toBeCloseTo(gap(0), 9);
+  });
+  it("a round tip leaves the point, a double line adds one outline, a look carries over", () => {
+    const s = newBalloon(box);
+    const tip = s.tails[0]!.tip;
+    const rounded = { ...s, tails: [{ ...s.tails[0]!, tipRound: 50 }] };
+    expect(balloonOutline(box, rounded).pts.some(([x, y]) => x === tip[0] && y === tip[1])).toBe(false);
+    expect(balloonSubs(box, { ...s, double: 10 }).length).toBe(2);
+    const look = balloonLook({ ...s, body: "cloud" });
+    expect(validLook(look)).toEqual(look);
+    expect(withBalloonLook(s, look).body).toBe("cloud");
+    expect(validLook({ body: "nope" })).toBeNull();
   });
   it("scaling moves the tip and a flip mirrors the bend; a bad balloon is refused", () => {
     const s = newBalloon(box);
