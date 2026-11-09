@@ -1,3 +1,4 @@
+import type { BalloonLink } from "./balloon-link";
 import { balloonSubs, newBalloon, scaledBalloon, type BalloonSpec } from "./balloon-geometry";
 /**
  * Vector path geometry (ADR 0099): pure functions over plain numbers, no DOM, no document. A path object (model.ts `PathObject`) is a
@@ -467,6 +468,8 @@ export function shapeSubs(kind: ShapeKind, x: number, y: number, w: number, h: n
 export interface ShapeParams {
   /** A speech balloon: its body and tails; `box` is its body. */
   readonly balloon?: BalloonSpec;
+  /** A connector between two balloons (or the piece that covers their outlines at its ends): made from them. */
+  readonly link?: BalloonLink;
   /** x, y, width, height of the unrounded shape's bounds. */
   readonly box: readonly [number, number, number, number];
   readonly sides?: number;

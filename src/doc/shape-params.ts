@@ -23,7 +23,7 @@ export function paramsOf(o: PathObject): ShapeParams | null {
   return same ? p : null;
 }
 
-export type ShapePatch = { sides?: number; tips?: number; inner?: number; balloon?: BalloonSpec };
+export type ShapePatch = { sides?: number; tips?: number; inner?: number; balloon?: BalloonSpec; box?: ShapeParams["box"] };
 
 /** The sharp geometry of a path: what its rounded corners are made from. */
 const sharpOf = (o: PathObject): readonly SubPath[] => o.base ?? (o.params && o.shape ? fittedShape(o.shape, o.params) : o.sub);
@@ -56,7 +56,7 @@ export function withRadius(o: PathObject, radius: Radius): PathObject {
 /** Whether the path has corners that a radius would round (or is rounded now); a boolean group's result is judged by its own outline. */
 const cornered = new WeakMap<PathObject, boolean>();
 export function hasCorners(o: PathObject): boolean {
-  if (o.params?.balloon) return false; // (its outline is made of many short lines: its body has its own rounding)
+  if (o.params?.balloon || o.params?.link) return false; // (its outline is made of many short lines: its body has its own rounding)
   let r = cornered.get(o);
   if (r === undefined) cornered.set(o, (r = o.radius !== undefined || canRound(sharpOf(o))));
   return r;

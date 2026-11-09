@@ -3,6 +3,7 @@ import type { CanvasObject, ObjectId } from "./model";
 import { homeObject, validateObject, worldForm } from "./model";
 import { withDerived } from "./boolean-group";
 import { withShapeTexts } from "./text-in-shape";
+import { withBalloonLinks } from "./balloon-link";
 
 /**
  * The authoritative document: a set of canvas objects keyed by stable id.
@@ -88,6 +89,7 @@ export class DocumentStore {
   transaction(label: string, next: readonly CanvasObject[], removed: readonly ObjectId[] = []): Transaction {
     // The results of boolean groups that the change reaches are brought up to date in the same transaction (ADR 0103).
     ({ next, removed } = withDerived(this, next, removed));
+    ({ next, removed } = withBalloonLinks(this, next, removed)); // (and the connectors of the balloons it changes)
     next = withShapeTexts(this, next, removed); // (and the words inside the shapes it changes)
     const before = new Map<ObjectId, CanvasObject | null>();
     const after = new Map<ObjectId, CanvasObject | null>();

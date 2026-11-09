@@ -59,6 +59,18 @@ export function parsePayload(text: string): ClipboardPayload | null {
  * point to centre them on and the view's depth) they are moved there at their on-screen size, from any frame or canvas: the
  * payload holds them in the frame of the view they were copied from. Without one they come back where they were. Stacking order is kept: `z` starts above `zTop`.
  */
+/** What a copy holds that names other objects, pointed at their copies: words stay with a shape that is copied too, and a connector with its balloons. */
+function linksCopied(o: CanvasObject, copyId: ReadonlyMap<string, string>): Partial<CanvasObject> {
+  if (o.kind === "text" && o.inShape?.shape !== undefined) {
+    const { shape, ...rest } = o.inShape;
+    const to = copyId.get(shape);
+    return { inShape: to ? { ...rest, shape: to } : rest } as Partial<CanvasObject>;
+  }
+  const l = o.kind === "path" ? o.params?.link : undefined;
+  if (o.kind === "path" && l) return { params: { ...o.params!, link: { ...l, a: copyId.get(l.a) ?? l.a, b: copyId.get(l.b) ?? l.b, ...(l.cover ? { cover: copyId.get(l.cover) ?? l.cover } : {}) } } } as Partial<CanvasObject>;
+  return {};
+}
+
 export function instantiate(p: ClipboardPayload, space: FrameSpace, zTop: number, target?: { frame: Frame; at: WorldPoint; depth: number }): { objects: CanvasObject[]; moved: boolean } {
   let objs: CanvasObject[];
   try {
@@ -92,7 +104,8 @@ export function instantiate(p: ClipboardPayload, space: FrameSpace, zTop: number
           o.unit + k,
         )
       : o;
-    return homeObject({ ...moved, id: copyId.get(o.id)!, z: zTop + 1 + i, ...(o.parent !== undefined ? { parent: copyId.get(o.parent) ?? o.parent } : {}), ...(o.attachmentTargetId !== null ? { attachmentTargetId: copyId.get(o.attachmentTargetId) ?? null } : {}), ...(o.groups ? { groups: o.groups.map(regroup) } : {}), ...(o.groupNames ? { groupNames: Object.fromEntries(Object.entries(o.groupNames).map(([k, v]) => [regroup(k), v])) } : {}), ...(o.boolOps ? { boolOps: Object.fromEntries(Object.entries(o.boolOps).map(([k, v]) => [regroup(k), v])) } : {}), ...(o.mask ? { mask: { ...o.mask, by: regroup(o.mask.by) } } : {}), ...(o.gen ? { gen: { ...o.gen, gid: regroup(o.gen.gid) } } : {}), ...(o.kind === "path" && o.result !== undefined ? { result: regroup(o.result) } : {}) } as CanvasObject, space);
+    const links = linksCopied(moved, copyId);
+    return homeObject({ ...moved, ...links, id: copyId.get(o.id)!, z: zTop + 1 + i, ...(o.parent !== undefined ? { parent: copyId.get(o.parent) ?? o.parent } : {}), ...(o.attachmentTargetId !== null ? { attachmentTargetId: copyId.get(o.attachmentTargetId) ?? null } : {}), ...(o.groups ? { groups: o.groups.map(regroup) } : {}), ...(o.groupNames ? { groupNames: Object.fromEntries(Object.entries(o.groupNames).map(([k, v]) => [regroup(k), v])) } : {}), ...(o.boolOps ? { boolOps: Object.fromEntries(Object.entries(o.boolOps).map(([k, v]) => [regroup(k), v])) } : {}), ...(o.mask ? { mask: { ...o.mask, by: regroup(o.mask.by) } } : {}), ...(o.gen ? { gen: { ...o.gen, gid: regroup(o.gen.gid) } } : {}), ...(o.kind === "path" && o.result !== undefined ? { result: regroup(o.result) } : {}) } as CanvasObject, space);
   });
   return { objects: out, moved: sameFrame };
 }

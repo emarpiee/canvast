@@ -42,7 +42,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { selectedBalloon } from "./actions";
+import { balloonsToPaths, canConnectBalloons, connectBalloons, selectedBalloon, selectedLink, selectedShapeText, setBalloonLink, setShapeText } from "./actions";
 import { canSplitPaths, splitPaths, placeCardViews, placeLinesBeside, imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, canSetInShape, setTextInShape, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, buildTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
@@ -1317,7 +1317,19 @@ async function start(): Promise<void> {
     },
   });
   dock.add(panelEl("pattern-panel"), { id: "pattern", title: "Pattern", side: "right" });
-  const balloonPanel = mountBalloonPanel(side, editor, { selected: () => selectedBalloon(doc, editor), change: (f, final) => commitShape(doc, editor, { balloon: f }, final) });
+  const balloonPanel = mountBalloonPanel(side, editor, {
+    selected: () => selectedBalloon(doc, editor),
+    change: (f, final) => commitShape(doc, editor, { balloon: f }, final),
+    text: () => selectedShapeText(doc, editor),
+    setText: (look, final) => setShapeText(doc, editor, look, final),
+    link: () => selectedLink(doc, editor),
+    setLink: (p) => setBalloonLink(doc, editor, p),
+    canConnect: () => canConnectBalloons(doc, editor),
+    connect: () => connectBalloons(doc, editor),
+    toPath: () => {
+      void confirmDialog({ title: "Convert to path?", lines: ["The balloon becomes an ordinary path: its nodes can be edited, and its body, tails and connectors can no longer be set."], confirmLabel: "Convert" }).then((yes) => { if (yes) balloonsToPaths(doc, editor); });
+    },
+  });
   dock.add(panelEl("balloon-panel"), { id: "balloon", title: "Speech balloon", side: "right" });
 const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     // Sorting by name needs the file names of the selected images (the document only has their hashes).
@@ -1822,7 +1834,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       makeMask: (mode) => makeMask(doc, editor, mode),
       makeClippingMask: () => makeClippingMask(doc, editor),
       canMakeMask: () => canMakeMask(doc, editor),
-      hasBalloon: () => selectedBalloon(doc, editor) !== null,
+      hasBalloon: () => selectedBalloon(doc, editor) !== null || selectedShapeText(doc, editor) !== null || selectedLink(doc, editor) !== null,
       toggleBalloonPanel: () => balloonPanel.toggle(),
       changeMask: (change) => changeMask(doc, editor, change),
       selectMask: () => selectTheMask(doc, editor),

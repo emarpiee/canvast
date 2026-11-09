@@ -73,7 +73,16 @@ export function flowOf(shape: ShapeOutline, size: number): Flow {
   const padX = shape.padX ?? INSET, padY = shape.padY ?? 0, hide = shape.hide === true;
   const p = polygon(shape.n);
   let key = keys.get(shape.n);
-  if (key === undefined) keys.set(shape.n, (key = shape.n.join(",")));
+  if (key === undefined) {
+    // (a short fingerprint, worked out once per outline: this key is built for every layout, and an outline is thousands of numbers)
+    let h1 = 0x811c9dc5, h2 = 0x1b873593;
+    for (const v of shape.n) {
+      const x = Math.round(v * 4096) | 0;
+      h1 = Math.imul(h1 ^ x, 16777619);
+      h2 = Math.imul(h2 ^ (x >>> 3), 2654435761);
+    }
+    keys.set(shape.n, (key = `${shape.n.length}:${h1 >>> 0}:${h2 >>> 0}`));
+  }
   return {
     key: `${size}|${padX}|${padY}|${hide}|${key}`,
     hide,

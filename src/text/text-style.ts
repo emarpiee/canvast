@@ -199,7 +199,7 @@ export function withLook(o: TextObject, look: TextLook, ppu = 0): TextObject {
 }
 
 export const sameLook = (a: TextObject, b: TextObject): boolean =>
-  a.size === b.size && a.w === b.w && a.color === b.color && a.assetId === b.assetId && a.lineHeight === b.lineHeight && a.tracking === b.tracking && a.align === b.align && a.autoWidth === b.autoWidth && JSON.stringify(a.gradient) === JSON.stringify(b.gradient) && JSON.stringify(a.outline) === JSON.stringify(b.outline) && JSON.stringify(a.card) === JSON.stringify(b.card) && a.h === b.h && a.valign === b.valign && a.paraGap === b.paraGap && a.indent === b.indent && a.caps === b.caps && a.maxLines === b.maxLines && a.kerning === b.kerning && JSON.stringify(a.features) === JSON.stringify(b.features) && JSON.stringify(a.axes) === JSON.stringify(b.axes);
+  JSON.stringify(a.inShape) === JSON.stringify(b.inShape) && JSON.stringify(a.onPath) === JSON.stringify(b.onPath) && a.size === b.size && a.w === b.w && a.color === b.color && a.assetId === b.assetId && a.lineHeight === b.lineHeight && a.tracking === b.tracking && a.align === b.align && a.autoWidth === b.autoWidth && JSON.stringify(a.gradient) === JSON.stringify(b.gradient) && JSON.stringify(a.outline) === JSON.stringify(b.outline) && JSON.stringify(a.card) === JSON.stringify(b.card) && a.h === b.h && a.valign === b.valign && a.paraGap === b.paraGap && a.indent === b.indent && a.caps === b.caps && a.maxLines === b.maxLines && a.kerning === b.kerning && JSON.stringify(a.features) === JSON.stringify(b.features) && JSON.stringify(a.axes) === JSON.stringify(b.axes);
 
 /**
  * A look kept as a saved style (a Styles kind): size, line height, letter spacing, alignment, colour, gradient and outline. The width mode is the text's own

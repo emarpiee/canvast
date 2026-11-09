@@ -104,7 +104,7 @@ describe("pattern generators (ADR 0162)", () => {
     const PHI = (1 + Math.sqrt(5)) / 2;
 
     it("are 55, each starting with no background and able to have one", () => {
-      const guides = GENERATORS.filter((g) => g.guide && g.family !== "Balloons");
+      const guides = GENERATORS.filter((g) => g.guide);
       expect(guides).toHaveLength(55);
       for (const g of guides) {
         const bg = settingsOf(g).find((s) => s.k === "bg")!;
@@ -325,51 +325,5 @@ describe("pattern generators (ADR 0162)", () => {
     const glow = GENERATORS.find((x) => x.id === "glow")!;
     expect(toSvg(generate(glow, defaultValues(glow), 5, 100, 100), 100, 100, { idPrefix: "x" })).toContain('<radialGradient id="x0"');
     expect(pathData({ n: [0, 0, 0, 0, 0, 0, 10, 0, 10, 0, 10, 0, 10, 10, 10, 10, 10, 10], closed: true })).toBe("M0 0L10 0L10 10L0 0Z");
-  });
-});
-
-describe("speech balloons", () => {
-  const G = generatorById("speech-balloon")!;
-  const make = (o: Record<string, string | number | boolean> = {}) => generate(G, { ...defaultValues(G), ...o }, 1, 800, 600);
-  const finite = (shapes: ReturnType<typeof make>): boolean => shapes.every((s) => s.sub.every((p) => p.n.length >= 12 && p.n.every(Number.isFinite)));
-  it("every body, with every tail, is one closed outline inside its box", () => {
-    for (const [body] of (settingsOf(G).find((s) => s.k === "body") as { opts: readonly (readonly [string, string])[] }).opts)
-      for (const tail of ["none", "point", "curved", "zigzag"]) {
-        const shapes = make({ body, tail });
-        expect(finite(shapes), `${body} ${tail}`).toBe(true);
-        const main = shapes.find((s) => s.name === "Balloon")!;
-        expect(main.sub).toHaveLength(1);
-        expect(main.sub[0]!.closed).toBe(true);
-      }
-  });
-  it("stays inside its box wherever it is moved, so a sheet never cuts it; a tail takes only its own width of a long side", () => {
-    for (const o of [{ bodyX: 0, bodyY: 0 }, { bodyX: 100, bodyY: 100, tipX: 0, tipY: 0 }, { bodyW: 100, bodyH: 100, wobble: 100, shadowX: 60, shadowY: 60 }, { count: 6, arrange: "stairs" }] as const)
-      for (const body of ["round", "heart", "burst"]) for (const s of make({ ...o, body }))
-        for (const p of s.sub) for (let i = 0; i < p.n.length; i += 6) {
-          expect(p.n[i]!, `${body} x`).toBeGreaterThanOrEqual(0);
-          expect(p.n[i]!, `${body} x`).toBeLessThanOrEqual(800);
-          expect(p.n[i + 1]!, `${body} y`).toBeGreaterThanOrEqual(0);
-          expect(p.n[i + 1]!, `${body} y`).toBeLessThanOrEqual(600);
-        }
-    // (a box's left and top sides are still there with its tail at the bottom)
-    const n = make({ body: "box", tailW: 10 }).find((s) => s.name === "Balloon")!.sub[0]!.n;
-    const xs = Array.from({ length: n.length / 6 }, (_, i) => n[i * 6]!);
-    expect(Math.min(...xs)).toBeCloseTo(400 - 0.86 * 400, 0);
-  });
-  it("the tail reaches its tip; thought bubbles, a second tail and every connector make shapes", () => {
-    const tip = make({ tipX: 10, tipY: 95 }).find((s) => s.name === "Balloon")!.sub[0]!.n;
-    let near = Infinity;
-    for (let i = 0; i < tip.length; i += 6) near = Math.min(near, Math.hypot(tip[i]! - 80, tip[i + 1]! - 570));
-    expect(near).toBeLessThan(1);
-    expect(make({ tail: "bubbles" }).some((s) => s.name === "Thought bubbles")).toBe(true);
-    for (const link of ["neck", "pinch", "line", "dots"]) {
-      const s = make({ count: 3, link });
-      expect(s.filter((x) => x.name?.startsWith("Balloon ")).length, link).toBe(3);
-      expect(s.some((x) => x.name === "Connector"), link).toBe(true);
-      expect(finite(s), link).toBe(true);
-    }
-    expect(make({ style: "dashed", weight: 4 }).some((s) => s.name === "Outline")).toBe(true);
-    expect(make({ style: "double" }).some((s) => s.name === "Inner outline")).toBe(true);
-    expect(make({ shadowY: 20, shadow: "#000000" }).some((s) => s.name === "Balloon shadow")).toBe(true);
   });
 });

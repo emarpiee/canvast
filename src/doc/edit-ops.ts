@@ -121,7 +121,7 @@ export function scaleAbout(o: CanvasObject, fixed: WorldPoint, kx: number, ky: n
       const { autoWidth: _a, ...fixedWidth } = o;
       return { ...fixedWidth, anchor, w: o.w * kx };
     }
-    return normalizeUnit({ ...o, anchor, w: o.w * kx, size: o.size * kx, ...(o.h !== undefined ? { h: o.h * kx } : {}) });
+    return normalizeUnit({ ...o, anchor, w: o.w * kx, size: o.size * kx, ...(o.h !== undefined ? { h: o.h * kx } : {}), ...(o.inShape ? { inShape: { ...o.inShape, n: o.inShape.n.map((v) => v * kx) } } : {}) });
   }
   if (o.kind === "path") {
     if (o.rot && kx !== ky) throw new RangeError("a turned path scales uniformly");
@@ -211,7 +211,7 @@ export function normalizeUnit(o: CanvasObject): CanvasObject {
   const s = 2 ** -n;
   const unit = o.unit + n;
   if (o.kind === "stroke") return { ...o, unit, points: o.points.map((v) => v * s), width: o.width * s };
-  if (o.kind === "text") return { ...o, unit, w: o.w * s, size: o.size * s, ...(o.h !== undefined ? { h: o.h * s } : {}) };
+  if (o.kind === "text") return { ...o, unit, w: o.w * s, size: o.size * s, ...(o.h !== undefined ? { h: o.h * s } : {}), ...(o.inShape ? { inShape: { ...o.inShape, n: o.inShape.n.map((v) => v * s) } } : {}) };
   if (o.kind === "path") return { ...o, unit, ...renamed(o, s), width: o.width * s };
   return { ...o, unit, w: o.w * s, h: o.h * s, ...(o.kind === "image" && o.radius !== undefined ? { radius: scaleRadius(o.radius, s) } : {}), ...(o.kind === "image" && o.width !== undefined ? { width: o.width * s } : {}) };
 }

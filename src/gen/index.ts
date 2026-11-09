@@ -1,4 +1,3 @@
-import { BALLOONS } from "./balloons";
 import { BLOBS } from "./blobs";
 import { EXTRA } from "./extra";
 import { FIELDS } from "./fields";
@@ -23,7 +22,7 @@ export { pathData, toSvg } from "./svg";
 export type { SvgOptions } from "./svg";
 
 /** Every pattern generator, in the order the picker shows them. */
-export const GENERATORS: readonly Generator[] = [...WAVES, ...BLOBS, ...SOFT, ...LINES, ...TILES, ...FIELDS, ...EXTRA, ...GUIDES, ...BALLOONS];
+export const GENERATORS: readonly Generator[] = [...WAVES, ...BLOBS, ...SOFT, ...LINES, ...TILES, ...FIELDS, ...EXTRA, ...GUIDES];
 
 /** The most shapes one pattern is made of (one path may hold many sub-paths). */
 export const MAX_SHAPES = 5000;

@@ -5,6 +5,7 @@ import { isArtFile } from "../assets/art-preview";
 import { beginProgress } from "./progress";
 import { withStyleLinks } from "../doc/style-links";
 import type { BalloonSpec, Box } from "../doc/balloon-geometry";
+import { newLinkObject, type BalloonLink } from "../doc/balloon-link";
 import { hasCorners, paramsOf, withRadius, withShapeParams, type ShapePatch } from "../doc/shape-params";
 import { DEFAULT_INNER, type Radius } from "../doc/path";
 import { canRound, nodesIn, roundCorners } from "../doc/rounding";
@@ -1210,24 +1211,122 @@ export interface ShapeChange {
   inner?: number;
   /** A speech balloon's numbers, worked out for each selected balloon. */
   balloon?: (s: BalloonSpec, box: Box) => BalloonSpec;
+  /** The body moved, the tails staying where they are. */
+  balloonBox?: (box: Box) => Box;
+}
+
+/** The selected balloons, and the balloons whose words are selected: a balloon can be set from either. */
+function balloonTargets(doc: DocumentStore, editor: EditorState): PathObject[] {
+  const out = new Map<string, PathObject>();
+  for (const o of selected(doc, editor)) {
+    const p = o.kind === "text" && o.inShape?.shape !== undefined ? doc.get(o.inShape.shape) : o;
+    if (p?.kind === "path" && p.params?.balloon && !p.locked) out.set(p.id, p);
+  }
+  return [...out.values()];
 }
 
 /** The first selected speech balloon: its box and numbers. */
 export function selectedBalloon(doc: DocumentStore, editor: EditorState): { box: Box; spec: BalloonSpec } | null {
-  for (const o of editablePaths(doc, editor)) if (o.params?.balloon) return { box: o.params.box, spec: o.params.balloon };
+  const o = balloonTargets(doc, editor)[0];
+  return o ? { box: o.params!.box as Box, spec: o.params!.balloon! } : null;
+}
+
+const inShapesAt = new WeakMap<object, TextObject[]>();
+/** Every text tied to a shape, found once per change of the document: the bars ask at every update of the interface. */
+function textsInShapes(doc: DocumentStore): TextObject[] {
+  const scan = (): TextObject[] => [...doc.all()].filter((o): o is TextObject => o.kind === "text" && o.inShape?.shape !== undefined);
+  const at = doc.lastTransaction;
+  if (!at) return scan();
+  let found = inShapesAt.get(at);
+  if (!found) inShapesAt.set(at, (found = scan()));
+  return found;
+}
+
+/** The words in the selected shapes, and the selected words that are in a shape. */
+function shapeTexts(doc: DocumentStore, editor: EditorState): TextObject[] {
+  const sel = selected(doc, editor);
+  const ids = new Set(sel.map((o) => o.id));
+  const out = new Map<string, TextObject>();
+  for (const o of sel) if (o.kind === "text" && o.inShape && !o.locked) out.set(o.id, o);
+  if (sel.some((o) => o.kind === "path")) for (const o of textsInShapes(doc)) if (!o.locked && ids.has(o.inShape!.shape!)) out.set(o.id, o);
+  return [...out.values()];
+}
+
+export function selectedShapeText(doc: DocumentStore, editor: EditorState): { padX: number; padY: number; hide: boolean; align: string; valign: string } | null {
+  const t = shapeTexts(doc, editor)[0];
+  return t ? { padX: t.inShape!.padX ?? 0.4, padY: t.inShape!.padY ?? 0, hide: t.inShape!.hide === true, align: t.align ?? "left", valign: t.valign ?? "top" } : null;
+}
+
+/** Change how the words sit in their shapes: one undo step when `final`. */
+export function setShapeText(doc: DocumentStore, editor: EditorState, look: TextLook, final: boolean): void {
+  if (editor.blockEdit()) return;
+  const next = shapeTexts(doc, editor).map((t) => withLook(t, look));
+  if (!final) return showReplaced(editor, next);
+  editor.preview = { kind: "none" };
+  if (next.length) doc.commit(doc.transaction("Text in shape", next));
+  editor.changed();
+}
+
+/** The words of a balloon, made when it has none yet (a double-click on it, to type them). */
+export function balloonText(doc: DocumentStore, path: PathObject): TextObject | null {
+  for (const o of doc.all()) if (o.kind === "text" && o.inShape?.shape === path.id) return o;
+  const [, , w, h] = path.params!.box;
+  const made = fittedInShape({ id: newObjectId(), kind: "text", ...(path.frame ? { frame: path.frame } : {}), anchor: path.anchor, unit: path.unit, z: doc.topZ() + 1, opacity: 1, attachmentTargetId: null, md: "Text", w: Math.abs(w), size: Math.min(Math.abs(w), Math.abs(h)) / 9, color: "#1f2329", ...(path.parent ? { parent: path.parent } : {}) } as TextObject, path);
+  if (made) doc.commit(doc.transaction("Add words to balloon", [made]));
+  return made;
+}
+
+/** The connector selected (its covering piece counts as it). */
+function selectedLinkObject(doc: DocumentStore, editor: EditorState): PathObject | null {
+  for (const o of selected(doc, editor)) {
+    if (o.kind !== "path" || !o.params?.link) continue;
+    const under = o.params.link.cover !== undefined ? doc.get(o.params.link.cover) : o;
+    if (under?.kind === "path") return under;
+  }
   return null;
+}
+export const selectedLink = (doc: DocumentStore, editor: EditorState): BalloonLink | null => selectedLinkObject(doc, editor)?.params?.link ?? null;
+
+export function setBalloonLink(doc: DocumentStore, editor: EditorState, patch: Partial<BalloonLink>): void {
+  const o = selectedLinkObject(doc, editor);
+  if (!o || editor.blockEdit()) return;
+  doc.commit(doc.transaction("Balloon connector", [{ ...o, params: { ...o.params!, link: { ...o.params!.link!, ...patch } } }]));
+  editor.changed();
+}
+
+const twoBalloons = (doc: DocumentStore, editor: EditorState): PathObject[] => {
+  const b = selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !!o.params?.balloon);
+  return b.length === 2 && b[0]!.frame === b[1]!.frame ? b : [];
+};
+export const canConnectBalloons = (doc: DocumentStore, editor: EditorState): boolean => twoBalloons(doc, editor).length === 2;
+
+/** Join the two selected balloons: the connector then follows them, and goes when one of them goes. */
+export function connectBalloons(doc: DocumentStore, editor: EditorState): void {
+  const b = twoBalloons(doc, editor);
+  if (!b.length || editor.blockEdit()) return;
+  doc.commit(doc.transaction("Connect balloons", [newLinkObject(b[0]!, b[1]!)]));
+  editor.changed();
+}
+
+/** The selected balloons become ordinary paths, for editing their nodes: their numbers are given up. */
+export function balloonsToPaths(doc: DocumentStore, editor: EditorState): void {
+  const next = balloonTargets(doc, editor).map((o) => { const { params: _p, shape: _s, ...rest } = o; return rest as PathObject; });
+  if (!next.length || editor.blockEdit()) return;
+  doc.commit(doc.transaction(next.length === 1 ? "Convert balloon to path" : `Convert ${next.length} balloons to paths`, next));
+  editor.changed();
 }
 
 /** Change the sides, points or ratio of the selected polygons and stars: one undo step. */
 export function commitShape(doc: DocumentStore, editor: EditorState, change: ShapeChange, final = true): void {
   if (editor.blockEdit()) return;
   const next: PathObject[] = [];
-  for (const o of editablePaths(doc, editor)) {
+  for (const o of change.balloon || change.balloonBox ? balloonTargets(doc, editor) : editablePaths(doc, editor)) {
     const patch: ShapePatch = {};
+    if (change.balloonBox && o.params?.balloon) patch.box = change.balloonBox(o.params.box as Box);
     if (change.sides !== undefined && o.shape === "polygon") patch.sides = change.sides;
     if (change.tips !== undefined && o.shape === "star") patch.tips = change.tips;
     if (change.inner !== undefined && o.shape === "star") patch.inner = change.inner;
-    if (change.balloon && o.params?.balloon) patch.balloon = change.balloon(o.params.balloon, o.params.box);
+    if (change.balloon && o.params?.balloon) patch.balloon = change.balloon(o.params.balloon, o.params.box as Box);
     if (!Object.keys(patch).length) continue;
     const made = withShapeParams(o, patch);
     if (made) next.push(made);
@@ -1235,7 +1334,7 @@ export function commitShape(doc: DocumentStore, editor: EditorState, change: Sha
   if (!final) return showReplaced(editor, next);
   editor.preview = { kind: "none" };
   if (!next.length) return editor.changed();
-  const what = change.balloon ? "Speech balloon" : change.sides !== undefined ? "Sides" : change.tips !== undefined ? "Points" : "Star ratio";
+  const what = change.balloon || change.balloonBox ? "Speech balloon" : change.sides !== undefined ? "Sides" : change.tips !== undefined ? "Points" : "Star ratio";
   doc.commit(doc.transaction(next.length === 1 ? what : `${what} of ${next.length} shapes`, next));
   editor.changed();
 }

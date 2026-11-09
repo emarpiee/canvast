@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.55.26 — Speech balloons complete (2026-11-09)
+
+- **Fixed:** padding, and other options of a text in a shape, were dropped when changed.
+- **Fixed:** a text in a shape resized or moved on its own left its outline behind, so its words spilled and were cut off; the shape now always sets where the words go.
+- **Fixed:** the words of a balloon were fitted to its outline with the tail; they now fit its body.
+- **Fixed:** a copied shape's words stayed tied to the original.
+- **Added:** words in a balloon by double-click, and the alignment, padding, overflow and Fit to shape in its panel, opened from the Actions bar for any text in a shape.
+- **Added:** any number of tails, thought bubbles, presets, a handle that moves the body while the tail tip stays; a tip let go inside the body removes its tail.
+- **Added:** connectors between two balloons (neck, pinched, line, dots) that follow them.
+- **Added:** Convert to path, with a warning.
+- **Fixed:** editing text in shapes and balloons did needless work at every pointer move and layout.
+- **Removed:** the Balloons tab of the Pattern panel; the Speech balloon tool replaces it.
+
 ## 0.55.25 — Speech balloon tail controls, text box width (2026-11-09)
 
 - **Changed:** a speech balloon's tail base stays where it is when the tip moves; *Base: Follows tip* in its panel brings the old way back.

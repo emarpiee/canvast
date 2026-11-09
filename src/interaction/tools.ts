@@ -16,7 +16,7 @@ import { moveNodes, edgeBetween, deleteVertex, cellAt } from "../doc/network";
 import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
 import { nodesIn, roundCorners } from "../doc/rounding";
 import { paramsOf } from "../doc/shape-params";
-import { BALLOON_LABELS, balloonDragged, type BalloonPart } from "../doc/balloon-geometry";
+import { BALLOON_LABELS, balloonDragged, balloonOutline, type BalloonPart } from "../doc/balloon-geometry";
 import { DEFAULT_INNER } from "../doc/path";
 import { linkAt } from "../text/layout";
 import { pictureBox } from "../render/gradient";
@@ -55,7 +55,7 @@ import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians, cosSin, normAngle, radiansFromAngle } from "../core/angle";
 import { formatRatio } from "../app/export-size";
 import { PanGesture } from "./navigation";
-import { drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -983,7 +983,11 @@ export function attachTools(
     if (g.what === "balloon" && g.balloon) {
       const { part, tail } = g.balloon;
       const l = localOf(tgt.po, s.x, s.y);
-      commitShapeNumbers(doc, editor, { balloon: (q, box) => balloonDragged(box, q, part, tail, [l.x, l.y]) }, final);
+      if (part === "move") commitShapeNumbers(doc, editor, { balloonBox: (b) => [l.x - b[2] / 2, l.y - b[3] / 2, b[2], b[3]] }, final);
+      else commitShapeNumbers(doc, editor, { balloon: (q, box) => {
+        const n = balloonDragged(box, q, part, tail, [l.x, l.y]);
+        return final && part === "tip" && balloonOutline(box, n).marks[tail] === null ? { ...n, tails: n.tails.filter((_, i) => i !== tail) } : n; // (let go inside the body: the tail is taken away)
+      } }, final);
       editor.handleLabel = final ? null : { x: s.x, y: s.y, text: BALLOON_LABELS[part] };
       return;
     }
@@ -2559,6 +2563,11 @@ export function attachTools(
     // A double click on the empty body of a sheet with things on it does nothing (it is ground, as for a click).
     if (hit && isContainer(hit) && !isMaskSheet(hit) && hasThingsOn(hit)) return;
     // A double-click on a path edits its nodes.
+    if (hit?.kind === "path" && hit.params?.balloon) {
+      const words = balloonText(doc, hit);
+      if (words) hooks.editText(words, world(s));
+      return;
+    }
     if (hit?.kind === "path") {
       editor.select([hit.id]);
       editor.setTool("node");

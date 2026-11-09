@@ -537,6 +537,9 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
       // Where the tail points: the triangle of the handles that go somewhere, filled, as it is the one that matters most.
       ctx.fillStyle = theme.selection;
       handleGlyph(ctx, b.x, b.y, r + 3, 3, b.a + Math.PI / 2);
+    } else if (b.part === "move") {
+      ctx.fillStyle = theme.selection; // (a filled square on its corner, in the middle of the body)
+      handleGlyph(ctx, b.x, b.y, r + 1, 4, Math.PI / 4);
     } else if (b.part === "base") handleGlyph(ctx, b.x, b.y, r + 1, 4, 0); // (a diamond: it slides round the body)
     else if (b.part === "bend") handleGlyph(ctx, b.x, b.y, r + 3, 4, 0, 0.42); // (the star of a ratio)
     else if (b.part === "body") {
