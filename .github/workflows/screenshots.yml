@@ -3,6 +3,10 @@ name: Screenshots
 # The README's pictures, taken on GitHub's runners (they drive the whole app, which lags a workstation in use). Run by hand; the pictures come as an artifact to look at and commit.
 on:
   workflow_dispatch:
+    inputs:
+      only:
+        description: Only these scripts, separated by spaces (empty for all)
+        default: ""
 
 jobs:
   shots:
@@ -27,7 +31,7 @@ jobs:
           ELECTRON_DISABLE_SANDBOX: "1"
         run: |
           mkdir -p shots
-          for s in shots shots-privacy shots-more shots-features shots-desktop shots-notes shots-library shots-views; do
+          for s in ${{ inputs.only || 'shots shots-privacy shots-more shots-features shots-desktop shots-notes shots-library shots-views shots-balloons' }}; do
             echo "== $s"
             xvfb-run -a node "scripts/showcase/$s.mjs" showcase.canvast shots/ || echo "FAILED $s"
           done
