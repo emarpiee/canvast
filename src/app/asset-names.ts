@@ -27,19 +27,6 @@ export class AssetNames {
     for (const fn of this.listeners) fn();
   }
 
-  /** The names known looked up again, and the subscribers told once if any is different (a file renamed outside the app, or on another device). */
-  async refresh(): Promise<void> {
-    let changed = false;
-    for (const [hash, was] of [...this.names]) {
-      const now = await this.lookup(hash).catch(() => "");
-      if (now && now !== was && this.names.has(hash)) {
-        this.names.set(hash, now);
-        changed = true;
-      }
-    }
-    if (changed) for (const fn of this.listeners) fn();
-  }
-
   /** Every name looked up again (a hidden item locked or opened: its name is shown or not). */
   clear(): void {
     this.names.clear();

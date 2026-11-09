@@ -287,3 +287,16 @@ test("rename assets: one (a new name, even a new extension) and many (enumerate,
   expect((await names()).every((n) => n.endsWith(".dat"))).toBe(true);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("an item placed from the library keeps the file's name of that moment as its layer name", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-assets").click();
+  const png = makePng(4, 4, () => [30, 160, 70, 255]);
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "green.png", mimeType: "image/png", buffer: Buffer.from(png) });
+  const card = p.locator('[data-testid="asset-card"]').first();
+  await expect(card).toBeVisible();
+  const hash = await card.getAttribute("data-hash");
+  await p.getByTestId("view-canvas").click();
+  await p.evaluate((h) => window.__canvastDebug.placeFromLibrary(h), hash!);
+  await expect.poll(async () => (await p.evaluate(() => window.__canvastDebug.objects())).at(-1)?.["name"]).toBe("green.png");
+});

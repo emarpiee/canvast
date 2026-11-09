@@ -215,6 +215,7 @@ export interface DebugHook {
   balloonDots(): Array<{ part: string; tail: number; x: number; y: number }>;
   /** How many frames have been drawn: it must not rise while nothing changes. */
   draws(): number;
+  placeFromLibrary(hash: string): Promise<unknown>;
   addStyle(kind: string, data: unknown): Promise<void>;
   styles(): Array<{ kind: string; data: unknown }>;
   handleLabel(): string | null;
@@ -594,6 +595,7 @@ export function installDebugHook(
       return (po && shapeHandles(po, false, editor)?.balloon) ?? [];
     },
     draws: () => deps.draws(),
+    placeFromLibrary: (hash) => session.placeAsset(hash),
     addStyle: async (kind, data) => void (await session.styles.add(kind, "", data)),
     styles: () => [...session.styles.items],
     handleLabel: () => editor.handleLabel?.text ?? null,

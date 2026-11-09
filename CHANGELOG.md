@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.41 — A placed item takes the file's name of that moment (2026-11-09)
+
+- **Fixed:** an item placed after its file was renamed in another program had the old name as its layer name. A newly placed item now keeps the file's name at that moment; a hidden item's name is not stored.
+
 ## 0.55.40 — Names follow a rename outside the app (2026-11-09)
 
 - **Fixed:** a file renamed in another program kept its old name as the layer name of the items placed from it.

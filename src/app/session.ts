@@ -96,6 +96,9 @@ export interface LinkCards {
   missing: string[];
 }
 
+/** The name a newly placed item keeps as its layer's: the file's now. A hidden item's name is never written on a canvas. */
+const placedNameOf = (e: { name: string; hidden?: boolean } | undefined): { placedName?: string } => (e && !e.hidden ? { placedName: e.name } : {});
+
 export class Session {
   current: CurrentMeta | null = null;
   tree: WorkspaceTree | null = null;
@@ -858,9 +861,10 @@ export class Session {
       this.tell("The file of this item is missing, so it cannot be placed.");
       return null;
     }
-    const tags = withTags ? ((await this.catalog?.entry(hash).catch(() => undefined))?.tags ?? []) : [];
+    const entry = await this.catalog?.entry(hash).catch(() => undefined);
+    const tags = withTags ? (entry?.tags ?? []) : [];
     // (a copy of a file elsewhere in the library is placed as its content: a canvas names contents, which every version of the app reads)
-    const r = await withGifFrames({ ...rec, hash: contentOf(rec.hash) });
+    const r = { ...(await withGifFrames({ ...rec, hash: contentOf(rec.hash) })), ...placedNameOf(entry) };
     return placeImage(card ? { ...r, pixelW: card.size.w, pixelH: card.size.h } : r, this.doc, this.view, 0, "Place item", tags, card?.preview).id;
   }
 
@@ -892,7 +896,7 @@ export class Session {
     for (const [i, h] of hashes.entries()) {
       progress?.update(i / hashes.length, `${i + 1} of ${hashes.length}`);
       const rec = await this.assets.record(h);
-      if (rec) recs.push(await withGifFrames({ ...rec, hash: contentOf(rec.hash) }));
+      if (rec) recs.push({ ...(await withGifFrames({ ...rec, hash: contentOf(rec.hash) })), ...placedNameOf(await this.catalog?.entry(h).catch(() => undefined)) });
     }
     progress?.done();
     if (recs.length < hashes.length) this.tell(`${hashes.length - recs.length} of the files are missing and were not placed.`);

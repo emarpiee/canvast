@@ -741,7 +741,7 @@ function mediaKindOf(rec: Pick<AssetRecord, "type" | "frames">): MediaState["kin
 }
 
 /** The image object for `rec` with its top-left corner at screen (x, y) and a size of wPx by hPx CSS px. */
-export function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type" | "frames">, doc: DocumentStore, view: ViewState, x: number, y: number, wPx: number, hPx: number, z: number): ImageObject {
+export function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type" | "frames"> & { /** Its name in the library now: the layer keeps it from here on. */ placedName?: string }, doc: DocumentStore, view: ViewState, x: number, y: number, wPx: number, hPx: number, z: number): ImageObject {
   const cam = view.camera;
   const f = 2 ** cam.zf; // local unit = 2^-zi world = f CSS px
   const c = screenToWorld(cam, view.viewport, { x, y });
@@ -756,6 +756,7 @@ export function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "t
     z,
     opacity: 1,
     attachmentTargetId: null,
+    ...(rec.placedName && rec.placedName.length <= MAX_NAME_LENGTH ? { name: rec.placedName } : {}),
     assetId: rec.hash,
     w: wPx / f,
     h: hPx / f,
@@ -799,7 +800,7 @@ export function placeCardViews(doc: DocumentStore, from: ImageObject, items: Rea
  * Placing does not select it or touch any existing object.
  */
 export function placeImage(
-  rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type" | "frames">,
+  rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type" | "frames"> & { placedName?: string },
   doc: DocumentStore,
   view: ViewState,
   offsetPx: number,

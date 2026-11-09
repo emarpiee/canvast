@@ -931,14 +931,7 @@ async function start(): Promise<void> {
       invalidate();
     }
   };
-  let namesTimer = 0;
-  session.subscribeAssets((_meta, usageOnly) => {
-    if (usageOnly) return;
-    void syncHidden();
-    // (a name changed outside the app reaches the library by itself: what is placed on a canvas shows it too)
-    window.clearTimeout(namesTimer);
-    namesTimer = window.setTimeout(() => void assetNames.refresh(), 300);
-  });
+  session.subscribeAssets((_meta, usageOnly) => void (usageOnly || syncHidden()));
   // Hidden items' pictures on the canvas (the screen only): while Settings > Privacy remembers the Hidden password and it was given
   // here, or while hidden mode is on outside the library (Stay in hidden mode); and, in the desktop app, while their key is open. What makes a file uses `filesAssets`, and a capture of the screen is drawn with
   // padlocks first (`padlocked`), so nothing readable of them leaves the app.
