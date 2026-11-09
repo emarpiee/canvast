@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.40 — Names follow a rename outside the app (2026-11-09)
+
+- **Fixed:** a file renamed in another program kept its old name as the layer name of the items placed from it.
+
 ## 0.55.39 — Resizing a sheet zoomed far out or in (2026-11-09)
 
 - **Fixed:** at a zoom where a sheet is kept in another coordinate frame than the view, its resize handles threw it far from the pointer.
