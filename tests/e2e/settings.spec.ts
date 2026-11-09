@@ -147,7 +147,7 @@ test("shortcuts: every key can be changed, to a key or a chord, with warnings; t
   await p.mouse.click(5, 5); // the focus leaves the panel
   await expect(waiting).toHaveCount(0);
   await panel.getByRole("button", { name: "Back to canvas" }).click();
-  await expect(p.getByRole("radio", { name: "Pen" })).toHaveAttribute("title", "Pen (K)");
+  await expect(p.getByRole("radio", { name: "Pen" })).toHaveAttribute("title", "Pen (J)");
   // The tool tooltips belong to the tool buttons only; the canvas (which also carries the current tool) has none.
   await expect(p.locator("#canvas")).not.toHaveAttribute("title", /.+/);
   // On the canvas: the new keys work, the old ones do not.
@@ -155,7 +155,7 @@ test("shortcuts: every key can be changed, to a key or a chord, with warnings; t
   expect(await tool()).toBe("select");
   await p.keyboard.press("p");
   expect(await tool(), "the old key no longer picks the pen").toBe("select");
-  await p.keyboard.press("k");
+  await p.keyboard.press("j");
   expect(await tool()).toBe("pen");
   await p.keyboard.press("v");
   await p.keyboard.press("Alt+q");
