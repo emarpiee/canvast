@@ -74,7 +74,7 @@ export const LOOK_LIMITS = { sizePx: [1, 2000], lineHeight: [0.5, 5], tracking: 
 const clamp = (v: number, [lo, hi]: readonly [number, number]): number => Math.min(hi, Math.max(lo, v));
 
 /** The look of a text at a zoom (`ppu`: screen px per local unit of the text, 0 when unknown: then there is no size). */
-export function lookOf(o: TextObject, ppu: number): Required<Omit<TextLook, "sizePx" | "heightPx" | "fitShape" | "pathOpts" | "shapeOpts">> & { pathOpts: { start: number; align: "start" | "center" | "end"; flip: boolean; lift: number } | null; shapeOpts: { padX: number; padY: number; hide: boolean } | null } & { sizePx: number | null; heightPx: number | null } {
+export function lookOf(o: TextObject, ppu: number): Required<Omit<TextLook, "sizePx" | "heightPx" | "fitShape" | "pathOpts" | "shapeOpts">> & { pathOpts: { start: number; align: "start" | "center" | "end"; flip: boolean; lift: number } | null; shapeOpts: { padX: number; padY: number; padR: number; padB: number; hide: boolean } | null } & { sizePx: number | null; heightPx: number | null } {
   return {
     sizePx: ppu > 0 && ppu < Infinity ? o.size * ppu : null,
     heightPx: o.h !== undefined && ppu > 0 && ppu < Infinity ? o.h * ppu : null,
@@ -96,7 +96,7 @@ export function lookOf(o: TextObject, ppu: number): Required<Omit<TextLook, "siz
     outline: o.outline ?? null,
     card: o.card ?? null,
     pathOpts: o.onPath ? { start: o.onPath.start ?? 0, align: o.onPath.align ?? "start", flip: o.onPath.flip === true, lift: o.onPath.lift ?? 0 } : null,
-    shapeOpts: o.inShape ? { padX: o.inShape.padX ?? 0.4, padY: o.inShape.padY ?? 0, hide: o.inShape.hide === true } : null,
+    shapeOpts: o.inShape ? { padX: o.inShape.padX ?? 0.4, padY: o.inShape.padY ?? 0, padR: o.inShape.padR ?? o.inShape.padX ?? 0.4, padB: o.inShape.padB ?? o.inShape.padY ?? 0, hide: o.inShape.hide === true } : null,
   };
 }
 

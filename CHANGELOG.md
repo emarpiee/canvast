@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.35 — A balloon style keeps the whole balloon (2026-11-09)
+
+- **Fixed:** a saved balloon style kept only the body's numbers; it now keeps the size and ratio, every tail, the fill, outline, opacity, blend and adjustments, and the look of the words. Applying it adds its words only to a balloon that has none. Saved earlier, a style still gives only its body.
+
 ## 0.55.34 — Advanced export (2026-11-09)
 
 - **Added:** Advanced export in Settings > Storage: search for items and folders and choose what goes in a backup, or Everything, with or without the canvases; hidden items are asked about first.

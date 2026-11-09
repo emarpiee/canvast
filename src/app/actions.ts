@@ -4,7 +4,7 @@ import { levelsBetween } from "../core/frames";
 import { isArtFile } from "../assets/art-preview";
 import { beginProgress } from "./progress";
 import { withStyleLinks } from "../doc/style-links";
-import { withBalloonLook, type BalloonLook, type BalloonSpec, type Box } from "../doc/balloon-geometry";
+import { balloonLook, tailsOffBox, tailsOnBox, withBalloonLook, type BalloonLook, type BalloonSpec, type Box } from "../doc/balloon-geometry";
 import { newLinkObject, withBalloonLinks, type BalloonLink } from "../doc/balloon-link";
 import { hasCorners, paramsOf, withRadius, withShapeParams, type ShapePatch } from "../doc/shape-params";
 import { DEFAULT_INNER, type Radius } from "../doc/path";
@@ -1258,13 +1258,41 @@ export function setShapeText(doc: DocumentStore, editor: EditorState, look: Text
   editor.changed();
 }
 
+/** New words for a balloon, placed in its body (not yet in the document). */
+function newBalloonWords(doc: DocumentStore, path: PathObject, md: string): TextObject | null {
+  const [, , w, h] = path.params!.box;
+  return fittedInShape({ id: newObjectId(), kind: "text", ...(path.frame ? { frame: path.frame } : {}), anchor: path.anchor, unit: path.unit, z: doc.topZ() + 1, opacity: 1, attachmentTargetId: null, md, w: Math.abs(w), size: Math.min(Math.abs(w), Math.abs(h)) / 9, color: "#1f2329", ...(path.parent ? { parent: path.parent } : {}) } as TextObject, path);
+}
+
+const wordsOf = (doc: DocumentStore, path: PathObject): TextObject | undefined => textsInShapes(doc).find((t) => t.inShape?.shape === path.id);
+
 /** The words of a balloon, made when it has none yet (a double-click on it, to type them). */
 export function balloonText(doc: DocumentStore, path: PathObject): TextObject | null {
-  for (const o of doc.all()) if (o.kind === "text" && o.inShape?.shape === path.id) return o;
-  const [, , w, h] = path.params!.box;
-  const made = fittedInShape({ id: newObjectId(), kind: "text", ...(path.frame ? { frame: path.frame } : {}), anchor: path.anchor, unit: path.unit, z: doc.topZ() + 1, opacity: 1, attachmentTargetId: null, md: "Text", w: Math.abs(w), size: Math.min(Math.abs(w), Math.abs(h)) / 9, color: "#1f2329", ...(path.parent ? { parent: path.parent } : {}) } as TextObject, path);
+  const had = wordsOf(doc, path);
+  if (had) return had;
+  const made = newBalloonWords(doc, path, "Text");
   if (made) doc.commit(doc.transaction("Add words to balloon", [made]));
   return made;
+}
+
+/** The whole look of the first selected balloon, for a saved style: lengths with the units they are in. */
+export function balloonStyle(doc: DocumentStore, editor: EditorState): BalloonLook | null {
+  const o = balloonTargets(doc, editor)[0];
+  if (!o) return null;
+  const box = o.params!.box as Box, spec = o.params!.balloon!;
+  const t = wordsOf(doc, o);
+  const { pathOpts: _p, ...look } = t ? lookOf(t, 2 ** t.unit) : ({} as ReturnType<typeof lookOf>);
+  return {
+    ...balloonLook(spec),
+    full: {
+      unit: o.unit,
+      w: Math.abs(box[2]),
+      h: Math.abs(box[3]),
+      tails: tailsOffBox(spec, box),
+      paint: { ...paintOf(o), opacity: o.opacity, ...(o.blend ? { blend: o.blend } : {}), ...(o.adjust ? { adjust: o.adjust } : {}) },
+      ...(t ? { text: { md: t.md, look } } : {}),
+    },
+  };
 }
 
 /** The connector selected (its covering piece counts as it). */
@@ -1302,9 +1330,37 @@ export function connectBalloons(doc: DocumentStore, editor: EditorState): void {
   editor.changed();
 }
 
-/** A look saved as a style goes on every selected balloon. */
-export function applyBalloonStyle(doc: DocumentStore, editor: EditorState, look: BalloonLook): void {
-  commitShape(doc, editor, { balloon: (s) => withBalloonLook(s, look) }, true);
+/** A saved style goes on every selected balloon: its size from the same top-left corner, its tails, paint and the look of its words; its words only where there are none. One undo step. */
+export function applyBalloonStyle(doc: DocumentStore, editor: EditorState, style: BalloonLook): void {
+  if (editor.blockEdit()) return;
+  const next: CanvasObject[] = [];
+  for (const o of balloonTargets(doc, editor)) {
+    const f = style.full;
+    if (!f) {
+      const made = withShapeParams(o, { balloon: withBalloonLook(o.params!.balloon!, style) });
+      if (made) next.push(made);
+      continue;
+    }
+    const k = 2 ** (f.unit - o.unit);
+    const b = o.params!.box as Box;
+    const box: Box = [b[0], b[1], f.w * k, f.h * k];
+    const made = withShapeParams(o, { box, balloon: { ...withBalloonLook(o.params!.balloon!, style), tails: tailsOnBox(f, box) } });
+    if (!made) continue;
+    const p = f.paint as Partial<PathObject>;
+    const painted = { ...made, ...p, width: (p.width ?? o.width) * k, ...(p.dash ? { dash: p.dash.map((v) => v * k) } : {}), ...(p.dashOffset ? { dashOffset: p.dashOffset * k } : {}) } as PathObject;
+    next.push(painted);
+    if (f.text) {
+      const words = wordsOf(doc, o) ?? newBalloonWords(doc, o, f.text.md);
+      if (words) next.push(withLook(words, f.text.look as TextLook, 2 ** words.unit));
+    }
+  }
+  if (!next.length) return;
+  try {
+    doc.commit(doc.transaction("Apply balloon style", next));
+  } catch {
+    editor.message = "That balloon style could not be applied.";
+  }
+  editor.changed();
 }
 
 /** The selected balloons become ordinary paths, for editing their nodes: their numbers are given up. */

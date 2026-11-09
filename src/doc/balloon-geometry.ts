@@ -230,6 +230,30 @@ export const newBalloon = ([x, y, w, h]: Box): BalloonSpec => {
 export interface BalloonLook {
   readonly body: string; readonly round: number; readonly bumps: number; readonly depth: number; readonly sides: number; readonly wobble: number; readonly seed: number; readonly double?: number;
   readonly tail?: { readonly kind: TailKind; readonly bend: number; readonly belly?: number; readonly tipRound?: number; readonly bubbles?: number };
+  /** A saved style's whole balloon: its size, tails, paint and words. */
+  readonly full?: BalloonFull;
+}
+
+/** What a saved style keeps beside the body's numbers. Lengths are in the object's units then (`unit`); the tips are shares of the box. */
+export interface BalloonFull {
+  readonly unit: number;
+  readonly w: number;
+  readonly h: number;
+  readonly tails: ReadonlyArray<Omit<BalloonTail, "tip" | "width"> & { readonly tipAt: P; readonly widthOf: number }>;
+  readonly paint: Readonly<Record<string, unknown>>;
+  readonly text?: { readonly md: string; readonly look: Readonly<Record<string, unknown>> };
+}
+
+/** The tails of a saved style, on a box. */
+export function tailsOnBox(full: BalloonFull, [x, y, w, h]: Box): BalloonTail[] {
+  const side = Math.min(Math.abs(w), Math.abs(h));
+  return full.tails.map(({ tipAt, widthOf, ...t }) => ({ ...t, tip: [x + tipAt[0] * w, y + tipAt[1] * h] as const, width: widthOf * side }));
+}
+
+/** The tails as a saved style keeps them. */
+export function tailsOffBox(s: BalloonSpec, [x, y, w, h]: Box): BalloonFull["tails"] {
+  const side = Math.min(Math.abs(w), Math.abs(h)) || 1;
+  return s.tails.map(({ tip, width, ...t }) => ({ ...t, tipAt: [(tip[0] - x) / (w || 1), (tip[1] - y) / (h || 1)] as const, widthOf: width / side }));
 }
 export function balloonLook(s: BalloonSpec): BalloonLook {
   const t = s.tails[0];
@@ -245,7 +269,12 @@ export function validLook(d: unknown): BalloonLook | null {
   const l = d as BalloonLook | null;
   if (!l || typeof l !== "object") return null;
   const tail = l.tail ? [{ tip: [2, 2] as const, width: 0.2, shift: 0, ...l.tail }] : [];
-  return validBalloon({ ...l, tails: tail } as BalloonSpec) ? l : null;
+  if (!validBalloon({ ...l, tails: tail } as BalloonSpec)) return null;
+  const f = l.full;
+  if (!f) return l;
+  const fine = [f.unit, f.w, f.h].every(Number.isFinite) && f.w > 0 && f.h > 0 && Array.isArray(f.tails) && typeof f.paint === "object" && f.paint !== null;
+  const { full: _f, ...plain } = l;
+  return fine && validBalloon({ ...plain, tails: tailsOnBox(f, [0, 0, 1, 1]) } as BalloonSpec) ? l : plain;
 }
 let remembered: BalloonLook | null = null;
 /** The look the next balloon is drawn with. */

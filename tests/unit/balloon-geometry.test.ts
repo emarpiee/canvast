@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BODIES, balloonDragged, balloonHandlePoints, balloonLook, balloonOutline, balloonSubs, newBalloon, validLook, withBalloonLook, scaledBalloon, validBalloon, type Box } from "../../src/doc/balloon-geometry";
+import { BODIES, balloonDragged, balloonHandlePoints, balloonLook, balloonOutline, balloonSubs, newBalloon, tailsOffBox, tailsOnBox, validLook, withBalloonLook, scaledBalloon, validBalloon, type Box } from "../../src/doc/balloon-geometry";
 
 const box: Box = [0, 0, 200, 100];
 describe("speech balloon geometry", () => {
@@ -47,6 +47,14 @@ describe("speech balloon geometry", () => {
     expect(validLook(look)).toEqual(look);
     expect(withBalloonLook(s, look).body).toBe("cloud");
     expect(validLook({ body: "nope" })).toBeNull();
+  });
+  it("a saved style's tails go on a box of any size in the same place", () => {
+    const s = newBalloon(box);
+    const off = tailsOffBox(s, box);
+    const on = tailsOnBox({ unit: 0, w: 100, h: 60, tails: off, paint: {} }, box);
+    expect(on[0]!.tip[0]).toBeCloseTo(s.tails[0]!.tip[0], 9);
+    expect(on[0]!.width).toBeCloseTo(s.tails[0]!.width, 9);
+    expect(tailsOnBox({ unit: 0, w: 1, h: 1, tails: off, paint: {} }, [0, 0, 400, 200])[0]!.tip[0]).toBeCloseTo(s.tails[0]!.tip[0] * 2, 9);
   });
   it("scaling moves the tip and a flip mirrors the bend; a bad balloon is refused", () => {
     const s = newBalloon(box);

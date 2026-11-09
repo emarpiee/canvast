@@ -42,7 +42,7 @@ import { mountHud } from "./hud";
 import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
-import { applyBalloonStyle, balloonsToPaths, canConnectBalloons, connectBalloons, selectedBalloon, selectedLink, selectedShapeText, setBalloonLink, setShapeText } from "./actions";
+import { applyBalloonStyle, balloonStyle, balloonsToPaths, canConnectBalloons, connectBalloons, selectedBalloon, selectedLink, selectedShapeText, setBalloonLink, setShapeText } from "./actions";
 import { canSplitPaths, splitPaths, placeCardViews, placeLinesBeside, imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, canSetInShape, setTextInShape, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, buildTarget, exportTargets, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, sheetRatio, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
@@ -1337,8 +1337,8 @@ async function start(): Promise<void> {
       }
     },
     saveStyle: () => {
-      const cur = selectedBalloon(doc, editor);
-      if (cur) void session.styles.add("balloon", "", balloonLook(cur.spec)).then((made) => {
+      const look = balloonStyle(doc, editor);
+      if (look) void session.styles.add("balloon", "", look).then((made) => {
         editor.message = made ? `Saved the balloon style “${made.name}”. It is in the Styles panel.` : "The balloon could not be saved as a style.";
         editor.changed();
       });
