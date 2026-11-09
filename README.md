@@ -256,7 +256,8 @@ One endless surface: move around it, draw and write on it, place your files, kee
 | Section | What is in it |
 | --- | --- |
 | [Navigating](#navigating) | Zoom, pan, bookmarks, tours, search, stepping from item to item |
-| [Drawing](#drawing) | Pens, shapes, speech balloons, paths, fills, boolean shapes, patterns, SVG |
+| [Drawing](#drawing) | Pens, shapes, paths, fills, boolean shapes, patterns, SVG |
+| [Speech balloons](#speech-balloons) | Bodies, tails, words and connectors, shaped by handles and a panel |
 | [Colour and styles](#colour-and-styles) | The colour picker, gradients, palettes, linked styles |
 | [Text](#text) | Rich text, fonts, text on a path and in a shape |
 | [Pictures and media](#pictures-video-audio-and-other-files) | Adjustments, crop, shadows, the media player, importing |
@@ -325,7 +326,7 @@ Everything you draw is vector, so it stays sharp at every magnification.
 | --- | --- | --- |
 | **Pen** | `P` | Four pens with pressure, tilt and a stabilizer |
 | **Shapes** | `U` | Rectangle, ellipse, line, polygon and star, editable after drawing |
-| **Speech balloons** | `K` | Balloon bodies and tails shaped by handles and a panel |
+| [**Speech balloons**](#speech-balloons) | `K` | Balloon bodies and tails shaped by handles and a panel |
 | **Paths**, **Edit nodes** | `B`, `N` | Bézier curves, node editing across several paths |
 | **Fill and outline** |  | Colour, gradients, pictures, repeated objects with variation |
 | **Combine shapes** |  | Union, intersect, subtract, exclude, divide, Shape builder, Fill gaps |
@@ -342,11 +343,6 @@ Everything you draw is vector, so it stays sharp at every magnification.
 
 - **Pen** (`P`): four pens (fine, pencil, ink, marker) with pressure, tilt and a stabilizer. Size is 0.5–128 px. A stroke is made at the current scale, so a 3 px line drawn deep in a zoom is a 3 px line there, and it stays vector-sharp at every magnification. *Thickness lock* keeps strokes the same width on screen at any zoom.
 - **Shapes** (`U`): rectangle, ellipse, line, polygon and star. Sides, points, ratio and per-corner radii stay editable after drawing.
-- **Speech balloons** (`K`): drag to draw one, double-click it to type its words.
-  - Handles set the tail tip, base, width, middle width and bend, the rounding or bump depth, the size of the body and its place while the tail tip stays; they snap when Snap is on. Double-click the outline to add a tail; let a tip go inside the body to remove it.
-  - The balloon panel (its button is at the start of the Properties bar) has twelve bodies, a double line, any number of tails with rounded tips, thought bubbles, presets, *Save as style* (size, ratio, tails, paint and the look of the words; its words go only into a balloon that has none), and the words. The next balloon takes the look of the last one changed.
-  - Select two or more balloons and *Connect balloons* joins them, left to right, with a neck, pinch, line or dots that follows them; the connector has handles for width, bend and where each end stands on its balloon. Deleting a balloon removes its connectors and leaves its words as plain text; deleting it with its words removes both.
-  - A balloon is drawn with the normal fill and outline, including dashes. *Convert to path* gives up its numbers for node editing.
 - **Paths** (`B`) and **Edit nodes** (`N`): Bézier curves with handles, snapping, a lasso for several nodes, and node editing across several paths at once. A double-click in Edit nodes selects a whole closed path with its holes, to move it as one, and *Split into pieces* makes each outline of a path its own object. *Simplify* fits a curve to a rough path; *Pen stroke to path* converts a stroke.
 - **Fill and outline**
   - Fills: solid colour; linear, radial or angular gradient; a picture; or other objects of the canvas repeated over the shape (*Objects*, which follows those objects live as you change them).
@@ -380,6 +376,28 @@ Everything you draw is vector, so it stays sharp at every magnification.
   - **Seeds:** *Randomize* picks random settings and a new seed (a snowflake on a setting keeps that setting); *New seed* keeps the settings, and says when the seed changes nothing. Type or drag a seed to make a result again. The regular generators (Stripes, Tiles, Halftone and the like) have a *Looseness* setting; at 0 they stay exact.
   - **Afterwards:** the result is a group of ordinary editable shapes that remembers its settings. Select it later and the panel shows them; changes replace it in place. Resizing its sheet makes it again to fill the new size (it stretches while you drag).
 - **SVG:** paste SVG text to get editable paths (gradients, including a radial one sized by its own transform and an angular one written as a CSS conic gradient box, dashes, transforms, `<use>`, symbols and clip paths, which become clipping masks), or make a vector copy of an SVG picture. Export shapes as SVG, copy them as SVG text, or save them to the library as an SVG picture.
+
+### Speech balloons
+
+Press `K`, drag to draw a balloon, and double-click it to type its words.
+
+![Two blue speech balloons joined by a connector, the handles of one showing, and the Speech balloon panel open beside them](docs/screenshots/balloons.webp)
+
+| Part | What you can do |
+| --- | --- |
+| **Handles** | Set the tail tip, base, width, middle width and bend, the rounding or bump depth, the body's size, and its place while the tail tip stays; they snap when Snap is on |
+| **Tails** | Double-click the outline to add one; let a tip go inside the body to remove it |
+| **Panel** | Its button is at the start of the Properties bar: twelve bodies, a double line, any number of tails with rounded tips, thought bubbles, presets, and the words |
+| **Styles** | *Save as style* keeps size, ratio, tails, paint and the look of the words; its words go only into a balloon that has none |
+| **Connectors** | Select two or more balloons and *Connect balloons* joins them, left to right |
+| **Paint** | The normal fill and outline, including dashes |
+
+#### More about speech balloons
+
+- The next balloon takes the look of the last one changed.
+- A connector is a neck, pinch, line or dots, and follows its balloons. Its handles set the width, the bend and where each end stands on its balloon.
+- Deleting a balloon removes its connectors and leaves its words as plain text; deleting it with its words removes both.
+- *Convert to path* gives up the balloon's numbers for node editing.
 
 ### Colour and styles
 
@@ -550,10 +568,12 @@ Copy to other apps, or export a sheet, a picture or selected shapes, and get wha
 | Formats | PNG, WebP, JPEG, SVG and PDF. What is on a sheet that clips is cut to the sheet in every format. PNG, JPEG and WebP carry their resolution |
 | Background | Transparent, white or black |
 | Result | Download it, copy it, or keep it in the library |
-| Several items | Selected sheets, or with *Each on its own* any selected items (pictures at their own pixels): one ZIP, or one multi-page PDF whose pages you can reorder. Otherwise a selection is one picture |
+| Several items | Selected sheets, or with *Each on its own* any selected items (pictures at their own pixels): one ZIP, or one multi-page PDF whose pages you can reorder. A balloon and its words are one item, and a connector is none. Otherwise a selection is one picture |
 | Vectors | Plain shapes are true vectors in PDF and SVG; masks are SVG masks; picture and pattern fills are embedded pictures clipped to the shape |
 
 ![Export dialog for the Earth, a clipping mask](docs/screenshots/export.webp)
+
+![Export with Each on its own: a small page for each selected item, and All as one picture to go back](docs/screenshots/export-each.webp)
 
 ---
 
@@ -1103,6 +1123,9 @@ The first tab to open a workspace edits it. Other tabs are read-only, follow its
 ### Backups
 
 - **Advanced export** (Settings > Storage) puts only what you choose in a backup: search for items and folders and tick them, or tick *Everything*. Hidden items are asked about first, so their password is asked once. A folder brings what is inside it, its folders too. The total size is shown as you choose. With *Also the canvases*, every file a canvas shows goes too. *Saved styles* (on by default) brings the styles and the fonts and pictures they use. A partial backup can only be added, never used to update a workspace, and does not count as the last backup for *Export changes*. Links in notes to items left out stay as they are and find nothing until those items are there.
+
+  ![Advanced export: a search field, the items and folders ticked, and the total size of what is chosen](docs/screenshots/advanced-export.webp)
+
 - **Export a backup** (Settings > Storage) downloads one `.canvast` file holding every board, canvas, object and view, plus every file once, and your settings (the workspace's and this device's: theme, shortcuts, panel layout). When you import it, only the settings this device has not set itself are restored; the ones you changed here are kept, and the import dialog says how many it will restore.
 - A board, a canvas or a single library item can be exported on its own, with only the files it uses.
 - **Import archive…** (or drop a `.canvast` file on the page) verifies every checksum first, asks how to import a workspace backup, shows what it contains and any problems, and only then writes, in a single transaction. Files you already have are not stored twice.
@@ -1873,6 +1896,7 @@ node scripts/showcase/shots-features.mjs showcase.canvast shots/ # the board men
 node scripts/showcase/shots-desktop.mjs showcase.canvast shots/  # the desktop app on a workspace folder (after npm run desktop's build)
 node scripts/showcase/shots-notes.mjs showcase.canvast shots/    # a note in the notes editor, and its card with the File panel
 node scripts/showcase/shots-library.mjs showcase.canvast shots/  # the library's folder tree and the Organize dialog
+node scripts/showcase/shots-balloons.mjs showcase.canvast shots/  # speech balloons, Advanced export and Export with each item on its own
 ```
 
 The `Screenshots` workflow on GitHub (*Run workflow*) does all of this and gives the WebP pictures as an artifact. The `File managers` workflow (`scripts/file-manager-paste.mjs`, every week and by hand) pastes a **Copy file** in five Linux file managers on a virtual screen and compares the file.

@@ -1,5 +1,54 @@
 # Changelog
 
+## 0.56.0 — Speech balloons, sharing on the network, safer hidden items (2026-11-10)
+
+Everything since 0.55.0, in one release (0.55.1 to 0.55.44).
+
+- **Added:** a Speech balloon tool (`K`): twelve bodies, any number of tails with handles for tip, base, width, middle width and bend, rounded tips, thought bubbles, a double line, presets, *Save as style* and *Convert to path*; the next balloon takes the last look.
+- **Added:** words in a balloon by double-click; *Connect balloons* joins two or more with a neck, pinch, line or dots that follow them and have their own handles.
+- **Added:** text inside any closed shape, boolean shape or group, each line as wide as the shape is there, with per-side padding, *Across* and *Down* alignment, justified text, words that go round holes and *Fit to shape*.
+- **Added:** sharing on the local network (desktop app): read-only guests in a browser or the app, a folder for file managers (WebDAV) with a login per device, its rights and an activity list.
+- **Added:** canvast tools, one file for Node.js 20 or later attached to every release: a menu in plain words or one-line commands to open hidden items, hide files into a workspace and share a folder. `hidden-items.mjs` with no arguments decrypts what sits beside it.
+- **Added:** **Lock** on the hidden mode chip and **Lock now** in Settings > Privacy; **New key** encrypts every hidden file and name again under a new random key.
+- **Added:** Advanced export in Settings > Storage: search and choose what goes in a backup, or Everything, with or without the canvases, with *Saved styles* on by default.
+- **Added:** *Each on its own* in Export, one PDF page or one file per selected item, and *Put each on its own sheet* in the Sheets menu.
+- **Added:** previews in the Trash for every kind the library draws one for.
+- **Added:** sort buttons for Saved searches and File types.
+- **Added:** the technical info bar shows the memory of tiles, the undo history and the JS heap, beside the decoded pictures.
+- **Added:** `Stress hidden` with `--big`, up to about 15 GB of files from 50 KB to 2 GB.
+- **Changed:** in the desktop app a deleted library item goes to the workspace's `.trash` at once.
+- **Changed:** hiding and showing keeps memory flat: past 16 MiB a file is sealed and opened a part at a time, and read fewer times. The tools do the same for files of any size.
+- **Changed:** undo keeps its 500 steps only while they hold about 256 MiB or less; big pictures being decoded at once wait their turn.
+- **Changed:** a tool's options come first in its bar; a panel setting of more than four choices is a dropdown.
+- **Changed:** words in a shape are typed in a box in the middle of the shape, on the shape's colour; each side handle sets the padding of its own side, the left and right handles of a text change only the width of its box.
+- **Changed:** deleting a speech balloon or any shape leaves its words as plain text, in the same undo step.
+- **Changed:** Settings > Sharing keeps fixed rows, with long lists in a dialog; Saved searches are rows like the folders'.
+- **Changed:** the hidden mode chip, Settings > Privacy and the README say what Exit and Lock each do.
+- **Changed:** the README starts with notes from the developer.
+- **Removed:** the limit of 500 saved styles.
+- **Removed:** the Balloons tab of the Pattern panel, replaced by the tool.
+
+- **Fixed:** *Lock now*, *New key* and other Settings buttons stayed on screen when they should hide; *Lock now* now says when locking is done, and its status shows only the latest answer.
+- **Fixed:** New key left the encrypted names of hidden files and folders under the old key.
+- **Fixed:** a hidden item kept its file name as a layer name on a canvas; hiding it takes that name off, and a hidden item's name is not stored.
+- **Fixed:** a guest's Hidden password said yes while hidden items were not shared.
+- **Fixed:** library items deleted in the desktop app could come back after a restart; a file changed since it came in stayed where it was.
+- **Fixed:** the start-up sweep could delete a file of yours named like the app's temporary ones; a board or canvas left half moved by a crash now goes back or into `.trash`.
+- **Fixed:** a resize handle dragged past the far side collapsed an item; a sheet's handles threw it far from the pointer at some zooms.
+- **Fixed:** styles restored from a backup appeared only after a restart, and saving one before that lost them.
+- **Fixed:** a saved balloon style kept only the body's numbers.
+- **Fixed:** connectors painted over a balloon's words, and one deleted alone left a piece behind.
+- **Fixed:** the words of a balloon were fitted to its outline with the tail, and used the unturned body of a turned balloon.
+- **Fixed:** text in a shape lost its options, left its outline behind and updated late; text along a path lagged, could vanish, did not follow its path, and *Along the path* and *Side* did nothing.
+- **Fixed:** a number field in a bar lost the focus or jumped back to its old value.
+- **Fixed:** a placed item took an old name after a rename in another program.
+- **Fixed:** in Export, a balloon and its words counted as separate items and a connector as one.
+- **Fixed:** the grab cursor and Space panning could stay on after Space was let go in another window.
+- **Fixed:** after a delete in the library the search box took the focus.
+- **Fixed:** Settings jumped to the top while sharing was on, and a press could open a dialog once per visit to the Sharing tab.
+- **Fixed:** canvast tools: the password question could show what was typed on newer Node.js.
+- **Fixed:** a pattern made on a sheet left part of the old picture in view.
+
 ## 0.55.44 — Memory: measured, and two limits (2026-11-10)
 
 - **Added:** the technical info bar shows the memory of tiles, the undo history and the JS heap, beside the decoded pictures.
