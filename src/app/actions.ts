@@ -4,6 +4,7 @@ import { levelsBetween } from "../core/frames";
 import { isArtFile } from "../assets/art-preview";
 import { beginProgress } from "./progress";
 import { withStyleLinks } from "../doc/style-links";
+import type { BalloonSpec, Box } from "../doc/balloon-geometry";
 import { hasCorners, paramsOf, withRadius, withShapeParams, type ShapePatch } from "../doc/shape-params";
 import { DEFAULT_INNER, type Radius } from "../doc/path";
 import { canRound, nodesIn, roundCorners } from "../doc/rounding";
@@ -1207,6 +1208,14 @@ export interface ShapeChange {
   sides?: number;
   tips?: number;
   inner?: number;
+  /** A speech balloon's numbers, worked out for each selected balloon. */
+  balloon?: (s: BalloonSpec, box: Box) => BalloonSpec;
+}
+
+/** The first selected speech balloon: its box and numbers. */
+export function selectedBalloon(doc: DocumentStore, editor: EditorState): { box: Box; spec: BalloonSpec } | null {
+  for (const o of editablePaths(doc, editor)) if (o.params?.balloon) return { box: o.params.box, spec: o.params.balloon };
+  return null;
 }
 
 /** Change the sides, points or ratio of the selected polygons and stars: one undo step. */
@@ -1218,6 +1227,7 @@ export function commitShape(doc: DocumentStore, editor: EditorState, change: Sha
     if (change.sides !== undefined && o.shape === "polygon") patch.sides = change.sides;
     if (change.tips !== undefined && o.shape === "star") patch.tips = change.tips;
     if (change.inner !== undefined && o.shape === "star") patch.inner = change.inner;
+    if (change.balloon && o.params?.balloon) patch.balloon = change.balloon(o.params.balloon, o.params.box);
     if (!Object.keys(patch).length) continue;
     const made = withShapeParams(o, patch);
     if (made) next.push(made);
@@ -1225,7 +1235,7 @@ export function commitShape(doc: DocumentStore, editor: EditorState, change: Sha
   if (!final) return showReplaced(editor, next);
   editor.preview = { kind: "none" };
   if (!next.length) return editor.changed();
-  const what = change.sides !== undefined ? "Sides" : change.tips !== undefined ? "Points" : "Star ratio";
+  const what = change.balloon ? "Speech balloon" : change.sides !== undefined ? "Sides" : change.tips !== undefined ? "Points" : "Star ratio";
   doc.commit(doc.transaction(next.length === 1 ? what : `${what} of ${next.length} shapes`, next));
   editor.changed();
 }

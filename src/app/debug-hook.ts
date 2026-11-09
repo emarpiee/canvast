@@ -211,6 +211,8 @@ export interface DebugHook {
   /** The resize handles of the selection box as last drawn. */
   drawnHandles(): Array<[number, number]>;
   /** The words beside a handle being dragged, or null. */
+  /** The handles of the selected speech balloon, on screen. */
+  balloonDots(): Array<{ part: string; tail: number; x: number; y: number }>;
   handleLabel(): string | null;
   /** The nodes picked together in Edit nodes (ADR 0145): how many on each path. */
   pickedNodes(): Array<[string, number]>;
@@ -580,6 +582,10 @@ export function installDebugHook(
       const po = visibleObjects(doc, deps.index, null, view.frameCamera, view.viewport).find((p) => editor.selection.has(p.obj.id));
       const h = po && shapeHandles(po, editor.cornersOpen === po.obj.id, editor);
       return h?.main ? { main: [h.main.x, h.main.y], corners: h.corners.map((d) => [d.x, d.y] as [number, number]), count: h.count ? ([h.count.x, h.count.y] as [number, number]) : null, countCentre: h.count ? ([h.count.cx, h.count.cy] as [number, number]) : null } : null;
+    },
+    balloonDots: () => {
+      const po = visibleObjects(doc, deps.index, null, view.frameCamera, view.viewport).find((p) => editor.selection.has(p.obj.id));
+      return (po && shapeHandles(po, false, editor)?.balloon) ?? [];
     },
     handleLabel: () => editor.handleLabel?.text ?? null,
     pickedNodes: () => [...editor.nodeMulti].map(([id, set]) => [id, set.size] as [string, number]),

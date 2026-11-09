@@ -3696,3 +3696,22 @@ test("a whole closed path: a double-click in Edit nodes picks it with its hole, 
   await expect.poll(async () => (await paths()).length).toBe(1);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("speech balloon: drawn with its key; its tail tip follows the handle, in one undo step, and keeps its numbers when resized", async ({ app }) => {
+  const p = app.page;
+  type B = Obj & { params?: { box: number[]; balloon?: { body: string; tails: Array<{ tip: number[] }> } } };
+  await key(app, "k");
+  await drag(app, [500, 300], [700, 420]);
+  const made = (await last(app)) as B;
+  expect(made.shape).toBe("balloon");
+  expect(made.params?.balloon?.body).toBe("oval");
+  expect(made.sub[0]!.closed).toBe(true);
+  const dots = () => p.evaluate(() => window.__canvastDebug.balloonDots());
+  const tip = (await dots()).find((d) => d.part === "tip")!;
+  await drag(app, [tip.x, tip.y], [tip.x + 90, tip.y + 40]);
+  const moved = (await last(app)) as B;
+  expect(moved.params!.balloon!.tails[0]!.tip[0]).toBeGreaterThan(made.params!.balloon!.tails[0]!.tip[0]!);
+  expect(moved.params!.box).toEqual(made.params!.box);
+  await p.keyboard.press("Control+z");
+  expect(((await last(app)) as B).params!.balloon!.tails[0]!.tip).toEqual(made.params!.balloon!.tails[0]!.tip);
+});

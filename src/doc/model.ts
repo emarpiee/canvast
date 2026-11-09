@@ -21,6 +21,7 @@ const textPathBounds = (o: TextObject): LocalBounds => {
 const pathBoundsCache = new WeakMap<TextObject, LocalBounds>();
 import type { TextAlign } from "../text/layout";
 import { MAX_MARKDOWN_LENGTH, canonical } from "../text/markdown";
+import { validBalloon } from "./balloon-geometry";
 import type { Align, Arrow, Cap, Join, Radius, ShapeKind, ShapeParams, SubPath } from "./path";
 import { ARROWS, miterLimitOf } from "./path";
 import type { Dash } from "./stroke-look";
@@ -654,6 +655,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
         const v = q[k];
         if (v !== undefined && !(typeof v === "number" && Number.isFinite(v) && v >= lo && v <= hi && (k === "inner" || Number.isInteger(v)))) throw new InvalidObjectError(`bad ${k}`);
       }
+      if (q.balloon !== undefined && !validBalloon(q.balloon)) throw new InvalidObjectError("bad balloon");
     }
     if (o.result !== undefined && !(typeof o.result === "string" && (o.groups ?? []).includes(o.result) && o.boolOps?.[o.result] !== undefined)) throw new InvalidObjectError("bad boolean result");
   } else if (o.kind === "text") {

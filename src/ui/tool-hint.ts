@@ -18,6 +18,7 @@ const SHAPE_HINT: Record<ShapeKind, string> = {
   line: "Drag to draw a line · Shift: steps of 45° · Alt: from the middle",
   polygon: "Drag to draw a polygon (the sides are set beside it) · Shift: even · Alt: from the centre",
   star: "Drag to draw a star (the points are set beside it) · Shift: even · Alt: from the centre",
+  balloon: "Drag to draw a speech balloon · then drag its handles: tail tip, base and width · Shift: even · Alt: from the centre",
 };
 
 export function toolHint(editor: EditorState, doc: DocumentStore): string | null {
@@ -26,6 +27,8 @@ export function toolHint(editor: EditorState, doc: DocumentStore): string | null
   switch (editor.tool) {
     case "shape":
       return editor.shapeDraft ? null : SHAPE_HINT[editor.shapeKind];
+    case "balloon":
+      return editor.shapeDraft ? null : SHAPE_HINT.balloon;
     case "sheet":
       return "Drag to draw a sheet · what you draw or move into it is held and cut by it · Ctrl+Alt+G puts the selected objects on a sheet";
     case "path":

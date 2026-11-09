@@ -512,6 +512,13 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, selected: readonly Pro
     ctx.strokeStyle = theme.selection;
   }
   const r = HANDLE_SIZE_PX / 2 + 1;
+  for (const b of h.balloon ?? []) {
+    ctx.fillStyle = b.part === "tip" ? theme.selection : theme.handleFill;
+    ctx.beginPath();
+    dot(ctx, theme, b.x, b.y, b.part === "tip" ? r : r - 1);
+    ctx.fill();
+    ctx.stroke();
+  }
   if (h.ratio) {
     // The ratio of a star: a small four-pointed star, its points against its waist (the inner radius against the outer).
     const [qx, qy, ro] = [h.ratio.x, h.ratio.y, r + 3];

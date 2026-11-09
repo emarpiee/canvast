@@ -1,3 +1,4 @@
+import { balloonSubs, newBalloon, scaledBalloon, type BalloonSpec } from "./balloon-geometry";
 /**
  * Vector path geometry (ADR 0099): pure functions over plain numbers, no DOM, no document. A path object (model.ts `PathObject`) is a
  * list of sub-paths; a sub-path is a list of nodes, flat, six numbers each:
@@ -391,11 +392,11 @@ function distSeg(px: number, py: number, ax: number, ay: number, bx: number, by:
 
 // ---- Shapes -----------------------------------------------------------------------------------------------------------------------
 
-export type ShapeKind = "rect" | "ellipse" | "line" | "polygon" | "star";
-export const SHAPE_KINDS: readonly ShapeKind[] = ["rect", "ellipse", "line", "polygon", "star"];
+export type ShapeKind = "rect" | "ellipse" | "line" | "polygon" | "star" | "balloon";
+export const SHAPE_KINDS: readonly ShapeKind[] = ["rect", "ellipse", "line", "polygon", "star", "balloon"];
 
 /** What a path is called in lists and undo labels. */
-export const SHAPE_NAMES: Record<ShapeKind | "path", string> = { rect: "Rectangle", ellipse: "Ellipse", line: "Line", polygon: "Polygon", star: "Star", path: "Path" };
+export const SHAPE_NAMES: Record<ShapeKind | "path", string> = { balloon: "Speech balloon", rect: "Rectangle", ellipse: "Ellipse", line: "Line", polygon: "Polygon", star: "Star", path: "Path" };
 
 /** The handle length that makes a cubic follow a quarter circle (0.5522847498). */
 const KAPPA = (4 / 3) * (Math.SQRT2 - 1);
@@ -456,6 +457,7 @@ export function shapeSubs(kind: ShapeKind, x: number, y: number, w: number, h: n
     case "line": return lineSubs(x, y, x + w, y + h);
     case "polygon": return polygonSubs(x, y, w, h, sides);
     case "star": return starSubs(x, y, w, h, tips, inner);
+    case "balloon": return balloonSubs([x, y, w, h], newBalloon([x, y, w, h]));
   }
 }
 
@@ -463,6 +465,8 @@ export function shapeSubs(kind: ShapeKind, x: number, y: number, w: number, h: n
 
 /** What a drawn shape is made from, kept so it can be changed later: its box and the numbers its kind takes (lengths in the object's local units). */
 export interface ShapeParams {
+  /** A speech balloon: its body and tails; `box` is its body. */
+  readonly balloon?: BalloonSpec;
   /** x, y, width, height of the unrounded shape's bounds. */
   readonly box: readonly [number, number, number, number];
   readonly sides?: number;
@@ -477,6 +481,7 @@ export const CORNERED: readonly ShapeKind[] = ["rect", "polygon", "star"];
 
 /** A shape filling `box` exactly (a polygon or star is stretched so that its bounds, not its circle, are the box). */
 export function fittedShape(kind: ShapeKind, p: ShapeParams): SubPath[] {
+  if (kind === "balloon") return balloonSubs(p.box, p.balloon ?? newBalloon(p.box));
   const g = shapeSubs(kind, 0, 0, 1, 1, p.sides ?? 6, p.tips ?? 5, p.inner ?? DEFAULT_INNER);
   const b = geometryBounds(g);
   const [x, y, w, h] = p.box;
@@ -486,7 +491,7 @@ export function fittedShape(kind: ShapeKind, p: ShapeParams): SubPath[] {
 }
 
 /** The parameters after the object's local coordinates are scaled. */
-export const scaleParams = (p: ShapeParams, kx: number, ky: number): ShapeParams => ({ ...p, box: [p.box[0] * kx, p.box[1] * ky, p.box[2] * kx, p.box[3] * ky] });
+export const scaleParams = (p: ShapeParams, kx: number, ky: number): ShapeParams => ({ ...p, box: [p.box[0] * kx, p.box[1] * ky, p.box[2] * kx, p.box[3] * ky], ...(p.balloon ? { balloon: scaledBalloon(p.balloon, kx, ky) } : {}) });
 
 /** A corner radius: one for every corner, or (a rectangle) one per node of its first sub-path. */
 export type Radius = number | readonly number[];
@@ -496,7 +501,7 @@ export const scaleRadius = (r: Radius, k: number): Radius => (typeof r === "numb
 
 /** The parameters of a shape just drawn into a box (null for kinds that have none). */
 export const drawnParams = (kind: ShapeKind, x: number, y: number, w: number, h: number, sides: number, tips: number): ShapeParams | null =>
-  CORNERED.includes(kind) ? { box: [x, y, w, h], ...(kind === "polygon" ? { sides } : {}), ...(kind === "star" ? { tips, inner: DEFAULT_INNER } : {}) } : null;
+  kind === "balloon" ? { box: [x, y, w, h], balloon: newBalloon([x, y, w, h]) } : CORNERED.includes(kind) ? { box: [x, y, w, h], ...(kind === "polygon" ? { sides } : {}), ...(kind === "star" ? { tips, inner: DEFAULT_INNER } : {}) } : null;
 
 /** The geometry of a shape being drawn: the same as it will be once drawn (fitted to its box). */
 export const drawnSubs = (kind: ShapeKind, x: number, y: number, w: number, h: number, sides: number, tips: number): SubPath[] => {

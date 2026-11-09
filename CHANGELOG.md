@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.22 — Speech balloon tool (2026-11-09)
+
+- **Added:** a Speech balloon tool next to Shapes (`K`): twelve body shapes, a tail set by handles (tip, base, width, bend), a handle for rounding or bump depth, and a panel opened from the Actions bar. A balloon stays editable, and resizes, undoes and saves like any shape.
+
 ## 0.55.21 — Text in boolean shapes and groups (2026-11-09)
 
 - **Fixed:** *Text inside the shape* and *Text along a path* were not offered for a boolean shape or a group; the words go in its biggest piece.

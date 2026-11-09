@@ -321,6 +321,7 @@ Everything you draw is vector, so it stays sharp at every magnification.
 | --- | --- | --- |
 | **Pen** | `P` | Four pens with pressure, tilt and a stabilizer |
 | **Shapes** | `U` | Rectangle, ellipse, line, polygon and star, editable after drawing |
+| **Speech balloons** | `K` | Balloon bodies and tails shaped by handles and a panel |
 | **Paths**, **Edit nodes** | `B`, `N` | Bézier curves, node editing across several paths |
 | **Fill and outline** |  | Colour, gradients, pictures, repeated objects with variation |
 | **Combine shapes** |  | Union, intersect, subtract, exclude, divide, Shape builder, Fill gaps |
@@ -337,6 +338,7 @@ Everything you draw is vector, so it stays sharp at every magnification.
 
 - **Pen** (`P`): four pens (fine, pencil, ink, marker) with pressure, tilt and a stabilizer. Size is 0.5–128 px. A stroke is made at the current scale, so a 3 px line drawn deep in a zoom is a 3 px line there, and it stays vector-sharp at every magnification. *Thickness lock* keeps strokes the same width on screen at any zoom.
 - **Shapes** (`U`): rectangle, ellipse, line, polygon and star. Sides, points, ratio and per-corner radii stay editable after drawing.
+- **Speech balloons** (`K`): drag to draw one. Its handles set the tail tip, base, width and bend, and the rounding or bump depth; the Actions bar opens its panel for the twelve body shapes and the tail. Editing its nodes makes it an ordinary path.
 - **Paths** (`B`) and **Edit nodes** (`N`): Bézier curves with handles, snapping, a lasso for several nodes, and node editing across several paths at once. A double-click in Edit nodes selects a whole closed path with its holes, to move it as one, and *Split into pieces* makes each outline of a path its own object. *Simplify* fits a curve to a rough path; *Pen stroke to path* converts a stroke.
 - **Fill and outline**
   - Fills: solid colour; linear, radial or angular gradient; a picture; or other objects of the canvas repeated over the shape (*Objects*, which follows those objects live as you change them).
@@ -1047,7 +1049,7 @@ Every shortcut can be changed in **Settings → Shortcuts**: a single key or a c
 | Zoom at centre | `+` / `−` (`Shift` = 4× step) |
 | Pan | Middle-drag · `Space`+drag · Hand tool · two fingers · `Shift`+wheel · arrow keys |
 | Return to origin | `0` · `Home` |
-| Tools | `V` select · `P` pen · `L` lasso · `H` hand · `T` text · `M` note · `U` shape · `B` path · `N` nodes · `C` sheet · `E` eraser |
+| Tools | `V` select · `P` pen · `L` lasso · `H` hand · `T` text · `M` note · `U` shape · `K` speech balloon · `B` path · `N` nodes · `C` sheet · `E` eraser |
 | Undo · redo | `Ctrl/⌘+Z` · `Ctrl/⌘+Shift+Z` or `Ctrl+Y` |
 | Copy · cut · paste · duplicate | `Ctrl/⌘+C` · `X` · `V` · `D` |
 | Select all · clear · cancel a gesture | `Ctrl/⌘+A` · `Esc` |

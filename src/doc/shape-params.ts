@@ -5,10 +5,12 @@
  */
 import { canRound, clampRadius, nodesIn, roundCorners } from "./rounding";
 import type { PathObject } from "./model";
+import type { BalloonSpec } from "./balloon-geometry";
 import { CORNERED, DEFAULT_INNER, fittedShape, geometryBounds, nodeCount, type Radius, type ShapeParams, type SubPath } from "./path";
 
 /** The parameters of a shape that has them, or can be worked out: a shape drawn before they were kept, whose nodes are still exactly its kind's own. */
 export function paramsOf(o: PathObject): ShapeParams | null {
+  if (o.shape === "balloon") return o.params ?? null;
   if (!o.shape || !CORNERED.includes(o.shape) && o.shape !== "ellipse") return null;
   if (o.params) return o.params;
   if (o.shape === "ellipse" || o.sub.length !== 1 || !o.sub[0]!.closed) return null;
@@ -21,7 +23,7 @@ export function paramsOf(o: PathObject): ShapeParams | null {
   return same ? p : null;
 }
 
-export type ShapePatch = { sides?: number; tips?: number; inner?: number };
+export type ShapePatch = { sides?: number; tips?: number; inner?: number; balloon?: BalloonSpec };
 
 /** The sharp geometry of a path: what its rounded corners are made from. */
 const sharpOf = (o: PathObject): readonly SubPath[] => o.base ?? (o.params && o.shape ? fittedShape(o.shape, o.params) : o.sub);
@@ -54,6 +56,7 @@ export function withRadius(o: PathObject, radius: Radius): PathObject {
 /** Whether the path has corners that a radius would round (or is rounded now); a boolean group's result is judged by its own outline. */
 const cornered = new WeakMap<PathObject, boolean>();
 export function hasCorners(o: PathObject): boolean {
+  if (o.params?.balloon) return false; // (its outline is made of many short lines: its body has its own rounding)
   let r = cornered.get(o);
   if (r === undefined) cornered.set(o, (r = o.radius !== undefined || canRound(sharpOf(o))));
   return r;

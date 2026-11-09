@@ -122,6 +122,7 @@ const TOOLS: Array<{ tool: Tool; icon: string; label: string; key: string }> = [
   { tool: "node", icon: ICONS.nodeTool, label: "Edit nodes", key: "N" },
   { tool: "pen", icon: ICONS.pencil, label: "Pen", key: "P" },
   { tool: "shape", icon: ICONS.shapeTool, label: "Shape and path", key: "U" },
+  { tool: "balloon", icon: ICONS.speechBalloon, label: "Speech balloon", key: "K" },
   { tool: "sheet", icon: ICONS.sheetTool, label: "Sheet", key: "C" },
   { tool: "lasso", icon: ICONS.lasso, label: "Lasso", key: "L" },
   { tool: "text", icon: ICONS.type, label: "Text", key: "T" },
@@ -294,12 +295,12 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         ${TEXT_FITS.map((a) => `<button type="button" role="radio" class="shape-kind" data-text-wrap hidden data-text-fit="${a.id}" aria-label="${a.label}" title="${a.title}">${a.icon}</button>`).join("")}
       </div>
       <div class="tb-group tb-options" data-for="select node" data-sel-colours data-no-command hidden role="group" aria-label="Colours of the selection"></div>
-      <div class="tb-group tb-options" data-for="shape path select node" data-kind="shape sheet picture">
+      <div class="tb-group tb-options" data-for="shape balloon path select node" data-kind="shape sheet picture">
         <button type="button" class="swatch swatch-paint" data-kind="shape sheet" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
         <button type="button" class="swatch swatch-paint" data-paint="stroke" aria-haspopup="dialog" aria-expanded="false" aria-label="Outline" title="Outline colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Outline</b></button>
       <button type="button" class="swatch swatch-outline" data-outline-options aria-haspopup="dialog" aria-expanded="false" aria-label="Outline options" title="Outline options: width, position (inside, centre, outside), corners and ends">${ICONS.outlineOptions}</button>
       </div>
-      <div class="tb-group tb-options" data-for="shape path">
+      <div class="tb-group tb-options" data-for="shape balloon path">
         <input type="range" class="size" data-shape-width min="0" max="100" step="1" aria-label="Outline width" title="Outline width (screen px at this zoom); all the way left: no outline">
         <span class="size-out" data-shape-out></span>
       </div>
@@ -800,7 +801,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       editor.penColor = d["color"];
       editor.changed();
     } else if (d["shapeKind"]) {
-      editor.shapeKind = d["shapeKind"] as ShapeKind;
+      editor.shapeKind = d["shapeKind"] as typeof editor.shapeKind;
       if (editor.tool === "path") editor.setTool("shape");
       editor.changed();
     } else if (d["selColour"] !== undefined) {

@@ -16,6 +16,7 @@ import { moveNodes, edgeBetween, deleteVertex, cellAt } from "../doc/network";
 import { NODE, SHAPE_NAMES, lineSubs, moveHandle, moveNode, nodeCount, drawnParams, drawnSubs, splitSegment, toggleSmooth, withNode } from "../doc/path";
 import { nodesIn, roundCorners } from "../doc/rounding";
 import { paramsOf } from "../doc/shape-params";
+import { BALLOON_LABELS, balloonDragged, type BalloonPart } from "../doc/balloon-geometry";
 import { DEFAULT_INNER } from "../doc/path";
 import { linkAt } from "../text/layout";
 import { pictureBox } from "../render/gradient";
@@ -257,7 +258,7 @@ type Gesture =
   /** Dragging a handle of a path's gradient (ADR 0100). */
   | { kind: "grad"; pointerId: number; id: ObjectId; which: "fill" | "stroke"; handle: GradHandle; g: Gradient }
   /** Dragging the corner radius dot or a star's ratio handle (ADR 0105): `r0` the radius in px and `proj0` where along the corner's bisector the press was. */
-  | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio" | "count"; index: number; ax: number; ay: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number; /** Every picked corner taken along (its radius and the most it can have), by node. */ multi?: ReadonlyMap<number, { r0: number; max: number }> }
+  | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio" | "count" | "balloon"; balloon?: { part: BalloonPart; tail: number }; index: number; ax: number; ay: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number; /** Every picked corner taken along (its radius and the most it can have), by node. */ multi?: ReadonlyMap<number, { r0: number; max: number }> }
   /** Dragging a shape out (Shape tool). */
   | { kind: "shape"; pointerId: number; start: ScreenPoint }
   /** A node of the path being built has been placed; dragging pulls its handles out (Path tool). */
@@ -732,15 +733,15 @@ export function attachTools(
       frame: view.frame,
       anchor: world(s),
       unit: -cam.zi,
-      kind: editor.tool === "sheet" ? "rect" : editor.shapeKind,
+      kind: editor.tool === "sheet" ? "rect" : editor.tool === "balloon" ? "balloon" : editor.shapeKind,
       bx: 0,
       by: 0,
       bw: 0,
       bh: 0,
       sides: editor.shapeSides,
       tips: editor.shapeTips,
-      fill: editor.tool === "sheet" ? "#ffffff" : editor.shapeKind === "line" ? null : paintOf(editor.shapeFill),
-      stroke: editor.tool === "sheet" ? null : editor.shapeKind === "line" && editor.shapeStroke === null ? newInk("#1f2329") : paintOf(editor.shapeStroke),
+      fill: editor.tool === "sheet" ? "#ffffff" : editor.tool === "balloon" ? (paintOf(editor.shapeFill) ?? "#ffffff") : editor.shapeKind === "line" ? null : paintOf(editor.shapeFill),
+      stroke: editor.tool === "sheet" ? null : editor.tool === "balloon" && editor.shapeStroke === null ? newInk("#1f2329") : editor.shapeKind === "line" && editor.shapeStroke === null ? newInk("#1f2329") : paintOf(editor.shapeStroke),
       width,
     };
     sheetStart = sheetAt(s.x, s.y)?.id;
@@ -802,6 +803,7 @@ export function attachTools(
     }
     doc.commit(doc.transaction(editor.tool === "sheet" ? "Draw sheet" : `Draw ${SHAPE_NAMES[d.kind].toLowerCase()}`, [obj]));
     editor.select([obj.id]);
+    if (editor.tool === "balloon") editor.setTool("select"); // (its handles are what comes next)
   };
 
   // The Path tool: a click adds a corner, a drag pulls a smooth node's handles out, a click on the first node closes the path;
@@ -959,7 +961,7 @@ export function attachTools(
         toggleCorners(id);
       }
     }, LONG_PRESS_MS) : 0;
-    g = { kind: "round", pointerId: e.pointerId, id, what: pick.what, index: pick.what === "corner" ? pick.dot.index : 0, ax: pick.what === "ratio" && h.ratio ? (h.ratio.x - h.ratio.cx) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, ay: pick.what === "ratio" && h.ratio ? (h.ratio.y - h.ratio.cy) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, r0: dot?.px ?? 0, proj0: along, x0: s.x, start: s, moved: false, opened: false, timer };
+    g = { kind: "round", pointerId: e.pointerId, id, what: pick.what, ...(pick.what === "balloon" ? { balloon: { part: pick.handle.part, tail: pick.handle.tail } } : {}), index: pick.what === "corner" ? pick.dot.index : 0, ax: pick.what === "ratio" && h.ratio ? (h.ratio.x - h.ratio.cx) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, ay: pick.what === "ratio" && h.ratio ? (h.ratio.y - h.ratio.cy) / Math.max(1e-6, Math.hypot(h.ratio.x - h.ratio.cx, h.ratio.y - h.ratio.cy)) : 0, r0: dot?.px ?? 0, proj0: along, x0: s.x, start: s, moved: false, opened: false, timer };
     const sel = editor.cornerSel;
     if (g.kind === "round" && pick.what === "corner" && sel && sel.id === id && sel.idx.size > 1 && sel.idx.has(pick.dot.index)) {
       g.multi = new Map(h.corners.filter((d) => sel.idx.has(d.index)).map((d) => [d.index, { r0: d.px, max: d.max }]));
@@ -978,6 +980,13 @@ export function attachTools(
     const h = tgt && shapeHandles(tgt.po, open, editor);
     if (!tgt || !h) return;
     const ppu = tgt.po.proj.ppu;
+    if (g.what === "balloon" && g.balloon) {
+      const { part, tail } = g.balloon;
+      const l = localOf(tgt.po, s.x, s.y);
+      commitShapeNumbers(doc, editor, { balloon: (q, box) => balloonDragged(box, q, part, tail, [l.x, l.y]) }, final);
+      editor.handleLabel = final ? null : { x: s.x, y: s.y, text: BALLOON_LABELS[part] };
+      return;
+    }
     if (g.what === "ratio" && h.ratio) {
       const q = h.ratio;
       // Only along its line (from the middle through the handle), wherever the pointer strays to.
@@ -1055,7 +1064,7 @@ export function attachTools(
       if (pick && h) {
         const prm = paramsOf(tgt.o);
         guide = handleGuide(h, pick, open);
-        text = pick.what === "ratio" ? `Ratio ${Math.round((prm?.inner ?? DEFAULT_INNER) * 100)}%` : pick.what === "count" ? `Count ${prm?.sides ?? prm?.tips ?? 0}` : `Radius ${Math.round((pick.what === "corner" ? pick.dot.px : h.main?.px ?? 0) * 10) / 10}`;
+        text = pick.what === "balloon" ? BALLOON_LABELS[pick.handle.part] : pick.what === "ratio" ? `Ratio ${Math.round((prm?.inner ?? DEFAULT_INNER) * 100)}%` : pick.what === "count" ? `Count ${prm?.sides ?? prm?.tips ?? 0}` : `Radius ${Math.round((pick.what === "corner" ? pick.dot.px : h.main?.px ?? 0) * 10) / 10}`;
       } else {
         const gh = editor.tool === "node" || editor.cornersOpen === tgt.o.id ? null : gradientHandles(tgt.po, editor.gradientFocus);
         const hit = gh && hitGradient(gh, s.x, s.y);
@@ -1994,6 +2003,7 @@ export function attachTools(
         g = { kind: "text", pointerId: e.pointerId, start: s, moved: false };
         break;
       case "shape":
+      case "balloon":
       case "sheet":
         startShape(s, e);
         break;

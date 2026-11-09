@@ -1,3 +1,4 @@
+import { balloonHandlePoints, type BalloonPart } from "../doc/balloon-geometry";
 import type { PathObject } from "../doc/model";
 import { editSubs } from "../doc/model";
 import type { ImageObject } from "../doc/model";
@@ -291,7 +292,11 @@ export interface CornerHandles {
   ratio: { x: number; y: number; cx: number; cy: number; outer: number } | null;
   /** The count handle of a polygon or star: on its second outer corner; dragged round the middle it changes how many there are (`a0`: the angle of the first corner). */
   count: { x: number; y: number; cx: number; cy: number; a0: number; n: number } | null;
+  /** A speech balloon's own handles. */
+  balloon?: BalloonHandle[];
 }
+
+export interface BalloonHandle { part: BalloonPart; tail: number; x: number; y: number }
 
 const MIN_DOT_PX = 18;
 const MAX_CORNER_DOTS = 64;
@@ -423,6 +428,15 @@ export function clearSpot(x: number, y: number, dirs: ReadonlyArray<readonly [nu
  * agree on where each is: what is drawn, what is hovered and what a press takes).
  */
 export function shapeHandles(po: ProjectedObject, expanded: boolean, editor: { gradientFocus: "fill" | "stroke" | null; drawnHandles: ReadonlyArray<readonly [number, number]> }): CornerHandles | null {
+  const q = po.obj.kind === "path" ? (po.obj as PathObject).params : undefined;
+  if (q?.balloon && !po.cover) {
+    const p = po.proj;
+    const balloon = balloonHandlePoints(q.box, q.balloon).map(({ part, tail, at }) => {
+      const [x, y] = outerAt(po, exactX(p, at[0]), exactY(p, at[1]));
+      return { part, tail, x, y };
+    });
+    return { main: null, corners: [], centre: null, ratio: null, count: null, balloon };
+  }
   return cornerHandles(po, expanded, [...(gradientHandles(po, editor.gradientFocus)?.pts ?? []), ...editor.drawnHandles.map(([x, y]) => ({ x, y }))]);
 }
 
@@ -452,7 +466,7 @@ export function handleGuide(h: CornerHandles, pick: CornerPick, open: boolean): 
   return { x0: dot.cx + dot.ux * MIN_DOT_PX, y0: dot.cy + dot.uy * MIN_DOT_PX, x1: dot.cx + (dot.ux * max) / dot.sinHalf, y1: dot.cy + (dot.uy * max) / dot.sinHalf };
 }
 
-export type CornerPick = { what: "main" } | { what: "corner"; dot: CornerDot } | { what: "ratio" } | { what: "count" };
+export type CornerPick = { what: "balloon"; handle: BalloonHandle } | { what: "main" } | { what: "corner"; dot: CornerDot } | { what: "ratio" } | { what: "count" };
 
 /** Which handle a press takes: a corner's own dot (when opened out), the ratio handle, or the main dot. */
 export function hitCornerHandle(h: CornerHandles, x: number, y: number, expanded: boolean): CornerPick | null {
@@ -465,6 +479,7 @@ export function hitCornerHandle(h: CornerHandles, x: number, y: number, expanded
       bestD = d;
     }
   };
+  for (const handle of h.balloon ?? []) consider({ what: "balloon", handle }, near(handle) - (handle.part === "tip" ? 1 : 0));
   if (h.main) consider({ what: "main" }, near(h.main) - 2); // the main one wins a tie: it is the bigger
   if (expanded) for (const dot of h.corners) consider({ what: "corner", dot }, near(dot));
   if (h.ratio) consider({ what: "ratio" }, near(h.ratio));

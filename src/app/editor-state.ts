@@ -14,7 +14,7 @@ import { roundCorners } from "../doc/rounding";
 import type { Paint } from "../doc/paint";
 import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 
-export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "note" | "eraser" | "shape" | "path" | "node" | "sheet";
+export type Tool = "select" | "pen" | "lasso" | "hand" | "text" | "note" | "eraser" | "shape" | "balloon" | "path" | "node" | "sheet";
 
 const EMPTY: ReadonlySet<ObjectId> = new Set();
 
@@ -166,7 +166,7 @@ export class EditorState {
   /** Select tool: ignore an object that fills the whole view (zoomed far into it), so it cannot be picked or deleted by accident. */
   ignoreFilling = false;
   /** The Shape and Path tools (ADR 0099): what they make. Fill and outline null: none. */
-  shapeKind: ShapeKind = "rect";
+  shapeKind: Exclude<ShapeKind, "balloon"> = "rect";
   shapeFill: Paint | null = "#2563eb";
   shapeStroke: Paint | null = null; // (shapes start with no outline; a line or an open path gets the ink when it has none)
   shapeWidthPx = 2;
