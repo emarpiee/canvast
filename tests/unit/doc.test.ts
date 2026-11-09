@@ -224,3 +224,15 @@ describe("a library item replaced by its new version", () => {
     expect((doc.get(card.id) as ImageObject)).toMatchObject({ assetId: NEW, w: 900 });
   });
 });
+
+describe("the undo history", () => {
+  it("lets the oldest steps go past what it may hold, and always keeps the last", () => {
+    const doc = new DocumentStore();
+    const points = Array.from({ length: 4_000_000 }, (_, i) => i % 1000);
+    for (let i = 0; i < 12; i++) doc.commit(doc.transaction("Draw", [stroke({ points })]));
+    expect(doc.historySteps).toBeLessThan(12);
+    expect(doc.historySteps).toBeGreaterThan(0);
+    expect(doc.historyBytes()).toBeLessThanOrEqual(256 * 2 ** 20);
+  });
+});
+

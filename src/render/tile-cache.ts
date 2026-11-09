@@ -128,6 +128,15 @@ export class TileCache {
   private readonly dirty = new Set<ObjectId>();
   private readonly pool: HTMLCanvasElement[] = [];
 
+  /** What the tiles hold now: how many, and their bytes (the spare canvases too). */
+  memory(): { tiles: number; bytes: number } {
+    let tiles = 0, bytes = 0;
+    const add = (c: HTMLCanvasElement | null): void => { if (c) bytes += c.width * c.height * 4; };
+    for (const g of [this.gen, ...this.ahead.values()]) for (const t of g?.tiles.values() ?? []) (tiles++, add(t.canvas));
+    this.pool.forEach(add);
+    return { tiles, bytes };
+  }
+
   constructor(
     private readonly getObject: (id: ObjectId) => CanvasObject | undefined,
     /** Schedules a redraw (used to refine a zoom preview once the zoom stops). */

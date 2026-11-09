@@ -124,6 +124,8 @@ const previewOf = (k: string): string | undefined => {
  * would otherwise decode in parallel, each briefly holding its full pixels: gigabytes for a few seconds (ADR 0030).
  */
 export const MAX_DECODES = 3;
+/** What the pictures being decoded at once may take, all their pixels, even when a smaller copy is what is kept. One bigger than this still goes, alone. */
+const DECODING_BYTES = 768 * 2 ** 20;
 /** A queued decode nothing has asked for within this many ms is dropped (the image left the view). */
 const QUEUE_STALE_MS = 1500;
 /** An image asked for within this many ms is in use and is never released. */
@@ -238,6 +240,8 @@ export class AssetLibrary {
   private running = 0;
   maxRunning = 0;
   private readonly queue = new Map<string, { hash: string; edge: number; wanted: number }>();
+  private decodingBytes = 0;
+  private readonly decodeWaiters: Array<() => void> = [];
   private lastEvictCheck = 0;
 
   constructor(
@@ -665,16 +669,27 @@ export class AssetLibrary {
     }
   }
 
+  /** Wait until this picture's pixels fit beside what is being decoded, and count them: returns what was counted. */
+  private async decodeRoom(rec: AssetRecord): Promise<number> {
+    const cost = rec.pixelW * rec.pixelH * 4;
+    while (this.decodingBytes > 0 && this.decodingBytes + cost > DECODING_BYTES) await new Promise<void>((go) => this.decodeWaiters.push(go));
+    this.decodingBytes += cost;
+    return cost;
+  }
+
   private async load(hash: string, edge = 0): Promise<void> {
     const key = hash + (edge ? reducedKey(edge) : "");
+    let cost = 0;
     try {
       const rec = await this.record(hash.split("#")[0]!);
       if (!rec) {
         this.missing.add(hash);
         if (await this.store?.locked(hash.split("#")[0]!)) this.locked.add(hash);
       } else if (edge && Math.max(...Object.values(pageOf(hash) ?? { w: rec.pixelW, h: rec.pixelH })) > edge) {
+        cost = await this.decodeRoom(rec);
         await this.ensureReduced(rec, edge, hash);
       } else {
+        cost = await this.decodeRoom(rec);
         // (asked for smaller than it is: the whole of it serves from now on, or the copy asked for would never come and the view would keep drawing)
         if (edge) this.noReduced.add(hash);
         await this.ensureDecoded(rec, hash);
@@ -682,6 +697,8 @@ export class AssetLibrary {
     } catch {
       this.missing.add(hash);
     } finally {
+      this.decodingBytes -= cost;
+      for (const go of this.decodeWaiters.splice(0)) go();
       this.pending.delete(key);
       this.onReady();
     }

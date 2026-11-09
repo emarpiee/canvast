@@ -1752,10 +1752,13 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     diagnostics: () => {
       const mem = assets.stats();
       const q = assets.decodeLoad();
+      const tileMem = tiles.memory();
+      const heap = (performance as unknown as { memory?: { usedJSHeapSize: number; jsHeapSizeLimit: number } }).memory; // (Chromium and the desktop app only)
       const mib = (b: number): string => (b / 2 ** 20).toFixed(0);
       return [
         `objects ${doc.size.toLocaleString()} · drawn ${stats.last?.visibleCount.toLocaleString() ?? 0}${indexSync.building() ? " · indexing…" : ""}`,
         `decoded ${mem.count} images · ${mib(mem.bytes)} / ${mib(mem.budget)} MiB · decoding ${q.running} · waiting ${q.queued}`,
+        `tiles ${tileMem.tiles} · ${mib(tileMem.bytes)} MiB · undo ${doc.historySteps} steps · ${mib(doc.historyBytes())} MiB${heap ? ` · JS ${mib(heap.usedJSHeapSize)} / ${mib(heap.jsHeapSizeLimit)} MiB` : ""}`,
       ];
     },
     notify: (message) => {

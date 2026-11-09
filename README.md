@@ -1001,7 +1001,7 @@ A markdown note's YAML block is its tags, description and properties, and each p
   The viewer has no context menu.
 - **Zen mode** (`Z`, or the leaf button) fades the bars and panels until the pointer is over them.
 - **Screenshot** (camera button) saves the selection, or the whole view, to the library. Settings choose the format, quality, name, folder and tags. They also choose whether to include the canvas pattern and the interface, a transparent background, and a copy on the clipboard.
-- **Info bar** (bottom left): the zoom, position and save state. *Information shown* switches between simple and technical (exact zoom as a power of two, frame rate, diagnostics). The bottom-right buttons cycle the canvas pattern (grid and others) and the item names (always, when selected, hidden).
+- **Info bar** (bottom left): the zoom, position and save state. *Information shown* switches between simple and technical (exact zoom as a power of two, frame rate, diagnostics, what the pictures, tiles, undo history and JS heap hold in memory). The bottom-right buttons cycle the canvas pattern (grid and others) and the item names (always, when selected, hidden).
 - **Hint line** (bottom): what the tool does, and what each key does over a handle.
 - **Notices** report results, often with a *View* button that opens what was made. They fade after a time that fits their length (an error stays to be read), and stack above the Actions bar, never over it.
 - **Long work** (exporting, importing, opening a library, moving files, deleting everything) shows a notice with a progress bar and its current stage, which stays until the work ends and then says the result.
@@ -1549,6 +1549,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Dense scenes | Zooming shows a scaled image, exact about 150 ms after you stop |
 | Far zoom-out | Too-small content is a soft mark you cannot select |
 | Very large documents | A million objects: about 940 MB and 6 s to load |
+| Undo on a canvas | The last 500 steps, or about 256 MiB of them if that comes first |
 | Large libraries | From 20,000 items on desktop, listed in pages; no *Similar images*, no counts on saved searches, no list of an item's copies in its details |
 | Copies of a file (desktop) | A copy found in another folder is an item of its own on desktop only; placed on a canvas it is its first item, and a backup carries it as its first item (not its own name, folder or tags) |
 | Frame rate | Measured on one desktop machine only |

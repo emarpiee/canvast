@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.55.44 — Memory: measured, and two limits (2026-11-10)
+
+- **Added:** the technical info bar shows the memory of tiles, the undo history and the JS heap, beside the decoded pictures.
+- **Changed:** big pictures being decoded at once are limited by their pixels, so several huge ones wait their turn.
+- **Changed:** the undo history keeps its 500 steps only while they hold about 256 MiB or less; past that the oldest go.
+
 ## 0.55.43 — Each selected item as its own page (2026-11-09)
 
 - **Added:** *Each on its own* in Export: several selected items, sheets or not, become one page of a PDF each, or one file each in a ZIP. With PDF chosen it is the way it opens. Pictures keep their own pixels until a width is set.

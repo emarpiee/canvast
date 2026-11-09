@@ -27,6 +27,28 @@ export type ChangeSource = "do" | "undo" | "redo" | "load";
 export type ChangedIds = ReadonlySet<ObjectId> | null;
 
 const HISTORY_LIMIT = 500;
+/** What the undo history may hold, about, however few steps that is (a step's objects are kept whole, before and after). */
+const HISTORY_BYTES = 256 * 2 ** 20;
+
+/** About what an object holds in memory, most of it its numbers. */
+function objectBytes(o: CanvasObject | null): number {
+  if (!o) return 0;
+  if (o.kind === "stroke") return 300 + o.points.length * 8;
+  if (o.kind === "text") return 300 + o.md.length * 2 + (o.inShape?.n.length ?? 0) * 8 + (o.onPath?.n.length ?? 0) * 8;
+  if (o.kind === "path") return 300 + [...o.sub, ...(o.base ?? [])].reduce((t, s) => t + s.n.length * 8, 0);
+  return 300;
+}
+
+const txBytes = new WeakMap<Transaction, number>();
+function bytesOf(tx: Transaction): number {
+  let n = txBytes.get(tx);
+  if (n === undefined) {
+    n = 200;
+    for (const m of [tx.before, tx.after]) for (const o of m.values()) n += objectBytes(o);
+    txBytes.set(tx, n);
+  }
+  return n;
+}
 
 export class DocumentStore {
   private readonly objects = new Map<ObjectId, CanvasObject>();
@@ -104,6 +126,14 @@ export class DocumentStore {
     return { label, before, after };
   }
 
+  /** About what the undo history holds in memory, and how many steps. */
+  historyBytes(): number {
+    return [...this.undoStack, ...this.redoStack].reduce((t, tx) => t + bytesOf(tx), 0);
+  }
+  get historySteps(): number {
+    return this.undoStack.length + this.redoStack.length;
+  }
+
   /** Validate and apply a transaction atomically, recording it for undo. */
   commit(tx: Transaction): void {
     if (tx.after.size === 0) return;
@@ -111,6 +141,7 @@ export class DocumentStore {
     this.undoStack.push(tx);
     if (this.undoStack.length > HISTORY_LIMIT) this.undoStack.shift();
     this.redoStack.length = 0;
+    for (let held = this.historyBytes(); held > HISTORY_BYTES && this.undoStack.length > 1; ) held -= bytesOf(this.undoStack.shift()!);
     this.emit("do", new Set(tx.after.keys()));
   }
 
