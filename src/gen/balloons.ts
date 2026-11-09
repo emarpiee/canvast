@@ -34,7 +34,7 @@ function bodyOf(kind: string, cx: number, cy: number, rx: number, ry: number, ro
     const rough = kind === "jagged" ? 0.5 : 0;
     return Array.from({ length: bumps * 2 }, (_, i) => {
       const a = ((i + (rough ? (rng() - 0.5) * rough : 0)) / (bumps * 2)) * TAU;
-      const r = i % 2 ? 1 - d * (rough ? 0.6 + rng() * 0.8 : 1) : 1 - (rough ? rng() * d * 0.4 : 0);
+      const r = i % 2 ? 1 - 2 * d * (rough ? 0.6 + rng() * 0.8 : 1) : 1 - (rough ? rng() * d * 0.4 : 0);
       return [cx + rx * Math.max(0.1, r) * Math.cos(a), cy + ry * Math.max(0.1, r) * Math.sin(a)] as P;
     });
   }
@@ -47,7 +47,7 @@ function bodyOf(kind: string, cx: number, cy: number, rx: number, ry: number, ro
       const t = (i / STEPS) * TAU;
       return [16 * Math.sin(t) ** 3, -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t))] as P;
     });
-    return pts.map(([x, y]) => [cx + (x / 16) * rx, cy + ((y + 2.5) / 14.5) * ry] as P);
+    return pts.map(([x, y]) => [cx + (x / 16) * rx, cy + ((y - 2.5) / 14.5) * ry] as P);
   }
   // A box of some rounding: its four corners, each an arc (a straight cut for the octagon).
   const r = kind === "capsule" ? Math.min(rx, ry) : kind === "box" ? 0 : Math.min(rx, ry) * Math.min(1, round / 100);
@@ -78,6 +78,24 @@ function wobbled(pts: P[], cx: number, cy: number, amount: number, rng: Rng): P[
 const dist = (a: P, b: P): number => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const lerp = (a: P, b: P, t: number): P => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
 
+/** Points every so far along the outline, its corners kept: a tail's feet can then land anywhere, on a long straight side too. */
+function evened(pts: readonly P[]): P[] {
+  const total = pts.reduce((t, p, i) => t + dist(p, pts[(i + 1) % pts.length]!), 0);
+  const most = total / 360;
+  const out: P[] = [];
+  pts.forEach((p, i) => {
+    const q = pts[(i + 1) % pts.length]!;
+    const many = Math.max(1, Math.ceil(dist(p, q) / most));
+    for (let k = 0; k < many; k++) out.push(lerp(p, q, k / many));
+  });
+  return out;
+}
+const inside = (pts: readonly P[], [x, y]: P): boolean => {
+  let on = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) if (pts[i]![1] > y !== pts[j]![1] > y && x < ((pts[j]![0] - pts[i]![0]) * (y - pts[i]![1])) / (pts[j]![1] - pts[i]![1]) + pts[i]![0]) on = !on;
+  return on;
+};
+
 /** The point of the outline nearest the way to the tip from the middle, moved along the outline by `shift` (a share of the width). */
 function baseIndex(pts: readonly P[], c: P, tip: P, shift: number): number {
   const want = Math.atan2(tip[1] - c[1], tip[0] - c[0]) + shift;
@@ -90,7 +108,9 @@ function baseIndex(pts: readonly P[], c: P, tip: P, shift: number): number {
 }
 
 /** The outline with a tail let into it: the part between its two feet taken out, the tail's two sides put in. */
-function withTail(pts: P[], c: P, tip: P, kind: string, width: number, bend: number, shift: number): P[] {
+function withTail(outline: P[], c: P, tip: P, kind: string, width: number, bend: number, shift: number): P[] {
+  if (inside(outline, tip)) return outline; // (a tip inside the balloon: no tail to draw)
+  const pts = evened(outline);
   const m = pts.length;
   const k = baseIndex(pts, c, tip, shift);
   const walk = (dir: number): number => {
@@ -117,9 +137,14 @@ function withTail(pts: P[], c: P, tip: P, kind: string, width: number, bend: num
     return [u * u * from[0] + 2 * u * t * cx + t * t * to[0], u * u * from[1] + 2 * u * t * cy + t * t * to[1]] as P;
   });
   if (kind === "zigzag") {
-    const at = (t: number, off: number): P => [mid[0] + (tip[0] - mid[0]) * t + nx * off, mid[1] + (tip[1] - mid[1]) * t + ny * off];
-    const w = width / 2;
-    ring.push(lerp(A, at(0.4, -w * 0.9), 1), at(0.32, w * 0.55), at(0.68, -w * 0.4), tip, at(0.72, w * 0.05), at(0.42, -w * 0.15), B);
+    // A bolt: a line that kinks twice, its two sides parallel and narrowing to the tip.
+    const kink = width * 0.45;
+    const at = (t: number, off: number, side: number): P => {
+      const half = (width / 2) * (1 - t);
+      const x = mid[0] + (tip[0] - mid[0]) * t + nx * (off + side * half), y = mid[1] + (tip[1] - mid[1]) * t + ny * (off + side * half);
+      return [x, y];
+    };
+    ring.push(at(0.38, kink, -1), at(0.62, -kink, -1), tip, at(0.62, -kink, 1), at(0.38, kink, 1), B);
     ring.pop();
     return ring;
   }
@@ -208,8 +233,8 @@ const SECTIONS: readonly Section[] = [
       R("weight", "Width", 0, 30, 5),
       steady(Ch("style", "Style", [["solid", "Solid"], ["double", "Double"], ["dashed", "Dashed"]], "solid")),
       when("style", ["double"], R("gap", "Gap", 1, 40, 10)),
-      when("style", ["dashed"], R("dash", "Dash length", 2, 80, 18)),
-      when("style", ["dashed"], R("dashGap", "Dash gap", 2, 80, 12)),
+      when("style", ["dashed"], R("dash", "Dash length", 2, 80, 45)),
+      when("style", ["dashed"], R("dashGap", "Dash gap", 2, 80, 30)),
       R("shadowX", "Shadow across", 0, 60, 0),
       R("shadowY", "Shadow down", 0, 60, 0),
     ],
@@ -223,25 +248,35 @@ function run(v: Values, rng: Rng, w: number, h: number): GenShape[] {
   const count = Math.max(1, Math.round(n("count")));
   const arrange = s("arrange");
   const body = s("body");
-  const tips: P[] = [[(n("tipX") / 100) * w, (n("tipY") / 100) * h]];
-  if (s("second") === "on") tips.push([(n("tip2X") / 100) * w, (n("tip2Y") / 100) * h]);
+  // Nothing may reach past the box (a sheet cuts what does): room for the outline's corners and the shadow.
+  const unit = Math.min(w, h);
+  const room = Math.min(unit / 4, weight * 2 + (Math.max(n("shadowX"), n("shadowY")) / 1000) * unit + 1 * (unit > 8 ? 1 : 0));
+  const keep = (x: number, y: number): P => [Math.min(w - room, Math.max(room, x)), Math.min(h - room, Math.max(room, y))];
+  const tips: P[] = [keep((n("tipX") / 100) * w, (n("tipY") / 100) * h)];
+  if (s("second") === "on") tips.push(keep((n("tip2X") / 100) * w, (n("tip2Y") / 100) * h));
   const tail = s("tail");
   // Each balloon's middle and half-sizes: one where the settings say, more spread over the box and getting smaller.
   const cells: Array<{ c: P; rx: number; ry: number }> = [];
   const rx0 = (n("bodyW") / 100) * w * 0.5, ry0 = (n("bodyH") / 100) * h * 0.5;
   const cx0 = (n("bodyX") / 100) * w, cy0 = (n("bodyY") / 100) * h;
   const shrink = n("shrink") / 100;
-  if (count === 1) cells.push({ c: [cx0, cy0], rx: rx0, ry: ry0 });
+  /** A balloon's place, moved and made smaller as far as it takes to stay inside the box (the hand-drawn wobble's reach counted). */
+  const fit = (x: number, y: number, rx: number, ry: number): { c: P; rx: number; ry: number } => {
+    const reach = 1 + (n("wobble") / 100) * 0.23;
+    const fx = Math.max(0.5, Math.min(rx * reach, w / 2 - room)), fy = Math.max(0.5, Math.min(ry * reach, h / 2 - room));
+    return { c: [Math.min(w - room - fx, Math.max(room + fx, x)), Math.min(h - room - fy, Math.max(room + fy, y))], rx: fx / reach, ry: fy / reach };
+  };
+  if (count === 1) cells.push(fit(cx0, cy0, rx0, ry0));
   else {
-    const across = arrange === "column" ? 1 : count, down = arrange === "row" ? 1 : count;
     for (let i = 0; i < count; i++) {
       const k = shrink ** i;
       const t = (i + 0.5) / count;
-      const x = across === 1 ? cx0 : arrange === "zigzag" ? (i % 2 ? 0.7 : 0.3) * w : t * w;
-      const y = down === 1 ? cy0 : t * ((n("tipY") > 60 ? 0.85 : 1) * h);
-      const rx = (arrange === "column" || arrange === "zigzag" ? rx0 * 0.6 : (w / count) * 0.46 * Math.max(1, across / 2)) * k;
-      const ry = (arrange === "row" ? ry0 : (h / count) * 0.5) * k;
-      cells.push({ c: [x, y], rx: Math.min(rx, rx0), ry: Math.min(ry, ry0) });
+      const rowLike = arrange === "row" || arrange === "stairs";
+      const x = arrange === "column" ? cx0 : arrange === "zigzag" ? (i % 2 ? 0.68 : 0.32) * w : t * w;
+      const y = arrange === "row" ? cy0 : t * h * (tail === "none" || tail === "bubbles" ? 1 : 0.88);
+      const rx = (rowLike ? (w / count) * (arrange === "stairs" ? 0.56 : 0.42) : Math.min(rx0, w * 0.3)) * k;
+      const ry = (arrange === "row" ? ry0 : (h / count) * (arrange === "stairs" ? 0.56 : 0.36)) * k;
+      cells.push(fit(x, y, rx, ry));
     }
   }
   const tailOn = s("tailOn");
@@ -249,7 +284,9 @@ function run(v: Values, rng: Rng, w: number, h: number): GenShape[] {
     let pts = wobbled(bodyOf(body, cell.c[0], cell.c[1], cell.rx, cell.ry, n("round"), Math.max(3, Math.round(n("bumps"))), n("bumpDepth"), Math.max(3, Math.round(n("sides"))), rng), cell.c[0], cell.c[1], n("wobble"), rng);
     if (area(pts) < 0) pts = [...pts].reverse();
     if (tail !== "none" && tail !== "bubbles" && (count === 1 || tailOn === "all" || (tailOn === "first" ? i === 0 : i === count - 1))) {
-      for (const tip of tips) pts = withTail(pts, cell.c, tip, tail, (n("tailW") / 100) * Math.min(w, h) * 1.4, n("bend"), (n("tailShift") * Math.PI) / 180);
+      // (linked: each tail points the way the settings say from its own balloon, so it never runs across the others)
+      const own = count === 1 ? tips : tips.map(([x, y]) => keep(cell.c[0] + ((x - cx0) * cell.rx) / rx0, cell.c[1] + ((y - cy0) * cell.ry) / ry0));
+      for (const tip of own) pts = withTail(pts, cell.c, tip, tail, (n("tailW") / 100) * Math.min(w, h) * 1.4, n("bend"), (n("tailShift") * Math.PI) / 180);
     }
     return pts;
   });
@@ -258,7 +295,6 @@ function run(v: Values, rng: Rng, w: number, h: number): GenShape[] {
   const links: SubPath[] = [];
   const beads: SubPath[] = [];
   const lines: SubPath[] = [];
-  const unit = Math.min(w, h);
   for (let i = 0; i + 1 < cells.length && link !== "none"; i++) {
     const A = cells[i]!, B = cells[i + 1]!;
     const d = dist(A.c, B.c) || 1;
@@ -266,21 +302,25 @@ function run(v: Values, rng: Rng, w: number, h: number): GenShape[] {
     const half = (n("neckW") / 200) * unit;
     if (link === "neck") links.push(poly([[A.c[0] + nx * half, A.c[1] + ny * half], [B.c[0] + nx * half, B.c[1] + ny * half], [B.c[0] - nx * half, B.c[1] - ny * half], [A.c[0] - nx * half, A.c[1] - ny * half]]));
     else if (link === "pinch") {
-      const m = lerp(A.c, B.c, 0.5);
       const side = (sg: number, from: P, to: P): P[] => Array.from({ length: 13 }, (_, k) => {
         const t = k / 12;
         const waist = 1 - 0.65 * Math.sin(t * Math.PI);
         const p = lerp(from, to, t);
         return [p[0] + sg * nx * half * waist, p[1] + sg * ny * half * waist] as P;
       });
-      void m;
       links.push(poly([...side(1, A.c, B.c), ...side(-1, B.c, A.c)]));
     } else if (link === "line") lines.push(curve([A.c, B.c]));
     else if (link === "dots") {
       const many = Math.max(1, Math.round(n("linkDots")));
       for (let k = 0; k < many; k++) {
-        const p = lerp(A.c, B.c, (k + 1) / (many + 1));
-        beads.push(ellipse(p[0], p[1], half, half));
+        // (in the gap between the two balloons, as many as fit there)
+        const dx = B.c[0] - A.c[0], dy = B.c[1] - A.c[1];
+        const from = 1 / Math.hypot(dx / A.rx, dy / A.ry), to = 1 - 1 / Math.hypot(dx / B.rx, dy / B.ry);
+        const r = Math.min(half, Math.max(0, to - from) * d / (2.4 * many));
+        if (r > 0.2) {
+          const p = lerp(A.c, B.c, from + ((to - from) * (k + 0.5)) / many);
+          beads.push(ellipse(p[0], p[1], r, r));
+        }
       }
     }
   }

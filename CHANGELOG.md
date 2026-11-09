@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.19 — Balloons audited (2026-11-09)
+
+- **Fixed:** a balloon's tail took whole sides of a box; a balloon moved in its settings could be cut by its sheet; the heart was out of its box; the zigzag tail folded over itself; a linked balloon's tail crossed the others; linked balloons overlapped, and dots hid under them; dashes were too short to see.
+
 ## 0.55.18 — Long choices are dropdowns (2026-11-09)
 
 - **Changed:** a panel setting of more than four choices is a dropdown, in every panel. The Balloons settings follow the others: Colour first, short names, rows shown only when they apply.

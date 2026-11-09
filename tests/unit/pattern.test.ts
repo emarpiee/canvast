@@ -342,6 +342,20 @@ describe("speech balloons", () => {
         expect(main.sub[0]!.closed).toBe(true);
       }
   });
+  it("stays inside its box wherever it is moved, so a sheet never cuts it; a tail takes only its own width of a long side", () => {
+    for (const o of [{ bodyX: 0, bodyY: 0 }, { bodyX: 100, bodyY: 100, tipX: 0, tipY: 0 }, { bodyW: 100, bodyH: 100, wobble: 100, shadowX: 60, shadowY: 60 }, { count: 6, arrange: "stairs" }] as const)
+      for (const body of ["round", "heart", "burst"]) for (const s of make({ ...o, body }))
+        for (const p of s.sub) for (let i = 0; i < p.n.length; i += 6) {
+          expect(p.n[i]!, `${body} x`).toBeGreaterThanOrEqual(0);
+          expect(p.n[i]!, `${body} x`).toBeLessThanOrEqual(800);
+          expect(p.n[i + 1]!, `${body} y`).toBeGreaterThanOrEqual(0);
+          expect(p.n[i + 1]!, `${body} y`).toBeLessThanOrEqual(600);
+        }
+    // (a box's left and top sides are still there with its tail at the bottom)
+    const n = make({ body: "box", tailW: 10 }).find((s) => s.name === "Balloon")!.sub[0]!.n;
+    const xs = Array.from({ length: n.length / 6 }, (_, i) => n[i * 6]!);
+    expect(Math.min(...xs)).toBeCloseTo(400 - 0.86 * 400, 0);
+  });
   it("the tail reaches its tip; thought bubbles, a second tail and every connector make shapes", () => {
     const tip = make({ tipX: 10, tipY: 95 }).find((s) => s.name === "Balloon")!.sub[0]!.n;
     let near = Infinity;
