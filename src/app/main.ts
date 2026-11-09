@@ -145,7 +145,7 @@ import { followFrameSetting, mountWindowRow } from "../ui/window-frame";
 import { followScrolling } from "../ui/scrollbars";
 import type { AppView } from "../ui/view-switch";
 import { entriesOfDrop, fileByFolders, filesOfEntries, hasFolder } from "./directory";
-import { isArchiveFile, runExport, runExportChanges, runExportFiles, runImport, takeAfterReload, takeStayUnlocked } from "../ui/archive-ui";
+import { isArchiveFile, runExport, runExportChanges, runAdvancedExport, runExportFiles, runImport, takeAfterReload, takeStayUnlocked } from "../ui/archive-ui";
 import { copyText, mountTextEditor } from "../ui/text-editor";
 import { FontLoader, whyNotFont } from "./font-loader";
 import { onFontsChange } from "../text/fonts";
@@ -2320,6 +2320,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     },
     exportFull: async () => void (await runExport(session, { kind: "workspace" })),
     exportChanges: () => runExportChanges(session),
+    exportAdvanced: async () => void (await runAdvancedExport(session)),
     exportFiles: async () => void (await runExportFiles(session, { kind: "workspace" })),
     importFiles: (files) => runImport(session, files),
     readOnly: () => session.readOnly,

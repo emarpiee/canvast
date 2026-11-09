@@ -1097,6 +1097,7 @@ The first tab to open a workspace edits it. Other tabs are read-only, follow its
 
 ### Backups
 
+- **Advanced export** (Settings > Storage) puts only what you choose in a backup: search for items and folders and tick them, or tick *Everything*. Hidden items are asked about first, so their password is asked once. A folder brings what is inside it. With *Also the canvases*, every file a canvas shows goes too. A partial backup can only be added, never used to update a workspace, and does not count as the last backup for *Export changes*. Links in notes to items left out stay as they are and find nothing until those items are there.
 - **Export a backup** (Settings > Storage) downloads one `.canvast` file holding every board, canvas, object and view, plus every file once, and your settings (the workspace's and this device's: theme, shortcuts, panel layout). When you import it, only the settings this device has not set itself are restored; the ones you changed here are kept, and the import dialog says how many it will restore.
 - A board, a canvas or a single library item can be exported on its own, with only the files it uses.
 - **Import archive…** (or drop a `.canvast` file on the page) verifies every checksum first, asks how to import a workspace backup, shows what it contains and any problems, and only then writes, in a single transaction. Files you already have are not stored twice.

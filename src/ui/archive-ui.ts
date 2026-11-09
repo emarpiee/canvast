@@ -1,3 +1,4 @@
+import { chooseExport } from "./advanced-export";
 import { isDisk, pipeInto } from "../storage/disk-file";
 import { saveFile } from "./file-actions";
 import { LIBRARY_FILE, externalFolder } from "../storage/external-folder";
@@ -41,7 +42,27 @@ const stages = (p: Progress) => (stage: string, done: number, total: number): vo
 export async function runExport(session: Session, asked: ExportScope): Promise<boolean> {
   const hiddenChosen = await scopeWithHiddenChoice(session, asked);
   const scope = hiddenChosen && (await scopeWithPrivacyChoice(session, hiddenChosen));
-  if (!scope) return false;
+  return scope ? exportScope(session, scope) : false;
+}
+
+/** Advanced export: the Hidden items asked about first (their password once, at the start), then what goes in. */
+export async function runAdvancedExport(session: Session): Promise<boolean> {
+  const hidden = await scopeWithHiddenChoice(session, { kind: "workspace" });
+  if (!hidden || !session.catalog) return false;
+  const listing = await session.catalog.list();
+  const items = listing.entries.filter((e) => !(e.hidden && hidden.skipHidden));
+  const pick = await chooseExport(items, listing.folders, session.storage?.hidden ? null : MAX_IMPORT_BYTES);
+  if (!pick) return false;
+  if (pick.everything) {
+    const scope = await scopeWithPrivacyChoice(session, hidden);
+    return scope ? exportScope(session, scope) : false;
+  }
+  const { skipHidden, sealWith } = hidden;
+  const carried = { ...(skipHidden !== undefined ? { skipHidden } : {}), ...(sealWith !== undefined ? { sealWith } : {}) };
+  return exportScope(session, pick.canvases ? { kind: "workspace", only: pick.hashes, ...carried } : { kind: "assets", hashes: pick.hashes, ...carried });
+}
+
+async function exportScope(session: Session, scope: ExportScope): Promise<boolean> {
   const p = beginProgress(session.editor, "export", scope.kind === "workspace" && scope.since !== undefined ? "Exporting the changes" : scope.kind === "workspace" && scope.noBytes ? "Saving the library index" : "Exporting the backup");
   try {
     const r = await session.exportArchive(scope, stages(p));
@@ -205,7 +226,7 @@ export async function runImport(session: Session, picked: File | readonly File[]
       { value: "update", label: "Update this workspace", help: "As the backup is: its canvases replace theirs here, an item's details are the backup's. What changed here since your last backup is kept beside, as a conflict copy; what the backup does not have goes to a board of its own, or the library's deleted items." },
       { value: "add", label: "Add as new boards", help: "Beside what is here: nothing here changes, the files and details it brings are added or merged." },
     ];
-    const mode = await chooseDialog({ title: `How to import ${file.name}?`, lines: [ours ? "It holds canvases of this workspace." : empty ? "This workspace is empty." : "It is a backup of another workspace."], choices: ours || empty ? choices : [choices[1]!, choices[0]!], confirmLabel: "Next" });
+    const mode = await chooseDialog({ title: `How to import ${file.name}?`, lines: [ours ? "It holds canvases of this workspace." : empty ? "This workspace is empty." : "It is a backup of another workspace."], choices: plan.partial ? [choices[1]!] : ours || empty ? choices : [choices[1]!, choices[0]!], confirmLabel: "Next" });
     if (mode === null) return;
     plan.mode = mode === "update" ? "update" : "add";
   }

@@ -781,3 +781,20 @@ test("a workspace password travels in a backup only when included, and an import
     await context.close();
   }
 });
+
+test("Advanced export: only what is chosen goes in, and it is not the workspace's last backup", async ({ app }) => {
+  const p = app.page;
+  await buildWorkspace(p);
+  await openPanel(p);
+  await p.getByTestId("set-export-advanced").click();
+  const dlg = p.getByTestId("advanced-export");
+  await expect(p.getByTestId("advanced-ok")).toBeDisabled();
+  await dlg.getByRole("searchbox").fill("green");
+  await dlg.locator(`[data-ax-item="${GREEN_HASH}"]`).check();
+  await expect(p.getByTestId("advanced-sum")).toContainText("1 item");
+  const file = await download(p, () => p.getByTestId("advanced-ok").click());
+  const m = await manifestOf(file.bytes);
+  expect(m["scope"]).toBe("assets");
+  expect(m.assets.map((a) => a.hash)).toEqual([GREEN_HASH]);
+  await expect(p.getByTestId("set-last-backup")).toContainText("No backup made yet");
+});

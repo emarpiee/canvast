@@ -99,6 +99,8 @@ export type ExportScope = (
    * encrypted names and folders, a key file with their sealed index), so a backup carries nothing readable of them, and either app opens them.
    */
   sealWith?: string;
+  /** A backup of only part of the library (Advanced export): these items, with the canvases and what they show. It never updates a workspace or starts a chain of backups. */
+  only?: readonly string[];
   /** A workspace backup that also carries the passwords (of the Hidden items and of the workspace) and the privacy settings (set by the app from Settings > Privacy). */
   withPrivacy?: boolean;
 };
@@ -210,6 +212,8 @@ export interface AssetOrganization {
 }
 
 export interface Manifest {
+  /** Only part of the library (Advanced export): it adds, and never stands for the whole workspace. */
+  partial?: true;
   format: typeof ARCHIVE_FORMAT;
   version: number;
   /** The workspace it was made from (0.54.61): an import updates the one whose boards and canvases it holds, by their ids. */
@@ -359,7 +363,8 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   }
   if (scope.kind === "workspace") {
     // A full backup also keeps library assets that nothing uses yet.
-    for (const e of await libraryIn(tx, snap).entries()) if (e.state === "active") hashes.add(contentOf(e.hash));
+    const only = scope.only ? new Set(scope.only.map(contentOf)) : null;
+    for (const e of await libraryIn(tx, snap).entries()) if (e.state === "active" && (!only || only.has(contentOf(e.hash)))) hashes.add(contentOf(e.hash));
   }
   if (scope.skipHidden) for (const h of await hiddenSet(tx, snap)) hashes.delete(h);
   const hiddenLock = scope.kind === "workspace" && scope.withPrivacy && !noBytes ? await req(tx.objectStore("meta").get("hiddenLock") as IDBRequest<unknown>) : undefined;
@@ -451,6 +456,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     ...(scope.kind === "workspace" ? { styles: (((await req(tx.objectStore("meta").get("styles") as IDBRequest<unknown>)) as unknown[] | undefined) ?? []).slice(0, 5000) } : {}),
     ...(since !== undefined ? { incremental: { since } } : {}),
     ...(noBytes ? { libraryFile: true as const } : {}),
+    ...(scope.only ? { partial: true as const } : {}),
     ...(scope.kind === "workspace" && settings && Object.keys(settings).length ? { settings } : {}),
     ...(typeof hiddenLock === "string" ? { hiddenLock } : {}),
     ...(typeof workspaceLock === "string" ? { workspaceLock } : {}),
@@ -584,6 +590,8 @@ export interface ImportPlan {
   files: number;
   /** This one file is an incremental backup on its own: what did not change is in the files before it, which were not added. */
   incrementalOnly: boolean;
+  /** Made from a part of the library: it can only be added. */
+  partial: boolean;
   /** Hidden items sealed by the desktop build (version 7), as they are, and their key file: put into the workspace folder there. */
   sealed: Array<{ hash: string; data: Blob; at?: string }>;
   sealedNames: Array<{ at: string; data: Blob }>;
@@ -783,6 +791,7 @@ async function planOf(parts: Part[], folder?: FolderFiles, progress?: ProgressFn
     styles: [],
     files: parts.length,
     incrementalOnly: parts.length === 1 && sinceOf(latest) !== null,
+    partial: parts.some((p) => p.m["partial"] === true),
     sealed: [],
     hiddenKey: null,
     thumbnails: [],

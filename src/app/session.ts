@@ -1212,7 +1212,7 @@ export class Session {
       : scope.kind === "board" ? r.manifest.boards[0]!.name
       : `${r.manifest.boards[0]!.name}-${r.manifest.boards[0]!.canvases[0]!.name}`;
     const fileName = archiveFileName(label, new Date(r.manifest.exportedAt));
-    if (scope.kind === "workspace" && !this.readOnly && !scope.noBytes) {
+    if (scope.kind === "workspace" && !this.readOnly && !scope.noBytes && !scope.only) {
       const rec: BackupRecord = {
         kind: scope.since !== undefined ? "incremental" : "full",
         at: r.manifest.exportedAt,

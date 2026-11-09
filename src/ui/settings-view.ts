@@ -362,6 +362,7 @@ export interface BackupHooks {
   last(): Promise<{ at: number; kind: "full" | "incremental"; fileName: string; bytes: number } | null>;
   exportFull(): Promise<void>;
   exportChanges(): Promise<void>;
+  exportAdvanced(): Promise<void>;
   exportFiles(): Promise<void>;
   importFiles(files: File[]): Promise<void>;
   readOnly(): boolean;
@@ -452,6 +453,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
              <p data-testid="set-last-backup" data-last-backup>…</p>
              <div class="action-rows">
                <div class="action-row"><button type="button" data-backup-action="full" data-testid="set-export-full">Export backup</button><span>One <code>.canvast</code> file with everything, including the files. Checked before it is handed over.</span></div>
+               <div class="action-row"><button type="button" data-backup-action="advanced" data-testid="set-export-advanced">Advanced export</button><span>Choose what goes in it: items and folders, with or without the canvases.</span></div>
                <div class="action-row"><button type="button" data-backup-action="changes" data-testid="set-export-changes">Export changes</button><span>Only what changed since the last backup: small. Keep it with the full backup and the earlier ones; restoring takes them all together. Needs a full backup first.</span></div>
                <div class="action-row"><button type="button" data-backup-action="files" data-testid="set-export-files">Export files</button><span>Just your original files as a ZIP, sorted by type or by your folders.</span></div>
                <div class="action-row"><button type="button" data-backup-action="import" data-testid="set-import">Import backup…</button><span>Add a backup (or a full one with its incremental ones, picked together) to this workspace; nothing existing is replaced.</span></div>
@@ -683,7 +685,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     if (!b || !backup) return;
     const a = b.dataset["backupAction"];
     if (a === "import") root.querySelector<HTMLInputElement>("[data-testid=set-import-input]")!.click();
-    else void (a === "full" ? backup.exportFull() : a === "changes" ? backup.exportChanges() : backup.exportFiles()).then(() => storage());
+    else void (a === "full" ? backup.exportFull() : a === "changes" ? backup.exportChanges() : a === "advanced" ? backup.exportAdvanced() : backup.exportFiles()).then(() => storage());
   });
   /** The Library files row: the workspace's split, and about how big one file is for this library. */
   const fillSplit = async (): Promise<void> => {

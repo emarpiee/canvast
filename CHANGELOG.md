@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.34 — Advanced export (2026-11-09)
+
+- **Added:** Advanced export in Settings > Storage: search for items and folders and choose what goes in a backup, or Everything, with or without the canvases; hidden items are asked about first.
+
 ## 0.55.33 — Connectors and the Styles tabs (2026-11-09)
 
 - **Fixed:** the neck of a connector painted over the words of a balloon; what hides the outlines now stops just inside each balloon's edge, and the two outlines meet.

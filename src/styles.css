@@ -714,6 +714,7 @@ dialog.confirm .confirm-facts dt { color: var(--hud-muted); }
 dialog.confirm .confirm-facts dd { margin: 0; font-weight: var(--weight-medium); overflow-wrap: anywhere; }
 dialog.confirm .confirm-sub { margin: 0 0 var(--s-4); font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--hud-muted); }
 dialog.confirm .confirm-list { display: grid; gap: var(--s-4); margin: 0 0 var(--s-6); padding: 0; list-style: none; }
+.advanced-export-list { max-height: calc(var(--list-h) * 9); overflow-y: auto; }
 dialog.confirm .confirm-list li { display: grid; gap: var(--s-1); padding: var(--s-4) var(--s-6); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
 dialog.confirm .confirm-list span { font-size: var(--text-sm); color: var(--hud-muted); }
 dialog.confirm .confirm-warn { margin: 0 0 var(--s-6); padding: var(--s-4) var(--s-6); border: 1px solid var(--hud-danger); border-radius: var(--r-md); background: color-mix(in oklch, var(--hud-danger) 10%, transparent); }
