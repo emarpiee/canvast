@@ -1,7 +1,6 @@
 // Builds the pattern generators on their own, to prove they work outside canvast and to ship them as files:
 //   node scripts/build-patterns.mjs -> dist-patterns/canvast-patterns.js (script, global CanvastPatterns), canvast-patterns.mjs (ES module),
 //                                      types/ (declarations) and demo.html (opens from file://)
-import { writeFileSync } from "node:fs";
 import { build } from "esbuild";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
@@ -21,9 +20,7 @@ await writeFile(resolve(out, "canvast-patterns.mjs"), esm);
 
 // declarations, so the package is typed when it is published (a failure here is a warning: the files above are complete)
 await rm(resolve(out, "types"), { recursive: true, force: true });
-const dts = spawnSync("npx", ["tsc", entry, "--declaration", "--emitDeclarationOnly", "--rootDir", "src", "--outDir", resolve(out, "types"), "--target", "es2020", "--module", "esnext", "--moduleResolution", "bundler", "--strict", "--skipLibCheck", "--noUncheckedIndexedAccess", "--ignoreConfig"], { cwd: root, encoding: "utf8" });
-// (the entry sits one level down, as the package also uses the shared random source of src/core)
-writeFileSync(resolve(out, "types", "index.d.ts"), 'export * from "./gen/index";\n');
+const dts = spawnSync("npx", ["tsc", entry, "--declaration", "--emitDeclarationOnly", "--outDir", resolve(out, "types"), "--target", "es2020", "--module", "esnext", "--moduleResolution", "bundler", "--strict", "--skipLibCheck", "--noUncheckedIndexedAccess", "--ignoreConfig"], { cwd: root, encoding: "utf8" });
 if (dts.status !== 0) console.warn("warning: declarations were not written\n" + (dts.stdout || dts.stderr).slice(0, 600));
 
 const demo = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pattern generators</title>

@@ -1,6 +1,6 @@
-import { makeRng } from "../core/rng";
+import { makeRng } from "../gen/rng";
 import type { SubPath } from "./path";
-import type { Rng } from "../core/rng";
+import type { Rng } from "../gen/rng";
 
 /**
  * A speech balloon's outline, made from its numbers: a body of one of many shapes with its tails let into it, one closed outline (so words
@@ -94,7 +94,7 @@ function evened(pts: readonly P[]): P[] {
   });
   return out;
 }
-const inside = (pts: readonly P[], [x, y]: P): boolean => {
+export const inside = (pts: readonly P[], [x, y]: P): boolean => {
   let on = false;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) if (pts[i]![1] > y !== pts[j]![1] > y && x < ((pts[j]![0] - pts[i]![0]) * (y - pts[i]![1])) / (pts[j]![1] - pts[i]![1]) + pts[i]![0]) on = !on;
   return on;
@@ -323,8 +323,8 @@ export const balloonSubs = (box: Box, s: BalloonSpec): SubPath[] => {
 };
 
 /** The parts of a balloon that have a handle. */
-export type BalloonPart = "tip" | "base" | "foot" | "bend" | "belly" | "body" | "move" | "size" | "linkW" | "linkBend";
-export const BALLOON_LABELS: Record<BalloonPart, string> = { tip: "Tail tip", base: "Tail base", foot: "Tail width", bend: "Tail bend", belly: "Tail middle width", body: "Body shape", move: "Move the body, the tail tip stays", size: "Size of the body, the tail tip stays", linkW: "Connector width", linkBend: "Connector bend" };
+export type BalloonPart = "tip" | "base" | "foot" | "bend" | "belly" | "body" | "move" | "size" | "linkW" | "linkBend" | "linkA" | "linkB";
+export const BALLOON_LABELS: Record<BalloonPart, string> = { tip: "Tail tip", base: "Tail base", foot: "Tail width", bend: "Tail bend", belly: "Tail middle width", body: "Body shape", move: "Move the body, the tail tip stays", size: "Size of the body, the tail tip stays", linkW: "Connector width", linkBend: "Connector bend", linkA: "Connector end", linkB: "Connector end" };
 
 /** How far the body handle sits in from the top of the box, for a body that has something to set (null: it has nothing). */
 function bodyAmount(s: BalloonSpec, ry: number, rx: number): number | null {

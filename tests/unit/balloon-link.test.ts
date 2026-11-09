@@ -19,6 +19,18 @@ describe("a connector between balloons", () => {
     expect(link.z).toBeLessThan(a.z);
     expect(made.find((o) => o.params!.link!.cover === link.id)!.z).toBeGreaterThan(a.z);
   });
+  it("what covers the outlines stays between the bodies; deleting the connector takes it along", () => {
+    const cover = made.find((o) => o.params!.link!.cover === link.id)!;
+    const xs = cover.sub[0]!.n.filter((_, i) => i % 2 === 0);
+    expect(Math.min(...xs)).toBeGreaterThan(40); // (from a's middle: its edge is 50 away)
+    expect(Math.max(...xs)).toBeLessThan(260);
+    expect(withBalloonLinks(src(a, b, ...made), [], [link.id]).removed.sort()).toEqual(made.map((o) => o.id).sort());
+  });
+  it("an end stands where its handle put it", () => {
+    const moved = { ...link, params: { ...link.params!, link: { ...link.params!.link!, aAt: [0, 1] as const } } } as PathObject;
+    const out = withBalloonLinks(src(a, b, ...made), [moved], []).next.find((o) => o.id === link.id) as PathObject;
+    expect(D.toNumber(out.anchor.y)).toBe(60);
+  });
   it("follows a balloon that moves, and goes with a removed balloon, cover too", () => {
     const moved = balloon("b", 500);
     const out = withBalloonLinks(src(a, b, ...made), [moved], []).next as PathObject[];

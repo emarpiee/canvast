@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.55.33 — Connectors and the Styles tabs (2026-11-09)
+
+- **Fixed:** the neck of a connector painted over the words of a balloon; what hides the outlines now stops just inside each balloon's edge, and the two outlines meet.
+- **Fixed:** a connector deleted by itself left a thin piece behind; such pieces are removed.
+- **Fixed:** the pattern package and `check:patterns`: the random source stays in the generators' folder.
+- **Added:** handles for where each end of a connector stands on its balloon.
+- **Changed:** the Speech balloon tab of the Styles panel has its icon, and the row of tabs scrolls.
+- **Removed:** the name label of a connector.
+
 ## 0.55.32 — Bars in order, editing in the shape, path options (2026-11-09)
 
 - **Fixed:** *Along the path* and *Side* of a text along a path did nothing.
@@ -7,6 +16,7 @@
 - **Fixed:** the pattern package was built without its declarations.
 - **Changed:** words in a shape are typed in a box in the middle of the shape, on the shape's colour.
 - **Changed:** a tool's options come first in its bar: the Speech balloon button and *Paragraph and box* are at the start, and *Adjust* before the numbers of a shape or a picture.
+
 
 ## 0.55.31 — Shared random source (2026-11-09)
 

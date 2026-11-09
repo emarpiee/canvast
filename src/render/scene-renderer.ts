@@ -544,7 +544,7 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, picked: readonly Proje
     else if (b.part === "move") {
       ctx.fillStyle = theme.selection; // (a filled square on its corner, in the middle of the body)
       handleGlyph(ctx, b.x, b.y, r + 1, 4, Math.PI / 4);
-    } else if (b.part === "base") handleGlyph(ctx, b.x, b.y, r + 1, 4, 0); // (a diamond: it slides round the body)
+    } else if (b.part === "base" || b.part === "linkA" || b.part === "linkB") handleGlyph(ctx, b.x, b.y, r + 1, 4, 0); // (a diamond: it slides round the body)
     else if (b.part === "bend" || b.part === "linkBend") handleGlyph(ctx, b.x, b.y, r + 3, 4, 0, 0.42); // (the star of a ratio)
     else if (b.part === "body") {
       ctx.beginPath();

@@ -1,3 +1,4 @@
+import { syncScroll } from "./bar";
 import type { BalloonLook } from "../doc/balloon-geometry";
 import { tabFromKey, tabHtml } from "./tabs";
 import { copyPlainText } from "../app/system-clipboard";
@@ -142,7 +143,8 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       .map((c, i) => `<div class="pal-row"><button type="button" class="pal-swatch" data-edit-colour="${i}" style="background:${esc(c.c)}" title="Change this colour" aria-label="Change the colour ${esc(c.name || c.c.toUpperCase())}"></button><input class="pal-name" data-colour-name="${i}" value="${esc(c.name ?? "")}" placeholder="${esc(c.c.toUpperCase())}" maxlength="${MAX_NAME}" aria-label="Name of colour ${i + 1}"><button type="button" class="layer-btn" data-remove-colour="${i}" aria-label="Remove ${esc(c.name || c.c.toUpperCase())}" title="Remove"${pal.colours.length < 2 ? " disabled" : ""}>${ICONS.x}</button></div>`)
       .join("")}<div class="pal-actions"><button type="button" class="pal-add" data-add-colour="${esc(item.id)}"${pal.colours.length >= MAX_PALETTE ? " disabled" : ""}>Add colour</button><button type="button" class="pal-done" data-done>Done</button></div></div>`;
 
-  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette, text: ICONS.textStyle, pattern: ICONS.mountainSnow };
+  let tabsAt = 0; // (the row is drawn again: it stays where it was scrolled to)
+  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette, text: ICONS.textStyle, pattern: ICONS.mountainSnow, balloon: ICONS.speechBalloon };
   const GUIDE: Record<string, string> = {
     adjustment: "Save an adjustment from the Adjust panel of a picture, then press it here to give other pictures the same look.",
     gradient: "A gradient is a blend of colours. Save one from the fill or outline picker, make a new one here, or import a GIMP .ggr file.",
@@ -210,6 +212,11 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       </div>`,
     });
     panel.appendChild(fileInput);
+    const tabRow = panel.querySelector<HTMLElement>(".styles-tabs")!;
+    tabRow.scrollLeft = tabsAt;
+    tabRow.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    syncScroll(tabRow);
+    tabRow.addEventListener("scroll", () => { tabsAt = tabRow.scrollLeft; }, { passive: true });
     if (typing) {
       const el = panel.querySelector<HTMLInputElement>("[data-styles-filter]");
       el?.focus();

@@ -1011,7 +1011,7 @@ export function attachTools(
       const sy = g.snap ? nearerOf(s.y, hy ? sn!.ty[hy.target]![hy.line]! : null, gridScreen(s.y, "y")) : null;
       editor.guides = !final && (sx !== null || sy !== null) ? { ...(sx !== null ? { x: sx } : {}), ...(sy !== null ? { y: sy } : {}) } : null;
       const l = localOf(tgt.po, sx ?? s.x, sy ?? s.y);
-      if (part === "linkW" || part === "linkBend") {
+      if (part === "linkW" || part === "linkBend" || part === "linkA" || part === "linkB") {
         const q = tgt.o.params!;
         setBalloonLink(doc, editor, linkDragged(q.box, q.link!, part, [l.x, l.y]), final);
       } else if (part === "move") commitShapeNumbers(doc, editor, { balloonBox: (b) => [l.x - b[2] / 2, l.y - b[3] / 2, b[2], b[3]] }, final);
