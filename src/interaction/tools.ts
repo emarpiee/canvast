@@ -55,7 +55,7 @@ import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians, cosSin, normAngle, radiansFromAngle } from "../core/angle";
 import { formatRatio } from "../app/export-size";
 import { PanGesture } from "./navigation";
-import { drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, setShapeText, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -261,6 +261,8 @@ type Gesture =
   | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio" | "count" | "balloon"; balloon?: { part: BalloonPart; tail: number }; index: number; ax: number; ay: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number; /** Every picked corner taken along (its radius and the most it can have), by node. */ multi?: ReadonlyMap<number, { r0: number; max: number }> }
   /** Dragging a shape out (Shape tool). */
   | { kind: "shape"; pointerId: number; start: ScreenPoint }
+  /** A side handle of words in a shape: the shape sets their box, so what it changes is the padding. */
+  | { kind: "textpad"; pointerId: number; start: ScreenPoint; edge: Edge; pad0: number; emPx: number; moved: boolean }
   /** A node of the path being built has been placed; dragging pulls its handles out (Path tool). */
   | { kind: "pathnode"; pointerId: number; start: ScreenPoint; dragging: boolean }
   /** A node, a handle or a segment of the selected path (Edit nodes tool); `base` is the path's geometry when the press began. */
@@ -968,6 +970,17 @@ export function attachTools(
     } else if (pick.what === "corner" && sel && !(sel.id === id && sel.idx.has(pick.dot.index))) editor.cornerSel = null; // (another corner: the picked ones are let go)
     return true;
   };
+  const updatePadding = (s: ScreenPoint, final: boolean): void => {
+    if (g.kind !== "textpad") return;
+    if (Math.hypot(s.x - g.start.x, s.y - g.start.y) >= DRAG_THRESHOLD_PX) g.moved = true;
+    if (!g.moved) return;
+    // Dragged in: more padding, dragged out: less.
+    const inward = g.edge === "e" ? g.start.x - s.x : g.edge === "w" ? s.x - g.start.x : g.edge === "s" ? g.start.y - s.y : s.y - g.start.y;
+    const pad = Math.max(0, Math.round((g.pad0 + inward / g.emPx) * 100) / 100);
+    const across = g.edge === "e" || g.edge === "w";
+    setShapeText(doc, editor, { shapeOpts: across ? { padX: pad } : { padY: pad } }, final);
+    editor.handleLabel = final ? null : { x: s.x, y: s.y, text: `Padding ${pad}` };
+  };
   const updateCorner = (s: ScreenPoint, final: boolean): void => {
     if (g.kind !== "round") return;
     if (!g.moved && Math.hypot(s.x - g.start.x, s.y - g.start.y) >= DRAG_THRESHOLD_PX) {
@@ -1413,6 +1426,13 @@ export function attachTools(
           const [cx, cy] = sel.frame.centre;
           const sides = h.edge ? { l: h.edge === "w", r: h.edge === "e", t: h.edge === "n", b: h.edge === "s" } : { l: h.at[0] < cx, r: h.at[0] > cx, t: h.at[1] < cy, b: h.at[1] > cy };
           g = { kind: "crop", pointerId: e.pointerId, base: pic, sides, start: s, ppu: po.proj.ppu };
+          return;
+        }
+        const words = ids.length === 1 ? doc.get(ids[0]!) : undefined;
+        const wordsPo = words?.kind === "text" && words.inShape?.shape !== undefined && h.edge ? visible().find((p) => p.obj.id === words.id) : undefined;
+        if (words?.kind === "text" && wordsPo && h.edge && wordsPo.proj.ppu > 0 && Number.isFinite(wordsPo.proj.ppu)) {
+          const across = h.edge === "e" || h.edge === "w";
+          g = { kind: "textpad", pointerId: e.pointerId, start: s, edge: h.edge, pad0: across ? (words.inShape!.padX ?? 0.4) : (words.inShape!.padY ?? 0), emPx: words.size * wordsPo.proj.ppu, moved: false };
           return;
         }
         // Free (one-axis, or both axes apart) for upright pictures and for paths, turned or not, whose turn is the box's: strokes and text keep their shape.
@@ -2225,6 +2245,9 @@ export function attachTools(
       case "round":
         updateCorner(s, false);
         break;
+      case "textpad":
+        updatePadding(s, false);
+        break;
       case "shape":
         updateShape(s, e);
         break;
@@ -2397,6 +2420,11 @@ export function attachTools(
         editor.handleLabel = null;
         if (cancelled || !g.moved) editor.preview = { kind: "none" };
         else updateCorner(s, true);
+        break;
+      case "textpad":
+        editor.handleLabel = null;
+        if (cancelled || !g.moved) editor.preview = { kind: "none" };
+        else updatePadding(s, true);
         break;
       case "shape":
         commitShape(s, cancelled, e, g.start);

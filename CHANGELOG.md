@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.29 — Side handles set padding in a shape (2026-11-09)
+
+- **Changed:** the side handles of a text in a shape change its padding: left and right the sides, top and bottom the top and bottom. Its corners still change the letter size.
+
 ## 0.55.28 — Balloon words kept (2026-11-09)
 
 - **Changed:** deleting a speech balloon keeps its words as plain text, as for any shape.
