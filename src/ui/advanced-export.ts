@@ -6,7 +6,7 @@ import { capList, showMoreButton } from "./show-more";
 
 /** What the list needs to know of a library item. */
 export interface ExportItem { hash: string; name: string; size: number; folderIds?: string[] }
-export interface ExportChoice { everything: boolean; hashes: string[]; canvases: boolean }
+export interface ExportChoice { everything: boolean; hashes: string[]; canvases: boolean; styles: boolean }
 
 /** Every item chosen: one by one, or in a chosen folder or a folder inside it. */
 export function chosenItems(items: readonly ExportItem[], folders: readonly AssetFolder[], ids: ReadonlySet<string>, folderIds: ReadonlySet<string>): ExportItem[] {
@@ -39,6 +39,7 @@ export function chooseExport(items: readonly ExportItem[], folders: readonly Ass
       <ul class="confirm-list advanced-export-list" data-ax-found></ul>
       <div data-ax-more></div>
       <label class="pg-check"><input type="checkbox" data-ax-canvases> <span>Also the canvases, and the files they show</span></label>
+      <label class="pg-check"><input type="checkbox" data-ax-styles checked> <span>Saved styles, and the fonts and pictures they use</span></label>
       <p data-ax-sum data-testid="advanced-sum"></p>
       <div class="confirm-warn" role="note" data-ax-warn hidden></div>
     </div>
@@ -102,7 +103,7 @@ export function chooseExport(items: readonly ExportItem[], folders: readonly Ass
       }
       const b = t.closest<HTMLButtonElement>(".confirm-actions button");
       if (!b) return;
-      if (b.value === "ok") answer = { everything: all.checked, hashes: chosenItems(items, folders, ids, folderIds).map((i) => i.hash), canvases: q<HTMLInputElement>("[data-ax-canvases]").checked };
+      if (b.value === "ok") answer = { everything: all.checked, hashes: chosenItems(items, folders, ids, folderIds).map((i) => i.hash), canvases: q<HTMLInputElement>("[data-ax-canvases]").checked, styles: q<HTMLInputElement>("[data-ax-styles]").checked };
       dlg.close();
     });
     found();

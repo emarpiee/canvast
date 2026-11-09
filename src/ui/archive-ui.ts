@@ -59,7 +59,7 @@ export async function runAdvancedExport(session: Session): Promise<boolean> {
   }
   const { skipHidden, sealWith } = hidden;
   const carried = { ...(skipHidden !== undefined ? { skipHidden } : {}), ...(sealWith !== undefined ? { sealWith } : {}) };
-  return exportScope(session, pick.canvases ? { kind: "workspace", only: pick.hashes, ...carried } : { kind: "assets", hashes: pick.hashes, ...carried });
+  return exportScope(session, pick.canvases ? { kind: "workspace", only: pick.hashes, withStyles: pick.styles, ...carried } : { kind: "assets", hashes: pick.hashes, withStyles: pick.styles, ...carried });
 }
 
 async function exportScope(session: Session, scope: ExportScope): Promise<boolean> {

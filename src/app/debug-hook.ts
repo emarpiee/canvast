@@ -215,6 +215,8 @@ export interface DebugHook {
   balloonDots(): Array<{ part: string; tail: number; x: number; y: number }>;
   /** How many frames have been drawn: it must not rise while nothing changes. */
   draws(): number;
+  addStyle(kind: string, data: unknown): Promise<void>;
+  styles(): Array<{ kind: string; data: unknown }>;
   handleLabel(): string | null;
   /** The nodes picked together in Edit nodes (ADR 0145): how many on each path. */
   pickedNodes(): Array<[string, number]>;
@@ -592,6 +594,8 @@ export function installDebugHook(
       return (po && shapeHandles(po, false, editor)?.balloon) ?? [];
     },
     draws: () => deps.draws(),
+    addStyle: async (kind, data) => void (await session.styles.add(kind, "", data)),
+    styles: () => [...session.styles.items],
     handleLabel: () => editor.handleLabel?.text ?? null,
     pickedNodes: () => [...editor.nodeMulti].map(([id, set]) => [id, set.size] as [string, number]),
     handleGuide: () => editor.handleLabel?.guide ?? null,

@@ -168,17 +168,28 @@ export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND
 
 export const kindById = (id: string): StyleKind | undefined => STYLE_KINDS.find((k) => k.id === id);
 
-export const MAX_STYLES = 500;
 export const MAX_STYLE_NAME = 60;
 
 const ID_RE = /^[0-9a-f]{32}$/;
+
+/** The library files saved styles use (a text style's font, a picture fill): by their SHA-256, wherever the style keeps them. */
+export function assetsOfStyles(items: unknown): string[] {
+  const out = new Set<string>();
+  const walk = (v: unknown): void => {
+    if (typeof v === "string" && /^[0-9a-f]{64}$/.test(v)) out.add(v);
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === "object") Object.values(v).forEach(walk);
+  };
+  walk(items);
+  return [...out];
+}
 
 /** What was stored (anything, maybe from another version or hand-edited) as a list of styles: the sound ones, kept in order. */
 export function cleanStyles(raw: unknown): StyleItem[] {
   if (!Array.isArray(raw)) return [];
   const out: StyleItem[] = [];
   const seen = new Set<string>();
-  for (const r of raw.slice(0, MAX_STYLES) as Array<Record<string, unknown>>) {
+  for (const r of raw as Array<Record<string, unknown>>) {
     if (!r || typeof r !== "object" || typeof r["id"] !== "string" || !ID_RE.test(r["id"]) || seen.has(r["id"])) continue;
     if (typeof r["kind"] !== "string" || typeof r["name"] !== "string" || !r["name"].trim()) continue;
     const kind = kindById(r["kind"]);
@@ -245,7 +256,7 @@ export class StyleLibrary {
   async add(kind: string, name: string, data: unknown): Promise<StyleItem | null> {
     const k = kindById(kind);
     const clean = k?.validate(data);
-    if (!k || clean === null || clean === undefined || this.list.length >= MAX_STYLES) return null;
+    if (!k || clean === null || clean === undefined) return null;
     const item: StyleItem = { id: this.newId(), kind, name: name.trim().slice(0, MAX_STYLE_NAME) || this.nextName(kind), at: Date.now(), data: clean };
     await this.set([...this.list, item]);
     return item;
@@ -263,7 +274,7 @@ export class StyleLibrary {
   /** A copy of a style right after it, named "… copy". */
   async duplicate(id: string): Promise<StyleItem | null> {
     const i = this.list.findIndex((s) => s.id === id);
-    if (i < 0 || this.list.length >= MAX_STYLES) return null;
+    if (i < 0) return null;
     const s = this.list[i]!;
     const copy: StyleItem = { ...s, id: this.newId(), name: `${s.name} copy`.slice(0, MAX_STYLE_NAME), at: Date.now() };
     await this.set([...this.list.slice(0, i + 1), copy, ...this.list.slice(i + 1)]);

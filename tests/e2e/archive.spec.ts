@@ -638,6 +638,9 @@ test("an incremental backup holds only what changed, a chain of backups restores
   await panel.locator('[data-new-from="empty"]').click();
   await expect(panel.locator(".style-card", { hasText: "Palette 1" })).toBeVisible();
   await p.getByRole("button", { name: "Hide the Styles panel" }).click();
+  // and a whole balloon, with the size, tails and words it keeps
+  const balloon = { body: "cloud", round: 35, bumps: 12, depth: 18, sides: 6, wobble: 0, seed: 1, full: { unit: 0, w: 120, h: 80, tails: [{ tipAt: [0.2, 1.4], widthOf: 0.2, kind: "curved", bend: 28, shift: 0, angle: 1 }], paint: { fill: "#ff0000", stroke: null, width: 2, opacity: 1 }, text: { md: "Hi", look: { align: "center" } } } };
+  await p.evaluate((d) => window.__canvastDebug.addStyle("balloon", d), balloon);
 
   await openPanel(p);
   // no backup yet: there is nothing to go on from
@@ -645,7 +648,7 @@ test("an incremental backup holds only what changed, a chain of backups restores
   const full = await download(p, () => p.getByTestId("set-export-full").click());
   const fullM = await manifestOf(full.bytes);
   expect(fullM["incremental"]).toBeUndefined();
-  expect((fullM["styles"] as unknown[]).length).toBe(1);
+  expect((fullM["styles"] as unknown[]).length).toBe(2);
 
   await p.getByTestId("view-canvas").click(); // (Settings > Storage was open for the backup)
   // one canvas changes (a stroke on the open one) and one original is added
@@ -688,7 +691,9 @@ test("an incremental backup holds only what changed, a chain of backups restores
   await q.getByTestId("confirm-ok").click();
   await expect(dlg).toHaveCount(0);
   await expect(q.getByTestId("toast")).toContainText(/Imported 3 canvases/);
-  await expect(q.getByTestId("toast")).toContainText("1 saved style added");
+  await expect(q.getByTestId("toast")).toContainText("2 saved styles added");
+  const came = (await q.evaluate(() => window.__canvastDebug.styles())).find((x) => x.kind === "balloon");
+  expect(came?.data).toEqual(balloon);
   const tree = (await sess(q)).tree!;
   const dst = await Promise.all(tree.slice(1).flatMap((b) => b.canvases.map((c) => dump(q, c.id))));
   expect(dst).toEqual(srcDumps); // the changed canvas as it is now, the others as they were

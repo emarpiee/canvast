@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ADJUSTMENT_KIND, COLOUR_KIND, GRADIENT_KIND, PALETTE_KIND, STYLE_KINDS, TEXT_KIND, StyleLibrary, cleanStyles, kindById } from "../../src/assets/styles";
+import { assetsOfStyles, ADJUSTMENT_KIND, COLOUR_KIND, GRADIENT_KIND, PALETTE_KIND, STYLE_KINDS, TEXT_KIND, StyleLibrary, cleanStyles, kindById } from "../../src/assets/styles";
 import type { StyleItem } from "../../src/assets/styles";
 
 const id = (n: number): string => n.toString(16).padStart(32, "0");
@@ -77,5 +77,18 @@ describe("styles (ADR 0120)", () => {
     const copy = (await l.duplicate(p.id))!;
     expect(copy.name).toBe("Brand copy");
     expect(l.items.map((s) => s.name)).toEqual(["Brand", "Brand copy"]);
+  });
+});
+
+describe("saved styles", () => {
+  it("have no limit, and a balloon's whole look is kept", () => {
+    const many = Array.from({ length: 1200 }, (_, i) => ({ id: `s${i}`, kind: "colour", name: `C${i}`, at: 1, data: "#112233" }));
+    expect(cleanStyles(many).length).toBe(1200);
+    const data = { body: "oval", round: 35, bumps: 12, depth: 18, sides: 6, wobble: 0, seed: 1, full: { unit: 0, w: 10, h: 10, tails: [], paint: { fill: "#fff" } } };
+    expect(cleanStyles([{ id: "b1", kind: "balloon", name: "B", at: 1, data }])[0]!.data).toEqual(data);
+  });
+  it("find the files they use", () => {
+    const h = "a".repeat(64);
+    expect(assetsOfStyles([{ data: { full: { text: { look: { assetId: h } } } } }])).toEqual([h]);
   });
 });

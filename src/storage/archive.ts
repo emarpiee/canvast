@@ -15,7 +15,7 @@ import type { AssetField, AssetFolder } from "../assets/asset-catalog";
 import { MAX_FIELDS, entryFromRecord, fieldParts, folderPath, meta, normalizeFields, normalizeNote, normalizeTags, visibleFolders } from "../assets/asset-catalog";
 import { sha256Hex } from "../assets/sha256";
 import type { StyleItem } from "../assets/styles";
-import { cleanStyles } from "../assets/styles";
+import { assetsOfStyles, cleanStyles } from "../assets/styles";
 import { done, req } from "./idb";
 import type { LibraryOp } from "./desktop-bridge";
 import { itemOf } from "./library-mirror";
@@ -101,6 +101,8 @@ export type ExportScope = (
   sealWith?: string;
   /** A backup of only part of the library (Advanced export): these items, with the canvases and what they show. It never updates a workspace or starts a chain of backups. */
   only?: readonly string[];
+  /** Whether a part of the library takes the saved styles along. */
+  withStyles?: boolean;
   /** A workspace backup that also carries the passwords (of the Hidden items and of the workspace) and the privacy settings (set by the app from Settings > Privacy). */
   withPrivacy?: boolean;
 };
@@ -366,6 +368,10 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     const only = scope.only ? new Set(scope.only.map(contentOf)) : null;
     for (const e of await libraryIn(tx, snap).entries()) if (e.state === "active" && (!only || only.has(contentOf(e.hash)))) hashes.add(contentOf(e.hash));
   }
+  // The saved styles go with a workspace backup; with a part of the library when asked, then with the fonts and pictures they use.
+  const carriesStyles = scope.kind === "workspace" ? scope.withStyles !== false : scope.kind === "assets" && scope.withStyles === true;
+  const savedStyles = carriesStyles ? (((await req(tx.objectStore("meta").get("styles") as IDBRequest<unknown>)) as unknown[] | undefined) ?? []) : null;
+  if (savedStyles && (scope.kind === "assets" || (scope.kind === "workspace" && scope.only))) for (const h of assetsOfStyles(savedStyles)) if (await libraryIn(tx, snap).rec(contentOf(h))) hashes.add(contentOf(h));
   if (scope.skipHidden) for (const h of await hiddenSet(tx, snap)) hashes.delete(h);
   const hiddenLock = scope.kind === "workspace" && scope.withPrivacy && !noBytes ? await req(tx.objectStore("meta").get("hiddenLock") as IDBRequest<unknown>) : undefined;
   const workspaceLock = scope.kind === "workspace" && scope.withPrivacy && !noBytes ? await req(tx.objectStore("meta").get("workspaceLock") as IDBRequest<unknown>) : undefined;
@@ -453,7 +459,7 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
     assets,
     missingAssets,
     ...(scope.kind === "workspace" ? { workspaceId: ws.id, folders: await foldersOut(await libraryIn(tx, snap).folders(), !scope.skipHidden && !sealedHooks.key) } : {}),
-    ...(scope.kind === "workspace" ? { styles: (((await req(tx.objectStore("meta").get("styles") as IDBRequest<unknown>)) as unknown[] | undefined) ?? []).slice(0, 5000) } : {}),
+    ...(savedStyles ? { styles: savedStyles } : {}),
     ...(since !== undefined ? { incremental: { since } } : {}),
     ...(noBytes ? { libraryFile: true as const } : {}),
     ...(scope.only ? { partial: true as const } : {}),
