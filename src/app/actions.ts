@@ -2821,12 +2821,24 @@ export async function bakePicture(
 
 // ---- Text on a path (ADR 0131) ----------------------------------------------------------------------------------------------------
 
+const subArea = (n: readonly number[]): number => {
+  const b = outlineBox(n);
+  return (b.maxX - b.minX) * (b.maxY - b.minY);
+};
+const biggestClosed = (o: PathObject): { n: readonly number[]; closed: boolean } | null =>
+  pathSubs(o).filter((s) => s.closed && s.n.length >= 12).reduce<{ n: readonly number[]; closed: boolean } | null>((best, s) => (!best || subArea(s.n) > subArea(best.n) ? s : best), null);
+
 /** The one picked text and the one picked path a text can be put on, when exactly those two are picked (and neither is turned or in another frame). */
 function textAndPath(doc: DocumentStore, editor: EditorState): { text: TextObject; path: PathObject } | null {
   const sel = selected(doc, editor);
-  if (sel.length !== 2) return null;
-  const text = sel.find((o): o is TextObject => o.kind === "text" && !o.locked);
-  const path = sel.find((o): o is PathObject => o.kind === "path" && o.sub.some((s) => s.n.length >= 12));
+  const texts = sel.filter((o): o is TextObject => o.kind === "text" && !o.locked);
+  if (texts.length !== 1 || sel.some((o) => o.kind !== "text" && o.kind !== "path")) return null;
+  const text = texts[0]!;
+  // What is drawn: a boolean group's result, not its hidden members; of one group of shapes, its biggest (on a tie the one on top).
+  const shapes = sel.filter((o): o is PathObject => o.kind === "path" && !isBoolMember(o) && o.sub.some((s) => s.n.length >= 12));
+  if (!shapes.length || (shapes.length > 1 && !shapes.every((o) => o.groups?.[0] !== undefined && o.groups[0] === shapes[0]!.groups![0]))) return null;
+  const areaOf = (o: PathObject): number => Math.max(...pathSubs(o).map((s) => subArea(s.n)));
+  const path = shapes.reduce((best, o) => (areaOf(o) >= areaOf(best) ? o : best));
   return text && path && text.frame === path.frame && !text.rot ? { text, path } : null;
 }
 
@@ -2839,12 +2851,12 @@ export const canTakeOffPath = (doc: DocumentStore, editor: EditorState): boolean
 /** Whether a text and a closed shape are picked: the words can flow inside it. */
 export const canSetInShape = (doc: DocumentStore, editor: EditorState): boolean => {
   const tp = textAndPath(doc, editor);
-  return !!tp && pathSubs(tp.path).some((s) => s.closed && s.n.length >= 12);
+  return !!tp && biggestClosed(tp.path) !== null;
 };
 
 /** The text inside this closed shape as it is now: the shape's outline, place and width (its options kept); null when it cannot be. */
 function fittedInShape(text: TextObject, path: PathObject): TextObject | null {
-  const sub = pathSubs(path).find((s) => s.closed && s.n.length >= 12);
+  const sub = biggestClosed(path); // (a boolean result of several pieces: the words go in the biggest)
   if (!sub) return null;
   const box = outlineBox(sub.n);
   const k = 2 ** (path.unit - text.unit);

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.21 — Text in boolean shapes and groups (2026-11-09)
+
+- **Fixed:** *Text inside the shape* and *Text along a path* were not offered for a boolean shape or a group; the words go in its biggest piece.
+
 ## 0.55.20 — Text follows its shape (2026-11-09)
 
 - **Fixed:** a text inside a shape kept the outline the shape had when the text was put in; it now follows the shape when it is moved, resized or changed.
