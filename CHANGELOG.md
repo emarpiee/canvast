@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.31 — Shared random source (2026-11-09)
+
+- **Changed:** the seeded random source moved to the core, shared by balloons and patterns; nothing changes on screen.
+
 ## 0.55.30 — Balloons and text in shapes: fixes and the rest of the list (2026-11-09)
 
 - **Fixed:** a number field in a bar lost the focus as it was typed in: a typed value counted as a drag and hid the field for a moment.

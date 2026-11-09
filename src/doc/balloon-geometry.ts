@@ -1,6 +1,6 @@
-import { makeRng } from "../gen/rng";
+import { makeRng } from "../core/rng";
 import type { SubPath } from "./path";
-import type { Rng } from "../gen/rng";
+import type { Rng } from "../core/rng";
 
 /**
  * A speech balloon's outline, made from its numbers: a body of one of many shapes with its tails let into it, one closed outline (so words

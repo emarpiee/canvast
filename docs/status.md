@@ -42,7 +42,7 @@ Unverified / Committed / Next bounded task**.
 - **Implemented:** the tool, connectors, text following (ADR 0185).
 - **Tested:** see the `Tests` run of the commit.
 - **Known failures:** none known.
-- **Unverified:** export of balloons to SVG and PDF was read, not run.
+- **Unverified:** export of balloons to SVG and PDF has not been checked.
 - **Committed:** v0.55.22 to v0.55.30, branch `lan-sharing`.
 - **Next bounded task:** the owner's check.
 
