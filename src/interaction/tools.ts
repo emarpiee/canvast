@@ -2312,7 +2312,7 @@ export function attachTools(
         if (g.sheets) {
           // the sheets with what is on them (picked or not), which follows by its pins, as the ratio and size fields do
           const withContents = new Set([...g.ids, ...descendantsOf(doc.all(), new Set(g.ids.filter((id) => isContainer(doc.get(id)))))]);
-          const plan = planSheetScale([...withContents].map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o), worldIn(fixed, g.frame), kx, ky, editor.lock !== null, editor.lockRadius);
+          const plan = planSheetScale([...withContents].map((id) => doc.get(id)).filter((o): o is CanvasObject => !!o), worldIn(fixed, g.frame), kx, ky, editor.lock !== null, editor.lockRadius, g.frame);
           editor.preview = { kind: "replace", ids: [...plan.keys()], objs: plan };
           replaceCommit = "Resize";
         } else editor.preview = { kind: "scale", ids: g.ids, frame: g.frame, fixed: worldIn(fixed, g.frame), kx, ky, keepWidth: editor.lock !== null, keepRadius: editor.lockRadius };

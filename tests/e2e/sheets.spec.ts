@@ -716,3 +716,26 @@ test("a sheet's handle dragged past its far side stops at a small size: the shee
     await expect.poll(async () => size(await frame())).toEqual([300, 200]);
   }
 });
+
+test("a sheet's handle resizes it from its far corner at any zoom, also where the sheet is in another frame than the view", async ({ app }) => {
+  const p = app.page;
+  const frame = async () => (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.corners;
+  for (const zi of [-9, 8, 24]) {
+    await p.evaluate((z) => window.__canvastDebug.setCamera({ cx: "0p0", cy: "0p0", zi: z, zf: 0, pz: z }), zi);
+    await app.frame();
+    await key(app, "c");
+    await drag(app, [400, 300], [700, 500]);
+    await key(app, "v");
+    await p.evaluate((z) => window.__canvastDebug.setCamera({ cx: "0p0", cy: "0p0", zi: z, zf: 0, pz: z }), zi - 1);
+    await app.frame();
+    const before = await frame();
+    const [cx, cy] = before[2]!;
+    await drag(app, [cx, cy], [cx - 30, cy - 20]);
+    await app.frame();
+    const after = await frame();
+    expect(Math.abs(after[0]![0] - before[0]![0]), `zoom ${zi}: the far corner stays`).toBeLessThan(3);
+    expect(Math.abs(after[0]![1] - before[0]![1]), `zoom ${zi}: the far corner stays`).toBeLessThan(3);
+    expect(after[2]![0], `zoom ${zi}: it got smaller`).toBeLessThan(cx - 5);
+    await key(app, "Delete");
+  }
+});

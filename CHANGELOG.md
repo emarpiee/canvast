@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.39 — Resizing a sheet zoomed far out or in (2026-11-09)
+
+- **Fixed:** at a zoom where a sheet is kept in another coordinate frame than the view, its resize handles threw it far from the pointer.
+
 ## 0.55.38 — A resize never collapses (2026-11-09)
 
 - **Fixed:** a handle dragged past the far side of a sheet or any item shrank it to almost nothing, and it seemed to be gone; a box now stops at a small size on the screen.

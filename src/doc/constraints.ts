@@ -5,7 +5,8 @@
  */
 import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
-import type { FrameSpace } from "../core/frames";
+import { expressExactIn } from "../core/frames";
+import type { Frame, FrameSpace } from "../core/frames";
 import type { CanvasObject, ObjectId } from "./model";
 import { isContainer } from "./containers";
 import { scaleAbout, translate, worldBounds } from "./edit-ops";
@@ -57,13 +58,17 @@ export function constrainSpan(kind: HConstraint | VConstraint, L0: number, L1: n
  * scales with the sheet, whatever its pins say). An object homed in another frame than its sheet (deep in a zoom, near objects can be filed in
  * different frames) is expressed in the sheet's frame, scaled there, and homed again.
  */
-export function planSheetScale(objs: readonly CanvasObject[], fixed: WorldPoint, kx: number, ky: number, keepWidth: boolean, keepRadius: boolean): Map<ObjectId, CanvasObject> {
+export function planSheetScale(objs: readonly CanvasObject[], fixed: WorldPoint, kx: number, ky: number, keepWidth: boolean, keepRadius: boolean, /** The frame `fixed` is in, when it can differ from the objects' (a handle dragged in the view). */ frame?: Frame): Map<ObjectId, CanvasObject> {
   const byId = new Map(objs.map((o) => [o.id, o]));
   const out = new Map<ObjectId, CanvasObject>();
   const kids = new Map<ObjectId, CanvasObject[]>();
   for (const o of objs) {
     if (o.parent !== undefined && byId.has(o.parent)) (kids.get(o.parent) ?? kids.set(o.parent, []).get(o.parent)!).push(o);
-    else out.set(o.id, scaleAbout(o, fixed, kx, o.kind === "stroke" ? kx : ky, keepWidth, keepRadius));
+    else {
+      // (each scaled about the same place, as it is written in the frame the object is filed in)
+      const f = o.frame ?? frame?.space.world;
+      out.set(o.id, scaleAbout(o, frame && f && f !== frame ? expressExactIn(f.space, frame, fixed, f) : fixed, kx, o.kind === "stroke" ? kx : ky, keepWidth, keepRadius));
+    }
   }
   // the groups made by a pattern generator (ADR 0162): their pieces grow with the sheet while it is resized; on release the pattern is made
   // again at the new size (app/pattern.ts remadePatterns)
