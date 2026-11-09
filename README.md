@@ -1069,7 +1069,7 @@ Every shortcut can be changed in **Settings → Shortcuts**: a single key or a c
 | Step to next item | `W` `A` `S` `D` |
 | Zen mode | `Z` (bars fade out until the pointer is over them) |
 | Text editing | `Ctrl/⌘+B` · `Ctrl/⌘+I` · `Tab` nests a list item · `Esc` or `Ctrl/⌘+Enter` finishes |
-| Resize | Drag a handle; `Shift` keeps proportions, `Alt` resizes about the middle, `Ctrl` turns snapping off |
+| Resize | Drag a handle; `Shift` keeps proportions, `Alt` resizes about the middle, `Ctrl` turns snapping off. A box stops at a small size and never flips |
 | Same size | The **Size** menu in the Actions bar gives the selected pictures, note cards, shapes, strokes and text the width or height of the smallest, the middle or the largest of them, in proportion |
 | Reset size | Several selected keep their layout: they move apart only as far as it takes to keep their gaps. **Reset size** in the Size menu on the Actions bar puts the selected pictures, videos, GIFs, sounds and note cards back to the size they are placed at, at the current zoom (one pixel of the file for one of the screen; a note card at Settings > Notes > Note tool card size), about their middle |
 | Copy by dragging | `Alt` as the drag starts |

@@ -698,3 +698,21 @@ test("Export… of many sheets lists every one of them for ordering, each with a
   await key(app, "Escape");
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a sheet's handle dragged past its far side stops at a small size: the sheet stays", async ({ app }) => {
+  const p = app.page;
+  await key(app, "c");
+  await drag(app, [400, 300], [700, 500]);
+  await pickSheet(app);
+  const frame = async () => (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.corners;
+  const size = (c: Array<[number, number]>) => [Math.round(c[1]![0] - c[0]![0]), Math.round(c[2]![1] - c[1]![1])];
+  await expect.poll(async () => size(await frame())).toEqual([300, 200]);
+  for (const [from, to] of [[[700, 400], [200, 400]], [[400, 400], [900, 400]], [[550, 300], [550, 700]], [[700, 500], [200, 100]]] as Array<[[number, number], [number, number]]>) {
+    await drag(app, from, to);
+    const [w, h] = size(await frame());
+    expect(w, `${from} width`).toBeGreaterThanOrEqual(7);
+    expect(h, `${from} height`).toBeGreaterThanOrEqual(7);
+    await p.keyboard.press("Control+z");
+    await expect.poll(async () => size(await frame())).toEqual([300, 200]);
+  }
+});

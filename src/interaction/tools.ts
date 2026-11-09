@@ -98,6 +98,8 @@ function inRotateZone(s: ScreenPoint, frame: SelectionFrame, handle: readonly [n
 const ANGLE_STEP = TURN / 24;
 /** Smallest scale factor a resize drag can produce (prevents flips/zero size). */
 const MIN_SCALE = 1e-6;
+/** The smallest a box can be made by dragging a handle, on the screen. */
+const MIN_BOX_PX = 8;
 
 /** What a move can snap to (interaction/snap.ts), gathered once when the move starts. */
 interface SnapContext {
@@ -1865,7 +1867,14 @@ export function attachTools(
         }
       }
     }
-    return { kx: Math.max(MIN_SCALE, kx), ky: Math.max(MIN_SCALE, ky), fixed };
+    // Dragged towards or past its far side, a box stops at a small size on the screen: it never collapses to nothing (a box already that small stays as it is).
+    const floorX = gs.size0.w > 0 ? Math.min(1, MIN_BOX_PX / gs.size0.w) : MIN_SCALE;
+    const floorY = gs.size0.h > 0 ? Math.min(1, MIN_BOX_PX / gs.size0.h) : MIN_SCALE;
+    if (kx === ky) {
+      const k = Math.max(MIN_SCALE, floorX, floorY, kx);
+      return { kx: k, ky: k, fixed };
+    }
+    return { kx: Math.max(MIN_SCALE, floorX, kx), ky: Math.max(MIN_SCALE, floorY, ky), fixed };
   };
 
   const commitPreview = (): void => {

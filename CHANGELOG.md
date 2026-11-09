@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.38 — A resize never collapses (2026-11-09)
+
+- **Fixed:** a handle dragged past the far side of a sheet or any item shrank it to almost nothing, and it seemed to be gone; a box now stops at a small size on the screen.
+
 ## 0.55.37 — Restored styles appear at once (2026-11-09)
 
 - **Fixed:** styles restored from a backup appeared only after a restart, and saving a style before that restart lost them.
