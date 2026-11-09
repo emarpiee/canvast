@@ -1279,7 +1279,9 @@ export class LibraryMirror {
   /** Every hidden item's file put in its folder of `.hidden/` (when the key opens: the files sealed before folders were kept there). */
   async placeAllHidden(): Promise<void> {
     // (only those with a random name of before: one changed while locked is placed by the write after opening, which has it pending)
-    const legacy = (await this.lib.recs("sealed")).filter((r) => r.file && /[0-9a-f]{32}\.bin$/.test(r.file)).map((r) => r.hash);
+    // (a New key under way: every name is encrypted again, by a rename, before the old key's record goes; stopped half-way, it goes on here)
+    const all = await this.vault.sealingAgain();
+    const legacy = (await this.lib.recs("sealed")).filter((r) => r.file && (all || /[0-9a-f]{32}\.bin$/.test(r.file))).map((r) => r.hash);
     await this.placeHidden(legacy, true);
   }
   async placeHidden(hashes: readonly string[], shown = false): Promise<void> {
@@ -1681,17 +1683,16 @@ export class LibraryMirror {
     let id: string | null = null;
     try {
       if (!rec.ext || !rec.file) throw new Error(`“${rec.name}” has no file in the workspace folder`);
-      // Proven three ways, each at native speed: the file is the item's (its SHA-256 read by the main process, before and after, so it
-      // did not change meanwhile); the copy on disk opens with the key, chunk by chunk, into exactly the bytes that were read and sealed.
-      if ((await this.bridge.hash(rec.file)) !== contentOf(hash)) throw new Error("the file is not what the library says");
+      // Proven at native speed: the copy on disk opens with the key, chunk by chunk, into exactly the bytes read and sealed; and the file
+      // is still the item's once that is done (its SHA-256, read by the main process).
       await this.setMeta(MOVING_KEY, { hash, from: rec.file, to: name } satisfies Moving);
       const writing = (id = await stream.begin(name));
       const digests = chunkDigests();
       await this.vault.sealTo(this.rawAt(rec.file, rec.size), { hash: contentOf(hash) }, (b) => stream.append(writing, b), digests.seen);
-      const written = await stream.finish(writing);
+      const written = await stream.finish(writing, false);
       const back = await this.vault.openAt(new DiskFile((from, to) => stream.read(writing, from, to), written.size));
       if (!back || back.file.size !== rec.size || !(await sameChunks(back.file, await digests.all()))) throw new Error("the sealed file did not open back the same");
-      if ((await this.bridge.hash(rec.file)) !== contentOf(hash)) throw new Error("the file changed while it was being hidden");
+      if ((await this.bridge.hash(rec.file)) !== contentOf(hash)) throw new Error("the file is not what the library says, or changed while it was being hidden");
       await stream.commit(writing);
       id = null;
       await this.setFile(hash, (r) => r.ext === 1 && r.file === rec.file, name);

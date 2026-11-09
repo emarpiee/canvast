@@ -183,8 +183,8 @@ export interface FileStream {
   append(id: string, bytes: Uint8Array): Promise<void>;
   /** The temporary file's bytes, as written. */
   read(id: string, from: number, to: number): Promise<Uint8Array>;
-  /** Made sure on the disk, closed, and read back: its SHA-256 and size. */
-  finish(id: string): Promise<{ hash: string; size: number }>;
+  /** Made sure on the disk, closed, and read back: its SHA-256 and size (`hashIt` false: its size only, for a caller that proves it itself). */
+  finish(id: string, hashIt?: boolean): Promise<{ hash: string; size: number }>;
   /** Into its place. Answers where that is. Without `replace`, a file already there is an error and stays. */
   commit(id: string): Promise<string>;
   abort(id: string): Promise<void>;

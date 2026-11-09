@@ -19,7 +19,7 @@ const bridge: DesktopBridge = {
     copy: (name) => ipcRenderer.invoke("canvast:stream", "copy", name),
     append: (id, bytes) => ipcRenderer.invoke("canvast:stream", "append", id, bytes),
     read: (id, from, to) => ipcRenderer.invoke("canvast:stream", "read", id, from, to),
-    finish: (id) => ipcRenderer.invoke("canvast:stream", "finish", id),
+    finish: (id, hashIt) => ipcRenderer.invoke("canvast:stream", "finish", id, hashIt),
     commit: (id) => ipcRenderer.invoke("canvast:stream", "commit", id),
     abort: (id) => ipcRenderer.invoke("canvast:stream", "abort", id),
   },

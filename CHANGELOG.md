@@ -1,8 +1,14 @@
 # Changelog
 
+## 0.55.15 — Lock now hides; New key moves the names too (2026-11-09)
+
+- **Fixed:** *Lock now*, *New key* and the other buttons of the Settings cards that should be hidden stayed on screen (a style overrode `hidden`).
+- **Fixed:** New key left the encrypted names of hidden files and folders under the old key; every name is now encrypted again before the old key's record goes.
+- **Changed:** hiding a file reads it fewer times: one check of the original once it is sealed, and the sealed copy read back once.
+
 ## 0.55.14 — Hidden items faster, New key, previews in the trash (2026-11-09)
 
-- **Changed:** hiding and showing hidden items is faster and keeps memory flat: every file past 16 MiB is sealed and opened a part at a time, and each copy is proven chunk by chunk with the platform's own SHA-256 (it was a SHA-256 written in JavaScript, about ten times slower), with the file itself checked by the main process before and after.
+- **Changed:** hiding and showing hidden items keeps memory flat: every file past 16 MiB is sealed and opened a part at a time, and each copy is proven chunk by chunk with the platform's own SHA-256 (it was a SHA-256 written in JavaScript, about ten times slower), with the file itself checked by the main process before and after.
 - **Added:** **New key** (Settings > Privacy): a new random key under the same password, every hidden file encrypted again with it in the background (each checked, their encrypted names too; stopped half-way, it goes on at the next opening), so old copies of `hidden.json` and the old password open nothing.
 - **Added:** changing the Hidden password says that copies of `hidden.json` from before still open with the old password, and points to New key.
 - **Added:** the Trash shows each file with the picture the library gives its kind (a note's page, a PDF's, a video's frame, an art file's picture), not only pictures.

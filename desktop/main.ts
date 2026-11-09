@@ -529,6 +529,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
         await s.fh.close();
         s.fh = null;
       }
+      if (args[1] === false) return { hash: "", size: (await stat(s.tmp)).size };
       const h = createHash("sha256");
       let size = 0;
       for await (const chunk of createReadStream(s.tmp)) {

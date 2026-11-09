@@ -3072,6 +3072,7 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
 @media (max-width: 640px) { .action-row { grid-template-columns: 1fr; gap: var(--s-2); } }
 /* Settings: the buttons of the Storage and About cards look like the app's other buttons (the same as Reset every shortcut and Back to canvas). */
 #settings-view .action-row button, #settings-view .storage-actions button, #settings-view [data-persist] { display: inline-flex; align-items: center; justify-content: center; min-height: var(--ctl); padding: 0 var(--s-6); font: var(--weight-medium) var(--text-md) var(--font-ui); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); cursor: pointer; }
+#settings-view .action-row button[hidden], #settings-view .storage-actions button[hidden], #settings-view [data-persist][hidden] { display: none; }
 #settings-view .action-row button:hover:not(:disabled), #settings-view .storage-actions button:hover:not(:disabled), #settings-view [data-persist]:hover { background: var(--hud-hover); }
 #settings-view button.is-danger { color: var(--hud-danger-fg); background: var(--hud-danger); border-color: var(--hud-danger); }
 /* Settings tabs: an icon each, and the tabs indented under the group they belong to. */

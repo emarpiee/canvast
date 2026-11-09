@@ -392,7 +392,7 @@ export class HiddenVault implements HiddenStore {
       // (proven chunk by chunk against what was read from the old copy, itself checked chunk by chunk by its own tags as it was opened)
       const digests = chunkDigests();
       await sealFileTo(this.key, opened.file, opened.item ?? {}, (b) => stream.append(id, b), undefined, digests.seen);
-      const written = await stream.finish(id);
+      const written = await stream.finish(id, false);
       const back = await openFileAt(this.key, new DiskFile((from, to) => stream.read(id, from, to), written.size));
       if (!back || back.file.size !== opened.file.size || !(await sameChunks(back.file, await digests.all()))) throw new Error("did not open back the same");
       await stream.commit(id);
