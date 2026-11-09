@@ -151,7 +151,8 @@ function filesUnder(dir) {
  * takes back sealed files whose entry is lost). Hashes of each, the sealed files that did not open, and files being written left behind.
  */
 async function onDisk(ws) {
-  const readable = new Set(filesUnder(join(ws, "library")).filter((f) => !f.includes(".tmp-")).map((f) => sha(readFileSync(f))));
+  const readable = new Set();
+  for (const f of filesUnder(join(ws, "library"))) if (!f.includes(".tmp-")) readable.add(await shaFile(f));
   const out = `${ws}-out`;
   rmSync(out, { recursive: true, force: true });
   const warnings = [];
@@ -163,7 +164,8 @@ async function onDisk(ws) {
   } finally {
     console.warn = warn;
   }
-  const sealed = new Set(filesUnder(out).filter((f) => !f.endsWith("hidden-items.json")).map((f) => sha(readFileSync(f))));
+  const sealed = new Set();
+  for (const f of filesUnder(out)) if (!f.endsWith("hidden-items.json")) sealed.add(await shaFile(f)); // (read as streams: a file can be past what one read may hold)
   rmSync(out, { recursive: true, force: true });
   const temps = filesUnder(ws).filter((f) => f.includes(".tmp-")).map((f) => relative(ws, f));
   return { readable, sealed, opened, damaged: warnings.filter((w) => /does not open/.test(w)), missing: warnings.filter((w) => /^missing/.test(w)), temps };
@@ -489,6 +491,7 @@ if (BIG > 0) {
     const m = await measured(s.app, async () => void (whole = path ? await get(path) : whole));
     if (whole.hash !== f.hash) (failed = true), console.error(`FAILED: new device: ${f.name} read back ${whole.bytes} bytes that are not the file's`);
     bigRows.push([`new device: ${label}: first MB ${Math.round(head.first)} ms, whole`, "", secs(whole.ms), rate(f.bytes, whole.ms), `${Math.round(m.peak)} MB`, ""]);
+    console.log(`new device: ${label}: first MB ${Math.round(head.first)} ms, whole ${secs(whole.ms)} (${rate(f.bytes, whole.ms)}), peak ${Math.round(m.peak)} MB`);
   };
   let onDevice = await hiddenPlaces();
   for (const size of SIZES.filter((x) => x.mb >= 100)) await readBack(`read ${size.name}`, size.files[0], onDevice);

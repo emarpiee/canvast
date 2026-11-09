@@ -704,16 +704,20 @@ test("a sheet's handle dragged past its far side stops at a small size: the shee
   await key(app, "c");
   await drag(app, [400, 300], [700, 500]);
   await pickSheet(app);
-  const frame = async () => (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.corners;
-  const size = (c: Array<[number, number]>) => [Math.round(c[1]![0] - c[0]![0]), Math.round(c[2]![1] - c[1]![1])];
-  await expect.poll(async () => size(await frame())).toEqual([300, 200]);
+  const id = (await objs(app)).find((o) => o.container)!.id;
+  const size = async () => {
+    const b = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+    return [Math.round(b.maxX - b.minX), Math.round(b.maxY - b.minY)];
+  };
+  await expect.poll(size).toEqual([300, 200]);
   for (const [from, to] of [[[700, 400], [200, 400]], [[400, 400], [900, 400]], [[550, 300], [550, 700]], [[700, 500], [200, 100]]] as Array<[[number, number], [number, number]]>) {
     await drag(app, from, to);
-    const [w, h] = size(await frame());
+    await app.frame();
+    const [w, h] = await size();
     expect(w, `${from} width`).toBeGreaterThanOrEqual(7);
     expect(h, `${from} height`).toBeGreaterThanOrEqual(7);
     await p.keyboard.press("Control+z");
-    await expect.poll(async () => size(await frame())).toEqual([300, 200]);
+    await expect.poll(size).toEqual([300, 200]);
   }
 });
 
