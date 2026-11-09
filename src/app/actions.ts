@@ -1,5 +1,5 @@
 import { plural } from "../doc/plural";
-import { biggestClosed, fittedInShape, fittedOnPath, subArea, textsInShapes } from "../doc/text-in-shape";
+import { biggestClosed, fittedInShape, fittedOnPath, parentOf, subArea, textsInShapes } from "../doc/text-in-shape";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { levelsBetween } from "../core/frames";
 import { isArtFile } from "../assets/art-preview";
@@ -1974,8 +1974,13 @@ export function exportTargets(doc: DocumentStore, editor: EditorState): ExportTa
 /** The selected things, each on its own: what is on a selected sheet goes with the sheet, and a group is one thing. Top to bottom, then left to right. */
 function selectedUnits(doc: DocumentStore, editor: EditorState): CanvasObject[][] {
   const units = new Map<string, CanvasObject[]>();
-  for (const o of rootsOf(selected(doc, editor).filter((x) => !x.hidden && !isMaskObject(x)))) {
-    const key = o.groups?.[0] ?? o.id;
+  const picked = rootsOf(selected(doc, editor).filter((x) => !x.hidden && !isMaskObject(x) && !(x.kind === "path" && x.params?.link))); // (a connector belongs to its balloons)
+  const ids = new Set(picked.map((o) => o.id));
+  const unitOf = (o: CanvasObject): string => o.groups?.[0] ?? o.id;
+  for (const o of picked) {
+    // (the words in a shape or along a path that is selected too are one thing with it)
+    const parent = o.kind === "text" ? parentOf(o) : undefined;
+    const key = parent !== undefined && ids.has(parent) ? unitOf(doc.get(parent)!) : unitOf(o);
     (units.get(key) ?? units.set(key, []).get(key)!).push(o);
   }
   const top = (u: readonly CanvasObject[]) => worldBounds(u[0]!);

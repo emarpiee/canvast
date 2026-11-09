@@ -749,15 +749,21 @@ test("several selected items: a sheet each, one undo step; and in Export, each o
   await key(app, "u");
   await drag(app, [300, 300], [400, 380]);
   await drag(app, [500, 300], [600, 380]);
+  // (a balloon and its words are one item)
+  await key(app, "k");
+  await drag(app, [700, 200], [920, 360]);
+  await p.mouse.dblclick(810, 280);
+  await p.keyboard.type("Hi");
+  await click(app, 1100, 650);
   await key(app, "v");
   await key(app, "Control+a");
   await sheetWith(p, "eachsheet");
-  await expect.poll(async () => (await objs(app)).filter((o) => o.container).length).toBe(2);
+  await expect.poll(async () => (await objs(app)).filter((o) => o.container).length).toBe(3);
   await key(app, "Control+z");
   await expect.poll(async () => (await objs(app)).filter((o) => o.container).length).toBe(0);
   await key(app, "Control+a");
   await exportWith(p, "exportpic");
   await p.getByTestId("export-each").click();
-  await expect(p.locator("[data-mini]")).toHaveCount(2);
+  await expect(p.locator("[data-mini]")).toHaveCount(3);
   await expect(p.getByTestId("export-together")).toBeVisible();
 });
