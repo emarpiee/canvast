@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.28 — Balloon words kept (2026-11-09)
+
+- **Changed:** deleting a speech balloon keeps its words as plain text, as for any shape.
+
 ## 0.55.27 — Text outlives its shape (2026-11-09)
 
 - **Fixed:** a text whose shape was deleted kept the shape's outline; it is plain text again, in the same undo step.

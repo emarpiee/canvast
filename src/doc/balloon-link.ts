@@ -50,7 +50,7 @@ const centreOf = (o: PathObject): { x: D.Dyadic; y: D.Dyadic } => {
 
 const LOOK = { kind: "path", opacity: 1, attachmentTargetId: null, shape: "balloon", name: "Balloon connector" } as const;
 
-/** The transaction's objects with the connectors of the balloons it changes made again, those of removed balloons taken away, and the words of removed balloons with them. */
+/** The transaction's objects with the connectors of the balloons it changes made again, and those of removed balloons taken away. */
 export function withBalloonLinks(src: DerivationSource, next: readonly CanvasObject[], removed: readonly ObjectId[]): { next: CanvasObject[]; removed: ObjectId[] } {
   if (!removed.length && !next.some((o) => o.kind === "path")) return { next: [...next], removed: [...removed] };
   const mine = new Map(next.map((o) => [o.id, o] as const));
@@ -65,7 +65,6 @@ export function withBalloonLinks(src: DerivationSource, next: readonly CanvasObj
     else links.push(o);
   };
   for (const o of src.all()) {
-    if (o.kind === "text" && o.inShape?.shape !== undefined && gone.has(o.inShape.shape) && isBalloon(src.get(o.inShape.shape))) outGone.add(o.id);
     if (!mine.has(o.id)) see(o);
   }
   next.forEach(see);
