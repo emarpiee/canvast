@@ -410,6 +410,7 @@ Press `T`, click and type. Text is stored as Markdown, and you can zoom into a l
 | **Look** | Spacing, alignment, kerning, OpenType features, variable font axes |
 | **Fonts** | Import `.ttf`, `.otf`, `.woff` or `.woff2`; right-to-left text works |
 | **Text on a path** | Text follows a path; **Text to path** (`Ctrl+E`) makes outlines |
+| **Text in a shape** | Words flow inside a closed shape, each line as wide as the shape is there |
 | **Notes** (`M`) | A markdown note with a card on the canvas: see [Notes](#notes) |
 
 #### More about text
@@ -419,6 +420,8 @@ Press `T`, click and type. Text is stored as Markdown, and you can zoom into a l
 - **Look:** colour or gradient, outline, size, line height, letter spacing, alignment, auto or fixed width, paragraph spacing, indent, case, line limit, a set height, kerning, OpenType features and the axes of variable fonts.
 - **Fonts:** import `.ttf`, `.otf`, `.woff` or `.woff2` into the library, including variable fonts. One text may use several fonts. Right-to-left and mixed-direction text are supported.
 - **Text on a path**, and **Text to path** (`Ctrl+E`) to turn letters into editable outlines.
+- **Text in a shape:** select a text and a closed shape, then *Path tools > Text inside the shape*. The words keep a copy of the outline: moving the shape later does not move them, and words that do not fit go on below it. *Text off its path or shape* sets them straight again.
+- **Options** (*Paragraph and box* on the text's bar): on a path, where the words start, their alignment along it, the side and the distance from it; in a shape, the padding at the sides and at the top and bottom, where the words sit, whether words that do not fit are shown, and **Fit to shape**.
 - **Notes** (`M`): the Note tool makes a markdown note in the library's Notes folder, places its card where you click and opens it in the Note panel (see [Notes](#notes)). A text can still sit on a coloured card (its box options); **Make note files** turns such texts into notes.
 - **No zoom limit:** zoom into a letter as far as you like; the font's real outlines are drawn.
 

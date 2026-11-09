@@ -550,7 +550,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const t = actions.selectedTextStyle();
     if (!t) return;
     openTextBoxPopover(e.currentTarget as HTMLElement, {
-      paraGap: t.paraGap, indent: t.indent, caps: t.caps, maxLines: t.maxLines, heightPx: t.heightPx, valign: t.valign, card: t.card,
+      paraGap: t.paraGap, indent: t.indent, caps: t.caps, maxLines: t.maxLines, heightPx: t.heightPx, valign: t.valign, card: t.card, pathOpts: t.pathOpts, shapeOpts: t.shapeOpts,
       onChange: (patch, final) => actions.setTextStyle(patch, final),
     });
   });

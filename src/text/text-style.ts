@@ -3,6 +3,7 @@
  * one, and keeps the stored form tidy (a default is never stored), so the options bar, the text tool, the editor and saved text styles
  * all go through the same code. A size is in screen px at the zoom it is read or applied at, like a corner radius.
  */
+import { outlineBox } from "./shape-flow";
 import type { TextObject } from "../doc/model";
 import type { Gradient } from "../doc/paint";
 import { isPaint } from "../doc/paint";
@@ -29,6 +30,12 @@ export interface TextLook {
   readonly heightPx?: number | null;
   /** Where the words sit in a set height. */
   readonly valign?: "top" | "middle" | "bottom";
+  /** A text on a path: where it starts (0 to 1), how it is aligned on the curve, which side it is on, how far off it (em). */
+  readonly pathOpts?: { start?: number; align?: "start" | "center" | "end"; flip?: boolean; lift?: number } | null;
+  /** A text in a shape: the space kept from the outline (em), and whether words that do not fit are left out. */
+  readonly shapeOpts?: { padX?: number; padY?: number; hide?: boolean } | null;
+  /** Once: the size that fills the shape. */
+  readonly fitShape?: boolean;
   /** Space between paragraphs in em. */
   readonly paraGap?: number;
   /** How far the first line of a paragraph starts in, in em. */
@@ -67,7 +74,7 @@ export const LOOK_LIMITS = { sizePx: [1, 2000], lineHeight: [0.5, 5], tracking: 
 const clamp = (v: number, [lo, hi]: readonly [number, number]): number => Math.min(hi, Math.max(lo, v));
 
 /** The look of a text at a zoom (`ppu`: screen px per local unit of the text, 0 when unknown: then there is no size). */
-export function lookOf(o: TextObject, ppu: number): Required<Omit<TextLook, "sizePx" | "heightPx">> & { sizePx: number | null; heightPx: number | null } {
+export function lookOf(o: TextObject, ppu: number): Required<Omit<TextLook, "sizePx" | "heightPx" | "fitShape" | "pathOpts" | "shapeOpts">> & { pathOpts: { start: number; align: "start" | "center" | "end"; flip: boolean; lift: number } | null; shapeOpts: { padX: number; padY: number; hide: boolean } | null } & { sizePx: number | null; heightPx: number | null } {
   return {
     sizePx: ppu > 0 && ppu < Infinity ? o.size * ppu : null,
     heightPx: o.h !== undefined && ppu > 0 && ppu < Infinity ? o.h * ppu : null,
@@ -88,12 +95,16 @@ export function lookOf(o: TextObject, ppu: number): Required<Omit<TextLook, "siz
     gradient: o.gradient ?? null,
     outline: o.outline ?? null,
     card: o.card ?? null,
+    pathOpts: o.onPath ? { start: o.onPath.start ?? 0, align: o.onPath.align ?? "start", flip: o.onPath.flip === true, lift: o.onPath.lift ?? 0 } : null,
+    shapeOpts: o.inShape ? { padX: o.inShape.padX ?? 0.4, padY: o.inShape.padY ?? 0, hide: o.inShape.hide === true } : null,
   };
 }
 
 /** What the Text tool shows and makes when nothing is being edited: the tool's look filled out with the defaults (and the pen colour). */
 export function toolLook(look: TextLook, penColor: string): ReturnType<typeof lookOf> {
   return {
+    pathOpts: null,
+    shapeOpts: null,
     sizePx: look.sizePx ?? NEW_TEXT_PX,
     lineHeight: look.lineHeight ?? LINE_HEIGHT,
     tracking: look.tracking ?? 0,
@@ -124,6 +135,19 @@ export function fitWidth(o: TextObject): TextObject {
 }
 
 /** The text with the given look fields applied: values kept in range, defaults left out of the stored form, the width refitted. */
+/** The biggest size at which all of a text's words fit inside its shape. */
+function fitToShape(o: TextObject): TextObject {
+  const H = outlineBox(o.inShape!.n).maxY;
+  const fits = (size: number): boolean => layoutOf({ ...o, size }).height * size <= H;
+  let lo = o.size / 64, hi = o.size * 64;
+  for (let i = 0; i < 24; i++) {
+    const mid = Math.sqrt(lo * hi);
+    if (fits(mid)) lo = mid;
+    else hi = mid;
+  }
+  return { ...o, size: lo };
+}
+
 export function withLook(o: TextObject, look: TextLook, ppu = 0): TextObject {
   const { lineHeight: _l, tracking: _t, align: _a, autoWidth: _f, assetId: _i, gradient: _g, outline: _ol, card: _cd, h: _h, valign: _v, paraGap: _pg, indent: _in, caps: _c, maxLines: _ml, kerning: _k, features: _fe, axes: _ax, ...rest } = o;
   const lineHeight = look.lineHeight !== undefined ? clamp(look.lineHeight, LOOK_LIMITS.lineHeight) : o.lineHeight;
@@ -147,6 +171,8 @@ export function withLook(o: TextObject, look: TextLook, ppu = 0): TextObject {
   const maxLines = look.maxLines !== undefined ? (look.maxLines === null ? undefined : Math.max(1, Math.round(look.maxLines))) : o.maxLines;
   let next: TextObject = {
     ...rest,
+    ...(look.pathOpts && o.onPath ? { onPath: { ...o.onPath, ...look.pathOpts } } : {}),
+    ...(look.shapeOpts && o.inShape ? { inShape: { ...o.inShape, ...look.shapeOpts } } : {}),
     ...(look.color !== undefined ? { color: look.color } : {}),
     ...(look.sizePx !== undefined && ppu > 0 && ppu < Infinity ? { size: clamp(look.sizePx, LOOK_LIMITS.sizePx) / ppu } : {}),
     ...(lineHeight !== undefined && lineHeight !== LINE_HEIGHT ? { lineHeight } : {}),
@@ -167,6 +193,7 @@ export function withLook(o: TextObject, look: TextLook, ppu = 0): TextObject {
     ...(features && features.length ? { features } : {}),
     ...(axes && Object.keys(axes).length ? { axes } : {}),
   };
+  if (look.fitShape && next.inShape) next = fitToShape(next);
   next = fitWidth(next);
   return look.sizePx !== undefined ? (normalizeUnit(next) as TextObject) : next;
 }

@@ -951,6 +951,32 @@ test("a text is set along a picked path (a copy of its curve), runs along it and
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("a text flows inside a picked closed shape, each line as wide as the shape is there, and is set straight again", async ({ app }) => {
+  const p = app.page;
+  await newText(p, 100, 600);
+  await p.keyboard.type("words that flow inside the round shape and wrap to its width on every line");
+  await finish(p);
+  await p.keyboard.press("u");
+  await p.click('[data-shape-kind="ellipse"]');
+  await app.drag({ x: 300, y: 200 }, { x: 600, y: 500 }, 6);
+  const text = (await textObjects(p))[0]!;
+  const flat = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), text.id))!.box;
+  await p.keyboard.press("v");
+  await p.mouse.click(flat.minX + 12, (flat.minY + flat.maxY) / 2);
+  await p.keyboard.down("Shift");
+  await p.mouse.click(450, 350);
+  await p.keyboard.up("Shift");
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toHaveLength(2);
+  await pathWith(p, "inshape");
+  await expect.poll(async () => ((await textObjects(p))[0]!["inShape"] as { n: number[] } | undefined)?.n.length).toBeGreaterThanOrEqual(12);
+  const inside = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), text.id))!.box;
+  expect(inside.minX).toBeGreaterThanOrEqual(290);
+  expect(inside.maxX).toBeLessThanOrEqual(610);
+  await pathWith(p, "offpath");
+  await expect.poll(async () => (await textObjects(p))[0]!["inShape"]).toBeUndefined();
+  expect(app.consoleErrors).toEqual([]);
+});
+
 const SYSTEM_FONTS = {
   woff2: "/usr/share/cockpit/static/fonts/RedHatDisplay-Medium.woff2",
   cff: "/usr/share/fonts/aajohan-comfortaa-fonts/Comfortaa-Regular.otf",

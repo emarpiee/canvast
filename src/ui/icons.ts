@@ -204,6 +204,7 @@ import pencilRulerSvg from "lucide-static/icons/pencil-ruler.svg";
 import chartSplineSvg from "lucide-static/icons/chart-spline.svg";
 import routeSvg from "lucide-static/icons/route.svg";
 import routeOffSvg from "lucide-static/icons/route-off.svg";
+import textInShapeSvg from "lucide-static/icons/square-dashed-text.svg";
 import caseSensitiveSvg from "lucide-static/icons/case-sensitive.svg";
 import link2Svg from "lucide-static/icons/link-2.svg";
 import rows3Svg from "lucide-static/icons/rows-3.svg";
@@ -512,6 +513,7 @@ export const ICONS = {
   chartSpline: clean(chartSplineSvg),
   route: clean(routeSvg),
   routeOff: clean(routeOffSvg),
+  textInShape: clean(textInShapeSvg),
   underline: clean(underlineSvg),
   strikethrough: clean(strikethroughSvg),
   textColour: clean(baselineSvg),

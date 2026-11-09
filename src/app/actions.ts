@@ -1,3 +1,4 @@
+import { outlineBox } from "../text/shape-flow";
 import { desktopBridge } from "../storage/desktop-bridge";
 import { levelsBetween } from "../core/frames";
 import { isArtFile } from "../assets/art-preview";
@@ -2833,7 +2834,35 @@ function textAndPath(doc: DocumentStore, editor: EditorState): { text: TextObjec
 export const canSetOnPath = (doc: DocumentStore, editor: EditorState): boolean => textAndPath(doc, editor) !== null;
 
 /** Whether a picked text runs along a curve: it can be taken off. */
-export const canTakeOffPath = (doc: DocumentStore, editor: EditorState): boolean => selected(doc, editor).some((o) => o.kind === "text" && o.onPath !== undefined && !o.locked);
+export const canTakeOffPath = (doc: DocumentStore, editor: EditorState): boolean => selected(doc, editor).some((o) => o.kind === "text" && (o.onPath !== undefined || o.inShape !== undefined) && !o.locked);
+
+/** Whether a text and a closed shape are picked: the words can flow inside it. */
+export const canSetInShape = (doc: DocumentStore, editor: EditorState): boolean => {
+  const tp = textAndPath(doc, editor);
+  return !!tp && pathSubs(tp.path).some((s) => s.closed && s.n.length >= 12);
+};
+
+/** Flow the picked text inside the picked closed shape: it keeps a copy of the outline, moves to the shape's box and is centred, one undo step. The shape stays where it is. */
+export function setTextInShape(doc: DocumentStore, editor: EditorState): void {
+  const tp = textAndPath(doc, editor);
+  if (!tp || editor.blockEdit()) return;
+  const { text, path } = tp;
+  const sub = pathSubs(path).find((s) => s.closed && s.n.length >= 12);
+  if (!sub) return;
+  const box = outlineBox(sub.n);
+  const k = 2 ** (path.unit - text.unit);
+  const n = sub.n.map((v, i) => (v - (i % 2 === 0 ? box.minX : box.minY)) * k);
+  const w = (box.maxX - box.minX) * k;
+  if (!n.every((v) => Number.isFinite(v)) || !(w > 0)) {
+    editor.message = "That shape is too far from the text's scale to put it inside.";
+    editor.changed();
+    return;
+  }
+  const { onPath: _p, autoWidth: _a, h: _h, ...rest } = text;
+  const anchor = { x: D.add(path.anchor.x, D.shift(D.fromNumber(box.minX), path.unit)), y: D.add(path.anchor.y, D.shift(D.fromNumber(box.minY), path.unit)) };
+  doc.commit(doc.transaction("Put text in shape", [{ ...rest, anchor, w, align: "center", valign: "middle", inShape: { n, closed: true } }]));
+  editor.changed();
+}
 
 /** Set the picked text along the picked path: the text keeps a copy of the path's first sub-path (in its own units), one undo step. The path stays where it is. */
 export function setTextOnPath(doc: DocumentStore, editor: EditorState): void {
@@ -2851,14 +2880,15 @@ export function setTextOnPath(doc: DocumentStore, editor: EditorState): void {
     editor.changed();
     return;
   }
-  doc.commit(doc.transaction("Set text on path", [{ ...text, onPath: { n, closed: sub.closed } }]));
+  const { inShape: _s, ...straight } = text;
+  doc.commit(doc.transaction("Set text on path", [{ ...straight, onPath: { n, closed: sub.closed } }]));
   editor.changed();
 }
 
 /** Take the picked texts off their curves: they are set straight again, as wide as they were. */
 export function takeTextOffPath(doc: DocumentStore, editor: EditorState): void {
-  const next = selected(doc, editor).filter((o): o is TextObject => o.kind === "text" && o.onPath !== undefined && !o.locked).map((o) => {
-    const { onPath: _p, ...rest } = o;
+  const next = selected(doc, editor).filter((o): o is TextObject => o.kind === "text" && (o.onPath !== undefined || o.inShape !== undefined) && !o.locked).map((o) => {
+    const { onPath: _p, inShape: _s, ...rest } = o;
     return fitWidth(rest);
   });
   if (!next.length || editor.blockEdit()) return;

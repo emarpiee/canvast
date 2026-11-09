@@ -1,3 +1,4 @@
+import { flowOf, type Flow, type ShapeOutline } from "./shape-flow";
 import type { TextObject } from "../doc/model";
 import type { Font } from "./font";
 import type { BlockType } from "./markdown";
@@ -95,6 +96,11 @@ export interface TextStyle {
   readonly features?: readonly string[];
   /** The values of a variable font's axes. */
   readonly axes?: Axes;
+  /** A closed outline the lines flow inside, each as wide as the shape is there; `size` turns it into em. */
+  readonly inShape?: ShapeOutline;
+  readonly size?: number;
+  /** Where the words sit in a shape (absent: the top). */
+  readonly valign?: "top" | "middle" | "bottom";
 }
 
 export const LINE_HEIGHT = 1.3;
@@ -130,11 +136,18 @@ export function textFont(): Font {
 
 export function layoutText(md: string, wrapEm: number, style: TextStyle = {}): TextLayout {
   const { lineHeight = LINE_HEIGHT, tracking = 0, align = "left", assetId, paraGap = BLOCK_GAP, indent = 0, caps, maxLines, kerning = false, features = [], axes } = style;
-  const key = `${wrapEm}|${lineHeight}|${tracking}|${align}|${assetId ?? ""}|${paraGap}|${indent}|${caps ?? ""}|${maxLines ?? ""}|${kerning ? 1 : 0}|${features.join(",")}|${axes ? JSON.stringify(axes) : ""}|${md}`;
+  const flow = style.inShape && style.size ? flowOf(style.inShape, style.size) : undefined;
+  const key = `${flow?.key ?? ""}|${flow ? style.valign ?? "" : ""}|${wrapEm}|${lineHeight}|${tracking}|${align}|${assetId ?? ""}|${paraGap}|${indent}|${caps ?? ""}|${maxLines ?? ""}|${kerning ? 1 : 0}|${features.join(",")}|${axes ? JSON.stringify(axes) : ""}|${md}`;
   let l = cache.get(key);
   if (!l) {
     if (cache.size >= CACHE_MAX) cache.clear();
-    l = compute(md, wrapEm, { lineHeight, tracking, align, assetId, paraGap, indent, caps, maxLines, kerning, features, axes });
+    const set = { lineHeight, tracking, align, assetId, paraGap, indent, caps, maxLines, kerning, features, axes };
+    l = compute(md, wrapEm, set, flow);
+    // (in a shape the words sit in the middle of its height, when they still fit from there)
+    if (flow && l.height < flow.height && style.valign && style.valign !== "top") {
+      const lower = compute(md, wrapEm, set, flow, (flow.height - l.height) / (style.valign === "middle" ? 2 : 1));
+      if (lower.height <= flow.height) l = lower;
+    }
     cache.set(key, l);
   }
   return l;
@@ -225,7 +238,7 @@ function caseOf(cp: number, caps: TextStyle["caps"], wordStart: boolean): { cps:
   return { cps: [cp], k: 1 };
 }
 
-function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "lineHeight" | "tracking" | "align" | "paraGap" | "indent" | "kerning" | "features">> & { assetId: string | undefined; caps: TextStyle["caps"] | undefined; maxLines: number | undefined; axes: Axes | undefined }): TextLayout {
+function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "lineHeight" | "tracking" | "align" | "paraGap" | "indent" | "kerning" | "features">> & { assetId: string | undefined; caps: TextStyle["caps"] | undefined; maxLines: number | undefined; axes: Axes | undefined }, flow?: Flow, startY = 0): TextLayout {
   const { lineHeight, tracking, align, assetId, paraGap, indent: firstIndent, caps, maxLines, kerning, features, axes } = style;
   const f = fontFor(assetId, axes);
   const upm = f.unitsPerEm;
@@ -275,7 +288,9 @@ function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "li
   };
   const lines: Line[] = [];
   let width = Number.isFinite(wrapEm) ? wrapEm : 0;
-  let y = 0;
+  let y = startY;
+  /** The stretch of the shape the line being set runs in (none past the end of the shape: the words go on, visibly, under it). */
+  let band: { x0: number; x1: number } | null = null;
   const blocks = parse(md);
   const numbers = listNumbers(blocks);
   blocks.forEach((b, bi) => {
@@ -284,7 +299,14 @@ function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "li
     const level = list ? b.level ?? 0 : 0;
     const indent = list ? LIST_INDENT * (level + 1) : 0;
     const startIn = b.type === "p" ? firstIndent : 0; // the first line of a paragraph starts further in
-    const avail = wrapEm - indent;
+    let avail = wrapEm - indent;
+    /** The room for the next line: the first height of the shape from here where one fits. */
+    const refit = (): void => {
+      if (!flow) return;
+      const lh = lineHeight * s;
+      for (band = flow.span(y, y + lh); !band && y < flow.height; band = flow.span(y, y + lh)) y += 0.25;
+      avail = (band ? band.x1 - band.x0 : wrapEm) - indent;
+    };
     const chars: Ch[] = [];
     let wordStart = true;
     for (const sp of b.spans) {
@@ -317,6 +339,7 @@ function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "li
     let line: Item[] = [];
     let first = true;
     const emit = (glyphs: typeof line, last = false): void => {
+      if (flow?.hide && !band && y >= flow.height && lines.length) return; // (past the end of the shape, and asked not to show)
       // A line is as tall as its biggest range (a line of small text is small); an empty line is the block's.
       const big = glyphs.filter((g) => g.cp !== 32).reduce((m, g) => Math.max(m, g.k), 0) || 1;
       const lh = lineHeight * s * big;
@@ -336,8 +359,13 @@ function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "li
         placed.push({ cp: g.cp, gid: g.gid, x, adv: g.adv * s, bold: g.bold, italic: g.italic, ...(g.k !== 1 ? { k: g.k } : {}), ...(g.color ? { color: g.color } : {}), ...(g.under ? { under: true as const } : {}), ...(g.strike ? { strike: true as const } : {}), ...(g.link ? { link: g.link } : {}), ...(g.face ? { face: g.face } : {}), ...(g.sub ? { sub: true as const } : {}) });
         x += g.adv * s;
       }
-      if (align === "justify" && !last && Number.isFinite(wrapEm)) x = justify(placed, glyphs.length, indent + (first ? startIn : 0), wrapEm);
-      width = Math.max(width, x);
+      if (align === "justify" && !last && !flow && Number.isFinite(wrapEm)) x = justify(placed, glyphs.length, indent + (first ? startIn : 0), wrapEm);
+      if (flow) {
+        // (in its stretch of the shape, aligned there)
+        const w = band ? band.x1 - band.x0 : wrapEm;
+        const d = (band?.x0 ?? 0) + (align === "center" ? Math.max(0, (w - x) / 2) : align === "right" ? Math.max(0, w - x) : 0);
+        for (let i = 0; i < placed.length; i++) placed[i] = { ...placed[i]!, x: placed[i]!.x + d };
+      } else width = Math.max(width, x);
       const content = ((f.ascender - f.descender) / upm) * s * big;
       lines.push({ top: y, bottom: y + lh, baseline: y + (lh - content) / 2 + (f.ascender / upm) * s * big, scale: s, glyphs: placed, decos: [] });
       y += lh;
@@ -345,12 +373,14 @@ function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "li
     };
     let x = startIn;
     let lastSpace = -1;
+    refit();
     for (const c of items) {
       const a = { gid: c.gid, adv: c.adv };
       const adv = a.adv * c.k * s;
       if (c.cp !== 32 && x + adv > avail && line.some((g) => g.cp !== 32)) {
         const carry = lastSpace >= 0 ? line.slice(lastSpace + 1) : [];
         emit(lastSpace >= 0 ? line.slice(0, lastSpace) : line);
+        refit();
         line = carry;
         x = carry.reduce((t, g) => t + g.adv * s, 0);
         lastSpace = -1;
@@ -379,7 +409,7 @@ function compute(md: string, wrapEm: number, style: Required<Pick<TextStyle, "li
     lines[maxLines - 1] = { ...ln, glyphs };
     width = Math.max(width, end());
   }
-  if (align === "center" || align === "right") {
+  if (!flow && (align === "center" || align === "right")) {
     // The width the lines align in: the set width, or (no wrapping) the widest line.
     const W = Number.isFinite(wrapEm) ? Math.max(wrapEm, width) : width;
     lines.forEach((ln, i) => {

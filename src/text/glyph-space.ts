@@ -46,6 +46,19 @@ export function curveOf(n: readonly number[], closed: boolean): Curve {
   return c;
 }
 
+const reversedCurves = new WeakMap<readonly number[], Curve>();
+function reversedOf(n: readonly number[], closed: boolean): Curve {
+  let r = reversedCurves.get(n);
+  if (r) return r;
+  const c = curveOf(n, closed);
+  const pts = new Float64Array(c.pts.length);
+  for (let i = 0; i < pts.length; i += 2) (pts[i] = c.pts[pts.length - 2 - i]!, pts[i + 1] = c.pts[pts.length - 1 - i]!);
+  const cum = new Float64Array(c.cum.length);
+  for (let i = 1; i < cum.length; i++) cum[i] = cum[i - 1]! + Math.hypot(pts[2 * i]! - pts[2 * i - 2]!, pts[2 * i + 1]! - pts[2 * i - 1]!);
+  reversedCurves.set(n, (r = { pts, cum, len: c.len, closed }));
+  return r;
+}
+
 /** The point at distance `s` along the curve and the unit tangent there (a closed curve wraps round; an open one goes on straight). */
 export function curveAt(c: Curve, s: number, out: { x: number; y: number; tx: number; ty: number }): void {
   const { pts, cum } = c;
@@ -80,6 +93,20 @@ export interface GlyphMap {
 }
 
 const here = { x: 0, y: 0, tx: 1, ty: 0 };
+/** Each text's first baseline (asked for every glyph, every frame: its layout's key is as long as its words). */
+const placings = new WeakMap<TextObject, { base: number; curve: Curve; start: number }>();
+/** A text's curve (read the other way when it is on the other side), its first baseline and where on the curve the words start. */
+function placing(o: TextObject): { base: number; curve: Curve; start: number } {
+  let p = placings.get(o);
+  if (!p) {
+    const on = o.onPath!;
+    const lay = layoutOf(o);
+    const curve = on.flip ? reversedOf(on.n, on.closed) : curveOf(on.n, on.closed);
+    const free = curve.len - lay.width * o.size;
+    placings.set(o, (p = { base: lay.lines[0]!.baseline, curve, start: (on.start ?? 0) * curve.len + (on.align === "center" ? free / 2 : on.align === "end" ? free : 0) }));
+  }
+  return p;
+}
 
 export function glyphMap(o: TextObject, line: Line, g: PlacedGlyph, shiftEm: number): GlyphMap {
   const f = glyphFont(o, g);
@@ -96,11 +123,11 @@ export function glyphMap(o: TextObject, line: Line, g: PlacedGlyph, shiftEm: num
   };
   if (!o.onPath) return m;
   // On a path: about the middle of the advance, turned to the tangent there, the baseline on the curve (lines after the first below it).
-  const curve = curveOf(o.onPath.n, o.onPath.closed);
+  const place = placing(o);
   const half = (g.adv * o.size) / 2;
-  curveAt(curve, (g.x + g.adv / 2) * o.size, here);
+  curveAt(place.curve, place.start + (g.x + g.adv / 2) * o.size, here);
   const { x: px, y: py, tx, ty } = here;
-  const dy = (line.baseline - layoutOf(o).lines[0]!.baseline) * o.size;
+  const dy = (line.baseline - place.base - (o.onPath.lift ?? 0)) * o.size;
   const bx = px - ty * dy, by = py + tx * dy; // (the normal on the right of the direction)
   m.at = (fx, fy) => {
     const lx = (g.italic ? fx + fy * SKEW : fx) * c + shiftEm * o.size - half;

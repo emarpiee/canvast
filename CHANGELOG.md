@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.55.16 — Text in shapes; text on a path repaired (2026-11-09)
+
+- **Added:** text inside a closed shape (*Path tools > Text inside the shape*): each line as wide as the shape is there.
+- **Added:** options in *Paragraph and box*: on a path, start, alignment, side and distance; in a shape, padding, where the words sit, whether words that do not fit are shown, and Fit to shape.
+- **Fixed:** text on a path could lag badly (each letter looked its whole text up again, every frame; big letters took exact arithmetic) and could vanish when its straight position was out of view.
+
 ## 0.55.15 — Lock now hides; New key moves the names too (2026-11-09)
 
 - **Fixed:** *Lock now*, *New key* and the other buttons of the Settings cards that should be hidden stayed on screen (a style overrode `hidden`).

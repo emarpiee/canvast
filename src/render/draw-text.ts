@@ -98,11 +98,12 @@ export function drawText(ctx: CanvasRenderingContext2D, po: ProjectedObject, vp:
       const path = new ExactPath(ctx, p, vp);
       let filled = false;
       for (const line of lay.lines) {
-        if (sy(line.bottom + TEXT_PAD_EM) < minY || sy(line.top - TEXT_PAD_EM) > maxY) continue;
-        const deep = po.exact || !(emPx * line.scale * lineBig(line) <= DEEP_EM_PX);
+        if (!o.onPath && (sy(line.bottom + TEXT_PAD_EM) < minY || sy(line.top - TEXT_PAD_EM) > maxY)) continue;
+        // (on a curve the letters are placed in doubles anyway: exact arithmetic on them only costs, each frame)
+        const deep = po.exact || (!o.onPath && !(emPx * line.scale * lineBig(line) <= DEEP_EM_PX));
         const pad = TEXT_PAD_EM * line.scale;
         for (const g of line.glyphs) {
-          if (g.cp === 32 || (g.color ?? o.color) !== colour || sx(g.x + g.adv + pad) < minX || sx(g.x - pad) > maxX) continue;
+          if (g.cp === 32 || (g.color ?? o.color) !== colour || (o.onPath ? curvedOff(o, line, g, p, po.exact, emPx, minX, maxX, minY, maxY) : sx(g.x + g.adv + pad) < minX || sx(g.x - pad) > maxX)) continue;
           const gs = glyphScale(line, g);
           const linePx = emPx * gs;
           const shifts = g.bold ? [0, BOLD_SHIFT_EM * gs] : [0];
@@ -152,10 +153,10 @@ function strokeOutline(ctx: CanvasRenderingContext2D, p: Projection, vp: Viewpor
   ctx.beginPath();
   const path = new ExactPath(ctx, p, vp);
   for (const line of lay.lines) {
-    if (sy(line.bottom + TEXT_PAD_EM) < minY || sy(line.top - TEXT_PAD_EM) > maxY) continue;
-    const deep = !(emPx * line.scale * lineBig(line) <= DEEP_EM_PX) || exact;
+    if (!o.onPath && (sy(line.bottom + TEXT_PAD_EM) < minY || sy(line.top - TEXT_PAD_EM) > maxY)) continue;
+    const deep = exact || (!o.onPath && !(emPx * line.scale * lineBig(line) <= DEEP_EM_PX));
     for (const g of line.glyphs) {
-      if (g.cp === 32 || !g.gid || sx(g.x + g.adv + TEXT_PAD_EM) < minX || sx(g.x - TEXT_PAD_EM) > maxX) continue;
+      if (g.cp === 32 || !g.gid || (o.onPath ? curvedOff(o, line, g, p, exact, emPx, minX, maxX, minY, maxY) : sx(g.x + g.adv + TEXT_PAD_EM) < minX || sx(g.x - TEXT_PAD_EM) > maxX)) continue;
       const shifts = g.bold ? [0, BOLD_SHIFT_EM * glyphScale(line, g)] : [0];
       for (const d of shifts) (deep ? addGlyphExact(path, o, line, g, d) : addGlyphFast(ctx, p, o, line, g, d));
     }
@@ -166,6 +167,15 @@ function strokeOutline(ctx: CanvasRenderingContext2D, p: Projection, vp: Viewpor
   ctx.lineWidth = Math.min(1e6, 2 * out.w * emPx);
   ctx.strokeStyle = out.c;
   ctx.stroke();
+}
+
+/** Whether a letter on a curve is out of view: judged where the curve puts it, never where the straight line would. */
+function curvedOff(o: TextObject, line: Line, g: PlacedGlyph, p: Projection, exact: boolean, emPx: number, minX: number, maxX: number, minY: number, maxY: number): boolean {
+  if (exact) return false;
+  const m = glyphMap(o, line, g, 0);
+  m.at(0, 0);
+  const x = projX(p, m.x), y = projY(p, m.y), r = emPx * (2 * glyphScale(line, g) + g.adv);
+  return x + r < minX || x - r > maxX || y + r < minY || y - r > maxY;
 }
 
 /** The biggest size of a glyph on a line, as a multiple of the line's. */
