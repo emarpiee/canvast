@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.55.18 — Long choices are dropdowns (2026-11-09)
+
+- **Changed:** a panel setting of more than four choices is a dropdown, in every panel. The Balloons settings follow the others: Colour first, short names, rows shown only when they apply.
+
 ## 0.55.17 — Speech balloons (2026-11-09)
 
 - **Added:** a Balloons tab in the Pattern panel: 12 body shapes; point, curved and zigzag tails, thought bubbles and a second tail, each with its tip; up to 6 linked balloons with a neck, pinched, line or dots connector; solid, double or dashed outlines, a shadow and a hand-drawn wobble.

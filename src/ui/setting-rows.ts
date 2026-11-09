@@ -5,6 +5,9 @@ import { esc } from "./format";
 import { ICONS } from "./icons";
 import { liveNumber } from "./live";
 
+/** The most choices a row shows as buttons. */
+const MOST_BUTTONS = 4;
+
 /** One setting's value. */
 export type SettingValue = number | string | boolean;
 
@@ -15,6 +18,8 @@ export type SettingValue = number | string | boolean;
 export function settingRowHtml(s: Setting, v: SettingValue, extra = "", /** Unique among the panels that can be open together. */ idPrefix = "pg-n-"): string {
   if (s.t === "range") return `<div class="adj-row" data-k="${s.k}"><label class="adj-label" for="${idPrefix}${s.k}">${esc(s.label)}${extra}</label><input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)}"><input type="number" class="adj-num" id="${idPrefix}${s.k}" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)} value"></div>`;
   if (s.t === "toggle") return `<div class="adj-row pg-line" data-k="${s.k}"><label class="pg-check"><input type="checkbox"${v ? " checked" : ""}> <span>${esc(s.label)}</span>${extra}</label></div>`;
+  // (more than a few: a dropdown, one line, however many there are)
+  if (s.t === "choice" && s.opts.length > MOST_BUTTONS) return `<div class="adj-row" data-k="${s.k}"><span class="adj-label">${esc(s.label)}${extra}</span><select data-choice aria-label="${esc(s.label)}">${s.opts.map(([o, l]) => `<option value="${o}"${o === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></div>`;
   if (s.t === "choice") return `<div class="adj-row pg-line" data-k="${s.k}"><span class="adj-label">${esc(s.label)}${extra}</span><div class="adj-layers pg-seg" role="group" aria-label="${esc(s.label)}">${s.opts.map(([o, l]) => `<button type="button" data-v="${o}" aria-pressed="${o === v}">${esc(l)}</button>`).join("")}</div></div>`;
   const none = v === "";
   return `<div class="adj-row pg-line" data-k="${s.k}"><span class="adj-label">${esc(s.label)}${extra}</span><div class="pg-colour"><button type="button" class="pg-swatch" data-swatch aria-label="${esc(s.label)} colour"></button><code>${none ? "none" : String(v).toUpperCase()}</code>${s.hide ? `<button type="button" class="pg-eye" data-eye aria-pressed="${!none}" aria-label="Show ${esc(s.label)}" title="${none ? "Show" : "Hide"} ${esc(s.label.toLowerCase())}">${none ? ICONS.eyeOff : ICONS.eye}</button>` : ""}</div></div>`;
@@ -33,6 +38,7 @@ export function bindSettingRow(r: HTMLElement, s: Setting, get: (k: string) => S
     range.addEventListener("input", () => { num.value = range.value; set(s.k, Number(range.value)); });
     liveNumber(num, (x) => { range.value = String(x); set(s.k, Math.min(s.max, Math.max(s.min, x))); });
   } else if (s.t === "toggle") r.querySelector("input")!.addEventListener("change", (e) => set(s.k, (e.target as HTMLInputElement).checked));
+  else if (s.t === "choice" && r.querySelector("select")) r.querySelector("select")!.addEventListener("change", (e) => set(s.k, (e.target as HTMLSelectElement).value));
   else if (s.t === "choice") r.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-v]");
     if (!b) return;

@@ -1,7 +1,7 @@
 import type { SubPath } from "./core";
 import { curve, ellipse, poly } from "./geom";
 import type { P } from "./geom";
-import { C, Ch, R, T, reader, steady, when } from "./kit";
+import { C, Ch, R, reader, steady, when } from "./kit";
 import type { Rng } from "./rng";
 import type { GenShape, Generator, Section, Values } from "./types";
 
@@ -156,7 +156,11 @@ function dashes(pts: readonly P[], on: number, off: number): SubPath[] {
 
 const SECTIONS: readonly Section[] = [
   {
-    title: "Balloon",
+    title: "Colour",
+    items: [C("fill", "Fill", "#ffffff", true), C("ink", "Outline", "#111111", true), C("shadow", "Shadow", "#000000", true)],
+  },
+  {
+    title: "Shape",
     items: [
       steady(Ch("body", "Shape", BODIES, "oval")),
       R("bodyW", "Width", 10, 100, 86),
@@ -178,35 +182,31 @@ const SECTIONS: readonly Section[] = [
       R("tipY", "Tip down", 0, 100, 96),
       when("tail", ["point", "curved", "zigzag"], R("tailW", "Base width", 1, 40, 12)),
       when("tail", ["curved"], R("bend", "Bend", -80, 80, 28)),
-      when("tail", ["point", "curved", "zigzag"], R("tailShift", "Base along the edge", -60, 60, 0)),
+      when("tail", ["point", "curved", "zigzag"], R("tailShift", "Base shift", -60, 60, 0)),
       when("tail", ["bubbles"], R("bubbles", "Bubbles", 1, 8, 3)),
       when("tail", ["bubbles"], R("bubbleSize", "Bubble size", 1, 20, 7)),
-      T("second", "Second tail", false),
-      R("tip2X", "2nd tip across", 0, 100, 78),
-      R("tip2Y", "2nd tip down", 0, 100, 96),
+      steady(Ch("second", "Second tail", [["off", "Off"], ["on", "On"]], "off")),
+      when("second", ["on"], R("tip2X", "Tip 2 across", 0, 100, 78)),
+      when("second", ["on"], R("tip2Y", "Tip 2 down", 0, 100, 96)),
     ],
   },
   {
-    title: "Linked balloons",
+    title: "Links",
     items: [
       steady(R("count", "Balloons", 1, 6, 1)),
       steady(Ch("arrange", "Arranged", [["row", "Row"], ["column", "Column"], ["stairs", "Stairs"], ["zigzag", "Zigzag"]], "stairs")),
-      R("shrink", "Each next one", 40, 100, 85),
+      R("shrink", "Next size", 40, 100, 85),
       Ch("link", "Connector", [["neck", "Neck"], ["pinch", "Pinched"], ["line", "Line"], ["dots", "Dots"], ["none", "None"]], "neck"),
-      R("neckW", "Connector width", 1, 40, 12),
-      R("linkDots", "Dots", 1, 8, 3),
+      when("link", ["neck", "pinch", "dots"], R("neckW", "Link width", 1, 40, 12)),
+      when("link", ["dots"], R("linkDots", "Link dots", 1, 8, 3)),
       steady(Ch("tailOn", "Tail on", [["first", "First"], ["last", "Last"], ["all", "Each"]], "first")),
     ],
-  },
-  {
-    title: "Colour",
-    items: [C("fill", "Fill", "#ffffff", true), C("ink", "Outline", "#111111", true), C("shadow", "Shadow", "#000000", true)],
   },
   {
     title: "Outline",
     items: [
       R("weight", "Width", 0, 30, 5),
-      steady(Ch("style", "Style", [["solid", "Solid"], ["double", "Double"], ["dashed", "Dashed (whisper)"]], "solid")),
+      steady(Ch("style", "Style", [["solid", "Solid"], ["double", "Double"], ["dashed", "Dashed"]], "solid")),
       when("style", ["double"], R("gap", "Gap", 1, 40, 10)),
       when("style", ["dashed"], R("dash", "Dash length", 2, 80, 18)),
       when("style", ["dashed"], R("dashGap", "Dash gap", 2, 80, 12)),
@@ -217,14 +217,14 @@ const SECTIONS: readonly Section[] = [
 ];
 
 function run(v: Values, rng: Rng, w: number, h: number): GenShape[] {
-  const { n, s, b, c } = reader(v);
+  const { n, s, c } = reader(v);
   const fill = c("fill"), ink = c("ink"), shadow = c("shadow");
   const weight = n("weight");
   const count = Math.max(1, Math.round(n("count")));
   const arrange = s("arrange");
   const body = s("body");
   const tips: P[] = [[(n("tipX") / 100) * w, (n("tipY") / 100) * h]];
-  if (b("second")) tips.push([(n("tip2X") / 100) * w, (n("tip2Y") / 100) * h]);
+  if (s("second") === "on") tips.push([(n("tip2X") / 100) * w, (n("tip2Y") / 100) * h]);
   const tail = s("tail");
   // Each balloon's middle and half-sizes: one where the settings say, more spread over the box and getting smaller.
   const cells: Array<{ c: P; rx: number; ry: number }> = [];
