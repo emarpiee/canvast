@@ -47,6 +47,7 @@ await p.getByTestId("view-assets").click();
 await p.getByTestId("assets-import-input").setInputFiles(["hero", "journey", "deep-zoom", "zoom-out", "shapes", "pattern"].map((n) => resolve(`docs/screenshots/${n}.webp`)));
 await p.getByTestId("asset-card").nth(5).waitFor();
 const hashes = await p.getByTestId("asset-card").evaluateAll((c) => c.map((x) => x.getAttribute("data-hash")));
+await p.getByTestId("view-canvas").click();
 await p.getByTestId("save-status").click();
 await p.getByTestId("set-export-advanced").click();
 const dlg = p.getByTestId("advanced-export");
@@ -57,7 +58,7 @@ console.log("shot advanced-export");
 await dlg.getByRole("button", { name: "Cancel" }).click();
 
 // A page for each selected picture
-await p.getByTestId("view-canvas").click();
+await p.getByRole("button", { name: "Back to canvas" }).click();
 await p.evaluate(() => window.__canvastDebug.setCamera({ cx: "4000p0", cy: "4000p0", zi: 0, zf: 0, pz: 0 }));
 for (const h of hashes.slice(0, 3)) await p.evaluate((x) => window.__canvastDebug.placeFromLibrary(x), h);
 await p.waitForTimeout(300);

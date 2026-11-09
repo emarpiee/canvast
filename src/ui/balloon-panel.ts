@@ -40,7 +40,7 @@ const tailSection = (many: number): Section => ({ title: "Tail", items: [
   when("tail", ["point", "curved"], R("belly", "Middle width", 0, 150, 50)),
   when("tail", ["curved"], R("bend", "Bend", -100, 100, 28)),
   when("tail", ["point", "curved"], R("tipRound", "Round tip", 0, 100, 0)),
-  Ch("base", "Base", [["locked", "Locked"], ["follows", "Follows tip"]], "locked"),
+  Ch("base", "Base", [["locked", "Locked"], ["follows", "Follows tip"]], "locked", true),
   when("base", ["locked"], R("baseAt", "Base at", -180, 180, 0)),
   when("base", ["follows"], R("shift", "Base shift", -68, 68, 0)),
 ] });
