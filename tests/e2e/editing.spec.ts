@@ -1210,6 +1210,13 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
     await p.mouse.click(x, y);
     await app.frame();
   };
+  /** Nothing selected, so no Actions bar sits where the next input goes. */
+  const clear = async () => {
+    await key(app, "Escape");
+    await key(app, "v");
+    await click(1100, 720);
+    await expect.poll(() => p.evaluate(() => window.__canvastDebug.selection().length)).toBe(0);
+  };
   const add = async (name: string, mimeType: string, buffer: Buffer) => {
     const before = (await objects(app)).length;
     await p.getByTestId("import-input").setInputFiles({ name, mimeType, buffer });
@@ -1223,9 +1230,11 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
   await key(app, "v");
   await key(app, "Control+a");
   await maskWith(p, "clipmask");
+  await clear();
   await add("pic2.png", "image/png", makePng(20, 20, () => [200, 40, 40, 255]));
   await add("anim.gif", "image/gif", Buffer.from(encodeGif(16, 16, [[255, 0, 0], [0, 255, 0], [0, 0, 255]], [0, 1, 2].map((c) => ({ w: 16, h: 16, pixels: Array(256).fill(c) })))));
   await add("tone.wav", "audio/wav", makeWav(1));
+  await clear();
   await key(app, "p");
   // (everything right of the debug panel, which ends before x 370)
   await drag([400, 120], [480, 170]);
@@ -1233,12 +1242,14 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
   await key(app, "v");
   await drag([385, 105], [495, 255]);
   await key(app, "Control+g");
+  await clear();
   await key(app, "u");
   await drag([520, 120], [580, 180]);
   await drag([550, 150], [610, 210]);
   await key(app, "v");
   await drag([510, 110], [620, 220]);
   await boolWith(p, "op:union");
+  await clear();
   await key(app, "u");
   await drag([650, 110], [780, 200]);
   await key(app, "t");
@@ -1247,7 +1258,9 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
   await key(app, "Escape");
   await key(app, "v");
   await drag([640, 100], [810, 290]);
+  expect(await p.evaluate(() => window.__canvastDebug.selection().length), "the shape and its words").toBe(2);
   await pathWith(p, "inshape");
+  await clear();
   await key(app, "u");
   await drag([830, 110], [960, 200]);
   await key(app, "t");
@@ -1256,7 +1269,9 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
   await key(app, "Escape");
   await key(app, "v");
   await drag([820, 100], [1000, 290]);
+  expect(await p.evaluate(() => window.__canvastDebug.selection().length), "the path and its words").toBe(2);
   await pathWith(p, "onpath");
+  await clear();
   for (const [a, b, words] of [[[400, 510], [510, 590], "One"], [[560, 510], [670, 590], "Two"]] as const) {
     await key(app, "k");
     await drag([...a], [...b]);
@@ -1268,7 +1283,7 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
   await drag([385, 495], [700, 720]);
   await p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
   await p.locator('[data-bl="connect"]').click();
-  await click(1100, 720);
+  await clear();
   await key(app, "c");
   await drag([760, 460], [1000, 660]);
   await key(app, "u");
