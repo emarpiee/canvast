@@ -103,20 +103,29 @@ async function writeNow(p: ClipboardParts): Promise<ClipboardResult> {
   return "failed";
 }
 
+/** The mark of the hidden field the older way copies from: its copy event is not a copy by the user (it keeps what this window copied as its own). */
+export const COPY_FIELD = "canvastCopy";
+/** Whether a copy or cut event is the older way's own writing (see COPY_FIELD). */
+export const isOwnWriting = (e: Event): boolean => (e.target as HTMLElement | null)?.dataset?.[COPY_FIELD] !== undefined;
+
 /** Words on the system clipboard, by the older way when the browser refuses the newer: whether it worked. */
 export async function copyPlainText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
     return true;
   } catch {
+    // (its copy event is our own writing, not a new copy: see COPY_FIELD; the focus goes back where it was, so the canvas keeps the keys and a paste)
+    const was = document.activeElement as HTMLElement | null;
     const t = document.createElement("textarea");
     t.value = text;
+    t.dataset[COPY_FIELD] = "";
     t.style.position = "fixed";
     t.style.opacity = "0";
     document.body.append(t);
     t.select();
     const done = document.execCommand("copy");
     t.remove();
+    was?.focus?.({ preventScroll: true });
     return done;
   }
 }

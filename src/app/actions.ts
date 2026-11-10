@@ -65,7 +65,7 @@ import { localToWorld, normalizeUnit, placeAbove, unionBounds, restack, rotateAb
 import { expandToUnits, groupObjects, ungroupObjects, unitKey } from "../doc/groups";
 import type { AlignKey, GapKey, SortKey, Unit } from "../doc/arrange";
 import { buildPayload, ClipboardError, instantiate, parsePayload } from "../doc/clipboard";
-import { writeSystemClipboard } from "./system-clipboard";
+import { isOwnWriting, writeSystemClipboard } from "./system-clipboard";
 import type { ClipboardPayload } from "../doc/clipboard";
 import { depthOf } from "../core/frames";
 import { alignUnits, arrangeGrid, distributeUnits, gridCells } from "../doc/arrange";
@@ -3094,7 +3094,8 @@ export const isCopiedPicture = (): boolean => pictureIsOurs || ownClipboard;
 let ownClipboard = false;
 if (typeof window !== "undefined") {
   window.addEventListener("blur", () => { forgetCopiedPicture(); ownClipboard = false; });
-  for (const kind of ["copy", "cut"]) window.addEventListener(kind, () => { ownClipboard = false; }, true); // (before the copy of objects marks it again)
+  // (before the copy of objects marks it again; not for the field the system clipboard's older way writes through: that is this copy still)
+  for (const kind of ["copy", "cut"]) window.addEventListener(kind, (e) => { if (!isOwnWriting(e)) ownClipboard = false; }, true);
 }
 
 /** Make a new picture of the picked still as it looks now (crop and adjustments baked in), beside it, in the library too. */

@@ -1449,6 +1449,11 @@ test("every kind of object snaps when resized by a handle: to another object's e
     await p.getByTestId("import-input").setInputFiles({ name: "p.png", mimeType: "image/png", buffer: png });
     await expect.poll(count).toBe(n + 1);
     await key(app, "v");
+    // (an import is not selected by itself: a click on it)
+    const id = (await objects(app)).find((o) => o.kind === "image")!.id;
+    const b = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+    await p.mouse.click((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
+    await expect.poll(() => p.evaluate(() => window.__canvastDebug.selection())).toEqual([id]);
   };
   // Each kind made left of the middle and left selected (with the Select tool on).
   const kinds: Array<[string, () => Promise<void>]> = [
@@ -1478,7 +1483,8 @@ test("every kind of object snaps when resized by a handle: to another object's e
     if (step === null) missed.push(`${name}: no grid step`);
     else {
       const w = fromDyadic((await p.evaluate(() => window.__canvastDebug.screenToWorld(740, 300))).x);
-      const line = toDyadic(Math.round(w / step) * step);
+      const unit = 2 ** step; // (the grid step is a power of two: its exponent)
+      const line = toDyadic(Math.round(w / unit) * unit);
       const lineX = (await p.evaluate((x) => window.__canvastDebug.worldToScreen(x, "0p0"), line)).x;
       const at = await resizeRightTo(lineX - 3);
       if (Math.abs(at - lineX) > 0.5) missed.push(`${name} to the grid: its side at ${at.toFixed(2)}, the line at ${lineX.toFixed(2)}`);
@@ -1527,7 +1533,7 @@ test("drawing a shape or a sheet snaps where it starts and where it ends: onto a
     if (!near(b.maxY, 250) || !near(b.minX, 953)) missed.push(`${name}: start on an edge at ${b.minX}, ${b.maxY}`);
     // ends 3 px off its bottom-right corner: on the corner
     b = await draw(tool, [600, 500], [903, 453]);
-    if (!near(b.maxX, 900) || !near(b.maxY, 450)) missed.push(`${name}: end on a corner at ${b.maxX}, ${b.maxY}`);
+    if (!near(b.maxX, 900) || !near(b.minY, 450)) missed.push(`${name}: end on a corner at ${b.maxX}, ${b.minY}`); // (drawn up: its end is its top)
     // the grid: alone, with Snap to the grid on, it starts on the grid line it is pressed 3 px from
     await key(app, "v");
     await key(app, "Control+a");
@@ -1536,7 +1542,8 @@ test("drawing a shape or a sheet snaps where it starts and where it ends: onto a
     await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", true));
     const step = (await p.evaluate(() => window.__canvastDebug.gridStep()))!;
     const w = await p.evaluate(() => window.__canvastDebug.screenToWorld(600, 560));
-    const line = await p.evaluate(([x, y]) => window.__canvastDebug.worldToScreen(x, y), [toDyadic(Math.round(fromDyadic(w.x) / step) * step), toDyadic(Math.round(fromDyadic(w.y) / step) * step)] as const);
+    const unit = 2 ** step; // (the grid step is a power of two: its exponent)
+    const line = await p.evaluate(([x, y]) => window.__canvastDebug.worldToScreen(x, y), [toDyadic(Math.round(fromDyadic(w.x) / unit) * unit), toDyadic(Math.round(fromDyadic(w.y) / unit) * unit)] as const);
     b = await draw(tool, [line.x - 3, line.y - 3], [line.x + 120, line.y + 90]);
     if (!near(b.minX, line.x) || !near(b.minY, line.y)) missed.push(`${name}: start on the grid at ${b.minX}, ${b.minY}, the line at ${line.x}, ${line.y}`);
     await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false));

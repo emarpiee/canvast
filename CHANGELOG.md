@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.20 — Firefox pastes copied shapes; snap tests fixed (2026-11-10)
+
+- **Fixed:** in Firefox, Ctrl+V after copying shapes, balloons or a mix with pictures pasted nothing: when the browser refuses the newer clipboard, the older way's own copy counted as a new copy from elsewhere and took the focus off the canvas. It no longer does either.
+- **Fixed:** the resize and drawing snap tests: a grid step is a power of two (the tests used its exponent as a length), an imported picture is clicked before it is resized (it was the rectangle beside it), and a shape drawn upward ends at its top.
+
 ## 0.56.19 — The Ctrl list scrolls past its ends instead of closing (2026-11-10)
 
 - **Fixed:** with *Scroll the Ctrl list at its ends* on, moving the pointer past the list's top or bottom edge closed it; it now stays open there (up to about three rows' height past the edge, over its width) and scrolls that way, faster outside than on its end row.
