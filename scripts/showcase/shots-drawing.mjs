@@ -168,6 +168,18 @@ await step("styles", async () => {
   await p.locator("[data-kind-pick]").first().click(); // (the panel opens on the kind it showed last: show the colours)
   await p.locator('[data-id="kind:colour"]').first().click();
   await settle(400);
+  // (six bars beside the panel, each given one of the saved colours: the styles in use)
+  for (let i = 0; i < 6; i++) {
+    await p.keyboard.press("u");
+    await p.locator('[data-shape-kind="rect"]').click();
+    await drag([cx + 20 + i * 70, cy - 160], [cx + 80 + i * 70, cy + 160], 4);
+    await p.keyboard.press("v");
+    await settle(200);
+    await p.locator(".styles-list [data-style]").nth(i * 2).click();
+    await settle(200);
+  }
+  await select([]);
+  await settle(400);
   await off();
   await shot("styles");
   await panel("Styles panel", false);
@@ -197,7 +209,7 @@ await step("comic", async () => {
     await p.locator(sel).press("Enter");
   }
   await p.keyboard.press("Escape");
-  await fit();
+  await fit([page]);
   const boxes = await Promise.all(panels.map((id) => boxOf(id)));
   const say = async (b, at, words) => {
     await p.keyboard.press("k");
@@ -237,7 +249,7 @@ await step("text", async () => {
   await settle(600);
   const b = await boxOf(page);
   await p.keyboard.press("t");
-  await p.mouse.click(b.minX, b.minY - 60);
+  await p.mouse.click(b.minX, Math.max(130, b.minY - 60));
   await settle(300);
   await p.keyboard.type("Chapter one: The way north");
   await p.keyboard.press("Control+a");
@@ -260,6 +272,8 @@ await step("export", async () => {
   await settle(1200);
   await shot("export");
   await p.keyboard.press("Escape");
+  await p.locator("dialog[open]").waitFor({ state: "detached", timeout: 5000 }).catch(() => p.keyboard.press("Escape"));
+  await settle(300);
 });
 
 // 13. Export, each on its own: the four panels as pages of their own

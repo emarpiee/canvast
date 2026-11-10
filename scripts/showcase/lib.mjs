@@ -106,12 +106,14 @@ export async function open(out, { width = 1440, height = 900, args = [] } = {}) 
   };
   const select = (ids) => H((x) => window.__canvastDebug.select(x), ids);
   const boxOf = async (id) => (await H((i) => window.__canvastDebug.objectScreen(i), id))?.box ?? null;
-  const fit = async () => {
-    await blur(); // (keys in a field of a panel would go to the field)
-    await p.keyboard.press("Control+a");
-    await p.keyboard.press("f");
+  /** The view fitted to these objects (all of them when none are given), through the Fit selection button: no keys, so no field takes them. */
+  const fit = async (ids) => {
+    await blur();
+    await select(ids ?? (await H(() => window.__canvastDebug.objects())).map((o) => o.id));
+    await settle(200);
+    await p.locator('[data-action="fit-selection"]').click();
     await settle(900);
-    await p.keyboard.press("Escape");
+    await select([]);
     await settle(300);
   };
   const done = async () => {
