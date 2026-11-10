@@ -3412,7 +3412,8 @@ test("CSS text pasted with a shape picked becomes its fill: a gradient (linear, 
   await click(app, 630, 380);
   const paste = (t: string) => p.evaluate((x) => { const dt = new DataTransfer(); dt.setData("text/plain", x); document.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); }, t);
   type G = { type: string; x0?: number; x1?: number; y0?: number; y1?: number; cx?: number; r?: number; angle?: number; stops: Array<{ o: number; c: string }> };
-  const fill = async (): Promise<G> => (await last(app)).fill as unknown as G;
+  const shape = (await last(app)).id;
+  const fill = async (): Promise<G> => (await objs(app)).find((o) => o.id === shape)!.fill as unknown as G;
   await paste("background: linear-gradient(90deg, #ff0000 0%, #0000ff 100%);");
   await expect.poll(async () => (await fill())?.type).toBe("linear");
   let g = await fill();
@@ -3431,14 +3432,20 @@ test("CSS text pasted with a shape picked becomes its fill: a gradient (linear, 
   // a solid colour in any CSS notation is a fill too
   for (const [t, hex] of [["#71DDD3", "#71ddd3"], ["rgb(255 0 0)", "#ff0000"], ["hsl(120 100% 50%)", "#00ff00"], ["oklch(0.628 0.2577 29.23)", "#ff0000"], ["fill: #0000ff80;", "#0000ff80"], ["rebeccapurple", "#663399"]] as const) {
     await paste(t);
-    await expect.poll(async () => String((await last(app)).fill), t).toBe(hex);
+    await expect.poll(async () => String(await fill()), t).toBe(hex);
   }
-  await paste("hello"); // (a word that is no colour name changes nothing)
-  await app.frame();
-  expect(String((await last(app)).fill)).toBe("#663399");
+  // (a word that is no colour name changes no fill: it is a new text, under the pointer, selected)
+  await p.mouse.move(300, 600);
+  await paste("hello");
+  await expect.poll(async () => (await last(app)).kind).toBe("text");
+  expect(((await last(app)) as unknown as { md: string }).md).toBe("hello");
+  expect(String(await fill())).toBe("#663399");
+  await click(app, 630, 380);
   await paste("conic-gradient(from 90deg at 50% 50%, #ff0000 0deg, #0000ff 180deg)");
   await expect.poll(async () => ((await fill()) as G).type).toBe("angular");
   for (const t of ["repeating-linear-gradient(red, blue 20%)", "linear-gradient(red, nonsense)", "linear-gradient(red 10px, blue 90px)"]) {
+    await click(app, 630, 380);
+    await p.mouse.move(300, 600);
     await paste(t);
     await app.frame();
     expect((await fill()).type, t).toBe("angular");
@@ -3730,6 +3737,46 @@ test("speech balloon: a double-click makes its words, kept in the body; nothing 
   const before = await p.evaluate(() => window.__canvastDebug.draws());
   await p.waitForTimeout(500);
   expect(await p.evaluate(() => window.__canvastDebug.draws()), "no frame while idle").toBe(before);
+  // Copy, cut and duplicate take a balloon's words with it, and a connector only with both its balloons.
+  await key(app, "k");
+  await drag(app, [850, 200], [1100, 350]);
+  await p.mouse.dblclick(975, 275);
+  await p.keyboard.type("Bye");
+  await click(app, 1000, 650);
+  await key(app, "v");
+  await key(app, "Control+a");
+  await p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
+  await p.locator('[data-bl="connect"]').click();
+  const count = () => p.evaluate(() => {
+    const all = window.__canvastDebug.objects() as Array<{ kind: string; params?: { link?: { cover?: string } } }>;
+    const link = (o: (typeof all)[number]) => o.params?.link;
+    return { words: all.filter((o) => o.kind === "text").length, balloons: all.filter((o) => o.kind === "path" && !link(o)).length, links: all.filter((o) => link(o) && link(o)!.cover === undefined).length };
+  });
+  await expect.poll(count).toEqual({ words: 2, balloons: 2, links: 1 });
+  await key(app, "Control+a");
+  await key(app, "Control+d");
+  await expect.poll(count).toEqual({ words: 4, balloons: 4, links: 2 });
+  await key(app, "Control+z");
+  await click(app, 1000, 650);
+  await click(app, 530, 400);
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([balloon.id]);
+  await key(app, "Control+c");
+  await p.mouse.move(300, 560);
+  await key(app, "Control+v");
+  await expect.poll(count).toEqual({ words: 3, balloons: 3, links: 1 });
+  const copy = await p.evaluate(() => {
+    const d = window.__canvastDebug;
+    const sel = d.selection();
+    return d.objects().filter((o) => sel.includes(o.id)).map((o) => ({ id: o.id, kind: o.kind, shape: (o as { inShape?: { shape: string } }).inShape?.shape }));
+  });
+  const pastedBalloon = copy.find((o) => o.kind === "path")!;
+  expect(copy.find((o) => o.kind === "text")?.shape, "the copied words are in the copied balloon").toBe(pastedBalloon.id);
+  await click(app, 1000, 650);
+  await click(app, 530, 400);
+  await key(app, "Control+x");
+  await expect.poll(count, "the cut balloon took its words and its connector").toEqual({ words: 2, balloons: 2, links: 0 });
+  await key(app, "Control+v");
+  await expect.poll(count).toEqual({ words: 3, balloons: 3, links: 0 });
 });
 
 test("a number field of the bar keeps the focus while it is typed in", async ({ app }) => {

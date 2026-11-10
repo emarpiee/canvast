@@ -2767,6 +2767,8 @@ test("cut, a pan with the middle button (a paste on Linux) places nothing; the p
   const box = () => page.evaluate(() => { const d = window.__canvastDebug; return d.objectScreen(d.objects().at(-1)!.id)!.box; });
   const b = await box();
   await page.mouse.click((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
+  // (text copied in another program before: the cut takes the clipboard's place, or the paste would take that text)
+  await app.evaluate(({ clipboard }) => clipboard.writeText("from another program"));
   await page.keyboard.press("Control+x");
   await expect.poll(() => page.evaluate(() => window.__canvastDebug.objects().length)).toBe(0);
   await page.mouse.move(640, 500);

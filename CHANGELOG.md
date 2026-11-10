@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.56.2 — Cut, copy and paste fixed (2026-11-10)
+
+- **Fixed:** in the desktop app, a cut left the clipboard as it was, so a paste took what was copied before (text or files of another program) instead of the cut objects.
+- **Fixed:** *Cut* in the command palette did not put the objects on the system clipboard, so a paste with the keys found nothing.
+- **Fixed:** a speech balloon or any shape with words was copied, cut or duplicated without its words; a cut left them behind as plain text.
+- **Fixed:** a connector copied with only one of its balloons stayed tied to the original; it now goes only with both, and copying both takes it along.
+- **Added:** words copied in another program and pasted on the canvas become a new text under the pointer, selected (a long one wrapped); they did nothing.
+- **Changed:** a cut says *Cut*, not *Copied*, and is undone as *Cut*.
+
 ## 0.56.1 — Opening and new files say how far they are (2026-11-10)
 
 - **Added:** the start screen says what opening a workspace is doing: the library's parts and the canvases, each with its count.

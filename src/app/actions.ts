@@ -230,9 +230,30 @@ const clipboardText = (objs: readonly CanvasObject[]): string => {
   return md.length ? md.join("\n\n") : `canvast: ${objs.length} object${objs.length === 1 ? "" : "s"}`;
 };
 
+/**
+ * What a copy of the selection takes: the selected objects (not locked ones), the words in a shape or along a path that is taken too, and
+ * the connectors whose two balloons are both taken. A connector without both its balloons stays behind, and the piece that covers a
+ * neck is always made again from its connector.
+ */
+function copiedObjects(doc: DocumentStore, editor: EditorState): CanvasObject[] {
+  const ids = new Set(selected(doc, editor).filter((o) => !o.locked).map((o) => o.id));
+  if (!ids.size) return [];
+  const linkOf = (o: CanvasObject) => (o.kind === "path" ? o.params?.link : undefined);
+  for (const o of doc.all()) {
+    if (o.kind === "text" && !o.hidden && parentOf(o) !== undefined && ids.has(parentOf(o)!)) ids.add(o.id);
+    const l = linkOf(o);
+    if (l && l.cover === undefined && ids.has(l.a) && ids.has(l.b)) ids.add(o.id);
+  }
+  return doc.ordered().filter((o) => {
+    if (!ids.has(o.id)) return false;
+    const l = linkOf(o);
+    return !l || (l.cover === undefined && ids.has(l.a) && ids.has(l.b));
+  });
+}
+
 /** Put the selection on the clipboard (the event's, when copying from a copy or cut event). Returns false when nothing is selected. */
-export function copySelection(doc: DocumentStore, editor: EditorState, view: ViewState, e?: ClipboardEvent, plain?: string): boolean {
-  const objs = selected(doc, editor).filter((o) => !o.locked);
+export function copySelection(doc: DocumentStore, editor: EditorState, view: ViewState, e?: ClipboardEvent, plain?: string, cutting = false): boolean {
+  const objs = copiedObjects(doc, editor);
   if (!objs.length) return false;
   const depth = depthOf(view.frameCamera);
   const payload = buildPayload(objs, view.frame, Number(depth.levels) + depth.frac);
@@ -245,9 +266,10 @@ export function copySelection(doc: DocumentStore, editor: EditorState, view: Vie
   } catch {
     // too large or storage unavailable: this tab still has it
   }
-  // (the desktop app's real copy follows at once; a line saying how many objects would be what an early paste gets. A browser's paste here needs it, to know its own.)
-  if (!desktopBridge() || !isPlaceholderText(text)) e?.clipboardData?.setData("text/plain", text);
-  editor.message = `Copied ${objs.length} object${objs.length === 1 ? "" : "s"}`;
+  // (the desktop app's real copy follows at once; a line saying how many objects would be what an early paste gets. A browser's paste here needs it, to know its own.
+  // A cut has no copy following it: its text always goes, or the clipboard keeps what was there before and a paste takes that.)
+  if (cutting || !desktopBridge() || !isPlaceholderText(text)) e?.clipboardData?.setData("text/plain", text);
+  editor.message = `${cutting ? "Cut" : "Copied"} ${plural(objs.length, "object")}`;
   editor.changed();
   return true;
 }
@@ -268,8 +290,12 @@ export function setCopiedText(text: string): void {
 
 /** Copy the selection and delete it, as one undo step for the delete. */
 export function cutSelection(doc: DocumentStore, editor: EditorState, view: ViewState, e?: ClipboardEvent, plain?: string): boolean {
-  if (editor.blockEdit() || !copySelection(doc, editor, view, e, plain)) return false;
-  deleteSelection(doc, editor);
+  if (editor.blockEdit()) return false;
+  // (what was copied goes, the words of a balloon too: left behind, they would be there twice after the paste; its connectors go with it)
+  const taken = copiedObjects(doc, editor).map((o) => o.id);
+  if (!copySelection(doc, editor, view, e, plain, true)) return false;
+  doc.commit(doc.transaction(taken.length === 1 ? "Cut object" : `Cut ${taken.length} objects`, [], taken));
+  editor.select([]);
   return true;
 }
 
@@ -310,7 +336,7 @@ export function pasteObjects(doc: DocumentStore, editor: EditorState, view: View
   const depth = depthOf(view.frameCamera);
   try {
     const { objects, moved } = instantiate(payload, doc.space, doc.topZ(), { frame: view.frame, at, depth: Number(depth.levels) + depth.frac });
-    doc.commit(doc.transaction(`Paste ${objects.length} object${objects.length === 1 ? "" : "s"}`, objects));
+    doc.commit(doc.transaction(`Paste ${plural(objects.length, "object")}`, objects));
     editor.select(objects.map((o) => o.id));
     editor.message = moved ? "" : "Pasted in place (copied from a different space)";
     pastes++;
@@ -325,7 +351,7 @@ export function pasteObjects(doc: DocumentStore, editor: EditorState, view: View
 /** Copy and paste the selection in one step (Ctrl+D): the copy lands a little down and right of the original. */
 export function duplicateSelection(doc: DocumentStore, editor: EditorState, view: ViewState, stepPx = PASTE_STEP_PX): void {
   if (editor.blockEdit()) return;
-  const objs = selected(doc, editor).filter((o) => !o.locked);
+  const objs = copiedObjects(doc, editor);
   if (!objs.length) return;
   // Not through the clipboard, which keeps what was copied: the copy lands where the original is, a little offset.
   const depth = depthOf(view.frameCamera);

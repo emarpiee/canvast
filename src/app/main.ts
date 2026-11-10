@@ -25,7 +25,7 @@ import { fileInLibrary } from "./library-filing";
 import { newNoteName, storeFrame } from "./frames";
 import { newObjectId, rasterKey } from "../doc/model";
 import type { CanvasObject, ImageObject, TextObject } from "../doc/model";
-import type { ScreenPoint } from "../core/camera";
+import { screenToWorld, type ScreenPoint } from "../core/camera";
 import type { AssetRecord } from "../assets/asset-library";
 import type { Gradient, GradientStop } from "../doc/paint";
 import type { PathObject } from "../doc/model";
@@ -2593,7 +2593,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       { group: "Edit", title: "Redo", keys: "Ctrl+Shift+Z", words: "again", enabled: () => onCanvas, run: () => redo(doc, editor) },
       { group: "Edit", title: "Copy", keys: "Ctrl+C", enabled: () => onCanvas && sel, run: () => { if (!document.execCommand("copy")) copySelection(doc, editor, view); } }, // (as the keys do: the copy event below puts it on the system clipboard too)
       ...(desktopBridge() ? [{ group: "Edit", title: "Copy file", words: "real file clipboard file manager", enabled: () => onCanvas && sel && selectedHashes().length > 0, run: () => void selectedFiles().then((ents) => (forgetCopiedPicture(), copyItemsAsFiles(copyOnCanvas, ents))) }] : []),
-      { group: "Edit", title: "Cut", keys: "Ctrl+X", enabled: () => onCanvas && sel, run: () => void cutSelection(doc, editor, view) },
+      { group: "Edit", title: "Cut", keys: "Ctrl+X", enabled: () => onCanvas && sel, run: () => { if (!document.execCommand("cut")) cutSelection(doc, editor, view); } }, // (as Copy: the cut event below puts it on the system clipboard)
       { group: "Edit", title: "Paste", keys: "Ctrl+V", enabled: () => onCanvas, run: () => void pasteObjects(doc, editor, view, null) },
       { group: "Edit", title: "Duplicate", keys: "Ctrl+D", words: "copy", enabled: () => onCanvas && sel, run: () => duplicateSelection(doc, editor, view) },
       { group: "Edit", title: "Rename", words: "file name picture image library layer", enabled: () => onCanvas && !session.readOnly && selectedPictures().length > 0, run: () => void renamePictures() },
@@ -2799,7 +2799,17 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     } else if (appView === "canvas" && !textEditor.isOpen && /^\s*(<\?xml[^>]*>\s*)?<svg[\s>]/i.test(e.clipboardData?.getData("text/plain") ?? "") && importSvg(doc, editor, view, e.clipboardData!.getData("text/plain"))) e.preventDefault();
     else if (appView === "canvas" && !textEditor.isOpen && pasteCssPaint(doc, editor, e.clipboardData?.getData("text/plain") ?? "")) e.preventDefault();
     else if (appView === "canvas" && !textEditor.isOpen && pasteObjects(doc, editor, view, e.clipboardData?.getData("text/plain") ?? null)) e.preventDefault();
+    else if (appView === "canvas" && !textEditor.isOpen && pasteWords(e.clipboardData?.getData("text/plain") ?? "")) e.preventDefault();
   });
+  /** Words copied in another program: a new text under the pointer (in the middle of the view before the pointer has been over it), a long one wrapped. */
+  const PASTED_TEXT_WRAP_PX = 480;
+  const pasteWords = (text: string): boolean => {
+    const words = text.replace(/\r\n?/g, "\n").trim();
+    if (!words || isPlaceholderText(words)) return false;
+    const vp = view.viewport;
+    const at = screenToWorld(view.camera, vp, editor.pointerAt ?? { x: vp.width / 2, y: vp.height / 2 });
+    return textEditor.add(words, at, words.length > 60 || words.includes("\n") ? { widthPx: PASTED_TEXT_WRAP_PX } : undefined);
+  };
   // A picture of the copied things (PNG: one still at full size with its crop and adjustments, else at most 1024 px) next to the text (alone when the text would only say "N objects"), for other apps; the text stays what copySelection set,
   // which is how a paste here knows the objects are still ours. Best effort: a browser without the clipboard picture API keeps the text.
   const copySize = (t: ExportTarget, long: number): { w: number; h: number } => ({ w: Math.max(1, Math.round(t.ratio >= 1 ? long : long * t.ratio)), h: Math.max(1, Math.round(t.ratio >= 1 ? long / t.ratio : long)) });

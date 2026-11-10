@@ -78,6 +78,8 @@ export interface TextEditor {
   /** Edit `target`, or a new text: at the point `at` (the middle of its first line), as wide as its words, or (`widthPx`, dragged out) as wide as that, from its top-left corner. */
   open(target: TextObject | null, at: WorldPoint, box?: { widthPx: number }): void;
   commit(): void;
+  /** A new text of these words (pasted from another program) at `at`, in the look of a new text; it is selected. Whether it was made. */
+  add(md: string, at: WorldPoint, box?: { widthPx: number }): boolean;
   readonly isOpen: boolean;
   /** The look of the text being edited at the zoom now (null: none is open). */
   look(): ReturnType<typeof lookOf> | null;
@@ -492,9 +494,22 @@ export function mountTextEditor(
     host.querySelector<HTMLElement>("canvas")?.focus({ preventScroll: true });
   });
 
+  const add = (md: string, at: WorldPoint, drawn?: { widthPx: number }): boolean => {
+    open(null, at, drawn);
+    const made = target;
+    if (!made || !isNew) return false;
+    box.innerHTML = blocksToHtml(parse(md));
+    commit();
+    if (!doc.get(made.id)) return false;
+    editor.select([made.id]);
+    editor.changed();
+    return true;
+  };
+
   return {
     open,
     commit,
+    add,
     get isOpen() {
       return target !== null;
     },

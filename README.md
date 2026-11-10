@@ -398,6 +398,7 @@ Press `K`, drag to draw a balloon, and double-click it to type its words.
 - A connector is a neck, pinch, line or dots, and follows its balloons. Its handles set the width, the bend and where each end stands on its balloon.
 - Deleting a balloon removes its connectors and leaves its words as plain text; deleting it with its words removes both.
 - *Convert to path* gives up the balloon's numbers for node editing.
+- Copy, cut and duplicate take a balloon's words with it, and a connector only when both its balloons go too.
 
 ### Colour and styles
 
@@ -552,7 +553,7 @@ Copy to other apps, or export a sheet, a picture or selected shapes, and get wha
 - `Ctrl/⌘+X` puts the text only (the shape is gone before a picture could be drawn).
 - Browsers cannot put files on the clipboard, so there a file goes as its picture or its name, and audio or a PDF stays in canvast.
 
-**Pasting back in canvast** brings the objects back exactly as they were (links, masks, crop, adjustments, their places relative to each other), under the pointer, as long as nothing else was copied in between. Ending a pan with the middle button never pastes, on Linux too, where a middle click is a system paste. Shapes and texts come back even from another tab; a picture or GIF only while this window keeps the focus (after switching windows it comes back as a new picture; see Limitations). Anything copied in another app is imported as usual: an SVG as shapes, an image as a picture. A paste into a text field, the notes editor, a dialog or a menu stays there: nothing is imported or placed.
+**Pasting back in canvast** brings the objects back exactly as they were (links, masks, crop, adjustments, their places relative to each other), under the pointer, as long as nothing else was copied in between. Ending a pan with the middle button never pastes, on Linux too, where a middle click is a system paste. Shapes and texts come back even from another tab; a picture or GIF only while this window keeps the focus (after switching windows it comes back as a new picture; see Limitations). Anything copied in another app is imported as usual: an SVG as shapes, an image as a picture, a CSS colour or gradient as the fill of the selected shapes, and any other words as a new text under the pointer (a long one wrapped). A paste into a text field, the notes editor, a dialog or a menu stays there: nothing is imported or placed.
 
 **What you export is what you see.**
 
