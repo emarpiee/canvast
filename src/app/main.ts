@@ -2994,14 +2994,15 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       pasteObjects(doc, editor, view, null);
     }, PASTE_EVENT_WAIT_MS);
   }, true);
-  window.addEventListener("paste", (e) => {
+  // (first, before anything on the page: Firefox sends the paste to a hidden editable box that holds a selection, whose own handler would take it)
+  const onPaste = (e: ClipboardEvent): void => {
     // (the fallback above already pasted for these keys: the late event is the same paste)
     if (pasteEventAt >= pasteKeyAt && performance.now() - pasteKeyAt > PASTE_EVENT_WAIT_MS && performance.now() - pasteKeyAt < 3000) return void e.preventDefault();
     pasteEventAt = performance.now();
     // A paste into a field, an editor (the notes editor takes a picture in itself), a dialog or a menu is theirs: nothing is imported or placed.
     // (by where the keys are: Firefox names a hidden editable box that holds a selection as the target, while the keys are on the page)
     const at = clipTarget(e);
-    if (e.defaultPrevented || typing(at) || (at as HTMLElement | null)?.closest?.("dialog, [popover], .note-dock") || document.querySelector("dialog:modal")) return;
+    if (typing(at) || (at as HTMLElement | null)?.closest?.("dialog, [popover], .note-dock") || document.querySelector("dialog:modal")) return;
     // (the system's paste of a middle click can come a good while after the button, on a busy machine; a paste key pressed since is a real paste)
     if (performance.now() - middleUpAt < 3000 && middleUpAt > pasteKeyAt) return void e.preventDefault();
     const files = onePerPicture([...(e.clipboardData?.files ?? [])]);
@@ -3018,7 +3019,11 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     else if (appView === "canvas" && !textEditor.isOpen && pasteCssPaint(doc, editor, e.clipboardData?.getData("text/plain") ?? "")) e.preventDefault();
     else if (appView === "canvas" && !textEditor.isOpen && pasteObjects(doc, editor, view, e.clipboardData?.getData("text/plain") ?? null)) e.preventDefault();
     else if (appView === "canvas" && !textEditor.isOpen && pasteWords(e.clipboardData?.getData("text/plain") ?? "")) e.preventDefault();
-  });
+  };
+  window.addEventListener("paste", (e) => {
+    onPaste(e);
+    if (e.defaultPrevented) e.stopPropagation(); // (taken here: nothing else pastes it too)
+  }, true);
   /** Words copied in another program: a new text under the pointer (in the middle of the view before the pointer has been over it), a long one wrapped. */
   const PASTED_TEXT_WRAP_PX = 480;
   const pasteWords = (text: string): boolean => {

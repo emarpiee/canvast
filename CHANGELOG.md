@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.56.26 — Firefox pastes on the canvas (2026-11-10)
+
+- **Fixed:** in Firefox, Ctrl+V on the canvas still pasted nothing: Firefox sends the paste to a hidden editable box that holds a selection, whose own handler took it first. The canvas now takes a paste before anything else on the page (unless a field or an editor has the keys).
+
 ## 0.56.25 — Firefox copies and pastes on the canvas (2026-11-10)
 
 - **Fixed:** in Firefox, copy and paste on the canvas did nothing: Firefox names a hidden editable box as the target of the copy and paste events, so they were taken for a copy inside a text field. Copy, cut and paste now go by where the keys are (the focused element, or the page).
