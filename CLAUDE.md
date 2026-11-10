@@ -8,26 +8,43 @@ This file is for coding agents working in the repo; it applies to this code only
 
 ## README format
 
-The README is the one place for documentation, in two parts: **For users** (features at a glance, installation, getting started, the canvas, the Library, notes, the interface and settings, keyboard and pointer, your data, privacy and hidden items, limitations), then **For developers** (how it works, file formats and API, building, testing, releasing, contributing).
+The README is the one place for documentation. It is built so that a new feature is one new block in a fixed place, never a rewrite. Keep these rules when adding to it.
 
-| Level | What it holds | Limit |
+**Fixed layout.** The banner and **Notes from the developer** (and `docs/creative-tools.md`) are the owner's words: never rewrite them. Then **Contents** (a two-column table: For users | For developers), then the two parts. *For users*: What you can do, Installation, Getting started, then one `##` area per kind of work (Reference boards, Drawing and vector editing, Comics and storyboards, The Library, Notes, Exporting and sharing, The endless canvas, Your workspace and data, Privacy and hidden items, The interface, settings and keys), then Limitations. *For developers*: How it works, API and file formats, Building from source, Testing, Releasing and project scripts, Contributing and support, Licence. A new area is rare: it needs a row in Contents and in *What you can do*.
+
+| Level | What it holds | Rule |
 | --- | --- | --- |
-| Part | Who it is for | One sentence |
-| Section (`##`) | A short intro, then links or a table of its sub-sections | About 3 lines before the first sub-section |
-| Feature (`###`) | One sentence, its screenshot if it has one, then a table or short bullets | About one screen, before any `<details>` |
-| Detail (`####`, *More about …*) | Edge cases, long explanations, rare options, shown in full under its own heading | No folded text: `<details>` goes unnoticed |
+| Area (`##`) | One sentence, then a **Section \| What is in it** table linking each `###` | Add a row when you add a `###` |
+| Feature (`###`) | What an artist uses it for (one sentence), its screenshot of that use, then how (a table) | Every feature with an interface has its own `###` (or `####` under a bigger one) |
+| Detail (`####`) | Edge cases, rare options, long explanations, as a table | Shown in full, never folded |
+
+**Adding a feature:** find the area it belongs to (one home per feature; elsewhere, link to it), add its `###` with the template above, add its row to the area's table, add a shot (below), add any limit to Limitations, and update *What you can do* only if the area's summary no longer fits.
 
 | Format | Use it for | Rule |
 | --- | --- | --- |
-| Bullets | A few short facts | One line each, at most 5 or 6 in a row, not nested |
-| Table | Options, kinds, shortcuts, comparisons | Short cells, no long sentences |
-| Numbered list | Steps | Only when the order matters |
+| Table | Options, parts, kinds, shortcuts, rules, anything with a name and an explanation | The default. Short cells; a two-column table with an empty header (`\| \| \|`) for name and explanation |
 | Paragraph | How or why | At most 3 lines |
-| Screenshot | A big feature | One each, after its first sentence, with `alt` text saying what it shows |
+| Numbered list | Steps | Only when the order matters |
+| Bullets | A plain list with no interface and no explanations (file names, a few facts) | Never for features; never `- **Name:** explanation` (that is a table row) |
+| Screenshot | Every feature with an interface, small ones too (flip, corners, one Adjust control, a menu) | As many as the features need, after the sentence they illustrate, `alt` text saying exactly what it shows |
 
-- A big feature gets its own sub-section, not a bullet.
-- **Limitations follows these rules too:** one section, in separate tables, one short sentence a row, its long explanations under a heading after the table. Every limit stays in it, and those about data loss, passwords or encryption are marked ⚠️.
-- When rewriting, compare before and after so that no fact or limit is lost, and check the links.
+- **Never:** `<details>`, versions, release numbers, ADR numbers, phase names or history (they live in `CHANGELOG.md`, `docs/status.md`, `docs/adr/`), the owner's own files, paths, machine or interests.
+- **Screenshots** are part of the documentation, not decoration. The rules:
+
+| Rule | |
+| --- | --- |
+| Every feature | Every feature with an interface in any part of the app (the canvas, the Library, notes, hidden mode, settings, the desktop app, the tools) has its picture, small features too. Never choose a "shortlist" |
+| A real use case | Each picture shows how an artist really uses that one feature (a mirrored drawing to check proportions, a greyscale copy as a value study, a lettered comic panel), with its own content. No forced storyline across pictures, no placeholder shapes, no repeated filler text |
+| Designed content | Made like real work: fitting fonts (the OFL fonts in `scripts/showcase/fonts/`: Comic Neue for lettering, Bangers for shouts and titles, Caveat for handwritten notes, Cormorant Garamond for print labels and book titles, Space Grotesk), real comic balloons (white, black outline, lettering in capitals, sized to the words, tail to the speaker), proper zoom and framing |
+| Words match the picture | The section's text and the `alt` text describe exactly what the picture shows; words about an artwork are true to it (its title, artist and date in `art.json`) |
+| Small and focused | Cropped to the feature (`scene.around()`), WebP, about 80 KB or less; many small pictures are better than one busy one |
+| Content | Public-domain art from `scripts/showcase/art/` (a new work goes into `art.json`, and so into `docs/screenshots/CREDITS.md`) or work drawn by the shot itself; never the owner's work or interests |
+| Made only by code | Each picture is a Playwright test in `tests/shots/*.shot.ts`, written like the end-to-end specs: the harness's `app` fixture, its proven helpers (`chooseInMenu`, `alignWith`, `boolWith`, `maskWith`, `pathWith`, `drag`), the debug hook, and `tests/shots/scene.ts` (art, fonts, SVG, text, `fit`, `around`, `shot`). Wait on the app's state (`expect.poll`), never guess a selector: take it from the source or a spec. Each shot is declared in `tests/shots/manifest.ts` (README section, use case, alt text); `npm run check:shots` fails when the README and the manifest disagree |
+| Where they run | Only on GitHub: the `Screenshots` workflow (`gh workflow run Screenshots --ref <branch> -f grep=<shot names>`) gives the WebP files and, for a shot that failed, its trace. Never on this PC. Run them from a branch, not `main`, while working on them (a branch push starts no `Tests` run) |
+| Kept current | A changed interface means its shots are taken again; a removed feature removes its shots, its manifest entries and its text |
+
+- **Limitations** keeps every limit, in tables grouped by area, one short sentence a row, long explanations under a heading after the table; data loss, passwords and encryption are marked ⚠️.
+- **Before committing a README change:** compare before and after so no fact or limit is lost, check that every `#anchor` and every image path resolves, and that nothing is orphaned (a shot no text uses, a section no table links).
 
 ## Testing
 

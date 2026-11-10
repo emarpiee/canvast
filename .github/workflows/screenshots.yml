@@ -4,8 +4,11 @@ name: Screenshots
 on:
   workflow_dispatch:
     inputs:
+      grep:
+        description: Only the pictures whose names match this (a regular expression; empty for all)
+        default: ""
       only:
-        description: Only these scripts, separated by spaces (empty for all)
+        description: Also these older scripts of scripts/showcase, separated by spaces (empty for none)
         default: ""
 
 jobs:
@@ -26,15 +29,22 @@ jobs:
       - name: Draw the showcase
         run: xvfb-run -a node scripts/showcase/build.mjs showcase.canvast
       - name: Take the pictures
-        # (each on its own: one that fails leaves the others)
+        # (each picture is a test of tests/shots on its own page: one that fails leaves the others, and its trace)
+        env:
+          CANVAST_BUILD_DIR: dist
+          CANVAST_SHOTS_DIR: shots
+        run: xvfb-run -a npx playwright test -c playwright.shots.config.ts ${{ inputs.grep && format('-g "{0}"', inputs.grep) || '' }} || echo "SOME PICTURES FAILED"
+      - name: Older scripts
+        if: inputs.only != ''
         env:
           ELECTRON_DISABLE_SANDBOX: "1"
         run: |
-          mkdir -p shots
-          for s in ${{ inputs.only || 'shots shots-boards shots-drawing shots-library shots-notes shots-workspace shots-views shots-privacy shots-desktop' }}; do
+          for s in ${{ inputs.only }}; do
             echo "== $s"
             xvfb-run -a node "scripts/showcase/$s.mjs" showcase.canvast shots/ || echo "FAILED $s"
           done
+      - name: WebP
+        run: |
           for f in shots/*.png; do w=$(identify -format %w "$f"); if [ "$w" -gt 1280 ]; then cwebp -quiet -q 78 -resize 1280 0 "$f" -o "${f%.png}.webp"; else cwebp -quiet -q 78 "$f" -o "${f%.png}.webp"; fi; done
           ls -la shots
       - uses: actions/upload-artifact@v4
@@ -42,3 +52,9 @@ jobs:
         with:
           name: screenshots
           path: shots/*.webp
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: failed-shots
+          path: shots-results/
+          if-no-files-found: ignore
