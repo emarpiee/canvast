@@ -304,7 +304,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       <div class="col-grip" data-grip="side" data-testid="side-grip" role="separator" aria-orientation="vertical" aria-label="Resize the library panel" title="Drag to resize the library panel (double-click to reset)" tabindex="0"></div>
       <div class="assets-main">
         <div class="assets-scroll"><div class="assets-list-head"><span></span>${COLUMNS.map(headCell).join("")}</div><div class="assets-grid" role="list" data-testid="assets-grid"></div></div><div class="assets-trash" data-testid="assets-trash" hidden></div>
+        <div class="assets-floats">
         <div class="assets-filtered" data-testid="assets-filtered" role="status" hidden>${ICONS.funnelX}<span class="assets-filtered-text"></span><button type="button" data-action="show-all" data-testid="assets-show-all">Show all items</button></div>
+        <button type="button" class="assets-to-top" data-action="to-top" data-testid="assets-to-top" title="Back to top (Home)" hidden>${ICONS.arrowUpToLine}Back to top</button>
+        </div>
         <div class="viewer" data-testid="slide-view" role="region" aria-label="Viewer" tabindex="-1" hidden>
           <button type="button" class="vbtn viewer-back" data-act="close" aria-label="Back to the library" title="Back to the library (Esc)">${ICONS.arrowLeft}</button>
           <button type="button" class="vbtn viewer-hide" data-act="bar" aria-label="Hide the controls" title="Hide the controls (F)">${ICONS.chevronsDown}</button>
@@ -348,8 +351,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <span class="assets-total" data-testid="assets-total"></span>
       </div>
       <div class="hud-controls assets-controls" role="toolbar" aria-label="View of the library">
-        <button type="button" data-action="to-top" data-testid="assets-to-top" aria-label="Back to top" title="Back to top (Home)" hidden>${ICONS.arrowUpToLine}</button>
-        <span class="hud-sep assets-top-sep" role="separator" hidden></span>
         <button type="button" data-action="columns" data-testid="assets-columns" aria-haspopup="dialog" aria-expanded="false" aria-label="List columns" title="Choose and arrange the columns of the list">${ICONS.columns3}</button>
         <button type="button" data-layout="grid" aria-pressed="true" aria-label="Thumbnails" title="Thumbnails">${ICONS.layoutGrid}</button>
         <button type="button" data-layout="list" aria-pressed="false" aria-label="List" title="List">${ICONS.layoutList}</button>
@@ -5478,9 +5479,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   grid.addEventListener("click", () => requestAnimationFrame(remember));
   // Back to top: shown once the list has been scrolled a screen down, in grid and list alike.
   const toTop = root.querySelector<HTMLButtonElement>('[data-testid="assets-to-top"]')!;
-  const toTopSep = root.querySelector<HTMLElement>(".assets-top-sep")!;
   function showToTop(): void {
-    toTop.hidden = toTopSep.hidden = scroller.scrollTop < scroller.clientHeight;
+    toTop.hidden = scroller.scrollTop < scroller.clientHeight;
   }
   root.querySelector<HTMLButtonElement>('[data-testid="assets-reload"]')!.addEventListener("click", () => {
     relistAll = true;

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.56.29 — Back to top beside the filter chip (2026-11-10)
+
+- **Changed:** *Back to top* is a button with its words over the bottom of the Library's grid, in the middle, in the look of the chip of what is filtered, beside it when that shows (it was an arrow in the status bar).
+
 ## 0.56.28 — Measuring what makes the Library stop (2026-11-10)
 
 - **Changed:** the canvas's last edits are saved beside the Library as it opens, not before (it showed a moment later); when the save had something to write, the Library is read again then.
