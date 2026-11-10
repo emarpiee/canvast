@@ -511,7 +511,7 @@ Keep a large canvas in order, and reach things that lie under others.
 
 #### More about organizing
 
-- **Layers panel:** group and nest, rename, hide, lock, re-stack, set opacity and blend mode, rotate. An item placed from the library takes the file's name at that moment as its layer name, and keeps it when the file is renamed later; a hidden item's name is not stored. Select with `Ctrl` (toggle) and `Shift` (range).
+- **Layers panel:** group and nest, rename, hide, lock, re-stack, set opacity and blend mode, rotate. Drag a row onto the middle of a group, a boolean group or a sheet to put it inside, or onto the top or bottom edge of a row to put it before or after it at that row's level (out of a group or a sheet too), as deep as groups (16) and sheets (32) go; a line or a highlight shows where it will land. An item placed from the library takes the file's name at that moment as its layer name, and keeps it when the file is renamed later; a hidden item's name is not stored. Select with `Ctrl` (toggle) and `Shift` (range).
 - **Sheets** (`C`): a sheet clips what it holds and has a ratio rather than a size (see [Shapes, sheets and masks](docs/reference/shapes-sheets-masks.md)).
   - Drawing a sheet over objects puts the ones wholly inside it on the sheet, in one undo step (ones it only crosses stay out).
   - *Put the selection on a sheet*, *Put each on its own sheet* (a picture's sheet is exactly its size, with no fill), *Fit to contents*, *Release* and *Turn on its side*.

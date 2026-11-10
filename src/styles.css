@@ -1215,6 +1215,9 @@ body:has(.assets-place-zone:not([hidden])) :is(#nav, .view-settings, .assets-bar
    items are dragged, filled while they are over it. */
 .drop-zone { color: var(--hud-accent-text); background: color-mix(in oklch, var(--theme-bg) 85%, var(--hud-accent)); outline: 2px dashed var(--hud-accent); outline-offset: -2px; }
 .drop-zone.is-drop-target { color: var(--hud-accent-fg); background: var(--hud-accent); outline-style: solid; }
+/* A row dropped before or after another (the Layers panel): a line where it will go. */
+.layer.is-drop-before { box-shadow: inset 0 2px 0 var(--hud-accent); }
+.layer.is-drop-after { box-shadow: inset 0 -2px 0 var(--hud-accent); }
 .drop-zone.is-drop-target :not(input) { color: inherit; } /* (all that is on it reads on the accent: counts and headings have quieter colours of their own) */
 .drop-zone.is-drop-target .layer-count { background: color-mix(in oklch, var(--hud-accent-fg) 22%, transparent); }
 /* What a drag from the library shows: up to five thumbnails stacked and fanned a little, and how many there are. */

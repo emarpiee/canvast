@@ -1,5 +1,6 @@
 import { showMoreButton } from "./show-more";
 import { treeGuides, treeSlot } from "./tree";
+import { rowHolds, type LayerPlace } from "../doc/layer-move";
 import type { EditorState } from "../app/editor-state";
 import { revealRow } from "../interaction/reveal";
 import { plural } from "../doc/plural";
@@ -29,6 +30,8 @@ export interface LayersActions {
   /** Whether a sheet hides what lies outside it (ADR 0108). */
   setClip(id: string, clip: boolean): void;
   moveAbove(ids: readonly string[], aboveId: string): void;
+  /** Move rows (objects, sheets, groups by id) before, after or inside another row: into or out of groups, boolean groups and sheets. */
+  moveLayers(keys: readonly string[], target: string, place: LayerPlace): void;
   /** Put the stacking order in name order (ADR 0059); only the order changes, never a position. `order` is front to back. */
   setOrder(order: readonly string[], label: string): void;
   /** `final` false: only shown while the slider is dragged; true: stored (one undo step). */
@@ -171,7 +174,6 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
   const seenGroups = new Set<string>();
   const names = actions.names.map;
   let scheduled = false;
-  let dragged: string[] = [];
   /** The row being renamed (kept across redraws) and what has been typed. */
   let renaming: { key: string; value: string } | null = null;
 
@@ -474,24 +476,52 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     }
   });
 
-  // Reorder: drop a row on another to put it just in front of that row (a group moves all its members).
+  // Drag a row: dropped on the top quarter of another row it goes before it (in front), on the bottom quarter after it; on the middle of a
+  // group, a boolean group or a sheet it goes inside. Into or out of any of them, as deep as their limits allow (doc/layer-move.ts).
+  let draggedKey: string | null = null;
+  let marked: HTMLElement | null = null;
+  const unmark = (): void => {
+    marked?.classList.remove("is-drop-before", "is-drop-after", "drop-zone", "is-drop-target");
+    marked = null;
+  };
+  const placeAt = (li: HTMLElement, y: number): LayerPlace => {
+    const r = li.getBoundingClientRect();
+    const f = (y - r.top) / (r.height || 1);
+    const holds = rowHolds(doc.ordered(), li.dataset["key"]!);
+    return holds ? (f < 0.25 ? "before" : f > 0.75 ? "after" : "inside") : f < 0.5 ? "before" : "after";
+  };
   panel.addEventListener("dragstart", (e) => {
     const li = (e.target as HTMLElement).closest<HTMLElement>("li.layer");
     if (!li) return;
-    dragged = members(li.dataset["key"]!).map((o) => o.id);
-    e.dataTransfer?.setData("text/plain", li.dataset["key"]!);
+    draggedKey = li.dataset["key"]!;
+    e.dataTransfer?.setData("text/plain", draggedKey);
   });
   panel.addEventListener("dragover", (e) => {
-    if (dragged.length && (e.target as HTMLElement).closest("li.layer")) e.preventDefault();
+    const li = (e.target as HTMLElement).closest<HTMLElement>("li.layer");
+    if (!draggedKey || !li || li.dataset["key"] === draggedKey) return unmark();
+    e.preventDefault();
+    const place = placeAt(li, e.clientY);
+    if (marked !== li) unmark();
+    marked = li;
+    li.classList.toggle("is-drop-before", place === "before");
+    li.classList.toggle("is-drop-after", place === "after");
+    li.classList.toggle("drop-zone", place === "inside");
+    li.classList.toggle("is-drop-target", place === "inside");
+  });
+  panel.addEventListener("dragleave", (e) => {
+    if (!(e.relatedTarget instanceof Node && panel.contains(e.relatedTarget))) unmark();
+  });
+  panel.addEventListener("dragend", () => {
+    unmark();
+    draggedKey = null;
   });
   panel.addEventListener("drop", (e) => {
     const li = (e.target as HTMLElement).closest<HTMLElement>("li.layer");
-    if (!li || !dragged.length) return;
+    const key = draggedKey;
+    unmark();
+    draggedKey = null;
+    if (!li || !key || li.dataset["key"] === key) return;
     e.preventDefault();
-    const targetMembers = members(li.dataset["key"]!);
-    // In front of the target's frontmost member.
-    const top = [...targetMembers].sort((a, b) => b.z - a.z)[0];
-    if (top) actions.moveAbove(dragged, top.id);
-    dragged = [];
+    actions.moveLayers([key], li.dataset["key"]!, placeAt(li, e.clientY));
   });
 }

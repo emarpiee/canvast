@@ -29,6 +29,7 @@ import { plainText } from "../text/markdown";
 import type { BoolOp } from "../doc/boolean";
 import { boolGroupsOf, isBoolMember, isResult, operandOf, resultOf } from "../doc/boolean-group";
 import { ancestorsOf, descendantsOf, isContainer, isMaskSheet, rootsOf } from "../doc/containers";
+import { planLayerMove, type LayerPlace } from "../doc/layer-move";
 import { DEFAULT_CONSTRAINT, constraintOf } from "../doc/constraints";
 import { cleanAdjust, cropOf, isNeutral, reachFraction } from "../doc/adjust";
 import type { Adjust } from "../doc/adjust";
@@ -477,6 +478,19 @@ export function moveAbove(doc: DocumentStore, editor: EditorState, ids: readonly
   if (!moving.length || !above || moving.some((o) => o.id === aboveId)) return;
   const changed = placeAbove(doc.ordered(), moving, above);
   if (changed.length) doc.commit(doc.transaction("Reorder", changed));
+  editor.changed();
+}
+
+/** Move Layers rows before, after or inside another row (doc/layer-move.ts): one undo step, or a message saying why not. */
+export function moveLayers(doc: DocumentStore, editor: EditorState, keys: readonly string[], target: string, place: LayerPlace): void {
+  if (editor.blockEdit()) return;
+  const plan = planLayerMove(doc.ordered(), keys, target, place);
+  if ("problem" in plan) {
+    editor.message = plan.problem;
+    editor.changed();
+    return;
+  }
+  if (plan.next.length) doc.commit(doc.transaction(place === "inside" ? "Move into" : "Move in the layers", plan.next));
   editor.changed();
 }
 

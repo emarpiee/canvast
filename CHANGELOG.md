@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.56.14 — Drag layers into and out of groups and sheets (2026-11-10)
+
+- **Added:** in the Layers panel a row dropped on the middle of a group, a boolean group or a sheet goes inside it; dropped on the top or bottom edge of a row it goes before or after it, at that row's level (out of a group or a sheet too). Objects, whole groups and sheets with what is on them, as deep as groups and sheets go; it stays where it is on the canvas; one undo step. A line or a highlight shows where it will land.
+- **Added:** a shape dropped into a boolean group becomes one of its shapes, and leaves it when dragged out; the result follows.
+- **Added:** a group never goes inside itself, nor a sheet onto itself or onto what is on it, nor a locked layer anywhere: a message says why.
+- **Added:** unit tests of every move (into, out, deep, boolean, sheets, refused) and a Layers drag test.
+- **Changed:** a drop on the middle of a plain row puts it after that row (before it on the top half).
+
 ## 0.56.13 — The ratio while drawing (2026-11-10)
 
 - **Added:** while a shape, sheet, speech balloon, text box or note box is drawn, its ratio (width : height) shows beside the pointer, as on a resize: one label for both.

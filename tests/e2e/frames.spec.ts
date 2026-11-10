@@ -1159,7 +1159,7 @@ test("layers panel: lists objects front to back, selects, hides and locks from i
   expect(await p.evaluate(() => window.__canvastDebug.selection()), "a locked layer is not picked on the canvas").toEqual([]);
   // Drag the back row onto the front row: it moves in front.
   const z = () => p.evaluate(() => Object.fromEntries(window.__canvastDebug.objects().map((o) => [o.id, o["z"] as number])));
-  await rows.nth(2).dragTo(rows.nth(0));
+  await rows.nth(2).dragTo(rows.nth(0), { targetPosition: { x: 30, y: 2 } }); // (the top edge of the row: before it)
   const z1 = await z();
   expect(z1[ids[0]!]! > z1[ids[2]!]!, "now in front of the one that was in front").toBe(true);
   await p.keyboard.press("Control+z");
@@ -1930,6 +1930,50 @@ test("bookmarks on a phone (360 px): each card has its ⋯ button, always shown,
   const menu = (await p.getByRole("menu").boundingBox())!;
   expect(menu.x).toBeGreaterThanOrEqual(0);
   expect(menu.x + menu.width).toBeLessThanOrEqual(360);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("layers panel: a row dragged into a group or a sheet goes inside it, dragged next to a row it goes to that row's level; one undo step each", async ({ app }) => {
+  const p = app.page;
+  await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+  const panel = p.getByTestId("layers-panel");
+  await p.keyboard.press("u");
+  for (const y of [250, 350, 450]) await app.drag({ x: 450, y }, { x: 550, y: y + 60 }, 4);
+  const [a, b, c] = (await p.evaluate(() => window.__canvastDebug.objectFrames())).map((o) => o.id); // back to front
+  await p.keyboard.press("v");
+  await p.mouse.click(500, 280);
+  await p.keyboard.down("Shift");
+  await p.mouse.click(500, 380);
+  await p.keyboard.up("Shift");
+  await p.keyboard.press("Control+g");
+  const objs = () => p.evaluate(() => window.__canvastDebug.objects() as Array<{ id: string; groups?: string[]; parent?: string; container?: unknown }>);
+  const gid = (await objs()).find((o) => o.id === a)!.groups![0]!;
+  await p.keyboard.press("c");
+  await app.drag({ x: 750, y: 250 }, { x: 950, y: 450 }, 4);
+  const sheet = (await objs()).find((o) => o.container)!.id;
+  await p.keyboard.press("Escape");
+  const row = (k: string) => panel.locator(`li.layer[data-key="${k}"]`);
+  const into = async (from: string, to: string) => {
+    const h = (await row(to).boundingBox())!.height;
+    await row(from).dragTo(row(to), { targetPosition: { x: 30, y: h / 2 } });
+    await app.frame();
+  };
+  // c into the group: it is a member
+  await into(c!, gid);
+  await expect.poll(async () => (await objs()).find((o) => o.id === c)!.groups ?? []).toEqual([gid]);
+  // c out again, next to the sheet's row: no group (the group opened, so its row shows)
+  if ((await row(gid).getAttribute("aria-expanded")) === "false") await row(gid).locator(".tree-twist").first().click();
+  await row(c!).dragTo(row(sheet), { targetPosition: { x: 30, y: 2 } });
+  await expect.poll(async () => (await objs()).find((o) => o.id === c)!.groups ?? []).toEqual([]);
+  // the whole group onto the sheet: every member is on it, still in its group
+  await into(gid, sheet);
+  await expect.poll(async () => (await objs()).filter((o) => o.id === a || o.id === b).map((o) => [o.parent, o.groups?.[0]])).toEqual([[sheet, gid], [sheet, gid]]);
+  // one undo takes the group off the sheet again
+  await p.keyboard.press("Control+z");
+  await expect.poll(async () => (await objs()).filter((o) => o.id === a || o.id === b).map((o) => o.parent ?? null)).toEqual([null, null]);
+  // and redo puts it back on (a sheet onto itself or what is on it is refused: tests/unit/layer-move.test.ts)
+  await p.keyboard.press("Control+y");
+  await expect.poll(async () => (await objs()).find((o) => o.id === a)!.parent).toBe(sheet);
   expect(app.consoleErrors).toEqual([]);
 });
 
