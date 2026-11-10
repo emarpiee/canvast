@@ -56,11 +56,10 @@ const inside = (b: Box, x: number, y: number): [number, number] => [b.minX + (b.
 
 /** A comic page: the four prints as panels on a page sheet with auto layout, two columns. The page's id and the panels'. */
 async function page(s: Scene): Promise<{ page: string; panels: string[] }> {
-  // (placed last to first: the grid "in stacking order" lays them out front to back, so the first panel comes first)
+  // (placed in story order: the grid "in stacking order" keeps that order)
   const art = await s.art("hokusai-seaside", "leprince", "verhaecht", "hokusai-under");
   await s.canvas("Page 1");
-  const placed = await s.placeRow([...art].reverse(), 30);
-  const panels = [...placed].reverse();
+  const panels = await s.placeRow(art, 30);
   await s.select(panels);
   await chooseInMenu(s.p, "arrangemenu", "grid:stack");
   await chooseInMenu(s.p, "sheetmenu", "puton");
