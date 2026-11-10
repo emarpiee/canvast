@@ -20,6 +20,9 @@ const PEN_WIDTH_PX = 3; // default pen width
 async function objects(app: App): Promise<Obj[]> {
   return (await app.page.evaluate(() => window.__canvastDebug.objects())) as Obj[];
 }
+/** A world coordinate as the debug hook writes it (`<mantissa>p<exponent>`), as a number; and a number back in that form. */
+const fromDyadic = (s: string): number => { const [m, e] = s.split("p"); return Number(m) * 2 ** Number(e); };
+const toDyadic = (v: number): string => `${Math.round(v * 2 ** 20)}p-20`;
 async function selection(app: App): Promise<string[]> {
   return app.page.evaluate(() => window.__canvastDebug.selection());
 }
@@ -1474,9 +1477,9 @@ test("every kind of object snaps when resized by a handle: to another object's e
     const step = await p.evaluate(() => window.__canvastDebug.gridStep());
     if (step === null) missed.push(`${name}: no grid step`);
     else {
-      const w = Number((await p.evaluate(() => window.__canvastDebug.screenToWorld(740, 300))).x);
-      const line = Math.round(w / step) * step;
-      const lineX = (await p.evaluate((x) => window.__canvastDebug.worldToScreen(String(x), "0"), line)).x;
+      const w = fromDyadic((await p.evaluate(() => window.__canvastDebug.screenToWorld(740, 300))).x);
+      const line = toDyadic(Math.round(w / step) * step);
+      const lineX = (await p.evaluate((x) => window.__canvastDebug.worldToScreen(x, "0p0"), line)).x;
       const at = await resizeRightTo(lineX - 3);
       if (Math.abs(at - lineX) > 0.5) missed.push(`${name} to the grid: its side at ${at.toFixed(2)}, the line at ${lineX.toFixed(2)}`);
     }
@@ -1533,7 +1536,7 @@ test("drawing a shape or a sheet snaps where it starts and where it ends: onto a
     await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", true));
     const step = (await p.evaluate(() => window.__canvastDebug.gridStep()))!;
     const w = await p.evaluate(() => window.__canvastDebug.screenToWorld(600, 560));
-    const line = await p.evaluate(([x, y]) => window.__canvastDebug.worldToScreen(String(x), String(y)), [Math.round(Number(w.x) / step) * step, Math.round(Number(w.y) / step) * step]);
+    const line = await p.evaluate(([x, y]) => window.__canvastDebug.worldToScreen(x, y), [toDyadic(Math.round(fromDyadic(w.x) / step) * step), toDyadic(Math.round(fromDyadic(w.y) / step) * step)] as const);
     b = await draw(tool, [line.x - 3, line.y - 3], [line.x + 120, line.y + 90]);
     if (!near(b.minX, line.x) || !near(b.minY, line.y)) missed.push(`${name}: start on the grid at ${b.minX}, ${b.minY}, the line at ${line.x}, ${line.y}`);
     await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false));
