@@ -167,18 +167,11 @@ test("sheets", async ({ scene: s }) => {
   await s.fit([pic!], 0.45, [0.5, 0.45]);
   const b = (await s.box([pic!]))!;
   const label = await s.text(b.minX, b.maxY + 30, "Mary Delany, Botanical Study, ca. 1772–82", { size: 22, font: "cormorant garamond semibold italic", colour: "#3b3428" });
-  // (a print laid out on a sheet: the picture and its label in a centred column, the sheet hugging them)
+  // (a print and its label put on a sheet: the sheet holds them and cuts what goes past its edges)
   await s.select([pic!, label]);
   await chooseInMenu(s.p, "sheetmenu", "puton");
   await expect.poll(async () => (await s.objects()).some((o) => o.container)).toBe(true);
   const sheet = (await s.objects()).find((o) => o.container)!.id;
-  await s.select([sheet]);
-  await s.p.keyboard.press("Shift+A");
-  await s.p.locator('[data-layout-flow="column"]').click();
-  for (const [sel, v] of [['[data-layout-gap="0"]', "28"], ['[data-layout-pad="h"]', "56"], ['[data-layout-pad="v"]', "56"]] as const) {
-    await s.p.locator(sel).fill(v);
-    await s.p.locator(sel).press("Enter");
-  }
   await s.paint(sheet, "fill", "#f6f1e6");
   // (auto layout sizes the sheet a moment later: framed once it has)
   await s.settle(800);
