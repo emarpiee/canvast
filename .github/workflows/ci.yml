@@ -39,6 +39,7 @@ jobs:
       - run: npm run check:components
       - run: npm run check:picker
       - run: npm run check:patterns
+      - run: npm run check:shots
       - run: npm run check:repro
       - name: Keep the built file
         uses: actions/upload-artifact@v4

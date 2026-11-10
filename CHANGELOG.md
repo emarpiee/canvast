@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.56.30 — The README written again, its pictures made by tests (2026-11-11)
+
+- **Changed:** the README is written again as a manual of the app as it is: an area for each kind of work, each feature in its own section with what an artist uses it for, a picture of that use, and how it works; every limit kept in Limitations.
+- **Changed:** its pictures are all new, one for each feature with an interface (small ones too: flip, corners, a value study, a balloon's tail, properties, the padlock, the tools' menu), each a real piece of work: public-domain artworks from The Met Open Access (credited in `docs/screenshots/CREDITS.md`), lettered comic balloons, fonts that fit (Comic Neue, Bangers, Caveat, Cormorant Garamond; SIL Open Font License), in both themes and several theme colours.
+- **Added:** README pictures are Playwright tests in `tests/shots/` on the end-to-end harness, with a manifest of each picture's section, use and alt text; the `Screenshots` workflow runs them in parallel and keeps a trace of any that fails; `npm run check:shots` (in CI) fails when the README and the manifest disagree.
+- **Added:** the README's rules and the screenshot rules, in `CLAUDE.md`.
+- **Removed:** the older screenshot scripts (`scripts/showcase/shots*.mjs` but the desktop one) and the journey picture of an earlier dive.
+
 ## 0.56.29 — Back to top beside the filter chip (2026-11-10)
 
 - **Changed:** *Back to top* is a button with its words over the bottom of the Library's grid, in the middle, in the look of the chip of what is filtered, beside it when that shows (it was an arrow in the status bar).
