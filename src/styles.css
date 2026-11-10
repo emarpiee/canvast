@@ -338,12 +338,16 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
   width: 100%;
   height: 100%;
   touch-action: none;
-  cursor: grab;
+  cursor: default;
   outline: none;
 }
 
+/* Each tool's cursor, in one place (a new tool gets a line here; tests/e2e/editing.spec.ts checks every tool of the rail): selecting is the
+   arrow, the hand grabs, words take the text cursor, and everything that draws, picks by drawing or erases takes the crosshair. */
 #canvas[data-tool="select"] { cursor: default; }
-#canvas[data-tool="pen"], #canvas[data-tool="lasso"], #canvas[data-tool="eraser"], #canvas[data-tool="node"] { cursor: crosshair; }
+#canvas[data-tool="hand"] { cursor: grab; }
+#canvas:is([data-tool="text"], [data-tool="note"]) { cursor: text; }
+#canvas:is([data-tool="pen"], [data-tool="shape"], [data-tool="balloon"], [data-tool="path"], [data-tool="sheet"], [data-tool="lasso"], [data-tool="eraser"], [data-tool="node"]) { cursor: crosshair; }
 #canvas[data-hover="ew"] { cursor: ew-resize; }
 #canvas[data-hover="ns"] { cursor: ns-resize; }
 #canvas[data-hover="nwse"] { cursor: nwse-resize; }
@@ -759,7 +763,6 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 
 /* Text editing overlay (ui/text-editor.ts). Spacing mirrors text/layout.ts:
    line height 1.3, block gap 0.6 em, list item gap 0.2 em, list indent 1.5 em. */
-#canvas[data-tool="text"], #canvas[data-tool="note"] { cursor: text; }
 .note-colour { width: var(--sp-9); height: var(--sp-9); padding: 0; border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 .note-colour[aria-checked="true"] { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 .text-editor {

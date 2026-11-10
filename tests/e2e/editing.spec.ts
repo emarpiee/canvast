@@ -1534,3 +1534,18 @@ test("drawing a shape or a sheet snaps where it starts and where it ends: onto a
   }
   expect(missed).toEqual([]);
 });
+
+test("every tool of the rail has the cursor of what it does: the arrow to select, the hand to pan, the text cursor for words, the crosshair to draw", async ({ app }) => {
+  const p = app.page;
+  const want: Record<string, string> = { select: "default", hand: "grab", text: "text", note: "text", pen: "crosshair", shape: "crosshair", balloon: "crosshair", path: "crosshair", sheet: "crosshair", lasso: "crosshair", eraser: "crosshair", node: "crosshair" };
+  const tools = await p.evaluate(() => [...new Set([...document.querySelectorAll<HTMLElement>(".rail [data-tool]")].map((b) => b.dataset["tool"]!))]);
+  expect(tools.length, "the rail's tools").toBeGreaterThan(5);
+  const wrong: string[] = [];
+  for (const t of [...new Set([...tools, ...Object.keys(want)])]) {
+    await p.evaluate((x) => window.__canvastDebug.setTool(x as never), t);
+    await app.frame();
+    const got = await p.evaluate(() => getComputedStyle(document.getElementById("canvas")!).cursor);
+    if (got !== (want[t] ?? "a cursor in this list")) wrong.push(`${t}: ${got}`);
+  }
+  expect(wrong).toEqual([]);
+});

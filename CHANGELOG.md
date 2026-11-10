@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.11 — Each tool its own cursor (2026-11-10)
+
+- **Fixed:** the Shapes, Speech balloon, Path and Sheet tools showed the hand over the canvas, as if it would pan; they show the crosshair. Every tool's cursor is now in one table (the arrow to select, the hand to pan, the text cursor for words, the crosshair to draw, pick by drawing or erase).
+- **Added:** a test checks the cursor of every tool of the rail.
+
 ## 0.56.10 — Resizing a sheet snaps; drawing snaps (2026-11-10)
 
 - **Fixed:** a sheet resized by a handle (a picture's own sheet too) did not snap: what is on it, which moves with it, counted as lines to snap to and held its side where it began. What moves along (on a sheet, attached) is never a line to snap to, for every gesture.
