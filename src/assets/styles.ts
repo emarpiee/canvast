@@ -17,7 +17,7 @@ import { cleanValues, generatorById } from "../gen";
 import type { Values } from "../gen";
 import type { TextLook } from "../text/text-style";
 import { formatRatio } from "../app/export-size";
-import { cleanExportPreset, exportPresetSummary, type ExportPreset } from "../ui/export-dialog";
+import { cleanExportPreset, exportPresetSummary, type ExportPreset } from "../app/export-prefs";
 
 export interface StyleItem {
   readonly id: string;

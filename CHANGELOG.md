@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.56.7 — The desktop build checks again (2026-11-10)
+
+- **Fixed:** the desktop app's type check failed since 0.56.5: the saved styles reached the Export dialog's page code for export presets. The presets' data now lives on its own (`app/export-prefs.ts`).
+
 ## 0.56.6 — One list of kinds in Styles; Pattern tabs by Density (2026-11-10)
 
 - **Changed:** the Styles panel shows its kinds in one list (the shared menu), each with its icon, its name and how many there are, opened from a button at its top, instead of a row of tabs.

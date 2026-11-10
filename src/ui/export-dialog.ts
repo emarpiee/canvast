@@ -20,6 +20,10 @@ import { SHOT_FORMATS, encodeShot } from "../app/screenshot";
 import { writeZip } from "../storage/zip";
 import type { ShotFormat } from "../app/screenshot";
 import { esc } from "./format";
+import { DEFAULTS, HEX, cleanBg, cleanExportPreset, exportPresetSummary, loadPrefsFrom } from "../app/export-prefs";
+import type { Action, ExportPreset, Format, PadUnit, Prefs } from "../app/export-prefs";
+export { cleanExportPreset, exportPresetSummary };
+export type { ExportPreset };
 import { ICONS } from "./icons";
 
 export interface ExportDeps {
@@ -56,26 +60,7 @@ export interface ExportDeps {
   pickColour?(anchor: HTMLElement, value: string, onInput: (hex: string) => void): void;
 }
 
-type Format = ShotFormat | "svg" | "pdf";
-type Action = "download" | "copy" | "library";
-type PadUnit = "px" | "%";
-interface Prefs {
-  unit: Unit;
-  dpi: number;
-  format: Format;
-  quality: number;
-  bg: Background;
-  /** Room around what is exported, in px of the file or % of its longer side. */
-  pad: number;
-  padUnit: PadUnit;
-  /** What Enter and Export again do. */
-  action: Action;
-}
-const DEFAULTS: Prefs = { unit: "px", dpi: 300, format: "png", quality: 92, bg: "transparent", pad: 0, padUnit: "px", action: "download" };
-const HEX = /^#[0-9a-f]{6}$/i;
-const cleanBg = (v: unknown): Background => (v === "white" || v === "black" || v === "transparent" ? v : typeof v === "string" && HEX.test(v) ? (v.toLowerCase() as Background) : DEFAULTS.bg);
 const KEY = "canvast.export";
-
 const loadPrefs = (): Prefs => {
   try {
     return loadPrefsFrom(JSON.parse(localStorage.getItem(KEY) ?? "{}") as Partial<Prefs>);
@@ -83,20 +68,6 @@ const loadPrefs = (): Prefs => {
     return DEFAULTS;
   }
 };
-function loadPrefsFrom(raw: Partial<Record<keyof Prefs, unknown>>): Prefs {
-  {
-    return {
-      unit: UNITS.includes(raw.unit as Unit) ? (raw.unit as Unit) : DEFAULTS.unit,
-      dpi: DPIS.includes(Number(raw.dpi)) ? Number(raw.dpi) : DEFAULTS.dpi,
-      format: raw.format === "png" || raw.format === "webp" || raw.format === "jpeg" || raw.format === "svg" || raw.format === "pdf" ? raw.format : DEFAULTS.format,
-      quality: Math.min(100, Math.max(10, Number(raw.quality) || DEFAULTS.quality)),
-      bg: cleanBg(raw.bg),
-      pad: Math.min(1000, Math.max(0, Number(raw.pad) || 0)),
-      padUnit: raw.padUnit === "%" ? "%" : "px",
-      action: raw.action === "copy" || raw.action === "library" ? raw.action : "download",
-    };
-  }
-}
 const savePrefs = (p: Prefs): void => {
   try {
     localStorage.setItem(KEY, JSON.stringify(p));
@@ -104,30 +75,6 @@ const savePrefs = (p: Prefs): void => {
     // a browser that keeps nothing: the choices last for this dialog
   }
 };
-
-/** What an export preset keeps (a saved style of the kind "export"): the choices, and a size as a width or as times its size on screen. */
-export interface ExportPreset {
-  readonly format: Format;
-  readonly quality: number;
-  readonly bg: Background;
-  readonly unit: Unit;
-  readonly dpi: number;
-  readonly pad: number;
-  readonly padUnit: PadUnit;
-  readonly size: { readonly w: number } | { readonly k: number } | null;
-}
-/** An export preset from stored data, or null. */
-export function cleanExportPreset(d: unknown): ExportPreset | null {
-  const r = d as Partial<Record<keyof ExportPreset, unknown>> | null;
-  if (!r || typeof r !== "object") return null;
-  const p = loadPrefsFrom(r);
-  const z = r.size as { w?: unknown; k?: unknown } | null | undefined;
-  const size = z && Number(z.k) > 0 && Number(z.k) <= 16 ? { k: Number(z.k) } : z && Number(z.w) >= 1 && Number(z.w) <= MAX_SIDE ? { w: Math.round(Number(z.w)) } : null;
-  return { format: p.format, quality: p.quality, bg: p.bg, unit: p.unit, dpi: p.dpi, pad: p.pad, padUnit: p.padUnit, size };
-}
-/** One line about a preset. */
-export const exportPresetSummary = (p: ExportPreset): string =>
-  [p.format.toUpperCase(), p.size ? ("k" in p.size ? `${p.size.k}× on screen` : `${p.size.w} px wide`) : "", p.pad ? `padding ${p.pad} ${p.padUnit}` : "", p.bg === "transparent" ? "" : p.bg].filter(Boolean).join(" · ");
 
 /** The last export of each sheet or selection on this device, by what it is made of (Export again uses it). */
 const LAST_KEY = "canvast.export.last";
