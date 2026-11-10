@@ -97,10 +97,10 @@ test("trash", async () => {
 });
 
 test("window-row", async () => {
+  // (the pointer glides up to the top edge: the row comes on a move there, and stays while the pointer is on it)
   await p.mouse.move(700, 300);
-  await p.mouse.move(700, 1);
-  await p.getByTestId("win-close").waitFor();
-  await p.getByTestId("win-close").hover(); // (the pointer stays on the row, so it stays)
+  await p.mouse.move(700, 2, { steps: 12 });
+  await expect(p.getByTestId("win-row")).toHaveClass(/is-shown/);
   await settle(400);
   await shot("window-row", { x: 0, y: 0, width: 1440, height: 160 });
 });
