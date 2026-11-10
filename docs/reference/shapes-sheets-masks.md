@@ -28,6 +28,7 @@ A fixed area of the canvas, like a page or an artboard. One drag draws it. It is
 | **Cuts** things at its edge | On by default; the clip button in Layers shows what lies outside. |
 | **Has a shape, not a size** | The Sheet bar shows a **Ratio** (`16:9`, `A4 portrait`, `1.5` …), a list of common shapes and **Turn** (portrait ⇄ landscape). A new ratio keeps the area and the top-left corner. |
 | **Makes what is on it follow it** | Each thing on a sheet has a **Pin** (left/top by default: it stays put; right, both, centre, or scale). **Scale contents** (kept with the sheet) makes everything on it grow with it, whatever the pins say. |
+| **Lays out what is on it** (auto layout, `Shift+A`) | A row, a column, a wrap or a grid, with a gap, padding, alignment and packing; the sheet hugs its contents or keeps its size; a thing on it can fill the room or stay out of the layout. Whatever changes on the sheet lays it out again, in the same undo step (ADR 0186). |
 | **Is measured in per cent** | X, Y, W and H of something on a sheet are per cent of the sheet, so they read the same at any zoom. |
 | **Gets a size when it is exported** | **Export…** (Actions bar, Sheet bar, command palette) chooses px, inches, cm or mm at a resolution, from the shape (ADR 0147). |
 | Fits and moves | **Fit to contents** shrinks it to what is on it; **Put on a sheet** (`Ctrl+Alt+G`) puts picked things on a new one and **Release** takes it away; the name above a sheet picks it with what is on it. |

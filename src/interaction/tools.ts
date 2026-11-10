@@ -318,6 +318,8 @@ type Gesture =
 const MIN_TEXT_BOX_PX = 24;
 
 export interface ToolHooks {
+  /** Shift+A: auto layout (ADR 0186) on or off for the picked sheets, or a new sheet that lays out the picked things. */
+  autoLayout(): void;
   /** Open the text editor on `target`, or on a new text object at `at` (a click: as wide as its words; a box dragged out: `box.widthPx` wide, `at` its top-left corner). */
   editText(target: TextObject | null, at: WorldPoint, box?: { widthPx: number }): void;
   /** A double-click on a picture or file card (a note's card opens the note to edit). */
@@ -2758,6 +2760,9 @@ export function attachTools(
     } else if (mod && e.altKey && key === "g") {
       e.preventDefault();
       sheetSelection(doc, editor);
+    } else if (!mod && e.shiftKey && !e.altKey && key === "a") {
+      e.preventDefault();
+      hooks.autoLayout();
     } else if (mod && key === "g") {
       if (e.shiftKey) ungroupSelection(doc, editor);
       else groupSelection(doc, editor);

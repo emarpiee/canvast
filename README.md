@@ -503,7 +503,7 @@ Keep a large canvas in order, and reach things that lie under others.
 | Feature | What it does |
 | --- | --- |
 | **Layers panel** | Group, rename, hide, lock, re-stack, opacity and blend modes |
-| **Sheets** (`C`) | Hold objects and cut them at their edge; what you export |
+| **Sheets** (`C`) | Hold objects and cut them at their edge; what you export; auto layout places what is on them |
 | **Masks** | By shape, opacity or brightness, or painted with the Pen |
 | **Snapping** | To boxes, corners and sides, with guide lines |
 | **Arranging** | Align, distribute, arrange in a grid; `Alt`+drag copies |
@@ -519,6 +519,7 @@ Keep a large canvas in order, and reach things that lie under others.
   - Ratio presets: `16:9`, `A4 portrait`, a number, or a size in px (`2000 x 1920` becomes `25 : 24`). One selected shape has the same field.
   - **Custom ratios:** *Save this ratio…* at the top of the *Shapes…* list takes a ratio or a size in px (made a ratio) and a name; they are listed under *Custom* and given as saved, upright or on the side. Rename, change, update from the selection or delete them under *Ratios* in the Styles panel (*Manage custom ratios…*). They are kept in the workspace and always go with a backup and an Advanced export.
   - Each object on a sheet has pins per axis (left, right, both, centre or scale) that decide what it does when the sheet is resized; *Scale contents* resizes everything with it.
+  - **Auto layout** (`Shift+A`, the Sheets menu of the Actions bar, or the sheet's badge in Layers; on touch, the menu): what is on the sheet is placed by rules, as a **row**, a **column**, a **wrap** (rows that break at the sheet's width) or a **grid**, with a gap, padding, an alignment across the flow and a packing along it (start, centre, end, spread). The sheet can **hug** its width and its height (grow and shrink to its contents) or keep its size. Anything added to, taken off, resized or moved on the sheet lays it out again, in the same undo step, and a sheet that hugs inside another lays that one out too. A thing dropped on the sheet takes the place it is dropped at (it moves there when released). Turning it on reads the layout from where things are, so they stay put; `Shift+A` on things that are on no sheet puts them on a new one that hugs them (with no fill). A thing on such a sheet can **fill** the room along an axis, or be kept **out of the layout** (the Properties bar). A sheet resized by hand stops hugging on that axis.
 - **Masks:** a clipping mask (a sheet of any shape), a mask by opacity or brightness, or a brush mask painted in black and white with the Pen. Masks can be inverted, selected on their own and released. A click on a mask selects it as one unit; a double click goes inside.
 - **Moving a group:** a group or several selected move from anywhere in their box, gaps too; press outside it to draw a selection box.
 - **Snapping:** moving, resizing, turning, dragging a node and dragging a gradient's handles snap to other things, with guide lines (the magnet button turns it off). Drawing snaps too: a shape, sheet, speech balloon or text box starts on the corner, edge or grid line it is pressed near, and its far corner snaps as a resized one does. Moving, resizing and dragging a node also snap to the grid's lines as shown, and to a group's box and middle as a whole. *Snap to the grid* and *Snap distance* are in Settings > Drawing.
@@ -1091,6 +1092,7 @@ Every shortcut can be changed in **Settings → Shortcuts**: a single key or a c
 | Delete | `Delete` · `Backspace` |
 | Group · ungroup | `Ctrl/⌘+G` · `Ctrl/⌘+Shift+G` |
 | Put the selection on a sheet · flatten | `Ctrl+Alt+G` · `Ctrl/⌘+E` (text to paths, a boolean group to one path) |
+| Auto layout on or off (picked sheets), or a new sheet that lays out the picked things | `Shift+A` |
 | Bring to front · send to back | `Ctrl/⌘+]` · `Ctrl/⌘+[` |
 | Bookmarks | `[` previous · `]` next · `Alt+1` … `Alt+9` go to bookmark 1 to 9 |
 | Previous view · next view | `Alt+Shift+←` · `Alt+Shift+→` |

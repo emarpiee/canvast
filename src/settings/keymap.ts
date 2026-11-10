@@ -158,6 +158,7 @@ export const KEY_COMMANDS: readonly KeyCommand[] = [
   cmd("edit.duplicate", "Duplicate", EDIT_GROUP, "Ctrl+D"),
   cmd("edit.group", "Group", EDIT_GROUP, "Ctrl+G"),
   cmd("edit.ungroup", "Ungroup", EDIT_GROUP, "Ctrl+Shift+G"),
+  cmd("edit.autoLayout", "Auto layout: on or off for the picked sheets, or a new sheet that lays out the picked things", EDIT_GROUP, "Shift+A"),
   cmd("edit.front", "Bring to front", EDIT_GROUP, "Ctrl+]"),
   cmd("edit.back", "Send to back", EDIT_GROUP, "Ctrl+["),
   cmd("edit.flatten", "Flatten: text to paths, a boolean group to one path", EDIT_GROUP, "Ctrl+E"),

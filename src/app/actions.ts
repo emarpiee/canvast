@@ -61,6 +61,9 @@ import { NOTE_PAGE_PIXEL_W, pivotOf } from "../doc/model";
 import { MAX_NAME_LENGTH, editSubs, inkStyle, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs, strokePoints } from "../doc/model";
 import { worldBounds, scaleAbout } from "../doc/edit-ops";
 import { planSheetScale } from "../doc/constraints";
+import { DEFAULT_LAYOUT, guessLayout, isLaidOut, layOutSheet, type LaidOutSheet } from "../doc/auto-layout";
+import { ownerOf } from "../doc/belongs";
+import type { SheetLayout } from "../doc/model";
 import { localToWorld, normalizeUnit, placeAbove, unionBounds, restack, rotateAbout, translate } from "../doc/edit-ops";
 import { expandToUnits, groupObjects, ungroupObjects, unitKey } from "../doc/groups";
 import type { AlignKey, GapKey, SortKey, Unit } from "../doc/arrange";
@@ -2794,9 +2797,106 @@ export function setPin(doc: DocumentStore, editor: EditorState, patch: { h?: Con
   editor.changed();
 }
 
-/** Whether a sheet that has things on it is picked (Fit to contents applies). */
+/** Whether a sheet that has things on it is picked (Fit to contents applies; a sheet with auto layout sizes itself: hug). */
 export const canFitSheet = (doc: DocumentStore, editor: EditorState): boolean =>
-  selected(doc, editor).some((o) => isContainer(o) && !o.rot && o.radius === undefined && [...doc.all()].some((k) => k.parent === o.id));
+  selected(doc, editor).some((o) => isContainer(o) && !o.rot && o.radius === undefined && !isLaidOut(o) && [...doc.all()].some((k) => k.parent === o.id));
+
+// ---- Auto layout (ADR 0186) ----------------------------------------------------------------------
+
+/** The one picked sheet that has auto layout, with its layout (null: none, or several). */
+export function autoLayoutOf(doc: DocumentStore, editor: EditorState): { sheet: LaidOutSheet; layout: SheetLayout } | null {
+  const s = pickedSheet(doc, editor);
+  return isLaidOut(s) ? { sheet: s, layout: s.container.layout } : null;
+}
+
+/** Whether the picked sheets have auto layout: every one (true), not every one (false), or no sheet is picked (null). */
+export function autoLayoutState(doc: DocumentStore, editor: EditorState): boolean | null {
+  const sheets = selected(doc, editor).filter((o) => isContainer(o) && !o.rot);
+  return sheets.length ? sheets.every((s) => isLaidOut(s)) : null;
+}
+
+/**
+ * Auto layout on or off for the picked sheets: one undo step. Turned on, the layout is read from where the things on the sheet are (a row, a
+ * column, a grid or a wrap, with their gap and the room to the edge), so they stay about where they are; the sheet keeps its size.
+ */
+export function setAutoLayout(doc: DocumentStore, editor: EditorState, on: boolean): void {
+  if (editor.blockEdit()) return;
+  const sheets = selected(doc, editor).filter((o): o is PathObject & { container: { clip: boolean } } => isContainer(o) && !o.rot && !o.locked && isLaidOut(o) !== on);
+  if (!sheets.length) return;
+  const all = doc.ordered();
+  const next = sheets.map((s): CanvasObject => {
+    const { layout: _l, ...rest } = s.container;
+    return { ...s, container: on ? { ...rest, layout: guessLayout(s, all, doc.space) } : rest };
+  });
+  doc.commit(doc.transaction(`Auto layout ${on ? "on" : "off"}${next.length > 1 ? ` (${next.length} sheets)` : ""}`, next));
+  editor.changed();
+}
+
+/** Shift+A: auto layout on the picked sheets (off when every one has it); for other picked things, a new sheet round them that lays them out and hugs them. */
+export function autoLayoutShortcut(doc: DocumentStore, editor: EditorState): void {
+  const state = autoLayoutState(doc, editor);
+  if (state !== null) return setAutoLayout(doc, editor, !state);
+  if (editor.blockEdit()) return;
+  const roots = rootsOf(selected(doc, editor).filter((o) => !o.locked));
+  const made = roots.length ? sheetAround(doc, roots, doc.ordered(), null) : null; // (no fill: the sheet is there to place them, as other tools make it)
+  if (!made) {
+    editor.message = "Select things to lay out, or a sheet.";
+    editor.changed();
+    return;
+  }
+  const inside = new Map(made.inside.map((o) => [o.id, o] as const));
+  const all = [...doc.ordered().map((o) => inside.get(o.id) ?? o), made.sheet];
+  const sheet = { ...made.sheet, container: { ...made.sheet.container!, layout: guessLayout(made.sheet as PathObject & { container: { clip: boolean } }, all, doc.space, [true, true]) } } as LaidOutSheet;
+  doc.commit(doc.transaction("Auto layout", [sheet, ...made.inside]));
+  editor.select([sheet.id]);
+  editor.changed();
+}
+
+/** Change the picked sheet's auto layout (its flow, gap, padding, alignment, hugging, columns): one undo step; not final, only shown. */
+export function patchAutoLayout(doc: DocumentStore, editor: EditorState, patch: Partial<SheetLayout>, final = true): void {
+  const got = autoLayoutOf(doc, editor);
+  if (!got || editor.blockEdit() || got.sheet.locked) return;
+  let layout: SheetLayout = { ...got.layout, ...patch };
+  // (a wrap needs a width to wrap at: a sheet that hugged its width keeps the width it has)
+  if (patch.flow === "wrap" && got.layout.flow !== "wrap" && layout.hug[0]) layout = { ...layout, hug: [false, layout.hug[1]] };
+  const sheet = { ...got.sheet, container: { ...got.sheet.container, layout } } as LaidOutSheet;
+  if (!final) return showReplaced(editor, [sheet, ...layOutSheet(sheet, doc.ordered().map((o) => (o.id === sheet.id ? sheet : o)), doc.space)]);
+  editor.preview = { kind: "none" };
+  doc.commit(doc.transaction("Change auto layout", [sheet]));
+  editor.changed();
+}
+
+/** The layout a sheet gets when turned on from the Layers panel (no selection needed): read from what is on it. */
+export function setSheetLayout(doc: DocumentStore, editor: EditorState, id: string, on: boolean): void {
+  const s = doc.get(id);
+  if (editor.blockEdit() || !isContainer(s) || s.rot || s.locked || isLaidOut(s) === on) return;
+  const { layout: _l, ...rest } = s.container;
+  doc.commit(doc.transaction(`Auto layout ${on ? "on" : "off"}`, [{ ...s, container: on ? { ...rest, layout: guessLayout(s, doc.ordered(), doc.space) } : rest } as CanvasObject]));
+  editor.changed();
+}
+
+/** How the first picked thing on a sheet with auto layout takes part in it (null: none is on one); `stretch`: whether it can fill (a pen stroke and a turned thing cannot). */
+export function selectedInLayout(doc: DocumentStore, editor: EditorState): { fill: "none" | "x" | "y" | "both"; free: boolean; stretch: boolean } | null {
+  const on = selected(doc, editor).find((o) => o.parent !== undefined && isLaidOut(doc.get(o.parent)) && ownerOf(o) === undefined);
+  return on ? { fill: on.inLayout?.fill ?? "none", free: on.inLayout?.free === true, stretch: on.kind !== "stroke" && !on.rot } : null;
+}
+
+/** Change how the picked things on sheets with auto layout take part in it: fill the room along an axis, or stay out of the layout where they are. One undo step. */
+export function setInLayout(doc: DocumentStore, editor: EditorState, patch: { fill?: "none" | "x" | "y" | "both"; free?: boolean }): void {
+  const on = selected(doc, editor).filter((o) => o.parent !== undefined && isLaidOut(doc.get(o.parent)) && !o.locked && ownerOf(o) === undefined);
+  if (!on.length || editor.blockEdit()) return;
+  const next = on.map((o): CanvasObject => {
+    const fill = patch.fill ?? o.inLayout?.fill ?? "none";
+    const free = patch.free ?? o.inLayout?.free === true;
+    const { inLayout: _i, ...rest } = o;
+    const v = { ...(fill !== "none" ? { fill } : {}), ...(free ? { free: true as const } : {}) };
+    return (Object.keys(v).length ? { ...rest, inLayout: v } : rest) as CanvasObject;
+  });
+  doc.commit(doc.transaction(patch.free !== undefined ? (patch.free ? "Keep out of the layout" : "Back into the layout") : "Fill in the layout", next));
+  editor.changed();
+}
+
+export { DEFAULT_LAYOUT };
 
 /** The one picked sheet (upright), when exactly one is picked. */
 const pickedSheet = (doc: DocumentStore, editor: EditorState) => {

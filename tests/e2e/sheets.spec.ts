@@ -823,3 +823,78 @@ test("several selected items: a sheet each, one undo step; and in Export, each o
   await expect(p.locator("[data-mini]")).toHaveCount(3);
   await expect(p.getByTestId("export-together")).toBeVisible();
 });
+
+test("auto layout: Shift+A puts the picked things on a sheet that lays them out in a row with their gap and hugs them; a shape drawn on it joins the row, deleting one closes the gap, dragging one past another reorders; the Layers badge and the Sheets menu switch it (ADR 0186)", async ({ app }) => {
+  const p = app.page;
+  type Laid = Obj & { container?: { clip: boolean; layout?: { flow: string; gap: number[]; hug: boolean[] } }; z: number };
+  const laid = async (): Promise<Laid[]> => (await objs(app)) as Laid[];
+  const boxOf = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+  await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false)); // (the places below are exact)
+  await key(app, "u");
+  await drag(app, [400, 300], [460, 360]);
+  await drag(app, [480, 300], [540, 360]);
+  await drag(app, [560, 300], [620, 360]);
+  const [s1, s2, s3] = (await objs(app)).slice(-3).map((o) => o.id) as [string, string, string];
+  await key(app, "v");
+  await key(app, "Control+a");
+  // (with no sheet picked the Sheets menu offers the same, for a touch screen; the key does it here)
+  await p.locator('[data-ctx="sheetmenu"]').click();
+  await expect(p.locator('.pop-menu [data-id="autolayout"]')).toContainText("new sheet");
+  await key(app, "Escape");
+  await expect(p.locator(".pop-menu")).toHaveCount(0);
+  await key(app, "Shift+A");
+  await app.frame();
+  const sheet = (await laid()).find((o) => o.container)!;
+  expect(sheet.container!.layout!.flow, "a row, read from where they are").toBe("row");
+  expect(sheet.container!.layout!.hug, "the new sheet hugs them").toEqual([true, true]);
+  expect((await laid()).filter((o) => o.parent === sheet.id).map((o) => o.id).sort()).toEqual([s1, s2, s3].sort());
+  expect(await selection(app)).toEqual([sheet.id]);
+  const xs = async () => Promise.all([s1, s2, s3].map(async (id) => (await boxOf(id)).minX));
+  expect((await xs()).map(Math.round)).toEqual([400, 480, 560]);
+  const sb = await boxOf(sheet.id);
+  expect([sb.minX, sb.minY, sb.maxX, sb.maxY].map(Math.round), "as large as the row").toEqual([400, 300, 620, 360]);
+  // the Properties bar shows the layout of the picked sheet: the gap in px as seen (20)
+  await expect(p.locator("[data-layout]")).toBeVisible();
+  await expect(p.locator('[data-layout-flow="row"]')).toHaveAttribute("aria-checked", "true");
+  expect(Number(await p.locator('[data-layout-gap="0"]').inputValue())).toBeCloseTo(20, 0);
+  // a shape drawn on the sheet joins the row where it is drawn (after the first), and the sheet grows round it
+  await key(app, "u");
+  await drag(app, [430, 320], [450, 340]);
+  const s4 = (await objs(app)).at(-1)!.id;
+  await key(app, "v");
+  await app.frame();
+  expect((await laid()).find((o) => o.id === s4)!.parent).toBe(sheet.id);
+  expect(Math.round((await boxOf(s4)).minX), "second in the row").toBe(480);
+  expect((await xs()).map(Math.round)).toEqual([400, 520, 600]);
+  expect(Math.round((await boxOf(sheet.id)).maxX), "the sheet grew by the shape and a gap").toBe(660);
+  // taken away, the gap closes
+  await click(app, 490, 330);
+  expect(await selection(app)).toEqual([s4]);
+  await key(app, "Delete");
+  await app.frame();
+  expect((await xs()).map(Math.round)).toEqual([400, 480, 560]);
+  expect(Math.round((await boxOf(sheet.id)).maxX)).toBe(620);
+  // the first dragged past the last goes last; one undo brings the order back
+  await click(app, 430, 330);
+  expect(await selection(app)).toEqual([s1]);
+  await drag(app, [430, 330], [600, 330]); // (still on the sheet, its middle past the last one's)
+  await app.frame();
+  expect((await xs()).map(Math.round), "s2, s3, then s1").toEqual([560, 400, 480]);
+  const z = (await laid()).filter((o) => [s1, s2, s3].includes(o.id)).map((o) => [o.id, o.z] as const);
+  expect(z.find(([id]) => id === s1)![1], "the front one, first in Layers, is now the last in the row").toBeLessThan(z.find(([id]) => id === s3)![1]);
+  await key(app, "Control+z");
+  await app.frame();
+  expect((await xs()).map(Math.round)).toEqual([400, 480, 560]);
+  // the Layers badge turns it off and on again (the layout read from the row again); the Sheets menu does the same
+  await p.locator("[data-layers]").click();
+  const badge = p.locator(".layers-panel [data-layout]");
+  await expect(badge).toHaveAttribute("aria-pressed", "true");
+  await badge.click();
+  await expect.poll(async () => (await laid()).find((o) => o.id === sheet.id)!.container!.layout).toBeUndefined();
+  await badge.click();
+  await expect.poll(async () => (await laid()).find((o) => o.id === sheet.id)!.container!.layout?.flow).toBe("row");
+  await pickSheet(app);
+  await sheetWith(p, "autolayout");
+  await expect.poll(async () => (await laid()).find((o) => o.id === sheet.id)!.container!.layout).toBeUndefined();
+  expect(app.consoleErrors).toEqual([]);
+});

@@ -64,6 +64,14 @@ import linkSvg from "lucide-static/icons/link.svg";
 import unlinkSvg from "lucide-static/icons/unlink.svg";
 import fileQuestionMarkSvg from "lucide-static/icons/file-question-mark.svg";
 import shrinkSvg from "lucide-static/icons/shrink.svg";
+import layoutTemplateSvg from "lucide-static/icons/layout-template.svg";
+import galleryHorizontalSvg from "lucide-static/icons/gallery-horizontal.svg";
+import galleryVerticalSvg from "lucide-static/icons/gallery-vertical.svg";
+import grid3x2Svg from "lucide-static/icons/grid-3x2.svg";
+import table2Svg from "lucide-static/icons/table-2.svg";
+import foldHorizontalSvg from "lucide-static/icons/fold-horizontal.svg";
+import foldVerticalSvg from "lucide-static/icons/fold-vertical.svg";
+import layoutFreeformSvg from "lucide-static/icons/layout-freeform.svg";
 import cropSvg from "lucide-static/icons/crop.svg";
 import flipHorizontalSvg from "lucide-static/icons/flip-horizontal-2.svg";
 import flipVerticalSvg from "lucide-static/icons/flip-vertical-2.svg";
@@ -711,6 +719,15 @@ export const ICONS = {
   unlink: clean(unlinkSvg),
   fileMissing: clean(fileQuestionMarkSvg),
   shrink: clean(shrinkSvg),
+  // auto layout (ADR 0186): the switch, the four flows, hugging the width and the height, a thing kept out of it
+  autoLayout: clean(layoutTemplateSvg),
+  flowRow: clean(galleryHorizontalSvg),
+  flowColumn: clean(galleryVerticalSvg),
+  flowWrap: clean(grid3x2Svg),
+  flowGrid: clean(table2Svg),
+  hugWidth: clean(foldHorizontalSvg),
+  hugHeight: clean(foldVerticalSvg),
+  layoutFree: clean(layoutFreeformSvg),
   crop: clean(cropSvg),
   flipHorizontal: clean(flipHorizontalSvg),
   flipVertical: clean(flipVerticalSvg),

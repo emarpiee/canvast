@@ -75,6 +75,8 @@ interface ObjectBase {
   readonly constraint?: { readonly h: "left" | "right" | "both" | "center" | "scale"; readonly v: "top" | "bottom" | "both" | "center" | "scale" };
   /** The sheet (a path with `container`, ADR 0108) this object is on; absent = on the canvas itself. A sheet that is gone counts as absent. */
   readonly parent?: ObjectId;
+  /** On a sheet with auto layout (ADR 0186): `fill` stretches it to the room along an axis; `free` keeps it out of the layout, where it is. Absent = laid out at its own size. */
+  readonly inLayout?: InLayout;
   /** The groups containing this object, outermost first (doc/groups.ts, ADR 0020); absent = not grouped. */
   readonly groups?: readonly string[];
   /** Layer name shown in the Layers panel (ADR 0047); absent = the automatic label. */
@@ -104,6 +106,41 @@ interface ObjectBase {
   /** Drawn, but cannot be picked, selected or edited while true (ADR 0021); absent = unlocked. */
   readonly locked?: boolean;
 }
+
+/** How a thing on a sheet with auto layout (ADR 0186) takes part in it. */
+export interface InLayout {
+  readonly fill?: "x" | "y" | "both";
+  readonly free?: true;
+}
+
+/**
+ * Auto layout of a sheet (ADR 0186): what is on it is placed by these rules, not by hand. Lengths are in the sheet's own units (`unit`), so
+ * they scale with it. `gap`: between items along the flow, then across it. `pad`: inside the sheet's edge, top, right, bottom, left.
+ * `hug`: whether the sheet takes the width, then the height, of its contents (else it keeps its own and the contents are aligned in it).
+ */
+export interface SheetLayout {
+  readonly flow: LayoutFlow;
+  readonly gap: readonly [number, number];
+  readonly pad: readonly [number, number, number, number];
+  /** Items across the flow (and the block of them, in a sheet that does not hug). */
+  readonly align: "start" | "centre" | "end";
+  /** Items along the flow, in a sheet that does not hug: packed at the start, the centre or the end, or spread between. */
+  readonly justify: "start" | "centre" | "end" | "between";
+  readonly hug: readonly [boolean, boolean];
+  /** Grid: how many columns; absent = about as many as rows. */
+  readonly columns?: number;
+}
+export type LayoutFlow = "row" | "column" | "wrap" | "grid";
+export const LAYOUT_FLOWS: readonly LayoutFlow[] = ["row", "column", "wrap", "grid"];
+export const LAYOUT_ALIGNS = ["start", "centre", "end"] as const;
+export const LAYOUT_JUSTIFIES = ["start", "centre", "end", "between"] as const;
+const validLayout = (l: unknown): l is SheetLayout => {
+  const o = l as SheetLayout | null;
+  const len = (v: unknown): boolean => typeof v === "number" && Number.isFinite(v) && v >= 0;
+  return typeof o === "object" && o !== null && LAYOUT_FLOWS.includes(o.flow) && Array.isArray(o.gap) && o.gap.length === 2 && o.gap.every(len) && Array.isArray(o.pad) && o.pad.length === 4 && o.pad.every(len) &&
+    (LAYOUT_ALIGNS as readonly string[]).includes(o.align) && (LAYOUT_JUSTIFIES as readonly string[]).includes(o.justify) && Array.isArray(o.hug) && o.hug.length === 2 && o.hug.every((v) => typeof v === "boolean") &&
+    (o.columns === undefined || (Number.isInteger(o.columns) && o.columns >= 1 && o.columns <= 1024));
+};
 
 /** What a pattern was made with: generator id, group id, seed and the values of its settings (numbers, texts and switches). */
 export interface GenInfo {
@@ -282,8 +319,8 @@ export interface PathObject extends ObjectBase {
   /** Absent: round. */
   readonly cap?: Cap;
   /** Present: this path is a sheet (ADR 0108): a rectangle that holds objects (they name it as their `parent`) and, with `clip`, hides what lies outside it. */
-  /** A sheet (ADR 0108). `scale`: when the sheet is resized, everything on it grows with it, whatever its pins say (ADR 0133). */
-  readonly container?: { readonly clip: boolean; readonly scale?: true; readonly mask?: true; readonly was?: { readonly fill: Paint | null; readonly stroke: Paint | null } };
+  /** A sheet (ADR 0108). `scale`: when the sheet is resized, everything on it grows with it, whatever its pins say (ADR 0133). `layout`: auto layout (ADR 0186). */
+  readonly container?: { readonly clip: boolean; readonly scale?: true; readonly mask?: true; readonly was?: { readonly fill: Paint | null; readonly stroke: Paint | null }; readonly layout?: SheetLayout };
   /** Absent: a solid outline. Dash and gap, in widths of the outline (ADR 0107). */
   readonly dash?: Dash;
   /** Corners sharper than this many degrees (1 to 90) are cut to a bevel instead of a point; absent = the default (29°). */
@@ -562,6 +599,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
   if (o.groups !== undefined && !(Array.isArray(o.groups) && o.groups.length > 0 && o.groups.length <= 16 && new Set(o.groups).size === o.groups.length && o.groups.every((g) => ID_RE.test(g)))) throw new InvalidObjectError("bad groups");
   if (o.parent !== undefined && !(typeof o.parent === "string" && ID_RE.test(o.parent) && o.parent !== o.id)) throw new InvalidObjectError("bad parent");
   if (o.constraint !== undefined && !(typeof o.constraint === "object" && o.constraint !== null && ["left", "right", "both", "center", "scale"].includes(o.constraint.h) && ["top", "bottom", "both", "center", "scale"].includes(o.constraint.v))) throw new InvalidObjectError("bad constraint");
+  if (o.inLayout !== undefined && !(typeof o.inLayout === "object" && o.inLayout !== null && (o.inLayout.fill === undefined || ["x", "y", "both"].includes(o.inLayout.fill)) && (o.inLayout.free === undefined || o.inLayout.free === true))) throw new InvalidObjectError("bad inLayout");
   if (o.name !== undefined && !(typeof o.name === "string" && o.name.length > 0 && o.name.length <= MAX_NAME_LENGTH)) throw new InvalidObjectError("bad name");
   if (o.adjust !== undefined && !validAdjust(o.adjust)) throw new InvalidObjectError("bad adjustments");
   if (o.blend !== undefined && !(BLEND_MODES as readonly string[]).includes(o.blend)) throw new InvalidObjectError("bad blend mode");
@@ -613,7 +651,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if (!(finite(o.width, "width") > 0)) throw new InvalidObjectError("width must be positive");
     if (o.join !== undefined && o.join !== "miter" && o.join !== "bevel") throw new InvalidObjectError("bad join");
     if (o.cap !== undefined && o.cap !== "butt" && o.cap !== "square") throw new InvalidObjectError("bad cap");
-    if (o.container !== undefined && !(typeof o.container === "object" && o.container !== null && typeof o.container.clip === "boolean" && (o.container.scale === undefined || o.container.scale === true) && (o.container.mask === undefined || o.container.mask === true) && (o.container.was === undefined || (typeof o.container.was === "object" && o.container.was !== null && [o.container.was.fill, o.container.was.stroke].every((v) => v === null || isPaint(v)))))) throw new InvalidObjectError("bad container");
+    if (o.container !== undefined && !(typeof o.container === "object" && o.container !== null && typeof o.container.clip === "boolean" && (o.container.scale === undefined || o.container.scale === true) && (o.container.mask === undefined || o.container.mask === true) && (o.container.was === undefined || (typeof o.container.was === "object" && o.container.was !== null && [o.container.was.fill, o.container.was.stroke].every((v) => v === null || isPaint(v)))) && (o.container.layout === undefined || validLayout(o.container.layout)))) throw new InvalidObjectError("bad container");
     if (o.dash !== undefined && !(Array.isArray(o.dash) && o.dash.length === 2 && o.dash.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0) && o.dash[0] + o.dash[1] > 0)) throw new InvalidObjectError("bad dash");
     if (o.profile !== undefined && !PROFILE_NAMES.includes(o.profile)) throw new InvalidObjectError("bad width profile");
     if (o.net !== undefined && o.net !== true) throw new InvalidObjectError("net is true or absent");

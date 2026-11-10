@@ -1,0 +1,120 @@
+import { describe, expect, it } from "vitest";
+import * as D from "../../src/core/dyadic";
+import { FrameSpace } from "../../src/core/frames";
+import type { CanvasObject, PathObject, SheetLayout } from "../../src/doc/model";
+import { newObjectId } from "../../src/doc/model";
+import type { DerivationSource } from "../../src/doc/boolean-group";
+import { DEFAULT_LAYOUT, guessLayout, layOutSheet, placeItems, withAutoLayout, type ItemSize } from "../../src/doc/auto-layout";
+import { worldBounds } from "../../src/doc/edit-ops";
+
+const space = new FrameSpace();
+const at = (x: number, y: number) => ({ x: D.fromNumber(x), y: D.fromNumber(y) });
+const rect = (x: number, y: number, w: number, h: number, z: number, extra: Partial<PathObject> = {}): PathObject =>
+  ({ id: newObjectId(), kind: "path", anchor: at(x, y), unit: 0, z, opacity: 1, attachmentTargetId: null, sub: [{ n: [0, 0, 0, 0, 0, 0, w, 0, w, 0, w, 0, w, h, w, h, w, h, 0, h, 0, h, 0, h], closed: true }], fill: "#000000", stroke: null, width: 1, ...extra });
+const sheet = (x: number, y: number, w: number, h: number, z: number, layout: Partial<SheetLayout> = {}, extra: Partial<PathObject> = {}): PathObject =>
+  rect(x, y, w, h, z, { container: { clip: true, layout: { ...DEFAULT_LAYOUT, ...layout } }, ...extra });
+const src = (...all: CanvasObject[]): DerivationSource => ({ get: (id) => all.find((o) => o.id === id), all: () => all, space });
+const box = (o: CanvasObject): [number, number, number, number] => {
+  const b = worldBounds(o);
+  return [D.toNumber(b.min.x), D.toNumber(b.min.y), D.toNumber(b.max.x), D.toNumber(b.max.y)];
+};
+const of = (list: readonly CanvasObject[], o: CanvasObject): CanvasObject => list.find((x) => x.id === o.id) ?? o;
+const near = (a: readonly number[], b: readonly number[]): void => a.forEach((v, i) => expect(v).toBeCloseTo(b[i]!, 6));
+
+describe("placing items (doc/auto-layout.ts placeItems)", () => {
+  const l = (p: Partial<SheetLayout>): SheetLayout => ({ ...DEFAULT_LAYOUT, ...p });
+  const two = [{ w: 10, h: 10 }, { w: 20, h: 10 }];
+  it("a row and a column, with a gap and padding, hugging their contents", () => {
+    const row = placeItems(l({ flow: "row", gap: [5, 0], pad: [1, 2, 3, 4] }), 100, 100, two);
+    expect(row.cells.map((c) => [c.x, c.y])).toEqual([[4, 1], [19, 1]]);
+    expect([row.w, row.h]).toEqual([41, 14]);
+    const col = placeItems(l({ flow: "column", gap: [5, 0], pad: [1, 2, 3, 4] }), 100, 100, two);
+    expect(col.cells.map((c) => [c.x, c.y])).toEqual([[4, 1], [4, 16]]);
+    expect([col.w, col.h]).toEqual([26, 29]);
+  });
+  it("a wrap breaks at the width of a sheet that keeps it; a grid has columns and rows as wide and tall as their largest", () => {
+    const wrap = placeItems(l({ flow: "wrap", hug: [false, true] }), 30, 5, [{ w: 10, h: 10 }, { w: 20, h: 10 }, { w: 10, h: 10 }]);
+    expect(wrap.cells.map((c) => [c.x, c.y])).toEqual([[0, 0], [10, 0], [0, 10]]);
+    expect([wrap.w, wrap.h]).toEqual([30, 20]);
+    const grid = placeItems(l({ flow: "grid", columns: 2, gap: [2, 3] }), 100, 100, [{ w: 10, h: 10 }, { w: 14, h: 10 }, { w: 10, h: 12 }, { w: 10, h: 10 }]);
+    expect(grid.cells.map((c) => [c.x, c.y])).toEqual([[0, 0], [12, 0], [0, 13], [12, 13]]);
+    expect([grid.w, grid.h]).toEqual([26, 25]);
+  });
+  it("in a sheet that keeps its size: items are packed, centred, at the end or spread; aligned across; one that fills takes the room", () => {
+    const fixed = (p: Partial<SheetLayout>, items: ItemSize[] = [{ w: 10, h: 10 }]) => placeItems(l({ hug: [false, false], ...p }), 100, 50, items).cells;
+    expect(fixed({ justify: "centre" })[0]!.x).toBe(45);
+    expect(fixed({ justify: "end" })[0]!.x).toBe(90);
+    expect(fixed({ justify: "between" }, [{ w: 10, h: 10 }, { w: 10, h: 10 }]).map((c) => c.x)).toEqual([0, 90]);
+    expect(fixed({ align: "end" })[0]!.y).toBe(40);
+    expect(fixed({ align: "centre" })[0]!.y).toBe(20);
+    const fill = fixed({}, [{ w: 10, h: 10, fill: "x" }, { w: 10, h: 10 }]);
+    expect(fill.map((c) => [c.x, c.w])).toEqual([[0, 90], [90, 10]]);
+    expect(fixed({}, [{ w: 10, h: 10, fill: "y" }])[0]!.h).toBe(50);
+  });
+});
+
+describe("laying out a sheet (layOutSheet, withAutoLayout)", () => {
+  it("puts the items in a row, front first, with the gap, and the sheet hugs them from its top-left corner", () => {
+    const s = sheet(0, 0, 100, 100, 0, { flow: "row", gap: [10, 0] });
+    const a = rect(50, 40, 20, 10, 2, { parent: s.id }), b = rect(5, 70, 30, 20, 1, { parent: s.id });
+    const out = layOutSheet(s as never, [s, a, b], space);
+    near(box(of(out, a)), [0, 0, 20, 10]);
+    near(box(of(out, b)), [30, 0, 60, 20]);
+    near(box(of(out, s)), [0, 0, 60, 20]);
+  });
+  it("a thing dropped on the sheet takes the place it is dropped at, and the stacking order follows", () => {
+    const s = sheet(0, 0, 60, 20, 0, { flow: "row", gap: [10, 0] });
+    const a = rect(0, 0, 20, 10, 2, { parent: s.id }), b = rect(30, 0, 20, 10, 1, { parent: s.id });
+    const moved = { ...b, anchor: at(-50, 0) } as CanvasObject; // (dragged left of a)
+    const out = withAutoLayout(src(s, a, b), [moved], []);
+    near(box(of(out, b)), [0, 0, 20, 10]);
+    near(box(of(out, a)), [30, 0, 50, 10]);
+    expect(of(out, b).z).toBe(2);
+    expect(of(out, a).z).toBe(1);
+  });
+  it("the whole sheet moved keeps its order; a sheet resized by hand stops hugging on that axis; a hidden or free thing is left alone", () => {
+    const s = sheet(0, 0, 50, 10, 0, { flow: "row", gap: [10, 0] });
+    const a = rect(0, 0, 20, 10, 2, { parent: s.id }), b = rect(30, 0, 20, 10, 1, { parent: s.id });
+    const shift = (o: CanvasObject): CanvasObject => ({ ...o, anchor: at(D.toNumber(o.anchor.x) + 100, D.toNumber(o.anchor.y) + 5) });
+    const movedAll = withAutoLayout(src(s, a, b), [shift(s), shift(a), shift(b)], []);
+    near(box(of(movedAll, a)), [100, 5, 120, 15]);
+    near(box(of(movedAll, b)), [130, 5, 150, 15]);
+    const wider = withAutoLayout(src(s, a, b), [{ ...rect(0, 0, 80, 10, 0), id: s.id, container: s.container! }], []);
+    expect((of(wider, s) as PathObject).container!.layout!.hug).toEqual([false, true]);
+    const hidden = rect(40, 40, 5, 5, 3, { parent: s.id, hidden: true }), free = rect(40, 40, 5, 5, 4, { parent: s.id, inLayout: { free: true } });
+    const out = withAutoLayout(src(s, a, b, hidden, free), [{ ...a, fill: "#ff0000" } as CanvasObject], []);
+    expect(out.find((o) => o.id === hidden.id)).toBeUndefined();
+    expect(out.find((o) => o.id === free.id)).toBeUndefined();
+  });
+  it("a sheet that hugs inside a sheet that hugs: something added to the inner one grows both, in one go", () => {
+    const outer = sheet(0, 0, 40, 10, 0, { flow: "row", gap: [5, 0] });
+    const beside = rect(15, 0, 25, 10, 1, { parent: outer.id }), inner = sheet(0, 0, 10, 10, 2, { flow: "row", gap: [0, 0] }, { parent: outer.id });
+    const x = rect(0, 0, 10, 10, 3, { parent: inner.id });
+    const added = rect(0, 0, 10, 10, 4, { parent: inner.id });
+    const out = withAutoLayout(src(outer, inner, x, beside), [added], []);
+    near(box(of(out, inner)), [0, 0, 20, 10]);
+    near(box(of(out, beside)), [25, 0, 50, 10]);
+    near(box(of(out, outer)), [0, 0, 50, 10]);
+  });
+  it("a thing that fills takes the room, and what is on an inner sheet that fills follows it by its pins", () => {
+    const s = sheet(0, 0, 100, 30, 0, { flow: "row", gap: [0, 0], hug: [false, false] });
+    const inner = sheet(0, 0, 20, 10, 1, { flow: "row" }, { parent: s.id, inLayout: { fill: "x" } });
+    const on = rect(0, 0, 20, 10, 2, { parent: inner.id, constraint: { h: "both", v: "top" } }), other = rect(50, 0, 20, 10, 3, { parent: s.id });
+    const out = withAutoLayout(src(s, inner, on, other), [{ ...other, fill: "#ff0000" } as CanvasObject], []);
+    near(box(of(out, other)), [0, 0, 20, 10]);
+    near(box(of(out, inner)), [20, 0, 100, 10]);
+    near(box(of(out, on)), [20, 0, 100, 10]);
+  });
+});
+
+describe("reading a layout from where things are (guessLayout)", () => {
+  it("a row with its usual gap and the room to the edge; a grid with its columns", () => {
+    const s = rect(0, 0, 100, 40, 0, { container: { clip: true } }) as PathObject & { container: { clip: boolean } };
+    const row = [rect(10, 10, 20, 20, 1, { parent: s.id }), rect(35, 10, 20, 20, 2, { parent: s.id }), rect(60, 10, 20, 20, 3, { parent: s.id })];
+    const g = guessLayout(s, [s, ...row], space);
+    expect([g.flow, g.gap, g.pad, g.hug]).toEqual(["row", [5, 0], [10, 20, 10, 10], [false, false]]);
+    const grid = [rect(0, 0, 10, 10, 1, { parent: s.id }), rect(20, 0, 10, 10, 2, { parent: s.id }), rect(0, 20, 10, 10, 3, { parent: s.id }), rect(20, 20, 10, 10, 4, { parent: s.id })];
+    const gg = guessLayout(s, [s, ...grid], space, [true, true]);
+    expect([gg.flow, gg.columns, gg.gap, gg.hug]).toEqual(["grid", 2, [10, 10], [true, true]]);
+  });
+});

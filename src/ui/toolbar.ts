@@ -6,7 +6,8 @@ import type { MenuItem } from "./more-menu";
 import { createBar, isOff, syncGroups, syncScroll } from "./bar";
 import { liveNumber } from "./live";
 import { isContainer } from "../doc/containers";
-import type { CanvasObject } from "../doc/model";
+import type { CanvasObject, SheetLayout } from "../doc/model";
+import { LAYOUT_FLOWS } from "../doc/model";
 import type { TextLook, lookOf } from "../text/text-style";
 import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 import type { EditorState, Tool } from "../app/editor-state";
@@ -80,6 +81,12 @@ export interface ToolbarActions {
   moveOnSheet(x: number, y: number, final?: boolean): void;
   /** Whether the picked sheet scales what is on it when it is resized, and the switch for it (a property of the sheet). */
   sheetScale(): boolean;
+  /** Auto layout (ADR 0186) of the one picked sheet (null: none, or it has none), with the screen px per unit of the sheet (its lengths are shown in px), and changing it. */
+  autoLayout(): { layout: SheetLayout; ppu: number } | null;
+  setAutoLayout(patch: Partial<SheetLayout>, final?: boolean): void;
+  /** How the first picked thing on a sheet with auto layout takes part in it (null: none is), and changing it. */
+  inLayout(): { fill: "none" | "x" | "y" | "both"; free: boolean; stretch: boolean } | null;
+  setInLayout(patch: { fill?: "none" | "x" | "y" | "both"; free?: boolean }): void;
   setSheetScale(on: boolean): void;
   resizeOnSheet(w: number, h: number, final?: boolean): void;
   /** Pictures (ADR 0118): crop the picked still, show it whole, and the adjustments of the picked pictures. */
@@ -296,6 +303,19 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
           <select data-sheet-preset aria-label="Shape preset" title="A common shape: the sheet or shape takes it, keeping its area and its top-left corner"><option value="">Shapes…</option><optgroup label="Custom" data-custom-ratios></optgroup>${["Basic", "Screen", "Paper", "Social"].map((g) => `<optgroup label="${g}">${RATIO_PRESETS.filter((r) => r.group === g).map((r) => `<option value="${r.ratio}">${r.label}</option>`).join("")}</optgroup>`).join("")}</select>
           <button type="button" data-sheet-turn aria-label="Turn it on its side: swap its width and height" title="Turn it on its side: portrait ⇄ landscape (the same area)">${ICONS.arrowRightLeft}</button>
           <button type="button" data-sheet-scale aria-pressed="false" aria-label="Scale contents with the sheet" title="Scale contents (kept with this sheet): when the sheet is resized, everything on it grows with it, whatever its pins say">${ICONS.sheetScale}</button></span>
+        <span class="tb-count" data-kind="sheet" data-layout hidden title="Auto layout: how what is on the sheet is placed. Lengths in px as seen now">
+          <span class="seg" role="radiogroup" aria-label="Flow">${[["row", "Row: items left to right", ICONS.flowRow], ["column", "Column: items top to bottom", ICONS.flowColumn], ["wrap", "Wrap: rows that break at the sheet's width", ICONS.flowWrap], ["grid", "Grid: columns and rows", ICONS.flowGrid]].map(([v, t, i]) => `<button type="button" role="radio" data-layout-flow="${v}" aria-checked="false" aria-label="${t}" title="${t}">${i}</button>`).join("")}</span>
+          <label>Gap <input type="number" data-layout-gap="0" min="0" step="any" inputmode="decimal" aria-label="Gap between items along the flow (px)" title="Gap between items along the flow"></label><label><input type="number" data-layout-gap="1" min="0" step="any" inputmode="decimal" aria-label="Gap between lines (px)" title="Gap between lines (a wrap or a grid)"></label>
+          <label>Pad <input type="number" data-layout-pad="h" min="0" step="any" inputmode="decimal" aria-label="Padding left and right (px)" title="Padding left and right"></label><label><input type="number" data-layout-pad="v" min="0" step="any" inputmode="decimal" aria-label="Padding top and bottom (px)" title="Padding top and bottom"></label>
+          <span data-layout-pad-sides hidden>${[["t", "top"], ["r", "right"], ["b", "bottom"], ["l", "left"]].map(([k, n]) => `<label>${n!.charAt(0).toUpperCase()} <input type="number" data-layout-pad="${k}" min="0" step="any" inputmode="decimal" aria-label="Padding ${n} (px)" title="Padding ${n}"></label>`).join("")}</span>
+          <button type="button" data-layout-pad-each aria-pressed="false" aria-label="Padding of each side" title="Padding of each side: top, right, bottom, left">${ICONS.maximize}</button>
+          <select data-layout-align aria-label="Items across the flow" title="Items across the flow: at the start, the centre or the end of their line (and the block of lines in a sheet that does not hug)"><option value="start">Start</option><option value="centre">Centre</option><option value="end">End</option></select>
+          <select data-layout-justify aria-label="Items along the flow" title="Items along the flow, in a sheet that does not hug: packed at the start, the centre or the end, or spread between"><option value="start">Pack start</option><option value="centre">Pack centre</option><option value="end">Pack end</option><option value="between">Spread</option></select>
+          <button type="button" data-layout-hug="0" aria-pressed="false" aria-label="Hug the width" title="Hug the width: the sheet is as wide as its contents (off: it keeps its width, and the contents are aligned in it)">${ICONS.hugWidth}</button><button type="button" data-layout-hug="1" aria-pressed="false" aria-label="Hug the height" title="Hug the height: the sheet is as tall as its contents (off: it keeps its height)">${ICONS.hugHeight}</button>
+          <label data-layout-columns-wrap hidden>Columns <input type="number" data-layout-columns min="1" max="1024" step="1" inputmode="numeric" aria-label="Columns of the grid" title="Columns of the grid (empty: about as many as rows)"></label></span>
+        <span class="tb-count" data-kind="any" data-in-layout hidden title="How it takes part in its sheet's auto layout">In layout
+          <select data-in-fill aria-label="Fill: stretch to the room" title="Its size in the layout: its own, or stretched to the room along an axis"><option value="none">Own size</option><option value="x">Fill width</option><option value="y">Fill height</option><option value="both">Fill both</option></select>
+          <button type="button" data-in-free aria-pressed="false" aria-label="Keep out of the layout" title="Keep out of the layout: it stays where it is put, the others flow round it">${ICONS.layoutFree}</button></span>
         <label class="tb-count" data-kind="shape" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the field left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
       <div class="tb-group tb-options" data-for="text note select node" data-kind="text">
@@ -645,6 +665,35 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   root.querySelector<HTMLElement>("[data-sheet-scale]")!.addEventListener("click", () => {
     actions.setSheetScale(!actions.sheetScale());
   });
+  // Auto layout (ADR 0186): the flow, the gap and padding (typed in px as seen now, kept in the sheet's units), the alignment, hugging, columns.
+  const layoutEl = <T extends HTMLElement>(sel: string): T => root.querySelector<T>(`[data-layout] ${sel}`)!;
+  const toUnits = (px: number): number => { const al = actions.autoLayout(); return al && al.ppu > 0 && al.ppu < Infinity ? Math.max(0, px) / al.ppu : NaN; };
+  for (const b of root.querySelectorAll<HTMLElement>("[data-layout-flow]")) b.addEventListener("click", () => actions.setAutoLayout({ flow: b.dataset["layoutFlow"] as SheetLayout["flow"] }));
+  for (const i of [0, 1] as const) liveNumber(layoutEl(`[data-layout-gap="${i}"]`), (v, final) => { const al = actions.autoLayout(), u = toUnits(v); if (al && Number.isFinite(u)) actions.setAutoLayout({ gap: i === 0 ? [u, al.layout.gap[1]] : [al.layout.gap[0], u] }, final); });
+  const PAD: Record<string, number[]> = { t: [0], r: [1], b: [2], l: [3], h: [1, 3], v: [0, 2] };
+  for (const [k, at] of Object.entries(PAD)) liveNumber(layoutEl(`[data-layout-pad="${k}"]`), (v, final) => {
+    const al = actions.autoLayout(), u = toUnits(v);
+    if (!al || !Number.isFinite(u)) return;
+    const pad = [...al.layout.pad] as [number, number, number, number];
+    for (const i of at) pad[i] = u;
+    actions.setAutoLayout({ pad }, final);
+  });
+  layoutEl<HTMLElement>("[data-layout-pad-each]").addEventListener("click", (e) => {
+    const b = e.currentTarget as HTMLElement;
+    b.setAttribute("aria-pressed", String(b.getAttribute("aria-pressed") !== "true"));
+    editor.changed(); // (the bar is drawn again: the fields of each side show or go)
+  });
+  layoutEl<HTMLSelectElement>("[data-layout-align]").addEventListener("change", (e) => actions.setAutoLayout({ align: (e.target as HTMLSelectElement).value as SheetLayout["align"] }));
+  layoutEl<HTMLSelectElement>("[data-layout-justify]").addEventListener("change", (e) => actions.setAutoLayout({ justify: (e.target as HTMLSelectElement).value as SheetLayout["justify"] }));
+  for (const b of root.querySelectorAll<HTMLElement>("[data-layout-hug]")) b.addEventListener("click", () => {
+    const al = actions.autoLayout();
+    if (!al) return;
+    const i = Number(b.dataset["layoutHug"]);
+    actions.setAutoLayout({ hug: i === 0 ? [!al.layout.hug[0], al.layout.hug[1]] : [al.layout.hug[0], !al.layout.hug[1]] });
+  });
+  liveNumber(layoutEl("[data-layout-columns]"), (v, final) => { if (final) actions.setAutoLayout(Number.isFinite(v) && v >= 1 ? { columns: Math.round(v) } : { columns: undefined as unknown as number }); });
+  root.querySelector<HTMLSelectElement>("[data-in-fill]")!.addEventListener("change", (e) => actions.setInLayout({ fill: (e.target as HTMLSelectElement).value as "none" | "x" | "y" | "both" }));
+  root.querySelector<HTMLElement>("[data-in-free]")!.addEventListener("click", () => { const il = actions.inLayout(); if (il) actions.setInLayout({ free: !il.free }); });
   root.querySelector<HTMLElement>("[data-crop]")!.addEventListener("click", () => {
     const id = [...editor.selection][0];
     editor.cropId = editor.cropId ? null : (id ?? null);
@@ -1026,6 +1075,38 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         const el = onSheet(f);
         if (free(el)) el.value = String(Math.round(v * 100) / 100);
       }
+    }
+    // Auto layout (ADR 0186): the picked sheet's, in px as seen now
+    const al = pick && still ? actions.autoLayout() : null;
+    root.querySelector<HTMLElement>("[data-layout]")!.hidden = !al;
+    if (al) {
+      const l = al.layout, px = (u: number): string => String(Math.round(u * al.ppu * 10) / 10);
+      for (const b of root.querySelectorAll<HTMLElement>("[data-layout-flow]")) b.setAttribute("aria-checked", String(b.dataset["layoutFlow"] === l.flow));
+      for (const i of [0, 1] as const) { const f = layoutEl<HTMLInputElement>(`[data-layout-gap="${i}"]`); if (free(f)) f.value = px(l.gap[i]); }
+      // (each side when they differ, or when asked)
+      const eachBtn = layoutEl<HTMLElement>("[data-layout-pad-each]");
+      const uneven = l.pad[0] !== l.pad[2] || l.pad[1] !== l.pad[3];
+      const each = uneven || eachBtn.getAttribute("aria-pressed") === "true";
+      layoutEl<HTMLElement>("[data-layout-pad-sides]").hidden = !each;
+      for (const k of ["h", "v"]) layoutEl<HTMLElement>(`[data-layout-pad="${k}"]`).parentElement!.hidden = each;
+      eachBtn.setAttribute("aria-pressed", String(each));
+      for (const [k, v] of [["t", l.pad[0]], ["r", l.pad[1]], ["b", l.pad[2]], ["l", l.pad[3]], ["h", l.pad[3]], ["v", l.pad[0]]] as const) { const f = layoutEl<HTMLInputElement>(`[data-layout-pad="${k}"]`); if (free(f)) f.value = px(v); }
+      layoutEl<HTMLSelectElement>("[data-layout-align]").value = l.align;
+      layoutEl<HTMLSelectElement>("[data-layout-justify]").value = l.justify;
+      for (const b of root.querySelectorAll<HTMLElement>("[data-layout-hug]")) b.setAttribute("aria-pressed", String(l.hug[Number(b.dataset["layoutHug"])]));
+      layoutEl<HTMLElement>("[data-layout-columns-wrap]").hidden = l.flow !== "grid";
+      const cols = layoutEl<HTMLInputElement>("[data-layout-columns]");
+      if (free(cols)) cols.value = l.columns === undefined ? "" : String(l.columns);
+      layoutEl<HTMLSelectElement>("[data-layout-justify]").disabled = l.hug[l.flow === "column" ? 1 : 0];
+      void LAYOUT_FLOWS;
+    }
+    const il = pick && still ? actions.inLayout() : null;
+    root.querySelector<HTMLElement>("[data-in-layout]")!.hidden = !il;
+    if (il) {
+      const fill = root.querySelector<HTMLSelectElement>("[data-in-fill]")!;
+      fill.value = il.fill;
+      fill.disabled = !il.stretch;
+      root.querySelector<HTMLElement>("[data-in-free]")!.setAttribute("aria-pressed", String(il.free));
     }
     const ratio = pick && still ? actions.sheetRatio() : null;
     root.querySelector<HTMLElement>("[data-sheet-size]")!.hidden = ratio === null;

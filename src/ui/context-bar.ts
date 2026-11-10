@@ -52,6 +52,11 @@ export interface ContextActions {
   releaseSheet(): void;
   canReleaseSheet(): boolean;
   putOnSheet(): void;
+  /** Auto layout (ADR 0186) of the picked sheets: every one has it (true), not every one (false), no sheet is picked (null); and the switch. */
+  autoLayout(): boolean | null;
+  setAutoLayout(on: boolean): void;
+  /** The picked things on a new sheet that lays them out and hugs them (what Shift+A does when no sheet is picked). */
+  layoutOnSheet(): void;
   canSheetEach(): boolean;
   sheetEach(): void;
   fitSheet(): void;
@@ -256,6 +261,9 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
           ...(actions.canSheetEach() ? [{ id: "eachsheet", label: "Put each on its own sheet", hint: "A sheet for each selected item", icon: ICONS.sheetEach, run: () => actions.sheetEach() }] : []),
           ...(actions.canReleaseSheet() ? [{ id: "unsheet", label: "Release the sheet", hint: "Keeps what is on it", icon: ICONS.releaseSheet, run: () => actions.releaseSheet() }] : []),
           ...(actions.canFitSheet() ? [{ id: "fitsheet", label: "Fit the sheet to its contents", hint: "The sheet shrinks or grows to what is on it", icon: ICONS.shrink, run: () => actions.fitSheet() }] : []),
+          actions.autoLayout() !== null
+            ? { id: "autolayout", label: "Auto layout", hint: "A row, a column, a wrap or a grid (Shift+A)", icon: ICONS.autoLayout, checked: actions.autoLayout() === true, run: () => actions.setAutoLayout(actions.autoLayout() !== true) }
+            : { id: "autolayout", label: "Auto layout on a new sheet", hint: "Round them, laid out as a row (Shift+A)", icon: ICONS.autoLayout, run: () => { closeMoreMenu(); actions.layoutOnSheet(); } },
         ];
         openMoreMenu(b, items(), "Sheets", { keepOpen: true, refresh: items });
         break;

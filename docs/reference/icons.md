@@ -192,6 +192,14 @@ One icon per function: two buttons that do different things never share an icon,
 | `refresh-ccw-dot` | Reset flip (the picture the right way round) |
 | `sliders-vertical` | Adjust the picture (the Properties bar), and the Adjust panel button of the panels bar: both open the Adjust panel |
 | `shrink` | Fit the sheet to what is on it |
+| `layout-template` | Auto layout on or off (Sheets menu, the sheet's badge in Layers) |
+| `gallery-horizontal` | Auto layout flow: row (Properties bar) |
+| `gallery-vertical` | Auto layout flow: column |
+| `grid-3x2` | Auto layout flow: wrap |
+| `table-2` | Auto layout flow: grid |
+| `fold-horizontal` | Auto layout: hug the width |
+| `fold-vertical` | Auto layout: hug the height |
+| `layout-freeform` | Keep a thing out of its sheet's auto layout |
 | `link` | Attach the picked objects to another object |
 | `unlink` | Detach the picked objects |
 | `fileMissing` | Library sidebar: Missing, the items whose file is gone |

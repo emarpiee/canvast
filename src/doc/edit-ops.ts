@@ -30,7 +30,7 @@ function scaleCoord(a: D.Dyadic, f: D.Dyadic, k: D.Dyadic, unit: number): D.Dyad
  * look; with the radius lock on (`keepRadius`) it stays the size it is. The rounding is made again.
  */
 function stretched(o: PathObject, kx: number, ky: number, keepRadius: boolean): Partial<PathObject> {
-  const params = o.params ? { params: scaleParams(o.params, kx, ky) } : {};
+  const params = o.params ? { params: scaleParams(o.params, kx, ky), ...layoutScaled(o, kx, ky) } : layoutScaled(o, kx, ky);
   const radius = o.radius === undefined ? undefined : keepRadius ? o.radius : scaleRadius(o.radius, Math.sqrt(kx * ky));
   const own = radius === undefined ? {} : { radius };
   if (o.base) {
@@ -41,8 +41,17 @@ function stretched(o: PathObject, kx: number, ky: number, keepRadius: boolean): 
 }
 
 /** A path with its local units renamed (s times as many units for the same size): everything in local units follows. */
+/** A sheet's auto layout lengths (gaps, padding: in its units) scaled with it; nothing for a path without one. */
+const layoutScaled = (o: PathObject, kx: number, ky: number): Partial<PathObject> => {
+  const l = o.container?.layout;
+  if (!l) return {};
+  const along = l.flow === "column" ? ky : kx, across = l.flow === "column" ? kx : ky;
+  return { container: { ...o.container!, layout: { ...l, gap: [l.gap[0] * along, l.gap[1] * across], pad: [l.pad[0] * ky, l.pad[1] * kx, l.pad[2] * ky, l.pad[3] * kx] } } };
+};
+
 function renamed(o: PathObject, s: number): Partial<PathObject> {
   return {
+    ...layoutScaled(o, s, s),
     sub: scaleSubs(o.sub, s, s),
     ...(o.params ? { params: scaleParams(o.params, s, s) } : {}),
     ...(o.base ? { base: scaleSubs(o.base, s, s) } : {}),

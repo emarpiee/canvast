@@ -4,6 +4,7 @@ import { homeObject, validateObject, worldForm } from "./model";
 import { withDerived } from "./boolean-group";
 import { withShapeTexts } from "./text-in-shape";
 import { withBalloonLinks } from "./balloon-link";
+import { withAutoLayout } from "./auto-layout";
 
 /**
  * The authoritative document: a set of canvas objects keyed by stable id.
@@ -109,6 +110,8 @@ export class DocumentStore {
 
   /** Build a transaction that replaces/creates `next` objects and deletes `removed` ids. */
   transaction(label: string, next: readonly CanvasObject[], removed: readonly ObjectId[] = []): Transaction {
+    // Sheets with auto layout that the change reaches lay out what is on them again (ADR 0186), before what follows from where things are.
+    next = withAutoLayout(this, next, removed);
     // The results of boolean groups that the change reaches are brought up to date in the same transaction (ADR 0103).
     ({ next, removed } = withDerived(this, next, removed));
     ({ next, removed } = withBalloonLinks(this, next, removed)); // (and the connectors of the balloons it changes)

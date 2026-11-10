@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.56.22 — Auto layout on sheets (2026-11-10)
+
+- **Added:** auto layout on sheets (ADR 0186): `Shift+A`, the Sheets menu or the sheet's badge in Layers lays out what is on a sheet as a row, a column, a wrap or a grid, with a gap, padding on each side, an alignment across the flow and a packing along it (start, centre, end, spread), all in the Properties bar when the sheet is picked. The sheet hugs its width or its height (as large as its contents) or keeps its size. Anything added to, taken off, resized or moved on the sheet lays it out again in the same undo step; a sheet that hugs lays out the sheet it is on in turn. A thing dropped on the sheet takes the place it is dropped at. Turning it on reads the layout from where things are; `Shift+A` on things that are on no sheet puts them on a new sheet that hugs them.
+- **Changed:** the sheet `Shift+A` makes round picked things has no fill (give it one with Fill), as in other tools; *Put on a sheet* still makes a white one.
+- **Added:** the Sheets menu offers *Auto layout on a new sheet* for picked things that are on no sheet (what `Shift+A` does), so it is reached without a keyboard.
+- **Added:** a thing on such a sheet can fill the room along an axis (width, height or both) or be kept out of the layout (Properties bar).
+- **Changed:** a sheet with auto layout that is resized by hand stops hugging on that axis; *Fit the sheet to its contents* is not offered for one (it hugs instead).
+- **Added:** unit tests of the placing rule, the derivation, dropping and nested hugging; a sheets test of `Shift+A`, joining, deleting, reordering, the Layers badge and the menu.
+
 ## 0.56.21 — What a sheet cuts stays cut, blurred or shadowed too (2026-11-10)
 
 - **Fixed:** a blur or a shadow on a shape, text or picture on a clipping sheet spread past the sheet's edge: the sheet cut the object before it was blurred. The cut now goes round the whole of it, adjusted and masked, on the canvas, in tiles and in exported pictures (an SVG already cut it so).
