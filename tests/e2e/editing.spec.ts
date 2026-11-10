@@ -1211,10 +1211,12 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
     await app.frame();
   };
   /** Nothing selected, so no Actions bar sits where the next input goes. */
+  let clears = 0;
   const clear = async () => {
-    await key(app, "Escape");
     await key(app, "v");
-    await click(1100, 720);
+    await key(app, "Escape");
+    // (a spot of its own each time: two clicks on one spot close together would be a double-click)
+    if (await p.evaluate(() => window.__canvastDebug.selection().length)) await click(1060 + 12 * (clears++ % 6), 715);
     await expect.poll(() => p.evaluate(() => window.__canvastDebug.selection().length)).toBe(0);
   };
   const words = async (x: number, y: number, text: string) => {
