@@ -104,7 +104,6 @@
   --dlg-m: 520px;
   --dlg-l: 640px;
   --dlg-xl: 720px;
-  --dlg-2xl: 54rem;
   --dlg-3xl: 72rem;
   --choice-h: 320px;
   --text-md: 13px;
@@ -2903,7 +2902,7 @@ select option, select optgroup { color: var(--hud-fg); background: var(--hud-bg)
 
 /* ---- Export (ui/export-dialog.ts, ADR 0147): the size is chosen here, from the shape ---------------------------------- */
 /* (the shared dialog, dialog.confirm, gives it its look; only its size and its own layout are here) */
-dialog.export-dlg { width: min(var(--dlg-2xl), calc(100vw - 2 * var(--edge))); max-width: none; padding: 0; overflow: auto; }
+dialog.export-dlg { width: min(var(--dlg-3xl), calc(100vw - 2 * var(--edge))); max-width: none; padding: 0; overflow: auto; }
 .ex-head { display: flex; align-items: center; justify-content: space-between; padding: var(--s-8) var(--s-10) var(--s-4); }
 .ex-head h2 { margin: 0; font-size: var(--text-3xl); font-weight: var(--weight-semibold); }
 .ex-what { color: var(--hud-muted); font-weight: var(--weight-regular); }
@@ -2929,9 +2928,9 @@ dialog.export-dlg { width: min(var(--dlg-2xl), calc(100vw - 2 * var(--edge))); m
 .ex-field.is-quiet select { color: var(--hud-muted); }
 .ex-hint { margin: 0; color: var(--hud-muted); font: var(--font-meta); }
 .ex-hint[hidden] { display: none; }
-.ex-preset { flex-direction: row; align-items: center; gap: var(--s-4); }
-.ex-preset select { flex: 1; min-width: 0; }
-.ex-swatch { display: inline-block; width: var(--icon-sm); height: var(--icon-sm); margin-left: var(--s-4); vertical-align: middle; background: var(--swatch, transparent); border: 1px solid var(--hud-border); border-radius: var(--r-dot); }
+.ex-field.ex-preset { flex-direction: row; align-items: center; gap: var(--s-4); }
+.ex-field.ex-preset select { flex: 1; min-width: 0; }
+.ex-swatch { display: inline-block; flex: none; width: var(--icon-sm); height: var(--icon-sm); background: var(--swatch, transparent); border: 1px solid var(--hud-border); border-radius: var(--r-dot); }
 .ex-field { display: flex; flex-direction: column; gap: var(--s-2); color: var(--hud-muted); font: var(--font-meta); }
 .ex-field input[type="number"], .ex-field input[type="text"], .ex-field select { height: var(--list-h); padding: 0 var(--s-4); color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-sm); font: var(--font-value); font-variant-numeric: tabular-nums; }
 .ex-field input[type="number"] { width: calc(var(--sp-15) + var(--sp-9)); text-align: right; }
@@ -2942,7 +2941,7 @@ dialog.export-dlg { width: min(var(--dlg-2xl), calc(100vw - 2 * var(--edge))); m
 .ex-label { color: var(--hud-muted); font: var(--font-meta); align-self: center; }
 /* One segmented control (a row of choices, one of them on): the export dialog, the paint modes and options of the colour picker, the Styles panel's target. */
 .seg { display: inline-flex; gap: var(--s-1); padding: var(--s-1); background: var(--hud-hover); border-radius: var(--r-sm); }
-.seg button { height: var(--field-h); padding: 0 var(--s-6); color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-xs); font: var(--font-value); cursor: pointer; }
+.seg button { display: inline-flex; align-items: center; justify-content: center; gap: var(--s-4); height: var(--field-h); padding: 0 var(--s-6); color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-xs); font: var(--font-value); cursor: pointer; }
 .seg button:hover:not(:disabled) { color: var(--hud-fg); }
 .seg button[aria-checked="true"], .seg button[aria-selected="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
 .seg button:disabled { opacity: 0.4; cursor: default; }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.8 — A wider Export dialog (2026-11-10)
+
+- **Changed:** the Export dialog is wider by default (as wide as for several items, within the window).
+- **Fixed:** in Export, *Preset* stood centred above the size, and the *Colour* background button put its swatch under its name.
+
 ## 0.56.7 — The desktop build checks again (2026-11-10)
 
 - **Fixed:** the desktop app's type check failed since 0.56.5: the saved styles reached the Export dialog's page code for export presets. The presets' data now lives on its own (`app/export-prefs.ts`).
@@ -11,7 +16,7 @@
 - **Added:** a menu row can show a count at its end.
 - **Fixed:** the Export dialog had the browser's plain square black border: a stray brace in the style sheet dropped its whole look. It now has the shared dialog's look (its border, corners and shadow).
 - **Fixed:** a colour or a menu opened from a dialog (Export's background *Colour*) could not be used: the page around a dialog does not answer. Menus and colour popovers now open inside the dialog.
-- **Changed:** every dialog's width is a token (six sizes) and keeps an edge from the window, the same for all; each has the shared shadow.
+- **Changed:** every dialog's width is a token and keeps an edge from the window, the same for all; each has the shared shadow.
 
 ## 0.56.5 — Export: on-screen sizes, padding, presets, Export again (2026-11-10)
 
