@@ -140,16 +140,19 @@ export function drawObjects(
     if (run.length) strokeBatch(ctx, run, strokeLineWidth(run[0]!), vp);
     run = [];
   };
-  const paintOne = (c: CanvasRenderingContext2D, po: ProjectedObject): void => {
-    // On a clipping sheet (ADR 0108): cut by the sheet's shape (rounded corners, turned, exact at depth, as it is drawn itself).
-    if (po.clip) {
-      c.save();
-      for (const cl of po.clip) {
-        c.beginPath();
-        addFillPath(c, cl, vp);
-        c.clip(cl.obj.kind === "path" && cl.obj.evenodd ? "evenodd" : "nonzero");
-      }
+  // On a clipping sheet (ADR 0108): cut by the sheet's shape (rounded corners, turned, exact at depth, as it is drawn itself).
+  const clipTo = (c: CanvasRenderingContext2D, po: ProjectedObject): void => {
+    c.save();
+    for (const cl of po.clip!) {
+      c.beginPath();
+      addFillPath(c, cl, vp);
+      c.clip(cl.obj.kind === "path" && cl.obj.evenodd ? "evenodd" : "nonzero");
     }
+  };
+  /** One object as it is drawn; `cut`: cut by its sheets here (false: the caller cuts it, after what spreads past it: a blur, a shadow). */
+  const paintOne = (c: CanvasRenderingContext2D, po: ProjectedObject, cut = true): void => {
+    const clipped = cut && !!po.clip;
+    if (clipped) clipTo(c, po);
     if (po.rotated) {
       // A turned image or text: draw the unturned one into the widened viewport, with the canvas turned.
       const t = po.rotated;
@@ -186,7 +189,7 @@ export function drawObjects(
       drawImageObject(c, po, vp, dpr, src, theme.imagePlaceholder);
       if (!src && assets.isLocked(key)) drawLockMark(c, po, dpr, theme.imageLocked);
     }
-    if (po.clip) c.restore();
+    if (clipped) c.restore();
   };
   for (const po of list) {
     if (batchable(po)) {
@@ -199,15 +202,18 @@ export function drawObjects(
     flush();
     const mask = po.obj.mask && po.maskPos?.length ? po.maskPos : null;
     // (a shape, stroke or text with adjustments is drawn on a scratch layer and adjusted there; a picture is adjusted in its pixels)
+    // (what a blur or a shadow spreads past the object is cut by its sheets too: the cut goes round the whole of it, adjusted and masked)
     const paintAdj = (c: CanvasRenderingContext2D): void => {
       const a = po.obj.adjust;
       // (a picture is adjusted in its own pixels: only its shadows are made here)
-      if (a && po.obj.kind !== "image" && !po.cover && !isNeutral(a)) drawAdjusted(c, po, a, (g) => paintOne(g, po));
-      else if (a && po.obj.kind === "image" && !po.cover && hasShadow(a)) drawAdjusted(c, po, a, (g) => paintOne(g, po), false);
-      else paintOne(c, po);
+      if (a && po.obj.kind !== "image" && !po.cover && !isNeutral(a)) drawAdjusted(c, po, a, (g) => paintOne(g, po, false));
+      else if (a && po.obj.kind === "image" && !po.cover && hasShadow(a)) drawAdjusted(c, po, a, (g) => paintOne(g, po, false), false);
+      else paintOne(c, po, false);
     };
+    if (po.clip) clipTo(ctx, po);
     if (mask) drawMasked(ctx, paintAdj, (c) => { for (const m of mask) paintOne(c, m); }, po.obj.mask!.mode, po.obj.mask!.invert === true);
     else paintAdj(ctx);
+    if (po.clip) ctx.restore();
   }
   flush();
   return pending;

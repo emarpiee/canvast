@@ -13,6 +13,7 @@ import { rasterKey } from "../doc/model";
 import { cameraIn } from "../scene/frame-index";
 import { worldToScreen } from "../core/camera";
 import { projectObject } from "../render/projection";
+import { ancestorsOf } from "../doc/containers";
 import { radiansFromAngle } from "../core/angle";
 import type { SettingKey, SettingsStore } from "../settings/settings";
 import { ICONS } from "./icons";
@@ -358,9 +359,21 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     }
     if (write) actions.setMedia(p.o.id, { t }, "Pause media");
     p.eng.unload();
-    p.eng.el.remove();
+    (p.eng.el.parentElement?.classList.contains("media-clip") ? p.eng.el.parentElement : p.eng.el).remove();
   };
 
+  /**
+   * The shape of the clipping sheet a player is on, in the page's px (a CSS path; "" when none cuts it): what plays, and what its blur spreads,
+   * stays inside the sheet as the canvas draws it. (Only the innermost one: a sheet on a sheet that cuts is itself cut by that one on the canvas.)
+   */
+  const sheetClip = (o: ImageObject): string => {
+    const sheet = ancestorsOf((id) => doc.get(id), o).find((c) => c.container.clip);
+    const cam = sheet && cameraIn(view.frameCamera, sheet.frame ?? doc.space.world);
+    const po = sheet && cam ? projectObject(sheet, cam, view.viewport, { keepTiny: true }) : null;
+    if (!po?.path) return "";
+    const d = po.path.filter((f) => f.pts.length >= 4).map((f) => `M${[...f.pts].map((v) => v.toFixed(1)).join(" ").replace(/^(\S+ \S+)/, "$1 L")}${f.closed ? "Z" : ""}`).join("");
+    return d ? `path(${sheet!.evenodd ? "evenodd, " : ""}"${d}")` : "";
+  };
   const transforming = (id: string): boolean => editor.preview.kind !== "none" && "ids" in editor.preview && editor.preview.ids.includes(id);
 
   const position = (p: Player): void => {
@@ -384,6 +397,9 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     el.style.display = visible ? "" : "none";
     el.style.opacity = p.loading ? "0" : "";
     el.style.filter = playingFilter(o.adjust); // (every adjustment, as a filter: the same one the canvas draws the paused picture with)
+    // (on a clipping sheet: cut by it, the blur too, as on the canvas; the cut is in the page's px, so it sits on the box round the picture)
+    const clipBox = el.parentElement?.classList.contains("media-clip") ? el.parentElement : null;
+    if (clipBox) clipBox.style.clipPath = visible ? sheetClip(o) : "";
     if (visible) {
       // A cropped video or GIF: the element is the whole picture, as big as the window would make it, put so the window is where the
       // object is, and everything outside the window is clipped away.
@@ -431,7 +447,11 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
     }
     const p: Player = { o, eng, loading: 0 };
     eng.el.style.display = "none"; // shown once it holds the paused picture: never the first frame for a moment
-    host.append(eng.el);
+    // (in a box as big as the view, which a clipping sheet's shape cuts: see sheetClip)
+    const clipBox = document.createElement("div");
+    clipBox.className = "media-clip";
+    clipBox.append(eng.el);
+    host.append(clipBox);
     eng.onTick = () => p === sel && refresh();
     // The canvas draws a paused video from a decode of the file; what the player really showed is better: keep that picture instead.
     eng.onSettled = () => {

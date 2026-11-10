@@ -1,4 +1,4 @@
-import { expect, outlineShapes, test, styleKind } from "./harness";
+import { expect, outlineShapes, test, styleKind, openAdjust } from "./harness";
 import type { App } from "./harness";
 import { makePng } from "./png";
 import { serializeAco } from "../../src/assets/aco";
@@ -22,11 +22,6 @@ const centre = async (app: App, id: string): Promise<[number, number]> => {
 const SUNSET = "GIMP Gradient\nName: Sunset\n1\n0.000000 0.500000 1.000000 1.000000 0.000000 0.000000 1.000000 0.000000 0.000000 1.000000 1.000000 0 0 0 0\n";
 
 /** The Adjust panel is a dock panel: the button shows it, and it stays (ADR 0123). */
-async function openAdjust(p: App["page"]): Promise<void> {
-  if (!(await p.getByTestId("adjust-panel").isVisible())) await p.getByRole("button", { name: /^Adjust the picture/ }).click();
-  await p.getByTestId("adjust-panel").locator(".adjust-pop").waitFor();
-}
-
 test("Styles: a shape painted with a saved colour follows it when the colour is changed; a colour set by hand unlinks it (ADR 0157)", async ({ app }) => {
   const p = app.page;
   const hexIn = async (hex: string) => {

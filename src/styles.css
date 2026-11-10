@@ -849,6 +849,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .layout-wrap { position: relative; display: inline-flex; }
 
 /* On-canvas video player (ui/media-player.ts) */
+.media-clip { position: absolute; inset: 0; pointer-events: none; z-index: var(--z-item); }
 .media-video { position: absolute; pointer-events: none; z-index: var(--z-item); background: var(--black); object-fit: fill; }
 .media-video[hidden], .media-bar[hidden] { display: none; }
 .media-bar { position: absolute; transform: translateX(-50%); width: 360px; max-width: calc(100% - 24px); display: flex; align-items: center; gap: var(--s-2); z-index: var(--z-item-bar); flex-wrap: nowrap; }

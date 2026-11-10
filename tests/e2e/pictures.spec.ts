@@ -1,4 +1,4 @@
-import { exportWith, expect, outlineShapes, test, styleKind } from "./harness";
+import { exportWith, expect, outlineShapes, test, styleKind, openAdjust } from "./harness";
 import type { App } from "./harness";
 import { makePng } from "./png";
 import { encodeGif } from "./gif";
@@ -22,11 +22,6 @@ async function place(app: App, name = "pic.png", buffer = PIC): Promise<Pic> {
 }
 
 /** The Adjust panel is a dock panel: the button shows it, and it stays (ADR 0123). */
-async function openAdjust(p: App["page"]): Promise<void> {
-  if (!(await p.getByTestId("adjust-panel").isVisible())) await p.getByRole("button", { name: /^Adjust the picture/ }).click();
-  await p.getByTestId("adjust-panel").locator(".adjust-pop").waitFor();
-}
-
 test("crop: the picture's handles move its window, what stays does not move, pulling back out restores it, one undo each", async ({ app }) => {
   const p = app.page;
   const pic = await place(app);

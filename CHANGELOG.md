@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.56.21 — What a sheet cuts stays cut, blurred or shadowed too (2026-11-10)
+
+- **Fixed:** a blur or a shadow on a shape, text or picture on a clipping sheet spread past the sheet's edge: the sheet cut the object before it was blurred. The cut now goes round the whole of it, adjusted and masked, on the canvas, in tiles and in exported pictures (an SVG already cut it so).
+- **Fixed:** a video or GIF playing on a clipping sheet showed whole over the sheet's edge (and its blur with it): it is now cut by the sheet's shape as the canvas cuts it (by the innermost clipping sheet).
+- **Changed:** the tests' Adjust panel helper is one (harness `openAdjust`); the sheet test checks that a blur stops at the sheet's edge.
+
 ## 0.56.20 — Firefox pastes copied shapes; snap tests fixed (2026-11-10)
 
 - **Fixed:** in Firefox, Ctrl+V after copying shapes, balloons or a mix with pictures pasted nothing: when the browser refuses the newer clipboard, the older way's own copy counted as a new copy from elsewhere and took the focus off the canvas. It no longer does either.

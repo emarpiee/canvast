@@ -1,5 +1,5 @@
 import fs from "node:fs";
-import { alignWith, exportWith, expect, sheetWith, test } from "./harness";
+import { alignWith, exportWith, expect, openAdjust, sheetWith, test } from "./harness";
 import type { App } from "./harness";
 
 /**
@@ -69,6 +69,18 @@ test("a sheet holds what is drawn on it and cuts it at its edge; the Layers clip
   expect(await selection(app), "what is cut away cannot be picked").toEqual([]);
   await click(app, 600, 425);
   expect(await selection(app)).toEqual([rect.id]);
+  // a blur spreads the shape, and the sheet cuts what it spreads past its edge too: just past the edge it looks as it did without the blur
+  await click(app, 150, 650); // (nothing selected while the pixels are read)
+  const past = await px(app, 704, 425);
+  await click(app, 600, 425);
+  await openAdjust(p);
+  await p.locator('.adjust-pop [data-adj-num="blur"]').fill("100");
+  await p.locator('.adjust-pop [data-adj-num="blur"]').blur();
+  await expect.poll(async () => ((await objs(app)).find((o) => o.id === rect.id) as unknown as { adjust?: { blur?: number } }).adjust?.blur).toBe(100);
+  await click(app, 150, 650);
+  await app.frame();
+  expect(await px(app, 704, 425), "the blur stops at the sheet's edge").toEqual(past);
+  await key(app, "Control+z");
 
   // the Layers panel: the sheet is a row holding the rectangle, with a clip button
   await p.locator("[data-layers]").click();

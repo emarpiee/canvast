@@ -215,6 +215,11 @@ export const arrangeWith = (page: Page, id: string, keepOpen = false): Promise<v
 export const boolWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "boolmenu", id);
 export const maskWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "maskmenu", id);
 export const sheetWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "sheetmenu", id);
+/** Open the Adjust panel for what is selected (its button on the Actions bar), and wait for its controls. */
+export async function openAdjust(page: Page): Promise<void> {
+  if (!(await page.getByTestId("adjust-panel").isVisible())) await page.getByRole("button", { name: /^Adjust the picture/ }).click();
+  await page.getByTestId("adjust-panel").locator(".adjust-pop").waitFor();
+}
 export const stateWith = (page: Page, id: "stateset" | "stateupdate" | "statereset"): Promise<void> => chooseInMenu(page, "statemenu", id);
 export const exportWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "exportmenu", id);
 /** Right-click empty canvas at (x, y) and choose a row of the context menu by its name (what the Properties bar's Show all and Unlock all buttons became). */
