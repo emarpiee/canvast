@@ -1581,3 +1581,72 @@ test("every tool of the rail has the cursor of what it does: the arrow, the hand
   }
   expect(wrong).toEqual([]);
 });
+
+test("Ctrl+click where nothing can be picked opens the list to choose from: a group's items, each thing of a multi-selection, and a hidden thing to show", async ({ app }) => {
+  const p = app.page;
+  const sel = () => p.evaluate(() => window.__canvastDebug.selection());
+  const ctrlClick = async (x: number, y: number) => {
+    await p.keyboard.down("Control");
+    await p.mouse.click(x, y);
+    await p.keyboard.up("Control");
+  };
+  const row = (id: string) => p.locator(`.pop-menu [data-id="reveal:${id}"]`);
+  await key(app, "u");
+  await app.drag({ x: 450, y: 300 }, { x: 520, y: 360 }, 4);
+  await app.drag({ x: 620, y: 420 }, { x: 690, y: 480 }, 4);
+  const [a, b] = (await objects(app)).map((o) => o.id);
+  await key(app, "v");
+  // a multi-selection: each selected thing is a row; a row picks it alone
+  await key(app, "Control+a");
+  await ctrlClick(570, 390); // (inside the box, over nothing)
+  await expect(row(a!)).toBeVisible();
+  await expect(row(b!)).toBeVisible();
+  await row(b!).click();
+  expect(await sel()).toEqual([b]);
+  // a group: its items
+  await key(app, "Control+a");
+  await key(app, "Control+g");
+  await ctrlClick(570, 390);
+  await expect(row(a!)).toBeVisible();
+  await row(a!).click();
+  expect(await sel()).toEqual([a]);
+  // a hidden thing under the pointer, nothing else there: its row shows it again
+  await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+  await p.getByTestId("layers-panel").locator('[data-do="hide"]').click();
+  await expect.poll(async () => (await objects(app)).find((o) => o.id === a)!["hidden"]).toBe(true);
+  await key(app, "Escape");
+  await ctrlClick(485, 330);
+  await expect(row(a!)).toContainText("");
+  await row(a!).click();
+  await expect.poll(async () => (await objects(app)).find((o) => o.id === a)!["hidden"] ?? false).toBe(false);
+  // something that can be picked: Ctrl+click picks it at once, as ever (no list)
+  await ctrlClick(485, 330);
+  await expect(p.locator(".pop-menu")).toHaveCount(0);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("the list to choose from shows a group inside the selection by its name and count, with its own items indented under it, each one pickable", async ({ app }) => {
+  const p = app.page;
+  await key(app, "u");
+  await app.drag({ x: 450, y: 300 }, { x: 510, y: 350 }, 4);
+  await app.drag({ x: 530, y: 300 }, { x: 590, y: 350 }, 4);
+  await app.drag({ x: 650, y: 450 }, { x: 710, y: 500 }, 4);
+  const [a, b] = (await objects(app)).map((o) => o.id);
+  await key(app, "v");
+  await p.mouse.click(480, 325);
+  await p.keyboard.down("Shift");
+  await p.mouse.click(560, 325);
+  await p.keyboard.up("Shift");
+  await key(app, "Control+g");
+  await key(app, "Control+a");
+  await key(app, "Control+g");
+  const inner = (await objects(app)).find((o) => o.id === a)!["groups"] as string[];
+  await p.keyboard.down("Control");
+  await p.mouse.click(600, 420); // (inside the outer group's box, over nothing)
+  await p.keyboard.up("Control");
+  await expect(p.locator(`.pop-menu [data-id="reveal:${inner[1]}"]`)).toContainText("Group (2): ");
+  await expect(p.locator(`.pop-menu [data-id="reveal:${b}"]`)).toContainText("›");
+  await p.locator(`.pop-menu [data-id="reveal:${b}"]`).click();
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([b]);
+  expect(app.consoleErrors).toEqual([]);
+});

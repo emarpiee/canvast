@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.56.16 — One list to choose from: Ctrl+click and a long press (2026-11-10)
+
+- **Added:** holding Ctrl over an empty spot inside the selection's box lists what the selection holds beside the pointer, the same rows as the list a click opens: a nested group is one row by its name, outlined whole, and a Ctrl+click on it picks the whole group.
+- **Added:** Ctrl+click inside the selection's box where nothing can be picked opens a list of what the selection holds: a lone group's items one level in, or each thing of a multi-selection; a row picks it alone (Shift adds or takes it out).
+- **Added:** that list, and a long press on touch, are one list (the shared menu, built by one function): what is under the pointer, then what the selection holds. Hidden and locked things under it are rows too: pressed, they are shown or unlocked. A shape's words and a balloon's connector say whose they are.
+- **Added:** in both lists a group the selection holds is one row, named by the very labels Layers uses (its name, its operation, or Group (2)), with what is in it (Group (2): Star, Rectangle); every row's name is its Layers label, and its own items are indented under it, each one pickable; the row under the pointer outlines all it stands for.
+- **Changed:** while Ctrl is held over an empty spot inside the selection, every item of the selection is listed beside the pointer in the shared menu, a box about eight rows high that scrolls (no "+ N more"); a row outlines only its item and picks it; letting go of Ctrl closes it. A row is ticked when all it stands for is selected.
+- **Added:** the first time the list opens, a notice says what it is.
+- **Changed:** Ctrl+click on something that can be picked still picks it at once; holding Ctrl still outlines what is under the pointer.
+- **Added:** a test of the list for a multi-selection, a group and a hidden thing.
+
 ## 0.56.15 — A balloon's words and connectors belong to it (2026-11-10)
 
 - **Fixed:** a speech balloon's words, a connector and its cover piece could end up in another group or sheet than their balloons (dragged apart in Layers, a balloon grouped alone, moved onto a sheet): words were unclipped or behind their balloon, a connector stuck out of a clipping sheet. The document now keeps a shape's words in its group and sheet, just in front of it, and a connector with its cover where both its balloons are (outside a boolean group), whatever moves them: one rule (doc/belongs.ts).

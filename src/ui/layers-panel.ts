@@ -65,6 +65,12 @@ interface Node {
 }
 
 /** The tree of groups and objects, front first. */
+/** A group's row label in Layers (its name, else its boolean operation, else "Group (n)"): what every list of groups says. */
+export function groupLabel(member: CanvasObject, gid: string, count: number): { icon: string; text: string } {
+  const bop = member.boolOps?.[gid];
+  return { icon: bop ? boolIcon(bop) : ICONS.group, text: member.groupNames?.[gid] ?? (bop ? BOOL_NAME[bop] : `Group (${count})`) };
+}
+
 export function layerTree(objects: readonly CanvasObject[]): Node[] {
   const roots: Node[] = [];
   const present = new Set(objects.map((o) => o.id));
@@ -225,7 +231,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       rows++;
       const first = n.members[0]!;
       const bop = n.group ? first.boolOps?.[n.id] : undefined;
-      const lab = n.sheet ? { icon: ICONS.sheetTool, text: n.sheet.name ?? "Sheet", swatch: undefined } : n.group ? { icon: bop ? boolIcon(bop) : ICONS.group, text: first.groupNames?.[n.id] ?? (bop ? BOOL_NAME[bop] : `Group (${n.members.length})`), swatch: undefined } : labelOf(first, names);
+      const lab = n.sheet ? { icon: ICONS.sheetTool, text: n.sheet.name ?? "Sheet", swatch: undefined } : n.group ? { ...groupLabel(first, n.id, n.members.length), swatch: undefined } : labelOf(first, names);
       const selected = n.members.every((m) => editor.selection.has(m.id));
       const hidden = n.members.every((m) => m.hidden);
       const locked = n.members.every((m) => m.locked);

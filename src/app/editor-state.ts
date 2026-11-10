@@ -227,6 +227,8 @@ export class EditorState {
   revealAt: { x: number; y: number } | null = null;
   /** Where the revealed list was drawn (px) and the thing each row stands for (null: one that cannot be picked): Ctrl+click on a row picks it. Set by the drawing. */
   revealList: { x: number; y: number; w: number; h: number; ids: ReadonlyArray<string | null> } | null = null;
+  /** Rows of the revealed list that stand for more than one thing (a group the selection holds), by the id of the thing that shows them: what a row picks, and the groups it enters. */
+  revealRows: ReadonlyMap<string, { readonly ids: readonly string[]; readonly enter: readonly string[] }> | null = null;
   /** The row of that list the pointer is on: its outline is shown strong. */
   revealHot: string | null = null;
   /** A text is being typed in (ui/text-editor.ts): the Properties bar shows the text's options, not the active tool's. */

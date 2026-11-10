@@ -338,8 +338,12 @@ export interface ToolHooks {
   labels(): readonly ItemLabel[];
   /** "#" or "@": search the canvas by name, tag or bookmark (ADR 0060). */
   openSearch(prefix: string): void;
-  /** A long press with a finger (no hover, no Ctrl): everything under it, top first, to choose from; `pick` picks one (additive: added to or taken from the pick). */
-  revealList(at: ScreenPoint, things: readonly CanvasObject[], pick: (id: ObjectId, additive: boolean) => void): void;
+  /**
+   * The list to choose from at a point (a long press, or Ctrl+click where there is a choice): what is under it and what the selection holds.
+   * `pick` selects a row's things (entering their groups); `onlyIfChoice` (Ctrl+click): open only where nothing pickable is under it but there is something to choose (the selection's
+   * items, a hidden or locked thing); `onOpen` runs just before it opens. Whether it opened.
+   */
+  revealList(at: ScreenPoint, pick: (ids: readonly ObjectId[], enter: readonly string[], additive: boolean) => void, opts: { onlyIfChoice: boolean; onOpen(): void; add?: boolean; touch?: boolean; maxRows?: number }): boolean;
 }
 
 export function attachTools(
@@ -1415,15 +1419,24 @@ export function attachTools(
     if ((e.ctrlKey || e.metaKey) && !e.altKey) {
       const row = revealRowAt(editor, s.x, s.y);
       if (row !== undefined) {
+        // (a row that stands for a group the selection holds, by the group's id: the whole group)
+        const unit = row ? editor.revealRows?.get(row) : undefined;
+        if (unit) {
+          editor.entered = [...unit.enter];
+          editor.select([...unit.ids], e.shiftKey);
+          return;
+        }
         const o = row ? doc.get(row) : undefined;
         if (o) {
           if (e.shiftKey && editor.selection.has(o.id)) {
             editor.selection.delete(o.id);
             editor.changed();
           } else {
-            editor.entered = [...(o.groups ?? [])];
+            // (a row that stands for a group the selection holds picks the whole group)
+            const unit = editor.revealRows?.get(o.id);
+            editor.entered = [...(unit ? unit.enter : (o.groups ?? []))];
             editor.openMask = maskAbove(o)?.id ?? null;
-            editor.select([o.id], e.shiftKey);
+            editor.select(unit ? [...unit.ids] : [o.id], e.shiftKey);
           }
         }
         return;
@@ -1569,23 +1582,24 @@ export function attachTools(
       const held = g;
       window.setTimeout(() => {
         if (g !== held) return; // (it moved, lifted or became a pinch)
-        const all = revealHits(visible(), s.x, s.y);
-        if (!all.length) return;
-        g = { kind: "none" };
-        if (before.length !== editor.selection.size || before.some((id) => !editor.selection.has(id))) editor.select(before);
-        editor.fingerListAt = performance.now();
-        navigator.vibrate?.(10);
-        hooks.revealList(s, all.map((h) => h.obj), (id, additive) => {
-          const o = doc.get(id);
-          if (!o) return;
-          editor.entered = [...(o.groups ?? [])];
-          editor.openMask = maskAbove(o)?.id ?? null;
-          pick([id], additive);
-        });
+        hooks.revealList(s, pickRow, { onlyIfChoice: false, touch: true, onOpen: () => {
+          g = { kind: "none" };
+          if (before.length !== editor.selection.size || before.some((id) => !editor.selection.has(id))) editor.select(before);
+          editor.fingerListAt = performance.now();
+          navigator.vibrate?.(10);
+        } });
       }, LONG_PRESS_MS);
     }
   };
 
+  /** A row of the list to choose from, picked: its things, inside their groups (and the mask over them opened). */
+  const pickRow = (ids: readonly ObjectId[], enter: readonly string[], additive: boolean): void => {
+    const o = doc.get(ids[0]!);
+    if (!o) return;
+    editor.entered = [...enter];
+    editor.openMask = maskAbove(o)?.id ?? null;
+    editor.select([...ids], additive);
+  };
   const pressBecomesDrag = (gp: Extract<Gesture, { kind: "press" }>, s: ScreenPoint, alt = false): void => {
     const t = gp.target;
     // Only what is already selected moves: a press-and-slide on anything else (a shape, a path, a stroke, like a picture) draws the selection box.
@@ -2445,6 +2459,8 @@ export function attachTools(
         break;
       }
       case "press": {
+        // Ctrl+click where there is a choice (things stacked there, or inside the selection's box): the list to choose from, as a long press gives
+        if (!cancelled && (e.ctrlKey || e.metaKey) && !e.altKey && e.pointerType !== "touch" && hooks.revealList(g.start, pickRow, { onlyIfChoice: true, add: g.additive, onOpen: () => undefined })) break;
         // A click: select what is under the pointer (media included), or clear.
         const t = g.click ?? g.target;
         if (t) {

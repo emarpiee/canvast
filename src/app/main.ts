@@ -24,7 +24,7 @@ import { cleanFileName } from "../doc/rename-rules";
 import { fileInLibrary } from "./library-filing";
 import { newNoteName, storeFrame } from "./frames";
 import { newObjectId, rasterKey } from "../doc/model";
-import type { CanvasObject, ImageObject, TextObject } from "../doc/model";
+import type { CanvasObject, ImageObject, ObjectId, TextObject } from "../doc/model";
 import { screenToWorld, type ScreenPoint } from "../core/camera";
 import type { AssetRecord } from "../assets/asset-library";
 import type { Gradient, GradientStop } from "../doc/paint";
@@ -62,7 +62,8 @@ import { setTextureHost } from "../render/texture";
 import { isTexture } from "../doc/texture";
 import { createTextureHost } from "./texture-host";
 import { pickAll } from "../render/hit-test";
-import { dimHits, revealHits } from "../interaction/reveal";
+import { dimHits, revealHits, type RevealWhy } from "../interaction/reveal";
+import { ownerOf } from "../doc/belongs";
 import { syncScroll } from "../ui/bar";
 import { parseHex, rgbToOklch } from "../colour-picker/colour";
 import { canvasItems, mountContextMenu } from "../ui/context-menu";
@@ -100,7 +101,7 @@ import { runSaveLibraryFile } from "../ui/archive-ui";
 import { mountToolbar, toolIcon } from "../ui/toolbar";
 import { initColourPopover, openColourPopover } from "../ui/colour-popover";
 import { toolCursor } from "../ui/tool-cursor";
-import { labelOf, mountLayersPanel } from "../ui/layers-panel";
+import { groupLabel, labelOf, mountLayersPanel } from "../ui/layers-panel";
 import { mountMediaPlayer } from "../ui/media-player";
 import { mountBookmarksPanel } from "../ui/bookmarks-panel";
 import { DENSE_MS, DPR_CAP, QualityGovernor } from "./quality";
@@ -154,7 +155,8 @@ import { onFontsChange } from "../text/fonts";
 import { describeFile } from "../assets/file-kind";
 import { styleOf, toolLook } from "../text/text-style";
 import { installTextFont } from "../text/inter";
-import { descendantsOf, isContainer } from "../doc/containers";
+import { descendantsOf, isContainer, rootsOf } from "../doc/containers";
+import { isResult } from "../doc/boolean-group";
 import { CameraHistory } from "./camera-history";
 import { mountTour } from "./tour";
 import { ADJUSTMENT_KIND, EXPORT_KIND, RATIO_KIND } from "../assets/styles";
@@ -802,10 +804,30 @@ async function start(): Promise<void> {
     }
     if (editor.revealAt && (!shot || shot.overlays)) {
       const all = (visible ??= visibleObjects(doc, index, editor, fc, vp));
-      const name = (po: ProjectedObject): string => po.obj.name ?? itemName(po.obj, (h) => assetNames.get(h)) ?? (po.obj.kind === "path" ? ({ rect: "Rectangle", ellipse: "Ellipse", polygon: "Polygon", star: "Star", line: "Line" } as Record<string, string>)[po.obj.shape ?? ""] ?? "Path" : po.obj.kind === "stroke" ? "Stroke" : po.obj.kind === "text" ? "Text" : "Item");
-      const hits = revealHits(all, editor.revealAt.x, editor.revealAt.y);
+      const name0 = (po: ProjectedObject): string => labelOf(po.obj, assetNames.map).text; // (as Layers names it)
+      let hits = revealHits(all, editor.revealAt.x, editor.revealAt.y);
+      // Over nothing inside the selection's box: what the selection holds, the very rows of the list a click opens (choicesAt): a nested group
+      // is one row, by its name, outlined whole, and picked whole.
+      // (one level while Ctrl is held: a nested group is one row; its items are in the list a click opens, which scrolls)
+      // Over nothing inside the selection's box: every item of the selection in the shared menu beside the pointer, a box that scrolls
+      // (opened once for the spot, gone with Ctrl), not drawn here, where a long list could not scroll.
+      if (!hits.length && !selectionListOpen && choicesAt(editor.revealAt).some((c) => c.from === "selection")) {
+        const at = editor.revealAt;
+        queueMicrotask(() => { selectionListOpen = toolHooksRevealList(at); });
+      }
+      const rows: Choice[] = [];
+      // (each row by its own key, a group's id for a group: shown by its first thing, so two rows never share one)
+      const keyOf = (c: Choice): string => c.key ?? c.ids[0]!;
+      if (rows.length) hits = rows.flatMap((c) => all.filter((po) => po.obj.id === c.ids[0]).map((po) => (keyOf(c) === po.obj.id ? po : { ...po, obj: { ...po.obj, id: keyOf(c) } as CanvasObject })));
+      editor.revealRows = rows.length ? new Map(rows.map((c) => [keyOf(c), { ids: c.ids, enter: c.enter }])) : null;
+      const rowName = new Map(rows.map((c) => [keyOf(c), c.label]));
+      const name = (po: ProjectedObject): string => rowName.get(po.obj.id) ?? name0(po);
+      // (the row under the pointer outlines all it stands for, strongly; the other rows only by the one thing that shows them)
+      const hotRow = rows.find((c) => keyOf(c) === editor.revealHot);
+      if (hotRow) drawRevealOutlines(ctx, all.filter((po) => hotRow.ids.includes(po.obj.id)), theme, true);
       const dim = dimHits(all, hiddenInView(doc, fc, vp), editor.revealAt.x, editor.revealAt.y);
-      editor.revealList = drawReveal(ctx, hits, editor.revealAt, theme, name, dim, editor.selection, editor.revealHot);
+      const shownPicked = rows.length ? new Set([...editor.selection, ...rows.filter((c) => c.ids.every((id) => editor.selection.has(id))).map(keyOf)]) : editor.selection;
+      editor.revealList = drawReveal(ctx, hits, editor.revealAt, theme, name, dim, shownPicked, editor.revealHot);
       // (a screen reader hears the same words through the hint line, once for each change)
       const said = hits.length || dim.length ? `Under the pointer: ${[...hits.map((po) => revealWords(name(po))), ...dim.map((d) => revealWords(name(d.po), d.why))].join(", ")}` : null;
       if (said !== editor.revealText) {
@@ -1161,6 +1183,113 @@ async function start(): Promise<void> {
   const notePanelReady = (d: FilePanelDeps): void => void (notePanel = mountFilePanel({ panel: notePanelEl, window: noteWindowEl }, d, () => settings.get("notes.panelMode")));
   let newNoteAt: (at: ScreenPoint, widthPx?: number) => Promise<void> = async () => undefined;
   let makeNoteFiles: () => Promise<void> = async () => undefined;
+  /**
+   * What the list to choose from holds at a point (one rule for Ctrl+click and a long press): what is under it, top first, with the hidden,
+   * locked and mask parts there; then, when it is inside the selection's box, what the selection holds: a lone group's items one level in,
+   * or each selected thing (a group or a sheet as one row). Words and connectors say whose they are.
+   */
+  interface Choice { /** The row's own key: a group's id, else its thing's. */ key?: string; /** How deep under a group of the selection (0: the selection's own items). */ depth?: number; ids: ObjectId[]; enter: string[]; label: string; icon: string; why?: RevealWhy; from: "here" | "selection"; sep?: boolean }
+  const choicesAt = (at: ScreenPoint): Choice[] => {
+    const fc = view.frameCamera, vp = view.viewport;
+    const all = visibleObjects(doc, index, editor, fc, vp);
+    const named = (o: CanvasObject): { label: string; icon: string } => {
+      const l = labelOf(o, assetNames.map);
+      const owner = ownerOf(o);
+      const of = owner !== undefined ? doc.get(owner) : undefined;
+      return { icon: l.icon, label: of ? `${o.kind === "text" ? "Words" : "Connector"} of ${labelOf(of, assetNames.map).text}` : l.text };
+    };
+    const one = (o: CanvasObject, from: Choice["from"], why?: RevealWhy): Choice => ({ ids: [o.id], enter: [...(o.groups ?? [])], ...named(o), from, ...(why ? { why } : {}) });
+    const out: Choice[] = [
+      ...revealHits(all, at.x, at.y).map((po) => one(po.obj, "here")),
+      ...dimHits(all, hiddenInView(doc, fc, vp), at.x, at.y).map((d) => one(d.po.obj, "here", d.why)),
+    ];
+    // (the selection's box from where its things are on screen: the drawn box is not there while Ctrl is held)
+    const boxes = all.filter((po) => editor.selection.has(po.obj.id)).map((po) => po.box);
+    const inBox = boxes.length > 0 && at.x >= Math.min(...boxes.map((b) => b.minX)) && at.x <= Math.max(...boxes.map((b) => b.maxX)) && at.y >= Math.min(...boxes.map((b) => b.minY)) && at.y <= Math.max(...boxes.map((b) => b.maxY));
+    if (!inBox) return out;
+    const level = editor.entered.length;
+    const sel = rootsOf(doc.ordered().filter((o) => editor.selection.has(o.id) && ownerOf(o) === undefined && !isResult(o))).reverse();
+    const unitsAt = (lv: number): Map<string, CanvasObject[]> => {
+      const m = new Map<string, CanvasObject[]>();
+      for (const o of sel) (m.get(o.groups?.[lv] ?? o.id) ?? m.set(o.groups?.[lv] ?? o.id, []).get(o.groups?.[lv] ?? o.id)!).push(o);
+      return m;
+    };
+    let lv = level;
+    let units = unitsAt(lv);
+    if (units.size === 1 && sel[0]?.groups?.[lv] !== undefined) units = unitsAt(++lv); // (a lone group: its items)
+    const listed = new Set(out.map((c) => c.ids.join()));
+    let first = true;
+    // A row for each item, and under a group its own items, indented (as deep as groups go): any one of them can be picked from the list.
+    const addRows = (objs: readonly CanvasObject[], at: number, depth: number): void => {
+      const m = new Map<string, CanvasObject[]>();
+      for (const o of objs) (m.get(o.groups?.[at] ?? o.id) ?? m.set(o.groups?.[at] ?? o.id, []).get(o.groups?.[at] ?? o.id)!).push(o);
+      for (const [key, items] of m) {
+        const head = items[0]!;
+        const group = key !== head.id;
+        const ids = items.map((o) => o.id);
+        if (depth === 0 && listed.has(ids.join())) continue;
+        const inner = group ? [...new Map(items.map((o) => [o.groups?.[at + 1] ?? o.id, o])).values()].map((o) => labelOf(o, assetNames.map).text) : [];
+        // (the names Layers shows: groupLabel and labelOf, never a list's own)
+        const g = group ? groupLabel(head, key, ids.length) : null;
+        const label = g ? `${g.text}: ${inner.slice(0, 3).join(", ")}${inner.length > 3 ? "…" : ""}` : named(head).label;
+        out.push({ key, depth, ids, enter: [...(head.groups ?? []).slice(0, at)], icon: g ? g.icon : named(head).icon, label: `${"   ".repeat(depth)}${depth ? "› " : ""}${label}`, from: "selection", ...(first && out.length ? { sep: true } : {}) });
+        first = false;
+        if (group) addRows(items, at + 1, depth + 1);
+      }
+    };
+    addRows([...units.values()].flat(), lv, 0);
+    return out;
+  };
+  const openChoiceList = (at: ScreenPoint, pick: (ids: readonly ObjectId[], enter: readonly string[], additive: boolean) => void, opts: { onlyIfChoice: boolean; onOpen(): void; add?: boolean; touch?: boolean; maxRows?: number }): boolean => {
+      const rows = choicesAt(at);
+      // (Ctrl+click on something that can be picked picks it at once, as ever: the list is for where nothing pickable is under the pointer)
+      if (!rows.length || (opts.onlyIfChoice && rows.some((r) => r.from === "here" && !r.why))) return false;
+      opts.onOpen();
+      const box = canvas.getBoundingClientRect();
+      const anchor = document.createElement("div");
+      anchor.style.cssText = `position:fixed;left:${box.left + at.x}px;top:${box.top + at.y}px;width:0;height:0;pointer-events:none`;
+      document.body.appendChild(anchor);
+      let add = opts.add ?? false;
+      const HINT: Record<RevealWhy, string> = { hidden: "Hidden: press to show it", locked: "Locked: press to unlock it", mask: "Part of a mask" };
+      const items = (): MenuItem[] => [
+        { id: "reveal-add", label: "Add to the selection", hint: "Press to add or remove; press outside to end", icon: ICONS.listChecks, checked: add, run: () => { add = !add; } },
+        ...rows.map((r, i): MenuItem => {
+          const on = r.ids.every((id) => editor.selection.has(id));
+          return { id: `reveal:${r.key ?? r.ids[0]}`, label: r.label, hint: r.why ? HINT[r.why] : r.from === "selection" ? "In the selection: select this one" : "Select this one", icon: r.icon, checked: on, disabled: r.why === "mask", ...(r.sep && i > 0 ? { sep: true } : {}), run: () => {
+            if (r.why === "hidden" || r.why === "locked") {
+              setFlagOn(doc, editor, r.ids, r.why, false);
+              return void closeMoreMenu();
+            }
+            if (add && on) editor.select([...editor.selection].filter((x) => !r.ids.includes(x)));
+            else pick(r.ids, r.enter, add);
+            if (!add) closeMoreMenu();
+          } };
+        }),
+        ...(opts.touch ? canvasItems(registry, true).map((it, i): MenuItem => ({ ...it, ...(i === 0 ? { sep: true } : {}), run: () => { closeMoreMenu(); it.run(); } })) : []),
+      ];
+      openMoreMenu(anchor, items(), opts.touch ? "Under your finger" : "Choose what to select", {
+        keepOpen: true,
+        consumeOutside: true,
+        needPress: true,
+        refresh: items,
+        onActive: (i) => { const r = i === null || i < 1 ? undefined : rows[i - 1]; editor.revealIds = r ? new Set(r.ids) : null; editor.redraw(); },
+        ...(opts.maxRows ? { maxRows: opts.maxRows } : {}),
+        onClose: () => { anchor.remove(); editor.revealIds = null; selectionListOpen = false; editor.redraw(); },
+      });
+      // (once: what the list is, for whoever meets it for the first time)
+      try {
+        if (!localStorage.getItem("canvast.hint.pickList")) {
+          localStorage.setItem("canvast.hint.pickList", "1");
+          editor.message = "Choose what to select: what is here, hidden and locked things too, and what the selection holds. Shift adds; Alt goes on to the one below.";
+          editor.changed();
+        }
+      } catch { /* (a browser that keeps nothing says it each time it would: nothing) */ }
+      return true;
+  };
+  /** The selection's list beside the pointer while Ctrl is held (every item, a box that scrolls): open, and gone when Ctrl is let go. */
+  let selectionListOpen = false;
+  const toolHooksRevealList = (at: ScreenPoint): boolean => openChoiceList(at, (ids, enter, add) => { editor.entered = [...enter]; editor.select([...ids], add); }, { onlyIfChoice: false, onOpen: () => undefined, maxRows: 8 });
+  window.addEventListener("keyup", (e) => { if ((e.key === "Control" || e.key === "Meta") && selectionListOpen) closeMoreMenu(); });
   attachTools(canvas, view, doc, index, editor, { edgePanSpeed: () => (settings.get("nav.edgePanOn") ? settings.get("nav.edgePan") / 100 : 0), editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h, id) => {
         const o = doc.get(id);
         void notePanel.open(h, o?.kind === "image" ? cardActions(o) : undefined);
@@ -1174,36 +1303,10 @@ async function start(): Promise<void> {
     focusSelection: () => focusCycle.tap(),
     labels: () => labels,
     openSearch: (prefix) => canvasSearch.open(prefix),
-    // A long press with a finger lists what is under it (ADR 0151): a row outlines its thing while touched and picks it when tapped; "Add to the pick" keeps what is picked.
-    revealList: (at, things, pick) => {
-      const box = canvas.getBoundingClientRect();
-      const anchor = document.createElement("div");
-      anchor.style.cssText = `position:fixed;left:${box.left + at.x}px;top:${box.top + at.y}px;width:0;height:0;pointer-events:none`;
-      document.body.appendChild(anchor);
-      let add = false;
-      const items = (): MenuItem[] => [
-        { id: "reveal-add", label: "Add to the selection", hint: "Tap to add or remove; tap outside to end", icon: ICONS.listChecks, checked: add, run: () => { add = !add; } },
-        ...things.map((o): MenuItem => {
-          const l = labelOf(o, assetNames.map);
-          // ticked while picked; in "Add to the pick" a tap on a picked one takes it out again
-          return { id: o.id, label: l.text, hint: "Select this one", icon: l.icon, checked: editor.selection.has(o.id), run: () => {
-            if (add && editor.selection.has(o.id)) editor.select([...editor.selection].filter((x) => x !== o.id));
-            else pick(o.id, add);
-            if (!add) closeMoreMenu();
-          } };
-        }),
-        // then what a right click offers (the same groups), so a long touch is the context menu: a choice runs and the list closes
-        ...canvasItems(registry, true).map((it, i): MenuItem => ({ ...it, ...(i === 0 ? { sep: true } : {}), run: () => { closeMoreMenu(); it.run(); } })),
-      ];
-      openMoreMenu(anchor, items(), "Under your finger", {
-        keepOpen: true,
-        consumeOutside: true,
-        needPress: true,
-        refresh: items,
-        onActive: (i) => { const o = i === null || i < 1 ? undefined : things[i - 1]; editor.revealIds = o ? new Set([o.id]) : null; editor.redraw(); },
-        onClose: () => { anchor.remove(); editor.revealIds = null; editor.redraw(); },
-      });
-    },
+    // The list to choose from (ADR 0151), one for a long press and Ctrl+click: what is under the pointer (hidden and locked things too, which a
+    // press shows or unlocks), then, inside the selection's box, what the selection holds (a group's items, or each selected thing). A row
+    // outlines its thing while touched and picks it when pressed; "Add to the selection" keeps what is picked; on touch the right-click menu follows.
+    revealList: (at, pick, opts) => openChoiceList(at, pick, opts),
   });
   const side = document.createElement("div");
   side.id = "side-panels";
