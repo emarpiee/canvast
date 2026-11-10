@@ -1,6 +1,6 @@
 # Credits for the README's pictures
 
-The screenshots in this folder are made by code: the tests in `tests/shots/` (and `scripts/showcase/shots-desktop.mjs` for the desktop app), run by the `Screenshots` workflow on GitHub. Everything in them is one of the artworks below, or made by those tests in the app.
+The screenshots in this folder are made by code: the tests in `tests/shots/` (the desktop app's in Electron), run by the `Screenshots` workflow on GitHub. Everything in them is one of the artworks below, or made by those tests in the app.
 
 ## Artworks
 

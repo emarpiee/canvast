@@ -34,6 +34,7 @@ jobs:
         env:
           CANVAST_BUILD_DIR: dist
           CANVAST_SHOTS_DIR: shots
+          ELECTRON_DISABLE_SANDBOX: "1"
         run: xvfb-run -a npx playwright test -c playwright.shots.config.ts ${{ inputs.grep && format('-g "{0}"', inputs.grep) || '' }} || echo "SOME PICTURES FAILED"
       - name: Older scripts
         if: inputs.only != ''

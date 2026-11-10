@@ -219,3 +219,22 @@ test("path-tools", async ({ scene: s }) => {
   await s.p.locator('[data-ctx="pathmenu"]').click();
   await s.shot("path-tools", await s.around({ objects: await s.ids(), els: [".pop-menu"], pad: 30 }));
 });
+
+test("pen-stabilizer", async ({ scene: s }) => {
+  await s.look({ theme: "light", hue: 20, pattern: "dots" });
+  const [h] = await s.art("delacroix");
+  await s.canvas("Contour");
+  const [pic] = await s.place([h!]);
+  await s.fit([pic!], 0.55, [0.4, 0.5]);
+  const b = (await s.box([pic!]))!;
+  await s.tool("pen");
+  await setPenColour(s.p, "#7a2e1f");
+  const stab = s.p.locator("[data-stab]");
+  if ((await stab.getAttribute("aria-pressed")) !== "true") await stab.click();
+  // the horse's back and rump as one long line, drawn with a shaky hand: the stabilizer keeps it calm
+  const at = (x: number, y: number): [number, number] => [b.maxX + 40 + (b.maxX - b.minX) * x, b.minY + (b.maxY - b.minY) * y];
+  const pts = curve([at(0.02, 0.35), at(0.2, 0.24), at(0.42, 0.3), at(0.62, 0.26), at(0.8, 0.4), at(0.86, 0.7)], 24).map(([x, y], i) => [x + Math.sin(i * 1.7) * 3, y + Math.cos(i * 2.3) * 3] as [number, number]);
+  await line(s, pts);
+  await s.settle();
+  await s.shot("pen-stabilizer", await s.around({ objects: await s.ids(), els: ["[data-stab]"], pad: 30 }));
+});

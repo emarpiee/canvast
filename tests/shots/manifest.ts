@@ -24,10 +24,12 @@ export const SHOTS: Record<string, ShotSpec> = {
   "layers": { section: "#layers", use: "Keep a master study in groups: the reference locked, the construction and the line of action on their own.", alt: "A study over Delacroix's horse: construction ovals and a line of action drawn on it, the Layers panel listing the groups, the reference locked" },
   "reveal": { section: "#reveal-and-the-ctrl-list", use: "Find and pick a print buried under others in a pile.", alt: "A pile of Hokusai prints with Ctrl held: the list of what lies under the pointer, one print outlined", pointer: true },
   "media": { section: "#video-audio-and-gifs", use: "Plan a camera move for an animatic: a slow pan across a painting, played on the board.", alt: "A clip of a slow camera pan across Van Gogh's Wheat Field with Cypresses playing on the canvas, its player bar below it", pointer: true },
+  "extract-frame": { section: "#video-audio-and-gifs", use: "Keep a key frame of a clip as a still picture, to draw from or to place in a storyboard.", alt: "A camera pan across Van Gogh's Wheat Field with Cypresses as a clip on the canvas, and beside it the frame extracted from it as a picture" },
   "canvas-tags": { section: "#tags-on-the-canvas", use: "Tag the studies on a canvas by what they teach, and find them again.", alt: "Studies tagged gesture and anatomy, the Tags panel listing the tags with their counts" },
 
   // Drawing and vector editing
   "pen": { section: "#pen", use: "Find the gesture: draw a line of action over each figure, from the head through the weight to the foot that carries it.", alt: "Three Degas dancers with a red line of action drawn over each with the Pen, the Pen's kinds in the bar above" },
+  "pen-stabilizer": { section: "#pen", use: "Draw a long, calm contour: the stabilizer smooths the wobble of the hand.", alt: "Delacroix's Study of a Horse beside a long ink line of a horse's back drawn with the Pen, the Stabilizer on in the bar above" },
   "shape-kinds": { section: "#shapes", use: "Block in a composition as flat value shapes before painting.", alt: "A landscape thumbnail made of shapes in four greys: sky, sun, two hills and a near ground, the Shape tool's kinds in the bar above" },
   "shapes": { section: "#combining-shapes", use: "Build an icon from simple shapes: a wave crest is a circle and a block joined, with circles cut out for the curl and the claws.", alt: "On the left the loose parts, a blue circle and block with cream circles over them; on the right the crest they make once subtracted, the Shapes menu open" },
   "nodes": { section: "#paths-and-nodes", use: "Refine a combined shape by its nodes: here the claws of the wave crest.", alt: "The wave crest in node editing, the nodes of its claws selected" },
@@ -107,4 +109,10 @@ export const SHOTS: Record<string, ShotSpec> = {
 
   // canvast tools
   "tools-menu": { section: "#canvast-tools-without-the-app", use: "Open your hidden items, hide files or share a folder on any computer with Node.js, without the app.", alt: "A terminal running node canvast-tools.mjs: its numbered menu in plain words" },
+
+  // The desktop app
+  "desktop": { section: "#the-workspace-folder-desktop-app", use: "Keep a project as a plain folder that any sync or backup tool can carry, and switch between projects.", alt: "The desktop app on a workspace folder named Picture book: its four prints on the canvas, and the board and canvas menu with Switch workspace open" },
+  "trash": { section: "#deleting-and-trash", use: "Bring back a file deleted by mistake: the workspace folder keeps deleted files in its Trash.", alt: "The Trash in the Library of the desktop app: deleted drawings as cards, one selected with Restore and Delete for good" },
+  "window-row": { section: "#the-windows-frame", use: "Turn the window frame off for more room; the window's row comes back at the top edge.", alt: "The window's own row with the frame off: the workspace's name, minimise, maximise and close over the top edge of the app" },
+  "sharing": { section: "#sharing-on-the-local-network", use: "Show a project on a tablet on the same network, read-only, without copying it there.", alt: "Settings, Sharing in the desktop app: sharing the workspace on the local network, its address, code and the devices allowed" },
 };

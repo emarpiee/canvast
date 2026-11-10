@@ -1,4 +1,1 @@
-# Pictures the README shows that are not tests/shots yet: the desktop app (Electron), made by scripts/showcase/shots-desktop.mjs.
-desktop
-window-row
-trash
+# Pictures the README shows that are not made by tests/shots (none now; list one here, by name, only while it is being moved to a shot).

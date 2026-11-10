@@ -310,3 +310,27 @@ test("media", async ({ scene: s }) => {
   await s.p.mouse.move((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2 + 20);
   await s.shot("media", await s.around({ objects: [id!], pad: 90 }));
 });
+
+test("extract-frame", async ({ scene: s }) => {
+  await s.look({ theme: "light", hue: 50 });
+  const dir = mkdtempSync(join(tmpdir(), "cv-clip-"));
+  const clip = join(dir, "wheat_field_camera_pan.webm");
+  execFileSync("ffmpeg", ["-v", "error", "-y", "-loop", "1", "-i", resolve("scripts/showcase/art", artFiles("vangogh")[0]!), "-vf", "scale=1600:-2,zoompan=z='1.15':x='iw/2-(iw/zoom/2)+on*1.2':y='ih/2-(ih/zoom/2)':d=150:s=960x720:fps=30", "-c:v", "libvpx-vp9", "-b:v", "600k", "-t", "5", clip]);
+  const h = await s.library([clip]);
+  await s.canvas("Animatic");
+  const [id] = await s.place([h["wheat_field_camera_pan.webm"]!]);
+  await s.fit([id!], 0.42, [0.36, 0.5]);
+  const b = (await s.box([id!]))!;
+  await s.tool("select");
+  await s.p.mouse.click((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
+  // (a key frame of the move, kept as a still picture beside the clip)
+  const before = new Set(await s.ids());
+  await s.p.locator('[data-cmd="extract"]').filter({ visible: true }).first().click();
+  await expect.poll(async () => (await s.ids()).some((i) => !before.has(i))).toBe(true);
+  const still = (await s.ids()).find((i) => !before.has(i))!;
+  await s.fit([id!, still], 0.7);
+  await s.select([still]);
+  await s.p.mouse.move((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
+  await s.settle(600);
+  await s.shot("extract-frame", await s.around({ objects: [id!, still], pad: 70 }));
+});

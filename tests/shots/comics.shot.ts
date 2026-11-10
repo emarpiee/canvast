@@ -84,7 +84,7 @@ test("comic", async ({ scene: s }) => {
   await balloon(s, { box: [...inside(b, 0.03, 0.04), ...inside(b, 0.45, 0.18)] as [number, number, number, number], words: "THREE DAYS OVER THE PASS.", kind: "caption", fill: "#f3e3a6", size: 15 });
   b = await on(3);
   await balloon(s, { box: [...inside(b, 0.55, 0.04), ...inside(b, 0.95, 0.36)] as [number, number, number, number], words: "HOLD ON!", kind: "shout", tip: inside(b, 0.42, 0.7), font: "bangers", size: 30 });
-  await s.fit([pg], 0.86);
+  await s.fit([pg], 0.66);
   await s.shot("comic", await s.around({ objects: [pg], pad: 20 }));
 });
 
