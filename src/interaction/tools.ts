@@ -257,13 +257,13 @@ type Gesture =
   | { kind: "press"; pointerId: number; start: ScreenPoint; target: CanvasObject | null; additive: boolean; click?: CanvasObject | null; exact?: boolean }
   | { kind: "move"; pointerId: number; frame: Frame; startWorld: WorldPoint; startScreen: ScreenPoint; ids: ObjectId[]; /** What it carries, from the pointer at the start, and how far past the view it already was. */ reach: { minX: number; minY: number; maxX: number; maxY: number; overMinX: number; overMinY: number; overMaxX: number; overMaxY: number } | null; snap: SnapContext | null }
   | { kind: "marquee"; pointerId: number; start: ScreenPoint; additive: boolean }
-  | { kind: "text"; pointerId: number; start: ScreenPoint; moved: boolean }
+  | { kind: "text"; pointerId: number; start: ScreenPoint; moved: boolean; snap: SnapContext | null }
   /** Dragging a handle of a path's gradient (ADR 0100). */
   | { kind: "grad"; pointerId: number; id: ObjectId; which: "fill" | "stroke"; handle: GradHandle; g: Gradient }
   /** Dragging the corner radius dot or a star's ratio handle (ADR 0105): `r0` the radius in px and `proj0` where along the corner's bisector the press was. */
   | { kind: "round"; pointerId: number; id: ObjectId; what: "main" | "corner" | "ratio" | "count" | "balloon"; balloon?: { part: BalloonPart; tail: number }; snap?: SnapContext | null; index: number; ax: number; ay: number; r0: number; proj0: number; x0: number; start: ScreenPoint; moved: boolean; opened: boolean; timer: number; /** Every picked corner taken along (its radius and the most it can have), by node. */ multi?: ReadonlyMap<number, { r0: number; max: number }> }
   /** Dragging a shape out (Shape tool). */
-  | { kind: "shape"; pointerId: number; start: ScreenPoint }
+  | { kind: "shape"; pointerId: number; start: ScreenPoint; /** What a corner being drawn snaps to (null: snapping off). */ snap: SnapContext | null }
   /** A side handle of words in a shape: the shape sets their box, so what it changes is the padding. */
   | { kind: "textpad"; pointerId: number; start: ScreenPoint; edge: Edge; pads: { padX: number; padY: number; padR: number; padB: number }; emPx: number; moved: boolean }
   /** A node of the path being built has been placed; dragging pulls its handles out (Path tool). */
@@ -730,8 +730,11 @@ export function attachTools(
 
   /** The frame a shape, frame or stroke being drawn started in (ADR 0108). */
   let sheetStart: ObjectId | undefined;
-  const startShape = (s: ScreenPoint, e: PointerEvent): void => {
+  const startShape = (s0: ScreenPoint, e: PointerEvent): void => {
     if (editor.blockEdit()) return;
+    // (the first corner catches a corner, an edge, a middle or a grid line of what is there: Ctrl held draws where the press is)
+    const snap = editor.snap && !(e.ctrlKey || e.metaKey) ? snapContext([], view.frame, true) : null;
+    const s = snapPoint(s0, snap);
     const cam = view.camera;
     const width = editor.shapeWidthPx / 2 ** cam.zf;
     editor.shapeDraft = {
@@ -750,13 +753,16 @@ export function attachTools(
       width,
     };
     sheetStart = sheetAt(s.x, s.y)?.id;
-    g = { kind: "shape", pointerId: e.pointerId, start: s };
+    g = { kind: "shape", pointerId: e.pointerId, start: s, snap };
     editor.changed();
   };
 
-  const updateShape = (s: ScreenPoint, e: PointerEvent): void => {
+  const updateShape = (s0: ScreenPoint, e: PointerEvent): void => {
     const d = editor.shapeDraft;
     if (!d) return;
+    // (the dragged corner snaps as a resized one does; a square or one drawn from its middle keeps the corner the pointer gives)
+    const sn = g.kind === "shape" && !(e.ctrlKey || e.metaKey) && !keys(e).shift && !keys(e).alt ? g.snap : null;
+    const s = snapPoint(s0, sn);
     const l = localIn(d.frame, d.anchor, d.unit, s);
     editor.shapeDraft = { ...d, ...shapeBox(d.kind, l.x, l.y, keys(e).shift, keys(e).alt) };
     editor.changed();
@@ -782,6 +788,7 @@ export function attachTools(
 
   const commitShape = (s: ScreenPoint, cancelled: boolean, e: PointerEvent, start: ScreenPoint): void => {
     updateShape(s, e);
+    editor.guides = null;
     const d = editor.shapeDraft;
     editor.shapeDraft = null;
     // A press without a drag makes nothing (a stray click must not leave a shape behind).
@@ -1599,9 +1606,13 @@ export function attachTools(
   };
 
   /** Gather what a move of `ids` can snap to; null when there is nothing to measure. */
-  const snapContext = (ids: readonly ObjectId[], frame: Frame): SnapContext | null => {
+  /** `free`: nothing moves (a shape being drawn): only what there is to snap to, and no box of its own. */
+  const snapContext = (ids: readonly ObjectId[], frame: Frame, free = false): SnapContext | null => {
     const vis = visible();
     const chosen = new Set(ids);
+    // What moves along with them (what is on a sheet, what is attached) is never a line to snap to: it would hold the edge where it began.
+    const carried = new Set(descendantsOf(doc.all(), chosen));
+    const target = (po: { obj: CanvasObject }): boolean => !chosen.has(po.obj.id) && !carried.has(po.obj.id);
     let box: ScreenBox | null = null;
     let ex: { minX: D.Dyadic; minY: D.Dyadic; maxX: D.Dyadic; maxY: D.Dyadic } | null = null;
     const ctx: SnapContext = { box: undefined as unknown as ScreenBox, src: undefined as unknown as ExactLines, tx: [], ty: [], objs: [], groupLines: new Map(), shape: undefined as unknown as SnapContext["shape"] };
@@ -1615,7 +1626,7 @@ export function attachTools(
         src.push(...sh.pts);
         srcRefs.push(...sh.refs);
         srcSegs.push(...sh.straight);
-      } else if (!chosen.has(po.obj.id) && !po.cover && onScreen(b) && tp.length < 2 * MAX_SNAP_POINTS) {
+      } else if (target(po) && !po.cover && onScreen(b) && tp.length < 2 * MAX_SNAP_POINTS) {
         const sh = shapeOnScreen(po);
         tp.push(...sh.pts, ...sh.mids);
         refs.push(...sh.refs, ...sh.midRefs);
@@ -1648,7 +1659,7 @@ export function attachTools(
               maxY: D.cmp(e.max.y, ex.maxY) > 0 ? e.max.y : ex.maxY,
             }
           : { minX: e.min.x, minY: e.min.y, maxX: e.max.x, maxY: e.max.y };
-      } else if (!po.cover && [b.minX, b.minY, b.maxX, b.maxY].every((v) => Math.abs(v) < 1e7)) {
+      } else if (target(po) && !po.cover && [b.minX, b.minY, b.maxX, b.maxY].every((v) => Math.abs(v) < 1e7)) {
         ctx.tx.push([b.minX, (b.minX + b.maxX) / 2, b.maxX]);
         ctx.ty.push([b.minY, (b.minY + b.maxY) / 2, b.maxY]);
         ctx.objs.push(po.obj);
@@ -1657,7 +1668,7 @@ export function attachTools(
     // A group is a target as a whole too: its box's edges and middle, as one object has (what moves out of it leaves it).
     const groups = new Map<string, { o: CanvasObject; b: ScreenBox; min: WorldPoint; max: WorldPoint }>();
     for (const po of vis) {
-      if (chosen.has(po.obj.id) || po.cover || !onScreen(po.box)) continue;
+      if (!target(po) || po.cover || !onScreen(po.box)) continue;
       for (const id of po.obj.groups ?? []) {
         const e = boundsIn(po.obj, frame);
         const had = groups.get(id);
@@ -1675,7 +1686,11 @@ export function attachTools(
       ctx.ty.push([g2.b.minY, (g2.b.minY + g2.b.maxY) / 2, g2.b.maxY]);
       ctx.objs.push(g2.o);
     }
-    if (!box || !ex) return null;
+    if (!box || !ex) {
+      if (!free) return null;
+      ctx.shape = { targets: snapTargets(tp, segs, straight), refs, src, srcRefs, srcSegs };
+      return ctx;
+    }
     ctx.shape = { targets: snapTargets(tp, segs, straight), refs, src, srcRefs, srcSegs };
     ctx.box = box;
     ctx.src = exactLines({ x: ex.minX, y: ex.minY }, { x: ex.maxX, y: ex.maxY });
@@ -1692,6 +1707,29 @@ export function attachTools(
   };
   /** Of a line of something and a grid line, the one nearer to `v`. */
   const nearerOf = (v: number, a: number | null, b: number | null): number | null => (a === null ? b : b === null || Math.abs(a - v) <= Math.abs(b - v) ? a : b);
+  /**
+   * Where a free point lands (the corner a resize or a drawing tool moves): each axis it may move on goes to the nearer of another object's
+   * line (an edge or the middle) and a grid line, within reach; null on an axis nothing holds. The one rule of resizing and drawing.
+   */
+  const lineSnap = (px: number, py: number, sn: SnapContext, moveX = true, moveY = true): { x: number | null; y: number | null } => {
+    const hx = moveX ? bestSnap([px, px, px], sn.tx) : null;
+    const hy = moveY ? bestSnap([py, py, py], sn.ty) : null;
+    return {
+      x: moveX ? nearerOf(px, hx ? sn.tx[hx.target]![hx.line]! : null, gridScreen(px, "x")) : null,
+      y: moveY ? nearerOf(py, hy ? sn.ty[hy.target]![hy.line]! : null, gridScreen(py, "y")) : null,
+    };
+  };
+  /** A point being drawn: onto another shape's corner (both axes), else each axis onto a line (`lineSnap`); with the guides that show it. */
+  const snapPoint = (p: ScreenPoint, sn: SnapContext | null): ScreenPoint => {
+    editor.guides = null;
+    if (!sn) return p;
+    const at = lineSnap(p.x, p.y, sn);
+    let x = at.x ?? p.x, y = at.y ?? p.y;
+    if (at.x !== null || at.y !== null) editor.guides = { ...(at.x !== null ? { x: at.x } : {}), ...(at.y !== null ? { y: at.y } : {}) };
+    const hit = shapeSnap(sn.shape.targets, [p.x, p.y], [], editor.guides ? 0 : Infinity);
+    if (hit) [x, y, editor.guides] = [hit.to[0], hit.to[1], hit.guides];
+    return { x, y };
+  };
   /** For a moving box: the move that puts the nearest of its three lines exactly on a grid line. */
   const gridMove = (lines: readonly D.Dyadic[], moved: D.Dyadic): { move: D.Dyadic; dist: number; by: number; line: number } | null => {
     const q = editor.gridStep(view.camera);
@@ -1832,10 +1870,8 @@ export function attachTools(
       if (!moveX) kx = 1;
       if (!moveY) ky = 1;
       if (sn) {
-        const hx = moveX ? bestSnap([px, px, px], sn.tx) : null;
-        const hy = moveY ? bestSnap([py, py, py], sn.ty) : null;
-        const tx = moveX && sx !== 0 ? nearerOf(px, hx ? sn.tx[hx.target]![hx.line]! : null, gridScreen(px, "x")) : null;
-        const ty = moveY && sy !== 0 ? nearerOf(py, hy ? sn.ty[hy.target]![hy.line]! : null, gridScreen(py, "y")) : null;
+        const at = lineSnap(px, py, sn, moveX && sx !== 0, moveY && sy !== 0);
+        const tx = at.x, ty = at.y;
         if (tx !== null) {
           kx = (tx - fixed.x) / sx;
           editor.guides = { x: tx };
@@ -2057,7 +2093,12 @@ export function attachTools(
         break;
       case "text":
       case "note":
-        g = { kind: "text", pointerId: e.pointerId, start: s, moved: false };
+        {
+          // (a text box dragged out snaps its corners as a drawn shape does; a click on a text edits it, where it is)
+          const snap = editor.snap && !(e.ctrlKey || e.metaKey) && !textAt(s) ? snapContext([], view.frame, true) : null;
+          g = { kind: "text", pointerId: e.pointerId, start: snap ? snapPoint(s, snap) : s, moved: false, snap };
+          editor.guides = null;
+        }
         break;
       case "shape":
       case "balloon":
@@ -2542,11 +2583,21 @@ export function attachTools(
         // Opened after the pointer is released, so the editor keeps the focus.
         editor.shapeDraft = null;
         if (cancelled || editor.blockEdit()) break;
-        if (editor.tool === "note") {
-          const wide = g.moved && Math.abs(s.x - g.start.x) >= MIN_TEXT_BOX_PX;
-          hooks.newNote?.({ x: wide ? Math.min(s.x, g.start.x) : g.start.x, y: wide ? Math.min(s.y, g.start.y) : g.start.y }, wide ? Math.abs(s.x - g.start.x) : undefined);
-        } else if (g.moved && Math.abs(s.x - g.start.x) >= MIN_TEXT_BOX_PX) hooks.editText(null, world({ x: Math.min(s.x, g.start.x), y: Math.min(s.y, g.start.y) }), { widthPx: Math.abs(s.x - g.start.x) });
-        else hooks.editText(textAt(g.start), world(g.start));
+        {
+          // (a box dragged out: its far corner snaps as a drawn shape's does)
+          const end = g.moved ? snapPoint(s, g.snap) : s;
+          editor.guides = null;
+          if (editor.tool === "note") {
+            const wide = g.moved && Math.abs(end.x - g.start.x) >= MIN_TEXT_BOX_PX;
+            hooks.newNote?.({ x: wide ? Math.min(end.x, g.start.x) : g.start.x, y: wide ? Math.min(end.y, g.start.y) : g.start.y }, wide ? Math.abs(end.x - g.start.x) : undefined);
+            break;
+          }
+          if (g.moved && Math.abs(end.x - g.start.x) >= MIN_TEXT_BOX_PX) {
+            hooks.editText(null, world({ x: Math.min(end.x, g.start.x), y: Math.min(end.y, g.start.y) }), { widthPx: Math.abs(end.x - g.start.x) });
+            break;
+          }
+        }
+        hooks.editText(textAt(g.start), world(g.start));
         break;
     }
     g = { kind: "none" };

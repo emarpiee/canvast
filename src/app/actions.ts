@@ -259,6 +259,7 @@ export function copySelection(doc: DocumentStore, editor: EditorState, view: Vie
   const payload = buildPayload(objs, view.frame, Number(depth.levels) + depth.frac);
   const text = plain ?? clipboardText(objs);
   inMemory = { payload, text };
+  ownClipboard = true;
   pastes = 0;
   try {
     // Another tab of the same browser profile can paste it too (the system clipboard only carries the text).
@@ -312,6 +313,7 @@ function readClipboard(systemText: string | null): ClipboardPayload | null {
     }
   }
   if (!own) return null;
+  if (ownClipboard && own === inMemory) return own.payload; // (copied here, and nothing else since)
   // Something else was copied since (outside canvast, or another tab's text): that is not ours to paste.
   const lines = (s: string): string => s.replace(/\r\n?/g, "\n"); // (a system may write line ends its own way)
   return systemText !== null && systemText !== "" && lines(systemText) !== lines(own.text) ? null : own.payload;
@@ -3067,8 +3069,18 @@ export const isPlaceholderText = (s: string): boolean => /^canvast: \d+ objects?
 let pictureIsOurs = false;
 export const markCopiedPicture = (): void => { pictureIsOurs = true; };
 export const forgetCopiedPicture = (): void => { pictureIsOurs = false; };
-export const isCopiedPicture = (): boolean => pictureIsOurs;
-if (typeof window !== "undefined") window.addEventListener("blur", forgetCopiedPicture);
+/** The system clipboard is what this window copied last (its objects, or their picture): see `ownClipboard`. */
+export const isCopiedPicture = (): boolean => pictureIsOurs || ownClipboard;
+/**
+ * The objects copied here are still what the clipboard holds: set by a copy of objects, gone when the window loses the focus (another program
+ * may copy) and at any other copy or cut (a field's words). A browser may write the clipboard its own way (Firefox), so the text it then
+ * holds cannot tell it; this can. One rule with the picture above.
+ */
+let ownClipboard = false;
+if (typeof window !== "undefined") {
+  window.addEventListener("blur", () => { forgetCopiedPicture(); ownClipboard = false; });
+  for (const kind of ["copy", "cut"]) window.addEventListener(kind, () => { ownClipboard = false; }, true); // (before the copy of objects marks it again)
+}
 
 /** Make a new picture of the picked still as it looks now (crop and adjustments baked in), beside it, in the library too. */
 export async function bakePicture(

@@ -1,5 +1,5 @@
 import * as D from "../../src/core/dyadic";
-import { LIMITS, boolWith, chooseInMenu, distance, expect, maskWith, pathWith, recordMetric, reps, setPenColour, test } from "./harness";
+import { LIMITS, boolWith, chooseInMenu, distance, expect, maskWith, pathWith, recordMetric, reps, setPenColour, sheetWith, test } from "./harness";
 import { encodeGif } from "./gif";
 import { makeWav } from "./video";
 import type { App } from "./harness";
@@ -1420,4 +1420,117 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
   same(await snapshot((await real()).filter((id) => !here.includes(id))), original, "cut on another canvas, pasted back");
   expect(await whole()).toEqual([]);
   expect(app.consoleErrors).toEqual([]);
+});
+
+test("every kind of object snaps when resized by a handle: to another object's edge, and to the grid when Snap to the grid is on", async ({ app }) => {
+  const p = app.page;
+  const frame = async () => (await p.evaluate(() => window.__canvastDebug.selectionFrame()))!.corners;
+  /** The selection's right side handle, dragged to `x`: where its right side ends up. */
+  const resizeRightTo = async (x: number): Promise<number> => {
+    const c = await frame();
+    const at = { x: c[1]![0], y: (c[1]![1] + c[2]![1]) / 2 };
+    await app.drag(at, { x, y: at.y }, 6);
+    await app.frame();
+    return (await frame())[1]![0];
+  };
+  const count = async () => (await objects(app)).length;
+  const clear = async () => {
+    await key(app, "v");
+    await key(app, "Control+a");
+    await key(app, "Delete");
+    await expect.poll(count).toBe(0);
+  };
+  const png = makePng(60, 40, (x, y) => [x * 4, y * 6, 90, 255]);
+  const picture = async () => {
+    const n = await count();
+    await p.getByTestId("import-input").setInputFiles({ name: "p.png", mimeType: "image/png", buffer: png });
+    await expect.poll(count).toBe(n + 1);
+    await key(app, "v");
+  };
+  // Each kind made left of the middle and left selected (with the Select tool on).
+  const kinds: Array<[string, () => Promise<void>]> = [
+    ["shape", async () => { await key(app, "u"); await app.drag({ x: 450, y: 300 }, { x: 560, y: 380 }); await key(app, "v"); }],
+    ["picture", picture],
+    ["picture on its own sheet", async () => { await picture(); await sheetWith(p, "eachsheet"); await expect.poll(async () => (await objects(app)).filter((o) => o["container"]).length).toBe(1); }],
+    ["pen stroke", async () => { await key(app, "p"); await app.drag({ x: 450, y: 320 }, { x: 560, y: 360 }); await key(app, "v"); await p.mouse.click(505, 340); }],
+    ["speech balloon", async () => { await key(app, "k"); await app.drag({ x: 450, y: 300 }, { x: 560, y: 380 }); await key(app, "v"); }],
+    ["group", async () => { await key(app, "u"); await app.drag({ x: 450, y: 300 }, { x: 500, y: 340 }); await app.drag({ x: 510, y: 350 }, { x: 560, y: 390 }); await key(app, "v"); await app.drag({ x: 440, y: 290 }, { x: 570, y: 400 }); await key(app, "Control+g"); }],
+    ["sheet", async () => { await key(app, "c"); await app.drag({ x: 450, y: 300 }, { x: 560, y: 380 }); await key(app, "v"); }],
+  ];
+  await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false)); // (the object alone: a grid line nearer would take the side)
+  const missed: string[] = [];
+  for (const [name, make] of kinds) {
+    // To another object: a rectangle whose left side is at x 800, the side dragged to 4 px short of it.
+    await key(app, "u");
+    await app.drag({ x: 800, y: 250 }, { x: 900, y: 450 });
+    await make();
+    expect((await p.evaluate(() => window.__canvastDebug.selection())).length, `${name}: selected`).toBeGreaterThan(0);
+    const right = await resizeRightTo(796);
+    if (Math.abs(right - 800) > 0.5) missed.push(`${name} to an object: its side at ${right.toFixed(2)}, not 800`);
+    await clear();
+    // To the grid: alone, with Snap to the grid on, the side dragged to 3 px short of a grid line.
+    await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", true));
+    await make();
+    const step = await p.evaluate(() => window.__canvastDebug.gridStep());
+    if (step === null) missed.push(`${name}: no grid step`);
+    else {
+      const w = Number((await p.evaluate(() => window.__canvastDebug.screenToWorld(740, 300))).x);
+      const line = Math.round(w / step) * step;
+      const lineX = (await p.evaluate((x) => window.__canvastDebug.worldToScreen(String(x), "0"), line)).x;
+      const at = await resizeRightTo(lineX - 3);
+      if (Math.abs(at - lineX) > 0.5) missed.push(`${name} to the grid: its side at ${at.toFixed(2)}, the line at ${lineX.toFixed(2)}`);
+    }
+    await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false));
+    await clear();
+  }
+  expect(missed).toEqual([]);
+});
+
+test("drawing a shape or a sheet snaps where it starts and where it ends: onto a corner, along an edge alone, and onto the grid", async ({ app }) => {
+  const p = app.page;
+  await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false));
+  const count = async () => (await objects(app)).length;
+  const lastBox = async () => {
+    const id = (await objects(app)).at(-1)!.id;
+    return (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+  };
+  const draw = async (tool: string, from: [number, number], to: [number, number]) => {
+    const n = await count();
+    await key(app, tool);
+    await app.drag({ x: from[0], y: from[1] }, { x: to[0], y: to[1] }, 6);
+    await expect.poll(count).toBe(n + 1);
+    return lastBox();
+  };
+  const near = (a: number, b: number) => Math.abs(a - b) <= 0.5;
+  const missed: string[] = [];
+  for (const [name, tool] of [["shape", "u"], ["sheet", "c"]] as const) {
+    // what there is to snap to: a rectangle from (800, 250) to (900, 450)
+    await draw("u", [800, 250], [900, 450]);
+    // starts 3 px off its top-left corner: on the corner
+    let b = await draw(tool, [797, 247], [700, 180]);
+    if (!near(b.maxX, 800) || !near(b.maxY, 250)) missed.push(`${name}: start on a corner at ${b.maxX}, ${b.maxY}`);
+    // starts 3 px above its top edge, far from its corners and middle: only that axis holds
+    b = await draw(tool, [953, 247], [1010, 180]);
+    if (!near(b.maxY, 250) || !near(b.minX, 953)) missed.push(`${name}: start on an edge at ${b.minX}, ${b.maxY}`);
+    // ends 3 px off its bottom-right corner: on the corner
+    b = await draw(tool, [600, 500], [903, 453]);
+    if (!near(b.maxX, 900) || !near(b.maxY, 450)) missed.push(`${name}: end on a corner at ${b.maxX}, ${b.maxY}`);
+    // the grid: alone, with Snap to the grid on, it starts on the grid line it is pressed 3 px from
+    await key(app, "v");
+    await key(app, "Control+a");
+    await key(app, "Delete");
+    await expect.poll(count).toBe(0);
+    await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", true));
+    const step = (await p.evaluate(() => window.__canvastDebug.gridStep()))!;
+    const w = await p.evaluate(() => window.__canvastDebug.screenToWorld(600, 560));
+    const line = await p.evaluate(([x, y]) => window.__canvastDebug.worldToScreen(String(x), String(y)), [Math.round(Number(w.x) / step) * step, Math.round(Number(w.y) / step) * step]);
+    b = await draw(tool, [line.x - 3, line.y - 3], [line.x + 120, line.y + 90]);
+    if (!near(b.minX, line.x) || !near(b.minY, line.y)) missed.push(`${name}: start on the grid at ${b.minX}, ${b.minY}, the line at ${line.x}, ${line.y}`);
+    await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false));
+    await key(app, "v");
+    await key(app, "Control+a");
+    await key(app, "Delete");
+    await expect.poll(count).toBe(0);
+  }
+  expect(missed).toEqual([]);
 });

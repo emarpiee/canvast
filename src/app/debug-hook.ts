@@ -219,6 +219,8 @@ export interface DebugHook {
   addStyle(kind: string, data: unknown): Promise<void>;
   styles(): Array<{ kind: string; data: unknown }>;
   handleLabel(): string | null;
+  /** The grid's step in world units at this zoom, as snapping uses it (null: no grid to snap to). */
+  gridStep(): number | null;
   /** The nodes picked together in Edit nodes (ADR 0145): how many on each path. */
   pickedNodes(): Array<[string, number]>;
   /** The line the hovered or dragged radius or ratio handle slides along (screen px), or null. */
@@ -439,6 +441,7 @@ export function installDebugHook(
     objects: () => doc.ordered().map(serializeWorld),
     storedObjects: () => doc.ordered().map(serializeObject),
     selection: () => [...editor.selection].sort(),
+    gridStep: () => editor.gridStep(view.camera),
     tool: () => editor.tool,
     setTool: (t) => editor.setTool(t),
     setLassoFilter: (f) => {

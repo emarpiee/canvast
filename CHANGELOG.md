@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.56.10 — Resizing a sheet snaps; drawing snaps (2026-11-10)
+
+- **Fixed:** a sheet resized by a handle (a picture's own sheet too) did not snap: what is on it, which moves with it, counted as lines to snap to and held its side where it began. What moves along (on a sheet, attached) is never a line to snap to, for every gesture.
+- **Added:** drawing snaps: a shape, a line, a sheet, a speech balloon, a text or a note box starts on the corner, edge, middle or grid line it is pressed near, and its dragged corner snaps as a resized one does (Ctrl held: no snap; Shift and Alt keep their corner). One rule with resizing.
+- **Fixed:** in Firefox, objects copied with Ctrl+C did not paste back with Ctrl+V: Firefox writes the clipboard its own way, so its text no longer matched what was copied. What was copied here counts as the clipboard until the window loses the focus or something else is copied, as a copied picture already did.
+- **Added:** a test draws shapes and sheets starting near a corner, an edge and a grid line, and ending near a corner, and checks where they land.
+- **Added:** a test resizes every kind (shape, picture, a picture on its own sheet, pen stroke, speech balloon, group, sheet) toward another object and toward the grid, and checks its side lands exactly on the line.
+
 ## 0.56.9 — Pressed buttons under the pointer; Library and Canvas joined (2026-11-10)
 
 - **Fixed:** a pressed or selected button under the pointer lost its fill and showed a light icon on a light ground (the Actions bar, the bars of tools); it stays filled, a step deeper.
