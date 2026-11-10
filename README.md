@@ -532,7 +532,7 @@ Keep a large canvas in order, and reach things that lie under others.
   - Hold `Ctrl` and move over the canvas: the outline of everything under the pointer shows, with their names in a list beside it.
   - `Ctrl`+click selects exactly that thing, even deep inside a group, mask or sheet. On a revealed outline you get the thing it belongs to, even under a filled shape; elsewhere you get the top thing (`Ctrl`+`Alt`+click goes down the stack).
   - In the list of names, move onto a row (its outline turns strong): `Ctrl`+click selects it, `Ctrl`+`Shift`+click adds or removes it. Selected ones are ticked.
-  - Over an empty spot inside the selection, the list holds everything the selection holds, groups by their Layers name with their items indented under them. It shows up to 16 rows; the wheel scrolls it while `Ctrl` is held, and with *Scroll the Ctrl list at its ends* on (Settings › Navigation) so does resting the pointer on its top or bottom row.
+  - Over an empty spot inside the selection, the list holds everything the selection holds, groups by their Layers name with their items indented under them. It shows up to 16 rows; the wheel scrolls it while `Ctrl` is held, and with *Scroll the Ctrl list at its ends* on (Settings › Navigation) so does resting the pointer on its top or bottom row or just past it (the list stays open there).
   - A selected thing moves when you drag from anywhere inside it, even under other things. A click without moving still selects the top thing.
   - A sheet is ground: dragging on a selected sheet draws a selection box (hold `Ctrl` to move the sheet).
 - **Hide and lock:** *Show all hidden* and *Unlock all* bring everything back.

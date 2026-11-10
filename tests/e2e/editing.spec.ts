@@ -1670,6 +1670,10 @@ test("the list to choose from shows a group inside the selection by its name and
   await p.evaluate(() => window.__canvastDebug.setSetting("select.listAutoScroll", true));
   await p.mouse.move(640, 301 + 4 + 16 * 16 - 4);
   await expect.poll(async () => (await list())?.scroll ?? 0).toBeGreaterThan(1);
+  // and past its edge it stays open and goes on scrolling (up, here, from below its top edge back to the top)
+  await p.mouse.move(640, 301 - 20);
+  await expect.poll(async () => (await list())?.scroll ?? -1).toBe(0);
+  expect(await list()).not.toBeNull();
   await p.keyboard.up("Control");
   await expect.poll(list).toBeNull();
   expect(app.consoleErrors).toEqual([]);

@@ -75,6 +75,8 @@ export const REVEAL_ROW_PX = 16;
 export const REVEAL_PAD_PX = 3;
 /** How many rows the revealed list shows at once at most (fewer when the view ends first); the rest scroll (the wheel, while it is open). */
 export const REVEAL_ROWS = 16;
+/** How far past the list's top or bottom edge the pointer may go and still scroll it (Settings: scroll the Ctrl list at its ends). */
+export const REVEAL_EDGE_PX = 48;
 
 /** Scroll the revealed list by `rows` (+ down); false when there is no list to scroll, so the wheel does what it always does. */
 export function scrollReveal(editor: EditorState, rows: number): boolean {
@@ -137,11 +139,15 @@ export function createReveal(editor: EditorState, allowed: () => boolean, autoSc
       // A drag never does: a Ctrl+drag down and right would leave the list behind where it started, under where the drag ends.
       const L = editor.revealList;
       const toward = !!(p && ctrlHeld && !pressed && L && editor.revealAt && p.x >= editor.revealAt.x && p.y >= editor.revealAt.y && p.x <= L.x + L.w && p.y <= L.y + L.h);
-      if (toward) {
+      // With the setting on, a list that scrolls stays open past its top and bottom edges too (as far as REVEAL_EDGE_PX), over its own width:
+      // there it scrolls that way, faster outside than on its end row.
+      const over = !!(p && ctrlHeld && !pressed && L && editor.revealAt && autoScroll() && L.total > L.ids.length && p.x >= L.x && p.x <= L.x + L.w && p.y >= L.y - REVEAL_EDGE_PX && p.y <= L.y + L.h + REVEAL_EDGE_PX);
+      if (toward || over) {
         const row = revealRowAt(editor, p!.x, p!.y) ?? null;
         if (editor.revealHot !== row) { editor.revealHot = row; editor.redraw(); }
-        const onList = p!.x >= L!.x && p!.y >= L!.y;
-        scrollAt(!autoScroll() || !onList ? 0 : p!.y < L!.y + REVEAL_PAD_PX + REVEAL_ROW_PX ? -1 : p!.y > L!.y + L!.h - REVEAL_PAD_PX - REVEAL_ROW_PX ? 1 : 0);
+        const top = L!.y + REVEAL_PAD_PX + REVEAL_ROW_PX, bottom = L!.y + L!.h - REVEAL_PAD_PX - REVEAL_ROW_PX;
+        const onList = p!.x >= L!.x;
+        scrollAt(!autoScroll() || !onList ? 0 : p!.y < L!.y ? -2 : p!.y < top && p!.y >= L!.y ? -1 : p!.y > L!.y + L!.h ? 2 : p!.y > bottom ? 1 : 0);
         return;
       }
       scrollAt(0);

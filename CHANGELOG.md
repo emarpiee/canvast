@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.56.19 — The Ctrl list scrolls past its ends instead of closing (2026-11-10)
+
+- **Fixed:** with *Scroll the Ctrl list at its ends* on, moving the pointer past the list's top or bottom edge closed it; it now stays open there (up to about three rows' height past the edge, over its width) and scrolls that way, faster outside than on its end row.
+
 ## 0.56.18 — A taller Ctrl list, and a setting to scroll it at its ends (2026-11-10)
 
 - **Changed:** the list beside the pointer while Ctrl is held is up to 16 rows tall (fewer when the bottom of the view comes first).
