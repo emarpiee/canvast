@@ -19,7 +19,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: sudo apt-get update && sudo apt-get install -y xvfb ffmpeg webp zip
+      - run: sudo apt-get update && sudo apt-get install -y xvfb ffmpeg webp zip imagemagick
       - run: npx playwright install --with-deps chromium
       - run: npm run build
       - run: npm run build:desktop
@@ -31,11 +31,11 @@ jobs:
           ELECTRON_DISABLE_SANDBOX: "1"
         run: |
           mkdir -p shots
-          for s in ${{ inputs.only || 'shots shots-privacy shots-more shots-features shots-desktop shots-notes shots-library shots-views shots-balloons' }}; do
+          for s in ${{ inputs.only || 'shots shots-boards shots-drawing shots-library shots-notes shots-workspace shots-views shots-privacy shots-desktop' }}; do
             echo "== $s"
             xvfb-run -a node "scripts/showcase/$s.mjs" showcase.canvast shots/ || echo "FAILED $s"
           done
-          for f in shots/*.png; do cwebp -quiet -q 80 "$f" -o "${f%.png}.webp"; done
+          for f in shots/*.png; do w=$(identify -format %w "$f"); if [ "$w" -gt 1280 ]; then cwebp -quiet -q 78 -resize 1280 0 "$f" -o "${f%.png}.webp"; else cwebp -quiet -q 78 "$f" -o "${f%.png}.webp"; fi; done
           ls -la shots
       - uses: actions/upload-artifact@v4
         if: always()

@@ -1,4 +1,5 @@
-// README screenshots: imports showcase.canvast into a fresh profile (theme: System, the browser set to dark) and photographs the app.
+// README screenshots of the endless canvas (the showcase: the Solar System, a million levels down, 1,000 levels up, a tour), the command
+// palette and Settings: imports showcase.canvast into a fresh profile (theme: System, the browser set to dark) and photographs the app.
 // Run from the repo root after `npm run build`: node scripts/showcase/shots.mjs <showcase.canvast> <outDir>
 import { chromium } from "@playwright/test";
 import { mkdtempSync } from "node:fs";
@@ -66,34 +67,11 @@ for (let i = 0; i < 12; i++) { await p.keyboard.press("ArrowRight"); await settl
 await shot("tour");
 await p.keyboard.press("Escape");
 
-// 4. Boolean shapes: the rocket is a Union, with the Shapes menu open
-await go("8 · Earth");
-await bookmarks(false);
-await p.keyboard.press("v");
-await p.mouse.click(1180, 352);
-await p.locator('[data-ctx="boolmenu"]').click();
-await p.mouse.move(1300, 600);
-await shot("shapes");
-await p.keyboard.press("Escape");
-await p.keyboard.press("Escape");
-
 // 5. 1,000 levels up
 await go("7 · The multiverse (1,000 levels up)");
 await bookmarks(false);
 await off();
 await shot("zoom-out");
-
-// 6. Layers and properties: Jupiter (a gradient fill) picked exactly with Ctrl+click
-await go("1 · The Solar System");
-await bookmarks(false);
-await p.getByRole("button", { name: "Layers panel", exact: true }).click();
-await p.keyboard.down("Control");
-await p.mouse.click(1102, 364); // (Jupiter itself: its orbit ring passes through the middle of the planet)
-await p.keyboard.up("Control");
-await off();
-await shot("layers");
-await p.getByRole("button", { name: "Layers panel", exact: true }).click();
-await p.keyboard.press("Escape");
 
 // 7. Command palette
 await go("1 · The Solar System");
@@ -101,33 +79,6 @@ await bookmarks(false);
 await p.keyboard.press("Control+k");
 await p.keyboard.type("zoom");
 await shot("command-palette");
-await p.keyboard.press("Escape");
-
-// 8. Export: the Earth (a clipping mask) picked by its name, Export… dialog
-await go("8 · Earth");
-await bookmarks(false);
-await p.mouse.click(447, 150);
-await p.keyboard.press("Control+k");
-await p.keyboard.type("Export… (choose a size)");
-await p.keyboard.press("Enter");
-await shot("export");
-await p.keyboard.press("Escape");
-await p.keyboard.press("Escape");
-
-// 9. Library: screenshots of the bookmarks, kept in the library
-for (const name of ["1 · The Solar System", "4 · The Milky Way", "8 · Earth", "9 · An island", "13 · DNA", "16 · Inside a proton"]) {
-  await go(name);
-  await bookmarks(false);
-  await p.getByRole("button", { name: "Screenshot", exact: true }).click();
-  await p.getByTestId("toast").filter({ hasText: /Screenshot saved/ }).waitFor();
-}
-await p.getByTestId("view-assets").click();
-// (the showcase also carries its two font files: the pictures are shown by their file type)
-await p.getByTestId("assets-side").getByRole("button", { name: /^\.WEBP/ }).click();
-await off();
-await shot("library");
-await p.locator(".asset-card, [data-testid='asset-card']").first().dblclick().catch(() => {});
-await shot("viewer");
 await p.keyboard.press("Escape");
 
 // 10. Settings

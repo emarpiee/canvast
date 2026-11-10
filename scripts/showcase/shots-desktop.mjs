@@ -5,6 +5,7 @@ import { _electron as electron } from "@playwright/test";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { artOf, artPath } from "./lib.mjs";
 
 const [archive, out] = process.argv.slice(2);
 const root = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "cv-desk-"));
@@ -31,10 +32,10 @@ await p.getByTestId("choose-ok").click(); // (How to import: the default way)
 await Promise.all([p.waitForEvent("load", { timeout: 120000 }), p.getByTestId("confirm-ok").click()]);
 await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 60000 });
 await p.addStyleTag({ content: ".hud-dev,.hud-debug{display:none!important}" });
-// A few pictures in the library too (the README's own screenshots), so library/images/ is in the folder
+// A few pictures in the library too (public-domain artworks, scripts/showcase/art), so library/images/ is in the folder
 await p.getByTestId("view-assets").click();
-await p.getByTestId("assets-import-input").setInputFiles(["hero", "journey", "deep-zoom"].map((n) => resolve(`docs/screenshots/${n}.webp`)));
-await p.waitForFunction(() => window.__canvastDebug.assetListing().then((l) => l.entries.length >= 5), null, { timeout: 60000 });
+await p.getByTestId("assets-import-input").setInputFiles(artOf("hokusai-under", "degas-dancer_with", "waterloo").map(artPath));
+await p.waitForFunction(() => window.__canvastDebug.assetListing().then((l) => l.entries.length >= 3), null, { timeout: 60000 });
 await p.getByTestId("view-canvas").click();
 await p.evaluate(() => window.__canvastDebug.flushStorage());
 await p.getByTestId("workspace-nav").click();
@@ -54,7 +55,7 @@ await p.keyboard.press("Escape");
 
 // The Trash: two of the pictures, as deleted files are kept in the workspace folder
 mkdirSync(join(ws, ".trash", "library", "images"), { recursive: true });
-for (const n of ["hero", "journey", "shapes", "pattern"]) copyFileSync(resolve(`docs/screenshots/${n}.webp`), join(ws, ".trash", "library", "images", `${n}.webp`));
+for (const f of artOf("verhaecht", "leprince", "delany", "hokusai-rooster")) copyFileSync(artPath(f), join(ws, ".trash", "library", "images", f));
 await p.getByTestId("view-assets").click();
 await p.locator('[data-scope="trash"]').click();
 await p.getByTestId("trash-card").first().click();

@@ -1,91 +1,113 @@
-// README screenshots of notes: a note in the library's notes editor, and its card on a canvas with the Note panel open beside it.
-// Imports showcase.canvast into a fresh profile (dark, the default theme colour) and photographs the app.
-// Run from the repo root after `npm run build`:
-//   node scripts/showcase/shots-notes.mjs <showcase.canvast> <outDir>
-import { chromium } from "@playwright/test";
-import { mkdtempSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+// The README's pictures of notes: a study plan written in the notes editor with its properties, links to other notes and pictures of
+// the library (public-domain artworks, scripts/showcase/art), what links to it, and its card on a canvas beside its references.
+// Run from the repo root after `npm run build`: node scripts/showcase/shots-notes.mjs <unused> <outDir>
+import { artOf, artPath, open } from "./lib.mjs";
 
-const [archive, out] = process.argv.slice(2);
-const work = mkdtempSync(join(process.env.TMPDIR ?? tmpdir(), "cv-shots-"));
-const ctx = await chromium.launchPersistentContext(join(work, "profile"), { viewport: { width: 1440, height: 900 }, colorScheme: "dark" });
-const p = ctx.pages()[0] ?? (await ctx.newPage());
-p.on("pageerror", (e) => console.log("PAGEERROR", String(e)));
-await p.goto("file://" + process.cwd() + "/dist/canvast.html#debug");
-await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
-await p.addStyleTag({ content: ".hud-dev,.hud-debug{display:none!important}" });
-const H = (fn, arg) => p.evaluate(fn, arg);
-const frame = () => H(() => window.__canvastDebug.nextFrame());
-const settle = async (ms = 800) => { await frame(); await p.waitForTimeout(ms); await frame(); };
-const shot = async (name) => {
-  await H(() => { for (const b of document.querySelectorAll(".notice-close")) b.click(); });
-  await settle();
-  await p.screenshot({ path: `${out}/${name}.png` });
-  console.log("shot", name);
-};
+const [, out] = process.argv.slice(2);
+const s = await open(out);
+const { p, H, settle, shot, step, off, blur, menu, importFiles, place, fit } = s;
 
-await p.getByTestId("save-status").click();
-await p.getByTestId("set-import-input").setInputFiles(resolve(archive));
-await p.getByTestId("choose-ok").click(); // (How to import: the default way)
-await p.getByTestId("confirm-ok").click();
-await p.getByTestId("toast").filter({ hasText: /Imported/ }).waitFor();
-await p.keyboard.press("Escape");
-
-const NOTE = `---
-tags: [planning, space]
-status: draft
+const horse = artOf("delacroix")[0], fair = artOf("bonheur")[0], wave = artOf("hokusai-under")[0];
+const PLAN = `---
+tags: [study-plan, anatomy]
+status: in progress
+week: 3
 ---
-# Solar System tour
+# Horse anatomy: study plan
 
-The showcase opens on the **Sun** and dives down to a leaf, then a million zoom levels further.
+Three weeks of studies from the masters, one form at a time.
 
-## Stops
-- [x] The Sun and its planets
-- [x] [[Earth]], then the island and its tree
-- [ ] The cells, DNA and the proton
-- [ ] Other universes, 1,000 levels up
+![${horse.replace(/\.jpg$/, "")}](${horse})
 
-> Every stop is a bookmark: press **1** to **9** to fly there.
+## This week
+- [x] Copy the head and neck, after Delacroix
+- [x] Ten-minute gestures, after [[Gesture practice]]
+- [ ] The weight on the back legs
+- [ ] One finished study in ink
 
-| Stop | Zoom levels |
-| --- | --- |
-| Earth | 30 |
-| A leaf | 60 |
-| A heart | 1,000,000 |
+> Draw the big masses first; the details follow from them.
 
-#showcase
+| Day | Study | Minutes |
+| --- | --- | --- |
+| Monday | Head and neck | 45 |
+| Wednesday | Legs in motion | 60 |
+| Friday | The whole horse | 90 |
+
+#reference
 `;
-await p.getByTestId("view-assets").click();
-await p.getByTestId("assets-import-input").setInputFiles({ name: "Solar System tour.md", mimeType: "text/markdown", buffer: Buffer.from(NOTE) });
-const noteCard = p.locator('[data-testid="asset-card"]', { hasText: "Solar System tour" }).first();
-await noteCard.waitFor();
-await noteCard.dblclick();
-await p.locator(".viewer-note .sun-editor-editable h1").first().waitFor();
-await shot("notes-editor");
+const GESTURE = `---
+tags: [practice]
+---
+# Gesture practice
 
-// On the canvas: its card placed, and the Note panel beside it
-await p.getByTestId("asset-place").click();
-await p.getByText("Place without tags").click(); // (the note's tags stay the library's)
-await p.locator("dialog[open]").getByRole("button", { name: "Place", exact: true }).click();
-await settle();
-const id = await H(() => window.__canvastDebug.objects().at(-1).id);
-const box = await p.locator("canvas").first().boundingBox();
-// The card to the right half (a drag with the Hand), so the panel on the left leaves it in view
-await p.keyboard.press("-"); // (a smaller card: it fits beside the panel)
-await settle();
-await p.keyboard.press("h");
-await p.mouse.move(box.x + 700, box.y + 820);
-await p.mouse.down();
-await p.mouse.move(box.x + 1110, box.y + 820, { steps: 8 });
-await p.mouse.up();
-await p.keyboard.press("v");
-await settle();
-const b = (await H((i) => window.__canvastDebug.objectScreen(i), id)).box;
-await p.mouse.dblclick(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
-await p.getByTestId("note-panel").locator(".sun-editor-editable h1").first().waitFor();
-await H(() => document.activeElement?.blur());
-await p.keyboard.press("Escape"); // (the card unselected: no Actions bar over the panel)
-await p.mouse.move(box.x + 1100, box.y + 780);
-await shot("notes-panel");
-await ctx.close();
+Short poses, one line for the action, then the masses. See [[Horse anatomy: study plan]].
+
+- 30 seconds × 10
+- 2 minutes × 5
+- 5 minutes × 2
+`;
+const COMPOSITION = `---
+tags: [template]
+---
+# Study notes
+
+**Subject:**
+**After:**
+
+## What I learned
+-
+`;
+const hashes = await importFiles([
+  artPath(horse), artPath(fair), artPath(wave),
+  { name: "Horse anatomy - study plan.md", mimeType: "text/markdown", buffer: Buffer.from(PLAN) },
+  { name: "Gesture practice.md", mimeType: "text/markdown", buffer: Buffer.from(GESTURE) },
+  { name: "Study notes.md", mimeType: "text/markdown", buffer: Buffer.from(COMPOSITION) },
+]);
+const note = (name) => p.locator(`[data-testid="asset-card"][data-hash="${hashes[name]}"]`);
+
+// 1. The notes editor: the plan, its picture from the library, task list, quote and table; its properties and tags in the details
+await step("notes-editor", async () => {
+  await note("Horse anatomy - study plan.md").dblclick();
+  await p.locator(".viewer-note .sun-editor-editable h1").first().waitFor({ timeout: 20_000 });
+  await settle(1200);
+  await off();
+  await shot("notes-editor");
+});
+
+// 2. Links: the details of the gesture note, what it links to and what links to it
+await step("notes-links", async () => {
+  await p.keyboard.press("Escape");
+  await settle(400);
+  await note("Gesture practice.md").click();
+  await p.getByTestId("asset-backlinks").waitFor({ timeout: 10_000 }).catch(() => undefined);
+  await settle(800);
+  await off();
+  await shot("notes-links");
+  await p.keyboard.press("Escape");
+});
+
+// 3. On a canvas: the plan's card beside its references, the Note panel open
+await step("notes-panel", async () => {
+  await p.getByTestId("view-canvas").click();
+  await settle(500);
+  await place([hashes[fair], hashes[horse]]);
+  await p.getByTestId("view-assets").click();
+  await note("Horse anatomy - study plan.md").click();
+  await p.getByTestId("asset-place").click();
+  await p.getByText("Place without tags").click().catch(() => undefined);
+  await p.locator("dialog[open]").getByRole("button", { name: "Place", exact: true }).click().catch(() => undefined);
+  await settle(800);
+  await p.keyboard.press("Control+a");
+  await menu("arrangemenu", "grid:name-asc");
+  await fit();
+  const id = (await H(() => window.__canvastDebug.objects())).find((o) => o.kind === "image" && /plan/i.test(o.name ?? ""))?.id ?? (await H(() => window.__canvastDebug.objects())).at(-1).id;
+  const b = (await H((i) => window.__canvastDebug.objectScreen(i), id)).box;
+  await p.mouse.dblclick(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
+  await p.getByTestId("note-panel").locator(".sun-editor-editable h1").first().waitFor({ timeout: 20_000 });
+  await blur();
+  await p.keyboard.press("Escape");
+  await off();
+  await shot("notes-panel");
+});
+
+await s.done();
