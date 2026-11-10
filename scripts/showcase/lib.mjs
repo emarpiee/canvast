@@ -106,13 +106,26 @@ export async function open(out, { width = 1440, height = 900, args = [] } = {}) 
   };
   const select = (ids) => H((x) => window.__canvastDebug.select(x), ids);
   const boxOf = async (id) => (await H((i) => window.__canvastDebug.objectScreen(i), id))?.box ?? null;
-  /** The view fitted to these objects (all of them when none are given), through the Fit selection button: no keys, so no field takes them. */
+  /** The view fitted to these objects (all of them when none are given): centred on their box, then zoomed so it fills most of the view. */
   const fit = async (ids) => {
     await blur();
-    await select(ids ?? (await H(() => window.__canvastDebug.objects())).map((o) => o.id));
-    await settle(200);
-    await p.locator('[data-action="fit-selection"]').click();
-    await settle(900);
+    const box = () => H((list) => {
+      const d = window.__canvastDebug;
+      const all = list ?? d.objects().map((o) => o.id);
+      const bs = all.map((id) => d.objectScreen(id)?.box).filter(Boolean);
+      if (!bs.length) return null;
+      return { minX: Math.min(...bs.map((b) => b.minX)), minY: Math.min(...bs.map((b) => b.minY)), maxX: Math.max(...bs.map((b) => b.maxX)), maxY: Math.max(...bs.map((b) => b.maxY)) };
+    }, ids ?? null);
+    for (let round = 0; round < 3; round++) {
+      const b = await box();
+      if (!b) return;
+      await H(([x, y]) => { const d = window.__canvastDebug; const w = d.screenToWorld(x, y); d.setCamera({ ...d.camera(), cx: w.x, cy: w.y }); }, [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2]);
+      await settle(200);
+      const s = Math.min((width * 0.78) / Math.max(1, b.maxX - b.minX), (height * 0.72) / Math.max(1, b.maxY - b.minY));
+      if (Math.abs(Math.log2(s)) < 0.05) break;
+      await H((l) => window.__canvastDebug.jump(l), Math.log2(s));
+      await settle(400);
+    }
     await select([]);
     await settle(300);
   };
