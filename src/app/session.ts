@@ -922,8 +922,10 @@ export class Session {
       const { name: _n, autoName: _a, ...rest } = o;
       return rest as CanvasObject;
     });
-    const canvases = await this.repo.forgetPlacedNames(names);
-    for (const id of canvases) if (id !== this.current?.canvasId) this.post({ kind: "commit", canvasId: id, revision: -1 });
+    // (the open canvas saves what changed through its own writer; storage changes only the others)
+    await this.persistence.flush();
+    const canvases = await this.repo.forgetPlacedNames(names, this.current?.canvasId ?? null);
+    for (const id of canvases) this.post({ kind: "commit", canvasId: id, revision: -1 });
   }
 
   async deleteAssetsEverywhere(hashes: readonly string[]): Promise<number> {

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.56.32 — Hiding a placed item no longer trips the canvas's save (2026-11-11)
+
+- **Fixed:** hiding a library item placed on the open canvas (and, at each start, an item hidden earlier) made that canvas's next save fail with "changed elsewhere": taking the item's file name off every canvas also rewrote the open one in storage behind its back. The open canvas now takes the name off in memory and saves it itself; storage changes only the other canvases, as renaming a tag or deleting everywhere already did.
+
 ## 0.56.31 — The desktop app's pictures made by tests too (2026-11-11)
 
 - **Changed:** the desktop app's README pictures (a project's workspace folder with Switch workspace, its Trash) are a shot test in Electron (`tests/shots/desktop.shot.ts`), like every other picture; the last screenshot script and its helper are removed.

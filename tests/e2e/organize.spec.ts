@@ -1497,6 +1497,8 @@ test("a hidden picture shown on the canvas (its password remembered) never reach
   await p.getByTestId("view-assets").click();
   await pick(p, hash);
   await p.getByTestId("asset-hide").click();
+  // Hiding takes its file name off the open canvas: that canvas saves it itself, so its next save is not refused as changed elsewhere.
+  await expect.poll(() => p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved");
   await p.getByTestId("view-settings").click();
   await p.getByRole("tab", { name: /Privacy/ }).click();
   await p.getByTestId("hidden-pw-set").click();

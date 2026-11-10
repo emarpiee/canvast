@@ -562,14 +562,19 @@ export class WorkspaceRepo implements WorkspaceStore {
     }
   }
 
-  /** The file names placed items keep as layer names, taken off these items on every canvas (they have been hidden): `names` is each one's name now. A name typed by hand stays. */
-  async forgetPlacedNames(names: ReadonlyMap<string, string>): Promise<string[]> {
+  /**
+   * The file names placed items keep as layer names, taken off these items on every canvas but `skip` (they have been hidden): `names`
+   * is each one's name now. A name typed by hand stays. The open canvas is `skip`: it changes in memory and saves through its own writer,
+   * so its revision is never moved under it (that save was refused as "changed elsewhere").
+   */
+  async forgetPlacedNames(names: ReadonlyMap<string, string>, skip: string | null): Promise<string[]> {
     const tx = this.db.transaction(["objects", "canvases"], "readwrite", { durability: "strict" });
     const committed = done(tx);
     const store = tx.objectStore("objects");
     const touched = new Set<string>();
     for (const [hash, now] of names) {
       for (const rec of await req(store.index("assetId").getAll(hash) as IDBRequest<ObjectRecord[]>)) {
+        if (rec.canvasId === skip) continue;
         const d = rec.data as SerializedObject & { name?: string; autoName?: true; kind?: string };
         if (d.kind === "text" || d.name === undefined || !(d.autoName || d.name === now)) continue;
         const { name: _n, autoName: _a, ...rest } = d;
