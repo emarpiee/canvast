@@ -30,18 +30,23 @@ async function go(s: Scene, name: string): Promise<void> {
 /** A studio's boards: a picture book and its references, with canvases named as such work is. */
 async function studio(s: Scene): Promise<void> {
   const p = s.p;
-  const tree = (await p.evaluate(() => window.__canvastDebug.session().tree))!;
-  await p.evaluate(([id]) => window.__canvastDebug.workspaceOp("renameBoard", id!, "Picture book"), [tree[0]!.id]);
-  for (const name of ["Cover", "Spread 1", "Spread 2"]) await s.canvas(name);
-  await p.evaluate(() => window.__canvastDebug.workspaceOp("newBoard"));
-  const t2 = (await p.evaluate(() => window.__canvastDebug.session().tree))!;
-  const refs = t2.at(-1)!;
-  await p.evaluate(([id]) => window.__canvastDebug.workspaceOp("renameBoard", id!, "References"), [refs.id]);
-  for (const name of ["Horses", "Landscapes"]) {
-    await p.evaluate(([id]) => window.__canvastDebug.workspaceOp("newCanvas", id!), [refs.id]);
-    const now = (await p.evaluate(() => window.__canvastDebug.session().tree))!.find((b) => b.id === refs.id)!;
-    await p.evaluate(([id, n]) => window.__canvastDebug.workspaceOp("renameCanvas", id!, n!), [now.canvases.at(-1)!.id, name]);
-  }
+  const op = (...a: string[]): Promise<void> => p.evaluate((x) => window.__canvastDebug.workspaceOp(...(x as [never])), a);
+  const tree = async () => (await p.evaluate(() => window.__canvastDebug.session().tree))!;
+  // (each board's first canvas is renamed, the others added)
+  const fill = async (boardId: string, names: string[]): Promise<void> => {
+    for (const [i, name] of names.entries()) {
+      if (i > 0) await op("newCanvas", boardId);
+      const b = (await tree()).find((x) => x.id === boardId)!;
+      await op("renameCanvas", b.canvases.at(-1)!.id, name);
+    }
+  };
+  const first = (await tree())[0]!;
+  await op("renameBoard", first.id, "Picture book");
+  await fill(first.id, ["Cover", "Spread 1", "Spread 2"]);
+  await op("newBoard");
+  const refs = (await tree()).at(-1)!;
+  await op("renameBoard", refs.id, "References");
+  await fill(refs.id, ["Horses", "Landscapes"]);
 }
 
 test("hero", async ({ scene: s }) => {
@@ -187,6 +192,7 @@ test("take-over", async ({ scene: s }) => {
   const second = await s.p.context().newPage();
   await second.goto(APP_URL);
   await second.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  await second.addStyleTag({ content: ".hud-dev,.hud-debug{display:none!important}" });
   await expect.poll(() => second.evaluate(() => window.__canvastDebug.session().readOnly)).toBe(true);
   await second.waitForTimeout(800);
   await second.mouse.move(720, 894);

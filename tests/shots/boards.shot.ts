@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { alignWith, arrangeWith, setPenColour } from "../e2e/harness";
+import { alignWith, arrangeWith, chooseInMenu, setPenColour } from "../e2e/harness";
 import { test, expect, artFiles, type Scene } from "./scene";
 
 /** A freehand line through these screen points (the Pen must be on). */
@@ -159,34 +159,34 @@ test("adjust-shadow", async ({ scene: s }) => {
 });
 
 test("sheets", async ({ scene: s }) => {
+  await s.look({ theme: "dark", hue: 95 });
   await s.fonts();
-  const art = await s.art("waterloo", "verhaecht", "leprince");
-  await s.canvas("Shots");
-  const ids = await s.placeRow(art, 160);
-  await s.fit(ids, 0.8);
-  const sheets: string[] = [];
-  for (const id of ids) {
-    await s.select([id]);
-    await s.p.locator('[data-ctx="sheetmenu"]').click();
-    await s.p.locator('.pop-menu [data-id="puton"]').click();
-    await s.p.keyboard.press("Escape");
-    await s.settle();
-    const sheet = (await s.objects()).filter((o) => o.container && !sheets.includes(o.id)).at(-1)!.id;
-    sheets.push(sheet);
-    await s.select([sheet]);
-    const ratio = s.p.locator("[data-sheet-ratio]");
-    await ratio.fill("16:9");
-    await ratio.press("Enter");
-    await expect(ratio).toHaveValue("16 : 9");
+  const [h] = await s.art("delany");
+  await s.canvas("Print");
+  const [pic] = await s.place([h!]);
+  await s.fit([pic!], 0.45, [0.5, 0.45]);
+  const b = (await s.box([pic!]))!;
+  const label = await s.text(b.minX, b.maxY + 30, "Mary Delany, Botanical Study, ca. 1772–82", { size: 22, font: "cormorant garamond semibold italic", colour: "#3b3428" });
+  // (a print laid out on an A4 sheet: the picture and its label in a centred column)
+  await s.select([pic!, label]);
+  await chooseInMenu(s.p, "sheetmenu", "puton");
+  await expect.poll(async () => (await s.objects()).some((o) => o.container)).toBe(true);
+  const sheet = (await s.objects()).find((o) => o.container)!.id;
+  await s.select([sheet]);
+  await s.p.keyboard.press("Shift+A");
+  await s.p.locator('[data-layout-flow="column"]').click();
+  for (const [sel, v] of [['[data-layout-gap="0"]', "28"], ['[data-layout-pad="h"]', "56"], ['[data-layout-pad="v"]', "56"]] as const) {
+    await s.p.locator(sel).fill(v);
+    await s.p.locator(sel).press("Enter");
   }
-  await s.select(sheets);
-  await alignWith(s.p, "align:middle");
-  await alignWith(s.p, "distribute:x");
-  await s.select([]);
-  await s.fit(sheets, 0.75);
-  await s.select([sheets[1]!]);
+  const ratio = s.p.locator("[data-sheet-ratio]");
+  await ratio.fill("A4 portrait");
+  await ratio.press("Enter");
+  await s.paint(sheet, "fill", "#f6f1e6");
+  await s.fit([sheet], 0.7);
+  await s.select([sheet]);
   await s.settle();
-  await s.shot("sheets", await s.around({ objects: sheets, els: ["[data-sheet-ratio]"], pad: 36 }));
+  await s.shot("sheets", await s.around({ objects: [sheet], els: ["[data-sheet-ratio]"], pad: 30 }));
 });
 
 test("arrange", async ({ scene: s }) => {

@@ -78,6 +78,7 @@ test("note-properties", async ({ scene: s }) => {
   await s.look({ theme: "dark", hue: 40 });
   const { card } = await notes(s);
   await card(STUDY.name).click();
+  await s.p.locator(".field-key").last().scrollIntoViewIfNeeded();
   await s.settle();
   await s.shot("note-properties", await s.around({ els: ['[data-testid="asset-inspector"]'], pad: 0 }));
 });

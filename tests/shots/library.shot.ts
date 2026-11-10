@@ -47,7 +47,7 @@ async function collection(s: Scene, extra: string[] = []): Promise<Collection> {
       const input = p.getByTestId("asset-tag-input");
       await input.fill(tag);
       await input.press("Enter");
-      await expect(p.getByTestId("asset-inspector")).toContainText(`#${tag.split("/").pop()}`);
+      await expect(p.getByTestId("asset-inspector")).toContainText(tag.split("/").pop()!);
     }
   }
   await p.keyboard.press("Escape");
