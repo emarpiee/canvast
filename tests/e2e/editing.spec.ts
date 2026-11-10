@@ -1486,7 +1486,10 @@ test("every kind of object snaps when resized by a handle: to another object's e
     await make();
     expect((await p.evaluate(() => window.__canvastDebug.selection())).length, `${name}: selected`).toBeGreaterThan(0);
     const right = await resizeRightTo(797); // (3 px short, as for the grid: a pen stroke's box has its pen's width round it)
-    if (Math.abs(right - 800) > reach) missed.push(`${name} to an object: its side at ${right.toFixed(2)}, not 800`);
+    // (a kind that keeps its proportions snaps by the nearer of its two moving edges: its bottom may be what lands on the rectangle's line)
+    const bottom = (await frame())[2]![1];
+    const byBottom = name === "pen stroke" && [250, 350, 450].some((y) => Math.abs(bottom - y) <= 0.5);
+    if (Math.abs(right - 800) > reach && !byBottom) missed.push(`${name} to an object: its side at ${right.toFixed(2)}, not 800`);
     await clear();
     // To the grid: alone, with Snap to the grid on, the side dragged to 3 px short of a grid line.
     await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", true));

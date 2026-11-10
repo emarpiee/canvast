@@ -2931,6 +2931,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     const el = t as HTMLElement | null;
     return !!el && (el.isContentEditable || /^(TEXTAREA|SELECT)$/.test(el.tagName) || (el.tagName === "INPUT" && !/^(range|checkbox|radio|button|color)$/.test((el as HTMLInputElement).type)));
   };
+  /** Where a copy, cut or paste belongs: the element that has the keys (the page itself when none does), else the event's target. */
+  const clipTarget = (e: Event): EventTarget | null => document.activeElement ?? e.target;
   const receive = (all: File[]): void => {
     // Archives are imported (after confirmation); everything else is a media import.
     for (const f of all.filter(isArchiveFile)) void runImport(session, f);
@@ -2997,7 +2999,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     if (pasteEventAt >= pasteKeyAt && performance.now() - pasteKeyAt > PASTE_EVENT_WAIT_MS && performance.now() - pasteKeyAt < 3000) return void e.preventDefault();
     pasteEventAt = performance.now();
     // A paste into a field, an editor (the notes editor takes a picture in itself), a dialog or a menu is theirs: nothing is imported or placed.
-    if (e.defaultPrevented || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog, [popover], .note-dock") || document.querySelector("dialog:modal")) return;
+    // (by where the keys are: Firefox names a hidden editable box that holds a selection as the target, while the keys are on the page)
+    const at = clipTarget(e);
+    if (e.defaultPrevented || typing(at) || (at as HTMLElement | null)?.closest?.("dialog, [popover], .note-dock") || document.querySelector("dialog:modal")) return;
     // (the system's paste of a middle click can come a good while after the button, on a busy machine; a paste key pressed since is a real paste)
     if (performance.now() - middleUpAt < 3000 && middleUpAt > pasteKeyAt) return void e.preventDefault();
     const files = onePerPicture([...(e.clipboardData?.files ?? [])]);
@@ -3180,8 +3184,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   for (const kind of ["copy", "cut"] as const) {
     document.addEventListener(kind, (e) => {
       clipEventAt = performance.now();
-      // (the canvas has the keys: the objects are copied, whatever text the page holds selected, which Firefox gives as the event's target)
-      if ((document.activeElement !== canvas && typing(e.target)) || typing(document.activeElement) || appView !== "canvas" || textEditor.isOpen) return;
+      // (by where the keys are, not the event's target: Firefox names a hidden editable box that holds a selection, while the keys are on the page)
+      if (typing(clipTarget(e)) || appView !== "canvas" || textEditor.isOpen) return;
       if (copyOrCut(kind, e)) e.preventDefault();
     });
   }

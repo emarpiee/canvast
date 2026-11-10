@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.25 — Firefox copies and pastes on the canvas (2026-11-10)
+
+- **Fixed:** in Firefox, copy and paste on the canvas did nothing: Firefox names a hidden editable box as the target of the copy and paste events, so they were taken for a copy inside a text field. Copy, cut and paste now go by where the keys are (the focused element, or the page).
+- **Fixed:** the resize-snap test accepts a pen stroke snapped by its bottom edge (it keeps its proportions, so the nearer edge holds).
+
 ## 0.56.24 — Firefox copies the canvas's objects; test fixes (2026-11-10)
 
 - **Fixed:** in Firefox, Ctrl+C after Ctrl+A copied the page's text, not the objects: Ctrl+A on the canvas no longer selects the page's text as well, and while the canvas has the keys a copy or cut is of the objects, whatever the browser names as the event's target.
