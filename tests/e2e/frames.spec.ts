@@ -1954,6 +1954,7 @@ test("layers panel: a row dragged into a group or a sheet goes inside it, dragge
   await p.keyboard.press("Escape");
   const row = (k: string) => panel.locator(`li.layer[data-key="${k}"]`);
   const into = async (from: string, to: string) => {
+    await expect(row(to)).toBeVisible(); // (the panel may be drawn again just after a drop)
     const h = (await row(to).boundingBox())!.height;
     await row(from).dragTo(row(to), { targetPosition: { x: 30, y: h / 2 } });
     await app.frame();

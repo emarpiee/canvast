@@ -2972,12 +2972,30 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   };
   window.addEventListener("pointermove", trackPointer, true);
   window.addEventListener("pointerdown", trackPointer, true);
+  /** How long after the paste keys a paste event is waited for before what was copied here is pasted without one (see the keydown below). */
+  const PASTE_EVENT_WAIT_MS = 250;
   // On Linux a middle click is also a paste, of what is selected in any app: here the middle button pans, so what it ends is no paste. (In a field it stays one.)
   let middleUpAt = -Infinity;
   for (const type of ["pointerdown", "pointerup", "auxclick"]) window.addEventListener(type, (e) => void ((e as MouseEvent).button === 1 && (middleUpAt = performance.now())), true);
   let pasteKeyAt = -Infinity;
-  window.addEventListener("keydown", (e) => void (((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") || (e.shiftKey && e.key === "Insert") ? (pasteKeyAt = performance.now()) : 0), true);
+  let pasteEventAt = -Infinity;
+  window.addEventListener("keydown", (e) => {
+    if (!(((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "v") || (e.shiftKey && e.key === "Insert"))) return;
+    pasteKeyAt = performance.now();
+    const at = pasteKeyAt;
+    // A browser may send no paste event for the keys when the system clipboard holds only a picture and nothing on the page takes text
+    // (Firefox, after a copy here put the copied things' picture there): what was copied here is pasted all the same, once.
+    if (typing(e.target) || appView !== "canvas" || textEditor.isOpen || !isCopiedPicture()) return;
+    setTimeout(() => {
+      if (pasteEventAt >= at || pasteKeyAt !== at || document.querySelector("dialog:modal")) return;
+      pasteEventAt = at; // (a paste event that comes later still is this one: not a second paste)
+      pasteObjects(doc, editor, view, null);
+    }, PASTE_EVENT_WAIT_MS);
+  }, true);
   window.addEventListener("paste", (e) => {
+    // (the fallback above already pasted for these keys: the late event is the same paste)
+    if (pasteEventAt >= pasteKeyAt && performance.now() - pasteKeyAt > PASTE_EVENT_WAIT_MS && performance.now() - pasteKeyAt < 3000) return void e.preventDefault();
+    pasteEventAt = performance.now();
     // A paste into a field, an editor (the notes editor takes a picture in itself), a dialog or a menu is theirs: nothing is imported or placed.
     if (e.defaultPrevented || typing(e.target) || (e.target as HTMLElement | null)?.closest?.("dialog, [popover], .note-dock") || document.querySelector("dialog:modal")) return;
     // (the system's paste of a middle click can come a good while after the button, on a busy machine; a paste key pressed since is a real paste)

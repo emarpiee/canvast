@@ -1459,7 +1459,7 @@ test("every kind of object snaps when resized by a handle: to another object's e
   const kinds: Array<[string, () => Promise<void>]> = [
     ["shape", async () => { await key(app, "u"); await app.drag({ x: 450, y: 300 }, { x: 560, y: 380 }); await key(app, "v"); }],
     ["picture", picture],
-    ["picture on its own sheet", async () => { await picture(); await sheetWith(p, "eachsheet"); await expect.poll(async () => (await objects(app)).filter((o) => o["container"]).length).toBe(1); }],
+    ["picture on its own sheet", async () => { await picture(); await sheetWith(p, "puton"); await expect.poll(async () => (await objects(app)).filter((o) => o["container"]).length).toBe(1); }],
     ["pen stroke", async () => { await key(app, "p"); await app.drag({ x: 450, y: 320 }, { x: 560, y: 360 }); await key(app, "v"); await p.mouse.click(505, 340); }],
     ["speech balloon", async () => { await key(app, "k"); await app.drag({ x: 450, y: 300 }, { x: 560, y: 380 }); await key(app, "v"); }],
     ["group", async () => { await key(app, "u"); await app.drag({ x: 450, y: 300 }, { x: 500, y: 340 }); await app.drag({ x: 510, y: 350 }, { x: 560, y: 390 }); await key(app, "v"); await app.drag({ x: 440, y: 290 }, { x: 570, y: 400 }); await key(app, "Control+g"); }],

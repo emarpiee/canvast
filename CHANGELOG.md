@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.23 — Firefox pastes copied things; test fixes (2026-11-10)
+
+- **Fixed:** in Firefox, Ctrl+V after copying shapes, balloons or a mix with pictures pasted nothing: Firefox sends no paste event when the clipboard holds only the picture a copy here puts there. When no paste event follows the keys within a moment, what was copied here is pasted all the same, once.
+- **Fixed:** tests: the resize-snap test puts its picture on a sheet with *Put on a sheet* (one item); the balloon test clicks the words where they are drawn in each browser; the Layers drag test waits for the row after the panel is drawn again.
+
 ## 0.56.22 — Auto layout on sheets (2026-11-10)
 
 - **Added:** auto layout on sheets (ADR 0186): `Shift+A`, the Sheets menu or the sheet's badge in Layers lays out what is on a sheet as a row, a column, a wrap or a grid, with a gap, padding on each side, an alignment across the flow and a packing along it (start, centre, end, spread), all in the Properties bar when the sheet is picked. The sheet hugs its width or its height (as large as its contents) or keeps its size. Anything added to, taken off, resized or moved on the sheet lays it out again in the same undo step; a sheet that hugs lays out the sheet it is on in turn. A thing dropped on the sheet takes the place it is dropped at. Turning it on reads the layout from where things are; `Shift+A` on things that are on no sheet puts them on a new sheet that hugs them.
