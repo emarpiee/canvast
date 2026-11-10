@@ -155,7 +155,8 @@ import { installTextFont } from "../text/inter";
 import { descendantsOf, isContainer } from "../doc/containers";
 import { CameraHistory } from "./camera-history";
 import { mountTour } from "./tour";
-import { ADJUSTMENT_KIND } from "../assets/styles";
+import { ADJUSTMENT_KIND, RATIO_KIND } from "../assets/styles";
+import { formatRatio, parseRatio } from "./export-size";
 import { setColourStyles } from "../ui/colour-popover";
 import { setTextureHooks } from "../ui/texture-editor";
 import { createTextureHooks } from "./texture-actions";
@@ -1217,7 +1218,38 @@ async function start(): Promise<void> {
     rename: (key, name) => renameLayer(doc, editor, key, name),
     names: assetNames,
   });
+  /** A ratio typed (16:9, 1.5, A4) or a size in px (1920 x 1080), as the Ratio field reads it; null when cancelled or not a ratio (said). */
+  const askRatio = async (title: string, value: number | null): Promise<{ ratio: number; typed: string } | null> => {
+    const typed = await promptDialog({ title, lines: ["A ratio (16:9, 3/2, 1.5, A4) or a size in px (1920 x 1080), which becomes its ratio."], value: value === null ? "" : formatRatio(value), confirmLabel: "OK" });
+    if (typed === null || !typed.trim()) return null;
+    const ratio = parseRatio(typed);
+    if (ratio === null || !(ratio > 0.01 && ratio < 100)) {
+      editor.message = `“${typed}” is not a shape. Try 16:9, 3/2, 1.5, A4 or 1920 x 1080.`;
+      editor.changed();
+      return null;
+    }
+    return { ratio, typed: typed.trim() };
+  };
+  /** Save a custom ratio (a saved style of its own kind, so it is kept in the workspace and goes with every backup), then its name. */
+  const saveCustomRatio = async (): Promise<void> => {
+    const got = await askRatio("Save a custom ratio", sheetRatio(doc, editor));
+    if (!got) return;
+    const name = await promptDialog({ title: "Name the ratio", lines: ["It is listed under Custom in the Shapes… list."], value: got.typed, confirmLabel: "Save" });
+    if (name === null) return;
+    const made = await session.styles.add(RATIO_KIND.id, name, got.ratio);
+    editor.message = made ? `Saved the ratio “${made.name}”.` : "Could not save the ratio.";
+    editor.changed();
+  };
   mountStylesPanel(side, editor, session.styles, {
+    ratio: {
+      current: () => sheetRatio(doc, editor),
+      apply: (r, label) => {
+        setSheetRatio(doc, editor, r, true);
+        editor.message = `Gave it the ratio “${label}”.`;
+        editor.changed();
+      },
+      ask: async (title, value) => (await askRatio(title, value))?.ratio ?? null,
+    },
     balloon: { can: () => selectedBalloon(doc, editor) !== null, apply: (look) => applyBalloonStyle(doc, editor, look) },
     pattern: {
       current: () => patternPanel.current(),
@@ -1468,6 +1500,13 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     },
     setPin: (patch) => setPin(doc, editor, patch as { h?: "left"; v?: "top" }),
     sheetRatio: () => sheetRatio(doc, editor),
+    customRatios: () => session.styles.of(RATIO_KIND.id).map((c) => ({ name: c.name, ratio: c.data as number })),
+    saveRatio: () => void saveCustomRatio(),
+    manageRatios: () => {
+      editor.stylesTab = RATIO_KIND.id;
+      editor.stylesOpen = true;
+      editor.changed();
+    },
     ratioOfSheet: () => ratioOfSheet(doc, editor),
     setSheetRatio: (r, final) => setSheetRatio(doc, editor, r, final),
     boxOnSheet: () => boxOnSheet(doc, editor),

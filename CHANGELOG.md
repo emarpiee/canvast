@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.4 — Custom ratios (2026-11-10)
+
+- **Added:** custom ratios for sheets and shapes: *Save this ratio…* in the *Shapes…* list takes a ratio or a size in px (made a ratio) and a name, listed under *Custom* and given as saved. A *Ratios* tab of the Styles panel renames, changes, updates and deletes them.
+- **Added:** custom ratios are kept in the workspace and go with every backup and Advanced export, also when *Saved styles* is left out.
+
 ## 0.56.3 — Ratio for shapes (2026-11-10)
 
 - **Added:** the *Ratio* field, its presets and *Turn* work on one selected shape (rectangle, ellipse, polygon, star, speech balloon) as on a sheet, keeping its area.

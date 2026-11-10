@@ -16,6 +16,7 @@ import { cleanLook } from "../text/text-style";
 import { cleanValues, generatorById } from "../gen";
 import type { Values } from "../gen";
 import type { TextLook } from "../text/text-style";
+import { formatRatio } from "../app/export-size";
 
 export interface StyleItem {
   readonly id: string;
@@ -164,7 +165,17 @@ export const BALLOON_KIND: StyleKind = {
   look: () => ({}),
 };
 
-export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND, BALLOON_KIND];
+/** A custom ratio (width ÷ height) for sheets and shapes, beside the built-in ones of the Shapes… list: a canvas has no pixels, so it is a ratio only. */
+export const RATIO_KIND: StyleKind = {
+  id: "ratio",
+  label: "Ratio",
+  plural: "Ratios",
+  empty: "None yet. Save one from the Shapes… list of a sheet or shape.",
+  validate: (d) => (typeof d === "number" && Number.isFinite(d) && d > 0.01 && d < 100 ? d : null),
+  summary: (d) => formatRatio(d as number),
+};
+
+export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND, BALLOON_KIND, RATIO_KIND];
 
 export const kindById = (id: string): StyleKind | undefined => STYLE_KINDS.find((k) => k.id === id);
 

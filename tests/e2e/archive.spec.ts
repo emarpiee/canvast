@@ -790,10 +790,16 @@ test("a workspace password travels in a backup only when included, and an import
 test("Advanced export: only what is chosen goes in, and it is not the workspace's last backup", async ({ app }) => {
   const p = app.page;
   await buildWorkspace(p);
+  // (a custom ratio always goes, even with the saved styles left out)
+  await p.evaluate(async () => {
+    await window.__canvastDebug.addStyle("ratio", 2.5);
+    await window.__canvastDebug.addStyle("colour", "#123456");
+  });
   await openPanel(p);
   await p.getByTestId("set-export-advanced").click();
   const dlg = p.getByTestId("advanced-export");
   await expect(p.getByTestId("advanced-ok")).toBeDisabled();
+  await dlg.locator("[data-ax-styles]").uncheck();
   await dlg.getByRole("searchbox").fill("green");
   await dlg.locator(`[data-ax-item="${GREEN_HASH}"]`).check();
   await expect(p.getByTestId("advanced-sum")).toContainText("1 item");
@@ -801,5 +807,6 @@ test("Advanced export: only what is chosen goes in, and it is not the workspace'
   const m = await manifestOf(file.bytes);
   expect(m["scope"]).toBe("assets");
   expect(m.assets.map((a) => a.hash)).toEqual([GREEN_HASH]);
+  expect((m["styles"] as Array<{ kind: string; data: unknown }>).map((s) => [s.kind, s.data])).toEqual([["ratio", 2.5]]);
   await expect(p.getByTestId("set-last-backup")).toContainText("No backup made yet");
 });

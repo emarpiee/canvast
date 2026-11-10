@@ -53,6 +53,8 @@ export interface StylesDeps {
   text: { count(): number; current(): TextLook | null; apply(look: TextLook, label: string): void };
   /** Pattern styles: putting one into the Pattern panel (and making it on what is picked). */
   balloon: { can(): boolean; apply(look: BalloonLook): void };
+  /** Custom ratios: given to the one selected sheet or shape; `current` is its ratio (null: none selected); `ask` asks for a ratio or a size in px. */
+  ratio: { current(): number | null; apply(ratio: number, label: string): void; ask(title: string, value: number | null): Promise<number | null> };
   pattern: { apply(data: PatternData, label: string): void; /** What the Pattern panel holds now (to update a style from it). */ current(): PatternData };
   /** The solid colours of the picked shapes, and the main colours of the one picked picture (null: none is picked). */
   selectionColours(): string[];
@@ -95,7 +97,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   fileInput.dataset["testid"] = "styles-import";
   panel.appendChild(fileInput);
 
-  const canApply = (kind: string): boolean => (kind === "pattern" ? true : kind === "balloon" ? deps.balloon.can() : kind === "adjustment" ? deps.adjustment.can() : kind === "text" ? deps.text.count() > 0 : deps.paint.count() > 0 || (kind === "gradient" && deps.map.count() > 0));
+  const canApply = (kind: string): boolean => (kind === "ratio" ? deps.ratio.current() !== null : kind === "pattern" ? true : kind === "balloon" ? deps.balloon.can() : kind === "adjustment" ? deps.adjustment.can() : kind === "text" ? deps.text.count() > 0 : deps.paint.count() > 0 || (kind === "gradient" && deps.map.count() > 0));
   const kindsShown = STYLE_KINDS;
 
   /** The small pictures of pattern styles, made once for each (the data of a style does not change; an update gets a new key). */
@@ -144,13 +146,14 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       .join("")}<div class="pal-actions"><button type="button" class="pal-add" data-add-colour="${esc(item.id)}"${pal.colours.length >= MAX_PALETTE ? " disabled" : ""}>Add colour</button><button type="button" class="pal-done" data-done>Done</button></div></div>`;
 
   let tabsAt = 0; // (the row is drawn again: it stays where it was scrolled to)
-  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette, text: ICONS.textStyle, pattern: ICONS.mountainSnow, balloon: ICONS.speechBalloon };
+  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette, text: ICONS.textStyle, pattern: ICONS.mountainSnow, balloon: ICONS.speechBalloon, ratio: ICONS.proportions };
   const GUIDE: Record<string, string> = {
     adjustment: "Save an adjustment from the Adjust panel of a picture, then press it here to give other pictures the same look.",
     gradient: "A gradient is a blend of colours. Save one from the fill or outline picker, make a new one here, or import a GIMP .ggr file.",
     colour: "Keep the colours you use. Add one here, or save one from any colour picker.",
     palette: "A palette is a set of colours you reuse together, like a brand's.",
     pattern: "A pattern style is a generator with its settings and seed. Save one from the Pattern panel, then press it to make the same pattern on the selected sheet or shape.",
+    ratio: "Your own shapes for sheets and shapes, beside the built-in ones of the Shapes… list. Select a sheet or shape, then press one to give it that ratio.",
     text: "A text style is a size, spacing, alignment and colour. Select a text, save its style here, then press it to give other texts the same look.",
   };
 
@@ -365,6 +368,13 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     if (item.kind === "adjustment")
       return [
         { label: "Update from the selected picture", hint: "Take its adjustments", icon: ICONS.refresh, disabled: !deps.adjustment.can(), aria: `Replace ${item.name} with the adjustments of the selected picture: the pictures that follow it change too`, run: () => { const a = deps.adjustment.current(); if (a) void styles.update(item.id, a); } },
+        ...common(item),
+        del,
+      ];
+    if (item.kind === "ratio")
+      return [
+        { label: "Change the ratio", hint: "Type a ratio or a size in px", icon: ICONS.rulerDimension, aria: `Change the ratio of ${item.name}`, run: () => void deps.ratio.ask(`Change “${item.name}”`, item.data as number).then((r) => r !== null && styles.update(item.id, r)) },
+        { label: "Update from the selection", hint: "Take its ratio", icon: ICONS.refresh, disabled: deps.ratio.current() === null, aria: `Replace ${item.name} with the ratio of the selected sheet or shape`, run: () => { const r = deps.ratio.current(); if (r !== null) void styles.update(item.id, r); } },
         ...common(item),
         del,
       ];
@@ -586,6 +596,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     else if (item.kind === "text") deps.text.apply(item.data as TextLook, item.name);
     else if (item.kind === "pattern") deps.pattern.apply(item.data as PatternData, item.name);
     else if (item.kind === "balloon") deps.balloon.apply(item.data as BalloonLook);
+    else if (item.kind === "ratio") deps.ratio.apply(item.data as number, item.name);
     else applyPaint(item);
   });
   panel.addEventListener("input", (e) => {

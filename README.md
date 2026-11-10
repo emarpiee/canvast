@@ -407,21 +407,21 @@ One colour picker for everything, and saved styles that objects stay linked to.
 | | |
 | --- | --- |
 | ![The colour picker, opened from a fill: OKHSV as a ring and box, with the recent colours](docs/screenshots/colour-picker.webp) | ![The Styles panel with saved colours](docs/screenshots/styles.webp) |
-| The colour picker, opened from a fill | The Styles panel: saved colours, gradients, text styles, adjustments, patterns and speech balloons |
+| The colour picker, opened from a fill | The Styles panel: saved colours, gradients, text styles, adjustments, patterns, speech balloons and custom ratios |
 
 | Feature | What it does |
 | --- | --- |
 | **Colour picker** | OKHSL, OKHSV or OKLCH, with an eyedropper, recent and saved colours |
 | **Gradients** | Linear, radial and angular, with stops you drag on the canvas |
 | **Palettes** | Built from a colour or a picture; `.gpl`, `.ase`, `.aco` and `.ggr` files |
-| **Styles panel** | Saved colours, gradients, text styles, adjustments, patterns and speech balloons; linked objects follow the first ones |
+| **Styles panel** | Saved colours, gradients, text styles, adjustments, patterns, speech balloons and custom ratios; linked objects follow the first ones |
 
 #### More about colour and styles
 
 - **Colour picker:** one picker for every colour. Choose OKHSL, OKHSV or OKLCH (CSS `oklch()`'s own lightness, chroma and hue); a ring and box, a plane with a hue bar, or sliders; text as hex or another format. It also has an eyedropper, recent colours and saved colours. A number changes by dragging its name left or right; with `Shift` it snaps to round steps worked out from its range (steps of 5 for 0–100, 10 for 0–255).
 - **Gradients:** linear, radial and angular, with stops you drag on the canvas, a *Randomize* button and a gradient map for pictures.
 - **Palettes:** *Palette from a colour* builds harmonies, and a palette can be taken from a picture. Palettes and gradients can be imported and exported as `.gpl`, `.ase`, `.aco` and `.ggr` files.
-- **Styles panel:** saved colours, gradients, text styles, adjustment stacks, patterns and speech balloons, as many as you like. They are kept in the workspace and go with a backup.
+- **Styles panel:** saved colours, gradients, text styles, adjustment stacks, patterns, speech balloons and custom ratios, as many as you like. They are kept in the workspace and go with a backup.
   - An object painted with a saved style is **linked** to it and follows when the style changes. A change by hand, or *Detach*, unlinks it.
   - A speech balloon style goes on the selected balloons when you press its card: size, tails, paint and the look of the words. It is not linked: changing the style later does not change them.
   - A pattern style keeps a generator with its settings and seed (*Save as a style* in the Pattern panel saves or updates it). Pressing its card puts it back in the Pattern panel and makes it on what is selected (on each of several selected shapes).
@@ -516,6 +516,7 @@ Keep a large canvas in order, and reach things that lie under others.
   - Drawing a sheet over objects puts the ones wholly inside it on the sheet, in one undo step (ones it only crosses stay out).
   - *Put the selection on a sheet*, *Put each on its own sheet* (a picture's sheet is exactly its size, with no fill), *Fit to contents*, *Release* and *Turn on its side*.
   - Ratio presets: `16:9`, `A4 portrait`, a number, or a size in px (`2000 x 1920` becomes `25 : 24`). One selected shape has the same field.
+  - **Custom ratios:** *Save this ratio…* at the top of the *Shapes…* list takes a ratio or a size in px (made a ratio) and a name; they are listed under *Custom* and given as saved, upright or on the side. Rename, change, update from the selection or delete them in the Styles panel's *Ratios* tab (*Manage custom ratios…*). They are kept in the workspace and always go with a backup and an Advanced export.
   - Each object on a sheet has pins per axis (left, right, both, centre or scale) that decide what it does when the sheet is resized; *Scale contents* resizes everything with it.
 - **Masks:** a clipping mask (a sheet of any shape), a mask by opacity or brightness, or a brush mask painted in black and white with the Pen. Masks can be inverted, selected on their own and released. A click on a mask selects it as one unit; a double click goes inside.
 - **Moving a group:** a group or several selected move from anywhere in their box, gaps too; press outside it to draw a selection box.
@@ -1123,7 +1124,7 @@ The first tab to open a workspace edits it. Other tabs are read-only, follow its
 
 ### Backups
 
-- **Advanced export** (Settings > Storage) puts only what you choose in a backup: search for items and folders and tick them, or tick *Everything*. Hidden items are asked about first, so their password is asked once. A folder brings what is inside it, its folders too. The total size is shown as you choose. With *Also the canvases*, every file a canvas shows goes too. *Saved styles* (on by default) brings the styles and the fonts and pictures they use. A partial backup can only be added, never used to update a workspace, and does not count as the last backup for *Export changes*. Links in notes to items left out stay as they are and find nothing until those items are there.
+- **Advanced export** (Settings > Storage) puts only what you choose in a backup: search for items and folders and tick them, or tick *Everything*. Hidden items are asked about first, so their password is asked once. A folder brings what is inside it, its folders too. The total size is shown as you choose. With *Also the canvases*, every file a canvas shows goes too. *Saved styles* (on by default) brings the styles and the fonts and pictures they use; custom ratios go either way. A partial backup can only be added, never used to update a workspace, and does not count as the last backup for *Export changes*. Links in notes to items left out stay as they are and find nothing until those items are there.
 
   ![Advanced export: a search field, the items and folders ticked, and the total size of what is chosen](docs/screenshots/advanced-export.webp)
 

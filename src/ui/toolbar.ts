@@ -68,6 +68,12 @@ export interface ToolbarActions {
   sheetRatio(): number | null;
   /** Whether that one is a sheet. */
   ratioOfSheet(): boolean;
+  /** The workspace's custom ratios (saved styles of the kind "ratio"), in their order. */
+  customRatios(): ReadonlyArray<{ name: string; ratio: number }>;
+  /** Save a custom ratio: typed, or a size in px; the selected one's ratio is offered. */
+  saveRatio(): void;
+  /** Open the custom ratios in the Styles panel (rename, change, update, delete). */
+  manageRatios(): void;
   setSheetRatio(ratio: number, final?: boolean): void;
   /** Where the one picked object on a sheet is and how big, in per cent of the sheet (null: none is), and moving or resizing it. */
   boxOnSheet(): { x: number; y: number; w: number; h: number; resizable: boolean } | null;
@@ -275,7 +281,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
           <span data-on-size><label>W <input type="number" data-on-w min="0" step="any" inputmode="decimal" aria-label="Width (per cent of the sheet's width)"></label> <label>H <input type="number" data-on-h min="0" step="any" inputmode="decimal" aria-label="Height (per cent of the sheet's height)"></label></span> %</span>
         <span class="tb-count" data-kind="sheet shape" data-sheet-size hidden title="The shape of its box: width ÷ height. A sheet has a shape, not a size; the size is chosen when it is exported (Export in the Actions bar)">
           <label>Ratio <input type="text" data-sheet-ratio size="11" spellcheck="false" autocomplete="off" inputmode="text" aria-label="Shape: width to height, like 16:9, 1.5 or A4" title="Type a ratio (16:9, 3/2, 1.5, A4, letter, square) or a size in px (2000 x 1920, or 2000x1920px, becomes 25 : 24), then Enter. Add portrait or landscape to turn it."></label>
-          <select data-sheet-preset aria-label="Shape preset" title="A common shape: the sheet or shape takes it, keeping its area and its top-left corner"><option value="">Shapes…</option>${["Basic", "Screen", "Paper", "Social"].map((g) => `<optgroup label="${g}">${RATIO_PRESETS.filter((r) => r.group === g).map((r) => `<option value="${r.ratio}">${r.label}</option>`).join("")}</optgroup>`).join("")}</select>
+          <select data-sheet-preset aria-label="Shape preset" title="A common shape: the sheet or shape takes it, keeping its area and its top-left corner"><option value="">Shapes…</option><optgroup label="Custom" data-custom-ratios></optgroup>${["Basic", "Screen", "Paper", "Social"].map((g) => `<optgroup label="${g}">${RATIO_PRESETS.filter((r) => r.group === g).map((r) => `<option value="${r.ratio}">${r.label}</option>`).join("")}</optgroup>`).join("")}</select>
           <button type="button" data-sheet-turn aria-label="Turn it on its side: swap its width and height" title="Turn it on its side: portrait ⇄ landscape (the same area)">${ICONS.arrowRightLeft}</button>
           <button type="button" data-sheet-scale aria-pressed="false" aria-label="Scale contents with the sheet" title="Scale contents (kept with this sheet): when the sheet is resized, everything on it grows with it, whatever its pins say">${ICONS.sheetScale}</button></span>
         <label class="tb-count" data-kind="shape" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the field left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
@@ -598,10 +604,25 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       e.stopPropagation();
     }
   });
+  // The custom ratios lead the list, with saving one and managing them; the built-in ones follow as they are.
+  const customGroup = root.querySelector<HTMLOptGroupElement>("[data-custom-ratios]")!;
+  const showCustom = (): void => {
+    const list = actions.customRatios();
+    const html = `${list.map((c) => `<option value="c:${c.ratio}">${esc(c.name)} ${esc(formatRatio(c.ratio))}</option>`).join("")}<option value="save">Save this ratio…</option>${list.length ? `<option value="manage">Manage custom ratios…</option>` : ""}`;
+    if (customGroup.dataset["html"] !== html) {
+      customGroup.dataset["html"] = html;
+      customGroup.innerHTML = html;
+    }
+  };
   sheetField("[data-sheet-preset]").addEventListener("change", (e) => {
     const sel = e.target as HTMLSelectElement;
-    const r = Number(sel.value);
+    const pick = sel.value;
     sel.value = "";
+    if (pick === "save") return actions.saveRatio();
+    if (pick === "manage") return actions.manageRatios();
+    // (a custom ratio is given as it was saved, upright or on its side)
+    if (pick.startsWith("c:")) return actions.setSheetRatio(Number(pick.slice(2)), true);
+    const r = Number(pick);
     const now = actions.sheetRatio();
     if (r > 0 && now !== null) actions.setSheetRatio(now < 1 ? 1 / r : r, true); // (a sheet on its side stays on its side)
   });
@@ -998,6 +1019,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-sheet-size]")!.hidden = ratio === null;
     if (ratio !== null) {
       showRatio();
+      showCustom();
       const scale = root.querySelector<HTMLElement>("[data-sheet-scale]")!;
       scale.hidden = !actions.ratioOfSheet(); // (what is on a sheet: a shape holds nothing)
       scale.setAttribute("aria-pressed", String(actions.sheetScale()));

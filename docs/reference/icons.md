@@ -10,6 +10,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `expand` | Scale contents with the sheet (the sheet's size field) |
 | `chart-spline` | Simplify the picked paths: fewer nodes, the same shape (Actions bar) |
 | `pencil-ruler` | Turn the picked pen strokes into editable paths (Actions bar) |
+| `proportions` | Ratios: the tab of custom ratios in the Styles panel |
+| `ruler-dimension-line` | Change the ratio of a custom ratio, typed (Styles panel, its ⋯ menu) |
 | `sticky-note` | Note tool (a new note file, its card placed where clicked) |
 | `stamp` | Outline stroke: make the line a shape (Actions bar) |
 | `feather` | Taper: make the line a shape thin at both ends (Actions bar) |

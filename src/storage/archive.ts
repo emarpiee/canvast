@@ -15,7 +15,7 @@ import type { AssetField, AssetFolder } from "../assets/asset-catalog";
 import { MAX_FIELDS, entryFromRecord, fieldParts, folderPath, meta, normalizeFields, normalizeNote, normalizeTags, visibleFolders } from "../assets/asset-catalog";
 import { sha256Hex } from "../assets/sha256";
 import type { StyleItem } from "../assets/styles";
-import { assetsOfStyles, cleanStyles } from "../assets/styles";
+import { RATIO_KIND, assetsOfStyles, cleanStyles } from "../assets/styles";
 import { done, req } from "./idb";
 import type { LibraryOp } from "./desktop-bridge";
 import { itemOf } from "./library-mirror";
@@ -370,8 +370,11 @@ export async function buildArchive(db: IDBDatabase, workspaceId: string, scope: 
   }
   // The saved styles go with a workspace backup; with a part of the library when asked, then with the fonts and pictures they use.
   const carriesStyles = scope.kind === "workspace" ? scope.withStyles !== false : scope.kind === "assets" && scope.withStyles === true;
-  const savedStyles = carriesStyles ? (((await req(tx.objectStore("meta").get("styles") as IDBRequest<unknown>)) as unknown[] | undefined) ?? []) : null;
-  if (savedStyles && (scope.kind === "assets" || (scope.kind === "workspace" && scope.only))) for (const h of assetsOfStyles(savedStyles)) if (await libraryIn(tx, snap).rec(contentOf(h))) hashes.add(contentOf(h));
+  // (custom ratios go with every backup and Advanced export, whether the other styles are taken or not)
+  const storedStyles = ((await req(tx.objectStore("meta").get("styles") as IDBRequest<unknown>)) as unknown[] | undefined) ?? [];
+  const ratiosOnly = storedStyles.filter((s) => (s as { kind?: unknown } | null)?.kind === RATIO_KIND.id);
+  const savedStyles = carriesStyles ? storedStyles : ratiosOnly.length ? ratiosOnly : null;
+  if (carriesStyles && savedStyles && (scope.kind === "assets" || (scope.kind === "workspace" && scope.only))) for (const h of assetsOfStyles(savedStyles)) if (await libraryIn(tx, snap).rec(contentOf(h))) hashes.add(contentOf(h));
   if (scope.skipHidden) for (const h of await hiddenSet(tx, snap)) hashes.delete(h);
   const hiddenLock = scope.kind === "workspace" && scope.withPrivacy && !noBytes ? await req(tx.objectStore("meta").get("hiddenLock") as IDBRequest<unknown>) : undefined;
   const workspaceLock = scope.kind === "workspace" && scope.withPrivacy && !noBytes ? await req(tx.objectStore("meta").get("workspaceLock") as IDBRequest<unknown>) : undefined;

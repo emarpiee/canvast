@@ -1,5 +1,7 @@
 // Lucide icons (ISC license, see THIRD_PARTY_NOTICES.md), inlined at build time.
 import tabDrawingSvg from "lucide-static/icons/square-pen.svg";
+import proportionsSvg from "lucide-static/icons/proportions.svg";
+import rulerDimensionSvg from "lucide-static/icons/ruler-dimension-line.svg";
 import tabNavigationSvg from "lucide-static/icons/compass.svg";
 import tabShortcutsSvg from "lucide-static/icons/keyboard.svg";
 import tabMediaSvg from "lucide-static/icons/circle-play.svg";
@@ -387,6 +389,8 @@ export const ICONS = {
   arrowUpToLine: clean(arrowUpToLineSvg),
   rotateCwSquare: clean(rotateCwSquare),
   ratio: clean(ratioIcon),
+  proportions: clean(proportionsSvg),
+  rulerDimension: clean(rulerDimensionSvg),
   focus: clean(focusIcon),
   search: clean(searchIcon),
   chevronsDown: clean(chevronsDown),

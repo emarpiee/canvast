@@ -272,6 +272,19 @@ test("a sheet has a shape, not a size: the Ratio field shows it (3 : 2), typing 
   await expect(ratio).toHaveValue("16 : 9");
   expect((await rb()).r).toBeCloseTo(16 / 9, 1);
   expect(Math.abs((await rb()).area / ra - 1), "the area is kept").toBeLessThan(0.02);
+  // A custom ratio: typed as a size in px, named, listed under Custom, and given as it was saved (upright here)
+  const preset = p.locator("[data-sheet-preset]");
+  await preset.selectOption("save");
+  await p.getByTestId("prompt-input").fill("1080 x 1920");
+  await p.getByTestId("prompt-ok").click();
+  await p.getByTestId("prompt-input").fill("Story");
+  await p.getByTestId("prompt-ok").click();
+  await expect(preset.locator("optgroup[label=Custom] option", { hasText: "Story 9 : 16" })).toHaveCount(1);
+  await preset.selectOption({ label: "Story 9 : 16" });
+  await app.frame();
+  await expect(ratio).toHaveValue("9 : 16");
+  expect((await rb()).r).toBeCloseTo(1080 / 1920, 2);
+  await expect(preset.locator("option[value=manage]")).toHaveCount(1);
   expect(app.consoleErrors).toEqual([]);
 });
 
