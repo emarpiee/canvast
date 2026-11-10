@@ -1217,6 +1217,14 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
     await click(1100, 720);
     await expect.poll(() => p.evaluate(() => window.__canvastDebug.selection().length)).toBe(0);
   };
+  const words = async (x: number, y: number, text: string) => {
+    const before = (await objects(app)).filter((o) => o.kind === "text").length;
+    await key(app, "t");
+    await click(x, y);
+    await p.keyboard.type(text);
+    await key(app, "Escape");
+    await expect.poll(async () => (await objects(app)).filter((o) => o.kind === "text").length, `the words ${text}`).toBe(before + 1);
+  };
   const add = async (name: string, mimeType: string, buffer: Buffer) => {
     const before = (await objects(app)).length;
     await p.getByTestId("import-input").setInputFiles({ name, mimeType, buffer });
@@ -1252,10 +1260,8 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
   await clear();
   await key(app, "u");
   await drag([650, 110], [780, 200]);
-  await key(app, "t");
-  await click(660, 250);
-  await p.keyboard.type("Inside");
-  await key(app, "Escape");
+  await clear();
+  await words(660, 250, "Inside");
   await key(app, "v");
   await drag([640, 100], [810, 290]);
   expect(await p.evaluate(() => window.__canvastDebug.selection().length), "the shape and its words").toBe(2);
@@ -1263,10 +1269,8 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
   await clear();
   await key(app, "u");
   await drag([830, 110], [960, 200]);
-  await key(app, "t");
-  await click(840, 250);
-  await p.keyboard.type("Along");
-  await key(app, "Escape");
+  await clear();
+  await words(840, 250, "Along");
   await key(app, "v");
   await drag([820, 100], [1000, 290]);
   expect(await p.evaluate(() => window.__canvastDebug.selection().length), "the path and its words").toBe(2);
