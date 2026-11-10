@@ -1,3 +1,4 @@
+import { clipboardState } from "./actions";
 import { openBackupKey } from "../storage/sealed-open";
 import { openNotesAsText } from "../ui/note-session";
 import type { DesktopCatalog, DesktopLibrary } from "../storage/desktop-library";
@@ -130,6 +131,8 @@ export interface DebugHook {
   /** Objects as stored (frame form: local numbers, frame id); works at any depth, unlike `objects()`. */
   storedObjects(): SerializedObject[];
   selection(): string[];
+  /** What a paste here would find: objects copied in this tab, and whether the system clipboard still counts as theirs. */
+  clipboard(): { copied: boolean; ours: boolean; picture: boolean };
   /** Select these objects (as a pick on the canvas would). */
   select(ids: string[]): void;
   /** The list beside the pointer while Ctrl is held: the rows it shows, how many it has, how far it is scrolled (null: none). */
@@ -446,6 +449,7 @@ export function installDebugHook(
     storedObjects: () => doc.ordered().map(serializeObject),
     selection: () => [...editor.selection].sort(),
     select: (ids) => editor.select(ids),
+    clipboard: () => clipboardState(),
     revealList: () => (editor.revealList ? { ids: [...editor.revealList.ids], total: editor.revealList.total, scroll: editor.revealScroll } : null),
     gridStep: () => editor.gridStep(view.camera),
     tool: () => editor.tool,

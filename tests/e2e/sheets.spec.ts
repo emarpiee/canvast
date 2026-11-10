@@ -860,7 +860,7 @@ test("auto layout: Shift+A puts the picked things on a sheet that lays them out 
   // a shape drawn on the sheet joins the row where it is drawn (in the gap after the first), and the sheet grows round it
   await key(app, "u");
   await drag(app, [463, 320], [477, 340]);
-  const s4 = (await objs(app)).at(-1)!.id;
+  const s4 = (await objs(app)).find((o) => !o.container && ![s1, s2, s3].includes(o.id))!.id; // (not the last in the list: the layout deals the stacking order again)
   await key(app, "v");
   await app.frame();
   expect((await laid()).find((o) => o.id === s4)!.parent).toBe(sheet.id);

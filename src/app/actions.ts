@@ -3184,6 +3184,8 @@ export const isPlaceholderText = (s: string): boolean => /^canvast: \d+ objects?
 let pictureIsOurs = false;
 export const markCopiedPicture = (): void => { pictureIsOurs = true; };
 export const forgetCopiedPicture = (): void => { pictureIsOurs = false; };
+/** What a paste here would find (for the debug hook): whether objects were copied in this tab, and whether the system clipboard still counts as this copy. */
+export const clipboardState = (): { copied: boolean; ours: boolean; picture: boolean } => ({ copied: inMemory !== null, ours: ownClipboard, picture: pictureIsOurs });
 /** The system clipboard is what this window copied last (its objects, or their picture): see `ownClipboard`. */
 export const isCopiedPicture = (): boolean => pictureIsOurs || ownClipboard;
 /**

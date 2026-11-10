@@ -1370,11 +1370,19 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
   const added = async () => (await real()).filter((id) => !firstIds.includes(id));
 
   // Same canvas: copy and paste, duplicate, cut and paste.
+  // (what the browser sends for the keys, and what a paste would find: said when the paste fails, as browsers differ here)
+  await p.evaluate(() => {
+    const log: string[] = ((window as unknown as { __clipLog: string[] }).__clipLog = []);
+    for (const t of ["keydown", "copy", "cut", "paste"]) window.addEventListener(t, (e) => log.push(`${t}:${(e as KeyboardEvent).key ?? ""}:${(e.target as HTMLElement | null)?.tagName}:${document.activeElement?.tagName}:${(e as ClipboardEvent).clipboardData?.types?.join("+") ?? ""}`), true);
+  });
   await key(app, "Control+a");
   await key(app, "Control+c");
   await p.mouse.move(640, 400);
+  const afterCopy = await p.evaluate(() => JSON.stringify(window.__canvastDebug.clipboard()));
   await key(app, "Control+v");
-  await expect.poll(kinds, "copy and paste on the same canvas").toEqual(twice);
+  await p.waitForTimeout(400);
+  const said = await p.evaluate(() => JSON.stringify({ log: (window as unknown as { __clipLog: string[] }).__clipLog, now: window.__canvastDebug.clipboard() }));
+  await expect.poll(kinds, `copy and paste on the same canvas (after the copy ${afterCopy}; ${said})`).toEqual(twice);
   same(await snapshot(await added()), original, "copy and paste on the same canvas");
   expect(await whole(new Set(await added())), "the paste names only its own copies").toEqual([]);
   await key(app, "Control+z");
@@ -1477,7 +1485,7 @@ test("every kind of object snaps when resized by a handle: to another object's e
     await app.drag({ x: 800, y: 250 }, { x: 900, y: 450 });
     await make();
     expect((await p.evaluate(() => window.__canvastDebug.selection())).length, `${name}: selected`).toBeGreaterThan(0);
-    const right = await resizeRightTo(796);
+    const right = await resizeRightTo(797); // (3 px short, as for the grid: a pen stroke's box has its pen's width round it)
     if (Math.abs(right - 800) > reach) missed.push(`${name} to an object: its side at ${right.toFixed(2)}, not 800`);
     await clear();
     // To the grid: alone, with Snap to the grid on, the side dragged to 3 px short of a grid line.

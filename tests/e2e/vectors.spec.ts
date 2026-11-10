@@ -3832,7 +3832,8 @@ test("a balloon's words and connector belong to it: in its group and sheet, in f
   expect(picked).toEqual([words(b1!).id]);
   await panel.locator('[data-do="hide"]').click();
   await expect.poll(async () => (await all()).find((o) => o.id === picked[0])!["hidden" as never]).toBe(true);
-  await row(g).locator(".tree-twist").first().click();
+  // (the group opened to show what was picked, or not: open it if it is folded)
+  if ((await row(g).getAttribute("aria-expanded")) !== "true") await row(g).locator(".tree-twist").first().click();
   const eye = row(b1!).locator("[data-eye]");
   await expect(eye).toHaveAttribute("aria-label", /^Show the hidden parts of /);
   await eye.click();
