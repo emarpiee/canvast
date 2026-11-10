@@ -183,7 +183,11 @@ test("sheets", async ({ scene: s }) => {
   await ratio.fill("A4 portrait");
   await ratio.press("Enter");
   await s.paint(sheet, "fill", "#f6f1e6");
-  await s.fit([sheet], 0.7);
+  // (auto layout sizes the sheet a moment later: framed once it has)
+  await s.settle(800);
+  await s.fit([sheet], 0.62);
+  await s.settle(400);
+  await s.fit([sheet], 0.62);
   await s.select([sheet]);
   await s.settle();
   await s.shot("sheets", await s.around({ objects: [sheet], els: ["[data-sheet-ratio]"], pad: 30 }));

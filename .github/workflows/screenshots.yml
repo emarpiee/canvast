@@ -47,6 +47,8 @@ jobs:
       - name: WebP
         run: |
           for f in shots/*.png; do w=$(identify -format %w "$f"); if [ "$w" -gt 1280 ]; then cwebp -quiet -q 78 -resize 1280 0 "$f" -o "${f%.png}.webp"; else cwebp -quiet -q 78 "$f" -o "${f%.png}.webp"; fi; done
+          # (a picture past about 80 KB is made again at lower quality, then lower still)
+          for f in shots/*.png; do o="${f%.png}.webp"; for q in 66 56 46; do [ "$(stat -c %s "$o")" -le 82000 ] && break; w=$(identify -format %w "$f"); r=""; [ "$w" -gt 1280 ] && r="-resize 1280 0"; cwebp -quiet -q $q $r "$f" -o "$o"; done; done
           ls -la shots
       - uses: actions/upload-artifact@v4
         if: always()
