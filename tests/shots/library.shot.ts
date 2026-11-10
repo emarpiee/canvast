@@ -40,17 +40,17 @@ async function collection(s: Scene, extra: string[] = []): Promise<Collection> {
   }
   await p.getByTestId("view-assets").click();
   const card = (f: string) => p.locator(`[data-testid="asset-card"][data-hash="${h(f)}"]`);
-  for (const [starts, tags] of TAGS) {
-    const fs = artFiles(...starts);
-    await card(fs[0]!).click();
-    for (const f of fs.slice(1)) await card(f).click({ modifiers: ["Control"] });
-    for (const t of tags) {
-      const input = fs.length > 1 ? p.getByTestId("bulk-tag-input") : p.getByTestId("asset-tag-input");
-      await input.fill(t);
+  // (one card at a time: each tag is checked on its card before the next)
+  for (const [starts, tags] of TAGS) for (const f of artFiles(...starts)) {
+    await card(f).click();
+    for (const tag of tags) {
+      const input = p.getByTestId("asset-tag-input");
+      await input.fill(tag);
       await input.press("Enter");
+      await expect(p.getByTestId("asset-inspector")).toContainText(`#${tag.split("/").pop()}`);
     }
-    await p.keyboard.press("Escape");
   }
+  await p.keyboard.press("Escape");
   await s.settle();
   return { h, card };
 }
@@ -109,6 +109,7 @@ test("search", async ({ scene: s }) => {
   await s.p.getByTestId("assets-search").fill("#drawing #figure orientation:portrait");
   await s.p.getByTestId("assets-search").press("Enter");
   await expect(s.p.getByTestId("asset-card").first()).toBeVisible();
+  await s.p.mouse.click(1000, 700); // (out of the search box: its suggestions close)
   await s.settle();
   await s.shot("search");
 });
@@ -184,4 +185,48 @@ test("font", async ({ scene: s }) => {
   await s.p.locator(".asset-preview .font-sample.is-ready").waitFor();
   await s.settle();
   await s.shot("font");
+});
+
+test("properties", async ({ scene: s }) => {
+  await s.look({ theme: "light", hue: 210 });
+  const c = await collection(s);
+  const wave = ART.find((a) => a.file.startsWith("hokusai-under"))!;
+  await c.card(wave.file).click();
+  // (a reference catalogued with what the museum says of it)
+  for (const [k, v] of [["artist", wave.artist], ["date", wave.date], ["medium", "Woodblock print"], ["source", "The Met Open Access"]] as const) {
+    await s.p.getByTestId("asset-field-add").click();
+    await s.p.locator(".field-key").last().fill(k);
+    await s.p.locator(".field-value").last().fill(v);
+    await s.p.locator(".field-value").last().blur();
+  }
+  await s.settle();
+  await s.shot("properties", await s.around({ els: ['[data-testid="asset-inspector"]'], pad: 0 }));
+});
+
+test("rename", async ({ scene: s }) => {
+  await s.look({ theme: "dark", hue: 120 });
+  const c = await collection(s);
+  await c.card(artFiles("anonymous-botanical")[0]!).click();
+  await s.p.getByTestId("asset-rename").click();
+  await s.settle();
+  await s.shot("rename");
+});
+
+test("thumbnail", async ({ scene: s }) => {
+  await s.look({ theme: "light", hue: 300 });
+  const c = await collection(s);
+  await c.card(artFiles("degheyn")[0]!).click();
+  await s.p.getByTestId("asset-thumb").click();
+  await s.settle();
+  await s.shot("thumbnail");
+});
+
+test("take-out", async ({ scene: s }) => {
+  await s.look({ theme: "dark", hue: 30 });
+  const c = await collection(s);
+  const card = c.card(artFiles("vangogh")[0]!);
+  await card.click();
+  await card.click({ button: "right" });
+  await expect(s.p.locator(".pop-menu")).toBeVisible();
+  await s.shot("take-out", await s.around({ els: [".pop-menu"], pad: 120 }));
 });

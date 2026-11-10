@@ -220,6 +220,9 @@ test("export-each", async ({ scene: s }) => {
   const ids = await s.placeRow(art);
   await s.select(ids);
   await exportWith(s.p, "exportpic");
+  // (it may open as one picture of all four, with a button for each on its own)
+  await s.settle(600);
+  if (await s.p.getByTestId("export-each").isVisible()) await s.p.getByTestId("export-each").click();
   await s.p.locator("[data-mini]").nth(1).waitFor();
   await s.settle(1000);
   await s.shot("export-each");

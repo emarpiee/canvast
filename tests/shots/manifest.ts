@@ -23,6 +23,7 @@ export const SHOTS: Record<string, ShotSpec> = {
   "align": { section: "#arranging-and-snapping", use: "Line studies up along their bottom edges.", alt: "Three Degas dancers aligned on their bottom edges, the Align menu open" },
   "layers": { section: "#layers", use: "Keep a master study in groups: the reference locked, the construction and the line of action on their own.", alt: "A study over Delacroix's horse: construction ovals and a line of action drawn on it, the Layers panel listing the groups, the reference locked" },
   "reveal": { section: "#reveal-and-the-ctrl-list", use: "Find and pick a print buried under others in a pile.", alt: "A pile of Hokusai prints with Ctrl held: the list of what lies under the pointer, one print outlined", pointer: true },
+  "media": { section: "#video-audio-and-gifs", use: "Plan a camera move for an animatic: a slow pan across a painting, played on the board.", alt: "A clip of a slow camera pan across Van Gogh's Wheat Field with Cypresses playing on the canvas, its player bar below it", pointer: true },
   "canvas-tags": { section: "#tags-on-the-canvas", use: "Tag the studies on a canvas by what they teach, and find them again.", alt: "Studies tagged gesture and anatomy, the Tags panel listing the tags with their counts" },
 
   // Drawing and vector editing
@@ -92,4 +93,18 @@ export const SHOTS: Record<string, ShotSpec> = {
   // Exporting and sharing
   "export": { section: "#export", use: "Export a comic page at print size, as PNG, WebP, JPEG or PDF.", alt: "The Export dialog for a page of four prints: its preview, the size presets in pixels and inches at 300 ppi, the formats and the background" },
   "export-each": { section: "#export", use: "Export several pictures at once, each as its own file or page.", alt: "Export with four prints selected: each one's small preview as a page of its own" },
+
+  // PDFs, 3D models and backups
+  "pdf-view": { section: "#pdfs-and-3d-models", use: "Read a study handout beside your pictures, without another app.", alt: "A PDF handout, Reading a woodblock print, open in the Library's PDF view: its first page, the page box, and its thumbnails" },
+  "model-view": { section: "#pdfs-and-3d-models", use: "Turn a simple 3D object under a light, as the start of a still-life lighting study.", alt: "A turned vase in the 3D view, lit from one side, its camera, surface and light settings beside it" },
+  "import-choice": { section: "#importing-a-backup", use: "Bring a backup back: update this workspace, or add its boards beside what is here.", alt: "The How to import question over Settings, Storage: Update this workspace, and Add as new boards, each with what it does" },
+
+  // The Library, details
+  "properties": { section: "#properties", use: "Catalogue a reference with what the museum says of it: artist, date, medium, source.", alt: "Hokusai's Great Wave selected, its details listing the properties artist Katsushika Hokusai, date ca. 1830–32, medium Woodblock print and source The Met Open Access" },
+  "rename": { section: "#rename", use: "Give a reference a name you will search for.", alt: "The Rename dialog for the anonymous Botanical Studies drawing, its name ready to change" },
+  "thumbnail": { section: "#custom-thumbnail", use: "Choose the picture a card shows: a detail that tells two studies apart.", alt: "The thumbnail choice for de Gheyn's two studies of a saddled horse: upload a picture, choose one from the library, or keep the original" },
+  "take-out": { section: "#taking-files-out", use: "Take a reference out of the app: download it or export it.", alt: "The right-click menu of Van Gogh's Wheat Field with Cypresses in the Library: its download, export and other commands" },
+
+  // canvast tools
+  "tools-menu": { section: "#canvast-tools-without-the-app", use: "Open your hidden items, hide files or share a folder on any computer with Node.js, without the app.", alt: "A terminal running node canvast-tools.mjs: its numbered menu in plain words" },
 };

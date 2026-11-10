@@ -1,5 +1,6 @@
 // README pictures of "Comics and storyboards": a page laid out from four prints, lettered as comics are (white balloons with a black
 // outline, capitals in a comic hand, tails to the speaker, caption boxes), the balloon kinds and the cover's type (manifest.ts).
+import { chooseInMenu } from "../e2e/harness";
 import { test, expect, type Scene, type Box } from "./scene";
 
 type Kind = "" | "speech" | "thought" | "shout" | "caption" | "soft";
@@ -55,22 +56,17 @@ const inside = (b: Box, x: number, y: number): [number, number] => [b.minX + (b.
 
 /** A comic page: the four prints as panels on a page sheet with auto layout, two columns. The page's id and the panels'. */
 async function page(s: Scene): Promise<{ page: string; panels: string[] }> {
+  // (placed last to first: the grid "in stacking order" lays them out front to back, so the first panel comes first)
   const art = await s.art("hokusai-seaside", "leprince", "verhaecht", "hokusai-under");
   await s.canvas("Page 1");
-  const panels = await s.place(art);
-  await s.fit(panels, 0.6);
+  const placed = await s.placeRow([...art].reverse(), 30);
+  const panels = [...placed].reverse();
   await s.select(panels);
-  await s.p.keyboard.press("Shift+A");
+  await chooseInMenu(s.p, "arrangemenu", "grid:stack");
+  await chooseInMenu(s.p, "sheetmenu", "puton");
   await expect.poll(async () => (await s.objects()).some((o) => o.container)).toBe(true);
   const pg = (await s.objects()).find((o) => o.container)!.id;
-  await s.select([pg]);
-  await s.p.locator('[data-layout-flow="grid"]').click();
-  for (const [sel, v] of [["[data-layout-columns]", "2"], ['[data-layout-gap="0"]', "14"], ['[data-layout-gap="1"]', "14"], ['[data-layout-pad="h"]', "22"], ['[data-layout-pad="v"]', "22"]] as const) {
-    await s.p.locator(sel).fill(v);
-    await s.p.locator(sel).press("Enter");
-  }
-  await s.p.locator('[data-paint="fill"]').filter({ visible: true }).first().click();
-  await s.hex("#fbf8f1");
+  await s.paint(pg, "fill", "#fbf8f1");
   await s.select([]);
   return { page: pg, panels };
 }

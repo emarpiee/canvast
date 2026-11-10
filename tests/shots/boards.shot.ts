@@ -1,6 +1,10 @@
 // README pictures of "Reference boards": each test is one picture of one feature, in the way an artist uses it (manifest.ts).
+import { execFileSync } from "node:child_process";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { alignWith, arrangeWith, setPenColour } from "../e2e/harness";
-import { test, expect, type Scene } from "./scene";
+import { test, expect, artFiles, type Scene } from "./scene";
 
 /** A freehand line through these screen points (the Pen must be on). */
 async function line(s: Scene, pts: Array<[number, number]>): Promise<void> {
@@ -291,4 +295,24 @@ test("canvas-tags", async ({ scene: s }) => {
   await s.select(ids.slice(0, 2));
   await s.settle();
   await s.shot("canvas-tags", await s.around({ objects: ids, els: ['[data-testid="tags-panel"]'], pad: 24 }));
+});
+
+test("media", async ({ scene: s }) => {
+  await s.look({ theme: "dark", hue: 50 });
+  // (a camera move planned for an animatic: a slow pan across the painting, made here with ffmpeg)
+  const dir = mkdtempSync(join(tmpdir(), "cv-clip-"));
+  const clip = join(dir, "wheat_field_camera_pan.webm");
+  execFileSync("ffmpeg", ["-v", "error", "-y", "-loop", "1", "-i", resolve("scripts/showcase/art", artFiles("vangogh")[0]!), "-vf", "scale=1600:-2,zoompan=z='1.15':x='iw/2-(iw/zoom/2)+on*1.2':y='ih/2-(ih/zoom/2)':d=150:s=960x720:fps=30", "-c:v", "libvpx-vp9", "-b:v", "600k", "-t", "5", clip]);
+  const h = await s.library([clip]);
+  await s.canvas("Animatic");
+  const [id] = await s.place([h["wheat_field_camera_pan.webm"]!]);
+  await s.fit([id!], 0.5);
+  const b = (await s.box([id!]))!;
+  await s.tool("select");
+  await s.p.mouse.click((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2);
+  const play = s.p.getByRole("button", { name: /^Play/ }).first();
+  if (await play.isVisible()) await play.click();
+  await s.p.waitForTimeout(1500);
+  await s.p.mouse.move((b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2 + 20);
+  await s.shot("media", await s.around({ objects: [id!], pad: 90 }));
 });
