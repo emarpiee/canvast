@@ -129,9 +129,70 @@ export async function open(out, { width = 1440, height = 900, args = [] } = {}) 
     await select([]);
     await settle(300);
   };
+  const ids = async () => (await H(() => window.__canvastDebug.objects())).map((o) => o.id);
+  /** Paste SVG text under the point (it lands as one group, half the view high); the ids it made. `loose`: ungrouped. */
+  const pasteSvg = async (svg, at = [width / 2, height / 2], { loose = false } = {}) => {
+    const before = new Set(await ids());
+    await p.mouse.move(at[0], at[1]);
+    await H((t) => { const dt = new DataTransfer(); dt.setData("text/plain", t); window.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); }, svg);
+    await settle(400);
+    if (loose) { await command("Ungroup"); await settle(300); }
+    return (await ids()).filter((i) => !before.has(i));
+  };
+  /** Run a command of the palette by its name. */
+  const command = async (name) => {
+    await blur();
+    await p.keyboard.press("Control+k");
+    await p.keyboard.type(name);
+    await p.waitForTimeout(250);
+    await p.keyboard.press("Enter");
+    await settle(300);
+  };
+  /** Type a colour into the open colour popover. */
+  const hex = async (value) => {
+    const field = p.locator(".colour-pop [data-hex]").filter({ visible: true }).first();
+    await field.fill(value.replace("#", ""));
+    await field.press("Enter");
+    await p.keyboard.press("Escape");
+  };
+  /** The Text tool's font, chosen by part of its name (a font of the library). */
+  const useFont = async (part) => {
+    const sel = p.locator("select[data-text-font]").filter({ visible: true }).first();
+    const label = await sel.evaluate((s, w) => [...s.options].find((o) => o.text.toLowerCase().includes(w))?.text ?? null, part.toLowerCase());
+    if (label) await sel.selectOption({ label });
+  };
+  /** A text at a point, set in a font, size and colour first (they carry to the new text). */
+  const text = async (x, y, str, { size = 24, colour = "#f2efe8", font = null } = {}) => {
+    await p.keyboard.press("t");
+    if (font) await useFont(font);
+    const sz = p.getByRole("spinbutton", { name: "Text size (px at this zoom)" });
+    await sz.fill(String(size));
+    await sz.press("Enter");
+    await p.getByRole("button", { name: "Text colour" }).click();
+    await hex(colour);
+    await p.mouse.click(x, y);
+    await p.waitForFunction(() => document.activeElement?.isContentEditable === true, null, { timeout: 4000 });
+    await p.keyboard.type(str);
+    await p.keyboard.press("Escape");
+    await p.keyboard.press("v");
+    await p.keyboard.press("Escape");
+    await blur();
+    await settle(200);
+    return (await H(() => window.__canvastDebug.objects())).filter((o) => o.kind === "text").at(-1)?.id ?? null;
+  };
+  /** A picture of part of the window: round these objects and these elements (selectors), with a margin. */
+  const around = async ({ objects = [], els = [], pad = 32 } = {}) => {
+    const bs = [];
+    for (const id of objects) { const b = await boxOf(id); if (b) bs.push(b); }
+    for (const s of els) { const b = await p.locator(s).filter({ visible: true }).first().boundingBox().catch(() => null); if (b) bs.push({ minX: b.x, minY: b.y, maxX: b.x + b.width, maxY: b.y + b.height }); }
+    if (!bs.length) return undefined;
+    const x0 = Math.max(0, Math.min(...bs.map((b) => b.minX)) - pad), y0 = Math.max(0, Math.min(...bs.map((b) => b.minY)) - pad);
+    const x1 = Math.min(width, Math.max(...bs.map((b) => b.maxX)) + pad), y1 = Math.min(height, Math.max(...bs.map((b) => b.maxY)) + pad);
+    return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
+  };
   const done = async () => {
     await ctx.close();
     if (failed) console.log(`${failed} picture(s) FAILED`);
   };
-  return { p, ctx, H, frame, settle, shot, step, off, blur, drag, stroke, menu, panel, newCanvas, importFiles, place, select, boxOf, fit, done, work };
+  return { p, ctx, H, frame, settle, shot, step, off, blur, drag, stroke, menu, panel, newCanvas, importFiles, place, select, boxOf, fit, done, work, width, height, ids, pasteSvg, command, hex, useFont, text, around };
 }

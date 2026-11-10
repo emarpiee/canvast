@@ -61,7 +61,7 @@ export const SHOTS: Record<string, ShotSpec> = {
   // Notes
   "notes-editor": { section: "#notes", use: "Keep study notes on a reference: its facts as properties, the print embedded, a checklist of what to look at and a copy plan.", alt: "A markdown note, The Great Wave: study notes, open in the notes editor: the print embedded, a checklist of the crest, Mount Fuji and the three boats, and a table of the copy plan" },
   "notes-links": { section: "#links-and-tags", use: "Link notes to each other and see what links to a note.", alt: "The note Seaside Village in Winter selected in the Library, its details listing the study notes of The Great Wave under Linked from" },
-  "note-properties": { section: "#properties", use: "Keep a work's facts (artist, date, medium, series) as properties you can search.", alt: "The details of The Great Wave's study notes: properties artist Katsushika Hokusai, date ca. 1830–32, medium Woodblock print, series and status, and its tags" },
+  "note-properties": { section: "#properties-1", use: "Keep a work's facts (artist, date, medium, series) as properties you can search.", alt: "The details of The Great Wave's study notes: properties artist Katsushika Hokusai, date ca. 1830–32, medium Woodblock print, series and status, and its tags" },
   "notes-panel": { section: "#notes-on-a-canvas", use: "Keep the notes beside the picture they are about, and edit them there.", alt: "The Great Wave on a canvas beside the card of its study notes, the note open in the Note panel" },
 
   // Privacy and hidden items
