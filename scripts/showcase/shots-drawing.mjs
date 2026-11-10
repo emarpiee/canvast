@@ -209,6 +209,7 @@ await step("comic", async () => {
   await say(boxes[3], [0.06, 0.06], "Look, the sea!");
   await p.keyboard.press("v");
   await p.keyboard.press("Escape");
+  await fit(); // (writing in a balloon zooms the view to it)
   await off();
   await shot("comic");
 });
