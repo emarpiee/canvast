@@ -3757,9 +3757,15 @@ test("speech balloon: a double-click makes its words, kept in the body; nothing 
   await key(app, "Control+d");
   await expect.poll(count).toEqual({ words: 4, balloons: 4, links: 2 });
   await key(app, "Control+z");
-  await click(app, 1000, 650);
-  await click(app, 530, 400);
-  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([balloon.id]);
+  // (the balloon alone: inside its body, between its edge and its words' box)
+  const screenBox = (id: string) => p.evaluate((i) => window.__canvastDebug.objectScreen(i)!.box, id);
+  const [bb, wb] = [await screenBox(balloon.id), await screenBox((await objs(app)).find((o) => o.kind === "text" && (o as unknown as { inShape?: { shape: string } }).inShape?.shape === balloon.id)!.id)];
+  const pickBalloon = async () => {
+    await click(app, 1000, 650);
+    await click(app, (bb.minX + wb.minX) / 2, (wb.minY + wb.maxY) / 2);
+    expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([balloon.id]);
+  };
+  await pickBalloon();
   await key(app, "Control+c");
   await p.mouse.move(300, 560);
   await key(app, "Control+v");
@@ -3771,8 +3777,7 @@ test("speech balloon: a double-click makes its words, kept in the body; nothing 
   });
   const pastedBalloon = copy.find((o) => o.kind === "path")!;
   expect(copy.find((o) => o.kind === "text")?.shape, "the copied words are in the copied balloon").toBe(pastedBalloon.id);
-  await click(app, 1000, 650);
-  await click(app, 530, 400);
+  await pickBalloon();
   await key(app, "Control+x");
   await expect.poll(count, "the cut balloon took its words and its connector").toEqual({ words: 2, balloons: 2, links: 0 });
   await key(app, "Control+v");
