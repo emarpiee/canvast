@@ -5,7 +5,7 @@
 import { readFileSync, mkdirSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import type { Page } from "@playwright/test";
-import { test as base, expect, type App } from "../e2e/harness";
+import { test as base, expect, chooseInMenu, type App } from "../e2e/harness";
 import { SHOTS } from "./manifest";
 
 export { expect };
@@ -62,22 +62,41 @@ export class Scene {
     await this.p.evaluate((n) => window.__canvastDebug.setTool(n as never), name);
     await this.settle(100);
   }
-  /** Objects side by side in a row, a gap of `gap` px on the screen between them, in the order given. */
-  async row(ids: string[], gap = 40): Promise<void> {
-    await this.tool("select");
-    let right: number | null = null;
-    for (const id of ids) {
-      const b = (await this.box([id]))!;
-      const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
-      const want = right === null ? b.minX : right + gap;
-      if (right !== null) {
-        await this.select([id]);
-        await this.app.drag({ x: cx, y: cy }, { x: cx + (want - b.minX), y: cy }, 6);
-      }
-      right = (await this.box([id]))!.maxX;
+  /** Library items placed side by side in a row: each placed with the camera moved along (so none lands on another), then lined up
+   * and spaced evenly by the app's own Align middle and Distribute horizontally. Their ids, left to right. */
+  async placeRow(hashes: string[], gap = 48): Promise<string[]> {
+    const ids: string[] = [];
+    for (const h of hashes) {
+      const [id] = await this.place([h]);
+      ids.push(id!);
+      const b = (await this.box([id!]))!;
+      await this.pan(b.maxX - b.minX + gap * 3, 0);
     }
-    await this.select([]);
+    if (ids.length > 1) {
+      await this.select(ids);
+      await chooseInMenu(this.p, "alignmenu", "align:middle");
+      if (ids.length > 2) await chooseInMenu(this.p, "alignmenu", "distribute:x");
+      await this.select([]);
+    }
     await this.settle();
+    return ids;
+  }
+  /** Move the camera by this many screen px (the view's content moves the other way). */
+  async pan(dx: number, dy: number): Promise<void> {
+    await this.p.evaluate(([x, y]) => {
+      const d = window.__canvastDebug;
+      const w = d.screenToWorld(720 + x!, 450 + y!);
+      d.setCamera({ ...d.camera(), cx: w.x, cy: w.y });
+    }, [dx, dy]);
+    await this.settle(100);
+  }
+  /** Paint an object's fill or outline with a colour, through the bar's picker. */
+  async paint(id: string, which: "fill" | "stroke", colour: string): Promise<void> {
+    await this.tool("select");
+    await this.select([id]);
+    await this.p.locator(`[data-paint="${which}"]`).filter({ visible: true }).first().click();
+    await this.hex(colour);
+    await this.select([]);
   }
   /** A new canvas in the first board, named, and open. */
   async canvas(name: string): Promise<void> {
@@ -185,6 +204,8 @@ export class Scene {
   /** A colour typed into the open colour popover. */
   async hex(value: string): Promise<void> {
     const field = this.p.locator(".colour-pop [data-hex]").filter({ visible: true }).first();
+    // (a paint that is "none" shows no colour field: a plain colour first)
+    if (!(await field.isVisible()) && (await this.p.locator('.colour-pop [data-mode="solid"]').isVisible())) await this.p.locator('.colour-pop [data-mode="solid"]').click();
     await field.fill(value.replace("#", ""));
     await field.press("Enter");
     await this.p.keyboard.press("Escape");
@@ -247,6 +268,8 @@ export class Scene {
 export const test = base.extend<{ scene: Scene }>({
   scene: async ({ app }, use) => {
     await app.page.addStyleTag({ content: ".hud-dev,.hud-debug{display:none!important}" });
-    await use(new Scene(app));
+    const s = new Scene(app);
+    await s.look(); // (every picture starts in the default look with item names off; a shot may choose another)
+    await use(s);
   },
 });

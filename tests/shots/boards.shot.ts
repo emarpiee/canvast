@@ -2,8 +2,6 @@
 import { alignWith, arrangeWith, setPenColour } from "../e2e/harness";
 import { test, expect, type Scene } from "./scene";
 
-/** Place pictures side by side, in a row with a gap. */
-const row = (s: Scene, ids: string[]): Promise<void> => s.row(ids, 48);
 /** A freehand line through these screen points (the Pen must be on). */
 async function line(s: Scene, pts: Array<[number, number]>): Promise<void> {
   await s.p.mouse.move(pts[0]![0], pts[0]![1]);
@@ -23,8 +21,7 @@ test("board", async ({ scene: s }) => {
   await s.fonts();
   const art = await s.art("delacroix", "bonheur", "degheyn");
   await s.canvas("Horses");
-  const ids = await s.place(art);
-  await row(s, ids);
+  const ids = await s.placeRow(art);
   await s.fit(ids, 0.62, [0.5, 0.52]);
   const boxes = await Promise.all(ids.map((id) => s.box([id])));
   const all = (await s.box(ids))!;
@@ -84,8 +81,7 @@ test("flip", async ({ scene: s }) => {
   await s.fonts();
   const [h] = await s.art("degheyn");
   await s.canvas("Flip");
-  const ids = await s.place([h!, h!]);
-  await row(s, ids);
+  const ids = await s.placeRow([h!, h!]);
   await s.fit(ids, 0.6);
   await s.select([ids[1]!]);
   await s.p.locator('[data-flip="x"]').click();
@@ -107,11 +103,11 @@ test("corners", async ({ scene: s }) => {
   await s.fit([id!], 0.55);
   await s.select([id!]);
   const r = s.p.locator("[data-sel-radius-wrap] input");
-  await r.fill("28");
+  await r.fill("44");
   await r.press("Enter");
   await s.p.locator('[data-paint="stroke"]').filter({ visible: true }).first().click();
   await s.p.locator('.colour-pop [data-mode="solid"]').click();
-  await s.hex("#efe6d2");
+  await s.hex("#5b4636");
   await s.settle();
   await s.shot("corners", await s.around({ objects: [id!], els: ["[data-sel-radius-wrap]"], pad: 36 }));
 });
@@ -120,8 +116,7 @@ test("adjust-values", async ({ scene: s }) => {
   await s.fonts();
   const [h] = await s.art("vangogh");
   await s.canvas("Value study");
-  const ids = await s.place([h!, h!]);
-  await row(s, ids);
+  const ids = await s.placeRow([h!, h!]);
   await s.fit(ids, 0.55, [0.42, 0.5]);
   await s.select([ids[1]!]);
   await s.p.getByRole("button", { name: "Adjust panel", exact: true }).click();
@@ -144,8 +139,7 @@ test("adjust-shadow", async ({ scene: s }) => {
   const art = await s.art("hokusai-basket", "hokusai-still", "hokusai-rooster");
   await s.canvas("Prints");
   await s.look({ theme: "light", hue: 40, pattern: "none" });
-  const ids = await s.place(art);
-  await row(s, ids);
+  const ids = await s.placeRow(art);
   await s.fit(ids, 0.6, [0.42, 0.5]);
   await s.select(ids);
   await s.p.getByRole("button", { name: "Adjust panel", exact: true }).click();
@@ -164,8 +158,7 @@ test("sheets", async ({ scene: s }) => {
   await s.fonts();
   const art = await s.art("waterloo", "verhaecht", "leprince");
   await s.canvas("Shots");
-  const ids = await s.place(art);
-  await row(s, ids);
+  const ids = await s.placeRow(art);
   await s.fit(ids, 0.8);
   const sheets: string[] = [];
   for (const id of ids) {
@@ -210,8 +203,7 @@ test("arrange", async ({ scene: s }) => {
 test("align", async ({ scene: s }) => {
   const art = await s.art("degas-dancer_with", "degas-dancer_onstage", "degas-dancer_adjusting");
   await s.canvas("Line up");
-  const ids = await s.place(art);
-  await row(s, ids);
+  const ids = await s.placeRow(art);
   for (const [i, id] of ids.entries()) {
     const b = (await s.box([id]))!;
     await s.select([id]);
@@ -246,9 +238,9 @@ test("layers", async ({ scene: s }) => {
   const action = (await s.ids()).filter((i) => !before2.has(i));
   await s.tool("select");
   await s.select(construction);
-  await s.p.locator('[data-ctx="group"]').click();
+  await s.command("Group");
   await s.select(action);
-  await s.p.locator('[data-ctx="group"]').click();
+  await s.command("Group");
   await s.select([ref!]);
   await s.p.locator('[data-ctx="lock"]').click();
   await s.select([]);
@@ -283,8 +275,7 @@ test("canvas-tags", async ({ scene: s }) => {
   await s.look({ theme: "light", hue: 140 });
   const art = await s.art("degas-dancer_with", "degas-dancer_onstage", "delacroix", "bonheur");
   await s.canvas("Studies");
-  const ids = await s.place(art);
-  await row(s, ids);
+  const ids = await s.placeRow(art);
   await s.fit(ids, 0.62, [0.4, 0.5]);
   await s.p.getByRole("button", { name: "Tags panel", exact: true }).click();
   for (const [sel, tags] of [[ids.slice(0, 2), "gesture, figure"], [ids.slice(2), "anatomy, horse"]] as const) {

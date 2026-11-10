@@ -16,9 +16,6 @@ async function lettering(s: Scene, font = "comic neue", size = 20): Promise<void
   await s.hex("#111111");
   await s.p.keyboard.press("Escape");
 }
-async function rangeTo(s: Scene, sel: string, v: number): Promise<void> {
-  await s.p.locator(sel).filter({ visible: true }).first().evaluate((e: HTMLInputElement, x: number) => { e.value = String(x); e.dispatchEvent(new Event("input", { bubbles: true })); e.dispatchEvent(new Event("change", { bubbles: true })); }, v);
-}
 /** One balloon: drawn, given its kind, a black outline, its words, and its tail moved to the speaker. Its id. */
 async function balloon(s: Scene, b: Balloon): Promise<string> {
   const p = s.p;
@@ -37,7 +34,6 @@ async function balloon(s: Scene, b: Balloon): Promise<string> {
   }
   await p.locator('[data-paint="stroke"]').filter({ visible: true }).first().click();
   await s.hex("#111111");
-  await rangeTo(s, "[data-shape-width]", 2);
   if (b.tip) {
     const tip = (await p.evaluate(() => window.__canvastDebug.balloonDots())).find((d) => d.part === "tip");
     if (tip) await s.app.drag({ x: tip.x, y: tip.y }, { x: b.tip[0], y: b.tip[1] }, 5);

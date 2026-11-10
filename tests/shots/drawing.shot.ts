@@ -22,10 +22,15 @@ const curve = (pts: Array<[number, number]>, n = 10): Array<[number, number]> =>
   out.push(pts.at(-1)!);
   return out;
 };
-async function shapeTool(s: Scene, kind: string, fill: string): Promise<void> {
-  await s.p.evaluate((f) => window.__canvastDebug.setSetting("shape.fill", f), fill);
+/** A shape drawn with the Shape tool from one corner to the other, then painted; its id. */
+async function shape(s: Scene, kind: string, from: [number, number], to: [number, number], fill: string): Promise<string> {
+  const before = new Set(await s.ids());
   await s.tool("shape");
   await s.p.locator(`[data-shape-kind="${kind}"]`).click();
+  await s.app.drag({ x: from[0], y: from[1] }, { x: to[0], y: to[1] }, 4);
+  const id = (await s.ids()).find((i) => !before.has(i))!;
+  await s.paint(id, "fill", fill);
+  return id;
 }
 
 test("pen", async ({ scene: s }) => {
@@ -53,27 +58,22 @@ test("pen", async ({ scene: s }) => {
 test("shape-kinds", async ({ scene: s }) => {
   await s.look({ theme: "light", hue: 210, pattern: "dots" });
   await s.canvas("Thumbnail");
-  // a value thumbnail of a landscape blocked in with shapes: sky, sun, far and near hills, a road
-  await shapeTool(s, "rect", "#d9dde3");
-  await s.app.drag({ x: 470, y: 230 }, { x: 970, y: 560 }, 4);
-  await shapeTool(s, "ellipse", "#f4f1ea");
-  await s.app.drag({ x: 800, y: 270 }, { x: 870, y: 340 }, 4);
-  await shapeTool(s, "polygon", "#8e98a6");
-  await s.app.drag({ x: 470, y: 330 }, { x: 760, y: 560 }, 4);
-  await shapeTool(s, "polygon", "#4d5764");
-  await s.app.drag({ x: 650, y: 380 }, { x: 990, y: 560 }, 4);
-  await shapeTool(s, "polygon", "#20262e");
-  await s.p.locator('[data-shape-kind="polygon"]').click();
-  await s.app.drag({ x: 500, y: 470 }, { x: 900, y: 600 }, 4);
+  // a value thumbnail of a landscape blocked in with shapes: sky, a low sun, far hills, near hills, a dark foreground
+  const ids = [
+    await shape(s, "rect", [470, 230], [970, 590], "#d9dde3"),
+    await shape(s, "ellipse", [790, 300], [860, 370], "#f6f3ec"),
+    await shape(s, "polygon", [470, 360], [800, 590], "#9aa3ae"),
+    await shape(s, "polygon", [640, 410], [990, 590], "#5d6672"),
+    await shape(s, "rect", [470, 520], [970, 590], "#2a3038"),
+  ];
   await s.tool("shape");
-  await expect(s.p.locator('[data-shape-kind="star"]')).toBeVisible();
-  await s.shot("shape-kinds", await s.around({ objects: await s.ids(), els: ['[data-shape-kind="rect"]', '[data-shape-kind="star"]'], pad: 30 }));
+  await s.shot("shape-kinds", await s.around({ objects: ids, els: ['[data-shape-kind="rect"]', '[data-shape-kind="star"]'], pad: 30 }));
 });
 
 // A wave crest built as an icon is: circles joined, then circles cut out of it for the curl and the claws.
 const CREST_PARTS = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">
 <circle cx="170" cy="170" r="120" fill="#1d4e89"/><rect x="40" y="200" width="330" height="90" fill="#1d4e89"/>
-<circle cx="215" cy="140" r="78" fill="#f4efe6"/><circle cx="300" cy="110" r="28" fill="#f4efe6"/><circle cx="330" cy="150" r="22" fill="#f4efe6"/></svg>`;
+<circle cx="205" cy="150" r="80" fill="#f4efe6"/><circle cx="262" cy="70" r="24" fill="#f4efe6"/><circle cx="283" cy="104" r="17" fill="#f4efe6"/><circle cx="292" cy="133" r="12" fill="#f4efe6"/></svg>`;
 
 test("shapes", async ({ scene: s }) => {
   await s.look({ theme: "dark", hue: 220 });
@@ -118,9 +118,7 @@ test("mask", async ({ scene: s }) => {
   await s.fit([pic!], 0.6);
   const b = (await s.box([pic!]))!;
   const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2, rx = (b.maxX - b.minX) * 0.4, ry = (b.maxY - b.minY) * 0.44;
-  await shapeTool(s, "ellipse", "#ffffff");
-  await s.app.drag({ x: cx - rx, y: cy - ry }, { x: cx + rx, y: cy + ry }, 4);
-  await s.tool("select");
+  await shape(s, "ellipse", [cx - rx, cy - ry], [cx + rx, cy + ry], "#ffffff");
   await s.select(await s.ids());
   await maskWith(s.p, "clipmask");
   await s.select([]);
@@ -133,10 +131,7 @@ test("mask", async ({ scene: s }) => {
 test("fill-gradient", async ({ scene: s }) => {
   await s.look({ theme: "dark", hue: 30 });
   await s.canvas("Sky");
-  await shapeTool(s, "rect", "#f2a65a");
-  await s.app.drag({ x: 420, y: 250 }, { x: 900, y: 600 }, 4);
-  await s.tool("select");
-  const [id] = await s.ids();
+  const id = await shape(s, "rect", [420, 250], [900, 600], "#f2a65a");
   await s.select([id!]);
   await s.p.locator('[data-paint="fill"]').filter({ visible: true }).first().click();
   await s.p.locator('.colour-pop [data-mode="linear"]').click();
@@ -204,10 +199,7 @@ test("colour-picker", async ({ scene: s }) => {
   const [pic] = await s.place([h!]);
   await s.fit([pic!], 0.5, [0.35, 0.5]);
   const b = (await s.box([pic!]))!;
-  await shapeTool(s, "rect", "#1f3a5f");
-  await s.app.drag({ x: b.maxX + 30, y: b.minY }, { x: b.maxX + 150, y: b.minY + 120 }, 4);
-  await s.tool("select");
-  const sw = (await s.ids()).filter((i) => i !== pic).at(-1)!;
+  const sw = await shape(s, "rect", [b.maxX + 30, b.minY], [b.maxX + 150, b.minY + 120], "#1f3a5f");
   await s.select([sw]);
   await s.p.locator('[data-paint="fill"]').filter({ visible: true }).first().click();
   await s.settle();
@@ -218,13 +210,10 @@ test("path-tools", async ({ scene: s }) => {
   await s.look({ theme: "dark", hue: 280 });
   await s.fonts();
   await s.canvas("Cover");
-  await s.tool("pen");
-  await setPenColour(s.p, "#8fb3ff");
-  await line(s, curve([[420, 520], [600, 380], [820, 360], [1020, 470]]));
-  await s.tool("select");
-  const path = (await s.ids())[0]!;
+  // (a vector curve to set the words on: a path, not a pen stroke)
+  const [path] = await s.svg(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 200"><path d="M10 170 C 160 20, 440 20, 590 150" fill="none" stroke="#8fb3ff" stroke-width="3"/></svg>`, [720, 420], true);
   const t = await s.text(470, 600, "Under the wave off Kanagawa", { size: 34, font: "cormorant garamond semibold", colour: "#f2efe8" });
-  await s.select([path, t]);
+  await s.select([path!, t]);
   await pathWith(s.p, "onpath");
   await s.select([t]);
   await s.p.locator('[data-ctx="pathmenu"]').click();
