@@ -7,8 +7,9 @@ import * as D from "../../src/core/dyadic";
 
 const at = (x: number) => ({ x: D.fromNumber(x), y: D.fromNumber(0) });
 const square = (w: number) => ({ n: [0, 0, 0, 0, 0, 0, w, 0, w, 0, w, 0, w, w, w, w, w, w, 0, w, 0, w, 0, w], closed: true });
-const path = (x: number, w: number) => ({ id: "s", kind: "path", anchor: at(x), unit: 0, sub: [square(w)] }) as unknown as CanvasObject;
-const text = { id: "t", kind: "text", anchor: at(0), unit: 0, w: 10, inShape: { n: square(10).n, closed: true, shape: "s" } } as unknown as CanvasObject;
+// (z as the document keeps them: the words just in front of their shape, doc/belongs.ts)
+const path = (x: number, w: number) => ({ id: "s", kind: "path", z: 0, anchor: at(x), unit: 0, sub: [square(w)] }) as unknown as CanvasObject;
+const text = { id: "t", kind: "text", z: 0.75, anchor: at(0), unit: 0, w: 10, inShape: { n: square(10).n, closed: true, shape: "s" } } as unknown as CanvasObject;
 const src = (...all: CanvasObject[]): DerivationSource => ({ get: (id) => all.find((o) => o.id === id), all: () => all, space: {} as DerivationSource["space"] });
 
 describe("a text inside a shape", () => {
@@ -32,8 +33,8 @@ describe("a text inside a shape", () => {
 });
 
 describe("a text along a path", () => {
-  const line = { id: "s", kind: "path", anchor: at(5), unit: 0, sub: [{ n: [0, 0, 0, 0, 0, 0, 30, 0, 30, 0, 30, 0], closed: false }] } as unknown as CanvasObject;
-  const onIt = { id: "t", kind: "text", anchor: at(0), unit: 0, w: 10, size: 2, onPath: { n: [5, 0, 5, 0, 5, 0, 35, 0, 35, 0, 35, 0], closed: false, path: "s" } } as unknown as CanvasObject;
+  const line = { id: "s", kind: "path", z: 0, anchor: at(5), unit: 0, sub: [{ n: [0, 0, 0, 0, 0, 0, 30, 0, 30, 0, 30, 0], closed: false }] } as unknown as CanvasObject;
+  const onIt = { id: "t", kind: "text", z: 0.75, anchor: at(0), unit: 0, w: 10, size: 2, onPath: { n: [5, 0, 5, 0, 5, 0, 35, 0, 35, 0, 35, 0], closed: false, path: "s" } } as unknown as CanvasObject;
   it("follows its path, and is plain when the path is deleted", () => {
     const moved = { ...line, anchor: at(9) } as CanvasObject;
     const t = withShapeTexts(src(line, onIt), [moved], []).find((o) => o.id === "t") as Extract<CanvasObject, { kind: "text" }>;
