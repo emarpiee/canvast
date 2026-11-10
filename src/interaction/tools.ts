@@ -328,6 +328,8 @@ export interface ToolHooks {
   toolForKey(key: string): Tool | undefined;
   /** How fast the view moves when a drag of objects nears an edge: 1 is 100%, 0 off (Settings > Navigation). */
   edgePanSpeed?(): number;
+  /** Whether the Ctrl list scrolls by itself with the pointer on its top or bottom row (Settings). */
+  listAutoScroll?(): boolean;
   /** The direction a plain key steps in (W A S D at first; Settings > Shortcuts), if any (ADR 0058, 0072). */
   navForKey(key: string): NavDir | undefined;
   /** Step the selection to a neighbouring item. */
@@ -501,7 +503,7 @@ export function attachTools(
    * Picking something outside the group they entered leaves that group.
    */
   // Reveal (interaction/reveal.ts, ADR 0149): Ctrl held over the canvas on Select (and Edit nodes and Lasso, ADR 0153) shows the outline of everything under the pointer.
-  const reveal = createReveal(editor, () => g.kind === "none" && (effectiveTool() === "select" || effectiveTool() === "node" || effectiveTool() === "lasso"));
+  const reveal = createReveal(editor, () => g.kind === "none" && (effectiveTool() === "select" || effectiveTool() === "node" || effectiveTool() === "lasso"), () => hooks.listAutoScroll?.() ?? false);
   const hasThingsOn = (sheet: CanvasObject): boolean => {
     for (const k of doc.all()) if (k.parent === sheet.id && !k.hidden) return true;
     return false;

@@ -73,8 +73,8 @@ export function deepPick(hits: readonly ProjectedObject[], picked: ReadonlySet<O
 /** Height of one row of the revealed list, and the padding above the first (CSS px). */
 export const REVEAL_ROW_PX = 16;
 export const REVEAL_PAD_PX = 3;
-/** How many rows the revealed list shows at once; the rest scroll (the wheel, while it is open). */
-export const REVEAL_ROWS = 8;
+/** How many rows the revealed list shows at once at most (fewer when the view ends first); the rest scroll (the wheel, while it is open). */
+export const REVEAL_ROWS = 16;
 
 /** Scroll the revealed list by `rows` (+ down); false when there is no list to scroll, so the wheel does what it always does. */
 export function scrollReveal(editor: EditorState, rows: number): boolean {
@@ -106,9 +106,18 @@ export const isDeepPress = (k: PressKeys): boolean => k.ctrl;
  * The state of the reveal: where the pointer is, whether Ctrl is down and whether the tool may reveal at all. `changed` is told when what is
  * revealed changes (the canvas redraws); the position is kept in `editor.revealAt` for the renderer.
  */
-export function createReveal(editor: EditorState, allowed: () => boolean) {
+export function createReveal(editor: EditorState, allowed: () => boolean, autoScroll: () => boolean = () => false) {
   let at: { x: number; y: number } | null = null;
   let ctrl = false;
+  // (the pointer on the list's top or bottom row, with the setting on: the list scrolls that way by itself until it leaves the row)
+  let edge = 0;
+  let timer: ReturnType<typeof setInterval> | undefined;
+  const scrollAt = (dir: number): void => {
+    if (dir === edge) return;
+    edge = dir;
+    clearInterval(timer);
+    timer = dir ? setInterval(() => { if (!scrollReveal(editor, edge)) scrollAt(0); }, 90) : undefined;
+  };
   const update = (): void => {
     const on = ctrl && at !== null && allowed();
     const next = on ? { x: at!.x, y: at!.y } : null;
@@ -131,8 +140,11 @@ export function createReveal(editor: EditorState, allowed: () => boolean) {
       if (toward) {
         const row = revealRowAt(editor, p!.x, p!.y) ?? null;
         if (editor.revealHot !== row) { editor.revealHot = row; editor.redraw(); }
+        const onList = p!.x >= L!.x && p!.y >= L!.y;
+        scrollAt(!autoScroll() || !onList ? 0 : p!.y < L!.y + REVEAL_PAD_PX + REVEAL_ROW_PX ? -1 : p!.y > L!.y + L!.h - REVEAL_PAD_PX - REVEAL_ROW_PX ? 1 : 0);
         return;
       }
+      scrollAt(0);
       if (editor.revealHot) editor.revealHot = null;
       at = p;
       ctrl = ctrlHeld;
@@ -141,6 +153,7 @@ export function createReveal(editor: EditorState, allowed: () => boolean) {
     /** Ctrl (or Cmd) went down or came up. */
     key(down: boolean): void {
       ctrl = down;
+      if (!down) scrollAt(0);
       update();
     },
     /** Something else took the pointer (a gesture began): nothing is revealed until it ends. */

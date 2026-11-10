@@ -1284,7 +1284,7 @@ async function start(): Promise<void> {
     e.preventDefault();
     e.stopImmediatePropagation();
   }, { capture: true, passive: false });
-  attachTools(canvas, view, doc, index, editor, { edgePanSpeed: () => (settings.get("nav.edgePanOn") ? settings.get("nav.edgePan") / 100 : 0), editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h, id) => {
+  attachTools(canvas, view, doc, index, editor, { listAutoScroll: () => settings.get("select.listAutoScroll"), edgePanSpeed: () => (settings.get("nav.edgePanOn") ? settings.get("nav.edgePan") / 100 : 0), editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h, id) => {
         const o = doc.get(id);
         void notePanel.open(h, o?.kind === "image" ? cardActions(o) : undefined);
       }, newNote: (at, w) => void newNoteAt(at, w), toolForKey: (k) => toolForKey(k), navForKey: (k) => navForKey(k),

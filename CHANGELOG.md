@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.56.18 — A taller Ctrl list, and a setting to scroll it at its ends (2026-11-10)
+
+- **Changed:** the list beside the pointer while Ctrl is held is up to 16 rows tall (fewer when the bottom of the view comes first).
+- **Added:** Settings › Navigation › *Scroll the Ctrl list at its ends* (off by default): with it on, holding the pointer on the list's top or bottom row scrolls it that way by itself; the wheel still scrolls it either way.
+- **Added:** the Ctrl list test checks 16 rows and the scrolling at the bottom row with the setting on.
+
 ## 0.56.17 — The small Ctrl list holds every item and scrolls (2026-11-10)
 
 - **Fixed:** holding Ctrl over an empty spot inside the selection opened the big touch menu far from the pointer; it is the small list beside the pointer again, now with every item (no "+ N more"): eight rows high, the wheel scrolls it while Ctrl is held (it does not zoom then), with a thin bar showing where you are; letting go of Ctrl ends it.

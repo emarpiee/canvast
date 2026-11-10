@@ -102,8 +102,10 @@ export function drawReveal(ctx: CanvasRenderingContext2D, hits: readonly Project
   ctx.textBaseline = "middle";
   const INDENT = 10;
   const all = [...hits.map((po) => ({ t: revealWords(name(po)), id: po.obj.id as string | null, d: opts.depth?.(po.obj.id) ?? 0 })), ...dim.map((d) => ({ t: revealWords(name(d.po), d.why), id: null as string | null, d: 0 }))];
-  const scroll = Math.max(0, Math.min(all.length - REVEAL_ROWS, opts.scroll ?? 0));
-  const rows = all.slice(scroll, scroll + REVEAL_ROWS);
+  // (as many rows as fit below the pointer, up to REVEAL_ROWS, three at least)
+  const fit = Math.max(3, Math.min(REVEAL_ROWS, Math.floor((ctx.canvas.clientHeight - at.y - 12 - 2 * REVEAL_PAD_PX) / REVEAL_ROW_PX)));
+  const scroll = Math.max(0, Math.min(all.length - fit, opts.scroll ?? 0));
+  const rows = all.slice(scroll, scroll + fit);
   const gutter = 14;
   const bar = all.length > rows.length ? 4 : 0;
   // (as wide as its widest row, scrolled to or not, so it does not change width while it scrolls)

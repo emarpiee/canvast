@@ -253,6 +253,7 @@ export const SETTINGS = {
   "shot.tagItems": { scope: "workspace", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "shot.copy": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "nav.edgePanOn": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
+  "select.listAutoScroll": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "nav.edgePan": { scope: "device", default: 100, validate: range(10, 300), effect: "immediate" } as Def<number>,
   "nav.mode": { scope: "device", default: "view", validate: oneOf(...NAV_MODES), effect: "immediate" } as Def<NavMode>,
   "nav.arrive": { scope: "device", default: "focus", validate: oneOf("focus", "keep"), effect: "immediate" } as Def<"focus" | "keep">,
