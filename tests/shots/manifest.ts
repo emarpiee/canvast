@@ -48,7 +48,7 @@ export const SHOTS: Record<string, ShotSpec> = {
   "library": { section: "#the-library", use: "Keep every reference once, in folders by subject, and see a print's details beside the grid.", alt: "The Library in the light theme: folders Japanese prints, Horses, Dancers, Landscapes and Botanical in the sidebar, the gallery of prints and drawings, Hokusai's Great Wave selected with its tags and folder in the details" },
   "library-list": { section: "#the-gallery", use: "Read a collection as a list, with each file's size, pixels and tags.", alt: "The Library as a list: name, pixels, type, size and tags of each drawing and print, Rosa Bonheur's study selected" },
   "sidebar": { section: "#folders-and-tags", use: "Pin the folder you work from most, nest tags by subject and keep the searches you repeat.", alt: "The Library's sidebar: Japanese prints pinned first among the folders, tags nested as animal/horse, animal/bird and figure/dance, and two saved searches" },
-  "search": { section: "#search", use: "Find all the figure and animal drawings in a tall format with one search.", alt: "The search #drawing (#figure OR #animal) orientation:portrait finding Degas's standing dancers, with the chip of what is filtered" },
+  "search": { section: "#search", use: "Find the figure drawings in a tall format with one search.", alt: "The search #drawing #figure orientation:portrait finding Degas's dancer drawings, with the chip of what is filtered" },
   "search-help": { section: "#search", use: "Look up the search words while typing.", alt: "The search help card: each operator and keyword with an example" },
   "viewer-grey": { section: "#the-viewer", use: "Check a print's values: see it in greyscale in the viewer.", alt: "Hokusai's Great Wave in the viewer, shown in greyscale, the strip of the folder's other prints below" },
   "organize": { section: "#organize", use: "File a reference and tag it in one dialog.", alt: "The Organize dialog for Mary Delany's Botanical Study: the folders as a tree with Botanical chosen, and the Tags tab" },
@@ -56,4 +56,19 @@ export const SHOTS: Record<string, ShotSpec> = {
   "similar": { section: "#similar-images", use: "Find a second scan of the same print hiding in the collection.", alt: "Similar images: Hokusai's Great Wave beside a smaller, warmer second scan of it" },
   "art-files": { section: "#art-files", use: "Keep paintings in progress from other apps beside their references: their picture shows without opening them.", alt: "A Krita file and an OpenRaster file in the Library, each showing the picture it keeps, the Krita painting-over of a Degas dancer selected" },
   "font": { section: "#fonts", use: "Keep the fonts of a project with its pictures and see each one set.", alt: "The Bangers font selected in the Library: its card in its own letters and a sample in the details" },
+
+  // Notes
+  "notes-editor": { section: "#notes", use: "Keep study notes on a reference: its facts as properties, the print embedded, a checklist of what to look at and a copy plan.", alt: "A markdown note, The Great Wave: study notes, open in the notes editor: the print embedded, a checklist of the crest, Mount Fuji and the three boats, and a table of the copy plan" },
+  "notes-links": { section: "#links-and-tags", use: "Link notes to each other and see what links to a note.", alt: "The note Seaside Village in Winter selected in the Library, its details listing the study notes of The Great Wave under Linked from" },
+  "note-properties": { section: "#properties", use: "Keep a work's facts (artist, date, medium, series) as properties you can search.", alt: "The details of The Great Wave's study notes: properties artist Katsushika Hokusai, date ca. 1830–32, medium Woodblock print, series and status, and its tags" },
+  "notes-panel": { section: "#notes-on-a-canvas", use: "Keep the notes beside the picture they are about, and edit them there.", alt: "The Great Wave on a canvas beside the card of its study notes, the note open in the Note panel" },
+
+  // Privacy and hidden items
+  "context-menu": { section: "#context-menus", use: "Reach what fits the thing under the pointer with a right click.", alt: "The context menu of a print on the canvas: its commands in groups, each with an icon and a short description" },
+  "library-hide": { section: "#hidden-items-and-passwords", use: "Hide a drawing you must not show (work under NDA, say) before sharing the screen.", alt: "Degas's Dancer Onstage selected in the Library, the pointer on the Hide button beside the star in its details", pointer: true },
+  "hidden-list": { section: "#hidden-mode", use: "Work on the hidden drawings in hidden mode: the Library lists only them.", alt: "Hidden mode: the Library listing only the four hidden Degas drawings, the Hidden mode chip with its pin, Exit and Lock at the start of the status bar" },
+  "padlock": { section: "#hiding", use: "A hidden drawing already placed on a canvas shows a padlock, not its picture.", alt: "A canvas with Hokusai's Great Wave and, beside it, the hidden Degas drawing drawn as a padlock" },
+  "export-hidden": { section: "#exports-and-backups-ask", use: "Decide whether a backup carries the hidden items.", alt: "The question before a backup: one hidden item would be in it; Leave them out, chosen, or Include them" },
+  "privacy": { section: "#hidden-mode", use: "Set the opening word, remembering, and the two passwords.", alt: "Settings, Privacy: the word that opens the Hidden items, remembering the Hidden password, and both passwords set" },
+  "lock-screen": { section: "#hidden-mode", use: "A workspace with a password shows nothing until it is given.", alt: "The lock screen: This workspace is locked, a password field and Open" },
 };

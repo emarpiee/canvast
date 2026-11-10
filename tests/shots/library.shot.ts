@@ -105,8 +105,8 @@ test("sidebar", async ({ scene: s }) => {
 test("search", async ({ scene: s }) => {
   await s.look({ theme: "light", hue: 200 });
   await collection(s);
-  // (the figure and animal drawings in a tall format: a search by tag, medium and shape)
-  await s.p.getByTestId("assets-search").fill("#drawing (#figure OR #animal) orientation:portrait");
+  // (the figure drawings in a tall format: a search by medium, subject and shape)
+  await s.p.getByTestId("assets-search").fill("#drawing #figure orientation:portrait");
   await s.p.getByTestId("assets-search").press("Enter");
   await expect(s.p.getByTestId("asset-card").first()).toBeVisible();
   await s.settle();

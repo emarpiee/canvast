@@ -5,22 +5,11 @@ import { test, expect, type Scene, type Box } from "./scene";
 type Kind = "" | "speech" | "thought" | "shout" | "caption" | "soft";
 interface Balloon { box: [number, number, number, number]; words: string; kind?: Kind; tip?: [number, number]; fill?: string; size?: number; font?: string }
 
-/** The lettering the next balloons take: a comic hand, black, in capitals. */
-async function lettering(s: Scene, font = "comic neue", size = 20): Promise<void> {
-  await s.tool("text");
-  await s.font(font);
-  const sz = s.p.getByRole("spinbutton", { name: "Text size (px at this zoom)" });
-  await sz.fill(String(size));
-  await sz.press("Enter");
-  await s.p.getByRole("button", { name: "Text colour" }).click();
-  await s.hex("#111111");
-  await s.p.keyboard.press("Escape");
-}
-/** One balloon: drawn, given its kind, a black outline, its words, and its tail moved to the speaker. Its id. */
+/** One balloon: drawn, given its kind and its tail, its words written, then painted as comics are (a white body with a black
+ * outline) and its words set in a comic hand. The camera is put back after writing (writing brings the view to the balloon). Its id. */
 async function balloon(s: Scene, b: Balloon): Promise<string> {
   const p = s.p;
-  await lettering(s, b.font ?? "comic neue", b.size ?? 20);
-  await p.evaluate((f) => window.__canvastDebug.setSetting("shape.fill", f), b.fill ?? "#ffffff");
+  const cam = await p.evaluate(() => window.__canvastDebug.camera());
   const before = new Set(await s.ids());
   await s.tool("balloon");
   const [x0, y0, x1, y1] = b.box;
@@ -32,19 +21,31 @@ async function balloon(s: Scene, b: Balloon): Promise<string> {
     if (!(await p.locator("[data-k='preset'] select").isVisible())) await p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
     await p.locator("[data-k='preset'] select").selectOption(b.kind);
   }
-  await p.locator('[data-paint="stroke"]').filter({ visible: true }).first().click();
-  await s.hex("#111111");
   if (b.tip) {
     const tip = (await p.evaluate(() => window.__canvastDebug.balloonDots())).find((d) => d.part === "tip");
     if (tip) await s.app.drag({ x: tip.x, y: tip.y }, { x: b.tip[0], y: b.tip[1] }, 5);
   }
-  // its words: a double-click in the body
-  await p.mouse.dblclick((x0 + x1) / 2, (y0 + y1) / 2);
+  const box = (await s.box([id]))!;
+  await p.mouse.dblclick((box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2);
   await p.waitForFunction(() => document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable);
   await p.keyboard.type(b.words);
   await p.keyboard.press("Escape");
   await p.keyboard.press("Escape");
   await s.blur();
+  await p.evaluate((c) => window.__canvastDebug.setCamera(c), cam);
+  await s.settle();
+  await s.paint(id, "fill", b.fill ?? "#ffffff");
+  await s.paint(id, "stroke", "#111111");
+  const words = (await p.evaluate(() => window.__canvastDebug.objects() as unknown as Array<{ id: string; kind: string; inShape?: { shape: string } }>)).find((o) => o.kind === "text" && o.inShape?.shape === id);
+  if (words) {
+    await s.select([words.id]);
+    await s.font(b.font ?? "comic neue");
+    const sz = p.getByRole("spinbutton", { name: "Text size (px at this zoom)" });
+    await sz.fill(String(b.size ?? 20));
+    await sz.press("Enter");
+    await p.getByRole("button", { name: "Text colour" }).click();
+    await s.hex("#111111");
+  }
   await s.select([]);
   await s.settle();
   return id;

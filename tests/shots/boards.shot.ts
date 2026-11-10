@@ -158,7 +158,7 @@ test("sheets", async ({ scene: s }) => {
   await s.fonts();
   const art = await s.art("waterloo", "verhaecht", "leprince");
   await s.canvas("Shots");
-  const ids = await s.placeRow(art);
+  const ids = await s.placeRow(art, 160);
   await s.fit(ids, 0.8);
   const sheets: string[] = [];
   for (const id of ids) {
@@ -175,6 +175,9 @@ test("sheets", async ({ scene: s }) => {
     await ratio.press("Enter");
     await expect(ratio).toHaveValue("16 : 9");
   }
+  await s.select(sheets);
+  await alignWith(s.p, "align:middle");
+  await alignWith(s.p, "distribute:x");
   await s.select([]);
   await s.fit(sheets, 0.75);
   await s.select([sheets[1]!]);
@@ -204,6 +207,7 @@ test("align", async ({ scene: s }) => {
   const art = await s.art("degas-dancer_with", "degas-dancer_onstage", "degas-dancer_adjusting");
   await s.canvas("Line up");
   const ids = await s.placeRow(art);
+  await s.fit(ids, 0.6, [0.42, 0.5]);
   for (const [i, id] of ids.entries()) {
     const b = (await s.box([id]))!;
     await s.select([id]);
@@ -276,7 +280,7 @@ test("canvas-tags", async ({ scene: s }) => {
   const art = await s.art("degas-dancer_with", "degas-dancer_onstage", "delacroix", "bonheur");
   await s.canvas("Studies");
   const ids = await s.placeRow(art);
-  await s.fit(ids, 0.62, [0.4, 0.5]);
+  await s.fit(ids, 0.6, [0.62, 0.5]);
   await s.p.getByRole("button", { name: "Tags panel", exact: true }).click();
   for (const [sel, tags] of [[ids.slice(0, 2), "gesture, figure"], [ids.slice(2), "anatomy, horse"]] as const) {
     await s.select([...sel]);
