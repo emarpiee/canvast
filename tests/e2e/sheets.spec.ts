@@ -519,6 +519,7 @@ test("Export…: a sheet's shape becomes a size here (px, in, cm, mm at a resolu
   await exportWith(p, "exportpic");
   await expect(dlg.locator('[data-format="svg"]')).toHaveAttribute("aria-checked", "true");
   await dlg.locator('[data-format="png"]').click();
+  await dlg.locator('[data-unit="px"]').click(); // (it opened in inches, as last time)
   await expect(w).toHaveValue("1080");
   await expect(dlg.locator("[data-chip]", { hasText: "1×" })).toHaveCount(1);
   await expect(dlg.locator("[data-ex-dpi-hint]")).toBeVisible(); // (in px the resolution is only recorded)
