@@ -192,7 +192,7 @@ await step("comic", async () => {
   }
   await blur();
   await settle(600);
-  await fit([page]);
+  await fit(); // (only the page and its panels are on this canvas)
   const boxes = await Promise.all(panels.map((id) => boxOf(id)));
   const say = async (b, at, words) => {
     await p.keyboard.press("k");
