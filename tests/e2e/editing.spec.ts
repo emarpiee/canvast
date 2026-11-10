@@ -1335,7 +1335,8 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
     const norm = (v: unknown): unknown => {
       if (typeof v === "string") return name.get(v) ?? v;
       if (Array.isArray(v)) return v.map(norm);
-      if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [name.get(k) ?? k, norm(x)]));
+      // (keys in one order: a copy is made again from its stored form, which may write them in another)
+      if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]): [string, unknown] => [name.get(k) ?? k, norm(x)]).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
       return v;
     };
     const forms = these.map(({ id: _id, ax: _x, ay: _y, z: _z, ...rest }) => JSON.stringify(norm(rest)));
