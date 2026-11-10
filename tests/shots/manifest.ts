@@ -71,4 +71,25 @@ export const SHOTS: Record<string, ShotSpec> = {
   "export-hidden": { section: "#exports-and-backups-ask", use: "Decide whether a backup carries the hidden items.", alt: "The question before a backup: one hidden item would be in it; Leave them out, chosen, or Include them" },
   "privacy": { section: "#hidden-mode", use: "Set the opening word, remembering, and the two passwords.", alt: "Settings, Privacy: the word that opens the Hidden items, remembering the Hidden password, and both passwords set" },
   "lock-screen": { section: "#hidden-mode", use: "A workspace with a password shows nothing until it is given.", alt: "The lock screen: This workspace is locked, a password field and Open" },
+
+  // The endless canvas
+  "hero": { section: "#the-endless-canvas", use: "Go anywhere on one canvas: the showcase's Solar System at home.", alt: "The showcase canvas at home: the Solar System, with the title canvast and its two lines" },
+  "deep-zoom": { section: "#try-the-showcase-powers-of-two", use: "Zoom in past any limit: one million levels below home, everything still works.", alt: "A heart one million zoom levels below the Solar System, with the title One million zoom levels" },
+  "zoom-out": { section: "#try-the-showcase-powers-of-two", use: "Zoom out as far as in: the multiverse a thousand levels above.", alt: "The multiverse, a thousand zoom levels above the Solar System: bubbles of universes, ours marked" },
+  "tour": { section: "#bookmarks-and-tours", use: "Play a canvas's bookmarks as a tour, for a talk or a review.", alt: "A tour of the showcase's bookmarks, in the light theme: the bookmark list and the tour's bar at the bottom" },
+  "switcher": { section: "#boards-and-canvases", use: "Keep a project's boards and canvases in one place and jump between them.", alt: "The board and canvas menu: a Picture book board with Cover, Spread 1 and Spread 2, and a References board with Horses and Landscapes" },
+  "bookmarks": { section: "#bookmarks-and-tours", use: "Bookmark each study on a long reference canvas to go back to it in one click.", alt: "The Bookmarks panel listing four bookmarks of a canvas of horse drawings and a print, each with its picture" },
+  "canvas-search": { section: "#search-on-the-canvas", use: "Find the studies tagged #gesture on a busy canvas.", alt: "Search on the canvas for #gesture, the tagged dancer drawings found" },
+  "command-palette": { section: "#the-command-palette", use: "Run any command by name: typing flip finds the flip commands for the selected print.", alt: "The command palette with flip typed, listing the flip commands, Hokusai's Great Wave selected behind it" },
+  "settings": { section: "#settings", use: "Make the app yours: theme, theme colour, density and the canvas.", alt: "Settings, Appearance, in the light theme: theme, theme colour, colourfulness and the canvas and info bar rows" },
+  "shortcuts": { section: "#keyboard-and-pointer-reference", use: "Change any shortcut, with a warning when two clash.", alt: "Settings, Shortcuts: every command with its keys, in the dark theme" },
+  "info-bar": { section: "#the-info-bar", use: "See what the app is doing: zoom, frame times and memory, with Information shown set to Technical.", alt: "The info bar with Information shown set to Technical: the exact zoom, frame times and what the pictures, tiles and undo history hold in memory" },
+  // Your workspace and data
+  "storage": { section: "#saving", use: "See that the work is saved and verified, how much space it takes, and make a backup.", alt: "Settings, Storage: the space used, the saving state, and the backup buttons" },
+  "advanced-export": { section: "#advanced-export", use: "Back up only part of a collection: three prints, ticked.", alt: "Advanced export: a search field, three Hokusai prints ticked among the items, and the size of what is chosen" },
+  "delete-all": { section: "#what-can-delete-data", use: "Start from scratch, safely: it asks, offers a backup and wants DELETE typed.", alt: "The Delete all data dialog: what will be deleted, the backup offered, and the field for DELETE" },
+  "take-over": { section: "#several-tabs", use: "A second tab on the same workspace follows the first and can take over.", alt: "A second tab on the same canvas, read-only, offering Take over" },
+  // Exporting and sharing
+  "export": { section: "#export", use: "Export a comic page at print size, as PNG, WebP, JPEG or PDF.", alt: "The Export dialog for a page of four prints: its preview, the size presets in pixels and inches at 300 ppi, the formats and the background" },
+  "export-each": { section: "#export", use: "Export several pictures at once, each as its own file or page.", alt: "Export with four prints selected: each one's small preview as a page of its own" },
 };

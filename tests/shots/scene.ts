@@ -160,6 +160,14 @@ export class Scene {
   /** The camera on these objects (all when none are given), filling `fill` of the view; the selection is left empty. */
   async fit(ids?: string[], fill = 0.72, at: [number, number] = [0.5, 0.5]): Promise<void> {
     await this.blur();
+    // (an object off the screen has no box: zoom out until every one asked for is on it)
+    const want = ids ?? (await this.ids());
+    for (let k = 0; k < 16; k++) {
+      const seen = await this.p.evaluate((l) => l.filter((id: string) => !!window.__canvastDebug.objectScreen(id)).length, want);
+      if (seen === want.length) break;
+      await this.p.evaluate(() => window.__canvastDebug.jump(-1));
+      await this.settle(100);
+    }
     for (let round = 0; round < 4; round++) {
       const b = await this.box(ids);
       if (!b) return;

@@ -1,6 +1,7 @@
 // README pictures of "Notes": an artist's study notes on a print, with its facts as properties, the print embedded, a checklist of what
 // to look at and a copy plan; a second note it links to; and the note as a card beside the print on a canvas (manifest.ts).
 import { resolve } from "node:path";
+import { readFileSync } from "node:fs";
 import { test, expect, artFiles, type Scene } from "./scene";
 
 const WAVE = artFiles("hokusai-under")[0]!;
@@ -47,7 +48,9 @@ An earlier Hokusai, from his *Album of Realistic Pictures* (1814): a quiet shore
 `);
 
 async function notes(s: Scene): Promise<{ card: (n: string) => ReturnType<Scene["p"]["locator"]>; h: Record<string, string> }> {
-  const h = await s.library([resolve("scripts/showcase/art", WAVE), resolve("scripts/showcase/art", VILLAGE), STUDY, VILLAGE_NOTE]);
+  // (files and buffers cannot go in one input: the prints as buffers too)
+  const jpg = (f: string) => ({ name: f, mimeType: "image/jpeg", buffer: readFileSync(resolve("scripts/showcase/art", f)) });
+  const h = await s.library([jpg(WAVE), jpg(VILLAGE), STUDY, VILLAGE_NOTE]);
   await s.p.getByTestId("view-assets").click();
   return { card: (n: string) => s.p.locator(`[data-testid="asset-card"][data-hash="${h[n]}"]`), h };
 }

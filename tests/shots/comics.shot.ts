@@ -21,12 +21,8 @@ async function balloon(s: Scene, b: Balloon): Promise<string> {
     if (!(await p.locator("[data-k='preset'] select").isVisible())) await p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
     await p.locator("[data-k='preset'] select").selectOption(b.kind);
   }
-  if (b.tip) {
-    const tip = (await p.evaluate(() => window.__canvastDebug.balloonDots())).find((d) => d.part === "tip");
-    if (tip) await s.app.drag({ x: tip.x, y: tip.y }, { x: b.tip[0], y: b.tip[1] }, 5);
-  }
-  const box = (await s.box([id]))!;
-  await p.mouse.dblclick((box.minX + box.maxX) / 2, (box.minY + box.maxY) / 2);
+  // its words first (a double-click in the body, where it was drawn), then its tail to the speaker
+  await p.mouse.dblclick((x0 + x1) / 2, (y0 + y1) / 2);
   await p.waitForFunction(() => document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable);
   await p.keyboard.type(b.words);
   await p.keyboard.press("Escape");
@@ -34,6 +30,11 @@ async function balloon(s: Scene, b: Balloon): Promise<string> {
   await s.blur();
   await p.evaluate((c) => window.__canvastDebug.setCamera(c), cam);
   await s.settle();
+  if (b.tip) {
+    await s.select([id]);
+    const tip = (await p.evaluate(() => window.__canvastDebug.balloonDots())).find((d) => d.part === "tip");
+    if (tip) await s.app.drag({ x: tip.x, y: tip.y }, { x: b.tip[0], y: b.tip[1] }, 5);
+  }
   await s.paint(id, "fill", b.fill ?? "#ffffff");
   await s.paint(id, "stroke", "#111111");
   const words = (await p.evaluate(() => window.__canvastDebug.objects() as unknown as Array<{ id: string; kind: string; inShape?: { shape: string } }>)).find((o) => o.kind === "text" && o.inShape?.shape === id);
