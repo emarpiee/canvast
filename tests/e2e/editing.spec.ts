@@ -1,5 +1,7 @@
 import * as D from "../../src/core/dyadic";
-import { LIMITS, chooseInMenu, distance, expect, recordMetric, reps, setPenColour, test } from "./harness";
+import { LIMITS, boolWith, chooseInMenu, distance, expect, maskWith, pathWith, recordMetric, reps, setPenColour, test } from "./harness";
+import { encodeGif } from "./gif";
+import { makeWav } from "./video";
 import type { App } from "./harness";
 import { makePng } from "./png";
 import { blockyFixture } from "./png";
@@ -1199,4 +1201,200 @@ test("two selected move from a gap between them, in their box", async ({ app }) 
   await app.frame();
   expect(Math.abs((await boxOf(a.id)).minY - x0.minY - 80), "moved").toBeLessThan(8);
   expect(Math.abs((await boxOf(b.id)).minY - y0.minY - 80), "moved").toBeLessThan(8);
+});
+
+test("copy, cut, paste and duplicate keep every kind of object whole, on the same canvas and on another", async ({ app }) => {
+  const p = app.page;
+  const drag = (a: [number, number], b: [number, number]) => app.drag({ x: a[0], y: a[1] }, { x: b[0], y: b[1] }, 6);
+  const click = async (x: number, y: number) => {
+    await p.mouse.click(x, y);
+    await app.frame();
+  };
+  const add = async (name: string, mimeType: string, buffer: Buffer) => {
+    const before = (await objects(app)).length;
+    await p.getByTestId("import-input").setInputFiles({ name, mimeType, buffer });
+    await expect.poll(async () => (await objects(app)).length).toBe(before + 1);
+  };
+  // One of each: a masked picture, a picture, a GIF, audio, a pen stroke in a group, a boolean shape, words in a shape and along a path,
+  // two balloons with words and a connector, a sheet with a shape on it, and a pattern on a shape.
+  await add("pic.png", "image/png", makePng(40, 30, (x, y) => [x * 6, y * 8, 120, 255]));
+  await key(app, "u");
+  await drag([600, 370], [680, 430]);
+  await key(app, "v");
+  await key(app, "Control+a");
+  await maskWith(p, "clipmask");
+  await add("pic2.png", "image/png", makePng(20, 20, () => [200, 40, 40, 255]));
+  await add("anim.gif", "image/gif", Buffer.from(encodeGif(16, 16, [[255, 0, 0], [0, 255, 0], [0, 0, 255]], [0, 1, 2].map((c) => ({ w: 16, h: 16, pixels: Array(256).fill(c) })))));
+  await add("tone.wav", "audio/wav", makeWav(1));
+  await key(app, "p");
+  await drag([100, 120], [200, 180]);
+  await drag([100, 220], [200, 260]);
+  await key(app, "v");
+  await drag([80, 100], [230, 290]);
+  await key(app, "Control+g");
+  await key(app, "u");
+  await drag([300, 120], [380, 200]);
+  await drag([340, 160], [420, 240]);
+  await key(app, "v");
+  await drag([290, 110], [440, 260]);
+  await boolWith(p, "op:union");
+  await key(app, "u");
+  await drag([500, 120], [640, 220]);
+  await key(app, "t");
+  await click(520, 300);
+  await p.keyboard.type("Inside");
+  await key(app, "Escape");
+  await key(app, "v");
+  await drag([490, 105], [720, 330]);
+  await pathWith(p, "inshape");
+  await key(app, "u");
+  await drag([760, 120], [900, 220]);
+  await key(app, "t");
+  await click(770, 300);
+  await p.keyboard.type("Along");
+  await key(app, "Escape");
+  await key(app, "v");
+  await drag([745, 105], [990, 330]);
+  await pathWith(p, "onpath");
+  for (const [a, b, words] of [[[300, 500], [450, 600], "One"], [[520, 500], [670, 600], "Two"]] as const) {
+    await key(app, "k");
+    await drag([...a], [...b]);
+    await p.mouse.dblclick((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    await p.keyboard.type(words);
+    await click(1100, 720);
+  }
+  await key(app, "v");
+  await drag([285, 480], [700, 630]);
+  await p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
+  await p.locator('[data-bl="connect"]').click();
+  await click(1100, 720);
+  await key(app, "c");
+  await drag([780, 450], [1050, 650]);
+  await key(app, "u");
+  await drag([850, 500], [950, 580]);
+  await key(app, "u");
+  await drag([80, 340], [220, 450]);
+  await key(app, "v");
+  await click(150, 395);
+  await p.click("[data-pattern-panel]");
+  await p.locator("[data-pg-pick]").click();
+  await p.locator('[data-gen="ripple"]').click();
+  await p.getByTestId("pattern-make").click();
+  await click(1100, 720);
+
+  // What each object is and what it names; a connector's covering piece is made again from its connector, so it is left out.
+  type O = Obj & { parent?: string; inShape?: { shape: string }; onPath?: { path: string }; params?: { link?: { a: string; b: string; cover?: string } }; mask?: { by: string }; groups?: string[]; isMask?: boolean; container?: unknown; gen?: unknown; boolOps?: unknown; assetId?: string };
+  const look = () => p.evaluate(() => window.__canvastDebug.objects()) as Promise<O[]>;
+  const sig = (o: O) => [o.kind, o.container ? "sheet" : "", o.parent ? "on-sheet" : "", o.inShape ? "in-shape" : "", o.onPath ? "on-path" : "", o.params?.link ? "connector" : "", o.isMask ? "mask" : "", o.mask ? "masked" : "", o.gen ? "pattern" : "", o.boolOps ? "boolean" : "", o.groups?.length ? "grouped" : "", o.assetId ? o.assetId.slice(0, 8) : ""].filter(Boolean).join(" ");
+  const kinds = async () => (await look()).filter((o) => o.params?.link?.cover === undefined).map(sig).sort();
+  /** Every name an object holds is of an object (or group) of this canvas; `among`: of those objects alone (a paste names only its own copies). */
+  const whole = async (among?: ReadonlySet<string>) => {
+    const all = await look();
+    const ids = new Set(among ?? all.map((o) => o.id));
+    const groups = new Set(all.filter((o) => ids.has(o.id)).flatMap((o) => o.groups ?? []));
+    const bad = all.filter((o) => ids.has(o.id)).flatMap((o) => {
+      const names = [o.parent, o.inShape?.shape, o.onPath?.path, o.params?.link?.a, o.params?.link?.b].filter((n): n is string => !!n);
+      return [...names.filter((n) => !ids.has(n)).map((n) => `${sig(o)} names ${n}`), ...(o.mask && !groups.has(o.mask.by) ? [`${sig(o)} masked by a group not here`] : [])];
+    });
+    return bad;
+  };
+  /**
+   * The objects (by id, in layer order), each in its whole stored form with what can differ in a copy taken out: its id, its place
+   * and its layer number. Every id it names (its sheet, shape, path, balloons, groups, mask) is written as which of these objects (or
+   * groups) it is, so a copy matches only when it names its own copies in the same way. With the size and place of each on the
+   * screen, as seen from the first.
+   */
+  const snapshot = async (ids: readonly string[]) => p.evaluate((ids) => {
+    const d = window.__canvastDebug;
+    const all = d.objects() as unknown as Array<Record<string, unknown> & { id: string; z: number; groups?: string[] }>;
+    const these = ids.map((id) => all.find((o) => o.id === id)!).sort((a, b) => a.z - b.z);
+    const name = new Map<string, string>(these.map((o, i) => [o.id, `#${i}`]));
+    for (const o of these) for (const g of o.groups ?? []) if (!name.has(g)) name.set(g, `g${name.size}`);
+    const norm = (v: unknown): unknown => {
+      if (typeof v === "string") return name.get(v) ?? v;
+      if (Array.isArray(v)) return v.map(norm);
+      if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [name.get(k) ?? k, norm(x)]));
+      return v;
+    };
+    const forms = these.map(({ id: _id, ax: _x, ay: _y, z: _z, ...rest }) => JSON.stringify(norm(rest)));
+    const boxes = these.map((o) => d.objectScreen(o.id)?.box ?? null);
+    const b0 = boxes[0];
+    return { forms, boxes: boxes.map((b) => (b && b0 ? [b.minX - b0.minX, b.minY - b0.minY, b.maxX - b.minX, b.maxY - b.minY] : null)) };
+  }, ids);
+  /** The copy is the original: the same stored form, object for object, and the same sizes and places to each other on the screen. */
+  const same = (copy: Awaited<ReturnType<typeof snapshot>>, original: Awaited<ReturnType<typeof snapshot>>, what: string) => {
+    expect(copy.forms.length, `${what}: as many objects`).toBe(original.forms.length);
+    for (const [i, form] of original.forms.entries()) expect(copy.forms[i], `${what}: object ${i} as it was`).toBe(form);
+    for (const [i, b] of original.boxes.entries()) {
+      expect(b, `${what}: object ${i} is on the screen`).not.toBeNull();
+      const c = copy.boxes[i]!;
+      expect(c, `${what}: its copy is on the screen`).not.toBeNull();
+      for (const k of [0, 1, 2, 3]) expect(Math.abs(c[k]! - b![k]!), `${what}: object ${i} keeps its size and place to the others`).toBeLessThan(1.5);
+    }
+  };
+  /** The objects of this canvas a copy is made of (a connector's covering piece is made again from its connector). */
+  const real = async () => (await look()).filter((o) => o.params?.link?.cover === undefined).map((o) => o.id);
+  const before = await kinds();
+  for (const want of ["image", "gif", "audio", "stroke grouped", "path boolean", "text in-shape", "text on-path", "connector", "path sheet", "on-sheet", "mask", "masked", "pattern"])
+    expect(before.some((k) => k.includes(want)), `the canvas has ${want}`).toBe(true);
+  expect(await whole()).toEqual([]);
+  const twice = [...before, ...before].sort();
+  const firstIds = await real();
+  const original = await snapshot(firstIds);
+  const added = async () => (await real()).filter((id) => !firstIds.includes(id));
+
+  // Same canvas: copy and paste, duplicate, cut and paste.
+  await key(app, "Control+a");
+  await key(app, "Control+c");
+  await p.mouse.move(640, 400);
+  await key(app, "Control+v");
+  await expect.poll(kinds, "copy and paste on the same canvas").toEqual(twice);
+  same(await snapshot(await added()), original, "copy and paste on the same canvas");
+  expect(await whole(new Set(await added())), "the paste names only its own copies").toEqual([]);
+  await key(app, "Control+z");
+  await expect.poll(kinds).toEqual(before);
+  await key(app, "Control+a");
+  await key(app, "Control+d");
+  await expect.poll(kinds, "duplicate").toEqual(twice);
+  same(await snapshot(await added()), original, "duplicate");
+  expect(await whole(new Set(await added()))).toEqual([]);
+  await key(app, "Control+z");
+  await expect.poll(kinds).toEqual(before);
+  same(await snapshot(await real()), original, "undo of a duplicate leaves the originals as they were");
+  await key(app, "Control+a");
+  await key(app, "Control+x");
+  await expect.poll(kinds, "cut").toEqual([]);
+  await p.mouse.move(640, 400);
+  await key(app, "Control+v");
+  await expect.poll(kinds, "cut and paste on the same canvas").toEqual(before);
+  same(await snapshot(await real()), original, "cut and paste on the same canvas");
+  expect(await whole()).toEqual([]);
+
+  // Another canvas: copied there, cut there and pasted back here.
+  const nav = async (pick: () => Promise<void>, expected: string) => {
+    if (await p.getByTestId("workspace-menu").isHidden()) await p.getByTestId("workspace-nav").click();
+    await pick();
+    await expect(p.getByTestId("workspace-nav")).toHaveText(expected);
+  };
+  const here = await real();
+  await key(app, "Control+a");
+  await key(app, "Control+c");
+  await nav(() => p.getByRole("button", { name: /^\+ New canvas/ }).last().click(), "Board 1 › Canvas 2");
+  await p.mouse.move(640, 400);
+  await key(app, "Control+v");
+  await expect.poll(kinds, "copy and paste on another canvas").toEqual(before);
+  same(await snapshot(await real()), original, "copy and paste on another canvas");
+  expect(await whole()).toEqual([]);
+  await key(app, "Control+a");
+  await key(app, "Control+x");
+  await expect.poll(kinds).toEqual([]);
+  await nav(() => p.getByRole("menuitemradio", { name: /Canvas 1/ }).click(), "Board 1 › Canvas 1");
+  await expect.poll(kinds, "the copy left this canvas as it was").toEqual(before);
+  same(await snapshot(here), original, "the canvas copied from, after the paste elsewhere");
+  await p.mouse.move(640, 400);
+  await key(app, "Control+v");
+  await expect.poll(kinds, "cut on another canvas, pasted back").toEqual(twice);
+  same(await snapshot((await real()).filter((id) => !here.includes(id))), original, "cut on another canvas, pasted back");
+  expect(await whole()).toEqual([]);
+  expect(app.consoleErrors).toEqual([]);
 });

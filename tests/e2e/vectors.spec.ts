@@ -3777,6 +3777,7 @@ test("speech balloon: a double-click makes its words, kept in the body; nothing 
   await expect.poll(count, "the cut balloon took its words and its connector").toEqual({ words: 2, balloons: 2, links: 0 });
   await key(app, "Control+v");
   await expect.poll(count).toEqual({ words: 3, balloons: 3, links: 0 });
+  expect(app.consoleErrors).toEqual([]);
 });
 
 test("a number field of the bar keeps the focus while it is typed in", async ({ app }) => {
