@@ -167,7 +167,7 @@ test("sheets", async ({ scene: s }) => {
   await s.fit([pic!], 0.45, [0.5, 0.45]);
   const b = (await s.box([pic!]))!;
   const label = await s.text(b.minX, b.maxY + 30, "Mary Delany, Botanical Study, ca. 1772–82", { size: 22, font: "cormorant garamond semibold italic", colour: "#3b3428" });
-  // (a print laid out on an A4 sheet: the picture and its label in a centred column)
+  // (a print laid out on a sheet: the picture and its label in a centred column, the sheet hugging them)
   await s.select([pic!, label]);
   await chooseInMenu(s.p, "sheetmenu", "puton");
   await expect.poll(async () => (await s.objects()).some((o) => o.container)).toBe(true);
@@ -179,9 +179,6 @@ test("sheets", async ({ scene: s }) => {
     await s.p.locator(sel).fill(v);
     await s.p.locator(sel).press("Enter");
   }
-  const ratio = s.p.locator("[data-sheet-ratio]");
-  await ratio.fill("A4 portrait");
-  await ratio.press("Enter");
   await s.paint(sheet, "fill", "#f6f1e6");
   // (auto layout sizes the sheet a moment later: framed once it has)
   await s.settle(800);
