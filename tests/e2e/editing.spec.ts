@@ -1432,7 +1432,9 @@ test("every kind of object snaps when resized by a handle: to another object's e
   const resizeRightTo = async (x: number): Promise<number> => {
     const c = await frame();
     const at = { x: c[2]![0], y: c[2]![1] };
-    await app.drag(at, { x, y: at.y }, 6);
+    // (along the box's diagonal, so a kind that keeps its proportions, a pen stroke, has its side where the pointer goes too)
+    const k = (x - c[0]![0]) / (c[2]![0] - c[0]![0]);
+    await app.drag(at, { x, y: c[0]![1] + k * (c[2]![1] - c[0]![1]) }, 6);
     await app.frame();
     return (await frame())[1]![0];
   };
@@ -1673,7 +1675,7 @@ test("the list to choose from shows a group inside the selection by its name and
   expect(first.ids.length).toBe(16);
   await p.mouse.wheel(0, 100);
   await expect.poll(async () => (await list())?.scroll ?? 0).toBe(1);
-  expect((await list())!.ids).not.toEqual(first.ids);
+  await expect.poll(async () => (await list())!.ids, "the rows shown move on (once drawn again)").not.toEqual(first.ids);
   expect(await p.evaluate(() => window.__canvastDebug.camera())).toEqual(cam);
   // with the setting on, the pointer resting on the list's bottom row scrolls it on by itself
   await p.evaluate(() => window.__canvastDebug.setSetting("select.listAutoScroll", true));

@@ -130,6 +130,8 @@ export interface DebugHook {
   /** Objects as stored (frame form: local numbers, frame id); works at any depth, unlike `objects()`. */
   storedObjects(): SerializedObject[];
   selection(): string[];
+  /** Select these objects (as a pick on the canvas would). */
+  select(ids: string[]): void;
   /** The list beside the pointer while Ctrl is held: the rows it shows, how many it has, how far it is scrolled (null: none). */
   revealList(): { ids: Array<string | null>; total: number; scroll: number } | null;
   tool(): Tool;
@@ -443,6 +445,7 @@ export function installDebugHook(
     objects: () => doc.ordered().map(serializeWorld),
     storedObjects: () => doc.ordered().map(serializeObject),
     selection: () => [...editor.selection].sort(),
+    select: (ids) => editor.select(ids),
     revealList: () => (editor.revealList ? { ids: [...editor.revealList.ids], total: editor.revealList.total, scroll: editor.revealScroll } : null),
     gridStep: () => editor.gridStep(view.camera),
     tool: () => editor.tool,

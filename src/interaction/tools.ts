@@ -2751,6 +2751,7 @@ export function attachTools(
     } else if (mod && key === "y") {
       if (g.kind === "none") redo(doc, editor);
     } else if (mod && key === "a") {
+      e.preventDefault(); // (not the browser's select-all of the page's text: in Firefox a copy then goes to that text, not to the objects)
       // everything that shows (the members of a boolean group are what its result is made of: they go with it, and are shown only inside it)
       const shown = doc.ordered().filter((o) => !o.hidden && !o.locked && boolGroupsOf(o).every((g) => g.own || editor.entered.includes(g.gid)));
       editor.select(expandToUnits(doc.ordered(), shown, editor.entered));

@@ -3180,7 +3180,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   for (const kind of ["copy", "cut"] as const) {
     document.addEventListener(kind, (e) => {
       clipEventAt = performance.now();
-      if (typing(e.target) || appView !== "canvas" || textEditor.isOpen) return;
+      // (the canvas has the keys: the objects are copied, whatever text the page holds selected, which Firefox gives as the event's target)
+      if ((document.activeElement !== canvas && typing(e.target)) || typing(document.activeElement) || appView !== "canvas" || textEditor.isOpen) return;
       if (copyOrCut(kind, e)) e.preventDefault();
     });
   }

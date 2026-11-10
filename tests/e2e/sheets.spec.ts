@@ -857,16 +857,17 @@ test("auto layout: Shift+A puts the picked things on a sheet that lays them out 
   await expect(p.locator("[data-auto-layout]")).toBeVisible();
   await expect(p.locator('[data-layout-flow="row"]')).toHaveAttribute("aria-checked", "true");
   expect(Number(await p.locator('[data-layout-gap="0"]').inputValue())).toBeCloseTo(20, 0);
-  // a shape drawn on the sheet joins the row where it is drawn (after the first), and the sheet grows round it
+  // a shape drawn on the sheet joins the row where it is drawn (in the gap after the first), and the sheet grows round it
   await key(app, "u");
-  await drag(app, [430, 320], [450, 340]);
+  await drag(app, [463, 320], [477, 340]);
   const s4 = (await objs(app)).at(-1)!.id;
   await key(app, "v");
   await app.frame();
   expect((await laid()).find((o) => o.id === s4)!.parent).toBe(sheet.id);
   expect(Math.round((await boxOf(s4)).minX), "second in the row").toBe(480);
-  expect((await xs()).map(Math.round)).toEqual([400, 520, 600]);
-  expect(Math.round((await boxOf(sheet.id)).maxX), "the sheet grew by the shape and a gap").toBe(660);
+  const w4 = (await boxOf(s4)).maxX - (await boxOf(s4)).minX;
+  expect((await xs()).map(Math.round)).toEqual([400, Math.round(500 + w4), Math.round(580 + w4)]);
+  expect(Math.round((await boxOf(sheet.id)).maxX), "the sheet grew by the shape and a gap").toBe(Math.round(640 + w4));
   // taken away, the gap closes
   await click(app, 490, 330);
   expect(await selection(app)).toEqual([s4]);

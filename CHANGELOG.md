@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.24 — Firefox copies the canvas's objects; test fixes (2026-11-10)
+
+- **Fixed:** in Firefox, Ctrl+C after Ctrl+A copied the page's text, not the objects: Ctrl+A on the canvas no longer selects the page's text as well, and while the canvas has the keys a copy or cut is of the objects, whatever the browser names as the event's target.
+- **Fixed:** tests: the resize-snap test drags the corner along the box's diagonal (a pen stroke keeps its proportions); the Ctrl list test waits for the rows to be drawn again after a scroll; the balloon test picks the words through the debug hook; the auto layout test draws its new shape in the gap.
+
 ## 0.56.23 — Firefox pastes copied things; test fixes (2026-11-10)
 
 - **Fixed:** in Firefox, Ctrl+C and Ctrl+X on the canvas copied nothing (so Ctrl+V pasted nothing): Firefox sends no copy or cut event when no text on the page is selected. The selected objects are now copied or cut all the same when no event comes; and when no paste event follows Ctrl+V within a moment, what was copied here is pasted, once.
