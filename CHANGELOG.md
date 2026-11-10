@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.56.9 — Pressed buttons under the pointer; Library and Canvas joined (2026-11-10)
+
+- **Fixed:** a pressed or selected button under the pointer lost its fill and showed a light icon on a light ground (the Actions bar, the bars of tools); it stays filled, a step deeper.
+- **Fixed:** the Library and Canvas buttons had a gap between them and round inner corners; they are one joined set again (a later rule of the top left row put the gap back).
+- **Changed:** one rule fills a pressed button of any bar with the accent, and one keeps it filled under the pointer, instead of one for each bar.
+- **Added:** a test hovers every button of the bars and of the segmented controls, pressed or not, in the light and the dark theme, and measures the contrast of its icon and its words.
+
 ## 0.56.8 — A wider Export dialog (2026-11-10)
 
 - **Changed:** the Export dialog is wider by default (as wide as for several items, within the window).

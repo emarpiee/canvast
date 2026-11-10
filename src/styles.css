@@ -484,7 +484,7 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 .toolbar .size-out { font: var(--font-value); min-width: 38px; text-align: right; opacity: 0.8; } /* (the spare room is beside the slider, never at the bar's edge) */
 .toolbar .swatch.is-on, .toolbar .width.is-on { box-shadow: inset 0 0 0 2px var(--hud-accent); }
 /* One meaning for "on" in every bar: a filled button. A ring means "this colour or size" (a choice among swatches), never a switch. */
-.toolbar button[aria-pressed="true"], .dock button[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); box-shadow: none; }
+.toolbar button[aria-pressed="true"], .dock button[aria-pressed="true"] { box-shadow: none; }
 .toolbar .width span { width: 16px; border-radius: var(--r-xs); background: currentColor; }
 
 .toast {
@@ -551,13 +551,12 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
   cursor: pointer;
 }
 .hud-dev button:hover { background: var(--hud-hover); }
-.hud-dev button[aria-pressed="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); border-color: transparent; }
+.hud-dev button[aria-pressed="true"] { border-color: transparent; }
 .hud-dev select option { color: var(--hud-fg); background: var(--hud-bg); }
 
 .hud-fps { font: var(--weight-medium) var(--text-xs) var(--font-mono); opacity: 0.85; white-space: nowrap; }
 .hud-diag { margin: 0; white-space: pre; }
 .hud-diag[hidden] { display: none; }
-.hud-controls button[aria-pressed="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
 .hud-save {
   all: unset;
   cursor: pointer;
@@ -864,7 +863,6 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .adj-note { grid-column: 1; font: var(--font-meta); color: var(--hud-muted); }
 .adj-layers { display: flex; flex-wrap: wrap; gap: var(--s-2); padding-bottom: var(--s-4); }
 .adj-layers button { min-width: var(--ctl); height: var(--ctl); padding: 0 var(--s-4); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
-.adj-layers button[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
 .adj-layers button svg { width: var(--icon-sm); height: var(--icon-sm); }
 .adj-curve { display: block; width: 12rem; height: 12rem; background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); touch-action: none; cursor: crosshair; }
 .adj-curve:focus-visible { outline: 2px solid var(--hud-accent); outline-offset: 2px; }
@@ -1007,7 +1005,6 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .ctx-bar button[data-ctx="delete"]:hover { color: var(--canvas-danger); }
 .ctx-bar button:hover:not(:disabled) { background: var(--hud-hover); }
 .ctx-bar button:disabled { opacity: 0.35; cursor: default; }
-.ctx-bar button[aria-pressed="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
 .ctx-bar .ctx-gap { width: auto; min-width: var(--ctl); padding: 0 var(--s-4); font: var(--font-meta); }
 
 /* ---- Interface skin (ADR 0052) -------------------------------------------------------------------------------------
@@ -1037,7 +1034,6 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .rail button { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; color: var(--hud-fg); background: transparent; border: 0; border-radius: var(--r-lg); cursor: pointer; }
 .rail button svg { width: 20px; height: 20px; }
 .rail button:hover { background: var(--hud-hover); }
-.rail button[aria-checked="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
 .toolbar { border-radius: var(--r-lg); padding: var(--s-4); }
 .toolbar button, .hud-controls button { border-radius: var(--r-md); }
 .toolbar button { min-width: 34px; height: 34px; }
@@ -1102,22 +1098,27 @@ input[type="radio"]:checked::before { content: ""; width: var(--sp-3); height: v
 .view-switch button svg { width: var(--icon-md); height: var(--icon-md); }
 .nav-pill { height: var(--bar-h); }
 /* The buttons that change the view (Library, Canvas, Settings) have a look of their own, a tint of the accent, so they read apart from the tools. Library and Canvas are joined as one set; the one in use is filled. */
-.view-switch { height: var(--bar-h); align-items: center; padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; }
+.view-switch { height: var(--bar-h); align-items: center; padding: 0; gap: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; }
 .view-switch button { box-sizing: border-box; height: var(--bar-h); border: 1px solid var(--view-edge); border-right: 0; border-radius: var(--ctl-r) 0 0 var(--ctl-r); box-shadow: var(--hud-lift); }
 .view-switch button:not([aria-selected="true"]), .nav-pill:not([data-active="true"]) .nav-crumb, .view-settings button:not([aria-pressed="true"]) { color: var(--hud-accent-text); background: var(--view-tint); }
+.view-switch button + button { border-radius: 0; } /* (one set: only the first is rounded on the left, the name after it on the right) */
 .nav-pill .nav-crumb { border: 1px solid var(--view-edge); border-radius: 0 var(--ctl-r) var(--ctl-r) 0; }
 .view-settings button { border: 1px solid var(--view-edge); border-radius: var(--ctl-r); box-shadow: var(--hud-lift); }
-#nav { gap: 0; }
+#nav { gap: 0; } /* (the Library set and the board and canvas pill are one joined row) */
 .nav-pill .nav-name-btn { margin-left: var(--near); }
 .view-switch button:not([aria-selected="true"]):hover, .nav-pill:not([data-active="true"]) .nav-crumb:hover, .view-settings button:not([aria-pressed="true"]):hover { background: var(--view-tint-hover); }
-#nav { left: var(--edge); top: var(--edge); gap: var(--near); }
+#nav { left: var(--edge); top: var(--edge); }
 #toolbar > .dock { top: calc(var(--edge) / var(--ui-scale, 1)); right: calc((var(--edge) + var(--bar-h) + var(--near)) / var(--ui-scale, 1)); } /* (the Settings button is in the corner) */
 /* Settings: a button of its own in the top-right corner of every view. */
 .view-settings { position: fixed; pointer-events: auto; top: var(--edge); right: var(--edge); z-index: var(--z-edge); zoom: var(--ui-scale, 1); }
 .view-settings button { display: inline-flex; align-items: center; justify-content: center; width: var(--bar-h); height: var(--bar-h); padding: 0; box-sizing: border-box; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(8px); cursor: pointer; }
 .view-settings button svg { width: 18px; height: 18px; }
 .view-settings button:hover { background: var(--hud-hover); }
-.view-settings button[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
+/* A pressed button of a bar is filled with the accent: one rule for every bar (what a bar adds to it is kept with the bar). */
+:is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls, .view-settings, .adj-layers, .hud-dev) button[aria-pressed="true"], .rail button[aria-checked="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
+/* A pressed, checked or selected button under the pointer stays filled, a step deeper, so its icon and words keep their colour on it (a bar's
+   hover background would otherwise take the fill away and leave a light icon on a light ground). One rule for every bar and segmented control. */
+:is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls, .view-switch, .view-settings, .seg, .adj-layers, .hud-dev) button:is([aria-pressed="true"], [aria-checked="true"], [aria-selected="true"]):hover:not(:disabled) { color: var(--hud-accent-fg); background: var(--hud-accent-hover); }
 /* The window with no frame (src/ui/window-frame.ts): a row over the top of the app, which comes from the very top edge and takes no room. Its drag area exists only while it shows. */
 /* (both in the top layer, as popovers: the bare look of one is undone here) */
 .win-edge { position: fixed; inset: 0 0 auto; width: auto; height: var(--edge); margin: 0; padding: 0; background: transparent; border: 0; }
