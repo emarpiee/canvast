@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.56.27 — Less memory when going from the canvas to the Library (2026-11-10)
+
+- **Changed:** leaving the canvas for the Library (or Settings) lets go of its tiles and of the pictures it had decoded; they are made again when you come back (the first frame back is a little slower). Editing on the canvas and then searching and browsing the Library no longer stacks the two in memory.
+- **Changed:** the undo history keeps at most 64 MiB (was 256 MiB): big edits keep fewer steps.
+- **Changed:** the Library keeps the thumbnails of the last 600 cards seen for a quick redraw (was 3000).
+- **Changed:** *Information shown: Technical* is one row whose segments are shown whole: when it is longer than the bar it scrolls sideways (the wheel, or a drag on a touch screen), with no scrollbar and the shared fade at the end that has more.
+- **Changed:** the Library's *Reset all filters* button (the funnel with a cross) shows while a search is typed too, as a search filters the list, and clears it with the other filters; *Show all items* over the grid does the same.
+- **Fixed:** a paste the canvas takes stops at the canvas only when the browser sent it to something without the keys (Firefox); elsewhere it goes on to the page as before.
+- **Fixed:** the Layers drag test asks for a row's box again while the panel is drawn again.
+- **Fixed:** a note took long to open, even a short one, or stayed blank: before showing it the editor waited for every font file of the library to load, for the list of every item that `[[` can link to (7,000 in a large library) and for the note templates. The note now shows at once; the `[[` and `#` lists fill in a moment later, and the fonts and templates are waited for less than half a second (a font that takes longer is in the menu the next time).
+- **Added:** *Information shown: Technical* counts the Library's thumbnails held, beside the canvas's pictures, tiles and undo history.
+
 ## 0.56.26 — Firefox pastes on the canvas (2026-11-10)
 
 - **Fixed:** in Firefox, Ctrl+V on the canvas still pasted nothing: Firefox sends the paste to a hidden editable box that holds a selection, whose own handler took it first. The canvas now takes a paste before anything else on the page (unless a field or an editor has the keys).

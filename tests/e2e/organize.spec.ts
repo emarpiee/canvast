@@ -751,6 +751,12 @@ test("the library's filters are kept over a reload, are said over the grid, and 
   await expect(side(p, /^All items/)).toHaveAttribute("aria-current", "true");
   await expect(reset).toBeHidden();
   await expect(p.getByTestId("assets-filtered")).toBeHidden();
+  // a search filters too: the reset button shows while one is typed, and resets it with the rest
+  await p.getByTestId("assets-search").fill("zzz");
+  await expect(reset).toBeVisible();
+  await reset.click();
+  await expect(p.getByTestId("assets-search")).toHaveValue("");
+  await expect(reset).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });
 

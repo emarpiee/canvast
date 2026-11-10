@@ -232,7 +232,7 @@ describe("the undo history", () => {
     for (let i = 0; i < 12; i++) doc.commit(doc.transaction("Draw", [stroke({ points })]));
     expect(doc.historySteps).toBeLessThan(12);
     expect(doc.historySteps).toBeGreaterThan(0);
-    expect(doc.historyBytes()).toBeLessThanOrEqual(256 * 2 ** 20);
+    expect(doc.historyBytes()).toBeLessThanOrEqual(64 * 2 ** 20);
   });
 });
 

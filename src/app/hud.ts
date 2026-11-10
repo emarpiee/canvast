@@ -7,6 +7,7 @@ import { MAX_JUMP_LEVELS, goHome, parseZoomLevel, viewLevel, zoomByStep, zoomTo 
 import type { FrameStats } from "./frame-stats";
 import { FpsMeter } from "./fps-meter";
 import { ICONS } from "../ui/icons";
+import { syncScroll } from "../ui/bar";
 import { openColourPopover } from "../ui/colour-popover";
 import { hexOfCss } from "../ui/text-editor";
 
@@ -229,6 +230,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
         fpsEl.textContent = fpsText();
         // One segment a line, side by side in the bar; the line breaks stay between them for anything that reads the text.
         diagEl.innerHTML = diagText().split("\n").map((l) => `<span>${l.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</span>`).join("\n");
+        syncScroll(readout); // (Technical is one row that scrolls sideways when it is longer than the bar: its fade shows there is more)
       } else {
         fpsEl.textContent = speedText();
         objEl.textContent = sceneText();
@@ -246,6 +248,7 @@ export function mountHud(root: HTMLElement, view: ViewState, stats: FrameStats, 
     objEl.hidden = mode !== "more";
     fpsEl.hidden = mode !== "more" && mode !== "technical";
     diagEl.hidden = mode !== "technical";
+    syncScroll(readout); // (the cue of a scrolled Technical row goes with it)
     infoButton.innerHTML = ICONS.info; // (one icon: the number says how much is shown)
     infoButton.dataset["mode"] = mode;
     infoButton.dataset["level"] = MODE_LEVEL[mode];

@@ -85,6 +85,9 @@ export interface NoteEditor {
   destroy(): void;
 }
 
+/** How long opening a note waits for the library's fonts and the note templates before it shows without them (ms). */
+const WAIT_MENUS_MS = 400;
+
 // SunEditor's demo presets (suneditor.com), without what needs a server or another library (math, embeds, PDF export).
 const GALLERIES = ["imageGallery", "videoGallery", "audioGallery", "fileGallery", "fileBrowser"];
 const TEXT_TOOLS = ["subscript", "superscript", "|", "textStyle", "copyFormat", "removeFormat"];
@@ -543,12 +546,20 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
   const NoteImage = linkDialog(image, "imgUrlFile");
   const NoteVideo = linkDialog(video, "videoUrlFile");
   const NoteAudio = linkDialog(audio, "audioUrlFile");
-  const value = await shown(opts.kind, opts.text, host.dir);
+  // The note shows at once: what only helps while writing comes beside it, never before it. The `[[` and `#` lists fill in when they are
+  // ready (the editor reads them as they are); the library's fonts and the note templates are waited for a moment only (a font file that
+  // takes long, or never loads, must not keep the note from opening: the menus then have the app's own, and the fonts are there next time).
+  const atMost = <T,>(p: Promise<T>, ms: number, instead: T): Promise<T> => Promise.race([p.catch(() => instead), new Promise<T>((ok) => setTimeout(() => ok(instead), ms))]);
+  const linkables: Array<{ key: string; name: string }> = [];
+  const tagList: Array<{ key: string }> = [];
+  void host.linkables().then((l) => void linkables.push(...l.map((x) => ({ key: x.key, name: x.name }))), () => undefined);
+  void host.tags().then((t) => void tagList.push(...t.map((x) => ({ key: x.replace(/\s+/g, "-") }))), () => undefined);
+  const [value, templates, fonts] = await Promise.all([
+    shown(opts.kind, opts.text, host.dir),
+    atMost(host.templates().then((list) => Promise.all(list.map(async (t) => ({ name: t.name, html: await shown(t.kind, t.text, t.dir) })))), WAIT_MENUS_MS, []),
+    atMost(host.fonts(), WAIT_MENUS_MS, ["Inter"]),
+  ]);
   for (const m of value.matchAll(/href="canvast-wiki:([^"]+)"/g)) knowPath(decodeURIComponent(m[1]!));
-  const linkables = (await host.linkables()).map((l) => ({ key: l.key, name: l.name }));
-  const tagList = (await host.tags()).map((t) => ({ key: t.replace(/\s+/g, "-") }));
-  const templates = await Promise.all((await host.templates()).map(async (t) => ({ name: t.name, html: await shown(t.kind, t.text, t.dir) })));
-  const fonts = await host.fonts();
   const choose = async (kind: AttachKind | "any"): Promise<HTMLElement | null> => {
     const item = await host.choose(kind);
     return item && targetFor(item);

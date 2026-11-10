@@ -29,7 +29,8 @@ export type ChangedIds = ReadonlySet<ObjectId> | null;
 
 const HISTORY_LIMIT = 500;
 /** What the undo history may hold, about, however few steps that is (a step's objects are kept whole, before and after). */
-const HISTORY_BYTES = 256 * 2 ** 20;
+// (undo of big edits keeps fewer steps: the history lives in memory beside the canvas's pictures and the Library's thumbnails)
+const HISTORY_BYTES = 64 * 2 ** 20;
 
 /** About what an object holds in memory, most of it its numbers. */
 function objectBytes(o: CanvasObject | null): number {

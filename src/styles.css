@@ -448,9 +448,9 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 /* A row that scrolls says so the same way everywhere, with no scrollbar: a fade and a small arrow at each end that has more to show (bar.ts syncScroll).
    The fade and the arrow are the first and last item of the row, stuck to its edge (a row has no padding of its own: --cue-rest is the room its ends keep). */
 .tb-options-row::before, .tb-options-row::after { content: ""; flex: none; width: var(--cue-rest, 0px); }
-:is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs)[data-scroll-start]::before, :is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs)[data-scroll-end]::after { position: sticky; z-index: 1; display: flex; align-items: center; align-self: stretch; width: var(--sp-10); pointer-events: none; color: var(--hud-fg); font: var(--weight-semibold) var(--text-xl)/1 var(--font-ui); }
-:is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs)[data-scroll-start]::before { content: "\2039"; left: 0; margin-right: calc(var(--cue-rest, 0px) - var(--s-10)); justify-content: flex-start; padding-left: var(--s-2); background: linear-gradient(to right, var(--hud-bg) 50%, color-mix(in oklch, var(--hud-bg) 70%, transparent) 75%, transparent); }
-:is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs)[data-scroll-end]::after { content: "\203A"; right: 0; margin-left: calc(var(--cue-rest, 0px) - var(--s-10)); justify-content: flex-end; padding-right: var(--s-2); background: linear-gradient(to left, var(--hud-bg) 50%, color-mix(in oklch, var(--hud-bg) 70%, transparent) 75%, transparent); }
+:is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs, .hud-readout)[data-scroll-start]::before, :is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs, .hud-readout)[data-scroll-end]::after { position: sticky; z-index: 1; display: flex; align-items: center; align-self: stretch; width: var(--sp-10); pointer-events: none; color: var(--hud-fg); font: var(--weight-semibold) var(--text-xl)/1 var(--font-ui); }
+:is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs, .hud-readout)[data-scroll-start]::before { content: "\2039"; left: 0; margin-right: calc(var(--cue-rest, 0px) - var(--s-10)); justify-content: flex-start; padding-left: var(--s-2); background: linear-gradient(to right, var(--hud-bg) 50%, color-mix(in oklch, var(--hud-bg) 70%, transparent) 75%, transparent); }
+:is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs, .hud-readout)[data-scroll-end]::after { content: "\203A"; right: 0; margin-left: calc(var(--cue-rest, 0px) - var(--s-10)); justify-content: flex-end; padding-right: var(--s-2); background: linear-gradient(to left, var(--hud-bg) 50%, color-mix(in oklch, var(--hud-bg) 70%, transparent) 75%, transparent); }
 /* what scrolls into view (the picked chip) stops clear of the fade and its arrow */
 :is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs) { scroll-padding-inline: var(--sp-10); }
 /* Switched off: for another kind of item than the one being edited (ui/toolbar.ts). */
@@ -2655,10 +2655,9 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 .set-body.is-searching .set-tabs button[aria-selected="true"] { color: inherit; background: none; font-weight: var(--weight-medium); }
 .set-body.is-searching .set-tabs button[aria-selected="true"]:hover { background: var(--hud-hover); }
 .set-body.is-searching .set-tabs button[aria-selected="true"] .set-hits { color: var(--hud-accent-fg); background: var(--hud-accent); }
-/* Technical shows many segments: one row that spreads them over the whole width (they shorten with an ellipsis before they would wrap); when the window is too narrow for one row they wrap instead. */
-.hud-bottom > .hud-readout[data-mode="technical"] { flex-wrap: nowrap; justify-content: space-between; column-gap: var(--s-6); }
-.hud-readout[data-mode="technical"] > *, .hud-readout[data-mode="technical"] .hud-diag > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-@media (max-width: 1100px) { .hud-bottom > .hud-readout[data-mode="technical"] { flex-wrap: wrap; justify-content: flex-start; } }
+/* Technical shows many segments: one row, each segment whole, that scrolls sideways (wheel or drag, no scrollbar) when it is longer than the bar; the shared fade at an end says there is more. */
+.hud-bottom > .hud-readout[data-mode="technical"] { flex-wrap: nowrap; justify-content: flex-start; column-gap: var(--s-10); overflow-x: auto; scrollbar-width: none; }
+.hud-readout[data-mode="technical"] > *, .hud-readout[data-mode="technical"] .hud-diag > span { flex: none; }
 .hud-readout .hud-zoom { flex: none; }
 /* The pill shows the canvas's name only, with all its room; the board is in the tooltip and the menu (the text stays for assistive tools). */
 .nav-crumb-board, .nav-crumb-sep { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

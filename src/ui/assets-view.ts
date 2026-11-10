@@ -110,6 +110,8 @@ import type { SettingsStore } from "../settings/settings";
  * be in any number of folders without being copied.
  */
 export interface AssetsView {
+  /** Thumbnails held for cards seen lately (Information shown: Technical). */
+  thumbsHeld(): number;
   show(): void;
   hide(): void;
   /** Put the cursor in the library's search box (closing the viewer if it is open). */
@@ -180,7 +182,8 @@ const SIDE_SORT_LOOK: Record<SideSort, { word: string; icon: string }> = {
 const MAX_DRAG_OUT = 1000;
 const SIDE_SHOWN = { folders: 8, types: 8, tags: 12, ctags: 12, saved: 8 } as const;
 /** How many loaded thumbnails are kept ready to show again. */
-const THUMB_URLS_KEPT = 3000;
+// (each address holds its thumbnail's bytes: enough for a few screens of cards to come back at once, not a whole session's browsing)
+const THUMB_URLS_KEPT = 600;
 /** How often the library is drawn again while the looks of the pictures are being read. */
 const LOOKS_REDRAW_MS = 400;
 /** A thumbnail not made because nothing wanted it any more by its turn. */
@@ -282,7 +285,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <option value="pixels">Most pixels</option><option value="type">Type A–Z</option><option value="tags">Tags A–Z</option><option value="folder">Folder A–Z</option><option value="favourite">Favourites first</option><option value="width">Widest first</option><option value="height">Tallest first</option><option value="canvases">On most canvases</option>
       </select>
       <button type="button" class="assets-btn is-icon" data-action="sort-dir" data-testid="assets-sort-dir" aria-pressed="false">${ICONS.arrowUpDown}</button>
-      <button type="button" class="assets-btn is-icon is-primary" data-action="reset-filters" data-testid="assets-reset-filters" aria-label="Reset all filters" title="Reset all filters: All items, Newest first, the whole library" hidden>${ICONS.funnelX}</button>
+      <button type="button" class="assets-btn is-icon is-primary" data-action="reset-filters" data-testid="assets-reset-filters" aria-label="Reset all filters" title="Reset all filters: the search, All items, Newest first, the whole library" hidden>${ICONS.funnelX}</button>
       <span class="assets-sep" role="separator"></span>
       <span class="split assets-import"><button type="button" class="assets-btn" data-action="import" data-testid="assets-import">${ICONS.arrowDownToLine}<span>Import</span></button><button type="button" class="assets-btn is-icon" data-action="import-menu" data-testid="assets-import-menu" aria-haspopup="menu" aria-label="Files or a folder" title="Bring in files, or a folder">${ICONS.chevronDown}</button></span>
       <span class="assets-sep" role="separator"></span>
@@ -2451,10 +2454,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (scope.startsWith("ctag:")) return `Canvas tag #${canvasTags.get(scope.slice(5))?.label ?? scope.slice(5)}`;
     return "Library";
   };
-  /** Keep the filters (not the search) with the layout, and show the reset button only when one is not its default. */
+  /** Keep the filters (not the search) with the layout, and show the reset button only when one is not its default, or a search narrows the list (it filters too). */
   const keepFilters = (): void => {
     const f = { usage: usageSel.value, sort: sortSel.value, reversed, scope: beforeHidden?.scope ?? scope }; // (hidden mode's scope is not kept)
-    resetFiltersBtn.hidden = f.usage === NO_FILTERS.usage && f.sort === NO_FILTERS.sort && !f.reversed && f.scope === NO_FILTERS.scope;
+    resetFiltersBtn.hidden = f.usage === NO_FILTERS.usage && f.sort === NO_FILTERS.sort && !f.reversed && f.scope === NO_FILTERS.scope && !search.value.trim();
     if (JSON.stringify(f) === JSON.stringify(ui.filters)) return;
     ui.filters = f;
     saveUi();
@@ -5068,12 +5071,11 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const first = group.find((h) => h === selected) ?? group[0]!;
     startShow(first, picked.size > 1 ? new Set(group) : undefined);
   });
-  filteredChip.querySelector("button")!.addEventListener("click", () => {
+  // (Show all items over the grid and the reset button are one action: the search goes too)
+  filteredChip.querySelector("button")!.addEventListener("click", () => resetFiltersBtn.click());
+  resetFiltersBtn.addEventListener("click", () => {
     search.value = "";
     paintSearchUi();
-    resetFiltersBtn.click();
-  });
-  resetFiltersBtn.addEventListener("click", () => {
     usageSel.value = NO_FILTERS.usage;
     sortSel.value = NO_FILTERS.sort;
     reversed = false;
@@ -5114,6 +5116,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   const saveBtn = root.querySelector<HTMLButtonElement>(".assets-searchbox .cs-save")!;
   const paintSearchUi = (): void => {
     clearBtn.hidden = !search.value;
+    keepFilters(); // (a search filters too: the reset button shows while there is one)
     searchHelpLine.hidden = !!search.value; // (what to type: only while nothing is typed)
     paintRecent(recentBox, ASSETS_RECENT, search.value, savedSearches);
     paintSaveToggle(saveBtn, search.value, way, savedSearches);
@@ -5526,6 +5529,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     saveUi();
   });
   const view: AssetsView = {
+    thumbsHeld: () => thumbUrls.size,
     show() {
       visible = true;
       pump();

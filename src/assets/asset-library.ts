@@ -425,6 +425,15 @@ export class AssetLibrary {
     return { queued: this.queue.size, running: this.running };
   }
 
+  /** Let go of every decoded image not drawn in the last moment (the canvas is left for the Library or Settings): they are decoded again when drawn. */
+  releaseIdle(now = performance.now()): void {
+    for (const [hash, d] of [...this.decoded.entries()]) {
+      if (now - d.lastUsed <= IN_USE_MS) continue;
+      this.decoded.delete(hash);
+      d.release();
+    }
+  }
+
   setBudget(bytes: number): void {
     this.budget = bytes;
     this.evict();

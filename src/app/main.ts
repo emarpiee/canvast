@@ -1963,7 +1963,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       return [
         `objects ${doc.size.toLocaleString()} · drawn ${stats.last?.visibleCount.toLocaleString() ?? 0}${indexSync.building() ? " · indexing…" : ""}`,
         `decoded ${mem.count} images · ${mib(mem.bytes)} / ${mib(mem.budget)} MiB · decoding ${q.running} · waiting ${q.queued}`,
-        `tiles ${tileMem.tiles} · ${mib(tileMem.bytes)} MiB · undo ${doc.historySteps} steps · ${mib(doc.historyBytes())} MiB${heap ? ` · JS ${mib(heap.usedJSHeapSize)} / ${mib(heap.jsHeapSizeLimit)} MiB` : ""}`,
+        `tiles ${tileMem.tiles} · ${mib(tileMem.bytes)} MiB · undo ${doc.historySteps} steps · ${mib(doc.historyBytes())} MiB · library thumbnails ${assetsView.thumbsHeld()}${heap ? ` · JS ${mib(heap.usedJSHeapSize)} / ${mib(heap.jsHeapSizeLimit)} MiB` : ""}`,
       ];
     },
     notify: (message) => {
@@ -2286,6 +2286,11 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     host.inert = v !== "canvas";
     closeMoreMenu(); // (a menu opened on the canvas, e.g. the long-press list, does not follow to another view)
     if (was === "assets") assetsView.hide();
+    // Leaving the canvas: its tiles and the pictures it decoded are let go (made again when it is back), so the Library does not run on top of them.
+    if (was === "canvas") {
+      tiles.clear();
+      assets.releaseIdle();
+    }
     if (was === "settings") settingsView.hide();
     if (v === "assets") assetsView.show();
     else if (v === "settings") settingsView.show();
@@ -3022,7 +3027,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   };
   window.addEventListener("paste", (e) => {
     onPaste(e);
-    if (e.defaultPrevented) e.stopPropagation(); // (taken here: nothing else pastes it too)
+    // (taken here, and sent to something that does not have the keys, Firefox's hidden editable box: it does not paste it a second time)
+    if (e.defaultPrevented && e.target !== document.activeElement) e.stopPropagation();
   }, true);
   /** Words copied in another program: a new text under the pointer (in the middle of the view before the pointer has been over it), a long one wrapped. */
   const PASTED_TEXT_WRAP_PX = 480;
