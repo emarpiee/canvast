@@ -104,7 +104,7 @@ await step("sidebar", async () => {
 
 // 4. Search: keywords and operators, the matches and the chip over the grid that says what is shown
 await step("search", async () => {
-  await p.getByTestId("assets-search").fill("#ink -#reference/landscape width>600");
+  await p.getByTestId("assets-search").fill("#ink -#reference/landscape width>500");
   await p.getByTestId("assets-search").press("Enter");
   await settle(800);
   await blur();

@@ -81,6 +81,7 @@ await step("notes-links", async () => {
   await settle(400);
   await note("Gesture practice.md").click();
   await p.getByTestId("asset-backlinks").waitFor({ timeout: 10_000 }).catch(() => undefined);
+  await p.getByTestId("asset-backlinks").scrollIntoViewIfNeeded().catch(() => undefined); // (below the fold of the details panel)
   await settle(800);
   await off();
   await shot("notes-links");

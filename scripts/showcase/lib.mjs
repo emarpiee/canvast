@@ -107,6 +107,7 @@ export async function open(out, { width = 1440, height = 900, args = [] } = {}) 
   const select = (ids) => H((x) => window.__canvastDebug.select(x), ids);
   const boxOf = async (id) => (await H((i) => window.__canvastDebug.objectScreen(i), id))?.box ?? null;
   const fit = async () => {
+    await blur(); // (keys in a field of a panel would go to the field)
     await p.keyboard.press("Control+a");
     await p.keyboard.press("f");
     await settle(900);

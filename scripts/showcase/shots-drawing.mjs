@@ -165,6 +165,9 @@ await step("styles", async () => {
   for (const c of ["#1d2b53", "#2c4f7c", "#5f8fb4", "#a9c6d9", "#e9e2cf", "#d8c39a", "#b07d4f", "#6b4b3a", "#2f2a26", "#c94f3d", "#e6a85c", "#f4efe6"]) { await paste(c); await settle(100); }
   for (const g of ["linear-gradient(180deg, #1d2b53, #5f8fb4, #e9e2cf)", "linear-gradient(90deg, #6b4b3a, #d8c39a)", "radial-gradient(circle, #f4efe6, #e6a85c, #c94f3d)"]) { await paste(g); await settle(100); }
   await blur();
+  await p.locator("[data-kind-pick]").first().click(); // (the panel opens on the kind it showed last: show the colours)
+  await p.locator('[data-id="kind:colour"]').first().click();
+  await settle(400);
   await off();
   await shot("styles");
   await panel("Styles panel", false);
@@ -230,14 +233,18 @@ await step("balloons", async () => {
 
 // 11. Text: a caption being written on the page, its formatting bar and its look in the bar above
 await step("text", async () => {
+  await H(() => window.__canvastDebug.jump(-1)); // (room round the page for its title)
+  await settle(600);
   const b = await boxOf(page);
   await p.keyboard.press("t");
-  await p.mouse.click(b.minX, b.maxY + 30);
+  await p.mouse.click(b.minX, b.minY - 60);
+  await settle(300);
   await p.keyboard.type("Chapter one: The way north");
   await p.keyboard.press("Control+a");
   await p.keyboard.press("Control+b");
-  await p.locator("[data-text-size]").fill("32");
-  await p.locator("[data-text-size]").press("Enter");
+  const size = p.locator("[data-text-size]").filter({ visible: true }).first();
+  await size.fill("32");
+  await size.press("Enter");
   await p.keyboard.press("Control+a");
   await off();
   await shot("text");
@@ -260,7 +267,8 @@ await step("export-each", async () => {
   const panels = (await objs()).filter((o) => o.container && o.id !== page).map((o) => o.id);
   await select(panels);
   await menu("exportmenu", "exportpic");
-  await p.getByTestId("export-each").click();
+  await settle(600);
+  if (await p.getByTestId("export-each").isVisible()) await p.getByTestId("export-each").click(); // (several sheets are already a page each)
   await p.locator("[data-mini]").nth(1).waitFor();
   await settle(1200);
   await shot("export-each");

@@ -17,10 +17,10 @@ const open = async () => {
 await open();
 const frame = () => p.evaluate(() => window.__canvastDebug.nextFrame());
 const settle = async (ms = 600) => { await frame(); await p.waitForTimeout(ms); await frame(); };
-const shot = async (name) => {
+const shot = async (name, clip) => {
   await p.evaluate(() => { for (const b of document.querySelectorAll(".notice-close")) b.click(); getSelection()?.removeAllRanges(); });
   await settle(300);
-  await p.screenshot({ path: `${out}/${name}.png` });
+  await p.screenshot({ path: `${out}/${name}.png`, ...(clip ? { clip } : {}) });
   console.log("shot", name);
 };
 const off = () => p.mouse.move(700, 893);
@@ -91,7 +91,10 @@ await p.getByTestId("view-canvas").click();
 await p.getByTestId("save-status").click();
 await p.getByTestId("set-export-full").click();
 await p.getByTestId("choose-dialog").waitFor();
-await shot("export-hidden");
+{
+  const b = await p.getByTestId("choose-dialog").boundingBox(); // (the question alone, with a margin of the page behind it)
+  await shot("export-hidden", { x: Math.max(0, b.x - 40), y: Math.max(0, b.y - 40), width: b.width + 80, height: b.height + 80 });
+}
 await p.getByTestId("choose-cancel").click();
 
 // 5. Settings > Privacy with both passwords set
