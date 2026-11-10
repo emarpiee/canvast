@@ -193,8 +193,9 @@ await step("comic", async () => {
   await blur();
   await settle(600);
   await fit(); // (only the page and its panels are on this canvas)
-  const boxes = await Promise.all(panels.map((id) => boxOf(id)));
-  const say = async (b, at, words) => {
+  const say = async (panelId, at, words) => {
+    await fit(); // (writing in a balloon zooms the view to it: measure the panel again each time)
+    const b = await boxOf(panelId);
     await p.keyboard.press("k");
     const x = b.minX + (b.maxX - b.minX) * at[0], y = b.minY + (b.maxY - b.minY) * at[1];
     await drag([x, y], [x + (b.maxX - b.minX) * 0.42, y + (b.maxY - b.minY) * 0.3], 4);
@@ -204,9 +205,9 @@ await step("comic", async () => {
     await p.keyboard.press("Escape");
     await settle(200);
   };
-  await say(boxes[0], [0.06, 0.06], "The road ends at the forest.");
-  await say(boxes[1], [0.5, 0.08], "Then we climb.");
-  await say(boxes[3], [0.06, 0.06], "Look, the sea!");
+  await say(panels[0], [0.06, 0.06], "The road ends at the forest.");
+  await say(panels[1], [0.5, 0.08], "Then we climb.");
+  await say(panels[3], [0.06, 0.06], "Look, the sea!");
   await p.keyboard.press("v");
   await p.keyboard.press("Escape");
   await fit(); // (writing in a balloon zooms the view to it)
