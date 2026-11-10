@@ -566,9 +566,12 @@ Copy to other apps, or export a sheet, a picture or selected shapes, and get wha
 
 | | |
 | --- | --- |
-| Size | From the shape: a width or height in px, in, cm or mm at 72–600 ppi, or a preset (A4, Full HD, a story, the picture's own pixels) |
+| Size | From the shape: a width or height in px, in, cm or mm at 72–600 ppi, a preset (A4, Full HD, a story, the picture's own pixels), or 1× to 4× its size on screen. The resolution counts for in, cm, mm and PDF; a file in px only records it |
+| Padding | Room around it, in px of the file or % of its longer side, in every format |
 | Formats | PNG, WebP, JPEG, SVG and PDF. What is on a sheet that clips is cut to the sheet in every format. PNG, JPEG and WebP carry their resolution |
-| Background | Transparent, white or black |
+| Background | Transparent, white, black, the canvas colour, or any colour |
+| Presets | *Save these as a preset…* keeps the choices (format, quality, background, padding, resolution, size) as a saved style; choose one from *Preset*, update it there, or manage them in the Styles panel |
+| Again | It opens as you last exported that sheet or selection on this device; *Export again* in the Export menu does it with no dialog. `Enter` exports as last time, `Ctrl+C` copies |
 | Result | Download it, copy it, or keep it in the library |
 | Several items | Selected sheets, or with *Each on its own* any selected items (pictures at their own pixels): one ZIP, or one multi-page PDF whose pages you can reorder. A balloon and its words are one item, and a connector is none. Otherwise a selection is one picture |
 | Vectors | Plain shapes are true vectors in PDF and SVG; masks are SVG masks; picture and pattern fills are embedded pictures clipped to the shape |

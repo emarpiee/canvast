@@ -41,7 +41,24 @@ export interface ExportTarget {
   readonly original: { readonly w: number; readonly h: number } | null;
 }
 
-export type Background = "transparent" | "white" | "black";
+/** Transparent, white, black, or any colour as `#rrggbb`. */
+export type Background = "transparent" | "white" | "black" | `#${string}`;
+
+/** The colour a background fills with (null: none). */
+export const backgroundFill = (bg: Background): string | null => (bg === "transparent" ? null : bg === "white" ? "#ffffff" : bg === "black" ? "#000000" : bg);
+
+/**
+ * The target with room around it: `frac` of its box's longer side on every side, in its own frame (exact), so the picture, the SVG and the
+ * PDF all leave the room with nothing else to know. Its ratio follows; a picture's own pixels no longer apply.
+ */
+export function paddedTarget(t: ExportTarget, frac: number): ExportTarget {
+  if (!(frac > 0) || !Number.isFinite(frac)) return t;
+  const w = D.sub(t.max.x, t.min.x), h = D.sub(t.max.y, t.min.y);
+  const long = D.cmp(w, h) >= 0 ? w : h;
+  const room = D.mul(long, D.fromNumber(frac));
+  const lw = 1 + 2 * frac * Math.max(t.ratio, 1) / t.ratio, lh = 1 + 2 * frac * Math.max(t.ratio, 1);
+  return { ...t, min: { x: D.sub(t.min.x, room), y: D.sub(t.min.y, room) }, max: { x: D.add(t.max.x, room), y: D.add(t.max.y, room) }, ratio: (t.ratio * lw) / lh, original: null };
+}
 
 export interface RenderDeps {
   readonly doc: DocumentStore;
@@ -74,7 +91,7 @@ export function paintExport(deps: RenderDeps, t: ExportTarget, ctx: CanvasRender
   const vp: Viewport = { width: w, height: h };
   ctx.clearRect(0, 0, w, h);
   if (bg !== "transparent") {
-    ctx.fillStyle = bg === "white" ? "#ffffff" : "#000000";
+    ctx.fillStyle = backgroundFill(bg)!;
     ctx.fillRect(0, 0, w, h);
   }
   let list = visibleObjects(deps.doc, deps.index, deps.editor ?? null, fc, vp).filter((po) => t.ids.has(po.obj.id) && !po.obj.hidden);

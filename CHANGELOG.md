@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.56.5 — Export: on-screen sizes, padding, presets, Export again (2026-11-10)
+
+- **Added:** in Export…, sizes of 1× to 4× what is shown on screen; padding round what is exported (px or %), in every format; any background colour, or the canvas colour.
+- **Added:** export presets, saved styles of their own (format, quality, background, padding, resolution, size): saved, chosen and updated in Export…, managed in the Styles panel.
+- **Added:** Export… opens as that sheet or selection was last exported on this device, and *Export again* in the Export menu does it with no dialog; `Enter` exports as last time, `Ctrl+C` copies.
+- **Changed:** a selection is named after what it is: a group's name, a balloon's or a text's first words, or "… and 2 more", not "selection".
+- **Changed:** the resolution is marked as recorded only when the size is in px; the size in in, cm or mm is shown only when one is chosen, or for a PDF.
+- **Changed:** one segmented control for the export dialog, the colour picker's modes and options, and the Styles panel's Apply to; the dialog's close and footer buttons are the shared ones; a quieted line uses the muted colour, not opacity.
+
 ## 0.56.4 — Custom ratios (2026-11-10)
 
 - **Added:** custom ratios for sheets and shapes: *Save this ratio…* in the *Shapes…* list takes a ratio or a size in px (made a ratio) and a name, listed under *Custom* and given as saved. A *Ratios* tab of the Styles panel renames, changes, updates and deletes them.

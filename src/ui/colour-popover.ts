@@ -474,7 +474,7 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
   pop.setAttribute("role", "dialog");
   pop.setAttribute("aria-label", o.name);
   const modes = document.createElement("div");
-  modes.className = "paint-modes";
+  modes.className = "seg paint-modes";
   modes.setAttribute("role", "radiogroup");
   modes.setAttribute("aria-label", `${o.name}: kind of paint`);
   const offered = (o.modes ?? (["none", "solid", "linear", "radial", "angular"] as const)).filter((m) => (m !== "image" && m !== "objects") || textureHooks());
@@ -621,7 +621,7 @@ export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void
   pop.setAttribute("role", "dialog");
   pop.setAttribute("aria-label", "Outline options");
   const choices = <T extends string>(key: string, label: string, items: ReadonlyArray<[T, string, string]>, value: T, disabled = false): string =>
-    `<div class="op-row"><span class="op-label" id="op-${key}">${label}</span><div class="paint-modes op-choices" role="radiogroup" aria-labelledby="op-${key}">${items
+    `<div class="op-row"><span class="op-label" id="op-${key}">${label}</span><div class="seg paint-modes op-choices" role="radiogroup" aria-labelledby="op-${key}">${items
       .map(([v, text, tip]) => `<button type="button" role="radio" data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}="${v}" aria-checked="${v === value}" title="${tip}"${disabled ? " disabled" : ""}>${text}</button>`)
       .join("")}</div></div>`;
   pop.innerHTML =
@@ -704,7 +704,7 @@ export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void
   const num = (key: string, label: string, value: string, unit: string, min: number, step: string): string =>
     `<div class="op-row"><label class="op-label" for="tb-${key}">${label}</label><input id="tb-${key}" class="op-width" data-field="${key}" type="number" min="${min}" step="${step}" inputmode="decimal" value="${value}"><span class="op-unit">${unit}</span></div>`;
   const choices = (key: string, label: string, items: ReadonlyArray<[string, string, string]>, value: string): string =>
-    `<div class="op-row"><span class="op-label" id="tb-${key}">${label}</span><div class="paint-modes op-choices" role="radiogroup" aria-labelledby="tb-${key}">${items
+    `<div class="op-row"><span class="op-label" id="tb-${key}">${label}</span><div class="seg paint-modes op-choices" role="radiogroup" aria-labelledby="tb-${key}">${items
       .map(([v, text, tip]) => `<button type="button" role="radio" data-${key}="${v}" aria-checked="${v === value}" title="${tip}">${text}</button>`)
       .join("")}</div></div>`;
   const round = (v: number): string => String(Math.round(v * 100) / 100);
@@ -722,7 +722,7 @@ export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void
     num("maxLines", "Most lines", o.maxLines === null ? "0" : String(o.maxLines), "0 = all", 0, "1") +
     (o.shapeOpts ? "" : num("heightPx", "Height", o.heightPx === null ? "0" : String(Math.round(o.heightPx * 100) / 100), "px, 0 = auto", 0, "any") +
       choices("valign", "Words sit", [["top", "Top", "At the top of the height"], ["middle", "Middle", "In the middle of the height"], ["bottom", "Bottom", "At the bottom of the height"]], o.valign)) +
-    `<div class="op-row"><span class="op-label" id="tb-card">Card</span><div class="paint-modes op-choices note-colours" role="radiogroup" aria-labelledby="tb-card"><button type="button" role="radio" data-card="none" aria-checked="${o.card === null}" title="No card behind the words">None</button>${NOTE_COLOURS.map((c) => `<button type="button" role="radio" class="note-colour" data-card="${c.fill}" aria-checked="${o.card?.fill === c.fill}" aria-label="${c.name} card" title="${c.name} card" style="background:${c.fill}"></button>`).join("")}</div></div>` +
+    `<div class="op-row"><span class="op-label" id="tb-card">Card</span><div class="seg paint-modes op-choices note-colours" role="radiogroup" aria-labelledby="tb-card"><button type="button" role="radio" data-card="none" aria-checked="${o.card === null}" title="No card behind the words">None</button>${NOTE_COLOURS.map((c) => `<button type="button" role="radio" class="note-colour" data-card="${c.fill}" aria-checked="${o.card?.fill === c.fill}" aria-label="${c.name} card" title="${c.name} card" style="background:${c.fill}"></button>`).join("")}</div></div>` +
     num("cardPad", "Card space", String(Math.round((o.card?.pad ?? NOTE_CARD.pad) * 100) / 100), "em", 0, "0.05") +
     num("cardRadius", "Card rounding", String(Math.round((o.card?.radius ?? NOTE_CARD.radius) * 100) / 100), "em", 0, "0.05");
   let card = o.card;

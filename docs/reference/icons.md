@@ -11,6 +11,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `chart-spline` | Simplify the picked paths: fewer nodes, the same shape (Actions bar) |
 | `pencil-ruler` | Turn the picked pen strokes into editable paths (Actions bar) |
 | `proportions` | Ratios: the tab of custom ratios in the Styles panel |
+| `file-cog` | Export presets: their tab in the Styles panel |
+| `repeat-2` | Export again: as last time, with no dialog (Actions bar, Export menu) |
 | `ruler-dimension-line` | Change the ratio of a custom ratio, typed (Styles panel, its ⋯ menu) |
 | `sticky-note` | Note tool (a new note file, its card placed where clicked) |
 | `stamp` | Outline stroke: make the line a shape (Actions bar) |

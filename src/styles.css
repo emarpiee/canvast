@@ -2728,8 +2728,7 @@ input[data-scrub-input]:focus { cursor: text; }
 .op-row { display: grid; grid-template-columns: 4.5rem 1fr; align-items: center; gap: var(--s-4); }
 .op-row[hidden] { display: none; }
 .op-label { font: var(--font-meta); color: var(--hud-muted); }
-.op-choices { margin-bottom: 0; }
-.op-choices button[disabled] { opacity: 0.4; cursor: default; }
+.seg.op-choices { margin-bottom: 0; }
 .op-width, .op-num { width: 5rem; padding: var(--s-2) var(--s-4); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 .op-unit { display: none; }
 .op-note { margin: 0; font: var(--font-meta); color: var(--hud-muted); }
@@ -2747,11 +2746,9 @@ input[data-scrub-input]:focus { cursor: text; }
 .tex-newseed svg { width: var(--icon-sm); height: var(--icon-sm); }
 /* a choice (Mode, Grid, Align) ends at the right edge, in the column of the numbers above it, as wide as its words need */
 .tex-fields .adj-row > select, .adj-group > .adj-row > select[data-choice] { grid-column: 2 / -1; justify-self: end; width: auto; min-width: 3.75rem; max-width: 100%; height: var(--field-h); padding: 0 var(--s-4); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
-.paint-modes { display: flex; overflow-x: auto; gap: var(--s-1); padding: var(--s-1); margin-bottom: var(--s-6); background: var(--hud-hover); border-radius: var(--r-md); }
-.paint-modes button { flex: 1 0 auto; display: grid; place-items: center; padding: var(--s-2) var(--s-4); font: var(--font-meta); color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-sm); cursor: pointer; white-space: nowrap; }
+.seg.paint-modes { display: flex; overflow-x: auto; margin-bottom: var(--s-6); }
+.seg.paint-modes button { flex: 1 0 auto; display: grid; place-items: center; height: auto; padding: var(--s-2) var(--s-4); font: var(--font-meta); white-space: nowrap; }
 .paint-modes button svg { width: var(--icon-md); height: var(--icon-md); }
-.paint-modes button:hover { background: var(--hud-hover); color: var(--hud-fg); }
-.paint-modes button[aria-checked="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
 .paint-none { padding: var(--s-8) var(--s-6); color: var(--hud-muted); font: var(--font-control); text-align: center; }
 
 /* A ticked choice in a menu (the current operation of a boolean group). */
@@ -2814,8 +2811,8 @@ input[data-scrub-input]:focus { cursor: text; }
 .styles-tab-head h3 { margin: 0; font: var(--weight-semibold) var(--text-sm) var(--font-ui); }
 .styles-target { display: flex; align-items: center; gap: var(--s-2); font: var(--font-meta); color: var(--hud-muted); }
 .styles-target span { margin-right: var(--s-2); }
-.styles-target button { flex: 1; height: var(--field-h); padding: 0 var(--s-4); background: none; color: var(--hud-fg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; font: var(--font-value); }
-.styles-target button[aria-checked="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); border-color: transparent; }
+.styles-target .seg { flex: 1; }
+.styles-target .seg button { flex: 1; }
 .styles-actions { display: flex; flex-wrap: wrap; gap: var(--s-4); }
 .styles-make { display: inline-flex; align-items: center; gap: var(--s-4); height: var(--list-h); padding: 0 var(--s-6); background: var(--hud-hover); color: var(--hud-fg); border: 1px dashed var(--hud-border); border-radius: var(--r-md); cursor: pointer; font: var(--font-value); }
 .styles-make:hover { border-color: var(--hud-accent); }
@@ -2913,9 +2910,6 @@ dialog.export-dlg[open] { animation: fade-in var(--dur-base) var(--ease-out) bot
 .ex-head { display: flex; align-items: center; justify-content: space-between; padding: var(--s-8) var(--s-10) var(--s-4); }
 .ex-head h2 { margin: 0; font-size: var(--text-3xl); font-weight: var(--weight-semibold); }
 .ex-what { color: var(--hud-muted); font-weight: var(--weight-regular); }
-.ex-x { display: inline-flex; align-items: center; justify-content: center; width: var(--sp-11); height: var(--field-h); padding: 0; color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--ctl-r); cursor: pointer; }
-.ex-x svg { width: var(--icon-md); height: var(--icon-md); }
-.ex-x:hover { color: var(--hud-fg); background: var(--hud-hover); }
 .ex-body { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s-10); padding: var(--s-4) var(--s-10) var(--s-6); align-items: start; }
 .ex-stage { display: flex; flex-direction: column; align-items: center; gap: var(--s-6); padding: var(--s-13) var(--s-13) var(--s-10) var(--s-13); min-width: calc(var(--sp-15) * 6); }
 .ex-frame { position: relative; width: calc(var(--sp-15) * 5 * min(1, var(--shape))); aspect-ratio: var(--shape); border-radius: var(--r-xs); box-shadow: var(--hud-lift); outline: 1px solid var(--hud-border); }
@@ -2935,6 +2929,12 @@ dialog.export-dlg[open] { animation: fade-in var(--dur-base) var(--ease-out) bot
 .ex-sec { display: flex; flex-direction: column; gap: var(--s-6); padding: var(--s-8); background: color-mix(in oklch, var(--hud-hover) 45%, transparent); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
 .ex-row { display: flex; flex-wrap: wrap; align-items: end; gap: var(--s-6); }
 .ex-row-dpi { align-items: center; justify-content: space-between; }
+.ex-field.is-quiet select { color: var(--hud-muted); }
+.ex-hint { margin: 0; color: var(--hud-muted); font: var(--font-meta); }
+.ex-hint[hidden] { display: none; }
+.ex-preset { flex-direction: row; align-items: center; gap: var(--s-4); }
+.ex-preset select { flex: 1; min-width: 0; }
+.ex-swatch { display: inline-block; width: var(--icon-sm); height: var(--icon-sm); margin-left: var(--s-4); vertical-align: middle; background: var(--swatch, transparent); border: 1px solid var(--hud-border); border-radius: var(--r-dot); }
 .ex-field { display: flex; flex-direction: column; gap: var(--s-2); color: var(--hud-muted); font: var(--font-meta); }
 .ex-field input[type="number"], .ex-field input[type="text"], .ex-field select { height: var(--list-h); padding: 0 var(--s-4); color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-sm); font: var(--font-value); font-variant-numeric: tabular-nums; }
 .ex-field input[type="number"] { width: calc(var(--sp-15) + var(--sp-9)); text-align: right; }
@@ -2943,14 +2943,15 @@ dialog.export-dlg[open] { animation: fade-in var(--dur-base) var(--ease-out) bot
 .ex-field[hidden], .ex-times[hidden] { display: none; }
 .ex-times { align-self: end; padding-bottom: var(--s-4); color: var(--hud-muted); }
 .ex-label { color: var(--hud-muted); font: var(--font-meta); align-self: center; }
-.ex-seg { display: inline-flex; gap: var(--s-1); padding: var(--s-1); background: var(--hud-hover); border-radius: var(--r-sm); }
-.ex-seg button { height: var(--field-h); padding: 0 var(--s-6); color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-xs); font: var(--font-value); cursor: pointer; }
-.ex-seg button:hover:not(:disabled) { color: var(--hud-fg); }
-.ex-seg button[aria-checked="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
-.ex-seg button:disabled { opacity: 0.4; cursor: default; }
+/* One segmented control (a row of choices, one of them on): the export dialog, the paint modes and options of the colour picker, the Styles panel's target. */
+.seg { display: inline-flex; gap: var(--s-1); padding: var(--s-1); background: var(--hud-hover); border-radius: var(--r-sm); }
+.seg button { height: var(--field-h); padding: 0 var(--s-6); color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-xs); font: var(--font-value); cursor: pointer; }
+.seg button:hover:not(:disabled) { color: var(--hud-fg); }
+.seg button[aria-checked="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
+.seg button:disabled { opacity: 0.4; cursor: default; }
 .ex-readout { flex: 1; min-width: 0; margin: 0; text-align: right; color: var(--hud-muted); font: var(--font-meta); font-variant-numeric: tabular-nums; }
 .ex-readout b { color: var(--hud-fg); font: var(--font-value); }
-.ex-at { opacity: 0.8; }
+.ex-at { color: var(--hud-muted); }
 .ex-chips { display: flex; flex-wrap: wrap; gap: var(--s-4); }
 .ex-chip { display: inline-flex; flex-direction: column; align-items: flex-start; gap: var(--s-1); padding: var(--s-4) var(--s-6); color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; text-align: left; }
 .ex-chip b { font: var(--font-value); }
@@ -2967,13 +2968,10 @@ dialog.export-dlg[open] { animation: fade-in var(--dur-base) var(--ease-out) bot
 .ex-warn { margin: 0; padding: 0 var(--s-10); color: var(--hud-danger); font: var(--font-meta); }
 .ex-warn[hidden] { display: none; }
 .ex-note { min-height: var(--sp-9); margin: 0; padding: 0 var(--s-10); color: var(--hud-muted); font: var(--font-meta); }
-.ex-foot { display: flex; justify-content: flex-end; gap: var(--s-4); padding: var(--s-6) var(--s-10) var(--s-8); }
-.ex-btn { display: inline-flex; align-items: center; gap: var(--s-4); height: calc(var(--ctl) + var(--sp-5)); padding: 0 var(--s-8); color: inherit; background: transparent; border: 1px solid var(--hud-border); border-radius: var(--r-sm); font: var(--weight-medium) var(--text-md) var(--font-ui); cursor: pointer; }
-.ex-btn svg { width: var(--icon-md); height: var(--icon-md); }
-.ex-btn:hover:not(:disabled) { background: var(--hud-hover); }
-.ex-btn.is-primary { color: var(--hud-accent-fg); background: var(--hud-accent); border-color: var(--hud-accent); }
-.ex-btn:disabled { opacity: 0.45; cursor: default; }
-dialog.export-dlg.is-busy .ex-btn { opacity: 0.6; pointer-events: none; }
+.ex-foot { margin-top: 0; padding: var(--s-6) var(--s-10) var(--s-8); }
+.confirm-actions button:has(svg) { display: inline-flex; align-items: center; gap: var(--s-4); }
+.confirm-actions button svg { width: var(--icon-md); height: var(--icon-md); }
+dialog.export-dlg.is-busy .ex-foot button { opacity: 0.6; pointer-events: none; }
 @media (max-width: 720px) {
   .ex-body { grid-template-columns: minmax(0, 1fr); }
   .ex-stage { min-width: 0; padding-inline: var(--s-13); }

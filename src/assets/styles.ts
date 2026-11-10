@@ -17,6 +17,7 @@ import { cleanValues, generatorById } from "../gen";
 import type { Values } from "../gen";
 import type { TextLook } from "../text/text-style";
 import { formatRatio } from "../app/export-size";
+import { cleanExportPreset, exportPresetSummary, type ExportPreset } from "../ui/export-dialog";
 
 export interface StyleItem {
   readonly id: string;
@@ -175,7 +176,17 @@ export const RATIO_KIND: StyleKind = {
   summary: (d) => formatRatio(d as number),
 };
 
-export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND, BALLOON_KIND, RATIO_KIND];
+/** An export preset: the format, quality, background, unit, resolution, padding and size of the Export dialog, to choose there again. */
+export const EXPORT_KIND: StyleKind = {
+  id: "export",
+  label: "Export preset",
+  plural: "Export presets",
+  empty: "None yet. Save one from the Export dialog's Preset list.",
+  validate: (d) => cleanExportPreset(d),
+  summary: (d) => exportPresetSummary(d as ExportPreset),
+};
+
+export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND, BALLOON_KIND, RATIO_KIND, EXPORT_KIND];
 
 export const kindById = (id: string): StyleKind | undefined => STYLE_KINDS.find((k) => k.id === id);
 

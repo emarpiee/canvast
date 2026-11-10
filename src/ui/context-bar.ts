@@ -80,6 +80,9 @@ export interface ContextActions {
   /** Export…: choose a size (from the shape) and save a sheet, a picture or shapes as a picture file (ADR 0147). */
   canExport(): boolean;
   exportPicture(): void;
+  /** Whether the selection was exported before on this device (Export again). */
+  canExportAgain(): boolean;
+  exportAgain(): void;
   downloadFile(): void;
   openFile(): void;
   hasLibraryItems(): boolean;
@@ -261,6 +264,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
         // What takes the picked things out of the canvas, in one menu that stays open: only what applies to the pick is listed
         const items = (): MenuItem[] => [
           ...(actions.canExport() ? [{ id: "exportpic", label: "Export…", hint: "PNG, WebP, JPEG, SVG or PDF, at a size", icon: ICONS.imageUp, run: () => { closeMoreMenu(); actions.exportPicture(); } }] : []),
+          ...(actions.canExport() && actions.canExportAgain() ? [{ id: "exportagain", label: "Export again", hint: "As last time, no dialog", icon: ICONS.repeat2, run: () => { closeMoreMenu(); actions.exportAgain(); } }] : []),
           ...(actions.canDownload() ? [{ id: "download", label: "Download the file", hint: "Its file; several go in a ZIP", icon: ICONS.download, run: () => actions.downloadFile() }] : []),
           ...(actions.canExportSvg() ? [{ id: "svglibrary", label: "Save to library", hint: "An SVG in the library, to place again", icon: ICONS.save, run: () => actions.saveSvgToLibrary() }] : []),
           ...([...editor.selection].some((id) => doc.get(id)?.kind === "text") ? [{ id: "copymd", label: "Copy Markdown", hint: "The Markdown of the selected text", icon: ICONS.markdown, run: () => actions.copyMarkdown() }] : []),

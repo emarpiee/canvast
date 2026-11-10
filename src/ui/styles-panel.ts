@@ -54,7 +54,7 @@ export interface StylesDeps {
   /** Pattern styles: putting one into the Pattern panel (and making it on what is picked). */
   balloon: { can(): boolean; apply(look: BalloonLook): void };
   /** Custom ratios: given to the one selected sheet or shape; `current` is its ratio (null: none selected); `ask` asks for a ratio or a size in px. */
-  ratio: { current(): number | null; apply(ratio: number, label: string): void; ask(title: string, value: number | null): Promise<number | null> };
+  ratio: { say(text: string): void; current(): number | null; apply(ratio: number, label: string): void; ask(title: string, value: number | null): Promise<number | null> };
   pattern: { apply(data: PatternData, label: string): void; /** What the Pattern panel holds now (to update a style from it). */ current(): PatternData };
   /** The solid colours of the picked shapes, and the main colours of the one picked picture (null: none is picked). */
   selectionColours(): string[];
@@ -97,7 +97,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   fileInput.dataset["testid"] = "styles-import";
   panel.appendChild(fileInput);
 
-  const canApply = (kind: string): boolean => (kind === "ratio" ? deps.ratio.current() !== null : kind === "pattern" ? true : kind === "balloon" ? deps.balloon.can() : kind === "adjustment" ? deps.adjustment.can() : kind === "text" ? deps.text.count() > 0 : deps.paint.count() > 0 || (kind === "gradient" && deps.map.count() > 0));
+  const canApply = (kind: string): boolean => (kind === "export" ? true : kind === "ratio" ? deps.ratio.current() !== null : kind === "pattern" ? true : kind === "balloon" ? deps.balloon.can() : kind === "adjustment" ? deps.adjustment.can() : kind === "text" ? deps.text.count() > 0 : deps.paint.count() > 0 || (kind === "gradient" && deps.map.count() > 0));
   const kindsShown = STYLE_KINDS;
 
   /** The small pictures of pattern styles, made once for each (the data of a style does not change; an update gets a new key). */
@@ -146,13 +146,14 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       .join("")}<div class="pal-actions"><button type="button" class="pal-add" data-add-colour="${esc(item.id)}"${pal.colours.length >= MAX_PALETTE ? " disabled" : ""}>Add colour</button><button type="button" class="pal-done" data-done>Done</button></div></div>`;
 
   let tabsAt = 0; // (the row is drawn again: it stays where it was scrolled to)
-  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette, text: ICONS.textStyle, pattern: ICONS.mountainSnow, balloon: ICONS.speechBalloon, ratio: ICONS.proportions };
+  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette, text: ICONS.textStyle, pattern: ICONS.mountainSnow, balloon: ICONS.speechBalloon, ratio: ICONS.proportions, export: ICONS.fileCog };
   const GUIDE: Record<string, string> = {
     adjustment: "Save an adjustment from the Adjust panel of a picture, then press it here to give other pictures the same look.",
     gradient: "A gradient is a blend of colours. Save one from the fill or outline picker, make a new one here, or import a GIMP .ggr file.",
     colour: "Keep the colours you use. Add one here, or save one from any colour picker.",
     palette: "A palette is a set of colours you reuse together, like a brand's.",
     pattern: "A pattern style is a generator with its settings and seed. Save one from the Pattern panel, then press it to make the same pattern on the selected sheet or shape.",
+    export: "An export preset keeps the Export dialog's choices: format, quality, background, padding, resolution and size. Choose one in the dialog's Preset list.",
     ratio: "Your own shapes for sheets and shapes, beside the built-in ones of the Shapes… list. Select a sheet or shape, then press one to give it that ratio.",
     text: "A text style is a size, spacing, alignment and colour. Select a text, save its style here, then press it to give other texts the same look.",
   };
@@ -207,7 +208,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       sub: `<div class="styles-tabs" role="tablist" aria-label="Kinds of style">${tabs}</div><div class="layers-filter"><input type="search" data-styles-filter placeholder="Search ${esc(k.plural.toLowerCase())}" aria-label="Search the ${esc(k.plural.toLowerCase())} by name" autocomplete="off" value="${esc(filter)}"></div>`,
       body: `<div class="styles-body" role="tabpanel" aria-label="${esc(k.plural)}">
         <div class="styles-tab-head"><h3>${esc(k.plural)}</h3>${k.id === "gradient" || k.id === "palette" ? moreButton(`More actions for ${k.plural}`, `data-kind-more="${k.id}"`) : ""}</div>
-        ${paints ? `<div class="styles-target" role="radiogroup" aria-label="Apply to"><span>Apply to</span>${seg("fill", "Fill", "Colours go on the fill of the selected shapes")}${seg("stroke", "Outline", "Colours go on the outline of the selected shapes")}${seg("both", "Both", "Fill and outline")}</div>` : ""}
+        ${paints ? `<div class="styles-target"><span id="styles-target-l">Apply to</span><div class="seg" role="radiogroup" aria-labelledby="styles-target-l">${seg("fill", "Fill", "Colours go on the fill of the selected shapes")}${seg("stroke", "Outline", "Colours go on the outline of the selected shapes")}${seg("both", "Both", "Fill and outline")}</div></div>` : ""}
         ${!can ? `<p class="styles-hint">${ICONS.pointer}<span>${paints ? (k.id === "gradient" ? "Select shapes or pictures on the canvas, then press one to apply it (on a picture it becomes a gradient map)." : "Select shapes on the canvas, then press one to apply it.") : k.id === "text" ? "Select texts on the canvas, then press one to apply it." : "Select pictures on the canvas, then press one to apply it."}</span></p>` : ""}
         ${actions ? `<div class="styles-actions">${actions}</div>` : ""}
         ${empty}
@@ -597,6 +598,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     else if (item.kind === "pattern") deps.pattern.apply(item.data as PatternData, item.name);
     else if (item.kind === "balloon") deps.balloon.apply(item.data as BalloonLook);
     else if (item.kind === "ratio") deps.ratio.apply(item.data as number, item.name);
+    else if (item.kind === "export") deps.ratio.say(`Choose “${item.name}” in the Preset list of Export….`);
     else applyPaint(item);
   });
   panel.addEventListener("input", (e) => {

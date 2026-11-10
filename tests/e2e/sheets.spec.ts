@@ -478,7 +478,7 @@ test("Export…: a sheet's shape becomes a size here (px, in, cm, mm at a resolu
   await w.fill("5");
   await expect(h).toHaveValue("3.33");
   await expect(dlg.locator("[data-ex-readout]")).toContainText("1500 × 1000 px");
-  await expect(dlg.locator("[data-ex-readout]")).toContainText("12.7 × 8.5 cm");
+  await expect(dlg.locator("[data-ex-readout]")).toContainText("5 × 3.33 in at 300 ppi"); // (the print size only in the unit chosen)
   // a resolution change keeps 5 in and changes the pixels
   await dlg.locator('[data-ex="dpi"]').selectOption("150");
   await expect(dlg.locator("[data-ex-readout]")).toContainText("750 × 500 px");
@@ -515,6 +515,23 @@ test("Export…: a sheet's shape becomes a size here (px, in, cm, mm at a resolu
   expect(svg, "1080 × 720 px at 150 ppi is 7.2 × 4.8 in").toContain('width="7.2in" height="4.8in"');
   await key(app, "Escape");
   await expect(dlg).toBeHidden();
+  // Opened again it starts as last time; padding adds room round it (the width stays); Enter exports; Export again needs no dialog
+  await exportWith(p, "exportpic");
+  await expect(dlg.locator('[data-format="svg"]')).toHaveAttribute("aria-checked", "true");
+  await dlg.locator('[data-format="png"]').click();
+  await expect(w).toHaveValue("1080");
+  await expect(dlg.locator("[data-chip]", { hasText: "1×" })).toHaveCount(1);
+  await expect(dlg.locator("[data-ex-dpi-hint]")).toBeVisible(); // (in px the resolution is only recorded)
+  await expect(dlg.locator("[data-ex-readout]")).not.toContainText(" in ");
+  await dlg.locator('[data-ex="pad"]').fill("10");
+  await expect(h).toHaveValue("727"); // (1060 × 706.7 inside, 10 px round it)
+  const [entered] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="pad"]').press("Enter")]);
+  expect(entered.suggestedFilename()).toMatch(/^sheet_\d+-1080x727\.png$/);
+  await key(app, "Escape");
+  await expect(dlg).toBeHidden();
+  const [again] = await Promise.all([p.waitForEvent("download"), exportWith(p, "exportagain")]);
+  expect(again.suggestedFilename()).toMatch(/^sheet_\d+-1080x727\.png$/);
+  await expect(dlg).toHaveCount(0);
   expect(app.consoleErrors).toEqual([]);
 });
 

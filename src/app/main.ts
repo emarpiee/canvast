@@ -98,7 +98,7 @@ import { installAutoIndex } from "../storage/auto-index";
 import { fmtBytes } from "../ui/format";
 import { runSaveLibraryFile } from "../ui/archive-ui";
 import { mountToolbar } from "../ui/toolbar";
-import { initColourPopover } from "../ui/colour-popover";
+import { initColourPopover, openColourPopover } from "../ui/colour-popover";
 import { labelOf, mountLayersPanel } from "../ui/layers-panel";
 import { mountMediaPlayer } from "../ui/media-player";
 import { mountBookmarksPanel } from "../ui/bookmarks-panel";
@@ -139,7 +139,8 @@ import { KEY_COMMANDS, Keymap, comboOfEvent, displayCombo, installKeymap } from 
 import { randomEmptyView, viewIsEmpty } from "../interaction/random-view";
 import { renderExport } from "./export-render";
 import type { ExportTarget } from "./export-render";
-import { openExportDialog } from "../ui/export-dialog";
+import * as D from "../core/dyadic";
+import { openExportDialog, exportAgain, exportedBefore, exportPresetSummary, type ExportPreset } from "../ui/export-dialog";
 import { mountViewSwitch } from "../ui/view-switch";
 import { followFrameSetting, mountWindowRow } from "../ui/window-frame";
 import { followScrolling } from "../ui/scrollbars";
@@ -155,7 +156,7 @@ import { installTextFont } from "../text/inter";
 import { descendantsOf, isContainer } from "../doc/containers";
 import { CameraHistory } from "./camera-history";
 import { mountTour } from "./tour";
-import { ADJUSTMENT_KIND, RATIO_KIND } from "../assets/styles";
+import { ADJUSTMENT_KIND, EXPORT_KIND, RATIO_KIND } from "../assets/styles";
 import { formatRatio, parseRatio } from "./export-size";
 import { setColourStyles } from "../ui/colour-popover";
 import { setTextureHooks } from "../ui/texture-editor";
@@ -1242,6 +1243,7 @@ async function start(): Promise<void> {
   };
   mountStylesPanel(side, editor, session.styles, {
     ratio: {
+      say: (text) => { editor.message = text; editor.changed(); },
       current: () => sheetRatio(doc, editor),
       apply: (r, label) => {
         setSheetRatio(doc, editor, r, true);
@@ -1559,15 +1561,48 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   /** Whether these objects include a pattern made by the Pattern panel (its shapes keep how it was made). */
   const holdsPattern = (ids: Iterable<string>): boolean => [...ids].some((id) => doc.get(id)?.gen !== undefined);
   // Export… (ui/export-dialog.ts, ADR 0147): the picked sheet, picture or shapes as a picture file whose size is chosen there, from its shape.
-  const openExport = (): void => {
+  /** How big a target is on screen now, in CSS px: from an object of it in its frame, as the renderer projects it. */
+  const screenSizeOf = (t: ExportTarget): { w: number; h: number } | null => {
+    const po = visibleObjects(doc, index, null, view.frameCamera, view.viewport).find((p) => t.ids.has(p.obj.id) && (p.obj.frame ?? doc.space.world) === t.frame && !p.cover);
+    if (!po || !(po.proj.ppu > 0)) return null;
+    const w = D.toNumber(D.shift(D.sub(t.max.x, t.min.x), -po.obj.unit)) * po.proj.ppu;
+    return Number.isFinite(w) && w > 0 ? { w, h: w / t.ratio } : null;
+  };
+  /** The canvas's background as #rrggbb, whatever notation the theme writes it in. */
+  const canvasHex = (): string => {
+    const c = document.createElement("canvas").getContext("2d", { willReadFrequently: true })!;
+    c.fillStyle = theme.background;
+    c.fillRect(0, 0, 1, 1);
+    const [r, g, b] = c.getImageData(0, 0, 1, 1).data;
+    return `#${[r, g, b].map((v) => v!.toString(16).padStart(2, "0")).join("")}`;
+  };
+  const openExport = (again = false): void => {
     const targets = exportTargets(doc, editor);
     if (!targets.length || appView !== "canvas") {
       editor.message = "Select a sheet, a picture or some shapes to export.";
       editor.changed();
       return;
     }
-    const each = targets.length === 1 ? exportEachTargets(doc, editor) : [];
-    openExportDialog({
+    const each = targets.length === 1 && !again ? exportEachTargets(doc, editor) : [];
+    (again ? exportAgain : openExportDialog)({
+      screenSize: screenSizeOf,
+      canvasColour: canvasHex,
+      pickColour: (anchor, value, onInput) => openColourPopover(anchor, { name: "Background", value, onInput }),
+      presets: {
+        list: () => session.styles.of(EXPORT_KIND.id).map((s) => ({ id: s.id, name: s.name, data: s.data as ExportPreset })),
+        save: async (data) => {
+          const name = await promptDialog({ title: "Name the export preset", lines: [exportPresetSummary(data)], value: "", confirmLabel: "Save" });
+          if (name === null) return null;
+          const made = await session.styles.add(EXPORT_KIND.id, name, data);
+          return made && { id: made.id, name: made.name };
+        },
+        update: (id, data) => session.styles.update(id, data),
+        manage: () => {
+          editor.stylesTab = EXPORT_KIND.id;
+          editor.stylesOpen = true;
+          editor.changed();
+        },
+      },
       targets,
       ...(each.length ? { each } : {}),
       render: (t, w, h, bg) => renderExport({ doc, index, assets: filesAssets, theme }, t, w, h, bg),
@@ -2005,6 +2040,8 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       resetInitialState: () => resetToInitialShape(doc, editor),
       canExport: () => exportTarget(doc, editor) !== null,
       exportPicture: () => openExport(),
+      canExportAgain: () => exportedBefore(exportTargets(doc, editor)),
+      exportAgain: () => openExport(true),
       canDownload: () => pickedFiles(doc, editor).length > 0,
       downloadFile: () => void downloadSelection(doc, editor, assets, session, settings),
       canMakeNoteFiles: () => [...editor.selection].some((id) => { const o = doc.get(id); return o?.kind === "text" && !!o.card; }),

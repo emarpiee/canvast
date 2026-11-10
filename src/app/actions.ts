@@ -2070,8 +2070,36 @@ export function buildTarget(doc: DocumentStore, sel: readonly CanvasObject[], sh
   const vectors = all.every((o) => o.kind === "path") && paths.length ? paths : null;
   const only = sel.length === 1 ? sel[0]! : null;
   const original = only && only.kind === "image" && !only.crop ? { w: only.pixelW, h: only.pixelH } : null;
-  const name = sheet?.name ?? only?.name ?? (only ? (only.kind === "image" ? "picture" : only.kind === "path" ? "shape" : only.kind) : "selection");
+  const name = sheet?.name ?? selectionName(doc, sel);
   return { kind: sheet ? "sheet" : "selection", name, frame, min, max, ids, ratio: lw / lh, vectors, original };
+}
+
+/** The first words of a text (its Markdown marks left out), for a name. */
+const firstWords = (md: string, n = 5): string => md.replace(/[#*_`>\[\]()!~|-]+/g, " ").split(/\s+/).filter(Boolean).slice(0, n).join(" ");
+
+/**
+ * What an export of these objects is called: its own name; a group's name when they are one group; a shape with its words (a balloon) by
+ * its name or its words; a text by its first words; else what it is (picture, shape...). Several things: the first one's, and how many more.
+ */
+function selectionName(doc: DocumentStore, sel: readonly CanvasObject[]): string {
+  const g = sel[0]?.groups?.[0];
+  if (g && sel.every((o) => o.groups?.[0] === g)) {
+    const named = sel.find((o) => o.groupNames?.[g])?.groupNames?.[g];
+    if (named) return named;
+  }
+  const ids = new Set(sel.map((o) => o.id));
+  // (words in a picked shape, and connectors, go with what holds them)
+  const units = sel.filter((o) => !(o.kind === "text" && parentOf(o) !== undefined && ids.has(parentOf(o)!)) && !(o.kind === "path" && o.params?.link));
+  const nameOf = (o: CanvasObject): string => {
+    if (o.name) return o.name;
+    if (o.kind === "text") return firstWords(o.md) || "text";
+    const words = sel.find((w): w is TextObject => w.kind === "text" && parentOf(w) === o.id);
+    if (words && firstWords(words.md)) return firstWords(words.md);
+    return o.kind === "image" ? "picture" : o.kind === "path" ? (o.shape === "balloon" ? "balloon" : "shape") : "drawing";
+  };
+  const first = units[0] ?? sel[0];
+  if (!first) return "selection";
+  return units.length > 1 ? `${nameOf(first)} and ${units.length - 1} more` : nameOf(first);
 }
 
 /** The shapes an objects fill repeats, hidden ones too (hiding the source is the usual way to use it), for the SVG; null when any is not a shape. */
