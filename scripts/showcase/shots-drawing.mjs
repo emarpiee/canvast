@@ -180,10 +180,12 @@ await step("comic", async () => {
   await settle(600);
   const panels = (await objs()).filter((o) => o.container).map((o) => o.id);
   await select(panels);
-  await p.keyboard.press("Shift+A");
+  await menu("sheetmenu", "puton"); // (a page round the panels)
   await settle(600);
   page = (await objs()).filter((o) => o.container).find((o) => !panels.includes(o.id))?.id ?? null;
   await select([page]);
+  await p.keyboard.press("Shift+A"); // (auto layout on the page)
+  await settle(600);
   await p.locator('[data-layout-flow="grid"]').click();
   await p.locator("[data-layout-columns]").fill("2");
   await p.locator("[data-layout-columns]").press("Enter");

@@ -115,7 +115,7 @@ await step("search", async () => {
 
 // 5. Search keywords: the help card beside the box
 await step("search-help", async () => {
-  await p.locator(".search-help-btn").first().click();
+  await p.locator("#assets-view .search-help-btn, .assets-searchbox .search-help-btn").filter({ visible: true }).first().click();
   await settle(500);
   await shot("search-help");
   await p.keyboard.press("Escape");

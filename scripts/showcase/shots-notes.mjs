@@ -1,6 +1,7 @@
 // The README's pictures of notes: a study plan written in the notes editor with its properties, links to other notes and pictures of
 // the library (public-domain artworks, scripts/showcase/art), what links to it, and its card on a canvas beside its references.
 // Run from the repo root after `npm run build`: node scripts/showcase/shots-notes.mjs <unused> <outDir>
+import { readFileSync } from "node:fs";
 import { artOf, artPath, open } from "./lib.mjs";
 
 const [, out] = process.argv.slice(2);
@@ -58,7 +59,7 @@ tags: [template]
 -
 `;
 const hashes = await importFiles([
-  artPath(horse), artPath(fair), artPath(wave),
+  ...[horse, fair, wave].map((f) => ({ name: f, mimeType: "image/jpeg", buffer: readFileSync(artPath(f)) })),
   { name: "Horse anatomy - study plan.md", mimeType: "text/markdown", buffer: Buffer.from(PLAN) },
   { name: "Gesture practice.md", mimeType: "text/markdown", buffer: Buffer.from(GESTURE) },
   { name: "Study notes.md", mimeType: "text/markdown", buffer: Buffer.from(COMPOSITION) },

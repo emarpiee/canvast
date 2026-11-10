@@ -14,63 +14,72 @@ const h = (file) => hashes[file];
 await p.getByTestId("view-canvas").click();
 await settle();
 
-// 1. A board for horse studies: the studies and the landscapes laid out on a sheet by auto layout, a title above them
+// 1. A board for horse studies: the studies and the landscapes laid out on a sheet by auto layout as a grid, a title above them
 let sheet = null;
-await step("board", async () => {
-  await newCanvas("Horse studies");
-  await place(artOf("delacroix", "bonheur", "degheyn", "waterloo", "verhaecht", "leprince").map(h));
-  await p.keyboard.press("Control+a");
-  await menu("arrangemenu", "grid:name-asc");
-  await p.keyboard.press("Shift+A");
-  await settle(800);
-  sheet = (await H(() => window.__canvastDebug.objects())).find((o) => o.container)?.id ?? null;
-  await p.keyboard.press("Escape");
-  await fit();
-  await p.keyboard.press("-");
-  await settle(500);
-  // a title over the sheet
-  const b = await boxOf(sheet);
-  await p.keyboard.press("t");
-  await p.mouse.click(b.minX, b.minY - 70);
-  await p.keyboard.type("Horses: weight, gesture, light");
-  await p.keyboard.press("Control+a");
-  await p.locator("[data-text-size]").fill("36");
-  await p.locator("[data-text-size]").press("Enter");
-  await p.keyboard.press("Escape");
-  await p.keyboard.press("Escape");
-  await p.keyboard.press("v");
-  await off();
-  await shot("board");
-});
-
-// 2. Auto layout: the sheet picked, its layout in the Properties bar, a gap and padding given
-await step("auto-layout", async () => {
-  await select([sheet]);
-  await settle(400);
-  await p.locator("[data-auto-layout]").waitFor();
+const layoutGrid = async (cols, gap, pad) => {
   await p.locator('[data-layout-flow="grid"]').click();
-  await p.locator('[data-layout-columns]').fill("3");
-  await p.locator('[data-layout-columns]').press("Enter");
-  for (const [sel, v] of [['[data-layout-gap="0"]', "24"], ['[data-layout-gap="1"]', "24"], ['[data-layout-pad="h"]', "24"], ['[data-layout-pad="v"]', "24"]]) {
-    await p.locator(sel).fill(v);
+  await p.locator("[data-layout-columns]").fill(String(cols));
+  await p.locator("[data-layout-columns]").press("Enter");
+  for (const [sel, v] of [['[data-layout-gap="0"]', gap], ['[data-layout-gap="1"]', gap], ['[data-layout-pad="h"]', pad], ['[data-layout-pad="v"]', pad]]) {
+    await p.locator(sel).fill(String(v));
     await p.locator(sel).press("Enter");
   }
   await blur();
   await settle(600);
+};
+await step("board", async () => {
+  await newCanvas("Horse studies");
+  await place(artOf("delacroix", "bonheur", "degheyn", "waterloo", "verhaecht", "leprince").map(h));
+  await fit();
+  await p.keyboard.press("Control+a");
+  await p.keyboard.press("Shift+A");
+  await settle(800);
+  sheet = (await H(() => window.__canvastDebug.objects())).find((o) => o.container)?.id ?? null;
+  await select([sheet]);
+  await settle(300);
+  await layoutGrid(3, 60, 60);
+  await p.keyboard.press("Escape");
+  await fit();
+  // a title over the sheet
+  const b = await boxOf(sheet);
+  await p.keyboard.press("t");
+  await p.mouse.click(b.minX, b.minY - 60);
+  await p.keyboard.type("Horses: weight, gesture, light");
+  await p.keyboard.press("Control+a");
+  await p.locator("[data-text-size]").fill("32");
+  await p.locator("[data-text-size]").press("Enter");
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("v");
+  await fit();
   await off();
-  await shot("auto-layout");
+  await shot("board");
 });
 
-// 3. Crop: one study, its window being moved
+// 2. Auto layout: the sheet picked, its layout in the Properties bar
+await step("auto-layout", async () => {
+  await select([sheet]);
+  await settle(500);
+  await p.locator("[data-auto-layout]").waitFor();
+  await off();
+  await shot("auto-layout");
+  await p.keyboard.press("Escape");
+});
+
+// 3. Crop: a study on a canvas of its own, its window being moved
 await step("crop", async () => {
-  const pics = (await H(() => window.__canvastDebug.objects())).filter((o) => o.kind === "image");
-  const one = pics[0].id;
+  await newCanvas("Crop");
+  const [one] = await place([h(artOf("delacroix")[0])]);
+  await fit();
+  await p.keyboard.press("-");
+  await settle(400);
   await select([one]);
   await settle(300);
   await p.locator("[data-crop]").click();
   await settle(400);
   const b = await boxOf(one);
-  await drag([b.maxX, (b.minY + b.maxY) / 2], [b.maxX - (b.maxX - b.minX) * 0.25, (b.minY + b.maxY) / 2]);
+  await drag([b.maxX, (b.minY + b.maxY) / 2], [b.maxX - (b.maxX - b.minX) * 0.22, (b.minY + b.maxY) / 2]);
+  await drag([(b.minX + b.maxX) / 2, b.minY], [(b.minX + b.maxX) / 2, b.minY + (b.maxY - b.minY) * 0.12]);
   await off();
   await shot("crop");
   await p.locator("[data-crop]").click();
