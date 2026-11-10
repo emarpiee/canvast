@@ -60,6 +60,9 @@ test.beforeAll(async () => {
   await p.keyboard.press("Control+a");
   await p.locator('[data-action="fit-selection"]').click();
   await p.keyboard.press("Escape");
+  // (the project's board and canvas named as such work is)
+  const tree = (await p.evaluate(() => window.__canvastDebug.session().tree))!;
+  await p.evaluate(([b, c]) => Promise.all([window.__canvastDebug.workspaceOp("renameBoard", b!, "Picture book"), window.__canvastDebug.workspaceOp("renameCanvas", c!, "References")]), [tree[0]!.id, tree[0]!.canvases[0]!.id]);
   await p.evaluate(() => window.__canvastDebug.flushStorage());
   await settle(800);
 });
@@ -97,6 +100,7 @@ test("window-row", async () => {
   await p.mouse.move(700, 300);
   await p.mouse.move(700, 1);
   await p.getByTestId("win-close").waitFor();
+  await p.getByTestId("win-close").hover(); // (the pointer stays on the row, so it stays)
   await settle(400);
   await shot("window-row", { x: 0, y: 0, width: 1440, height: 160 });
 });
