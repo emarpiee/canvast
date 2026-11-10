@@ -410,7 +410,7 @@ export function drawOverlays(
   drawSelection(ctx, selected, editor, theme, vp);
   if (editor.tool === "node") drawNodes(ctx, selected, editor, theme);
   if (editor.tool === "select") drawCornerHandles(ctx, selected, editor, theme, owner);
-  if (editor.tool === "select" || editor.tool === "node") drawHandleLabel(ctx, editor, theme);
+  drawHandleLabel(ctx, editor, theme); // (whatever the tool: a resize, a handle, or a box being drawn says its value)
   // (not while the nodes are edited or a shape's corners are opened out one by one: those handles are what is being worked on)
   if (editor.tool === "select" && !(selected.length === 1 && editor.cornersOpen === selected[0]!.obj.id)) drawGradientHandles(ctx, selected, theme, editor.gradientFocus);
 
@@ -578,7 +578,7 @@ function drawCornerHandles(ctx: CanvasRenderingContext2D, picked: readonly Proje
   ctx.restore();
 }
 
-/** The line a handle slides along and the few words beside the pointer (Radius 12, Count 8, what the keys do over a node): for the Select and Edit nodes tools. */
+/** The line a handle slides along and the few words beside the pointer (Radius 12, Count 8, what the keys do over a node, the ratio of a box being drawn or resized). */
 function drawHandleLabel(ctx: CanvasRenderingContext2D, editor: EditorState, theme: SceneTheme): void {
   if (!editor.handleLabel) return;
   ctx.save();

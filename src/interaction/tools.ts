@@ -757,14 +757,22 @@ export function attachTools(
     editor.changed();
   };
 
+  /** The shape of a box being made or resized, as a ratio (width : height), beside the pointer: one label for resizing and every drawing tool. */
+  const showRatio = (s: ScreenPoint, w: number, h: number): void => {
+    editor.handleLabel = w > 0 && h > 0 && Number.isFinite(w / h) ? { x: s.x, y: s.y, text: formatRatio(w / h) } : null;
+  };
   const updateShape = (s0: ScreenPoint, e: PointerEvent): void => {
     const d = editor.shapeDraft;
     if (!d) return;
     // (the dragged corner snaps as a resized one does; a square or one drawn from its middle keeps the corner the pointer gives)
-    const sn = g.kind === "shape" && !(e.ctrlKey || e.metaKey) && !keys(e).shift && !keys(e).alt ? g.snap : null;
+    // (a text or note box being dragged out snaps as a shape does: its outline shows where it will be)
+    const sn = (g.kind === "shape" || g.kind === "text") && !(e.ctrlKey || e.metaKey) && !keys(e).shift && !keys(e).alt ? g.snap : null;
     const s = snapPoint(s0, sn);
     const l = localIn(d.frame, d.anchor, d.unit, s);
-    editor.shapeDraft = { ...d, ...shapeBox(d.kind, l.x, l.y, keys(e).shift, keys(e).alt) };
+    const box = shapeBox(d.kind, l.x, l.y, keys(e).shift, keys(e).alt);
+    editor.shapeDraft = { ...d, ...box };
+    // (a line has no shape to give: only boxes show their ratio)
+    if (d.kind !== "line") showRatio(s, Math.abs(box.bw), Math.abs(box.bh));
     editor.changed();
   };
 
@@ -789,6 +797,7 @@ export function attachTools(
   const commitShape = (s: ScreenPoint, cancelled: boolean, e: PointerEvent, start: ScreenPoint): void => {
     updateShape(s, e);
     editor.guides = null;
+    editor.handleLabel = null;
     const d = editor.shapeDraft;
     editor.shapeDraft = null;
     // A press without a drag makes nothing (a stray click must not leave a shape behind).
@@ -2349,7 +2358,7 @@ export function attachTools(
       case "scale": {
         const { kx, ky, fixed } = scaleFactors(g, s, { shift: keys(e).shift, alt: keys(e).alt, noSnap: e.ctrlKey || e.metaKey });
         // the shape of the box as it is resized, as a ratio (width : height), beside the finger or pointer
-        if (g.size0.w > 0 && g.size0.h > 0 && kx > 0 && ky > 0) editor.handleLabel = { x: s.x, y: s.y, text: formatRatio((g.size0.w * kx) / (g.size0.h * ky)) };
+        if (g.size0.w > 0 && g.size0.h > 0 && kx > 0 && ky > 0) showRatio(s, g.size0.w * kx, g.size0.h * ky);
         if (g.sheets) {
           // the sheets with what is on them (picked or not), which follows by its pins, as the ratio and size fields do
           const withContents = new Set([...g.ids, ...descendantsOf(doc.all(), new Set(g.ids.filter((id) => isContainer(doc.get(id)))))]);
@@ -2582,11 +2591,13 @@ export function attachTools(
       case "text":
         // Opened after the pointer is released, so the editor keeps the focus.
         editor.shapeDraft = null;
+        editor.handleLabel = null;
         if (cancelled || editor.blockEdit()) break;
         {
           // (a box dragged out: its far corner snaps as a drawn shape's does)
           const end = g.moved ? snapPoint(s, g.snap) : s;
           editor.guides = null;
+          editor.handleLabel = null;
           if (editor.tool === "note") {
             const wide = g.moved && Math.abs(end.x - g.start.x) >= MIN_TEXT_BOX_PX;
             hooks.newNote?.({ x: wide ? Math.min(end.x, g.start.x) : g.start.x, y: wide ? Math.min(end.y, g.start.y) : g.start.y }, wide ? Math.abs(end.x - g.start.x) : undefined);

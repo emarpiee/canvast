@@ -1506,6 +1506,16 @@ test("drawing a shape or a sheet snaps where it starts and where it ends: onto a
   for (const [name, tool] of [["shape", "u"], ["sheet", "c"]] as const) {
     // what there is to snap to: a rectangle from (800, 250) to (900, 450)
     await draw("u", [800, 250], [900, 450]);
+    // while it is drawn, its ratio is shown beside the pointer, as on a resize; let go, it goes
+    await key(app, tool);
+    await p.mouse.move(400, 500);
+    await p.mouse.down();
+    await p.mouse.move(500, 550, { steps: 3 });
+    await p.mouse.move(600, 600, { steps: 3 });
+    await expect.poll(() => p.evaluate(() => window.__canvastDebug.handleLabel()), `${name}: the ratio while drawn`).toBe("2 : 1");
+    await p.mouse.up();
+    await expect.poll(() => p.evaluate(() => window.__canvastDebug.handleLabel())).toBeNull();
+    await key(app, "Control+z");
     // starts 3 px off its top-left corner: on the corner
     let b = await draw(tool, [797, 247], [700, 180]);
     if (!near(b.maxX, 800) || !near(b.maxY, 250)) missed.push(`${name}: start on a corner at ${b.maxX}, ${b.maxY}`);

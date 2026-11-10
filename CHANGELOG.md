@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.56.13 — The ratio while drawing (2026-11-10)
+
+- **Added:** while a shape, sheet, speech balloon, text box or note box is drawn, its ratio (width : height) shows beside the pointer, as on a resize: one label for both.
+- **Fixed:** the words beside the pointer were drawn only with the Select and Edit nodes tools, so a drawing tool's ratio never showed; they show with every tool.
+- **Fixed:** a text or note box being dragged out showed its outline where the pointer was, not where it would snap to.
+
 ## 0.56.12 — Each tool's cursor carries its icon (2026-11-10)
 
 - **Fixed:** the tools that draw showed a plain crosshair, the same for every tool. A tool that draws, picks by drawing or erases shows its own icon beside a small crosshair, the icon the rail shows: each kind of shape and of pen its own.
