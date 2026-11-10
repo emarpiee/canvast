@@ -166,7 +166,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `library` | View in the library (selection bar) |
 | `locate` | Show 1 instance(s) on Board 1 › Canvas 1 |
 | `lock` | Lock thickness |
-| `lock-keyhole` | Lock the selection: it is drawn, but cannot be pic; Lock selection |
+| `lock-keyhole` | Lock: the selection (it is drawn, but cannot be picked); the hidden items (hidden mode chip) |
 | `lock-keyhole-open` | Unlock all |
 | `magnet` | Snap to other objects |
 | `map-pin` | Place on Board 1 › Canvas 1 |
@@ -192,6 +192,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `refresh-ccw-dot` | Reset flip (the picture the right way round) |
 | `sliders-vertical` | Adjust the picture (the Properties bar), and the Adjust panel button of the panels bar: both open the Adjust panel |
 | `shrink` | Fit the sheet to what is on it |
+| `rotate-cw` | Reload the library: read it again and draw every card anew (end of the Library's status bar) |
 | `layout-template` | Auto layout on or off (Sheets menu, the sheet's badge in Layers) |
 | `gallery-horizontal` | Auto layout flow: row (Properties bar) |
 | `gallery-vertical` | Auto layout flow: column |
@@ -291,8 +292,8 @@ One icon per function: two buttons that do different things never share an icon,
 | `arrow-up-to-line` | Back to the top of the library (status bar, grid and list) |
 | `minus` (also Zoom out) | Minimize the window (desktop app, window frame off): the common window icon, the owner's choice over a unique one |
 | `square` | Maximize or restore the window (desktop app, window frame off): the common window icon, the owner's choice |
-| `anchor` | Stay in hidden mode when leaving the library (hidden mode, status bar) |
-| `pin` | Pin a folder to the top of the library sidebar (filled on a pinned one) |
+| `log-out` | Exit hidden mode (hidden mode chip, status bar) |
+| `pin` | Pin: a folder to the top of the library sidebar; hidden mode, so it stays on when leaving the library (filled when pinned) |
 | `folder-up` | The mark of a pinned folder in the library sidebar |
 | `pin-off` | Unpin a folder (library sidebar) |
 | `file-image` | Custom thumbnail of a library item (details panel, bulk bar) |

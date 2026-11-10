@@ -427,6 +427,11 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
   // An export outside the workspace: only into a folder the person chose in the system's dialog (tests name one), never inside the
   // workspace, and only at safe relative paths under the folder made there. Each file is read back and its SHA-256 answered.
   const exports = new Map<string, string>();
+  // What each of the app's processes holds in memory (MB), for Information shown: Technical: the page, the GPU and the app itself.
+  ipcMain.handle("canvast:memory", (e) => {
+    own(e);
+    return app.getAppMetrics().map((m) => ({ type: m.type, mb: Math.round(m.memory.workingSetSize / 1024) }));
+  });
   ipcMain.handle("canvast:export", async (e, op: unknown, ...args: unknown[]) => {
     own(e);
     if (op === "begin") {

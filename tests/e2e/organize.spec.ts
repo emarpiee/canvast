@@ -757,6 +757,11 @@ test("the library's filters are kept over a reload, are said over the grid, and 
   await reset.click();
   await expect(p.getByTestId("assets-search")).toHaveValue("");
   await expect(reset).toBeHidden();
+  // Reload, at the end of the status bar: the library is read and drawn again, as it was
+  const cards = p.getByTestId("asset-card");
+  const n = await cards.count();
+  await p.getByTestId("assets-reload").click();
+  await expect(cards).toHaveCount(n);
   expect(app.consoleErrors).toEqual([]);
 });
 

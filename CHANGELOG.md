@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.56.28 — Measuring what makes the Library stop (2026-11-10)
+
+- **Changed:** the canvas's last edits are saved beside the Library as it opens, not before (it showed a moment later); when the save had something to write, the Library is read again then.
+- **Changed:** the hidden mode chip's buttons use the app's common icons: a pin to stay in hidden mode (filled when on, as a pinned folder), *Exit* with the exit icon, *Lock* with the lock of *Lock selection*.
+- **Fixed:** a paste the canvas takes stops there only when the browser sent it to a hidden text box that does not have the keys (Firefox); a page's own listeners get it otherwise.
+- **Added:** **Reload the library** at the end of the Library's status bar: it is read again and every card drawn anew, for when something looks out of date.
+- **Fixed:** opening the Library again with nothing changed in it laid out, counted and drew every card again (over a second in a library of 7,000 items, before it could scroll); the same listing is now kept and nothing is done again.
+
+- **Added:** *Information shown: Technical* also shows how long the Library took to be read and drawn the last time and its slowest steps (saving the canvas, reading the list, the canvas tags, filtering, drawing), the longest time the page could not answer in the last minute (Chromium and the desktop app), and, in the desktop app, what each of its processes holds in memory (the app, the page, the GPU), as the system's own list shows it.
+
 ## 0.56.27 — Less memory when going from the canvas to the Library (2026-11-10)
 
 - **Changed:** leaving the canvas for the Library (or Settings) lets go of its tiles and of the pictures it had decoded; they are made again when you come back (the first frame back is a little slower). Editing on the canvas and then searching and browsing the Library no longer stacks the two in memory.

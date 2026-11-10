@@ -112,6 +112,8 @@ import type { SettingsStore } from "../settings/settings";
 export interface AssetsView {
   /** Thumbnails held for cards seen lately (Information shown: Technical). */
   thumbsHeld(): number;
+  /** How long the library took to be read and drawn the last time, and its slowest steps (Information shown: Technical); "" before it is. */
+  lastOpen(): string;
   show(): void;
   hide(): void;
   /** Put the cursor in the library's search box (closing the viewer if it is open). */
@@ -340,7 +342,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     </div>
     <footer class="hud-bottom assets-statusbar" data-testid="assets-statusbar">
       <div class="hud-readout assets-readout" aria-live="off">
-        <span class="assets-hidden-bar" data-testid="hidden-mode-bar" role="status" title="Hidden mode: only hidden items are listed, and what you do here is done to them" hidden>${ICONS.eyeClosed}<span class="assets-hidden-label">Hidden mode</span><button type="button" data-action="hidden-stay" data-testid="hidden-mode-stay" aria-pressed="false" aria-label="Stay in hidden mode when leaving the library" title="Stay in hidden mode when leaving the library (also in Settings > Privacy)">${ICONS.anchor}</button><button type="button" data-action="exit-hidden" data-testid="hidden-mode-exit" aria-label="Exit hidden mode" title="Exit hidden mode: the hidden items leave this screen, still unlocked (devices they are shared with can open them)">Exit</button><button type="button" data-action="lock-hidden" data-testid="hidden-mode-lock" aria-label="Lock the hidden items" title="Lock: nothing opens the hidden items, here or on a shared device, until the password is typed again" hidden>Lock</button></span>
+        <span class="assets-hidden-bar" data-testid="hidden-mode-bar" role="status" title="Hidden mode: only hidden items are listed, and what you do here is done to them" hidden>${ICONS.eyeClosed}<span class="assets-hidden-label">Hidden mode</span><button type="button" data-action="hidden-stay" data-testid="hidden-mode-stay" aria-pressed="false" aria-label="Stay in hidden mode when leaving the library" title="Pin hidden mode: stay in it when leaving the library (also in Settings > Privacy)">${ICONS.pin}</button><button type="button" data-action="exit-hidden" data-testid="hidden-mode-exit" aria-label="Exit hidden mode" title="Exit hidden mode: the hidden items leave this screen, still unlocked (devices they are shared with can open them)">${ICONS.logOut}Exit</button><button type="button" data-action="lock-hidden" data-testid="hidden-mode-lock" aria-label="Lock the hidden items" title="Lock: nothing opens the hidden items, here or on a shared device, until the password is typed again" hidden>${ICONS.lockKeyhole}Lock</button></span>
         <span class="assets-count" data-testid="assets-count"></span>
         <span class="assets-picked" data-testid="assets-picked" hidden></span>
         <span class="assets-total" data-testid="assets-total"></span>
@@ -353,6 +355,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         <button type="button" data-layout="list" aria-pressed="false" aria-label="List" title="List">${ICONS.layoutList}</button>
         <span class="hud-sep assets-size-sep" role="separator"></span>
         <label class="assets-size" title="Thumbnail size">${ICONS.moveDiagonal}<input type="range" min="96" max="240" step="24" value="144" aria-label="Thumbnail size"></label>
+        <span class="hud-sep" role="separator"></span>
+        <button type="button" data-action="reload-library" data-testid="assets-reload" aria-label="Reload the library" title="Reload the library: read it again and draw every card anew (when something looks out of date)">${ICONS.reloadLibrary}</button>
       </div>
     </footer>
     <div class="place-menu" role="menu" aria-label="Place on" data-testid="place-menu" hidden></div>`;
@@ -2089,10 +2093,29 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   };
   // ---- data
   /** Read the library again; `metaOnly` after a change to its organization only, which keeps the usage and the canvas tags read before. */
+  /** Reload (the button at the end of the status bar): the listing is taken as new, so everything is counted, laid out and drawn again. */
+  let relistAll = false;
+  /** Whether two listings hold the same items, folders and missing files, in the same order, each the same in every field. */
+  const sameListing = (a: CatalogListing, b: CatalogListing): boolean => {
+    if (a.entries.length !== b.entries.length || a.missing.length !== b.missing.length || a.folders.length !== b.folders.length) return false;
+    if (JSON.stringify(a.folders) !== JSON.stringify(b.folders) || JSON.stringify(a.missing) !== JSON.stringify(b.missing) || JSON.stringify(a.hiddenFolders ?? null) !== JSON.stringify(b.hiddenFolders ?? null)) return false;
+    for (let i = 0; i < a.entries.length; i++) if (JSON.stringify(a.entries[i]) !== JSON.stringify(b.entries[i])) return false;
+    return a.pendingDeletion === b.pendingDeletion;
+  };
+  // How long the last reading and drawing of the library took, step by step (Information shown: Technical), to find what makes it stop.
+  const laps: Array<[string, number]> = [];
+  let lapAt = 0, lapStart = 0, lapTotal = 0, filterMs = 0;
+  const lap = (name: string): void => {
+    const now = performance.now();
+    laps.push([name, now - lapAt]);
+    lapAt = now;
+  };
   const refresh = async (metaOnly = false): Promise<void> => {
     if (desktopBridge()) void trashView.refresh();
     if (!visible) return;
     const gen = ++generation;
+    laps.length = 0;
+    lapAt = lapStart = performance.now();
     if (!session.catalog) {
       grid.innerHTML = `<p class="assets-empty">Storage is unavailable, so there is no library in this tab.</p>`;
       return;
@@ -2108,9 +2131,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const pages = pagesNow();
     const light = !pages && metaOnly && listing ? await session.catalog.relist(listing) : null;
     if (gen !== generation) return;
-    if (!light && !(pages && metaOnly)) await session.persistence.flush(); // usage reflects every edit made so far
+    // The canvas's last edits are saved beside it, not before it: the library shows at once, and when the save had something to write
+    // (which can change how often a file is used), it is read again then (kept as it is when nothing changed).
+    const unsaved = !light && !(pages && metaOnly) && session.persistence.pendingCount > 0;
+    if (unsaved) void session.persistence.flush().then(() => { if (visible && gen === generation) void refresh(metaOnly); }, () => undefined);
+    lap("canvas saved");
     let l = pages ? await pagedListing(pages, metaOnly) : (light ?? (await session.catalog.list()));
+    lap("list read");
     if (!l) return;
+    // Nothing changed since the last time (the library opened again after looking at a canvas): the same listing is kept, so nothing is
+    // laid out, counted or drawn again (that took seconds in a large library, before it could scroll).
+    if (!pages && listing && !relistAll && sameListing(listing, l)) l = listing;
+    relistAll = false;
+    lap("compared");
     if (!pages) {
       allFolders = [...l.folders, ...(l.hiddenFolders ?? [])];
       if (hiddenMode) l = { ...l, folders: modeFolders(countSideOf(l.entries, allFolders, true).folders.keys()) };
@@ -2131,9 +2164,14 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       canvasTags = await session.canvasTagIndex().catch(() => canvasTags);
       assetCanvasTags = selected && picked.size <= 1 ? await session.canvasTagsOfAsset(selected).catch(() => []) : [];
     } else if (!selected || picked.size !== 1) places = [];
+    lap("canvas tags");
     if (gen !== generation) return;
     if (scope.startsWith("ctag:") && ![...canvasTags.keys()].some((k) => tagIsOrUnder(k, scope.slice(5)))) scope = "all";
+    filterMs = 0;
     render();
+    lap("drawn");
+    laps.push(["filtered", filterMs]);
+    lapTotal = performance.now() - lapStart;
     startStep("library shown");
     void fillThumbs();
   };
@@ -2526,7 +2564,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       void requery(pages);
       if (!paged) return;
     }
+    const filterAt = performance.now();
     const rows = filtered();
+    filterMs += performance.now() - filterAt;
     const usageAll = usageSel.value === "all" && !search.value.trim() && scope === "all";
     // (the items of the mode: hidden ones are counted in hidden mode only, and only they are)
     if (totalOf?.of !== (paged ?? listing)) {
@@ -2541,6 +2581,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     filteredChip.hidden = !why.length || rows.length >= all;
     if (!filteredChip.hidden) filteredText.textContent = `Showing ${rows.length} of ${plural(all, "item")}: ${why.join(" · ")}`;
     showPicked();
+    const timed = (name: string, at: number): void => void (laps.length < 40 && laps.push([name, performance.now() - at])); // (a redraw after the opening adds its own, a few)
+    let at = performance.now();
     if (cardsOf !== listing || cardsReadOnly !== session.readOnly) {
       if (!pagesNow() && cardsOf !== listing) sortProps(fieldKeysNow());
       cardHtml = new WeakMap();
@@ -2579,12 +2621,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           grid.classList.add("is-virtual");
           gridEmpty = "";
         }
+        timed("cards listed", at);
+        at = performance.now();
         relayout();
+        timed("laid out", at);
       }
     }
+    at = performance.now();
     markPicked();
     renderSide();
+    timed("sidebar", at);
+    at = performance.now();
     renderInspector();
+    timed("details", at);
     if (slideHash && !viewer.hidden) {
       if (!entryOf(slideHash) && !note?.busy) closeSlide(); // the open asset was deleted (a note being saved gets a new hash)
       else if (viewList().list !== filmOf) renderFilm();
@@ -5433,6 +5482,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   function showToTop(): void {
     toTop.hidden = toTopSep.hidden = scroller.scrollTop < scroller.clientHeight;
   }
+  root.querySelector<HTMLButtonElement>('[data-testid="assets-reload"]')!.addEventListener("click", () => {
+    relistAll = true;
+    void refresh();
+  });
   toTop.addEventListener("click", () => {
     scroller.scrollTop = 0;
     showToTop();
@@ -5530,6 +5583,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   });
   const view: AssetsView = {
     thumbsHeld: () => thumbUrls.size,
+    // ("drawn" holds the filtering too: it is said apart)
+    lastOpen: () => (laps.length ? `library read and drawn in ${Math.round(lapTotal)} ms: ${[...laps].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([n, ms]) => `${n} ${Math.round(ms)}`).join(" · ")}` : ""),
     show() {
       visible = true;
       pump();

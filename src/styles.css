@@ -3164,7 +3164,7 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
   .side-row.tree-row .side-more.side-pin { right: calc(var(--s-2) + var(--tree-row-h)); }
   .side-row.tree-row:has(.side-pin):hover .side-item, .side-row.tree-row:has(.side-pin):focus-within .side-item { padding-right: calc(var(--s-2) + var(--tree-row-h)); }
 }
-.side-pin[aria-pressed="true"] svg { fill: currentColor; }
+.side-pin[aria-pressed="true"] svg, .assets-hidden-bar [data-action="hidden-stay"][aria-pressed="true"] svg { fill: currentColor; } /* (pinned: filled, the one look of a pin that is on) */
 @media (hover: none), (max-width: 640px) { .side-row .side-more.side-pin { display: none; } } /* (no hover to show it: pinning is in the row's More) */
 .asset-where { margin: 0 0 var(--s-4); font-size: var(--text-sm); overflow-wrap: anywhere; }
 

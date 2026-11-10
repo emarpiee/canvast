@@ -1955,6 +1955,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     scene: () => ({ objects: doc.size, drawn: stats.last?.visibleCount ?? 0, indexing: indexSync.building() }),
     quality: () => quality.level,
     diagnostics: () => {
+      void pollProcesses();
       const mem = assets.stats();
       const q = assets.decodeLoad();
       const tileMem = tiles.memory();
@@ -1964,6 +1965,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         `objects ${doc.size.toLocaleString()} · drawn ${stats.last?.visibleCount.toLocaleString() ?? 0}${indexSync.building() ? " · indexing…" : ""}`,
         `decoded ${mem.count} images · ${mib(mem.bytes)} / ${mib(mem.budget)} MiB · decoding ${q.running} · waiting ${q.queued}`,
         `tiles ${tileMem.tiles} · ${mib(tileMem.bytes)} MiB · undo ${doc.historySteps} steps · ${mib(doc.historyBytes())} MiB · library thumbnails ${assetsView.thumbsHeld()}${heap ? ` · JS ${mib(heap.usedJSHeapSize)} / ${mib(heap.jsHeapSizeLimit)} MiB` : ""}`,
+        ...(processes ? [processes] : []),
+        ...(freeze ? [`longest stop ${Math.round(freeze.ms)} ms, ${Math.round((performance.now() - freeze.at) / 1000)} s ago`] : []),
+        ...(assetsView.lastOpen() ? [assetsView.lastOpen()] : []),
       ];
     },
     notify: (message) => {
@@ -1972,6 +1976,27 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     },
   });
   applyZen(); // the button beside Home exists now
+  // Information shown: Technical also says what each of the desktop app's processes holds (what the system's list shows), and the longest
+  // time the page could not answer in the last minute (a stop), to find what makes it stop.
+  let processes = "";
+  let polledAt = 0;
+  const pollProcesses = async (): Promise<void> => {
+    const bridge = desktopBridge();
+    if (!bridge?.memory || performance.now() - polledAt < 2000) return;
+    polledAt = performance.now();
+    const list = await bridge.memory().catch(() => []);
+    const by = new Map<string, number>();
+    for (const m of list) by.set(m.type, (by.get(m.type) ?? 0) + m.mb);
+    processes = list.length ? `processes ${[...by].map(([t, mb]) => `${t === "Tab" ? "page" : t === "Browser" ? "app" : t.toLowerCase()} ${mb} MB`).join(" · ")} · all ${[...by.values()].reduce((a, b) => a + b, 0)} MB` : "";
+  };
+  let freeze: { ms: number; at: number } | null = null;
+  try {
+    new PerformanceObserver((l) => {
+      const now = performance.now();
+      if (freeze && now - freeze.at > 60_000) freeze = null; // (a minute later it is not news)
+      for (const t of l.getEntries()) if (!freeze || t.duration > freeze.ms) freeze = { ms: t.duration, at: t.startTime };
+    }).observe({ type: "longtask", buffered: false });
+  } catch { /* (a browser that does not tell long tasks, Firefox: no line) */ }
   if (debug) mountDevPanel(document.getElementById("hud")!, view, doc, () => pruneSelection(doc, editor), (n) => notices.push(n));
   const markNav = mountNavigator(document.getElementById("workspace")!, session, () => setView("canvas"));
   const followButton = document.querySelector<HTMLButtonElement>('[data-testid="follow-host"]');
@@ -3028,7 +3053,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   window.addEventListener("paste", (e) => {
     onPaste(e);
     // (taken here, and sent to something that does not have the keys, Firefox's hidden editable box: it does not paste it a second time)
-    if (e.defaultPrevented && e.target !== document.activeElement) e.stopPropagation();
+    if (e.defaultPrevented && typing(e.target) && e.target !== document.activeElement) e.stopPropagation();
   }, true);
   /** Words copied in another program: a new text under the pointer (in the middle of the view before the pointer has been over it), a long one wrapped. */
   const PASTED_TEXT_WRAP_PX = 480;

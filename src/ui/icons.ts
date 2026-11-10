@@ -108,6 +108,7 @@ import rotateCcw from "lucide-static/icons/rotate-ccw.svg";
 import funnelXSvg from "lucide-static/icons/funnel-x.svg";
 import arrowUpToLineSvg from "lucide-static/icons/arrow-up-to-line.svg";
 import rotateCwSquare from "lucide-static/icons/rotate-cw-square.svg";
+import rotateCwSvg from "lucide-static/icons/rotate-cw.svg";
 import ratioIcon from "lucide-static/icons/ratio.svg";
 import focusIcon from "lucide-static/icons/focus.svg";
 import searchIcon from "lucide-static/icons/search.svg";
@@ -175,7 +176,7 @@ import fileInputIcon from "lucide-static/icons/file-input.svg";
 import fileOutputIcon from "lucide-static/icons/file-output.svg";
 import fileArchiveIcon from "lucide-static/icons/file-archive.svg";
 import pinIcon from "lucide-static/icons/pin.svg";
-import anchorIcon from "lucide-static/icons/anchor.svg";
+import logOutSvg from "lucide-static/icons/log-out.svg";
 import eclipseIcon from "lucide-static/icons/eclipse.svg";
 import pinOffIcon from "lucide-static/icons/pin-off.svg";
 import folderUpIcon from "lucide-static/icons/folder-up.svg";
@@ -398,6 +399,8 @@ export const ICONS = {
   funnelX: clean(funnelXSvg),
   arrowUpToLine: clean(arrowUpToLineSvg),
   rotateCwSquare: clean(rotateCwSquare),
+  /** Reload the library: read it again and draw it anew. */
+  reloadLibrary: clean(rotateCwSvg),
   ratio: clean(ratioIcon),
   proportions: clean(proportionsSvg),
   fileCog: clean(fileCogSvg),
@@ -469,7 +472,8 @@ export const ICONS = {
   fileOutput: clean(fileOutputIcon),
   fileArchive: clean(fileArchiveIcon),
   pin: clean(pinIcon),
-  anchor: clean(anchorIcon),
+  /** Exit a mode (hidden mode). */
+  logOut: clean(logOutSvg),
   eclipse: clean(eclipseIcon),
   pinOff: clean(pinOffIcon),
   folderUp: clean(folderUpIcon),

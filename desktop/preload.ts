@@ -7,6 +7,7 @@ import type { DesktopBridge } from "../src/storage/desktop-bridge";
 
 const bridge: DesktopBridge = {
   workspace: () => ipcRenderer.invoke("canvast:workspace"),
+  memory: () => ipcRenderer.invoke("canvast:memory"),
   read: (path) => ipcRenderer.invoke("canvast:read", path),
   exists: (path) => ipcRenderer.invoke("canvast:exists", path),
   folderExists: (path) => ipcRenderer.invoke("canvast:folderExists", path),
