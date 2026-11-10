@@ -101,8 +101,9 @@ test("window-row", async () => {
   await p.mouse.move(700, 300);
   await p.mouse.move(700, 2, { steps: 12 });
   await expect(p.getByTestId("win-row")).toHaveClass(/is-shown/);
-  await settle(400);
-  await shot("window-row", { x: 0, y: 0, width: 1440, height: 160 });
+  await p.waitForTimeout(250); // (its slide in)
+  mkdirSync(OUT, { recursive: true });
+  await p.screenshot({ path: resolve(OUT, "window-row.png"), clip: { x: 0, y: 0, width: 1440, height: 160 } });
 });
 
 test("sharing", async () => {
