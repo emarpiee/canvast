@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.56.17 — The small Ctrl list holds every item and scrolls (2026-11-10)
+
+- **Fixed:** holding Ctrl over an empty spot inside the selection opened the big touch menu far from the pointer; it is the small list beside the pointer again, now with every item (no "+ N more"): eight rows high, the wheel scrolls it while Ctrl is held (it does not zoom then), with a thin bar showing where you are; letting go of Ctrl ends it.
+- **Changed:** a group's row is its Layers label alone (Group (22)), and its items are indented under it by spacing, not "›".
+- **Added:** the Ctrl list test checks that the list holds every row, scrolls with the wheel and leaves the view as it was.
+
 ## 0.56.16 — One list to choose from: Ctrl+click and a long press (2026-11-10)
 
 - **Added:** holding Ctrl over an empty spot inside the selection's box lists what the selection holds beside the pointer, the same rows as the list a click opens: a nested group is one row by its name, outlined whole, and a Ctrl+click on it picks the whole group.

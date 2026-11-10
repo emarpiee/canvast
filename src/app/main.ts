@@ -62,7 +62,7 @@ import { setTextureHost } from "../render/texture";
 import { isTexture } from "../doc/texture";
 import { createTextureHost } from "./texture-host";
 import { pickAll } from "../render/hit-test";
-import { dimHits, revealHits, type RevealWhy } from "../interaction/reveal";
+import { dimHits, revealHits, scrollReveal, type RevealWhy } from "../interaction/reveal";
 import { ownerOf } from "../doc/belongs";
 import { syncScroll } from "../ui/bar";
 import { parseHex, rgbToOklch } from "../colour-picker/colour";
@@ -808,14 +808,8 @@ async function start(): Promise<void> {
       let hits = revealHits(all, editor.revealAt.x, editor.revealAt.y);
       // Over nothing inside the selection's box: what the selection holds, the very rows of the list a click opens (choicesAt): a nested group
       // is one row, by its name, outlined whole, and picked whole.
-      // (one level while Ctrl is held: a nested group is one row; its items are in the list a click opens, which scrolls)
-      // Over nothing inside the selection's box: every item of the selection in the shared menu beside the pointer, a box that scrolls
-      // (opened once for the spot, gone with Ctrl), not drawn here, where a long list could not scroll.
-      if (!hits.length && !selectionListOpen && choicesAt(editor.revealAt).some((c) => c.from === "selection")) {
-        const at = editor.revealAt;
-        queueMicrotask(() => { selectionListOpen = toolHooksRevealList(at); });
-      }
-      const rows: Choice[] = [];
+      // Every item, nested groups' items indented under them, in the small list beside the pointer, which scrolls (the wheel, while Ctrl is held).
+      const rows: Choice[] = hits.length ? [] : choicesAt(editor.revealAt).filter((c) => c.from === "selection");
       // (each row by its own key, a group's id for a group: shown by its first thing, so two rows never share one)
       const keyOf = (c: Choice): string => c.key ?? c.ids[0]!;
       if (rows.length) hits = rows.flatMap((c) => all.filter((po) => po.obj.id === c.ids[0]).map((po) => (keyOf(c) === po.obj.id ? po : { ...po, obj: { ...po.obj, id: keyOf(c) } as CanvasObject })));
@@ -827,7 +821,8 @@ async function start(): Promise<void> {
       if (hotRow) drawRevealOutlines(ctx, all.filter((po) => hotRow.ids.includes(po.obj.id)), theme, true);
       const dim = dimHits(all, hiddenInView(doc, fc, vp), editor.revealAt.x, editor.revealAt.y);
       const shownPicked = rows.length ? new Set([...editor.selection, ...rows.filter((c) => c.ids.every((id) => editor.selection.has(id))).map(keyOf)]) : editor.selection;
-      editor.revealList = drawReveal(ctx, hits, editor.revealAt, theme, name, dim, shownPicked, editor.revealHot);
+      const rowDepth = new Map(rows.map((c) => [keyOf(c), c.depth ?? 0]));
+      editor.revealList = drawReveal(ctx, hits, editor.revealAt, theme, name, dim, shownPicked, editor.revealHot, { ...(rows.length ? { depth: (id: string) => rowDepth.get(id) ?? 0 } : {}), scroll: editor.revealScroll });
       // (a screen reader hears the same words through the hint line, once for each change)
       const said = hits.length || dim.length ? `Under the pointer: ${[...hits.map((po) => revealWords(name(po))), ...dim.map((d) => revealWords(name(d.po), d.why))].join(", ")}` : null;
       if (said !== editor.revealText) {
@@ -1228,11 +1223,9 @@ async function start(): Promise<void> {
         const group = key !== head.id;
         const ids = items.map((o) => o.id);
         if (depth === 0 && listed.has(ids.join())) continue;
-        const inner = group ? [...new Map(items.map((o) => [o.groups?.[at + 1] ?? o.id, o])).values()].map((o) => labelOf(o, assetNames.map).text) : [];
         // (the names Layers shows: groupLabel and labelOf, never a list's own)
         const g = group ? groupLabel(head, key, ids.length) : null;
-        const label = g ? `${g.text}: ${inner.slice(0, 3).join(", ")}${inner.length > 3 ? "…" : ""}` : named(head).label;
-        out.push({ key, depth, ids, enter: [...(head.groups ?? []).slice(0, at)], icon: g ? g.icon : named(head).icon, label: `${"   ".repeat(depth)}${depth ? "› " : ""}${label}`, from: "selection", ...(first && out.length ? { sep: true } : {}) });
+        out.push({ key, depth, ids, enter: [...(head.groups ?? []).slice(0, at)], icon: g ? g.icon : named(head).icon, label: g ? g.text : named(head).label, from: "selection", ...(first && out.length ? { sep: true } : {}) });
         first = false;
         if (group) addRows(items, at + 1, depth + 1);
       }
@@ -1240,7 +1233,7 @@ async function start(): Promise<void> {
     addRows([...units.values()].flat(), lv, 0);
     return out;
   };
-  const openChoiceList = (at: ScreenPoint, pick: (ids: readonly ObjectId[], enter: readonly string[], additive: boolean) => void, opts: { onlyIfChoice: boolean; onOpen(): void; add?: boolean; touch?: boolean; maxRows?: number }): boolean => {
+  const openChoiceList = (at: ScreenPoint, pick: (ids: readonly ObjectId[], enter: readonly string[], additive: boolean) => void, opts: { onlyIfChoice: boolean; onOpen(): void; add?: boolean; touch?: boolean }): boolean => {
       const rows = choicesAt(at);
       // (Ctrl+click on something that can be picked picks it at once, as ever: the list is for where nothing pickable is under the pointer)
       if (!rows.length || (opts.onlyIfChoice && rows.some((r) => r.from === "here" && !r.why))) return false;
@@ -1255,7 +1248,7 @@ async function start(): Promise<void> {
         { id: "reveal-add", label: "Add to the selection", hint: "Press to add or remove; press outside to end", icon: ICONS.listChecks, checked: add, run: () => { add = !add; } },
         ...rows.map((r, i): MenuItem => {
           const on = r.ids.every((id) => editor.selection.has(id));
-          return { id: `reveal:${r.key ?? r.ids[0]}`, label: r.label, hint: r.why ? HINT[r.why] : r.from === "selection" ? "In the selection: select this one" : "Select this one", icon: r.icon, checked: on, disabled: r.why === "mask", ...(r.sep && i > 0 ? { sep: true } : {}), run: () => {
+          return { id: `reveal:${r.key ?? r.ids[0]}`, label: `${"\u2003".repeat(r.depth ?? 0)}${r.label}`, hint: r.why ? HINT[r.why] : r.from === "selection" ? "In the selection: select this one" : "Select this one", icon: r.icon, checked: on, disabled: r.why === "mask", ...(r.sep && i > 0 ? { sep: true } : {}), run: () => {
             if (r.why === "hidden" || r.why === "locked") {
               setFlagOn(doc, editor, r.ids, r.why, false);
               return void closeMoreMenu();
@@ -1273,8 +1266,7 @@ async function start(): Promise<void> {
         needPress: true,
         refresh: items,
         onActive: (i) => { const r = i === null || i < 1 ? undefined : rows[i - 1]; editor.revealIds = r ? new Set(r.ids) : null; editor.redraw(); },
-        ...(opts.maxRows ? { maxRows: opts.maxRows } : {}),
-        onClose: () => { anchor.remove(); editor.revealIds = null; selectionListOpen = false; editor.redraw(); },
+        onClose: () => { anchor.remove(); editor.revealIds = null; editor.redraw(); },
       });
       // (once: what the list is, for whoever meets it for the first time)
       try {
@@ -1286,10 +1278,12 @@ async function start(): Promise<void> {
       } catch { /* (a browser that keeps nothing says it each time it would: nothing) */ }
       return true;
   };
-  /** The selection's list beside the pointer while Ctrl is held (every item, a box that scrolls): open, and gone when Ctrl is let go. */
-  let selectionListOpen = false;
-  const toolHooksRevealList = (at: ScreenPoint): boolean => openChoiceList(at, (ids, enter, add) => { editor.entered = [...enter]; editor.select([...ids], add); }, { onlyIfChoice: false, onOpen: () => undefined, maxRows: 8 });
-  window.addEventListener("keyup", (e) => { if ((e.key === "Control" || e.key === "Meta") && selectionListOpen) closeMoreMenu(); });
+  // The wheel scrolls the list beside the pointer while it is open and longer than it shows (Ctrl+wheel zooms again once Ctrl is let go).
+  window.addEventListener("wheel", (e) => {
+    if (e.target !== canvas || !scrollReveal(editor, Math.sign(e.deltaY) * (Math.abs(e.deltaY) > 150 ? 3 : 1))) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, { capture: true, passive: false });
   attachTools(canvas, view, doc, index, editor, { edgePanSpeed: () => (settings.get("nav.edgePanOn") ? settings.get("nav.edgePan") / 100 : 0), editText: (t, at, box) => textEditor.open(t, at, box), openItem: (h, id) => {
         const o = doc.get(id);
         void notePanel.open(h, o?.kind === "image" ? cardActions(o) : undefined);

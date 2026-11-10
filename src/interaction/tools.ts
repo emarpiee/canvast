@@ -343,7 +343,7 @@ export interface ToolHooks {
    * `pick` selects a row's things (entering their groups); `onlyIfChoice` (Ctrl+click): open only where nothing pickable is under it but there is something to choose (the selection's
    * items, a hidden or locked thing); `onOpen` runs just before it opens. Whether it opened.
    */
-  revealList(at: ScreenPoint, pick: (ids: readonly ObjectId[], enter: readonly string[], additive: boolean) => void, opts: { onlyIfChoice: boolean; onOpen(): void; add?: boolean; touch?: boolean; maxRows?: number }): boolean;
+  revealList(at: ScreenPoint, pick: (ids: readonly ObjectId[], enter: readonly string[], additive: boolean) => void, opts: { onlyIfChoice: boolean; onOpen(): void; add?: boolean; touch?: boolean }): boolean;
 }
 
 export function attachTools(

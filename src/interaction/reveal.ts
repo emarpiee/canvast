@@ -73,6 +73,17 @@ export function deepPick(hits: readonly ProjectedObject[], picked: ReadonlySet<O
 /** Height of one row of the revealed list, and the padding above the first (CSS px). */
 export const REVEAL_ROW_PX = 16;
 export const REVEAL_PAD_PX = 3;
+/** How many rows the revealed list shows at once; the rest scroll (the wheel, while it is open). */
+export const REVEAL_ROWS = 8;
+
+/** Scroll the revealed list by `rows` (+ down); false when there is no list to scroll, so the wheel does what it always does. */
+export function scrollReveal(editor: EditorState, rows: number): boolean {
+  const L = editor.revealList;
+  if (!editor.revealAt || !L || L.total <= L.ids.length) return false;
+  const next = Math.max(0, Math.min(L.total - L.ids.length, editor.revealScroll + rows));
+  if (next !== editor.revealScroll) { editor.revealScroll = next; editor.revealHot = null; editor.redraw(); }
+  return true;
+}
 
 /** The row of the revealed list under (x, y): its thing (null: a row that cannot be picked), or undefined when the point is not on the list. */
 export function revealRowAt(editor: EditorState, x: number, y: number): ObjectId | null | undefined {
@@ -106,6 +117,7 @@ export function createReveal(editor: EditorState, allowed: () => boolean) {
     if (!next && !was) return;
     if (next && was && Math.abs(next.x - was.x) < 1 && Math.abs(next.y - was.y) < 1) return;
     editor.revealAt = next;
+    editor.revealScroll = 0; // (a new spot: its list from the top)
     editor.redraw(); // (the canvas only: a Layers panel being dragged in must not be rebuilt under the pointer)
   };
   return {

@@ -6,7 +6,7 @@
 import type { ProjectedObject } from "./projection";
 import { LABEL_FONT } from "./item-label";
 import type { SceneTheme } from "./scene-renderer";
-import { REVEAL_PAD_PX, REVEAL_ROW_PX, type DimHit } from "../interaction/reveal";
+import { REVEAL_PAD_PX, REVEAL_ROW_PX, REVEAL_ROWS, type DimHit } from "../interaction/reveal";
 import { itemCorners } from "./selection-frame";
 
 const finite = (v: readonly [number, number]): boolean => Math.abs(v[0]) < 1e6 && Math.abs(v[1]) < 1e6;
@@ -81,13 +81,17 @@ export interface RevealListBox {
   w: number;
   h: number;
   ids: Array<string | null>;
+  /** How many rows the whole list has (more than `ids` when it scrolls). */
+  total: number;
 }
 
 /**
- * The stack under the pointer: outlines, and the names of up to six of them, top first, beside the pointer; what cannot be picked comes last, dotted.
- * The names are a list to pick from (Ctrl+click on a row): the picked ones are ticked and the row under the pointer (`hot`) is outlined strong.
+ * The stack under the pointer (or what the selection holds): outlines, and the names of all of them, top first, beside the pointer, in a box
+ * of `REVEAL_ROWS` rows that scrolls (`scroll` rows past, with a thin bar on its edge); what cannot be picked comes last, dotted. A row of a
+ * group's item is indented by `depth`. The names are a list to pick from (Ctrl+click on a row): the picked ones are ticked and the row under
+ * the pointer (`hot`) is outlined strong.
  */
-export function drawReveal(ctx: CanvasRenderingContext2D, hits: readonly ProjectedObject[], at: { x: number; y: number }, theme: SceneTheme, name: (po: ProjectedObject) => string, dim: readonly DimHit[] = [], picked: ReadonlySet<string> = new Set(), hot: string | null = null): RevealListBox | null {
+export function drawReveal(ctx: CanvasRenderingContext2D, hits: readonly ProjectedObject[], at: { x: number; y: number }, theme: SceneTheme, name: (po: ProjectedObject) => string, dim: readonly DimHit[] = [], picked: ReadonlySet<string> = new Set(), hot: string | null = null, opts: { depth?: (id: string) => number; scroll?: number } = {}): RevealListBox | null {
   if (!hits.length && !dim.length) return null;
   drawRevealOutlines(ctx, hits, theme);
   drawDimOutlines(ctx, dim, theme);
@@ -96,10 +100,14 @@ export function drawReveal(ctx: CanvasRenderingContext2D, hits: readonly Project
   ctx.save();
   ctx.font = LABEL_FONT;
   ctx.textBaseline = "middle";
-  const all = [...hits.map((po) => ({ t: revealWords(name(po)), id: po.obj.id as string | null })), ...dim.map((d) => ({ t: revealWords(name(d.po), d.why), id: null as string | null }))];
-  const rows = all.slice(0, 6);
+  const INDENT = 10;
+  const all = [...hits.map((po) => ({ t: revealWords(name(po)), id: po.obj.id as string | null, d: opts.depth?.(po.obj.id) ?? 0 })), ...dim.map((d) => ({ t: revealWords(name(d.po), d.why), id: null as string | null, d: 0 }))];
+  const scroll = Math.max(0, Math.min(all.length - REVEAL_ROWS, opts.scroll ?? 0));
+  const rows = all.slice(scroll, scroll + REVEAL_ROWS);
   const gutter = 14;
-  const w = Math.max(...rows.map((r) => ctx.measureText(r.t).width)) + 12 + gutter;
+  const bar = all.length > rows.length ? 4 : 0;
+  // (as wide as its widest row, scrolled to or not, so it does not change width while it scrolls)
+  const w = Math.max(...all.map((r) => ctx.measureText(r.t).width + r.d * INDENT)) + 12 + gutter + bar;
   const h = rows.length * REVEAL_ROW_PX + 2 * REVEAL_PAD_PX;
   const x = at.x + 4, y = at.y + 4; // (close enough that the pointer reaches the list)
   ctx.fillStyle = theme.handleFill;
@@ -109,23 +117,31 @@ export function drawReveal(ctx: CanvasRenderingContext2D, hits: readonly Project
   ctx.rect(x, y, w, h);
   ctx.fill();
   ctx.stroke();
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w - bar, h);
+  ctx.clip();
   rows.forEach((r, i) => {
     const ry = y + REVEAL_PAD_PX + i * REVEAL_ROW_PX;
     if (r.id && r.id === hot) {
       ctx.save();
       ctx.globalAlpha = 0.2;
       ctx.fillStyle = theme.selection;
-      ctx.fillRect(x + 1, ry, w - 2, REVEAL_ROW_PX);
+      ctx.fillRect(x + 1, ry, w - 2 - bar, REVEAL_ROW_PX);
       ctx.restore();
     }
-    ctx.fillStyle = i === 0 ? theme.selection : theme.landmarkLabel;
+    ctx.fillStyle = i + scroll === 0 && !opts.depth ? theme.selection : theme.landmarkLabel;
     if (r.id && picked.has(r.id)) ctx.fillText("\u2713", x + 4, ry + REVEAL_ROW_PX / 2);
-    ctx.fillText(r.t, x + 6 + gutter, ry + REVEAL_ROW_PX / 2);
+    ctx.fillText(r.t, x + 6 + gutter + r.d * INDENT, ry + REVEAL_ROW_PX / 2);
   });
-  if (all.length > rows.length) {
-    ctx.fillStyle = theme.landmarkLabel;
-    ctx.fillText(`+ ${all.length - rows.length} more`, x + 6, y + h + 9);
+  ctx.restore();
+  if (bar) {
+    // (where the shown rows are in the whole list)
+    const inner = h - 2 * REVEAL_PAD_PX;
+    ctx.fillStyle = theme.selection;
+    ctx.globalAlpha = 0.5;
+    ctx.fillRect(x + w - bar - 1, y + REVEAL_PAD_PX + (inner * scroll) / all.length, bar - 1, Math.max(6, (inner * rows.length) / all.length));
   }
   ctx.restore();
-  return { x, y, w, h, ids: rows.map((r) => r.id) };
+  return { x, y, w, h, ids: rows.map((r) => r.id), total: all.length };
 }

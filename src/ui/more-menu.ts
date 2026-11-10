@@ -152,8 +152,6 @@ export interface MenuOptions {
   consumeOutside?: boolean;
   /** Closer rows, one line each (a long list to choose from: the colours of a selection). */
   compact?: boolean;
-  /** At most this many rows high: the rest scroll (a list of any length beside the pointer). */
-  maxRows?: number;
   /** The menu opened under a finger that is still down: the click that comes when it lifts is not a choice; only a press on the menu itself arms it. */
   needPress?: boolean;
 }
@@ -166,7 +164,6 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
   menu.className = "pop-menu";
   if (opts.keepOpen) menu.dataset["keep"] = "true";
   if (opts.compact) menu.classList.add("is-compact");
-  if (opts.maxRows) menu.style.maxHeight = `calc(var(--field-h) * ${opts.maxRows})`;
   if (opts.consumeOutside ?? opts.keepOpen) menu.dataset["consume"] = "true"; // (a menu that stays open for several tries: the press that ends it is only that, so the pick it worked on stays)
   menu.setAttribute("role", "menu");
   menu.setAttribute("aria-label", label);

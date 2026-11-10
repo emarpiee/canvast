@@ -1644,9 +1644,29 @@ test("the list to choose from shows a group inside the selection by its name and
   await p.keyboard.down("Control");
   await p.mouse.click(600, 420); // (inside the outer group's box, over nothing)
   await p.keyboard.up("Control");
-  await expect(p.locator(`.pop-menu [data-id="reveal:${inner[1]}"]`)).toContainText("Group (2): ");
-  await expect(p.locator(`.pop-menu [data-id="reveal:${b}"]`)).toContainText("›");
+  await expect(p.locator(`.pop-menu [data-id="reveal:${inner[1]}"]`)).toContainText(/^\s*Group \(2\)/); // (the Layers label, nothing added)
+  await expect(p.locator(`.pop-menu [data-id="reveal:${b}"]`)).not.toContainText("›");
   await p.locator(`.pop-menu [data-id="reveal:${b}"]`).click();
   expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([b]);
+  // Ctrl held over nothing inside a selection longer than the list shows: the small list beside the pointer holds every row and the wheel
+  // scrolls it (the view does not zoom); letting go of Ctrl ends it.
+  await key(app, "u");
+  for (let i = 0; i < 8; i++) await app.drag({ x: 420 + i * 40, y: 560 }, { x: 445 + i * 40, y: 585 }, 2);
+  await key(app, "v");
+  await key(app, "Control+a");
+  const list = () => p.evaluate(() => window.__canvastDebug.revealList());
+  const cam = await p.evaluate(() => window.__canvastDebug.camera());
+  await p.mouse.move(600, 530);
+  await p.keyboard.down("Control");
+  await p.mouse.move(602, 531);
+  await expect.poll(async () => (await list())?.total ?? 0).toBeGreaterThan(8);
+  const first = (await list())!;
+  expect(first.ids.length).toBe(8);
+  await p.mouse.wheel(0, 100);
+  await expect.poll(async () => (await list())?.scroll ?? 0).toBe(1);
+  expect((await list())!.ids).not.toEqual(first.ids);
+  expect(await p.evaluate(() => window.__canvastDebug.camera())).toEqual(cam);
+  await p.keyboard.up("Control");
+  await expect.poll(list).toBeNull();
   expect(app.consoleErrors).toEqual([]);
 });

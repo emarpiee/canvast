@@ -226,7 +226,9 @@ export class EditorState {
   /** Ctrl held and the pointer over the canvas on Select: where, so everything under it shows its outline (set by the tools, drawn with the overlays). */
   revealAt: { x: number; y: number } | null = null;
   /** Where the revealed list was drawn (px) and the thing each row stands for (null: one that cannot be picked): Ctrl+click on a row picks it. Set by the drawing. */
-  revealList: { x: number; y: number; w: number; h: number; ids: ReadonlyArray<string | null> } | null = null;
+  revealList: { x: number; y: number; w: number; h: number; ids: ReadonlyArray<string | null>; total: number } | null = null;
+  /** How many rows of the revealed list are scrolled past (the wheel scrolls it while it is longer than it shows); back to 0 for a new spot. */
+  revealScroll = 0;
   /** Rows of the revealed list that stand for more than one thing (a group the selection holds), by the id of the thing that shows them: what a row picks, and the groups it enters. */
   revealRows: ReadonlyMap<string, { readonly ids: readonly string[]; readonly enter: readonly string[] }> | null = null;
   /** The row of that list the pointer is on: its outline is shown strong. */
