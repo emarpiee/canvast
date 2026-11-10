@@ -96,16 +96,6 @@ test("trash", async () => {
   await p.getByTestId("view-canvas").click();
 });
 
-test("window-row", async () => {
-  // (the pointer glides up to the top edge: the row comes on a move there, and stays while the pointer is on it)
-  await p.mouse.move(700, 300);
-  await p.mouse.move(700, 2, { steps: 12 });
-  await expect(p.getByTestId("win-row")).toHaveClass(/is-shown/);
-  await p.waitForTimeout(250); // (its slide in)
-  mkdirSync(OUT, { recursive: true });
-  await p.screenshot({ path: resolve(OUT, "window-row.png"), clip: { x: 0, y: 0, width: 1440, height: 160 } });
-});
-
 test("sharing", async () => {
   await p.mouse.move(700, 500);
   await p.getByTestId("view-settings").click();

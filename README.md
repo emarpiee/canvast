@@ -19,6 +19,8 @@
   <a href="#installation"><img src="https://img.shields.io/badge/runs_on-Linux_%C2%B7_any_browser-007B69" alt="Runs on Linux and in any modern browser"></a>
 </p>
 
+![A minute of canvast in use: references landing on a board, a grey value study, crop and auto layout, gesture lines over dancers, shapes, boolean cuts, patterns, guides, a mask, a gradient and the colour picker, a lettered comic page, the Library, its viewer, a PDF and a 3D model, a linked note, export, a dive 24 levels into the canvas, hidden items, the lock screen, theme colours, and the logo](docs/screenshots/canvast-60s.gif)
+
 **Your references, drawings and notes, in one place.** canvast is a creative workspace for the whole of a project: collect references and lay them out on boards, draw and edit vectors, make comic pages and storyboards, write notes that link to your files, and keep every file in a library you can search, tag and browse. All of it on one endless canvas you can zoom into without limit, and all of it on your own machine.
 
 | What you get | |
@@ -343,6 +345,10 @@ Plan a camera move for an animatic: a slow pan across a painting, played on the 
 
 ![A clip of a slow camera pan across Van Gogh's Wheat Field with Cypresses playing on the canvas, its player bar below it](docs/screenshots/media.webp)
 
+Keep a key frame of a clip as a still picture, to draw from or to place in a storyboard.
+
+![A camera pan across Van Gogh's Wheat Field with Cypresses as a clip on the canvas, and beside it the frame extracted from it as a picture](docs/screenshots/extract-frame.webp)
+
 | Player control | What it does |
 | --- | --- |
 | Play and pause, the seek bar | As in any player; the paused frame is saved |
@@ -510,6 +516,10 @@ The **Pen** (`P`) draws strokes with pressure, tilt and a stabilizer, made at th
 Find the gesture: draw a line of action over each figure, from the head through the weight to the foot that carries it.
 
 ![Three Degas dancers with a red line of action drawn over each with the Pen, the Pen's kinds in the bar above](docs/screenshots/pen.webp)
+
+Draw a long, calm contour: the stabilizer smooths the wobble of the hand.
+
+![Delacroix's Study of a Horse beside a long ink line of a horse's back drawn with the Pen, the Stabilizer on in the bar above](docs/screenshots/pen-stabilizer.webp)
 
 | Setting | What it does |
 | --- | --- |
@@ -1120,7 +1130,9 @@ Take a reference out of the app: download it or export it.
 
 **A file is erased only when nothing, undo included, can bring it back.**
 
-![The Trash in the library: deleted files as cards, with Restore and Delete for good in the details panel](docs/screenshots/trash.webp)
+Bring back a file deleted by mistake: the workspace folder keeps deleted files in its Trash.
+
+![The Trash in the Library of the desktop app: deleted drawings as cards, one selected with Restore and Delete for good](docs/screenshots/trash.webp)
 
 | Action | What happens |
 | --- | --- |
@@ -1387,6 +1399,10 @@ Export several pictures at once, each as its own file or page.
 ### Sharing on the local network
 
 The desktop app can let others on the same network look at the open workspace, in a browser or in their own desktop app (guests), and open its library as a folder in a file manager (the folder). Each is turned on by itself, and *Settings > Sharing* groups them: Guests, Folder for file managers, then Both (starting with the app, the activity).
+
+Show a project on a tablet on the same network, read-only, without copying it there.
+
+![Settings, Sharing in the desktop app: sharing the workspace on the local network, its address, code and the devices allowed](docs/screenshots/sharing.webp)
 
 | Step | On the computer that shares | On the guest's |
 | --- | --- | --- |
@@ -1675,7 +1691,9 @@ Damaged objects found when loading are skipped and reported, never silently chan
 
 In the desktop app your workspace is a **folder of ordinary files** that you choose, so any sync tool, backup tool or file manager can see it. It works offline and loads nothing from the network.
 
-![The desktop app on a workspace folder, with the Switch workspace menu open](docs/screenshots/desktop.webp)
+Keep a project as a plain folder that any sync or backup tool can carry, and switch between projects.
+
+![The desktop app on a workspace folder named Picture book: its References canvas of four prints, and the board and canvas menu with Switch workspace open](docs/screenshots/desktop.webp)
 
 The same workspace on disk, as a file manager shows it:
 
@@ -1713,8 +1731,6 @@ Illustration studio/
 #### The window's frame
 
 Settings > Appearance > **Window frame**: *System* (the default) is the title bar your desktop draws; *Off* has none, for more room.
-
-![The window's own row with the frame off: the workspace's name, minimise, maximise and close, over the top edge of the app](docs/screenshots/window-row.webp)
 
 | With the frame off | |
 | --- | --- |
@@ -2604,7 +2620,8 @@ Every picture in this README is made by code: each one is a Playwright test in `
 | A picture | A test in `tests/shots/<area>.shot.ts` on the end-to-end harness (a fresh page of the built app, input that must land where it says, waits on the app's own state) with the helpers of `tests/shots/scene.ts`: the art and fonts into the library, SVG pasted, text set in a font, the camera fitted, the theme and theme colour chosen, and the picture cropped round the feature |
 | Its words | `tests/shots/manifest.ts` gives each picture its section, the use it shows and its alt text; `npm run check:shots` fails when the README and the manifest disagree |
 | On GitHub | The `Screenshots` workflow (*Run workflow*; *grep* picks pictures by name) takes them all in parallel and gives them as WebP (`cwebp -q 78`, at most 1280 px wide); a picture that fails leaves its trace and its last screen in a second artifact |
-| The desktop app | `scripts/showcase/shots-desktop.mjs` (Electron): the app on a workspace folder, the Trash and the window's own row; the workflow runs it when *only* names it |
+| The desktop app | `tests/shots/desktop.shot.ts` starts the desktop build (`npm run build:desktop`) in Electron on a new workspace folder: the folder with Switch workspace, its Trash and Sharing |
+| The animation at the top | `canvast-60s.gif` is a one-minute video of the app in use: each clip recorded frame by frame with Playwright on the shot harness, laid out with HTML, CSS and GSAP, with a soundtrack synthesized in code. The GIF is 720 px wide at 12 frames a second with its own 128-colour palette (`ffmpeg … palettegen/paletteuse`), then `gifsicle -O3 --lossy=120`, about 19 MB |
 
 | Area | Its pictures (`tests/shots/`) |
 | --- | --- |
@@ -2617,6 +2634,7 @@ Every picture in this README is made by code: each one is a Playwright test in `
 | `privacy.shot.ts` | The context menu, hiding, hidden mode, the padlock, the backup question, Settings > Privacy, the lock screen |
 | `workspace.shot.ts` | The showcase (home, deep, far out, a tour), boards and canvases, bookmarks, search on the canvas, the command palette, Settings, Shortcuts, the info bar, Storage, Advanced export, Delete all, a second tab, Export |
 | `tools.shot.ts` | The canvast tools' menu in a terminal |
+| `desktop.shot.ts` | The desktop app: a project's folder, its Trash, Sharing |
 
 ```sh
 npm run build && npm run build:tools
