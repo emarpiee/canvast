@@ -19,8 +19,6 @@
   <a href="#installation"><img src="https://img.shields.io/badge/runs_on-Linux_%C2%B7_any_browser-007B69" alt="Runs on Linux and in any modern browser"></a>
 </p>
 
-![Thirty seconds of canvast: a zoom from the cosmos down to a leaf and one million zoom levels down, then the app's features and its logo](docs/screenshots/canvast-30s.gif)
-
 **Your references, drawings and notes, in one place.** canvast is a creative workspace for the whole of a project: collect references and lay them out on boards, draw and edit vectors, make comic pages and storyboards, write notes that link to your files, and keep every file in a library you can search, tag and browse. All of it on one endless canvas you can zoom into without limit, and all of it on your own machine.
 
 | What you get | |
@@ -30,7 +28,7 @@
 | **One file, or a desktop app** | Copy `canvast.html` anywhere (a folder, a USB stick) and open it, or install the desktop app on Linux. [Installation](#installation) |
 | **No edges** | Pan in any direction and zoom in or out without ever reaching a border or a limit. [The endless canvas](#the-endless-canvas) |
 
-The pictures in this README show public-domain artworks (The Met Open Access) and things drawn in the app by the scripts that take them; [CREDITS.md](docs/screenshots/CREDITS.md) lists every one.
+The pictures in this README show public-domain artworks (The Met Open Access) and work made in the app by the tests that take them; [CREDITS.md](docs/screenshots/CREDITS.md) lists every one.
 
 ## Notes from the developer
 
@@ -2607,7 +2605,6 @@ Every picture in this README is made by code: each one is a Playwright test in `
 | Its words | `tests/shots/manifest.ts` gives each picture its section, the use it shows and its alt text; `npm run check:shots` fails when the README and the manifest disagree |
 | On GitHub | The `Screenshots` workflow (*Run workflow*; *grep* picks pictures by name) takes them all in parallel and gives them as WebP (`cwebp -q 78`, at most 1280 px wide); a picture that fails leaves its trace and its last screen in a second artifact |
 | The desktop app | `scripts/showcase/shots-desktop.mjs` (Electron): the app on a workspace folder, the Trash and the window's own row; the workflow runs it when *only* names it |
-| The animation at the top | `canvast-30s.gif` is made from a 30-second video recorded in the app: 720 px wide at 12 frames a second with its own palette (`ffmpeg … palettegen/paletteuse`), then `gifsicle -O3 --lossy=80`, which keeps it near 7 MB |
 
 | Area | Its pictures (`tests/shots/`) |
 | --- | --- |
