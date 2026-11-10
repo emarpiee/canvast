@@ -342,7 +342,7 @@ Everything you draw is vector, so it stays sharp at every magnification.
 #### More about drawing
 
 - **Pen** (`P`): four pens (fine, pencil, ink, marker) with pressure, tilt and a stabilizer. Size is 0.5–128 px. A stroke is made at the current scale, so a 3 px line drawn deep in a zoom is a 3 px line there, and it stays vector-sharp at every magnification. *Thickness lock* keeps strokes the same width on screen at any zoom.
-- **Shapes** (`U`): rectangle, ellipse, line, polygon and star. Sides, points, ratio and per-corner radii stay editable after drawing.
+- **Shapes** (`U`): rectangle, ellipse, line, polygon and star. Sides, points, ratio and per-corner radii stay editable after drawing. The *Ratio* field of one selected shape (not a line) gives it another width to height, keeping its area: typed, a preset, or turned on its side.
 - **Paths** (`B`) and **Edit nodes** (`N`): Bézier curves with handles, snapping, a lasso for several nodes, and node editing across several paths at once. A double-click in Edit nodes selects a whole closed path with its holes, to move it as one, and *Split into pieces* makes each outline of a path its own object. *Simplify* fits a curve to a rough path; *Pen stroke to path* converts a stroke.
 - **Fill and outline**
   - Fills: solid colour; linear, radial or angular gradient; a picture; or other objects of the canvas repeated over the shape (*Objects*, which follows those objects live as you change them).
@@ -515,7 +515,7 @@ Keep a large canvas in order, and reach things that lie under others.
 - **Sheets** (`C`): a sheet clips what it holds and has a ratio rather than a size (see [Shapes, sheets and masks](docs/reference/shapes-sheets-masks.md)).
   - Drawing a sheet over objects puts the ones wholly inside it on the sheet, in one undo step (ones it only crosses stay out).
   - *Put the selection on a sheet*, *Put each on its own sheet* (a picture's sheet is exactly its size, with no fill), *Fit to contents*, *Release* and *Turn on its side*.
-  - Ratio presets: `16:9`, `A4 portrait`, a number, or a size in px (`2000 x 1920` becomes `25 : 24`).
+  - Ratio presets: `16:9`, `A4 portrait`, a number, or a size in px (`2000 x 1920` becomes `25 : 24`). One selected shape has the same field.
   - Each object on a sheet has pins per axis (left, right, both, centre or scale) that decide what it does when the sheet is resized; *Scale contents* resizes everything with it.
 - **Masks:** a clipping mask (a sheet of any shape), a mask by opacity or brightness, or a brush mask painted in black and white with the Pen. Masks can be inverted, selected on their own and released. A click on a mask selects it as one unit; a double click goes inside.
 - **Moving a group:** a group or several selected move from anywhere in their box, gaps too; press outside it to draw a selection box.

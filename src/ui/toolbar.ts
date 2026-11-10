@@ -64,7 +64,10 @@ export interface ToolbarActions {
   importFont(file: File): Promise<string | null>;
   setPin(patch: { h?: string; v?: string }): void;
   /** The shape (width ÷ height) of the one picked sheet, and giving it another, keeping its area (ADR 0147). */
+  /** The width ÷ height of the one selected sheet or shape (not a line), or null. */
   sheetRatio(): number | null;
+  /** Whether that one is a sheet. */
+  ratioOfSheet(): boolean;
   setSheetRatio(ratio: number, final?: boolean): void;
   /** Where the one picked object on a sheet is and how big, in per cent of the sheet (null: none is), and moving or resizing it. */
   boxOnSheet(): { x: number; y: number; w: number; h: number; resizable: boolean } | null;
@@ -270,11 +273,10 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <span class="tb-count" data-kind="any" data-on-sheet hidden title="Where it is on its sheet, in per cent of the sheet: X and Y from its top-left corner, W and H of its width and height">On sheet
           <label>X <input type="number" data-on-x step="any" inputmode="decimal" aria-label="Position from the left of the sheet (per cent of its width)"></label> <label>Y <input type="number" data-on-y step="any" inputmode="decimal" aria-label="Position from the top of the sheet (per cent of its height)"></label>
           <span data-on-size><label>W <input type="number" data-on-w min="0" step="any" inputmode="decimal" aria-label="Width (per cent of the sheet's width)"></label> <label>H <input type="number" data-on-h min="0" step="any" inputmode="decimal" aria-label="Height (per cent of the sheet's height)"></label></span> %</span>
-        <span class="tb-count" data-kind="sheet" data-sheet-size hidden title="The shape of the sheet: width ÷ height. A sheet has a shape, not a size; the size is chosen when it is exported (Export in the Actions bar)">
-          <span class="tb-shape" data-sheet-shape aria-hidden="true"></span>
-          <label>Ratio <input type="text" data-sheet-ratio size="11" spellcheck="false" autocomplete="off" inputmode="text" aria-label="Sheet shape: width to height, like 16:9, 1.5 or A4" title="Type a ratio (16:9, 3/2, 1.5, A4, letter, square) or a size in px (2000 x 1920, or 2000x1920px, becomes 25 : 24), then Enter. Add portrait or landscape to turn it."></label>
-          <select data-sheet-preset aria-label="Sheet shape preset" title="A common shape: the sheet takes it, keeping its area and its top-left corner"><option value="">Shapes…</option>${["Basic", "Screen", "Paper", "Social"].map((g) => `<optgroup label="${g}">${RATIO_PRESETS.filter((r) => r.group === g).map((r) => `<option value="${r.ratio}">${r.label}</option>`).join("")}</optgroup>`).join("")}</select>
-          <button type="button" data-sheet-turn aria-label="Turn the sheet on its side: swap its width and height" title="Turn it on its side: portrait ⇄ landscape (the same area)">${ICONS.arrowRightLeft}</button>
+        <span class="tb-count" data-kind="sheet shape" data-sheet-size hidden title="The shape of its box: width ÷ height. A sheet has a shape, not a size; the size is chosen when it is exported (Export in the Actions bar)">
+          <label>Ratio <input type="text" data-sheet-ratio size="11" spellcheck="false" autocomplete="off" inputmode="text" aria-label="Shape: width to height, like 16:9, 1.5 or A4" title="Type a ratio (16:9, 3/2, 1.5, A4, letter, square) or a size in px (2000 x 1920, or 2000x1920px, becomes 25 : 24), then Enter. Add portrait or landscape to turn it."></label>
+          <select data-sheet-preset aria-label="Shape preset" title="A common shape: the sheet or shape takes it, keeping its area and its top-left corner"><option value="">Shapes…</option>${["Basic", "Screen", "Paper", "Social"].map((g) => `<optgroup label="${g}">${RATIO_PRESETS.filter((r) => r.group === g).map((r) => `<option value="${r.ratio}">${r.label}</option>`).join("")}</optgroup>`).join("")}</select>
+          <button type="button" data-sheet-turn aria-label="Turn it on its side: swap its width and height" title="Turn it on its side: portrait ⇄ landscape (the same area)">${ICONS.arrowRightLeft}</button>
           <button type="button" data-sheet-scale aria-pressed="false" aria-label="Scale contents with the sheet" title="Scale contents (kept with this sheet): when the sheet is resized, everything on it grows with it, whatever its pins say">${ICONS.sheetScale}</button></span>
         <label class="tb-count" data-kind="shape" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the field left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
@@ -996,9 +998,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     root.querySelector<HTMLElement>("[data-sheet-size]")!.hidden = ratio === null;
     if (ratio !== null) {
       showRatio();
-      const shape = root.querySelector<HTMLElement>("[data-sheet-shape]")!;
-      shape.style.setProperty("--shape", String(Math.min(Math.max(ratio, 0.2), 5)));
-      root.querySelector<HTMLElement>("[data-sheet-scale]")!.setAttribute("aria-pressed", String(actions.sheetScale()));
+      const scale = root.querySelector<HTMLElement>("[data-sheet-scale]")!;
+      scale.hidden = !actions.ratioOfSheet(); // (what is on a sheet: a shape holds nothing)
+      scale.setAttribute("aria-pressed", String(actions.sheetScale()));
     }
     for (const [key, shown, value] of fields) {
       if (!still && pick) continue;

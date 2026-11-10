@@ -2716,7 +2716,6 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 .toolbar .tb-count { display: inline-flex; flex: none; align-items: center; gap: var(--s-4); font: var(--font-meta); color: var(--hud-muted); white-space: nowrap; }
 .toolbar .tb-count[hidden] { display: none; }
 .toolbar .tb-count input[data-sheet-ratio] { width: calc(var(--sp-15) * 1.5); text-align: left; }
-.toolbar .tb-shape { flex: none; height: var(--icon-md); aspect-ratio: var(--shape, 1); border: 1px solid var(--hud-muted); border-radius: var(--r-xs); background: color-mix(in oklch, var(--hud-accent) 18%, transparent); }
 .toolbar .tb-count label { display: inline-flex; align-items: center; gap: var(--s-4); }
 .toolbar .tb-count select, .text-format select { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; height: var(--field-h); padding: 0 var(--s-4); font: var(--font-value); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 input[data-scrub-input] { cursor: ew-resize; user-select: text; }

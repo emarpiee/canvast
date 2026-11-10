@@ -2771,9 +2771,19 @@ export function setSheetScale(doc: DocumentStore, editor: EditorState, on: boole
   editor.changed();
 }
 
-/** The shape of the one picked sheet: its width ÷ height (ADR 0147: a sheet has a shape, and gets a size only when it is exported), or null. */
+/** The one picked upright sheet or shape that has a width and a height (a line has none): what the Ratio field changes. */
+const pickedBox = (doc: DocumentStore, editor: EditorState): CanvasObject | null => {
+  const sel = selected(doc, editor);
+  const o = sel.length === 1 ? sel[0]! : (pickedSheet(doc, editor) ?? null);
+  return o && !o.rot && !o.locked && (isContainer(o) || (o.kind === "path" && o.shape !== undefined && o.shape !== "line")) ? o : null;
+};
+
+/** Whether the Ratio field's one is a sheet. */
+export const ratioOfSheet = (doc: DocumentStore, editor: EditorState): boolean => isContainer(pickedBox(doc, editor));
+
+/** The shape of the one picked sheet or shape: its width ÷ height (ADR 0147: a sheet has a shape, and gets a size only when it is exported), or null. */
 export function sheetRatio(doc: DocumentStore, editor: EditorState): number | null {
-  const s = pickedSheet(doc, editor);
+  const s = pickedBox(doc, editor);
   const sz = s && sheetLocalSize(s);
   return sz ? sz.w / sz.h : null;
 }
@@ -2802,11 +2812,11 @@ function scaleSheet(doc: DocumentStore, editor: EditorState, s: CanvasObject, kx
  * makes it grow with the sheet), unless the sheet has Scale contents. One undo step (shown only while `final` is false).
  */
 export function setSheetRatio(doc: DocumentStore, editor: EditorState, ratio: number, final = true): void {
-  const s = pickedSheet(doc, editor);
+  const s = pickedBox(doc, editor);
   const sz = s && sheetLocalSize(s);
   if (editor.blockEdit() || !s || !sz || !(ratio > 0.01 && ratio < 100) || !Number.isFinite(ratio)) return;
   const area = sz.w * sz.h;
-  scaleSheet(doc, editor, s, Math.sqrt(area * ratio) / sz.w, Math.sqrt(area / ratio) / sz.h, final, "Sheet shape");
+  scaleSheet(doc, editor, s, Math.sqrt(area * ratio) / sz.w, Math.sqrt(area / ratio) / sz.h, final, isContainer(s) ? "Sheet shape" : "Shape ratio");
 }
 
 /** Make each picked sheet exactly as large as what is directly on it (ADR 0108): one undo step. */

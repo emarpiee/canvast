@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.3 — Ratio for shapes (2026-11-10)
+
+- **Added:** the *Ratio* field, its presets and *Turn* work on one selected shape (rectangle, ellipse, polygon, star, speech balloon) as on a sheet, keeping its area.
+- **Removed:** the small picture of the shape beside *Ratio*.
+
 ## 0.56.2 — Cut, copy and paste fixed (2026-11-10)
 
 - **Fixed:** in the desktop app, a cut left the clipboard as it was, so a paste took what was copied before (text or files of another program) instead of the cut objects.

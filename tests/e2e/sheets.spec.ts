@@ -259,6 +259,19 @@ test("a sheet has a shape, not a size: the Ratio field shows it (3 : 2), typing 
   await ratio.press("Enter");
   await expect(p.getByTestId("toast")).toContainText("is not a shape");
   await expect(ratio).toHaveValue("9 : 16");
+  await expect(p.locator("[data-sheet-scale]")).toBeVisible();
+  // A shape has it too (not Scale contents, which is a sheet's): the rectangle on the sheet, 4 : 3 to 16 : 9, its area kept
+  const rb = async () => { const b = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), rect.id))!.box; return { r: (b.maxX - b.minX) / (b.maxY - b.minY), area: (b.maxX - b.minX) * (b.maxY - b.minY) }; };
+  await click(app, 460, 350);
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([rect.id]);
+  await expect(ratio).toHaveValue("4 : 3");
+  await expect(p.locator("[data-sheet-scale]")).toBeHidden();
+  const ra = (await rb()).area;
+  await p.locator("[data-sheet-preset]").selectOption({ label: "Video 16 : 9" });
+  await app.frame();
+  await expect(ratio).toHaveValue("16 : 9");
+  expect((await rb()).r).toBeCloseTo(16 / 9, 1);
+  expect(Math.abs((await rb()).area / ra - 1), "the area is kept").toBeLessThan(0.02);
   expect(app.consoleErrors).toEqual([]);
 });
 
