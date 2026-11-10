@@ -1,3 +1,4 @@
+import { popHost } from "./modal";
 import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 import { NOTE_CARD, NOTE_COLOURS } from "../text/text-style";
 import type { Arrow } from "../doc/path";
@@ -250,7 +251,7 @@ export function openColourPopover(anchor: HTMLElement, o: ColourPopoverOptions):
   pop.append(picker.el);
   const saveBtn = saveColourButton(() => lastHex, () => picker.setGroups(groups()));
   if (saveBtn) pop.append(saveBtn);
-  document.body.appendChild(pop);
+  popHost().appendChild(pop);
   place(pop, anchor);
   anchor.setAttribute("aria-expanded", "true");
   open = { pop, anchor, picker, onClose: o.onClose };
@@ -354,7 +355,7 @@ export function openGradientPopover(anchor: HTMLElement, o: GradientPopoverOptio
     onChange: (v) => o.onChange((g = gradientFromValue(g, v))),
   });
   pop.append(ed.el);
-  document.body.appendChild(pop);
+  popHost().appendChild(pop);
   place(pop, anchor);
   anchor.setAttribute("aria-expanded", "true");
   open = { pop, anchor, picker: ed, onClose: o.onClose };
@@ -406,7 +407,7 @@ function openChildGradient(parent: HTMLElement, o: ChildGradientOptions): void {
       () => o.onSaved?.(),
     ),
   );
-  document.body.appendChild(pop);
+  popHost().appendChild(pop);
   const put = (): void => {
     const p = parent.getBoundingClientRect();
     const w = pop.offsetWidth, h = pop.offsetHeight;
@@ -572,7 +573,7 @@ export function openPaintPopover(anchor: HTMLElement, o: PaintPopoverOptions): v
     settle(paint);
   });
   mount();
-  document.body.appendChild(pop);
+  popHost().appendChild(pop);
   place(pop, anchor);
   anchor.setAttribute("aria-expanded", "true");
   // Closing keeps what was last shown: a number typed in a field is only "changed" on Enter or leaving it.
@@ -664,7 +665,7 @@ export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void
       }
     }
   });
-  document.body.appendChild(pop);
+  popHost().appendChild(pop);
   place(pop, anchor);
   anchor.setAttribute("aria-expanded", "true");
   open = { pop, anchor, picker: { destroy() {} }, onClose: o.onClose };
@@ -757,7 +758,7 @@ export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void
     } else if (b.dataset["caps"]) o.onChange({ caps: b.dataset["caps"] === "none" ? null : (b.dataset["caps"] as TextBoxOptions["caps"]) }, true);
     else o.onChange({ valign: b.dataset["valign"] as TextBoxOptions["valign"] }, true);
   });
-  document.body.appendChild(pop);
+  popHost().appendChild(pop);
   place(pop, anchor);
   anchor.setAttribute("aria-expanded", "true");
   open = { pop, anchor, picker: { destroy() {} }, onClose: o.onClose };
@@ -831,7 +832,7 @@ export function openFontOptionsPopover(anchor: HTMLElement, o: FontOptions): voi
       set(a.def, true);
     });
   }
-  document.body.appendChild(pop);
+  popHost().appendChild(pop);
   place(pop, anchor);
   anchor.setAttribute("aria-expanded", "true");
   open = { pop, anchor, picker: { destroy() {} }, onClose: o.onClose };

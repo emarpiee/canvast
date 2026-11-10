@@ -25,6 +25,12 @@ export function makeModal(o: ModalOptions): HTMLDialogElement {
   return dlg;
 }
 
+/**
+ * Where a menu or popover goes: into the newest open modal, whose page around it is inert (a popover put on the page could not be used), else
+ * the page. Every menu and popover is put here.
+ */
+export const popHost = (): HTMLElement => [...document.querySelectorAll<HTMLDialogElement>("dialog[open]")].at(-1) ?? document.body;
+
 const watchers = new Set<() => void>();
 /** Told when a modal has opened or closed: what must stay above every modal moves into the newest (the window's row). */
 export const onModalChange = (fn: () => void): void => void watchers.add(fn);

@@ -236,7 +236,7 @@ function openDialog(deps: ExportDeps, again = false): void {
 
     const preset = presetOf(t.ratio);
   const dlg = makeModal({
-    className: multi ? "export-dlg is-multi" : "export-dlg",
+    className: multi ? "confirm export-dlg is-multi" : "confirm export-dlg",
     testid: "export-dialog",
     titleId: "ex-title",
     html: `
@@ -779,6 +779,7 @@ function openDialog(deps: ExportDeps, again = false): void {
   // Enter exports as last time (Download at first); Ctrl+C copies, unless words are selected in a field.
   dlg.addEventListener("keydown", (e) => {
     const el = e.target as HTMLElement;
+    if (el.closest(".colour-pop, .pop-menu")) return; // (a colour or a menu opened from the dialog keeps its keys)
     if (e.key === "Enter" && !e.isComposing && !el.closest("button, select, textarea, [role=radio]")) {
       e.preventDefault();
       if (el === wIn || el === hIn) fromField(el === wIn ? "w" : "h");

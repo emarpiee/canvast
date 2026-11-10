@@ -99,6 +99,13 @@
   --text-sm: 12px;
   --tree-row-h: 26px;
   --choice-w: 460px;
+  /* Dialog widths, narrowest first (a dialog is never wider than the window less an edge each side). */
+  --dlg-s: 440px;
+  --dlg-m: 520px;
+  --dlg-l: 640px;
+  --dlg-xl: 720px;
+  --dlg-2xl: 54rem;
+  --dlg-3xl: 72rem;
   --choice-h: 320px;
   --text-md: 13px;
   --text-lg: 14px;
@@ -437,12 +444,12 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 /* When the row is wider than the room it has, it scrolls sideways and its ends fade: the one place the bar gives way, never into a menu. */
 /* A row that scrolls says so the same way everywhere, with no scrollbar: a fade and a small arrow at each end that has more to show (bar.ts syncScroll).
    The fade and the arrow are the first and last item of the row, stuck to its edge (a row has no padding of its own: --cue-rest is the room its ends keep). */
-.tb-options-row::before, .tb-options-row::after, .styles-tabs::before, .styles-tabs::after { content: ""; flex: none; width: var(--cue-rest, 0px); }
-:is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs, .styles-tabs)[data-scroll-start]::before, :is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs, .styles-tabs)[data-scroll-end]::after { position: sticky; z-index: 1; display: flex; align-items: center; align-self: stretch; width: var(--sp-10); pointer-events: none; color: var(--hud-fg); font: var(--weight-semibold) var(--text-xl)/1 var(--font-ui); }
-:is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs, .styles-tabs)[data-scroll-start]::before { content: "\2039"; left: 0; margin-right: calc(var(--cue-rest, 0px) - var(--s-10)); justify-content: flex-start; padding-left: var(--s-2); background: linear-gradient(to right, var(--hud-bg) 50%, color-mix(in oklch, var(--hud-bg) 70%, transparent) 75%, transparent); }
-:is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs, .styles-tabs)[data-scroll-end]::after { content: "\203A"; right: 0; margin-left: calc(var(--cue-rest, 0px) - var(--s-10)); justify-content: flex-end; padding-right: var(--s-2); background: linear-gradient(to left, var(--hud-bg) 50%, color-mix(in oklch, var(--hud-bg) 70%, transparent) 75%, transparent); }
+.tb-options-row::before, .tb-options-row::after { content: ""; flex: none; width: var(--cue-rest, 0px); }
+:is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs)[data-scroll-start]::before, :is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs)[data-scroll-end]::after { position: sticky; z-index: 1; display: flex; align-items: center; align-self: stretch; width: var(--sp-10); pointer-events: none; color: var(--hud-fg); font: var(--weight-semibold) var(--text-xl)/1 var(--font-ui); }
+:is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs)[data-scroll-start]::before { content: "\2039"; left: 0; margin-right: calc(var(--cue-rest, 0px) - var(--s-10)); justify-content: flex-start; padding-left: var(--s-2); background: linear-gradient(to right, var(--hud-bg) 50%, color-mix(in oklch, var(--hud-bg) 70%, transparent) 75%, transparent); }
+:is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs)[data-scroll-end]::after { content: "\203A"; right: 0; margin-left: calc(var(--cue-rest, 0px) - var(--s-10)); justify-content: flex-end; padding-right: var(--s-2); background: linear-gradient(to left, var(--hud-bg) 50%, color-mix(in oklch, var(--hud-bg) 70%, transparent) 75%, transparent); }
 /* what scrolls into view (the picked chip) stops clear of the fade and its arrow */
-:is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs, .styles-tabs) { scroll-padding-inline: var(--sp-10); }
+:is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs) { scroll-padding-inline: var(--sp-10); }
 /* Switched off: for another kind of item than the one being edited (ui/toolbar.ts). */
 [data-off] { display: none !important; }
 .toolbar .tb-chip { width: auto; padding: 0 var(--s-6); font: var(--font-meta); }
@@ -682,7 +689,9 @@ body[data-view="assets"] .hint-float, body[data-view="settings"] .hint-float { d
 
 /* ---- confirmation dialog --------------------------------------------- */
 dialog.confirm {
-  max-width: min(440px, calc(100vw - 32px));
+  max-width: min(var(--dlg-s), calc(100vw - 2 * var(--edge)));
+  max-height: calc(100dvh - 2 * var(--edge));
+  box-shadow: var(--hud-lift);
   padding: var(--s-8) var(--s-10);
   color: var(--hud-fg);
   background: var(--theme-bg);
@@ -706,8 +715,8 @@ dialog.lock-screen .confirm-actions button { flex: 1; height: var(--ctl); }
 .lock-logo svg, .about-logo svg { display: block; width: 100%; height: 100%; }
 .about-title { display: flex; align-items: center; gap: var(--s-6); }
 .about-logo { flex: none; width: var(--logo-sm); height: var(--logo-sm); color: var(--logo-colour); }
-dialog.confirm h2 { margin: 0 0 var(--s-4); font-size: var(--text-xl); }
-dialog.confirm p { margin: 0 0 var(--s-4); overflow-wrap: anywhere; }
+:where(dialog.confirm) h2 { margin: 0 0 var(--s-4); font-size: var(--text-xl); }
+:where(dialog.confirm) p { margin: 0 0 var(--s-4); overflow-wrap: anywhere; }
 /* A dialog's summary, read at a glance: facts in two columns, a titled list, warnings in a box. */
 dialog.confirm .confirm-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--s-4) var(--s-8); margin: var(--s-2) 0 var(--s-6); }
 dialog.confirm .confirm-facts dt { color: var(--hud-muted); }
@@ -2193,6 +2202,8 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .pop-menu button.has-sep::before { content: ""; position: absolute; left: var(--s-2); right: var(--s-2); top: calc(-1 * var(--s-1) - 1px); border-top: 1px solid var(--hud-border); }
 .pop-menu button:disabled { opacity: 0.4; cursor: default; }
 .pop-menu button.is-danger { color: var(--hud-danger); }
+.pop-menu .menu-count + .menu-tick { margin-left: var(--s-4); }
+.pop-menu .menu-count { margin-left: auto; padding-left: var(--s-6); color: var(--hud-muted); font: var(--font-meta); font-variant-numeric: tabular-nums; }
 .pop-menu svg { width: 16px; height: 16px; flex: none; color: var(--hud-muted); }
 .pop-menu button.is-danger svg { color: inherit; }
 /* The retired bookmark button row and the layers' floating eye and lock */
@@ -2371,7 +2382,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .tags-rules code { font: inherit; padding: 0 var(--s-1); background: var(--hud-hover); border-radius: var(--r-2xs); }
 
 /* The rename dialog (ui/batch-rename.ts, ADR 0085). */
-dialog.rename-dialog { width: min(640px, calc(100vw - 2 * var(--edge))); }
+dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); }
 .rn-row { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--s-6); margin-bottom: var(--s-6); }
 .rn-row select { justify-self: end; min-width: 220px; height: var(--list-h); padding: 0 var(--s-6); font: var(--font-control); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-md); }
 .rn-fields { display: grid; gap: var(--s-4); margin-bottom: var(--s-4); }
@@ -2800,13 +2811,12 @@ input[data-scrub-input]:focus { cursor: text; }
 .pal-add, .pal-done { height: var(--field-h); padding: 0 var(--s-6); border-radius: var(--r-sm); border: 1px solid var(--hud-border); cursor: pointer; font: var(--font-value); background: var(--hud-hover); color: var(--hud-fg); }
 .pal-done { background: var(--hud-accent); color: var(--hud-accent-fg); border-color: transparent; }
 .pal-add:disabled { opacity: 0.5; cursor: not-allowed; }
-.styles-tabs { display: flex; gap: var(--s-2); padding: var(--s-4) var(--s-4) 0; overflow-x: auto; scrollbar-width: none; flex: none; }
-.styles-tabs::-webkit-scrollbar { display: none; }
-.styles-tab { flex: 1 0 auto; min-width: var(--ctl); position: relative; display: inline-flex; align-items: center; justify-content: center; gap: var(--s-2); height: calc(var(--list-h) + var(--sp-4)); padding: 0 var(--s-2); background: none; border: 1px solid transparent; border-radius: var(--r-md); color: var(--hud-muted); cursor: pointer; }
-.styles-tab svg { width: var(--icon-md); height: var(--icon-md); }
-.styles-tab:hover { background: var(--hud-hover); color: var(--hud-fg); }
-.styles-tab[aria-selected="true"] { background: var(--hud-hover); border-color: var(--hud-accent); color: var(--hud-fg); }
-.styles-tab-n { font: var(--font-meta); color: var(--hud-muted); }
+.styles-kinds { padding: var(--s-4) var(--s-4) 0; flex: none; }
+.styles-kind { min-height: var(--list-h); padding-inline: var(--s-4); }
+.pick-current > svg:first-child { width: var(--icon-md); height: var(--icon-md); }
+.pick-current .menu-count { color: var(--hud-muted); font: var(--font-meta); font-variant-numeric: tabular-nums; }
+.pg-tabs { display: flex; margin: var(--s-4) var(--s-4) 0; flex: none; }
+.pg-tabs button { flex: 1; }
 .styles-tab-head { display: flex; align-items: center; justify-content: space-between; }
 .styles-tab-head h3 { margin: 0; font: var(--weight-semibold) var(--text-sm) var(--font-ui); }
 .styles-target { display: flex; align-items: center; gap: var(--s-2); font: var(--font-meta); color: var(--hud-muted); }
@@ -2890,23 +2900,10 @@ select option, select optgroup { color: var(--hud-fg); background: var(--hud-bg)
   .assets-size { flex: 1 1 0; min-width: 4rem; }
   .assets-size input { flex: 1; width: auto; min-width: 0; }
 }
-}
 
 /* ---- Export (ui/export-dialog.ts, ADR 0147): the size is chosen here, from the shape ---------------------------------- */
-dialog.export-dlg {
-  width: min(54rem, calc(100vw - 2 * var(--edge)));
-  max-height: calc(100dvh - 2 * var(--edge));
-  padding: 0;
-  color: var(--hud-fg);
-  background: var(--theme-bg);
-  border: 1px solid var(--hud-border);
-  border-radius: var(--r-lg);
-  box-shadow: var(--hud-lift);
-  font: var(--text-md)/1.45 var(--font-ui);
-  overflow: auto;
-}
-dialog.export-dlg::backdrop { background: var(--hud-scrim); }
-dialog.export-dlg[open] { animation: fade-in var(--dur-base) var(--ease-out) both; }
+/* (the shared dialog, dialog.confirm, gives it its look; only its size and its own layout are here) */
+dialog.export-dlg { width: min(var(--dlg-2xl), calc(100vw - 2 * var(--edge))); max-width: none; padding: 0; overflow: auto; }
 .ex-head { display: flex; align-items: center; justify-content: space-between; padding: var(--s-8) var(--s-10) var(--s-4); }
 .ex-head h2 { margin: 0; font-size: var(--text-3xl); font-weight: var(--weight-semibold); }
 .ex-what { color: var(--hud-muted); font-weight: var(--weight-regular); }
@@ -2947,7 +2944,7 @@ dialog.export-dlg[open] { animation: fade-in var(--dur-base) var(--ease-out) bot
 .seg { display: inline-flex; gap: var(--s-1); padding: var(--s-1); background: var(--hud-hover); border-radius: var(--r-sm); }
 .seg button { height: var(--field-h); padding: 0 var(--s-6); color: var(--hud-muted); background: transparent; border: 0; border-radius: var(--r-xs); font: var(--font-value); cursor: pointer; }
 .seg button:hover:not(:disabled) { color: var(--hud-fg); }
-.seg button[aria-checked="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
+.seg button[aria-checked="true"], .seg button[aria-selected="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); }
 .seg button:disabled { opacity: 0.4; cursor: default; }
 .ex-readout { flex: 1; min-width: 0; margin: 0; text-align: right; color: var(--hud-muted); font: var(--font-meta); font-variant-numeric: tabular-nums; }
 .ex-readout b { color: var(--hud-fg); font: var(--font-value); }
@@ -2989,7 +2986,7 @@ dialog.export-dlg.is-busy .ex-foot button { opacity: 0.6; pointer-events: none; 
 .ex-move:disabled { opacity: 0.3; cursor: default; }
 .ex-minis { max-height: calc(var(--sp-15) * 5); overflow-y: auto; padding: var(--s-4); }
 /* Several sheets: the dialog takes the height of the window and the pictures take the room of the left half, scrolling when there are more. */
-dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height: calc(100dvh - 2 * var(--edge)); width: min(72rem, calc(100vw - 2 * var(--edge))); }
+dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height: calc(100dvh - 2 * var(--edge)); width: min(var(--dlg-3xl), calc(100vw - 2 * var(--edge))); }
 .is-multi .ex-body { flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }
 .is-multi .ex-stage { min-width: 0; min-height: 0; padding: 0; align-items: stretch; }
 .is-multi .ex-minis { flex: 1; min-height: 0; max-height: none; max-width: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(var(--sp-15) * 1.6), 1fr)); gap: var(--s-8) var(--s-6); justify-items: center; align-content: start; padding: var(--s-6); background: color-mix(in oklch, var(--hud-hover) 35%, transparent); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
@@ -3051,8 +3048,8 @@ dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height
 #settings-view .storage-actions button svg { flex: none; width: var(--icon-md); height: var(--icon-md); }
 #settings-view button.is-danger { color: var(--hud-danger-fg); background: var(--hud-danger); border-color: var(--hud-danger); }
 .set-danger { border-color: var(--hud-danger); }
-dialog.reset-dialog { max-width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; }
-dialog.list-dialog { width: min(720px, calc(100vw - 32px)); max-width: none; max-height: calc(100vh - 32px); overflow-y: auto; } /* (a list that can grow: it scrolls here, never on the page) */
+dialog.reset-dialog { max-width: min(var(--dlg-m), calc(100vw - 2 * var(--edge))); overflow-y: auto; }
+dialog.list-dialog { width: min(var(--dlg-xl), calc(100vw - 2 * var(--edge))); max-width: none; overflow-y: auto; } /* (a list that can grow: it scrolls here, never on the page) */
 dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-lg); }
 .reset-list { margin: 0 0 var(--s-4); padding-left: var(--s-8); }
 .reset-last { margin: 0 0 var(--s-4); opacity: 0.8; }
@@ -3085,9 +3082,9 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
 
 /* Pattern panel (ADR 0162): built from the settings a generator declares; shares the Adjust panel's rows and fields. */
 .pg-pick { display: grid; gap: var(--s-2); padding: var(--s-4) var(--s-6) var(--s-4); border-bottom: 1px solid var(--hud-border); }
-.pg-current { display: flex; align-items: center; gap: var(--s-4); width: 100%; padding: var(--s-2); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; text-align: left; }
-.pg-current .pg-name { flex: 1 1 auto; }
-.pg-current svg { width: var(--icon-sm); height: var(--icon-sm); flex: none; }
+.pg-current, .pick-current { display: flex; align-items: center; gap: var(--s-4); width: 100%; padding: var(--s-2); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; text-align: left; }
+.pg-current .pg-name, .pick-current .pg-name { flex: 1 1 auto; }
+.pg-current svg, .pick-current svg { width: var(--icon-sm); height: var(--icon-sm); flex: none; }
 .pg-grid { max-height: 18rem; overflow-y: auto; padding: var(--s-4); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 .pg-grid[hidden] { display: none; }
 .pg-grid h5 { margin: var(--s-4) 0 var(--s-2); font: var(--weight-semibold) var(--text-xs) var(--font-ui); color: var(--hud-muted); text-transform: uppercase; letter-spacing: 0.06em; }

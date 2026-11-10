@@ -2,7 +2,7 @@ import { createHash, scrypt as nodeScrypt } from "node:crypto";
 import { createVault, nameKeys, sealFile, sealName, sealText, useScrypt } from "../../src/storage/hidden-vault";
 import { readFile } from "node:fs/promises";
 import type { Browser, BrowserContext, Page } from "@playwright/test";
-import { APP_URL, expect, openActions, rowAction, test, importMode } from "./harness";
+import { APP_URL, expect, openActions, rowAction, test, importMode, styleKind } from "./harness";
 import { blockyFixture, makePng } from "./png";
 import { encodeGif } from "./gif";
 import { readZip, writeZip } from "../../src/storage/zip";
@@ -634,7 +634,7 @@ test("an incremental backup holds only what changed, a chain of backups restores
   // a saved style: an empty palette
   await p.getByRole("button", { name: "Styles panel", exact: true }).click();
   const panel = p.getByTestId("styles-panel");
-  await panel.getByRole("tab", { name: /^Palettes/ }).click();
+  await styleKind(p, "palette");
   await panel.locator('[data-new-from="empty"]').click();
   await expect(panel.locator(".style-card", { hasText: "Palette 1" })).toBeVisible();
   await p.getByRole("button", { name: "Hide the Styles panel" }).click();

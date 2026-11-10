@@ -1,4 +1,4 @@
-import { exportWith, expect, test } from "./harness";
+import { exportWith, expect, test, styleKind } from "./harness";
 import type { App } from "./harness";
 
 /**
@@ -260,7 +260,7 @@ test("Pattern styles: Save as a style keeps the generator, settings and seed in 
   await choose(app, "tides"); // something else in the panel now
   await expect(p.locator("[data-pg-name]")).toHaveText("Tides");
   await p.click("[data-styles]");
-  await p.locator('[data-tab="pattern"]').click();
+  await styleKind(p, "pattern");
   const card = p.getByTestId("styles-panel").locator(".style-card");
   await expect(card).toHaveCount(1);
   await expect(card.locator(".style-pattern svg")).toBeVisible();
@@ -280,7 +280,7 @@ test("Pattern styles: update a style from the Pattern panel, and pressing one wi
   await p.locator("[data-pg-seed]").dispatchEvent("change");
   await p.locator("[data-pg-style]").click();
   await p.click("[data-styles]");
-  await p.locator('[data-tab="pattern"]').click();
+  await styleKind(p, "pattern");
   const panel = p.getByTestId("styles-panel");
   await expect(panel.locator(".style-card")).toContainText("Stripes · seed 11");
   // the panel changes, and the style is brought up to date from it

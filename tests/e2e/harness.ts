@@ -204,6 +204,12 @@ export async function chooseInMenu(page: Page, button: GroupMenu, id: string, ke
     await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur()); // (the focus went back to the bar's button, whose name the hint line would show)
   }
 }
+/** Show the saved styles of a kind in the Styles panel: its one list of kinds (the shared menu). */
+export async function styleKind(page: Page, kind: string): Promise<void> {
+  await page.locator("[data-kind-pick]").click();
+  await page.locator(`.pop-menu [data-id="kind:${kind}"]`).click();
+  await expect(page.locator("[data-kind-pick]")).toHaveAttribute("aria-label", new RegExp(`^Kind of style: `));
+}
 export const alignWith = (page: Page, id: string, keepOpen = false): Promise<void> => chooseInMenu(page, "alignmenu", id, keepOpen);
 export const arrangeWith = (page: Page, id: string, keepOpen = false): Promise<void> => chooseInMenu(page, "arrangemenu", id, keepOpen);
 export const boolWith = (page: Page, id: string): Promise<void> => chooseInMenu(page, "boolmenu", id);

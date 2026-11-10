@@ -1,3 +1,4 @@
+import { popHost } from "./modal";
 import { esc } from "./format";
 import { ICONS } from "./icons";
 
@@ -22,6 +23,8 @@ export interface MenuItem {
   hint: string;
   /** A line above this item: it starts a new group of the menu. */
   sep?: boolean;
+  /** A number at the end of the row (how many there are of it). */
+  count?: number;
   /** Its own ⋯ at the end of the row: a menu of what can be done to it (rename, delete). */
   more?: readonly MenuItem[];
   /** Names the item for tests and scripts (`data-id`). */
@@ -61,7 +64,7 @@ const closeChild = (refocus = false): void => {
 };
 
 /** A menu row's markup: its icon, label and hint. */
-const rowHtml = (it: MenuItem, i: number): string => `<button type="button" role="${it.checked === undefined ? "menuitem" : "menuitemradio"}"${it.checked === undefined ? "" : ` aria-checked="${it.checked}"`} data-i="${i}"${it.id ? ` data-id="${esc(it.id)}"` : ""} class="${it.danger ? "is-danger" : ""}${it.checked ? " is-checked" : ""}${it.sep && i > 0 ? " has-sep" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}${it.hint ? `<span class="menu-text"><span>${esc(it.label)}</span><span class="menu-hint">${esc(it.hint)}</span></span>` : `<span>${esc(it.label)}</span>`}${it.checked ? `<span class="menu-tick" aria-hidden="true">${ICONS.check}</span>` : ""}</button>`;
+const rowHtml = (it: MenuItem, i: number): string => `<button type="button" role="${it.checked === undefined ? "menuitem" : "menuitemradio"}"${it.checked === undefined ? "" : ` aria-checked="${it.checked}"`} data-i="${i}"${it.id ? ` data-id="${esc(it.id)}"` : ""} class="${it.danger ? "is-danger" : ""}${it.checked ? " is-checked" : ""}${it.sep && i > 0 ? " has-sep" : ""}"${it.disabled ? " disabled" : ""} aria-label="${esc(it.aria ?? it.label)}">${it.icon ?? ""}${it.hint ? `<span class="menu-text"><span>${esc(it.label)}</span><span class="menu-hint">${esc(it.hint)}</span></span>` : `<span>${esc(it.label)}</span>`}${it.count !== undefined ? `<span class="menu-count">${it.count}</span>` : ""}${it.checked ? `<span class="menu-tick" aria-hidden="true">${ICONS.check}</span>` : ""}</button>`;
 
 export function closeMoreMenu(refocus = false): void {
   closeChild();
@@ -171,7 +174,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
     .join("");
   };
   render();
-  document.body.appendChild(menu);
+  popHost().appendChild(menu);
   placeMenu(menu, anchor);
   anchor.setAttribute("aria-expanded", "true");
   open = { menu, anchor, onClose: opts.onClose };
@@ -203,7 +206,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
         closeMoreMenu();
         pick.run();
       });
-      document.body.appendChild(sub);
+      popHost().appendChild(sub);
       placeMenu(sub, moreOf);
       moreOf.setAttribute("aria-expanded", "true");
       child = { menu: sub, from: moreOf };

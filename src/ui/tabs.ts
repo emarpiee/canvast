@@ -1,8 +1,8 @@
 import { esc } from "./format";
 
-/** One tab of a tab strip (role, selection, the keyboard's roving focus). `inner` is what it shows; the strip is a `.styles-tabs` with role tablist. */
+/** One tab of a tab strip (role, selection, the keyboard's roving focus). `inner` is what it shows; the strip is a `.seg` (the shared segmented control) with role tablist. */
 export const tabHtml = (id: string, name: string, selected: boolean, inner: string): string =>
-  `<button type="button" role="tab" class="styles-tab" data-tab="${esc(id)}" aria-selected="${selected}" tabindex="${selected ? 0 : -1}" aria-label="${esc(name)}" title="${esc(name)}">${inner}</button>`;
+  `<button type="button" role="tab" data-tab="${esc(id)}" aria-selected="${selected}" tabindex="${selected ? 0 : -1}" aria-label="${esc(name)}" title="${esc(name)}">${inner}</button>`;
 
 /** The tab an arrow key, Home or End on a tab goes to; null when the key is not one of them or the press is not on a tab. */
 export function tabFromKey(e: KeyboardEvent, ids: readonly string[]): string | null {

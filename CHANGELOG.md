@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.56.6 — One list of kinds in Styles; Pattern tabs by Density (2026-11-10)
+
+- **Changed:** the Styles panel shows its kinds in one list (the shared menu), each with its icon, its name and how many there are, opened from a button at its top, instead of a row of tabs.
+- **Changed:** the Patterns and Guides tabs of the Pattern panel are the shared segmented control, sized by Density.
+- **Added:** a menu row can show a count at its end.
+- **Fixed:** the Export dialog had the browser's plain square black border: a stray brace in the style sheet dropped its whole look. It now has the shared dialog's look (its border, corners and shadow).
+- **Fixed:** a colour or a menu opened from a dialog (Export's background *Colour*) could not be used: the page around a dialog does not answer. Menus and colour popovers now open inside the dialog.
+- **Changed:** every dialog's width is a token (six sizes) and keeps an edge from the window, the same for all; each has the shared shadow.
+
 ## 0.56.5 — Export: on-screen sizes, padding, presets, Export again (2026-11-10)
 
 - **Added:** in Export…, sizes of 1× to 4× what is shown on screen; padding round what is exported (px or %), in every format; any background colour, or the canvas colour.

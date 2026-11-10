@@ -1,4 +1,4 @@
-import { expect, outlineShapes, test } from "./harness";
+import { expect, outlineShapes, test, styleKind } from "./harness";
 import type { App } from "./harness";
 import { makePng } from "./png";
 import { serializeAco } from "../../src/assets/aco";
@@ -43,7 +43,8 @@ test("Styles: a shape painted with a saved colour follows it when the colour is 
   await p.mouse.click(...(await centre(app, a.id)));
   await p.getByRole("button", { name: "Styles panel", exact: true }).click();
   const panel = p.getByTestId("styles-panel");
-  await panel.getByRole("tab", { name: /^Colours/ }).click();
+  await styleKind(p, "colour");
+  await expect(panel.locator("[data-kind-pick] .menu-count")).toHaveText("0");
   await panel.getByRole("button", { name: "Add a colour" }).click();
   await hexIn("ff0000");
   const card = panel.locator(".style-card", { hasText: "Colour 1" });
@@ -84,7 +85,7 @@ test("Styles: a gradient is saved from the fill picker, applied (the part asked 
   await p.getByRole("button", { name: "Styles panel", exact: true }).click();
   const panel = p.getByTestId("styles-panel");
   const card = (name: string) => panel.locator(".style-card", { hasText: name });
-  await panel.getByRole("tab", { name: /^Gradients/ }).click();
+  await styleKind(p, "gradient");
   await expect(card("Gradient 1")).toContainText("Linear · 2 stops");
   // one shape picked: it goes on the fill, no question
   await p.mouse.click(...(await centre(app, b.id)));
@@ -139,9 +140,9 @@ test("Styles: a gradient is saved from the fill picker, applied (the part asked 
     await paste("conic-gradient(from 90deg, #ff0000 0deg, #0000ff 180deg)");
     await expect(panel.locator(".style-card", { hasText: "Angular · 2 stops" })).toHaveCount(1); // (and the card says so)
     await paste("oklch(0.628 0.2577 29.23)");
-    await panel.getByRole("tab", { name: /^Colours/ }).click();
+    await styleKind(p, "colour");
     await expect(panel.locator(".style-card", { hasText: "#FF0000" })).toHaveCount(1);
-    await panel.getByRole("tab", { name: /^Gradients/ }).click();
+    await styleKind(p, "gradient");
   }
 
   // written as a GIMP gradient, and a file of that kind read back
@@ -166,7 +167,7 @@ test("Styles: a palette from the selection's colours is opened, a colour of it a
   await p.mouse.click(...(await centre(app, shape.id)));
   await p.getByRole("button", { name: "Styles panel", exact: true }).click();
   const panel = p.getByTestId("styles-panel");
-  await panel.getByRole("tab", { name: /^Palettes/ }).click();
+  await styleKind(p, "palette");
   await expect(panel.getByTestId("palette-empty")).toContainText("A palette is a set of colours"); // a first-time person is told what to do
   await panel.locator('[data-new-from="selection"]').click();
   const card = panel.locator(".style-palette").first();
@@ -241,7 +242,7 @@ test("Styles: a text style is saved from a picked text and put on another one (s
   await p.getByRole("spinbutton", { name: "Text size (px at this zoom)" }).fill("30");
   await p.getByRole("spinbutton", { name: "Text size (px at this zoom)" }).press("Enter");
   await p.getByRole("button", { name: "Styles panel" }).click();
-  await p.getByRole("tab", { name: /^Text styles/ }).click();
+  await styleKind(p, "text");
   await p.getByRole("button", { name: "Save from the text" }).click();
   await expect(p.getByTestId("styles-panel").locator(".style-card")).toHaveCount(1);
   await expect(p.getByTestId("styles-panel").locator(".style-card")).toContainText("30 px");
@@ -261,7 +262,7 @@ test("Styles: a gradient map on a picture maps its brightness onto a saved gradi
   const p = app.page;
   await p.getByRole("button", { name: "Styles panel", exact: true }).click();
   await p.getByTestId("styles-import").setInputFiles({ name: "sunset.ggr", mimeType: "text/plain", buffer: Buffer.from(SUNSET) });
-  await p.getByTestId("styles-panel").getByRole("tab", { name: /^Gradients/ }).click();
+  await styleKind(p, "gradient");
   await expect(p.getByTestId("styles-panel").locator(".style-card", { hasText: "Sunset" })).toBeVisible();
   await p.getByTestId("import-input").setInputFiles({ name: "grey.png", mimeType: "image/png", buffer: makePng(80, 80, () => [128, 128, 128, 255]) });
   await expect.poll(async () => (await objs(app)).length).toBe(1);

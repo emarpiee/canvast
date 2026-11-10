@@ -63,7 +63,7 @@ export function mountPatternPanel(host: HTMLElement, editor: EditorState, action
   panel.innerHTML = panelHtml({
     title: "Pattern",
     tools: `<button type="button" class="layer-btn" data-pg-reset aria-label="Reset the settings" title="Reset the settings of this generator">${ICONS.listRestart}</button>`,
-    sub: `<div class="styles-tabs" role="tablist" aria-label="Kinds of pattern" data-pg-tabs></div><div class="pg-pick">
+    sub: `<div class="seg pg-tabs" role="tablist" aria-label="Kinds of pattern" data-pg-tabs></div><div class="pg-pick">
       <button type="button" class="pg-current" data-pg-pick aria-expanded="false" aria-label="Generator"><span class="pg-thumb" data-pg-cur></span><span class="pg-name" data-pg-name></span>${ICONS.chevronDown}</button>
       <div class="pg-grid" data-pg-grid hidden>${families.map((f) => `<div data-pg-family="${tabOfFamily(f)}"><h5>${f}</h5><div class="pg-tiles">${GENERATORS.filter((g) => g.family === f).map((g) => `<button type="button" class="pg-tile" data-gen="${g.id}" aria-label="${esc(g.label)}: ${esc(g.about)}" title="${esc(g.about)}"><span class="pg-thumb"></span><span>${esc(g.label)}</span></button>`).join("")}</div></div>`).join("")}</div>
       <p class="adj-note" data-pg-about></p>

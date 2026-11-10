@@ -1,4 +1,4 @@
-import { exportWith, expect, outlineShapes, test } from "./harness";
+import { exportWith, expect, outlineShapes, test, styleKind } from "./harness";
 import type { App } from "./harness";
 import { makePng } from "./png";
 import { encodeGif } from "./gif";
@@ -427,11 +427,11 @@ test("Styles: an adjustment is saved from the Adjust panel into the library's St
   await panel.getByRole("button", { name: /^More actions for style Punchy 2/ }).click();
   await p.getByRole("menuitem", { name: /^Replace Punchy 2 with the adjustments/ }).click();
   await expect.poll(async () => (await objs(app)).find((o) => o.id === second.id)!.adjust).toEqual({ contrast: 50 });
-  await panel.getByRole("tab", { name: /^Gradients/ }).click(); // another tab shows other styles
+  await styleKind(p, "gradient"); // another tab shows other styles
   await expect(card("Punchy 2")).toHaveCount(0);
 
   // deleted from the panel
-  await panel.getByRole("tab", { name: /^Adjustments/ }).click();
+  await styleKind(p, "adjustment");
   await panel.getByRole("button", { name: /^More actions for style Punchy 2/ }).click();
   await p.getByRole("menuitem", { name: /^Delete style Punchy 2/ }).click();
   await p.getByTestId("confirm-ok").click();
