@@ -168,20 +168,9 @@ await step("styles", async () => {
   await p.locator("[data-kind-pick]").first().click(); // (the panel opens on the kind it showed last: show the colours)
   await p.locator('[data-id="kind:colour"]').first().click();
   await settle(400);
-  // (six bars beside the panel, each given one of the saved colours: the styles in use)
-  for (let i = 0; i < 6; i++) {
-    await p.keyboard.press("u");
-    await p.locator('[data-shape-kind="rect"]').click();
-    await drag([cx + 20 + i * 70, cy - 160], [cx + 80 + i * 70, cy + 160], 4);
-    await p.keyboard.press("v");
-    await settle(200);
-    await p.locator(".styles-list [data-style]").nth(i * 2).click();
-    await settle(200);
-  }
-  await select([]);
-  await settle(400);
   await off();
-  await shot("styles");
+  const sp = await p.locator(".styles-panel, [data-panel='styles']").first().boundingBox();
+  await shot("styles", { x: Math.max(0, sp.x - 24), y: Math.max(0, sp.y - 24), width: sp.width + 48, height: Math.min(sp.height + 48, 760) });
   await panel("Styles panel", false);
 });
 
@@ -189,26 +178,20 @@ await step("styles", async () => {
 let page = null;
 await step("comic", async () => {
   await newCanvas("Comic page");
-  const pics = await place(artOf("waterloo", "verhaecht", "leprince", "hokusai-seaside").map(h));
-  await select(pics);
-  await menu("sheetmenu", "eachsheet");
-  await settle(600);
-  const panels = (await objs()).filter((o) => o.container).map((o) => o.id);
+  const panels = await place(artOf("waterloo", "verhaecht", "leprince", "hokusai-seaside").map(h));
+  await fit();
   await select(panels);
-  await menu("sheetmenu", "puton"); // (a page round the panels)
-  await settle(600);
-  page = (await objs()).filter((o) => o.container).find((o) => !panels.includes(o.id))?.id ?? null;
+  await p.keyboard.press("Shift+A"); // (a page round the panels, with auto layout: as on a board)
+  await settle(800);
+  page = (await objs()).find((o) => o.container)?.id ?? null;
   await select([page]);
-  await p.keyboard.press("Shift+A"); // (auto layout on the page)
-  await settle(600);
-  await p.locator('[data-layout-flow="grid"]').click();
-  await p.locator("[data-layout-columns]").fill("2");
-  await p.locator("[data-layout-columns]").press("Enter");
-  for (const [sel, val] of [['[data-layout-gap="0"]', "16"], ['[data-layout-gap="1"]', "16"], ['[data-layout-pad="h"]', "24"], ['[data-layout-pad="v"]', "24"]]) {
-    await p.locator(sel).fill(val);
-    await p.locator(sel).press("Enter");
+  await settle(400);
+  for (const [sel, v] of [['[data-layout-flow="grid"]', null], ["[data-layout-columns]", 2], ['[data-layout-gap="0"]', 16], ['[data-layout-gap="1"]', 16], ['[data-layout-pad="h"]', 24], ['[data-layout-pad="v"]', 24]]) {
+    if (v === null) await p.locator(sel).click();
+    else { await p.locator(sel).fill(String(v)); await p.locator(sel).press("Enter"); }
   }
-  await p.keyboard.press("Escape");
+  await blur();
+  await settle(600);
   await fit([page]);
   const boxes = await Promise.all(panels.map((id) => boxOf(id)));
   const say = async (b, at, words) => {
@@ -271,15 +254,16 @@ await step("export", async () => {
   await menu("exportmenu", "exportpic");
   await settle(1200);
   await shot("export");
-  await p.keyboard.press("Escape");
-  await p.locator("dialog[open]").waitFor({ state: "detached", timeout: 5000 }).catch(() => p.keyboard.press("Escape"));
+  await p.locator('[data-ex="close"]').filter({ visible: true }).first().click();
   await settle(300);
 });
 
 // 13. Export, each on its own: the four panels as pages of their own
 await step("export-each", async () => {
-  const panels = (await objs()).filter((o) => o.container && o.id !== page).map((o) => o.id);
+  const panels = (await objs()).filter((o) => o.kind === "image").map((o) => o.id);
   await select(panels);
+  await settle(300);
+  console.log("export-each: selected", panels.length);
   await menu("exportmenu", "exportpic");
   await settle(600);
   if (await p.getByTestId("export-each").isVisible()) await p.getByTestId("export-each").click(); // (several sheets are already a page each)
