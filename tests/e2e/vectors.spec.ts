@@ -3727,6 +3727,10 @@ test("speech balloon: a double-click makes its words, kept in the body; nothing 
   const p = app.page;
   await key(app, "k");
   await drag(app, [500, 300], [800, 500]);
+  // (its tail, near the tip: where a click picks the balloon alone, its words' box being as big as its body)
+  const dots = await p.evaluate(() => window.__canvastDebug.balloonDots());
+  const [tip, base] = [dots.find((d) => d.part === "tip")!, dots.find((d) => d.part === "base")!];
+  const onTail = { x: tip.x + (base.x - tip.x) * 0.3, y: tip.y + (base.y - tip.y) * 0.3 };
   await p.mouse.dblclick(650, 400);
   await p.keyboard.type("Hello");
   await click(app, 1000, 650);
@@ -3757,12 +3761,9 @@ test("speech balloon: a double-click makes its words, kept in the body; nothing 
   await key(app, "Control+d");
   await expect.poll(count).toEqual({ words: 4, balloons: 4, links: 2 });
   await key(app, "Control+z");
-  // (the balloon alone: inside its body, between its edge and its words' box)
-  const screenBox = (id: string) => p.evaluate((i) => window.__canvastDebug.objectScreen(i)!.box, id);
-  const [bb, wb] = [await screenBox(balloon.id), await screenBox((await objs(app)).find((o) => o.kind === "text" && (o as unknown as { inShape?: { shape: string } }).inShape?.shape === balloon.id)!.id)];
   const pickBalloon = async () => {
     await click(app, 1000, 650);
-    await click(app, (bb.minX + wb.minX) / 2, (wb.minY + wb.maxY) / 2);
+    await click(app, onTail.x, onTail.y);
     expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([balloon.id]);
   };
   await pickBalloon();
