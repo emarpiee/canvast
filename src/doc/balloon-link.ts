@@ -1,3 +1,4 @@
+import { sharedPlace } from "./belongs";
 import * as D from "../core/dyadic";
 import { balloonOutline, boxShape, circle, inside, poly, type Box, type P } from "./balloon-geometry";
 import type { DerivationSource } from "./boolean-group";
@@ -149,7 +150,9 @@ export function withBalloonLinks(src: DerivationSource, next: readonly CanvasObj
     const size = Math.min(sa.rx, sa.ry, sb.rx * k, sb.ry * k) * 2;
     const made = { ...(A.frame ? { frame: A.frame } : {}), anchor: ea.world, unit: A.unit };
     const line = l.style === "line";
-    const { frame: _f, name: _n, ...rest } = o;
+    const place = sharedPlace([A, B], now);
+    const { frame: _f, name: _n, groups: _g, groupNames: _gn, parent: _p, ...rest } = { ...o, ...place } as PathObject;
+    Object.assign(rest, place);
     const kept: BalloonLink = { ...l, size, ra: [sa.rx, sa.ry], rb: [sb.rx * k, sb.ry * k] };
     out.set(o.id, { ...rest, ...made, params: { box: [0, 0, to[0], to[1]], link: kept }, z: Math.min(A.z, B.z) - 0.5, sub: linkSubs(l, to, size, 0), fill: line ? null : A.fill, stroke: A.stroke, width: A.width } as PathObject);
     const range = l.style === "neck" || l.style === "pinched" ? betweenBodies(l, to, A, B, ea.local, eb.local, k) : null;
@@ -158,8 +161,8 @@ export function withBalloonLinks(src: DerivationSource, next: readonly CanvasObj
       const sub = linkSubs(l, to, size, A.width * 0.5, range);
       const z = Math.max(A.z, B.z) + 0.5;
       const params = { box: [0, 0, to[0], to[1]] as const, link: { ...kept, cover: o.id } };
-      if (cover) { const { frame: _c, name: _m, ...keep } = cover; out.set(cover.id, { ...keep, ...made, z, sub, fill: A.fill, stroke: null, width: A.width, params } as PathObject); }
-      else out.set(newObjectId(), { ...LOOK, id: "", ...made, z, sub, fill: A.fill, stroke: null, width: A.width, params } as unknown as PathObject);
+      if (cover) { const { frame: _c, name: _m, groups: _cg, groupNames: _cn, parent: _cp, ...keep } = cover; out.set(cover.id, { ...keep, ...place, ...made, z, sub, fill: A.fill, stroke: null, width: A.width, params } as PathObject); }
+      else out.set(newObjectId(), { ...LOOK, id: "", ...place, ...made, z, sub, fill: A.fill, stroke: null, width: A.width, params } as unknown as PathObject);
     } else if (cover) drop(cover.id);
   }
   // (a connector deleted by itself takes its covering piece along; so does a piece left behind by an earlier version)

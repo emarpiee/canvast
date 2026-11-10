@@ -3786,6 +3786,59 @@ test("speech balloon: a double-click makes its words, kept in the body; nothing 
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("a balloon's words and connector belong to it: in its group and sheet, in front of it, and its Layers row stands for them", async ({ app }) => {
+  const p = app.page;
+  await p.getByRole("button", { name: "Layers panel", exact: true }).click();
+  const panel = p.getByTestId("layers-panel");
+  for (const [a, b, words] of [[[400, 250], [560, 360], "One"], [[700, 250], [860, 360], "Two"]] as const) {
+    await key(app, "k");
+    await drag(app, [...a], [...b]);
+    await p.mouse.dblclick((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+    await p.keyboard.type(words);
+    await click(app, 1000, 650);
+  }
+  await key(app, "v");
+  await key(app, "Control+a");
+  await p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
+  await p.locator('[data-bl="connect"]').click();
+  await click(app, 1000, 650);
+  type O = { id: string; kind: string; z: number; groups?: string[]; parent?: string; inShape?: { shape: string }; params?: { balloon?: unknown; link?: { a: string; cover?: string } } };
+  const all = () => p.evaluate(() => window.__canvastDebug.objects()) as unknown as Promise<O[]>;
+  const [b1, b2] = (await all()).filter((o) => o.params?.balloon).map((o) => o.id);
+  // Layers lists the two balloons only: their words, the connector and its cover are in their rows
+  await expect(panel.locator("li.layer")).toHaveCount(2);
+  const row = (k: string) => panel.locator(`li.layer[data-key="${k}"]`);
+  // the first balloon grouped alone: its words go in its group, just in front of it; the connector stays where both balloons are
+  await row(b1!).click();
+  await key(app, "Control+g");
+  let st = await all();
+  const of = (id: string) => st.find((o) => o.id === id)!;
+  const words = (id: string) => st.find((o) => o.kind === "text" && o.inShape?.shape === id)!;
+  const links = () => st.filter((o) => o.params?.link);
+  const g = of(b1!).groups![0]!;
+  expect(words(b1!).groups).toEqual([g]);
+  expect(words(b1!).z).toBeCloseTo(of(b1!).z + 0.75, 6);
+  expect(links().map((o) => o.groups ?? [])).toEqual(links().map(() => []));
+  // the second balloon dragged into that group in Layers: now both are in it, and so are the connector and its cover
+  const h = (await row(g).boundingBox())!.height;
+  await row(b2!).dragTo(row(g), { targetPosition: { x: 30, y: h / 2 } });
+  await expect.poll(async () => { st = await all(); return links().map((o) => o.groups ?? []); }).toEqual(links().map(() => [g]));
+  expect(words(b2!).groups).toEqual([g]);
+  // words hidden on their own (picked on the canvas) are shown again from their balloon's row, which says it is partly hidden
+  await click(app, 1000, 650);
+  await click(app, 480, 305);
+  const picked = await p.evaluate(() => window.__canvastDebug.selection());
+  expect(picked).toEqual([words(b1!).id]);
+  await panel.locator('[data-do="hide"]').click();
+  await expect.poll(async () => (await all()).find((o) => o.id === picked[0])!["hidden" as never]).toBe(true);
+  await row(g).locator(".tree-twist").first().click();
+  const eye = row(b1!).locator("[data-eye]");
+  await expect(eye).toHaveAttribute("aria-label", /^Show the hidden parts of /);
+  await eye.click();
+  await expect.poll(async () => (await all()).find((o) => o.id === picked[0])!["hidden" as never] ?? false).toBe(false);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("a number field of the bar keeps the focus while it is typed in", async ({ app }) => {
   const p = app.page;
   await key(app, "t");

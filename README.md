@@ -397,6 +397,7 @@ Press `K`, drag to draw a balloon, and double-click it to type its words.
 - The next balloon takes the look of the last one changed.
 - A connector is a neck, pinch, line or dots, and follows its balloons. Its handles set the width, the bend and where each end stands on its balloon.
 - Deleting a balloon removes its connectors and leaves its words as plain text; deleting it with its words removes both.
+- A balloon's words, connectors and their cover pieces belong to it: they are in its group and sheet, in front of it, and its row in Layers stands for them. Connect balloons joins balloons on the same sheet.
 - *Convert to path* gives up the balloon's numbers for node editing.
 - Copy, cut and duplicate take a balloon's words with it, and a connector only when both its balloons go too.
 

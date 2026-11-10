@@ -1,6 +1,7 @@
 import type { CanvasObject, ObjectId } from "./model";
 import { MAX_GROUP_DEPTH } from "./groups";
 import { MAX_SHEET_DEPTH, ancestorsOf, descendantsOf, isContainer } from "./containers";
+import { belongingTo } from "./belongs";
 
 /**
  * Moving rows of the Layers panel (a row is an object, a sheet with what is on it, or a group by its id) before, after or inside another row.
@@ -13,12 +14,14 @@ export type LayerPlace = "before" | "after" | "inside";
 /** The members of a row: an object (a sheet: it and what is on it), or every member of a group. */
 export function rowMembers(all: readonly CanvasObject[], key: string): CanvasObject[] {
   const o = all.find((x) => x.id === key);
+  let found: CanvasObject[];
   if (o) {
-    if (!isContainer(o)) return [o];
-    const ids = new Set([o.id, ...descendantsOf(all, new Set([o.id]))]);
-    return all.filter((x) => ids.has(x.id));
-  }
-  return all.filter((x) => x.groups?.includes(key));
+    const ids = new Set(isContainer(o) ? [o.id, ...descendantsOf(all, new Set([o.id]))] : [o.id]);
+    found = all.filter((x) => ids.has(x.id));
+  } else found = all.filter((x) => x.groups?.includes(key));
+  // (and what belongs to them: a shape's words, a balloon's connectors: doc/belongs.ts)
+  const ids = new Set(found.map((x) => x.id));
+  return [...found, ...belongingTo(all, ids).filter((x) => !ids.has(x.id))];
 }
 
 /** Whether a row can hold others: a group (a boolean one too) or a sheet. */

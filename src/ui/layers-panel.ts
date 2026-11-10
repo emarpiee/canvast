@@ -1,6 +1,7 @@
 import { showMoreButton } from "./show-more";
 import { treeGuides, treeSlot } from "./tree";
-import { rowHolds, type LayerPlace } from "../doc/layer-move";
+import { rowHolds, rowMembers, type LayerPlace } from "../doc/layer-move";
+import { ownerOf } from "../doc/belongs";
 import type { EditorState } from "../app/editor-state";
 import { revealRow } from "../interaction/reveal";
 import { plural } from "../doc/plural";
@@ -10,7 +11,7 @@ import type { BlendMode, CanvasObject, PathObject } from "../doc/model";
 import { BLEND_MODES, MAX_NAME_LENGTH, inkOf } from "../doc/model";
 import { SHAPE_NAMES } from "../doc/path";
 import { isBoolMember, isResult } from "../doc/boolean-group";
-import { ancestorsOf, isContainer, withDescendants } from "../doc/containers";
+import { ancestorsOf, isContainer } from "../doc/containers";
 import type { BoolOp } from "../doc/boolean";
 import { plainText } from "../text/markdown";
 import { esc } from "./format";
@@ -66,6 +67,13 @@ interface Node {
 /** The tree of groups and objects, front first. */
 export function layerTree(objects: readonly CanvasObject[]): Node[] {
   const roots: Node[] = [];
+  const present = new Set(objects.map((o) => o.id));
+  const belongs = (o: CanvasObject): boolean => {
+    const owner = ownerOf(o);
+    if (owner !== undefined && present.has(owner)) return true;
+    const cover = o.kind === "path" ? o.params?.link?.cover : undefined;
+    return cover !== undefined; // (a connector's cover piece is never a layer)
+  };
   const groups = new Map<string, Node>();
   const byId = new Map(objects.map((o) => [o.id, o]));
   const sheets = new Map<string, Node>();
@@ -88,6 +96,7 @@ export function layerTree(objects: readonly CanvasObject[]): Node[] {
   const sorted = [...objects].sort((a, b) => b.z - a.z || (a.id < b.id ? 1 : -1));
   for (const o of sorted) {
     if (isResult(o)) continue; // what a boolean group looks like is not a layer of its own (ADR 0103): the group is the row
+    if (belongs(o)) continue; // (a shape's words, a balloon's connector: its shape's row stands for them, doc/belongs.ts)
     if (isContainer(o)) {
       sheetNode(o);
       continue;
@@ -220,13 +229,18 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       const selected = n.members.every((m) => editor.selection.has(m.id));
       const hidden = n.members.every((m) => m.hidden);
       const locked = n.members.every((m) => m.locked);
+      // (a row whose parts are hidden or locked on their own, a balloon's words say, shows it too, and its button shows or unlocks them all)
+      // (its parts as the shared rule has them: words and connectors are no members of the tree's row, doc/belongs.ts)
+      const parts = rowMembers(all, n.id);
+      const partHidden = !hidden && parts.some((m) => m.hidden);
+      const partLocked = !locked && parts.some((m) => m.locked);
       const expanded = n.group && open.has(n.id);
       const key = n.group ? n.id : first.id;
       const head = `<li role="treeitem" ${n.group ? `aria-expanded="${expanded}"` : ""} aria-selected="${selected}" class="layer tree-row${n.group ? " is-group" : ""}${selected ? " is-selected" : ""}${hidden ? " is-hidden" : ""}${locked ? " is-locked" : ""}" data-key="${key}" data-ids="${n.members.map((m) => m.id).join(",")}" data-group="${n.group}" draggable="true" style="--depth:${depth}">
         ${treeGuides(depth, last, conts)}${treeSlot({ hasKids: !!n.group, open: !!expanded }, "data-twist")}
         <span class="layer-icon">${lab.icon}</span>${lab.swatch ? `<span class="layer-swatch" style="background:${swatchBackground(lab.swatch)}"></span>` : ""}
         ${renaming?.key === key ? `<input class="layer-rename" data-rename maxlength="${MAX_NAME_LENGTH}" value="${esc(renaming.value)}" aria-label="Layer name">` : `<span class="layer-name" title="${esc([...(first.groups ?? []).slice(0, n.group && !n.sheet ? first.groups!.indexOf(n.id) : undefined).map((g) => first.groupNames?.[g] ?? "Group"), lab.text].join(" › "))} (double-click to rename)">${splitName(lab.text)}</span>${n.group ? `<span class="layer-count" title="${plural(n.members.length, "item")} inside">${n.members.length}</span>` : ""}`}
-        ${n.sheet ? `<button type="button" class="layer-state layer-clip" data-clip aria-pressed="${n.sheet.container!.clip}" aria-label="Clip content of ${esc(lab.text)}" title="${n.sheet.container!.clip ? "Clipping: what is outside the frame is hidden. Press to show it" : "Not clipping: press to hide what is outside the sheet"}">${ICONS.scissorsLineDashed}</button>` : ""}${hidden ? `<button type="button" class="layer-state" data-eye aria-pressed="true" aria-label="Show ${esc(lab.text)}" title="Hidden: show it">${ICONS.eyeOff}</button>` : ""}${locked ? `<button type="button" class="layer-state" data-lock aria-pressed="true" aria-label="Unlock ${esc(lab.text)}" title="Locked: unlock it">${ICONS.lockKeyhole}</button>` : ""}
+        ${n.sheet ? `<button type="button" class="layer-state layer-clip" data-clip aria-pressed="${n.sheet.container!.clip}" aria-label="Clip content of ${esc(lab.text)}" title="${n.sheet.container!.clip ? "Clipping: what is outside the frame is hidden. Press to show it" : "Not clipping: press to hide what is outside the sheet"}">${ICONS.scissorsLineDashed}</button>` : ""}${hidden || partHidden ? `<button type="button" class="layer-state" data-eye aria-pressed="true" aria-label="${partHidden ? "Show the hidden parts of" : "Show"} ${esc(lab.text)}" title="${partHidden ? "Partly hidden: show all of it" : "Hidden: show it"}">${ICONS.eyeOff}</button>` : ""}${locked || partLocked ? `<button type="button" class="layer-state" data-lock aria-pressed="true" aria-label="${partLocked ? "Unlock the locked parts of" : "Unlock"} ${esc(lab.text)}" title="${partLocked ? "Partly locked: unlock all of it" : "Locked: unlock it"}">${ICONS.lockKeyhole}</button>` : ""}
       </li>`;
       return head + (expanded ? n.children.map((c, i) => row(c, depth + 1, i === n.children.length - 1, depth >= 1 ? [...conts, !last] : conts)).join("") : "");
     };
@@ -290,14 +304,8 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
   });
   render();
 
-  const members = (key: string): CanvasObject[] => {
-    const o = doc.get(key);
-    if (isContainer(o)) {
-      const ids = new Set(withDescendants(doc.all(), [o.id]));
-      return doc.ordered().filter((x) => ids.has(x.id)); // a sheet's row is the sheet and what is in it
-    }
-    return o ? [o] : doc.ordered().filter((x) => x.groups?.includes(key));
-  };
+  /** What a row is: an object (a sheet with what is on it), a group's members, with what belongs to them (one rule with moving rows: doc/layer-move.ts). */
+  const members = (key: string): CanvasObject[] => rowMembers(doc.ordered(), key);
 
   const endRename = (commit: boolean): void => {
     const r = renaming;
@@ -449,9 +457,9 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       const f = doc.get(key);
       if (isContainer(f)) actions.setClip(f.id, !f.container.clip);
     } else if (t.closest("[data-eye]")) {
-      actions.setFlagOn(objs.map((o) => o.id), "hidden", !objs.every((o) => o.hidden));
+      actions.setFlagOn(objs.map((o) => o.id), "hidden", !objs.some((o) => o.hidden)); // (any part hidden: all shown)
     } else if (t.closest("[data-lock]")) {
-      actions.setFlagOn(objs.map((o) => o.id), "locked", !objs.every((o) => o.locked));
+      actions.setFlagOn(objs.map((o) => o.id), "locked", !objs.some((o) => o.locked));
     } else {
       // A shape inside a boolean group is edited from inside it: its row takes you in (the group itself and everything else, out).
       const inside = !li.dataset["group"] || li.dataset["group"] === "false" ? objs[0] : undefined;

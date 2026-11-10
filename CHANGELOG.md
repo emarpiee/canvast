@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.56.15 — A balloon's words and connectors belong to it (2026-11-10)
+
+- **Fixed:** a speech balloon's words, a connector and its cover piece could end up in another group or sheet than their balloons (dragged apart in Layers, a balloon grouped alone, moved onto a sheet): words were unclipped or behind their balloon, a connector stuck out of a clipping sheet. The document now keeps a shape's words in its group and sheet, just in front of it, and a connector with its cover where both its balloons are (outside a boolean group), whatever moves them: one rule (doc/belongs.ts).
+- **Changed:** in Layers a shape's row stands for its words, and a balloon's for its connectors: they are no rows of their own, and the row selects, hides, locks and moves them together. A connector's cover piece is never listed.
+- **Changed:** Connect balloons joins balloons on the same sheet only.
+- **Fixed:** a balloon's words hidden or locked on their own (picked on the canvas) could not be shown or unlocked again from Layers, even after a reload: a row whose parts are partly hidden or locked shows it, and its eye or lock shows or unlocks all of them.
+- **Added:** a test groups a balloon alone and drags another into its group in Layers, and checks where the words, the connector and its cover go.
+
 ## 0.56.14 — Drag layers into and out of groups and sheets (2026-11-10)
 
 - **Added:** in the Layers panel a row dropped on the middle of a group, a boolean group or a sheet goes inside it; dropped on the top or bottom edge of a row it goes before or after it, at that row's level (out of a group or a sheet too). Objects, whole groups and sheets with what is on them, as deep as groups and sheets go; it stays where it is on the canvas; one undo step. A line or a highlight shows where it will land.

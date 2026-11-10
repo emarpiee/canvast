@@ -1362,7 +1362,8 @@ export function setBalloonLink(doc: DocumentStore, editor: EditorState, patch: P
 
 const balloonsToJoin = (doc: DocumentStore, editor: EditorState): PathObject[] => {
   const b = selected(doc, editor).filter((o): o is PathObject => o.kind === "path" && !!o.params?.balloon);
-  return b.length >= 2 && b.every((o) => o.frame === b[0]!.frame) ? b : [];
+  // (on one sheet, or none: a connector sits where its balloons both are)
+  return b.length >= 2 && b.every((o) => o.frame === b[0]!.frame && o.parent === b[0]!.parent) ? b : [];
 };
 export const canConnectBalloons = (doc: DocumentStore, editor: EditorState): boolean => balloonsToJoin(doc, editor).length >= 2;
 

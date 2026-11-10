@@ -1,3 +1,4 @@
+import { isIn, placedIn, sharedPlace } from "./belongs";
 import * as D from "../core/dyadic";
 import { outlineBox } from "../text/shape-flow";
 import type { DerivationSource } from "./boolean-group";
@@ -79,6 +80,9 @@ export function fittedInShape(text: TextObject, path: PathObject): TextObject | 
  * The transaction's objects with the texts inside shapes kept in their shapes, in the same undo step: when the shape changes they follow it, and a text
  * moved or scaled on its own goes back to its shape (scaled, it keeps its new letter size). The shape is what sets where the words go.
  */
+/** How far in front of its shape the words sit: in front of a connector's cover piece (half a step), behind the next object (a whole one). */
+export const WORDS_IN_FRONT = 0.75;
+
 export function withShapeTexts(src: DerivationSource, next: readonly CanvasObject[], removed: readonly ObjectId[]): CanvasObject[] {
   const paths = next.some((o) => o.kind === "path");
   if (!paths && !removed.length && !next.some((o) => o.kind === "text" && parentOf(o) !== undefined)) return [...next];
@@ -96,6 +100,12 @@ export function withShapeTexts(src: DerivationSource, next: readonly CanvasObjec
       return;
     }
     const made = refit(t, path);
+    const base = made ?? t;
+    // (they belong to their shape: its groups and sheet, just in front of it, wherever either of them is moved: doc/belongs.ts)
+    const place = sharedPlace([path], (id) => mine.get(id) ?? src.get(id));
+    const z = path.z + WORDS_IN_FRONT;
+    const placed = isIn(base, place) && base.z === z ? base : ({ ...placedIn(base, place), z } as TextObject);
+    if (placed !== base) return void out.set(t.id, placed);
     if (!made) return;
     const was = t.onPath ?? t.inShape!, now = made.onPath ?? made.inShape!;
     if (made.w !== t.w || !D.equals(made.anchor.x, t.anchor.x) || !D.equals(made.anchor.y, t.anchor.y) || now.n.join() !== was.n.join() || now.closed !== was.closed || String((now as { holes?: unknown }).holes) !== String((was as { holes?: unknown }).holes)) out.set(t.id, made);
