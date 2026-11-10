@@ -1305,9 +1305,9 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
   await click(1100, 720);
 
   // What each object is and what it names; a connector's covering piece is made again from its connector, so it is left out.
-  type O = Obj & { parent?: string; inShape?: { shape: string }; onPath?: { path: string }; params?: { link?: { a: string; b: string; cover?: string } }; mask?: { by: string }; groups?: string[]; isMask?: boolean; container?: unknown; gen?: unknown; boolOps?: unknown; assetId?: string };
+  type O = Obj & { parent?: string; inShape?: { shape: string }; onPath?: { path: string }; params?: { link?: { a: string; b: string; cover?: string } }; mask?: { by: string }; groups?: string[]; isMask?: boolean; container?: unknown; gen?: unknown; boolOps?: unknown; assetId?: string; media?: { kind: string } };
   const look = () => p.evaluate(() => window.__canvastDebug.objects()) as Promise<O[]>;
-  const sig = (o: O) => [o.kind, o.container ? "sheet" : "", o.parent ? "on-sheet" : "", o.inShape ? "in-shape" : "", o.onPath ? "on-path" : "", o.params?.link ? "connector" : "", o.isMask ? "mask" : "", o.mask ? "masked" : "", o.gen ? "pattern" : "", o.boolOps ? "boolean" : "", o.groups?.length ? "grouped" : "", o.assetId ? o.assetId.slice(0, 8) : ""].filter(Boolean).join(" ");
+  const sig = (o: O) => [o.kind, o.media?.kind ?? "", o.container ? "sheet" : "", o.parent ? "on-sheet" : "", o.inShape ? "in-shape" : "", o.onPath ? "on-path" : "", o.params?.link ? "connector" : "", o.isMask ? "mask" : "", o.mask ? "masked" : "", o.gen ? "pattern" : "", o.boolOps ? "boolean" : "", o.groups?.length ? "grouped" : "", o.assetId ? o.assetId.slice(0, 8) : ""].filter(Boolean).join(" ");
   const kinds = async () => (await look()).filter((o) => o.params?.link?.cover === undefined).map(sig).sort();
   /** Every name an object holds is of an object (or group) of this canvas; `among`: of those objects alone (a paste names only its own copies). */
   const whole = async (among?: ReadonlySet<string>) => {
