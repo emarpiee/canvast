@@ -2,13 +2,8 @@
 import { alignWith, arrangeWith, setPenColour } from "../e2e/harness";
 import { test, expect, type Scene } from "./scene";
 
-/** Place pictures side by side, in a row with a gap, as a grid of one row. */
-async function row(s: Scene, ids: string[]): Promise<void> {
-  await s.select(ids);
-  await arrangeWith(s.p, "grid:name-asc");
-  await s.select([]);
-  await s.settle();
-}
+/** Place pictures side by side, in a row with a gap. */
+const row = (s: Scene, ids: string[]): Promise<void> => s.row(ids, 48);
 /** A freehand line through these screen points (the Pen must be on). */
 async function line(s: Scene, pts: Array<[number, number]>): Promise<void> {
   await s.p.mouse.move(pts[0]![0], pts[0]![1]);
@@ -115,6 +110,7 @@ test("corners", async ({ scene: s }) => {
   await r.fill("28");
   await r.press("Enter");
   await s.p.locator('[data-paint="stroke"]').filter({ visible: true }).first().click();
+  await s.p.locator('.colour-pop [data-mode="solid"]').click();
   await s.hex("#efe6d2");
   await s.settle();
   await s.shot("corners", await s.around({ objects: [id!], els: ["[data-sel-radius-wrap]"], pad: 36 }));
@@ -160,9 +156,6 @@ test("adjust-shadow", async ({ scene: s }) => {
     await n.press("Enter");
   }
   await s.blur();
-  await s.select([]);
-  await s.p.getByRole("button", { name: "Adjust panel", exact: true }).click().catch(() => undefined);
-  await s.select(ids);
   await s.settle();
   await s.shot("adjust-shadow", await s.around({ objects: ids, els: ['[data-testid="adjust-panel"]'], pad: 30 }));
 });
@@ -178,7 +171,7 @@ test("sheets", async ({ scene: s }) => {
   for (const id of ids) {
     await s.select([id]);
     await s.p.locator('[data-ctx="sheetmenu"]').click();
-    await s.p.locator('.pop-menu [data-id="eachsheet"]').click();
+    await s.p.locator('.pop-menu [data-id="puton"]').click();
     await s.p.keyboard.press("Escape");
     await s.settle();
     const sheet = (await s.objects()).filter((o) => o.container && !sheets.includes(o.id)).at(-1)!.id;
@@ -240,7 +233,7 @@ test("layers", async ({ scene: s }) => {
   const b = (await s.box([ref!]))!;
   const W = b.maxX - b.minX, Hh = b.maxY - b.minY;
   const at = (x: number, y: number): [number, number] => [b.minX + W * x, b.minY + Hh * y];
-  await s.p.keyboard.press("p");
+  await s.tool("pen");
   await setPenColour(s.p, "#e05a47");
   const before = new Set(await s.ids());
   // construction: the chest, the barrel and the hindquarters as ovals, the head as a wedge
@@ -251,7 +244,7 @@ test("layers", async ({ scene: s }) => {
   const before2 = new Set(await s.ids());
   await line(s, [at(0.27, 0.14), at(0.36, 0.34), at(0.5, 0.46), at(0.66, 0.4), at(0.74, 0.62), at(0.72, 0.9)]); // (the line of action)
   const action = (await s.ids()).filter((i) => !before2.has(i));
-  await s.p.keyboard.press("v");
+  await s.tool("select");
   await s.select(construction);
   await s.p.locator('[data-ctx="group"]').click();
   await s.select(action);

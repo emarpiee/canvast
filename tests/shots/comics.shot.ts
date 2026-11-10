@@ -1,0 +1,152 @@
+// README pictures of "Comics and storyboards": a page laid out from four prints, lettered as comics are (white balloons with a black
+// outline, capitals in a comic hand, tails to the speaker, caption boxes), the balloon kinds and the cover's type (manifest.ts).
+import { test, expect, type Scene, type Box } from "./scene";
+
+type Kind = "" | "speech" | "thought" | "shout" | "caption" | "soft";
+interface Balloon { box: [number, number, number, number]; words: string; kind?: Kind; tip?: [number, number]; fill?: string; size?: number; font?: string }
+
+/** The lettering the next balloons take: a comic hand, black, in capitals. */
+async function lettering(s: Scene, font = "comic neue", size = 20): Promise<void> {
+  await s.tool("text");
+  await s.font(font);
+  const sz = s.p.getByRole("spinbutton", { name: "Text size (px at this zoom)" });
+  await sz.fill(String(size));
+  await sz.press("Enter");
+  await s.p.getByRole("button", { name: "Text colour" }).click();
+  await s.hex("#111111");
+  await s.p.keyboard.press("Escape");
+}
+async function rangeTo(s: Scene, sel: string, v: number): Promise<void> {
+  await s.p.locator(sel).filter({ visible: true }).first().evaluate((e: HTMLInputElement, x: number) => { e.value = String(x); e.dispatchEvent(new Event("input", { bubbles: true })); e.dispatchEvent(new Event("change", { bubbles: true })); }, v);
+}
+/** One balloon: drawn, given its kind, a black outline, its words, and its tail moved to the speaker. Its id. */
+async function balloon(s: Scene, b: Balloon): Promise<string> {
+  const p = s.p;
+  await lettering(s, b.font ?? "comic neue", b.size ?? 20);
+  await p.evaluate((f) => window.__canvastDebug.setSetting("shape.fill", f), b.fill ?? "#ffffff");
+  const before = new Set(await s.ids());
+  await s.tool("balloon");
+  const [x0, y0, x1, y1] = b.box;
+  await s.app.drag({ x: x0, y: y0 }, { x: x1, y: y1 }, 4);
+  const id = (await s.objects()).find((o) => !before.has(o.id) && o.shape === "balloon")!.id;
+  await s.tool("select");
+  await s.select([id]);
+  if (b.kind) {
+    if (!(await p.locator("[data-k='preset'] select").isVisible())) await p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
+    await p.locator("[data-k='preset'] select").selectOption(b.kind);
+  }
+  await p.locator('[data-paint="stroke"]').filter({ visible: true }).first().click();
+  await s.hex("#111111");
+  await rangeTo(s, "[data-shape-width]", 2);
+  if (b.tip) {
+    const tip = (await p.evaluate(() => window.__canvastDebug.balloonDots())).find((d) => d.part === "tip");
+    if (tip) await s.app.drag({ x: tip.x, y: tip.y }, { x: b.tip[0], y: b.tip[1] }, 5);
+  }
+  // its words: a double-click in the body
+  await p.mouse.dblclick((x0 + x1) / 2, (y0 + y1) / 2);
+  await p.waitForFunction(() => document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable);
+  await p.keyboard.type(b.words);
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("Escape");
+  await s.blur();
+  await s.select([]);
+  await s.settle();
+  return id;
+}
+const inside = (b: Box, x: number, y: number): [number, number] => [b.minX + (b.maxX - b.minX) * x, b.minY + (b.maxY - b.minY) * y];
+
+/** A comic page: the four prints as panels on a page sheet with auto layout, two columns. The page's id and the panels'. */
+async function page(s: Scene): Promise<{ page: string; panels: string[] }> {
+  const art = await s.art("hokusai-seaside", "leprince", "verhaecht", "hokusai-under");
+  await s.canvas("Page 1");
+  const panels = await s.place(art);
+  await s.fit(panels, 0.6);
+  await s.select(panels);
+  await s.p.keyboard.press("Shift+A");
+  await expect.poll(async () => (await s.objects()).some((o) => o.container)).toBe(true);
+  const pg = (await s.objects()).find((o) => o.container)!.id;
+  await s.select([pg]);
+  await s.p.locator('[data-layout-flow="grid"]').click();
+  for (const [sel, v] of [["[data-layout-columns]", "2"], ['[data-layout-gap="0"]', "14"], ['[data-layout-gap="1"]', "14"], ['[data-layout-pad="h"]', "22"], ['[data-layout-pad="v"]', "22"]] as const) {
+    await s.p.locator(sel).fill(v);
+    await s.p.locator(sel).press("Enter");
+  }
+  await s.p.locator('[data-paint="fill"]').filter({ visible: true }).first().click();
+  await s.hex("#fbf8f1");
+  await s.select([]);
+  return { page: pg, panels };
+}
+
+test("comic", async ({ scene: s }) => {
+  await s.look({ theme: "dark", hue: 210 });
+  await s.fonts();
+  const { page: pg, panels } = await page(s);
+  // (writing in a balloon brings the view to it: the page is framed again before each)
+  const on = async (i: number): Promise<Box> => { await s.fit([pg], 0.86); return (await s.box([panels[i]!]))!; };
+  let b = await on(0);
+  await balloon(s, { box: [...inside(b, 0.03, 0.04), ...inside(b, 0.5, 0.2)] as [number, number, number, number], words: "WINTER. THE VILLAGE WAITS FOR THE BOATS.", kind: "caption", fill: "#f3e3a6", size: 15 });
+  b = await on(1);
+  await balloon(s, { box: [...inside(b, 0.5, 0.05), ...inside(b, 0.96, 0.33)] as [number, number, number, number], words: "THE FORD IS HIGH THIS YEAR.", kind: "speech", tip: inside(b, 0.55, 0.62), size: 15 });
+  b = await on(2);
+  await balloon(s, { box: [...inside(b, 0.03, 0.04), ...inside(b, 0.45, 0.18)] as [number, number, number, number], words: "THREE DAYS OVER THE PASS.", kind: "caption", fill: "#f3e3a6", size: 15 });
+  b = await on(3);
+  await balloon(s, { box: [...inside(b, 0.55, 0.04), ...inside(b, 0.95, 0.36)] as [number, number, number, number], words: "HOLD ON!", kind: "shout", tip: inside(b, 0.42, 0.7), font: "bangers", size: 30 });
+  await s.fit([pg], 0.86);
+  await s.shot("comic", await s.around({ objects: [pg], pad: 20 }));
+});
+
+test("balloon-kinds", async ({ scene: s }) => {
+  await s.look({ theme: "light", hue: 30, pattern: "dots" });
+  await s.fonts();
+  await s.canvas("Lettering");
+  const made: string[] = [];
+  made.push(await balloon(s, { box: [220, 260, 520, 420], words: "WE'LL BE HOME BY DARK.", kind: "speech", tip: [300, 520] }));
+  made.push(await balloon(s, { box: [580, 250, 860, 420], words: "IF THE RIVER LETS US...", kind: "thought", tip: [640, 540] }));
+  made.push(await balloon(s, { box: [910, 240, 1220, 440], words: "LOOK OUT!", kind: "shout", tip: [1000, 540], font: "bangers", size: 34 }));
+  made.push(await balloon(s, { box: [300, 600, 700, 670], words: "LATER THAT NIGHT.", kind: "caption", fill: "#f3e3a6" }));
+  await s.select([made[2]!]);
+  if (!(await s.p.locator("[data-k='preset'] select").isVisible())) await s.p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
+  await s.settle();
+  await s.shot("balloon-kinds", await s.around({ objects: made, els: ["[data-k='preset']"], pad: 30 }));
+});
+
+test("balloons", async ({ scene: s }) => {
+  await s.look({ theme: "dark", hue: 30 });
+  await s.fonts();
+  const [h] = await s.art("leprince");
+  await s.canvas("Panel");
+  const [pic] = await s.place([h!]);
+  await s.fit([pic!], 0.62, [0.4, 0.5]);
+  const b = (await s.box([pic!]))!;
+  const id = await balloon(s, { box: [...inside(b, 0.5, 0.05), ...inside(b, 0.95, 0.33)] as [number, number, number, number], words: "THE FORD IS HIGH THIS YEAR.", kind: "speech", tip: inside(b, 0.55, 0.62), size: 16 });
+  await s.fit([pic!], 0.62, [0.4, 0.5]);
+  await s.select([id]);
+  if (!(await s.p.locator("[data-k='preset'] select").isVisible())) await s.p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
+  await s.settle();
+  await s.shot("balloons", await s.around({ objects: [pic!], els: ["[data-k='preset']"], pad: 24 }));
+});
+
+test("text", async ({ scene: s }) => {
+  await s.look({ theme: "dark", hue: 220 });
+  await s.fonts();
+  const [h] = await s.art("hokusai-under");
+  await s.canvas("Cover");
+  const [pic] = await s.place([h!]);
+  await s.fit([pic!], 0.6, [0.5, 0.56]);
+  const b = (await s.box([pic!]))!;
+  const sub = await s.text(b.minX, b.minY - 46, "a story told in four prints", { size: 26, font: "cormorant garamond semibold italic", colour: "#e9dfc8" });
+  // the title, left being edited: its formatting bar shows
+  await s.tool("text");
+  await s.font("bangers");
+  const sz = s.p.getByRole("spinbutton", { name: "Text size (px at this zoom)" });
+  await sz.fill("64");
+  await sz.press("Enter");
+  await s.p.getByRole("button", { name: "Text colour" }).click();
+  await s.hex("#f4efe6");
+  await s.p.mouse.click(b.minX, b.minY - 130);
+  await s.p.waitForFunction(() => document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable);
+  await s.p.keyboard.type("THE CROSSING");
+  await s.p.keyboard.press("Control+a");
+  await s.settle();
+  await s.shot("text", await s.around({ objects: [pic!, sub], els: ["[data-text-size]"], pad: 30 }));
+});

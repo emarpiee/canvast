@@ -51,11 +51,34 @@ export class Scene {
   async look({ theme = "dark", hue = 178, pattern = "grid", density = "compact" }: { theme?: "light" | "dark"; hue?: number; pattern?: "grid" | "dots" | "scale" | "none"; density?: "comfortable" | "compact" | "dense" } = {}): Promise<void> {
     await this.p.evaluate(([t, h, pt, d]) => {
       const s = window.__canvastDebug.setSetting;
-      s("ui.theme", t); s("ui.hue", h); s("ui.pattern", pt); s("ui.density", d);
+      s("ui.theme", t); s("ui.hue", h); s("ui.pattern", pt); s("ui.density", d); s("ui.names", "off");
     }, [theme, hue, pattern, density] as const);
     await this.settle();
   }
 
+  /** A tool, chosen through the debug hook (keys go to whatever has the focus). */
+  async tool(name: "select" | "pen" | "shape" | "balloon" | "text" | "sheet" | "node" | "path"): Promise<void> {
+    await this.blur();
+    await this.p.evaluate((n) => window.__canvastDebug.setTool(n as never), name);
+    await this.settle(100);
+  }
+  /** Objects side by side in a row, a gap of `gap` px on the screen between them, in the order given. */
+  async row(ids: string[], gap = 40): Promise<void> {
+    await this.tool("select");
+    let right: number | null = null;
+    for (const id of ids) {
+      const b = (await this.box([id]))!;
+      const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2;
+      const want = right === null ? b.minX : right + gap;
+      if (right !== null) {
+        await this.select([id]);
+        await this.app.drag({ x: cx, y: cy }, { x: cx + (want - b.minX), y: cy }, 6);
+      }
+      right = (await this.box([id]))!.maxX;
+    }
+    await this.select([]);
+    await this.settle();
+  }
   /** A new canvas in the first board, named, and open. */
   async canvas(name: string): Promise<void> {
     const p = this.p;
@@ -169,14 +192,15 @@ export class Scene {
   /** The Text tool's font, by part of its name (a font in the library). */
   async font(part: string): Promise<void> {
     const sel = this.p.locator("select[data-text-font]").filter({ visible: true }).first();
-    const label = await sel.evaluate((s: HTMLSelectElement, w: string) => [...s.options].find((o) => o.text.toLowerCase().includes(w))?.text ?? null, part.toLowerCase());
+    const norm = (x: string): string => x.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const label = await sel.evaluate((s: HTMLSelectElement, w: string) => [...s.options].find((o) => o.text.toLowerCase().replace(/[^a-z0-9]/g, "").includes(w))?.text ?? null, norm(part));
     expect(label, `a font named like "${part}" in the library`).not.toBeNull();
     await sel.selectOption({ label: label! });
   }
   /** A text at a point, in a font, size and colour set on the Text tool first; its id. */
   async text(x: number, y: number, words: string, { size = 24, colour = "#f2efe8", font = "" } = {}): Promise<string> {
     const p = this.p;
-    await p.keyboard.press("t");
+    await this.tool("text");
     if (font) await this.font(font);
     const sz = p.getByRole("spinbutton", { name: "Text size (px at this zoom)" });
     await sz.fill(String(size));
@@ -187,7 +211,7 @@ export class Scene {
     await p.waitForFunction(() => document.activeElement instanceof HTMLElement && document.activeElement.isContentEditable);
     await p.keyboard.type(words);
     await p.keyboard.press("Escape");
-    await p.keyboard.press("v");
+    await this.tool("select");
     await p.keyboard.press("Escape");
     await this.blur();
     await this.settle();

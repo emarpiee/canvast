@@ -5,7 +5,8 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "tests/shots",
   testMatch: "**/*.shot.ts",
-  timeout: 180_000,
+  timeout: 120_000,
+  expect: { timeout: 15_000 },
   fullyParallel: true,
   workers: process.env.CI ? 4 : 1,
   retries: 0,
@@ -17,6 +18,7 @@ export default defineConfig({
     deviceScaleFactor: 1,
     colorScheme: "dark",
     trace: "retain-on-failure",
+    actionTimeout: 15_000,
     screenshot: "only-on-failure",
   },
 });
