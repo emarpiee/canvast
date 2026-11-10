@@ -97,8 +97,9 @@ import { be, plural } from "../doc/plural";
 import { installAutoIndex } from "../storage/auto-index";
 import { fmtBytes } from "../ui/format";
 import { runSaveLibraryFile } from "../ui/archive-ui";
-import { mountToolbar } from "../ui/toolbar";
+import { mountToolbar, toolIcon } from "../ui/toolbar";
 import { initColourPopover, openColourPopover } from "../ui/colour-popover";
+import { toolCursor } from "../ui/tool-cursor";
 import { labelOf, mountLayersPanel } from "../ui/layers-panel";
 import { mountMediaPlayer } from "../ui/media-player";
 import { mountBookmarksPanel } from "../ui/bookmarks-panel";
@@ -1081,12 +1082,23 @@ async function start(): Promise<void> {
     invalidate();
   });
   doc.subscribe(invalidate);
-  editor.subscribe(() => {
+  // The cursor of the tool in use: its own icon beside a crosshair (ui/tool-cursor.ts), made again only when the tool or its kind changes.
+  let cursorFor = "";
+  const showTool = (): void => {
     canvas.dataset["tool"] = editor.tool;
+    const key = `${editor.tool}|${editor.shapeKind}|${editor.penKind}`;
+    if (key === cursorFor) return;
+    cursorFor = key;
+    const icon = toolIcon(editor.tool, editor.shapeKind, editor.penKind);
+    if (icon) canvas.style.setProperty("--tool-cursor", toolCursor(icon));
+    else canvas.style.removeProperty("--tool-cursor");
+  };
+  editor.subscribe(() => {
+    showTool();
     invalidate();
   });
   editor.subscribeRedraw(invalidate);
-  canvas.dataset["tool"] = editor.tool;
+  showTool();
 
   const importFiles = (files: File[]): Promise<unknown> => importImages(files, assets, doc, view, editor);
   attachNavigation(canvas, view);

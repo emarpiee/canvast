@@ -343,11 +343,11 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 }
 
 /* Each tool's cursor, in one place (a new tool gets a line here; tests/e2e/editing.spec.ts checks every tool of the rail): selecting is the
-   arrow, the hand grabs, words take the text cursor, and everything that draws, picks by drawing or erases takes the crosshair. */
+   arrow, the hand grabs, words take the text cursor, and everything that draws, picks by drawing or erases takes its own icon beside a crosshair. */
 #canvas[data-tool="select"] { cursor: default; }
 #canvas[data-tool="hand"] { cursor: grab; }
 #canvas:is([data-tool="text"], [data-tool="note"]) { cursor: text; }
-#canvas:is([data-tool="pen"], [data-tool="shape"], [data-tool="balloon"], [data-tool="path"], [data-tool="sheet"], [data-tool="lasso"], [data-tool="eraser"], [data-tool="node"]) { cursor: crosshair; }
+#canvas:is([data-tool="pen"], [data-tool="shape"], [data-tool="balloon"], [data-tool="path"], [data-tool="sheet"], [data-tool="lasso"], [data-tool="eraser"], [data-tool="node"]) { cursor: var(--tool-cursor, crosshair); } /* (the tool's icon beside a crosshair: ui/tool-cursor.ts) */
 #canvas[data-hover="ew"] { cursor: ew-resize; }
 #canvas[data-hover="ns"] { cursor: ns-resize; }
 #canvas[data-hover="nwse"] { cursor: nwse-resize; }

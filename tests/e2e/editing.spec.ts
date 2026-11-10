@@ -1535,17 +1535,36 @@ test("drawing a shape or a sheet snaps where it starts and where it ends: onto a
   expect(missed).toEqual([]);
 });
 
-test("every tool of the rail has the cursor of what it does: the arrow to select, the hand to pan, the text cursor for words, the crosshair to draw", async ({ app }) => {
+test("every tool of the rail has the cursor of what it does: the arrow, the hand, the text cursor, or its own icon beside a crosshair (each kind of shape and pen its own)", async ({ app }) => {
   const p = app.page;
-  const want: Record<string, string> = { select: "default", hand: "grab", text: "text", note: "text", pen: "crosshair", shape: "crosshair", balloon: "crosshair", path: "crosshair", sheet: "crosshair", lasso: "crosshair", eraser: "crosshair", node: "crosshair" };
+  const own: Record<string, string> = { select: "default", hand: "grab", text: "text", note: "text" };
+  const cursor = () => p.evaluate(() => getComputedStyle(document.getElementById("canvas")!).cursor);
   const tools = await p.evaluate(() => [...new Set([...document.querySelectorAll<HTMLElement>(".rail [data-tool]")].map((b) => b.dataset["tool"]!))]);
   expect(tools.length, "the rail's tools").toBeGreaterThan(5);
   const wrong: string[] = [];
-  for (const t of [...new Set([...tools, ...Object.keys(want)])]) {
+  const seen = new Map<string, string>();
+  /** A drawing tool's cursor is a picture (its icon), with the crosshair after it, and no other tool or kind has the same. */
+  const drawn = (what: string, c: string) => {
+    if (!c.startsWith("url(") || !c.endsWith("crosshair")) wrong.push(`${what}: ${c.slice(0, 40)}`);
+    else if (seen.has(c)) wrong.push(`${what}: the same cursor as ${seen.get(c)}`);
+    else seen.set(c, what);
+  };
+  for (const t of [...new Set([...tools, "path"])]) {
     await p.evaluate((x) => window.__canvastDebug.setTool(x as never), t);
     await app.frame();
-    const got = await p.evaluate(() => getComputedStyle(document.getElementById("canvas")!).cursor);
-    if (got !== (want[t] ?? "a cursor in this list")) wrong.push(`${t}: ${got}`);
+    const c = await cursor();
+    if (own[t]) { if (c !== own[t]) wrong.push(`${t}: ${c.slice(0, 40)}, not ${own[t]}`); }
+    else if (t !== "shape" && t !== "pen") drawn(t, c);
+  }
+  // each kind of shape and of pen: its own icon
+  for (const [k, attr] of [["u", "shape-kind"], ["p", "pen-kind"]] as const) {
+    await p.keyboard.press(k);
+    const kinds = await p.evaluate((a) => [...new Set([...document.querySelectorAll<HTMLElement>(`[data-${a}]`)].map((b) => b.getAttribute(`data-${a}`)!))], attr);
+    for (const kind of kinds) {
+      await p.locator(`[data-${attr}="${kind}"]`).filter({ visible: true }).first().click();
+      await app.frame();
+      drawn(`${attr} ${kind}`, await cursor());
+    }
   }
   expect(wrong).toEqual([]);
 });

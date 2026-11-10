@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.12 — Each tool's cursor carries its icon (2026-11-10)
+
+- **Fixed:** the tools that draw showed a plain crosshair, the same for every tool. A tool that draws, picks by drawing or erases shows its own icon beside a small crosshair, the icon the rail shows: each kind of shape and of pen its own.
+- **Added:** the cursor test checks every kind of shape and pen too, and that no two tools share a cursor.
+
 ## 0.56.11 — Each tool its own cursor (2026-11-10)
 
 - **Fixed:** the Shapes, Speech balloon, Path and Sheet tools showed the hand over the canvas, as if it would pan; they show the crosshair. Every tool's cursor is now in one table (the arrow to select, the hand to pan, the text cursor for words, the crosshair to draw, pick by drawing or erase).

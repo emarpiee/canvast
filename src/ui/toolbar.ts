@@ -157,6 +157,18 @@ const SHAPE_MENU: Array<{ id: ShapeKind; label: string; title: string; icon: str
 ];
 void SHAPE_KINDS;
 
+/**
+ * The icon a tool shows on the rail (a shape tool: the kind of shape; a pen: the kind of pen): what its cursor carries too. Null for the tools
+ * whose cursor is the system's own (the arrow, the hand, the text cursor).
+ */
+export function toolIcon(tool: Tool, shapeKind: string, penKind: string): string | null {
+  if (tool === "select" || tool === "hand" || tool === "text" || tool === "note") return null;
+  if (tool === "shape") return SHAPE_MENU.find((s) => s.id === shapeKind)?.icon ?? ICONS.shapeTool;
+  if (tool === "pen") return PEN_MENU.find((s) => s.id === penKind)?.icon ?? ICONS.pencil;
+  if (tool === "path") return ICONS.pathTool;
+  return TOOLS.find((t) => t.tool === tool)?.icon ?? null;
+}
+
 export const LAYOUT_MENU: Array<{ head: string; items: Array<{ id: string; label: string; icon: string; hint: string }> }> = [
   {
     head: "Arrange in a grid",
