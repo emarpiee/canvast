@@ -3826,9 +3826,11 @@ test("a balloon's words and connector belong to it: in its group and sheet, in f
   expect(words(b2!).groups).toEqual([g]);
   // words hidden on their own (picked on the canvas) are shown again from their balloon's row, which says it is partly hidden
   await click(app, 1000, 650);
-  // (on the words themselves: where the letters fall differs a little between browsers)
+  // (a Ctrl+click picks the words alone, deep in the group, where they are drawn in each browser; a plain click picks the group)
   const wb = (await p.evaluate((id) => window.__canvastDebug.objectScreen(id), words(b1!).id))!.box;
+  await p.keyboard.down("Control");
   await click(app, (wb.minX + wb.maxX) / 2, (wb.minY + wb.maxY) / 2);
+  await p.keyboard.up("Control");
   const picked = await p.evaluate(() => window.__canvastDebug.selection());
   expect(picked).toEqual([words(b1!).id]);
   await panel.locator('[data-do="hide"]').click();

@@ -3164,21 +3164,34 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     await copyPicture(t, withText, made ?? own, made ? (svgs[0]?.name ?? t.name) : undefined, files, anyHidden);
   };
   // Copy and cut take the selected objects (text fields and the text editor keep their own).
+  /** The copy or the cut of the selected objects (`e`: the browser's event, whose clipboard takes the text; none when the browser sent none). */
+  const copyOrCut = (kind: "copy" | "cut", e?: ClipboardEvent): boolean => {
+    // Shapes leave as SVG text and a copy also puts a picture of what was copied on the system clipboard (see copyPicture); a paste into canvast still finds the objects.
+    const ts = exportTargets(doc, editor);
+    const t = ts.length === 1 ? ts[0]! : null;
+    // (a picture or objects fill is written into an SVG as embedded images, which would be megabytes of text: those shapes go as a picture only)
+    const svg0 = t?.vectors && !t.vectors.some((o) => isTexture(o.fill) || isTexture(o.stroke)) ? svgOfTarget(doc, t, { w: String(copySize(t, 1000).w), h: String(copySize(t, 1000).h) }) : null;
+    const svg = svg0 && svg0.length <= MAX_COPIED_SVG ? svg0 : null;
+    if (!(kind === "copy" ? copySelection : cutSelection)(doc, editor, view, e, svg ?? undefined)) return false;
+    if (kind === "copy") void sayingProgress(copyOnCanvas.say, () => copyOut(t, !svg, svg ?? undefined));
+    return true;
+  };
+  let clipEventAt = -Infinity;
   for (const kind of ["copy", "cut"] as const) {
     document.addEventListener(kind, (e) => {
+      clipEventAt = performance.now();
       if (typing(e.target) || appView !== "canvas" || textEditor.isOpen) return;
-      // Shapes leave as SVG text and a copy also puts a picture of what was copied on the system clipboard (see copyPicture); a paste into canvast still finds the objects.
-      const ts = exportTargets(doc, editor);
-      const t = ts.length === 1 ? ts[0]! : null;
-      // (a picture or objects fill is written into an SVG as embedded images, which would be megabytes of text: those shapes go as a picture only)
-      const svg0 = t?.vectors && !t.vectors.some((o) => isTexture(o.fill) || isTexture(o.stroke)) ? svgOfTarget(doc, t, { w: String(copySize(t, 1000).w), h: String(copySize(t, 1000).h) }) : null;
-      const svg = svg0 && svg0.length <= MAX_COPIED_SVG ? svg0 : null;
-      if ((kind === "copy" ? copySelection : cutSelection)(doc, editor, view, e, svg ?? undefined)) {
-        e.preventDefault();
-        if (kind === "copy") void sayingProgress(copyOnCanvas.say, () => copyOut(t, !svg, svg ?? undefined));
-      }
+      if (copyOrCut(kind, e)) e.preventDefault();
     });
   }
+  // A browser may send no copy or cut event for the keys when nothing on the page is selected as text (Firefox): the selected objects are
+  // copied or cut all the same, right after the keys, when no event came.
+  window.addEventListener("keydown", (e) => {
+    const k = e.key.toLowerCase();
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || (k !== "c" && k !== "x") || typing(e.target) || appView !== "canvas" || textEditor.isOpen || !editor.selection.size) return;
+    const at = performance.now();
+    setTimeout(() => { if (clipEventAt < at && !document.querySelector("dialog:modal")) copyOrCut(k === "c" ? "copy" : "cut"); }, 0);
+  }, true);
   // Best-effort flush when the page is hidden; saves are already debounced to 150 ms.
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {

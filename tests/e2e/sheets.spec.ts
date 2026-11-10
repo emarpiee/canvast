@@ -854,7 +854,7 @@ test("auto layout: Shift+A puts the picked things on a sheet that lays them out 
   const sb = await boxOf(sheet.id);
   expect([sb.minX, sb.minY, sb.maxX, sb.maxY].map(Math.round), "as large as the row").toEqual([400, 300, 620, 360]);
   // the Properties bar shows the layout of the picked sheet: the gap in px as seen (20)
-  await expect(p.locator("[data-layout]")).toBeVisible();
+  await expect(p.locator("[data-auto-layout]")).toBeVisible();
   await expect(p.locator('[data-layout-flow="row"]')).toHaveAttribute("aria-checked", "true");
   expect(Number(await p.locator('[data-layout-gap="0"]').inputValue())).toBeCloseTo(20, 0);
   // a shape drawn on the sheet joins the row where it is drawn (after the first), and the sheet grows round it
@@ -887,7 +887,7 @@ test("auto layout: Shift+A puts the picked things on a sheet that lays them out 
   expect((await xs()).map(Math.round)).toEqual([400, 480, 560]);
   // the Layers badge turns it off and on again (the layout read from the row again); the Sheets menu does the same
   await p.locator("[data-layers]").click();
-  const badge = p.locator(".layers-panel [data-layout]");
+  const badge = p.locator(".layers-panel [data-auto-layout]");
   await expect(badge).toHaveAttribute("aria-pressed", "true");
   await badge.click();
   await expect.poll(async () => (await laid()).find((o) => o.id === sheet.id)!.container!.layout).toBeUndefined();

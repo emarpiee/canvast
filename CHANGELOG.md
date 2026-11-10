@@ -2,8 +2,9 @@
 
 ## 0.56.23 — Firefox pastes copied things; test fixes (2026-11-10)
 
-- **Fixed:** in Firefox, Ctrl+V after copying shapes, balloons or a mix with pictures pasted nothing: Firefox sends no paste event when the clipboard holds only the picture a copy here puts there. When no paste event follows the keys within a moment, what was copied here is pasted all the same, once.
-- **Fixed:** tests: the resize-snap test puts its picture on a sheet with *Put on a sheet* (one item); the balloon test clicks the words where they are drawn in each browser; the Layers drag test waits for the row after the panel is drawn again.
+- **Fixed:** in Firefox, Ctrl+C and Ctrl+X on the canvas copied nothing (so Ctrl+V pasted nothing): Firefox sends no copy or cut event when no text on the page is selected. The selected objects are now copied or cut all the same when no event comes; and when no paste event follows Ctrl+V within a moment, what was copied here is pasted, once.
+- **Fixed:** the auto layout controls used an attribute the Library's view buttons already had; renamed.
+- **Fixed:** tests: the resize-snap test puts its picture on a sheet with *Put on a sheet* (one item); the balloon test Ctrl+clicks the words where they are drawn (a plain click picks their group); the resize-snap test drags a corner and allows a balloon's outline its known pixel; the Layers drag test waits for the row after the panel is drawn again.
 
 ## 0.56.22 — Auto layout on sheets (2026-11-10)
 
