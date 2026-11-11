@@ -48,7 +48,7 @@ const BASE = {
   cfact: 2, ol: 1, olStyle: "solid", hoverOl: 1, hoverOlStyle: "solid", br: 6, corner: "round", press: 60, elev: 0, tintsh: "retroma",
   cBtn: "", cBtnHover: "", cBtnOn: "", cIcon: "", cIconOn: "", cOutline: "", cOutlineHover: "",
   // interface
-  font: FONTS[0][0], text: 1, iconw: 2, dens: "1", r: 10, paneOut: 14, paneIn: 14, fwo: 2, fwi: 2, ring: "groove", ringOStyle: "solid",
+  font: FONTS[0][0], text: 1, iconw: 2, dens: "1", r: 10, paneOut: 20, /* (the owner's: more room round the panes than the demo's 14) */ paneIn: 14, fwo: 2, fwi: 2, ring: "groove", ringOStyle: "solid",
   simpleHdr: false, hdrR: 10, cHdr: "", cHdrText: "",
   tabStyle: "key", tabR: 8, tabFontOn: "inherit", tabFontOff: "inherit", cTabOutline: "", cTabOn: "", cTabOff: "",
   simpleMenu: false, menuR: 10, menuOl: 1, menuOlStyle: "solid", cMenu: "", cMenuOl: "", modalCorner: "round", modalR: 14, cScrim: "",

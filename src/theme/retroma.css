@@ -148,9 +148,9 @@
   border-radius: calc(var(--rt-btn-r) + var(--pad)); corner-shape: var(--rt-corner);
   box-shadow: var(--rt-lift); pointer-events: auto;
 }
-:root[data-look="retroma"] body[data-view="assets"] :is(#nav, .view-settings) { top: calc(var(--rt-pane-out) + var(--rt-ring-o-w) + var(--rt-lib-in) + var(--pad)); padding: 0; background: transparent; border-width: 0; box-shadow: none; }
-:root[data-look="retroma"] body[data-view="assets"] #nav { left: calc(var(--rt-pane-out) + var(--rt-ring-o-w) + var(--rt-lib-in) + var(--s-4)); }
-:root[data-look="retroma"] body[data-view="assets"] .view-settings { right: calc(var(--rt-pane-out) + var(--rt-ring-o-w) + var(--rt-lib-in) + var(--s-4)); }
+:root[data-look="retroma"] body[data-view="assets"] :is(#nav, .view-settings) { top: calc(var(--rt-pane-out) + var(--rt-ring-o-w) + var(--pad)); padding: 0; background: transparent; border-width: 0; box-shadow: none; }
+:root[data-look="retroma"] body[data-view="assets"] #nav { left: calc(var(--rt-pane-out) + var(--rt-ring-o-w) + var(--s-4)); }
+:root[data-look="retroma"] body[data-view="assets"] .view-settings { right: calc(var(--rt-pane-out) + var(--rt-ring-o-w) + var(--s-4)); }
 :root[data-look="retroma"] :is(.view-switch, .nav-pill, #view-switch, #workspace, .nav) { height: auto; padding: 0; gap: var(--rt-gap); background: transparent; border: 0; box-shadow: none; }
 :root[data-look="retroma"] :is(.view-switch button, .nav-pill .nav-crumb, .view-settings button) { height: var(--ctl); min-width: var(--ctl); border-radius: var(--rt-btn-r); }
 :root[data-look="retroma"] :is(.nav-pill .nav-crumb, .view-settings button) { width: var(--ctl); }
@@ -249,8 +249,7 @@
 :root[data-look="retroma"][data-rt-simplepanes="on"] :is(.set-card, .layers-panel, .side-views, .side-sec, .asset-sec) { background: transparent; border-color: transparent; box-shadow: none; }
 :root[data-look="retroma"] :is(#assets-view, #settings-view) { background: var(--rt-frame); }
 /* the Library: one pane in three parts (its bar on top, the body, the status bar), each drawing its side of the rings */
-:root[data-look="retroma"] { --rt-lib-in: var(--rt-pane-in); }
-:root[data-look="retroma"] #assets-view { padding: var(--rt-pane-out); }
+:root[data-look="retroma"] #assets-view { padding: var(--rt-pane-out); } /* (the room between the window's edge and the Library's pane: Retroma › Pane outer spacing) */
 /* the canvas in the same frame (Pane outer spacing round it, the pane's rings at its edge); its bars float inside it */
 :root[data-look="retroma"] body[data-view="canvas"] { background: var(--rt-frame); --edge: calc(var(--rt-pane-out) + var(--rt-ring-o-w) + var(--s-4)); }
 :root[data-look="retroma"] body[data-view="canvas"] #canvas-host {
@@ -260,7 +259,7 @@
 }
 :root[data-look="retroma"] body[data-view="canvas"] #canvas-host::after { content: ""; position: absolute; inset: 0; z-index: var(--z-edge); pointer-events: none; border: var(--rt-ring-i-w) var(--rt-ring-i-style) transparent; border-color: var(--rt-ring-i-t) var(--rt-ring-i-r) var(--rt-ring-i-b) var(--rt-ring-i-l); border-radius: calc(var(--rt-r) - var(--rt-ring-o-w)); } /* (round the Library's pane: Pane outer spacing; inside its frame, round what it holds: Pane inner spacing) */ /* (the frame round the Library's pane: Retroma › Pane outer spacing) */
 :root[data-look="retroma"] #assets-view .assets-bar {
-  padding-block: calc(var(--pad) + var(--rt-lib-in)) var(--pad); padding-right: calc(var(--s-6) + var(--rt-lib-in));
+  padding-block: var(--pad); padding-right: var(--s-6);
   background: var(--rt-frame); color: var(--rt-fg-on-frame-app); /* (the Library's top bar and status bar are the frame's colour) */
   border: var(--rt-ring-o) transparent; border-bottom: var(--rt-outline) solid var(--rt-rule);
   border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-rule) var(--rt-ring-o-l);
@@ -269,13 +268,12 @@
   --hud-fg: var(--rt-fg-on-frame-app); --hud-muted: var(--rt-muted-on-frame-app);
 }
 :root[data-look="retroma"] #assets-view .assets-body {
-  gap: 0; padding: 0 var(--rt-lib-in); margin: 0;
+  gap: 0; padding: 0; margin: 0;
   border-inline: var(--rt-ring-o) transparent; border-left-color: var(--rt-ring-o-l); border-right-color: var(--rt-ring-o-r);
   box-shadow: var(--rt-ri-l), var(--rt-ri-r);
   --hud-fg: var(--rt-fg); --hud-muted: var(--rt-fg-muted); color: var(--hud-fg);
 }
 :root[data-look="retroma"] #assets-view .viewer { border-radius: 0; } /* (the pane clips it to its own corners) */
-:root[data-look="retroma"] #assets-view.is-viewing .assets-body { padding: var(--rt-lib-in); }
 :root[data-look="retroma"] #assets-view.is-viewing .assets-body { border-top: var(--rt-ring-o) var(--rt-ring-o-t); border-bottom: var(--rt-ring-o) var(--rt-ring-o-b); border-radius: var(--rt-r); overflow: hidden; }
 /* the pane's inner ring, drawn over what it holds (v4's .pane::before): its columns are the frame's colour, so the edge shows on every side */
 :root[data-look="retroma"] #assets-view .assets-body { position: relative; }
@@ -290,7 +288,6 @@
   box-shadow: var(--rt-ri-l), var(--rt-ri-b), var(--rt-ri-r);
   font-size: var(--text-sm);
   --hud-fg: var(--rt-fg-on-frame-app); --hud-muted: var(--rt-muted-on-frame-app);
-  padding: 0 var(--rt-lib-in) var(--rt-lib-in);
   & > .hud-readout { padding-inline: var(--s-6); }
 }
 :root[data-look="retroma"] #assets-view .col-grip { margin-inline: 0; }
