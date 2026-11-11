@@ -48,12 +48,16 @@ function putK(S: Loose, k: string, v: unknown): void {
 /** A control of the demo's list as a shared row's setting, its default read from Retroma's (in the scope picked now). */
 /** Settings the app keeps in one place for every theme (Settings › Appearance): not repeated here. */
 const APP_OWNED = new Set(["mode", "dens", "motion", "zen", "grid"]);
+/** The demo's fading of the bars while panning is left out: the app's Zen mode is the one way the bars fade. */
+const LEFT_OUT_KEYS = new Set(["fadeOnPan", "fadeSpeed", "fadeOut", "fadeIn"]);
+/** Settings not shown here: the app's own, and those left out. */
+const notHere = (k: string): boolean => APP_OWNED.has(k) || LEFT_OUT_KEYS.has(k);
 /** Groups of the demo left out: Zen mode is the app's own (Settings › Appearance), the same in every theme. */
 const LEFT_OUT = new Set(["Zen mode"]);
-const shownGroups = (groups: readonly Group[]): Group[] => groups.filter((g) => !LEFT_OUT.has(g.title) && g.items.some((c) => c.k && c.label && !APP_OWNED.has(c.k)));
+const shownGroups = (groups: readonly Group[]): Group[] => groups.filter((g) => !LEFT_OUT.has(g.title) && g.items.some((c) => c.k && c.label && !notHere(c.k)));
 
 function toSetting(c: Control, S: Loose): Setting | null {
-  if (!c.k || !c.label || APP_OWNED.has(c.k)) return null;
+  if (!c.k || !c.label || notHere(c.k)) return null;
   const scoped = { ...(JSON.parse(JSON.stringify(BASE)) as Loose), ...Object.fromEntries(SCOPES.map((s) => [s, S[s]])) };
   const def = getK(scoped, c.k);
   if (c.t === "range") return { t: "range", k: c.k, label: c.label, min: c.min!, max: c.max!, step: c.step!, def: typeof def === "number" ? def : c.min!, usual: [c.min!, c.max!] };
@@ -155,7 +159,7 @@ export function mountRetromaSection(host: HTMLElement, settings: SettingsStore, 
     const fresh = JSON.parse(JSON.stringify(BASE)) as Loose;
     const copy = (v: unknown): unknown => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
     const branch = (o: Loose, k: string): Loose => (o[k] && typeof o[k] === "object" ? (o[k] as Loose) : (o[k] = {}) as Loose);
-    for (const k of new Set(groups.flatMap((g) => g.items.flatMap((c) => (c.k && !APP_OWNED.has(c.k) ? [c.k] : []))))) {
+    for (const k of new Set(groups.flatMap((g) => g.items.flatMap((c) => (c.k && !notHere(c.k) ? [c.k] : []))))) {
       if (k.startsWith("@@")) {
         for (const m of ["lt", "dk"]) branch(S, m)[k.slice(2)] = copy((fresh[m] as Loose)[k.slice(2)]);
       } else if (k.startsWith("@")) {

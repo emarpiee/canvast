@@ -61,7 +61,7 @@
   --k-ol: var(--rt-outline-c); --k-olw: var(--rt-outline); --k-ols: var(--rt-outline-style);
   --k-sh: var(--rt-raise);
   --k-cx: var(--rt-cx); --k-cy: var(--rt-cy); --k-px: 0px; --k-py: 0px;
-  position: relative; isolation: isolate;
+  isolation: isolate;
   color: var(--rt-icon);
   font-weight: 700;
   background: transparent; border-width: 0; box-shadow: none; outline: none; backdrop-filter: none;
@@ -88,6 +88,8 @@
   &.is-primary { --surf: var(--rt-accent); color: var(--rt-on-accent); &:hover:not(:disabled) { --surf: var(--rt-accent-hover); } }
   &.is-danger { color: var(--rt-danger); }
 }
+/* (a key's face needs a positioned key; given with no weight, so a key placed by its own rule, as the viewer's buttons, stays where it is) */
+:where(:root[data-look="retroma"]) :where(:is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls, .tb-options-row, .adj-layers, .view-settings, .view-switch, .seg, .confirm-actions, .storage-actions, .action-row, .set-tabs, .rail-fly, .side-head, .asset-quick, .asset-actions, .panel-head, .panel-foot, .layers-tools, .set-control, .ex-foot, .ex-head) button, .assets-btn, .set-reset, .set-done, .rt-open, .set-link, .nav-crumb, .vbtn, .pg-auto, .pg-current) { position: relative; }
 /* a key with words: the demo's room on each side, its icon and words 7px apart */
 :root[data-look="retroma"] :is(.confirm-actions button, .storage-actions button, .action-row button, .ex-foot button, .set-control button:not(.pg-swatch, .set-chip-x, .colour-swatch, .is-icon), .rt-open, .set-reset, .set-done, .assets-btn:not(.is-icon), .pg-auto) {
   display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--s-6) / 2);
@@ -187,6 +189,7 @@
   box-shadow: var(--rt-ri-t), var(--rt-ri-l), var(--rt-ri-b), var(--rt-ri-r), var(--rt-ri-soft);
   --hud-fg: var(--rt-fg); --hud-muted: var(--rt-fg-muted); color: var(--hud-fg);
 }
+:root[data-look="retroma"] :is(.layers-panel, dialog.confirm) { border-color: var(--rt-ring-i-t) var(--rt-ring-i-r) var(--rt-ring-i-b) var(--rt-ring-i-l); } /* (what floats, a dialog or a docked panel, has the ridge: lit on its top and left) */
 :root[data-look="retroma"][data-rt-simplepanes="on"] :is(.set-card, .layers-panel) { background: transparent; border-color: transparent; box-shadow: none; }
 :root[data-look="retroma"] :is(#assets-view, #settings-view) { background: var(--rt-frame); }
 /* the Library: one pane in three parts (its bar on top, the body, the status bar), each drawing its side of the rings */
@@ -387,7 +390,12 @@
   --se-edit-anchor: var(--rt-link-c); --se-edit-anchor-on-font: var(--rt-link-c); --se-edit-hr-color: var(--rt-hr-c);
   --se-doc-background: var(--rt-pane);
 }
-:root[data-look="retroma"] .viewer-note .sun-editor-editable.se-theme-canvast { border: var(--rt-ring-i-w) var(--rt-ring-i-style) transparent; border-color: var(--rt-ring-i-t) var(--rt-ring-i-r) var(--rt-ring-i-b) var(--rt-ring-i-l); border-radius: var(--rt-r); box-shadow: inset 0 0 var(--rt-pane-sh) var(--rt-pane-inner); }
+/* the note in the viewer: one frame (the pane's), the page a sheet on it with room round its shadow, one rule over the bar below */
+:root[data-look="retroma"] .viewer-note .sun-editor.se-theme-canvast { border: 0; }
+:root[data-look="retroma"] .viewer-note .se-wrapper { padding: var(--s-10); box-shadow: none; }
+:root[data-look="retroma"] .viewer-note .se-status-bar { border-top: 0; background: var(--rt-pane); }
+:root[data-look="retroma"] .viewer-note .sun-editor-editable.se-theme-canvast { border: var(--rt-ring-i-w) var(--rt-ring-i-style) transparent; border-color: var(--rt-ring-i-t) var(--rt-ring-i-r) var(--rt-ring-i-b) var(--rt-ring-i-l); border-radius: var(--rt-r); box-shadow: var(--rt-lift-sheet), inset 0 0 var(--rt-pane-sh) var(--rt-pane-inner); }
+:root[data-look="retroma"] #assets-view .viewer.is-note .viewer-bar { background: var(--rt-pane-alt); border-top: var(--rt-outline) solid var(--rt-rule); }
 :root[data-look="retroma"] #assets-view .viewer.is-note { background: var(--rt-pane); & .viewer-stage { background: transparent; } }
 :root[data-look="retroma"] .sun-editor .se-toolbar { background: var(--rt-ed-hdr-bg); border-bottom: var(--rt-outline) solid var(--rt-rule); }
 /* the editor's buttons are keys (v4's .ed-bar): the key's face, raised; on or pressed, sunk with what is on it */
@@ -527,11 +535,9 @@
 :root[data-look="retroma"] li.__se__acb-merged { --acb: var(--rt-check-merged); }
 :root[data-look="retroma"][data-rt-acb="on"] li.__se__acb-merged .__se__acb-mark::before { content: "⇲"; }
 
-/* ---- 10. The canvas: simple floating bars, bars that fade while you pan, where the zoom controls sit (Retroma › Canvas & Library) ---- */
+/* ---- 10. The canvas: simple floating bars, where the zoom controls sit (Retroma › Canvas & Library) ---- */
 :root[data-look="retroma"][data-rt-simplebars="on"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls) { background: transparent; border-color: transparent; box-shadow: none; backdrop-filter: none; }
 :root[data-look="retroma"][data-rt-simplebars="on"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls) button { box-shadow: none; }
-:root[data-look="retroma"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls, .hud-readout) { transition: opacity var(--rt-fade-ms) ease; }
-:root[data-look="retroma"][data-rt-panning="on"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls, .hud-readout) { opacity: var(--rt-zen-o); }
 :root[data-look="retroma"][data-rt-part-controls-at="bl"] .hud-controls { right: auto; left: calc(var(--edge) * 2 + var(--bar-h)); }
 :root[data-look="retroma"][data-rt-part-controls-at="tr"] .hud-controls { bottom: auto; top: calc(var(--edge) * 2 + var(--bar-h)); }
 
@@ -674,8 +680,6 @@
 /* search suggestions: a header and a body (Retroma › Search and link preview) */
 :root[data-look="retroma"] .search-suggest { background: var(--rt-res-body); }
 :root[data-look="retroma"] .search-suggest :is(h3, h4, .search-suggest-head) { background: var(--rt-res-hdr); color: var(--rt-res-hdr-fg); }
-/* the bars fade after a while (Retroma › Canvas) */
-:root[data-look="retroma"][data-rt-panning="on"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls, .hud-readout) { transition-delay: var(--rt-fade-delay); }
 /* notes: headings' line height and their # marks, footnotes, drawn bullets, done tasks, table selection, callout titles (Retroma › Notes) */
 :root[data-look="retroma"] .sun-editor-editable.se-theme-canvast :is(h1, h2, h3, h4, h5, h6) { line-height: var(--rt-h-lh); }
 :root[data-look="retroma"][data-rt-part-hash="true"] .sun-editor-editable.se-theme-canvast :is(h1, h2, h3, h4, h5, h6)::before { opacity: var(--rt-hash-o); font-size: var(--rt-hash-s); margin-right: 0.25em; }

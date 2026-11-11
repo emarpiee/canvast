@@ -3081,21 +3081,6 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   window.addEventListener("pointermove", trackPointer, true);
   // A pointer held on the canvas (a drag pan): the tiles never take the view for resting while it is (a heavy canvas's slow frame is no rest).
   canvas.addEventListener("pointerdown", () => void (tiles.holding = true));
-  // Retroma › Canvas: the floating bars fade while the canvas is dragged (after the fade-out delay) and come back after the fade-in delay.
-  let fadeTimer: ReturnType<typeof setTimeout> | undefined;
-  canvas.addEventListener("pointerdown", () => {
-    if (settings.get("ui.look") !== "retroma") return;
-    const s = retromaSettings(settings.get("retroma.look")) as Record<string, unknown>;
-    if (!s["fadeOnPan"]) return;
-    clearTimeout(fadeTimer);
-    fadeTimer = setTimeout(() => void (document.documentElement.dataset["rtPanning"] = "on"), Number(s["fadeOut"]) * 1000);
-  });
-  window.addEventListener("pointerup", () => {
-    clearTimeout(fadeTimer);
-    if (document.documentElement.dataset["rtPanning"] !== "on") return;
-    const s = retromaSettings(settings.get("retroma.look")) as Record<string, unknown>;
-    fadeTimer = setTimeout(() => void delete document.documentElement.dataset["rtPanning"], Number(s["fadeIn"]) * 1000);
-  }, true);
   for (const type of ["pointerup", "pointercancel"]) window.addEventListener(type, (e) => void ((e as PointerEvent).buttons === 0 && (tiles.holding = false)), true);
   window.addEventListener("pointerdown", trackPointer, true);
   /** How long after the paste keys a paste event is waited for before what was copied here is pasted without one (see the keydown below). */
