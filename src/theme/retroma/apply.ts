@@ -17,6 +17,8 @@ export function retromaSettings(changedJson: string): Record<string, unknown> {
   for (const [k, v] of Object.entries(changed)) {
     if (!(k in s) && k !== "hex" && k !== "preset") continue;
     const base = s[k];
+    // (a font left empty, as an earlier build could store it, would leave the page in the browser's fallback: the theme's own stays)
+    if (/font$/i.test(k) && v === "" && typeof base === "string" && base !== "") continue;
     s[k] = base && typeof base === "object" && !Array.isArray(base) && v && typeof v === "object" ? deepMerge(base as Record<string, unknown>, v as Record<string, unknown>) : v;
   }
   return s;
