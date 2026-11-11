@@ -49,6 +49,12 @@ const DENSE_MS = 12; // default; the quality governor lowers it (app/quality.ts)
  * where the build's time does not see it, and drawing them all again on every frame of a zoom is what made zooming slow.
  */
 const DENSE_OBJECTS = 1500;
+/**
+ * Past the preview's range, the new set is built a few tiles a frame (this many ms of work), with the old set drawn scaled under the tiles
+ * not built yet (a backdrop, kept while the zoom stays within BACK_MAX_LEVELS of it): no frame waits for a whole set.
+ */
+const BUILD_MS = 8;
+const BACK_MAX_LEVELS = 3;
 const PREVIEW_MAX_LEVELS = 1;
 const REFINE_MS = 150;
 /**
@@ -130,6 +136,8 @@ export class TileCache {
   private restAt: { ax: number; ay: number } | null = null;
   /** A pointer is held on the canvas (a drag pan): the view is moving whatever the clock says, so it never counts as resting. */
   holding = false;
+  /** The old set, drawn scaled under the new set's missing tiles while it is built (see BUILD_MS). */
+  private back: Generation | null = null;
   /**
    * When the zoom (or frame) last changed, and the time before. Two changes within REFINE_MS are a zoom in progress (a wheel, a pinch):
    * a set is built for it only once it has held still for REFINE_MS, not between two notches. A single change (a jump) is built at once.
@@ -166,6 +174,7 @@ export class TileCache {
   clear(): void {
     if (this.gen) for (const t of this.gen.tiles.values()) this.release(t);
     this.gen = null;
+    this.dropBack();
     this.dropAhead();
     this.dirty.clear();
   }
@@ -256,8 +265,8 @@ export class TileCache {
     this.lastKey = key;
     const z = cam.zi + cam.zf;
     const dense = this.lastFullMs > this.denseMs || this.lastFullObjects > DENSE_OBJECTS;
+    if (this.back && (this.back.frameId !== frameId || Math.abs(cam.zi + cam.zf - this.back.z) > BACK_MAX_LEVELS || this.dirty.size || !this.back.key.endsWith(`|${dpr}`))) this.dropBack();
     if (this.gen && this.gen.key !== key) {
-      this.restarts.key++;
       // The preview scales the last tile set: only within the same frame.
       const preview = !stable && dense && this.gen.frameId === frameId;
       // Zooming out, the scaled set leaves a bare border: a prebuilt set that reaches every edge is shown instead.
@@ -270,7 +279,14 @@ export class TileCache {
         const pv2 = this.preview(ctx, cam, vp, dpr, border);
         if (pv2) return pv2;
       }
-      this.clear();
+      this.restarts.key++;
+      // Beyond it, with nothing prepared: the old set stays as a backdrop while the new one is built a few tiles a frame.
+      if (preview && !this.dirty.size && this.gen.tiles.size && Math.abs(z - this.gen.z) <= BACK_MAX_LEVELS) {
+        this.dropBack();
+        this.back = this.gen;
+        this.gen = null;
+        this.dropAhead();
+      } else this.clear();
     }
     if (!this.gen) {
       // Build tiles only once the zoom has held still for a frame; in a dense
@@ -349,14 +365,28 @@ export class TileCache {
     }
     const buildStart = performance.now();
     this.renderedTotal += missing.length;
-    const visible = missing.length ? this.buildTiles(g, missing, dx, dy, vp, dpr, query, drawObjects, reach, Infinity).visible : 0;
+    const visible = missing.length ? this.buildTiles(g, missing, dx, dy, vp, dpr, query, drawObjects, reach, this.back ? BUILD_MS : Infinity).visible : 0;
+    // The backdrop, scaled, under the tiles still to build (clipped to them: nothing shows twice); gone once the set is whole.
+    const stillMissing = needed.filter(([i, j]) => !g.tiles.has(`${i},${j}`));
+    if (this.back) {
+      if (stillMissing.length) {
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.beginPath();
+        for (const [i, j] of stillMissing) ctx.rect(i * td + dx, j * td + dy, td, td);
+        ctx.clip();
+        this.drawScaled(ctx, this.back, cam, vp, dpr);
+        ctx.restore();
+        this.requestFrame(); // (the rest of the set, next frame)
+      } else this.dropBack();
+    }
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.imageSmoothingEnabled = false;
     for (const [i, j] of needed) {
-      const c = g.tiles.get(`${i},${j}`)!.canvas;
+      const c = g.tiles.get(`${i},${j}`)?.canvas;
       if (c) ctx.drawImage(c, gd, gd, td, td, i * td + dx, j * td + dy, td, td);
     }
     ctx.restore();
@@ -370,7 +400,7 @@ export class TileCache {
         g.tiles.delete(k);
       }
     }
-    if (missing.length === needed.length && needed.length) {
+    if (missing.length === needed.length && needed.length && !stillMissing.length) {
       this.lastFullMs = performance.now() - buildStart;
       this.lastFullObjects = visible;
     }
@@ -530,16 +560,40 @@ export class TileCache {
    * border after zooming out with no prebuilt set to take over) are drawn
    * directly by `border`, so the view is never cut off.
    */
+  private dropBack(): void {
+    if (this.back) for (const t of this.back.tiles.values()) this.release(t);
+    this.back = null;
+  }
+
   private preview(ctx: CanvasRenderingContext2D, cam: Camera, vp: Viewport, dpr: number, border?: DrawBorder): TileFrame | null {
     const g = this.gen!;
     const dz = cam.zi + cam.zf - g.z;
     if (this.dirty.size || !g.key.endsWith(`|${dpr}`) || Math.abs(dz) > PREVIEW_MAX_LEVELS || !g.tiles.size) return null;
+    const n = this.drawScaled(ctx, g, cam, vp, dpr);
+    if (n < 0) return null;
+    if (border && !this.covers(g, cam, vp, dpr)) {
+      const e = this.extent(g, cam, vp, dpr);
+      // (empty tiles are not drawn, but their place is covered: nothing of them was there)
+      border(ctx, e ? { l: e.l / dpr, t: e.t / dpr, r: e.r / dpr, b: e.b / dpr } : { l: 0, t: 0, r: 0, b: 0 });
+    }
+    if (this.refineTimer) clearTimeout(this.refineTimer);
+    this.refineTimer = setTimeout(() => {
+      this.refineTimer = null;
+      this.refineNow = true; // the next frame counts as stable and is rendered exactly
+      this.requestFrame();
+    }, REFINE_MS);
+    return { tiles: n, rendered: 0, visible: 0, preview: true };
+  }
+
+  /** The tiles of set `g` drawn scaled and placed for this camera; how many were drawn (-1: it cannot be placed). */
+  private drawScaled(ctx: CanvasRenderingContext2D, g: Generation, cam: Camera, vp: Viewport, dpr: number): number {
+    const dz = cam.zi + cam.zf - g.z;
     const s = 2 ** dz;
     const f = 2 ** cam.zf;
     // Device position of the set's reference point (its viewport's top-left) under this camera.
     const ox = (vp.width / 2 + D.diffToNumber(g.center.x, cam.center.x, cam.zi) * f) * dpr - (g.vp.width / 2) * dpr * s;
     const oy = (vp.height / 2 + D.diffToNumber(g.center.y, cam.center.y, cam.zi) * f) * dpr - (g.vp.height / 2) * dpr * s;
-    if (!Number.isFinite(ox) || !Number.isFinite(oy)) return null;
+    if (!Number.isFinite(ox) || !Number.isFinite(oy)) return -1;
     const td = TILE_CSS * dpr;
     const gd = GUARD_CSS * dpr;
     ctx.save();
@@ -559,18 +613,7 @@ export class TileCache {
       n++;
     }
     ctx.restore();
-    if (border && !this.covers(g, cam, vp, dpr)) {
-      const e = this.extent(g, cam, vp, dpr);
-      // (empty tiles are not drawn, but their place is covered: nothing of them was there)
-      border(ctx, e ? { l: e.l / dpr, t: e.t / dpr, r: e.r / dpr, b: e.b / dpr } : { l: 0, t: 0, r: 0, b: 0 });
-    }
-    if (this.refineTimer) clearTimeout(this.refineTimer);
-    this.refineTimer = setTimeout(() => {
-      this.refineTimer = null;
-      this.refineNow = true; // the next frame counts as stable and is rendered exactly
-      this.requestFrame();
-    }, REFINE_MS);
-    return { tiles: n, rendered: 0, visible: 0, preview: true };
+    return n;
   }
 
   /**
