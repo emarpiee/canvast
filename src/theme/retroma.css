@@ -206,6 +206,28 @@
 :root[data-look="retroma"] :is(input[type="checkbox"], input[type="radio"]) { border-color: var(--rt-outline-c); box-shadow: var(--rt-raise-sm); }
 :root[data-look="retroma"] :is(input[type="checkbox"], input[type="radio"]):is(:checked, :indeterminate) { box-shadow: var(--rt-sink); }
 :root[data-look="retroma"] :is(input[type="range"], progress) { accent-color: var(--rt-accent); box-shadow: none; background: transparent; border: 0; }
+/* the slider: v4's (the browser's own in Firefox), drawn the same in every browser with fixed greys, so its contrast never follows the accent:
+   a 6 px track, light grey with a grey edge; the part before the thumb the accent with a darker edge; a 16 px dark grey thumb in a white ring */
+:root[data-look="retroma"] {
+  --rt-range-track: #e9e9ed; --rt-range-edge: #8f8f9d; --rt-range-thumb: #676774; --rt-range-ring: #ffffff;
+  --rt-range-h: 6px; --rt-range-k: 16px; --rt-range-fill: var(--rt-accent); --rt-range-fill-edge: oklch(from var(--rt-accent) calc(l - 0.08) c h);
+}
+:root[data-look="retroma"] input[type="range"]:not(.set-hue) {
+  appearance: none; -webkit-appearance: none; height: var(--rt-range-k); margin: 0; padding: 0; overflow: hidden; cursor: pointer;
+  &::-webkit-slider-runnable-track {
+    height: var(--rt-range-k); border: 0;
+    background: linear-gradient(transparent calc(50% - var(--rt-range-h) / 2), var(--rt-range-edge) 0 calc(50% - var(--rt-range-h) / 2 + 1px), var(--rt-range-track) 0 calc(50% + var(--rt-range-h) / 2 - 1px), var(--rt-range-edge) 0 calc(50% + var(--rt-range-h) / 2), transparent 0);
+  }
+  /* (the part before the thumb: the thumb's border image, carried out to the left and cut by the slider's own box) */
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none; width: var(--rt-range-k); height: var(--rt-range-k); border: 0; border-radius: 50%;
+    background: var(--rt-range-thumb); box-shadow: inset 0 0 0 2px var(--rt-range-ring);
+    border-image: linear-gradient(var(--rt-range-fill-edge) 0 1px, var(--rt-range-fill) 0 calc(100% - 1px), var(--rt-range-fill-edge) 0) fill 0 / calc((var(--rt-range-k) - var(--rt-range-h)) / 2) calc(var(--rt-range-k) - 1px) calc((var(--rt-range-k) - var(--rt-range-h)) / 2) 0 / 0 0 0 100vw;
+  }
+  &::-moz-range-track { box-sizing: border-box; height: var(--rt-range-h); background: var(--rt-range-track); border: 1px solid var(--rt-range-edge); border-radius: calc(var(--rt-range-h) / 2); }
+  &::-moz-range-progress { box-sizing: border-box; height: var(--rt-range-h); background: var(--rt-range-fill); border: 1px solid var(--rt-range-fill-edge); border-radius: calc(var(--rt-range-h) / 2); }
+  &::-moz-range-thumb { box-sizing: border-box; width: var(--rt-range-k); height: var(--rt-range-k); background: var(--rt-range-thumb); border: 2px solid var(--rt-range-ring); border-radius: 50%; }
+}
 :root[data-look="retroma"] .adj-num { font-family: var(--rt-font-mono); }
 
 /* ---- 4. Surfaces, as the demo draws them -----------------------------------------------------------------------------------------
