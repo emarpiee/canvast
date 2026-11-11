@@ -250,7 +250,7 @@
   --rt-ri-soft: inset 0 0 var(--rt-pane-sh) var(--rt-pane-inner);
   --rt-r-in: calc(var(--rt-r) - var(--rt-ring-o-w));
 }
-:root[data-look="retroma"] :is(.set-card, .layers-panel, dialog.confirm, .side-views, .side-sec, .asset-sec) { /* (Settings' cards, panels, dialogs and the Library's section cards: one pane) */
+:root[data-look="retroma"] :is(.set-card, .layers-panel, dialog.confirm, .side-views, .side-sec, .asset-sec, .asset-more[open]) { /* (Settings' cards, panels, dialogs and the Library's section cards, the file's details while shown: one pane) */
   background: var(--rt-pane);
   border: var(--rt-ring-o) transparent;
   border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-ring-o-b) var(--rt-ring-o-l);
@@ -269,7 +269,7 @@
 :root[data-look="retroma"] :--floating { border: var(--rt-float-w) ridge var(--rt-float-ol-c); box-shadow: var(--rt-float-glow); backdrop-filter: none; }
 :root[data-look="retroma"] .layers-panel { box-shadow: none; }
 :root[data-look="retroma"] .rail-fly { padding: var(--pad); gap: var(--rt-gap); border-radius: calc(var(--rt-btn-r) + var(--pad) + var(--rt-float-w)); } /* (keys inside a frame: its corner is theirs plus the room and the frame) */ /* (a docked panel sits on the canvas without the glow: the canvas is not drawn under it, so a glow showed square corners) */
-:root[data-look="retroma"][data-rt-simplepanes="on"] :is(.set-card, .layers-panel, .side-views, .side-sec, .asset-sec) { background: transparent; border-color: transparent; box-shadow: none; }
+:root[data-look="retroma"][data-rt-simplepanes="on"] :is(.set-card, .layers-panel, .side-views, .side-sec, .asset-sec, .asset-more[open]) { background: transparent; border-color: transparent; box-shadow: none; }
 :root[data-look="retroma"] :is(#assets-view, #settings-view) { background: var(--rt-frame); }
 /* the Library: one pane in three parts (its bar on top, the body, the status bar), each drawing its side of the rings */
 /* the frame: one ring, Pane outer spacing from the window's edge; inside it, after Gap inside the frame, the panels (the Library's bar, columns
@@ -326,7 +326,7 @@
   & > .hud-readout { padding-inline: var(--s-6); }
 }
 /* the Library's two side columns (the sidebar and the details) are one look: the frame's colour, the same room */
-:root[data-look="retroma"] #assets-view .side-views, :root[data-look="retroma"] #assets-view .side-sec, :root[data-look="retroma"] #assets-view .asset-sec { padding: var(--s-6); } /* (every card of the Library's columns: one room inside, by Density) */
+:root[data-look="retroma"] #assets-view .side-views, :root[data-look="retroma"] #assets-view .side-sec, :root[data-look="retroma"] #assets-view .asset-sec, :root[data-look="retroma"] #assets-view .asset-more[open] { padding: var(--s-6); } /* (every card of the Library's columns: one room inside, by Density) */
 :root[data-look="retroma"] #assets-view .assets-side, :root[data-look="retroma"] #assets-view .asset-inspector { overflow: auto; padding: var(--s-6); background: var(--rt-frame); --hud-fg: var(--rt-fg-on-frame-app); --hud-muted: var(--rt-muted-on-frame-app); color: var(--hud-fg); } /* (the frame's colour, what is on it held to 4.5:1; the boxes in them keep their own colours) */
 :root[data-look="retroma"] #assets-view .assets-body:not(.has-side-w) > .assets-side { flex-basis: calc(var(--rt-side-w) + 2 * var(--s-6)); } /* (v4's width for the rows, plus the cards' room on each side) */
 :root[data-look="retroma"] #assets-view .assets-main { background: var(--rt-paper); }
