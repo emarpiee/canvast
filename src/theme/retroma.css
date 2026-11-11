@@ -387,7 +387,18 @@
   --se-doc-background: var(--rt-pane);
 }
 :root[data-look="retroma"] .viewer-note .sun-editor-editable.se-theme-canvast { border: var(--rt-ring-i-w) var(--rt-ring-i-style) transparent; border-color: var(--rt-ring-i-t) var(--rt-ring-i-r) var(--rt-ring-i-b) var(--rt-ring-i-l); border-radius: var(--rt-r); box-shadow: inset 0 0 var(--rt-pane-sh) var(--rt-pane-inner); }
-:root[data-look="retroma"] .sun-editor .se-toolbar { background: var(--rt-ed-hdr-bg); }
+:root[data-look="retroma"] #assets-view .viewer.is-note { background: var(--rt-pane); & .viewer-stage { background: transparent; } }
+:root[data-look="retroma"] .sun-editor .se-toolbar { background: var(--rt-ed-hdr-bg); border-bottom: var(--rt-outline) solid var(--rt-rule); }
+/* the editor's buttons are keys (v4's .ed-bar): the key's face, raised; on or pressed, sunk with what is on it */
+:root[data-look="retroma"] .sun-editor.se-theme-canvast .se-toolbar .se-toolbar-btn {
+  margin: 2px; color: var(--rt-icon); font-weight: 700;
+  background: var(--rt-btn-bg); border: var(--rt-outline) solid var(--rt-outline-c); border-radius: var(--rt-btn-r); corner-shape: var(--rt-corner);
+  box-shadow: var(--rt-raise);
+  & > * { transform: translate(var(--rt-cx), var(--rt-cy)); transition: transform var(--rt-press-ms); }
+  &:hover:not(:disabled) { background: var(--rt-btn-hover); border-color: var(--rt-outline-hover); }
+  &:is(.active, .on, [aria-pressed="true"], :active:not(:disabled)) { background: var(--rt-btn-on); color: var(--rt-icon-on); box-shadow: var(--rt-sink); transform: translate(var(--rt-press-x), var(--rt-press-y)); & > * { transform: translate(var(--rt-cx-a), var(--rt-cy-a)); } }
+}
+:root[data-look="retroma"][data-rt-part-simple-ed-hdr="true"] .sun-editor .se-toolbar { border-bottom-color: transparent; }
 :root[data-look="retroma"][data-rt-part-simple-ed-hdr="true"] .sun-editor .se-toolbar { background: transparent; }
 :root[data-look="retroma"] .sun-editor-editable.se-theme-canvast { padding-top: var(--rt-ed-top); line-height: var(--rt-ed-lh); color: var(--rt-para-fg); background-color: var(--rt-ed-bg); }
 :root[data-look="retroma"] .sun-editor-editable.se-theme-canvast > * { max-width: var(--rt-ed-width); margin-left: auto; margin-right: auto; }
@@ -426,36 +437,42 @@
 :root[data-look="retroma"] { --code-keyword: var(--rt-syn-k); --code-string: var(--rt-syn-s); --code-comment: var(--rt-syn-c); --code-number: var(--rt-syn-n); --code-function: var(--rt-syn-f); --code-tag: var(--rt-syn-t); }
 
 /* ---- 9. Callouts and alternative checkboxes in notes: each kind its colour (Retroma › Notes) ------------------------------- */
-:root[data-look="retroma"] .__se__callout-note { --co: var(--rt-callout-note); }
-:root[data-look="retroma"] .__se__callout-abstract { --co: var(--rt-callout-abstract); }
-:root[data-look="retroma"] .__se__callout-summary { --co: var(--rt-callout-summary); }
-:root[data-look="retroma"] .__se__callout-tldr { --co: var(--rt-callout-tldr); }
-:root[data-look="retroma"] .__se__callout-info { --co: var(--rt-callout-info); }
-:root[data-look="retroma"] .__se__callout-todo { --co: var(--rt-callout-todo); }
-:root[data-look="retroma"] .__se__callout-tip { --co: var(--rt-callout-tip); }
-:root[data-look="retroma"] .__se__callout-hint { --co: var(--rt-callout-hint); }
-:root[data-look="retroma"] .__se__callout-important { --co: var(--rt-callout-important); }
-:root[data-look="retroma"] .__se__callout-success { --co: var(--rt-callout-success); }
-:root[data-look="retroma"] .__se__callout-check { --co: var(--rt-callout-check); }
-:root[data-look="retroma"] .__se__callout-done { --co: var(--rt-callout-done); }
-:root[data-look="retroma"] .__se__callout-question { --co: var(--rt-callout-question); }
-:root[data-look="retroma"] .__se__callout-help { --co: var(--rt-callout-help); }
-:root[data-look="retroma"] .__se__callout-faq { --co: var(--rt-callout-faq); }
-:root[data-look="retroma"] .__se__callout-warning { --co: var(--rt-callout-warning); }
-:root[data-look="retroma"] .__se__callout-caution { --co: var(--rt-callout-caution); }
-:root[data-look="retroma"] .__se__callout-attention { --co: var(--rt-callout-attention); }
-:root[data-look="retroma"] .__se__callout-failure { --co: var(--rt-callout-failure); }
-:root[data-look="retroma"] .__se__callout-fail { --co: var(--rt-callout-fail); }
-:root[data-look="retroma"] .__se__callout-missing { --co: var(--rt-callout-missing); }
-:root[data-look="retroma"] .__se__callout-danger { --co: var(--rt-callout-danger); }
-:root[data-look="retroma"] .__se__callout-error { --co: var(--rt-callout-error); }
-:root[data-look="retroma"] .__se__callout-bug { --co: var(--rt-callout-bug); }
-:root[data-look="retroma"] .__se__callout-example { --co: var(--rt-callout-example); }
-:root[data-look="retroma"] .__se__callout-quote { --co: var(--rt-callout-quote); }
-:root[data-look="retroma"] .__se__callout-cite { --co: var(--rt-callout-cite); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-note { --co: var(--rt-callout-note); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-abstract { --co: var(--rt-callout-abstract); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-summary { --co: var(--rt-callout-summary); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-tldr { --co: var(--rt-callout-tldr); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-info { --co: var(--rt-callout-info); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-todo { --co: var(--rt-callout-todo); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-tip { --co: var(--rt-callout-tip); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-hint { --co: var(--rt-callout-hint); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-important { --co: var(--rt-callout-important); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-success { --co: var(--rt-callout-success); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-check { --co: var(--rt-callout-check); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-done { --co: var(--rt-callout-done); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-question { --co: var(--rt-callout-question); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-help { --co: var(--rt-callout-help); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-faq { --co: var(--rt-callout-faq); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-warning { --co: var(--rt-callout-warning); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-caution { --co: var(--rt-callout-caution); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-attention { --co: var(--rt-callout-attention); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-failure { --co: var(--rt-callout-failure); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-fail { --co: var(--rt-callout-fail); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-missing { --co: var(--rt-callout-missing); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-danger { --co: var(--rt-callout-danger); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-error { --co: var(--rt-callout-error); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-bug { --co: var(--rt-callout-bug); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-example { --co: var(--rt-callout-example); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-quote { --co: var(--rt-callout-quote); }
+:root[data-look="retroma"] .sun-editor-editable blockquote.__se__callout-cite { --co: var(--rt-callout-cite); }
 :root[data-look="retroma"] .sun-editor-editable.se-theme-canvast blockquote.__se__callout { border: var(--rt-co-ol) solid oklch(from var(--co) l c h / var(--rt-co-op)); border-left-width: var(--rt-co-ol); border-radius: var(--rt-co-r); background: oklch(from var(--co) l c h / 0.12); padding: var(--rt-co-pad); color: var(--rt-para-fg); }
 :root[data-look="retroma"] .sun-editor-editable.se-theme-canvast .__se__callout-mark { color: inherit; font-weight: var(--rt-co-t-w); font-size: var(--rt-co-t-s); }
 :root[data-look="retroma"][data-rt-cotitle="on"] .sun-editor-editable.se-theme-canvast .__se__callout-mark { color: var(--co); }
+/* the title line as v4's: the kind's icon (where it has one), the title in bold; the [!kind] mark itself stays in the text, unseen */
+:root[data-look="retroma"] .sun-editor-editable.se-theme-canvast blockquote.__se__callout > p:first-child::first-line { font-weight: var(--rt-co-t-w); }
+:root[data-look="retroma"]:not([data-rt-retrocallout="on"]) .sun-editor-editable.se-theme-canvast .__se__callout-mark { display: inline-block; width: 0; padding: 0; overflow: hidden; vertical-align: middle; font-size: 0; }
+:root[data-look="retroma"]:not([data-rt-retrocallout="on"]) .sun-editor-editable.se-theme-canvast blockquote:is(.__se__callout-tip, .__se__callout-hint, .__se__callout-important, .__se__callout-warning, .__se__callout-caution, .__se__callout-attention) .__se__callout-mark { width: var(--icon-sm); height: var(--icon-sm); margin-right: var(--s-2); background: currentColor; mask: var(--co-icon) center / contain no-repeat; }
+:root[data-look="retroma"] .sun-editor-editable blockquote:is(.__se__callout-tip, .__se__callout-hint, .__se__callout-important) { --co-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z'/%3E%3C/svg%3E"); }
+:root[data-look="retroma"] .sun-editor-editable blockquote:is(.__se__callout-warning, .__se__callout-caution, .__se__callout-attention) { --co-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'/%3E%3C/svg%3E"); }
 :root[data-look="retroma"][data-rt-retrocallout="on"] .sun-editor-editable.se-theme-canvast blockquote.__se__callout { border-width: max(2px, var(--rt-co-ol)); box-shadow: 4px 4px 0 oklch(from var(--co) l c h / 0.8); }
 :root[data-look="retroma"][data-rt-retrocallout="on"] .sun-editor-editable.se-theme-canvast .__se__callout-mark { display: inline-block; padding: 0 var(--s-4); color: oklch(0.99 0 0); background: oklch(from var(--co) l c h / 0.85); font-family: "Press Start 2P", monospace; font-size: 0.6em; }
 :root[data-look="retroma"] .sun-editor-editable.se-theme-canvast .__se__acb-mark { border-radius: var(--rt-check-r); }
