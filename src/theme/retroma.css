@@ -209,6 +209,7 @@
   box-shadow: var(--rt-ri-l), var(--rt-ri-r);
   --hud-fg: var(--rt-fg); --hud-muted: var(--rt-fg-muted); color: var(--hud-fg);
 }
+:root[data-look="retroma"] #assets-view .viewer { border-radius: 0; } /* (the pane clips it to its own corners) */
 :root[data-look="retroma"] #assets-view.is-viewing .assets-body { border-bottom: var(--rt-ring-o) var(--rt-ring-o-b); border-radius: 0 0 var(--rt-r) var(--rt-r); overflow: hidden; }
 :root[data-look="retroma"] #assets-view .assets-statusbar {
   margin: 0; min-height: var(--rt-status-h);
@@ -241,12 +242,15 @@
 :root[data-look="retroma"][data-rt-part-simple-folder-hdr="true"] .side-head { background: transparent; }
 :root[data-look="retroma"][data-rt-part-simple-folder-hdr="true"] :is(.side-head h2, .side-sec-toggle h2) { text-transform: none; letter-spacing: 0; }
 /* panels on the canvas: header strip, contents on paper, foot strip */
-:root[data-look="retroma"] .layers-panel { overflow: hidden; padding: var(--rt-ring-i-w); }
+:root[data-look="retroma"] .layers-panel { overflow: hidden; padding: var(--rt-ring-i-w); --in-r: calc(var(--rt-r) - var(--rt-ring-o-w) - var(--rt-ring-i-w)); }
+/* (what touches a pane's corners follows its curve: the pane's radius less its border and its padding) */
+:root[data-look="retroma"] .layers-panel > :not([hidden]):first-child { border-top-left-radius: var(--in-r); border-top-right-radius: var(--in-r); }
+:root[data-look="retroma"] .layers-panel > :not([hidden]):last-child, :root[data-look="retroma"] .layers-panel > :not([hidden]):has(+ [hidden]:last-child) { border-bottom-left-radius: var(--in-r); border-bottom-right-radius: var(--in-r); }
 :root[data-look="retroma"] .panel-head {
   padding: calc(var(--rt-pane-in) * 0.6) var(--s-4) calc(var(--rt-pane-in) * 0.6) var(--rt-pane-in);
   background: var(--rt-hdr-bg); color: var(--rt-hdr-fg);
   border-bottom: var(--rt-outline) solid var(--rt-rule);
-  border-radius: var(--rt-r-in) var(--rt-r-in) 0 0; corner-shape: var(--rt-corner-hdr);
+  corner-shape: var(--rt-corner-hdr);
   --hud-fg: var(--rt-fg-on-hdr-app);
 }
 :root[data-look="retroma"] .layers-panel h2:not(:where(.viewer-note *)) { font-weight: 700; color: var(--rt-fg-on-hdr-app); }
@@ -311,7 +315,7 @@
   corner-shape: var(--rt-corner-menu);
   box-shadow: var(--rt-lift);
   --hud-fg: var(--rt-fg); --hud-muted: var(--rt-fg-muted);
-  & button { font-weight: 700; border: var(--rt-outline) solid transparent; border-radius: calc(var(--rt-menu-r) - 3px); column-gap: 10px; }
+  & button { font-weight: 700; border: var(--rt-outline) solid transparent; border-radius: max(0px, calc(var(--rt-menu-r) - var(--rt-menu-ol) - 5px)); column-gap: 10px; }
   & button:is(:hover, :focus-visible):not(:disabled) { background: var(--rt-accent); color: var(--rt-on-accent); border-color: var(--rt-outline-c); --hud-muted: var(--rt-on-accent); & :is(.menu-hint, svg) { color: var(--rt-on-accent); } }
   & .menu-hint { font-weight: 400; color: var(--rt-fg-muted); }
   & button.is-danger:not(:hover) { color: var(--rt-danger); }
@@ -341,8 +345,8 @@
   border-radius: var(--rt-modal-r); corner-shape: var(--rt-modal-corner);
   box-shadow: var(--rt-lift-modal);
   --hud-fg: var(--rt-fg); --hud-muted: var(--rt-fg-muted);
-  & .palette-input { margin: 0 var(--s-4) var(--s-4); padding: var(--s-4) var(--s-6); border: calc(var(--rt-outline) * 2) solid var(--rt-outline-c); border-radius: calc(var(--rt-btn-r) + 2px); font-size: var(--text-lg); }
-  & .palette-list { padding: 0 0 var(--s-2); border-top: var(--rt-outline) solid var(--rt-rule); }
+  & .palette-input { margin: 0 var(--s-4) var(--s-4); padding: var(--s-4) var(--s-6); border: calc(var(--rt-outline) * 2) solid var(--rt-outline-c); border-radius: max(var(--s-1), calc(var(--rt-modal-r) - var(--rt-ring-o-w) - var(--s-4))); font-size: var(--text-lg); }
+  & .palette-list { padding: 0 0 calc(var(--rt-modal-r) - var(--rt-ring-o-w)); border-top: var(--rt-outline) solid var(--rt-rule); }
   & .palette-list li { margin: 0 var(--s-2); padding: var(--s-4) var(--s-6); border-radius: 0; border-bottom: var(--rt-outline) solid var(--rt-rule); }
   & .palette-list li.is-active { background: var(--rt-btn-on); color: var(--rt-fg-on-on-app); --hud-muted: var(--rt-fg-on-on-app); }
   & .palette-title { font-weight: 700; }
@@ -370,7 +374,7 @@
   box-shadow: var(--rt-raise);
   transition: transform var(--rt-press-ms), box-shadow var(--rt-press-ms);
   & :is(.asset-thumb, .asset-info) { transform: translate(var(--rt-cx), var(--rt-cy)); transition: transform var(--rt-press-ms); }
-  & .asset-thumb { inset: 6px 6px var(--cap) 6px; box-sizing: border-box; border: 3px solid var(--rt-card-cover, var(--rt-mat)); outline: var(--rt-img-ol) solid var(--rt-img-ol-c); border-radius: var(--rt-img-r); overflow: hidden; }
+  & .asset-thumb { inset: 6px 6px var(--cap) 6px; box-sizing: border-box; border: 3px solid var(--rt-card-cover, var(--rt-mat)); outline: var(--rt-img-ol) solid var(--rt-img-ol-c); border-radius: min(var(--rt-img-r), max(0px, calc(var(--rt-card-r) - var(--rt-card-ol-w) - 6px))); overflow: hidden; }
   & .asset-info { left: 6px; right: 6px; bottom: 4px; gap: 0; padding: 0; color: var(--rt-fg); background: none; opacity: 1; }
   & .asset-name { font-size: var(--text-sm); font-weight: 700; }
   & .asset-meta { font-size: var(--text-xs); color: var(--rt-fg-muted); }
