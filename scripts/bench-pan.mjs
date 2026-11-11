@@ -29,7 +29,7 @@ await cdp.send("Profiler.enable");
 await cdp.send("Profiler.setSamplingInterval", { interval: 200 });
 
 /** One pan: the pointer dragged across and back for `seconds`, `perFrame` moves each ~16 ms. */
-async function pan(label, perFrame, seconds = 4, fraction = 0) {
+async function pan(label, perFrame, seconds = 4, fraction = 0, input = null) {
   await H(() => {
     // (one counter of frames at a time: the last run's stops)
     window.__panRun = (window.__panRun ?? 0) + 1;
@@ -47,15 +47,16 @@ async function pan(label, perFrame, seconds = 4, fraction = 0) {
   const rendered0 = s0.renderedTotal;
   await cdp.send("Profiler.start");
   await page.mouse.move(720, 450);
-  await page.mouse.down();
   const steps = Math.round(seconds * 60);
-  for (let i = 0; i < steps; i++) {
+  if (input) await input(steps);
+  else await page.mouse.down();
+  for (let i = 0; !input && i < steps; i++) {
     const phase = Math.sin((i / steps) * Math.PI * 2);
     // (fraction: the pointer between whole pixels, as Wayland and scaled screens report it)
     for (let k = 0; k < perFrame; k++) await page.mouse.move(720 + phase * 500 + k + (fraction ? ((i * 7 + k) % 10) * fraction : 0), 450 + Math.cos((i / steps) * Math.PI * 4) * 200 + (fraction ? ((i * 3 + k) % 10) * fraction : 0));
     await page.waitForTimeout(16);
   }
-  await page.mouse.up();
+  if (!input) await page.mouse.up();
   const { profile } = await cdp.send("Profiler.stop");
   const frames = await H(() => window.__panFrames.slice());
   const draws = await H(() => window.__canvastDebug.frameTimes());
@@ -96,6 +97,15 @@ await H(() => window.__canvastDebug.nextFrame());
 await page.waitForTimeout(800);
 console.log(`\n(zoom now ${JSON.stringify(await H(() => window.__canvastDebug.camera()))})`);
 runs.push(await pan("zoom-fraction-60hz", 1), await pan("zoom-fraction-fast-mouse", 4));
+// Zooming with the wheel: in and out over two levels, a notch a frame (slow) and four a frame (a fast wheel or a touchpad).
+const wheel = (perFrame) => async (steps) => {
+  for (let i = 0; i < steps; i++) {
+    const dir = Math.floor((i / steps) * 4) % 2 === 0 ? -1 : 1; // (in, out, in, out)
+    for (let k = 0; k < perFrame; k++) await page.mouse.wheel(0, dir * 40);
+    await page.waitForTimeout(16);
+  }
+};
+runs.push(await pan("wheel-zoom-slow", 1, 4, 0, wheel(1)), await pan("wheel-zoom-fast", 4, 4, 0, wheel(4)));
 const results = { strokes: loaded.objects, generateMs: loaded.generateMs, runs };
 writeFileSync(resolve(out, "results.json"), JSON.stringify(results, null, 2));
 await browser.close();
