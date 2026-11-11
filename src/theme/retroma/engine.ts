@@ -403,6 +403,9 @@ function lighting(T) {
   out["--accent-text"] = css(fix(rc(T.accent.L, T.accent.C, T.accent.h), T.pane, 4.5));
   out["--accent-text-frame"] = css(fix(rc(T.accent.L, T.accent.C, T.accent.h), T.frame, 4.5));
   // (text straight on the frame and on a pressed key, held to the app's 4.5:1 whatever the demo's contrast boost)
+  // (what floats, as Retroma's Obsidian modal, prompt and menus: a ridge in the pane's colour at 0.9 (0.3 in dark), a glow of the accent)
+  out["--float-ol-c"] = css(rc(dark() ? 0.3 : 0.9, T.pane.C, T.pane.h));
+  out["--float-glow-c"] = css(rc(dark() ? 0.75 : 0.25, T.accent.C, T.accent.h));
   out["--fg-on-frame-app"] = css(fix(T.fgOnFrame, T.frame, 4.5));
   out["--muted-on-frame-app"] = css(fix(T.fgOnFrameMuted, T.frame, 4.5));
   out["--fg-on-on-app"] = css(fix(T.fgOnOn, T.btnOn, 4.5));

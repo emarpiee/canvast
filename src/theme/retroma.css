@@ -189,7 +189,11 @@
   box-shadow: var(--rt-ri-t), var(--rt-ri-l), var(--rt-ri-b), var(--rt-ri-r), var(--rt-ri-soft);
   --hud-fg: var(--rt-fg); --hud-muted: var(--rt-fg-muted); color: var(--hud-fg);
 }
-:root[data-look="retroma"] :is(.layers-panel, dialog.confirm) { border-color: var(--rt-ring-i-t) var(--rt-ring-i-r) var(--rt-ring-i-b) var(--rt-ring-i-l); } /* (what floats, a dialog or a docked panel, has the ridge: lit on its top and left) */
+/* what floats (a dialog, a docked panel, the command palette) is framed as Retroma's Obsidian modal and prompt: a wide ridge in the pane's
+   colour at 0.9 (0.3 in dark), twice the inner ring's width */
+:root[data-look="retroma"] { --rt-float-w: calc(var(--rt-ring-i-w) * 2); --rt-float-glow: 0 0 12px 2px oklch(from var(--rt-float-glow-c) l c h / 0.3); }
+:root[data-look="retroma"] :is(.layers-panel, dialog.confirm, .palette) { border: var(--rt-float-w) ridge var(--rt-float-ol-c); box-shadow: none; backdrop-filter: none; }
+:root[data-look="retroma"] :is(dialog.confirm, .palette) { box-shadow: var(--rt-float-glow); } /* (the glow is the modal's and the prompt's; a docked panel sits on the canvas without it) */
 :root[data-look="retroma"][data-rt-simplepanes="on"] :is(.set-card, .layers-panel) { background: transparent; border-color: transparent; box-shadow: none; }
 :root[data-look="retroma"] :is(#assets-view, #settings-view) { background: var(--rt-frame); }
 /* the Library: one pane in three parts (its bar on top, the body, the status bar), each drawing its side of the rings */
@@ -242,7 +246,7 @@
 :root[data-look="retroma"][data-rt-part-simple-folder-hdr="true"] .side-head { background: transparent; }
 :root[data-look="retroma"][data-rt-part-simple-folder-hdr="true"] :is(.side-head h2, .side-sec-toggle h2) { text-transform: none; letter-spacing: 0; }
 /* panels on the canvas: header strip, contents on paper, foot strip */
-:root[data-look="retroma"] .layers-panel { overflow: hidden; padding: var(--rt-ring-i-w); --in-r: calc(var(--rt-r) - var(--rt-ring-o-w) - var(--rt-ring-i-w)); }
+:root[data-look="retroma"] .layers-panel { overflow: hidden; padding: 0; --in-r: calc(var(--rt-r) - var(--rt-float-w)); }
 /* (what touches a pane's corners follows its curve: the pane's radius less its border and its padding) */
 :root[data-look="retroma"] .layers-panel > :not([hidden]):first-child { border-top-left-radius: var(--in-r); border-top-right-radius: var(--in-r); }
 :root[data-look="retroma"] .layers-panel > :not([hidden]):last-child, :root[data-look="retroma"] .layers-panel > :not([hidden]):has(+ [hidden]:last-child) { border-bottom-left-radius: var(--in-r); border-bottom-right-radius: var(--in-r); }
@@ -263,7 +267,6 @@
 :root[data-look="retroma"] dialog.confirm {
   border-radius: var(--rt-modal-r);
   corner-shape: var(--rt-modal-corner);
-  box-shadow: var(--rt-ri-t), var(--rt-ri-l), var(--rt-ri-b), var(--rt-ri-r), var(--rt-ri-soft), var(--rt-lift-modal);
   padding: var(--rt-pane-in);
   & > h2:first-child {
     margin: calc(-1 * var(--rt-pane-in)) calc(-1 * var(--rt-pane-in)) var(--s-6);
@@ -271,13 +274,13 @@
     font-size: var(--text-lg); font-weight: 700;
     background: var(--rt-mhdr-bg); color: var(--rt-mhdr-fg);
     border-bottom: var(--rt-outline) solid var(--rt-rule);
-    border-radius: calc(var(--rt-modal-r) - var(--rt-ring-o-w)) calc(var(--rt-modal-r) - var(--rt-ring-o-w)) 0 0;
+    border-radius: calc(var(--rt-modal-r) - var(--rt-float-w)) calc(var(--rt-modal-r) - var(--rt-float-w)) 0 0;
   }
   & > .confirm-actions:last-child {
     margin: var(--s-6) calc(-1 * var(--rt-pane-in)) calc(-1 * var(--rt-pane-in));
     padding: var(--s-6) var(--rt-pane-in);
     background: var(--rt-pane-alt); border-top: var(--rt-outline) solid var(--rt-rule);
-    border-radius: 0 0 calc(var(--rt-modal-r) - var(--rt-ring-o-w)) calc(var(--rt-modal-r) - var(--rt-ring-o-w));
+    border-radius: 0 0 calc(var(--rt-modal-r) - var(--rt-float-w)) calc(var(--rt-modal-r) - var(--rt-float-w));
   }
 }
 :root[data-look="retroma"] .rt-rows > .adj-group:first-child { border-top: 0; padding-top: 0; }
@@ -340,13 +343,10 @@
 :root[data-look="retroma"] .palette {
   padding: var(--s-4) 0 0;
   background: var(--rt-pane);
-  border: var(--rt-ring-o-w) var(--rt-ring-o-style) transparent;
-  border-color: var(--rt-ring-i-t) var(--rt-ring-i-r) var(--rt-ring-i-b) var(--rt-ring-i-l);
   border-radius: var(--rt-modal-r); corner-shape: var(--rt-modal-corner);
-  box-shadow: var(--rt-lift-modal);
   --hud-fg: var(--rt-fg); --hud-muted: var(--rt-fg-muted);
-  & .palette-input { margin: 0 var(--s-4) var(--s-4); padding: var(--s-4) var(--s-6); border: calc(var(--rt-outline) * 2) solid var(--rt-outline-c); border-radius: max(var(--s-1), calc(var(--rt-modal-r) - var(--rt-ring-o-w) - var(--s-4))); font-size: var(--text-lg); }
-  & .palette-list { padding: 0 0 calc(var(--rt-modal-r) - var(--rt-ring-o-w)); border-top: var(--rt-outline) solid var(--rt-rule); }
+  & .palette-input { margin: 0 var(--s-4) var(--s-4); padding: var(--s-4) var(--s-6); border: calc(var(--rt-outline) * 2) solid var(--rt-outline-c); border-radius: max(var(--s-1), calc(var(--rt-modal-r) - var(--rt-float-w) - var(--s-4))); font-size: var(--text-lg); }
+  & .palette-list { padding: 0 0 calc(var(--rt-modal-r) - var(--rt-float-w)); border-top: var(--rt-outline) solid var(--rt-rule); }
   & .palette-list li { margin: 0 var(--s-2); padding: var(--s-4) var(--s-6); border-radius: 0; border-bottom: var(--rt-outline) solid var(--rt-rule); }
   & .palette-list li.is-active { background: var(--rt-btn-on); color: var(--rt-fg-on-on-app); --hud-muted: var(--rt-fg-on-on-app); }
   & .palette-title { font-weight: 700; }
