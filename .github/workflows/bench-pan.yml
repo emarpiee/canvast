@@ -1,0 +1,34 @@
+# Panning a drawing of many long strokes with real input (scripts/bench-pan.mjs): frames per second, frame and draw times, tiles built, and
+# a CPU profile of where the time goes. Run by hand (Run workflow); the numbers land in the run's log and the profiles in its artifact.
+name: Bench pan
+
+on:
+  workflow_dispatch:
+    inputs:
+      strokes:
+        description: How many hatching strokes
+        default: "900"
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y xvfb
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: xvfb-run -a node scripts/bench-pan.mjs ${{ inputs.strokes }} bench-pan
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-pan
+          path: bench-pan/

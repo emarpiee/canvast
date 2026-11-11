@@ -17,7 +17,9 @@ import { normalizeUnit } from "../doc/edit-ops";
 export type BenchScene =
   | { kind: "dense"; n: number; seed?: number }
   | { kind: "clusters"; n: number; clusters: number; seed?: number }
-  | { kind: "mixed"; n: number; visible: number; seed?: number };
+  | { kind: "mixed"; n: number; visible: number; seed?: number }
+  /** Hatching: `n` long strokes of many points (a drawing's shading), spread over twice the view so a pan keeps finding more. */
+  | { kind: "hatch"; n: number; seed?: number };
 
 const COLORS = ["#1f2329", "#2563eb", "#dc2626", "#16a34a"];
 
@@ -74,9 +76,27 @@ function denseBlock(start: number, n: number, r: () => number, cx: D.Dyadic, cy:
   }
 }
 
+/** A hatching stroke: a zigzag of `k` points across ~`len` units, slightly curved, as a pen draws shading. */
+function hatch(r: () => number, k: number, len: number): number[] {
+  const pts: number[] = [];
+  const turn = (r() - 0.5) * 0.6, amp = 20 + r() * 60;
+  for (let i = 0; i < k; i++) {
+    const t = i / (k - 1);
+    pts.push(t * len + Math.sin(t * 3) * 30 * turn, (i % 2 ? amp : -amp) * (0.6 + 0.4 * Math.sin(t * Math.PI)) + t * len * turn);
+  }
+  return pts;
+}
+
 export function generateBenchScene(scene: BenchScene): { objects: CanvasObject[]; camera: Camera } {
   const r = rng(scene.seed ?? 1);
   const out: CanvasObject[] = [];
+  if (scene.kind === "hatch") {
+    for (let i = 0; i < scene.n; i++) {
+      const x = D.fromNumber(Math.round((r() - 0.5) * 2600)), y = D.fromNumber(Math.round((r() - 0.5) * 1600));
+      out.push(normalizeUnit({ id: benchId(i), kind: "stroke", anchor: { x, y }, unit: 0, z: i, opacity: 1, attachmentTargetId: null, points: hatch(r, 40 + Math.floor(r() * 120), 150 + r() * 450), width: 2 + Math.floor(r() * 3) * 2, color: COLORS[i % 2 ? 0 : 1]! }) as StrokeObject);
+    }
+    return { objects: out, camera: lookAt({ x: D.ZERO, y: D.ZERO }, 0) };
+  }
   if (scene.kind === "dense") {
     denseBlock(0, scene.n, r, D.ZERO, D.ZERO, 0, out);
     return { objects: out, camera: lookAt({ x: D.ZERO, y: D.ZERO }, 0) };
