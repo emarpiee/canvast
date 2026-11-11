@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.56.38 — The note editor stays open through a new version of its file (2026-11-11)
+
+- **Fixed:** an open note could close by itself (or seem not to open) when its file got a new version (its properties written into it after a tag or field change, or saved elsewhere): the Library redrew before the new version was listed and took the note for deleted. It now closes only once the library says the item is gone.
+
 ## 0.56.37 — Smooth panning on big drawings (2026-11-11)
 
 - **Fixed:** panning a canvas with many strokes dropped to 10–20 frames a second: a pan by a fraction of a pixel (the pointer between pixels, as Wayland, scaled screens and touchpads report it) threw away every tile of the view and drew them all again, on every move. The tiles are now kept while the view moves (drawn at the nearest whole pixel) and drawn again exactly once it rests. In the pan benchmark, tiles drawn in 4 seconds of panning fell from 5,742 to 35 and a frame from about 250 ms to 17 ms.

@@ -2636,8 +2636,18 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     renderInspector();
     timed("details", at);
     if (slideHash && !viewer.hidden) {
-      if (!entryOf(slideHash) && !note?.busy) closeSlide(); // the open asset was deleted (a note being saved gets a new hash)
-      else if (viewList().list !== filmOf) renderFilm();
+      if (!entryOf(slideHash) && !note?.busy) {
+        // Not in the listing: closed only once the library says it is gone. A new version of an open note (its properties written into its
+        // file, saved here or elsewhere) may be listed a moment after this redraw: closing on that alone shut the editor under the person.
+        const h = slideHash;
+        void (async () => {
+          await ensure([h]).catch(() => undefined);
+          if (slideHash !== h || viewer.hidden) return;
+          if (entryOf(h)) return renderFilm();
+          const e = await session.catalog?.entry(h).catch(() => undefined);
+          if (slideHash === h && !viewer.hidden && (!e || e.state !== "active")) closeSlide();
+        })();
+      } else if (viewList().list !== filmOf) renderFilm();
     }
     importBtn.disabled = session.readOnly;
   };
