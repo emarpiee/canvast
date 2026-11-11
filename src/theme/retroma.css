@@ -204,6 +204,8 @@
 }
 :root[data-look="retroma"] :is(input, select, textarea):focus-visible { outline: var(--rt-outline) var(--rt-focus-style) var(--rt-focus); outline-offset: 0; } /* (a field in use: one thin line of the focus colour round its outline) */
 :root[data-look="retroma"] :is(input[type="checkbox"], input[type="radio"]) { border-color: var(--rt-outline-c); box-shadow: var(--rt-raise-sm); }
+:root[data-look="retroma"] { --rt-btn-r-sm: calc(var(--rt-btn-r) / 2); } /* (a small control's corner: a key's, for its size, so a checkbox or a slider's thumb looks like a small key, not a dot) */
+:root[data-look="retroma"] input[type="checkbox"] { border-radius: var(--rt-btn-r-sm); }
 :root[data-look="retroma"] :is(input[type="checkbox"], input[type="radio"]):is(:checked, :indeterminate) { box-shadow: var(--rt-sink); }
 :root[data-look="retroma"] :is(input[type="range"], progress) { accent-color: var(--rt-accent); box-shadow: none; background: transparent; border: 0; }
 /* the slider: v4's (the browser's own in Firefox), drawn the same in every browser with fixed greys, so its contrast never follows the accent:
@@ -220,13 +222,13 @@
   }
   /* (the part before the thumb: the thumb's border image, carried out to the left and cut by the slider's own box) */
   &::-webkit-slider-thumb {
-    -webkit-appearance: none; width: var(--rt-range-k); height: var(--rt-range-k); border: 0; border-radius: 50%;
+    -webkit-appearance: none; width: var(--rt-range-k); height: var(--rt-range-k); border: 0; border-radius: var(--rt-btn-r-sm);
     background: var(--rt-range-thumb); box-shadow: inset 0 0 0 2px var(--rt-range-ring);
     border-image: linear-gradient(var(--rt-range-fill-edge) 0 1px, var(--rt-range-fill) 0 calc(100% - 1px), var(--rt-range-fill-edge) 0) fill 0 / calc((var(--rt-range-k) - var(--rt-range-h)) / 2) calc(var(--rt-range-k) - 1px) calc((var(--rt-range-k) - var(--rt-range-h)) / 2) 0 / 0 0 0 100vw;
   }
-  &::-moz-range-track { box-sizing: border-box; height: var(--rt-range-h); background: var(--rt-range-track); border: 1px solid var(--rt-range-edge); border-radius: calc(var(--rt-range-h) / 2); }
-  &::-moz-range-progress { box-sizing: border-box; height: var(--rt-range-h); background: var(--rt-range-fill); border: 1px solid var(--rt-range-fill-edge); border-radius: calc(var(--rt-range-h) / 2); }
-  &::-moz-range-thumb { box-sizing: border-box; width: var(--rt-range-k); height: var(--rt-range-k); background: var(--rt-range-thumb); border: 2px solid var(--rt-range-ring); border-radius: 50%; }
+  &::-moz-range-track { box-sizing: border-box; height: var(--rt-range-h); background: var(--rt-range-track); border: 1px solid var(--rt-range-edge); border-radius: min(var(--rt-btn-r-sm), var(--rt-range-h) / 2); }
+  &::-moz-range-progress { box-sizing: border-box; height: var(--rt-range-h); background: var(--rt-range-fill); border: 1px solid var(--rt-range-fill-edge); border-radius: min(var(--rt-btn-r-sm), var(--rt-range-h) / 2); }
+  &::-moz-range-thumb { box-sizing: border-box; width: var(--rt-range-k); height: var(--rt-range-k); background: var(--rt-range-thumb); border: 2px solid var(--rt-range-ring); border-radius: var(--rt-btn-r-sm); }
 }
 :root[data-look="retroma"] .adj-num { font-family: var(--rt-font-mono); }
 
@@ -289,7 +291,16 @@
   box-shadow: inset 0 var(--rt-ring-o-w) 0 0 var(--rt-ring-o-t), inset var(--rt-ring-o-w) 0 0 0 var(--rt-ring-o-l), inset calc(-1 * var(--rt-ring-o-w)) 0 0 0 var(--rt-ring-o-r), inset 0 calc(-1 * var(--rt-ring-o-w)) 0 0 var(--rt-ring-o-b), var(--rt-ri-soft);
 }
 :root[data-look="retroma"] #assets-view { padding: var(--rt-frame-in); gap: var(--rt-pane-gap); }
-:root[data-look="retroma"] body[data-view="canvas"] { background: var(--rt-frame); --edge: calc(var(--rt-frame-in) + var(--s-4)); }
+:root[data-look="retroma"] body[data-view="canvas"] { background: var(--rt-frame); }
+:root[data-look="retroma"] body:is([data-view="canvas"], [data-view="settings"]) { --edge: calc(var(--rt-frame-in) + var(--s-4)); }
+/* Settings in the same frame, its gap clear as the canvas's: the ring at Pane outer spacing, the page inside the gap */
+:root[data-look="retroma"] #settings-view { padding-inline: var(--rt-frame-in); padding-bottom: var(--rt-frame-in); }
+:root[data-look="retroma"] #settings-view .set-tabs { max-height: 100%; overflow-y: auto; } /* (the list of tabs scrolls inside the frame, as the page beside it) */
+:root[data-look="retroma"] #settings-view::before {
+  content: ""; position: fixed; inset: var(--rt-pane-out); z-index: 1; pointer-events: none;
+  border: var(--rt-ring-o) transparent; border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-ring-o-b) var(--rt-ring-o-l);
+  border-radius: var(--rt-r); corner-shape: var(--rt-corner-pane); box-shadow: var(--rt-ri-t), var(--rt-ri-l), var(--rt-ri-r), var(--rt-ri-b);
+}
 /* (the canvas fills the frame; the gap inside the frame stays as room, with no colour and no ring: the bars and the info bar keep to it) */
 :root[data-look="retroma"] body[data-view="canvas"] .hud-bottom { inset: auto var(--rt-pane-gap) var(--rt-pane-gap); }
 :root[data-look="retroma"] body[data-view="canvas"] .hud-bottom > .hud-readout { border-radius: var(--rt-r-in); corner-shape: var(--rt-corner-pane); }

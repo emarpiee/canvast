@@ -3155,6 +3155,7 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
 .pg-auto[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); border-color: var(--hud-accent); }
 /* Settings: a link to another tab, written in a sentence; a card's title with its Reset. */
 .set-link { padding: 0 var(--s-2); font: inherit; color: var(--hud-accent-text); background: none; border: 1px solid var(--hud-border); border-radius: var(--ctl-r); cursor: pointer; }
+.rt-section, .rt-section > [data-rt-basics] { display: contents; } /* (Retroma's cards are the tab's own, with the same gap between them as every tab's) */
 .set-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-6); }
 .pg-foot { gap: var(--s-4); }
 .pg-seed, .pg-actions { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
