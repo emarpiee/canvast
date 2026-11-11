@@ -25,9 +25,24 @@ export function settingRowHtml(s: Setting, v: SettingValue, extra = "", /** Uniq
   return `<div class="adj-row pg-line" data-k="${s.k}"><span class="adj-label">${esc(s.label)}${extra}</span><div class="pg-colour"><button type="button" class="pg-swatch" data-swatch aria-label="${esc(s.label)} colour"></button><code>${none ? (s.auto ? "auto" : "none") : String(v).toUpperCase()}</code>${s.auto ? `<button type="button" class="pg-auto" data-auto aria-pressed="${none}" title="Worked out by the theme">Auto</button>` : ""}${s.hide ? `<button type="button" class="pg-eye" data-eye aria-pressed="${!none}" aria-label="Show ${esc(s.label)}" title="${none ? "Show" : "Hide"} ${esc(s.label.toLowerCase())}">${none ? ICONS.eyeOff : ICONS.eye}</button>` : ""}</div></div>`;
 }
 
+/**
+ * The same setting as a row of the Settings page (`.set-row`): its name and help on the left, its control at the right edge, where it is kept, and
+ * its own reset. A choice is a dropdown here, so every control stays on one line at the row's height.
+ */
+export function settingPageRowHtml(s: Setting, v: SettingValue, scope: string, idPrefix: string): string {
+  const id = `${idPrefix}${s.k.replace(/[^\w-]/g, "-")}`;
+  const control =
+    s.t === "range" ? `<input type="range" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)}"><input type="number" class="adj-num" id="${id}" min="${s.min}" max="${s.max}" step="${s.step}" value="${v}" aria-label="${esc(s.label)} value">`
+    : s.t === "toggle" ? `<input type="checkbox" id="${id}"${v ? " checked" : ""}>`
+    : s.t === "choice" ? `<select data-choice id="${id}">${s.opts.map(([o, l]) => `<option value="${esc(o)}"${o === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>`
+    : `<button type="button" class="set-colour" id="${id}" data-swatch aria-haspopup="dialog" aria-label="${esc(s.label)} colour"><span class="set-colour-dot" data-dot></span><span class="set-colour-hex" data-hex></span></button>${s.auto ? `<button type="button" class="pg-auto" data-auto aria-pressed="${v === ""}" title="Worked out by the theme">Auto</button>` : ""}`;
+  return `<div class="set-row" data-k="${esc(s.k)}"><div class="set-words"><label class="adj-label" for="${id}"><span class="set-label">${esc(s.label)}</span>${s.tip ? `<span class="set-help">${esc(s.tip)}</span>` : ""}</label></div><div class="set-control">${control}</div><span class="set-scope" title="Where this setting is kept">${esc(scope)}</span><button type="button" class="set-reset" data-row-reset aria-label="Reset ${esc(s.label)} to its default" title="Reset to the default">${ICONS.settingReset}</button></div>`;
+}
+
 /** Makes a row work. `get` reads a value now, `set` changes it; `reset` is its double-click. */
 export function bindSettingRow(r: HTMLElement, s: Setting, get: (k: string) => SettingValue, set: (k: string, v: SettingValue) => void, reset: () => void): void {
-  r.querySelector(".adj-label, .pg-check")?.setAttribute("title", `${s.tip ? `${s.tip} ` : ""}Double-click to reset`);
+  r.querySelector(".adj-label, .pg-check")?.setAttribute("title", `${s.tip && !r.matches(".set-row") ? `${s.tip} ` : ""}Double-click to reset`);
+  r.querySelector("[data-row-reset]")?.addEventListener("click", reset);
   r.addEventListener("dblclick", (e) => {
     const on = e.target as HTMLElement;
     if (on.closest("[data-lock]") || !on.closest(".adj-label, .pg-check, input[type=range]")) return;
@@ -46,12 +61,12 @@ export function bindSettingRow(r: HTMLElement, s: Setting, get: (k: string) => S
     set(s.k, b.dataset["v"]!);
   });
   else {
-    const sw = r.querySelector<HTMLElement>("[data-swatch]")!, code = r.querySelector("code")!;
+    const sw = r.querySelector<HTMLElement>("[data-swatch]")!, dot = r.querySelector<HTMLElement>("[data-dot]") ?? sw, code = r.querySelector("[data-hex], code")!;
     let last = (get(s.k) as string) || s.shown || s.def;
     const paint = (): void => {
       const c = get(s.k) as string;
-      sw.style.background = c || last;
-      sw.classList.toggle("is-none", c === "");
+      dot.style.background = c || last;
+      dot.classList.toggle("is-none", c === "");
       code.textContent = c ? c.toUpperCase() : s.auto ? "auto" : "none";
       r.querySelector("[data-auto]")?.setAttribute("aria-pressed", String(c === ""));
       const eye = r.querySelector<HTMLElement>("[data-eye]");
@@ -83,6 +98,8 @@ export function mountSettings(host: HTMLElement, o: {
   /** After a row is made. */
   bound?(r: HTMLElement, s: Setting): void;
   idPrefix?: string;
+  /** Rows of the Settings page (`settingPageRowHtml`), each group a card, kept where this says ("This device"). */
+  page?: { scope: string };
 }): { build(): void; syncResets(): void } {
   const shown = (s: Setting): boolean => !s.when || s.when.slice(1).includes(o.get(s.when[0]!) as string);
   const items = (sec: Section): readonly Setting[] => sec.items.filter(shown);
@@ -92,9 +109,18 @@ export function mountSettings(host: HTMLElement, o: {
       const b = [...host.querySelectorAll<HTMLButtonElement>("[data-group-reset]")].find((x) => x.dataset["groupReset"] === sec.title);
       if (b) b.disabled = !changed(sec);
     }
+    const all = o.sections().flatMap((x) => x.items);
+    for (const r of host.querySelectorAll<HTMLElement>("[data-k]")) {
+      const s = all.find((x) => x.k === r.dataset["k"]);
+      const b = r.querySelector<HTMLButtonElement>("[data-row-reset]");
+      if (s && b) b.disabled = o.get(s.k) === s.def;
+    }
   };
   const build = (): void => {
-    host.innerHTML = o.sections().map((sec) => `<div class="adj-group">${groupHeadHtml(sec.title, changed(sec))}${items(sec).map((s) => settingRowHtml(s, o.get(s.k), o.extra?.(s) ?? "", o.idPrefix)).join("")}</div>`).join("");
+    const page = o.page;
+    host.innerHTML = o.sections().map((sec) => page
+      ? `<div class="set-card"><h3 class="set-card-head"><span>${esc(sec.title)}</span><button type="button" class="set-reset" data-group-reset="${esc(sec.title)}" aria-label="Reset every ${esc(sec.title)} setting"${changed(sec) ? "" : " disabled"}>Reset</button></h3>${sec.note ? `<p class="set-help">${esc(sec.note)}</p>` : ""}${items(sec).map((s) => settingPageRowHtml(s, o.get(s.k), page.scope, o.idPrefix ?? "set-n-")).join("")}</div>`
+      : `<div class="adj-group">${groupHeadHtml(sec.title, changed(sec))}${items(sec).map((s) => settingRowHtml(s, o.get(s.k), o.extra?.(s) ?? "", o.idPrefix)).join("")}</div>`).join("");
     const all = o.sections().flatMap((x) => x.items);
     for (const r of host.querySelectorAll<HTMLElement>("[data-k]")) {
       const s = all.find((x) => x.k === r.dataset["k"])!;
@@ -107,6 +133,7 @@ export function mountSettings(host: HTMLElement, o: {
         build();
       });
     }
+    if (o.page) syncResets();
   };
   host.addEventListener("click", (e) => {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-group-reset]");

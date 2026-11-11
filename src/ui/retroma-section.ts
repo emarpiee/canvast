@@ -1,8 +1,7 @@
-// Settings › Retroma: the theme's customisation. A Basics card with what most people change; each group of the rest (the demo's full list,
-// ui/retroma-controls.ts) is a row that opens it in a dialog, so the page keeps a fixed size. Every control is a shared row (ui/setting-rows.ts),
-// colours open the app's colour picker. Changes are kept as what differs from Retroma's defaults (settings key retroma.look).
+// Settings › Retroma: the theme's customisation. The Retroma tab holds the Basics (what most people change) and the presets; each category of the
+// rest (the demo's full list, ui/retroma-controls.ts) is a tab of its own under it, its groups as cards. Every control is a row of the Settings page
+// (ui/setting-rows.ts, so Search finds it); colours open the app's colour picker. Changes are kept as what differs from Retroma's defaults (settings key retroma.look).
 import { mountSettings, type SettingValue } from "./setting-rows";
-import { makeModal } from "./modal";
 import { esc } from "./format";
 import { TABS as TABS_ } from "./retroma-controls";
 import { BASE, PRESETS as PRESETS_, accentFromHex, presetSettings } from "../theme/retroma/engine";
@@ -11,7 +10,6 @@ import type { Section, Setting } from "../gen/types";
 import type { SettingsStore } from "../settings/settings";
 import { importRetromaPresets } from "../theme/retroma/import";
 import { confirmDialog } from "./confirm";
-import type { SettingRow } from "./share-panel";
 
 /** Theme presets kept with the workspace (saved styles of the kind "retroma"): listed, saved and added from Retroma's presets file. */
 export interface ThemePresets {
@@ -72,7 +70,34 @@ const find = (k: string): Control | undefined => TABS.flatMap(([, groups]) => gr
 /** What the Basics card holds: the accent, the scheme, the keys' look and light, the font and corners, how the Library shows its items. */
 const BASICS = ["hue", "chroma", "accentL", "scheme", "btn", "@@angle", "corner", "font", "libItems", "paneOut", "paneGap", "cf", "cfDark", "lDark"];
 
-export function mountRetromaSection(host: HTMLElement, settings: SettingsStore, openAppearance: () => void, rowHtml: SettingRow, presets?: ThemePresets): void {
+/** One plain line under each Basics setting: what it changes, in the words of what you see. */
+const BASIC_HELP: Record<string, string> = {
+  preset: "A finished look to start from; changing anything after it makes it your own.",
+  hex: "The colour of pressed keys, selections and links; the other colours are worked out from it.",
+  hue: "The accent's hue, round the colour wheel.",
+  chroma: "How vivid the accent is, from grey to full colour.",
+  accentL: "How light the accent is.",
+  scheme: "How the panes' and tags' colours sit beside the accent on the colour wheel.",
+  btn: "How keys look: lit and shaded, flat with a hard shadow, or flat.",
+  "@@angle": "Where the light comes from, for the keys' shadow and highlight.",
+  corner: "The shape of the corners of keys and panes.",
+  font: "The font of the interface.",
+  libItems: "How the Library shows its items: cards with the name under the picture, or the pictures alone.",
+  paneOut: "The room between the window's edge and the frame.",
+  paneGap: "The room between the frame and the panels inside it (the Library's bars and columns, the canvas's bars).",
+  cf: "How much colour the backgrounds carry in light mode.",
+  cfDark: "How much colour the backgrounds carry in dark mode.",
+  lDark: "How light the backgrounds are in dark mode.",
+};
+const withHelp = (s: Setting): Setting => { const tip = BASIC_HELP[s.k]; return tip ? { ...s, tip } : s; };
+/** Where the Retroma settings are kept (the setting retroma.look). */
+const SCOPE = "This device";
+
+/** Retroma's categories, each a tab of Settings under Retroma (its groups as cards): those with something shown. */
+export const RETROMA_CATEGORIES: ReadonlyArray<{ id: string; label: string }> = TABS.filter(([, groups]) => shownGroups(groups).length).map(([name]) => ({ id: `retroma-${name.toLowerCase().replace(/[^a-z]+/g, "-").replace(/-$/, "")}`, label: name }));
+
+/** `host`: the Retroma tab (Basics and the presets); `catHost(id)`: the tab of each of RETROMA_CATEGORIES. */
+export function mountRetromaSection(host: HTMLElement, catHost: (id: string) => HTMLElement | null, settings: SettingsStore, openAppearance: () => void, presets?: ThemePresets): void {
   let S = retromaSettings(settings.get("retroma.look"));
   const save = (): void => void settings.set("retroma.look", retromaChanges(S));
   const builds: Array<() => void> = [];
@@ -123,15 +148,12 @@ export function mountRetromaSection(host: HTMLElement, settings: SettingsStore, 
   const presetRow = (): Setting => ({ t: "choice", k: "preset", label: "Preset", opts: [["", "Your own"], ...presetNames()], def: "", dropdown: true });
   const accentRow: Setting = { t: "colour", k: "hex", label: "Accent colour", def: "#8a5cf5" };
   host.innerHTML = `
-    <div class="set-card rt-basics"><h3>Basics</h3><p class="set-help">A preset, your accent colour and the look of keys and corners. Light or dark, Density, Zen mode, Animation and the canvas pattern are in <button type="button" class="set-link" data-rt-appearance>Appearance</button>, for every theme.</p><div class="rt-rows" data-rt-basics></div>
-      <div class="storage-actions"><button type="button" data-rt-save>Save as preset…</button><button type="button" data-rt-import>Import Retroma presets…</button><button type="button" data-rt-reset-all data-testid="retroma-reset-all">Reset all of Retroma…</button><input type="file" accept=".json,application/json" hidden data-rt-file></div><p class="set-help" data-rt-note role="status"></p></div>
-    ${TABS.map(([name, groups]) => {
-      const shown = shownGroups(groups);
-      return shown.length ? `<div class="set-card rt-advanced"><h3 class="rt-card-head"><span>${esc(name)} <span class="set-help">Advanced</span></span><button type="button" class="set-reset" data-rt-reset-tab="${esc(name)}" aria-label="Reset every ${esc(name)} setting of Retroma">Reset</button></h3>${shown.map((g) => rowHtml({ label: esc(g.title.replace(/<[^>]*>/g, "")), help: g.note ? esc(g.note) : "", control: `<button type="button" class="rt-open" data-rt-group="${esc(name)}|${esc(g.title)}">Change…</button>` })).join("")}</div>` : "";
-    }).join("")}`;
+    <p class="set-help">The settings most people change. Each part of Retroma has a tab of its own under Retroma (Colour, Buttons, Interface and the rest), and Search finds any of them. Light or dark, Density, Zen mode, Animation and the canvas pattern are in <button type="button" class="set-link" data-rt-appearance>Appearance</button>, for every theme.</p>
+    <div data-rt-basics></div>
+    <div class="set-card"><h3>Presets</h3><div class="storage-actions"><button type="button" data-rt-save>Save as preset…</button><button type="button" data-rt-import>Import Retroma presets…</button><button type="button" data-rt-reset-all data-testid="retroma-reset-all">Reset all of Retroma…</button><input type="file" accept=".json,application/json" hidden data-rt-file></div><p class="set-help" data-rt-note role="status"></p></div>`;
   const basics = mountSettings(host.querySelector<HTMLElement>("[data-rt-basics]")!, {
-    sections: () => [{ title: "Retroma", items: [presetRow(), accentRow, ...BASICS.map((k) => find(k)).flatMap((c) => (c ? [toSetting(c, S)!] : []))] } as Section],
-    get, set, reset, idPrefix: "rt-basic-",
+    sections: () => [{ title: "Basics", items: [presetRow(), accentRow, ...BASICS.map((k) => find(k)).flatMap((c) => (c ? [toSetting(c, S)!] : []))].map(withHelp) } as Section],
+    get, set, reset, idPrefix: "rt-basic-", page: { scope: SCOPE },
   });
   builds.push(() => basics.build());
   basics.build();
@@ -186,34 +208,24 @@ export function mountRetromaSection(host: HTMLElement, settings: SettingsStore, 
     for (const b of builds) b();
     note.textContent = "Retroma is back to its own settings.";
   }));
-  host.addEventListener("click", (e) => {
-    const r = (e.target as HTMLElement).closest<HTMLElement>("[data-rt-reset-tab]");
-    if (r) {
-      const tab = TABS.find(([n]) => n === r.dataset["rtResetTab"]);
-      if (tab) resetGroups(shownGroups(tab[1]));
-      return;
-    }
-    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-rt-group]");
-    if (!b) return;
-    const [tabName, title] = b.dataset["rtGroup"]!.split("|") as [string, string];
-    const group = (TABS.find(([n]) => n === tabName)?.[1] ?? []).find((g) => g.title === title);
-    if (group) openGroup(group);
-  });
-  function openGroup(g: Group): void {
-    const titleId = "rt-dlg-title";
-    const plain = g.title.replace(/<[^>]*>/g, "");
-    const dlg = makeModal({ className: "confirm rt-dialog", testid: "retroma-dialog", titleId, html: `<h2 id="${titleId}">${esc(plain)}</h2>${g.note ? `<p class="set-help">${esc(g.note)}</p>` : ""}<div class="rt-rows" data-rt-rows></div><div class="confirm-actions"><button type="button" class="is-primary" value="done" data-testid="retroma-done">Done</button></div>` });
-    const rows = mountSettings(dlg.querySelector<HTMLElement>("[data-rt-rows]")!, {
-      sections: () => [{ title: plain, items: g.items.flatMap((c) => { const s = toSetting(c, S); return s ? [s] : []; }) } as Section],
-      get, set, reset, idPrefix: "rt-adv-",
+  // each category: its groups as cards of rows; a card's Reset puts its group back in every light mode and state it can point at
+  for (const [name, groups] of TABS) {
+    const cat = RETROMA_CATEGORIES.find((c) => c.label === name);
+    const el = cat && catHost(cat.id);
+    if (!el) continue;
+    const shown = shownGroups(groups);
+    const rows = mountSettings(el, {
+      sections: () => shown.map((g) => ({ title: g.title.replace(/<[^>]*>/g, "").trim(), ...(g.note ? { note: g.note } : {}), items: g.items.flatMap((c) => { const x = toSetting(c, S); return x ? [x] : []; }) })),
+      get, set,
+      reset: (items) => {
+        const g = items.length > 1 ? shown.find((x) => x.items.some((c) => c.k === items[0]!.k)) : undefined;
+        if (g) resetGroups([g]);
+        else reset(items);
+      },
+      idPrefix: `${cat.id}-`, page: { scope: SCOPE },
     });
-    const rebuild = (): void => rows.build();
     rows.build();
-    builds.push(rebuild);
-    const close = (): void => { builds.splice(builds.indexOf(rebuild), 1); dlg.close(); dlg.remove(); };
-    dlg.querySelector("[data-testid=retroma-done]")!.addEventListener("click", close);
-    dlg.addEventListener("cancel", (e) => { e.preventDefault(); close(); });
-    dlg.showModal();
+    builds.push(() => rows.build());
   }
   // (a change made elsewhere, another tab or a reset of the whole setting: read again)
   settings.subscribe((key) => {

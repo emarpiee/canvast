@@ -30,6 +30,8 @@ export type Setting = Base &
 export interface Section {
   readonly title: string;
   readonly items: readonly Setting[];
+  /** A line under the title (the Settings page's cards). */
+  readonly note?: string;
 }
 
 /** One shape a generator makes: sub-paths in the box, a fill and/or an outline (the width is in box units). */

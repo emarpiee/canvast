@@ -87,7 +87,6 @@
   button.assets-btn:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
   button.set-reset:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
   button.set-done:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  button.rt-open:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
   button.set-link:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
   button.nav-crumb:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
   button.vbtn:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
@@ -134,7 +133,7 @@
 /* (a key's face needs a positioned key; given with no weight, so a key placed by its own rule, as the viewer's buttons, stays where it is) */
 :where(:root[data-look="retroma"]) :--key { position: relative; }
 /* a key with words: the demo's room on each side, its icon and words 7px apart */
-:root[data-look="retroma"] :is(.confirm-actions button, .storage-actions button, .action-row button, .ex-foot button, .set-control button:not(.pg-swatch, .set-chip-x, .is-icon), .rt-open, .set-reset, .set-done, .assets-btn:not(.is-icon), .pg-auto) {
+:root[data-look="retroma"] :is(.confirm-actions button, .storage-actions button, .action-row button, .ex-foot button, .set-control button:not(.pg-swatch, .set-chip-x, .is-icon), .set-reset, .set-done, .assets-btn:not(.is-icon), .pg-auto) {
   display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--s-6) / 2);
   box-sizing: border-box; min-height: var(--ctl); padding-block: 0; padding-inline: var(--s-6);
   font-size: var(--text-md); white-space: nowrap;
@@ -347,7 +346,6 @@
     border-radius: 0 0 calc(var(--rt-modal-r) - var(--rt-float-w)) calc(var(--rt-modal-r) - var(--rt-float-w));
   }
 }
-:root[data-look="retroma"] .rt-rows > .adj-group:first-child { border-top: 0; padding-top: 0; }
 /* Settings: the demo's style panel. The tabs are keys on the frame; each card a pane (a bold title, rows with a dashed rule) */
 :root[data-look="retroma"] .set-tabs { padding: 0; gap: var(--s-2); background: transparent; border: 0; box-shadow: none; & button { white-space: nowrap; font-size: var(--text-sm); } }
 :root[data-look="retroma"] :is(.set-tabs-h, .set-panels > section > h2) { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--rt-muted-on-frame-app); }
@@ -356,17 +354,6 @@
 :root[data-look="retroma"] .set-card > :is(h3, h4):first-child { margin: 0 0 var(--s-2); font-size: var(--text-md); font-weight: 700; color: var(--rt-fg); }
 :root[data-look="retroma"] .set-card .set-row { padding-block: calc(var(--s-6) / 2 + var(--s-1)); border-bottom: var(--rt-outline) dashed var(--rt-rule); }
 :root[data-look="retroma"] .set-card .set-row:last-child { border-bottom: 0; }
-/* Retroma's own controls (Settings › Retroma and its dialogs) are the demo's .ctl: the name and the value on one line, the control under them */
-:root[data-look="retroma"] .rt-rows .adj-row {
-  grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--s-1); column-gap: var(--s-4);
-  font-size: var(--text-sm);
-  & > .adj-label { grid-column: 1; font-weight: 700; color: var(--rt-fg-muted); }
-  & > .adj-num { grid-column: 2; grid-row: 1; width: 4.5em; height: auto; padding: 0; text-align: right; color: var(--rt-fg); background: transparent; border: 0; box-shadow: none; }
-  & > input[type="range"] { grid-column: 1 / -1; grid-row: 2; }
-  & > :is(select, .adj-layers, .pg-colour, .seg) { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; }
-  & > :is(.adj-layers, .seg) { justify-self: start; }
-  &:has(> select) { display: grid; & > select { width: 100%; max-width: none; justify-self: stretch; height: var(--ctl); } }
-}
 /* the canvas's info bar is Retroma's strip along the bottom; the Library's status bar keeps its own colours */
 :root[data-look="retroma"] .hud-bottom { background: transparent; }
 :root[data-look="retroma"] .hud-readout { --hud-fg: var(--rt-info-fg); --hud-muted: var(--rt-info-fg); color: var(--rt-info-fg); font-size: var(--text-sm); }

@@ -957,6 +957,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .set-list { margin: 0; padding-left: var(--s-6); display: grid; gap: var(--s-2); font-size: var(--text-sm); }
 .set-control { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); min-width: 0; } /* (every row's controls end at its right edge) */
 .set-control input[type="range"] { flex: 1; min-width: 0; }
+.set-row .set-control > .adj-num { flex: none; width: calc(2 * var(--ctl)); height: var(--ctl); } /* (a number beside its range, on the row's one line) */
 .set-control output { min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; opacity: 0.8; }
 .set-control select { width: 100%; font: inherit; color: inherit; height: var(--ctl); background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-sm); }
 .set-scope { font-size: var(--text-xs); color: var(--hud-muted); }
@@ -2654,6 +2655,10 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 /* ---- Settings: the tabs in groups, and a search across all of them (ADR 0094) ---- */
 .set-tabs-h { padding: var(--s-6) var(--s-6) var(--s-2); color: var(--hud-muted); font: var(--weight-semibold) var(--text-xs)/1.3 var(--font-ui); letter-spacing: 0.04em; text-transform: uppercase; }
 .set-tabs-h:first-child { padding-top: 0; }
+/* a tab under another (Retroma's categories): indented to its parent's words, shown while the parent or one of its own is open, and while searching */
+.set-tabs .set-subtab { display: none; justify-content: flex-start; margin-left: calc(var(--icon-md) + var(--s-4)); }
+.set-subtab > .set-tab-label { flex: 1; text-align: start; }
+.set-tabs[data-open="retroma"] .set-subtab, .set-body.is-searching .set-tabs .set-subtab { display: flex; }
 .set-tabs button { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); }
 .set-hits { min-width: var(--icon-md); padding: 0 var(--s-4); font: var(--weight-semibold) var(--text-xs)/1.6 var(--font-ui); text-align: center; color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: var(--r-pill); }
 .set-hits:empty { display: none; }
@@ -3148,12 +3153,9 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
 /* (a colour the theme works out: Auto, pressed while it is) */
 .pg-auto { height: var(--field-h); padding: 0 var(--s-4); font: var(--font-meta); color: var(--hud-fg); background: none; border: 1px solid var(--hud-border); border-radius: var(--ctl-r); cursor: pointer; }
 .pg-auto[aria-pressed="true"] { color: var(--hud-accent-fg); background: var(--hud-accent); border-color: var(--hud-accent); }
-/* Settings › Retroma: a link to another tab, written in a sentence; the button that opens a group of the theme's settings. */
+/* Settings: a link to another tab, written in a sentence; a card's title with its Reset. */
 .set-link { padding: 0 var(--s-2); font: inherit; color: var(--hud-accent-text); background: none; border: 1px solid var(--hud-border); border-radius: var(--ctl-r); cursor: pointer; }
-.rt-open { height: var(--ctl); box-sizing: border-box; padding: 0 var(--s-6); font: var(--font-control); color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--ctl-r); cursor: pointer; }
-dialog.rt-dialog { box-sizing: border-box; width: min(var(--dlg-m), calc(100vw - 2 * var(--edge))); max-width: none; overflow-x: hidden; }
-.rt-dialog .rt-rows { display: grid; gap: var(--s-4); min-width: 0; max-height: 70vh; overflow-y: auto; overflow-x: hidden; }
-.rt-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-6); }
+.set-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-6); }
 .pg-foot { gap: var(--s-4); }
 .pg-seed, .pg-actions { display: flex; align-items: center; gap: var(--s-4); flex-wrap: wrap; }
 .pg-seed label { display: flex; align-items: center; gap: var(--s-4); color: var(--hud-muted); font: var(--font-meta); }

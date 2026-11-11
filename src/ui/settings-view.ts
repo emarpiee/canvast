@@ -1,4 +1,4 @@
-import { mountRetromaSection, type ThemePresets } from "./retroma-section";
+import { RETROMA_CATEGORIES, mountRetromaSection, type ThemePresets } from "./retroma-section";
 import { NOTE_STYLES } from "../notes/note-file";
 import { mountSharing } from "./share-panel";
 import { listDialog } from "./confirm";
@@ -58,6 +58,8 @@ interface Row {
 interface Tab {
   readonly id: string;
   readonly label: string;
+  /** The panel's heading, when it is not the label (a tab under another: Retroma's categories). */
+  readonly title?: string;
   readonly rows?: readonly Row[];
 }
 
@@ -117,7 +119,7 @@ const TAB_GROUPS: ReadonlyArray<readonly [title: string, ids: readonly string[]]
   ["Working", ["drawing", "navigation", "shortcuts"]],
   ["Library", ["notes", "saving"]],
   ["Media", ["media", "screenshot"]],
-  ["Interface", ["appearance", "retroma", "performance"]],
+  ["Interface", ["appearance", "retroma", ...RETROMA_CATEGORIES.map((c) => c.id), "performance"]],
   ["App", ["storage", "sharing", "privacy", "about", "develop"]],
 ];
 
@@ -307,6 +309,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
     ],
   },
   { id: "retroma", label: "Retroma" },
+  ...RETROMA_CATEGORIES.map((c) => ({ id: c.id, label: c.label, title: `Retroma: ${c.label}` })),
   { id: "shortcuts", label: "Shortcuts" },
   { id: "storage", label: "Storage" },
   ...(desktopBridge()?.share ? [{ id: "sharing", label: "Sharing" }] : []),
@@ -406,7 +409,8 @@ const pwCard = (kind: "hidden" | "workspace", title: string, help: string): stri
              <div class="storage-actions"><button type="button" data-pw="set" data-kind="${kind}" data-testid="${kind}-pw-set">Set a password…</button><button type="button" data-pw="remove" data-kind="${kind}" data-testid="${kind}-pw-remove" hidden>Remove the password…</button>${kind === "hidden" ? `<button type="button" data-pw="lock" data-kind="hidden" data-testid="hidden-pw-lock" title="${esc(LOCK_TIP)}" hidden>Lock now</button><button type="button" data-pw="newkey" data-kind="hidden" data-testid="hidden-pw-newkey" title="${esc(NEW_KEY_TIP)}" hidden>New key…</button>` : ""}</div></div>`;
 
 export function mountSettingsView(root: HTMLElement, settings: SettingsStore, keymap: Keymap, onClose: () => void, backup?: BackupHooks, themePresets?: ThemePresets): { show(tab?: string): void; hide(): void } {
-  const tabButton = (t: Tab): string => `<button type="button" role="tab" id="set-tab-${t.id}" aria-controls="set-panel-${t.id}" data-tab="${t.id}"><span class="set-tab-icon" aria-hidden="true">${ICONS[TAB_ICON[t.id] ?? "tabAbout"]}</span><span class="set-tab-label">${esc(t.label)}</span><span class="set-hits" aria-hidden="true"></span></button>`;
+  // (a tab under another, Retroma's categories: no icon of its own, shown while its parent or one of its own is open, and while searching)
+  const tabButton = (t: Tab): string => t.title ? `<button type="button" role="tab" class="set-subtab" aria-label="${esc(t.title)}" id="set-tab-${t.id}" aria-controls="set-panel-${t.id}" data-tab="${t.id}"><span class="set-tab-label">${esc(t.label)}</span><span class="set-hits" aria-hidden="true"></span></button>` : `<button type="button" role="tab" id="set-tab-${t.id}" aria-controls="set-panel-${t.id}" data-tab="${t.id}"><span class="set-tab-icon" aria-hidden="true">${ICONS[TAB_ICON[t.id] ?? "tabAbout"]}</span><span class="set-tab-label">${esc(t.label)}</span><span class="set-hits" aria-hidden="true"></span></button>`;
   const tabsHtml = TAB_GROUPS.map(
     ([title, ids]) => `<div class="set-tabs-h" role="presentation">${esc(title)}</div>${ids.flatMap((id) => SETTINGS_TABS.filter((t) => t.id === id)).map(tabButton).join("")}`,
   ).join("");
@@ -437,6 +441,8 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
         ? ""
       : t.id === "retroma"
         ? `<div class="rt-section" data-retroma></div>`
+      : t.title
+        ? `<div class="rt-section" data-retroma-cat="${t.id}"></div>`
       : t.id === "shortcuts"
         ? `<div class="set-info set-keys"><p>Every shortcut can be changed, to one key or to several together (Ctrl+Shift+F, Alt+Q). Press <strong>Change</strong>, then the keys you want; <strong>Add</strong> gives the command another key; the <strong>×</strong> takes a key away; Escape cancels. You are warned when a key is already used, or when the browser or the system may take it.</p>
            <p><button type="button" class="set-reset" data-keys-reset-all>Reset every shortcut</button></p>
@@ -485,7 +491,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
              <div class="set-info set-card"><h3>Licences</h3><details><summary>Software this app is built from</summary><pre class="set-licences" data-testid="about-licences">${esc(NOTICES)}</pre></details></div>`
         : `<div class="set-info set-card"><p>canvast works entirely on this device. It makes no network requests: the page is one file and its security policy refuses every connection.</p>
            <p>Nothing you draw, import or write leaves this browser unless you export it yourself.</p></div>`;
-    return `<section role="tabpanel" id="set-panel-${t.id}" aria-labelledby="set-tab-${t.id}" data-panel="${t.id}" hidden><h2>${esc(t.label)}</h2>${body}</section>`;
+    return `<section role="tabpanel" id="set-panel-${t.id}" aria-labelledby="set-tab-${t.id}" data-panel="${t.id}" hidden><h2>${esc(t.title ?? t.label)}</h2>${body}</section>`;
   }).join("");
   root.innerHTML = `<div class="set-head"><h1 class="set-title">Settings</h1>
     <div class="set-searchbox">${ICONS.search}<input type="search" class="set-search" data-testid="settings-search" placeholder="Search settings" aria-label="Search settings" title="Search settings (press / to start)" autocomplete="off" spellcheck="false"><button type="button" class="cs-clear" data-search-clear aria-label="Clear the search" title="Clear the search" hidden>${ICONS.x}</button></div>
@@ -511,6 +517,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
       if (on && focus) t.focus();
     }
     for (const p of panels) p.hidden = p.dataset["panel"] !== id;
+    root.querySelector<HTMLElement>(".set-tabs")!.dataset["open"] = id.startsWith("retroma") ? "retroma" : "";
     cancelCapture();
     if (id === "storage") void storage();
     if (id === "sharing") {
@@ -561,7 +568,8 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     root.querySelector(".set-body")!.classList.toggle("is-searching", words.length > 0);
     let total = 0;
     for (const sec of panels) {
-      const tabLabel = SETTINGS_TABS.find((t) => t.id === sec.dataset["panel"])!.label.toLowerCase();
+      const tab = SETTINGS_TABS.find((t) => t.id === sec.dataset["panel"])!;
+      const tabLabel = (tab.title ?? tab.label).toLowerCase();
       let hits = 0;
       for (const card of sec.querySelectorAll<HTMLElement>(".set-card")) {
         const title = card.querySelector(":scope > h3, :scope > h4")?.textContent?.toLowerCase() ?? "";
@@ -925,7 +933,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     if (key === "dev.tools") root.querySelector<HTMLElement>("[data-dev-note]")!.hidden = false;
   });
   settings.subscribe(refresh);
-  mountRetromaSection(root.querySelector<HTMLElement>("[data-retroma]")!, settings, () => select("appearance", true), plainRowHtml, themePresets);
+  mountRetromaSection(root.querySelector<HTMLElement>("[data-retroma]")!, (id) => root.querySelector<HTMLElement>(`[data-retroma-cat="${id}"]`), settings, () => select("appearance", true), themePresets);
   select(current);
   refresh();
   const tabRow = root.querySelector<HTMLElement>(".set-tabs")!;
