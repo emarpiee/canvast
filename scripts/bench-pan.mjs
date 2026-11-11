@@ -29,7 +29,7 @@ await cdp.send("Profiler.enable");
 await cdp.send("Profiler.setSamplingInterval", { interval: 200 });
 
 /** One pan: the pointer dragged across and back for `seconds`, `perFrame` moves each ~16 ms. */
-async function pan(label, perFrame, seconds = 4) {
+async function pan(label, perFrame, seconds = 4, fraction = 0) {
   await H(() => {
     window.__panFrames = [];
     const tick = (t) => {
@@ -46,7 +46,8 @@ async function pan(label, perFrame, seconds = 4) {
   const steps = Math.round(seconds * 60);
   for (let i = 0; i < steps; i++) {
     const phase = Math.sin((i / steps) * Math.PI * 2);
-    for (let k = 0; k < perFrame; k++) await page.mouse.move(720 + phase * 500 + k, 450 + Math.cos((i / steps) * Math.PI * 4) * 200);
+    // (fraction: the pointer between whole pixels, as Wayland and scaled screens report it)
+    for (let k = 0; k < perFrame; k++) await page.mouse.move(720 + phase * 500 + k + (fraction ? ((i * 7 + k) % 10) * fraction : 0), 450 + Math.cos((i / steps) * Math.PI * 4) * 200 + (fraction ? ((i * 3 + k) % 10) * fraction : 0));
     await page.waitForTimeout(16);
   }
   await page.mouse.up();
@@ -82,7 +83,7 @@ async function pan(label, perFrame, seconds = 4) {
 }
 
 // At a whole zoom level, then at a fraction of one (as after a wheel zoom: 2^-0.3), where a pan is not a whole number of device pixels.
-const runs = [await pan("zoom-whole-60hz", 1), await pan("zoom-whole-fast-mouse", 4)];
+const runs = [await pan("zoom-whole-60hz", 1), await pan("zoom-whole-fast-mouse", 4), await pan("zoom-whole-subpixel-pointer", 1, 4, 0.037)];
 await H(() => window.__canvastDebug.jump(-0.3));
 await H(() => window.__canvastDebug.nextFrame());
 await page.waitForTimeout(800);
