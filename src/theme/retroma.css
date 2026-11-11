@@ -120,7 +120,7 @@
   transform: translate(calc(-1 * var(--k-cx)), calc(-1 * var(--k-cy)));
   transition: transform var(--rt-press-ms), box-shadow var(--rt-press-ms), background-color var(--rt-press-ms), border-color var(--rt-press-ms);
 }
-:root[data-look="retroma"] button:hover:not(:disabled) { --surf: var(--rt-btn-hover); --k-olw: var(--rt-hover-ol); --k-ols: var(--rt-hover-ol-style); --k-ol: var(--rt-outline-hover); }
+:root[data-look="retroma"] button:hover:not(:disabled, [aria-pressed="true"], [aria-checked="true"], [aria-selected="true"]) { /* (a key that is on keeps its pressed look under the pointer) */ --surf: var(--rt-btn-hover); --k-olw: var(--rt-hover-ol); --k-ols: var(--rt-hover-ol-style); --k-ol: var(--rt-outline-hover); }
 :root[data-look="retroma"] button:focus-visible { --k-focus: var(--rt-focus-w) var(--rt-focus-style) var(--rt-focus); }
 :root[data-look="retroma"] button:--on {
   --surf: var(--rt-btn-on); --k-sh: var(--rt-sink); --k-fg: var(--rt-icon-on);
@@ -128,6 +128,7 @@
 }
 :root[data-look="retroma"] button.is-primary { --surf: var(--rt-accent); --k-fg: var(--rt-on-accent); }
 :root[data-look="retroma"] button.is-primary:hover:not(:disabled) { --surf: var(--rt-accent-hover); }
+:root[data-look="retroma"] button:--on:hover { color: var(--k-fg); background: transparent; } /* (Legacy's bars fill a pressed button under the pointer with the accent: a key keeps its own) */
 :root[data-look="retroma"] button.is-primary:--on { --surf: var(--rt-accent); --k-fg: var(--rt-on-accent); } /* (pressed, the call to action stays the accent and sinks, its words on it as at rest: v4's .btn.primary) */
 :root[data-look="retroma"] button.is-danger { --k-fg: var(--rt-danger); }
 /* (a key's face needs a positioned key; given with no weight, so a key placed by its own rule, as the viewer's buttons, stays where it is) */
@@ -249,7 +250,15 @@
 :root[data-look="retroma"] :is(#assets-view, #settings-view) { background: var(--rt-frame); }
 /* the Library: one pane in three parts (its bar on top, the body, the status bar), each drawing its side of the rings */
 :root[data-look="retroma"] { --rt-lib-in: var(--rt-pane-in); }
-:root[data-look="retroma"] #assets-view { padding: var(--rt-pane-out); } /* (round the Library's pane: Pane outer spacing; inside its frame, round what it holds: Pane inner spacing) */ /* (the frame round the Library's pane: Retroma › Pane outer spacing) */
+:root[data-look="retroma"] #assets-view { padding: var(--rt-pane-out); }
+/* the canvas in the same frame (Pane outer spacing round it, the pane's rings at its edge); its bars float inside it */
+:root[data-look="retroma"] body[data-view="canvas"] { background: var(--rt-frame); --edge: calc(var(--rt-pane-out) + var(--rt-ring-o-w) + var(--s-4)); }
+:root[data-look="retroma"] body[data-view="canvas"] #canvas-host {
+  inset: var(--rt-pane-out); overflow: hidden;
+  border: var(--rt-ring-o) transparent; border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-ring-o-b) var(--rt-ring-o-l);
+  border-radius: var(--rt-r); corner-shape: var(--rt-corner-pane);
+}
+:root[data-look="retroma"] body[data-view="canvas"] #canvas-host::after { content: ""; position: absolute; inset: 0; z-index: var(--z-edge); pointer-events: none; border: var(--rt-ring-i-w) var(--rt-ring-i-style) transparent; border-color: var(--rt-ring-i-t) var(--rt-ring-i-r) var(--rt-ring-i-b) var(--rt-ring-i-l); border-radius: calc(var(--rt-r) - var(--rt-ring-o-w)); } /* (round the Library's pane: Pane outer spacing; inside its frame, round what it holds: Pane inner spacing) */ /* (the frame round the Library's pane: Retroma › Pane outer spacing) */
 :root[data-look="retroma"] #assets-view .assets-bar {
   padding-block: calc(var(--pad) + var(--rt-lib-in)) var(--pad); padding-right: calc(var(--s-6) + var(--rt-lib-in));
   background: var(--rt-frame); color: var(--rt-fg-on-frame-app); /* (the Library's top bar and status bar are the frame's colour) */
