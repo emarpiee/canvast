@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.39 — Smooth zooming on big drawings (2026-11-11)
+
+- **Fixed:** zooming a canvas with thousands of objects dropped to about 20 frames a second after the pan fix: a pan or zoom on a heavy canvas could be taken for a rest mid-move, a dense view was judged only by its drawing time, and a zoom past the scaled preview, or a view coming to rest, drew its whole new set of tiles in one long frame. Now the view rests only when it has not moved and no pointer is held, a view of many objects counts as dense, a set is built only once the wheel holds still, and a new set is built a few tiles a frame over the old one drawn scaled. On the *Powers of two* showcase (about 7,000 objects) wheel zooming holds 60 frames a second (frame p95 17 ms, was 33 ms); on a synthetic drawing whose 6,000 strokes all cross every tile, the longest frame fell from 1.8 s to 0.5 s (one tile).
+- **Added:** the *Bench pan* workflow zooms with the wheel too (slow and fast) and can run on the showcase at a bookmark; it counts the tile sets thrown away.
+
 ## 0.56.38 — The note editor stays open through a new version of its file (2026-11-11)
 
 - **Fixed:** an open note could close by itself (or seem not to open) when its file got a new version (its properties written into it after a tag or field change, or saved elsewhere): the Library redrew before the new version was listed and took the note for deleted. It now closes only once the library says the item is gone.
