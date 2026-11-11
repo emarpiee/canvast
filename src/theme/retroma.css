@@ -268,7 +268,10 @@
   box-shadow: inset 0 var(--rt-ring-o-w) 0 0 var(--rt-ring-o-t), inset var(--rt-ring-o-w) 0 0 0 var(--rt-ring-o-l), inset calc(-1 * var(--rt-ring-o-w)) 0 0 0 var(--rt-ring-o-r), inset 0 calc(-1 * var(--rt-ring-o-w)) 0 0 var(--rt-ring-o-b), var(--rt-ri-soft);
 }
 :root[data-look="retroma"] #assets-view { padding: var(--rt-frame-in); gap: var(--rt-pane-gap); }
-:root[data-look="retroma"] body[data-view="canvas"] { background: var(--rt-frame); --edge: calc(var(--rt-pane-out) + var(--rt-ring-o-w) + var(--s-4)); }
+:root[data-look="retroma"] body[data-view="canvas"] { background: var(--rt-frame); --edge: calc(var(--rt-frame-in) + var(--s-4)); }
+/* (the canvas fills the frame; the gap inside the frame stays as room, with no colour and no ring: the bars and the info bar keep to it) */
+:root[data-look="retroma"] body[data-view="canvas"] .hud-bottom { inset: auto var(--rt-pane-gap) var(--rt-pane-gap); }
+:root[data-look="retroma"] body[data-view="canvas"] .hud-bottom > .hud-readout { border-radius: var(--rt-r-in); corner-shape: var(--rt-corner-pane); }
 :root[data-look="retroma"] body[data-view="canvas"] #canvas-host { /* (the canvas sits straight in the frame: no gap, no panel of its own) */
   inset: var(--rt-pane-out); overflow: hidden;
   border: var(--rt-ring-o) transparent; border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-ring-o-b) var(--rt-ring-o-l);
