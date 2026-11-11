@@ -128,6 +128,14 @@ export class TileCache {
   private refineNow = false;
   /** Where the view was (its raw offset from the set) when the rest timer of an inexact pan started: it rests only if it is still there. */
   private restAt: { ax: number; ay: number } | null = null;
+  /** A pointer is held on the canvas (a drag pan): the view is moving whatever the clock says, so it never counts as resting. */
+  holding = false;
+  /**
+   * When the zoom (or frame) last changed, and the time before. Two changes within REFINE_MS are a zoom in progress (a wheel, a pinch):
+   * a set is built for it only once it has held still for REFINE_MS, not between two notches. A single change (a jump) is built at once.
+   */
+  private keyAt = -Infinity;
+  private keyGap = Infinity;
   private gen: Generation | null = null;
   /** Prebuilt sets one zoom level in (+1) and out (-1) from `gen`. */
   private readonly ahead = new Map<number, Generation>();
@@ -228,7 +236,20 @@ export class TileCache {
     const td = TILE_CSS * dpr;
     if (!this.enabled || !Number.isInteger(td) || !Number.isInteger(GUARD_CSS * dpr)) return null;
     const key = `${frameId}|${cam.zi}|${cam.zf}|${dpr}`;
-    const stable = key === this.lastKey || this.refineNow;
+    const now = performance.now();
+    if (key !== this.lastKey) {
+      this.keyGap = now - this.keyAt;
+      this.keyAt = now;
+      // (a frame once the zoom has held still: the set is built then)
+      if (this.refineTimer) clearTimeout(this.refineTimer);
+      this.refineTimer = setTimeout(() => {
+        this.refineTimer = null;
+        this.refineNow = true;
+        this.requestFrame();
+      }, REFINE_MS);
+    }
+    const zooming = this.keyGap < REFINE_MS;
+    const stable = (key === this.lastKey && (!zooming || now - this.keyAt >= REFINE_MS)) || this.refineNow;
     /** The view has rested after a move that was not whole device pixels: now the set is built again exactly. */
     const refine = this.refineNow;
     this.refineNow = false;
@@ -263,7 +284,7 @@ export class TileCache {
     // built again exactly. Throwing the set away on every such move cost a whole set each frame.
     // (resting means not moved since the timer started: a frame slower than the timer, on a heavy canvas, is no rest)
     const moved = !!off && !!this.restAt && (Math.abs(off.ax - this.restAt.ax) > 1e-6 || Math.abs(off.ay - this.restAt.ay) > 1e-6);
-    if (off && !off.whole && (!refine || moved) && this.gen!.tiles.size) {
+    if (off && !off.whole && (!refine || moved || this.holding) && this.gen!.tiles.size) {
       this.restAt = { ax: off.ax, ay: off.ay };
       if (this.refineTimer) clearTimeout(this.refineTimer);
       this.refineTimer = setTimeout(() => {

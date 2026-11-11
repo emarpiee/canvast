@@ -3026,6 +3026,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     if (x >= 0 && y >= 0 && x <= r.width && y <= r.height) editor.pointerAt = { x, y };
   };
   window.addEventListener("pointermove", trackPointer, true);
+  // A pointer held on the canvas (a drag pan): the tiles never take the view for resting while it is (a heavy canvas's slow frame is no rest).
+  canvas.addEventListener("pointerdown", () => void (tiles.holding = true));
+  for (const type of ["pointerup", "pointercancel"]) window.addEventListener(type, (e) => void ((e as PointerEvent).buttons === 0 && (tiles.holding = false)), true);
   window.addEventListener("pointerdown", trackPointer, true);
   /** How long after the paste keys a paste event is waited for before what was copied here is pasted without one (see the keydown below). */
   const PASTE_EVENT_WAIT_MS = 250;
