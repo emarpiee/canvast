@@ -3007,7 +3007,6 @@ dialog.export-dlg.is-busy .ex-foot button { opacity: 0.6; pointer-events: none; 
 /* The name: a pattern of words and tokens, the tokens to insert, and the files it makes. */
 .ex-namerow { align-items: center; }
 .ex-namerow .ex-name { flex: 1; min-width: 0; }
-.ex-tokens { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .ex-names { margin: 0; color: var(--hud-muted); font: var(--font-meta); overflow-wrap: anywhere; }
 /* Several sheets: the dialog takes the height of the window and the pictures take the room of the left half, scrolling when there are more. */
 dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height: calc(100dvh - 2 * var(--edge)); width: min(var(--dlg-3xl), calc(100vw - 2 * var(--edge))); }
@@ -3237,3 +3236,8 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .pop-menu-row > .more-btn { flex: none; opacity: 1; width: var(--row-btn); min-height: 0; height: var(--row-btn); padding: 0; justify-content: center; }
 .pop-menu.is-child { z-index: 61; }
 
+/* A name pattern's parts, in every dialog that writes one (Rename, Export…): the tokens to put in, and the Date row (name-pattern-ui.ts). */
+.np-tokens { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.np-date { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-4); }
+.np-date[hidden], .np-date input[hidden] { display: none; }
+.np-label { color: var(--hud-muted); font: var(--font-meta); }

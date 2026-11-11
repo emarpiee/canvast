@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.56.36 — One name pattern for Rename and Export, with dates (2026-11-11)
+
+- **Added:** dates in names, in the Library's Rename and in Export: `{date}` (2026-11-11) or `{date:FORMAT}` in any arrangement of `YYYY` `YY` `MM` `DD` `HH` `mm` `ss` (`{date:YYYYMMDD}`, `{date:DD.MM.YY}`, `{date:YYYY-MM-DD_HHmm}`). A Date row, shown while the pattern holds a date, chooses *Today*, *This date* (a day you set) or, in Rename, *Date added* (each item's own).
+- **Changed:** Export numbers files as Rename does: `###` is the number with as many digits as `#` (`####` → 0001), from a *Starting with* number; `{n}` still works, as `##`. The built-in name formats use `###`.
+- **Added:** token chips in Rename too (`{name}`, `###`, `{date}`, `{date:YYYYMMDD}`), the same as Export's.
+- **Fixed:** an export preset now keeps the name pattern, the size rule, the extra versions, the first number and the date, as 0.56.33 said it would.
+- **Fixed:** a name holding `#` (as `draft #2`) was numbered again by Rename's `{name}`; what a token puts in is no longer read as part of the pattern.
+
 ## 0.56.35 — Ticking export items with a click, Ctrl and Shift (2026-11-11)
 
 - **Fixed:** an item of an export of several was ticked or unticked only by a click right on its small box; a click anywhere on the item does it now.

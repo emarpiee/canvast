@@ -1092,6 +1092,15 @@ Give a reference a name you will search for.
 
 ![The Rename dialog for the anonymous Botanical Studies drawing, its name ready to change](docs/screenshots/rename.webp)
 
+Numbering several items (*Enumerate*) uses a name pattern, the same as Export's file names:
+
+| Write | It becomes |
+| --- | --- |
+| `#`, `###` | The number, zero-padded to as many digits as `#` (`###` → 001); *starting with* sets the first. No `#`: the number follows a space |
+| `{name}` | The item's old name |
+| `{date}`, `{date:FORMAT}` | A date, 2026-11-11, or in a format of `YYYY` `YY` `MM` `DD` `HH` `mm` `ss`: `{date:YYYYMMDD}` → 20261111, `{date:DD.MM.YY}` → 11.11.26; any other character stays as written |
+| Which date | *Today*, *This date* (a day you set), or *Date added* (each item's own). The Date row shows while the pattern holds a date |
+
 #### Undo in the library
 
 `Ctrl+Z` undoes the last change to tags, favourites, folders or names (`Ctrl+Shift+Z` or `Ctrl+Y` redoes), up to 50 steps; deleting from the library has its own safety (files are kept while undo on a canvas can need them).
@@ -1389,7 +1398,7 @@ Export several pictures at once: leave some out, name the files by a pattern, an
 | What goes | Each item has a tick: click an item anywhere to leave it out (it fades and loses its number) or bring it back; `Ctrl`+click (`⌘` on a Mac) several, `Shift`+click to set a whole run like the last one clicked, or use *All* and *None*. `Space` on an item ticks or unticks it, `Delete` leaves it out. Reorder them with the arrows or by dragging |
 | Output | For several items: *Separate files* (one ZIP), *PDF pages* (one PDF, a page for each, in the order shown) or *One picture* (all of them together) |
 | Size of each | For several items: *Same width*, *Same height*, *Longest side*, or *Scale* (1× to 4× each one's size on the canvas, so big things stay bigger) |
-| Names | A pattern of words and tokens: `{name}` (without its file's extension; click an item's name to give it another), `{n}` (01, 02 …), `{w}` and `{h}` (pixels), `{canvas}`, `{date}`, `{format}`. The files it makes are listed under it before you export; two alike get `-2`. The ZIP or PDF has its own name |
+| Names | A name pattern, the same as the Library's Rename: `###` (the number, as many digits as `#`, from *Starting with*; `{n}` is `##`), `{name}` (without its file's extension; click an item's name to give it another), `{date}` or `{date:YYYYMMDD}` (today or a day you set, see [Rename](#rename)), and Export's own `{w}` `{h}` (pixels), `{canvas}`, `{format}`. The files it makes are listed under it before you export; two alike get `-2`. The ZIP or PDF has its own name |
 | Name formats | *Formats…* beside the name: built-in patterns, yours, and *Save it as a name format…*. They are saved styles, managed in the Styles panel, and go with the workspace's backups. Settings > Saving to the library sets the pattern and the size rule a new export starts with |
 | Also | Extra versions of each file: *@2x* and *@3x* (twice and three times as big, named `…@2x.png`), and *SVG* beside each picture when it is vectors |
 | Vectors | Plain shapes are true vectors in PDF and SVG; masks are SVG masks; picture and pattern fills are embedded pictures clipped to the shape |

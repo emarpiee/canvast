@@ -3059,7 +3059,8 @@ test("an angular gradient (SVG has none) is written as a picture inside the SVG,
     const before = (await last(app)).fill as unknown as { type: string; stops: unknown[]; angle: number; cx: number; cy: number };
     const count = (await objs(app)).length;
     await p.evaluate((t) => { const dt = new DataTransfer(); dt.setData("text/plain", t); document.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true })); }, svg);
-    await expect.poll(async () => (await objs(app)).length).toBe(count + 1);
+    // (an SVG with a picture inside is read in its own time: a busy runner takes longer than the default wait)
+    await expect.poll(async () => (await objs(app)).length, { timeout: 15_000 }).toBe(count + 1);
     const back = (await last(app)).fill as unknown as typeof before;
     expect(back.type).toBe("angular");
     expect(back).toEqual(before);

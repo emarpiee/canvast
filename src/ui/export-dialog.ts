@@ -25,7 +25,9 @@ import type { Action, ExportPreset, Format, PadUnit, Prefs } from "../app/export
 export { cleanExportPreset, exportPresetSummary };
 export type { ExportPreset };
 import { ICONS } from "./icons";
-import { BUILT_IN_PATTERNS, DEFAULT_PATTERN, NAME_TOKENS, SIZE_RULES, VARIANTS, cleanSizeRule, nameFrom, sizeByRule, today, uniqueNames, variantName, variantScale, withoutExtension } from "../app/export-names";
+import { BUILT_IN_PATTERNS, DEFAULT_PATTERN, EXPORT_TOKENS, SIZE_RULES, VARIANTS, cleanSizeRule, nameFrom, sizeByRule, uniqueNames, variantName, variantScale, withoutExtension } from "../app/export-names";
+import { dateOf } from "../doc/name-pattern";
+import { dateRowHtml, patternChipsHtml, wireDateRow, wirePatternChips, type DateChoice } from "./name-pattern-ui";
 import type { SizeRule, Variant } from "../app/export-names";
 
 export interface ExportDeps {
@@ -166,6 +168,8 @@ function openDialog(deps: ExportDeps, again = false): void {
   const out = new Set<ExportTarget>();
   /** A name typed for one thing ({name} in the pattern), by what was picked. */
   const own = new Map<ExportTarget, string>();
+  /** What {date} is in the names: today or a day set; kept in the choices. */
+  const dateChoice: DateChoice = { source: prefs.dateSource === "fixed" ? "fixed" : "today", fixed: prefs.fixedDate };
   /** Times its size on the canvas, for the Scale rule. */
   let scaleV = 1;
   /** Several things, shown as one picture: the way back to each on its own is in the Output choice. */
@@ -260,7 +264,9 @@ function openDialog(deps: ExportDeps, again = false): void {
             <label class="ex-field ex-name"><span data-ex-namelabel>Name</span> <input type="text" data-ex="name" spellcheck="false" autocomplete="off" maxlength="120" aria-label="File name: words and tokens"><span data-ex-ext class="ex-ext"></span></label>
             <select data-ex="namefmt" aria-label="Name formats: built-in and saved, or save this one" title="Name formats"></select>
           </div>
-          <div class="ex-tokens" role="group" aria-label="Insert a token" data-ex-tokens>${NAME_TOKENS.map(([tok, what]) => `<button type="button" class="tag-chip is-suggest ex-token" data-token="${tok}" title="${esc(what)}">${tok}</button>`).join("")}</div>
+          ${patternChipsHtml(EXPORT_TOKENS)}
+          <div class="ex-row" data-ex-startrow><label class="ex-field">Starting with <input type="number" data-ex="start" min="0" max="1000000000" step="1" value="${prefs.start}" aria-label="The first number (#)"></label></div>
+          ${dateRowHtml(dateChoice)}
           <p class="ex-names" data-ex-names data-testid="export-names" aria-live="polite"></p>
           <label class="ex-field ex-name" data-ex-packrow hidden><span data-ex-packlabel>ZIP name</span> <input type="text" data-ex="pack" spellcheck="false" autocomplete="off" maxlength="120" aria-label="Name of the ZIP or PDF"><span data-ex-packext class="ex-ext"></span></label>
           <div class="ex-row" data-ex-varrow><span class="ex-label" id="ex-var-l">Also</span><div class="seg" role="group" aria-labelledby="ex-var-l" data-ex-variants>${VARIANTS.filter(([v]) => v !== "svg" || allVectors).map(([v, label, tip]) => `<button type="button" role="checkbox" data-variant="${v}" aria-checked="${prefs.variants.includes(v)}" title="${esc(tip)}">${label}</button>`).join("")}</div></div>
@@ -326,16 +332,21 @@ function openDialog(deps: ExportDeps, again = false): void {
   const ext = (): string => (prefs.format === "svg" ? "svg" : prefs.format === "pdf" ? "pdf" : SHOT_FORMATS[prefs.format].ext);
 
   const packIn = q<HTMLInputElement>('[data-ex="pack"]');
+  const showDate = wireDateRow(dlg, dateChoice, () => {
+    prefs.dateSource = dateChoice.source === "fixed" ? "fixed" : "today";
+    prefs.fixedDate = dateChoice.fixed;
+    refreshName();
+  });
   /** Several things leave as files of their own (in a ZIP), not as the pages of one PDF. */
   const asFiles = (): boolean => multi && prefs.format !== "pdf";
   /** The name of each file (without its extension) for the things ticked, by the pattern; never two alike. */
   const stems = (): Map<number, string> => {
     const list = multi ? chosen() : [0];
     const canvas = deps.canvasName?.() ?? "canvas";
-    const date = today();
+    const date = dateOf(dateChoice.source, dateChoice.fixed);
     const raw0 = list.map((i, k) => {
       const z = sizeOf(i);
-      return nameFrom(prefs.pattern || DEFAULT_PATTERN, { name: multi ? itemName(i) : own.get(raw[0]!) ?? t.name, n: k + 1, count: list.length, w: z.w, h: z.h, canvas, format: ext(), date });
+      return nameFrom(prefs.pattern || DEFAULT_PATTERN, { name: multi ? itemName(i) : own.get(raw[0]!) ?? t.name, n: prefs.start + k, w: z.w, h: z.h, canvas, format: ext(), date });
     });
     const unique = uniqueNames(raw0);
     return new Map(list.map((i, k) => [i, unique[k]!]));
@@ -366,7 +377,9 @@ function openDialog(deps: ExportDeps, again = false): void {
     // (the name pattern names the files inside; a PDF of several is one file, named by its own field)
     const patternShown = !(multi && !asFiles());
     q<HTMLElement>(".ex-namerow").hidden = !patternShown;
-    q<HTMLElement>("[data-ex-tokens]").hidden = !patternShown;
+    q<HTMLElement>("[data-np-tokens]").hidden = !patternShown;
+    q<HTMLElement>("[data-ex-startrow]").hidden = !patternShown || !/#|\{n\}/.test(prefs.pattern || DEFAULT_PATTERN);
+    showDate(patternShown ? prefs.pattern || DEFAULT_PATTERN : "");
     const shownNames = names.slice(0, 3).map(esc).join(", ");
     q("[data-ex-names]").innerHTML = names.length ? `${pack ? `In <b>${esc(packName())}.${packExt}</b>: ` : ""}${shownNames}${names.length > 3 ? ` and ${names.length - 3} more` : ""}` : "Nothing is ticked.";
     q<HTMLElement>("[data-ex-varrow]").hidden = prefs.format === "pdf";
@@ -690,7 +703,7 @@ function openDialog(deps: ExportDeps, again = false): void {
   // Presets: the saved choices of a kind of export (saved styles of the kind "export", in the workspace), and saving these.
   const presetSel = dlg.querySelector<HTMLSelectElement>('[data-ex="preset"]');
   let presetId: string | null = null;
-  const current = (): ExportPreset => ({ format: prefs.format, quality: prefs.quality, bg: prefs.bg, unit: prefs.unit, dpi: prefs.dpi, pad: prefs.pad, padUnit: prefs.padUnit, size: scaleK !== null ? { k: scaleK } : multi ? null : { w: widthPx } });
+  const current = (): ExportPreset => ({ format: prefs.format, quality: prefs.quality, bg: prefs.bg, unit: prefs.unit, dpi: prefs.dpi, pad: prefs.pad, padUnit: prefs.padUnit, size: scaleK !== null ? { k: scaleK } : multi ? null : { w: widthPx }, ...(prefs.pattern ? { pattern: prefs.pattern } : {}), sizeRule: prefs.sizeRule, variants: prefs.variants, start: prefs.start, dateSource: prefs.dateSource, fixedDate: prefs.fixedDate });
   const showPresets = (): void => {
     if (!presetSel || !deps.presets) return;
     const list = deps.presets.list();
@@ -710,6 +723,18 @@ function openDialog(deps: ExportDeps, again = false): void {
     prefs.pad = p.pad;
     prefs.padUnit = p.padUnit;
     padIn.value = String(p.pad);
+    // (the names, the size of each and the extra versions; a preset saved before them leaves them as they are)
+    if (p.pattern !== undefined) prefs.pattern = p.pattern;
+    if (p.sizeRule) prefs.sizeRule = p.sizeRule;
+    if (p.variants) prefs.variants = [...p.variants];
+    if (p.start !== undefined) startIn.value = String((prefs.start = p.start));
+    if (p.dateSource) {
+      prefs.dateSource = dateChoice.source = p.dateSource;
+      prefs.fixedDate = dateChoice.fixed = p.fixedDate ?? "";
+      const day = dlg.querySelector<HTMLInputElement>("[data-np-day]");
+      if (day) day.value = dateChoice.fixed;
+    }
+    nameIn.value = prefs.pattern || DEFAULT_PATTERN;
     scaleK = null;
     if (p.size && "k" in p.size && onScreen) {
       scaleK = p.size.k;
@@ -750,15 +775,12 @@ function openDialog(deps: ExportDeps, again = false): void {
     packTouched = true;
     refreshName();
   });
-  // Tokens go in where the cursor is.
-  q("[data-ex-tokens]").addEventListener("click", (e) => {
-    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-token]");
-    if (!b) return;
-    const at = nameIn.selectionStart ?? nameIn.value.length, to = nameIn.selectionEnd ?? at;
-    nameIn.value = nameIn.value.slice(0, at) + b.dataset["token"]! + nameIn.value.slice(to);
-    nameIn.focus();
-    nameIn.setSelectionRange(at + b.dataset["token"]!.length, at + b.dataset["token"]!.length);
-    nameIn.dispatchEvent(new Event("input"));
+  wirePatternChips(dlg, nameIn);
+  const startIn = q<HTMLInputElement>('[data-ex="start"]');
+  startIn.addEventListener("input", () => {
+    const v = Math.floor(Number(startIn.value));
+    prefs.start = Number.isFinite(v) && v >= 0 ? Math.min(1e9, v) : 1;
+    refreshName();
   });
   // Name formats: the built-in ones, those saved (styles of the workspace), and saving this one.
   const fmtSel = q<HTMLSelectElement>('[data-ex="namefmt"]');

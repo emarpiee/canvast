@@ -1,25 +1,22 @@
 /**
- * The names and sizes of exported files, as plain functions (the Export dialog, presets and tests use them): a name pattern with tokens
- * ({name} {n} {w} {h} {canvas} {date} {format}), the files' names made from it (cleaned by the shared file-name rules, never two alike),
- * the size of each of several things by a rule (the same width, the same height, the same longest side, or a scale of its size on the
- * canvas), and the extra versions of each file (2×, 3×, SVG) with their suffixes.
+ * The names and sizes of exported files, as plain functions (the Export dialog, presets and tests use them): file names from a name pattern
+ * (`doc/name-pattern.ts`, the same rule as the Library's Rename) with Export's own tokens ({w} {h} {canvas} {format}), cleaned by the shared
+ * file-name rules and never two alike; the size of each of several things by a rule; and the extra versions of each file (2×, 3×, SVG).
  */
-import { cleanName } from "../doc/file-names";
+import { cleanName, freeNameIn } from "../doc/file-names";
+import { fillPattern } from "../doc/name-pattern";
 
-/** The tokens a name pattern can hold, each with what it stands for (the Export dialog lists them). */
-export const NAME_TOKENS: ReadonlyArray<readonly [token: string, what: string]> = [
-  ["{name}", "its name"],
-  ["{n}", "its number, 01, 02 …"],
-  ["{w}", "width in px"],
-  ["{h}", "height in px"],
-  ["{canvas}", "the canvas"],
-  ["{date}", "today, 2026-11-11"],
-  ["{format}", "png, pdf …"],
+/** Export's own tokens, beside the shared ones of every name pattern. */
+export const EXPORT_TOKENS: ReadonlyArray<{ token: string; what: string }> = [
+  { token: "{w}", what: "its width in px" },
+  { token: "{h}", what: "its height in px" },
+  { token: "{canvas}", what: "the canvas's name" },
+  { token: "{format}", what: "png, pdf …" },
 ];
 /** What a name pattern is when none is chosen. */
 export const DEFAULT_PATTERN = "{name}";
 /** Name patterns offered before any is saved. */
-export const BUILT_IN_PATTERNS: readonly string[] = ["{name}", "{n}-{name}", "{name}-{w}x{h}", "{canvas}-{n}", "{name}-{date}"];
+export const BUILT_IN_PATTERNS: readonly string[] = ["{name}", "###-{name}", "{name}-{w}x{h}", "{canvas}-###", "{name}-{date:YYYYMMDD}"];
 export const MAX_PATTERN = 120;
 
 /** A name pattern from stored data (a saved style of the kind "exportname", a setting), or null. */
@@ -32,44 +29,29 @@ export function cleanNamePattern(d: unknown): { pattern: string } | null {
 
 export interface NameParts {
   readonly name: string;
-  /** Its place among the files, from 1. */
+  /** Its number (`#`): its place among the files plus the first number, less one. */
   readonly n: number;
-  /** How many files there are (the number gets as many digits as the count). */
-  readonly count: number;
   readonly w: number;
   readonly h: number;
   readonly canvas: string;
   readonly format: string;
-  /** Today, as YYYY-MM-DD (given, so a test can fix it). */
-  readonly date: string;
+  /** What `{date}` is. */
+  readonly date: Date;
 }
 
 /** A name without the extension of the file it came from ("pumpkin.svg" → "pumpkin"), so {name} never carries two extensions. */
 export const withoutExtension = (name: string): string => name.replace(/\.[a-z0-9]{1,5}$/i, "") || name;
 
-/** Today as YYYY-MM-DD, on this device's calendar. */
-export const today = (d = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-
-/** The pattern with its tokens filled in and made a valid file name by the shared rules (no extension); an empty result falls back to the item's name. */
+/** The pattern filled in and made a valid file name by the shared rules (no extension); an empty result falls back to the item's name. */
 export function nameFrom(pattern: string, p: NameParts): string {
-  const digits = Math.max(2, String(p.count).length);
-  const filled = (pattern || DEFAULT_PATTERN).replace(/\{(name|n|w|h|canvas|date|format)\}/g, (_m, k: string) =>
-    k === "name" ? withoutExtension(p.name) : k === "n" ? String(p.n).padStart(digits, "0") : k === "w" ? String(p.w) : k === "h" ? String(p.h) : k === "canvas" ? p.canvas : k === "date" ? p.date : p.format,
-  );
-  return cleanName(filled, "kept", cleanName(p.name, "kept", "export"));
+  const filled = fillPattern(pattern || DEFAULT_PATTERN, { name: withoutExtension(p.name), number: p.n, date: p.date, values: { w: String(p.w), h: String(p.h), canvas: p.canvas, format: p.format } });
+  return cleanName(filled, "kept", cleanName(withoutExtension(p.name), "kept", "export"));
 }
 
 /** These file names made all different, case aside (a second "skull.png" becomes "skull-2.png"), in the order given. */
 export function uniqueNames(names: readonly string[]): string[] {
   const taken = new Set<string>();
-  return names.map((full) => {
-    const dot = full.lastIndexOf(".");
-    const [stem, ext] = dot > 0 ? [full.slice(0, dot), full.slice(dot)] : [full, ""];
-    let out = full;
-    for (let k = 2; taken.has(out.toLowerCase()); k++) out = `${stem}-${k}${ext}`;
-    taken.add(out.toLowerCase());
-    return out;
-  });
+  return names.map((n) => freeNameIn(taken, n));
 }
 
 /** How each of several things is sized: all as wide, as tall, the same longest side, or a scale of its size on the canvas. */

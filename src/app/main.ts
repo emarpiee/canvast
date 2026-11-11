@@ -1053,7 +1053,10 @@ async function start(): Promise<void> {
   const renamePictures = async (): Promise<void> => {
     const pics = selectedPictures();
     const hashes = [...new Set(pics.map((o) => o.assetId))];
-    const items = (await Promise.all(hashes.map(async (h) => ({ id: h, name: (await session.catalog?.entry(h).catch(() => undefined))?.name ?? "" })))).filter((i) => i.name);
+    const items = (await Promise.all(hashes.map(async (h) => {
+      const en = await session.catalog?.entry(h).catch(() => undefined);
+      return { id: h, name: en?.name ?? "", ...(en ? { date: en.importedAt } : {}) };
+    }))).filter((i) => i.name);
     if (!items.length) return;
     const result = await openBatchRename(items, { noun: items.length === 1 ? "item" : "items" });
     if (!result) return;

@@ -7,6 +7,7 @@ import type { ShotFormat } from "./screenshot";
 import { DPIS, MAX_SIDE, UNITS } from "./export-size";
 import { cleanNamePattern, cleanSizeRule, cleanVariants } from "./export-names";
 import type { SizeRule, Variant } from "./export-names";
+import { parseDay, type DateSource } from "../doc/name-pattern";
 import type { Unit } from "./export-size";
 
 export type Format = ShotFormat | "svg" | "pdf";
@@ -29,8 +30,13 @@ export interface Prefs {
   sizeRule: SizeRule;
   /** Extra versions of each file (2×, 3×, SVG). */
   variants: Variant[];
+  /** The first number (`#`) of the files' names. */
+  start: number;
+  /** What `{date}` is: today or a day set (YYYY-MM-DD). */
+  dateSource: DateSource;
+  fixedDate: string;
 }
-export const DEFAULTS: Prefs = { unit: "px", dpi: 300, format: "png", quality: 92, bg: "transparent", pad: 0, padUnit: "px", action: "download", pattern: "", sizeRule: "width", variants: [] };
+export const DEFAULTS: Prefs = { unit: "px", dpi: 300, format: "png", quality: 92, bg: "transparent", pad: 0, padUnit: "px", action: "download", pattern: "", sizeRule: "width", variants: [], start: 1, dateSource: "today", fixedDate: "" };
 export const HEX = /^#[0-9a-f]{6}$/i;
 export const cleanBg = (v: unknown): Background => (v === "white" || v === "black" || v === "transparent" ? v : typeof v === "string" && HEX.test(v) ? (v.toLowerCase() as Background) : DEFAULTS.bg);
 
@@ -49,6 +55,9 @@ export function loadPrefsFrom(raw: Partial<Record<keyof Prefs, unknown>>): Prefs
       pattern: cleanNamePattern(raw.pattern)?.pattern ?? "",
       sizeRule: cleanSizeRule(raw.sizeRule),
       variants: cleanVariants(raw.variants),
+      start: Number.isInteger(Number(raw.start)) && Number(raw.start) >= 0 && Number(raw.start) <= 1e9 ? Number(raw.start) : 1,
+      dateSource: raw.dateSource === "fixed" && typeof raw.fixedDate === "string" && parseDay(raw.fixedDate) ? "fixed" : "today",
+      fixedDate: typeof raw.fixedDate === "string" && parseDay(raw.fixedDate) ? raw.fixedDate : "",
     };
   }
 }
@@ -67,6 +76,9 @@ export interface ExportPreset {
   readonly pattern?: string;
   readonly sizeRule?: SizeRule;
   readonly variants?: readonly Variant[];
+  readonly start?: number;
+  readonly dateSource?: DateSource;
+  readonly fixedDate?: string;
 }
 /** An export preset from stored data, or null. */
 export function cleanExportPreset(d: unknown): ExportPreset | null {
@@ -75,7 +87,7 @@ export function cleanExportPreset(d: unknown): ExportPreset | null {
   const p = loadPrefsFrom(r);
   const z = r.size as { w?: unknown; k?: unknown } | null | undefined;
   const size = z && Number(z.k) > 0 && Number(z.k) <= 16 ? { k: Number(z.k) } : z && Number(z.w) >= 1 && Number(z.w) <= MAX_SIDE ? { w: Math.round(Number(z.w)) } : null;
-  return { format: p.format, quality: p.quality, bg: p.bg, unit: p.unit, dpi: p.dpi, pad: p.pad, padUnit: p.padUnit, size, ...(p.pattern ? { pattern: p.pattern } : {}), ...(p.sizeRule !== "width" ? { sizeRule: p.sizeRule } : {}), ...(p.variants.length ? { variants: p.variants } : {}) };
+  return { format: p.format, quality: p.quality, bg: p.bg, unit: p.unit, dpi: p.dpi, pad: p.pad, padUnit: p.padUnit, size, ...(p.pattern ? { pattern: p.pattern } : {}), ...(p.sizeRule !== "width" ? { sizeRule: p.sizeRule } : {}), ...(p.variants.length ? { variants: p.variants } : {}), ...(p.start !== 1 ? { start: p.start } : {}), ...(p.dateSource === "fixed" ? { dateSource: "fixed" as const, fixedDate: p.fixedDate } : {}) };
 }
 /** One line about a preset. */
 export const exportPresetSummary = (p: ExportPreset): string =>

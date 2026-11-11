@@ -3,6 +3,7 @@ import { scrubNumbers } from "../colour-picker/scrub";
 import { MAX_NAME, applyRule, ruleProblem, splitName } from "../doc/rename-rules";
 import type { RenameMode, RenameRule } from "../doc/rename-rules";
 import { esc } from "./format";
+import { dateRowHtml, patternChipsHtml, wireDateRow, wirePatternChips, type DateChoice } from "./name-pattern-ui";
 
 /**
  * The rename dialog (ADR 0085), for one thing or many, in the manner of a file manager's batch rename: *How to rename* (enumerate,
@@ -13,6 +14,8 @@ import { esc } from "./format";
 export interface RenameItem {
   id: string;
   name: string;
+  /** Its own date (ms; a library item's date added), for `{date}` as each one's own. */
+  date?: number;
 }
 
 export interface RenameOptions {
@@ -30,6 +33,8 @@ const MODES: ReadonlyArray<[RenameMode, string]> = [
 ];
 
 let lastMode: RenameMode = "enumerate";
+/** Which date `{date}` is, kept from one rename to the next. */
+const lastDate: DateChoice = { source: "today", fixed: "" };
 
 /** Resolves with the items whose name changed (id and new name), or null when cancelled or nothing changed. */
 export function openBatchRename(items: readonly RenameItem[], opts: RenameOptions = {}): Promise<RenameItem[] | null> {
@@ -55,7 +60,9 @@ export function openBatchRename(items: readonly RenameItem[], opts: RenameOption
              <select id="rn-mode" data-rn="mode">${modes.map(([m, l]) => `<option value="${m}">${esc(l)}</option>`).join("")}</select></div>
            <div class="rn-fields" data-for="enumerate">
              <label class="rn-field"><span>Rename the ${items.length} selected ${esc(noun)} to</span><input type="text" class="rn-input" data-rn="pattern" value="New name #" aria-label="Name pattern" maxlength="${MAX_NAME}" autocomplete="off" spellcheck="false"></label>
+             ${patternChipsHtml()}
              <label class="rn-inline"><span># is replaced by ascending numbers, starting with</span><input type="number" class="rn-num" data-rn="start" value="1" min="0" step="1" aria-label="First number"></label>
+             ${dateRowHtml(lastDate, items.some((i) => i.date !== undefined) ? "Date added" : undefined)}
            </div>
            <div class="rn-fields" data-for="replace" hidden>
              <label class="rn-field"><span>Replace</span><input type="text" class="rn-input" data-rn="find" aria-label="Text to find" autocomplete="off" spellcheck="false"></label>
@@ -91,7 +98,7 @@ export function openBatchRename(items: readonly RenameItem[], opts: RenameOption
   const rule = (): RenameRule => {
     const mode = (modeSel?.value ?? "enumerate") as RenameMode;
     const keepExt = ext ? field("keep").checked : false;
-    if (mode === "enumerate") return { mode, pattern: field("pattern").value, start: Math.floor(Number(field("start").value)), keepExt };
+    if (mode === "enumerate") return { mode, pattern: field("pattern").value, start: Math.floor(Number(field("start").value)), keepExt, dateSource: lastDate.source, fixedDate: lastDate.fixed };
     if (mode === "replace") return { mode, find: field("find").value, with: field("with").value, matchCase: field("case").checked, regex: field("regex").checked, keepExt };
     if (mode === "add") return { mode, text: field("text").value, where: (dlg.querySelector<HTMLInputElement>('[data-rn="where"]:checked')?.value ?? "after") as "before" | "after", keepExt };
     return { mode: "extension", ext: field("ext").value };
@@ -101,9 +108,12 @@ export function openBatchRename(items: readonly RenameItem[], opts: RenameOption
       const v = field("one").value.trim();
       return [v ? (whole ? v : v + one0.ext) : items[0]!.name];
     }
-    return applyRule(items.map((i) => i.name), rule());
+    return applyRule(items.map((i) => i.name), rule(), items.map((i) => i.date ?? Number.NaN));
   };
+  const showDate = one ? () => undefined : wireDateRow(dlg, lastDate, () => refresh());
+  if (!one) wirePatternChips(dlg, field("pattern"));
   const refresh = (): void => {
+    if (!one) showDate(field("pattern").value);
     if (modeSel) {
       for (const f of dlg.querySelectorAll<HTMLElement>(".rn-fields")) f.hidden = f.dataset["for"] !== modeSel.value;
       const keep = dlg.querySelector<HTMLElement>(".rn-keep");

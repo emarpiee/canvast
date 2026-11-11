@@ -4727,7 +4727,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (session.readOnly) return;
     const items = hashes.flatMap((h) => {
       const en = entryOf(h);
-      return en ? [{ id: h, name: en.name }] : [];
+      return en ? [{ id: h, name: en.name, date: en.importedAt }] : [];
     });
     if (!items.length) return;
     const result = await openBatchRename(items, { noun: items.length === 1 ? "item" : "items" });

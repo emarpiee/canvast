@@ -124,6 +124,8 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 
 - **Icons (`src/ui/icons.ts`, registry in `docs/reference/icons.md`).** Every icon button must use an icon no other *different* function uses, and the icon must make sense for what the button does (not a stand-in picked because it was free). Buttons with the same function (all "close", all "delete", all "More") share one icon. Before adding an icon button, check the registry and `src/ui/icons.ts` for the icon you want, and add a row when you add one. Don't reuse an icon from another function even if it is close (a pencil is the Pen tool, so Rename uses a text cursor).
 
+- **Name patterns.** Anything that names things in a series (the Library's Rename, Export's file names, and whatever comes next) fills its pattern with `fillPattern` of `src/doc/name-pattern.ts` (`#` runs, `{name}`, `{date:FORMAT}`, the caller's own tokens) and shows its token chips and Date row with `src/ui/name-pattern-ui.ts`. Never parse a pattern or format a date for a name anywhere else; a new token is a `values` entry of the caller, a new shared one goes in `PATTERN_TOKENS`.
+
 - **File and folder names (ADR 0180).** Every rule is in `src/doc/file-names.ts`: call it, never write a regex of your own (`npm run check:name-rules`). A newer rule never renames a file already on a disk.
 
 ## Standalone tools

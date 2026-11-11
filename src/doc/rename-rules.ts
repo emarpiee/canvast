@@ -3,10 +3,16 @@
  * layers, bookmarks or boards later) through the dialog in `ui/batch-rename.ts`.
  */
 import { MAX_NAME, cleanItemName, splitName } from "./file-names";
+import { dateOf, fillPattern, hasNumber } from "./name-pattern";
+import type { DateSource } from "./name-pattern";
 
 export type RenameRule =
-  /** `#` is replaced by ascending numbers from `start`; a run of `#` is zero-padded to its length; no `#`: the number follows a space. `{name}` is the old name. */
-  | { mode: "enumerate"; pattern: string; start: number; keepExt: boolean }
+  /**
+   * A name pattern (`doc/name-pattern.ts`): `#` is replaced by ascending numbers from `start`, a run of `#` zero-padded to its length (no `#`:
+   * the number follows a space); `{name}` is the old name; `{date}` or `{date:YYYYMMDD}` a date, today, the day set (YYYY-MM-DD) or each
+   * thing's own (its date added).
+   */
+  | { mode: "enumerate"; pattern: string; start: number; keepExt: boolean; dateSource?: DateSource; fixedDate?: string }
   | { mode: "replace"; find: string; with: string; matchCase: boolean; regex: boolean; keepExt: boolean }
   | { mode: "add"; text: string; where: "before" | "after"; keepExt: boolean }
   /** Set the extension (without the dot); empty removes it. */
@@ -33,8 +39,11 @@ export function ruleProblem(rule: RenameRule): string | null {
   return null;
 }
 
-/** The new names, in the order given (the numbers of an enumeration follow that order). A name the rule would empty keeps its old name. */
-export function applyRule(names: readonly string[], rule: RenameRule): string[] {
+/**
+ * The new names, in the order given (the numbers of an enumeration follow that order). A name the rule would empty keeps its old name.
+ * `dates`: each name's own date (ms), for `{date}` as each thing's own.
+ */
+export function applyRule(names: readonly string[], rule: RenameRule, dates?: readonly number[]): string[] {
   if (ruleProblem(rule)) return [...names];
   return names.map((old, i) => {
     const { stem, ext } = splitName(old);
@@ -45,8 +54,8 @@ export function applyRule(names: readonly string[], rule: RenameRule): string[] 
     switch (rule.mode) {
       case "enumerate": {
         const n = rule.start + i;
-        const base = rule.pattern.replace(/\{name\}/g, body);
-        next = /#/.test(base) ? base.replace(/#+/g, (run) => String(n).padStart(run.length, "0")) : `${base} ${n}`;
+        const filled = fillPattern(rule.pattern, { name: body, number: n, date: dateOf(rule.dateSource ?? "today", rule.fixedDate ?? "", dates?.[i]) });
+        next = hasNumber(rule.pattern) ? filled : `${filled} ${n}`;
         break;
       }
       case "replace": {

@@ -1,12 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { cleanNamePattern, nameFrom, sizeByRule, uniqueNames, variantName } from "../../src/app/export-names";
 
-const parts = { name: "pumpkin", n: 3, count: 12, w: 1080, h: 720, canvas: "Halloween set", format: "png", date: "2026-11-11" };
+const parts = { name: "pumpkin", n: 3, w: 1080, h: 720, canvas: "Halloween set", format: "png", date: new Date(2026, 10, 11) };
 
 describe("export names", () => {
-  it("fills every token, numbers padded to the count, and cleans what a file cannot hold", () => {
-    expect(nameFrom("{n}-{name}-{w}x{h}", parts)).toBe("03-pumpkin-1080x720");
-    expect(nameFrom("{canvas} {date} {format}", parts)).toBe("Halloween set 2026-11-11 png");
+  it("fills the shared tokens and its own, and cleans what a file cannot hold", () => {
+    expect(nameFrom("###-{name}-{w}x{h}", parts)).toBe("003-pumpkin-1080x720");
+    expect(nameFrom("{n}-{name}", parts), "{n} is ##, as saved formats wrote it").toBe("03-pumpkin");
+    expect(nameFrom("{canvas} {date:YYYYMMDD} {format}", parts)).toBe("Halloween set 20261111 png");
     expect(nameFrom("{name}: final?", parts)).not.toMatch(/[:?]/);
     expect(nameFrom("", parts)).toBe("pumpkin");
     expect(nameFrom("{name}", { ...parts, name: "pumpkin.svg" }), "no second extension").toBe("pumpkin");

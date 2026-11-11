@@ -16,6 +16,9 @@ describe("batch rename rules (ADR 0085)", () => {
     expect(applyRule(["x.png"], { mode: "enumerate", pattern: "New name", start: 1, keepExt: true })).toEqual(["New name 1.png"]); // no #: the number follows
     expect(applyRule(["x.png"], { mode: "enumerate", pattern: "{name}_#", start: 1, keepExt: true })).toEqual(["x_1.png"]);
     expect(applyRule(["x.png"], { mode: "enumerate", pattern: "n#", start: 1, keepExt: false })).toEqual(["n1"]); // the extension is part of what is replaced
+    // a date as the pattern says: the day set, or each one's own (its date added)
+    expect(applyRule(["x.png"], { mode: "enumerate", pattern: "{date:YYYYMMDD}-##", start: 1, keepExt: true, dateSource: "fixed", fixedDate: "2025-03-09" })).toEqual(["20250309-01.png"]);
+    expect(applyRule(["a.png", "b.png"], { mode: "enumerate", pattern: "{date:DD.MM}_{name}", start: 1, keepExt: true, dateSource: "own" }, [new Date(2026, 0, 2).getTime(), new Date(2026, 4, 6).getTime()])).toEqual(["02.01_a 1.png", "06.05_b 2.png"]);
   });
   it("replace text: plain or regular expression, with or without case", () => {
     expect(applyRule(names, { mode: "replace", find: "PHOTO", with: "pic", matchCase: false, regex: false, keepExt: true })[2]).toBe("My pic.JPG");

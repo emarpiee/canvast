@@ -252,6 +252,14 @@ test("rename assets: one (a new name, even a new extension) and many (enumerate,
   await expect(preview.locator("li")).toHaveCount(3); // every name is listed, whole
   await expect(preview).toContainText("Item 05");
   await expect(p.locator(".rn-h")).toContainText("all 3 change");
+  // a date from its chip, set to one day (the Date row shows only while the pattern holds a date), then back to the numbers alone
+  await dialog.locator('[data-token="{date:YYYYMMDD}"]').click();
+  await dialog.locator('[data-np-date="fixed"]').click();
+  await dialog.locator("[data-np-day]").fill("2025-03-09");
+  await expect(preview).toContainText("Item 0520250309");
+  await expect(dialog.locator('[data-np-date="own"]'), "each one's own: its date added").toBeVisible();
+  await p.getByLabel("Name pattern").fill("Item ##");
+  await expect(dialog.locator("[data-np-daterow]")).toBeHidden();
   await p.getByTestId("rename-ok").click();
   await expect.poll(async () => (await names()).every((n) => n.startsWith("Item 0"))).toBe(true);
   const after = await names();
