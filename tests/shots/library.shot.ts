@@ -212,6 +212,24 @@ test("rename", async ({ scene: s }) => {
   await s.shot("rename");
 });
 
+test("rename-many", async ({ scene: s }) => {
+  await s.look({ theme: "light", hue: 30 });
+  const c = await collection(s);
+  const fs = artFiles("degas");
+  await c.card(fs[0]!).click();
+  for (const f of fs.slice(1)) await c.card(f).click({ modifiers: ["Control"] });
+  await s.p.getByTestId("bulk-rename").click();
+  // (the studies of one life class: numbered, with the day they were drawn)
+  const dlg = s.p.getByTestId("rename-dialog");
+  await dlg.locator('[data-rn="mode"]').selectOption("enumerate");
+  await dlg.locator('[data-rn="pattern"]').fill("dancers-{date:YYYYMMDD}-###");
+  await dlg.locator('[data-np-date="fixed"]').click();
+  await dlg.locator("[data-np-day]").fill("2026-11-02");
+  await expect(s.p.getByTestId("rename-preview")).toContainText("dancers-20261102-001");
+  await s.settle();
+  await s.shot("rename-many", await s.around({ els: ['[data-testid="rename-dialog"]'], pad: 0 }));
+});
+
 test("thumbnail", async ({ scene: s }) => {
   await s.look({ theme: "light", hue: 300 });
   const c = await collection(s);

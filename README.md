@@ -1101,6 +1101,10 @@ Numbering several items (*Enumerate*) uses a name pattern, the same as Export's 
 | `{date}`, `{date:FORMAT}` | A date, 2026-11-11, or in a format of `YYYY` `YY` `MM` `DD` `HH` `mm` `ss`: `{date:YYYYMMDD}` → 20261111, `{date:DD.MM.YY}` → 11.11.26; any other character stays as written |
 | Which date | *Today*, *This date* (a day you set), or *Date added* (each item's own). The Date row shows while the pattern holds a date |
 
+Number the studies of one life class with the day they were drawn:
+
+![Rename 4 items for four Degas dancer drawings: Enumerate with the pattern dancers-{date:YYYYMMDD}-###, the token chips, the Date row set to This date, 2 November 2026, and the preview from dancers-20261102-001](docs/screenshots/rename-many.webp)
+
 #### Undo in the library
 
 `Ctrl+Z` undoes the last change to tags, favourites, folders or names (`Ctrl+Shift+Z` or `Ctrl+Y` redoes), up to 50 steps; deleting from the library has its own safety (files are kept while undo on a canvas can need them).
@@ -1383,7 +1387,7 @@ Export a comic page at print size, as PNG, WebP, JPEG or PDF.
 
 Export several pictures at once: leave some out, name the files by a pattern, and add a 2× copy of each.
 
-![Export with four prints selected: three ticked and one left out (faded), the file names made from the pattern {n}-{name} listed under it with their @2x copies, and the Output choice of separate files, PDF pages or one picture](docs/screenshots/export-each.webp)
+![Export with four prints selected: three ticked and one left out (faded), the file names made from the pattern ###-{name} (001-, 002-…) listed under it with their @2x copies, and the Output choice of separate files, PDF pages or one picture](docs/screenshots/export-each.webp)
 
 | Choice | What it does |
 | --- | --- |

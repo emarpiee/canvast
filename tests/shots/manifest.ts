@@ -94,7 +94,7 @@ export const SHOTS: Record<string, ShotSpec> = {
   "take-over": { section: "#several-tabs", use: "A second tab on the same workspace follows the first and can take over.", alt: "A second tab on the same canvas, read-only, offering Take over" },
   // Exporting and sharing
   "export": { section: "#export", use: "Export a comic page at print size, as PNG, WebP, JPEG or PDF.", alt: "The Export dialog for a page of four prints: its preview, the size presets in pixels and inches at 300 ppi, the formats and the background" },
-  "export-each": { section: "#export", use: "Export several pictures at once: leave some out, name the files by a pattern, and add a 2× copy of each.", alt: "Export with four prints selected: three ticked and one left out (faded), the file names made from the pattern {n}-{name} listed under it with their @2x copies, and the Output choice of separate files, PDF pages or one picture" },
+  "export-each": { section: "#export", use: "Export several pictures at once: leave some out, name the files by a pattern, and add a 2× copy of each.", alt: "Export with four prints selected: three ticked and one left out (faded), the file names made from the pattern ###-{name} (001-, 002-…) listed under it with their @2x copies, and the Output choice of separate files, PDF pages or one picture" },
 
   // PDFs, 3D models and backups
   "pdf-view": { section: "#pdfs-and-3d-models", use: "Read a study handout beside your pictures, without another app.", alt: "A PDF handout, Reading a woodblock print, open in the Library's PDF view: its first page, the page box, and its thumbnails" },
@@ -104,6 +104,7 @@ export const SHOTS: Record<string, ShotSpec> = {
   // The Library, details
   "properties": { section: "#properties", use: "Catalogue a reference with what the museum says of it: artist, date, medium, source.", alt: "Hokusai's Great Wave selected, its details listing the properties artist Katsushika Hokusai, date ca. 1830–32, medium Woodblock print and source The Met Open Access" },
   "rename": { section: "#rename", use: "Give a reference a name you will search for.", alt: "The Rename dialog for the anonymous Botanical Studies drawing, its name ready to change" },
+  "rename-many": { section: "#rename", use: "Number the studies of one life class with the day they were drawn.", alt: "Rename 4 items for four Degas dancer drawings: Enumerate with the pattern dancers-{date:YYYYMMDD}-###, the token chips, the Date row set to This date, 2 November 2026, and the preview from dancers-20261102-001" },
   "thumbnail": { section: "#custom-thumbnail", use: "Choose the picture a card shows: a detail that tells two studies apart.", alt: "The thumbnail choice for de Gheyn's two studies of a saddled horse: upload a picture, choose one from the library, or keep the original" },
   "take-out": { section: "#taking-files-out", use: "Take a reference out of the app: download it or export it.", alt: "The right-click menu of Van Gogh's Wheat Field with Cypresses in the Library: its download, export and other commands" },
 
