@@ -4,7 +4,7 @@
 
 Everything since 0.56.0, in one release (0.56.1 to 0.56.40).
 
-- **Added:** the pan and zoom standard: a *Pan and zoom* workflow pans and wheel-zooms the *Powers of two* showcase (about 7,000 objects) with real input on every push and pull request, held to a fixed budget (`scripts/lib/pan-zoom-budget.mjs`); `npm run release` needs it passed on the commit.
+- **Added:** the pan and zoom standard: a *Pan and zoom* workflow pans and wheel-zooms the *Powers of two* showcase (about 7,000 objects) with real input on every push and pull request, held to a fixed budget (`scripts/lib/pan-zoom-budget.mjs`); `npm run release` needs it passed on the commit. Its first run caught a slip of 0.56.40 (a view judged light built a set between wheel notches only to throw it away: 984 tiles in a slow wheel zoom); a run of zoom changes waits for the zoom to hold still on every view again.
 - **Added:** auto layout on sheets (`Shift+A`): a row, a column, a wrap or a grid, with gap, padding, alignment and packing; a sheet hugs its contents or keeps its size, and things on it can fill the room or stay out of the layout.
 - **Added:** Export of several items chooses what goes without leaving the dialog (a click, `Ctrl`+click, `Shift`+click, *All*, *None*), names the files by a pattern with their list shown first, saves name formats as styles, sizes each by a rule (same width, height, longest side or a scale), adds `@2x`/`@3x` copies and SVGs, and sends them as separate files, PDF pages or one picture.
 - **Added:** one name pattern for Export and the Library's Rename: `###` numbers with as many digits as `#`, `{name}`, `{date}` and `{date:FORMAT}` (today, a day you set, or each item's date added), with token chips in both.

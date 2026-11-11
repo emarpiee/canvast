@@ -911,7 +911,11 @@ test("Settings > Notes: Save notes on close saves without asking; a note's forma
   await p.getByTestId("assets-import-input").setInputFiles([{ name: "keep.md", mimeType: "text/markdown", buffer: Buffer.from("# Keep\n\nWords.\n") }, { name: "rich.md", mimeType: "text/markdown", buffer: Buffer.from("# Rich\n\nWords.\n") }]);
   const names = () => p.evaluate(() => window.__canvastDebug.assetListing().then((l) => l.entries.map((e) => e.name).sort()));
   const edit = async (name: string): Promise<void> => {
-    await p.locator(`[data-testid="asset-card"][title="${name}"]`).dblclick();
+    // (a save just before redraws the cards: a double-click on one being replaced opens nothing, so it is tried again)
+    await expect(async () => {
+      await p.locator(`[data-testid="asset-card"][title="${name}"]`).dblclick();
+      await expect(page(p).locator("h1")).toBeVisible({ timeout: 3000 });
+    }).toPass();
     await page(p).locator("h1").click();
     await p.keyboard.press("End");
     await p.keyboard.type("!");

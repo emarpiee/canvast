@@ -7,7 +7,8 @@ The whole end-to-end suite with the full stress loops (`Tests` workflow, `suite:
 | Result | **Passed**: 1,621 tests passed, 51 skipped (by project), 0 flaky, 0 failed |
 | Wall time | 21 min 51 s (04:54:35 to 05:16:26 UTC), the longest job `desktop` |
 | Jobs | 37: 9 groups × 4 browser projects (`chromium`, `chromium-cpu`, `chromium-dpr2`, `firefox`), plus `desktop` |
-| Before it | the same suite on 0.56.39 failed in `tiles.spec` (light views waited for the zoom to hold still, so tiles came 150 ms later than the specs expect; fixed: the wait is for heavy views only) and once in `vectors.spec` (a race in the bar alignment check; it polls now) |
+| Before it | the same suite on 0.56.39 failed in `tiles.spec` (light views waited for the zoom to hold still, so tiles came 150 ms later than the specs expect; the specs expected tiles two frames after a jump; they now wait for tiles) and once in `vectors.spec` (a race in the bar alignment check; it polls now) |
+| After it | the first `Pan and zoom` run found that limiting that wait to heavy views made wheel zooms build and throw away sets (984 tiles); the wait applies to every view again, the tile specs wait for tiles, and a quick suite ran on that commit |
 
 ## Jobs (minutes)
 
