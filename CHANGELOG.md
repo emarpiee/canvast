@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.56.35 — Ticking export items with a click, Ctrl and Shift (2026-11-11)
+
+- **Fixed:** an item of an export of several was ticked or unticked only by a click right on its small box; a click anywhere on the item does it now.
+- **Added:** `Ctrl`+click (`⌘` on a Mac) ticks or unticks several items one by one, and `Shift`+click sets a whole run of items like the last one clicked.
+- **Changed:** the README's two Export pictures show the dialog as it is now.
+
 ## 0.56.34 — Export names without a second extension (2026-11-11)
 
 - **Fixed:** `{name}` kept the extension of a picture's own file, so an export of `pumpkin.svg` was named `pumpkin.svg.png` (and a ZIP `pumpkin.svg-and-2-more`); it now drops it.

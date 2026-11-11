@@ -308,7 +308,7 @@ function openDialog(deps: ExportDeps, again = false): void {
       thumbs = [...dlg.querySelectorAll<HTMLCanvasElement>("[data-ex-thumb]")];
       return;
     }
-    box.innerHTML = ts.map((x, i) => `<figure class="ex-mini${out.has(raw[i]!) ? " is-out" : ""}" data-mini="${i}" tabindex="0" draggable="true" title="Drag to change its place; Space includes or leaves it out"><div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(x.ratio, 0.2), 5)}"><canvas class="ex-thumb" data-ex-thumb aria-label="Preview of ${esc(itemName(i))}"></canvas><b class="ex-page" data-ex-page></b><input type="checkbox" class="ex-tick" data-tick${out.has(raw[i]!) ? "" : " checked"} aria-label="Include ${esc(itemName(i))}"></div><figcaption><button type="button" class="ex-move" data-move="-1" aria-label="Move ${esc(itemName(i))} earlier" ${i === 0 ? "disabled" : ""}>${ICONS.chevronLeft}</button><button type="button" class="ex-caption" data-rename title="Rename this file: ${esc(itemName(i))}">${esc(itemName(i))}</button><button type="button" class="ex-move" data-move="1" aria-label="Move ${esc(itemName(i))} later" ${i === ts.length - 1 ? "disabled" : ""}>${ICONS.chevronRight}</button></figcaption></figure>`).join("");
+    box.innerHTML = ts.map((x, i) => `<figure class="ex-mini${out.has(raw[i]!) ? " is-out" : ""}" data-mini="${i}" tabindex="0" draggable="true" title="Click to include it or leave it out (Ctrl+click several, Shift+click a run); drag to change its place"><div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(x.ratio, 0.2), 5)}"><canvas class="ex-thumb" data-ex-thumb aria-label="Preview of ${esc(itemName(i))}"></canvas><b class="ex-page" data-ex-page></b><input type="checkbox" class="ex-tick" data-tick tabindex="-1"${out.has(raw[i]!) ? "" : " checked"} aria-label="Include ${esc(itemName(i))}"></div><figcaption><button type="button" class="ex-move" data-move="-1" aria-label="Move ${esc(itemName(i))} earlier" ${i === 0 ? "disabled" : ""}>${ICONS.chevronLeft}</button><button type="button" class="ex-caption" data-rename title="Rename this file: ${esc(itemName(i))}">${esc(itemName(i))}</button><button type="button" class="ex-move" data-move="1" aria-label="Move ${esc(itemName(i))} later" ${i === ts.length - 1 ? "disabled" : ""}>${ICONS.chevronRight}</button></figcaption></figure>`).join("");
     renumber();
     thumbs = [...box.querySelectorAll<HTMLCanvasElement>("[data-ex-thumb]")];
   };
@@ -826,11 +826,25 @@ function openDialog(deps: ExportDeps, again = false): void {
     renumber();
     refresh();
   };
-  dlg.querySelector("[data-ex-minis]")?.addEventListener("change", (e) => {
-    const box = (e.target as HTMLElement).closest<HTMLInputElement>("[data-tick]");
-    const i = Number(box?.closest<HTMLElement>("[data-mini]")?.dataset["mini"]);
-    if (!box || !Number.isInteger(i)) return;
-    setOut(i, !box.checked);
+  // A click anywhere on a picture ticks or unticks it (Ctrl or ⌘ as well, for one more); Shift+click sets every picture from the last one
+  // clicked to this one as the last one is now. The arrows, the name and dragging keep their own jobs.
+  let anchor = -1;
+  const minisBox = dlg.querySelector<HTMLElement>("[data-ex-minis]");
+  minisBox?.addEventListener("mousedown", (e) => {
+    if (e.shiftKey && (e.target as HTMLElement).closest("[data-mini]")) e.preventDefault(); // (no text selected by a Shift+click)
+  });
+  minisBox?.addEventListener("click", (e) => {
+    const el = e.target as HTMLElement;
+    const fig = el.closest<HTMLElement>("[data-mini]");
+    if (!fig || el.closest("[data-move], [data-rename], .ex-caption-edit")) return;
+    const i = Number(fig.dataset["mini"]);
+    if (e.shiftKey && anchor >= 0 && anchor < raw.length) {
+      const off = out.has(raw[anchor]!);
+      for (let k = Math.min(anchor, i); k <= Math.max(anchor, i); k++) setOut(k, off);
+    } else {
+      setOut(i, !out.has(raw[i]!));
+      anchor = i;
+    }
     ticked();
   });
   dlg.querySelector("[data-ex-minis]")?.addEventListener("keydown", (e) => {

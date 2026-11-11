@@ -697,11 +697,17 @@ test("Export… of several sheets: each at the width chosen with its own shape, 
   expect(new Set(names).size, "a file for each sheet, named by the pattern with its size").toBe(2);
   expect(names.some((n) => n!.endsWith("600x400.png")) && names.some((n) => n!.endsWith("600x1200.png"))).toBe(true);
   // one left out without leaving the dialog: the other leaves alone, as a file of its own
-  await dlg.locator('[data-mini="1"] [data-tick]').uncheck();
+  await dlg.locator('[data-mini="1"] .ex-frame').click(); // (anywhere on the picture, not only its box)
   await expect(dlg.getByTestId("export-count")).toHaveText("1 of 2 items");
+  await expect(dlg.locator('[data-mini="1"] [data-tick]')).not.toBeChecked();
   const [alone] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
   expect(alone.suggestedFilename()).toMatch(/^01-Sheet \d+-600x\d+\.png$/);
-  await dlg.locator('[data-mini="1"] [data-tick]').check();
+  // Shift+click sets a run like the last one clicked: the first left out too, then All brings them back
+  await dlg.locator('[data-mini="0"] .ex-frame').click();
+  await dlg.locator('[data-mini="1"] .ex-frame').click({ modifiers: ["Shift"] });
+  await expect(dlg.getByTestId("export-count")).toHaveText("0 of 2 items");
+  await dlg.locator('[data-ex="all"]').click();
+  await expect(dlg.getByTestId("export-count")).toHaveText("All 2 items");
   // the same sheets as one PDF: a page each, at the physical size (600 px at 300 ppi is 2 in = 144 pt)
   await dlg.locator('[data-output="pdf"]').click();
   await expect(dlg.locator('[data-ex="copy"]')).toBeDisabled();

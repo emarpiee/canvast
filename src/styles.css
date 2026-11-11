@@ -2998,7 +2998,8 @@ dialog.export-dlg.is-busy .ex-foot button { opacity: 0.6; pointer-events: none; 
 .ex-minis { max-height: calc(var(--sp-15) * 5); overflow-y: auto; padding: var(--s-4); }
 /* What goes: a tick on each picture (left out: faded, numbered with a dash), All and None above them, and each one's name, which a click makes a field. */
 .ex-pick { display: flex; align-items: center; justify-content: center; gap: var(--s-4); color: var(--hud-muted); font: var(--font-meta); }
-.ex-tick { position: absolute; top: calc(-1 * var(--s-2)); right: calc(-1 * var(--s-2)); }
+.ex-tick { position: absolute; top: calc(-1 * var(--s-2)); right: calc(-1 * var(--s-2)); pointer-events: none; }
+.ex-mini { cursor: pointer; }
 .ex-mini.is-out .ex-frame { opacity: var(--mark-opacity); }
 .ex-caption { min-width: 0; overflow: hidden; padding: 0; color: inherit; font: inherit; text-overflow: ellipsis; white-space: nowrap; background: transparent; border: 0; cursor: text; }
 .ex-caption:hover { color: var(--hud-fg); }

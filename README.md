@@ -1386,7 +1386,7 @@ Export several pictures at once: leave some out, name the files by a pattern, an
 | Again | It opens as you last exported that sheet or selection on this device; *Export again* in the Export menu does it with no dialog. `Enter` exports as last time, `Ctrl+C` copies |
 | Result | Download it, copy it, or keep it in the library |
 | Several items | Selected sheets, or with *Separate files* any selected items (pictures at their own pixels). A balloon and its words are one item, and a connector is none. Otherwise a selection is one picture |
-| What goes | Each item has a tick: untick one to leave it out (it fades and loses its number), or use *All* and *None*; `Space` on an item ticks or unticks it, `Delete` leaves it out. Reorder them with the arrows or by dragging |
+| What goes | Each item has a tick: click an item anywhere to leave it out (it fades and loses its number) or bring it back; `Ctrl`+click (`⌘` on a Mac) several, `Shift`+click to set a whole run like the last one clicked, or use *All* and *None*. `Space` on an item ticks or unticks it, `Delete` leaves it out. Reorder them with the arrows or by dragging |
 | Output | For several items: *Separate files* (one ZIP), *PDF pages* (one PDF, a page for each, in the order shown) or *One picture* (all of them together) |
 | Size of each | For several items: *Same width*, *Same height*, *Longest side*, or *Scale* (1× to 4× each one's size on the canvas, so big things stay bigger) |
 | Names | A pattern of words and tokens: `{name}` (without its file's extension; click an item's name to give it another), `{n}` (01, 02 …), `{w}` and `{h}` (pixels), `{canvas}`, `{date}`, `{format}`. The files it makes are listed under it before you export; two alike get `-2`. The ZIP or PDF has its own name |
