@@ -254,19 +254,24 @@
 @custom-selector :--frame #assets-view, body[data-view="canvas"];
 @custom-selector :--panel #assets-view .assets-bar, #assets-view .assets-side, #assets-view .assets-main, #assets-view .asset-inspector, #assets-view .assets-statusbar, body[data-view="canvas"] #canvas-host;
 :root[data-look="retroma"] { --rt-frame-in: calc(var(--rt-pane-out) + var(--rt-ring-o-w) + var(--rt-pane-gap)); --rt-panel-in: calc(var(--rt-frame-in) + var(--rt-ring-o-w)); } /* (where a panel starts, and where what is in it starts) */
-:root[data-look="retroma"] :--frame::before {
-  content: ""; position: fixed; inset: var(--rt-pane-out); z-index: 0; pointer-events: none;
+:root[data-look="retroma"] :--frame::before { /* (a pane: the pane's colour fills the gap round the panels) */
+  content: ""; position: fixed; inset: var(--rt-pane-out); z-index: -1; pointer-events: none; background: var(--rt-pane);
   border: var(--rt-ring-o) transparent; border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-ring-o-b) var(--rt-ring-o-l);
   border-radius: var(--rt-r); corner-shape: var(--rt-corner-pane); box-shadow: var(--rt-ri-t), var(--rt-ri-l), var(--rt-ri-r), var(--rt-ri-b);
 }
-:root[data-look="retroma"] :--panel {
-  border: var(--rt-ring-o) transparent; border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-ring-o-b) var(--rt-ring-o-l);
-  border-radius: var(--rt-r); corner-shape: var(--rt-corner-pane); box-shadow: var(--rt-ri-t), var(--rt-ri-l), var(--rt-ri-r), var(--rt-ri-b); overflow: hidden;
+:root[data-look="retroma"] :--panel { border-radius: var(--rt-r); corner-shape: var(--rt-corner-pane); overflow: hidden; }
+/* the bars (top and status) sit up on the pane: its dark outer ring; what they hold sits down in it: the light ring outside, the dark one inside, a soft shade */
+:root[data-look="retroma"] :is(#assets-view .assets-bar, #assets-view .assets-statusbar) { border: var(--rt-ring-o) transparent; border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-ring-o-b) var(--rt-ring-o-l); }
+@custom-selector :--well #assets-view .assets-side, #assets-view .assets-main, #assets-view .asset-inspector, body[data-view="canvas"] #canvas-host::after;
+:root[data-look="retroma"] :--well {
+  border: var(--rt-ring-i-w) solid transparent; border-color: var(--rt-ring-i-t) var(--rt-ring-i-r) var(--rt-ring-i-b) var(--rt-ring-i-l);
+  box-shadow: inset 0 var(--rt-ring-o-w) 0 0 var(--rt-ring-o-t), inset var(--rt-ring-o-w) 0 0 0 var(--rt-ring-o-l), inset calc(-1 * var(--rt-ring-o-w)) 0 0 0 var(--rt-ring-o-r), inset 0 calc(-1 * var(--rt-ring-o-w)) 0 0 var(--rt-ring-o-b), var(--rt-ri-soft);
 }
 :root[data-look="retroma"] #assets-view { padding: var(--rt-frame-in); gap: var(--rt-pane-gap); }
 :root[data-look="retroma"] body[data-view="canvas"] { background: var(--rt-frame); --edge: calc(var(--rt-panel-in) + var(--s-4)); }
+:root[data-look="retroma"] body[data-view="canvas"]::before { z-index: 0; } /* (the body paints its own colour over a layer below it; first in the body, the frame stays under everything else) */
 :root[data-look="retroma"] body[data-view="canvas"] #canvas-host { inset: var(--rt-frame-in); }
-:root[data-look="retroma"] body[data-view="canvas"] #canvas-host::after { content: ""; position: absolute; inset: 0; z-index: var(--z-edge); pointer-events: none; box-shadow: var(--rt-ri-t), var(--rt-ri-l), var(--rt-ri-r), var(--rt-ri-b); border-radius: calc(var(--rt-r) - var(--rt-ring-o-w)); } /* (the canvas covers its panel's inner ring, so it is drawn over it) */
+:root[data-look="retroma"] body[data-view="canvas"] #canvas-host::after { content: ""; position: absolute; inset: 0; z-index: var(--z-edge); pointer-events: none; border-radius: inherit; } /* (the canvas would cover its rings, so they are drawn over it) */
 :root[data-look="retroma"] #assets-view .assets-bar {
   padding-block: var(--pad); padding-right: var(--s-6);
   background: var(--rt-frame); color: var(--rt-fg-on-frame-app); /* (the Library's top bar and status bar are the frame's colour) */
