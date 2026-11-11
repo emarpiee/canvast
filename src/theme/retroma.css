@@ -103,8 +103,7 @@
   border-radius: calc(var(--rt-btn-r) + var(--pad)); corner-shape: var(--rt-corner);
   box-shadow: var(--rt-lift); pointer-events: auto;
 }
-:root[data-look="retroma"] body[data-view="assets"] :is(#nav, .view-settings) { padding: 0; background: transparent; border-color: transparent; box-shadow: none; }
-:root[data-look="retroma"] body[data-view="assets"] .view-settings { top: calc(var(--edge) + var(--rt-ring-o-w) + var(--pad)); }
+:root[data-look="retroma"] body[data-view="assets"] :is(#nav, .view-settings) { top: calc(var(--edge) + var(--rt-ring-o-w) + var(--pad)); padding: 0; background: transparent; border-width: 0; box-shadow: none; }
 :root[data-look="retroma"] body[data-view="assets"] #nav { left: calc(var(--edge) + var(--rt-ring-o-w) + var(--s-4)); }
 :root[data-look="retroma"] body[data-view="assets"] .view-settings { right: calc(var(--edge) + var(--rt-ring-o-w) + var(--s-4)); }
 :root[data-look="retroma"] :is(.view-switch, .nav-pill, #view-switch, #workspace, .nav) { height: auto; padding: 0; gap: var(--rt-gap); background: transparent; border: 0; box-shadow: none; }
@@ -220,11 +219,13 @@
   & > .hud-readout { padding-inline: var(--s-6); }
 }
 :root[data-look="retroma"] #assets-view .col-grip { margin-inline: 0; }
-:root[data-look="retroma"] #assets-view .assets-side { padding: calc(var(--s-4) + var(--s-1)); background: var(--rt-folder-pane-bg); border-right: var(--rt-outline) solid var(--rt-rule); }
+/* the Library's two side columns (the sidebar and the details) are one look: the pane's colour, the same room, a rule on the side towards the items */
+:root[data-look="retroma"] #assets-view :is(.assets-side, .asset-inspector) { padding: var(--s-6); background: var(--rt-pane); border: 0; border-radius: 0; }
+:root[data-look="retroma"] #assets-view .assets-side { border-right: var(--rt-outline) solid var(--rt-rule); }
+:root[data-look="retroma"] #assets-view .asset-inspector { border-left: var(--rt-outline) solid var(--rt-rule); }
 :root[data-look="retroma"] #assets-view .assets-body:not(.has-side-w) > .assets-side { flex-basis: var(--rt-side-w); }
 :root[data-look="retroma"] #assets-view .assets-main { background: var(--rt-paper); }
 :root[data-look="retroma"] #assets-view .assets-scroll { padding: var(--s-6); }
-:root[data-look="retroma"] #assets-view .asset-inspector { background: var(--rt-pane); border: 0; border-left: var(--rt-outline) solid var(--rt-rule); border-radius: 0; }
 :root[data-look="retroma"] #assets-view .asset-insp-head h2 { font-weight: 700; }
 :root[data-look="retroma"] #assets-view .asset-sec { padding: var(--s-6) 0; background: transparent; border: 0; border-radius: 0; }
 :root[data-look="retroma"] #assets-view :is(.asset-dsec + .asset-dsec, .asset-sec + .asset-sec) { border-top: var(--rt-outline) dashed var(--rt-rule); }
@@ -580,7 +581,9 @@
 :root[data-look="retroma"] :where(:focus-visible) { outline: var(--rt-focus-w) var(--rt-focus-style) var(--rt-focus); }
 /* the Library's list view and its rows (Retroma › Library list view, File rows) */
 :root[data-look="retroma"] .assets-body.is-list .assets-list-head { background: var(--rt-lv-hdr); color: var(--rt-lv-hdr-fg); font-weight: var(--rt-lv-hdr-w); border-radius: var(--rt-btn-r); }
-:root[data-look="retroma"] .assets-body.is-list .asset-card { box-shadow: none; border-radius: var(--rt-file-r); border-style: var(--rt-file-ol-style); font-family: var(--rt-file-font); }
+:root[data-look="retroma"] .assets-body.is-list .asset-card { box-shadow: none; border-radius: var(--rt-file-r); border-style: var(--rt-file-ol-style); font-family: var(--rt-file-font); padding-left: var(--s-4); & .asset-thumb { border-radius: var(--s-2); } }
+/* (the rows' room before the picture, v4's 8px: the column heads move with it, so names stay under their heads) */
+:root[data-look="retroma"] .assets-body.is-list .assets-list-head { padding-left: calc(var(--s-12) + var(--s-4)); }
 :root[data-look="retroma"] .assets-body.is-list .asset-card:hover { background: var(--rt-lv-hover); }
 :root[data-look="retroma"] .assets-body.is-list .asset-card[aria-pressed="true"] { background: var(--rt-btn-on); box-shadow: inset 0 0 0 var(--rt-outline) var(--rt-lv-active); }
 /* the PDF viewer (Retroma › PDF viewer) */
