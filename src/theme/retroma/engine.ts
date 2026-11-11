@@ -56,7 +56,7 @@ const BASE = {
   sbW: 10, sbR: 8, tagR: 999, tagOl: 1, tagLeft: 1, tagW: 700, tagSize: 1, tagPad: 9, tagFont: "inherit", imgR: 6, imgOl: 1, cImgOl: "",
   // canvas and library
   ground: "theme", cCanvas: "", grid: "dots", gridk: 0.5, cDots: "", canvasFont: "inherit", simpleBars: false, fadeOnPan: true, fadeOut: 0, fadeIn: 0.3, fadeSpeed: 200, controlsAt: "br",
-  ccardR: 10, ccardOl: 2, ccardPad: 10, cCcard: "", cCcardOl: "", grpR: 14, grpOl: 2, cGrp: "", cGrpOl: "", mat: "white",
+  ccardR: 10, ccardOl: 2, ccardPad: 10, cCcard: "", cCcardOl: "", grpR: 14, grpOl: 2, cGrp: "", cGrpOl: "", mat: "theme", /* (the owner's choice over the demo's white: the mat follows the theme's paper, so it is dark in dark mode) */
   rainbow: true, folderIcon: "folder", folderR: 6, folderOl: 1, folderOlStyle: "solid", folderLeft: 1, folderOpenOl: 2, indentStyle: "solid", indentW: 2, treeGap: 3, wrap: "nowrap", folderFont: "inherit", sideW: 190, cFolderPane: "",
   simplePdf: false, cPdf: "", cPdfThumbs: "", pdfThumbR: 6,
   zen: false, zenO: 0.15, pinTop: false,
