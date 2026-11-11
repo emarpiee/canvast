@@ -230,8 +230,13 @@
 /* what floats (a dialog, a docked panel, the command palette) is framed as Retroma's Obsidian modal and prompt: a wide ridge in the pane's
    colour at 0.9 (0.3 in dark), twice the inner ring's width */
 :root[data-look="retroma"] { --rt-float-w: calc(var(--rt-ring-i-w) * 2); --rt-float-glow: 0 0 12px 2px oklch(from var(--rt-float-glow-c) l c h / 0.3); }
-:root[data-look="retroma"] :is(.layers-panel, dialog.confirm, .palette) { border: var(--rt-float-w) ridge var(--rt-float-ol-c); box-shadow: none; backdrop-filter: none; }
-:root[data-look="retroma"] :is(dialog.confirm, .palette) { box-shadow: var(--rt-float-glow); } /* (the glow is the modal's and the prompt's; a docked panel sits on the canvas without it) */
+/* Every floating surface, one list and one rule: dialogs, docked panels, the command palette, menus, the tools' flyout, the canvas switcher, the
+   Place menu, the Library's columns, search and its help, the colour picker, the Library picker, link previews, the tour, a note's own window,
+   the canvas search. (Bars and notices are not surfaces: they keep v4's outline and their colours.) */
+@custom-selector :--floating dialog.confirm, .layers-panel, .palette, .pop-menu, .rail-fly, .nav-menu, .place-menu, .assets-columns, .assets-search-pop, .search-help, .colour-pop, .lib-pick, .note-link-peek, .tour-caption, .note-window > .note-dock, .cs;
+:root[data-look="retroma"] :--floating { border: var(--rt-float-w) ridge var(--rt-float-ol-c); box-shadow: var(--rt-float-glow); backdrop-filter: none; }
+:root[data-look="retroma"] .layers-panel { box-shadow: none; }
+:root[data-look="retroma"] .rail-fly { padding: var(--pad); gap: var(--rt-gap); border-radius: calc(var(--rt-btn-r) + var(--pad) + var(--rt-float-w)); } /* (keys inside a frame: its corner is theirs plus the room and the frame) */ /* (a docked panel sits on the canvas without the glow: the canvas is not drawn under it, so a glow showed square corners) */
 :root[data-look="retroma"][data-rt-simplepanes="on"] :is(.set-card, .layers-panel) { background: transparent; border-color: transparent; box-shadow: none; }
 :root[data-look="retroma"] :is(#assets-view, #settings-view) { background: var(--rt-frame); }
 /* the Library: one pane in three parts (its bar on top, the body, the status bar), each drawing its side of the rings */
@@ -351,12 +356,10 @@
 :root[data-look="retroma"] .pop-menu {
   padding: 5px; gap: 2px;
   background: var(--rt-menu-bg);
-  border: var(--rt-menu-ol) var(--rt-menu-ol-style) var(--rt-menu-ol-c);
   border-radius: var(--rt-menu-r);
   corner-shape: var(--rt-corner-menu);
-  box-shadow: var(--rt-lift);
   --hud-fg: var(--rt-fg); --hud-muted: var(--rt-fg-muted);
-  & button { font-weight: 700; border: var(--rt-outline) solid transparent; border-radius: max(0px, calc(var(--rt-menu-r) - var(--rt-menu-ol) - 5px)); column-gap: 10px; }
+  & button { font-weight: 700; border: var(--rt-outline) solid transparent; border-radius: max(0px, calc(var(--rt-menu-r) - var(--rt-float-w) - 5px)); column-gap: 10px; }
   & button:is(:hover, :focus-visible):not(:disabled) { background: var(--rt-accent); color: var(--rt-on-accent); border-color: var(--rt-outline-c); --hud-muted: var(--rt-on-accent); & :is(.menu-hint, svg) { color: var(--rt-on-accent); } }
   & .menu-hint { font-weight: 400; color: var(--rt-fg-muted); }
   & button.is-danger:not(:hover) { color: var(--rt-danger); }
@@ -651,7 +654,7 @@
 
 /* ---- 13. Note properties (the details' fields) and the link preview (Retroma › Properties, Search and link preview) ------------- */
 :root[data-look="retroma"] :is(.note-link-peek, .search-suggest) { corner-shape: var(--rt-corner-menu); }
-:root[data-look="retroma"] .note-link-peek { width: var(--rt-pv-w); max-height: var(--rt-pv-h); background: var(--rt-menu-bg); border: var(--rt-menu-ol) var(--rt-menu-ol-style) var(--rt-menu-ol-c); border-radius: var(--rt-menu-r); box-shadow: var(--rt-lift); }
+:root[data-look="retroma"] .note-link-peek { width: var(--rt-pv-w); max-height: var(--rt-pv-h); background: var(--rt-menu-bg); border-radius: var(--rt-menu-r); }
 :root[data-look="retroma"] mark.found, :root[data-look="retroma"] .search-match { background: var(--rt-match); color: var(--rt-match-fg); }
 
 /* ---- 13b. Properties, as Retroma's (its .metadata-container and .metadata-property) -------------------------------------------------
