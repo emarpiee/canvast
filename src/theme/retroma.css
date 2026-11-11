@@ -54,42 +54,80 @@
   --rt-gap: calc(var(--s-6) / 2);
   --rt-pane-in: calc(var(--s-6) + var(--s-1));
 }
-:root[data-look="retroma"] :is(
-  :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls, .tb-options-row, .adj-layers, .view-settings, .view-switch, .seg, .confirm-actions, .storage-actions, .action-row, .set-tabs, .rail-fly, .side-head, .asset-quick, .asset-actions, .panel-head, .panel-foot, .layers-tools, .set-control, .ex-foot, .ex-head) button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .assets-btn, .set-reset, .set-done, .rt-open, .set-link, .nav-pill .nav-crumb, .vbtn, .pg-auto, .pg-current) {
+/* Which buttons are keys: any button of a bar, a panel's head or foot, a dialog's or a setting's actions, and the app's own key classes.
+   (expanded by scripts/lib/custom-selectors.mjs into one plain selector per item, each filed under `button`) */
+@custom-selector :--key .rail button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .dock button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .toolbar button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .ctx-bar button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .hud-controls button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .tb-options-row button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .adj-layers button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .view-settings button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .view-switch button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .seg button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .confirm-actions button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .storage-actions button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .action-row button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .set-tabs button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .rail-fly button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .side-head button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .asset-quick button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .asset-actions button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .panel-head button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .panel-foot button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .layers-tools button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .set-control button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .ex-foot button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  .ex-head button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  button.assets-btn:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  button.set-reset:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  button.set-done:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  button.rt-open:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  button.set-link:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  button.nav-crumb:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  button.vbtn:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  button.pg-auto:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  button.pg-current:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch);
+/* Which buttons are keys: the list is written once per rule that needs it (the key and its face), always ending in `button`, so the browser
+   checks it on buttons only (a selector list or nesting at the end of a rule is checked on every element, which made the Library's scroll lag).
+   A key's states are plain `button` rules that only set the key's own variables: a button that is not a key does not read them. */
+:root[data-look="retroma"] :--key {
   --surf: var(--rt-btn-bg);
   --k-ol: var(--rt-outline-c); --k-olw: var(--rt-outline); --k-ols: var(--rt-outline-style);
-  --k-sh: var(--rt-raise);
+  --k-sh: var(--rt-raise); --k-fg: var(--rt-icon);
   --k-cx: var(--rt-cx); --k-cy: var(--rt-cy); --k-px: 0px; --k-py: 0px;
   isolation: isolate;
-  color: var(--rt-icon);
+  color: var(--k-fg);
   font-weight: 700;
-  background: transparent; border-width: 0; box-shadow: none; outline: none; backdrop-filter: none;
+  background: transparent; border-width: 0; box-shadow: none; backdrop-filter: none;
+  outline: var(--k-focus, none); outline-offset: 2px;
   border-radius: var(--rt-btn-r);
   corner-shape: var(--rt-corner);
   transform: translate(calc(var(--k-px) + var(--k-cx)), calc(var(--k-py) + var(--k-cy)));
   transition: transform var(--rt-press-ms), color var(--rt-press-ms);
-  &::before {
-    content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-    background: var(--surf);
-    border: var(--k-olw) var(--k-ols) var(--k-ol);
-    border-radius: inherit; corner-shape: inherit;
-    box-shadow: var(--k-sh);
-    transform: translate(calc(-1 * var(--k-cx)), calc(-1 * var(--k-cy)));
-    transition: transform var(--rt-press-ms), box-shadow var(--rt-press-ms), background-color var(--rt-press-ms), border-color var(--rt-press-ms);
-  }
-  &:hover:not(:disabled) { --surf: var(--rt-btn-hover); --k-olw: var(--rt-hover-ol); --k-ols: var(--rt-hover-ol-style); --k-ol: var(--rt-outline-hover); }
-  &:focus-visible { outline: var(--rt-focus-w) var(--rt-focus-style) var(--rt-focus); outline-offset: 2px; }
-  &:is([aria-pressed="true"], [aria-checked="true"], [aria-selected="true"], :active:not(:disabled)) {
-    --surf: var(--rt-btn-on); --k-sh: var(--rt-sink);
-    --k-cx: var(--rt-cx-a); --k-cy: var(--rt-cy-a); --k-px: var(--rt-press-x); --k-py: var(--rt-press-y);
-    color: var(--rt-icon-on);
-  }
-  &.is-primary { --surf: var(--rt-accent); color: var(--rt-on-accent); &:hover:not(:disabled) { --surf: var(--rt-accent-hover); } }
-  &.is-danger { color: var(--rt-danger); }
 }
+:root[data-look="retroma"] :--key::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: var(--surf);
+  border: var(--k-olw) var(--k-ols) var(--k-ol);
+  border-radius: inherit; corner-shape: inherit;
+  box-shadow: var(--k-sh);
+  transform: translate(calc(-1 * var(--k-cx)), calc(-1 * var(--k-cy)));
+  transition: transform var(--rt-press-ms), box-shadow var(--rt-press-ms), background-color var(--rt-press-ms), border-color var(--rt-press-ms);
+}
+:root[data-look="retroma"] button:hover:not(:disabled) { --surf: var(--rt-btn-hover); --k-olw: var(--rt-hover-ol); --k-ols: var(--rt-hover-ol-style); --k-ol: var(--rt-outline-hover); }
+:root[data-look="retroma"] button:focus-visible { --k-focus: var(--rt-focus-w) var(--rt-focus-style) var(--rt-focus); }
+:root[data-look="retroma"] button:is([aria-pressed="true"], [aria-checked="true"], [aria-selected="true"], :active:not(:disabled)) {
+  --surf: var(--rt-btn-on); --k-sh: var(--rt-sink); --k-fg: var(--rt-icon-on);
+  --k-cx: var(--rt-cx-a); --k-cy: var(--rt-cy-a); --k-px: var(--rt-press-x); --k-py: var(--rt-press-y);
+}
+/* (the class twice: as heavy as a key's own rule, which carries one class more for the buttons it leaves out, so these come out on top by order) */
+:root[data-look="retroma"] button.is-primary.is-primary { --surf: var(--rt-accent); --k-fg: var(--rt-on-accent); }
+:root[data-look="retroma"] button.is-primary.is-primary:hover:not(:disabled) { --surf: var(--rt-accent-hover); }
+:root[data-look="retroma"] button.is-danger.is-danger { --k-fg: var(--rt-danger); }
 /* (a key's face needs a positioned key; given with no weight, so a key placed by its own rule, as the viewer's buttons, stays where it is) */
-:where(:root[data-look="retroma"]) :where(:is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls, .tb-options-row, .adj-layers, .view-settings, .view-switch, .seg, .confirm-actions, .storage-actions, .action-row, .set-tabs, .rail-fly, .side-head, .asset-quick, .asset-actions, .panel-head, .panel-foot, .layers-tools, .set-control, .ex-foot, .ex-head) button, .assets-btn, .set-reset, .set-done, .rt-open, .set-link, .nav-crumb, .vbtn, .pg-auto, .pg-current) { position: relative; }
+:where(:root[data-look="retroma"]) :--key { position: relative; }
 /* a key with words: the demo's room on each side, its icon and words 7px apart */
 :root[data-look="retroma"] :is(.confirm-actions button, .storage-actions button, .action-row button, .ex-foot button, .set-control button:not(.pg-swatch, .set-chip-x, .colour-swatch, .is-icon), .rt-open, .set-reset, .set-done, .assets-btn:not(.is-icon), .pg-auto) {
   display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--s-6) / 2);
@@ -335,7 +373,7 @@
   &.is-success { background: var(--rt-ok-bg); color: var(--rt-ok-fg); --hud-fg: var(--rt-ok-fg); --hud-muted: var(--rt-ok-fg); --tone: var(--rt-ok-fg); }
   &.is-warning { background: var(--rt-warn-bg); color: var(--rt-warn-fg); --hud-fg: var(--rt-warn-fg); --hud-muted: var(--rt-warn-fg); --tone: var(--rt-warn-fg); }
   &.is-error { background: var(--rt-err-bg); color: var(--rt-err-fg); --hud-fg: var(--rt-err-fg); --hud-muted: var(--rt-err-fg); --tone: var(--rt-err-fg); }
-  & button { --surf: var(--rt-frame-deep); --k-ol: currentColor; color: inherit; }
+  & button { --surf: var(--rt-frame-deep); --k-ol: currentColor; --k-fg: var(--hud-fg); }
   &:is(.is-success, .is-warning, .is-error) button { --surf: transparent; }
 }
 /* the command palette, as Retroma's prompt: a floating pane with the ridge, the search a field with the dark outline, rows split by a
@@ -353,7 +391,6 @@
   & :is(.palette-group, kbd) { font-size: var(--text-xs); color: var(--hud-muted); }
   & kbd { font-family: var(--rt-font-mono); text-transform: uppercase; letter-spacing: 0.06em; }
 }
-:root[data-look="retroma"] ::selection { background: var(--rt-selection); }
 
 /* ---- 6. The Library's rows and cards (the demo's .navrow and .card) ---------------------------------------------------------------
    A view or folder row: the selected one a pressed key. A card: a key with its picture on a mat, its name and one line under it. */
@@ -578,8 +615,6 @@
 :root[data-look="retroma"][data-rt-tabstyle="filled"] .set-tabs button[aria-selected="true"] { --surf: var(--rt-pane); box-shadow: var(--rt-tab-hl); transform: none; border-color: var(--rt-tab-outline); }
 :root[data-look="retroma"] .set-tabs button { border-radius: var(--rt-tab-r); font-family: var(--rt-tab-font-off); color: var(--rt-tab-fg-off); }
 :root[data-look="retroma"] .set-tabs button[aria-selected="true"] { font-family: var(--rt-tab-font-on); color: var(--rt-tab-fg-on); }
-:root[data-look="retroma"] ::-webkit-scrollbar { width: var(--rt-sb-w); height: var(--rt-sb-w); }
-:root[data-look="retroma"] :is(:hover, .is-scrolling, :focus-within)::-webkit-scrollbar-thumb { background-color: var(--rt-sb-thumb); border-radius: var(--rt-sb-r); }
 :root[data-look="retroma"] .tag-chip { font-family: var(--rt-tag-font); font-weight: var(--rt-tag-w); border: var(--rt-tag-ol) solid var(--rt-outline-c); border-left-width: var(--rt-tag-left); border-radius: var(--rt-tag-r); background: var(--rt-second-tint); color: var(--rt-fg-on-second); }
 :root[data-look="retroma"] :where(:focus-visible) { outline: var(--rt-focus-w) var(--rt-focus-style) var(--rt-focus); }
 /* the Library's list view and its rows (Retroma › Library list view, File rows) */
@@ -629,12 +664,11 @@
 
 /* ---- 16. On a phone (Retroma › Phone): the bottom bars simple, the rail's colour, the side panels' width, thin scrollbars, the controls at the top */
 @media (max-width: 640px) {
+  :root[data-look="retroma"] { --scroll-size: var(--rt-msb-w); --scroll-r: var(--rt-msb-r); }
   :root[data-look="retroma"][data-rt-simplenav="on"] :is(.hud-controls, .ctx-bar) { background: transparent; border-color: transparent; box-shadow: none; }
   :root[data-look="retroma"][data-rt-simplenav="on"] :is(.hud-controls, .ctx-bar) button { box-shadow: none; }
   :root[data-look="retroma"] #toolbar > .rail { background: var(--rt-m-tool-bg); }
   :root[data-look="retroma"] #side-panels { width: min(var(--rt-m-side-w), calc(100vw - 24px)); }
-  :root[data-look="retroma"] ::-webkit-scrollbar { width: var(--rt-msb-w); height: var(--rt-msb-w); }
-  :root[data-look="retroma"] :is(:hover, .is-scrolling, :focus-within)::-webkit-scrollbar-thumb { border-radius: var(--rt-msb-r); }
   :root[data-look="retroma"][data-rt-part-nav-at="top"] .hud-controls { bottom: auto; top: calc(var(--edge) * 2 + var(--bar-h)); }
 }
 
@@ -645,11 +679,10 @@
   --text-2xs: calc(10px * var(--rt-text)); --text-xs: calc(11px * var(--rt-text)); --text-sm: calc(12px * var(--rt-text)); --text-md: calc(13px * var(--rt-text));
   --text-lg: calc(14px * var(--rt-text)); --text-xl: calc(15px * var(--rt-text)); --text-2xl: calc(16px * var(--rt-text)); --text-3xl: calc(18px * var(--rt-text));
   --text-4xl: calc(20px * var(--rt-text)); --text-5xl: calc(24px * var(--rt-text));
-  --code-url: var(--rt-syn-u); --code-important: var(--rt-syn-i);
+  --code-url: var(--rt-syn-u); --code-important: var(--rt-syn-i); --code-operator: var(--rt-syn-o); --code-punctuation: var(--rt-syn-p);
+  --text-selection: var(--rt-selection);
+  --scroll-size: var(--rt-sb-w); --scroll-thumb: var(--rt-sb-thumb); --scroll-track: var(--rt-sb-track); --scroll-r: var(--rt-sb-r);
 }
-/* (operators and punctuation are coloured in Retroma only: Legacy leaves them the text's colour) */
-:root[data-look="retroma"] ::highlight(canvast-code-operator) { color: var(--rt-syn-o); }
-:root[data-look="retroma"] ::highlight(canvast-code-punctuation) { color: var(--rt-syn-p); }
 :root[data-look="retroma"] :is(button, .ico, .side-item, .notice-icon, .tree-twist, .side-sec-toggle) svg { stroke-width: var(--rt-icon-w); }
 /* corner shapes, each part its own (Retroma › Corners; where the browser has no corner-shape the corners stay round) */
 :root[data-look="retroma"] .sun-editor-editable.se-theme-canvast blockquote.__se__callout { corner-shape: var(--rt-corner-callout); }
@@ -668,7 +701,6 @@
 :root[data-look="retroma"] .tree-twist[aria-expanded="false"] { color: var(--rt-marker-collapsed); }
 :root[data-look="retroma"] .tag-chip { font-size: calc(var(--text-sm) * var(--rt-tag-size)); padding-inline: var(--rt-tag-pad) var(--s-2); }
 /* scrollbars' track, tabs' outline line (Retroma › Interface) */
-:root[data-look="retroma"] :is(:hover, .is-scrolling, :focus-within)::-webkit-scrollbar-track { background: var(--rt-sb-track); }
 :root[data-look="retroma"] .set-tabs button { border-style: var(--rt-tab-ol-style); }
 /* the PDF viewer's pages are sheets (Retroma › PDF viewer) */
 :root[data-look="retroma"] .pdf-page { box-shadow: var(--rt-lift-sheet); border-radius: var(--rt-pdf-thumb-r); }

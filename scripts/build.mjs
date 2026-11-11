@@ -2,6 +2,7 @@
 //   node scripts/build.mjs [--out <dir>]  -> <dir>/canvast.html (default dist/) and <dir>/build.json: what it was made from (source hash, git head), to compare builds
 //   (developer tools are a setting: Settings > Develop, or #debug)
 import { build } from "esbuild";
+import { expandCustomSelectors } from "./lib/custom-selectors.mjs";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -55,7 +56,7 @@ const editorCss = await build({
   write: false,
   logLevel: "warning",
 });
-const styles = `${editorCss.outputFiles[0].text}\n${await readFile(resolve(root, "src/styles.css"), "utf8")}\n${await readFile(resolve(root, "src/theme/retroma.css"), "utf8")}`; // (the Retroma theme after the shared rules: scoped to it, it wins where it styles a part)
+const styles = `${editorCss.outputFiles[0].text}\n${await readFile(resolve(root, "src/styles.css"), "utf8")}\n${expandCustomSelectors(await readFile(resolve(root, "src/theme/retroma.css"), "utf8"))}`; // (the Retroma theme after the shared rules: scoped to it, it wins where it styles a part)
 const template = await readFile(resolve(root, "src/index.html"), "utf8");
 // Third-party notices travel inside the single file (Lucide icons are ISC, Inter is OFL-1.1).
 const pkgOf = async (name) => JSON.parse(await readFile(resolve(root, "node_modules", name, "package.json"), "utf8"));

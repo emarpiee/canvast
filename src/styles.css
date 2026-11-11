@@ -308,7 +308,7 @@ html, body {
 :where(select, textarea, input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], input[type="date"], input[type="datetime-local"]) { font: var(--font-value); min-height: var(--field-h); box-sizing: border-box; color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-sm); padding: var(--s-2) var(--s-4); }
 /* Every place text is typed shows its caret and its selection in the accent, so neither depends on the browser's default against our backgrounds. */
 input, textarea, [contenteditable="true"] { caret-color: var(--hud-accent); }
-::selection { background: color-mix(in oklch, var(--hud-accent) 45%, transparent); }
+::selection { background: var(--text-selection, color-mix(in oklch, var(--hud-accent) 45%, transparent)); } /* (a theme sets --text-selection: one unconditional rule, as a theme's own ::selection or ::highlight under an ancestor makes every restyle work out highlight styles) */
 /* The interface is not text to select (a drag across a bar, a status line or a panel must not paint it); only what is typed in, code and the file facts (to copy a hash) can be selected. */
 body { -webkit-user-select: none; user-select: none; }
 input, textarea, [contenteditable="true"], pre, code, .asset-more dd, [data-selectable] { -webkit-user-select: text; user-select: text; }
@@ -320,8 +320,9 @@ input, textarea, [contenteditable="true"], pre, code, .asset-more dd, [data-sele
   ::-webkit-scrollbar { width: var(--scroll-size); height: var(--scroll-size); background: transparent; }
   ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
   ::-webkit-scrollbar-button { display: none; }
-  ::-webkit-scrollbar-thumb { min-height: var(--sp-12); min-width: var(--sp-12); background-color: transparent; background-clip: padding-box; border: var(--scroll-inset) solid transparent; border-radius: var(--r-pill); }
-  :hover::-webkit-scrollbar-thumb, .is-scrolling::-webkit-scrollbar-thumb, :focus-within::-webkit-scrollbar-thumb { background-color: color-mix(in oklch, var(--hud-accent) 60%, transparent); }
+  ::-webkit-scrollbar-thumb { min-height: var(--sp-12); min-width: var(--sp-12); background-color: transparent; background-clip: padding-box; border: var(--scroll-inset) solid transparent; border-radius: var(--scroll-r, var(--r-pill)); }
+  :hover::-webkit-scrollbar-thumb, .is-scrolling::-webkit-scrollbar-thumb, :focus-within::-webkit-scrollbar-thumb { background-color: var(--scroll-thumb, color-mix(in oklch, var(--hud-accent) 60%, transparent)); }
+  :hover::-webkit-scrollbar-track, .is-scrolling::-webkit-scrollbar-track, :focus-within::-webkit-scrollbar-track { background: var(--scroll-track, transparent); } /* (a theme sets --scroll-thumb, --scroll-track, --scroll-r: these rules stay unconditional, as a theme's own under an ancestor would make every restyle work out scrollbar styles) */
   ::-webkit-scrollbar-thumb:hover, ::-webkit-scrollbar-thumb:active { background-color: var(--hud-accent); border-width: var(--sp-1); }
 }
 @supports not selector(::-webkit-scrollbar) {
@@ -1550,6 +1551,8 @@ body *:has(.has-full-note) { z-index: var(--z-pop); }
 ::highlight(canvast-code-tag) { color: var(--code-tag); }
 ::highlight(canvast-code-url) { color: var(--code-url); }
 ::highlight(canvast-code-important) { color: var(--code-important); }
+::highlight(canvast-code-operator) { color: var(--code-operator); } /* (operators and punctuation: unset, so the text's own colour, unless a theme sets them) */
+::highlight(canvast-code-punctuation) { color: var(--code-punctuation); }
 .sun-editor.se-theme-canvast .se-controller .se-select-menu { width: max-content; max-width: min(28rem, calc(100vw - var(--sp-8))); overflow: hidden; }
 .sun-editor.se-theme-canvast .se-controller .se-select-menu ul { min-width: 0; } /* (the list keeps to the box: a long name ends in …) */
 .sun-editor.se-theme-canvast .se-autocomplete-item { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
