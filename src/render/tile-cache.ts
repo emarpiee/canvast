@@ -111,6 +111,8 @@ export class TileCache {
   enabled = true;
   /** Tiles rendered since the page loaded (diagnostics and tests). */
   renderedTotal = 0;
+  /** Why tile sets were thrown away and built again, counted (benchmarks and tests read them): a move that was not whole device pixels, a new zoom or frame. */
+  readonly restarts = { offset: 0, key: 0, lastOffset: null as null | { ax: number; ay: number } };
   /** Cost of the last full tile-set build (about one exact frame of committed objects). */
   lastFullMs = 0;
   /** A rebuild slower than this makes the scene "dense": zoom frames show a scaled preview. */
@@ -223,6 +225,7 @@ export class TileCache {
     const z = cam.zi + cam.zf;
     const dense = this.lastFullMs > this.denseMs;
     if (this.gen && this.gen.key !== key) {
+      this.restarts.key++;
       // The preview scales the last tile set: only within the same frame.
       const preview = !stable && dense && this.gen.frameId === frameId;
       // Zooming out, the scaled set leaves a bare border: a prebuilt set that reaches every edge is shown instead.
@@ -245,6 +248,7 @@ export class TileCache {
     }
     let off = this.offset(this.gen, cam, vp, dpr);
     if (!off) {
+      this.restarts.offset++;
       // Not a whole-device-pixel move: start over at this camera.
       this.clear();
       this.gen = { key, z, center: cam.center, frameId, vp, tiles: new Map() };
@@ -530,6 +534,7 @@ export class TileCache {
     const ay = (D.diffToNumber(g.center.y, cam.center.y, cam.zi) * f + (vp.height - g.vp.height) / 2) * dpr;
     const dx = Math.round(ax);
     const dy = Math.round(ay);
+    this.restarts.lastOffset = { ax, ay };
     if (Math.abs(ax - dx) > 1e-6 || Math.abs(ay - dy) > 1e-6 || Math.abs(dx) > 2 ** 30 || Math.abs(dy) > 2 ** 30) return null;
     return { dx, dy };
   }

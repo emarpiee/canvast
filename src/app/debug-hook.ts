@@ -208,7 +208,7 @@ export interface DebugHook {
   /** Turn the raster tile cache on or off (to compare against direct rendering). */
   setTileCache(on: boolean): void;
   /** Tile use of the last rendered frame (null: rendered directly), and tiles held. */
-  tileStats(): { last: TileFrame | null; held: number; renderedTotal: number; ahead: number };
+  tileStats(): { last: TileFrame | null; held: number; renderedTotal: number; ahead: number; restarts: { offset: number; key: number; lastOffset: null | { ax: number; ay: number } } };
   /** Decoded images held (count, bytes, budget), and set the budget in bytes (ADR 0027). */
   decodedStats(): { count: number; bytes: number; budget: number; maxRunning: number };
   /** The box of the selection on screen: its rotation (radians) and corners (top-left first, in the box's own axes). */
@@ -618,7 +618,7 @@ export function installDebugHook(
     qualityLevel: () => deps.quality.level,
     setQualityLevel: (l) => deps.quality.force(l),
     setDecodedBudget: (bytes) => session.assets!.setBudget(bytes),
-    tileStats: () => ({ last: stats.last?.tiles ?? null, held: deps.tiles.tileCount, renderedTotal: deps.tiles.renderedTotal, ahead: deps.tiles.aheadTiles }),
+    tileStats: () => ({ last: stats.last?.tiles ?? null, held: deps.tiles.tileCount, renderedTotal: deps.tiles.renderedTotal, ahead: deps.tiles.aheadTiles, restarts: { ...deps.tiles.restarts } }),
     benchRun: (frames, mode = "panzoom") => {
       const total: number[] = [];
       const frame: number[] = [];

@@ -31,15 +31,20 @@ await cdp.send("Profiler.setSamplingInterval", { interval: 200 });
 /** One pan: the pointer dragged across and back for `seconds`, `perFrame` moves each ~16 ms. */
 async function pan(label, perFrame, seconds = 4, fraction = 0) {
   await H(() => {
+    // (one counter of frames at a time: the last run's stops)
+    window.__panRun = (window.__panRun ?? 0) + 1;
+    const run = window.__panRun;
     window.__panFrames = [];
     const tick = (t) => {
+      if (window.__panRun !== run) return;
       window.__panFrames.push(t);
-      if (window.__panFrames.length < 100000) requestAnimationFrame(tick);
+      requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
     window.__canvastDebug.resetFrameTimes();
   });
-  const rendered0 = (await H(() => window.__canvastDebug.tileStats())).renderedTotal;
+  const s0 = await H(() => window.__canvastDebug.tileStats());
+  const rendered0 = s0.renderedTotal;
   await cdp.send("Profiler.start");
   await page.mouse.move(720, 450);
   await page.mouse.down();
@@ -54,7 +59,9 @@ async function pan(label, perFrame, seconds = 4, fraction = 0) {
   const { profile } = await cdp.send("Profiler.stop");
   const frames = await H(() => window.__panFrames.slice());
   const draws = await H(() => window.__canvastDebug.frameTimes());
-  const rendered = (await H(() => window.__canvastDebug.tileStats())).renderedTotal - rendered0;
+  const s1 = await H(() => window.__canvastDebug.tileStats());
+  const rendered = s1.renderedTotal - rendered0;
+  const restarts = { offset: s1.restarts.offset - s0.restarts.offset, key: s1.restarts.key - s0.restarts.key, lastOffset: s1.restarts.lastOffset };
   writeFileSync(resolve(out, `${label}.cpuprofile`), JSON.stringify(profile));
   // frame intervals
   const gaps = frames.slice(1).map((t, i) => t - frames[i]);
@@ -75,9 +82,9 @@ async function pan(label, perFrame, seconds = 4, fraction = 0) {
     label, moves_per_frame: perFrame, frames: frames.length, fps: Math.round((frames.length / seconds) * 10) / 10,
     frame_ms: { p50: Math.round(pct(gaps, 50)), p95: Math.round(pct(gaps, 95)), worst: Math.round(Math.max(0, ...gaps)) },
     draw_ms: { p50: Math.round(pct(draws, 50) * 10) / 10, p95: Math.round(pct(draws, 95) * 10) / 10, worst: Math.round(Math.max(0, ...draws)) },
-    tiles_built: rendered, profile_ms: Math.round(total), top,
+    tiles_built: rendered, restarts, profile_ms: Math.round(total), top,
   };
-  console.log(`\n== ${label}: ${r.fps} FPS, frame p50 ${r.frame_ms.p50} ms p95 ${r.frame_ms.p95} ms worst ${r.frame_ms.worst} ms; draw p50 ${r.draw_ms.p50} p95 ${r.draw_ms.p95} worst ${r.draw_ms.worst} ms; tiles built ${rendered}`);
+  console.log(`\n== ${label}: ${r.fps} FPS, frame p50 ${r.frame_ms.p50} ms p95 ${r.frame_ms.p95} ms worst ${r.frame_ms.worst} ms; draw p50 ${r.draw_ms.p50} p95 ${r.draw_ms.p95} worst ${r.draw_ms.worst} ms; tiles built ${rendered}; sets thrown away: ${restarts.offset} not whole px, ${restarts.key} zoom/frame; last offset ${JSON.stringify(restarts.lastOffset)}`);
   for (const x of top) console.log(`  ${x.share.padStart(6)}  ${String(x.ms).padStart(5)} ms  ${x.fn}`);
   return r;
 }
