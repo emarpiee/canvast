@@ -636,8 +636,12 @@
 :root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group.is-open { background: color-mix(in oklch, var(--f-bg) 45%, transparent); outline: 1px solid var(--f-ol); outline-offset: 1px; margin-block: var(--s-6); }
 :root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .folder-group-list { display: block; margin: 0; padding: 0; list-style: none; }
 :root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-item { color: var(--f-fg); background: transparent; border: 0; box-shadow: none; outline: none; }
-:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-item:hover, :root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-item.is-active { background: oklch(from var(--f-ol) l c h / 0.3); font-weight: 700; }
-:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-item.is-active { background: oklch(from var(--f-ol) l c h / 0.4); color: var(--f-fg); }
+/* (the wash fills the folder's whole row, edge to edge in its box) */
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .tree-row { border-radius: max(0px, calc(var(--rt-folder-r) - var(--rt-folder-ol) - 1px)); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .tree-row:hover, :root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .tree-row.is-current { background: oklch(from var(--f-ol) l c h / 0.3); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .tree-row.is-current { background: oklch(from var(--f-ol) l c h / 0.4); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .tree-row:hover .side-item, :root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-item.is-active { font-weight: 700; color: var(--f-fg); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-pin, :root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-more { color: var(--f-fg); }
 :root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-item svg { fill: currentColor; fill-opacity: 0.85; color: var(--f-fg); }
 :root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-n { color: var(--f-fg); }
 :root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .tg { width: 0; background: none; border-left: 2px dashed oklch(from var(--f-ol) l c h / 0.5); }

@@ -3203,6 +3203,17 @@ dialog.rt-dialog { box-sizing: border-box; width: min(var(--dlg-m), calc(100vw -
   .side-row.tree-row:has(.side-pin):hover .side-item, .side-row.tree-row:has(.side-pin):focus-within .side-item { padding-right: calc(var(--s-2) + var(--tree-row-h)); }
 }
 .side-pin[aria-pressed="true"] svg, .assets-hidden-bar [data-action="hidden-stay"][aria-pressed="true"] svg { fill: currentColor; } /* (pinned: filled, the one look of a pin that is on) */
+/* A folder with subfolders: a small branch before its count (it opens and closes on its own row, with no arrow). */
+.side-kids { flex: none; width: var(--sp-3); height: var(--sp-3); margin-left: auto; margin-right: calc(-1 * var(--s-2)); border-left: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; border-bottom-left-radius: 2px; opacity: 0.6; }
+.side-kids + .side-n { margin-left: var(--s-2); }
+/* A pinned folder always shows its pin, filled: at the row's edge with the count before it; under the pointer it makes room for More. */
+.side-row .side-more.side-pin[aria-pressed="true"] { opacity: 1; }
+@media (hover: hover) and (min-width: 641px) {
+  .side-row.tree-row .side-more.side-pin[aria-pressed="true"] { right: var(--s-2); }
+  .side-row.tree-row:has(.side-pin[aria-pressed="true"]) .side-item { padding-right: calc(var(--s-2) + var(--tree-row-h)); }
+  .side-row.tree-row:is(:hover, :focus-within) .side-more.side-pin[aria-pressed="true"] { right: calc(var(--s-2) + var(--tree-row-h)); }
+}
+@media (hover: none), (max-width: 640px) { .side-row .side-more.side-pin[aria-pressed="true"] { display: inline-flex; } }
 @media (hover: none), (max-width: 640px) { .side-row .side-more.side-pin { display: none; } } /* (no hover to show it: pinning is in the row's More) */
 .asset-where { margin: 0 0 var(--s-4); font-size: var(--text-sm); overflow-wrap: anywhere; }
 
