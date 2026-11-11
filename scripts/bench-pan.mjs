@@ -1,7 +1,7 @@
 // Panning a drawing with many long strokes, measured with real input (runs on GitHub: the `Bench pan` workflow). A scene of hatching
 // (`hatch` in src/app/bench.ts) is panned by mouse drags with the Hand tool, at 60 moves a second and at 4 moves a frame (a fast mouse),
 // while the page records each frame and Chrome records a CPU profile. Prints frames per second, frame times, the app's own draw times,
-// tiles built, and where the time went (the functions with the most time of their own).
+// tiles built, and where the time went, at a whole zoom level and at a fraction of one (the functions with the most time of their own).
 // Run from the repo root after `npm run build`: node scripts/bench-pan.mjs [strokes] [outDir]   (CANVAST_BUILD_DIR: the build, default dist)
 import { chromium } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -81,6 +81,13 @@ async function pan(label, perFrame, seconds = 4) {
   return r;
 }
 
-const results = { strokes: loaded.objects, generateMs: loaded.generateMs, runs: [await pan("pan-60hz", 1), await pan("pan-fast-mouse", 4)] };
+// At a whole zoom level, then at a fraction of one (as after a wheel zoom: 2^-0.3), where a pan is not a whole number of device pixels.
+const runs = [await pan("zoom-whole-60hz", 1), await pan("zoom-whole-fast-mouse", 4)];
+await H(() => window.__canvastDebug.jump(-0.3));
+await H(() => window.__canvastDebug.nextFrame());
+await page.waitForTimeout(800);
+console.log(`\n(zoom now ${JSON.stringify(await H(() => window.__canvastDebug.camera()))})`);
+runs.push(await pan("zoom-fraction-60hz", 1), await pan("zoom-fraction-fast-mouse", 4));
+const results = { strokes: loaded.objects, generateMs: loaded.generateMs, runs };
 writeFileSync(resolve(out, "results.json"), JSON.stringify(results, null, 2));
 await browser.close();
