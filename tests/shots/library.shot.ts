@@ -226,6 +226,7 @@ test("rename-many", async ({ scene: s }) => {
   await dlg.locator('[data-np-date="fixed"]').click();
   await dlg.locator("[data-np-day]").fill("2026-11-02");
   await expect(s.p.getByTestId("rename-preview")).toContainText("dancers-20261102-001");
+  await dlg.locator("[data-np-day]").blur();
   await s.settle();
   await s.shot("rename-many", await s.around({ els: ['[data-testid="rename-dialog"]'], pad: 0 }));
 });
