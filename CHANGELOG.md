@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.56.40 — No bare patches while zooming fast (2026-11-11)
+
+- **Fixed:** zooming fast on a big drawing showed parts of the view blank for a moment (filling from the top) while its tiles were built: where the old tiles did not reach (zooming out, or over a set still half built) nothing was drawn under the tiles still to build. That part is now drawn exactly, a half-built set is shown over the older whole one, and tiles are built from the middle of the view outwards.
+- **Changed:** waiting for the zoom to hold still before building tiles applies only to a heavy view; a light one builds them at once, as before.
+- **Added:** a README picture of renaming several items with a dated, numbered pattern; the Export picture uses `###` for its numbers.
+
 ## 0.56.39 — Smooth zooming on big drawings (2026-11-11)
 
 - **Fixed:** zooming a canvas with thousands of objects dropped to about 20 frames a second after the pan fix: a pan or zoom on a heavy canvas could be taken for a rest mid-move, a dense view was judged only by its drawing time, and a zoom past the scaled preview, or a view coming to rest, drew its whole new set of tiles in one long frame. Now the view rests only when it has not moved and no pointer is held, a view of many objects counts as dense, a set is built only once the wheel holds still, and a new set is built a few tiles a frame over the old one drawn scaled. On the *Powers of two* showcase (about 7,000 objects) wheel zooming holds 60 frames a second (frame p95 17 ms, was 33 ms); on a synthetic drawing whose 6,000 strokes all cross every tile, the longest frame fell from 1.8 s to 0.5 s (one tile).
