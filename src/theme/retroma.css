@@ -156,7 +156,7 @@
   box-shadow: var(--rt-raise-sm);
   padding-inline: var(--s-4) var(--s-2);
 }
-:root[data-look="retroma"] :is(input, select, textarea):focus-visible { outline: var(--rt-focus-w) var(--rt-focus-style) var(--rt-focus); outline-offset: 1px; }
+:root[data-look="retroma"] :is(input, select, textarea):focus-visible { outline: var(--rt-outline) var(--rt-focus-style) var(--rt-focus); outline-offset: 0; } /* (a field in use: one thin line of the focus colour round its outline) */
 :root[data-look="retroma"] :is(input[type="checkbox"], input[type="radio"]) { border-color: var(--rt-outline-c); box-shadow: var(--rt-raise-sm); }
 :root[data-look="retroma"] :is(input[type="checkbox"], input[type="radio"]):is(:checked, :indeterminate) { box-shadow: var(--rt-sink); }
 :root[data-look="retroma"] :is(input[type="range"], progress) { accent-color: var(--rt-accent); box-shadow: none; background: transparent; border: 0; }
@@ -363,32 +363,7 @@
   & .side-n { font-family: var(--rt-font-mono); font-size: var(--text-xs); }
 }
 :root[data-look="retroma"] :is(.tree-row, .side-row):has(> .side-item.is-active) { --hud-accent-fg: var(--rt-fg-on-on-app); --hud-fg: var(--rt-fg-on-on-app); --hud-muted: var(--rt-fg-on-on-app); }
-:root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card {
-  --cap: calc(var(--text-sm) * 1.4 + var(--text-xs) * 1.4 + 8px);
-  padding: 0; overflow: visible;
-  color: var(--rt-fg);
-  background: var(--rt-card-bg);
-  border: var(--rt-card-ol-w) var(--rt-card-ol-style) var(--rt-card-ol-c);
-  border-radius: var(--rt-card-r);
-  corner-shape: var(--rt-corner-card);
-  box-shadow: var(--rt-raise);
-  transition: transform var(--rt-press-ms), box-shadow var(--rt-press-ms);
-  & :is(.asset-thumb, .asset-info) { transform: translate(var(--rt-cx), var(--rt-cy)); transition: transform var(--rt-press-ms); }
-  & .asset-thumb { inset: 6px 6px var(--cap) 6px; box-sizing: border-box; border: 3px solid var(--rt-card-cover, var(--rt-mat)); outline: var(--rt-img-ol) solid var(--rt-img-ol-c); border-radius: min(var(--rt-img-r), max(0px, calc(var(--rt-card-r) - var(--rt-card-ol-w) - 6px))); overflow: hidden; }
-  & .asset-info { left: 6px; right: 6px; bottom: 4px; gap: 0; padding: 0; color: var(--rt-fg); background: none; opacity: 1; }
-  & .asset-name { font-size: var(--text-sm); font-weight: 700; }
-  & .asset-meta { font-size: var(--text-xs); color: var(--rt-fg-muted); }
-  & :is(.asset-uses, .asset-tags) { display: none; }
-  &::after { display: none; }
-  &:hover:not([aria-pressed="true"]) { border-color: var(--rt-card-ol-hover); box-shadow: var(--rt-raise); }
-  &:is([aria-pressed="true"], :active) {
-    background: var(--rt-btn-on); color: var(--rt-fg-on-on-app);
-    box-shadow: var(--rt-sink), 0 0 0 3px var(--rt-select);
-    transform: translate(var(--rt-press-x), var(--rt-press-y));
-    & :is(.asset-thumb, .asset-info) { transform: translate(var(--rt-cx-a), var(--rt-cy-a)); }
-    & :is(.asset-info, .asset-meta) { color: var(--rt-fg-on-on-app); }
-  }
-}
+:root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card { box-shadow: var(--rt-lift-sheet); } /* (the Library's pictures as in Legacy, with only Retroma's sheet shadow under each) */
 
 /* ---- 7. Filters (Retroma › Filters): CRT scanlines and vignette, text glow, pixel icons, greyscale ------------------------------ */
 :root[data-look="retroma"][data-rt-crt="on"] body::after {
