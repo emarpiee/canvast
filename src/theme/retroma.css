@@ -143,9 +143,9 @@
   border-radius: calc(var(--rt-btn-r) + var(--pad)); corner-shape: var(--rt-corner);
   box-shadow: var(--rt-lift); pointer-events: auto;
 }
-:root[data-look="retroma"] body[data-view="assets"] :is(#nav, .view-settings) { top: calc(var(--edge) + var(--rt-ring-o-w) + var(--pad)); padding: 0; background: transparent; border-width: 0; box-shadow: none; }
-:root[data-look="retroma"] body[data-view="assets"] #nav { left: calc(var(--edge) + var(--rt-ring-o-w) + var(--s-4)); }
-:root[data-look="retroma"] body[data-view="assets"] .view-settings { right: calc(var(--edge) + var(--rt-ring-o-w) + var(--s-4)); }
+:root[data-look="retroma"] body[data-view="assets"] :is(#nav, .view-settings) { top: calc(var(--rt-pane-out) + var(--rt-ring-o-w) + var(--pad)); padding: 0; background: transparent; border-width: 0; box-shadow: none; }
+:root[data-look="retroma"] body[data-view="assets"] #nav { left: calc(var(--rt-pane-out) + var(--rt-ring-o-w) + var(--s-4)); }
+:root[data-look="retroma"] body[data-view="assets"] .view-settings { right: calc(var(--rt-pane-out) + var(--rt-ring-o-w) + var(--s-4)); }
 :root[data-look="retroma"] :is(.view-switch, .nav-pill, #view-switch, #workspace, .nav) { height: auto; padding: 0; gap: var(--rt-gap); background: transparent; border: 0; box-shadow: none; }
 :root[data-look="retroma"] :is(.view-switch button, .nav-pill .nav-crumb, .view-settings button) { height: var(--ctl); min-width: var(--ctl); border-radius: var(--rt-btn-r); }
 :root[data-look="retroma"] :is(.nav-pill .nav-crumb, .view-settings button) { width: var(--ctl); }
@@ -240,7 +240,7 @@
 :root[data-look="retroma"][data-rt-simplepanes="on"] :is(.set-card, .layers-panel) { background: transparent; border-color: transparent; box-shadow: none; }
 :root[data-look="retroma"] :is(#assets-view, #settings-view) { background: var(--rt-frame); }
 /* the Library: one pane in three parts (its bar on top, the body, the status bar), each drawing its side of the rings */
-:root[data-look="retroma"] #assets-view { padding: var(--edge); }
+:root[data-look="retroma"] #assets-view { padding: var(--rt-pane-out); } /* (the frame round the Library's pane: Retroma › Pane outer spacing) */
 :root[data-look="retroma"] #assets-view .assets-bar {
   padding-block: var(--pad); padding-right: var(--s-6);
   background: var(--rt-hdr-bg); color: var(--rt-hdr-fg);
@@ -453,11 +453,12 @@
   --se-edit-anchor: var(--rt-link-c); --se-edit-anchor-on-font: var(--rt-link-c); --se-edit-hr-color: var(--rt-hr-c);
   --se-doc-background: var(--rt-pane);
 }
-/* the note in the viewer: one frame (the pane's), the page a sheet on it with room round its shadow, one rule over the bar below */
-:root[data-look="retroma"] .viewer-note .sun-editor.se-theme-canvast { border: 0; }
-:root[data-look="retroma"] .viewer-note .se-wrapper { padding: var(--s-10); box-shadow: none; }
-:root[data-look="retroma"] .viewer-note .se-status-bar { border-top: 0; background: var(--rt-pane); }
-:root[data-look="retroma"] .viewer-note .sun-editor-editable.se-theme-canvast { border: var(--rt-ring-i-w) var(--rt-ring-i-style) transparent; border-color: var(--rt-ring-i-t) var(--rt-ring-i-r) var(--rt-ring-i-b) var(--rt-ring-i-l); border-radius: var(--rt-r); box-shadow: var(--rt-lift-sheet), inset 0 0 var(--rt-pane-sh) var(--rt-pane-inner); }
+/* a note's editor, in the viewer and in its own window: the page sits right on the editor's box (no frame, no shadow, no room round it);
+   one rule over the bar below */
+:root[data-look="retroma"] .sun-editor.se-theme-canvast { border: 0; }
+:root[data-look="retroma"] .sun-editor.se-theme-canvast .se-wrapper { padding: 0; box-shadow: none; }
+:root[data-look="retroma"] .sun-editor.se-theme-canvast .se-status-bar { border-top: 0; background: var(--rt-pane); }
+:root[data-look="retroma"] .sun-editor-editable.se-theme-canvast { border: 0; border-radius: 0; box-shadow: none; }
 :root[data-look="retroma"] #assets-view .viewer.is-note .viewer-bar { background: var(--rt-pane-alt); border-top: var(--rt-outline) solid var(--rt-rule); }
 :root[data-look="retroma"] #assets-view .viewer.is-note { background: var(--rt-pane); & .viewer-stage { background: transparent; } }
 :root[data-look="retroma"] .sun-editor .se-toolbar { background: var(--rt-ed-hdr-bg); border-bottom: var(--rt-outline) solid var(--rt-rule); }
