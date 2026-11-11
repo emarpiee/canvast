@@ -155,9 +155,9 @@
 :root[data-look="retroma"] :is(.nav-pill .nav-crumb, .view-settings button) { width: var(--ctl); }
 :root[data-look="retroma"] .nav-pill[data-active="true"] .nav-crumb { --surf: var(--rt-btn-on); --k-sh: var(--rt-sink); --k-cx: var(--rt-cx-a); --k-cy: var(--rt-cy-a); --k-px: var(--rt-press-x); --k-py: var(--rt-press-y); color: var(--rt-icon-on); }
 :root[data-look="retroma"] .nav-pill .nav-name-btn { height: var(--ctl); margin-left: 0; font-weight: 700; color: var(--rt-fg-on-alt-app); }
-:root[data-look="retroma"] body[data-view="assets"] .nav-pill .nav-name-btn, :root[data-look="retroma"] body[data-view="assets"] .nav-pill .nav-crumb-text { color: var(--rt-info-fg); text-shadow: none; }
-:root[data-look="retroma"] body[data-view="assets"] .nav-pill .nav-name-btn svg { color: var(--rt-info-fg); } /* (on the Library's top bar, the info bar's colour; no glow, which is for the canvas) */
-:root[data-look="retroma"] #assets-view .assets-statusbar .hud-controls { --hud-fg: var(--rt-info-fg); --hud-muted: var(--rt-info-fg); color: var(--rt-info-fg); }
+:root[data-look="retroma"] body[data-view="assets"] .nav-pill .nav-name-btn, :root[data-look="retroma"] body[data-view="assets"] .nav-pill .nav-crumb-text { color: var(--rt-fg-on-frame-app); text-shadow: none; }
+:root[data-look="retroma"] body[data-view="assets"] .nav-pill .nav-name-btn svg { color: var(--rt-fg-on-frame-app); } /* (on the Library's top bar, the frame's text colour; no glow, which is for the canvas) */
+:root[data-look="retroma"] #assets-view .assets-statusbar .hud-controls { --hud-fg: var(--rt-fg-on-frame-app); --hud-muted: var(--rt-muted-on-frame-app); color: var(--rt-fg-on-frame-app); }
 :root[data-look="retroma"] .nav-crumb-text { padding-inline: var(--s-2) var(--s-4); font-weight: 700; color: var(--rt-fg-on-alt-app); }
 /* a bar (the demo's .bar): a shade off the pane, the dark outline, the keys 6px apart and 6px in, its corners round the keys' */
 :root[data-look="retroma"] :--bar {
@@ -172,7 +172,7 @@
 }
 :root[data-look="retroma"] :is(.tb-group, .layers-tools, .tb-options-row) { gap: var(--rt-gap); }
 :root[data-look="retroma"] .rail-sep { background: var(--rt-rule); }
-:root[data-look="retroma"] .assets-sep { background: oklch(from var(--rt-info-fg) l c h / 0.35); }
+:root[data-look="retroma"] .assets-sep { background: oklch(from var(--rt-fg-on-frame-app) l c h / 0.35); }
 :root[data-look="retroma"] .tb-group:not([hidden]) ~ .tb-group:not([hidden]) { border-left-color: var(--rt-rule); }
 /* a segmented choice (the demo's .seg): 4px in, 4px apart, smaller keys */
 :root[data-look="retroma"] .seg {
@@ -251,12 +251,12 @@
 :root[data-look="retroma"] #assets-view { padding: var(--rt-pane-out); } /* (the frame round the Library's pane: Retroma › Pane outer spacing) */
 :root[data-look="retroma"] #assets-view .assets-bar {
   padding-block: var(--pad); padding-right: var(--s-6);
-  background: var(--rt-info-bg); color: var(--rt-info-fg); /* (the Library's top bar and status bar are the canvas's info bar's colours) */
+  background: var(--rt-frame); color: var(--rt-fg-on-frame-app); /* (the Library's top bar and status bar are the frame's colour) */
   border: var(--rt-ring-o) transparent; border-bottom: var(--rt-outline) solid var(--rt-rule);
   border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-rule) var(--rt-ring-o-l);
   border-radius: var(--rt-r) var(--rt-r) 0 0; corner-shape: var(--rt-corner-hdr);
   box-shadow: var(--rt-ri-t), var(--rt-ri-l), var(--rt-ri-r);
-  --hud-fg: var(--rt-info-fg); --hud-muted: var(--rt-info-fg);
+  --hud-fg: var(--rt-fg-on-frame-app); --hud-muted: var(--rt-muted-on-frame-app);
 }
 :root[data-look="retroma"] #assets-view .assets-body {
   gap: 0; padding: 0; margin: 0;
@@ -265,16 +265,20 @@
   --hud-fg: var(--rt-fg); --hud-muted: var(--rt-fg-muted); color: var(--hud-fg);
 }
 :root[data-look="retroma"] #assets-view .viewer { border-radius: 0; } /* (the pane clips it to its own corners) */
-:root[data-look="retroma"] #assets-view.is-viewing .assets-body { border-bottom: var(--rt-ring-o) var(--rt-ring-o-b); border-radius: 0 0 var(--rt-r) var(--rt-r); overflow: hidden; }
+:root[data-look="retroma"] #assets-view.is-viewing .assets-body { border-top: var(--rt-ring-o) var(--rt-ring-o-t); border-bottom: var(--rt-ring-o) var(--rt-ring-o-b); border-radius: var(--rt-r); overflow: hidden; }
+/* the pane's inner ring, drawn over what it holds (v4's .pane::before): its columns are the frame's colour, so the edge shows on every side */
+:root[data-look="retroma"] #assets-view .assets-body { position: relative; }
+:root[data-look="retroma"] #assets-view .assets-body::after { content: ""; position: absolute; inset: 0; z-index: 5; pointer-events: none; border-inline: var(--rt-ring-i-w) var(--rt-ring-i-style) transparent; border-left-color: var(--rt-ring-i-l); border-right-color: var(--rt-ring-i-r); }
+:root[data-look="retroma"] #assets-view.is-viewing .assets-body::after { border: var(--rt-ring-i-w) var(--rt-ring-i-style) transparent; border-color: var(--rt-ring-i-t) var(--rt-ring-i-r) var(--rt-ring-i-b) var(--rt-ring-i-l); border-radius: calc(var(--rt-r) - var(--rt-ring-o-w)); }
 :root[data-look="retroma"] #assets-view .assets-statusbar {
   margin: 0; min-height: var(--rt-status-h);
-  background: var(--rt-info-bg); color: var(--rt-info-fg);
+  background: var(--rt-frame); color: var(--rt-fg-on-frame-app);
   border: var(--rt-ring-o) transparent; border-top: var(--rt-outline) solid var(--rt-rule);
   border-color: var(--rt-rule) var(--rt-ring-o-r) var(--rt-ring-o-b) var(--rt-ring-o-l);
   border-radius: 0 0 var(--rt-r) var(--rt-r); corner-shape: var(--rt-corner-pane);
   box-shadow: var(--rt-ri-l), var(--rt-ri-b), var(--rt-ri-r);
   font-size: var(--text-sm);
-  --hud-fg: var(--rt-info-fg); --hud-muted: var(--rt-info-fg);
+  --hud-fg: var(--rt-fg-on-frame-app); --hud-muted: var(--rt-muted-on-frame-app);
   & > .hud-readout { padding-inline: var(--s-6); }
 }
 :root[data-look="retroma"] #assets-view .col-grip { margin-inline: 0; }
@@ -354,7 +358,7 @@
 /* the canvas's info bar is Retroma's strip along the bottom; the Library's status bar keeps its own colours */
 :root[data-look="retroma"] .hud-bottom { background: transparent; }
 :root[data-look="retroma"] .hud-readout { --hud-fg: var(--rt-info-fg); --hud-muted: var(--rt-info-fg); color: var(--rt-info-fg); font-size: var(--text-sm); }
-:root[data-look="retroma"] #assets-view .assets-readout { --hud-fg: var(--rt-info-fg); --hud-muted: var(--rt-info-fg); background: transparent; color: var(--rt-info-fg); }
+:root[data-look="retroma"] #assets-view .assets-readout { --hud-fg: var(--rt-fg-on-frame-app); --hud-muted: var(--rt-muted-on-frame-app); background: transparent; color: var(--rt-fg-on-frame-app); }
 :root[data-look="retroma"] body { font-family: var(--rt-font); }
 
 /* ---- 5. Menus (the demo's .menu and .mi) and notices (.notice) -------------------------------------------------------------------- */
