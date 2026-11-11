@@ -2702,8 +2702,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return `<button type="button" class="side-more" data-side-more data-kind="${kind}" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for ${kindWord[kind]} ${esc(name)}" title="More">${ICONS.ellipsis}</button>`;
     };
     const picked = pickedKeys(scope);
-    const item = (key: string, label: string, n: number | null, opts: { depth?: number; icon?: string; extra?: string; cls?: string; before?: string; title?: string; /** What the row does, in place of choosing a scope. */ attrs?: string } = {}): string =>
-      `<li class="side-row ${opts.cls ?? ""}" style="--depth:${opts.depth ?? 0}">${opts.before ?? ""}<button type="button" class="side-item${(TRASH_WORD.test(search.value) ? key === "trash" : scope === key || picked.has(key)) ? " is-active" : ""}" ${opts.attrs ?? `data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}"`} title="${opts.title ?? label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : ""}">
+    const item = (key: string, label: string, n: number | null, opts: { depth?: number; icon?: string; extra?: string; cls?: string; before?: string; title?: string; /** What the row does, in place of choosing a scope. */ attrs?: string; /** A row with rows under it: open or not (a click opens or closes it). */ expanded?: boolean } = {}): string =>
+      `<li class="side-row ${opts.cls ?? ""}" style="--depth:${opts.depth ?? 0}">${opts.before ?? ""}<button type="button" class="side-item${(TRASH_WORD.test(search.value) ? key === "trash" : scope === key || picked.has(key)) ? " is-active" : ""}" ${opts.attrs ?? `data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}"`}${opts.expanded === undefined ? "" : ` aria-expanded="${opts.expanded}"`} title="${opts.title ?? label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : ""}">
         ${opts.icon ?? ""}<span class="side-label">${label}</span>${n === null ? "" : `<span class="side-n${opts.before !== undefined ? " layer-count" : ""}">${n}</span>`}</button>${opts.extra ?? ""}</li>`;
     const nameInput = (value: string, label: string): string =>
       `<li class="side-row"><input class="side-name" data-testid="folder-name-input" value="${esc(value)}" aria-label="${label}" maxlength="120"></li>`;
@@ -2736,7 +2736,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           : item(`folder:${f.id}`, esc(f.name), subtreeCount(f.id), {
               depth: at.depth,
               cls: `tree-row${pinnedNow.has(f.id) ? " is-pinned" : ""}`,
-              before: treeGuides(at.depth, at.last, at.conts) + treeSlot(at, `data-folder-twist="${esc(f.id)}"`),
+              before: treeGuides(at.depth, at.last, at.conts), // (no arrow: a folder with subfolders opens and closes on its own row)
+              ...(at.hasKids && !findingFolders ? { expanded: at.open } : {}),
               icon: pinnedNow.has(f.id) ? ICONS.folderUp : at.open ? ICONS.folderOpen : ICONS.folder,
               ...(pinnedNow.has(f.id) ? { title: `${esc(folderPath(listing!.folders, f.id).join(" › "))} (pinned)` } : {}),
               extra: (ro ? "" : `<button type="button" class="side-more side-pin" data-folder-action="pin" data-id="${esc(f.id)}" aria-pressed="${ui.pinned.includes(f.id)}" aria-label="${ui.pinned.includes(f.id) ? "Unpin" : "Pin"} folder ${esc(f.name)}" title="${ui.pinned.includes(f.id) ? "Unpin" : "Pin to top"}">${ICONS.pin}</button>`) + more("folder", f.id, f.name, [
@@ -2880,7 +2881,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           (listing.folders.length > 1 ? sortBtn("folders") : "") + foldAll + addBtn('data-folder-action="new" data-id="" data-testid="folder-new"', "New folder"),
           `${listing.folders.length ? findBox("folders", "folders") : ""}<ul class="side-list" data-testid="folder-tree">
             ${naming?.kind === "new" && naming.parent === null ? nameInput("", "Name of the new folder") : ""}
-            ${capped("folders", [...folderSorted(listing.folders.filter((f) => pinnedNow.has(f.id))), ...folderSorted(listing.folders.filter((f) => f.parentId === null && !pinnedNow.has(f.id) && (!foldersKept || foldersKept.has(f.id))))].map((f) => ({ html: treeOf(f), active: pinnedNow.has(f.id) || [scope.startsWith("folder:") ? scope.slice(7) : "", naming?.kind === "rename" ? naming.id : "", naming?.kind === "new" ? (naming.parent ?? "") : ""].some((id) => id && folderSubtree(listing!.folders, f.id).has(id)) })), findingFolders) || (naming ? "" : `<li class="side-empty">${findingFolders ? "No folders match." : "No folders yet."}</li>`)}
+            ${capped("folders", [...folderSorted(listing.folders.filter((f) => pinnedNow.has(f.id))), ...folderSorted(listing.folders.filter((f) => f.parentId === null && !pinnedNow.has(f.id) && (!foldersKept || foldersKept.has(f.id))))].map((f) => ({ html: `<li class="folder-group${folderKids(f.id).length && (findingFolders || !ui.folded.includes(f.id)) ? " is-open" : ""}"><ul class="folder-group-list">${treeOf(f)}</ul></li>`, active: pinnedNow.has(f.id) || [scope.startsWith("folder:") ? scope.slice(7) : "", naming?.kind === "rename" ? naming.id : "", naming?.kind === "new" ? (naming.parent ?? "") : ""].some((id) => id && folderSubtree(listing!.folders, f.id).has(id)) })), findingFolders) || (naming ? "" : `<li class="side-empty">${findingFolders ? "No folders match." : "No folders yet."}</li>`)}
           </ul>`,
         )}
         ${section(
@@ -4450,13 +4451,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       renderSide();
       return;
     }
-    if (b.dataset["folderTwist"] !== undefined) {
-      const id = b.dataset["folderTwist"];
-      ui.folded = ui.folded.includes(id) ? ui.folded.filter((x) => x !== id) : [...ui.folded, id];
-      saveUi();
-      renderSide();
-      return;
-    }
     if (b.dataset["tagTwist"] !== undefined) {
       const id = b.dataset["tagTwist"];
       ui.folded = ui.folded.includes(id) ? ui.folded.filter((x) => x !== id) : [...ui.folded, id];
@@ -4545,6 +4539,15 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (b.dataset["scope"]) {
       // Choosing the one already chosen lets go of it (back to all assets).
       let next = b.dataset["scope"];
+      // A folder with subfolders opens on a click and closes on the next, and is the one chosen either way (folders as in a file manager).
+      if (next.startsWith("folder:") && b.hasAttribute("aria-expanded")) {
+        const id = next.slice(7);
+        ui.folded = b.getAttribute("aria-expanded") === "true" ? [...ui.folded.filter((x) => x !== id), id] : ui.folded.filter((x) => x !== id);
+        saveUi();
+        scope = next;
+        render();
+        return;
+      }
       // Ctrl (or ⌘) on a file type or a tag adds it to the filter, or takes it out: several types, several tags, or both.
       if ((e.ctrlKey || e.metaKey) && /^(ext|tag):/.test(next)) next = togglePicked(scope, next);
       else if (next === scope && next !== "all") {

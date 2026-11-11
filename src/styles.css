@@ -1302,6 +1302,7 @@ body:has(.assets-place-zone:not([hidden])) :is(#nav, .view-settings, .assets-bar
 /* The library sidebar. */
 .assets-side { flex: 0 0 208px; overflow: auto; padding-bottom: var(--s-8); }
 .side-list { list-style: none; margin: 0 0 var(--s-4); padding: 0; }
+.folder-group, .folder-group-list { display: contents; } /* (a top-level folder and its subfolders, together: a theme may draw them as one box) */
 .side-row { display: flex; align-items: center; gap: var(--s-1); padding-left: calc(var(--depth, 0) * var(--sp-7)); }
 .side-item { flex: 1; min-width: 0; display: flex; justify-content: space-between; gap: var(--s-4); padding: var(--s-4) var(--s-6); font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
 .side-item:hover { background: var(--hud-hover); }

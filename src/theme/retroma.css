@@ -605,38 +605,45 @@
 :root[data-look="retroma"][data-rt-part-controls-at="bl"] .hud-controls { right: auto; left: calc(var(--edge) * 2 + var(--bar-h)); }
 :root[data-look="retroma"][data-rt-part-controls-at="tr"] .hud-controls { bottom: auto; top: calc(var(--edge) * 2 + var(--bar-h)); }
 
-/* ---- 11. Folders in the Library: Retroma's rainbow folders (15 colours round from the accent, a row each) ---------------------------
-   A folder is its colour see-through, its text and lines in the colour's dark, a thicker line on its left, a small shadow under it; an open
-   folder is its colour in full with a line round it. Each row sets its colours; one rule draws every folder. */
-:root[data-look="retroma"] .side-sec[data-sec="folders"] .tree-row {
-  &:nth-child(15n + 1) { --f-bg: var(--rt-folder-1-bg); --f-fg: var(--rt-folder-1-fg); --f-ol: var(--rt-folder-1-ol); --f-bg-open: var(--rt-folder-1-bgOpen); --f-fg-open: var(--rt-folder-1-fgOpen); }
-  &:nth-child(15n + 2) { --f-bg: var(--rt-folder-2-bg); --f-fg: var(--rt-folder-2-fg); --f-ol: var(--rt-folder-2-ol); --f-bg-open: var(--rt-folder-2-bgOpen); --f-fg-open: var(--rt-folder-2-fgOpen); }
-  &:nth-child(15n + 3) { --f-bg: var(--rt-folder-3-bg); --f-fg: var(--rt-folder-3-fg); --f-ol: var(--rt-folder-3-ol); --f-bg-open: var(--rt-folder-3-bgOpen); --f-fg-open: var(--rt-folder-3-fgOpen); }
-  &:nth-child(15n + 4) { --f-bg: var(--rt-folder-4-bg); --f-fg: var(--rt-folder-4-fg); --f-ol: var(--rt-folder-4-ol); --f-bg-open: var(--rt-folder-4-bgOpen); --f-fg-open: var(--rt-folder-4-fgOpen); }
-  &:nth-child(15n + 5) { --f-bg: var(--rt-folder-5-bg); --f-fg: var(--rt-folder-5-fg); --f-ol: var(--rt-folder-5-ol); --f-bg-open: var(--rt-folder-5-bgOpen); --f-fg-open: var(--rt-folder-5-fgOpen); }
-  &:nth-child(15n + 6) { --f-bg: var(--rt-folder-6-bg); --f-fg: var(--rt-folder-6-fg); --f-ol: var(--rt-folder-6-ol); --f-bg-open: var(--rt-folder-6-bgOpen); --f-fg-open: var(--rt-folder-6-fgOpen); }
-  &:nth-child(15n + 7) { --f-bg: var(--rt-folder-7-bg); --f-fg: var(--rt-folder-7-fg); --f-ol: var(--rt-folder-7-ol); --f-bg-open: var(--rt-folder-7-bgOpen); --f-fg-open: var(--rt-folder-7-fgOpen); }
-  &:nth-child(15n + 8) { --f-bg: var(--rt-folder-8-bg); --f-fg: var(--rt-folder-8-fg); --f-ol: var(--rt-folder-8-ol); --f-bg-open: var(--rt-folder-8-bgOpen); --f-fg-open: var(--rt-folder-8-fgOpen); }
-  &:nth-child(15n + 9) { --f-bg: var(--rt-folder-9-bg); --f-fg: var(--rt-folder-9-fg); --f-ol: var(--rt-folder-9-ol); --f-bg-open: var(--rt-folder-9-bgOpen); --f-fg-open: var(--rt-folder-9-fgOpen); }
-  &:nth-child(15n + 10) { --f-bg: var(--rt-folder-10-bg); --f-fg: var(--rt-folder-10-fg); --f-ol: var(--rt-folder-10-ol); --f-bg-open: var(--rt-folder-10-bgOpen); --f-fg-open: var(--rt-folder-10-fgOpen); }
-  &:nth-child(15n + 11) { --f-bg: var(--rt-folder-11-bg); --f-fg: var(--rt-folder-11-fg); --f-ol: var(--rt-folder-11-ol); --f-bg-open: var(--rt-folder-11-bgOpen); --f-fg-open: var(--rt-folder-11-fgOpen); }
-  &:nth-child(15n + 12) { --f-bg: var(--rt-folder-12-bg); --f-fg: var(--rt-folder-12-fg); --f-ol: var(--rt-folder-12-ol); --f-bg-open: var(--rt-folder-12-bgOpen); --f-fg-open: var(--rt-folder-12-fgOpen); }
-  &:nth-child(15n + 13) { --f-bg: var(--rt-folder-13-bg); --f-fg: var(--rt-folder-13-fg); --f-ol: var(--rt-folder-13-ol); --f-bg-open: var(--rt-folder-13-bgOpen); --f-fg-open: var(--rt-folder-13-fgOpen); }
-  &:nth-child(15n + 14) { --f-bg: var(--rt-folder-14-bg); --f-fg: var(--rt-folder-14-fg); --f-ol: var(--rt-folder-14-ol); --f-bg-open: var(--rt-folder-14-bgOpen); --f-fg-open: var(--rt-folder-14-fgOpen); }
-  &:nth-child(15n + 15) { --f-bg: var(--rt-folder-15-bg); --f-fg: var(--rt-folder-15-fg); --f-ol: var(--rt-folder-15-ol); --f-bg-open: var(--rt-folder-15-bgOpen); --f-fg-open: var(--rt-folder-15-fgOpen); }
-  & > .side-item:not(.is-active) {
-    background: var(--f-bg); color: var(--f-fg);
-    border: var(--rt-folder-ol) var(--rt-folder-ol-style) var(--f-ol);
-    border-left-width: var(--rt-folder-left);
-    border-radius: var(--rt-folder-r);
-    corner-shape: var(--rt-corner-folder);
-    font-family: var(--rt-folder-font);
-    & svg { color: inherit; }
-  }
-  &:has(.tree-twist[aria-expanded="true"]) > .side-item:not(.is-active) { background: var(--f-bg-open); color: var(--f-fg-open); border-width: var(--rt-folder-open-ol); }
+/* ---- 11. Folders in the Library, as Retroma's Obsidian file explorer ----------------------------------------------------------------
+   Each top-level folder is a box holding its subfolders, in its own colour (15 round from the accent): its colour see-through, a line in the
+   colour's dark (thicker on the left), a small shadow under it; open, it is lighter with a second line round it. The rows inside are plain:
+   their text and filled icons in the folder's colour, under the pointer and when chosen a wash of it and bold; a dashed guide in the colour.
+   (A folder with subfolders opens and closes on its own row, in every theme.) */
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 1) { --f-bg: var(--rt-folder-1-bg); --f-fg: var(--rt-folder-1-fg); --f-ol: var(--rt-folder-1-ol); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 2) { --f-bg: var(--rt-folder-2-bg); --f-fg: var(--rt-folder-2-fg); --f-ol: var(--rt-folder-2-ol); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 3) { --f-bg: var(--rt-folder-3-bg); --f-fg: var(--rt-folder-3-fg); --f-ol: var(--rt-folder-3-ol); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 4) { --f-bg: var(--rt-folder-4-bg); --f-fg: var(--rt-folder-4-fg); --f-ol: var(--rt-folder-4-ol); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 5) { --f-bg: var(--rt-folder-5-bg); --f-fg: var(--rt-folder-5-fg); --f-ol: var(--rt-folder-5-ol); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 6) { --f-bg: var(--rt-folder-6-bg); --f-fg: var(--rt-folder-6-fg); --f-ol: var(--rt-folder-6-ol); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 7) { --f-bg: var(--rt-folder-7-bg); --f-fg: var(--rt-folder-7-fg); --f-ol: var(--rt-folder-7-ol); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 8) { --f-bg: var(--rt-folder-8-bg); --f-fg: var(--rt-folder-8-fg); --f-ol: var(--rt-folder-8-ol); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 9) { --f-bg: var(--rt-folder-9-bg); --f-fg: var(--rt-folder-9-fg); --f-ol: var(--rt-folder-9-ol); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 10) { --f-bg: var(--rt-folder-10-bg); --f-fg: var(--rt-folder-10-fg); --f-ol: var(--rt-folder-10-ol); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 11) { --f-bg: var(--rt-folder-11-bg); --f-fg: var(--rt-folder-11-fg); --f-ol: var(--rt-folder-11-ol); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 12) { --f-bg: var(--rt-folder-12-bg); --f-fg: var(--rt-folder-12-fg); --f-ol: var(--rt-folder-12-ol); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 13) { --f-bg: var(--rt-folder-13-bg); --f-fg: var(--rt-folder-13-fg); --f-ol: var(--rt-folder-13-ol); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 14) { --f-bg: var(--rt-folder-14-bg); --f-fg: var(--rt-folder-14-fg); --f-ol: var(--rt-folder-14-ol); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 15) { --f-bg: var(--rt-folder-15-bg); --f-fg: var(--rt-folder-15-fg); --f-ol: var(--rt-folder-15-ol); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group {
+  display: block; margin-block: var(--s-4); padding: var(--s-1) 0;
+  background: var(--f-bg);
+  border: var(--rt-folder-ol) var(--rt-folder-ol-style) var(--f-ol); border-left-width: var(--rt-folder-left);
+  border-radius: var(--rt-folder-r); corner-shape: var(--rt-corner-folder);
+  box-shadow: 0 2px 0 oklch(from var(--rt-accent) 0.7 c h / 0.5);
+  font-family: var(--rt-folder-font);
 }
-:root[data-look="retroma"][data-rt-folderstyle="outline"] .side-sec[data-sec="folders"] .tree-row > .side-item:not(.is-active) { background: transparent; }
-:root[data-look="retroma"][data-rt-folderstyle="plain"] .side-sec[data-sec="folders"] .tree-row > .side-item:not(.is-active) { background: transparent; border-color: transparent; box-shadow: none; outline: none; color: var(--rt-fg); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group.is-open { background: color-mix(in oklch, var(--f-bg) 45%, transparent); outline: 1px solid var(--f-ol); outline-offset: 1px; margin-block: var(--s-6); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .folder-group-list { display: block; margin: 0; padding: 0; list-style: none; }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-item { color: var(--f-fg); background: transparent; border: 0; box-shadow: none; outline: none; }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-item:hover, :root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-item.is-active { background: oklch(from var(--f-ol) l c h / 0.3); font-weight: 700; }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-item.is-active { background: oklch(from var(--f-ol) l c h / 0.4); color: var(--f-fg); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-item svg { fill: currentColor; fill-opacity: 0.85; color: var(--f-fg); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-n { color: var(--f-fg); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .tg { width: 0; background: none; border-left: 2px dashed oklch(from var(--f-ol) l c h / 0.5); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .tg-own::after { display: none; }
+:root[data-look="retroma"][data-rt-folderstyle="outline"] .side-sec[data-sec="folders"] .folder-group { background: transparent; }
+:root[data-look="retroma"][data-rt-folderstyle="plain"] .side-sec[data-sec="folders"] .folder-group { background: transparent; border-color: transparent; box-shadow: none; outline: none; }
 
 /* ---- 12. Title bar, status bars, tabs, scrollbars, tags, the focus ring (Retroma › Interface) ---------------------------------- */
 :root[data-look="retroma"] .win-row { background: var(--rt-title-bg); color: var(--rt-title-fg); }
@@ -723,8 +730,6 @@
 :root[data-look="retroma"] :is(.set-sub, .set-head .set-help) { color: var(--rt-fg-on-frame-muted); }
 :root[data-look="retroma"] .set-title { color: var(--rt-fg-on-frame); }
 /* the Library: the cover round a card's picture, its sidebar, folders' tree, rows and names (Retroma › Folders, Library cards, File rows) */
-:root[data-look="retroma"] .side-sec[data-sec="folders"] .tree-row { margin-block: calc(var(--rt-tree-gap) / 2); }
-:root[data-look="retroma"] .side-sec[data-sec="folders"] .side-row.tree-row { padding-left: calc(var(--sp-3) + var(--depth, 0) * (var(--tree-indent) + var(--rt-indent) - 10px)); background-image: repeating-linear-gradient(90deg, transparent 0 calc(var(--sp-3) + var(--tree-indent) / 2), var(--rt-indent-c) 0 calc(var(--sp-3) + var(--tree-indent) / 2 + var(--rt-indent-w)), transparent 0 calc(var(--tree-indent) + var(--rt-indent) - 10px)); background-size: calc(var(--depth, 0) * (var(--tree-indent) + var(--rt-indent) - 10px)) 100%; background-repeat: no-repeat; }
 :root[data-look="retroma"] .side-label { white-space: var(--rt-wrap); }
 :root[data-look="retroma"] .assets-body.is-list .asset-name { white-space: var(--rt-file-wrap); }
 :root[data-look="retroma"] .assets-body.is-list .asset-card { min-height: var(--rt-lv-row-h); }

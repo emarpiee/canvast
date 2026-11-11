@@ -96,7 +96,7 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await name("Ink");
   const tree = p.getByTestId("folder-tree");
   await expect(tree.getByText("Ink")).toBeVisible();
-  await tree.getByRole("button", { name: "Collapse", exact: true }).click();
+  await tree.getByRole("button", { name: /^Art/ }).click(); // (a folder with subfolders closes on its own row)
   await expect(tree.getByText("Ink")).toHaveCount(0);
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
@@ -218,7 +218,7 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   await tree.getByRole("button", { name: "Pin folder Art", exact: true }).click(); // (the row's own button)
   await expect(folderOrder).toHaveText(["Art", "Bee", "Plain"]);
   await expect(tree.getByRole("button", { name: "Unpin folder Art", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await tree.getByRole("button", { name: "Expand", exact: true }).click();
+  await tree.getByRole("button", { name: /^Art/ }).click(); // (and opens on it)
   await expect(folderOrder).toHaveText(["Art", "Ink", "Bee", "Plain"]);
   await pinFolder("Pin", "Ink");
   await expect(folderOrder).toHaveText(["Ink", "Art", "Bee", "Plain"]);
