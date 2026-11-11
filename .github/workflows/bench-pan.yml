@@ -6,8 +6,16 @@ on:
   workflow_dispatch:
     inputs:
       strokes:
-        description: How many hatching strokes
+        description: How many hatching strokes (when the scene is hatch)
         default: "900"
+      scene:
+        description: "hatch: generated strokes; showcase: the Powers of two showcase at a bookmark"
+        type: choice
+        options: [hatch, showcase]
+        default: hatch
+      bookmark:
+        description: The showcase's bookmark to bench at
+        default: "1 · The Solar System"
 
 permissions:
   contents: read
@@ -26,7 +34,12 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y xvfb
       - run: npx playwright install --with-deps chromium
       - run: npm run build
-      - run: xvfb-run -a node scripts/bench-pan.mjs ${{ inputs.strokes }} bench-pan
+      - name: Draw the showcase
+        if: inputs.scene == 'showcase'
+        run: xvfb-run -a node scripts/showcase/build.mjs showcase.canvast
+      - run: xvfb-run -a node scripts/bench-pan.mjs ${{ inputs.scene == 'showcase' && 'showcase.canvast' || inputs.strokes }} bench-pan
+        env:
+          BENCH_BOOKMARK: ${{ inputs.bookmark }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

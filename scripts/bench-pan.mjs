@@ -8,7 +8,10 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-const n = Number(process.argv[2] ?? 900);
+// The scene: a number (that many generated hatching strokes), or a .canvast file (the showcase: its Powers of two canvas, at a bookmark).
+const sceneArg = process.argv[2] ?? "900";
+const n = Number(sceneArg);
+const BOOKMARK = process.env.BENCH_BOOKMARK ?? "1 · The Solar System";
 const out = resolve(process.argv[3] ?? "bench-pan");
 mkdirSync(out, { recursive: true });
 const url = pathToFileURL(resolve(process.env.CANVAST_BUILD_DIR ?? "dist", "canvast.html")).href + "#debug";
@@ -18,7 +21,27 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 await page.goto(url);
 await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
 const H = (fn, arg) => page.evaluate(fn, arg);
-const loaded = await H((k) => window.__canvastDebug.benchLoad({ kind: "hatch", n: k }), n);
+let loaded;
+if (Number.isFinite(n)) loaded = await H((k) => window.__canvastDebug.benchLoad({ kind: "hatch", n: k }), n);
+else {
+  // the showcase imported as a person would, its canvas opened at a bookmark
+  await page.getByTestId("save-status").click();
+  await page.getByTestId("set-import-input").setInputFiles(resolve(sceneArg));
+  await page.getByTestId("choose-ok").click();
+  await page.getByTestId("confirm-ok").click();
+  await page.getByTestId("toast").filter({ hasText: /Imported/ }).waitFor({ timeout: 120_000 });
+  await page.keyboard.press("Escape");
+  await page.getByTestId("workspace-nav").click();
+  await page.getByTestId("workspace-menu").getByText("Powers of two", { exact: true }).click();
+  if (await page.getByTestId("workspace-menu").isVisible()) await page.keyboard.press("Escape");
+  await page.getByRole("button", { name: "Bookmarks panel", exact: true }).click();
+  await page.getByRole("button", { name: `Go to ${BOOKMARK}` }).click();
+  await page.waitForTimeout(1500);
+  await page.getByRole("button", { name: "Bookmarks panel", exact: true }).click();
+  await H(() => document.activeElement?.blur());
+  loaded = { objects: (await H(() => window.__canvastDebug.objects())).length, generateMs: 0 };
+  console.log(`showcase at "${BOOKMARK}": ${loaded.objects} objects in view's canvas`);
+}
 await H(() => window.__canvastDebug.setSetting("ui.info", "technical"));
 await H(() => window.__canvastDebug.setTool("hand"));
 await H(() => window.__canvastDebug.nextFrame());
