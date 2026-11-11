@@ -35,7 +35,8 @@ async function compare(p: Page): Promise<Diff & { tiles: unknown }> {
     h.setTileCache(false);
     const direct = await snap();
     h.setTileCache(true);
-    await snap(); // first frame at a zoom is direct; tiles are built on the next
+    // (tiles are built once the zoom holds still: after a run of zoom changes, a moment later)
+    for (let k = 0; k < 120 && !h.tileStats().last; k++) await snap();
     const tiled = await snap();
     let over16 = 0;
     let over60 = 0;
@@ -60,6 +61,16 @@ const stats = (p: Page) => p.evaluate(() => window.__canvastDebug.tileStats());
  * Tiles rendered while `action` runs plus two frames. Each change also
  * schedules frames of its own, so the count is cumulative, not "last frame".
  */
+/** Frames until the view is drawn from tiles (after a run of zoom changes they wait until the zoom holds still). */
+async function tilesShown(p: Page): Promise<void> {
+  await expect
+    .poll(async () => {
+      await p.evaluate(() => window.__canvastDebug.nextFrame());
+      return (await stats(p)).last;
+    })
+    .not.toBeNull();
+}
+
 async function renderedDuring(p: Page, action: () => Promise<unknown>): Promise<number> {
   const before = (await stats(p)).renderedTotal;
   await action();
@@ -131,7 +142,7 @@ test("panning reuses tiles; a still camera renders none; the zoom changing rende
 test("a pan that is not a whole number of device pixels keeps the tiles while the view moves, and builds them exactly once it rests", async ({ app }) => {
   const p = app.page;
   await p.evaluate(() => window.__canvastDebug.benchLoad({ kind: "dense", n: 1000 }));
-  await renderedDuring(p, async () => undefined);
+  await tilesShown(p);
   const full = (await stats(p)).last!.tiles;
   // (a pointer between pixels, as Wayland, scaled screens and touchpads give: a few moves of a fraction of a pixel)
   const subPixelPan = () =>
@@ -154,7 +165,7 @@ test("a pan that is not a whole number of device pixels keeps the tiles while th
 test("edits refresh exactly the affected tiles: draw, move, undo, delete, opacity", async ({ app }) => {
   const p = app.page;
   await p.evaluate(() => window.__canvastDebug.benchLoad({ kind: "dense", n: 300 }));
-  await renderedDuring(p, async () => undefined);
+  await tilesShown(p);
   const full = (await stats(p)).last!.tiles;
   // Draw a stroke with the pen (the stroke in progress is an overlay; the committed one goes into tiles).
   await p.keyboard.press("p");
@@ -220,8 +231,7 @@ test("a tile showing an image placeholder is refreshed when the original finishe
       return p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x!, y!), at);
     })
     .toEqual([40, 140, 220]);
-  await app.frame();
-  expect((await stats(p)).last).not.toBeNull(); // drawn from tiles, not because the cache was bypassed
+  await tilesShown(p); // drawn from tiles, not because the cache was bypassed
   expect(await p.evaluate(([x, y]) => window.__canvastDebug.pixelAt(x!, y!), at)).toEqual([40, 140, 220]);
 });
 

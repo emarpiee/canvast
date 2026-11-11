@@ -258,8 +258,9 @@ export class TileCache {
       }, REFINE_MS);
     }
     const dense = this.lastFullMs > this.denseMs || this.lastFullObjects > DENSE_OBJECTS;
-    // (a run of zoom changes waits for the zoom to hold still only where a set is costly: a light view builds one at once, as always)
-    const zooming = dense && this.keyGap < REFINE_MS;
+    // (during a run of zoom changes, a light view too: what makes it light is judged from a set at another zoom, and a set built between
+    // two notches is thrown away by the next. The view is drawn directly meanwhile)
+    const zooming = this.keyGap < REFINE_MS;
     const stable = (key === this.lastKey && (!zooming || now - this.keyAt >= REFINE_MS)) || this.refineNow;
     /** The view has rested after a move that was not whole device pixels: now the set is built again exactly. */
     const refine = this.refineNow;
