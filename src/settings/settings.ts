@@ -150,6 +150,10 @@ export const SETTINGS = {
   "media.step.audio": { scope: "device", default: 1, validate: range(0.1, 600), effect: "immediate" } as Def<number>,
   "media.step.gif": { scope: "device", default: 1, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "ui.theme": { scope: "device", default: "system", validate: oneOf("system", "light", "dark"), effect: "immediate" } as Def<"system" | "light" | "dark">,
+  /** The theme: Retroma (the default) or Legacy (the app's earlier look, kept as it was). */
+  "ui.look": { scope: "device", default: "retroma", validate: oneOf("retroma", "legacy"), effect: "immediate" } as Def<"retroma" | "legacy">,
+  /** Retroma's customisation: only what differs from its defaults, as JSON (src/theme/retroma/apply.ts). */
+  "retroma.look": { scope: "device", default: "{}", validate: (v: unknown) => { try { return typeof v === "string" && v.length <= 400_000 && JSON.parse(v) && typeof JSON.parse(v) === "object" ? v : undefined; } catch { return undefined; } }, effect: "immediate" } as Def<string>,
   "key.hand": { scope: "device", default: "h", validate: letter, effect: "immediate" } as Def<string>,
   "key.select": { scope: "device", default: "v", validate: letter, effect: "immediate" } as Def<string>,
   "key.pen": { scope: "device", default: "p", validate: letter, effect: "immediate" } as Def<string>,

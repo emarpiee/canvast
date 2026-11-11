@@ -31,7 +31,7 @@ const KNOWN = [
   /^https:\/\/lea\.verou\.me/, // (the author in the licence comment of the code colouring)
   /^https?:\/\/www\.w3\.org\//, // XML namespaces (SVG, XLink)
   /^https:\/\/github\.com\/rsms\/inter$/, // the Inter licence text
-  /^https:\/\/scripts\.sil\.org\/OFL$/, // the Inter licence text
+  /^https?:\/\/scripts\.sil\.org\/OFL$/, // the OFL licence texts (Inter; Retroma's fonts write it with http)
   /^https:\/\/bottosson\.github\.io\/posts\/colorpicker\/$/, // a credit in the colour picker's code
   /^https:\/\/\$\{\w+\}:\$\{\w+\.port\}$/, // Settings > Sharing shows the host's own address (only text; the page connects nowhere)
   /^https:\/\/\\u2026$/, // the placeholder "https://…" in the link dialog's text

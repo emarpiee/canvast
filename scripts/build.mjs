@@ -26,7 +26,7 @@ const result = await build({
     __CANVAST_VERSION__: JSON.stringify(pkg.version),
     "import.meta.url": '""', // (only in pdf.js' branch for Node)
   },
-  loader: { ".svg": "text", ".ttf": "binary", ".md": "text", ".wasm": "binary" },
+  loader: { ".svg": "text", ".ttf": "binary", ".woff2": "binary", ".md": "text", ".wasm": "binary" },
   // pdf.js' worker, as the text of a plain script: a page opened from a file cannot start a module worker in every browser.
   plugins: [{
     name: "pdf-worker",
@@ -55,7 +55,7 @@ const editorCss = await build({
   write: false,
   logLevel: "warning",
 });
-const styles = `${editorCss.outputFiles[0].text}\n${await readFile(resolve(root, "src/styles.css"), "utf8")}`;
+const styles = `${editorCss.outputFiles[0].text}\n${await readFile(resolve(root, "src/styles.css"), "utf8")}\n${await readFile(resolve(root, "src/theme/retroma.css"), "utf8")}`; // (the Retroma theme after the shared rules: scoped to it, it wins where it styles a part)
 const template = await readFile(resolve(root, "src/index.html"), "utf8");
 // Third-party notices travel inside the single file (Lucide icons are ISC, Inter is OFL-1.1).
 const pkgOf = async (name) => JSON.parse(await readFile(resolve(root, "node_modules", name, "package.json"), "utf8"));
@@ -71,7 +71,8 @@ const notices =
   `Inter Regular font (@expo-google-fonts/inter ${inter.version}, Inter_400Regular.ttf, unmodified)\n${await licence("@expo-google-fonts/inter/LICENSE_FONT")}\n\n` +
   `SunEditor (suneditor ${sun.version}, the notes editor)\n${await licence("suneditor/LICENSE.txt")}\n\n` +
   `pdf.js (pdfjs-dist ${pdfjs.version}, draws PDFs), Apache-2.0: https://www.apache.org/licenses/LICENSE-2.0\n\n` +
-  `three.js (three ${threejs.version}, draws 3D models)\n${await licence("three/LICENSE")}\n-->\n`;
+  `three.js (three ${threejs.version}, draws 3D models)\n${await licence("three/LICENSE")}\n\n` +
+  `Retroma's fonts (src/theme/fonts, Latin subsets in WOFF2 from @expo-google-fonts): Atkinson Hyperlegible, Space Grotesk, Courier Prime, Fraunces, VT323, Press Start 2P, Caveat and DM Mono under the SIL Open Font License 1.1; Special Elite under the Apache License 2.0\n${(await readFile(resolve(root, "src/theme/fonts/LICENSE-atkinson-hyperlegible.txt"), "utf8")).replace(/--/g, "- -").trim()}\n-->\n`;
 const html = template
   .replaceAll("__CANVAST_VERSION__", pkg.version)
   .replace("/*__CANVAST_STYLES__*/", () => styles)

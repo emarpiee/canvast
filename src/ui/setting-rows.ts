@@ -22,7 +22,7 @@ export function settingRowHtml(s: Setting, v: SettingValue, extra = "", /** Uniq
   if (s.t === "choice" && (s.opts.length > MOST_BUTTONS || s.dropdown)) return `<div class="adj-row" data-k="${s.k}"><span class="adj-label">${esc(s.label)}${extra}</span><select data-choice aria-label="${esc(s.label)}">${s.opts.map(([o, l]) => `<option value="${o}"${o === v ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></div>`;
   if (s.t === "choice") return `<div class="adj-row pg-line" data-k="${s.k}"><span class="adj-label">${esc(s.label)}${extra}</span><div class="adj-layers pg-seg" role="group" aria-label="${esc(s.label)}">${s.opts.map(([o, l]) => `<button type="button" data-v="${o}" aria-pressed="${o === v}">${esc(l)}</button>`).join("")}</div></div>`;
   const none = v === "";
-  return `<div class="adj-row pg-line" data-k="${s.k}"><span class="adj-label">${esc(s.label)}${extra}</span><div class="pg-colour"><button type="button" class="pg-swatch" data-swatch aria-label="${esc(s.label)} colour"></button><code>${none ? "none" : String(v).toUpperCase()}</code>${s.hide ? `<button type="button" class="pg-eye" data-eye aria-pressed="${!none}" aria-label="Show ${esc(s.label)}" title="${none ? "Show" : "Hide"} ${esc(s.label.toLowerCase())}">${none ? ICONS.eyeOff : ICONS.eye}</button>` : ""}</div></div>`;
+  return `<div class="adj-row pg-line" data-k="${s.k}"><span class="adj-label">${esc(s.label)}${extra}</span><div class="pg-colour"><button type="button" class="pg-swatch" data-swatch aria-label="${esc(s.label)} colour"></button><code>${none ? (s.auto ? "auto" : "none") : String(v).toUpperCase()}</code>${s.auto ? `<button type="button" class="pg-auto" data-auto aria-pressed="${none}" title="Worked out by the theme">Auto</button>` : ""}${s.hide ? `<button type="button" class="pg-eye" data-eye aria-pressed="${!none}" aria-label="Show ${esc(s.label)}" title="${none ? "Show" : "Hide"} ${esc(s.label.toLowerCase())}">${none ? ICONS.eyeOff : ICONS.eye}</button>` : ""}</div></div>`;
 }
 
 /** Makes a row work. `get` reads a value now, `set` changes it; `reset` is its double-click. */
@@ -52,13 +52,15 @@ export function bindSettingRow(r: HTMLElement, s: Setting, get: (k: string) => S
       const c = get(s.k) as string;
       sw.style.background = c || last;
       sw.classList.toggle("is-none", c === "");
-      code.textContent = c ? c.toUpperCase() : "none";
+      code.textContent = c ? c.toUpperCase() : s.auto ? "auto" : "none";
+      r.querySelector("[data-auto]")?.setAttribute("aria-pressed", String(c === ""));
       const eye = r.querySelector<HTMLElement>("[data-eye]");
       if (eye) { eye.setAttribute("aria-pressed", String(c !== "")); eye.innerHTML = c ? ICONS.eye : ICONS.eyeOff; }
     };
     paint();
     sw.addEventListener("click", () => openColourPopover(sw, { name: s.label, value: last, onInput: (h) => { last = h.slice(0, 7); set(s.k, last); paint(); } }));
     r.querySelector("[data-eye]")?.addEventListener("click", () => { set(s.k, get(s.k) === "" ? last : ""); paint(); });
+    r.querySelector("[data-auto]")?.addEventListener("click", () => { set(s.k, get(s.k) === "" ? last : ""); paint(); });
   }
 }
 

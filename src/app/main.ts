@@ -1,3 +1,5 @@
+import { applyRetroma, retromaChanges, retromaSettings } from "../theme/retroma/apply";
+import { presetSettings } from "../theme/retroma/engine";
 import { setSnapPx } from "../interaction/snap";
 import { followHost, sendView } from "./follow";
 import { readOnlyLine, readOnlyWhy } from "../storage/guest-page";
@@ -159,7 +161,7 @@ import { descendantsOf, isContainer, rootsOf } from "../doc/containers";
 import { isResult } from "../doc/boolean-group";
 import { CameraHistory } from "./camera-history";
 import { mountTour } from "./tour";
-import { ADJUSTMENT_KIND, EXPORT_KIND, EXPORT_NAME_KIND, RATIO_KIND } from "../assets/styles";
+import { ADJUSTMENT_KIND, EXPORT_KIND, EXPORT_NAME_KIND, RETROMA_KIND, RATIO_KIND } from "../assets/styles";
 import { formatRatio, parseRatio } from "./export-size";
 import { setColourStyles } from "../ui/colour-popover";
 import { setTextureHooks } from "../ui/texture-editor";
@@ -397,6 +399,14 @@ async function start(): Promise<void> {
     settings.set("eraser.wholeGroups", editor.eraseWholeGroups);
     settings.set("eraser.parts", editor.eraseParts);
   });
+  // The theme (ui.look): Retroma, worked out from its settings for light or dark (src/theme/retroma), or Legacy, the stylesheet alone.
+  const applyLook = (): void => {
+    const t = settings.get("ui.theme");
+    const dark = t === "system" ? matchMedia("(prefers-color-scheme: dark)").matches : t === "dark";
+    const motion = settings.get("ui.motion");
+    const reducedMotion = motion === "reduce" || (motion === "system" && matchMedia("(prefers-reduced-motion: reduce)").matches);
+    applyRetroma(document.documentElement, settings.get("ui.look") === "retroma", settings.get("retroma.look"), { dark, reducedMotion });
+  };
   // Theme chosen in Settings (ui.theme): "system" leaves the attribute off so the operating system decides.
   const applyThemeAttribute = (): void => {
     const t = settings.get("ui.theme");
@@ -465,6 +475,7 @@ async function start(): Promise<void> {
   applyAppearance();
   applyZen();
   applyThemeAttribute();
+  applyLook();
   let theme = readTheme(document.documentElement);
   setCanvasInk(theme.ink);
   let dpr = window.devicePixelRatio || 1;
@@ -1081,6 +1092,7 @@ async function start(): Promise<void> {
   };
   new ResizeObserver(resize).observe(host);
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    applyLook();
     theme = readTheme(document.documentElement);
     setCanvasInk(theme.ink);
     tiles.clear();
@@ -2590,6 +2602,33 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   session.subscribeAssets(() => session.autoIndex?.poke()); // (commits, imports, catalog changes)
   settings.subscribe(() => session.autoIndex?.poke());
   externalFolder.subscribe(() => session.autoIndex?.poke()); // (a folder was chosen or came back)
+  // Retroma's theme presets: saved styles of the kind "retroma", kept with the workspace (Settings › Retroma lists, saves and imports them).
+  const themePresets = {
+    list: () => session.styles.of(RETROMA_KIND.id).map((s) => ({ id: s.id, name: s.name, hex: (s.data as { hex: string }).hex, changes: (s.data as { changes: string }).changes })),
+    save: async (changes: string, hex: string) => {
+      const name = await promptDialog({ title: "Name this theme preset", lines: ["It keeps the accent and every customisation, with the workspace."], value: "My Retroma", confirmLabel: "Save" });
+      if (name !== null) await session.styles.add(RETROMA_KIND.id, name, { changes, hex });
+    },
+    add: async (name: string, changes: string, hex: string) => void (await session.styles.add(RETROMA_KIND.id, name, { changes, hex })),
+  };
+  // Retroma's schedule (Settings › Retroma › Schedule): one preset by day, another by night, checked every minute and when it changes.
+  let themeScheduled = "";
+  const checkSchedule = (): void => {
+    if (settings.get("ui.look") !== "retroma") return;
+    const s = retromaSettings(settings.get("retroma.look")) as Record<string, unknown>;
+    if (!s["schedOn"]) return void (themeScheduled = "");
+    const hour = Number(s["schedSim"]) >= 0 ? Number(s["schedSim"]) : new Date().getHours();
+    const want = String(hour >= Number(s["schedDayFrom"]) && hour < Number(s["schedNightFrom"]) ? s["schedDay"] : s["schedNight"]);
+    if (want === themeScheduled) return;
+    themeScheduled = want;
+    const p = presetSettings(want);
+    if (!p) return;
+    const keep = Object.fromEntries(["schedOn", "schedDay", "schedNight", "schedDayFrom", "schedNightFrom", "schedSim", "em", "es", "hl", "ct", "at", "fi"].map((k) => [k, s[k]]));
+    settings.set("retroma.look", retromaChanges({ ...p, ...keep, preset: want }));
+  };
+  setInterval(checkSchedule, 60_000);
+  settings.subscribe((key) => key === "retroma.look" && queueMicrotask(checkSchedule));
+  checkSchedule();
   const settingsView = mountSettingsView(document.getElementById("settings-view")!, settings, keymap, () => setView("canvas"), {
     last: async () => {
       const r = await session.lastBackup();
@@ -2732,7 +2771,7 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       p.update(null, "the page reloads when it is done");
       await (session.storage?.resetAll(() => p.update(null, "waiting for the other canvast tabs to close")) ?? Promise.reject(new Error("storage is unavailable"))).catch((e) => p.fail(`Could not delete all data: ${(e as Error).message}`));
     },
-  });
+  }, themePresets);
   // A setting changed in the Settings view reaches the tools and the drawing (the toolbars write to the store the other way).
   settings.subscribe((key) => {
     switch (key) {
@@ -2763,9 +2802,14 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       case "nav.baseSeconds":
       case "nav.respectMotion":
         applyAppearance();
+        if (key === "ui.motion") applyLook(); // (Retroma's light and presses follow Animation too)
         return;
       case "ui.zen":
         applyZen();
+        // (Retroma gives zen mode its own canvas colour: read the canvas's colours again)
+        theme = readTheme(document.documentElement);
+        tiles.clear();
+        invalidate();
         return;
       case "ui.hints":
         hintLine.current?.refresh();
@@ -2798,8 +2842,17 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
         tiles.clear();
         invalidate();
         return;
+      case "ui.look":
+      case "retroma.look":
+        applyLook();
+        theme = readTheme(document.documentElement);
+        setCanvasInk(theme.ink);
+        tiles.clear();
+        invalidate();
+        return;
       case "ui.theme":
         applyThemeAttribute();
+        applyLook();
         theme = readTheme(document.documentElement);
         setCanvasInk(theme.ink);
         tiles.clear();
@@ -3028,6 +3081,21 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
   window.addEventListener("pointermove", trackPointer, true);
   // A pointer held on the canvas (a drag pan): the tiles never take the view for resting while it is (a heavy canvas's slow frame is no rest).
   canvas.addEventListener("pointerdown", () => void (tiles.holding = true));
+  // Retroma › Canvas: the floating bars fade while the canvas is dragged (after the fade-out delay) and come back after the fade-in delay.
+  let fadeTimer: ReturnType<typeof setTimeout> | undefined;
+  canvas.addEventListener("pointerdown", () => {
+    if (settings.get("ui.look") !== "retroma") return;
+    const s = retromaSettings(settings.get("retroma.look")) as Record<string, unknown>;
+    if (!s["fadeOnPan"]) return;
+    clearTimeout(fadeTimer);
+    fadeTimer = setTimeout(() => void (document.documentElement.dataset["rtPanning"] = "on"), Number(s["fadeOut"]) * 1000);
+  });
+  window.addEventListener("pointerup", () => {
+    clearTimeout(fadeTimer);
+    if (document.documentElement.dataset["rtPanning"] !== "on") return;
+    const s = retromaSettings(settings.get("retroma.look")) as Record<string, unknown>;
+    fadeTimer = setTimeout(() => void delete document.documentElement.dataset["rtPanning"], Number(s["fadeIn"]) * 1000);
+  }, true);
   for (const type of ["pointerup", "pointercancel"]) window.addEventListener(type, (e) => void ((e as PointerEvent).buttons === 0 && (tiles.holding = false)), true);
   window.addEventListener("pointerdown", trackPointer, true);
   /** How long after the paste keys a paste event is waited for before what was copied here is pasted without one (see the keydown below). */

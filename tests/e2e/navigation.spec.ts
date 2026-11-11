@@ -398,7 +398,7 @@ test("the command palette has the bars' buttons and the settings as commands, an
   await box.fill("@settings theme");
   const themed = await titles();
   expect(themed.length).toBeGreaterThan(1);
-  expect(themed).toContain("Theme: Dark");
+  expect(themed).toContain("Light or dark: Dark");
   expect(await palette.locator(".palette-group").allTextContents()).toEqual(themed.map(() => "Setting"));
   // A choice of a setting is a command: it sets it.
   await box.fill("@settings theme dark");

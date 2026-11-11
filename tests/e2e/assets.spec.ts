@@ -939,7 +939,10 @@ test("a video this browser cannot decode is still imported as a card of its own 
   const sum = async (x: number, y: number) => (await p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y])).slice(0, 3).reduce((s, v) => s + v, 0);
   const mx = Math.round((box.minX + box.maxX) / 2);
   const my = Math.round((box.minY + box.maxY) / 2);
-  await expect.poll(async () => (await sum(mx, Math.round(my - (box.maxY - box.minY) * 0.06))) - (await sum(Math.round(box.maxX + 30), my))).toBeGreaterThan(40);
+  // (the play mark stands out of the card, and the card, near its edge, out of the canvas: whatever colour the theme gives the canvas)
+  const edge = Math.round(box.minX + (box.maxX - box.minX) * 0.08);
+  await expect.poll(async () => (await sum(mx, Math.round(my - (box.maxY - box.minY) * 0.06))) - (await sum(edge, my))).toBeGreaterThan(40);
+  await expect.poll(async () => Math.abs((await sum(edge, my)) - (await sum(Math.round(box.maxX + 30), my)))).toBeGreaterThan(40);
   // The card is drawn (dark, not a placeholder gap) and selecting it offers the file, not playback.
   await p.keyboard.press("v");
   await p.mouse.click(Math.round((box.minX + box.maxX) / 2), Math.round((box.minY + box.maxY) / 2));

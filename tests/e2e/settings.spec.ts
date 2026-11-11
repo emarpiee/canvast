@@ -64,19 +64,19 @@ test("settings view: tabs, a row reaches the tools, reset, theme and reload (ADR
   await expect(reset).toBeDisabled();
   // Theme: dark and light are applied at once and kept across a reload.
   await panel.getByRole("tab", { name: "Appearance" }).click();
-  await panel.getByLabel("Theme", { exact: true }).selectOption("dark");
+  await panel.getByLabel("Light or dark", { exact: true }).selectOption("dark");
   await expect(p.locator("html")).toHaveAttribute("data-theme", "dark");
   await panel.getByRole("button", { name: "Back to canvas" }).click();
   await app.frame();
   const bg = async () => (await p.evaluate(() => window.__canvastDebug.pixelAt(6, 6))).join(",");
   const dark = await bg();
   await view.click();
-  await panel.getByLabel("Theme", { exact: true }).selectOption("light");
+  await panel.getByLabel("Light or dark", { exact: true }).selectOption("light");
   await panel.getByRole("button", { name: "Back to canvas" }).click();
   await app.frame();
   expect(await bg(), "the canvas background follows the theme").not.toBe(dark);
   await view.click();
-  await panel.getByLabel("Theme", { exact: true }).selectOption("dark");
+  await panel.getByLabel("Light or dark", { exact: true }).selectOption("dark");
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await expect(p.locator("html")).toHaveAttribute("data-theme", "dark");
@@ -286,6 +286,9 @@ test("theme colour: the hue and colourfulness dials recolour the interface but n
   const panel = p.locator("#settings-view");
   await p.getByTestId("view-settings").click();
   await panel.getByRole("tab", { name: "Appearance" }).click();
+  // (the dials are Legacy's: Retroma, the default, has its own accent, and hides them)
+  await expect(panel.getByLabel("Theme colour", { exact: true })).toBeHidden();
+  await panel.getByLabel("Theme", { exact: true }).selectOption("legacy");
   /** Contrast of the selected view tab (its text on its fill) and the brightness of the canvas background, read from the real colours. */
   const measure = () =>
     p.evaluate(() => {

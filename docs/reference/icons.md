@@ -73,6 +73,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `blend` | Styles panel: Gradients tab |
 | `droplet` | Styles panel: Colours tab |
 | `palette` | Styles panel: Palettes tab |
+| `joystick` | Settings: the Retroma tab (the theme's own section) |
 | `fileUp` | Styles panel: Import .ggr or .gpl files |
 | `droplets` | Styles panel: Change colour (menu item) |
 | `rainbow` | Styles panel: New palette from a colour (harmony) |

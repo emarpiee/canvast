@@ -103,7 +103,57 @@ export function markdownHtml(text: string): string {
   }
   for (const pre of t.content.querySelectorAll("pre")) codeLines(pre);
   cellPictures(t.content, document);
+  markCallouts(t.content);
+  markAltCheckboxes(t.content);
   return t.innerHTML;
+}
+
+/** The kinds of callout Obsidian knows (`> [!kind] Title`); another word is shown as a note. */
+export const CALLOUT_KINDS = ["note", "abstract", "summary", "tldr", "info", "todo", "tip", "hint", "important", "success", "check", "done", "question", "help", "faq", "warning", "caution", "attention", "failure", "fail", "missing", "danger", "error", "bug", "example", "quote", "cite"] as const;
+/** The alternative checkboxes (`- [/] task`): the mark between the brackets and the name it is styled by. */
+export const ALT_CHECKBOXES: Readonly<Record<string, string>> = { "/": "incomplete", "-": "cancelled", ">": "forwarded", "<": "scheduling", "?": "question", "!": "important", "*": "star", '"': "quote", l: "location", b: "bookmark", i: "information", S: "savings", I: "idea", p: "pros", c: "cons", f: "fire", k: "key", w: "win", u: "up", d: "down", D: "draft", P: "open", M: "merged" };
+
+/** The first text of `el` when it starts with `pattern`: the text node, and the match. */
+function leadingText(el: Element, pattern: RegExp): { node: Text; m: RegExpExecArray } | null {
+  const walk = el.ownerDocument.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+  while (walk.nextNode()) {
+    const n = walk.currentNode as Text;
+    if (!n.data.trim()) continue;
+    const m = pattern.exec(n.data);
+    return m ? { node: n, m } : null;
+  }
+  return null;
+}
+/** Wraps the start of a text node (the marker) in a span of its own, so it can be styled; the text is unchanged, so the Markdown written back is. */
+function wrapLead(node: Text, length: number, className: string): void {
+  const rest = node.splitText(length);
+  const span = node.ownerDocument.createElement("span");
+  span.className = className;
+  node.replaceWith(span);
+  span.append(node);
+  void rest;
+}
+/** A blockquote that starts `[!kind]` is a callout: marked by classes the editor keeps (its text, and so its Markdown, unchanged). */
+function markCallouts(root: ParentNode): void {
+  for (const q of root.querySelectorAll("blockquote")) {
+    const lead = leadingText(q, /^\s*\[!([a-z-]+)\][+-]?/i);
+    if (!lead) continue;
+    const word = lead.m[1]!.toLowerCase();
+    const kind = (CALLOUT_KINDS as readonly string[]).includes(word) ? word : "note";
+    q.classList.add("__se__callout", `__se__callout-${kind}`);
+    wrapLead(lead.node, lead.m[0].length, "__se__callout-mark");
+  }
+}
+/** A list item that starts with an alternative checkbox (`[/]`, `[!]` …): marked the same way. */
+function markAltCheckboxes(root: ParentNode): void {
+  for (const li of root.querySelectorAll("li")) {
+    if (li.querySelector(":scope > input[type=checkbox]")) continue;
+    const lead = leadingText(li, /^\s*\[(.)\]\s/);
+    const name = lead && ALT_CHECKBOXES[lead.m[1]!];
+    if (!lead || !name) continue;
+    li.classList.add("__se__acb", `__se__acb-${name}`);
+    wrapLead(lead.node, lead.m[0].trimEnd().length, "__se__acb-mark");
+  }
 }
 
 /** A note's HTML as markdown, as Obsidian writes it: footnotes, embeds and table alignment kept (see obsidianMarkdown). */
@@ -116,6 +166,13 @@ export function htmlMarkdown(h: string): string {
     c.innerHTML = c.innerHTML.replace(/<br\s*\/?>/g, "\n");
     if (/(?:^|>|\n)`{3,}/.test(c.innerHTML)) c.innerHTML = c.innerHTML.replace(/`/g, FENCE_TICK);
   }
+  // (callouts and alternative checkboxes are marks for the eye only: their text is what is written)
+  for (const m of t.content.querySelectorAll(".__se__callout-mark, .__se__acb-mark")) m.replaceWith(...m.childNodes);
+  for (const el of t.content.querySelectorAll(".__se__callout, .__se__acb")) {
+    for (const c of [...el.classList]) if (c.startsWith("__se__callout") || c.startsWith("__se__acb")) el.classList.remove(c);
+    if (!el.classList.length) el.removeAttribute("class");
+  }
+  t.content.normalize();
   h = t.innerHTML;
   const aligns = [...t.content.querySelectorAll("table")].map((tb) => [...(tb.querySelector("tr")?.children ?? [])].map((c) => ((c as HTMLElement).style.textAlign || null) as "left" | "center" | "right" | null));
   return obsidianMarkdown(helper.markdown.jsonToMarkdown(helper.converter.htmlToJson(h)), aligns);

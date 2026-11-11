@@ -1,3 +1,4 @@
+import { mountRetromaSection, type ThemePresets } from "./retroma-section";
 import { NOTE_STYLES } from "../notes/note-file";
 import { mountSharing } from "./share-panel";
 import { listDialog } from "./confirm";
@@ -110,13 +111,13 @@ function cardsOf(rows: readonly Row[]): Array<{ title: string; rows: Row[] }> {
 
 /** The tabs in the sidebar, in groups. */
 /** The icon of each tab (Screenshot shares the camera of the Screenshot button). */
-const TAB_ICON: Record<string, keyof typeof ICONS> = { drawing: "tabDrawing", navigation: "tabNavigation", shortcuts: "tabShortcuts", media: "tabMedia", library: "tabLibrary", notes: "tabNotes", saving: "tabSaving", screenshot: "camera", appearance: "tabAppearance", panels: "tabPanels", performance: "tabPerformance", storage: "tabStorage", sharing: "tabSharing", privacy: "tabPrivacy", about: "tabAbout", develop: "tabDevelop" };
+const TAB_ICON: Record<string, keyof typeof ICONS> = { retroma: "joystick", drawing: "tabDrawing", navigation: "tabNavigation", shortcuts: "tabShortcuts", media: "tabMedia", library: "tabLibrary", notes: "tabNotes", saving: "tabSaving", screenshot: "camera", appearance: "tabAppearance", panels: "tabPanels", performance: "tabPerformance", storage: "tabStorage", sharing: "tabSharing", privacy: "tabPrivacy", about: "tabAbout", develop: "tabDevelop" };
 
 const TAB_GROUPS: ReadonlyArray<readonly [title: string, ids: readonly string[]]> = [
   ["Working", ["drawing", "navigation", "shortcuts"]],
   ["Library", ["notes", "saving"]],
   ["Media", ["media", "screenshot"]],
-  ["Interface", ["appearance", "performance"]],
+  ["Interface", ["appearance", "retroma", "performance"]],
   ["App", ["storage", "sharing", "privacy", "about", "develop"]],
 ];
 
@@ -285,7 +286,8 @@ export const SETTINGS_TABS: readonly Tab[] = [
     id: "appearance",
     label: "Appearance",
     rows: [
-      { key: "ui.theme", label: "Theme", help: "System follows your operating system.", control: { kind: "select", options: [["system", "System"], ["light", "Light"], ["dark", "Dark"]] } },
+      { key: "ui.look", label: "Theme", help: "Retroma, the default, with its own section below; or Legacy, the app's earlier look.", control: { kind: "select", options: [["retroma", "Retroma"], ["legacy", "Legacy"]] } },
+      { key: "ui.theme", label: "Light or dark", help: "System follows your operating system.", control: { kind: "select", options: [["system", "System"], ["light", "Light"], ["dark", "Dark"]] } },
       ...(DESKTOP ? [{ key: "ui.frame" as const, label: "Window frame", help: "Off: a title row that shows from the top edge. After a restart.", more: "System: the title bar your desktop draws. Off: no title bar, so more room; move the pointer to the very top edge and a row comes over the app, with minimise, maximise and close, and the window moves by dragging it. It shows for a moment at each start. Applies the next time the app starts.", control: { kind: "select" as const, options: [["system", "System"], ["off", "Off"]] as Array<[string, string]> } }] : []),
       { key: "ui.hue", label: "Theme colour", help: "The hue of the accent and of every tint. Brightness and contrast do not change with it.", control: { kind: "range", min: 0, max: 360, step: 1, unit: "°", live: true, hue: [["Viridian", 178], ["Ultramarine", 265], ["Violet", 310], ["Madder", 15], ["Ochre", 80]], adaptive: "ui.hueAdaptive" } },
       { key: "ui.vivid", label: "Colourfulness", help: "From grey to vivid; brightness stays the same.", control: { kind: "range", min: 0, max: 150, step: 5, unit: "%", live: true } },
@@ -304,6 +306,7 @@ export const SETTINGS_TABS: readonly Tab[] = [
       { key: "panel.keep", label: "Panels kept open", help: "How many stacked panels stay open with Keep the latest few open.", more: `Counting the active one; up to the ${DOCK_PANEL_IDS.length} panels the app has. Press a title bar to open or fold a panel yourself; drag it to float it or to stack it on the other side.`, control: { kind: "range", min: 1, max: DOCK_PANEL_IDS.length, step: 1, unit: "panels" } },
     ],
   },
+  { id: "retroma", label: "Retroma" },
   { id: "shortcuts", label: "Shortcuts" },
   { id: "storage", label: "Storage" },
   ...(desktopBridge()?.share ? [{ id: "sharing", label: "Sharing" }] : []),
@@ -402,7 +405,7 @@ const pwCard = (kind: "hidden" | "workspace", title: string, help: string): stri
              <p data-pw-state role="status">…</p>
              <div class="storage-actions"><button type="button" data-pw="set" data-kind="${kind}" data-testid="${kind}-pw-set">Set a password…</button><button type="button" data-pw="remove" data-kind="${kind}" data-testid="${kind}-pw-remove" hidden>Remove the password…</button>${kind === "hidden" ? `<button type="button" data-pw="lock" data-kind="hidden" data-testid="hidden-pw-lock" title="${esc(LOCK_TIP)}" hidden>Lock now</button><button type="button" data-pw="newkey" data-kind="hidden" data-testid="hidden-pw-newkey" title="${esc(NEW_KEY_TIP)}" hidden>New key…</button>` : ""}</div></div>`;
 
-export function mountSettingsView(root: HTMLElement, settings: SettingsStore, keymap: Keymap, onClose: () => void, backup?: BackupHooks): { show(tab?: string): void; hide(): void } {
+export function mountSettingsView(root: HTMLElement, settings: SettingsStore, keymap: Keymap, onClose: () => void, backup?: BackupHooks, themePresets?: ThemePresets): { show(tab?: string): void; hide(): void } {
   const tabButton = (t: Tab): string => `<button type="button" role="tab" id="set-tab-${t.id}" aria-controls="set-panel-${t.id}" data-tab="${t.id}"><span class="set-tab-icon" aria-hidden="true">${ICONS[TAB_ICON[t.id] ?? "tabAbout"]}</span><span class="set-tab-label">${esc(t.label)}</span><span class="set-hits" aria-hidden="true"></span></button>`;
   const tabsHtml = TAB_GROUPS.map(
     ([title, ids]) => `<div class="set-tabs-h" role="presentation">${esc(title)}</div>${ids.flatMap((id) => SETTINGS_TABS.filter((t) => t.id === id)).map(tabButton).join("")}`,
@@ -432,6 +435,8 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
           : "")
       : t.id === "sharing"
         ? ""
+      : t.id === "retroma"
+        ? `<div class="rt-section" data-retroma></div>`
       : t.id === "shortcuts"
         ? `<div class="set-info set-keys"><p>Every shortcut can be changed, to one key or to several together (Ctrl+Shift+F, Alt+Q). Press <strong>Change</strong>, then the keys you want; <strong>Add</strong> gives the command another key; the <strong>×</strong> takes a key away; Escape cancels. You are warned when a key is already used, or when the browser or the system may take it.</p>
            <p><button type="button" class="set-reset" data-keys-reset-all>Reset every shortcut</button></p>
@@ -754,6 +759,12 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   const refresh = (): void => {
     renderKeys();
     search();
+    // Theme colour and Colourfulness are the Legacy theme's dials: Retroma has its own accent, in its own section.
+    const retroma = settings.get("ui.look") === "retroma";
+    for (const k of ["ui.hue", "ui.vivid"]) {
+      const row = root.querySelector<HTMLElement>(`.set-row[data-row="${k}"]`);
+      if (row) row.hidden = retroma;
+    }
     for (const r of all) {
       const el = root.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-set="${r.key}"]`);
       if (!el) continue;
@@ -914,6 +925,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
     if (key === "dev.tools") root.querySelector<HTMLElement>("[data-dev-note]")!.hidden = false;
   });
   settings.subscribe(refresh);
+  mountRetromaSection(root.querySelector<HTMLElement>("[data-retroma]")!, settings, () => select("appearance", true), plainRowHtml, themePresets);
   select(current);
   refresh();
   const tabRow = root.querySelector<HTMLElement>(".set-tabs")!;

@@ -24,7 +24,7 @@ export type Setting = Base &
     | { readonly t: "choice"; readonly opts: readonly (readonly [string, string])[]; readonly def: string; /** A dropdown however few there are: its names do not fit side by side. */ readonly dropdown?: true }
     | { readonly t: "toggle"; readonly def: boolean }
     /** A colour "#rrggbb"; with `hide`, "" means none (the eye of the panel). */
-    | { readonly t: "colour"; readonly def: string; readonly hide?: true; /** The colour it takes when a hidden default is shown. */ readonly shown?: string }
+    | { readonly t: "colour"; readonly def: string; readonly hide?: true; /** The colour it takes when a hidden default is shown. */ readonly shown?: string; /** "" means worked out by the theme: an Auto button in place of the eye. */ readonly auto?: true }
   );
 
 export interface Section {

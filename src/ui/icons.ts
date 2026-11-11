@@ -244,6 +244,7 @@ import boxSelect from "lucide-static/icons/box-select.svg";
 import bookmarkCheck from "lucide-static/icons/bookmark-check.svg";
 import bookmarkPlus from "lucide-static/icons/bookmark-plus.svg";
 import paletteSvg from "lucide-static/icons/palette.svg";
+import joystickSvg from "lucide-static/icons/joystick.svg";
 import fileUpSvg from "lucide-static/icons/file-up.svg";
 import notebookPenSvg from "lucide-static/icons/notebook-pen.svg";
 import squareCheckBigSvg from "lucide-static/icons/square-check-big.svg";
@@ -577,6 +578,7 @@ export const ICONS = {
   paintObjects: clean(paintObjectsSvg),
   droplet: clean(dropletSvg),
   palette: clean(paletteSvg),
+  joystick: clean(joystickSvg),
   fileUp: clean(fileUpSvg),
   notebookPen: clean(notebookPenSvg),
   squareCheckBig: clean(squareCheckBigSvg),

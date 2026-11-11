@@ -50,11 +50,12 @@ function loadPrism(): Promise<PrismApi> {
 
 /** The few colours, and the many kinds of token each is for. */
 const GROUPS: Readonly<Record<string, string>> = {
-  keyword: "keyword", boolean: "keyword", important: "keyword", atrule: "keyword", rule: "keyword", directive: "keyword", "macro": "keyword",
-  string: "string", "attr-value": "string", char: "string", regex: "string", url: "string", "template-string": "string", "string-interpolation": "string",
+  keyword: "keyword", boolean: "keyword", important: "important", atrule: "keyword", rule: "keyword", directive: "keyword", "macro": "keyword",
+  string: "string", "attr-value": "string", char: "string", regex: "string", url: "url", "template-string": "string", "string-interpolation": "string",
   comment: "comment", prolog: "comment", doctype: "comment", cdata: "comment",
   number: "number", constant: "number", symbol: "number", null: "number", unit: "number",
   function: "function", builtin: "function", "class-name": "function", selector: "function", title: "function",
+  operator: "operator", punctuation: "punctuation",
   tag: "tag", "attr-name": "tag", property: "tag", key: "tag", namespace: "tag", variable: "tag",
 };
 export const CODE_COLOUR_GROUPS: readonly string[] = [...new Set(Object.values(GROUPS))];
@@ -78,7 +79,8 @@ export async function codeSpans(text: string, language: string): Promise<CodeSpa
     else {
       const aliases = Array.isArray(s.alias) ? s.alias : s.alias ? [s.alias] : [];
       const own = [s.type, ...aliases].map((t) => GROUPS[t]).find(Boolean);
-      walk(s.content, own ?? inherited);
+      // (an operator or a mark of punctuation inside a coloured token keeps that token's colour)
+      walk(s.content, inherited && (own === "operator" || own === "punctuation") ? inherited : own ?? inherited);
     }
   };
   walk(P.tokenize(text, grammar), undefined);

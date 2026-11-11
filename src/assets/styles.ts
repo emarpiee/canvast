@@ -197,7 +197,23 @@ export const EXPORT_NAME_KIND: StyleKind = {
   summary: (d) => (d as { pattern: string }).pattern,
 };
 
-export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND, BALLOON_KIND, RATIO_KIND, EXPORT_KIND, EXPORT_NAME_KIND];
+/** A Retroma theme preset: what differs from Retroma's defaults (as JSON) and its accent; chosen in Settings › Retroma, kept with the workspace. */
+export const RETROMA_KIND: StyleKind = {
+  id: "retroma",
+  label: "Theme preset",
+  plural: "Theme presets",
+  empty: "None yet. Save one in Settings › Retroma, or import Retroma's presets file there.",
+  validate: (d) => {
+    const o = d as { changes?: unknown; hex?: unknown } | null;
+    if (!o || typeof o.changes !== "string" || o.changes.length > 400_000 || typeof o.hex !== "string" || !/^#[0-9a-f]{6}$/i.test(o.hex)) return null;
+    try { if (typeof JSON.parse(o.changes) !== "object") return null; } catch { return null; }
+    return { changes: o.changes, hex: o.hex };
+  },
+  summary: (d) => `Accent ${(d as { hex: string }).hex.toUpperCase()}`,
+  look: (d) => ({ swatches: [(d as { hex: string }).hex] }),
+};
+
+export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND, BALLOON_KIND, RATIO_KIND, EXPORT_KIND, EXPORT_NAME_KIND, RETROMA_KIND];
 
 export const kindById = (id: string): StyleKind | undefined => STYLE_KINDS.find((k) => k.id === id);
 
