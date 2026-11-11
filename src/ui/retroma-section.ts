@@ -52,8 +52,8 @@ const APP_OWNED = new Set(["mode", "dens", "motion", "zen", "grid"]);
 const LEFT_OUT_KEYS = new Set(["fadeOnPan", "fadeSpeed", "fadeOut", "fadeIn", "mat", "cCardCover"]); /* (and the picture mat: the owner removed it, pictures have no mat) */
 /** Settings not shown here: the app's own, and those left out. */
 const notHere = (k: string): boolean => APP_OWNED.has(k) || LEFT_OUT_KEYS.has(k);
-/** Groups of the demo left out: Zen mode is the app's own (Settings › Appearance), the same in every theme. */
-const LEFT_OUT = new Set(["Zen mode"]);
+/** Groups of the demo left out: Zen mode is the app's own (Settings › Appearance), and the note editor's groups (notes keep the app's own editor look in every theme). */
+const LEFT_OUT = new Set(["Zen mode", "Editor", "Editor frame", "Each heading", "Headings", "Text", "Links and lists", "Blockquotes and callouts", "More text and pictures", "Code", "Checkboxes and tables"]); /* (and the note editor's groups: notes look as in Legacy, in every theme) */
 const shownGroups = (groups: readonly Group[]): Group[] => groups.filter((g) => !LEFT_OUT.has(g.title) && g.items.some((c) => c.k && c.label && !notHere(c.k)));
 
 function toSetting(c: Control, S: Loose): Setting | null {
