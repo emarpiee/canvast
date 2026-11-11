@@ -57,39 +57,42 @@
 /* Which buttons are keys: any button of a bar, a panel's head or foot, a dialog's or a setting's actions, and the app's own key classes.
    (expanded by scripts/lib/custom-selectors.mjs into one plain selector per item, each filed under `button`; what it leaves out is in
    :where(), so a key's own rule weighs a class and a button and a key placed by its own rule, as the viewer's buttons, keeps its place) */
-@custom-selector :--key .rail button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .dock button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .toolbar button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .ctx-bar button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .hud-controls button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .tb-options-row button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .adj-layers button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .view-settings button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .view-switch button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .seg button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .confirm-actions button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .storage-actions button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .action-row button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .set-tabs button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .rail-fly button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .side-head button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .asset-quick button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .asset-actions button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .panel-head button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .panel-foot button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .layers-tools button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .set-control button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .ex-foot button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  .ex-head button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  button.assets-btn:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  button.set-reset:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  button.set-done:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  button.rt-open:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  button.set-link:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  button.nav-crumb:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  button.vbtn:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  button.pg-auto:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
-  button.pg-current:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch));
+/* The floating tool bars, and a key's pressed or chosen state: each list written once */
+@custom-selector :--bar .rail, .dock, .toolbar, .ctx-bar, .hud-controls;
+@custom-selector :--on [aria-pressed="true"], [aria-checked="true"], [aria-selected="true"], :active:not(:disabled);
+@custom-selector :--key .rail button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .dock button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .toolbar button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .ctx-bar button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .hud-controls button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .tb-options-row button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .adj-layers button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .view-settings button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .view-switch button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .seg button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .confirm-actions button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .storage-actions button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .action-row button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .set-tabs button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .rail-fly button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .side-head button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .asset-quick button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .asset-actions button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .panel-head button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .panel-foot button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .layers-tools button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .set-control button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .ex-foot button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  .ex-head button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  button.assets-btn:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  button.set-reset:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  button.set-done:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  button.rt-open:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  button.set-link:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  button.nav-crumb:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  button.vbtn:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  button.pg-auto:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
+  button.pg-current:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x));
 /* Which buttons are keys: the list is written once per rule that needs it (the key and its face), always ending in `button`, so the browser
    checks it on buttons only (a selector list or nesting at the end of a rule is checked on every element, which made the Library's scroll lag).
    A key's states are plain `button` rules that only set the key's own variables: a button that is not a key does not read them. */
@@ -119,17 +122,18 @@
 }
 :root[data-look="retroma"] button:hover:not(:disabled) { --surf: var(--rt-btn-hover); --k-olw: var(--rt-hover-ol); --k-ols: var(--rt-hover-ol-style); --k-ol: var(--rt-outline-hover); }
 :root[data-look="retroma"] button:focus-visible { --k-focus: var(--rt-focus-w) var(--rt-focus-style) var(--rt-focus); }
-:root[data-look="retroma"] button:is([aria-pressed="true"], [aria-checked="true"], [aria-selected="true"], :active:not(:disabled)) {
+:root[data-look="retroma"] button:--on {
   --surf: var(--rt-btn-on); --k-sh: var(--rt-sink); --k-fg: var(--rt-icon-on);
   --k-cx: var(--rt-cx-a); --k-cy: var(--rt-cy-a); --k-px: var(--rt-press-x); --k-py: var(--rt-press-y);
 }
 :root[data-look="retroma"] button.is-primary { --surf: var(--rt-accent); --k-fg: var(--rt-on-accent); }
 :root[data-look="retroma"] button.is-primary:hover:not(:disabled) { --surf: var(--rt-accent-hover); }
+:root[data-look="retroma"] button.is-primary:--on { --surf: var(--rt-accent); --k-fg: var(--rt-on-accent); } /* (pressed, the call to action stays the accent and sinks, its words on it as at rest: v4's .btn.primary) */
 :root[data-look="retroma"] button.is-danger { --k-fg: var(--rt-danger); }
 /* (a key's face needs a positioned key; given with no weight, so a key placed by its own rule, as the viewer's buttons, stays where it is) */
 :where(:root[data-look="retroma"]) :--key { position: relative; }
 /* a key with words: the demo's room on each side, its icon and words 7px apart */
-:root[data-look="retroma"] :is(.confirm-actions button, .storage-actions button, .action-row button, .ex-foot button, .set-control button:not(.pg-swatch, .set-chip-x, .colour-swatch, .is-icon), .rt-open, .set-reset, .set-done, .assets-btn:not(.is-icon), .pg-auto) {
+:root[data-look="retroma"] :is(.confirm-actions button, .storage-actions button, .action-row button, .ex-foot button, .set-control button:not(.pg-swatch, .set-chip-x, .is-icon), .rt-open, .set-reset, .set-done, .assets-btn:not(.is-icon), .pg-auto) {
   display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--s-6) / 2);
   box-sizing: border-box; min-height: var(--ctl); padding-block: 0; padding-inline: var(--s-6);
   font-size: var(--text-md); white-space: nowrap;
@@ -151,9 +155,12 @@
 :root[data-look="retroma"] :is(.nav-pill .nav-crumb, .view-settings button) { width: var(--ctl); }
 :root[data-look="retroma"] .nav-pill[data-active="true"] .nav-crumb { --surf: var(--rt-btn-on); --k-sh: var(--rt-sink); --k-cx: var(--rt-cx-a); --k-cy: var(--rt-cy-a); --k-px: var(--rt-press-x); --k-py: var(--rt-press-y); color: var(--rt-icon-on); }
 :root[data-look="retroma"] .nav-pill .nav-name-btn { height: var(--ctl); margin-left: 0; font-weight: 700; color: var(--rt-fg-on-alt-app); }
+:root[data-look="retroma"] body[data-view="assets"] .nav-pill .nav-name-btn, :root[data-look="retroma"] body[data-view="assets"] .nav-pill .nav-crumb-text { color: var(--rt-info-fg); text-shadow: none; }
+:root[data-look="retroma"] body[data-view="assets"] .nav-pill .nav-name-btn svg { color: var(--rt-info-fg); } /* (on the Library's top bar, the info bar's colour; no glow, which is for the canvas) */
+:root[data-look="retroma"] #assets-view .assets-statusbar .hud-controls { --hud-fg: var(--rt-info-fg); --hud-muted: var(--rt-info-fg); color: var(--rt-info-fg); }
 :root[data-look="retroma"] .nav-crumb-text { padding-inline: var(--s-2) var(--s-4); font-weight: 700; color: var(--rt-fg-on-alt-app); }
 /* a bar (the demo's .bar): a shade off the pane, the dark outline, the keys 6px apart and 6px in, its corners round the keys' */
-:root[data-look="retroma"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls) {
+:root[data-look="retroma"] :--bar {
   padding: var(--pad); gap: var(--rt-gap);
   background: var(--rt-pane-alt);
   border: var(--rt-outline) solid var(--rt-outline-c);
@@ -164,7 +171,8 @@
   --hud-fg: var(--rt-fg-on-alt-app); --hud-muted: var(--rt-fg-muted); color: var(--hud-fg);
 }
 :root[data-look="retroma"] :is(.tb-group, .layers-tools, .tb-options-row) { gap: var(--rt-gap); }
-:root[data-look="retroma"] :is(.rail-sep, .assets-sep) { background: var(--rt-rule); }
+:root[data-look="retroma"] .rail-sep { background: var(--rt-rule); }
+:root[data-look="retroma"] .assets-sep { background: oklch(from var(--rt-info-fg) l c h / 0.35); }
 :root[data-look="retroma"] .tb-group:not([hidden]) ~ .tb-group:not([hidden]) { border-left-color: var(--rt-rule); }
 /* a segmented choice (the demo's .seg): 4px in, 4px apart, smaller keys */
 :root[data-look="retroma"] .seg {
@@ -174,7 +182,7 @@
   & button { min-height: calc(var(--ctl) - var(--s-2)); padding-inline: calc(var(--s-6) - var(--s-1)); font-size: var(--text-sm); }
 }
 :root[data-look="retroma"] #assets-view .hud-controls { background: transparent; border-color: transparent; box-shadow: none; padding: 0; }
-:root[data-look="retroma"][data-rt-simplebars="on"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls) { background: transparent; border-color: transparent; box-shadow: none; padding: 0; & button { --k-sh: none; } }
+:root[data-look="retroma"][data-rt-simplebars="on"] :--bar { background: transparent; border-color: transparent; box-shadow: none; padding: 0; & button { --k-sh: none; } }
 
 /* ---- 3. Fields (the demo's .field), dropdowns (its select: a small raised key), checkboxes (.check), sliders -------------------------- */
 :root[data-look="retroma"] :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"]), textarea):not(.se-wrapper *, .asset-field > *) {
@@ -218,7 +226,7 @@
   --rt-ri-soft: inset 0 0 var(--rt-pane-sh) var(--rt-pane-inner);
   --rt-r-in: calc(var(--rt-r) - var(--rt-ring-o-w));
 }
-:root[data-look="retroma"] :is(.set-card, .layers-panel, dialog.confirm) {
+:root[data-look="retroma"] :is(.set-card, .layers-panel, dialog.confirm, .side-views, .side-sec, .asset-sec) { /* (Settings' cards, panels, dialogs and the Library's section cards: one pane) */
   background: var(--rt-pane);
   border: var(--rt-ring-o) transparent;
   border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-ring-o-b) var(--rt-ring-o-l);
@@ -237,18 +245,18 @@
 :root[data-look="retroma"] :--floating { border: var(--rt-float-w) ridge var(--rt-float-ol-c); box-shadow: var(--rt-float-glow); backdrop-filter: none; }
 :root[data-look="retroma"] .layers-panel { box-shadow: none; }
 :root[data-look="retroma"] .rail-fly { padding: var(--pad); gap: var(--rt-gap); border-radius: calc(var(--rt-btn-r) + var(--pad) + var(--rt-float-w)); } /* (keys inside a frame: its corner is theirs plus the room and the frame) */ /* (a docked panel sits on the canvas without the glow: the canvas is not drawn under it, so a glow showed square corners) */
-:root[data-look="retroma"][data-rt-simplepanes="on"] :is(.set-card, .layers-panel) { background: transparent; border-color: transparent; box-shadow: none; }
+:root[data-look="retroma"][data-rt-simplepanes="on"] :is(.set-card, .layers-panel, .side-views, .side-sec, .asset-sec) { background: transparent; border-color: transparent; box-shadow: none; }
 :root[data-look="retroma"] :is(#assets-view, #settings-view) { background: var(--rt-frame); }
 /* the Library: one pane in three parts (its bar on top, the body, the status bar), each drawing its side of the rings */
 :root[data-look="retroma"] #assets-view { padding: var(--rt-pane-out); } /* (the frame round the Library's pane: Retroma › Pane outer spacing) */
 :root[data-look="retroma"] #assets-view .assets-bar {
   padding-block: var(--pad); padding-right: var(--s-6);
-  background: var(--rt-hdr-bg); color: var(--rt-hdr-fg);
+  background: var(--rt-info-bg); color: var(--rt-info-fg); /* (the Library's top bar and status bar are the canvas's info bar's colours) */
   border: var(--rt-ring-o) transparent; border-bottom: var(--rt-outline) solid var(--rt-rule);
   border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-rule) var(--rt-ring-o-l);
   border-radius: var(--rt-r) var(--rt-r) 0 0; corner-shape: var(--rt-corner-hdr);
   box-shadow: var(--rt-ri-t), var(--rt-ri-l), var(--rt-ri-r);
-  --hud-fg: var(--rt-fg-on-hdr-app); --hud-muted: var(--rt-fg-muted);
+  --hud-fg: var(--rt-info-fg); --hud-muted: var(--rt-info-fg);
 }
 :root[data-look="retroma"] #assets-view .assets-body {
   gap: 0; padding: 0; margin: 0;
@@ -260,13 +268,13 @@
 :root[data-look="retroma"] #assets-view.is-viewing .assets-body { border-bottom: var(--rt-ring-o) var(--rt-ring-o-b); border-radius: 0 0 var(--rt-r) var(--rt-r); overflow: hidden; }
 :root[data-look="retroma"] #assets-view .assets-statusbar {
   margin: 0; min-height: var(--rt-status-h);
-  background: var(--rt-status-bg); color: var(--rt-status-fg);
+  background: var(--rt-info-bg); color: var(--rt-info-fg);
   border: var(--rt-ring-o) transparent; border-top: var(--rt-outline) solid var(--rt-rule);
   border-color: var(--rt-rule) var(--rt-ring-o-r) var(--rt-ring-o-b) var(--rt-ring-o-l);
   border-radius: 0 0 var(--rt-r) var(--rt-r); corner-shape: var(--rt-corner-pane);
   box-shadow: var(--rt-ri-l), var(--rt-ri-b), var(--rt-ri-r);
   font-size: var(--text-sm);
-  --hud-fg: var(--rt-status-fg); --hud-muted: var(--rt-status-fg);
+  --hud-fg: var(--rt-info-fg); --hud-muted: var(--rt-info-fg);
   & > .hud-readout { padding-inline: var(--s-6); }
 }
 :root[data-look="retroma"] #assets-view .col-grip { margin-inline: 0; }
@@ -278,10 +286,7 @@
 :root[data-look="retroma"] #assets-view .assets-main { background: var(--rt-paper); }
 :root[data-look="retroma"] #assets-view .assets-scroll { padding: var(--s-6); }
 :root[data-look="retroma"] #assets-view .asset-insp-head h2 { font-weight: 700; }
-:root[data-look="retroma"] #assets-view .asset-sec { padding: var(--s-6) 0; background: transparent; border: 0; border-radius: 0; }
-:root[data-look="retroma"] #assets-view :is(.asset-dsec + .asset-dsec, .asset-sec + .asset-sec) { border-top: var(--rt-outline) dashed var(--rt-rule); }
 :root[data-look="retroma"] #assets-view .asset-sec > h3 { color: var(--hud-muted); font-weight: 700; }
-:root[data-look="retroma"] #assets-view :is(.side-views, .side-sec) { padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
 /* the sidebar's section labels (the demo's .side .h): small, bold, in capitals, on the folder header's colour; their keys small */
 :root[data-look="retroma"] .side-head { margin: var(--s-4) 0 var(--s-1); padding: 0 0 0 var(--s-1); gap: var(--s-1); background: var(--rt-fhdr-bg); border-radius: var(--s-2); }
 :root[data-look="retroma"] :is(.side-head h2, .side-sec-toggle h2) { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--hud-muted); }
@@ -349,7 +354,7 @@
 /* the canvas's info bar is Retroma's strip along the bottom; the Library's status bar keeps its own colours */
 :root[data-look="retroma"] .hud-bottom { background: transparent; }
 :root[data-look="retroma"] .hud-readout { --hud-fg: var(--rt-info-fg); --hud-muted: var(--rt-info-fg); color: var(--rt-info-fg); font-size: var(--text-sm); }
-:root[data-look="retroma"] #assets-view .assets-readout { --hud-fg: var(--rt-status-fg); --hud-muted: var(--rt-status-fg); background: transparent; color: var(--rt-status-fg); }
+:root[data-look="retroma"] #assets-view .assets-readout { --hud-fg: var(--rt-info-fg); --hud-muted: var(--rt-info-fg); background: transparent; color: var(--rt-info-fg); }
 :root[data-look="retroma"] body { font-family: var(--rt-font); }
 
 /* ---- 5. Menus (the demo's .menu and .mi) and notices (.notice) -------------------------------------------------------------------- */
@@ -600,8 +605,6 @@
 :root[data-look="retroma"][data-rt-acb="on"] li.__se__acb-merged .__se__acb-mark::before { content: "⇲"; }
 
 /* ---- 10. The canvas: simple floating bars, where the zoom controls sit (Retroma › Canvas & Library) ---- */
-:root[data-look="retroma"][data-rt-simplebars="on"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls) { background: transparent; border-color: transparent; box-shadow: none; backdrop-filter: none; }
-:root[data-look="retroma"][data-rt-simplebars="on"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls) button { box-shadow: none; }
 :root[data-look="retroma"][data-rt-part-controls-at="bl"] .hud-controls { right: auto; left: calc(var(--edge) * 2 + var(--bar-h)); }
 :root[data-look="retroma"][data-rt-part-controls-at="tr"] .hud-controls { bottom: auto; top: calc(var(--edge) * 2 + var(--bar-h)); }
 
@@ -671,7 +674,7 @@
 /* ---- 13. Note properties (the details' fields) and the link preview (Retroma › Properties, Search and link preview) ------------- */
 :root[data-look="retroma"] :is(.note-link-peek, .search-suggest) { corner-shape: var(--rt-corner-menu); }
 :root[data-look="retroma"] .note-link-peek { width: var(--rt-pv-w); max-height: var(--rt-pv-h); background: var(--rt-menu-bg); border-radius: var(--rt-menu-r); }
-:root[data-look="retroma"] mark.found, :root[data-look="retroma"] .search-match { background: var(--rt-match); color: var(--rt-match-fg); }
+:root[data-look="retroma"] mark.found { background: var(--rt-match); color: var(--rt-match-fg); }
 
 /* ---- 13b. Properties, as Retroma's (its .metadata-container and .metadata-property) -------------------------------------------------
    The list sits in a box with the inner ring; each property is a box of its own: its name on a strip of the pane's colour, its value on
@@ -747,7 +750,7 @@
 :root[data-look="retroma"][data-rt-simplepdf="on"] .pdf-page { box-shadow: none; }
 /* search suggestions: a header and a body (Retroma › Search and link preview) */
 :root[data-look="retroma"] .search-suggest { background: var(--rt-res-body); }
-:root[data-look="retroma"] .search-suggest :is(h3, h4, .search-suggest-head) { background: var(--rt-res-hdr); color: var(--rt-res-hdr-fg); }
+:root[data-look="retroma"] .search-suggest :is(h3, h4) { background: var(--rt-res-hdr); color: var(--rt-res-hdr-fg); }
 /* notes: headings' line height and their # marks, footnotes, drawn bullets, done tasks, table selection, callout titles (Retroma › Notes) */
 :root[data-look="retroma"] .sun-editor-editable.se-theme-canvast :is(h1, h2, h3, h4, h5, h6) { line-height: var(--rt-h-lh); }
 :root[data-look="retroma"][data-rt-part-hash="true"] .sun-editor-editable.se-theme-canvast :is(h1, h2, h3, h4, h5, h6)::before { opacity: var(--rt-hash-o); font-size: var(--rt-hash-s); margin-right: 0.25em; }
