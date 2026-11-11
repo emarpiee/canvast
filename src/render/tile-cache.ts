@@ -281,12 +281,9 @@ export class TileCache {
       }
       this.restarts.key++;
       // Beyond it, with nothing prepared: the old set stays as a backdrop while the new one is built a few tiles a frame.
-      if (preview && !this.dirty.size && this.gen.tiles.size && Math.abs(z - this.gen.z) <= BACK_MAX_LEVELS) {
-        this.dropBack();
-        this.back = this.gen;
-        this.gen = null;
-        this.dropAhead();
-      } else this.clear();
+      // (and so when the zoom comes to rest on a dense canvas: its exact set is built over the scaled one, not in one long frame)
+      if (dense && this.gen.frameId === frameId && !this.dirty.size && this.gen.tiles.size && Math.abs(z - this.gen.z) <= BACK_MAX_LEVELS) this.toBack();
+      else this.clear();
     }
     if (!this.gen) {
       // Build tiles only once the zoom has held still for a frame; in a dense
@@ -311,8 +308,9 @@ export class TileCache {
     } else if (!off || !off.whole) {
       this.restAt = null;
       this.restarts.offset++;
-      // Enormous, or resting after an inexact move: start over at this camera.
-      this.clear();
+      // Enormous, or resting after an inexact move: start over at this camera (on a dense canvas over the old set, a few tiles a frame).
+      if (off && dense && !this.dirty.size && this.gen!.tiles.size) this.toBack();
+      else this.clear();
       this.gen = { key, z, center: cam.center, frameId, vp, tiles: new Map() };
       off = { dx: 0, dy: 0, ax: 0, ay: 0, whole: true };
     }
@@ -560,6 +558,15 @@ export class TileCache {
    * border after zooming out with no prebuilt set to take over) are drawn
    * directly by `border`, so the view is never cut off.
    */
+  /** The current set becomes the backdrop of the next. */
+  private toBack(): void {
+    // (a set still being built over a backdrop is dropped instead: the backdrop is the whole picture)
+    if (this.back && this.gen) for (const t of this.gen.tiles.values()) this.release(t);
+    else this.back = this.gen;
+    this.gen = null;
+    this.dropAhead();
+  }
+
   private dropBack(): void {
     if (this.back) for (const t of this.back.tiles.values()) this.release(t);
     this.back = null;
