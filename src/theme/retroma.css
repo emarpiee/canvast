@@ -331,6 +331,24 @@
   & button { --surf: var(--rt-frame-deep); --k-ol: currentColor; color: inherit; }
   &:is(.is-success, .is-warning, .is-error) button { --surf: transparent; }
 }
+/* the command palette, as Retroma's prompt: a floating pane with the ridge, the search a field with the dark outline, rows split by a
+   rule, the chosen row the pressed key's colour, the keys small and quiet at the end */
+:root[data-look="retroma"] .palette {
+  padding: var(--s-4) 0 0;
+  background: var(--rt-pane);
+  border: var(--rt-ring-o-w) var(--rt-ring-o-style) transparent;
+  border-color: var(--rt-ring-i-t) var(--rt-ring-i-r) var(--rt-ring-i-b) var(--rt-ring-i-l);
+  border-radius: var(--rt-modal-r); corner-shape: var(--rt-modal-corner);
+  box-shadow: var(--rt-lift-modal);
+  --hud-fg: var(--rt-fg); --hud-muted: var(--rt-fg-muted);
+  & .palette-input { margin: 0 var(--s-4) var(--s-4); padding: var(--s-4) var(--s-6); border: calc(var(--rt-outline) * 2) solid var(--rt-outline-c); border-radius: calc(var(--rt-btn-r) + 2px); font-size: var(--text-lg); }
+  & .palette-list { padding: 0 0 var(--s-2); border-top: var(--rt-outline) solid var(--rt-rule); }
+  & .palette-list li { margin: 0 var(--s-2); padding: var(--s-4) var(--s-6); border-radius: 0; border-bottom: var(--rt-outline) solid var(--rt-rule); }
+  & .palette-list li.is-active { background: var(--rt-btn-on); color: var(--rt-fg-on-on-app); --hud-muted: var(--rt-fg-on-on-app); }
+  & .palette-title { font-weight: 700; }
+  & :is(.palette-group, kbd) { font-size: var(--text-xs); color: var(--hud-muted); }
+  & kbd { font-family: var(--rt-font-mono); text-transform: uppercase; letter-spacing: 0.06em; }
+}
 :root[data-look="retroma"] ::selection { background: var(--rt-selection); }
 
 /* ---- 6. The Library's rows and cards (the demo's .navrow and .card) ---------------------------------------------------------------
