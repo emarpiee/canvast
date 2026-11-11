@@ -286,7 +286,8 @@ test("theme colour: the hue and colourfulness dials recolour the interface but n
   const panel = p.locator("#settings-view");
   await p.getByTestId("view-settings").click();
   await panel.getByRole("tab", { name: "Appearance" }).click();
-  // (the dials are Legacy's: Retroma, the default, has its own accent, and hides them)
+  // (the dials are Legacy's: Retroma has its own accent, and hides them)
+  await panel.getByLabel("Theme", { exact: true }).selectOption("retroma");
   await expect(panel.getByLabel("Theme colour", { exact: true })).toBeHidden();
   await panel.getByLabel("Theme", { exact: true }).selectOption("legacy");
   /** Contrast of the selected view tab (its text on its fill) and the brightness of the canvas background, read from the real colours. */

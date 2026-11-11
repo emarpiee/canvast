@@ -15,7 +15,7 @@ const { srcHash } = await sourceHash(root);
 const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 13).replace("T", "-");
 const dir = resolve(root, "test-builds", `${stamp}-${srcHash.slice(0, 8)}`);
 await mkdir(dir, { recursive: true });
-const built = spawnSync("node", ["scripts/build.mjs", "--out", dir], { cwd: root, stdio: "inherit" });
+const built = spawnSync("node", ["scripts/build.mjs", "--out", dir], { cwd: root, stdio: "inherit", env: { ...process.env, CANVAST_DEFAULT_LOOK: "legacy" } }); // (every test runs in Legacy, the look the tests are written for)
 if (built.status !== 0) process.exit(built.status ?? 1);
 // the colour picker's own demo page is part of what the tests open: a copy built from the same source goes in the snapshot (never a stale dist-picker/)
 const pickerDir = resolve(dir, "picker");

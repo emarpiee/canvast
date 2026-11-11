@@ -1,6 +1,8 @@
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  // (the build-time values the source reads: the tests start in Legacy, as every test build does)
+  define: { __CANVAST_DEFAULT_LOOK__: JSON.stringify("legacy") },
   // The build reads .md and .svg files as text (scripts/build.mjs); a unit test that imports a module using them gets the same.
   plugins: [
     {

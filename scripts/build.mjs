@@ -25,6 +25,8 @@ const result = await build({
   write: false,
   define: {
     __CANVAST_VERSION__: JSON.stringify(pkg.version),
+    // (the theme a new install starts in: Retroma; the test builds start in Legacy, the look the tests are written for: CANVAST_DEFAULT_LOOK)
+    __CANVAST_DEFAULT_LOOK__: JSON.stringify(process.env.CANVAST_DEFAULT_LOOK === "legacy" ? "legacy" : "retroma"),
     "import.meta.url": '""', // (only in pdf.js' branch for Node)
   },
   loader: { ".svg": "text", ".ttf": "binary", ".woff2": "binary", ".md": "text", ".wasm": "binary" },

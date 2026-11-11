@@ -19,6 +19,8 @@ import { DOCK_PANEL_IDS } from "./panels";
 import { paintFromText } from "../doc/paint";
 import { validPropTypes } from "../notes/prop-types";
 import { validSaved } from "../search/saved";
+/** The theme a new install starts in (scripts/build.mjs: Retroma, or Legacy in the test builds). */
+declare const __CANVAST_DEFAULT_LOOK__: "retroma" | "legacy";
 
 /** The ways W A S D step to the next item (interaction/item-navigation.ts), in the order Settings lists them. */
 export const NAV_MODES = ["view", "anywhere", "layer-view", "layer", "az-view", "az"] as const;
@@ -151,7 +153,7 @@ export const SETTINGS = {
   "media.step.gif": { scope: "device", default: 1, validate: (v: unknown) => (Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 1000 ? (v as number) : undefined), effect: "immediate" } as Def<number>,
   "ui.theme": { scope: "device", default: "system", validate: oneOf("system", "light", "dark"), effect: "immediate" } as Def<"system" | "light" | "dark">,
   /** The theme: Retroma (the default) or Legacy (the app's earlier look, kept as it was). */
-  "ui.look": { scope: "device", default: "retroma", validate: oneOf("retroma", "legacy"), effect: "immediate" } as Def<"retroma" | "legacy">,
+  "ui.look": { scope: "device", default: __CANVAST_DEFAULT_LOOK__, validate: oneOf("retroma", "legacy"), effect: "immediate" } as Def<"retroma" | "legacy">,
   /** Retroma's customisation: only what differs from its defaults, as JSON (src/theme/retroma/apply.ts). */
   "retroma.look": { scope: "device", default: "{}", validate: (v: unknown) => { try { return typeof v === "string" && v.length <= 400_000 && JSON.parse(v) && typeof JSON.parse(v) === "object" ? v : undefined; } catch { return undefined; } }, effect: "immediate" } as Def<string>,
   "key.hand": { scope: "device", default: "h", validate: letter, effect: "immediate" } as Def<string>,
