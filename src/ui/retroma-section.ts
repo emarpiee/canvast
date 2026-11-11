@@ -49,7 +49,7 @@ function putK(S: Loose, k: string, v: unknown): void {
 /** Settings the app keeps in one place for every theme (Settings › Appearance): not repeated here. */
 const APP_OWNED = new Set(["mode", "dens", "motion", "zen", "grid"]);
 /** The demo's fading of the bars while panning is left out: the app's Zen mode is the one way the bars fade. */
-const LEFT_OUT_KEYS = new Set(["fadeOnPan", "fadeSpeed", "fadeOut", "fadeIn"]);
+const LEFT_OUT_KEYS = new Set(["fadeOnPan", "fadeSpeed", "fadeOut", "fadeIn", "mat", "cCardCover"]); /* (and the picture mat: the owner removed it, pictures have no mat) */
 /** Settings not shown here: the app's own, and those left out. */
 const notHere = (k: string): boolean => APP_OWNED.has(k) || LEFT_OUT_KEYS.has(k);
 /** Groups of the demo left out: Zen mode is the app's own (Settings › Appearance), the same in every theme. */
@@ -70,7 +70,7 @@ function toSetting(c: Control, S: Loose): Setting | null {
 
 const find = (k: string): Control | undefined => TABS.flatMap(([, groups]) => groups.flatMap((g) => g.items)).find((c) => c.k === k);
 /** What the Basics card holds: the accent, the scheme, the keys' look and light, the font and corners, how the Library shows its items. */
-const BASICS = ["hue", "chroma", "accentL", "scheme", "btn", "@@angle", "corner", "font", "libItems", "mat", "cf", "cfDark", "lDark"];
+const BASICS = ["hue", "chroma", "accentL", "scheme", "btn", "@@angle", "corner", "font", "libItems", "cf", "cfDark", "lDark"];
 
 export function mountRetromaSection(host: HTMLElement, settings: SettingsStore, openAppearance: () => void, rowHtml: SettingRow, presets?: ThemePresets): void {
   let S = retromaSettings(settings.get("retroma.look"));
