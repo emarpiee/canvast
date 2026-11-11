@@ -45,18 +45,22 @@
 }
 /* (a colour set for the canvas in Appearance is written on :root itself, so it still wins, as in Legacy) */
 
-/* ---- 2. Keys: Retroma's buttons (its `button`, `.clickable-icon`, `.tappable`), every pressable thing of the app in one list --------
-   A key's face (its colour, outline and light) is drawn on its ::before; the key itself carries what is on it. At rest the contents sit up
-   towards the light (--rt-cx/cy); pressed or on, the face sinks and everything on it, words too, rides down with it (--rt-cx-a/cy-a);
-   in Neubrutalism the whole key moves into its shadow (--rt-press-x/y). Hovered it lightens and takes the hover line. */
+/* ---- 2. Keys (the demo's .btn): every pressable thing of the app in one list ---------------------------------------------------------
+   The face (its colour, outline and light) is drawn on ::before; the key carries what is on it, so at rest its contents sit up towards the
+   light (--rt-cx/cy) and pressed they ride down with the face (--rt-cx-a/cy-a), words too; in Neubrutalism the whole key moves into its
+   shadow (--rt-press-x/y). Hovered it lightens and takes the hover line. The call to action is the accent; a destructive key is red text. */
+:root[data-look="retroma"] {
+  --pad: calc(var(--s-6) / 2); /* the demo's 6px round the keys of a bar (Density scales it): --bar-h follows */
+  --rt-gap: calc(var(--s-6) / 2);
+  --rt-pane-in: calc(var(--s-6) + var(--s-1));
+}
 :root[data-look="retroma"] :is(
-  :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls, .tb-options-row, .adj-layers, .view-settings, .view-switch, .seg, .confirm-actions, .storage-actions, .action-row, .set-tabs, .rail-fly, .side-head, .asset-quick, .asset-actions, .panel-head, .panel-foot, .layers-tools, .set-control) button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
+  :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls, .tb-options-row, .adj-layers, .view-settings, .view-switch, .seg, .confirm-actions, .storage-actions, .action-row, .set-tabs, .rail-fly, .side-head, .asset-quick, .asset-actions, .panel-head, .panel-foot, .layers-tools, .set-control, .ex-foot, .ex-head) button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
   .assets-btn, .set-reset, .set-done, .rt-open, .set-link, .nav-pill .nav-crumb, .vbtn, .pg-auto, .pg-current) {
   --surf: var(--rt-btn-bg);
   --k-ol: var(--rt-outline-c); --k-olw: var(--rt-outline); --k-ols: var(--rt-outline-style);
   --k-sh: var(--rt-raise);
-  --k-cx: var(--rt-cx); --k-cy: var(--rt-cy);
-  --k-px: 0px; --k-py: 0px;
+  --k-cx: var(--rt-cx); --k-cy: var(--rt-cy); --k-px: 0px; --k-py: 0px;
   position: relative; isolation: isolate;
   color: var(--rt-icon);
   font-weight: 700;
@@ -76,174 +80,241 @@
   }
   &:hover:not(:disabled) { --surf: var(--rt-btn-hover); --k-olw: var(--rt-hover-ol); --k-ols: var(--rt-hover-ol-style); --k-ol: var(--rt-outline-hover); }
   &:focus-visible { outline: var(--rt-focus-w) var(--rt-focus-style) var(--rt-focus); outline-offset: 2px; }
-  &:is([aria-pressed="true"], [aria-checked="true"], [aria-selected="true"], [aria-expanded="true"]:not([aria-haspopup]), :active:not(:disabled)) {
+  &:is([aria-pressed="true"], [aria-checked="true"], [aria-selected="true"], :active:not(:disabled)) {
     --surf: var(--rt-btn-on); --k-sh: var(--rt-sink);
     --k-cx: var(--rt-cx-a); --k-cy: var(--rt-cy-a); --k-px: var(--rt-press-x); --k-py: var(--rt-press-y);
     color: var(--rt-icon-on);
   }
-  /* the call to action carries the accent (Retroma's .mod-cta), a destructive one the danger colour (.mod-warning) */
   &.is-primary { --surf: var(--rt-accent); color: var(--rt-on-accent); &:hover:not(:disabled) { --surf: var(--rt-accent-hover); } }
-  &.is-danger { --surf: var(--rt-danger); color: var(--rt-on-danger); }
+  &.is-danger { color: var(--rt-danger); }
 }
-/* a key with words: Retroma's height and room on each side, its icon and words apart (the demo's .btn) */
-:root[data-look="retroma"] :is(.confirm-actions button, .storage-actions button, .action-row button, .set-control button:not(.pg-swatch, .set-chip-x, .colour-swatch, .is-icon), .rt-open, .set-reset, .set-done, .assets-btn:not(.is-icon), .pg-auto) {
-  display: inline-flex; align-items: center; justify-content: center; gap: var(--s-6);
-  box-sizing: border-box; min-height: var(--ctl); padding-block: 0; padding-inline: var(--s-8);
-  white-space: nowrap;
+/* a key with words: the demo's room on each side, its icon and words 7px apart */
+:root[data-look="retroma"] :is(.confirm-actions button, .storage-actions button, .action-row button, .ex-foot button, .set-control button:not(.pg-swatch, .set-chip-x, .colour-swatch, .is-icon), .rt-open, .set-reset, .set-done, .assets-btn:not(.is-icon), .pg-auto) {
+  display: inline-flex; align-items: center; justify-content: center; gap: calc(var(--s-6) / 2);
+  box-sizing: border-box; min-height: var(--ctl); padding-block: 0; padding-inline: var(--s-6);
+  font-size: var(--text-md); white-space: nowrap;
 }
-:root[data-look="retroma"] .asset-actions .assets-btn:not(.is-icon) { padding-inline: var(--s-6); }
-:root[data-look="retroma"] .seg button { padding-inline: var(--s-8); }
-:root[data-look="retroma"] .set-link { padding: 0 var(--s-4); }
-/* the canvas key beside Library is pressed while the canvas is the view */
+:root[data-look="retroma"] .asset-actions .assets-btn:not(.is-icon) { padding-inline: var(--s-4); }
+:root[data-look="retroma"] .set-link { padding: 0 var(--s-2); }
+/* the keys of the top row: Library, the canvas key and the canvas's name are the demo's tabs in one bar; the settings key a bar of one */
+:root[data-look="retroma"] #nav, :root[data-look="retroma"] .view-settings {
+  padding: var(--pad); gap: var(--rt-gap); align-items: center;
+  background: var(--rt-pane-alt); border: var(--rt-outline) solid var(--rt-outline-c);
+  border-radius: calc(var(--rt-btn-r) + var(--pad)); corner-shape: var(--rt-corner);
+  box-shadow: var(--rt-lift); pointer-events: auto;
+}
+:root[data-look="retroma"] body[data-view="assets"] :is(#nav, .view-settings) { padding: 0; background: transparent; border-color: transparent; box-shadow: none; }
+:root[data-look="retroma"] body[data-view="assets"] .view-settings { top: calc(var(--edge) + var(--rt-ring-o-w) + var(--pad)); }
+:root[data-look="retroma"] body[data-view="assets"] #nav { left: calc(var(--edge) + var(--rt-ring-o-w) + var(--s-4)); }
+:root[data-look="retroma"] body[data-view="assets"] .view-settings { right: calc(var(--edge) + var(--rt-ring-o-w) + var(--s-4)); }
+:root[data-look="retroma"] :is(.view-switch, .nav-pill, #view-switch, #workspace, .nav) { height: auto; padding: 0; gap: var(--rt-gap); background: transparent; border: 0; box-shadow: none; }
+:root[data-look="retroma"] :is(.view-switch button, .nav-pill .nav-crumb, .view-settings button) { height: var(--ctl); min-width: var(--ctl); border-radius: var(--rt-btn-r); }
+:root[data-look="retroma"] :is(.nav-pill .nav-crumb, .view-settings button) { width: var(--ctl); }
 :root[data-look="retroma"] .nav-pill[data-active="true"] .nav-crumb { --surf: var(--rt-btn-on); --k-sh: var(--rt-sink); --k-cx: var(--rt-cx-a); --k-cy: var(--rt-cy-a); --k-px: var(--rt-press-x); --k-py: var(--rt-press-y); color: var(--rt-icon-on); }
-/* Library and the canvas key are two keys of their own, round, a little apart */
-:root[data-look="retroma"] :is(.view-switch button, .nav-pill .nav-crumb) { border-radius: var(--rt-btn-r); }
-:root[data-look="retroma"] #workspace { margin-left: var(--s-4); }
-/* a group of keys is a bar (the demo's .bar): a shade off the pane, a dark outline, the keys inside it a little apart, its corners round
-   the keys' (the canvas's bars, the switches, segmented choices) */
-:root[data-look="retroma"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls, .seg) {
+:root[data-look="retroma"] .nav-pill .nav-name-btn { height: var(--ctl); margin-left: 0; font-weight: 700; color: var(--rt-fg-on-alt-app); }
+:root[data-look="retroma"] .nav-crumb-text { padding-inline: var(--s-2) var(--s-4); font-weight: 700; color: var(--rt-fg-on-alt-app); }
+/* a bar (the demo's .bar): a shade off the pane, the dark outline, the keys 6px apart and 6px in, its corners round the keys' */
+:root[data-look="retroma"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls) {
+  padding: var(--pad); gap: var(--rt-gap);
   background: var(--rt-pane-alt);
   border: var(--rt-outline) solid var(--rt-outline-c);
-  border-radius: calc(var(--rt-btn-r) + var(--s-4));
+  border-radius: calc(var(--rt-btn-r) + var(--pad));
   corner-shape: var(--rt-corner);
   box-shadow: var(--rt-lift);
   backdrop-filter: none;
   --hud-fg: var(--rt-fg-on-alt-app); --hud-muted: var(--rt-fg-muted); color: var(--hud-fg);
 }
-:root[data-look="retroma"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls) { padding: var(--s-4); gap: var(--s-4); }
-:root[data-look="retroma"] :is(.tb-group, .layers-tools, .rail) { gap: var(--s-4); }
-:root[data-look="retroma"] .seg { padding: var(--s-2); gap: var(--s-2); border-radius: calc(var(--rt-btn-r) + var(--s-2)); box-shadow: none; }
-:root[data-look="retroma"] .view-switch { background: transparent; border: 0; box-shadow: none; }
+:root[data-look="retroma"] :is(.tb-group, .layers-tools, .tb-options-row) { gap: var(--rt-gap); }
 :root[data-look="retroma"] :is(.rail-sep, .assets-sep) { background: var(--rt-rule); }
 :root[data-look="retroma"] .tb-group:not([hidden]) ~ .tb-group:not([hidden]) { border-left-color: var(--rt-rule); }
-:root[data-look="retroma"] :is(#assets-view .hud-controls, .assets-bar) { background: transparent; border-color: transparent; box-shadow: none; }
-:root[data-look="retroma"][data-rt-simplebars="on"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls) { background: transparent; border-color: transparent; box-shadow: none; & button { --k-sh: none; } }
+/* a segmented choice (the demo's .seg): 4px in, 4px apart, smaller keys */
+:root[data-look="retroma"] .seg {
+  padding: var(--s-2); gap: var(--s-2);
+  background: var(--rt-pane-alt); border: var(--rt-outline) solid var(--rt-outline-c);
+  border-radius: calc(var(--rt-btn-r) + var(--s-2)); corner-shape: var(--rt-corner); box-shadow: none;
+  & button { min-height: calc(var(--ctl) - var(--s-2)); padding-inline: calc(var(--s-6) - var(--s-1)); font-size: var(--text-sm); }
+}
+:root[data-look="retroma"] #assets-view .hud-controls { background: transparent; border-color: transparent; box-shadow: none; padding: 0; }
+:root[data-look="retroma"][data-rt-simplebars="on"] :is(.rail, .dock, .toolbar, .ctx-bar, .hud-controls) { background: transparent; border-color: transparent; box-shadow: none; padding: 0; & button { --k-sh: none; } }
 
-/* ---- 3. Fields: an input is the field colour with the dark outline (on paper a step darker, so it still stands out); a dropdown is a
-   small key (Retroma's .dropdown: the key's face, a half-strength outline, the raised light) --------------------------------------- */
-:root[data-look="retroma"] { --rt-field-here: var(--rt-field-bg); }
+/* ---- 3. Fields (the demo's .field), dropdowns (its select: a small raised key), checkboxes (.check), sliders -------------------------- */
 :root[data-look="retroma"] :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"], [type="button"]), textarea):not(.se-wrapper *, .asset-field > *) {
-  background-color: var(--rt-field-here);
+  color: var(--rt-fg);
+  background-color: var(--rt-field-bg);
   border: var(--rt-outline) var(--rt-outline-style) var(--rt-outline-c);
   border-radius: var(--rt-btn-r);
   corner-shape: var(--rt-corner);
   box-shadow: var(--rt-field-sh);
-  color: var(--rt-fg);
 }
 :root[data-look="retroma"] select:not(.se-wrapper *, .asset-field > *) {
+  color: var(--rt-fg);
   background-color: var(--rt-btn-bg);
-  border: var(--rt-outline) var(--rt-outline-style) oklch(from var(--rt-outline-c) l c h / 0.5);
+  border: var(--rt-outline) solid var(--rt-outline-c);
   border-radius: var(--rt-btn-r);
   corner-shape: var(--rt-corner);
   box-shadow: var(--rt-raise-sm);
-  color: var(--rt-fg);
-  padding-inline: var(--s-6) var(--s-4);
-  &:hover { background-color: var(--rt-btn-hover); border-color: var(--rt-outline-c); }
+  padding-inline: var(--s-4) var(--s-2);
 }
 :root[data-look="retroma"] :is(input, select, textarea):focus-visible { outline: var(--rt-focus-w) var(--rt-focus-style) var(--rt-focus); outline-offset: 1px; }
 :root[data-look="retroma"] :is(input[type="checkbox"], input[type="radio"]) { border-color: var(--rt-outline-c); box-shadow: var(--rt-raise-sm); }
 :root[data-look="retroma"] :is(input[type="checkbox"], input[type="radio"]):is(:checked, :indeterminate) { box-shadow: var(--rt-sink); }
 :root[data-look="retroma"] :is(input[type="range"], progress) { accent-color: var(--rt-accent); box-shadow: none; background: transparent; border: 0; }
+:root[data-look="retroma"] .adj-num { font-family: var(--rt-font-mono); }
 
-/* ---- 4. Surfaces, as the demo draws them -------------------------------------------------------------------------------------------
-   Pane    (the demo's .pane): the pane colour, the lit outer ring as its border, the inner ring and its soft shadow just inside, round.
-   Header  (.phdr): a strip across the top of a pane, its own colour, bold, a rule under it.
-   Content (.pane > .content, .cards): what a pane holds: paper for lists of things, the pane colour for settings.
+/* ---- 4. Surfaces, as the demo draws them -----------------------------------------------------------------------------------------
+   Pane    (.pane): the pane colour, the lit outer ring as its border, the inner ring and its soft shadow just inside (drawn as inset shadows),
+           round. Its header (.phdr): a strip of the header colour across the top, bold, a rule under it. Its foot (the modal's footer): the
+           bar colour, a rule over it. What it holds: the pane colour, or paper for things (the Library's cards, a panel's contents).
    Which part of the app is which:
-     Library: the bar on top sits on the frame; the sidebar, the items and the details are one pane, side by side with a rule between:
-              the sidebar in the folder pane's colour, the items on paper, the details in the pane's colour.
-     Settings: the tab list and each card are panes (the demo's style panel: a bold title, rows with a dashed rule).
-     Panels on the canvas and dialogs: a pane, its head the header strip, its body the content, its foot a strip of the bar colour. */
+     The Library is one pane: its bar the header strip; the sidebar (the folder pane's colour, a rule on its right), the items (paper) and the
+       details (the pane colour, a rule on its left) side by side; the status bar along its bottom.
+     Settings is the demo's style panel: the tabs are keys on the frame, each card a pane with a bold title, rows with a dashed rule.
+     A panel on the canvas and a dialog: a pane, its head the header strip (a dialog's in the modal header's colour), its foot the footer. */
 :root[data-look="retroma"] {
-  --rt-ring-i-sh: inset 0 var(--rt-ring-i-w) 0 0 var(--rt-ring-i-t), inset var(--rt-ring-i-w) 0 0 0 var(--rt-ring-i-l), inset 0 calc(-1 * var(--rt-ring-i-w)) 0 0 var(--rt-ring-i-b), inset calc(-1 * var(--rt-ring-i-w)) 0 0 0 var(--rt-ring-i-r), inset 0 0 var(--rt-pane-sh) var(--rt-pane-inner);
+  --rt-ring-o: var(--rt-ring-o-w) var(--rt-ring-o-style);
+  --rt-ri-t: inset 0 var(--rt-ring-i-w) 0 0 var(--rt-ring-i-t);
+  --rt-ri-l: inset var(--rt-ring-i-w) 0 0 0 var(--rt-ring-i-l);
+  --rt-ri-b: inset 0 calc(-1 * var(--rt-ring-i-w)) 0 0 var(--rt-ring-i-b);
+  --rt-ri-r: inset calc(-1 * var(--rt-ring-i-w)) 0 0 0 var(--rt-ring-i-r);
+  --rt-ri-soft: inset 0 0 var(--rt-pane-sh) var(--rt-pane-inner);
+  --rt-r-in: calc(var(--rt-r) - var(--rt-ring-o-w));
 }
-:root[data-look="retroma"] :is(.assets-body, .set-tabs, .set-card, .layers-panel, dialog.confirm) {
+:root[data-look="retroma"] :is(.set-card, .layers-panel, dialog.confirm) {
   background: var(--rt-pane);
-  border: var(--rt-ring-o-w) var(--rt-ring-o-style) transparent;
+  border: var(--rt-ring-o) transparent;
   border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-ring-o-b) var(--rt-ring-o-l);
   border-radius: var(--rt-r);
   corner-shape: var(--rt-corner-pane);
-  box-shadow: var(--rt-ring-i-sh);
+  box-shadow: var(--rt-ri-t), var(--rt-ri-l), var(--rt-ri-b), var(--rt-ri-r), var(--rt-ri-soft);
   --hud-fg: var(--rt-fg); --hud-muted: var(--rt-fg-muted); color: var(--hud-fg);
 }
-:root[data-look="retroma"][data-rt-simplepanes="on"] :is(.assets-body, .set-tabs, .set-card, .layers-panel) { background: transparent; border-color: transparent; box-shadow: none; }
-/* header strips */
-:root[data-look="retroma"] :is(.panel-head, dialog.confirm > h2:first-child) {
+:root[data-look="retroma"][data-rt-simplepanes="on"] :is(.set-card, .layers-panel) { background: transparent; border-color: transparent; box-shadow: none; }
+:root[data-look="retroma"] :is(#assets-view, #settings-view) { background: var(--rt-frame); }
+/* the Library: one pane in three parts (its bar on top, the body, the status bar), each drawing its side of the rings */
+:root[data-look="retroma"] #assets-view { padding: var(--edge); }
+:root[data-look="retroma"] #assets-view .assets-bar {
+  padding-block: var(--pad); padding-right: var(--s-6);
+  background: var(--rt-hdr-bg); color: var(--rt-hdr-fg);
+  border: var(--rt-ring-o) transparent; border-bottom: var(--rt-outline) solid var(--rt-rule);
+  border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-rule) var(--rt-ring-o-l);
+  border-radius: var(--rt-r) var(--rt-r) 0 0; corner-shape: var(--rt-corner-hdr);
+  box-shadow: var(--rt-ri-t), var(--rt-ri-l), var(--rt-ri-r);
+  --hud-fg: var(--rt-fg-on-hdr-app); --hud-muted: var(--rt-fg-muted);
+}
+:root[data-look="retroma"] #assets-view .assets-body {
+  gap: 0; padding: 0; margin: 0;
+  border-inline: var(--rt-ring-o) transparent; border-left-color: var(--rt-ring-o-l); border-right-color: var(--rt-ring-o-r);
+  box-shadow: var(--rt-ri-l), var(--rt-ri-r);
+  --hud-fg: var(--rt-fg); --hud-muted: var(--rt-fg-muted); color: var(--hud-fg);
+}
+:root[data-look="retroma"] #assets-view.is-viewing .assets-body { border-bottom: var(--rt-ring-o) var(--rt-ring-o-b); border-radius: 0 0 var(--rt-r) var(--rt-r); overflow: hidden; }
+:root[data-look="retroma"] #assets-view .assets-statusbar {
+  margin: 0; min-height: var(--rt-status-h);
+  background: var(--rt-status-bg); color: var(--rt-status-fg);
+  border: var(--rt-ring-o) transparent; border-top: var(--rt-outline) solid var(--rt-rule);
+  border-color: var(--rt-rule) var(--rt-ring-o-r) var(--rt-ring-o-b) var(--rt-ring-o-l);
+  border-radius: 0 0 var(--rt-r) var(--rt-r); corner-shape: var(--rt-corner-pane);
+  box-shadow: var(--rt-ri-l), var(--rt-ri-b), var(--rt-ri-r);
+  font-size: var(--text-sm);
+  --hud-fg: var(--rt-status-fg); --hud-muted: var(--rt-status-fg);
+  & > .hud-readout { padding-inline: var(--s-6); }
+}
+:root[data-look="retroma"] #assets-view .col-grip { margin-inline: 0; }
+:root[data-look="retroma"] #assets-view .assets-side { padding: calc(var(--s-4) + var(--s-1)); background: var(--rt-folder-pane-bg); border-right: var(--rt-outline) solid var(--rt-rule); }
+:root[data-look="retroma"] #assets-view .assets-body:not(.has-side-w) > .assets-side { flex-basis: var(--rt-side-w); }
+:root[data-look="retroma"] #assets-view .assets-main { background: var(--rt-paper); }
+:root[data-look="retroma"] #assets-view .assets-scroll { padding: var(--s-6); }
+:root[data-look="retroma"] #assets-view .asset-inspector { background: var(--rt-pane); border: 0; border-left: var(--rt-outline) solid var(--rt-rule); border-radius: 0; }
+:root[data-look="retroma"] #assets-view .asset-insp-head h2 { font-weight: 700; }
+:root[data-look="retroma"] #assets-view .asset-sec { padding: var(--s-6) 0; background: transparent; border: 0; border-radius: 0; }
+:root[data-look="retroma"] #assets-view :is(.asset-dsec + .asset-dsec, .asset-sec + .asset-sec) { border-top: var(--rt-outline) dashed var(--rt-rule); }
+:root[data-look="retroma"] #assets-view .asset-sec > h3 { color: var(--rt-fg-muted); font-weight: 700; }
+:root[data-look="retroma"] #assets-view :is(.side-views, .side-sec) { padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
+/* the sidebar's section labels (the demo's .side .h): small, bold, in capitals, on the folder header's colour; their keys small */
+:root[data-look="retroma"] .side-head { margin: var(--s-4) 0 var(--s-1); padding: 0 0 0 var(--s-1); gap: var(--s-1); background: var(--rt-fhdr-bg); border-radius: var(--s-2); }
+:root[data-look="retroma"] :is(.side-head h2, .side-sec-toggle h2) { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--rt-fg-muted); }
+:root[data-look="retroma"] .side-head :is(.side-add, .side-more) { width: var(--row-btn); height: var(--row-btn); }
+:root[data-look="retroma"][data-rt-part-simple-folder-hdr="true"] .side-head { background: transparent; }
+:root[data-look="retroma"][data-rt-part-simple-folder-hdr="true"] :is(.side-head h2, .side-sec-toggle h2) { text-transform: none; letter-spacing: 0; }
+/* panels on the canvas: header strip, contents on paper, foot strip */
+:root[data-look="retroma"] .layers-panel { overflow: hidden; padding: var(--rt-ring-i-w); }
+:root[data-look="retroma"] .panel-head {
+  padding: calc(var(--rt-pane-in) * 0.6) var(--s-4) calc(var(--rt-pane-in) * 0.6) var(--rt-pane-in);
   background: var(--rt-hdr-bg); color: var(--rt-hdr-fg);
   border-bottom: var(--rt-outline) solid var(--rt-rule);
-  border-radius: calc(var(--rt-r) - var(--rt-ring-o-w)) calc(var(--rt-r) - var(--rt-ring-o-w)) 0 0;
-  corner-shape: var(--rt-corner-hdr);
-  font-weight: 700;
+  border-radius: var(--rt-r-in) var(--rt-r-in) 0 0; corner-shape: var(--rt-corner-hdr);
   --hud-fg: var(--rt-fg-on-hdr-app);
 }
-:root[data-look="retroma"] .panel-head { padding: calc(var(--s-6) * 0.8) var(--s-6) calc(var(--s-6) * 0.8) var(--s-10); }
 :root[data-look="retroma"] .layers-panel h2:not(:where(.viewer-note *)) { font-weight: 700; color: var(--rt-fg-on-hdr-app); }
 :root[data-look="retroma"][data-rt-part-simple-hdr="true"] .panel-head { background: transparent; border-bottom-color: transparent; }
-/* a panel's contents: paper (fields on it a step darker); its foot a strip of the bar colour */
-:root[data-look="retroma"] .layers-panel { overflow: hidden; padding: var(--rt-ring-i-w); }
-:root[data-look="retroma"] :is(.panel-body, .panel-sub) { background: var(--rt-paper); --rt-field-here: color-mix(in oklch, var(--rt-paper), var(--rt-pane) 60%); }
+:root[data-look="retroma"] :is(.panel-body, .panel-sub) { background: var(--rt-paper); }
 :root[data-look="retroma"] .panel-sub { border-bottom: var(--rt-outline) solid var(--rt-rule); }
 :root[data-look="retroma"] .panel-foot { background: var(--rt-pane-alt); border-top: var(--rt-outline) solid var(--rt-rule); --hud-fg: var(--rt-fg-on-alt-app); }
-:root[data-look="retroma"] :is(.adj-group, .layers-panel .adj-group) { border-top-color: var(--rt-rule); }
-/* dialogs: the demo's modal (its own header colour, the body, a footer strip with the buttons) */
+:root[data-look="retroma"] .adj-group { border-top-color: var(--rt-rule); }
+/* dialogs (the demo's .modal): its header in the modal header's colour, the body, the footer strip */
 :root[data-look="retroma"] dialog.confirm {
   border-radius: var(--rt-modal-r);
   corner-shape: var(--rt-modal-corner);
-  box-shadow: var(--rt-ring-i-sh), var(--rt-lift-modal);
-  padding: var(--s-10) var(--s-12);
-  & > h2:first-child { margin: calc(-1 * var(--s-10)) calc(-1 * var(--s-12)) var(--s-10); padding: var(--s-8) var(--s-12); background: var(--rt-mhdr-bg); color: var(--rt-mhdr-fg); border-radius: calc(var(--rt-modal-r) - var(--rt-ring-o-w)) calc(var(--rt-modal-r) - var(--rt-ring-o-w)) 0 0; }
-  & > .confirm-actions:last-child { margin: var(--s-10) calc(-1 * var(--s-12)) calc(-1 * var(--s-10)); padding: var(--s-8) var(--s-12); background: var(--rt-pane-alt); border-top: var(--rt-outline) solid var(--rt-rule); border-radius: 0 0 calc(var(--rt-modal-r) - var(--rt-ring-o-w)) calc(var(--rt-modal-r) - var(--rt-ring-o-w)); }
+  box-shadow: var(--rt-ri-t), var(--rt-ri-l), var(--rt-ri-b), var(--rt-ri-r), var(--rt-ri-soft), var(--rt-lift-modal);
+  padding: var(--rt-pane-in);
+  & > h2:first-child {
+    margin: calc(-1 * var(--rt-pane-in)) calc(-1 * var(--rt-pane-in)) var(--s-6);
+    padding: calc(var(--rt-pane-in) * 0.8) var(--rt-pane-in);
+    font-size: var(--text-lg); font-weight: 700;
+    background: var(--rt-mhdr-bg); color: var(--rt-mhdr-fg);
+    border-bottom: var(--rt-outline) solid var(--rt-rule);
+    border-radius: calc(var(--rt-modal-r) - var(--rt-ring-o-w)) calc(var(--rt-modal-r) - var(--rt-ring-o-w)) 0 0;
+  }
+  & > .confirm-actions:last-child {
+    margin: var(--s-6) calc(-1 * var(--rt-pane-in)) calc(-1 * var(--rt-pane-in));
+    padding: var(--s-6) var(--rt-pane-in);
+    background: var(--rt-pane-alt); border-top: var(--rt-outline) solid var(--rt-rule);
+    border-radius: 0 0 calc(var(--rt-modal-r) - var(--rt-ring-o-w)) calc(var(--rt-modal-r) - var(--rt-ring-o-w));
+  }
 }
-/* the Library: the frame round it; the bar on the frame; one pane holding the sidebar, the items and the details */
-:root[data-look="retroma"] :is(#assets-view, #settings-view) { background: var(--rt-frame); }
-:root[data-look="retroma"] #assets-view .assets-body { gap: 0; padding: var(--rt-ring-i-w); margin: var(--s-4) 0 var(--s-8); overflow: hidden; }
-:root[data-look="retroma"] #assets-view .assets-body.is-viewing { margin-top: 0; }
-:root[data-look="retroma"] #assets-view .col-grip { margin-inline: 0; }
-:root[data-look="retroma"] #assets-view .assets-side { padding: var(--s-8) var(--s-6); background: var(--rt-folder-pane-bg); border-right: var(--rt-outline) solid var(--rt-rule); border-radius: calc(var(--rt-r) - var(--rt-ring-o-w)) 0 0 calc(var(--rt-r) - var(--rt-ring-o-w)); }
-:root[data-look="retroma"] #assets-view .assets-body:not(.has-side-w) > .assets-side { flex-basis: var(--rt-side-w); }
-:root[data-look="retroma"] #assets-view .assets-main { background: var(--rt-paper); --rt-field-here: color-mix(in oklch, var(--rt-paper), var(--rt-pane) 60%); }
-:root[data-look="retroma"] #assets-view .asset-inspector { background: var(--rt-pane); border: 0; border-left: var(--rt-outline) solid var(--rt-rule); border-radius: 0 calc(var(--rt-r) - var(--rt-ring-o-w)) calc(var(--rt-r) - var(--rt-ring-o-w)) 0; }
-:root[data-look="retroma"] #assets-view .asset-insp-head h2 { font-weight: 700; }
-:root[data-look="retroma"] #assets-view .asset-sec { padding: var(--s-6) 0; background: transparent; border: 0; border-radius: 0; }
-:root[data-look="retroma"] #assets-view .asset-dsec + .asset-dsec, :root[data-look="retroma"] #assets-view .asset-sec + .asset-sec { border-top: var(--rt-outline) dashed var(--rt-rule); }
-:root[data-look="retroma"] #assets-view .asset-sec > h3 { color: var(--rt-fg); font-weight: 700; }
-:root[data-look="retroma"] #assets-view :is(.side-views, .side-sec) { padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
-/* the sidebar: the demo's section labels (small, bold, in capitals, on the folder header's colour) over plain rows */
-:root[data-look="retroma"] .side-head { margin: var(--s-8) 0 var(--s-2); padding: 0 var(--s-2) 0 var(--s-4); background: var(--rt-fhdr-bg); border-radius: var(--s-2); }
-:root[data-look="retroma"] .side-head h2, :root[data-look="retroma"] .side-sec-toggle h2 { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--rt-fg-muted); }
-:root[data-look="retroma"][data-rt-part-simple-folder-hdr="true"] .side-head { background: transparent; }
-:root[data-look="retroma"][data-rt-part-simple-folder-hdr="true"] :is(.side-head h2, .side-sec-toggle h2) { text-transform: none; letter-spacing: 0; }
-/* Settings: the tab list and each card are the demo's style panes: a bold title, rows with a dashed rule between, room round them */
-:root[data-look="retroma"] .set-panels > section { gap: var(--s-8); }
-:root[data-look="retroma"] .set-card { padding: var(--s-8) var(--s-10); }
 :root[data-look="retroma"] .rt-rows > .adj-group:first-child { border-top: 0; padding-top: 0; }
-:root[data-look="retroma"] .set-card > :is(h3, h4):first-child { margin: 0 0 var(--s-4); font-size: var(--text-md); font-weight: 700; color: var(--rt-fg); }
-:root[data-look="retroma"] .set-card .set-row { border-bottom: var(--rt-outline) dashed var(--rt-rule); }
+/* Settings: the demo's style panel. The tabs are keys on the frame; each card a pane (a bold title, rows with a dashed rule) */
+:root[data-look="retroma"] .set-tabs { padding: 0; gap: var(--s-2); background: transparent; border: 0; box-shadow: none; & button { white-space: nowrap; font-size: var(--text-sm); } }
+:root[data-look="retroma"] :is(.set-tabs-h, .set-panels > section > h2) { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--rt-muted-on-frame-app); }
+:root[data-look="retroma"] .set-panels > section { gap: var(--s-6); }
+:root[data-look="retroma"] .set-card { padding: var(--s-6); }
+:root[data-look="retroma"] .set-card > :is(h3, h4):first-child { margin: 0 0 var(--s-2); font-size: var(--text-md); font-weight: 700; color: var(--rt-fg); }
+:root[data-look="retroma"] .set-card .set-row { padding-block: calc(var(--s-6) / 2 + var(--s-1)); border-bottom: var(--rt-outline) dashed var(--rt-rule); }
 :root[data-look="retroma"] .set-card .set-row:last-child { border-bottom: 0; }
-:root[data-look="retroma"] .set-tabs { padding: var(--s-6); gap: var(--s-4); & button { white-space: nowrap; } }
-:root[data-look="retroma"] :is(.set-panels > section > h2, .set-tabs-h) { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
-:root[data-look="retroma"] .set-panels > section > h2 { color: var(--rt-muted-on-frame-app); }
+/* Retroma's own controls (Settings › Retroma and its dialogs) are the demo's .ctl: the name and the value on one line, the control under them */
+:root[data-look="retroma"] .rt-rows .adj-row {
+  grid-template-columns: minmax(0, 1fr) auto; row-gap: var(--s-1); column-gap: var(--s-4);
+  font-size: var(--text-sm);
+  & > .adj-label { grid-column: 1; font-weight: 700; color: var(--rt-fg-muted); }
+  & > .adj-num { grid-column: 2; grid-row: 1; width: 4.5em; height: auto; padding: 0; text-align: right; color: var(--rt-fg); background: transparent; border: 0; box-shadow: none; }
+  & > input[type="range"] { grid-column: 1 / -1; grid-row: 2; }
+  & > :is(select, .adj-layers, .pg-colour, .seg) { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; }
+  & > :is(.adj-layers, .seg) { justify-self: start; }
+  &:has(> select) { display: grid; & > select { width: 100%; max-width: none; justify-self: stretch; height: var(--ctl); } }
+}
 /* the canvas's info bar is Retroma's strip along the bottom; the Library's status bar keeps its own colours */
 :root[data-look="retroma"] .hud-bottom { background: transparent; }
-:root[data-look="retroma"] .hud-readout { --hud-fg: var(--rt-info-fg); --hud-muted: var(--rt-info-fg); color: var(--rt-info-fg); font-weight: 700; }
-:root[data-look="retroma"] #assets-view .assets-readout { --hud-fg: var(--rt-status-fg); --hud-muted: var(--rt-status-fg); background: transparent; color: var(--rt-status-fg); font-weight: 400; }
+:root[data-look="retroma"] .hud-readout { --hud-fg: var(--rt-info-fg); --hud-muted: var(--rt-info-fg); color: var(--rt-info-fg); font-size: var(--text-sm); }
+:root[data-look="retroma"] #assets-view .assets-readout { --hud-fg: var(--rt-status-fg); --hud-muted: var(--rt-status-fg); background: transparent; color: var(--rt-status-fg); }
 :root[data-look="retroma"] body { font-family: var(--rt-font); }
 
-/* ---- 5. Menus and notices: Retroma's menu (the inner ring, bold rows, a quiet hint) and its notice (bold, on the deep frame) ---------- */
+/* ---- 5. Menus (the demo's .menu and .mi) and notices (.notice) -------------------------------------------------------------------- */
 :root[data-look="retroma"] .pop-menu {
-  padding: 5px;
+  padding: 5px; gap: 2px;
   background: var(--rt-menu-bg);
   border: var(--rt-menu-ol) var(--rt-menu-ol-style) var(--rt-menu-ol-c);
   border-radius: var(--rt-menu-r);
   corner-shape: var(--rt-corner-menu);
   box-shadow: var(--rt-lift);
   --hud-fg: var(--rt-fg); --hud-muted: var(--rt-fg-muted);
-  & button { font-weight: 700; border: var(--rt-outline) solid transparent; border-radius: calc(var(--rt-menu-r) - 3px); }
+  & button { font-weight: 700; border: var(--rt-outline) solid transparent; border-radius: calc(var(--rt-menu-r) - 3px); column-gap: 10px; }
+  & button:is(:hover, :focus-visible):not(:disabled) { background: var(--rt-accent); color: var(--rt-on-accent); border-color: var(--rt-outline-c); --hud-muted: var(--rt-on-accent); & :is(.menu-hint, svg) { color: var(--rt-on-accent); } }
   & .menu-hint { font-weight: 400; color: var(--rt-fg-muted); }
+  & button.is-danger:not(:hover) { color: var(--rt-danger); }
 }
-:root[data-look="retroma"][data-rt-simplemenu="on"] .pop-menu { box-shadow: 0 6px 18px var(--rt-pane-inner); }
+:root[data-look="retroma"][data-rt-simplemenu="on"] .pop-menu { box-shadow: 0 6px 18px oklch(0 0 0 / 0.15); }
 :root[data-look="retroma"] .notice {
-  margin: 0;
+  margin: 0; padding: 8px 10px;
   background: var(--rt-frame-deep); color: var(--rt-on-frame-deep);
   border: var(--rt-outline) solid var(--rt-outline-c);
   border-radius: var(--rt-r);
@@ -253,20 +324,23 @@
   &.is-success { background: var(--rt-ok-bg); color: var(--rt-ok-fg); --hud-fg: var(--rt-ok-fg); --hud-muted: var(--rt-ok-fg); --tone: var(--rt-ok-fg); }
   &.is-warning { background: var(--rt-warn-bg); color: var(--rt-warn-fg); --hud-fg: var(--rt-warn-fg); --hud-muted: var(--rt-warn-fg); --tone: var(--rt-warn-fg); }
   &.is-error { background: var(--rt-err-bg); color: var(--rt-err-fg); --hud-fg: var(--rt-err-fg); --hud-muted: var(--rt-err-fg); --tone: var(--rt-err-fg); }
-  & button { --surf: transparent; --k-ol: currentColor; --k-sh: none; color: inherit; }
+  & button { --surf: var(--rt-frame-deep); --k-ol: currentColor; color: inherit; }
+  &:is(.is-success, .is-warning, .is-error) button { --surf: transparent; }
 }
 :root[data-look="retroma"] ::selection { background: var(--rt-selection); }
 
-/* ---- 6. The Library's rows and cards ---------------------------------------------------------------------------------------------
-   A view or folder row is Retroma's nav item: the selected one a pressed key; a card is a key holding its picture on a mat. */
+/* ---- 6. The Library's rows and cards (the demo's .navrow and .card) ---------------------------------------------------------------
+   A view or folder row: the selected one a pressed key. A card: a key with its picture on a mat, its name and one line under it. */
 :root[data-look="retroma"] .side-item {
   border-radius: var(--rt-folder-r);
   &.is-active { --surf: var(--rt-btn-on); background: var(--surf); color: var(--rt-fg-on-on-app); font-weight: 700; box-shadow: var(--rt-sink); outline: var(--rt-outline) solid var(--rt-outline-c); outline-offset: calc(-1 * var(--rt-outline)); }
-  & .side-n { font-family: var(--rt-font-mono); }
+  & .side-n { font-family: var(--rt-font-mono); font-size: var(--text-xs); }
 }
 :root[data-look="retroma"] :is(.tree-row, .side-row):has(> .side-item.is-active) { --hud-accent-fg: var(--rt-fg-on-on-app); --hud-fg: var(--rt-fg-on-on-app); --hud-muted: var(--rt-fg-on-on-app); }
 :root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card {
-  padding: 0;
+  --cap: calc(var(--text-sm) * 1.4 + var(--text-xs) * 1.4 + 8px);
+  padding: 0; overflow: visible;
+  color: var(--rt-fg);
   background: var(--rt-card-bg);
   border: var(--rt-card-ol-w) var(--rt-card-ol-style) var(--rt-card-ol-c);
   border-radius: var(--rt-card-r);
@@ -274,12 +348,21 @@
   box-shadow: var(--rt-raise);
   transition: transform var(--rt-press-ms), box-shadow var(--rt-press-ms);
   & :is(.asset-thumb, .asset-info) { transform: translate(var(--rt-cx), var(--rt-cy)); transition: transform var(--rt-press-ms); }
-  & .asset-thumb { inset: 6px; box-sizing: border-box; border: 3px solid var(--rt-card-cover, var(--rt-mat)); outline: var(--rt-img-ol) solid var(--rt-img-ol-c); border-radius: var(--rt-img-r); overflow: hidden; }
-  &:hover:not([aria-pressed="true"]) { border-color: var(--rt-card-ol-hover); }
-  &:is([aria-pressed="true"], :active) { background: var(--rt-btn-on); box-shadow: var(--rt-sink); transform: translate(var(--rt-press-x), var(--rt-press-y)); & :is(.asset-thumb, .asset-info) { transform: translate(var(--rt-cx-a), var(--rt-cy-a)); } }
-  &[aria-pressed="true"]::after { background: transparent; box-shadow: 0 0 0 3px var(--rt-select); }
+  & .asset-thumb { inset: 6px 6px var(--cap) 6px; box-sizing: border-box; border: 3px solid var(--rt-card-cover, var(--rt-mat)); outline: var(--rt-img-ol) solid var(--rt-img-ol-c); border-radius: var(--rt-img-r); overflow: hidden; }
+  & .asset-info { left: 6px; right: 6px; bottom: 4px; gap: 0; padding: 0; color: var(--rt-fg); background: none; opacity: 1; }
+  & .asset-name { font-size: var(--text-sm); font-weight: 700; }
+  & .asset-meta { font-size: var(--text-xs); color: var(--rt-fg-muted); }
+  & :is(.asset-uses, .asset-tags) { display: none; }
+  &::after { display: none; }
+  &:hover:not([aria-pressed="true"]) { border-color: var(--rt-card-ol-hover); box-shadow: var(--rt-raise); }
+  &:is([aria-pressed="true"], :active) {
+    background: var(--rt-btn-on); color: var(--rt-fg-on-on-app);
+    box-shadow: var(--rt-sink), 0 0 0 3px var(--rt-select);
+    transform: translate(var(--rt-press-x), var(--rt-press-y));
+    & :is(.asset-thumb, .asset-info) { transform: translate(var(--rt-cx-a), var(--rt-cy-a)); }
+    & :is(.asset-info, .asset-meta) { color: var(--rt-fg-on-on-app); }
+  }
 }
-:root[data-look="retroma"] #assets-view .asset-name { font-weight: 700; }
 
 /* ---- 7. Filters (Retroma › Filters): CRT scanlines and vignette, text glow, pixel icons, greyscale ------------------------------ */
 :root[data-look="retroma"][data-rt-crt="on"] body::after {
@@ -459,18 +542,16 @@
     border-left-width: var(--rt-folder-left);
     border-radius: var(--rt-folder-r);
     corner-shape: var(--rt-corner-folder);
-    box-shadow: 0 2px 0 var(--rt-rule);
     font-family: var(--rt-folder-font);
     & svg { color: inherit; }
   }
-  &:has(.tree-twist[aria-expanded="true"]) > .side-item:not(.is-active) { background: var(--f-bg-open); color: var(--f-fg-open); outline: 1px solid var(--f-ol); outline-offset: 1px; border-width: var(--rt-folder-open-ol); }
+  &:has(.tree-twist[aria-expanded="true"]) > .side-item:not(.is-active) { background: var(--f-bg-open); color: var(--f-fg-open); border-width: var(--rt-folder-open-ol); }
 }
 :root[data-look="retroma"][data-rt-folderstyle="outline"] .side-sec[data-sec="folders"] .tree-row > .side-item:not(.is-active) { background: transparent; }
 :root[data-look="retroma"][data-rt-folderstyle="plain"] .side-sec[data-sec="folders"] .tree-row > .side-item:not(.is-active) { background: transparent; border-color: transparent; box-shadow: none; outline: none; color: var(--rt-fg); }
 
 /* ---- 12. Title bar, status bars, tabs, scrollbars, tags, the focus ring (Retroma › Interface) ---------------------------------- */
 :root[data-look="retroma"] .win-row { background: var(--rt-title-bg); color: var(--rt-title-fg); }
-:root[data-look="retroma"] #assets-view .assets-statusbar { background: var(--rt-status-bg); color: var(--rt-status-fg); min-height: var(--rt-status-h); border-top: var(--rt-outline) solid var(--rt-rule); --hud-fg: var(--rt-status-fg); --hud-muted: var(--rt-status-fg); }
 :root[data-look="retroma"] .hud-readout { background: var(--rt-info-bg); color: var(--rt-info-fg); }
 :root[data-look="retroma"][data-rt-tabstyle="underline"] .set-tabs button[aria-selected="true"] { --surf: transparent; box-shadow: inset 0 -3px 0 var(--rt-accent); transform: none; }
 :root[data-look="retroma"][data-rt-tabstyle="filled"] .set-tabs button[aria-selected="true"] { --surf: var(--rt-pane); box-shadow: var(--rt-tab-hl); transform: none; border-color: var(--rt-tab-outline); }
