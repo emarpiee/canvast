@@ -292,12 +292,14 @@
 }
 /* the Library's two side columns (the sidebar and the details) are one look: the frame's colour, the same room */
 :root[data-look="retroma"] #assets-view .side-views, :root[data-look="retroma"] #assets-view .side-sec, :root[data-look="retroma"] #assets-view .asset-sec { padding: var(--s-6); } /* (every card of the Library's columns: one room inside, by Density) */
-:root[data-look="retroma"] #assets-view .assets-side, :root[data-look="retroma"] #assets-view .asset-inspector { scrollbar-gutter: stable both-edges; padding: var(--s-6) calc(var(--s-6) - var(--scroll-size, 0px)); background: var(--rt-frame); --hud-fg: var(--rt-fg-on-frame-app); --hud-muted: var(--rt-muted-on-frame-app); color: var(--hud-fg); } /* (the frame's colour, what is on it held to 4.5:1; the boxes in them keep their own colours) */
+:root[data-look="retroma"] #assets-view .assets-side, :root[data-look="retroma"] #assets-view .asset-inspector { overflow: auto; padding: var(--s-6); background: var(--rt-frame); --hud-fg: var(--rt-fg-on-frame-app); --hud-muted: var(--rt-muted-on-frame-app); color: var(--hud-fg); } /* (the frame's colour, what is on it held to 4.5:1; the boxes in them keep their own colours) */
 :root[data-look="retroma"] #assets-view .assets-body:not(.has-side-w) > .assets-side { flex-basis: calc(var(--rt-side-w) + 2 * var(--s-6)); } /* (v4's width for the rows, plus the cards' room on each side) */
 :root[data-look="retroma"] #assets-view .assets-main { background: var(--rt-paper); }
 :root[data-look="retroma"] #assets-view .assets-scroll { padding: var(--s-6); }
 :root[data-look="retroma"] #assets-view .asset-insp-head h2 { font-weight: 700; }
 :root[data-look="retroma"] #assets-view .asset-sec > h3 { color: var(--hud-muted); font-weight: 700; }
+/* (where scrollbars take room (::-webkit-scrollbar, --scroll-size), the columns keep it on both sides, so the cards stay centred; elsewhere, as in Firefox, they take none) */
+@supports selector(::-webkit-scrollbar) { :root[data-look="retroma"] #assets-view .assets-side, :root[data-look="retroma"] #assets-view .asset-inspector { scrollbar-gutter: stable both-edges; padding-inline: calc(var(--s-6) - var(--scroll-size, 0px)); } }
 /* the sidebar's section labels (the demo's .side .h): small, bold, in capitals, on the folder header's colour; their keys small */
 :root[data-look="retroma"] .side-head { margin: var(--s-4) 0 var(--s-1); padding: 0 0 0 var(--s-1); gap: var(--s-1); background: var(--rt-fhdr-bg); border-radius: var(--s-2); }
 :root[data-look="retroma"] :is(.side-head h2, .side-sec-toggle h2) { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--hud-muted); }
