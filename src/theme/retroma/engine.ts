@@ -296,11 +296,13 @@ function lighting(T) {
     v.sink = `inset ${asx}px ${asy}px ${a.sB}px ${accentShade(a.sL, a.sO, a.sC, 1)}, inset ${ahx}px ${ahy}px ${a.hB}px ${hl(a.hL, a.hO, a.hC, 1)}`;
     v.px = v.py = 0;
     const f = Math.max(1, S.cfact);
-    v.cx = stillNow() ? 0 : nhx / f; v.cy = stillNow() ? 0 : nhy / f; v.cxa = stillNow() ? 0 : asx / f; v.cya = stillNow() ? 0 : asy / f;
+    // (as v3: a key's contents sit up at rest and ride down when pressed whatever the motion setting; that is where they are, not an
+    // animation. Reduced motion only takes the press's transition away, --press-ms)
+    v.cx = nhx / f; v.cy = nhy / f; v.cxa = asx / f; v.cya = asy / f;
   } else if (S.btn === "neu") {
     v.raise = `${nx}px ${ny}px ${n.sB}px ${accentShade(n.sL, n.sO, n.sC, mult)}`;
     v.raiseSm = `${r(nx / 2)}px ${r(ny / 2)}px 0 ${accentShade(n.sL, n.sO, n.sC, mult)}`;
-    v.sink = "0 0 0 transparent"; v.px = stillNow() ? 0 : nx; v.py = stillNow() ? 0 : ny; v.cx = v.cy = v.cxa = v.cya = 0;
+    v.sink = "0 0 0 transparent"; v.px = nx; v.py = ny; v.cx = v.cy = v.cxa = v.cya = 0;
   } else {
     v.raise = v.raiseSm = "0 0 0 transparent"; v.sink = `inset 0 0 0 99px ${css(T.hover)}`; v.px = v.py = v.cx = v.cy = v.cxa = v.cya = 0;
   }
