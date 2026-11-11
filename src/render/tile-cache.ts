@@ -44,6 +44,11 @@ const GUARD_CSS = 8;
  * stops. Sparse scenes never use it: they stay exact on every frame.
  */
 const DENSE_MS = 12; // default; the quality governor lowers it (app/quality.ts)
+/**
+ * A view of this many objects counts as dense too, however fast its tiles were built: much of drawing them happens later, on the GPU,
+ * where the build's time does not see it, and drawing them all again on every frame of a zoom is what made zooming slow.
+ */
+const DENSE_OBJECTS = 1500;
 const PREVIEW_MAX_LEVELS = 1;
 const REFINE_MS = 150;
 /**
@@ -115,10 +120,14 @@ export class TileCache {
   readonly restarts = { offset: 0, key: 0, lastOffset: null as null | { ax: number; ay: number } };
   /** Cost of the last full tile-set build (about one exact frame of committed objects). */
   lastFullMs = 0;
+  /** How many objects the last whole set held. */
+  lastFullObjects = 0;
   /** A rebuild slower than this makes the scene "dense": zoom frames show a scaled preview. */
   denseMs = DENSE_MS;
   private refineTimer: ReturnType<typeof setTimeout> | null = null;
   private refineNow = false;
+  /** Where the view was (its raw offset from the set) when the rest timer of an inexact pan started: it rests only if it is still there. */
+  private restAt: { ax: number; ay: number } | null = null;
   private gen: Generation | null = null;
   /** Prebuilt sets one zoom level in (+1) and out (-1) from `gen`. */
   private readonly ahead = new Map<number, Generation>();
@@ -225,7 +234,7 @@ export class TileCache {
     this.refineNow = false;
     this.lastKey = key;
     const z = cam.zi + cam.zf;
-    const dense = this.lastFullMs > this.denseMs;
+    const dense = this.lastFullMs > this.denseMs || this.lastFullObjects > DENSE_OBJECTS;
     if (this.gen && this.gen.key !== key) {
       this.restarts.key++;
       // The preview scales the last tile set: only within the same frame.
@@ -252,7 +261,10 @@ export class TileCache {
     // A move that is not whole device pixels (a pointer between pixels: Wayland, scaled screens, touchpads, a glide): while the view moves,
     // the set is kept and drawn at the nearest whole pixel (half a device pixel at most from exact, no blur, no seams); once it rests, it is
     // built again exactly. Throwing the set away on every such move cost a whole set each frame.
-    if (off && !off.whole && !refine && this.gen!.tiles.size) {
+    // (resting means not moved since the timer started: a frame slower than the timer, on a heavy canvas, is no rest)
+    const moved = !!off && !!this.restAt && (Math.abs(off.ax - this.restAt.ax) > 1e-6 || Math.abs(off.ay - this.restAt.ay) > 1e-6);
+    if (off && !off.whole && (!refine || moved) && this.gen!.tiles.size) {
+      this.restAt = { ax: off.ax, ay: off.ay };
       if (this.refineTimer) clearTimeout(this.refineTimer);
       this.refineTimer = setTimeout(() => {
         this.refineTimer = null;
@@ -260,11 +272,12 @@ export class TileCache {
         this.requestFrame();
       }, REFINE_MS);
     } else if (!off || !off.whole) {
+      this.restAt = null;
       this.restarts.offset++;
       // Enormous, or resting after an inexact move: start over at this camera.
       this.clear();
       this.gen = { key, z, center: cam.center, frameId, vp, tiles: new Map() };
-      off = { dx: 0, dy: 0, whole: true };
+      off = { dx: 0, dy: 0, ax: 0, ay: 0, whole: true };
     }
     const g = this.gen!;
     const { dx, dy } = off;
@@ -336,8 +349,11 @@ export class TileCache {
         g.tiles.delete(k);
       }
     }
-    if (missing.length === needed.length && needed.length) this.lastFullMs = performance.now() - buildStart;
-    if (ahead && this.idleBuild && this.lastFullMs > this.denseMs && !this.refineTimer) {
+    if (missing.length === needed.length && needed.length) {
+      this.lastFullMs = performance.now() - buildStart;
+      this.lastFullObjects = visible;
+    }
+    if (ahead && this.idleBuild && (this.lastFullMs > this.denseMs || this.lastFullObjects > DENSE_OBJECTS) && !this.refineTimer) {
       this.aheadArgs = { source: ahead, vp, dpr, reach };
       this.idleTimer = setTimeout(() => this.stepAhead(), IDLE_MS);
     }
@@ -540,7 +556,7 @@ export class TileCache {
    * Device-pixel offset of the current view from the generation's, rounded to whole pixels (`whole`: it was whole already), or null
    * when it is enormous or not a number.
    */
-  private offset(g: Generation, cam: Camera, vp: Viewport, dpr: number): { dx: number; dy: number; whole: boolean } | null {
+  private offset(g: Generation, cam: Camera, vp: Viewport, dpr: number): { dx: number; dy: number; ax: number; ay: number; whole: boolean } | null {
     const f = 2 ** cam.zf;
     const ax = (D.diffToNumber(g.center.x, cam.center.x, cam.zi) * f + (vp.width - g.vp.width) / 2) * dpr;
     const ay = (D.diffToNumber(g.center.y, cam.center.y, cam.zi) * f + (vp.height - g.vp.height) / 2) * dpr;
@@ -548,7 +564,7 @@ export class TileCache {
     const dy = Math.round(ay);
     this.restarts.lastOffset = { ax, ay };
     if (!Number.isFinite(ax) || !Number.isFinite(ay) || Math.abs(dx) > 2 ** 30 || Math.abs(dy) > 2 ** 30) return null;
-    return { dx, dy, whole: Math.abs(ax - dx) <= 1e-6 && Math.abs(ay - dy) <= 1e-6 };
+    return { dx, dy, ax, ay, whole: Math.abs(ax - dx) <= 1e-6 && Math.abs(ay - dy) <= 1e-6 };
   }
 
   private release(t: Tile): void {
