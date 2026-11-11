@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.56.37 — Smooth panning on big drawings (2026-11-11)
+
+- **Fixed:** panning a canvas with many strokes dropped to 10–20 frames a second: a pan by a fraction of a pixel (the pointer between pixels, as Wayland, scaled screens and touchpads report it) threw away every tile of the view and drew them all again, on every move. The tiles are now kept while the view moves (drawn at the nearest whole pixel) and drawn again exactly once it rests. In the pan benchmark, tiles drawn in 4 seconds of panning fell from 5,742 to 35 and a frame from about 250 ms to 17 ms.
+- **Added:** `scripts/bench-pan.mjs` and the *Bench pan* workflow: panning a drawing of long strokes with real mouse drags, with a CPU profile of where the time goes.
+- **Changed:** the README's two Export pictures show the shared name pattern chips.
+
 ## 0.56.36 — One name pattern for Rename and Export, with dates (2026-11-11)
 
 - **Added:** dates in names, in the Library's Rename and in Export: `{date}` (2026-11-11) or `{date:FORMAT}` in any arrangement of `YYYY` `YY` `MM` `DD` `HH` `mm` `ss` (`{date:YYYYMMDD}`, `{date:DD.MM.YY}`, `{date:YYYY-MM-DD_HHmm}`). A Date row, shown while the pattern holds a date, chooses *Today*, *This date* (a day you set) or, in Rename, *Date added* (each item's own).
