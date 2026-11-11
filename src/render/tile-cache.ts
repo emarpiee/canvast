@@ -363,17 +363,30 @@ export class TileCache {
     }
     const buildStart = performance.now();
     this.renderedTotal += missing.length;
-    const visible = missing.length ? this.buildTiles(g, missing, dx, dy, vp, dpr, query, drawObjects, reach, this.back ? BUILD_MS : Infinity).visible : 0;
-    // The backdrop, scaled, under the tiles still to build (clipped to them: nothing shows twice); gone once the set is whole.
+    // (over a backdrop, a few tiles a frame, from the middle of the view outwards)
+    const backEdge = this.back ? this.extent(this.back, cam, vp, dpr) : null;
+    if (backEdge && missing.length > 1) {
+      const ci = (vp.width * dpr) / 2 - dx, cj = (vp.height * dpr) / 2 - dy;
+      const far = ([i, j]: [number, number]): number => ((i + 0.5) * td - ci) ** 2 + ((j + 0.5) * td - cj) ** 2;
+      missing.sort((a, b) => far(a) - far(b));
+    }
+    const visible = missing.length ? this.buildTiles(g, missing, dx, dy, vp, dpr, query, drawObjects, reach, backEdge ? BUILD_MS : Infinity).visible : 0;
+    // The backdrop, scaled, under the tiles still to build (clipped to them: nothing shows twice), and what it does not reach (zooming
+    // out) drawn exactly there; gone once the set is whole.
     const stillMissing = needed.filter(([i, j]) => !g.tiles.has(`${i},${j}`));
     if (this.back) {
-      if (stillMissing.length) {
+      if (stillMissing.length && backEdge) {
+        const t0 = ctx.getTransform();
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.beginPath();
         for (const [i, j] of stillMissing) ctx.rect(i * td + dx, j * td + dy, td, td);
         ctx.clip();
         this.drawScaled(ctx, this.back, cam, vp, dpr);
+        if (border && !this.covers(this.back, cam, vp, dpr)) {
+          ctx.setTransform(t0);
+          border(ctx, { l: backEdge.l / dpr, t: backEdge.t / dpr, r: backEdge.r / dpr, b: backEdge.b / dpr });
+        }
         ctx.restore();
         this.requestFrame(); // (the rest of the set, next frame)
       } else this.dropBack();
@@ -576,10 +589,14 @@ export class TileCache {
     const g = this.gen!;
     const dz = cam.zi + cam.zf - g.z;
     if (this.dirty.size || !g.key.endsWith(`|${dpr}`) || Math.abs(dz) > PREVIEW_MAX_LEVELS || !g.tiles.size) return null;
+    // A set still being built (its holes) shows its backdrop under it, where it has no tile yet.
+    let base: Generation = g;
+    const back = this.back && !this.extent(g, cam, vp, dpr) ? this.backUnder(ctx, g, cam, vp, dpr) : null;
+    if (back) base = back;
     const n = this.drawScaled(ctx, g, cam, vp, dpr);
     if (n < 0) return null;
-    if (border && !this.covers(g, cam, vp, dpr)) {
-      const e = this.extent(g, cam, vp, dpr);
+    if (border && !this.covers(g, cam, vp, dpr) && !this.covers(base, cam, vp, dpr)) {
+      const e = this.extent(base, cam, vp, dpr) ?? this.extent(g, cam, vp, dpr);
       // (empty tiles are not drawn, but their place is covered: nothing of them was there)
       border(ctx, e ? { l: e.l / dpr, t: e.t / dpr, r: e.r / dpr, b: e.b / dpr } : { l: 0, t: 0, r: 0, b: 0 });
     }
@@ -590,6 +607,31 @@ export class TileCache {
       this.requestFrame();
     }, REFINE_MS);
     return { tiles: n, rendered: 0, visible: 0, preview: true };
+  }
+
+  /** The backdrop drawn scaled everywhere but on the tiles `g` has; the backdrop, or null when it cannot be placed. */
+  private backUnder(ctx: CanvasRenderingContext2D, g: Generation, cam: Camera, vp: Viewport, dpr: number): Generation | null {
+    const back = this.back!;
+    const s = 2 ** (cam.zi + cam.zf - g.z);
+    const f = 2 ** cam.zf;
+    const ox = (vp.width / 2 + D.diffToNumber(g.center.x, cam.center.x, cam.zi) * f) * dpr - (g.vp.width / 2) * dpr * s;
+    const oy = (vp.height / 2 + D.diffToNumber(g.center.y, cam.center.y, cam.zi) * f) * dpr - (g.vp.height / 2) * dpr * s;
+    if (!Number.isFinite(ox) || !Number.isFinite(oy) || !back.key.endsWith(`|${dpr}`)) return null;
+    const td = TILE_CSS * dpr;
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.beginPath();
+    ctx.rect(0, 0, vp.width * dpr, vp.height * dpr);
+    // (the same rounding as drawScaled, so the edges meet)
+    for (const k of g.tiles.keys()) {
+      const [i, j] = k.split(",").map(Number) as [number, number];
+      const x0 = Math.floor(ox + i * td * s), y0 = Math.floor(oy + j * td * s);
+      ctx.rect(x0, y0, Math.ceil(ox + (i + 1) * td * s) - x0, Math.ceil(oy + (j + 1) * td * s) - y0);
+    }
+    ctx.clip("evenodd");
+    const n = this.drawScaled(ctx, back, cam, vp, dpr);
+    ctx.restore();
+    return n < 0 ? null : back;
   }
 
   /** The tiles of set `g` drawn scaled and placed for this camera; how many were drawn (-1: it cannot be placed). */
