@@ -2,17 +2,22 @@
 // (`hatch` in src/app/bench.ts) is panned by mouse drags with the Hand tool, at 60 moves a second and at 4 moves a frame (a fast mouse),
 // while the page records each frame and Chrome records a CPU profile. Prints frames per second, frame times, the app's own draw times,
 // tiles built, and where the time went, at a whole zoom level and at a fraction of one (the functions with the most time of their own).
-// Run from the repo root after `npm run build`: node scripts/bench-pan.mjs [strokes] [outDir]   (CANVAST_BUILD_DIR: the build, default dist)
+// Run from the repo root after `npm run build`: node scripts/bench-pan.mjs [strokes | file.canvast] [outDir] [--check]   (CANVAST_BUILD_DIR:
+// the build, default dist). --check: the pan and zoom standard (scripts/lib/pan-zoom-budget.mjs, on the showcase): fails when a run is over it.
 import { chromium } from "@playwright/test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
+import { PAN_ZOOM_BUDGET, overBudget } from "./lib/pan-zoom-budget.mjs";
+
+const check = process.argv.includes("--check");
+const args = process.argv.slice(2).filter((a) => a !== "--check");
 
 // The scene: a number (that many generated hatching strokes), or a .canvast file (the showcase: its Powers of two canvas, at a bookmark).
-const sceneArg = process.argv[2] ?? "900";
+const sceneArg = args[0] ?? "900";
 const n = Number(sceneArg);
 const BOOKMARK = process.env.BENCH_BOOKMARK ?? "1 · The Solar System";
-const out = resolve(process.argv[3] ?? "bench-pan");
+const out = resolve(args[1] ?? "bench-pan");
 mkdirSync(out, { recursive: true });
 const url = pathToFileURL(resolve(process.env.CANVAST_BUILD_DIR ?? "dist", "canvast.html")).href + "#debug";
 
@@ -132,3 +137,12 @@ runs.push(await pan("wheel-zoom-slow", 1, 4, 0, wheel(1)), await pan("wheel-zoom
 const results = { strokes: loaded.objects, generateMs: loaded.generateMs, runs };
 writeFileSync(resolve(out, "results.json"), JSON.stringify(results, null, 2));
 await browser.close();
+if (check) {
+  const over = overBudget(runs);
+  console.log(`\n== The pan and zoom standard (${Object.keys(PAN_ZOOM_BUDGET).length} runs): ${over.length ? "FAILED" : "passed"}`);
+  for (const line of over) console.log(`  over: ${line}`);
+  if (over.length) {
+    console.log("A change made the canvas view slower to pan or zoom: fix it (the budget is never loosened; a time over it once is run again first).");
+    process.exit(1);
+  }
+}

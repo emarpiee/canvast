@@ -2323,11 +2323,11 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Far trips | A trip to a bookmark that is more than a view apart and more than 20,000 levels of zoom away is not flown: it zooms out 24 levels from here and in to there, switching where both are tiny (with a brief dip to dark, unless turned off). A trip to a place within a view, however deep, is flown |
 | Camera precision | After zooming out more than 4,096 levels beyond the deepest point and back in, the view returns to within 2^-96 px of the file rather than exactly |
 | Very deep views | Magnification has no limit, but each level of depth enlarges the numbers involved, so extreme depths cost more CPU per frame |
-| Dense scenes | With hundreds to thousands of objects visible at once, zooming shows a briefly scaled image of the last exact frame and snaps to the exact picture about 150 ms after you stop. Zooming out before the next level out has been prepared (it is made while the view rests, in a fraction of a second), the edge the scaled image does not reach is drawn exactly, so those frames are slower but the view is never cut off. A zoom that goes more than one level in one gesture pauses for one exact frame at each level it has nothing prepared for |
+| Dense scenes | With hundreds to thousands of objects visible at once, zooming shows a briefly scaled image of the last exact frame and snaps to the exact picture about 150 ms after you stop. Zooming out before the next level out has been prepared (it is made while the view rests, in a fraction of a second), the edge the scaled image does not reach is drawn exactly, so those frames are slower but the view is never cut off. While the wheel keeps turning, the exact picture waits until the zoom holds still; past what is prepared, it is built a few tiles a frame over the scaled one (the part that does not reach drawn exactly), so no frame waits for all of it. A drawing where thousands of long strokes all cross the same small area can still take one slow frame (about half a second) for one tile |
 | Far zoom-out | Content too small to draw is shown as a soft mark in its own colour (pictures as grey). Marks cannot be selected; zoom in to edit |
 | Very large documents | A board of one million objects needs about 940 MB of memory and about 6 s to build its index on load |
 | Large libraries | The Library draws only the cards near the view, so scrolling stays smooth however deep you go (measured with 20,000 items: opening about 1 s, wheel scrolling at 60 frames a second at the top and at the end, no stall while typing a search). Search results are redrawn when typing pauses for a quarter of a second. A thumbnail missing from storage is made from its file, three at a time. Backups of many gigabytes have not been measured; an import holds about one 128 MiB batch of files in memory at a time, and each canvas is read whole. In the desktop app a library of 20,000 items or more is listed a page at a time: only the cards near the view are read, and search, sort and counts are worked out where the library is kept; *Similar images* is then not offered (it reads how every picture looks), and a selection of more than 5,000 items shows its count but not its size. Measured on a GitHub runner with a million files: the app opens in about 8 s and the Library shows them all about 2 s later (about 500 MB); the first open on a new device takes about 2 minutes; a file put into `library/` from outside is listed in about 3 s |
-| Frame rate | Measured on one desktop machine; no results exist for other device classes |
+| Frame rate | Measured on one desktop machine, and panning and zooming on GitHub's Linux machines in Chromium ([the pan and zoom standard](#the-pan-and-zoom-standard)); no results exist for Firefox, phones, tablets or other device classes |
 
 #### Platform
 
@@ -2580,7 +2580,7 @@ The build is deterministic: the same source produces the same `canvast.html`, an
 | `npm run test:status` | List test builds with their result and how far each is behind the source |
 | `npm run bench` | Scale and tile-cache benchmarks |
 | `node scripts/bench-library.mjs <N> --dir <folder>` | The desktop app on a workspace folder of N library files (made in `--dir`, outside any synced folder): first and second open, a file put in from outside, one rename |
-| `node scripts/bench-pan.mjs [strokes \| file.canvast]` | Panning and wheel zooming a drawing of long hatching strokes (or the *Powers of two* canvas of a `.canvast` file, at a bookmark) with real mouse input: frames per second, frame and draw times, tiles built and thrown away, and a CPU profile of where the time goes (the `Bench pan` workflow runs it) |
+| `node scripts/bench-pan.mjs [strokes \| file.canvast] [--check]` | Panning and wheel zooming a drawing of long hatching strokes (or the *Powers of two* canvas of a `.canvast` file, at a bookmark) with real mouse input: frames per second, frame and draw times, tiles built and thrown away, and a CPU profile of where the time goes (the `Bench pan` workflow runs it). `--check` holds the runs to the [pan and zoom standard](#the-pan-and-zoom-standard) |
 | `node scripts/stress-hidden.mjs --dir <folder>` | Hidden items under load and crashes, in the desktop app: 10,000 items hidden, locked, opened, shown and hidden again, decrypted by the outside tool (times, CPU, peak memory, every file checked by SHA-256); then rounds where the app is killed at a random moment during a hide, show, move or lock, each checked for lost or damaged files. `--big 1` puts about 15 GB of files from 50 KB to 2 GB beside the small ones instead of the first part: each size hidden, read back through the folder for file managers (its first megabyte, a part in the middle, the whole file), shown again or decrypted by the outside tool, with its time, speed, peak memory and the disk used beyond the files. The `Stress hidden` workflow runs it on GitHub; it also opens, reads and writes big files on a new device |
 | `npm run check:offline` | Fail if the built file references anything outside itself |
 | `npm run check:name-rules` | Fail if file and folder name rules are written outside their module |
@@ -2609,8 +2609,29 @@ The build is deterministic: the same source produces the same `canvast.html`, an
 | --- | --- |
 | `CI` (`.github/workflows/ci.yml`) | Typecheck, unit tests, the build, the offline, naming, token, storage, picker and pattern checks, and the reproducible-build check; keeps the built file as an artifact |
 | `Tests` (`.github/workflows/tests.yml`) | The whole end-to-end suite, one job per test group and browser set-up (Chromium, Chromium CPU-only, Chromium at pixel ratio 2 with touch, Firefox) plus the desktop app under a virtual display, all at once. The full suite every Sunday and on request |
+| `Pan and zoom` (`.github/workflows/pan-zoom.yml`) | The [pan and zoom standard](#the-pan-and-zoom-standard): panning and wheel zooming the showcase, held to a fixed budget |
 
 Shared machines vary in speed, so a failure there in a test that measures time is checked again on the reference machine before it counts.
+
+#### The pan and zoom standard
+
+Every change is held to how smoothly the canvas pans and zooms. The `Pan and zoom` workflow draws the *Powers of two* showcase (about 7,000 objects), opens it at its first bookmark, and pans and wheel-zooms it with real mouse input in Chromium. A change that breaks the budget in `scripts/lib/pan-zoom-budget.mjs` has made the canvas view slower, and `npm run release` refuses a commit where it has not passed.
+
+| Run | What it does |
+| --- | --- |
+| Pan at a whole zoom | Mouse drags at 60 moves a second, a fast mouse (4 a frame), and a pointer between pixels (as Wayland, scaled screens and touchpads report it) |
+| Pan at a fraction of a zoom level | The same at 2^-0.3, where a pan is not a whole number of pixels |
+| Wheel zoom | In and out over two levels, a notch a frame and four a frame |
+
+| Measure (each run) | At most |
+| --- | --- |
+| Frame time, 95th percentile | 25 ms (smooth: 17 ms, one frame at 60 Hz) |
+| Longest frame | 500 ms |
+| The app's own drawing, 95th percentile | 16 ms |
+| Tiles drawn | 150 in a pan, 300 in a wheel zoom |
+| Tile sets thrown away | 2 for a pan not of whole pixels, 2 for a pan or 12 for a wheel zoom from a change of zoom |
+
+The budget is never loosened to let a change pass. A time over it once is run again before it counts (shared machines vary); the counts of tiles and sets do not depend on the machine.
 
 ---
 
@@ -2620,7 +2641,7 @@ Shared machines vary in speed, so a failure there in a test that measures time i
 
 `npm run release` publishes a version. Run it after the version is bumped, `CHANGELOG.md` has its `## X.Y.Z — Title (date)` section, and everything is pushed.
 
-1. It builds and checks `dist/canvast.html`.
+1. It builds and checks `dist/canvast.html`, and checks that the [pan and zoom standard](#the-pan-and-zoom-standard) passed on the commit.
 2. It creates (or updates) the GitHub release `vX.Y.Z` with the file and its SHA-256, and the [canvast tools](#canvast-tools-without-the-app) built from the same commit (`canvast-tools.mjs`), and marks it **Latest**.
 3. It reads the release back to confirm it is the latest and serves the same file.
 4. Publishing starts the `Release packages` workflow (`.github/workflows/release-packages.yml`). On an x86_64 and an ARM machine it builds the app from the tag, checks that its single file is the one released (the build is reproducible), makes the packages with `npm run package:desktop` (which checks each), and adds them with their SHA-256 and the AppImage's `.zsync`. No package is uploaded from the developer's machine; the workflow can also be run by hand for a tag.

@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.0: smooth pan and zoom, the pan and zoom standard; release of 0.56.1 to 0.56.40 (2026-11-11)
+
+- **Implemented:** the tile cache keeps its set through sub-pixel pans and builds it exactly at rest; a rest is no move since the timer and no pointer held; a heavy view (slow to draw or over 1,500 objects) waits for a zoom to hold still and builds a new set a few tiles a frame (8 ms) over the old one scaled, the rest drawn exactly, from the middle outwards. The pan and zoom standard (`scripts/bench-pan.mjs --check`, `scripts/lib/pan-zoom-budget.mjs`, the `Pan and zoom` workflow) gates `npm run release`.
+- **Tested:** `Bench pan` on GitHub, showcase: pan and wheel zoom frame p95 17 ms, draw p95 at most 10 ms; full suite on the final rendering commit (see `docs/testing/full-run-0.57.0.md`).
+- **Known failures:** a drawing whose thousands of long strokes all cross one tile still takes one frame of about 0.5 s for that tile.
+- **Unverified:** Firefox, phones and tablets have no pan and zoom measurements.
+- **Committed:** v0.56.37 to v0.57.0 on `main`, released as v0.57.0.
+- **Next bounded task:** none set.
+
 ## v0.55.30: speech balloon tool, text tied to its shape or path (2026-11-09)
 
 - **Implemented:** the tool, connectors, text following (ADR 0185).

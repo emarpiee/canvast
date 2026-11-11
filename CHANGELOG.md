@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.57.0 — Smooth pan and zoom, auto layout, Export by pattern (2026-11-11)
+
+Everything since 0.56.0, in one release (0.56.1 to 0.56.40).
+
+- **Added:** the pan and zoom standard: a *Pan and zoom* workflow pans and wheel-zooms the *Powers of two* showcase (about 7,000 objects) with real input on every push and pull request, held to a fixed budget (`scripts/lib/pan-zoom-budget.mjs`); `npm run release` needs it passed on the commit.
+- **Added:** auto layout on sheets (`Shift+A`): a row, a column, a wrap or a grid, with gap, padding, alignment and packing; a sheet hugs its contents or keeps its size, and things on it can fill the room or stay out of the layout.
+- **Added:** Export of several items chooses what goes without leaving the dialog (a click, `Ctrl`+click, `Shift`+click, *All*, *None*), names the files by a pattern with their list shown first, saves name formats as styles, sizes each by a rule (same width, height, longest side or a scale), adds `@2x`/`@3x` copies and SVGs, and sends them as separate files, PDF pages or one picture.
+- **Added:** one name pattern for Export and the Library's Rename: `###` numbers with as many digits as `#`, `{name}`, `{date}` and `{date:FORMAT}` (today, a day you set, or each item's date added), with token chips in both.
+- **Added:** Export on-screen sizes (1× to 4×), padding, any background, export presets, *Export again*; a wider dialog.
+- **Added:** custom ratios for sheets and shapes, and the ratio field for one shape; the ratio shows while drawing.
+- **Added:** drag layers into and out of groups, boolean groups and sheets in the Layers panel; one list of what is under the pointer and what the selection holds (Ctrl and a long press), up to 16 rows, scrolling.
+- **Added:** drawing snaps to corners, edges, middles and the grid, as resizing does; each tool shows its own cursor with its icon.
+- **Added:** words copied in another program paste on the canvas as a text; the start screen and files put in from outside say how far they are; *Reload the library*; the technical info bar shows the Library's timings and, in the desktop app, each process's memory.
+- **Added:** the README written again around what each feature is for, with a picture of every feature in use, each made by a test (`tests/shots/`, the `Screenshots` workflow, `check:shots`).
+- **Changed:** leaving the canvas for the Library lets go of its tiles and pictures; undo keeps at most 64 MiB; the Library keeps 600 thumbnails.
+- **Changed:** the Styles panel lists its kinds in one menu; *Back to top* is a button over the Library's grid; a balloon's words and connectors belong to it in Layers.
+- **Fixed:** panning a big drawing dropped to 10–20 frames a second (a pan of a fraction of a pixel redrew every tile on every move), and zooming one dropped to about 20 with a long frame at each level and bare patches when zooming fast. Both now hold about 60 on the showcase.
+- **Fixed:** hiding a placed item made the open canvas's next save fail with "changed elsewhere".
+- **Fixed:** an open note could close by itself when its file got a new version; a note took long to open.
+- **Fixed:** Firefox copy, cut and paste on the canvas; cut, copy and paste in the desktop app and the command palette, and of shapes with words and connectors.
+- **Fixed:** a blur or shadow on a clipping sheet spread past its edge, and a video on one showed whole.
+- **Fixed:** pressed buttons lost their fill under the pointer; the Library and Canvas buttons are joined again; the Export dialog's look, its colour menus, and `{name}` keeping a file's extension.
+
 ## 0.56.40 — No bare patches while zooming fast (2026-11-11)
 
 - **Fixed:** zooming fast on a big drawing showed parts of the view blank for a moment (filling from the top) while its tiles were built: where the old tiles did not reach (zooming out, or over a set still half built) nothing was drawn under the tiles still to build. That part is now drawn exactly, a half-built set is shown over the older whole one, and tiles are built from the middle of the view outwards.

@@ -30,6 +30,9 @@ run("git", ["fetch", "origin", "main", "--tags", "--quiet"]); // (tags too: a re
 const head = run("git", ["rev-parse", "HEAD"]);
 if (head !== run("git", ["rev-parse", "origin/main"])) stop("HEAD is not what origin/main has: push first (a release points at a pushed commit).");
 if (!changelogSection(readFileSync(join(root, "CHANGELOG.md"), "utf8"), version)) stop(`CHANGELOG.md has no section "## ${version} — Title (date)".`);
+// The pan and zoom standard (.github/workflows/pan-zoom.yml) must have passed on this commit: a release never makes the canvas view slower.
+const pz = JSON.parse(run("gh", ["run", "list", "--repo", repo, "--workflow", "Pan and zoom", "--commit", head, "--json", "status,conclusion,url"]) || "[]");
+if (!pz.some((r) => r.conclusion === "success")) stop(pz.length ? `the Pan and zoom standard has not passed on this commit (${pz[0].status} ${pz[0].conclusion || ""} ${pz[0].url}): fix what made it slower, or wait for it.` : "the Pan and zoom standard has not run on this commit: it runs on each push to main.");
 
 // 2. Build the file and check it
 say(`Building canvast ${version} (${head.slice(0, 7)})…`);
