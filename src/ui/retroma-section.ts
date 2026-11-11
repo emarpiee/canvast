@@ -70,7 +70,7 @@ function toSetting(c: Control, S: Loose): Setting | null {
 
 const find = (k: string): Control | undefined => TABS.flatMap(([, groups]) => groups.flatMap((g) => g.items)).find((c) => c.k === k);
 /** What the Basics card holds: the accent, the scheme, the keys' look and light, the font and corners, how the Library shows its items. */
-const BASICS = ["hue", "chroma", "accentL", "scheme", "btn", "@@angle", "corner", "font", "libItems", "paneOut", "cf", "cfDark", "lDark"];
+const BASICS = ["hue", "chroma", "accentL", "scheme", "btn", "@@angle", "corner", "font", "libItems", "paneOut", "paneGap", "cf", "cfDark", "lDark"];
 
 export function mountRetromaSection(host: HTMLElement, settings: SettingsStore, openAppearance: () => void, rowHtml: SettingRow, presets?: ThemePresets): void {
   let S = retromaSettings(settings.get("retroma.look"));

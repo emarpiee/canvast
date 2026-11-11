@@ -6,9 +6,7 @@ import { resolve } from "node:path";
 import { computeRetroma, presetSettings, PRESETS } from "../../src/theme/retroma/engine";
 
 /** Where the app departs from the demo on the owner's word (each value then follows the app, not the fixture). */
-const OWNER_CHANGES: Record<string, string> = {
-  "--pane-out": "2026-11-12: more room between the window's edge and the panes (20 px, the demo's 14)",
-};
+const OWNER_CHANGES: Record<string, string> = {};
 const gold = JSON.parse(readFileSync(resolve(__dirname, "fixtures/retroma-golden.json"), "utf8")) as { cases: Record<string, { vars: Record<string, string>; data: Record<string, string> }> };
 
 describe("Retroma engine", () => {

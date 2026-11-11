@@ -48,7 +48,7 @@ const BASE = {
   cfact: 2, ol: 1, olStyle: "solid", hoverOl: 1, hoverOlStyle: "solid", br: 6, corner: "round", press: 60, elev: 0, tintsh: "retroma",
   cBtn: "", cBtnHover: "", cBtnOn: "", cIcon: "", cIconOn: "", cOutline: "", cOutlineHover: "",
   // interface
-  font: FONTS[0][0], text: 1, iconw: 2, dens: "1", r: 10, paneOut: 20, /* (the owner's: more room round the panes than the demo's 14) */ paneIn: 14, fwo: 2, fwi: 2, ring: "groove", ringOStyle: "solid",
+  font: FONTS[0][0], text: 1, iconw: 2, dens: "1", r: 10, paneOut: 14, paneIn: 14, paneGap: 10, /* (the owner's: room between a pane's frame and the panels inside it) */ fwo: 2, fwi: 2, ring: "groove", ringOStyle: "solid",
   simpleHdr: false, hdrR: 10, cHdr: "", cHdrText: "",
   tabStyle: "key", tabR: 8, tabFontOn: "inherit", tabFontOff: "inherit", cTabOutline: "", cTabOn: "", cTabOff: "",
   simpleMenu: false, menuR: 10, menuOl: 1, menuOlStyle: "solid", cMenu: "", cMenuOl: "", modalCorner: "round", modalR: 14, cScrim: "",
@@ -355,7 +355,7 @@ function lighting(T) {
     "--lift": L.lift, "--lift-modal": L.liftModal, "--lift-sheet": L.liftSheet,
     "--font": S.font, "--font-mono": '"DM Mono", ui-monospace, monospace', "--text": S.text, "--icon-w": S.pixelIcons ? S.pixelW : S.iconw, "--icap": S.pixelIcons ? "square" : "round", "--ijoin": S.pixelIcons ? "miter" : "round", "--ishape": S.pixelIcons ? "crispEdges" : "auto", "--dens": S.dens,
     "--outline": px(S.ol), "--outline-style": S.olStyle, "--hover-ol": px(S.hoverOl), "--hover-ol-style": S.hoverOlStyle, "--btn-r": px(S.br), "--corner": S.corner, "--press-ms": `${stillNow() ? 0 : S.press}ms`,
-    "--r": px(S.r), "--pane-out": px(S.paneOut), "--pane-in": px(S.paneIn), "--ring-o-w": px(S.fwo), "--ring-i-w": px(S.fwi), "--ring-o-style": S.ringOStyle, "--hdr-r": px(S.hdrR),
+    "--r": px(S.r), "--pane-out": px(S.paneOut), "--pane-in": px(S.paneIn), "--pane-gap": px(S.paneGap ?? 10), "--ring-o-w": px(S.fwo), "--ring-i-w": px(S.fwi), "--ring-o-style": S.ringOStyle, "--hdr-r": px(S.hdrR),
     "--tab-r": px(S.tabR), "--tab-font-on": f("tabFontOn"), "--tab-font-off": f("tabFontOff"),
     "--menu-r": px(S.menuR), "--menu-ol": px(S.menuOl), "--menu-ol-style": S.menuOlStyle, "--modal-r": px(S.modalR), "--modal-corner": S.modalCorner,
     "--status-h": px(S.statusH), "--sb-w": px(S.sbW), "--sb-r": px(S.sbR), "--sb-ff": S.sbW < 8 ? "thin" : "auto",
