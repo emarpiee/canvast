@@ -3227,7 +3227,7 @@ test("the selection options (radius lock, snap, axis box) are a bar of their own
     const [c, d] = [(await ctx.boundingBox())!, (await pick.boundingBox())!];
     return Math.abs(d.y + d.height / 2 - (c.y + c.height / 2));
   };
-  expect(await line(), "on the bar's line").toBeLessThan(2);
+  await expect.poll(line, { message: "on the bar's line" }).toBeLessThan(2);
   // Settings > Actions bar: follows the selection; the options go with it
   await p.getByTestId("view-settings").click();
   await p.locator("#settings-view").getByRole("tab", { name: "Appearance" }).click();
@@ -3235,7 +3235,7 @@ test("the selection options (radius lock, snap, axis box) are a bar of their own
   await p.getByTestId("view-canvas").click();
   await expect(ctx).toHaveClass(/is-following/);
   await expect(pick).toBeVisible();
-  expect(await line(), "still on the bar's line").toBeLessThan(2);
+  await expect.poll(line, { message: "still on the bar's line" }).toBeLessThan(2);
   expect(app.consoleErrors).toEqual([]);
 });
 
