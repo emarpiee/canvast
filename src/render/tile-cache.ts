@@ -220,6 +220,8 @@ export class TileCache {
     if (!this.enabled || !Number.isInteger(td) || !Number.isInteger(GUARD_CSS * dpr)) return null;
     const key = `${frameId}|${cam.zi}|${cam.zf}|${dpr}`;
     const stable = key === this.lastKey || this.refineNow;
+    /** The view has rested after a move that was not whole device pixels: now the set is built again exactly. */
+    const refine = this.refineNow;
     this.refineNow = false;
     this.lastKey = key;
     const z = cam.zi + cam.zf;
@@ -247,12 +249,22 @@ export class TileCache {
       this.gen = { key, z, center: cam.center, frameId, vp, tiles: new Map() };
     }
     let off = this.offset(this.gen, cam, vp, dpr);
-    if (!off) {
+    // A move that is not whole device pixels (a pointer between pixels: Wayland, scaled screens, touchpads, a glide): while the view moves,
+    // the set is kept and drawn at the nearest whole pixel (half a device pixel at most from exact, no blur, no seams); once it rests, it is
+    // built again exactly. Throwing the set away on every such move cost a whole set each frame.
+    if (off && !off.whole && !refine && this.gen!.tiles.size) {
+      if (this.refineTimer) clearTimeout(this.refineTimer);
+      this.refineTimer = setTimeout(() => {
+        this.refineTimer = null;
+        this.refineNow = true;
+        this.requestFrame();
+      }, REFINE_MS);
+    } else if (!off || !off.whole) {
       this.restarts.offset++;
-      // Not a whole-device-pixel move: start over at this camera.
+      // Enormous, or resting after an inexact move: start over at this camera.
       this.clear();
       this.gen = { key, z, center: cam.center, frameId, vp, tiles: new Map() };
-      off = { dx: 0, dy: 0 };
+      off = { dx: 0, dy: 0, whole: true };
     }
     const g = this.gen!;
     const { dx, dy } = off;
@@ -525,18 +537,18 @@ export class TileCache {
   }
 
   /**
-   * Device-pixel offset of the current view from the generation's, or null
-   * if it is not a whole number of device pixels (or is enormous).
+   * Device-pixel offset of the current view from the generation's, rounded to whole pixels (`whole`: it was whole already), or null
+   * when it is enormous or not a number.
    */
-  private offset(g: Generation, cam: Camera, vp: Viewport, dpr: number): { dx: number; dy: number } | null {
+  private offset(g: Generation, cam: Camera, vp: Viewport, dpr: number): { dx: number; dy: number; whole: boolean } | null {
     const f = 2 ** cam.zf;
     const ax = (D.diffToNumber(g.center.x, cam.center.x, cam.zi) * f + (vp.width - g.vp.width) / 2) * dpr;
     const ay = (D.diffToNumber(g.center.y, cam.center.y, cam.zi) * f + (vp.height - g.vp.height) / 2) * dpr;
     const dx = Math.round(ax);
     const dy = Math.round(ay);
     this.restarts.lastOffset = { ax, ay };
-    if (Math.abs(ax - dx) > 1e-6 || Math.abs(ay - dy) > 1e-6 || Math.abs(dx) > 2 ** 30 || Math.abs(dy) > 2 ** 30) return null;
-    return { dx, dy };
+    if (!Number.isFinite(ax) || !Number.isFinite(ay) || Math.abs(dx) > 2 ** 30 || Math.abs(dy) > 2 ** 30) return null;
+    return { dx, dy, whole: Math.abs(ax - dx) <= 1e-6 && Math.abs(ay - dy) <= 1e-6 };
   }
 
   private release(t: Tile): void {

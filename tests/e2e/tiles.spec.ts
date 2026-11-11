@@ -118,8 +118,8 @@ test("panning reuses tiles; a still camera renders none; the zoom changing rende
     return { added: h.tileStats().renderedTotal - before, last: h.tileStats().last };
   });
   // A dense scene shows scaled previews of the existing set while the zoom changes (ADR 0012). The
-  // trajectory returns to the set's own zoom after a sub-pixel pan, where exactly one set is rebuilt
-  // (tiles are never reused at a fractional offset); nothing else is built.
+  // trajectory returns to the set's own zoom after a sub-pixel pan, where the set is kept while the view moves
+  // and built again exactly once it rests; nothing else is built.
   expect(during.added).toBeLessThanOrEqual(full);
   // Once it holds still, frames are tiled again (rebuilt at the current zoom).
   await app.frame();
@@ -128,21 +128,27 @@ test("panning reuses tiles; a still camera renders none; the zoom changing rende
   expectSamePicture(await compare(p), "after zoom");
 });
 
-test("a pan that is not a whole number of device pixels rebuilds tiles instead of resampling them", async ({ app }) => {
+test("a pan that is not a whole number of device pixels keeps the tiles while the view moves, and builds them exactly once it rests", async ({ app }) => {
   const p = app.page;
   await p.evaluate(() => window.__canvastDebug.benchLoad({ kind: "dense", n: 1000 }));
   await renderedDuring(p, async () => undefined);
   const full = (await stats(p)).last!.tiles;
-  const rebuilt = await renderedDuring(p, () =>
+  // (a pointer between pixels, as Wayland, scaled screens and touchpads give: a few moves of a fraction of a pixel)
+  const subPixelPan = () =>
     p.evaluate(() => {
       const h = window.__canvastDebug;
       const v = h.viewport();
-      const w = h.screenToWorld(v.width / 2 + 0.375, v.height / 2);
+      const w = h.screenToWorld(v.width / 2 + 3.375, v.height / 2 + 0.6);
       h.setCamera({ ...h.camera(), cx: w.x, cy: w.y });
-    }),
-  );
-  expect(rebuilt).toBe(full);
-  expectSamePicture(await compare(p), "sub-pixel pan");
+    });
+  let moving = 0;
+  for (let i = 0; i < 4; i++) moving += await renderedDuring(p, subPixelPan);
+  expect(moving, "while it moves, at most the new edge tiles are built, never whole sets").toBeLessThan(full);
+  // at rest (after the refine delay) the set is built again exactly: the same picture as direct rendering
+  await p.waitForTimeout(300);
+  await p.evaluate(() => window.__canvastDebug.nextFrame());
+  expect((await stats(p)).restarts.offset, "one exact set once it rests").toBeGreaterThanOrEqual(1);
+  expectSamePicture(await compare(p), "sub-pixel pan, at rest");
 });
 
 test("edits refresh exactly the affected tiles: draw, move, undo, delete, opacity", async ({ app }) => {
