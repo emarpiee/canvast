@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.56.34 — Export names without a second extension (2026-11-11)
+
+- **Fixed:** `{name}` kept the extension of a picture's own file, so an export of `pumpkin.svg` was named `pumpkin.svg.png` (and a ZIP `pumpkin.svg-and-2-more`); it now drops it.
+- **Fixed:** the count under the pictures of an export of several said every item even with some left out; it counts what is ticked.
+
 ## 0.56.33 — Export: choose what goes, name the files, size them by a rule (2026-11-11)
 
 - **Added:** a tick on each item of an export of several: untick one to leave it out without leaving the dialog, or use *All* and *None*; `Space` ticks or unticks the item in focus, `Delete` leaves it out. What is left out fades and loses its number; sizes, names and files follow what is ticked.

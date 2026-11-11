@@ -9,6 +9,7 @@ describe("export names", () => {
     expect(nameFrom("{canvas} {date} {format}", parts)).toBe("Halloween set 2026-11-11 png");
     expect(nameFrom("{name}: final?", parts)).not.toMatch(/[:?]/);
     expect(nameFrom("", parts)).toBe("pumpkin");
+    expect(nameFrom("{name}", { ...parts, name: "pumpkin.svg" }), "no second extension").toBe("pumpkin");
     expect(nameFrom("{unknown}", parts)).toBe("{unknown}");
   });
   it("makes names unique, case aside, keeping the extension", () => {

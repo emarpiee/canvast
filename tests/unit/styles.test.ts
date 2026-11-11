@@ -12,7 +12,7 @@ const lib = () => {
 
 describe("styles (ADR 0120)", () => {
   it("has one registry: each kind says how to check, say and show its data", () => {
-    expect(STYLE_KINDS.map((k) => k.id)).toEqual(["adjustment", "gradient", "colour", "palette", "text", "pattern", "balloon", "ratio", "export"]);
+    expect(STYLE_KINDS.map((k) => k.id)).toEqual(["adjustment", "gradient", "colour", "palette", "text", "pattern", "balloon", "ratio", "export", "exportname"]);
     expect(kindById("ratio")!.validate(16 / 9)).toBeCloseTo(16 / 9);
     expect(kindById("ratio")!.validate(0)).toBeNull();
     expect(kindById("ratio")!.summary(16 / 9)).toBe("16 : 9");

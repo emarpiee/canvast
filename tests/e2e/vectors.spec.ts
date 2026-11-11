@@ -3558,9 +3558,8 @@ test("adjustments on a shape: drawn on what it looks like, blur spreads past its
       dt.setData("text/plain", text);
       window.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
     }, svgText);
-    await app.frame();
-    const back = (await objs(app)).slice(n0) as unknown as Array<{ adjust?: unknown }>;
-    expect(back.at(-1)?.adjust).toEqual({ exposure: 60, blur: 100 });
+    // (the SVG is read in its own time: wait for what it makes, not one frame)
+    await expect.poll(async () => ((await objs(app)).slice(n0) as unknown as Array<{ adjust?: unknown }>).at(-1)?.adjust).toEqual({ exposure: 60, blur: 100 });
     await key(app, "Control+z"); // (the paste first, then the blur)
   }
   await key(app, "Control+z");

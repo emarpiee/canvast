@@ -44,6 +44,9 @@ export interface NameParts {
   readonly date: string;
 }
 
+/** A name without the extension of the file it came from ("pumpkin.svg" → "pumpkin"), so {name} never carries two extensions. */
+export const withoutExtension = (name: string): string => name.replace(/\.[a-z0-9]{1,5}$/i, "") || name;
+
 /** Today as YYYY-MM-DD, on this device's calendar. */
 export const today = (d = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -51,7 +54,7 @@ export const today = (d = new Date()): string => `${d.getFullYear()}-${String(d.
 export function nameFrom(pattern: string, p: NameParts): string {
   const digits = Math.max(2, String(p.count).length);
   const filled = (pattern || DEFAULT_PATTERN).replace(/\{(name|n|w|h|canvas|date|format)\}/g, (_m, k: string) =>
-    k === "name" ? p.name : k === "n" ? String(p.n).padStart(digits, "0") : k === "w" ? String(p.w) : k === "h" ? String(p.h) : k === "canvas" ? p.canvas : k === "date" ? p.date : p.format,
+    k === "name" ? withoutExtension(p.name) : k === "n" ? String(p.n).padStart(digits, "0") : k === "w" ? String(p.w) : k === "h" ? String(p.h) : k === "canvas" ? p.canvas : k === "date" ? p.date : p.format,
   );
   return cleanName(filled, "kept", cleanName(p.name, "kept", "export"));
 }

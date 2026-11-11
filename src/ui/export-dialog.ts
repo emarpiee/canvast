@@ -25,7 +25,7 @@ import type { Action, ExportPreset, Format, PadUnit, Prefs } from "../app/export
 export { cleanExportPreset, exportPresetSummary };
 export type { ExportPreset };
 import { ICONS } from "./icons";
-import { BUILT_IN_PATTERNS, DEFAULT_PATTERN, NAME_TOKENS, SIZE_RULES, VARIANTS, cleanSizeRule, nameFrom, sizeByRule, today, uniqueNames, variantName, variantScale } from "../app/export-names";
+import { BUILT_IN_PATTERNS, DEFAULT_PATTERN, NAME_TOKENS, SIZE_RULES, VARIANTS, cleanSizeRule, nameFrom, sizeByRule, today, uniqueNames, variantName, variantScale, withoutExtension } from "../app/export-names";
 import type { SizeRule, Variant } from "../app/export-names";
 
 export interface ExportDeps {
@@ -296,6 +296,8 @@ function openDialog(deps: ExportDeps, again = false): void {
       f.querySelector<HTMLInputElement>("[data-tick]")!.checked = !off;
       f.querySelector<HTMLElement>("[data-ex-page]")!.textContent = off ? "–" : String(++n);
     }
+    const shape = dlg.querySelector<HTMLElement>('[data-testid="export-shape"] strong');
+    if (shape && multi) shape.textContent = plural(n, noun.slice(0, -1));
     const count = dlg.querySelector<HTMLElement>("[data-ex-count]");
     if (count) count.textContent = n === raw.length ? `All ${plural(n, "item")}` : `${n} of ${raw.length} ${raw.length === 1 ? "item" : "items"}`;
   };
@@ -349,7 +351,7 @@ function openDialog(deps: ExportDeps, again = false): void {
     return uniqueNames(out);
   };
   /** The ZIP's or the PDF's own name (several files, or one PDF of several). */
-  const packName = (): string => replaceInvalid(packIn.value).trim() || `${slug(itemName(chosen()[0] ?? 0))}-and-${Math.max(0, chosen().length - 1)}-more`;
+  const packName = (): string => replaceInvalid(packIn.value).trim() || `${slug(withoutExtension(itemName(chosen()[0] ?? 0)))}-and-${Math.max(0, chosen().length - 1)}-more`;
   const refreshName = (): void => {
     if (document.activeElement !== nameIn) nameIn.value = prefs.pattern || DEFAULT_PATTERN;
     const names = fileNames();
@@ -360,7 +362,7 @@ function openDialog(deps: ExportDeps, again = false): void {
     q<HTMLElement>("[data-ex-packrow]").hidden = !pack;
     q("[data-ex-packlabel]").textContent = packExt === "pdf" ? "PDF name" : "ZIP name";
     q("[data-ex-packext]").textContent = `.${packExt}`;
-    if (!packTouched) packIn.value = multi ? `${slug(itemName(chosen()[0] ?? 0))}-and-${Math.max(0, chosen().length - 1)}-more` : (stems().get(0) ?? "export");
+    if (!packTouched) packIn.value = multi ? `${slug(withoutExtension(itemName(chosen()[0] ?? 0)))}-and-${Math.max(0, chosen().length - 1)}-more` : (stems().get(0) ?? "export");
     // (the name pattern names the files inside; a PDF of several is one file, named by its own field)
     const patternShown = !(multi && !asFiles());
     q<HTMLElement>(".ex-namerow").hidden = !patternShown;
