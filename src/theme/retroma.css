@@ -271,7 +271,7 @@
 }
 :root[data-look="retroma"] #assets-view .col-grip { margin-inline: 0; }
 /* the Library's two side columns (the sidebar and the details) are one look: the pane's colour, the same room, a rule on the side towards the items */
-:root[data-look="retroma"] #assets-view :is(.assets-side, .asset-inspector) { padding: var(--s-6); background: var(--rt-pane); border: 0; border-radius: 0; }
+:root[data-look="retroma"] #assets-view .assets-side, :root[data-look="retroma"] #assets-view .asset-inspector { padding: var(--s-6); background: var(--rt-frame); border: 0; border-radius: 0; --hud-fg: var(--rt-fg-on-frame-app); --hud-muted: var(--rt-muted-on-frame-app); color: var(--hud-fg); } /* (the frame's colour, what is on it held to 4.5:1; the boxes in them keep their own colours) */
 :root[data-look="retroma"] #assets-view .assets-side { border-right: var(--rt-outline) solid var(--rt-rule); }
 :root[data-look="retroma"] #assets-view .asset-inspector { border-left: var(--rt-outline) solid var(--rt-rule); }
 :root[data-look="retroma"] #assets-view .assets-body:not(.has-side-w) > .assets-side { flex-basis: var(--rt-side-w); }
@@ -280,11 +280,11 @@
 :root[data-look="retroma"] #assets-view .asset-insp-head h2 { font-weight: 700; }
 :root[data-look="retroma"] #assets-view .asset-sec { padding: var(--s-6) 0; background: transparent; border: 0; border-radius: 0; }
 :root[data-look="retroma"] #assets-view :is(.asset-dsec + .asset-dsec, .asset-sec + .asset-sec) { border-top: var(--rt-outline) dashed var(--rt-rule); }
-:root[data-look="retroma"] #assets-view .asset-sec > h3 { color: var(--rt-fg-muted); font-weight: 700; }
+:root[data-look="retroma"] #assets-view .asset-sec > h3 { color: var(--hud-muted); font-weight: 700; }
 :root[data-look="retroma"] #assets-view :is(.side-views, .side-sec) { padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none; }
 /* the sidebar's section labels (the demo's .side .h): small, bold, in capitals, on the folder header's colour; their keys small */
 :root[data-look="retroma"] .side-head { margin: var(--s-4) 0 var(--s-1); padding: 0 0 0 var(--s-1); gap: var(--s-1); background: var(--rt-fhdr-bg); border-radius: var(--s-2); }
-:root[data-look="retroma"] :is(.side-head h2, .side-sec-toggle h2) { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--rt-fg-muted); }
+:root[data-look="retroma"] :is(.side-head h2, .side-sec-toggle h2) { font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--hud-muted); }
 :root[data-look="retroma"] .side-head :is(.side-add, .side-more) { width: var(--row-btn); height: var(--row-btn); }
 :root[data-look="retroma"][data-rt-part-simple-folder-hdr="true"] .side-head { background: transparent; }
 :root[data-look="retroma"][data-rt-part-simple-folder-hdr="true"] :is(.side-head h2, .side-sec-toggle h2) { text-transform: none; letter-spacing: 0; }
@@ -627,13 +627,13 @@
 :root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group:nth-child(15n + 15) { --f-bg: var(--rt-folder-15-bg); --f-fg: var(--rt-folder-15-fg); --f-ol: var(--rt-folder-15-ol); }
 :root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group {
   display: block; margin-block: var(--s-4); padding: var(--s-1) 0;
-  background: var(--f-bg);
+  background: linear-gradient(var(--f-bg), var(--f-bg)), var(--rt-folder-pane-bg); /* (its colour over the folder pane's, whatever the column is) */
   border: var(--rt-folder-ol) var(--rt-folder-ol-style) var(--f-ol); border-left-width: var(--rt-folder-left);
   border-radius: var(--rt-folder-r); corner-shape: var(--rt-corner-folder);
   box-shadow: 0 2px 0 oklch(from var(--rt-accent) 0.7 c h / 0.5);
   font-family: var(--rt-folder-font);
 }
-:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group.is-open { background: color-mix(in oklch, var(--f-bg) 45%, transparent); outline: 1px solid var(--f-ol); outline-offset: 1px; margin-block: var(--s-6); }
+:root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group.is-open { background: linear-gradient(color-mix(in oklch, var(--f-bg) 45%, transparent), color-mix(in oklch, var(--f-bg) 45%, transparent)), var(--rt-folder-pane-bg); outline: 1px solid var(--f-ol); outline-offset: 1px; margin-block: var(--s-6); }
 :root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .folder-group-list { display: block; margin: 0; padding: 0; list-style: none; }
 :root[data-look="retroma"] .side-sec[data-sec="folders"] .folder-group .side-item { color: var(--f-fg); background: transparent; border: 0; box-shadow: none; outline: none; }
 /* (the wash fills the folder's whole row, edge to edge in its box) */
