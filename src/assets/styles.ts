@@ -18,6 +18,7 @@ import type { Values } from "../gen";
 import type { TextLook } from "../text/text-style";
 import { formatRatio } from "../app/export-size";
 import { cleanExportPreset, exportPresetSummary, type ExportPreset } from "../app/export-prefs";
+import { cleanNamePattern } from "../app/export-names";
 
 export interface StyleItem {
   readonly id: string;
@@ -186,7 +187,17 @@ export const EXPORT_KIND: StyleKind = {
   summary: (d) => exportPresetSummary(d as ExportPreset),
 };
 
-export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND, BALLOON_KIND, RATIO_KIND, EXPORT_KIND];
+/** Name formats of exported files (patterns such as "{n}-{name}"), chosen in the Export dialog; they travel with the workspace's styles. */
+export const EXPORT_NAME_KIND: StyleKind = {
+  id: "exportname",
+  label: "Name format",
+  plural: "Name formats",
+  empty: "None yet. Save one from the Export dialog's name formats.",
+  validate: (d) => cleanNamePattern(d),
+  summary: (d) => (d as { pattern: string }).pattern,
+};
+
+export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND, BALLOON_KIND, RATIO_KIND, EXPORT_KIND, EXPORT_NAME_KIND];
 
 export const kindById = (id: string): StyleKind | undefined => STYLE_KINDS.find((k) => k.id === id);
 

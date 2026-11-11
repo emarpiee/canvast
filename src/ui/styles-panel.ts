@@ -143,9 +143,9 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       .map((c, i) => `<div class="pal-row"><button type="button" class="pal-swatch" data-edit-colour="${i}" style="background:${esc(c.c)}" title="Change this colour" aria-label="Change the colour ${esc(c.name || c.c.toUpperCase())}"></button><input class="pal-name" data-colour-name="${i}" value="${esc(c.name ?? "")}" placeholder="${esc(c.c.toUpperCase())}" maxlength="${MAX_NAME}" aria-label="Name of colour ${i + 1}"><button type="button" class="layer-btn" data-remove-colour="${i}" aria-label="Remove ${esc(c.name || c.c.toUpperCase())}" title="Remove"${pal.colours.length < 2 ? " disabled" : ""}>${ICONS.x}</button></div>`)
       .join("")}<div class="pal-actions"><button type="button" class="pal-add" data-add-colour="${esc(item.id)}"${pal.colours.length >= MAX_PALETTE ? " disabled" : ""}>Add colour</button><button type="button" class="pal-done" data-done>Done</button></div></div>`;
 
-  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette, text: ICONS.textStyle, pattern: ICONS.mountainSnow, balloon: ICONS.speechBalloon, ratio: ICONS.proportions, export: ICONS.fileCog };
+  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette, text: ICONS.textStyle, pattern: ICONS.mountainSnow, balloon: ICONS.speechBalloon, ratio: ICONS.proportions, export: ICONS.fileCog, exportname: ICONS.fileSignature };
   /** The short line under each kind in the list of kinds. */
-  const KIND_HINT: Record<string, string> = { adjustment: "From the Adjust panel", gradient: "Blends of colours", colour: "Single colours", palette: "Sets of colours", text: "Size, spacing, colour", pattern: "A generator and its seed", balloon: "Speech balloon looks", ratio: "Shapes of sheets and shapes", export: "Choices of Export…" };
+  const KIND_HINT: Record<string, string> = { adjustment: "From the Adjust panel", gradient: "Blends of colours", colour: "Single colours", palette: "Sets of colours", text: "Size, spacing, colour", pattern: "A generator and its seed", balloon: "Speech balloon looks", ratio: "Shapes of sheets and shapes", export: "Choices of Export…", exportname: "File names for Export…" };
   const GUIDE: Record<string, string> = {
     adjustment: "Save an adjustment from the Adjust panel of a picture, then press it here to give other pictures the same look.",
     gradient: "A gradient is a blend of colours. Save one from the fill or outline picker, make a new one here, or import a GIMP .ggr file.",
@@ -153,6 +153,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     palette: "A palette is a set of colours you reuse together, like a brand's.",
     pattern: "A pattern style is a generator with its settings and seed. Save one from the Pattern panel, then press it to make the same pattern on the selected sheet or shape.",
     export: "An export preset keeps the Export dialog's choices: format, quality, background, padding, resolution and size. Choose one in the dialog's Preset list.",
+    exportname: "A name format names exported files: words and tokens such as {name}, {n} for the number, {w} and {h} for the size. Save one from the Export dialog; it is offered there next time, and goes with the workspace's backups.",
     ratio: "Your own shapes for sheets and shapes, beside the built-in ones of the Shapes… list. Select a sheet or shape, then press one to give it that ratio.",
     text: "A text style is a size, spacing, alignment and colour. Select a text, save its style here, then press it to give other texts the same look.",
   };

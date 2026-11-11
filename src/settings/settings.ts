@@ -242,6 +242,8 @@ export const SETTINGS = {
   // the Pattern panel (ADR 0162, saved by Export… or as SVG) and picked shapes saved as an SVG.
   "export.folder": { scope: "workspace", default: "Exports", validate: text(60), effect: "immediate" } as Def<string>,
   "export.tags": { scope: "workspace", default: "export", validate: text(200), effect: "immediate" } as Def<string>,
+  "export.namePattern": { scope: "workspace", default: "{name}", validate: text(120), effect: "immediate" } as Def<string>,
+  "export.sizeRule": { scope: "workspace", default: "width", validate: oneOf("width", "height", "long", "scale"), effect: "immediate" } as Def<"width" | "height" | "long" | "scale">,
   "pattern.folder": { scope: "workspace", default: "Patterns", validate: text(60), effect: "immediate" } as Def<string>,
   "pattern.tags": { scope: "workspace", default: "pattern", validate: text(200), effect: "immediate" } as Def<string>,
   "svg.folder": { scope: "workspace", default: "Shapes", validate: text(60), effect: "immediate" } as Def<string>,

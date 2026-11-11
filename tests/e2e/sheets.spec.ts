@@ -501,7 +501,7 @@ test("Export…: a sheet's shape becomes a size here (px, in, cm, mm at a resolu
   await expect(h).toHaveValue("720");
   // the file is exactly that size
   const [download] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
-  expect(download.suggestedFilename()).toMatch(/^sheet_\d+-1080x720\.png$/);
+  expect(download.suggestedFilename(), "named by the default pattern, {name}").toMatch(/^Sheet \d+\.png$/);
   const bytes = fs.readFileSync(await download.path());
   expect(bytes.readUInt32BE(16), "the width in the PNG header").toBe(1080);
   expect(bytes.readUInt32BE(20)).toBe(720);
@@ -539,11 +539,11 @@ test("Export…: a sheet's shape becomes a size here (px, in, cm, mm at a resolu
   await dlg.locator('[data-ex="pad"]').fill("10");
   await expect(h).toHaveValue("727"); // (1060 × 706.7 inside, 10 px round it)
   const [entered] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="pad"]').press("Enter")]);
-  expect(entered.suggestedFilename()).toMatch(/^sheet_\d+-1080x727\.png$/);
+  expect(entered.suggestedFilename()).toMatch(/^Sheet \d+\.png$/);
   await key(app, "Escape");
   await expect(dlg).toBeHidden();
   const [again] = await Promise.all([p.waitForEvent("download"), exportWith(p, "exportagain")]);
-  expect(again.suggestedFilename()).toMatch(/^sheet_\d+-1080x727\.png$/);
+  expect(again.suggestedFilename()).toMatch(/^Sheet \d+\.png$/);
   await expect(dlg).toHaveCount(0);
   expect(app.consoleErrors).toEqual([]);
 });
@@ -684,14 +684,26 @@ test("Export… of several sheets: each at the width chosen with its own shape, 
   await dlg.locator('[data-ex="w"]').fill("600");
   await expect(dlg.locator("[data-ex-readout]")).toContainText("600 × 400 px");
   await expect(dlg.locator("[data-ex-readout]")).toContainText("600 × 1200 px");
+  // the files' names by a pattern of tokens, shown before they are made; an extra @2x version shows in them too
+  await dlg.locator('[data-ex="name"]').fill("{n}-{name}-{w}x{h}");
+  await expect(dlg.getByTestId("export-names")).toContainText("01-Sheet");
+  await dlg.locator('[data-variant="2x"]').click();
+  await expect(dlg.getByTestId("export-names")).toContainText("@2x.png");
+  await dlg.locator('[data-variant="2x"]').click();
   const [zip] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
   expect(zip.suggestedFilename()).toMatch(/\.zip$/);
   const z = fs.readFileSync(await zip.path());
-  const names = [...z.toString("latin1").matchAll(/(\d-sheet_\d+-\d+x\d+\.png)/g)].map((m) => m[1]);
-  expect(new Set(names).size, "a file for each sheet, named with its size").toBe(2);
+  const names = [...z.toString("latin1").matchAll(/(\d{2}-Sheet \d+-\d+x\d+\.png)/g)].map((m) => m[1]);
+  expect(new Set(names).size, "a file for each sheet, named by the pattern with its size").toBe(2);
   expect(names.some((n) => n!.endsWith("600x400.png")) && names.some((n) => n!.endsWith("600x1200.png"))).toBe(true);
+  // one left out without leaving the dialog: the other leaves alone, as a file of its own
+  await dlg.locator('[data-mini="1"] [data-tick]').uncheck();
+  await expect(dlg.getByTestId("export-count")).toHaveText("1 of 2 items");
+  const [alone] = await Promise.all([p.waitForEvent("download"), dlg.locator('[data-ex="download"]').click()]);
+  expect(alone.suggestedFilename()).toMatch(/^01-Sheet \d+-600x\d+\.png$/);
+  await dlg.locator('[data-mini="1"] [data-tick]').check();
   // the same sheets as one PDF: a page each, at the physical size (600 px at 300 ppi is 2 in = 144 pt)
-  await dlg.locator('[data-format="pdf"]').click();
+  await dlg.locator('[data-output="pdf"]').click();
   await expect(dlg.locator('[data-ex="copy"]')).toBeDisabled();
   // the pages follow the order shown: the first sheet moved later goes second
   await dlg.locator('[data-mini="0"] [data-move="1"]').click();

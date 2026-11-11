@@ -159,7 +159,7 @@ import { descendantsOf, isContainer, rootsOf } from "../doc/containers";
 import { isResult } from "../doc/boolean-group";
 import { CameraHistory } from "./camera-history";
 import { mountTour } from "./tour";
-import { ADJUSTMENT_KIND, EXPORT_KIND, RATIO_KIND } from "../assets/styles";
+import { ADJUSTMENT_KIND, EXPORT_KIND, EXPORT_NAME_KIND, RATIO_KIND } from "../assets/styles";
 import { formatRatio, parseRatio } from "./export-size";
 import { setColourStyles } from "../ui/colour-popover";
 import { setTextureHooks } from "../ui/texture-editor";
@@ -1717,6 +1717,26 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
           editor.stylesOpen = true;
           editor.changed();
         },
+      },
+      // Name formats (saved styles of the kind "exportname"): offered beside the name, saved from it, managed in the Styles panel.
+      names: {
+        list: () => session.styles.of(EXPORT_NAME_KIND.id).map((s) => ({ id: s.id, name: s.name, pattern: (s.data as { pattern: string }).pattern })),
+        save: async (pattern) => {
+          const name = await promptDialog({ title: "Name the name format", lines: [pattern], value: pattern, confirmLabel: "Save" });
+          if (name === null) return null;
+          const made = await session.styles.add(EXPORT_NAME_KIND.id, name, { pattern });
+          return made && { id: made.id, name: made.name };
+        },
+        manage: () => {
+          editor.stylesTab = EXPORT_NAME_KIND.id;
+          editor.stylesOpen = true;
+          editor.changed();
+        },
+      },
+      defaults: () => ({ pattern: settings.get("export.namePattern"), sizeRule: settings.get("export.sizeRule") }),
+      canvasName: () => {
+        const cur = session.current;
+        return session.tree?.boards.find((b) => b.board.id === cur?.boardId)?.canvases.find((c) => c.id === cur?.canvasId)?.name ?? "canvas";
       },
       targets,
       ...(each.length ? { each } : {}),

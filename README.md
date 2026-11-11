@@ -1372,9 +1372,9 @@ Export a comic page at print size, as PNG, WebP, JPEG or PDF.
 
 ![The Export dialog for a page of four prints: its preview, the size presets in pixels and inches at 300 ppi, the formats and the background](docs/screenshots/export.webp)
 
-Export several pictures at once, each as its own file or page.
+Export several pictures at once: leave some out, name the files by a pattern, and add a 2× copy of each.
 
-![Export with four prints selected: each one's small preview as a page of its own](docs/screenshots/export-each.webp)
+![Export with four prints selected: three ticked and one left out (faded), the file names made from the pattern {n}-{name} listed under it with their @2x copies, and the Output choice of separate files, PDF pages or one picture](docs/screenshots/export-each.webp)
 
 | Choice | What it does |
 | --- | --- |
@@ -1382,10 +1382,16 @@ Export several pictures at once, each as its own file or page.
 | Padding | Room around it, in px of the file or % of its longer side, in every format |
 | Formats | PNG, WebP, JPEG, SVG and PDF. What is on a sheet that clips is cut to the sheet in every format. PNG, JPEG and WebP carry their resolution |
 | Background | Transparent, white, black, the canvas colour, or any colour |
-| Presets | *Save these as a preset…* keeps the choices (format, quality, background, padding, resolution, size) as a saved style; choose one from *Preset*, update it there, or manage them in the Styles panel |
+| Presets | *Save these as a preset…* keeps the choices (format, quality, background, padding, resolution, size, name pattern, size rule, extra versions) as a saved style; choose one from *Preset*, update it there, or manage them in the Styles panel |
 | Again | It opens as you last exported that sheet or selection on this device; *Export again* in the Export menu does it with no dialog. `Enter` exports as last time, `Ctrl+C` copies |
 | Result | Download it, copy it, or keep it in the library |
-| Several items | Selected sheets, or with *Each on its own* any selected items (pictures at their own pixels): one ZIP, or one multi-page PDF whose pages you can reorder. A balloon and its words are one item, and a connector is none. Otherwise a selection is one picture |
+| Several items | Selected sheets, or with *Separate files* any selected items (pictures at their own pixels). A balloon and its words are one item, and a connector is none. Otherwise a selection is one picture |
+| What goes | Each item has a tick: untick one to leave it out (it fades and loses its number), or use *All* and *None*; `Space` on an item ticks or unticks it, `Delete` leaves it out. Reorder them with the arrows or by dragging |
+| Output | For several items: *Separate files* (one ZIP), *PDF pages* (one PDF, a page for each, in the order shown) or *One picture* (all of them together) |
+| Size of each | For several items: *Same width*, *Same height*, *Longest side*, or *Scale* (1× to 4× each one's size on the canvas, so big things stay bigger) |
+| Names | A pattern of words and tokens: `{name}` (click an item's name to give it another), `{n}` (01, 02 …), `{w}` and `{h}` (pixels), `{canvas}`, `{date}`, `{format}`. The files it makes are listed under it before you export; two alike get `-2`. The ZIP or PDF has its own name |
+| Name formats | *Formats…* beside the name: built-in patterns, yours, and *Save it as a name format…*. They are saved styles, managed in the Styles panel, and go with the workspace's backups. Settings > Saving to the library sets the pattern and the size rule a new export starts with |
+| Also | Extra versions of each file: *@2x* and *@3x* (twice and three times as big, named `…@2x.png`), and *SVG* beside each picture when it is vectors |
 | Vectors | Plain shapes are true vectors in PDF and SVG; masks are SVG masks; picture and pattern fills are embedded pictures clipped to the shape |
 
 ### What you export is what you see

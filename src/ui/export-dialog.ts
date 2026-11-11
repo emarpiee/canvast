@@ -25,6 +25,8 @@ import type { Action, ExportPreset, Format, PadUnit, Prefs } from "../app/export
 export { cleanExportPreset, exportPresetSummary };
 export type { ExportPreset };
 import { ICONS } from "./icons";
+import { BUILT_IN_PATTERNS, DEFAULT_PATTERN, NAME_TOKENS, SIZE_RULES, VARIANTS, cleanSizeRule, nameFrom, sizeByRule, today, uniqueNames, variantName, variantScale } from "../app/export-names";
+import type { SizeRule, Variant } from "../app/export-names";
 
 export interface ExportDeps {
   /** What is exported: one target, or one for each of several sheets (they leave together, as a ZIP or the pages of a PDF). */
@@ -58,6 +60,16 @@ export interface ExportDeps {
   };
   /** Pick a colour (the shared colour popover). */
   pickColour?(anchor: HTMLElement, value: string, onInput: (hex: string) => void): void;
+  /** Name formats (saved styles of the kind "exportname"): listed beside the name, saved from it, managed in the Styles panel. */
+  names?: {
+    list(): ReadonlyArray<{ id: string; name: string; pattern: string }>;
+    save(pattern: string): Promise<{ id: string; name: string } | null>;
+    manage(): void;
+  };
+  /** The workspace's defaults (Settings > Saving to the library): the name pattern and how several things are sized. */
+  defaults?(): { pattern: string; sizeRule: string };
+  /** The open canvas's name ({canvas} in a name). */
+  canvasName?(): string;
 }
 
 const KEY = "canvast.export";
@@ -146,6 +158,19 @@ function openDialog(deps: ExportDeps, again = false): void {
   const last = lastOf(key);
   const prefs: Prefs = last ? (({ widthPx: _w, name: _n, ...p }) => p)(last) : loadPrefs();
   if (prefs.format === "svg" && !allVectors) prefs.format = "png";
+  // (a first export of these things starts from the workspace's defaults: its name pattern and how several are sized)
+  const defaults = deps.defaults?.();
+  if (!prefs.pattern) prefs.pattern = defaults?.pattern ?? "";
+  if (!last && defaults) prefs.sizeRule = cleanSizeRule(defaults.sizeRule);
+  /** Left out of this export (unticked), by what was picked. */
+  const out = new Set<ExportTarget>();
+  /** A name typed for one thing ({name} in the pattern), by what was picked. */
+  const own = new Map<ExportTarget, string>();
+  /** Times its size on the canvas, for the Scale rule. */
+  let scaleV = 1;
+  /** Several things, shown as one picture: the way back to each on its own is in the Output choice. */
+  const asOne = !multi && !!deps.each?.length;
+  const canOne = multi ? !!deps.together?.length : asOne;
   // To begin with: the picture's own pixels, else the first size the shape is made for (A4, Full HD …), else the longer side 1920 px.
   const startW = t.ratio >= 1 ? 1920 : 1920 * t.ratio;
   const exact = multi ? undefined : sizeSuggestions(t.ratio, 8).find((s) => s.exact);
@@ -157,7 +182,6 @@ function openDialog(deps: ExportDeps, again = false): void {
   // A size the shape is made for is taken whole (2480 × 3508 for A4), not worked out from a ratio that may differ in the last digit.
   let whole: { w: number; h: number } | null = multi ? null : t.original ? { w: t.original.w, h: t.original.h } : exact ? { w: exact.w, h: exact.h } : null;
   if (last && whole && whole.w !== last.widthPx) whole = null;
-  let nameTouched = !!last?.name;
   /** The times-on-screen size chosen (a chip), kept by a preset; null once a width is typed. */
   let scaleK: number | null = null;
   /** The padding as a share of each target's longer side (px: of the size it leaves at). */
@@ -198,14 +222,15 @@ function openDialog(deps: ExportDeps, again = false): void {
           <span class="ex-dim ex-dim-w" data-ex-dim-w></span>
           <span class="ex-dim ex-dim-h" data-ex-dim-h></span>
         </div>`}
-        ${deps.each?.length ? `<button type="button" class="adj-map-edit" data-ex="each" data-testid="export-each">Each on its own (${deps.each.length} pages or files)</button>` : deps.together ? `<button type="button" class="adj-map-edit" data-ex="together" data-testid="export-together">All as one picture</button>` : ""}
+        ${multi ? `<div class="ex-pick" data-ex-pick><span data-ex-count data-testid="export-count"></span><button type="button" class="adj-map-edit" data-ex="all">All</button><button type="button" class="adj-map-edit" data-ex="none">None</button></div>` : ""}
         <p class="ex-shape" data-testid="export-shape">${multi ? `<strong>${ts.length} ${noun}</strong> <span>· ${ownSizes() ? "each at its own pixels, until you set a width" : "each at this width, its own shape"}</span>` : `Shape <strong>${esc(formatRatio(t.ratio))}</strong>${preset ? ` <span>· ${esc(preset.short)}</span>` : ""}`}</p>
       </div>
       <div class="ex-panel">
         ${deps.presets ? `<label class="ex-field ex-preset">Preset <select data-ex="preset" aria-label="Export preset: saved choices, or save these"></select></label>` : ""}
         <section class="ex-sec" aria-label="Size">
+          ${multi ? `<div class="ex-row"><div class="seg" role="radiogroup" aria-label="Size of each" data-ex-rules>${SIZE_RULES.map(([r, label, tip]) => `<button type="button" role="radio" data-rule="${r}" aria-checked="${r === prefs.sizeRule}" title="${esc(tip)}">${label}</button>`).join("")}</div></div>` : ""}
           <div class="ex-row">
-            <label class="ex-field">${multi ? "Width of each" : "Width"} <input type="number" data-ex="w" min="0" step="any" inputmode="decimal" aria-label="Width"></label>
+            <label class="ex-field"><span data-ex-wlabel>${multi ? "Width of each" : "Width"}</span> <input type="number" data-ex="w" min="0" step="any" inputmode="decimal" aria-label="Width"></label>
             <span class="ex-times"${multi ? " hidden" : ""} title="The shape stays: change one side and the other follows" aria-hidden="true">×</span>
             <label class="ex-field"${multi ? " hidden" : ""}>Height <input type="number" data-ex="h" min="0" step="any" inputmode="decimal" aria-label="Height"></label>
             <div class="seg" role="radiogroup" aria-label="Unit" data-ex-units>${UNITS.map((u) => `<button type="button" role="radio" data-unit="${u}" aria-checked="${u === prefs.unit}">${UNIT_LABEL[u]}</button>`).join("")}</div>
@@ -222,15 +247,23 @@ function openDialog(deps: ExportDeps, again = false): void {
           <div class="ex-chips" role="group" aria-label="Sizes for this shape" data-ex-chips></div>
         </section>
         <section class="ex-sec" aria-label="File">
-          <div class="ex-row">
-            <div class="seg" role="radiogroup" aria-label="Format" data-ex-formats>${(["png", "webp", "jpeg"] as const).map((f) => `<button type="button" role="radio" data-format="${f}" aria-checked="${f === prefs.format}">${f === "jpeg" ? "JPEG" : f.toUpperCase()}</button>`).join("")}${allVectors ? `<button type="button" role="radio" data-format="svg" aria-checked="${prefs.format === "svg"}" title="Stays sharp at any size">SVG</button>` : ""}<button type="button" role="radio" data-format="pdf" aria-checked="${prefs.format === "pdf"}" title="One page for each picture, at the physical size; plain shapes stay vectors">PDF</button></div>
+          ${multi || asOne ? `<div class="ex-row"><span class="ex-label" id="ex-out-l">Output</span><div class="seg" role="radiogroup" aria-labelledby="ex-out-l" data-ex-outputs><button type="button" role="radio" data-output="files" title="Each a file of its own, together in a ZIP" data-testid="export-each">Separate files</button><button type="button" role="radio" data-output="pdf" title="One PDF, a page for each">PDF pages</button>${canOne ? `<button type="button" role="radio" data-output="one" title="All of them as one picture" data-testid="export-together">One picture</button>` : ""}</div></div>` : ""}
+          <div class="ex-row" data-ex-formatrow>
+            <div class="seg" role="radiogroup" aria-label="Format" data-ex-formats>${(["png", "webp", "jpeg"] as const).map((f) => `<button type="button" role="radio" data-format="${f}" aria-checked="${f === prefs.format}">${f === "jpeg" ? "JPEG" : f.toUpperCase()}</button>`).join("")}${allVectors ? `<button type="button" role="radio" data-format="svg" aria-checked="${prefs.format === "svg"}" title="Stays sharp at any size">SVG</button>` : ""}${multi ? "" : `<button type="button" role="radio" data-format="pdf" aria-checked="${prefs.format === "pdf"}" title="One page for each picture, at the physical size; plain shapes stay vectors">PDF</button>`}</div>
             <label class="ex-field ex-quality" data-ex-quality>Quality <input type="range" data-ex="q" min="10" max="100" step="1" value="${prefs.quality}" aria-label="Quality"> <output data-ex-qout>${prefs.quality}%</output></label>
           </div>
           <div class="ex-row" data-ex-bgrow>
             <span class="ex-label" id="ex-bg-l">Background</span>
             <div class="seg" role="radiogroup" aria-labelledby="ex-bg-l" data-ex-bgs>${(["transparent", "white", "black"] as const).map((b) => `<button type="button" role="radio" data-bg="${b}" aria-checked="${b === prefs.bg}">${b[0]!.toUpperCase()}${b.slice(1)}</button>`).join("")}${deps.canvasColour ? `<button type="button" role="radio" data-bg="canvas" aria-checked="false" title="The canvas's own background colour">Canvas</button>` : ""}${deps.pickColour ? `<button type="button" role="radio" data-bg="pick" aria-checked="false" aria-haspopup="dialog" title="Any colour">Colour<span class="ex-swatch" data-ex-swatch></span></button>` : ""}</div>
           </div>
-          <label class="ex-field ex-name">Name <input type="text" data-ex="name" spellcheck="false" autocomplete="off" aria-label="File name"><span data-ex-ext class="ex-ext"></span></label>
+          <div class="ex-row ex-namerow">
+            <label class="ex-field ex-name"><span data-ex-namelabel>Name</span> <input type="text" data-ex="name" spellcheck="false" autocomplete="off" maxlength="120" aria-label="File name: words and tokens"><span data-ex-ext class="ex-ext"></span></label>
+            <select data-ex="namefmt" aria-label="Name formats: built-in and saved, or save this one" title="Name formats"></select>
+          </div>
+          <div class="ex-tokens" role="group" aria-label="Insert a token" data-ex-tokens>${NAME_TOKENS.map(([tok, what]) => `<button type="button" class="tag-chip is-suggest ex-token" data-token="${tok}" title="${esc(what)}">${tok}</button>`).join("")}</div>
+          <p class="ex-names" data-ex-names data-testid="export-names" aria-live="polite"></p>
+          <label class="ex-field ex-name" data-ex-packrow hidden><span data-ex-packlabel>ZIP name</span> <input type="text" data-ex="pack" spellcheck="false" autocomplete="off" maxlength="120" aria-label="Name of the ZIP or PDF"><span data-ex-packext class="ex-ext"></span></label>
+          <div class="ex-row" data-ex-varrow><span class="ex-label" id="ex-var-l">Also</span><div class="seg" role="group" aria-labelledby="ex-var-l" data-ex-variants>${VARIANTS.filter(([v]) => v !== "svg" || allVectors).map(([v, label, tip]) => `<button type="button" role="checkbox" data-variant="${v}" aria-checked="${prefs.variants.includes(v)}" title="${esc(tip)}">${label}</button>`).join("")}</div></div>
         </section>
       </div>
     </div>
@@ -249,6 +282,23 @@ function openDialog(deps: ExportDeps, again = false): void {
   const dpiSel = q<HTMLSelectElement>('[data-ex="dpi"]'), qIn = q<HTMLInputElement>('[data-ex="q"]'), nameIn = q<HTMLInputElement>('[data-ex="name"]');
   const note = q<HTMLElement>("[data-ex-note]"), readout = q<HTMLElement>("[data-ex-readout]"), chips = q<HTMLElement>("[data-ex-chips]");
   let thumbs: HTMLCanvasElement[] = [];
+  /** A thing's name: one typed for it here, else its own. */
+  const itemName = (i: number): string => own.get(raw[i]!) ?? raw[i]!.name;
+  /** The places of the things that go (ticked), in order. */
+  const chosen = (): number[] => raw.map((_, i) => i).filter((i) => !out.has(raw[i]!));
+  /** Each ticked picture's number as it will leave; a dash on those left out; the count above them. */
+  const renumber = (): void => {
+    let n = 0;
+    for (const f of dlg.querySelectorAll<HTMLElement>("[data-mini]")) {
+      const i = Number(f.dataset["mini"]);
+      const off = out.has(raw[i]!);
+      f.classList.toggle("is-out", off);
+      f.querySelector<HTMLInputElement>("[data-tick]")!.checked = !off;
+      f.querySelector<HTMLElement>("[data-ex-page]")!.textContent = off ? "–" : String(++n);
+    }
+    const count = dlg.querySelector<HTMLElement>("[data-ex-count]");
+    if (count) count.textContent = n === raw.length ? `All ${plural(n, "item")}` : `${n} of ${raw.length} ${raw.length === 1 ? "item" : "items"}`;
+  };
   /** The small pictures of several sheets, numbered as they will leave, each with buttons to move it earlier or later. */
   const drawMinis = (): void => {
     const box = dlg.querySelector<HTMLElement>("[data-ex-minis]");
@@ -256,7 +306,8 @@ function openDialog(deps: ExportDeps, again = false): void {
       thumbs = [...dlg.querySelectorAll<HTMLCanvasElement>("[data-ex-thumb]")];
       return;
     }
-    box.innerHTML = ts.map((x, i) => `<figure class="ex-mini" data-mini="${i}" draggable="true" title="Drag to change its place"><div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(x.ratio, 0.2), 5)}"><canvas class="ex-thumb" data-ex-thumb aria-label="Preview of ${esc(x.name)}"></canvas><b class="ex-page">${i + 1}</b></div><figcaption><button type="button" class="ex-move" data-move="-1" aria-label="Move ${esc(x.name)} earlier" ${i === 0 ? "disabled" : ""}>${ICONS.chevronLeft}</button><span>${esc(x.name)}</span><button type="button" class="ex-move" data-move="1" aria-label="Move ${esc(x.name)} later" ${i === ts.length - 1 ? "disabled" : ""}>${ICONS.chevronRight}</button></figcaption></figure>`).join("");
+    box.innerHTML = ts.map((x, i) => `<figure class="ex-mini${out.has(raw[i]!) ? " is-out" : ""}" data-mini="${i}" tabindex="0" draggable="true" title="Drag to change its place; Space includes or leaves it out"><div class="ex-frame" data-ex-frame style="--shape:${Math.min(Math.max(x.ratio, 0.2), 5)}"><canvas class="ex-thumb" data-ex-thumb aria-label="Preview of ${esc(itemName(i))}"></canvas><b class="ex-page" data-ex-page></b><input type="checkbox" class="ex-tick" data-tick${out.has(raw[i]!) ? "" : " checked"} aria-label="Include ${esc(itemName(i))}"></div><figcaption><button type="button" class="ex-move" data-move="-1" aria-label="Move ${esc(itemName(i))} earlier" ${i === 0 ? "disabled" : ""}>${ICONS.chevronLeft}</button><button type="button" class="ex-caption" data-rename title="Rename this file: ${esc(itemName(i))}">${esc(itemName(i))}</button><button type="button" class="ex-move" data-move="1" aria-label="Move ${esc(itemName(i))} later" ${i === ts.length - 1 ? "disabled" : ""}>${ICONS.chevronRight}</button></figcaption></figure>`).join("");
+    renumber();
     thumbs = [...box.querySelectorAll<HTMLCanvasElement>("[data-ex-thumb]")];
   };
   drawMinis();
@@ -264,14 +315,62 @@ function openDialog(deps: ExportDeps, again = false): void {
 
   const px = (): { w: number; h: number; capped: boolean } => (whole && whole.w === widthPx ? { ...whole, capped: false } : clampSize(widthPx, widthPx / t.ratio));
   /** The pixel size of target `i` at the width chosen: its own height from its own shape (the first one's is `px()`). */
-  const sizeOf = (i: number): { w: number; h: number } => (i === 0 && !multi ? px() : ownSizes() ? clampSize(ts[i]!.original!.w, ts[i]!.original!.h) : clampSize(widthPx, widthPx / ts[i]!.ratio));
+  const sizeOf = (i: number): { w: number; h: number } => {
+    if (i === 0 && !multi) return px();
+    if (ownSizes() && prefs.sizeRule === "width") return clampSize(ts[i]!.original!.w, ts[i]!.original!.h);
+    const z = sizeByRule(prefs.sizeRule, prefs.sizeRule === "scale" ? scaleV : widthPx, ts[i]!.ratio, ts[i]!.world);
+    return clampSize(z.w, z.h);
+  };
   const ext = (): string => (prefs.format === "svg" ? "svg" : prefs.format === "pdf" ? "pdf" : SHOT_FORMATS[prefs.format].ext);
 
-  const refreshName = (): void => {
-    const s = px();
-    if (!nameTouched) nameIn.value = multi ? `${slug(t.name)}-and-${ts.length - 1}-more` : `${slug(t.name)}-${prefs.format === "svg" ? "vector" : `${s.w}x${s.h}`}`;
-    q("[data-ex-ext]").textContent = `.${ext()}`;
+  const packIn = q<HTMLInputElement>('[data-ex="pack"]');
+  /** Several things leave as files of their own (in a ZIP), not as the pages of one PDF. */
+  const asFiles = (): boolean => multi && prefs.format !== "pdf";
+  /** The name of each file (without its extension) for the things ticked, by the pattern; never two alike. */
+  const stems = (): Map<number, string> => {
+    const list = multi ? chosen() : [0];
+    const canvas = deps.canvasName?.() ?? "canvas";
+    const date = today();
+    const raw0 = list.map((i, k) => {
+      const z = sizeOf(i);
+      return nameFrom(prefs.pattern || DEFAULT_PATTERN, { name: multi ? itemName(i) : own.get(raw[0]!) ?? t.name, n: k + 1, count: list.length, w: z.w, h: z.h, canvas, format: ext(), date });
+    });
+    const unique = uniqueNames(raw0);
+    return new Map(list.map((i, k) => [i, unique[k]!]));
   };
+  /** Every file this export makes, by name: each picture and its extra versions (a PDF of several is one file). */
+  const fileNames = (): string[] => {
+    if (multi && !asFiles()) return [`${packName()}.pdf`];
+    const out: string[] = [];
+    for (const stem of stems().values()) {
+      out.push(`${stem}.${ext()}`);
+      if (prefs.format !== "pdf") for (const v of prefs.variants) if (v !== "svg" || allVectors) out.push(variantName(stem, v, ext()));
+    }
+    return uniqueNames(out);
+  };
+  /** The ZIP's or the PDF's own name (several files, or one PDF of several). */
+  const packName = (): string => replaceInvalid(packIn.value).trim() || `${slug(itemName(chosen()[0] ?? 0))}-and-${Math.max(0, chosen().length - 1)}-more`;
+  const refreshName = (): void => {
+    if (document.activeElement !== nameIn) nameIn.value = prefs.pattern || DEFAULT_PATTERN;
+    const names = fileNames();
+    const pack = multi || names.length > 1;
+    const packExt = multi && !asFiles() ? "pdf" : "zip";
+    q("[data-ex-ext]").textContent = multi && !asFiles() ? "" : `.${ext()}`;
+    q("[data-ex-namelabel]").textContent = multi ? "File names" : "Name";
+    q<HTMLElement>("[data-ex-packrow]").hidden = !pack;
+    q("[data-ex-packlabel]").textContent = packExt === "pdf" ? "PDF name" : "ZIP name";
+    q("[data-ex-packext]").textContent = `.${packExt}`;
+    if (!packTouched) packIn.value = multi ? `${slug(itemName(chosen()[0] ?? 0))}-and-${Math.max(0, chosen().length - 1)}-more` : (stems().get(0) ?? "export");
+    // (the name pattern names the files inside; a PDF of several is one file, named by its own field)
+    const patternShown = !(multi && !asFiles());
+    q<HTMLElement>(".ex-namerow").hidden = !patternShown;
+    q<HTMLElement>("[data-ex-tokens]").hidden = !patternShown;
+    const shownNames = names.slice(0, 3).map(esc).join(", ");
+    q("[data-ex-names]").innerHTML = names.length ? `${pack ? `In <b>${esc(packName())}.${packExt}</b>: ` : ""}${shownNames}${names.length > 3 ? ` and ${names.length - 3} more` : ""}` : "Nothing is ticked.";
+    q<HTMLElement>("[data-ex-varrow]").hidden = prefs.format === "pdf";
+    for (const b of radios("[data-variant]")) b.setAttribute("aria-checked", String(prefs.variants.includes(b.dataset["variant"] as Variant)));
+  };
+  let packTouched = !!last?.name;
 
   // Previews: a single one is drawn at once; the pictures of several sheets are drawn small, one at a time, only when they are on screen (as the
   // list scrolls), and kept for as long as the background stays the same, so moving a page about redraws nothing.
@@ -353,6 +452,11 @@ function openDialog(deps: ExportDeps, again = false): void {
     return Math.max(1, Math.round(prefs.padUnit === "px" ? cw + 2 * prefs.pad : cw * (1 + (2 * prefs.pad * Math.max(raw[0]!.ratio, 1)) / 100 / raw[0]!.ratio)));
   };
   const buildChips = (): void => {
+    if (multi && prefs.sizeRule === "scale") {
+      suggestions = [1, 2, 3, 4].map((k): Chip => ({ label: `${k}×`, title: `${k}× its size on the canvas`, w: 0, h: 0, dpi: null, exact: false, k }));
+      chips.innerHTML = suggestions.map((c, i) => `<button type="button" class="ex-chip" data-chip="${i}" aria-pressed="${c.k === scaleV}" title="${esc(c.title)}"><b>${esc(c.label)}</b><span>of its size</span></button>`).join("");
+      return;
+    }
     const sized = multi ? sizeSuggestions(1, 12).filter((c) => !c.exact).map((c) => ({ ...c, h: 0 })) : sizeSuggestions(t.ratio, 8);
     if (t.original && !multi) sized.unshift({ label: "Original", w: t.original.w, h: t.original.h, dpi: null, exact: true });
     const scaled = onScreen && onScreen.w > 0 ? [1, 2, 3, 4].map((k): Chip => { const w = scaledWidth(k); return { label: `${k}×`, title: `${k}× its size on screen`, w, h: Math.round(w / t.ratio), dpi: null, exact: false, k }; }) : [];
@@ -364,6 +468,12 @@ function openDialog(deps: ExportDeps, again = false): void {
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-chip]");
     if (!b) return;
     const c = suggestions[Number(b.dataset["chip"])]!;
+    if (multi && prefs.sizeRule === "scale") {
+      scaleV = c.k ?? 1;
+      for (const x of chips.querySelectorAll<HTMLElement>("[data-chip]")) x.setAttribute("aria-pressed", String(x === b));
+      refresh();
+      return;
+    }
     widthPx = c.w;
     whole = c.k || prefs.pad > 0 ? null : { w: c.w, h: c.h };
     scaleK = c.k ?? null;
@@ -437,13 +547,24 @@ function openDialog(deps: ExportDeps, again = false): void {
     const u = prefs.unit;
     dlg.dataset["px"] = `${s.w}x${s.h}`; // (what the file will be: read by tests and by anyone inspecting)
     if (opts.fields !== false) {
-      if (document.activeElement !== wIn) wIn.value = shown(fromPx(s.w, u, prefs.dpi), u);
+      if (document.activeElement !== wIn) wIn.value = multi ? (prefs.sizeRule === "scale" ? String(scaleV) : shown(fromPx(widthPx, u, prefs.dpi), u)) : shown(fromPx(s.w, u, prefs.dpi), u);
       if (document.activeElement !== hIn) hIn.value = shown(fromPx(s.h, u, prefs.dpi), u);
     }
+    if (multi) {
+      q("[data-ex-wlabel]").textContent = prefs.sizeRule === "scale" ? "Scale (× its size on the canvas)" : prefs.sizeRule === "height" ? "Height of each" : prefs.sizeRule === "long" ? "Longest side of each" : "Width of each";
+      q<HTMLElement>("[data-ex-units]").hidden = prefs.sizeRule === "scale";
+      for (const b of radios("[data-rule]")) b.setAttribute("aria-checked", String(b.dataset["rule"] === prefs.sizeRule));
+      const outNow = prefs.format === "pdf" ? "pdf" : "files";
+      for (const b of radios("[data-output]")) b.setAttribute("aria-checked", String(b.dataset["output"] === outNow));
+      q<HTMLElement>("[data-ex-formatrow]").hidden = prefs.format === "pdf";
+      const none = chosen().length === 0;
+      for (const k of ["download", "library"]) q<HTMLButtonElement>(`[data-ex="${k}"]`).disabled = busy || none;
+    } else if (asOne) for (const b of radios("[data-output]")) b.setAttribute("aria-checked", String(b.dataset["output"] === "one"));
     wIn.step = hIn.step = u === "px" ? "1" : "any";
     const mp = (s.w * s.h) / 1e6;
     if (multi) {
-      readout.innerHTML = ts.slice(0, 5).map((x, i) => `<span>${esc(x.name)}: <b>${sizeOf(i).w} × ${sizeOf(i).h} px</b></span>`).join("<br>") + (ts.length > 5 ? `<br>+ ${ts.length - 5} more` : "") + ` <span class="ex-at">at ${prefs.dpi} ppi</span>`;
+      const on = chosen();
+      readout.innerHTML = on.slice(0, 5).map((i) => `<span>${esc(itemName(i))}: <b>${sizeOf(i).w} × ${sizeOf(i).h} px</b></span>`).join("<br>") + (on.length > 5 ? `<br>+ ${on.length - 5} more` : "") + ` <span class="ex-at">at ${prefs.dpi} ppi</span>`;
     } else {
       // (the size in a print unit only when one is chosen, or for a PDF, whose pages are measured)
       const print: Unit = u === "px" ? "mm" : u;
@@ -452,7 +573,7 @@ function openDialog(deps: ExportDeps, again = false): void {
       q("[data-ex-dim-h]").textContent = `${shown(fromPx(s.h, u, prefs.dpi), u)} ${UNIT_LABEL[u]}`;
     }
     // (the chips are made once: a press on one must not be lost to them being redrawn when the field it leaves fires its change)
-    for (const b of chips.querySelectorAll<HTMLElement>("[data-chip]")) b.setAttribute("aria-pressed", String(suggestions[Number(b.dataset["chip"])]!.w === s.w));
+    if (!(multi && prefs.sizeRule === "scale")) for (const b of chips.querySelectorAll<HTMLElement>("[data-chip]")) b.setAttribute("aria-pressed", String(suggestions[Number(b.dataset["chip"])]!.w === (multi ? widthPx : s.w)));
     note.textContent = s.capped ? `Capped at ${MAX_SIDE.toLocaleString("en")} px a side and ${(MAX_AREA / 1e6).toFixed(0)} MP: that is the most a picture can be.` : mp > 40 ? "A big picture: it can take a moment and a lot of memory." : "";
     const warn = prefs.format === "svg" ? (deps.svgWarning?.(ts) ?? null) : null;
     q("[data-ex-warn]").hidden = !warn;
@@ -484,6 +605,11 @@ function openDialog(deps: ExportDeps, again = false): void {
   const fromField = (which: "w" | "h"): void => {
     const v = Number(which === "w" ? wIn.value : hIn.value);
     if (!(v > 0) || !Number.isFinite(v)) return;
+    if (multi && prefs.sizeRule === "scale") {
+      scaleV = Math.min(64, Math.max(0.05, v));
+      refresh({ fields: false });
+      return;
+    }
     const p = toPx(v, prefs.unit, prefs.dpi);
     whole = null;
     scaleK = null;
@@ -614,10 +740,150 @@ function openDialog(deps: ExportDeps, again = false): void {
     prefs.quality = Number(qIn.value);
     q("[data-ex-qout]").textContent = `${prefs.quality}%`;
   });
-  nameIn.addEventListener("input", () => (nameTouched = true));
+  nameIn.addEventListener("input", () => {
+    prefs.pattern = nameIn.value.trim() === DEFAULT_PATTERN ? "" : nameIn.value;
+    refreshName();
+  });
+  packIn.addEventListener("input", () => {
+    packTouched = true;
+    refreshName();
+  });
+  // Tokens go in where the cursor is.
+  q("[data-ex-tokens]").addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-token]");
+    if (!b) return;
+    const at = nameIn.selectionStart ?? nameIn.value.length, to = nameIn.selectionEnd ?? at;
+    nameIn.value = nameIn.value.slice(0, at) + b.dataset["token"]! + nameIn.value.slice(to);
+    nameIn.focus();
+    nameIn.setSelectionRange(at + b.dataset["token"]!.length, at + b.dataset["token"]!.length);
+    nameIn.dispatchEvent(new Event("input"));
+  });
+  // Name formats: the built-in ones, those saved (styles of the workspace), and saving this one.
+  const fmtSel = q<HTMLSelectElement>('[data-ex="namefmt"]');
+  const showFormats = (): void => {
+    const saved = deps.names?.list() ?? [];
+    fmtSel.innerHTML = `<option value="">Formats…</option><optgroup label="Built in">${BUILT_IN_PATTERNS.map((pt) => `<option value="b:${esc(pt)}">${esc(pt)}</option>`).join("")}</optgroup>${saved.length ? `<optgroup label="Saved">${saved.map((s) => `<option value="b:${esc(s.pattern)}">${esc(s.name)} · ${esc(s.pattern)}</option>`).join("")}</optgroup>` : ""}${deps.names ? `<optgroup label="This format"><option value="save">Save it as a name format…</option>${saved.length ? `<option value="manage">Manage name formats…</option>` : ""}</optgroup>` : ""}`;
+    fmtSel.value = "";
+  };
+  fmtSel.addEventListener("change", () => {
+    const v = fmtSel.value;
+    fmtSel.value = "";
+    if (v.startsWith("b:")) {
+      prefs.pattern = v.slice(2) === DEFAULT_PATTERN ? "" : v.slice(2);
+      nameIn.value = v.slice(2);
+      refresh();
+    } else if (v === "save") void deps.names?.save(prefs.pattern || DEFAULT_PATTERN).then(showFormats);
+    else if (v === "manage") {
+      dlg.close();
+      deps.names?.manage();
+    }
+  });
+  showFormats();
+  // Output of several: files of their own (a ZIP), the pages of one PDF, or all as one picture (the other dialog).
+  dlg.querySelector("[data-ex-outputs]")?.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-output]");
+    if (!b) return;
+    const o = b.dataset["output"];
+    if (multi) {
+      if (o === "one") {
+        savePrefs(prefs);
+        dlg.close();
+        return openTogether(deps);
+      }
+      prefs.format = o === "pdf" ? "pdf" : prefs.format === "pdf" ? "png" : prefs.format;
+      refresh();
+      void refreshThumb();
+    } else if (asOne && o !== "one") {
+      prefs.format = o === "pdf" ? "pdf" : prefs.format === "pdf" ? "png" : prefs.format;
+      savePrefs(prefs);
+      dlg.close();
+      openEach(deps);
+    }
+  });
+  dlg.querySelector("[data-ex-rules]")?.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-rule]");
+    if (!b) return;
+    prefs.sizeRule = b.dataset["rule"] as SizeRule;
+    whole = null;
+    buildChips();
+    refresh();
+  });
+  q("[data-ex-variants]").addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-variant]");
+    if (!b) return;
+    const v = b.dataset["variant"] as Variant;
+    prefs.variants = prefs.variants.includes(v) ? prefs.variants.filter((x) => x !== v) : [...prefs.variants, v];
+    refreshName();
+  });
+  // Ticks: what goes. A click on the box, Space on a picture, All and None; Delete leaves the picture out.
+  const setOut = (i: number, off: boolean): void => {
+    if (off) out.add(raw[i]!);
+    else out.delete(raw[i]!);
+  };
+  const ticked = (): void => {
+    renumber();
+    refresh();
+  };
+  dlg.querySelector("[data-ex-minis]")?.addEventListener("change", (e) => {
+    const box = (e.target as HTMLElement).closest<HTMLInputElement>("[data-tick]");
+    const i = Number(box?.closest<HTMLElement>("[data-mini]")?.dataset["mini"]);
+    if (!box || !Number.isInteger(i)) return;
+    setOut(i, !box.checked);
+    ticked();
+  });
+  dlg.querySelector("[data-ex-minis]")?.addEventListener("keydown", (e) => {
+    const f = e as KeyboardEvent;
+    const fig = (f.target as HTMLElement).closest<HTMLElement>("[data-mini]");
+    if (!fig || f.target !== fig) return;
+    const i = Number(fig.dataset["mini"]);
+    if (f.key === " ") setOut(i, !out.has(raw[i]!));
+    else if (f.key === "Delete" || f.key === "Backspace") setOut(i, true);
+    else return;
+    f.preventDefault();
+    ticked();
+  });
+  dlg.querySelector("[data-ex-pick]")?.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[data-ex]");
+    if (!b || (b.dataset["ex"] !== "all" && b.dataset["ex"] !== "none")) return;
+    raw.forEach((_, i) => setOut(i, b.dataset["ex"] === "none"));
+    ticked();
+  });
+  // A picture's own name: its caption is a button that becomes a field.
+  dlg.querySelector("[data-ex-minis]")?.addEventListener("click", (e) => {
+    const cap = (e.target as HTMLElement).closest<HTMLElement>("[data-rename]");
+    const i = Number(cap?.closest<HTMLElement>("[data-mini]")?.dataset["mini"]);
+    if (!cap || !Number.isInteger(i)) return;
+    const field = document.createElement("input");
+    field.type = "text";
+    field.className = "ex-caption-edit";
+    field.value = itemName(i);
+    field.maxLength = 120;
+    field.setAttribute("aria-label", `Name of ${itemName(i)}`);
+    cap.replaceWith(field);
+    field.focus();
+    field.select();
+    let done = false;
+    const finish = (keep: boolean): void => {
+      if (done) return;
+      done = true;
+      const v = field.value.trim();
+      if (keep) {
+        if (v && v !== raw[i]!.name) own.set(raw[i]!, v);
+        else own.delete(raw[i]!);
+      }
+      drawMinis();
+      watchMinis();
+      refresh();
+      void refreshThumb();
+    };
+    field.addEventListener("keydown", (k) => {
+      if (k.key === "Enter") (k.preventDefault(), k.stopPropagation(), finish(true));
+      else if (k.key === "Escape") (k.preventDefault(), k.stopPropagation(), finish(false));
+    });
+    field.addEventListener("blur", () => finish(true));
+  });
 
   interface Made { name: string; blob: Blob; mime: string }
-  const base = (): string => replaceInvalid(nameIn.value).trim() || slug(t.name);
   const sizeText = (i: number): { w: string; h: string } => {
     const z = sizeOf(i), u = prefs.unit;
     const one = (v: number): string => `${shown(fromPx(v, u, prefs.dpi), u)}${u === "px" ? "" : u}`;
@@ -626,10 +892,11 @@ function openDialog(deps: ExportDeps, again = false): void {
   /** The files, each made at the size asked for (one for each sheet; a PDF is one file with a page for each). */
   const make = async (as: Format): Promise<Made[]> => {
     const bgFor = (f: Format): Background => (f === "jpeg" && prefs.bg === "transparent" ? "white" : prefs.bg);
-    const stem = (i: number, e: string, withSize: boolean): string => (multi ? `${i + 1}-${slug(ts[i]!.name)}${withSize ? `-${sizeOf(i).w}x${sizeOf(i).h}` : ""}.${e}` : `${base()}.${e}`);
+    const names = stems();
+    const list = multi ? chosen() : [0];
     if (as === "pdf") {
       const pages = [];
-      for (let i = 0; i < ts.length; i++) {
+      for (const i of list) {
         const z = sizeOf(i);
         const wPt = (z.w / prefs.dpi) * 72, hPt = (z.h / prefs.dpi) * 72;
         const vec = deps.pdfVector(ts[i]!, wPt, hPt);
@@ -642,24 +909,43 @@ function openDialog(deps: ExportDeps, again = false): void {
         const jpeg = bg === "transparent" ? null : new Uint8Array(await (await encodeShot(canvas, "jpeg", prefs.quality)).blob.arrayBuffer());
         pages.push(pdfPageOf(canvas, wPt, hPt, jpeg));
       }
-      return [{ name: `${base()}.pdf`, blob: await pdfOf(pages), mime: "application/pdf" }];
+      return [{ name: `${multi ? packName() : names.get(0)!}.pdf`, blob: await pdfOf(pages), mime: "application/pdf" }];
     }
-    const out: Made[] = [];
-    for (let i = 0; i < ts.length; i++) {
-      if (as === "svg") {
-        const svg = deps.svg(ts[i]!, sizeText(i));
-        if (!svg) throw new Error("this cannot be made as SVG");
-        out.push({ name: stem(i, "svg", false), blob: new Blob([svg], { type: "image/svg+xml" }), mime: "image/svg+xml" });
-        continue;
-      }
-      const z = sizeOf(i);
+    const made: Made[] = [];
+    /** One picture of target `i` at `k` times its size, encoded as `as`. */
+    const picture = async (i: number, k: number): Promise<{ blob: Blob; ext: string; mime: string }> => {
+      const z0 = sizeOf(i), z = k === 1 ? z0 : clampSize(z0.w * k, z0.h * k);
       const canvas = await deps.render(ts[i]!, z.w, z.h, bgFor(as));
-      const enc = await encodeShot(canvas, as, prefs.quality);
+      const enc = await encodeShot(canvas, as as ShotFormat, prefs.quality);
       // (the print resolution goes into the file: a 5 in picture says 5 in)
-      const blob = enc.format === "png" ? await pngWithDpi(enc.blob, prefs.dpi) : enc.format === "jpeg" ? await jpegWithDpi(enc.blob, prefs.dpi) : enc.format === "webp" ? await webpWithDpi(enc.blob, prefs.dpi) : enc.blob;
-      out.push({ name: stem(i, SHOT_FORMATS[enc.format].ext, true), blob, mime: SHOT_FORMATS[enc.format].mime });
+      const blob = enc.format === "png" ? await pngWithDpi(enc.blob, prefs.dpi * k) : enc.format === "jpeg" ? await jpegWithDpi(enc.blob, prefs.dpi * k) : enc.format === "webp" ? await webpWithDpi(enc.blob, prefs.dpi * k) : enc.blob;
+      return { blob, ext: SHOT_FORMATS[enc.format].ext, mime: SHOT_FORMATS[enc.format].mime };
+    };
+    const svgOf = (i: number): Blob => {
+      const svg = deps.svg(ts[i]!, sizeText(i));
+      if (!svg) throw new Error("this cannot be made as SVG");
+      return new Blob([svg], { type: "image/svg+xml" });
+    };
+    for (const i of list) {
+      const stem = names.get(i)!;
+      if (as === "svg") made.push({ name: `${stem}.svg`, blob: svgOf(i), mime: "image/svg+xml" });
+      else {
+        const one = await picture(i, 1);
+        made.push({ name: `${stem}.${one.ext}`, blob: one.blob, mime: one.mime });
+      }
+      // the extra versions of it: bigger copies, and its vectors as an SVG
+      for (const v of prefs.variants) {
+        if (v === "svg") {
+          if (as !== "svg" && ts[i]!.vectors) made.push({ name: variantName(stem, "svg", "svg"), blob: svgOf(i), mime: "image/svg+xml" });
+          continue;
+        }
+        if (as === "svg") continue;
+        const big = await picture(i, variantScale(v));
+        made.push({ name: variantName(stem, v, big.ext), blob: big.blob, mime: big.mime });
+      }
     }
-    return out;
+    const unique = uniqueNames(made.map((m) => m.name));
+    return made.map((m, k) => ({ ...m, name: unique[k]! }));
   };
   const size = (b: Blob): string => (b.size < 1024 * 1024 ? `${Math.max(1, Math.round(b.size / 1024))} KB` : `${(b.size / 1024 / 1024).toFixed(1)} MB`);
   const save = (blob: Blob, name: string): void => {
@@ -693,8 +979,8 @@ function openDialog(deps: ExportDeps, again = false): void {
             note.textContent = `Saved “${files[0]!.name}”: ${prefs.format === "svg" ? "vector" : prefs.format === "pdf" ? `${ts.length} page${ts.length === 1 ? "" : "s"}` : `${s.w} × ${s.h} px`}, ${size(files[0]!.blob)}.`;
           } else {
             const zip = await writeZip(files.map((f) => ({ name: f.name, data: f.blob })));
-            save(zip, `${base()}.zip`);
-            note.textContent = `Saved “${base()}.zip”: ${plural(files.length, "picture")}, ${size(zip)}.`;
+            save(zip, `${packName()}.zip`);
+            note.textContent = `Saved “${packName()}.zip”: ${plural(files.length, "file")}, ${size(zip)}.`;
           }
         } else {
           for (const f of files) await deps.toLibrary(new File([f.blob], f.name, { type: f.mime }), ts);
@@ -703,7 +989,7 @@ function openDialog(deps: ExportDeps, again = false): void {
       }
       if (what !== "copy") prefs.action = what;
       savePrefs(prefs);
-      keepLast(key, { ...prefs, widthPx, ...(nameTouched ? { name: nameIn.value } : {}) });
+      keepLast(key, { ...prefs, widthPx, ...(packTouched ? { name: packIn.value } : {}) });
     } catch (err) {
       note.textContent = `Could not export: ${(err as Error).message}`;
     } finally {
@@ -741,7 +1027,7 @@ function openDialog(deps: ExportDeps, again = false): void {
       void run("copy");
     }
   });
-  if (last?.name) nameIn.value = last.name;
+  if (last?.name) packIn.value = last.name;
   refresh();
   if (again) {
     // Export again: as last time, with no dialog to see; what happened is said as a notice.

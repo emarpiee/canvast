@@ -94,7 +94,7 @@ export const SHOTS: Record<string, ShotSpec> = {
   "take-over": { section: "#several-tabs", use: "A second tab on the same workspace follows the first and can take over.", alt: "A second tab on the same canvas, read-only, offering Take over" },
   // Exporting and sharing
   "export": { section: "#export", use: "Export a comic page at print size, as PNG, WebP, JPEG or PDF.", alt: "The Export dialog for a page of four prints: its preview, the size presets in pixels and inches at 300 ppi, the formats and the background" },
-  "export-each": { section: "#export", use: "Export several pictures at once, each as its own file or page.", alt: "Export with four prints selected: each one's small preview as a page of its own" },
+  "export-each": { section: "#export", use: "Export several pictures at once: leave some out, name the files by a pattern, and add a 2× copy of each.", alt: "Export with four prints selected: three ticked and one left out (faded), the file names made from the pattern {n}-{name} listed under it with their @2x copies, and the Output choice of separate files, PDF pages or one picture" },
 
   // PDFs, 3D models and backups
   "pdf-view": { section: "#pdfs-and-3d-models", use: "Read a study handout beside your pictures, without another app.", alt: "A PDF handout, Reading a woodblock print, open in the Library's PDF view: its first page, the page box, and its thumbnails" },

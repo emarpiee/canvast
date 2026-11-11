@@ -5,6 +5,8 @@
 import type { Background } from "./export-render";
 import type { ShotFormat } from "./screenshot";
 import { DPIS, MAX_SIDE, UNITS } from "./export-size";
+import { cleanNamePattern, cleanSizeRule, cleanVariants } from "./export-names";
+import type { SizeRule, Variant } from "./export-names";
 import type { Unit } from "./export-size";
 
 export type Format = ShotFormat | "svg" | "pdf";
@@ -21,8 +23,14 @@ export interface Prefs {
   padUnit: PadUnit;
   /** What Enter and Export again do. */
   action: Action;
+  /** The files' names: a pattern of words and tokens ({name}, {n} …); empty: the default. */
+  pattern: string;
+  /** How several things are sized: the same width, height, longest side, or a scale of their size on the canvas. */
+  sizeRule: SizeRule;
+  /** Extra versions of each file (2×, 3×, SVG). */
+  variants: Variant[];
 }
-export const DEFAULTS: Prefs = { unit: "px", dpi: 300, format: "png", quality: 92, bg: "transparent", pad: 0, padUnit: "px", action: "download" };
+export const DEFAULTS: Prefs = { unit: "px", dpi: 300, format: "png", quality: 92, bg: "transparent", pad: 0, padUnit: "px", action: "download", pattern: "", sizeRule: "width", variants: [] };
 export const HEX = /^#[0-9a-f]{6}$/i;
 export const cleanBg = (v: unknown): Background => (v === "white" || v === "black" || v === "transparent" ? v : typeof v === "string" && HEX.test(v) ? (v.toLowerCase() as Background) : DEFAULTS.bg);
 
@@ -38,6 +46,9 @@ export function loadPrefsFrom(raw: Partial<Record<keyof Prefs, unknown>>): Prefs
       pad: Math.min(1000, Math.max(0, Number(raw.pad) || 0)),
       padUnit: raw.padUnit === "%" ? "%" : "px",
       action: raw.action === "copy" || raw.action === "library" ? raw.action : "download",
+      pattern: cleanNamePattern(raw.pattern)?.pattern ?? "",
+      sizeRule: cleanSizeRule(raw.sizeRule),
+      variants: cleanVariants(raw.variants),
     };
   }
 }
@@ -52,6 +63,10 @@ export interface ExportPreset {
   readonly pad: number;
   readonly padUnit: PadUnit;
   readonly size: { readonly w: number } | { readonly k: number } | null;
+  /** The name pattern and how several things are sized and multiplied (absent in presets saved before them). */
+  readonly pattern?: string;
+  readonly sizeRule?: SizeRule;
+  readonly variants?: readonly Variant[];
 }
 /** An export preset from stored data, or null. */
 export function cleanExportPreset(d: unknown): ExportPreset | null {
@@ -60,8 +75,8 @@ export function cleanExportPreset(d: unknown): ExportPreset | null {
   const p = loadPrefsFrom(r);
   const z = r.size as { w?: unknown; k?: unknown } | null | undefined;
   const size = z && Number(z.k) > 0 && Number(z.k) <= 16 ? { k: Number(z.k) } : z && Number(z.w) >= 1 && Number(z.w) <= MAX_SIDE ? { w: Math.round(Number(z.w)) } : null;
-  return { format: p.format, quality: p.quality, bg: p.bg, unit: p.unit, dpi: p.dpi, pad: p.pad, padUnit: p.padUnit, size };
+  return { format: p.format, quality: p.quality, bg: p.bg, unit: p.unit, dpi: p.dpi, pad: p.pad, padUnit: p.padUnit, size, ...(p.pattern ? { pattern: p.pattern } : {}), ...(p.sizeRule !== "width" ? { sizeRule: p.sizeRule } : {}), ...(p.variants.length ? { variants: p.variants } : {}) };
 }
 /** One line about a preset. */
 export const exportPresetSummary = (p: ExportPreset): string =>
-  [p.format.toUpperCase(), p.size ? ("k" in p.size ? `${p.size.k}× on screen` : `${p.size.w} px wide`) : "", p.pad ? `padding ${p.pad} ${p.padUnit}` : "", p.bg === "transparent" ? "" : p.bg].filter(Boolean).join(" · ");
+  [p.format.toUpperCase(), p.size ? ("k" in p.size ? `${p.size.k}× on screen` : `${p.size.w} px wide`) : "", p.pad ? `padding ${p.pad} ${p.padUnit}` : "", p.bg === "transparent" ? "" : p.bg, p.variants?.length ? `+ ${p.variants.map((v) => (v === "svg" ? "SVG" : `@${v}`)).join(" ")}` : "", p.pattern ? p.pattern : ""].filter(Boolean).join(" · ");

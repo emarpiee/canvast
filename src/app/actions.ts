@@ -2091,7 +2091,7 @@ export function buildTarget(doc: DocumentStore, sel: readonly CanvasObject[], sh
   const only = sel.length === 1 ? sel[0]! : null;
   const original = only && only.kind === "image" && !only.crop ? { w: only.pixelW, h: only.pixelH } : null;
   const name = sheet?.name ?? selectionName(doc, sel);
-  return { kind: sheet ? "sheet" : "selection", name, frame, min, max, ids, ratio: lw / lh, vectors, original };
+  return { kind: sheet ? "sheet" : "selection", name, frame, min, max, ids, ratio: lw / lh, vectors, original, world: { w: lw, h: lh } };
 }
 
 /** The first words of a text (its Markdown marks left out), for a name. */
@@ -2115,7 +2115,9 @@ function selectionName(doc: DocumentStore, sel: readonly CanvasObject[]): string
     if (o.kind === "text") return firstWords(o.md) || "text";
     const words = sel.find((w): w is TextObject => w.kind === "text" && parentOf(w) === o.id);
     if (words && firstWords(words.md)) return firstWords(words.md);
-    return o.kind === "image" ? "picture" : o.kind === "path" ? (o.shape === "balloon" ? "balloon" : "shape") : "drawing";
+    // (what it is, in words a file name can say: a rectangle, a star, a speech balloon …)
+    const SHAPES: Record<string, string> = { rect: "rectangle", ellipse: "ellipse", line: "line", polygon: "polygon", star: "star", balloon: "speech balloon" };
+    return o.kind === "image" ? "picture" : o.kind === "path" ? (o.container ? "sheet" : (o.shape && SHAPES[o.shape]) || "path") : "drawing";
   };
   const first = units[0] ?? sel[0];
   if (!first) return "selection";

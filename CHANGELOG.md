@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.56.33 — Export: choose what goes, name the files, size them by a rule (2026-11-11)
+
+- **Added:** a tick on each item of an export of several: untick one to leave it out without leaving the dialog, or use *All* and *None*; `Space` ticks or unticks the item in focus, `Delete` leaves it out. What is left out fades and loses its number; sizes, names and files follow what is ticked.
+- **Added:** file names by a pattern of words and tokens: `{name}`, `{n}` (01, 02 …), `{w}`, `{h}`, `{canvas}`, `{date}`, `{format}`, with the files it makes listed before you export (two alike get `-2`); click an item's name to give it its own. The ZIP or PDF of several has a name of its own.
+- **Added:** name formats: built-in patterns and your own, saved from the dialog as a new kind of style (*Name formats* in the Styles panel), so they go with the workspace's backups.
+- **Added:** *Size of each* for several items: the same width, the same height, the same longest side, or a scale of each one's size on the canvas (1× to 4×).
+- **Added:** *Also*: extra versions of each file, `@2x` and `@3x` copies, and an SVG beside each picture that is vectors.
+- **Added:** Settings > Saving to the library: the name pattern and the size rule a new export starts with.
+- **Changed:** how several items leave is one choice, *Output*: separate files (a ZIP), PDF pages, or one picture (it replaces the *Each on its own* and *All as one picture* buttons). Export presets keep the name pattern, the size rule and the extra versions too.
+- **Changed:** a file's name starts from the item's name (the pattern `{name}`), no longer with its size added; a shape is named for what it is (a rectangle, a star, a speech balloon) rather than "shape".
+
 ## 0.56.32 — Hiding a placed item no longer trips the canvas's save (2026-11-11)
 
 - **Fixed:** hiding a library item placed on the open canvas (and, at each start, an item hidden earlier) made that canvas's next save fail with "changed elsewhere": taking the item's file name off every canvas also rewrote the open one in storage behind its back. The open canvas now takes the name off in memory and saves it itself; storage changes only the other canvases, as renaming a tag or deleting everywhere already did.

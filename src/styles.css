@@ -2996,6 +2996,18 @@ dialog.export-dlg.is-busy .ex-foot button { opacity: 0.6; pointer-events: none; 
 .ex-move:hover:not(:disabled) { color: var(--hud-fg); background: var(--hud-hover); }
 .ex-move:disabled { opacity: 0.3; cursor: default; }
 .ex-minis { max-height: calc(var(--sp-15) * 5); overflow-y: auto; padding: var(--s-4); }
+/* What goes: a tick on each picture (left out: faded, numbered with a dash), All and None above them, and each one's name, which a click makes a field. */
+.ex-pick { display: flex; align-items: center; justify-content: center; gap: var(--s-4); color: var(--hud-muted); font: var(--font-meta); }
+.ex-tick { position: absolute; top: calc(-1 * var(--s-2)); right: calc(-1 * var(--s-2)); }
+.ex-mini.is-out .ex-frame { opacity: var(--mark-opacity); }
+.ex-caption { min-width: 0; overflow: hidden; padding: 0; color: inherit; font: inherit; text-overflow: ellipsis; white-space: nowrap; background: transparent; border: 0; cursor: text; }
+.ex-caption:hover { color: var(--hud-fg); }
+.ex-caption-edit { min-width: 0; width: 100%; font: var(--font-meta); }
+/* The name: a pattern of words and tokens, the tokens to insert, and the files it makes. */
+.ex-namerow { align-items: center; }
+.ex-namerow .ex-name { flex: 1; min-width: 0; }
+.ex-tokens { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.ex-names { margin: 0; color: var(--hud-muted); font: var(--font-meta); overflow-wrap: anywhere; }
 /* Several sheets: the dialog takes the height of the window and the pictures take the room of the left half, scrolling when there are more. */
 dialog.export-dlg.is-multi[open] { display: flex; flex-direction: column; height: calc(100dvh - 2 * var(--edge)); width: min(var(--dlg-3xl), calc(100vw - 2 * var(--edge))); }
 .is-multi .ex-body { flex: 1; min-height: 0; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: stretch; }

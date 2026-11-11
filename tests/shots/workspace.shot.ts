@@ -230,6 +230,10 @@ test("export-each", async ({ scene: s }) => {
   await s.settle(600);
   if (await s.p.getByTestId("export-each").isVisible()) await s.p.getByTestId("export-each").click();
   await s.p.locator("[data-mini]").nth(1).waitFor();
+  // (one print left out, the files named by a pattern, and a 2× copy of each for screens that need it)
+  await s.p.locator('[data-mini="3"] [data-tick]').uncheck();
+  await s.p.locator('[data-ex="name"]').fill("{n}-{name}");
+  await s.p.locator('[data-variant="2x"]').click();
   await s.settle(1000);
   await s.shot("export-each");
 });

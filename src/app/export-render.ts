@@ -39,6 +39,8 @@ export interface ExportTarget {
   readonly vectors: readonly PathObject[] | null;
   /** One picture, whole: the pixels it has. */
   readonly original: { readonly w: number; readonly h: number } | null;
+  /** Its size on the canvas, in canvas units (what 1× is for a scale). */
+  readonly world?: { readonly w: number; readonly h: number };
 }
 
 /** Transparent, white, black, or any colour as `#rrggbb`. */
@@ -57,7 +59,7 @@ export function paddedTarget(t: ExportTarget, frac: number): ExportTarget {
   const long = D.cmp(w, h) >= 0 ? w : h;
   const room = D.mul(long, D.fromNumber(frac));
   const lw = 1 + 2 * frac * Math.max(t.ratio, 1) / t.ratio, lh = 1 + 2 * frac * Math.max(t.ratio, 1);
-  return { ...t, min: { x: D.sub(t.min.x, room), y: D.sub(t.min.y, room) }, max: { x: D.add(t.max.x, room), y: D.add(t.max.y, room) }, ratio: (t.ratio * lw) / lh, original: null };
+  return { ...t, min: { x: D.sub(t.min.x, room), y: D.sub(t.min.y, room) }, max: { x: D.add(t.max.x, room), y: D.add(t.max.y, room) }, ratio: (t.ratio * lw) / lh, original: null, ...(t.world ? { world: { w: t.world.w + 2 * frac * Math.max(t.world.w, t.world.h), h: t.world.h + 2 * frac * Math.max(t.world.w, t.world.h) } } : {}) };
 }
 
 export interface RenderDeps {
