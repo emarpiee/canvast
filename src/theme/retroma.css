@@ -444,10 +444,12 @@
   & .side-n { font-family: var(--rt-font-mono); font-size: var(--text-xs); }
 }
 :root[data-look="retroma"] :is(.tree-row, .side-row):has(> .side-item.is-active) { --hud-accent-fg: var(--rt-fg-on-on-app); --hud-fg: var(--rt-fg-on-on-app); --hud-muted: var(--rt-fg-on-on-app); }
-/* Library items (Retroma › Basics): Cards (v4, below) or Pictures: Legacy's tiles, the sheet shadow under each, the accent as their ring
+/* Library items (Retroma › Basics): Cards (v4, below) or Pictures: Legacy's tiles with the cards' shadow (raised, sunk when held or selected), the accent as their ring
    under the pointer and when selected */
-:root[data-look="retroma"][data-rt-part-lib-items="pictures"] #assets-view .assets-body:not(.is-list) .asset-card { box-shadow: var(--rt-lift-sheet); }
-:root[data-look="retroma"][data-rt-part-lib-items="pictures"] #assets-view .assets-body:not(.is-list) .asset-card:hover::after { box-shadow: inset 0 0 0 2px var(--rt-accent); }
+/* (the key's light is drawn inside its edge, so a picture filling the tile would cover it: it is drawn over the picture, with the rings) */
+:root[data-look="retroma"][data-rt-part-lib-items="pictures"] #assets-view .assets-body:not(.is-list) .asset-card::after { box-shadow: var(--rt-raise); transition: box-shadow var(--rt-press-ms); }
+:root[data-look="retroma"][data-rt-part-lib-items="pictures"] #assets-view .assets-body:not(.is-list) .asset-card:hover::after { box-shadow: var(--rt-raise), inset 0 0 0 2px var(--rt-accent); }
+:root[data-look="retroma"][data-rt-part-lib-items="pictures"] #assets-view .assets-body:not(.is-list) .asset-card:active::after, :root[data-look="retroma"][data-rt-part-lib-items="pictures"] #assets-view .assets-body:not(.is-list) .asset-card[aria-pressed="true"]::after { box-shadow: var(--rt-sink), inset 0 0 0 3px var(--rt-accent); }
 /* (written flat, each rule ending in a class: a card is made and dropped as the Library scrolls, and a rule ending in nesting or :is()
    is checked on every element) */
 :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card {
