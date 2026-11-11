@@ -283,10 +283,11 @@
 }
 :root[data-look="retroma"] #assets-view .col-grip { margin-inline: 0; }
 /* the Library's two side columns (the sidebar and the details) are one look: the pane's colour, the same room, a rule on the side towards the items */
-:root[data-look="retroma"] #assets-view .assets-side, :root[data-look="retroma"] #assets-view .asset-inspector { padding: var(--s-6); background: var(--rt-frame); border: 0; border-radius: 0; --hud-fg: var(--rt-fg-on-frame-app); --hud-muted: var(--rt-muted-on-frame-app); color: var(--hud-fg); } /* (the frame's colour, what is on it held to 4.5:1; the boxes in them keep their own colours) */
+:root[data-look="retroma"] #assets-view .side-views, :root[data-look="retroma"] #assets-view .side-sec, :root[data-look="retroma"] #assets-view .asset-sec { padding: var(--s-6); } /* (every card of the Library's columns: one room inside, by Density) */
+:root[data-look="retroma"] #assets-view .assets-side, :root[data-look="retroma"] #assets-view .asset-inspector { scrollbar-gutter: stable both-edges; padding: var(--s-6) calc(var(--s-6) - var(--scroll-size, 0px)); background: var(--rt-frame); border: 0; border-radius: 0; --hud-fg: var(--rt-fg-on-frame-app); --hud-muted: var(--rt-muted-on-frame-app); color: var(--hud-fg); } /* (the frame's colour, what is on it held to 4.5:1; the boxes in them keep their own colours) */
 :root[data-look="retroma"] #assets-view .assets-side { border-right: var(--rt-outline) solid var(--rt-rule); }
 :root[data-look="retroma"] #assets-view .asset-inspector { border-left: var(--rt-outline) solid var(--rt-rule); }
-:root[data-look="retroma"] #assets-view .assets-body:not(.has-side-w) > .assets-side { flex-basis: var(--rt-side-w); }
+:root[data-look="retroma"] #assets-view .assets-body:not(.has-side-w) > .assets-side { flex-basis: calc(var(--rt-side-w) + 2 * var(--s-6)); } /* (v4's width for the rows, plus the cards' room on each side) */
 :root[data-look="retroma"] #assets-view .assets-main { background: var(--rt-paper); }
 :root[data-look="retroma"] #assets-view .assets-scroll { padding: var(--s-6); }
 :root[data-look="retroma"] #assets-view .asset-insp-head h2 { font-weight: 700; }
