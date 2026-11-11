@@ -78,7 +78,7 @@ const BASE = {
   motion: "system", rot1: 330, rot2: 30, cFocus: "", focusW: 3, focusStyle: "solid", inputStyle: "well", cSuccess: "", cWarning: "", cError: "",
   cornerPane: "", cornerContent: "", cornerHdr: "", cornerMenu: "", cornerFolder: "", cornerCallout: "", cornerCode: "", cornerBq: "", cornerCard: "", cornerProps: "",
   ringIStyle: "solid", paneSh: 4, simplePanes: false, tabOlStyle: "solid", tabAngle: -1, tabHl: 0,
-  cCardBg: "", cCardOl: "", cCardOlHover: "", cCardCover: "", cardR: -1, cardOl: -1, cardOlStyle: "solid",
+  cCardBg: "", cCardOl: "", cCardOlHover: "", cCardCover: "", cardR: -1, cardOl: -1, cardOlStyle: "solid", libItems: "cards",
   cLvHdr: "", lvHdrW: 700, cLvHover: "", lvRowH: 34, cLvActive: "", fileR: 6, fileFont: "inherit", fileOlStyle: "solid", fileWrap: "nowrap",
   folderStyle: "fill", fi: 1, fc: { 1: "", 2: "", 3: "", 4: "", 5: "", 6: "", 7: "", 8: "", 9: "", 10: "", 11: "", 12: "", 13: "", 14: "", 15: "" }, cFolderBg: "", cFolderBgOpen: "", cFolderText: "", cFolderTextOpen: "", cFolderHdr: "", simpleFolderHdr: false, simpleFolderContent: false,
   cMatch: "", cResHdr: "", cResBody: "", previewW: 300, previewH: 130,
@@ -431,6 +431,6 @@ function lighting(T) {
   });
   const callouts = Object.fromEntries(Object.entries(T.co).map(([k, c]) => [k, css(c as Any)]));
   const checkboxes = Object.fromEntries(Object.entries(T.acbs).map(([k, c]) => [k, css(c as Any)]));
-  const parts = { ringIStyle: S.ringIStyle, simpleEdBox: S.simpleEdBox, simpleFolderHdr: S.simpleFolderHdr, grid: S.grid, pattern: S.pattern, controlsAt: S.controlsAt, navAt: S.navAt, pinTop: S.pinTop, pinTitle: S.pinTitle, pinStatus: S.pinStatus, pinLeft: S.pinLeft, pinRight: S.pinRight, greyAll: S.greyAll, simpleHdr: S.simpleHdr, simpleEdHdr: S.simpleEdHdr, hash: S.hash, folderIcon: S.folderIcon };
+  const parts = { libItems: S.libItems ?? "cards", ringIStyle: S.ringIStyle, simpleEdBox: S.simpleEdBox, simpleFolderHdr: S.simpleFolderHdr, grid: S.grid, pattern: S.pattern, controlsAt: S.controlsAt, navAt: S.navAt, pinTop: S.pinTop, pinTitle: S.pinTitle, pinStatus: S.pinStatus, pinLeft: S.pinLeft, pinRight: S.pinRight, greyAll: S.greyAll, simpleHdr: S.simpleHdr, simpleEdHdr: S.simpleEdHdr, hash: S.hash, folderIcon: S.folderIcon };
   return { vars: out, data, folders, callouts, checkboxes, parts };
 }

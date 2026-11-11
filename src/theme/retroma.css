@@ -55,40 +55,41 @@
   --rt-pane-in: calc(var(--s-6) + var(--s-1));
 }
 /* Which buttons are keys: any button of a bar, a panel's head or foot, a dialog's or a setting's actions, and the app's own key classes.
-   (expanded by scripts/lib/custom-selectors.mjs into one plain selector per item, each filed under `button`) */
-@custom-selector :--key .rail button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .dock button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .toolbar button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .ctx-bar button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .hud-controls button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .tb-options-row button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .adj-layers button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .view-settings button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .view-switch button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .seg button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .confirm-actions button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .storage-actions button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .action-row button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .set-tabs button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .rail-fly button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .side-head button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .asset-quick button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .asset-actions button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .panel-head button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .panel-foot button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .layers-tools button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .set-control button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .ex-foot button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  .ex-head button:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  button.assets-btn:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  button.set-reset:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  button.set-done:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  button.rt-open:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  button.set-link:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  button.nav-crumb:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  button.vbtn:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  button.pg-auto:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch),
-  button.pg-current:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch);
+   (expanded by scripts/lib/custom-selectors.mjs into one plain selector per item, each filed under `button`; what it leaves out is in
+   :where(), so a key's own rule weighs a class and a button and a key placed by its own rule, as the viewer's buttons, keeps its place) */
+@custom-selector :--key .rail button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .dock button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .toolbar button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .ctx-bar button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .hud-controls button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .tb-options-row button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .adj-layers button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .view-settings button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .view-switch button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .seg button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .confirm-actions button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .storage-actions button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .action-row button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .set-tabs button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .rail-fly button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .side-head button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .asset-quick button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .asset-actions button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .panel-head button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .panel-foot button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .layers-tools button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .set-control button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .ex-foot button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  .ex-head button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  button.assets-btn:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  button.set-reset:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  button.set-done:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  button.rt-open:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  button.set-link:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  button.nav-crumb:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  button.vbtn:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  button.pg-auto:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch)),
+  button.pg-current:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, .colour-swatch));
 /* Which buttons are keys: the list is written once per rule that needs it (the key and its face), always ending in `button`, so the browser
    checks it on buttons only (a selector list or nesting at the end of a rule is checked on every element, which made the Library's scroll lag).
    A key's states are plain `button` rules that only set the key's own variables: a button that is not a key does not read them. */
@@ -122,10 +123,9 @@
   --surf: var(--rt-btn-on); --k-sh: var(--rt-sink); --k-fg: var(--rt-icon-on);
   --k-cx: var(--rt-cx-a); --k-cy: var(--rt-cy-a); --k-px: var(--rt-press-x); --k-py: var(--rt-press-y);
 }
-/* (the class twice: as heavy as a key's own rule, which carries one class more for the buttons it leaves out, so these come out on top by order) */
-:root[data-look="retroma"] button.is-primary.is-primary { --surf: var(--rt-accent); --k-fg: var(--rt-on-accent); }
-:root[data-look="retroma"] button.is-primary.is-primary:hover:not(:disabled) { --surf: var(--rt-accent-hover); }
-:root[data-look="retroma"] button.is-danger.is-danger { --k-fg: var(--rt-danger); }
+:root[data-look="retroma"] button.is-primary { --surf: var(--rt-accent); --k-fg: var(--rt-on-accent); }
+:root[data-look="retroma"] button.is-primary:hover:not(:disabled) { --surf: var(--rt-accent-hover); }
+:root[data-look="retroma"] button.is-danger { --k-fg: var(--rt-danger); }
 /* (a key's face needs a positioned key; given with no weight, so a key placed by its own rule, as the viewer's buttons, stays where it is) */
 :where(:root[data-look="retroma"]) :--key { position: relative; }
 /* a key with words: the demo's room on each side, its icon and words 7px apart */
@@ -403,9 +403,13 @@
   & .side-n { font-family: var(--rt-font-mono); font-size: var(--text-xs); }
 }
 :root[data-look="retroma"] :is(.tree-row, .side-row):has(> .side-item.is-active) { --hud-accent-fg: var(--rt-fg-on-on-app); --hud-fg: var(--rt-fg-on-on-app); --hud-muted: var(--rt-fg-on-on-app); }
+/* Library items (Retroma › Basics): Cards (v4, below) or Pictures: Legacy's tiles, the sheet shadow under each, the accent as their ring
+   under the pointer and when selected */
+:root[data-look="retroma"][data-rt-part-lib-items="pictures"] #assets-view .assets-body:not(.is-list) .asset-card { box-shadow: var(--rt-lift-sheet); }
+:root[data-look="retroma"][data-rt-part-lib-items="pictures"] #assets-view .assets-body:not(.is-list) .asset-card:hover::after { box-shadow: inset 0 0 0 2px var(--rt-accent); }
 /* (written flat, each rule ending in a class: a card is made and dropped as the Library scrolls, and a rule ending in nesting or :is()
    is checked on every element) */
-:root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card {
+:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card {
   padding: 0;
   color: var(--rt-fg);
   background: var(--rt-card-bg);
@@ -415,17 +419,17 @@
   box-shadow: var(--rt-raise);
   transition: transform var(--rt-press-ms), box-shadow var(--rt-press-ms);
 }
-:root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card .asset-thumb, :root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card .asset-info { transform: translate(var(--rt-cx), var(--rt-cy)); transition: transform var(--rt-press-ms); }
-:root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card .asset-thumb { inset: 6px 6px calc(var(--text-sm) * 1.4 + var(--text-xs) * 1.4 + 8px) 6px; box-sizing: border-box; border: 3px solid var(--rt-card-cover, var(--rt-mat)); outline: var(--rt-img-ol) solid var(--rt-img-ol-c); border-radius: min(var(--rt-img-r), max(0px, calc(var(--rt-card-r) - var(--rt-card-ol-w) - 6px))); overflow: hidden; }
-:root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card .asset-info { left: 6px; right: 6px; bottom: 4px; gap: 0; padding: 0; color: var(--rt-fg); background: none; opacity: 1; }
-:root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card .asset-name { font-size: var(--text-sm); font-weight: 700; }
-:root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card .asset-meta { font-size: var(--text-xs); color: var(--rt-fg-muted); }
-:root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card .asset-uses, :root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card .asset-tags { display: none; }
-:root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card::after { display: none; }
-:root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card:hover:not([aria-pressed="true"]) { border-color: var(--rt-card-ol-hover); box-shadow: var(--rt-raise); }
-:root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card[aria-pressed="true"], :root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card:active { background: var(--rt-btn-on); color: var(--rt-fg-on-on-app); box-shadow: var(--rt-sink), 0 0 0 3px var(--rt-select); transform: translate(var(--rt-press-x), var(--rt-press-y)); }
-:root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card[aria-pressed="true"] .asset-thumb, :root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card[aria-pressed="true"] .asset-info, :root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card:active .asset-thumb, :root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card:active .asset-info { transform: translate(var(--rt-cx-a), var(--rt-cy-a)); }
-:root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card[aria-pressed="true"] .asset-info, :root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card[aria-pressed="true"] .asset-meta, :root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card:active .asset-info, :root[data-look="retroma"] #assets-view .assets-body:not(.is-list) .asset-card:active .asset-meta { color: var(--rt-fg-on-on-app); }
+:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-thumb, :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-info { transform: translate(var(--rt-cx), var(--rt-cy)); transition: transform var(--rt-press-ms); }
+:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-thumb { inset: 6px 6px calc(var(--text-sm) * 1.4 + var(--text-xs) * 1.4 + 8px) 6px; box-sizing: border-box; border: 3px solid var(--rt-card-cover, var(--rt-mat)); outline: var(--rt-img-ol) solid var(--rt-img-ol-c); border-radius: min(var(--rt-img-r), max(0px, calc(var(--rt-card-r) - var(--rt-card-ol-w) - 6px))); overflow: hidden; }
+:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-info { left: 6px; right: 6px; bottom: 4px; gap: 0; padding: 0; color: var(--rt-fg); background: none; opacity: 1; }
+:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-name { font-size: var(--text-sm); font-weight: 700; }
+:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-meta { font-size: var(--text-xs); color: var(--rt-fg-muted); }
+:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-uses, :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-tags { display: none; }
+:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card::after { display: none; }
+:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card:hover:not([aria-pressed="true"]) { border-color: var(--rt-card-ol-hover); box-shadow: var(--rt-raise); }
+:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card[aria-pressed="true"], :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card:active { background: var(--rt-btn-on); color: var(--rt-fg-on-on-app); box-shadow: var(--rt-sink), 0 0 0 3px var(--rt-select); transform: translate(var(--rt-press-x), var(--rt-press-y)); }
+:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card[aria-pressed="true"] .asset-thumb, :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card[aria-pressed="true"] .asset-info, :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card:active .asset-thumb, :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card:active .asset-info { transform: translate(var(--rt-cx-a), var(--rt-cy-a)); }
+:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card[aria-pressed="true"] .asset-info, :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card[aria-pressed="true"] .asset-meta, :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card:active .asset-info, :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card:active .asset-meta { color: var(--rt-fg-on-on-app); }
 
 /* ---- 7. Filters (Retroma › Filters): CRT scanlines and vignette, text glow, pixel icons, greyscale ------------------------------ */
 :root[data-look="retroma"][data-rt-crt="on"] body::after {
