@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.4 — Concealed folders' setting on one line (2026-11-12)
+
+- **Fixed:** Settings > Privacy › Concealed folders said what it is on more than one short line.
+
 ## 0.57.3 — Conceal a folder (2026-11-12)
 
 - **Added:** **Conceal folder** in a library folder's ⋯ menu, a view filter: its items, and its subfolders', are listed only when that folder (or one in it) is opened, not in All items, a search, a file type, a tag, another folder, Similar images, the Library's and notes' pickers or a note's suggestions; nothing of the folder or its items changes. A fog mark on its row, **Reveal folder** to list them everywhere again, kept in the workspace; Settings > Privacy counts and lists the concealed folders.
