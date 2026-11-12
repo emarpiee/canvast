@@ -97,16 +97,18 @@ test("model-view", async ({ scene: s }) => {
   await s.shot("model-view");
 });
 
-/** The vase open in its 3D view, turned a little to be seen from above, in a line style; the Lines tab shown. */
-async function vaseInLines(s: Scene, style: string): Promise<void> {
+/** The vase open in its 3D view, in a line style (turned a little to be seen from above, unless asked not to); the Lines tab shown. */
+async function vaseInLines(s: Scene, style: string, turn = true): Promise<void> {
   await s.p.locator('[data-testid="asset-card"][title="vase_for_light_study.stl"]').dblclick();
   const stage = s.p.locator('[data-testid="model-stage"][data-drawn]');
   await stage.waitFor({ timeout: 60_000 });
-  const box = (await stage.boundingBox())!;
-  await s.p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await s.p.mouse.down();
-  await s.p.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 + 70, { steps: 8 });
-  await s.p.mouse.up();
+  if (turn) {
+    const box = (await stage.boundingBox())!;
+    await s.p.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await s.p.mouse.down();
+    await s.p.mouse.move(box.x + box.width / 2 + 40, box.y + box.height / 2 + 70, { steps: 8 });
+    await s.p.mouse.up();
+  }
   await s.p.getByTestId("view-styles").click();
   await s.p.getByRole("menuitem", { name: new RegExp(`^${style}`) }).click();
   await s.p.locator('[data-testid="model-stage"][data-inked="1"]').waitFor({ timeout: 60_000 });
@@ -135,9 +137,8 @@ test("model-narrow", async ({ scene: s }) => {
   await s.look({ theme: "light", hue: 178 });
   await files(s);
   await s.p.setViewportSize({ width: 390, height: 844 });
-  await vaseInLines(s, "Ink");
-  await s.p.getByTestId("view-more").click();
-  await expect(s.p.getByRole("menu", { name: "More of this view" })).toBeVisible();
+  await vaseInLines(s, "Ink", false);
+  await expect(s.p.getByTestId("view-more")).toBeVisible();
   await s.settle(400);
   await s.shot("model-narrow");
 });

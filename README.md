@@ -84,7 +84,7 @@ Collect drawings by different masters on one board to compare how each handles t
 | [**Reference boards**](#reference-boards) | Collect pictures, video and files on a canvas; crop, flip and adjust them without touching the files; lay them out on sheets by rules (auto layout); find what lies under what |
 | [**Drawing and vector editing**](#drawing-and-vector-editing) | Pressure pens, shapes, Bézier paths and node editing, boolean shapes, masks, gradients and pattern fills, 38 patterns and 55 composition guides, a colour picker for everything and saved styles, layers |
 | [**Comics and storyboards**](#comics-and-storyboards) | Pages and panels as sheets with real ratios, speech balloons with tails and connectors, rich text with your own fonts, pages exported to PDF |
-| [**The Library**](#the-library) | Every file once, in folders and tags, with a search that knows sizes, ratios, colours and dates, a viewer, previews of art files, PDFs and 3D models, similar images and safe deletion |
+| [**The Library**](#the-library) | Every file once, in folders and tags, with a search that knows sizes, ratios, colours and dates, a viewer, previews of art files, PDFs and 3D models (lit, or drawn as line art), similar images and safe deletion |
 | [**Notes**](#notes) | Markdown, text and rich text notes in a full editor, with `[[links]]`, backlinks, properties, templates, and cards on a canvas |
 | [**Exporting and sharing**](#exporting-and-sharing) | PNG, WebP, JPEG, SVG and PDF at any size; copy to other apps; share the workspace on your local network |
 | [**The endless canvas**](#the-endless-canvas) | No edge and no zoom limit; bookmarks, tours and camera travel between far places; exact positions at any depth |
@@ -1028,7 +1028,7 @@ Give a model the look of a blueprint or a comic in one choice, and keep your own
 
 Check a figure's pose on a phone: the model above, its settings below.
 
-![The 3D view on a phone: the vase in ink lines above, the Lines tab as a sheet under it, and the bar's other buttons in its ⋯ menu](docs/screenshots/model-narrow.webp)
+![The 3D view on a phone: the vase in ink lines above, the Lines tab as a sheet under it, and the bar's other buttons folded into its ⋯ button](docs/screenshots/model-narrow.webp)
 
 ### Art files
 
@@ -2385,7 +2385,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 
 | Area | Limitation |
 | --- | --- |
-| Rendering | Canvas 2D only, on the main thread; no GPU or WebGL path, no workers |
+| Rendering | The canvas is Canvas 2D only, on the main thread; no GPU or WebGL path, no workers (a 3D model draws with WebGL in its own view) |
 | Collaboration | Only looking: the desktop app shares a workspace read-only on the local network. Nobody can edit together; the single file never connects anywhere |
 
 ### The browser version
@@ -2483,6 +2483,7 @@ Rendering is CPU-first **Canvas 2D**.
 | Pictures at their shown size | A big picture (a photo, a long note's page) is drawn from a 512 px copy when it is small on the screen and from a 1024 px copy at a middle size; all its pixels are read only when it is shown big. Each copy is made once, then kept while memory allows. |
 | Deep zoom into any kind of object | Every kind has a sampler so its colour never disappears when the view is inside it. |
 | Text | Uses the browser's glyphs normally and the font's exact outlines past about 2,000 px per letter. |
+| 3D models | Drawn with WebGL (three.js) in their own view, not on the canvas, where a card shows a picture of a view. Their line art from the model's edges is worked out in a worker, a view at a time, and laid over the picture; the same drawing becomes placed paths and SVG files. |
 
 Measured on a CPU-only configuration with about 500 visible objects: 1.7 ms per frame (p50) with 10 thousand objects in the document, 2.2 ms with 100 thousand, 7.7–9.6 ms with one million.
 
@@ -2525,7 +2526,7 @@ src/
   scene/         multi-scale spatial index
   text/          font reading, Markdown model, layout
   interaction/   navigation, tools, snapping, pens, item stepping
-  assets/        content addressing, decoding, catalog, garbage collection
+  assets/        content addressing, decoding, catalog, garbage collection, 3D models and their line art
   storage/       IndexedDB, workspace repository, persistence, writer lease, ZIP, archives
   search/        boolean query parser and evaluator, canvas search keywords, recent and saved searches
   settings/      declared settings, scopes, rebindable shortcuts

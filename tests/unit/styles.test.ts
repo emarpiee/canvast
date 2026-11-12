@@ -12,7 +12,15 @@ const lib = () => {
 
 describe("styles (ADR 0120)", () => {
   it("has one registry: each kind says how to check, say and show its data", () => {
-    expect(STYLE_KINDS.map((k) => k.id)).toEqual(["adjustment", "gradient", "colour", "palette", "text", "pattern", "balloon", "ratio", "export", "exportname"]);
+    expect(STYLE_KINDS.map((k) => k.id)).toEqual(["adjustment", "gradient", "colour", "palette", "text", "pattern", "balloon", "lines3d", "ratio", "export", "exportname"]);
+    // A 3D line style keeps only what lines are, each sound: an unknown key goes, a number past its range is held to it.
+    const lines = kindById("lines3d")!.validate({ linesShow: "only", linesWidth: 99, toneMode: "hatch", bogus: 1 }) as Record<string, unknown>;
+    expect(lines["linesWidth"]).toBe(8);
+    expect(lines["toneMode"]).toBe("hatch");
+    expect(lines).not.toHaveProperty("bogus");
+    expect(lines).not.toHaveProperty("yaw");
+    expect(kindById("lines3d")!.validate("ink")).toBeNull();
+    expect(kindById("lines3d")!.summary(lines)).toBe("Lines only · hatching");
     expect(kindById("ratio")!.validate(16 / 9)).toBeCloseTo(16 / 9);
     expect(kindById("ratio")!.validate(0)).toBeNull();
     expect(kindById("ratio")!.summary(16 / 9)).toBe("16 : 9");
