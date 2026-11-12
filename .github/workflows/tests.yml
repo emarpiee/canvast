@@ -19,6 +19,19 @@ on:
         type: choice
         options: [quick, full]
         default: quick
+      spec:
+        description: "Only these tests, to chase a failure (tests/e2e/x.spec.ts, tests/e2e/x.spec.ts:123, several apart by spaces); empty: the suite"
+        type: string
+        default: ""
+      project:
+        description: "With a spec: the browser set-up it runs in"
+        type: choice
+        options: [chromium, chromium-cpu, chromium-dpr2, firefox]
+        default: chromium
+      repeat:
+        description: "With a spec: how many times it runs (a failure that comes now and then shows up)"
+        type: number
+        default: 10
 
 concurrency:
   group: tests-${{ github.ref }}-${{ github.event_name }}
@@ -31,7 +44,32 @@ env:
   FULL: ${{ github.event_name == 'schedule' || inputs.suite == 'full' }}
 
 jobs:
+  # One test, run many times with its trace kept, pass or fail: how a failure that only GitHub's machines show is looked at.
+  one:
+    if: ${{ inputs.spec != '' && inputs.spec != null }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    name: one test · ${{ inputs.project }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps ${{ inputs.project == 'firefox' && 'firefox' || 'chromium' }}
+      - name: Run the test
+        run: npm run test:snap -- --project=${{ inputs.project }} --repeat-each=${{ inputs.repeat }} --trace=on --retries=0 ${{ inputs.spec }}
+      - name: Keep the results and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-one-${{ inputs.project }}
+          path: test-builds/*/results
+          retention-days: 14
+
   plan:
+    if: ${{ inputs.spec == '' || inputs.spec == null }}
     runs-on: ubuntu-latest
     outputs:
       groups: ${{ steps.groups.outputs.groups }}
@@ -73,6 +111,7 @@ jobs:
           retention-days: 14
 
   desktop:
+    if: ${{ inputs.spec == '' || inputs.spec == null }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
