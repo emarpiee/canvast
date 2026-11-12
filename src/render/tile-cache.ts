@@ -130,6 +130,8 @@ export class TileCache {
   /** Tiles rendered since the page loaded (diagnostics and tests). */
   renderedTotal = 0;
   /** Why tile sets were thrown away and built again, counted (benchmarks and tests read them): a move that was not whole device pixels, a new zoom or frame. */
+  /** (trace) the cost of the set being built: its queries, its slices; reset when a set starts */
+  trace = { q: 0, slices: 0 };
   readonly restarts = { offset: 0, key: 0, lastOffset: null as null | { ax: number; ay: number }, why: {} as Record<string, number> };
   /** Cost of the last full tile-set build (about one exact frame of committed objects). */
   lastFullMs = 0;
@@ -293,7 +295,7 @@ export class TileCache {
       this.restarts.key++;
       {
         const dz = Math.abs(z - this.gen.z);
-        const w = `${dense ? `dense(${this.lastFullMs > this.denseMs ? `ms ${this.lastFullMs.toFixed(1)}>${this.denseMs}` : ""}${this.lastFullObjects > DENSE_OBJECTS ? ` obj ${this.lastFullObjects}` : ""})` : "light"} ${stable ? (refine ? "refine" : "stable") : "moving"} dz${dz > PREVIEW_MAX_LEVELS ? ">1" : "<=1"}${this.dirty.size ? " dirty" : ""}${this.gen.frameId !== frameId ? " frame" : ""}${this.gen.tiles.size ? "" : " empty"}`;
+        const w = `${dense ? `dense(${this.lastFullMs > this.denseMs ? `ms ${this.lastFullMs.toFixed(1)}>${this.denseMs}` : ""}${this.lastFullObjects > DENSE_OBJECTS ? ` obj ${this.lastFullObjects}` : ""})` : "light"} ${stable ? (refine ? "refine" : "stable") : "moving"} dz${dz > PREVIEW_MAX_LEVELS ? ">1" : "<=1"}${this.dirty.size ? " dirty" : ""}${this.gen.frameId !== frameId ? " frame" : ""}${this.gen.tiles.size ? "" : " empty"} | last set: query ${this.trace.q.toFixed(0)}ms in ${this.trace.slices} slices`;
         this.restarts.why[w] = (this.restarts.why[w] ?? 0) + 1;
       }
       // Beyond it, with nothing prepared: the old set stays as a backdrop while the new one is built a few tiles a frame.
@@ -306,6 +308,7 @@ export class TileCache {
       // scene build now (the zoom moved beyond the preview range).
       if (!stable && !dense) return null;
       this.gen = { key, z, center: cam.center, frameId, vp, tiles: new Map(), measuring: true, buildMs: 0 };
+      this.trace = { q: 0, slices: 0 };
     }
     let off = this.offset(this.gen, cam, vp, dpr);
     // A move that is not whole device pixels (a pointer between pixels: Wayland, scaled screens, touchpads, a glide): while the view moves,
@@ -328,6 +331,7 @@ export class TileCache {
       if (off && dense && !this.dirty.size && this.gen!.tiles.size) this.toBack();
       else this.clear();
       this.gen = { key, z, center: cam.center, frameId, vp, tiles: new Map(), measuring: true, buildMs: 0 };
+      this.trace = { q: 0, slices: 0 };
       off = { dx: 0, dy: 0, ax: 0, ay: 0, whole: true };
     }
     const g = this.gen!;
@@ -478,6 +482,8 @@ export class TileCache {
     const infl: Viewport = { width: vp.width + 2 * m, height: vp.height + 2 * m };
     const start = performance.now();
     const list = query(infl);
+    this.trace.q += performance.now() - start;
+    this.trace.slices++;
     let built = 0;
     for (const [i, j] of missing) {
       if (built && performance.now() - start > budgetMs) break;
