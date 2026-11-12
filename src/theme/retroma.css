@@ -301,15 +301,19 @@
   border: var(--rt-ring-o) transparent; border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-ring-o-b) var(--rt-ring-o-l);
   border-radius: var(--rt-r); corner-shape: var(--rt-corner-pane); box-shadow: var(--rt-ri-t), var(--rt-ri-l), var(--rt-ri-r), var(--rt-ri-b);
 }
-/* (the canvas fills the frame; the gap inside the frame stays as room, with no colour and no ring: the bars and the info bar keep to it) */
-:root[data-look="retroma"] body[data-view="canvas"] .hud-bottom { inset: auto var(--rt-pane-gap) var(--rt-pane-gap); }
+/* The canvas: it keeps the whole window, as in Legacy, so every bar on it (those placed from the window and those placed in the canvas)
+   reads one edge and one gap; the frame is drawn over it: the ring at Pane outer spacing, the frame's colour out to the window's edge.
+   The gap inside the frame stays as room, with no colour and no ring: the bars and the info bar keep to it. */
+:root[data-look="retroma"] body[data-view="canvas"] .hud-bottom { inset: auto var(--rt-frame-in) var(--rt-frame-in); }
+:root[data-look="retroma"] body[data-view="canvas"] .hud-bottom > .hud-controls { margin-inline: calc(var(--edge) - var(--rt-frame-in)); } /* (the strip is already in the frame: the controls keep the window's edge as every bar) */
 :root[data-look="retroma"] body[data-view="canvas"] .hud-bottom > .hud-readout:not(.assets-readout) { border-top: 2px solid var(--rt-info-edge); border-radius: var(--rt-r-in); corner-shape: var(--rt-corner-pane); } /* (Obsidian Retroma's status bar: a darker line on top) */
-:root[data-look="retroma"] body[data-view="canvas"] #canvas-host { /* (the canvas sits straight in the frame: no gap, no panel of its own) */
-  inset: var(--rt-pane-out); overflow: hidden;
+:root[data-look="retroma"] body[data-view="canvas"] #canvas-host { overflow: hidden; }
+:root[data-look="retroma"] body[data-view="canvas"] #canvas-host::after {
+  content: ""; position: absolute; inset: var(--rt-pane-out); z-index: var(--z-edge); pointer-events: none;
   border: var(--rt-ring-o) transparent; border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-ring-o-b) var(--rt-ring-o-l);
   border-radius: var(--rt-r); corner-shape: var(--rt-corner-pane);
+  box-shadow: 0 0 0 100vmax var(--rt-frame), var(--rt-ri-t), var(--rt-ri-l), var(--rt-ri-r), var(--rt-ri-b);
 }
-:root[data-look="retroma"] body[data-view="canvas"] #canvas-host::after { content: ""; position: absolute; inset: 0; z-index: var(--z-edge); pointer-events: none; box-shadow: var(--rt-ri-t), var(--rt-ri-l), var(--rt-ri-r), var(--rt-ri-b); border-radius: var(--rt-r-in); } /* (the canvas would cover the frame's inner ring, so it is drawn over it) */
 :root[data-look="retroma"] #assets-view .assets-bar {
   padding-block: var(--pad); padding-right: var(--s-6);
   background: var(--rt-frame); color: var(--rt-fg-on-frame-app); /* (the Library's top bar and status bar are the frame's colour) */
