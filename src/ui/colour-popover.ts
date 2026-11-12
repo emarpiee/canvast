@@ -865,6 +865,22 @@ export interface AdjustOptions {
 const DEFAULT_MAP: readonly GradientStop[] = [{ o: 0, c: "#1e1b4b" }, { o: 1, c: "#f59e0b" }];
 
 /** Fill `host` (the body of the Adjust panel) with the adjustment controls for the picked pictures (ADR 0118; a dock panel, ADR 0123). Call again to show other pictures. */
+/** Which adjustments have their advanced controls open (ADR 0190), remembered on this device. */
+const ADV_KEY = "canvast.adjust.open";
+const advOpen: Set<string> = (() => {
+  try {
+    const v = JSON.parse(localStorage.getItem(ADV_KEY) ?? "[]") as unknown;
+    return new Set(Array.isArray(v) ? v.filter((x): x is string => typeof x === "string").slice(0, 20) : []);
+  } catch {
+    return new Set<string>();
+  }
+})();
+const saveAdvOpen = (): void => {
+  try {
+    localStorage.setItem(ADV_KEY, JSON.stringify([...advOpen]));
+  } catch { /* (no storage: open for this session only) */ }
+};
+
 export function buildAdjustPanel(host: HTMLElement, o: AdjustOptions): { current(): Adjust; reset(): void } {
   // The panel works on one layer of a stack at a time; changing layer builds it again for that layer.
   let inner: { current(): Adjust; reset(): void } = buildAdjustLayer(host, o, 0, (adjust, layer) => {
@@ -899,10 +915,17 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     syncResets();
     o.onChange(compose(cur), label);
   };
+  /** What each adjustment with advanced controls holds under its fold (ADR 0190): a choice first, then numbers. */
+  const ADVANCED: Partial<Record<AdjustKey, { keys: readonly AdjustKey[]; lead?: () => string }>> = {
+    blur: { keys: ["blurAngle", "blurOffset", "blurCenterX", "blurCenterY", "blurQuality"], lead: () => blurTypeRow() },
+    sharpen: { keys: ["sharpenRadius"] },
+    grain: { keys: ["grainSize", "grainColour"] },
+    pixelate: { keys: [], lead: () => pixelShapeRow() },
+  };
   const GROUPS: Array<[string, readonly AdjustKey[]]> = [
     ["Light", ["exposure", "contrast", "highlights", "shadows"]],
     ["Colour", ["temperature", "tint", "saturation", "vibrance", "red", "green", "blue"]],
-    ["Detail", ["blur", "blurAngle", "sharpen", "grain", "pixelate"]],
+    ["Detail", ["blur", "sharpen", "grain", "pixelate"]],
     ["Drop shadow", ["dropOpacity", "dropX", "dropY", "dropBlur", "dropSpread"]],
     ["Inner shadow", ["innerOpacity", "innerX", "innerY", "innerBlur", "innerSpread"]],
   ];
@@ -914,7 +937,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   };
   /** What each group holds, so its Reset can take it all off (a shadow's colour with it). */
   const GROUP_FIELDS: Record<string, readonly (keyof Adjust)[]> = {
-    ...Object.fromEntries(GROUPS.map(([name, keys]) => [name, [...keys, ...(SHADOW_COLOUR[name] ? [SHADOW_COLOUR[name]!] : []), ...(name === "Detail" ? (["blurType"] as const) : [])]])),
+    ...Object.fromEntries(GROUPS.map(([name, keys]) => [name, [...keys, ...keys.flatMap((k) => ADVANCED[k]?.keys ?? []), ...(SHADOW_COLOUR[name] ? [SHADOW_COLOUR[name]!] : []), ...(name === "Detail" ? (["blurType", "pixelShape"] as const) : [])]])),
     "Gradient map": ["map"],
     Levels: ["levels"],
     Curves: ["curves"],
@@ -925,11 +948,24 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   const syncResets = (): void => {
     for (const b of pop.querySelectorAll<HTMLButtonElement>("[data-group-reset]")) b.disabled = !groupChanged(b.dataset["groupReset"]!);
   };
+  /** The cells of pixelate: squares or round dots (ADR 0190). */
+  const pixelShapeRow = (): string =>
+    `<div class="adj-row"><label class="adj-label" for="adj-pixel-shape">Shape</label><select id="adj-pixel-shape" data-adj-pixel-shape aria-label="Pixelate shape"><option value=""${cur.pixelShape ? "" : " selected"}>Squares</option><option value="dots"${cur.pixelShape === "dots" ? " selected" : ""}>Dots</option></select></div>`;
   /** How a blur spreads (ADR 0189): soft, along a line, out from the middle, round it; the angle row only for a line. */
   const blurTypeRow = (): string =>
     `<div class="adj-row"><label class="adj-label" for="adj-blur-type">Type</label><select id="adj-blur-type" data-adj-blur-type aria-label="Blur type">${BLUR_TYPES.map(([v, l]) => `<option value="${v}"${(cur.blurType ?? "") === v ? " selected" : ""}>${l}</option>`).join("")}</select></div>`;
-  const row = (s: (typeof rows)[number]): string =>
-    `<div class="adj-row${cur[s.key] ? " is-changed" : ""}"${s.key === "blurAngle" && cur.blurType !== "motion" ? " hidden" : ""} data-adj-row="${s.key}"><label class="adj-label" for="adj-num-${s.key}" title="Double-click to reset ${s.label}">${s.label}</label><input type="range" id="adj-${s.key}" data-adj="${s.key}" min="${s.min}" max="${s.max}" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label}"><input type="number" class="adj-num" id="adj-num-${s.key}" data-adj-num="${s.key}" min="${s.min}" max="${s.max}" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label} (number)"></div>`;
+  /** Which advanced rows a blur of this type shows (ADR 0190). */
+  const advShown = (k: AdjustKey): boolean =>
+    k === "blurAngle" || k === "blurOffset" ? cur.blurType === "motion" : k === "blurCenterX" || k === "blurCenterY" ? cur.blurType === "zoom" || cur.blurType === "spin" : k === "blurQuality" ? !!cur.blurType : true;
+  /** An adjustment's advanced controls, folded under its row (open where they were left open, on this device). */
+  const advanced = (k: AdjustKey): string => {
+    const adv = ADVANCED[k];
+    if (!adv) return "";
+    const open = advOpen.has(k);
+    return `<div class="adj-adv" data-adv-of="${k}"${open ? "" : " hidden"}>${adv.lead?.() ?? ""}${adv.keys.map((a) => row(rows.find((r) => r.key === a)!, !advShown(a))).join("")}</div>`;
+  };
+  const row = (s: (typeof rows)[number], hide = false): string =>
+    `<div class="adj-row${cur[s.key] ? " is-changed" : ""}"${hide ? " hidden" : ""} data-adj-row="${s.key}">${ADVANCED[s.key] ? `<span class="adj-label adj-fold"><button type="button" class="adj-more" data-adj-more="${s.key}" aria-expanded="${advOpen.has(s.key)}" aria-label="More ${s.label.toLowerCase()} settings" title="More ${s.label.toLowerCase()} settings">${ICONS.chevronDown}</button><label for="adj-num-${s.key}" title="Double-click to reset ${s.label}">${s.label}</label></span>` : `<label class="adj-label" for="adj-num-${s.key}" title="Double-click to reset ${s.label}">${s.label}</label>`}<input type="range" id="adj-${s.key}" data-adj="${s.key}" min="${s.min}" max="${s.max}" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label}"><input type="number" class="adj-num" id="adj-num-${s.key}" data-adj-num="${s.key}" min="${s.min}" max="${s.max}" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label} (number)"></div>`;
   let saved = o.styles.gradients();
   const sameStops = (a: readonly GradientStop[], b: readonly GradientStop[]): boolean => JSON.stringify(a) === JSON.stringify(b);
   const mapIndex = (): string => (!cur.map ? "" : String(saved.findIndex((g) => sameStops(g.stops, cur.map!.stops)))).replace("-1", "keep");
@@ -944,7 +980,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   pop.innerHTML =
     layerTabs +
     `<header class="adj-head"><span class="adj-note">${o.count > 1 ? `Shows the first of ${o.count} pictures; applies to all.` : "The file is not changed."}</span></header>` +
-    GROUPS.map(([name, keys]) => `<section class="adj-group" aria-label="${name}">${head(name)}${keys.map((k) => row(rows.find((r) => r.key === k)!) + (k === "blur" ? blurTypeRow() : "")).join("")}${colourRow(name)}</section>`).join("") +
+    GROUPS.map(([name, keys]) => `<section class="adj-group" aria-label="${name}">${head(name)}${keys.map((k) => row(rows.find((r) => r.key === k)!) + advanced(k)).join("")}${colourRow(name)}</section>`).join("") +
     mapSection() +
     levelsSection +
     curvesSection +
@@ -1083,9 +1119,16 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
     if (t.hasAttribute("data-adj-blur-type")) {
       const { blurType: _t, ...rest } = cur;
       cur = t.value ? { ...rest, blurType: t.value as BlurType } : rest;
-      pop.querySelector<HTMLElement>('[data-adj-row="blurAngle"]')!.hidden = cur.blurType !== "motion";
+      for (const k of ADVANCED.blur!.keys) pop.querySelector<HTMLElement>(`[data-adj-row="${k}"]`)!.hidden = !advShown(k);
       cancelPreview();
       emitChange("Blur type");
+      return;
+    }
+    if (t.hasAttribute("data-adj-pixel-shape")) {
+      const { pixelShape: _s, ...rest } = cur;
+      cur = t.value === "dots" ? { ...rest, pixelShape: "dots" } : rest;
+      cancelPreview();
+      emitChange("Pixelate shape");
       return;
     }
     if (t.dataset["adjColour"]) {
@@ -1101,6 +1144,17 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   const onClick = (e: Event): void => {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
     if (!b) return;
+    if (b.dataset["adjMore"]) {
+      // (an adjustment's advanced controls fold out and in; remembered on this device)
+      const k = b.dataset["adjMore"] as AdjustKey;
+      const open = !advOpen.has(k);
+      if (open) advOpen.add(k);
+      else advOpen.delete(k);
+      saveAdvOpen();
+      b.setAttribute("aria-expanded", String(open));
+      pop.querySelector<HTMLElement>(`[data-adv-of="${k}"]`)!.hidden = !open;
+      return;
+    }
     if (b.dataset["groupReset"]) {
       const name = b.dataset["groupReset"];
       const gone = new Set<string>(GROUP_FIELDS[name]!);

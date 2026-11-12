@@ -113,8 +113,8 @@ export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject,
     if (!adjustInto(c, draw, a, refDev)) return body(ctx);
     out = c;
   }
-  if (typed && "filter" in ctx) out = typedBlur(out, typed, (maxBlur(a) / 100) * 0.02 * refDev, a.blurAngle ?? 0);
-  if (colour && a.pixelate && "filter" in ctx) pixelateInto(out, pixelCell(a.pixelate, refDev));
+  if (typed && "filter" in ctx) out = typedBlur(out, typed, (maxBlur(a) / 100) * 0.02 * refDev, a);
+  if (colour && a.pixelate && "filter" in ctx) pixelateInto(out, pixelCell(a.pixelate, refDev), a.pixelShape === "dots");
   const inner = shadowOf(a, "inner");
   if (inner) {
     // the inside of the edge: what is not under the object (made smaller by the spread) moved by the offset, blurred, kept where the object is
@@ -193,17 +193,40 @@ export function drawBackdrop(ctx: CanvasRenderingContext2D, po: ProjectedObject,
   snap.drawImage(ctx.canvas, x0, y0, w, h, 0, 0, w, h);
   const plain: Adjust = { ...a, dropOpacity: 0, innerOpacity: 0 };
   const strength = Math.max(0, Math.min(1, po.obj.opacity));
-  ctx.save();
-  ctx.beginPath();
-  outline(ctx);
-  ctx.clip(evenodd ? "evenodd" : "nonzero");
-  if (strength >= 1) {
-    // (what was there goes: a see-through edge of the adjusted picture would let the plain one show through)
-    ctx.save();
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.clearRect(x0, y0, w, h);
-    ctx.restore();
+  // The adjusted picture of what is under it, on a layer of the snapshot's size (the canvas's transform, moved to the snapshot's corner).
+  const adj = layer(7, w, h);
+  adj.setTransform(t.a, 0, 0, t.d, t.e - x0, t.f - y0);
+  drawAdjusted(adj, po, plain, (g) => g.drawImage(snap.canvas, (x0 - t.e) / t.a, (y0 - t.f) / t.d, w / t.a, h / t.d));
+  adj.setTransform(1, 0, 0, 1, 0, 0);
+  let inside: CanvasRenderingContext2D = adj;
+  if (strength < 1) {
+    // (its opacity is the strength: the adjusted picture over the plain one, that much)
+    inside = layer(8, w, h);
+    inside.drawImage(snap.canvas, 0, 0);
+    inside.globalAlpha = strength;
+    inside.drawImage(adj.canvas, 0, 0);
+    inside.globalAlpha = 1;
   }
-  drawAdjusted(ctx, po, plain, (g) => g.drawImage(snap.canvas, (x0 - t.e) / t.a, (y0 - t.f) / t.d, w / t.a, h / t.d), true, strength);
+  // The adjusted picture kept inside the outline and the plain one outside it, by the same soft edge, then added: at the edge they make up the
+  // whole pixel between them. (Clearing the inside and drawing the adjusted picture over it each with its own soft edge left a seam: a thin
+  // line of what lies beneath, the canvas's ground, round the shape.)
+  const cut = (g: CanvasRenderingContext2D, op: GlobalCompositeOperation): void => {
+    g.save();
+    g.setTransform(t.a, 0, 0, t.d, t.e - x0, t.f - y0);
+    g.globalCompositeOperation = op;
+    g.beginPath();
+    outline(g);
+    g.fill(evenodd ? "evenodd" : "nonzero");
+    g.restore();
+  };
+  cut(inside, "destination-in");
+  cut(snap, "destination-out");
+  snap.globalCompositeOperation = "lighter";
+  snap.drawImage(inside.canvas, 0, 0);
+  snap.globalCompositeOperation = "source-over";
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(x0, y0, w, h);
+  ctx.drawImage(snap.canvas, x0, y0);
   ctx.restore();
 }

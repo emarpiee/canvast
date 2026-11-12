@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.57.7 — Advanced adjustment controls; adjustment shapes without a seam (2026-11-12)
+
+- **Added:** advanced controls folded under Blur, Sharpen, Grain and Pixelate in the Adjust panel (ADR 0190): a motion blur's offset, a zoom or spin blur's centre, a blur's quality, sharpening's radius, grain's size and colour, pixelate's round dots.
+- **Fixed:** an adjustment shape drew a thin line round itself on the canvas and in exported pictures (what lay beneath showed through at its edge).
+
 ## 0.57.6 — Blur types, pixelate, stronger adjustments (2026-11-12)
 
 - **Added:** a blur's *Type* in the Adjust panel: **Motion** (with an angle), **Zoom** and **Spin** beside the usual soft blur (ADR 0189).

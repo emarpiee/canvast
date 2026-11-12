@@ -17,7 +17,7 @@ describe("styles (ADR 0120)", () => {
     expect(kindById("ratio")!.validate(0)).toBeNull();
     expect(kindById("ratio")!.summary(16 / 9)).toBe("16 : 9");
     expect(kindById("adjustment")).toBe(ADJUSTMENT_KIND);
-    expect(ADJUSTMENT_KIND.validate({ exposure: 20.4, blur: 0, grain: 500 })).toEqual({ exposure: 20, grain: 100 });
+    expect(ADJUSTMENT_KIND.validate({ exposure: 20.4, blur: 0, grain: 500 })).toEqual({ exposure: 20, grain: 200 }); // (grain goes to 200: ADR 0189)
     expect(ADJUSTMENT_KIND.validate({ exposure: 0 })).toBeNull();
     expect(ADJUSTMENT_KIND.summary({ exposure: 20, contrast: -10, tint: 5, blur: 4, grain: 9 })).toBe("Exposure +20, Contrast −10, Tint +5 and 2 more");
     expect(COLOUR_KIND.validate("#2563EB")).toBe("#2563eb");

@@ -3,7 +3,7 @@
  * layer laid over each other on the graphics card (shifted along a line, scaled out from the middle, or turned round it), each the average of what
  * came before, then softened a little so the copies do not show as steps. Nothing is read back from the graphics card.
  */
-import type { BlurType } from "../doc/adjust";
+import type { Adjust, BlurType } from "../doc/adjust";
 
 const scratch: HTMLCanvasElement[] = [];
 function layer(i: number, w: number, h: number): CanvasRenderingContext2D {
@@ -20,16 +20,20 @@ const MAX_COPIES = 40;
  * `src` blurred by `type`, as wide as a soft blur of standard deviation `sigma` (px) spreads (about 6 sigma end to end): a motion blur along
  * `angle` (degrees), a zoom blur out from the middle, a spin blur round it. Returns a canvas of the same size (one of this module's own).
  */
-export function typedBlur(src: HTMLCanvasElement, type: BlurType, sigma: number, angle = 0): HTMLCanvasElement {
+export function typedBlur(src: HTMLCanvasElement, type: BlurType, sigma: number, o: Pick<Adjust, "blurAngle" | "blurOffset" | "blurQuality" | "blurCenterX" | "blurCenterY"> = {}): HTMLCanvasElement {
   const w = src.width, h = src.height;
   const len = 6 * sigma;
   const half = Math.max(1, Math.max(w, h) / 2);
-  const n = Math.max(6, Math.min(MAX_COPIES, Math.ceil(len / 2)));
+  // (Quality: fewer or more copies than the usual, ADR 0190)
+  const q = 2 ** ((o.blurQuality ?? 0) / 50);
+  const n = Math.max(4, Math.min(MAX_COPIES * 4, Math.ceil(Math.max(6, Math.min(MAX_COPIES, Math.ceil(len / 2))) * q)));
   const g = layer(0, w, h);
-  const cx = w / 2, cy = h / 2;
-  const rad = (angle * Math.PI) / 180;
+  // (Centre: the middle of a zoom or spin, a share of half the layer from its middle)
+  const cx = w / 2 + ((o.blurCenterX ?? 0) / 100) * (w / 2), cy = h / 2 + ((o.blurCenterY ?? 0) / 100) * (h / 2);
+  const rad = ((o.blurAngle ?? 0) * Math.PI) / 180;
+  const shift = (o.blurOffset ?? 0) / 200; // (Offset: the streak behind or ahead of the picture instead of on both sides)
   for (let k = 0; k < n; k++) {
-    const f = k / (n - 1) - 0.5; // (from -½ to ½ of the streak)
+    const f = k / (n - 1) - 0.5 + shift; // (from -½ to ½ of the streak, moved by the offset)
     g.globalAlpha = 1 / (k + 1); // (each copy the average of those before it)
     if (type === "motion") g.setTransform(1, 0, 0, 1, Math.cos(rad) * len * f, Math.sin(rad) * len * f);
     else if (type === "zoom") {
@@ -53,8 +57,8 @@ export function typedBlur(src: HTMLCanvasElement, type: BlurType, sigma: number,
   return out.canvas;
 }
 
-/** `c` made of square cells `cell` px wide (each one colour): drawn small with no smoothing, then large again. */
-export function pixelateInto(c: HTMLCanvasElement, cell: number): void {
+/** `c` made of square cells `cell` px wide (each one colour): drawn small with no smoothing, then large again; `dots`: each cell a round dot. */
+export function pixelateInto(c: HTMLCanvasElement, cell: number, dots = false): void {
   if (!(cell >= 2)) return;
   const w = c.width, h = c.height;
   const sw = Math.max(1, Math.round(w / cell)), sh = Math.max(1, Math.round(h / cell));
@@ -68,6 +72,21 @@ export function pixelateInto(c: HTMLCanvasElement, cell: number): void {
   g.clearRect(0, 0, w, h);
   g.imageSmoothingEnabled = false;
   g.drawImage(small.canvas, 0, 0, sw, sh, 0, 0, w, h);
+  if (dots) {
+    // (round cells: a dot in each, the rest cleared; one pattern stretched to the cells, so it is one draw however many there are)
+    const DOT = 64;
+    const d = layer(3, DOT, DOT);
+    d.beginPath();
+    d.arc(DOT / 2, DOT / 2, DOT * 0.46, 0, Math.PI * 2);
+    d.fill();
+    const pat = g.createPattern(d.canvas, "repeat");
+    if (pat) {
+      pat.setTransform(new DOMMatrix().scale(w / sw / DOT, h / sh / DOT));
+      g.globalCompositeOperation = "destination-in";
+      g.fillStyle = pat;
+      g.fillRect(0, 0, w, h);
+    }
+  }
   g.restore();
 }
 

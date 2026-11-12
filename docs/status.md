@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.7: advanced adjustment controls; adjustment shapes without a seam (2026-11-12)
+
+- **Implemented:** ADR 0190: `blurOffset`, `blurCenterX/Y`, `blurQuality`, `sharpenRadius`, `grainSize`, `grainColour`, `pixelShape` (model, cleaning, `typedBlur`, `pixelateInto` dots, `layerPrimitives`, `adjustInto`); the panel's folds (`ADVANCED`, `advOpen`). `drawBackdrop` now composes the adjusted inside and the plain outside off the canvas by one soft edge and puts them back in one draw (the seam).
+- **Tested:** in the browser while building (every control; zoom centre moved; coloured coarse grain; dots; no seam across an adjustment shape's edge on a white sheet over the dark ground, with blur and with exposure); unit and e2e tests extended (pictures.spec blur test, vectors.spec adjustment shape seam check); v0.57.6's failing tests fixed (a Styles unit test still capped grain at 100; the blur test reloaded before the save).
+- **Known failures:** none known.
+- **Unverified:** Firefox by hand.
+- **Committed:** v0.57.7 on `main`.
+- **Next bounded task:** none set (later: a canvas handle for a blur's centre, a saturation mix by colour).
+
 ## v0.57.6: blur types, pixelate, wider adjustment ranges (2026-11-12)
 
 - **Implemented:** `AdjustSpec.max` per adjustment (ADR 0189); `blurType` and `blurAngle`, `pixelate` in the model, validation, cleaning and the cache key; `render/blur-types.ts` (`typedBlur`, `pixelateInto`) used by `drawAdjusted` and `adjustInto`; the Detail group's Type, Angle and Pixelate rows.

@@ -184,6 +184,10 @@ test("a blur has a type (motion, zoom, spin) and a picture can be pixelated (ADR
   await num("blur", 300); // (past the old 100)
   await app.frame();
   const looks = [await row()];
+  // the blur's type and its own settings are folded under it (ADR 0190)
+  await expect(pop.locator('[data-adv-of="blur"]')).toBeHidden();
+  await pop.locator('[data-adj-more="blur"]').click();
+  await expect(pop.locator('[data-adv-of="blur"]')).toBeVisible();
   await expect(pop.locator('[data-adj-row="blurAngle"]')).toBeHidden();
   for (const t of ["motion", "zoom", "spin"]) {
     await pop.locator("[data-adj-blur-type]").selectOption(t);
@@ -192,6 +196,11 @@ test("a blur has a type (motion, zoom, spin) and a picture can be pixelated (ADR
     looks.push(await row());
   }
   expect((await objs(app)).find((o) => o.id === a.id)!.adjust).toEqual({ blur: 300, blurType: "spin" });
+  await expect(pop.locator('[data-adj-row="blurCenterX"]')).toBeVisible();
+  await num("blurCenterX", 60);
+  await expect.poll(row, "a spin round another middle").not.toBe(looks.at(-1));
+  await num("blurCenterX", 0);
+  expect(await p.evaluate(() => window.__canvastDebug.flushSave())).toBe("saved"); // (saved before the reload: a change is written a moment after it)
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   expect((await objs(app)).find((o) => o.id === a.id)!.adjust).toEqual({ blur: 300, blurType: "spin" });
@@ -203,6 +212,10 @@ test("a blur has a type (motion, zoom, spin) and a picture can be pixelated (ADR
   await num("pixelate", 100);
   await app.frame();
   await expect.poll(async () => { const r = JSON.parse(await row()) as number[][]; const v = r.map((c) => c[0]!); return Math.max(...v) - Math.min(...v); }).toBeLessThan(160);
+  // round cells: its shape, under its fold
+  if (await pop.locator('[data-adv-of="pixelate"]').isHidden()) await pop.locator('[data-adj-more="pixelate"]').click();
+  await pop.locator("[data-adj-pixel-shape]").selectOption("dots");
+  await expect.poll(async () => (await objs(app)).find((o) => o.id === a.id)!.adjust).toEqual({ pixelate: 100, pixelShape: "dots" });
   expect(app.consoleErrors).toEqual([]);
 });
 

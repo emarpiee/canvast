@@ -66,10 +66,23 @@ export interface Adjust {
   readonly blurType?: BlurType;
   /** The direction of a motion blur, in degrees (0: across). */
   readonly blurAngle?: number;
+  /** Advanced (ADR 0190), each 0 = as before: a motion blur's streak behind (-100) or ahead (100) instead of centred; how many copies make a
+   * blur of another type (-100: a quarter, 100: four times); the middle of a zoom or spin blur, a share of half the object across and down. */
+  readonly blurOffset?: number;
+  readonly blurQuality?: number;
+  readonly blurCenterX?: number;
+  readonly blurCenterY?: number;
   readonly sharpen?: number;
+  /** How wide sharpening looks (0: one pixel, 100: ten). */
+  readonly sharpenRadius?: number;
   readonly grain?: number;
+  /** How coarse the grain is (0: one pixel, 100: eight), and how much colour it has (0: grey). */
+  readonly grainSize?: number;
+  readonly grainColour?: number;
   /** Square cells, a share of the object's size (100: a tenth of it). */
   readonly pixelate?: number;
+  /** The cells of pixelate: squares (absent) or round dots. */
+  readonly pixelShape?: "dots";
   /**
    * Shadows of what is drawn (not of a picture's pixels): a drop shadow behind it and an inner shadow inside its edge. Opacity 0 = none. The offset
    * (`X`, `Y`: -100 to 100, a tenth of the object's size at the ends), the `Blur` and the `Spread` (how far the shadow is grown, or the inner one shrunk: 0 to 100, a twentieth of its size) are shares of the object's own
@@ -89,7 +102,7 @@ export interface Adjust {
   readonly innerColor?: string;
 }
 
-export type AdjustKey = Exclude<keyof Adjust, "map" | "levels" | "curves" | "next" | "dropColor" | "innerColor" | "blurType">;
+export type AdjustKey = Exclude<keyof Adjust, "map" | "levels" | "curves" | "next" | "dropColor" | "innerColor" | "blurType" | "pixelShape">;
 
 /** The kinds of blur besides the usual one (ADR 0189). */
 export type BlurType = "motion" | "zoom" | "spin";
@@ -119,8 +132,15 @@ export const ADJUSTMENTS: readonly AdjustSpec[] = [
   { key: "blue", label: "Blue", min: -200, max: 200, pointwise: true },
   { key: "blur", label: "Blur", min: 0, max: 400, pointwise: false },
   { key: "blurAngle", label: "Angle", min: 0, max: 359, pointwise: false },
+  { key: "blurOffset", label: "Offset", min: -100, max: 100, pointwise: false },
+  { key: "blurCenterX", label: "Centre across", min: -100, max: 100, pointwise: false },
+  { key: "blurCenterY", label: "Centre down", min: -100, max: 100, pointwise: false },
+  { key: "blurQuality", label: "Quality", min: -100, max: 100, pointwise: false },
   { key: "sharpen", label: "Sharpen", min: 0, max: 200, pointwise: false },
+  { key: "sharpenRadius", label: "Radius", min: 0, max: 100, pointwise: false },
   { key: "grain", label: "Grain", min: 0, max: 200, pointwise: false },
+  { key: "grainSize", label: "Size", min: 0, max: 100, pointwise: false },
+  { key: "grainColour", label: "Colour", min: 0, max: 100, pointwise: false },
   { key: "pixelate", label: "Pixelate", min: 0, max: 100, pointwise: false },
   { key: "dropOpacity", label: "Opacity", min: 0, max: 100, pointwise: false },
   { key: "dropX", label: "Across", min: -300, max: 300, pointwise: false },
@@ -214,6 +234,7 @@ export function validAdjust(a: unknown, depth = 1): a is Adjust {
     if (k === "next") return validAdjust(v, depth + 1);
     if (k === "dropColor" || k === "innerColor") return isColour(v);
     if (k === "blurType") return BLUR_TYPES.some(([t]) => t !== "" && t === v);
+    if (k === "pixelShape") return v === "dots";
     if (k === "levels") return !!v && typeof v === "object" && Object.entries(v).every(([ch, l]) => CHANNELS.includes(ch as Channel) && cleanLevels(l as Levels) !== undefined);
     if (k === "curves") return !!v && typeof v === "object" && Object.entries(v).every(([ch, c]) => CHANNELS.includes(ch as Channel) && cleanCurve(c as CurvePoints) !== undefined);
     const s = ADJUSTMENTS.find((x) => x.key === k);
@@ -267,7 +288,14 @@ export function cleanAdjust(a: Adjust, depth = 1): Adjust | undefined {
   }
   // (a blur's type only with a blur, and its angle only with a motion blur)
   if (out["blur"] && a.blurType && BLUR_TYPES.some(([t]) => t !== "" && t === a.blurType)) out["blurType"] = a.blurType;
-  if (out["blurType"] !== "motion") delete out["blurAngle"];
+  // (each advanced number only where it means something, ADR 0190)
+  const type = out["blurType"];
+  if (type !== "motion") (delete out["blurAngle"], delete out["blurOffset"]);
+  if (type !== "zoom" && type !== "spin") (delete out["blurCenterX"], delete out["blurCenterY"]);
+  if (!type) delete out["blurQuality"];
+  if (!out["sharpen"]) delete out["sharpenRadius"];
+  if (!out["grain"]) (delete out["grainSize"], delete out["grainColour"]);
+  if (out["pixelate"] && a.pixelShape === "dots") out["pixelShape"] = "dots";
   if (out["dropOpacity"] && isColour(a.dropColor) && a.dropColor.toLowerCase() !== "#000000") out["dropColor"] = a.dropColor.toLowerCase();
   if (out["innerOpacity"] && isColour(a.innerColor) && a.innerColor.toLowerCase() !== "#000000") out["innerColor"] = a.innerColor.toLowerCase();
   return Object.keys(out).length ? (out as Adjust) : undefined;
@@ -275,7 +303,7 @@ export function cleanAdjust(a: Adjust, depth = 1): Adjust | undefined {
 
 /** A short text that differs whenever the adjustments do (to cache what was drawn with them). */
 export const adjustKey = (a: Adjust | undefined): string =>
-  a ? ADJUSTMENTS.map((s) => a[s.key] ?? 0).join(",") + (a.blurType ? `|B${a.blurType}` : "") + (a.map ? `|${a.map.amount}:${a.map.stops.map((s) => `${s.o}${s.c}`).join(",")}` : "") + (a.levels ? `|L${JSON.stringify(a.levels)}` : "") + (a.curves ? `|C${JSON.stringify(a.curves)}` : "") + (a.next ? `|N(${adjustKey(a.next)})` : "") + (a.dropColor ?? "") + (a.innerColor ?? "") : "";
+  a ? ADJUSTMENTS.map((s) => a[s.key] ?? 0).join(",") + (a.blurType ? `|B${a.blurType}` : "") + (a.pixelShape ? `|P${a.pixelShape}` : "") + (a.map ? `|${a.map.amount}:${a.map.stops.map((s) => `${s.o}${s.c}`).join(",")}` : "") + (a.levels ? `|L${JSON.stringify(a.levels)}` : "") + (a.curves ? `|C${JSON.stringify(a.curves)}` : "") + (a.next ? `|N(${adjustKey(a.next)})` : "") + (a.dropColor ?? "") + (a.innerColor ?? "") : "";
 
 const clamp = (v: number): number => (v < 0 ? 0 : v > 255 ? 255 : v);
 /** sRGB byte to linear light, and back (a table of 4096 steps): exposure works in linear light, and a table is far quicker than a power. */

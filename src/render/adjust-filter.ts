@@ -76,6 +76,10 @@ export function svgAdjustReach(a: Adjust, ref: number): number {
   return Math.max(3 * blur, d ? (Math.max(Math.abs(d.x), Math.abs(d.y)) * 0.1 + 3 * d.blur * 0.05 + d.spread * 0.05) * ref : 0);
 }
 
+/** A sharpening's radius (px) for its Radius (0 to 100), and a grain's size (px) for its Size: one pixel at 0 (ADR 0190). */
+export const sharpenRadiusPx = (v: number): number => 1 + (v / 100) * 9;
+export const grainSizePx = (v: number): number => 1 + (v / 100) * 7;
+
 /** The filter primitives of one layer of a stack (the blur of a layer is a CSS blur, taken from the first layer only). */
 function layerPrimitives(a: Adjust, id: string, f: string[]): void {
   const e = (a.exposure ?? 0) / 100, c = (a.contrast ?? 0) / 100, t = (a.temperature ?? 0) / 100, ti = (a.tint ?? 0) / 100;
@@ -102,16 +106,25 @@ function layerPrimitives(a: Adjust, id: string, f: string[]): void {
         `<feComposite in="map-${id}" in2="pre-${id}" operator="arithmetic" k1="0" k2="${n(k)}" k3="${n(1 - k)}" k4="0"/>`,
     );
   }
-  if (a.sharpen) {
+  if (a.sharpen && a.sharpenRadius) {
+    // a wider sharpening (ADR 0190): the picture plus `amount` times its difference from a blurred copy of itself (an unsharp mask)
+    const amt = (a.sharpen / 100) * 1.5;
+    f.push(
+      `<feColorMatrix type="identity" result="sp-${id}"/><feGaussianBlur in="sp-${id}" stdDeviation="${n(sharpenRadiusPx(a.sharpenRadius) / 2)}" edgeMode="duplicate" result="sb-${id}"/>` +
+        `<feComposite in="sp-${id}" in2="sb-${id}" operator="arithmetic" k1="0" k2="${n(1 + amt)}" k3="${n(-amt)}" k4="0"/>`,
+    );
+  } else if (a.sharpen) {
     const k = (a.sharpen / 100) * 1.5 * 0.25 * 4; // the unsharp mask of the stills: the pixel plus `amount` times its difference from its four neighbours
     const m = k / 4;
     f.push(`<feConvolveMatrix order="3" kernelMatrix="0 ${n(-m)} 0 ${n(-m)} ${n(1 + k)} ${n(-m)} 0 ${n(-m)} 0" preserveAlpha="true" edgeMode="duplicate"/>`);
   }
   if (a.grain) {
     const amt = (a.grain / 100) * 0.24;
+    // (Size: a lower frequency is a coarser grain; Colour: each channel its own noise instead of one grey, ADR 0190)
+    const k = (a.grainColour ?? 0) / 100;
     f.push(
-      `<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" seed="3" result="n-${id}"/>` +
-        `<feColorMatrix in="n-${id}" type="matrix" values="1 0 0 0 0  1 0 0 0 0  1 0 0 0 0  0 0 0 0 1" result="g-${id}"/>` +
+      `<feTurbulence type="fractalNoise" baseFrequency="${n(0.9 / grainSizePx(a.grainSize ?? 0))}" numOctaves="1" seed="3" result="n-${id}"/>` +
+        `<feColorMatrix in="n-${id}" type="matrix" values="1 0 0 0 0  ${n(1 - k)} ${n(k)} 0 0 0  ${n(1 - k)} 0 ${n(k)} 0 0  0 0 0 0 1" result="g-${id}"/>` +
         `<feComposite in="SourceGraphic" in2="g-${id}" operator="arithmetic" k1="0" k2="1" k3="${n(amt)}" k4="${n(-amt / 2)}"/>`,
     );
   }

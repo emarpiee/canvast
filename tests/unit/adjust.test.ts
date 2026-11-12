@@ -39,6 +39,12 @@ describe("adjustments of a picture (ADR 0118)", () => {
     expect(cleanAdjust({ blur: 50, blurType: "zoom", blurAngle: 30 })).toEqual({ blur: 50, blurType: "zoom" });
     expect(cleanAdjust({ blurType: "spin", pixelate: 40 })).toEqual({ pixelate: 40 });
     expect(needsNeighbours({ pixelate: 5 })).toBe(true);
+    // advanced controls (ADR 0190) only where they mean something
+    expect(cleanAdjust({ blur: 50, blurType: "motion", blurOffset: 40, blurCenterX: 30, blurQuality: 20 })).toEqual({ blur: 50, blurType: "motion", blurOffset: 40, blurQuality: 20 });
+    expect(cleanAdjust({ blur: 50, blurType: "spin", blurOffset: 40, blurCenterX: 30 })).toEqual({ blur: 50, blurType: "spin", blurCenterX: 30 });
+    expect(cleanAdjust({ blur: 50, blurQuality: 20 })).toEqual({ blur: 50 });
+    expect(cleanAdjust({ sharpenRadius: 50, grainSize: 30, grainColour: 40, pixelShape: "dots" })).toBeUndefined();
+    expect(cleanAdjust({ sharpen: 10, sharpenRadius: 50, grain: 5, grainSize: 30, pixelate: 20, pixelShape: "dots" })).toEqual({ sharpen: 10, sharpenRadius: 50, grain: 5, grainSize: 30, pixelate: 20, pixelShape: "dots" });
     expect(adjustKey({ blur: 5 })).not.toBe(adjustKey({ blur: 5, blurType: "spin" }));
     expect(cleanAdjust({ exposure: 0.2 })).toBeUndefined();
     expect(needsNeighbours({ blur: 5 })).toBe(true);

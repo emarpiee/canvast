@@ -3599,6 +3599,11 @@ test("an adjustment shape (ADR 0188): a shape with no fill adjusts what is under
   await app.frame();
   expect(await px(630, 375), "under it: brighter").not.toEqual(plain);
   expect(await px(520, 310), "beside it: the plain fill").toEqual(plain);
+  // no seam at its edge: down across the top of the ellipse, no pixel darker than both the plain and the brightened fill
+  const lum = (c: number[] | null): number => (c ? c[0]! + c[1]! + c[2]! : 0);
+  const floor = Math.min(lum(plain), lum(await px(630, 375))) - 6;
+  const across = await p.evaluate(() => Array.from({ length: 14 }, (_, i) => window.__canvastDebug.pixelAt(630, 314 + i)));
+  expect(across.map(lum).filter((v) => v < floor), "a seam round the shape").toEqual([]);
   const row = () => p.evaluate(() => Array.from({ length: 30 }, (_, i) => window.__canvastDebug.pixelAt(520 + i * 9, 375)));
   await p.evaluate(() => window.__canvastDebug.setTileCache(false));
   await app.frame();

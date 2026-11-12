@@ -3,6 +3,7 @@
  * zooming and turning draw the kept copy. The colour part is `adjustPixel` over every pixel; blur uses the canvas's own filter; sharpen
  * is a 3 x 3 unsharp mask; grain is the same noise on every draw (it is fixed to the pixel, not to the time).
  */
+import { grainSizePx, sharpenRadiusPx } from "./adjust-filter";
 import { pixelCell, pixelateInto, typedBlur } from "./blur-types";
 import type { Adjust } from "../doc/adjust";
 import type { ImageObject } from "../doc/model";
@@ -26,6 +27,32 @@ const single = (l: Adjust): Adjust => {
   const { next: _n, ...rest } = l;
   return rest;
 };
+
+/** Each pixel's average over a square `r` px each way (two passes, a running sum: as quick for a wide radius as a narrow one). */
+function boxBlur(d: Uint8ClampedArray, w: number, h: number, r: number): Float32Array {
+  const tmp = new Float32Array(d.length), out = new Float32Array(d.length);
+  for (let y = 0; y < h; y++) {
+    for (let ch = 0; ch < 3; ch++) {
+      let sum = 0;
+      for (let x = -r; x <= r; x++) sum += d[(y * w + Math.min(w - 1, Math.max(0, x))) * 4 + ch]!;
+      for (let x = 0; x < w; x++) {
+        tmp[(y * w + x) * 4 + ch] = sum / (2 * r + 1);
+        sum += d[(y * w + Math.min(w - 1, x + r + 1)) * 4 + ch]! - d[(y * w + Math.max(0, x - r)) * 4 + ch]!;
+      }
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    for (let ch = 0; ch < 3; ch++) {
+      let sum = 0;
+      for (let y = -r; y <= r; y++) sum += tmp[(Math.min(h - 1, Math.max(0, y)) * w + x) * 4 + ch]!;
+      for (let y = 0; y < h; y++) {
+        out[(y * w + x) * 4 + ch] = sum / (2 * r + 1);
+        sum += tmp[(Math.min(h - 1, y + r + 1) * w + x) * 4 + ch]! - tmp[(Math.max(0, y - r) * w + x) * 4 + ch]!;
+      }
+    }
+  }
+  return out;
+}
 
 /** Draw into `c` what `draw` paints, adjusted: blur while drawing, then the colour of every pixel, sharpening and grain. */
 /** `ref`: the size (px) a blur of 100 % is 2 % of; default the longer side of `c` (a shape passes its own, so blur does not depend on what part of it is drawn). */
@@ -53,7 +80,7 @@ export function adjustInto(c: HTMLCanvasElement, draw: (g: CanvasRenderingContex
   g.filter = "none";
   if (a.blur && a.blurType) {
     // (a blur of another type, ADR 0189: from copies of what was drawn)
-    const blurred = typedBlur(c, a.blurType, sigma, a.blurAngle ?? 0);
+    const blurred = typedBlur(c, a.blurType, sigma, a);
     g.clearRect(0, 0, w, h);
     g.drawImage(blurred, 0, 0);
   }
@@ -64,7 +91,12 @@ export function adjustInto(c: HTMLCanvasElement, draw: (g: CanvasRenderingContex
     const px = prepare(a);
     for (let i = 0; i < d.length; i += 4) if (d[i + 3] !== 0) px(d, i);
   }
-  if (a.sharpen) {
+  if (a.sharpen && a.sharpenRadius) {
+    // a wider sharpening (ADR 0190): the pixel plus `amount` times its difference from the average round it, as wide as the radius
+    const amount = (a.sharpen / 100) * 1.5;
+    const avg = boxBlur(d, w, h, Math.round(sharpenRadiusPx(a.sharpenRadius)));
+    for (let i = 0; i < d.length; i += 4) for (let ch = 0; ch < 3; ch++) d[i + ch] = d[i + ch]! + amount * (d[i + ch]! - avg[i + ch]!);
+  } else if (a.sharpen) {
     // unsharp mask: the pixel plus `amount` times its difference from the average of its four neighbours
     const amount = (a.sharpen / 100) * 1.5;
     const copy = new Uint8ClampedArray(d);
@@ -80,19 +112,22 @@ export function adjustInto(c: HTMLCanvasElement, draw: (g: CanvasRenderingContex
   }
   if (a.grain) {
     const amount = (a.grain / 100) * 60;
+    const size = Math.max(1, Math.round(grainSizePx(a.grainSize ?? 0))), k = (a.grainColour ?? 0) / 100;
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const i = (y * w + x) * 4;
         if (d[i + 3] === 0) continue;
-        const n = hash(x, y) * amount;
+        // (a grain as coarse as its size; with colour, each channel partly its own noise)
+        const gx = Math.floor(x / size), gy = Math.floor(y / size);
+        const n = hash(gx, gy) * amount;
         d[i] = d[i]! + n;
-        d[i + 1] = d[i + 1]! + n;
-        d[i + 2] = d[i + 2]! + n;
+        d[i + 1] = d[i + 1]! + (k ? (1 - k) * n + k * hash(gx + 7919, gy) * amount : n);
+        d[i + 2] = d[i + 2]! + (k ? (1 - k) * n + k * hash(gx, gy + 7919) * amount : n);
       }
     }
   }
   g.putImageData(img, 0, 0);
-  if (a.pixelate) pixelateInto(c, pixelCell(a.pixelate, ref ?? Math.max(w, h)));
+  if (a.pixelate) pixelateInto(c, pixelCell(a.pixelate, ref ?? Math.max(w, h)), a.pixelShape === "dots");
   return true;
 }
 

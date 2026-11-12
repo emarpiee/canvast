@@ -881,6 +881,15 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .adj-group h4 { margin: 0 0 var(--s-1); font: var(--weight-semibold) var(--text-xs) var(--font-ui); color: var(--hud-muted); text-transform: uppercase; letter-spacing: 0.06em; }
 .adj-row { display: grid; grid-template-columns: 5.25rem minmax(0, 1fr) 3.75rem; align-items: center; gap: var(--s-4); font: var(--font-meta); color: var(--hud-muted); }
 .adj-row.is-changed .adj-label { color: var(--hud-fg); font-weight: var(--weight-semibold); }
+/* An adjustment's advanced controls (ADR 0190): a fold button before its name, its rows indented under it. */
+.adj-fold { display: flex; align-items: center; gap: var(--s-1); min-width: 0; }
+.adj-fold > label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adj-row .adj-more { display: inline-flex; align-items: center; justify-content: center; flex: none; width: var(--chip-btn); height: var(--chip-btn); padding: 0; color: var(--hud-muted); background: none; border: 0; border-radius: var(--r-sm); cursor: pointer; }
+.adj-row .adj-more:hover { color: var(--hud-fg); background: var(--hud-hover); }
+.adj-more svg { width: var(--icon-sm); height: var(--icon-sm); transition: transform var(--dur-fast) var(--ease-out); }
+.adj-more[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.adj-adv { display: grid; gap: var(--s-2); margin: 0 0 var(--s-2) var(--s-6); padding-left: var(--s-4); border-left: 1px solid var(--hud-border); }
+.adj-adv[hidden] { display: none; }
 .adj-row input[type="range"] { width: 100%; min-width: 0; }
 .adj-num { width: 100%; box-sizing: border-box; height: var(--field-h); padding: 0 var(--s-4); text-align: right; font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
 .adj-map { display: grid; gap: var(--s-4); }
