@@ -485,10 +485,10 @@ test("folders nest, an asset is in one folder at a time, and deleting a folder n
   await expect(p.getByTestId("asset-folder-now")).toHaveText("Refs");
   await fileInto(p, "Hands");
 
-  await side(p, /^Refs/).click();
-  await expect(cards(p)).toHaveCount(2); // a folder shows its subfolders too
   await side(p, /^Hands/).click();
   await expect(cards(p)).toHaveCount(1);
+  await side(p, /^Refs/).click(); // (a folder with subfolders closes on its own row as it is chosen)
+  await expect(cards(p)).toHaveCount(2); // a folder shows its subfolders too
   await side(p, /^Unfiled/).click();
   await expect(cards(p)).toHaveCount(0);
   expect(await p.evaluate(() => window.__canvastDebug.storedAssetHashes())).toEqual([HASH, GREEN_HASH].sort());

@@ -112,6 +112,7 @@ test("a folder folds, stays folded after a reload, and Organize moves to a folde
   expect(rightGap).toBeLessThan(16);
 
   // Organize: nothing until Apply; a tag with a path is a branch of the tree
+  await p.getByTestId("assets-side").getByRole("button", { name: /^All items/ }).click(); // (choosing Art on its row showed that empty folder)
   await p.getByTestId("asset-card").first().click();
   await p.getByTestId("asset-organize").click();
   const dlg = p.getByTestId("tree-chooser");
