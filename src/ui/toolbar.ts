@@ -342,6 +342,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <button type="button" data-balloon-panel hidden aria-label="Speech balloon and text in shape" title="Speech balloon and text in shape: body, tails, words, padding, alignment, connectors">${ICONS.speechBalloon}</button>
         <button type="button" class="swatch swatch-paint" data-kind="shape sheet" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
         <button type="button" class="swatch swatch-paint" data-paint="stroke" aria-haspopup="dialog" aria-expanded="false" aria-label="Outline" title="Outline colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Outline</b></button>
+      <label class="tb-count" data-scrub="outline-w" data-outline-w-wrap hidden title="Outline width, in px at this zoom (0: none). Drag the field left or right to change it">Width <input type="number" data-outline-w min="0" step="0.5" inputmode="decimal" aria-label="Outline width (px at this zoom)"></label>
       <button type="button" class="swatch swatch-outline" data-outline-options aria-haspopup="dialog" aria-expanded="false" aria-label="Outline options" title="Outline options: width, position (inside, centre, outside), corners and ends">${ICONS.outlineOptions}</button>
       </div>
       <div class="tb-group tb-options" data-for="shape balloon path">
@@ -389,6 +390,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   colourBar.row.append(root.querySelector("[data-sel-colours]")!);
   // The Outline options button sits beside the Outline colour: in this bar, after the chips, when several shapes are picked.
   const outlineBtn = root.querySelector<HTMLElement>("[data-outline-options]")!;
+  // (the outline's width beside it, between the Outline colour and its options: the quick way to the width every outline has)
+  const outlineW = root.querySelector<HTMLElement>("[data-outline-w-wrap]")!;
+  const outlineWInput = outlineW.querySelector<HTMLInputElement>("input")!;
   const outlineHome = outlineBtn.parentElement!;
   root.querySelector(".toolbar")!.after(colourBar.el);
   // On a phone the colours of the selection share the row of the Properties bar (one row less at the top); wider, they are a bar of their own under it.
@@ -711,6 +715,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   shapeInput("[data-sel-sides]", (v) => (v >= 3 && v <= 24 ? { sides: Math.round(v) } : null));
   shapeInput("[data-sel-tips]", (v) => (v >= 3 && v <= 24 ? { tips: Math.round(v) } : null));
   liveNumber(root.querySelector<HTMLInputElement>("[data-sel-smooth]")!, (v, final) => v >= 0 && v <= 100 && actions.setSmoothing(v, final));
+  liveNumber(outlineWInput, (v, final) => v >= 0 && actions.setSelectedWidth(v, final));
   shapeInput("[data-sel-inner]", (v) => (v >= 5 && v <= 95 ? { inner: v / 100 } : null));
 
   // Drag a number's field to change it, live (one undo step when released): the quick way to a radius, a count, a ratio.
@@ -720,6 +725,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     sides: { to: (v, dx) => Math.max(3, Math.min(24, Math.round(v + dx / 12))), apply: (v, f) => actions.shapeSelected({ sides: v }, f) },
     tips: { to: (v, dx) => Math.max(3, Math.min(24, Math.round(v + dx / 12))), apply: (v, f) => actions.shapeSelected({ tips: v }, f) },
     inner: { to: (v, dx) => Math.max(5, Math.min(95, Math.round(v + dx / 2))), apply: (v, f) => actions.shapeSelected({ inner: v / 100 }, f) },
+    "outline-w": { to: (v, dx) => Math.max(0, Math.round((v + dx / 4) * 2) / 2), apply: (v, f) => actions.setSelectedWidth(v, f) },
   };
   let scrub: { label: HTMLElement; input: HTMLInputElement; key: string; start: number; x: number; moved: boolean; last: number } | null = null;
   root.addEventListener("pointerdown", (e) => {
@@ -1153,8 +1159,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (!editor.gesturing) {
     }
     const outlineAt = several ? root.querySelector<HTMLElement>("[data-sel-colours]")! : outlineHome;
-    if (outlineBtn.parentElement !== outlineAt) outlineAt.append(outlineBtn);
+    if (outlineBtn.parentElement !== outlineAt) outlineAt.append(outlineW, outlineBtn);
     outlineBtn.hidden = (editor.tool === "select" || editor.tool === "node") && !sel;
+    const ol = (editor.tool === "select" || editor.tool === "node") && sel && !editor.gesturing ? actions.selectedOutline() : null;
+    outlineW.hidden = !ol;
+    if (ol && free(outlineWInput)) {
+      outlineWInput.value = ol.widthPx === null ? "" : String(Math.round(ol.widthPx * 100) / 100);
+      outlineWInput.placeholder = ol.widthPx === null ? "Mixed" : "";
+    }
     for (const b of root.querySelectorAll<HTMLButtonElement>("[data-paint]")) {
       const which = b.dataset["paint"] as "fill" | "stroke";
       const value = sel ? sel[which] : which === "fill" ? editor.shapeFill : editor.shapeStroke;

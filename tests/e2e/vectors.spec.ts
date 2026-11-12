@@ -862,6 +862,14 @@ test("outline options: width, position inside, centre or outside the edge (drawn
   await pop.locator(".op-width").press("Enter");
   await key(app, "Escape");
   expect((await last(app)).stroke).toBe("#1f2329");
+  // the width is also in the bar, between the Outline colour and its options: it reads the shape's, and sets it as the options do
+  const barWidth = p.locator("[data-outline-w]");
+  await expect(barWidth).toHaveValue("6");
+  await barWidth.fill("12");
+  await barWidth.press("Enter");
+  await p.click("[data-outline-options]");
+  await expect(pop.locator(".op-width")).toHaveValue("12");
+  await key(app, "Escape");
   await reload(app);
   expect(((await last(app)) as Obj & { align?: string }).align).toBe("inside");
   // what the next shape gets is remembered too (it was set to Outside, Sharp corners were then left alone), but not the outline itself:

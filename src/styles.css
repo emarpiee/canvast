@@ -938,9 +938,9 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 /* Settings view (ui/settings-view.ts). */
 #settings-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: calc((var(--nav-bottom, var(--s-15)) + 2 * var(--near)) / var(--ui-scale, 1)) var(--s-8) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
 #settings-view[hidden] { display: none; }
-.set-head { display: flex; align-items: center; gap: var(--s-6); max-width: 960px; width: 100%; margin: 0 auto var(--s-6); }
+.set-head { display: flex; align-items: center; gap: var(--s-6); max-width: 1600px; width: 100%; margin: 0 auto var(--s-6); }
 .set-title { margin: 0; font-size: var(--text-3xl); font-weight: 600; flex: 1; }
-.set-body { display: flex; gap: var(--s-10); max-width: 960px; width: 100%; margin: 0 auto; min-height: 0; flex: 1; }
+.set-body { display: flex; gap: var(--s-10); max-width: 1600px; width: 100%; margin: 0 auto; min-height: 0; flex: 1; }
 .set-tabs { display: flex; flex-direction: column; gap: var(--s-1); width: 210px; flex: none; }
 .set-tabs button { text-align: left; font: inherit; color: inherit; padding: var(--s-4) var(--s-6); background: none; border: 0; border-radius: var(--r-sm); cursor: pointer; }
 .set-tabs button:hover { background: var(--hud-hover); }
@@ -2639,6 +2639,14 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
   .set-card { padding: var(--s-6) var(--s-6); }
 }
 .set-panels > section[hidden] { display: none; }
+/* A wide screen: the cards of a tab flow in two columns (each still wide enough for its rows on one line), so the page uses the room
+   without stretching a row into a line too long to read; a tab with more than cards (Shortcuts, Storage) stays one column. */
+.set-panels { container-type: inline-size; }
+@container (min-width: 75rem) {
+  .set-panels > section:not([hidden]):not(:has(> :not(h2, .set-card))) { display: block; columns: 2; column-gap: var(--s-8); }
+  .set-panels > section:not(:has(> :not(h2, .set-card))) > h2 { column-span: all; margin-bottom: var(--s-6); }
+  .set-panels > section:not(:has(> :not(h2, .set-card))) > .set-card { break-inside: avoid; margin-bottom: var(--s-6); }
+}
 
 /* ---- Animation (ADR 0093): what appears fades and eases in, what you point at changes colour smoothly. Every duration and curve is a token; the Animation setting (Performance) scales or removes them all. ---- */
 :root[data-motion="subtle"] { --anim-move: 0; }
