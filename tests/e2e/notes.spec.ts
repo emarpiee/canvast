@@ -811,16 +811,19 @@ test("markdown that comes as words: pasted, it is read as markdown; marks saved 
   await paste("- alpha\n- beta\n\nSome **bold** words");
   await expect(page(p).locator("ul li")).toHaveText(["alpha", "beta", "dash"]);
   await expect(page(p).locator("strong")).toHaveText("bold");
-  // C: typed at a line's start, then a space, a mark makes its format
-  await page(p).locator("strong").click();
-  await p.keyboard.press("End");
-  await p.keyboard.press("Enter");
-  await p.keyboard.type("## Typed");
-  await expect(page(p).locator("h2")).toHaveText("Typed");
+  // C: typed at a line's start, then a space, a mark makes its format (the cursor put at the end of the last line)
+  await page(p).locator("p").last().evaluate((el) => {
+    getSelection()!.collapse(el, el.childNodes.length);
+    (el.closest("[contenteditable]") as HTMLElement).focus();
+  });
   await p.keyboard.press("Enter");
   await p.keyboard.type("- item");
   await expect(page(p).locator("li").filter({ hasText: "item" })).toHaveCount(1);
-  await expect.poll(text).toMatch(/## Typed\n\n- item/);
+  await p.keyboard.press("Enter");
+  await p.keyboard.press("Enter"); // (out of the list)
+  await p.keyboard.type("> quoted");
+  await expect(page(p).locator("blockquote")).toHaveText("quoted");
+  await expect.poll(text).toMatch(/- item\n\n> quoted/);
 });
 
 test("a note's created and modified are automatic: a save writes them, under the names and in the format of the settings, and the panel does not edit them", async ({ app }) => {

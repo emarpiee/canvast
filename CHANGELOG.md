@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.10 — A long wheel zoom draws directly instead of building tiles it throws away (2026-11-12)
+
+- **Fixed:** a long wheel or touchpad zoom over a canvas with large pictures stuttered: a view judged costly built a whole new set of tiles at every level the zoom crossed (20 to 37 ms each, a large picture drawn once in each tile it covers) where drawing the view directly took about 2 ms. While a zoom is in progress, such a view is now drawn directly until the zoom holds still.
+
 ## 0.57.9 — Notes read markdown that comes as words, and copy as markdown (2026-11-12)
 
 - **Fixed:** markdown pasted into a note as words (a chat app's copy button, a `.md` file in a text editor) stayed words: its lists, headings and quotes were paragraphs, and saved, their marks were escaped (`1\.`, `\-`). It is read as markdown now; words with no marks, and anything pasted in a code block, stay words.

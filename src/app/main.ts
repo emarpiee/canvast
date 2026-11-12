@@ -780,6 +780,7 @@ async function start(): Promise<void> {
     let visible: ReturnType<typeof visibleObjects> | null = null;
     let t2 = performance.now();
     if (!tiled) {
+      const direct0 = performance.now();
       visible = visibleObjects(doc, index, editor, fc, vp);
       t2 = performance.now();
       if (visible.some((po) => isBackdrop(po.obj))) {
@@ -795,6 +796,7 @@ async function start(): Promise<void> {
         ctx.drawImage(own, 0, 0);
         ctx.restore();
       } else drawObjects(ctx, visible, assets, vp, dpr, theme);
+      tiles.directMs = performance.now() - direct0; // (what this view costs drawn directly: a zoom in progress draws so while it is less than a set)
     }
     // Selection outlines need the visible selected objects; query only when something is selected.
     // Inside a boolean group (ADR 0103) its members are drawn as outlines over its result, and are what can be selected.

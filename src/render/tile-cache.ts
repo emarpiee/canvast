@@ -135,6 +135,11 @@ export class TileCache {
   lastFullMs = 0;
   /** How many objects the last whole set held. */
   lastFullObjects = 0;
+  /**
+   * Cost of the last frame drawn directly, without tiles (the caller measures it; 0 until one is). A set's tiles draw what lies across
+   * several of them more than once (a large picture once a tile), so a view can cost far more as a set than drawn directly.
+   */
+  directMs = 0;
   /** A rebuild slower than this makes the scene "dense": zoom frames show a scaled preview. */
   denseMs = DENSE_MS;
   private refineTimer: ReturnType<typeof setTimeout> | null = null;
@@ -290,6 +295,10 @@ export class TileCache {
         const pv2 = this.preview(ctx, cam, vp, dpr, border);
         if (pv2) return pv2;
       }
+      // A zoom in progress beyond the scaled set, on a view that costs less drawn directly than a frame's budget: drawn so until the zoom
+      // rests, as a light view is. (A set built for each level the wheel crosses was thrown away by the next: at 20 to 37 ms a set where
+      // the view drawn directly took 2 ms, the Pan and zoom standard's slow wheel run built 984 tiles.)
+      if (!stable && zooming && this.directMs <= this.denseMs) return null;
       this.restarts.key++;
       // Beyond it, with nothing prepared: the old set stays as a backdrop while the new one is built a few tiles a frame.
       // (and so when the zoom comes to rest on a dense canvas: its exact set is built over the scaled one, not in one long frame)
