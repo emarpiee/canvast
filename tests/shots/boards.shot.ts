@@ -80,7 +80,7 @@ test("layout-masonry", async ({ scene: s }) => {
   await s.canvas("References");
   const art = await s.art(...artFiles("hokusai", "degas", "delany", "anonymous", "vangogh"));
   const sheet = await laidOut(s, art, "masonry", [["[data-layout-columns]", "4"], ['[data-layout-gap="0"]', "18"], ['[data-layout-gap="1"]', "18"], ['[data-layout-pad="h"]', "24"], ['[data-layout-pad="v"]', "24"]]);
-  await s.fit([sheet], 0.78, [0.5, 0.55]);
+  await s.fit([sheet], 0.62, [0.5, 0.47]);
   await s.select([sheet]);
   await s.settle();
   await s.shot("layout-masonry", await s.around({ objects: [sheet], pad: 24 }));
@@ -91,7 +91,12 @@ test("layout-justified", async ({ scene: s }) => {
   await s.canvas("Landscapes");
   const art = await s.art(...artFiles("waterloo", "verhaecht", "leprince", "vangogh", "hokusai-under", "hokusai-seaside", "degas-dancer_onstage", "bonheur"));
   const sheet = await laidOut(s, art, "justified", [['[data-layout-gap="0"]', "14"], ['[data-layout-gap="1"]', "14"], ['[data-layout-pad="h"]', "20"], ['[data-layout-pad="v"]', "20"]]);
-  await s.fit([sheet], 0.8, [0.5, 0.55]);
+  // (rows about a quarter of the sheet's width tall, and the sheet as tall as its rows)
+  const w = (await s.box([sheet]))!;
+  await s.p.locator("[data-layout-rowh]").fill(String(Math.round((w.maxX - w.minX) / 4.5)));
+  await s.p.locator("[data-layout-rowh]").press("Enter");
+  if ((await s.p.locator('[data-layout-hug="1"]').getAttribute("aria-pressed")) !== "true") await s.p.locator('[data-layout-hug="1"]').click();
+  await s.fit([sheet], 0.66, [0.5, 0.47]);
   await s.select([sheet]);
   await s.settle();
   await s.shot("layout-justified", await s.around({ objects: [sheet], pad: 24 }));
@@ -102,11 +107,12 @@ test("layout-tracks", async ({ scene: s }) => {
   await s.canvas("Page 1");
   const art = await s.art("bonheur", "degas-dancer_with", "degas-dancer_onstage", "delacroix", "degheyn");
   const sheet = await laidOut(s, art, "grid", [["[data-layout-columns]", "3"], ['[data-layout-gap="0"]', "20"], ['[data-layout-gap="1"]', "20"], ['[data-layout-pad="h"]', "32"], ['[data-layout-pad="v"]', "32"]]);
-  // (the first picture spans the top row: a wide establishing panel)
-  const first = (await s.objects()).filter((o) => o.kind === "image").map((o) => o.id)[0]!;
+  // (the first picture, the front one, spans the top row: a wide establishing panel)
+  const first = (await s.objects()).filter((o) => o.kind === "image").map((o) => o.id).at(-1)!;
   await s.select([first]);
   await s.p.locator('[data-in-span="0"]').fill("3");
   await s.p.locator('[data-in-span="0"]').press("Enter");
+  await s.fit([sheet], 0.5, [0.62, 0.55]);
   await s.select([sheet]);
   await s.p.locator("[data-layout-tracks]").click();
   await s.p.locator('button[data-track="c:1:fr"]').click();
