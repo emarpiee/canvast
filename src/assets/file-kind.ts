@@ -90,3 +90,13 @@ export function describeFile(name: string, type: string): FileDescription {
 export function viewableBlob(blob: Blob, how: "pdf" | "text"): Blob {
   return new Blob([blob], { type: how === "pdf" ? "application/pdf" : "text/plain;charset=utf-8" });
 }
+
+/** A note's picture in the library: the top of its page, this wide for its height (the whole page is as tall as the note). */
+export const NOTE_THUMB_RATIO = 4 / 3;
+
+/**
+ * The shape of an item's card in the library's grid, width over height: its picture's proportions (between 0.4 and 3); a note's, its
+ * picture's (the top of its page), whatever its length, so its card never crops the title off the sides.
+ */
+export const cardRatio = (e: { name: string; pixelW: number; pixelH: number }): number =>
+  noteKindOf(e.name) !== null ? NOTE_THUMB_RATIO : Math.max(0.4, Math.min(3, e.pixelW / Math.max(1, e.pixelH)));

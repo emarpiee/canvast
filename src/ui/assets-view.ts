@@ -22,7 +22,7 @@ import { itemsIn, justifiedLayout, listLayout, nearestInRow, rowOf, squaresLayou
 import { newNoteName, storeFrame } from "../app/frames";
 import { artFullPicture, isArtFile } from "../assets/art-preview";
 import { externalFolder } from "../storage/external-folder";
-import { isModelFile, isPdfFile, AUTO_COPY_NOTE, chipOf, describeFile, extOf, hasThumb, isAutoCopy, isCard, isFontFile } from "../assets/file-kind";
+import { isModelFile, isPdfFile, AUTO_COPY_NOTE, cardRatio, chipOf, describeFile, extOf, hasThumb, isAutoCopy, isCard, isFontFile } from "../assets/file-kind";
 import { FILE_CARD_NOTE } from "../assets/card";
 import { FONT_SAMPLES, fontSampleHtml, showFont } from "./font-specimen";
 import { downloadOriginal, fileActionsOf, openOriginalInTab } from "./file-actions";
@@ -2609,7 +2609,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       shown = [
         ...(paged
           ? rows.map((h, i) => ({ hash: h, ar: paged!.ratios[i]!, html: () => pagedHtml(h) }))
-          : filteredEntries().map((e) => ({ hash: e.hash, ar: Math.max(0.4, Math.min(3, e.pixelW / Math.max(1, e.pixelH))), html: () => entryHtml(e) }))),
+          : filteredEntries().map((e) => ({ hash: e.hash, ar: cardRatio(e), html: () => entryHtml(e) }))),
         ...missing.map((m) => ({ hash: m.hash, ar: 1.4, html: () => missingHtml(m) })),
       ];
       shownAt = paged ? null : new Map(shown.map((x, i) => [x.hash, i]));

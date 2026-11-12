@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.11 — Note cards show their titles whole (2026-11-13)
+
+- **Fixed:** in the library, a long note's card was narrow (it took the shape of the whole page, as tall as the note) while its picture is the top of the page, so the title was cut off at both sides. Every note's card now has its picture's shape.
+
 ## 0.57.10 — A long wheel zoom draws directly instead of building tiles it throws away (2026-11-12)
 
 - **Fixed:** a long wheel or touchpad zoom over a canvas with large pictures stuttered: a view judged costly built a whole new set of tiles at every level the zoom crossed (20 to 37 ms each, a large picture drawn once in each tile it covers) where drawing the view directly took about 2 ms. While a zoom is in progress, such a view is now drawn directly until the zoom holds still.

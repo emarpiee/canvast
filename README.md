@@ -1251,7 +1251,7 @@ Keep the notes beside the picture they are about, and edit them there.
 
 | Previews | |
 | --- | --- |
-| In the library | A note's card and details show the top of its page (headings, lists, tables, colours) |
+| In the library | A note's card and details show the top of its page (headings, lists, tables, colours). Every note's card has that one shape, however long the note, so its title shows whole |
 | On a canvas | Its card is its page, laid out at the card's own size and drawn at twice that so it stays sharp when zoomed in. Shown small, it is drawn from a copy at that size |
 | What it shows | The pictures it links to (also Obsidian's `![[picture]]`), a video by its picture with ▶, a sound by its waveform with ♪, a GIF by its first frame; never a hidden item's. Its text is in the system's font in the preview only |
 | Light or dark | **Preview look** (Settings > Notes: Auto, the default, follows the app's theme); a change redraws every preview at once, so a note's previews are made when shown, never stored |

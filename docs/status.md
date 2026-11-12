@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.11: note cards show their titles whole (2026-11-13)
+
+- **Implemented:** `cardRatio` (src/assets/file-kind.ts), one rule for the grid's card shape in the browser library (`assets-view`) and the desktop index (`library-index`): a note's is `NOTE_THUMB_RATIO` (4:3, its thumbnail's, thumb.ts), whatever its `pixelW`/`pixelH` (its whole page, as tall as the note); the rest as before (0.4 to 3).
+- **Tested:** typecheck and build here; unit test in library-layout.test.ts (CI); Tests on GitHub.
+- **Known failures:** none known.
+- **Unverified:** by hand on the owner's library.
+- **Committed:** v0.57.11 on `main`.
+- **Next bounded task:** read this push's runs.
+
 ## v0.57.10: a long wheel zoom draws directly instead of building tiles it throws away (2026-11-12)
 
 - **Implemented:** `TileCache.directMs` (the caller's last direct frame, main.ts); during a run of zoom changes past the preview bound, a view whose direct frame cost at most `denseMs` returns null (drawn directly) instead of starting a set. Cause traced on branch `pan-zoom-trace` (not merged): every failing Pan and zoom run judged the view dense with sets of 20 to 37 ms built in one slice (the query 1 ms), the view drawn directly 1.7 ms; wheel events always reached the canvas and every run zoomed the same 10 levels; passing runs only measured a set under 12 ms. v0.57.8's re-judging is kept (harmless, not the fix). The notes test of v0.57.9 places the cursor itself and types `- ` and `> ` (End left it inside a bold word).

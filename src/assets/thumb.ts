@@ -9,7 +9,7 @@ import { externalFolder } from "../storage/external-folder";
 import { artCardPicture, isArtFile } from "./art-preview";
 import { makeFileCard } from "./card";
 import { drawnFromFile } from "./adapters";
-import { chipOf, describeFile, isCard, isFontFile, isModelFile, isPdfFile } from "./file-kind";
+import { NOTE_THUMB_RATIO, chipOf, describeFile, isCard, isFontFile, isModelFile, isPdfFile } from "./file-kind";
 
 /** Longest edge of a stored thumbnail (CSS px: cards show them at up to 240). */
 export const THUMB_PX = 256;
@@ -150,7 +150,7 @@ async function makePictureThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
 /** A note's thumbnail: the top of its page (as on its card on a canvas, 4:3). Null when it cannot be drawn. */
 async function makeNoteThumb(rec: AssetRecord): Promise<ThumbRecord | null> {
   try {
-    const c = await notePicture(rec.name, await rec.blob.text(), THUMB_PX, Math.round((THUMB_PX * 3) / 4), rec.hash);
+    const c = await notePicture(rec.name, await rec.blob.text(), THUMB_PX, Math.round(THUMB_PX / NOTE_THUMB_RATIO), rec.hash);
     return await encodeThumb(rec.hash, c);
   } catch {
     return null;

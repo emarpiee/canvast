@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NOTE_THUMB_RATIO, cardRatio } from "../../src/assets/file-kind";
 import { itemsIn, justifiedLayout, listLayout, MIN_CARD_W, nearestInRow, rowOf, squaresLayout } from "../../src/ui/library-layout";
 
 describe("library layout", () => {
@@ -39,5 +40,11 @@ describe("library layout", () => {
     expect(a).toBeGreaterThan(0);
     for (let k = a; k < b; k++) expect(j.boxes[k]!.y + j.boxes[k]!.h).toBeGreaterThanOrEqual(j.height / 2);
     expect(j.boxes[a - 1]!.y + j.boxes[a - 1]!.h).toBeLessThan(j.height / 2);
+  });
+
+  it("a card is its picture's shape; a note's is its picture's (the top of its page), however long the note", () => {
+    expect(cardRatio({ name: "a.png", pixelW: 1600, pixelH: 900 })).toBeCloseTo(16 / 9);
+    expect(cardRatio({ name: "tall.png", pixelW: 100, pixelH: 1000 })).toBe(0.4);
+    for (const name of ["long.md", "n.note.html", "t.txt"]) expect(cardRatio({ name, pixelW: 800, pixelH: 8000 }), name).toBe(NOTE_THUMB_RATIO);
   });
 });

@@ -9,6 +9,7 @@ import { FOLDERS_KEY } from "../src/assets/asset-catalog";
 import { concealedUnder, countSide, inScope, matcher, propValues, sortListed } from "../src/assets/library-match";
 import type { ListedEntry, SortKey, UsageFilter, Way } from "../src/assets/library-match";
 import { parseQuery } from "../src/search/query";
+import { cardRatio } from "../src/assets/file-kind";
 import type { LibraryOp } from "../src/storage/desktop-bridge";
 
 /** What the index reads: the active entries (as JSON), a meta value, and each change as it is made. The SQLite library (main process) is one; a guest's hidden items (ADR 0184) another. */
@@ -117,7 +118,7 @@ export class LibraryIndex {
     const sets = { inFolders: q.inFolders ? new Set(q.inFolders) : null, canvasTagged: q.canvasTagged ? new Set(q.canvasTagged) : null, concealed: concealedUnder(folders, q.concealed ?? []) };
     const rows = this.sorted.rows.filter((e) => inScope(e, q.scope, sets, q.hidden === true) && (!words && q.usage === "all" ? true : match(e, words, q.usage, q.way)));
     const ratios = new Float32Array(rows.length);
-    rows.forEach((e, i) => (ratios[i] = Math.max(0.4, Math.min(3, e.pixelW / Math.max(1, e.pixelH)))));
+    rows.forEach((e, i) => (ratios[i] = cardRatio(e)));
     // (the items of the mode: hidden ones are counted in hidden mode only, and only they are)
     let bytes = 0, total = 0;
     for (const e of items.values()) if (!!e.hidden === (q.hidden === true) && !(sets.concealed && (e.folderIds ?? []).some((id) => sets.concealed!.has(id)))) (bytes += e.size), total++; // (nor a concealed folder's)
