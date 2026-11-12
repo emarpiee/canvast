@@ -734,10 +734,10 @@ test("a note copied from Obsidian: its source, or the page it drew, shows its pi
   expect((await entry()).fields?.find((f) => f.key === "undone")).toBeUndefined();
 });
 
-test("copying the whole note takes its properties, as the file's YAML; a part is copied as before; Copy in the library too", async ({ app, browserName }) => {
+test("copying the whole note takes its properties, as the file's YAML; a part is copied as markdown, its list items with their marks; Copy in the library too", async ({ app, browserName }) => {
   test.skip(browserName === "firefox", "Firefox does not let a test give a copy its data, or read the clipboard");
   const p = app.page;
-  const FILE = '---\ntitle: "Sample"\ncast:\n  - "Smith, John"\n---\n# Words\n\nMore words\n';
+  const FILE = '---\ntitle: "Sample"\ncast:\n  - "Smith, John"\n---\n# Words\n\nMore **words**\n\n- one\n- two\n';
   await p.getByTestId("view-assets").click();
   await p.getByTestId("assets-import-input").setInputFiles({ name: "c.md", mimeType: "text/markdown", buffer: Buffer.from(FILE) });
   await p.context().grantPermissions(["clipboard-read", "clipboard-write"]);
@@ -761,8 +761,66 @@ test("copying the whole note takes its properties, as the file's YAML; a part is
   await p.evaluate(() => navigator.clipboard.writeText(""));
   await p.locator('button[data-command="copy"]').first().evaluate((b: HTMLElement) => b.click());
   await expect.poll(() => p.evaluate(() => navigator.clipboard.readText())).toBe(FILE);
+  // A part: as markdown (its page beside it, for apps that take pages), across list items with their marks.
   await page(p).locator("h1").first().evaluate((h) => getSelection()!.selectAllChildren(h));
-  expect(await copied(), "a part stays the browser's").toBe("");
+  expect(await copied(), "a heading keeps its mark").toBe("# Words");
+  await page(p).locator("p").first().evaluate((el) => getSelection()!.selectAllChildren(el));
+  expect(await copied()).toBe("More **words**");
+  await page(p).locator("ul").evaluate((ul) => {
+    const r = document.createRange();
+    r.setStart(ul.firstElementChild!.firstChild!, 0);
+    r.setEnd(ul.lastElementChild!.firstChild!, 3);
+    getSelection()!.removeAllRanges();
+    getSelection()!.addRange(r);
+  });
+  expect(await copied(), "list items keep their marks").toBe("- one\n- two");
+});
+
+test("markdown that comes as words: pasted, it is read as markdown; marks saved escaped are read again by / Lines with marks; typed marks make formats when the setting is on", async ({ app, browserName }) => {
+  test.skip(browserName === "firefox", "Firefox does not let a test make a paste with its data");
+  const p = app.page;
+  expect(await p.evaluate(() => window.__canvastDebug.getSetting("notes.typedMarks")), "off by default: it changes what is typed").toBe(false);
+  await p.evaluate(() => window.__canvastDebug.setSetting("notes.typedMarks", true));
+  await p.getByTestId("view-assets").click();
+  // (a note saved when pasted lists were words: its marks escaped)
+  await p.getByTestId("assets-import-input").setInputFiles({ name: "marks.md", mimeType: "text/markdown", buffer: Buffer.from("# Marks\n\n1\\. one\n2\\. two\n\\- dash\n") });
+  await p.locator('[data-testid="asset-card"][title="marks.md"]').dblclick();
+  await expect(page(p).locator("h1")).toBeVisible();
+  await expect(page(p).locator("ol, ul")).toHaveCount(0);
+  const text = () => p.evaluate(() => window.__canvastDebug.notesAsText()[0]!.text);
+  // D: the / command reads them again, as one list and the next
+  await page(p).locator("h1").click();
+  await p.keyboard.press("End");
+  await p.keyboard.press("Enter");
+  await p.keyboard.type("/lines with");
+  const row = p.locator(".se-cmd-row").filter({ hasText: "Lines with marks into lists" }).filter({ visible: true });
+  await expect(row).toHaveCount(1);
+  await row.click();
+  await expect(page(p).locator("ol li")).toHaveText(["one", "two"]);
+  await expect(page(p).locator("ul li")).toHaveText(["dash"]);
+  await expect.poll(text).toContain("1. one\n2. two");
+  expect(await text()).not.toContain("\\");
+  // A: markdown pasted as words (a chat app's copy: no page with it) is read as markdown; words with no marks stay words
+  const paste = (plain: string) =>
+    page(p).locator("h1").evaluate((el, plain) => {
+      getSelection()!.collapse(el, el.childNodes.length);
+      const dt = new DataTransfer();
+      dt.setData("text/plain", plain);
+      el.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    }, plain);
+  await paste("- alpha\n- beta\n\nSome **bold** words");
+  await expect(page(p).locator("ul li")).toHaveText(["alpha", "beta", "dash"]);
+  await expect(page(p).locator("strong")).toHaveText("bold");
+  // C: typed at a line's start, then a space, a mark makes its format
+  await page(p).locator("strong").click();
+  await p.keyboard.press("End");
+  await p.keyboard.press("Enter");
+  await p.keyboard.type("## Typed");
+  await expect(page(p).locator("h2")).toHaveText("Typed");
+  await p.keyboard.press("Enter");
+  await p.keyboard.type("- item");
+  await expect(page(p).locator("li").filter({ hasText: "item" })).toHaveCount(1);
+  await expect.poll(text).toMatch(/## Typed\n\n- item/);
 });
 
 test("a note's created and modified are automatic: a save writes them, under the names and in the format of the settings, and the panel does not edit them", async ({ app }) => {

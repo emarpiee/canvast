@@ -86,7 +86,7 @@ export class OpenNote {
     const text = await blob.text();
     const note = new OpenNote(hash, kind, name, blob.type || "text/plain", null, wordsOf(kind, text), deps, place);
     const host = await note.host();
-    note.editor = await mountNoteEditor(el, { kind, text, style: deps.settings.get(place.styleKey ?? "notes.style"), wrapSelection: deps.settings.get("notes.wrapSelection"), codeColours: deps.settings.get("notes.codeColours"), host, title: titleOf(name), root: place.root?.() ?? null });
+    note.editor = await mountNoteEditor(el, { kind, text, style: deps.settings.get(place.styleKey ?? "notes.style"), wrapSelection: deps.settings.get("notes.wrapSelection"), typedMarks: deps.settings.get("notes.typedMarks"), codeColours: deps.settings.get("notes.codeColours"), host, title: titleOf(name), root: place.root?.() ?? null });
     open.add(note);
     await note.readWhole();
     // The editor's style changed: the notes open in that style show it now (changes not saved are asked about, as on any leaving).

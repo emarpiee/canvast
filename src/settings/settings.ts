@@ -176,6 +176,8 @@ export const SETTINGS = {
   "notes.writeProps": { scope: "workspace", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.codeColours": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.wrapSelection": { scope: "device", default: true, validate: bool, effect: "immediate" } as Def<boolean>,
+  // (off: whatever changes what is typed by itself ships off)
+  "notes.typedMarks": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.saveOnClose": { scope: "device", default: false, validate: bool, effect: "immediate" } as Def<boolean>,
   "notes.saveAs": { scope: "workspace", default: "ask", validate: oneOf("ask", "file", "rich"), effect: "immediate" } as Def<"ask" | "file" | "rich">,
   "notes.cardShows": { scope: "workspace", default: "whole", validate: oneOf("part", "whole"), effect: "immediate" } as Def<"part" | "whole">,

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.57.9 — Notes read markdown that comes as words, and copy as markdown (2026-11-12)
+
+- **Fixed:** markdown pasted into a note as words (a chat app's copy button, a `.md` file in a text editor) stayed words: its lists, headings and quotes were paragraphs, and saved, their marks were escaped (`1\.`, `\-`). It is read as markdown now; words with no marks, and anything pasted in a code block, stay words.
+- **Fixed:** copying or cutting part of a note gave only its bare words: it gives markdown now (a heading selected whole with its `#`, list items with their marks), with the page beside it for apps that take pages.
+- **Added:** **Lines with marks into lists** in a note's `/` menu: lines that start with `1.`, `-`, `#` or `>` but are words (their marks escaped in the file) become the list, heading or quote they say; one undo step.
+- **Added:** **Markdown marks make formats** (Settings > Notes, off at first): `-`, `*`, `+`, a number with `.` or `)`, `>` and `#` typed at a line's start, then a space, make a list, a quote or a heading.
+
 ## 0.57.8 — Wheel zoom no longer rebuilds the view at every level (2026-11-12)
 
 - **Fixed:** after one slow build of the view, a wheel or touchpad zoom built a whole new set of tiles at every level it crossed, light views too, so it stuttered (the cost of a view was judged only from a set built in one frame, and a view judged costly builds its sets a few tiles a frame, so it was never judged again). Every set started for a view now judges it once it is whole.

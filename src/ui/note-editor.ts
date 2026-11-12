@@ -1,9 +1,9 @@
 import { ICONS } from "./icons";
 import { scrubNumbers } from "../colour-picker/scrub";
 import suneditor, { helper, interfaces } from "suneditor";
-import { htmlMarkdown, markdownHtml, pastedHtml, pastedMarkdown } from "../notes/note-markdown";
+import { htmlMarkdown, markdownHtml, pastedHtml, pastedMarkdown, unescapeMarks } from "../notes/note-markdown";
 import { dropCode, paintCode } from "../notes/code-colours";
-import { copyPlainText } from "../app/system-clipboard";
+import { copyPlainText, copyTextAndPage } from "../app/system-clipboard";
 import { align, anchor, audio, audioGallery, autocomplete, backgroundColor, blockquote, blockStyle, codeBlock, drawing, fileBrowser, fileGallery, fileUpload, font, fontColor, fontSize, hr, image, imageGallery, layout, lineHeight, link, list, list_bulleted, list_numbered, paragraphStyle, slashCommand, table, template, textStyle, video, videoGallery } from "suneditor/plugins";
 import type { SunEditor } from "suneditor/types";
 import { FENCE_TICK, WIKI, encodeLinkPart, keepSpelling, libraryLink, linkTarget, linksToWiki, obsidianMarkdown, richNoteBody, richNoteFile, textHtml, wikiToLinks } from "../notes/note-file";
@@ -171,6 +171,7 @@ const SLASH_MENU: NonNullable<SunEditor.InitOptions["slashCommand"]> = {
     "list_numbered",
     { key: "quote", title: "Quote", icon: "blockquote", keywords: ["blockquote", "cite"], action: ($) => void $.format.applyBlock(document.createElement("BLOCKQUOTE")) },
     { key: "code", title: "Code", icon: "code_block", keywords: ["pre", "snippet"], action: ($) => void $.format.setBrLine(document.createElement("PRE")) },
+    { key: "marks", title: "Lines with marks into lists", icon: "list_numbered", keywords: ["markdown", "marks", "escaped", "backslash", "slash", "list", "heading", "quote", "fix"], action: ($) => void readMarks($) },
     "hr",
     "table",
     "image",
@@ -183,6 +184,32 @@ const SLASH_MENU: NonNullable<SunEditor.InitOptions["slashCommand"]> = {
     "backgroundColor",
   ],
 };
+
+/**
+ * The note's paragraphs whose lines start with a list's, a heading's or a quote's mark (`1.`, `-`, `#`, `>`), written as words (pasted as
+ * words, or typed, before they were read as markdown; saved, their marks are escaped: `1\.`, `\-`), read again as the list, heading or quote
+ * they say. Paragraphs one after the other are read together, so their items make one list. One undo step; how many paragraphs it read.
+ * Only when asked (a slash command): nothing changes a note by itself.
+ */
+function readMarks($: SunEditor.Deps): number {
+  const area = $.frameContext.get("wysiwyg") as HTMLElement;
+  const runs: HTMLElement[][] = [];
+  let run: HTMLElement[] = [];
+  for (const b of [...area.children] as HTMLElement[]) {
+    const md = b.tagName === "P" ? htmlMarkdown(b.outerHTML) : "";
+    if (md && unescapeMarks(md) !== md) run.push(b);
+    else if (run.length) (runs.push(run), (run = []));
+  }
+  if (run.length) runs.push(run);
+  for (const r of runs) {
+    const t = document.createElement("template");
+    t.innerHTML = $.html.clean(markdownHtml(r.map((p) => unescapeMarks(htmlMarkdown(p.outerHTML))).join("\n")), { forceFormat: false, whitelist: null, blacklist: null });
+    r[0]!.before(t.content);
+    for (const p of r) p.remove();
+  }
+  if (runs.length) $.history.push(false);
+  return runs.reduce((n, r) => n + r.length, 0);
+}
 
 function presetOptions(style: NoteStyle): SunEditor.InitOptions {
   switch (style) {
@@ -418,7 +445,7 @@ function fasterCode(editor: { $: { html: unknown } }): void {
   };
 }
 
-export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; text: string; style: NoteStyle; host: NoteHost; /** A sign typed over selected words goes round them (Settings). */ wrapSelection?: boolean; /** Code blocks in a language are coloured (Settings). */ codeColours?: boolean; /** The note's name (no extension), for {{title}}. */ title: string; /** The whole place it is shown in (else the library's viewer). */ root?: HTMLElement | null }): Promise<NoteEditor> {
+export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; text: string; style: NoteStyle; host: NoteHost; /** A sign typed over selected words goes round them (Settings). */ wrapSelection?: boolean; /** A list's, a quote's or a heading's mark typed at a line's start, then a space, makes it (Settings). */ typedMarks?: boolean; /** Code blocks in a language are coloured (Settings). */ codeColours?: boolean; /** The note's name (no extension), for {{title}}. */ title: string; /** The whole place it is shown in (else the library's viewer). */ root?: HTMLElement | null }): Promise<NoteEditor> {
   const { host } = opts;
   /** Each address shown in the note for a library item → the link written in the file for it. */
   const links = new Map<string, string>();
@@ -664,8 +691,11 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
         const url = /^(https?:\/\/|mailto:)\S+$/i.test(text) ? text : null;
         if (!words.trim() || /\n/.test(words) || (!wiki && !url)) {
           // From Obsidian: its source, else the page it drew, read as a note's own (its pictures found in the library, a code block's lines kept).
+          // Markdown that comes as words (a chat app's copy, a .md file in a text editor) is read too: left as words, its lists would be
+          // paragraphs, and saved, their marks escaped (`1\.`, `\-`).
           if (opts.kind === "txt") return undefined;
-          const source = pastedMarkdown((event as ClipboardEvent).clipboardData?.getData("text/plain") ?? "");
+          if (sel?.anchorNode && helper.dom.query.getParentElement(sel.anchorNode, "pre")) return undefined; // (in a code block, words are words)
+          const source =pastedMarkdown((event as ClipboardEvent).clipboardData?.getData("text/plain") ?? "", (event as ClipboardEvent).clipboardData?.getData("text/html") ?? "");
           const drawn = source ? null : pastedHtml((event as ClipboardEvent).clipboardData?.getData("text/html") ?? "");
           const got = source ?? drawn;
           if (!got) return undefined;
@@ -798,6 +828,31 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     wrapped = { sign, words: sel.rangeCount ? sel.getRangeAt(0).toString() : words };
     dirty = true;
     $.history.push(false);
+  });
+  // A list's, a quote's or a heading's mark typed at the start of a line, then a space, makes that format, as markdown would read it
+  // (Settings, off by default: it changes what is typed). The editor's own `1.` and `---` do so already, on or off.
+  el.querySelector(".sun-editor-editable")?.addEventListener("input", (ev) => {
+    const e = ev as InputEvent, sel = window.getSelection();
+    if (!opts.typedMarks || opts.kind === "txt" || e.inputType !== "insertText" || e.isComposing || !/^[  ]$/.test(e.data ?? "") || !sel?.isCollapsed || !sel.anchorNode) return;
+    const $ = editor.$;
+    const area = $.frameContext.get("wysiwyg") as HTMLElement;
+    const line = $.format.getLine(sel.anchorNode, null) as HTMLElement | null;
+    if (!line || line.tagName !== "P" || line.parentElement !== area) return; // (a line of its own: not in a list, a quote, a table or code already)
+    const before = document.createRange();
+    before.setStart(line, 0);
+    before.setEnd(sel.anchorNode, sel.anchorOffset);
+    const mark = /^(?:([-*+])|(\d{1,9})[.)]|(>)|(#{1,6}))[  ]$/.exec(before.toString());
+    if (!mark) return;
+    before.deleteContents();
+    if (!line.textContent) line.innerHTML = "<br>"; // (an empty line keeps its place for the cursor)
+    $.selection.setRange(line, 0, line, 0);
+    if (mark[1] || mark[2]) {
+      const r = $.listFormat.apply(mark[1] ? "ul:" : "ol:", [line], false);
+      if (r) $.selection.setRange(r.sc, r.so, r.ec, r.eo);
+    } else if (mark[3]) $.format.applyBlock(document.createElement("BLOCKQUOTE"));
+    else $.format.setLine(document.createElement(`H${mark[4]!.length}`));
+    $.history.push(false);
+    dirty = true;
   });
   // A task box is ticked with a click: its `checked` attribute is what the file keeps (`- [x]`), one step of undo.
   // Ctrl+click (⌘ on a Mac) on a link opens what it points at; a plain click puts the cursor in it, to edit.
@@ -981,21 +1036,73 @@ export async function mountNoteEditor(el: HTMLElement, opts: { kind: NoteKind; t
     lastMd = null; // (only a save's words become what the file says)
     return host.whole(words, self.pastedProps());
   };
+  /**
+   * A part of the note selected, as markdown (for a text editor, Obsidian's source, a chat) and as the page it is (for an app that takes
+   * pages); null when nothing of the note's words is selected, in a plain text note, or in a code block (its words are the copy). What is
+   * selected across blocks keeps the lists, quotes and tables round it, so its items keep their marks.
+   */
+  const partNow = (): { text: string; html: string } | null => {
+    if (opts.kind === "txt") return null;
+    const sel = getSelection();
+    const area = editor.$.frameContext.get("wysiwyg") as HTMLElement;
+    if (!sel || sel.isCollapsed || !sel.rangeCount || !area.contains(sel.anchorNode) || !area.contains(sel.focusNode)) return null;
+    const range = sel.getRangeAt(0);
+    const at: Node = range.commonAncestorContainer;
+    if (helper.dom.query.getParentElement(at, "pre")) return null;
+    const box = document.createElement("div");
+    box.append(range.cloneContents());
+    // (a line selected whole keeps what it is: a heading its #, an item its -)
+    let up: Element | null = at instanceof Element ? at : (at?.parentElement ?? null);
+    const line = up?.closest("p, h1, h2, h3, h4, h5, h6, li");
+    const whole = !!line && area.contains(line) && range.toString().trim() === (line.textContent ?? "").trim();
+    if (whole || box.querySelector("p, div, li, h1, h2, h3, h4, h5, h6, pre, blockquote, ul, ol, table, tr, td, th, hr, figure")) {
+      for (; up && up !== area; up = up.parentElement) {
+        if (!up.matches(whole ? "ul, ol, li, blockquote, table, thead, tbody, tr, p, h1, h2, h3, h4, h5, h6" : "ul, ol, li, blockquote, table, thead, tbody, tr")) continue;
+        const wrap = up.cloneNode(false) as Element;
+        wrap.append(...box.childNodes);
+        box.replaceChildren(wrap);
+      }
+    }
+    const html = box.innerHTML;
+    const text = mdOf(mapped(settled(html))).trim();
+    return text ? { text, html } : null;
+  };
   el.addEventListener("copy", (e) => {
+    if (!e.clipboardData) return;
     const whole = wholeNow();
-    if (whole === null || !e.clipboardData) return;
-    e.clipboardData.setData("text/plain", whole); // (nothing else: an app given a page too would take the page, without the properties)
+    if (whole !== null) e.clipboardData.setData("text/plain", whole); // (nothing else: an app given a page too would take the page, without the properties)
+    else {
+      const part = partNow();
+      if (!part) return;
+      e.clipboardData.setData("text/plain", part.text);
+      e.clipboardData.setData("text/html", part.html);
+    }
     e.preventDefault();
     e.stopPropagation();
+  }, true);
+  // A cut goes as a copy does, then the words selected go (one undo step).
+  el.addEventListener("cut", (e) => {
+    const part = e.clipboardData && partNow();
+    if (!part) return;
+    e.clipboardData!.setData("text/plain", part.text);
+    e.clipboardData!.setData("text/html", part.html);
+    e.preventDefault();
+    e.stopPropagation();
+    const $ = editor.$;
+    const r = $.html.remove();
+    if (r?.container) $.selection.setRange(r.container, r.offset, r.container, r.offset);
+    $.history.push(false);
+    dirty = true;
   }, true);
   // (its toolbar's Copy button, which writes the clipboard itself)
   el.addEventListener("click", (e) => {
     if (!(e.target as HTMLElement).closest?.('[data-command="copy"]')) return;
     const whole = wholeNow();
-    if (whole === null) return;
+    const part = whole === null ? partNow() : null;
+    if (whole === null && !part) return;
     e.preventDefault();
     e.stopPropagation();
-    void copyPlainText(whole);
+    void (whole !== null ? copyPlainText(whole) : copyTextAndPage(part!.text, part!.html));
   }, true);
   const self: NoteEditor = {
     // (edited since it was saved: a change the editor reports late, as its history taking the last keys, is no edit when the note is as saved)
