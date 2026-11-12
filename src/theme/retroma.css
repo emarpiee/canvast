@@ -60,38 +60,38 @@
 /* The floating tool bars, and a key's pressed or chosen state: each list written once */
 @custom-selector :--bar .rail, .dock, .toolbar, .ctx-bar, .hud-controls;
 @custom-selector :--on [aria-pressed="true"], [aria-checked="true"], [aria-selected="true"], :active:not(:disabled);
-@custom-selector :--key .rail button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .dock button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .toolbar button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .ctx-bar button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .hud-controls button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .tb-options-row button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .adj-layers button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .view-settings button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .view-switch button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .seg button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .confirm-actions button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .storage-actions button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .action-row button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .set-tabs button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .rail-fly button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .side-head button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .asset-quick button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .asset-actions button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .panel-head button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .panel-foot button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .layers-tools button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .set-control button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .ex-foot button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  .ex-head button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  button.assets-btn:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  button.set-reset:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  button.set-done:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  button.set-link:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  button.nav-crumb:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  button.vbtn:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  button.pg-auto:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x)),
-  button.pg-current:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x));
+@custom-selector :--key .rail button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .dock button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .toolbar button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .ctx-bar button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .hud-controls button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .tb-options-row button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .adj-layers button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .view-settings button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .view-switch button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .seg button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .confirm-actions button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .storage-actions button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .action-row button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .set-tabs button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .rail-fly button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .side-head button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .asset-quick button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .asset-actions button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .panel-head button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .panel-foot button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .layers-tools button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .set-control button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .ex-foot button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  .ex-head button:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  button.assets-btn:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  button.set-reset:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  button.set-done:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  button.set-link:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  button.nav-crumb:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  button.vbtn:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  button.pg-auto:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"])),
+  button.pg-current:where(:not(.side-sec-toggle, .tree-twist, .pg-swatch, .set-chip-x, [data-action="field-remove"]));
 /* Which buttons are keys: the list is written once per rule that needs it (the key and its face), always ending in `button`, so the browser
    checks it on buttons only (a selector list or nesting at the end of a rule is checked on every element, which made the Library's scroll lag).
    A key's states are plain `button` rules that only set the key's own variables: a button that is not a key does not read them. */
@@ -204,31 +204,31 @@
 }
 :root[data-look="retroma"] :is(input, select, textarea):focus-visible { outline: var(--rt-outline) var(--rt-focus-style) var(--rt-focus); outline-offset: 0; } /* (a field in use: one thin line of the focus colour round its outline) */
 :root[data-look="retroma"] :is(input[type="checkbox"], input[type="radio"]) { border-color: var(--rt-outline-c); box-shadow: var(--rt-raise-sm); }
-:root[data-look="retroma"] { --rt-btn-r-sm: calc(var(--rt-btn-r) / 2); } /* (a small control's corner: a key's, for its size, so a checkbox or a slider's thumb looks like a small key, not a dot) */
-:root[data-look="retroma"] input[type="checkbox"] { border-radius: var(--rt-btn-r-sm); }
+:root[data-look="retroma"] input[type="checkbox"] { border-radius: var(--rt-btn-r); } /* (a checkbox and a slider's thumb have the keys' corner, as every control) */
 :root[data-look="retroma"] :is(input[type="checkbox"], input[type="radio"]):is(:checked, :indeterminate) { box-shadow: var(--rt-sink); }
 :root[data-look="retroma"] :is(input[type="range"], progress) { accent-color: var(--rt-accent); box-shadow: none; background: transparent; border: 0; }
 /* the slider: v4's (the browser's own in Firefox), drawn the same in every browser with fixed greys, so its contrast never follows the accent:
    a 6 px track, light grey with a grey edge; the part before the thumb the accent with a darker edge; a 16 px dark grey thumb in a white ring */
 :root[data-look="retroma"] {
   --rt-range-track: #e9e9ed; --rt-range-edge: #8f8f9d; --rt-range-thumb: #676774; --rt-range-ring: #ffffff;
-  --rt-range-h: 6px; --rt-range-k: 16px; --rt-range-fill: var(--rt-accent); --rt-range-fill-edge: oklch(from var(--rt-accent) calc(l - 0.08) c h);
+  --rt-range-h: 6px; --rt-range-k: 16px; --rt-range-r: min(var(--rt-btn-r), var(--rt-range-h) / 2); --rt-range-fill: var(--rt-accent); --rt-range-fill-edge: oklch(from var(--rt-accent) calc(l - 0.08) c h);
 }
 :root[data-look="retroma"] input[type="range"]:not(.set-hue) {
   appearance: none; -webkit-appearance: none; height: var(--rt-range-k); margin: 0; padding: 0; overflow: hidden; cursor: pointer;
-  &::-webkit-slider-runnable-track {
-    height: var(--rt-range-k); border: 0;
-    background: linear-gradient(transparent calc(50% - var(--rt-range-h) / 2), var(--rt-range-edge) 0 calc(50% - var(--rt-range-h) / 2 + 1px), var(--rt-range-track) 0 calc(50% + var(--rt-range-h) / 2 - 1px), var(--rt-range-edge) 0 calc(50% + var(--rt-range-h) / 2), transparent 0);
-  }
+  &::-webkit-slider-runnable-track { box-sizing: border-box; height: var(--rt-range-h); background: var(--rt-range-track); border: 1px solid var(--rt-range-edge); border-radius: var(--rt-range-r); }
+  /* (the slider's box cuts the fill at its ends; this rounds them as the track's) */
+  mask: radial-gradient(circle at var(--rt-range-r) 50%, #000 var(--rt-range-r), transparent calc(var(--rt-range-r) + 0.5px)) left / calc(2 * var(--rt-range-r) + 0.5px) 100% no-repeat,
+        radial-gradient(circle at calc(100% - var(--rt-range-r)) 50%, #000 var(--rt-range-r), transparent calc(var(--rt-range-r) + 0.5px)) right / calc(2 * var(--rt-range-r) + 0.5px) 100% no-repeat,
+        linear-gradient(#000 0 0) center / calc(100% - 2 * var(--rt-range-r)) 100% no-repeat;
   /* (the part before the thumb: the thumb's border image, carried out to the left and cut by the slider's own box) */
   &::-webkit-slider-thumb {
-    -webkit-appearance: none; width: var(--rt-range-k); height: var(--rt-range-k); border: 0; border-radius: var(--rt-btn-r-sm);
+    -webkit-appearance: none; width: var(--rt-range-k); height: var(--rt-range-k); margin-top: calc((var(--rt-range-h) - var(--rt-range-k)) / 2 - 1px); border: 0; border-radius: var(--rt-btn-r);
     background: var(--rt-range-thumb); box-shadow: inset 0 0 0 2px var(--rt-range-ring);
     border-image: linear-gradient(var(--rt-range-fill-edge) 0 1px, var(--rt-range-fill) 0 calc(100% - 1px), var(--rt-range-fill-edge) 0) fill 0 / calc((var(--rt-range-k) - var(--rt-range-h)) / 2) calc(var(--rt-range-k) - 1px) calc((var(--rt-range-k) - var(--rt-range-h)) / 2) 0 / 0 0 0 100vw;
   }
-  &::-moz-range-track { box-sizing: border-box; height: var(--rt-range-h); background: var(--rt-range-track); border: 1px solid var(--rt-range-edge); border-radius: min(var(--rt-btn-r-sm), var(--rt-range-h) / 2); }
-  &::-moz-range-progress { box-sizing: border-box; height: var(--rt-range-h); background: var(--rt-range-fill); border: 1px solid var(--rt-range-fill-edge); border-radius: min(var(--rt-btn-r-sm), var(--rt-range-h) / 2); }
-  &::-moz-range-thumb { box-sizing: border-box; width: var(--rt-range-k); height: var(--rt-range-k); background: var(--rt-range-thumb); border: 2px solid var(--rt-range-ring); border-radius: var(--rt-btn-r-sm); }
+  &::-moz-range-track { box-sizing: border-box; height: var(--rt-range-h); background: var(--rt-range-track); border: 1px solid var(--rt-range-edge); border-radius: var(--rt-range-r); }
+  &::-moz-range-progress { box-sizing: border-box; height: var(--rt-range-h); background: var(--rt-range-fill); border: 1px solid var(--rt-range-fill-edge); border-radius: var(--rt-range-r); }
+  &::-moz-range-thumb { box-sizing: border-box; width: var(--rt-range-k); height: var(--rt-range-k); background: var(--rt-range-thumb); border: 2px solid var(--rt-range-ring); border-radius: var(--rt-btn-r); }
 }
 :root[data-look="retroma"] .adj-num { font-family: var(--rt-font-mono); }
 
@@ -444,11 +444,11 @@
   & .side-n { font-family: var(--rt-font-mono); font-size: var(--text-xs); }
 }
 :root[data-look="retroma"] :is(.tree-row, .side-row):has(> .side-item.is-active) { --hud-accent-fg: var(--rt-fg-on-on-app); --hud-fg: var(--rt-fg-on-on-app); --hud-muted: var(--rt-fg-on-on-app); }
-/* Library items (Retroma › Basics): Cards (v4, below) or Pictures: Legacy's tiles with the cards' shadow (raised, sunk when held or selected), the accent as their ring
+/* Library items (Retroma › Basics): Cards (v4, below) or Pictures: Legacy's tiles with the cards' outline and shadow (raised, sunk when held or selected), the accent as their ring
    under the pointer and when selected */
 /* (the key's light is drawn inside its edge, so a picture filling the tile would cover it: it is drawn over the picture, with the rings) */
-:root[data-look="retroma"][data-rt-part-lib-items="pictures"] #assets-view .assets-body:not(.is-list) .asset-card::after { box-shadow: var(--rt-raise); transition: box-shadow var(--rt-press-ms); }
-:root[data-look="retroma"][data-rt-part-lib-items="pictures"] #assets-view .assets-body:not(.is-list) .asset-card:hover::after { box-shadow: var(--rt-raise), inset 0 0 0 2px var(--rt-accent); }
+:root[data-look="retroma"][data-rt-part-lib-items="pictures"] #assets-view .assets-body:not(.is-list) .asset-card::after { box-shadow: inset 0 0 0 var(--rt-card-ol-w) var(--rt-card-ol-c), var(--rt-raise); transition: box-shadow var(--rt-press-ms); }
+:root[data-look="retroma"][data-rt-part-lib-items="pictures"] #assets-view .assets-body:not(.is-list) .asset-card:hover::after { box-shadow: inset 0 0 0 var(--rt-card-ol-w) var(--rt-card-ol-hover), var(--rt-raise); }
 :root[data-look="retroma"][data-rt-part-lib-items="pictures"] #assets-view .assets-body:not(.is-list) .asset-card:active::after, :root[data-look="retroma"][data-rt-part-lib-items="pictures"] #assets-view .assets-body:not(.is-list) .asset-card[aria-pressed="true"]::after { box-shadow: var(--rt-sink), inset 0 0 0 3px var(--rt-accent); }
 /* (written flat, each rule ending in a class: a card is made and dropped as the Library scrolls, and a rule ending in nesting or :is()
    is checked on every element) */
@@ -463,10 +463,10 @@
   transition: transform var(--rt-press-ms), box-shadow var(--rt-press-ms);
 }
 :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-thumb, :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-info { transform: translate(var(--rt-cx), var(--rt-cy)); transition: transform var(--rt-press-ms); }
-:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-thumb { inset: 6px 6px calc(var(--text-sm) * 1.4 + var(--text-xs) * 1.4 + 8px) 6px; box-sizing: border-box; border: 0; outline: var(--rt-img-ol) solid var(--rt-img-ol-c); border-radius: min(var(--rt-img-r), max(0px, calc(var(--rt-card-r) - var(--rt-card-ol-w) - 6px))); overflow: hidden; }
+:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-thumb { inset: 6px 6px calc(var(--text-sm) * 1.4 + 8px) 6px; box-sizing: border-box; border: 0; outline: var(--rt-img-ol) solid var(--rt-img-ol-c); border-radius: min(var(--rt-img-r), max(0px, calc(var(--rt-card-r) - var(--rt-card-ol-w) - 6px))); overflow: hidden; }
 :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-info { left: 6px; right: 6px; bottom: 4px; gap: 0; padding: 0; color: var(--rt-fg); background: none; opacity: 1; }
 :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-name { font-size: var(--text-sm); font-weight: 700; }
-:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-meta { font-size: var(--text-xs); color: var(--rt-fg-muted); }
+:root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-meta { display: none; } /* (a card shows its name only) */
 :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-uses, :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card .asset-tags { display: none; }
 :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card::after { display: none; }
 :root[data-look="retroma"]:not([data-rt-part-lib-items="pictures"]) #assets-view .assets-body:not(.is-list) .asset-card:hover:not([aria-pressed="true"], :active) { border-color: var(--rt-card-ol-hover); box-shadow: var(--rt-raise); } /* (not while held: the press sinks it) */
