@@ -792,7 +792,7 @@ test("markdown that comes as words: pasted, it is read as markdown; marks saved 
   await page(p).locator("h1").click();
   await p.keyboard.press("End");
   await p.keyboard.press("Enter");
-  await p.keyboard.type("/lines with");
+  await p.keyboard.type("/marks"); // (a space would end the / menu)
   const row = p.locator(".se-cmd-row").filter({ hasText: "Lines with marks into lists" }).filter({ visible: true });
   await expect(row).toHaveCount(1);
   await row.click();
