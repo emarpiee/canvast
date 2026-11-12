@@ -82,7 +82,7 @@ export function mountSettings(host: HTMLElement, o: {
   bound?(r: HTMLElement, s: Setting): void;
   idPrefix?: string;
 }): { build(): void; syncResets(): void } {
-  const shown = (s: Setting): boolean => !s.when || s.when.slice(1).includes(o.get(s.when[0]!) as string);
+  const shown = (s: Setting): boolean => !s.when || s.when.slice(1).includes(String(o.get(s.when[0]!))); // (a switch's value reads "true" or "false")
   const items = (sec: Section): readonly Setting[] => sec.items.filter(shown);
   const changed = (sec: Section): boolean => sec.items.some((s) => o.get(s.k) !== s.def);
   const syncResets = (): void => {

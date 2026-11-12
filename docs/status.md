@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.12: line art of 3D models from their own edges; the 3D view on small screens (2026-11-13)
+
+- **Implemented:** ADR 0191. `src/assets/model-edges.ts` (EdgeModel: joined corners, outline and crease edges, a face buffer, visibility along each edge with the rim rule, tones, hand-drawn, lines joined into groups; `paintInk`, `inkSvg`, `drawingOfLines`), run in the model worker (`{mesh}`, `{ink, id}`); `ModelStage` keeps a worker per stage, one view at a time, the latest waiting, paints its lines on a canvas laid over the picture (a quad), a flat-fill surface, `inkOf` for Place and SVG, `inkSettled` for cards, `data-inked` on the stage. Line settings in four groups, `MODEL_TABS`, `LINE_PRESETS`, `LINE_STYLE_KIND` (`lines3d`) and the Styles panel's `lines3d` deps through `src/ui/model-front.ts`; the 3D view's tabs, Line styles menu, Save SVG, More menu for narrow views (`@container`), two-pointer pinch and slide. A setting row may depend on a switch.
+- **Tested:** typecheck and build here; the engine run alone in Node on a cube (outline 6 edges as one line, 3 creases, 3 hidden edges, face on a square), a torus at 100 to 1200 px (no outline breaks under a line's width) and a 500 000-triangle sphere (1.4 s the first view, about 0.2 s each after, 0.13 s while turning); scratch Playwright shots of the 8 styles, a narrow view, Save SVG, Place and a card. New unit tests `tests/unit/model-edges.test.ts`; `file-views.spec` line art test rewritten and a narrow-view test added; three README shots (`model-lines`, `model-line-styles`, `model-narrow`): on GitHub.
+- **Known failures:** none known yet.
+- **Unverified:** Firefox; pinch and two-finger slide on a real touch screen; glTF models with skins or morphs (their posed corners are read with three.js's `getVertexPosition`); a model of millions of triangles by hand.
+- **Committed:** v0.57.12 on `main`.
+- **Next bounded task:** read this push's runs; take the three new shots with the Screenshots workflow.
+
 ## v0.57.11: note cards show their titles whole (2026-11-13)
 
 - **Implemented:** `cardRatio` (src/assets/file-kind.ts), one rule for the grid's card shape in the browser library (`assets-view`) and the desktop index (`library-index`): a note's is `NOTE_THUMB_RATIO` (4:3, its thumbnail's, thumb.ts), whatever its `pixelW`/`pixelH` (its whole page, as tall as the note); the rest as before (0.4 to 3).

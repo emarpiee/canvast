@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import type { Page } from "@playwright/test";
 import { expect, test } from "./harness";
 import { makePng } from "./png";
@@ -606,24 +606,31 @@ test("a large 3D model (over 64 MB, read off the page): a picture in the library
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("line art of a 3D model: live over it or alone, and placed on the canvas as editable paths", async ({ app }) => {
+test("line art of a 3D model: from its edges or its picture, over it or alone, line styles built in and saved, an SVG file, and placed on the canvas as editable paths", async ({ app }) => {
   const p = app.page;
   test.skip(!(await hasGl(p)), "no 3D graphics in this browser here");
   const c = await importModel(p, "cube.stl", STL);
   await c.dblclick();
   await expect(modelView(p)).toBeVisible();
   const side = p.getByTestId("model-side");
+  // The settings are in tabs: the lines in theirs, only their switch while they are off.
+  await p.getByTestId("model-tab-lines").click();
+  await expect(side.locator('[data-k="linesShow"]')).toHaveCount(1);
   await expect(side.locator('[data-k="linesWidth"]')).toHaveCount(0);
   const look = () => p.getByTestId("model-stage").locator("canvas").evaluate((x: HTMLCanvasElement) => x.toDataURL());
+  const linesShown = p.locator('[data-testid="model-stage"][data-inked="1"]');
   await p.waitForTimeout(200);
   const plain = await look();
   await side.locator('[data-k="linesShow"] [data-v="over"]').click();
   await expect(side.locator('[data-k="linesWidth"]')).toHaveCount(1);
+  await expect(side.locator('[data-k="creaseAngle"]')).toHaveCount(1);
+  await expect(linesShown).toBeVisible();
   await expect.poll(look).not.toBe(plain);
   await side.locator('[data-k="linesShow"] [data-v="only"]').click();
+  await p.getByTestId("model-tab-view").click();
   await expect(side.locator('[data-k="bg"] code')).toHaveText("#FFFFFF");
+  await p.getByTestId("model-tab-lines").click();
   await expect.poll(() => painted(p)).toBeGreaterThan(0.001);
-  // A thin line finds what a thick one does: reach, not width, says how far it looks.
   const inked = () => p.getByTestId("model-stage").locator("canvas").evaluate((x: HTMLCanvasElement) => {
     const t = document.createElement("canvas");
     t.width = x.width;
@@ -635,12 +642,35 @@ test("line art of a 3D model: live over it or alone, and placed on the canvas as
     for (let i = 0; i < d.length; i += 4) if (d[i]! < 128) n++;
     return n;
   });
+  // From the picture, a thin line finds what a thick one does: reach, not width, says how far it looks.
+  await side.locator('[data-k="linesBy"] [data-v="picture"]').click();
+  await expect(side.locator('[data-k="linesReach"]')).toHaveCount(1);
+  await expect(side.locator('[data-k="creaseAngle"]')).toHaveCount(0);
   await side.locator('[data-k="linesWidth"] input[type=number]').fill("4");
   await p.waitForTimeout(200);
   const thick = await inked();
   await side.locator('[data-k="linesWidth"] input[type=number]').fill("1");
   await expect.poll(inked).toBeLessThan(thick);
   expect(await inked()).toBeGreaterThan(0);
+  // A line style sets the lines, their shading and the ground; one of your own is kept in Styles and offered for any model.
+  await p.getByTestId("view-styles").click();
+  await p.getByRole("menuitem", { name: /^Blueprint/ }).click();
+  await expect(side.locator('[data-k="linesBy"] [data-v="edges"]')).toHaveAttribute("aria-pressed", "true");
+  await expect(side.locator('[data-k="hiddenShow"] input')).toBeChecked();
+  await expect(linesShown).toBeVisible();
+  await p.getByTestId("view-styles").click();
+  await p.getByRole("menuitem", { name: /^Save these lines as a style/ }).click();
+  await p.getByTestId("view-styles").click();
+  await expect(p.getByRole("menuitem", { name: /^3D line style 1/ })).toBeVisible();
+  await p.keyboard.press("Escape");
+  // The lines as an SVG file: each kind in its own group.
+  const download = p.waitForEvent("download");
+  await p.getByTestId("view-svg").click();
+  const svg = readFileSync(await (await download).path(), "utf8");
+  expect(svg).toContain('id="outline"');
+  expect(svg).toContain('id="hidden-edges"');
+  expect(svg).toContain("stroke-dasharray");
+  // On a canvas: the lines it shows, placed as paths to edit.
   await detailsShown(p);
   await p.getByTestId("asset-place").click();
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "image").length)).toBe(1);
@@ -648,12 +678,28 @@ test("line art of a 3D model: live over it or alone, and placed on the canvas as
   await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
   const panel = p.getByTestId("note-panel");
   await expect(panel.getByTestId("model-view")).toBeVisible();
-  await expect(panel.locator('[data-testid="model-stage"][data-drawn]')).toBeVisible();
+  await expect(panel.locator('[data-testid="model-stage"][data-inked="1"]')).toBeVisible();
   await panel.getByTestId("view-lines").click();
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "path").length), { timeout: 30_000 }).toBeGreaterThan(0);
   const path = await p.evaluate(() => window.__canvastDebug.objects().find((o) => o.kind === "path") as unknown as { fill: unknown; stroke: unknown });
   expect(path.fill).toBeNull();
   expect(path.stroke).toBeTruthy();
   await expect.poll(() => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "image").length)).toBe(1);
+  expect(app.consoleErrors).toEqual([]);
+});
+
+test("a 3D view on a narrow screen: its settings in a sheet under the model, the bar's other buttons in its More menu", async ({ app }) => {
+  const p = app.page;
+  test.skip(test.info().project.name !== "chromium" || !(await hasGl(p)), "a layout: once, where there are 3D graphics");
+  const c = await importModel(p, "cube.stl", STL);
+  await p.setViewportSize({ width: 390, height: 844 });
+  await c.dblclick();
+  await expect(p.locator('[data-testid="model-stage"][data-drawn]')).toBeVisible();
+  const stage = (await p.getByTestId("model-stage").boundingBox())!, side = (await p.getByTestId("model-side").boundingBox())!;
+  expect(side.y).toBeGreaterThanOrEqual(stage.y + stage.height - 1);
+  await expect(p.getByTestId("view-mark")).toBeHidden();
+  await p.getByTestId("view-more").click();
+  await p.getByRole("menuitem", { name: /^Bookmark this view/ }).click();
+  await expect(p.getByTestId("view-mark")).toHaveAttribute("aria-pressed", "true");
   expect(app.consoleErrors).toEqual([]);
 });

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { linesSvg, traceLines } from "../../src/assets/model-lines";
+import { traceLines } from "../../src/assets/model-lines";
+import { drawingOfLines, inkSvg } from "../../src/assets/model-edges";
 
 const W = 60, H = 60;
 /** A mask with what `on` says. */
@@ -38,7 +39,7 @@ describe("the lines of a 3D view, followed from what it shows", () => {
     expect(kept.lines[0]!.filter((_, i) => i % 2 === 0).at(-1)).toBeGreaterThan(40);
   });
   it("makes real paths, split when one would hold too many", () => {
-    const svg = linesSvg([[0, 0, 10, 10], [5, 5, 6, 6]], 20, 20, "#111111", 2, 1);
+    const svg = inkSvg(drawingOfLines([[0, 0, 10, 10], [5, 5, 6, 6]], 20, 20, 2), { contour: "#111111", crease: "#111111", hidden: "#111111", hiddenOpacity: 1, hiddenDash: 4, tone: "#111111" }, { perPath: 1 });
     expect(svg.match(/<path /g)).toHaveLength(2);
     expect(svg).toContain('d="M0 0L10 10"');
     expect(svg).toContain('stroke-width="2"');

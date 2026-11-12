@@ -1,8 +1,10 @@
-import type { AnimationClip, AnimationMixer, Light, Material, Mesh, MeshNormalMaterial, MeshToonMaterial, Object3D, OrthographicCamera, PerspectiveCamera, PlaneGeometry, Scene, ShaderMaterial, WebGLRenderTarget, WebGLRenderer } from "three";
+import type { AnimationClip, AnimationMixer, CanvasTexture, Light, Material, Mesh, MeshBasicMaterial, MeshNormalMaterial, MeshToonMaterial, Object3D, OrthographicCamera, PerspectiveCamera, PlaneGeometry, Scene, ShaderMaterial, SkinnedMesh, WebGLRenderTarget, WebGLRenderer } from "three";
 import { extOf } from "./file-kind";
 import { defaultLook, readLook } from "./model-look";
 import type { ModelLook } from "./model-look";
 import type { LinesResult, TraceInput } from "./model-lines";
+import { paintInk } from "./model-edges";
+import type { Drawing, EdgeMesh, InkSpec, InkStyle, ToneKind } from "./model-edges";
 
 // three.js, for what the app draws of a 3D model: one `ModelStage` draws a model with a look on its canvas, in a view and for a card alike.
 
@@ -14,6 +16,17 @@ const three = (): Promise<Three> => (lib ??= import("three"));
 export const MODEL_CARD_EDGE = 1600;
 /** The shape of a new model card. */
 const CARD_RATIO = 4 / 3;
+/** Lines to find for a view, and how to paint them. */
+interface InkJob {
+  spec: InkSpec;
+  key: string;
+  look: ModelLook;
+  w: number;
+  h: number;
+  paint: string;
+}
+/** What changes only how found lines are painted, not where they are. */
+const LINE_PAINT = ["linesColour", "creaseColour", "hiddenColour", "hiddenOpacity", "hiddenDash", "toneColour"] as const;
 /** Past this a model does not open: all of it has to be in memory, and on the graphics card. */
 export const MAX_MODEL_BYTES = 2 ** 30;
 /** A file that has more triangles than this is drawn at one pixel to a pixel while it is turned. */
@@ -45,10 +58,11 @@ interface WorkerPart {
   index?: Uint32Array | Uint16Array;
 }
 let workerUrl: Promise<string> | null = null;
+/** A worker of the model's own (reading files, finding lines). */
+const modelWorker = async (): Promise<Worker> => new Worker(await (workerUrl ??= import("./model-inside").then(({ workerText }) => URL.createObjectURL(new Blob([workerText], { type: "text/javascript" })))));
 /** Reads a file off the page, in a worker of its own that goes when it is done. The bytes are given to it. */
 async function readInWorker(bytes: Uint8Array, ext: string): Promise<WorkerPart[]> {
-  workerUrl ??= import("./model-inside").then(({ workerText }) => URL.createObjectURL(new Blob([workerText], { type: "text/javascript" })));
-  const worker = new Worker(await workerUrl);
+  const worker = await modelWorker();
   const data = bytes.byteOffset === 0 && bytes.byteLength === bytes.buffer.byteLength ? bytes.buffer : bytes.slice().buffer;
   try {
     return await new Promise<WorkerPart[]>((done, failed) => {
@@ -63,8 +77,7 @@ async function readInWorker(bytes: Uint8Array, ext: string): Promise<WorkerPart[
 
 /** The lines of a view, worked out off the page. */
 export async function linesInWorker(input: TraceInput): Promise<LinesResult> {
-  workerUrl ??= import("./model-inside").then(({ workerText }) => URL.createObjectURL(new Blob([workerText], { type: "text/javascript" })));
-  const worker = new Worker(await workerUrl);
+  const worker = await modelWorker();
   try {
     return await new Promise<LinesResult>((done, failed) => {
       worker.onmessage = (e: MessageEvent<{ result?: LinesResult; error?: string }>) => (e.data.result ? done(e.data.result) : failed(new Error(e.data.error ?? "its lines could not be read")));
@@ -195,7 +208,7 @@ export class ModelStage {
   private model: Object3D | null = null;
   private lights: Light[] = [];
   private readonly own = new Map<Mesh, Material | Material[]>();
-  private readonly plain: { clay: Material; flat: Material; wire: Material; tones: MeshToonMaterial };
+  private readonly plain: { clay: Material; flat: Material; wire: Material; tones: MeshToonMaterial; fill: MeshBasicMaterial };
   private clips: AnimationClip[] = [];
   private mixer: AnimationMixer | null = null;
   private shownTones = 0;
@@ -213,6 +226,31 @@ export class ModelStage {
   private edges: WebGLRenderTarget | null = null;
   /** A model of so many triangles that a drag should not also draw each at two pixels to one. */
   heavy = false;
+  /** The view is being turned: its lines are found coarser, to keep up. */
+  moving = false;
+  /** Lines from the model's edges came for what is drawn: draw again to show them. */
+  onInk: (() => void) | null = null;
+  /** The lines from the model's edges: worked out in a worker that keeps the model, painted on a canvas laid over the picture. */
+  private ink: {
+    worker: Worker;
+    /** The model's shape as the worker has it (its pose, which way is up). */
+    sent: number;
+    canvas: HTMLCanvasElement;
+    texture: CanvasTexture;
+    quad: { scene: Scene; camera: OrthographicCamera; mesh: Mesh<PlaneGeometry, MeshBasicMaterial> };
+    /** What is on the canvas (a view and its paint), what is being found, what comes after it. */
+    shown: { key: string; drawing: Drawing } | null;
+    paint: string;
+    busy: string;
+    next: InkJob | null;
+    asked: Map<number, { done(d: Drawing): void; failed(e: Error): void }>;
+    settled: Array<() => void>;
+    id: number;
+  } | null = null;
+  private inkMaking: Promise<NonNullable<ModelStage["ink"]>> | null = null;
+  /** Each change of the model's shape (a model, a pose, which way is up). */
+  private shape = 0;
+  private wantedInk = "";
   private readonly persp: PerspectiveCamera;
   private readonly ortho: OrthographicCamera;
   private shownSurface = "";
@@ -231,7 +269,7 @@ export class ModelStage {
     const clay = new T.MeshStandardMaterial({ roughness: 0.85, side: T.DoubleSide });
     const flat = new T.MeshBasicMaterial({ side: T.DoubleSide });
     const wire = new T.MeshBasicMaterial({ wireframe: true });
-    this.plain = { clay, flat, wire, tones: new T.MeshToonMaterial({ side: T.DoubleSide }) };
+    this.plain = { clay, flat, wire, tones: new T.MeshToonMaterial({ side: T.DoubleSide }), fill: new T.MeshBasicMaterial({ side: T.DoubleSide }) };
   }
 
   /** Null when this browser or machine has no 3D graphics. */
@@ -277,6 +315,8 @@ export class ModelStage {
     this.heavy = triangles > HEAVY_TRIANGLES;
     this.model = g;
     this.holder.add(g);
+    this.shape++;
+    if (this.ink) this.ink.shown = null;
   }
 
   /** Lights stand round the model as lamps in a room: at a value of 0, in front of it, whatever the camera does. */
@@ -339,10 +379,14 @@ export class ModelStage {
     if (this.holder.rotation.x !== upX) {
       this.holder.rotation.set(upX, 0, 0);
       this.gl.shadowMap.needsUpdate = true;
+      this.shape++;
     }
     // The surface.
-    const surface = look["surface"] as string;
-    const { clay, flat, wire, tones } = this.plain;
+    const show = look["linesShow"] as string;
+    // (on a fill, the model is one flat colour under its lines)
+    const surface = show === "flat" ? "fill" : (look["surface"] as string);
+    const { clay, flat, wire, tones, fill } = this.plain;
+    fill.color.set(look["linesFill"] as string);
     for (const m of [clay, flat, wire, tones] as unknown as Array<{ color: { set(c: string): void } }>) m.color.set(look["colour"] as string);
     if (surface === "tones" && look["tones"] !== this.shownTones) {
       // Light falls into this many flat steps of value.
@@ -358,7 +402,7 @@ export class ModelStage {
     if (surface !== this.shownSurface) {
       this.shownSurface = surface;
       this.gl.shadowMap.needsUpdate = true;
-      for (const [m, mat] of this.own) m.material = surface === "own" ? mat : surface === "clay" ? clay : surface === "tones" ? tones : surface === "flat" ? flat : wire;
+      for (const [m, mat] of this.own) m.material = surface === "own" ? mat : surface === "clay" ? clay : surface === "tones" ? tones : surface === "flat" ? flat : surface === "fill" ? fill : wire;
     }
     // The pose: one moment of one of its animations.
     if (this.mixer) {
@@ -373,6 +417,7 @@ export class ModelStage {
         this.shownPose = pose;
         this.mixer.setTime(Math.min(look["poseTime"] as number, this.clips[c]!.duration * 0.9999)); // (at its very end it would loop back to its start)
         this.gl.shadowMap.needsUpdate = true;
+        this.shape++;
       }
     }
     this.setLights(look);
@@ -404,9 +449,236 @@ export class ModelStage {
     camera.lookAt(target);
     camera.updateMatrixWorld();
     this.lastCamera = camera;
-    const show = look["linesShow"] as string;
     if (show !== "only") this.gl.render(this.scene, camera);
-    if (show !== "off") this.drawLines(look, camera, show === "only");
+    else this.gl.clear();
+    this.wantedInk = "";
+    if (show === "off") return;
+    if (look["linesBy"] === "picture") return this.drawLines(look, camera, show === "only");
+    if (w < 8 || h < 8) return; // (not laid out yet)
+    // From its edges: what was found last shows until what is in view now comes.
+    const px = this.gl.getDrawingBufferSize(new T.Vector2());
+    const quick = this.moving ? 0.5 : 1;
+    const spec = this.inkSpec(look, camera, Math.max(1, Math.round(px.x * quick)), Math.max(1, Math.round(px.y * quick)), this.moving, false);
+    this.wantInk(spec, look, px.x, px.y);
+  }
+
+  /** What the worker needs to find a view's lines from the model's edges, at `w` × `h` pixels. */
+  private inkSpec(look: ModelLook, camera: PerspectiveCamera | OrthographicCamera, w: number, h: number, quick: boolean, fill: boolean): InkSpec {
+    const T = this.T;
+    const px = h / 800; // (sizes are for a picture 800 pixels tall: the same drawing at any size)
+    const lights: InkSpec["lights"] = ["key", "fill", "rim"]
+      .filter((k) => look[`${k}Type`] !== "off")
+      .map((k) => {
+        const a = (look[`${k}Around`] as number) * (Math.PI / 180), e = (look[`${k}Height`] as number) * (Math.PI / 180);
+        return { dir: [Math.sin(a) * Math.cos(e), Math.sin(e), Math.cos(a) * Math.cos(e)] as const, power: (look[`${k}Power`] as number) / 3.5 };
+      });
+    const toCamera = camera.getWorldDirection(new T.Vector3()).negate();
+    return {
+      w, h, view: [...camera.matrixWorldInverse.elements], proj: [...camera.projectionMatrix.elements], persp: camera === this.persp, near: camera.near,
+      camPos: [camera.position.x, camera.position.y, camera.position.z], camDir: [toCamera.x, toCamera.y, toCamera.z], quick,
+      outline: !!look["linesOuter"], outlineWidth: (look["linesWidth"] as number) * px,
+      creases: !!look["linesCreases"], creaseWidth: (look["creaseWidth"] as number) * px, creaseAngle: look["creaseAngle"] as number,
+      hidden: !!look["hiddenShow"],
+      tones: look["toneMode"] as ToneKind, toneSpacing: (look["toneSpacing"] as number) * px, toneStrength: (look["toneStrength"] as number) / 100, toneWidth: (look["toneWidth"] as number) * px, toneAngle: look["toneAngle"] as number,
+      sketch: (look["sketch"] as number) * px, fade: (look["depthFade"] as number) / 100, weight: !!look["depthWeight"],
+      lights, ambient: (look["ambientPower"] as number) / 3, fill,
+    };
+  }
+
+  /** How a view's lines are painted, at `h` pixels tall. */
+  static inkStyle(look: ModelLook, h: number, fill: boolean): InkStyle {
+    return {
+      contour: look["linesColour"] as string, crease: look["creaseColour"] as string, hidden: look["hiddenColour"] as string,
+      hiddenOpacity: (look["hiddenOpacity"] as number) / 100, hiddenDash: ((look["hiddenDash"] as number) * h) / 800, tone: look["toneColour"] as string,
+      fill: fill && look["linesShow"] === "flat" ? (look["linesFill"] as string) : undefined,
+    };
+  }
+
+  /** The model's triangles where they stand now (posed, turned up), for the worker. */
+  private edgeMesh(): EdgeMesh {
+    const T = this.T;
+    this.scene.updateMatrixWorld(true);
+    const meshes: Mesh[] = [];
+    this.model?.traverseVisible((o) => void ((o as Mesh).isMesh && meshes.push(o as Mesh)));
+    let corners = 0, count = 0;
+    for (const m of meshes) {
+      corners += m.geometry.getAttribute("position")?.count ?? 0;
+      count += m.geometry.index?.count ?? m.geometry.getAttribute("position")?.count ?? 0;
+    }
+    const pos = new Float32Array(corners * 3), faces = new Uint32Array(count - (count % 3));
+    const v = new T.Vector3();
+    let at = 0, f = 0;
+    for (const m of meshes) {
+      const p = m.geometry.getAttribute("position");
+      if (!p) continue;
+      (m as SkinnedMesh).skeleton?.update();
+      const e = m.matrixWorld.elements, plain = !(m as SkinnedMesh).isSkinnedMesh && !m.geometry.morphAttributes["position"]?.length;
+      for (let i = 0; i < p.count; i++) {
+        if (plain) v.set(p.getX(i), p.getY(i), p.getZ(i));
+        else m.getVertexPosition(i, v);
+        pos[(at + i) * 3] = e[0]! * v.x + e[4]! * v.y + e[8]! * v.z + e[12]!;
+        pos[(at + i) * 3 + 1] = e[1]! * v.x + e[5]! * v.y + e[9]! * v.z + e[13]!;
+        pos[(at + i) * 3 + 2] = e[2]! * v.x + e[6]! * v.y + e[10]! * v.z + e[14]!;
+      }
+      const idx = m.geometry.index, n = (idx?.count ?? p.count) - ((idx?.count ?? p.count) % 3);
+      for (let i = 0; i < n && f < faces.length; i++) faces[f++] = at + (idx ? idx.getX(i) : i);
+      at += p.count;
+    }
+    return { pos, faces: faces.subarray(0, f - (f % 3)) };
+  }
+
+  /** The worker, the canvas of lines and what lays it over the picture: made once, when lines from edges are first asked for. */
+  private async inkParts(): Promise<NonNullable<ModelStage["ink"]>> {
+    if (this.ink) return this.ink;
+    return (this.inkMaking ??= (async () => {
+      const T = this.T;
+      const worker = await modelWorker();
+      const canvas = document.createElement("canvas");
+      const texture = new T.CanvasTexture(canvas);
+      texture.colorSpace = T.SRGBColorSpace;
+      const mesh = new T.Mesh(new T.PlaneGeometry(2, 2), new T.MeshBasicMaterial({ map: texture, transparent: true, depthTest: false, depthWrite: false }));
+      mesh.position.z = -1; // (in front of the camera, past its near side)
+      const scene = new T.Scene();
+      scene.add(mesh);
+      const ink: NonNullable<ModelStage["ink"]> = { worker, sent: -1, canvas, texture, quad: { scene, camera: new T.OrthographicCamera(), mesh }, shown: null, paint: "", busy: "", next: null, asked: new Map(), settled: [], id: 0 };
+      worker.onmessage = (e: MessageEvent<{ drawing?: Drawing; error?: string; id: number }>) => {
+        const asked = ink.asked.get(e.data.id);
+        ink.asked.delete(e.data.id);
+        if (e.data.drawing) asked?.done(e.data.drawing);
+        else asked?.failed(new Error(e.data.error ?? "its lines could not be drawn"));
+      };
+      worker.onerror = () => {
+        for (const a of ink.asked.values()) a.failed(new Error("its lines could not be drawn"));
+        ink.asked.clear();
+      };
+      this.ink = ink;
+      return ink;
+    })());
+  }
+
+  /** The lines of a view from the model's edges, found off the page. */
+  private async askInk(spec: InkSpec): Promise<Drawing> {
+    const ink = await this.inkParts();
+    if (ink.sent !== this.shape) {
+      ink.sent = this.shape;
+      const mesh = this.edgeMesh();
+      ink.worker.postMessage({ mesh }, [mesh.pos.buffer, mesh.faces.buffer]);
+    }
+    const id = ++ink.id;
+    return new Promise<Drawing>((done, failed) => {
+      ink.asked.set(id, { done, failed });
+      ink.worker.postMessage({ ink: spec, id });
+    });
+  }
+
+  /** Shows the lines of this view: those found last, until these come (one is found at a time; only the latest waits). */
+  private wantInk(spec: InkSpec, look: ModelLook, w: number, h: number): void {
+    const key = JSON.stringify([this.shape, spec]);
+    const paint = JSON.stringify([key, LINE_PAINT.map((k) => look[k]), w, h]);
+    this.wantedInk = key;
+    const ink = this.ink;
+    // What was found last, while these are found: only at this size (stretched, it would not lie on the model).
+    if (ink?.shown && ink.canvas.width === w && ink.canvas.height === h) {
+      // (only its colours changed: painted again from what was found)
+      if (ink.shown.key === key && ink.paint !== paint) this.paintInkCanvas(ink, ink.shown.drawing, look, w, h, paint);
+      this.layInk(ink);
+    }
+    const job: InkJob = { spec, key, look, w, h, paint };
+    if (!ink) {
+      // (the first: the worker is still being made; the latest asked for goes when it is)
+      const first = !this.firstInk;
+      this.firstInk = job;
+      if (first)
+        void this.inkParts().then(() => {
+          const j = this.firstInk;
+          this.firstInk = null;
+          if (j) this.findInk(j);
+        });
+      return;
+    }
+    if (ink.shown?.key === key || ink.busy === key) return this.inkSettledIf();
+    if (ink.busy) ink.next = job;
+    else this.findInk(job);
+  }
+  private firstInk: InkJob | null = null;
+
+  private findInk(job: InkJob): void {
+    void this.inkParts().then((ink) => {
+      ink.busy = job.key;
+      const after = (): void => {
+        ink.busy = "";
+        const next = ink.next;
+        ink.next = null;
+        if (next && next.key !== ink.shown?.key) this.findInk(next);
+        else this.inkSettledIf(true);
+      };
+      this.askInk(job.spec).then(
+        (d) => {
+          ink.shown = { key: job.key, drawing: d };
+          this.paintInkCanvas(ink, d, job.look, job.w, job.h, job.paint);
+          after();
+          this.onInk?.();
+        },
+        after,
+      );
+    });
+  }
+
+  /** Paints what was found on the canvas laid over the picture, at its pixels. */
+  private paintInkCanvas(ink: NonNullable<ModelStage["ink"]>, d: Drawing, look: ModelLook, w: number, h: number, paint: string): void {
+    ink.paint = paint;
+    if (ink.canvas.width !== w || ink.canvas.height !== h) {
+      ink.canvas.width = w;
+      ink.canvas.height = h;
+      // (a texture keeps the size it was made at: a new one for the new size)
+      ink.texture.dispose();
+      ink.texture = new this.T.CanvasTexture(ink.canvas);
+      ink.texture.colorSpace = this.T.SRGBColorSpace;
+      ink.quad.mesh.material.map = ink.texture;
+    }
+    const g = ink.canvas.getContext("2d")!;
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, w, h);
+    g.setTransform(w / d.w, 0, 0, h / d.h, 0, 0);
+    paintInk(g, d, ModelStage.inkStyle(look, d.h, false));
+    ink.texture.needsUpdate = true;
+  }
+
+  /** Lays the canvas of lines over what was drawn. */
+  private layInk(ink: NonNullable<ModelStage["ink"]>): void {
+    const auto = this.gl.autoClear;
+    this.gl.autoClear = false;
+    this.gl.render(ink.quad.scene, ink.quad.camera);
+    this.gl.autoClear = auto;
+  }
+
+  /** Lets those waiting for the lines go once nothing is being found. */
+  private inkSettledIf(anyway = false): void {
+    const ink = this.ink;
+    if (!ink || ink.busy || (!anyway && ink.shown?.key !== this.wantedInk)) return;
+    const list = ink.settled;
+    ink.settled = [];
+    for (const f of list) f();
+  }
+
+  /** The lines of what was last drawn are on it (or it has none to find). */
+  get inkCurrent(): boolean {
+    return !this.wantedInk || (!!this.ink && !this.ink.busy && this.ink.shown?.key === this.wantedInk);
+  }
+
+  /** Resolves when the lines of what was last drawn have come (at once when there are none to find). */
+  inkSettled(): Promise<void> {
+    const ink = this.ink;
+    if (!this.wantedInk || (ink && !ink.busy && ink.shown?.key === this.wantedInk)) return Promise.resolve();
+    if (!ink) return this.inkParts().then(() => this.inkSettled());
+    return new Promise((done) => ink.settled.push(done));
+  }
+
+  /** A view's lines from the model's edges at `w` × `h` (for placing on a canvas or a file): the last drawn camera, exactly, with the faces in sight for a fill. */
+  async inkOf(look: ModelLook, w: number, h: number): Promise<Drawing | null> {
+    const camera = this.lastCamera;
+    if (!camera || !this.model) return null;
+    return this.askInk(this.inkSpec(look, camera, w, h, false, look["linesShow"] === "flat"));
   }
 
   /** Renders the surface's direction and depth into `seen`, at this canvas's size. */
@@ -542,6 +814,14 @@ export class ModelStage {
     this.plain.wire.dispose();
     this.plain.tones.gradientMap?.dispose();
     this.plain.tones.dispose();
+    this.plain.fill.dispose();
+    if (this.ink) {
+      this.ink.worker.terminate();
+      this.ink.texture.dispose();
+      this.ink.quad.mesh.geometry.dispose();
+      this.ink.quad.mesh.material.dispose();
+      for (const f of this.ink.settled) f();
+    }
     this.seen?.depthTexture?.dispose();
     this.seen?.dispose();
     this.seenNormals?.dispose();
@@ -589,6 +869,11 @@ export function modelPicture(read: () => Promise<Uint8Array>, name: string, o: {
     const size = o.size ?? { w: edge, h: Math.round(edge / CARD_RATIO) };
     const look = o.preview ? readLook(o.preview, firstLook(name)) : defaultLook(firstLook(name));
     stage.draw(look, size.w, size.h);
+    // (lines from the model's edges come from its worker: drawn again with them)
+    if (look["linesShow"] !== "off" && look["linesBy"] !== "picture") {
+      await stage.inkSettled();
+      stage.draw(look, size.w, size.h);
+    }
     if (!look["mirror"]) return createImageBitmap(stage.canvas, { premultiplyAlpha: "none" });
     const flipped = document.createElement("canvas");
     flipped.width = size.w;

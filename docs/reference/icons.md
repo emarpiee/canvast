@@ -119,7 +119,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `circle` | Ellipse shape |
 | `circle-help` | How to combine search words |
 | `copy` | Duplicate |
-| `download` | Download original (library details and selection bar) |
+| `download` | Download original (library details and selection bar); Save the lines as SVG (3D view) |
 | `ellipsis` | More actions for board Board 1; More actions for canvas Canvas 1 |
 | `eraser` | Object eraser |
 | `external-link` | Open in a new tab |
@@ -318,6 +318,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `folder-tree` | Organize: move to a folder and add tags, from one list (library) |
 | `book-open` | Open a file in the panel on a canvas (a PDF, the Actions bar) |
 | `lightbulb` | Lighting of a 3D model: its classic setups |
+| `drafting-compass` | Line styles of a 3D view (its menu, its rows, the 3D line styles in the Styles panel) |
 | `rotate-3d` | Place a turnaround of a 3D model on the canvas |
 | `file-up` | A PDF's previous page |
 | `file-down` | A PDF's next page |

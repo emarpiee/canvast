@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.57.12 — Line art of 3D models from their own edges; the 3D view on small screens (2026-11-13)
+
+- **Added:** lines of a 3D model found from its own edges (*Find by: Model edges*, the new default; ADR 0191): the outline, creases where faces meet at a sharper turn than an angle you set, and the edges behind, dashed, each with its own width and colour.
+- **Added:** shading in a 3D view's lines: hatching, cross-hatching, halftone dots or stippling where the view's lights leave the model dark, with their colour, spacing, strength, width and angle.
+- **Added:** hand-drawn 3D lines: a wobble, far lines faded, near lines thicker.
+- **Added:** lines on a fill: the model in one flat colour under its lines.
+- **Added:** **Line styles** in the 3D view's bar: Blueprint, Ink, Architectural, Etching, Patent, Comic dots, Pencil and Toon, and your own, saved as 3D line styles in the Styles panel for any model.
+- **Added:** **Save the lines as SVG** in the 3D view: the line art as an SVG file, each kind of line in its own group.
+- **Added:** the 3D view's settings in three tabs (View, Lines, Light); in a narrow view they are a sheet under the model and the bar's other buttons are in its More menu; two fingers pinch to zoom and move together to slide.
+- **Changed:** **Place the lines** places the lines from the model's edges as they show (outline, creases, hidden edges, tones and the fill, each kind in its own paths); lines found from the picture are placed as before.
+
 ## 0.57.11 — Note cards show their titles whole (2026-11-13)
 
 - **Fixed:** in the library, a long note's card was narrow (it took the shape of the whole page, as tall as the note) while its picture is the top of the page, so the title was cut off at both sides. Every note's card now has its picture's shape.

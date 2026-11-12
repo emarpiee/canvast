@@ -15,7 +15,7 @@ type Base = {
   readonly steady?: true;
   /** A few more words on what it does, in the tip of its name. */
   readonly tip?: string;
-  /** Shown only while the choice `when[0]` is one of the others. */
+  /** Shown only while the choice `when[0]` is one of the others (a switch: "true" or "false"). */
   readonly when?: readonly string[];
 };
 export type Setting = Base &

@@ -113,24 +113,3 @@ export function traceLines(i: TraceInput): LinesResult {
   all.sort((a, b) => b.len - a.len);
   return { lines: all.slice(0, i.most).map((l) => l.line), dropped: Math.max(0, all.length - i.most) };
 }
-
-/** Lines as an SVG drawing, in paths of at most `perPath` lines (a path of the app holds so many). */
-export function linesSvg(lines: readonly (readonly number[])[], w: number, h: number, colour: string, width: number, perPath = 4000, pointsPerPath = 60_000): string {
-  const paths: string[] = [];
-  const flush = (d: string[]): void => void paths.push(`<path d="${d.join("")}" fill="none" stroke="${colour}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`);
-  let d: string[] = [], points = 0;
-  for (const l of lines) {
-    if (d.length >= perPath || points + l.length / 2 > pointsPerPath) {
-      flush(d);
-      d = [];
-      points = 0;
-    }
-    const at = (j: number): string => `${Math.round(l[j]! * 100) / 100} ${Math.round(l[j + 1]! * 100) / 100}`;
-    let one = `M${at(0)}`;
-    for (let j = 2; j < l.length; j += 2) one += `L${at(j)}`;
-    d.push(one);
-    points += l.length / 2;
-  }
-  if (d.length) flush(d);
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" width="${w}" height="${h}">${paths.join("")}</svg>`;
-}

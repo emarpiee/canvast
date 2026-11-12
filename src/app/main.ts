@@ -126,6 +126,8 @@ import type { BusyScreen } from "../ui/busy-screen";
 import { extractPalette } from "../assets/extract-palette";
 import { mountTagsPanel } from "../ui/tags-panel";
 import { mountStylesPanel } from "../ui/styles-panel";
+import { modelViewInFront } from "../ui/model-front";
+import type { ModelLook } from "../assets/model-look";
 import { linkedUpdates } from "./style-sync";
 import { PanelDock } from "../ui/panel-dock";
 import { mountAdjustPanel } from "../ui/adjust-panel";
@@ -1383,6 +1385,7 @@ async function start(): Promise<void> {
       ask: async (title, value) => (await askRatio(title, value))?.ratio ?? null,
     },
     balloon: { can: () => selectedBalloon(doc, editor) !== null, apply: (look) => applyBalloonStyle(doc, editor, look) },
+    lines3d: { can: () => modelViewInFront() !== null, apply: (d, name) => modelViewInFront()?.useLineStyle(d as ModelLook, name) },
     pattern: {
       current: () => patternPanel.current(),
       apply: (d, label) => {

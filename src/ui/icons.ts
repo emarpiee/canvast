@@ -308,6 +308,7 @@ import fileType from "lucide-static/icons/file-type.svg";
 import fileTextSvg from "lucide-static/icons/file-text.svg";
 import fileSignatureSvg from "lucide-static/icons/file-signature.svg";
 import fileCodeSvg from "lucide-static/icons/file-code.svg";
+import draftingCompassSvg from "lucide-static/icons/drafting-compass.svg";
 import layers2 from "lucide-static/icons/layers-2.svg";
 import alignHStart from "lucide-static/icons/align-horizontal-justify-start.svg";
 import alignHCenter from "lucide-static/icons/align-horizontal-justify-center.svg";
@@ -659,6 +660,7 @@ export const ICONS = {
   fileText: clean(fileTextSvg),
   fileSignature: clean(fileSignatureSvg),
   fileCode: clean(fileCodeSvg),
+  draftingCompass: clean(draftingCompassSvg),
   layers2: clean(layers2),
   alignHStart: clean(alignHStart),
   alignHCenter: clean(alignHCenter),

@@ -4,6 +4,8 @@ import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import type { BufferGeometry, Mesh } from "three";
 import { traceLines } from "./model-lines";
 import type { TraceInput } from "./model-lines";
+import { EdgeModel } from "./model-edges";
+import type { Drawing, EdgeMesh, InkSpec } from "./model-edges";
 
 // Reads a model's file off the page: a large one takes seconds, and the page must not stop for them. What it makes goes back as plain arrays.
 
@@ -21,7 +23,26 @@ const partOf = (g: BufferGeometry): Part => {
   return { position: g.getAttribute("position")!.array as Float32Array, normal: g.getAttribute("normal")!.array as Float32Array, ...(color ? { color } : {}), ...(index ? { index } : {}) };
 };
 
-self.onmessage = (e: MessageEvent<{ data: ArrayBuffer; ext: string } | { lines: TraceInput }>) => {
+/** The model whose edges are drawn, kept between views. */
+let edges: EdgeModel | null = null;
+
+self.onmessage = (e: MessageEvent<{ data: ArrayBuffer; ext: string } | { lines: TraceInput } | { mesh: EdgeMesh } | { ink: InkSpec; id: number }>) => {
+  const post = (m: unknown, transfer: Transferable[] = []): void => (self as unknown as Worker).postMessage(m, transfer);
+  if ("mesh" in e.data) {
+    edges = new EdgeModel(e.data.mesh);
+    return;
+  }
+  if ("ink" in e.data) {
+    const id = e.data.id;
+    try {
+      if (!edges) throw new Error("no model");
+      const d: Drawing = edges.draw(e.data.ink);
+      post({ drawing: d, id }, [d.dots.buffer, d.fill.buffer, ...d.groups.flatMap((g) => [g.pts.buffer, g.ends.buffer])] as Transferable[]);
+    } catch (err) {
+      post({ error: (err as Error).message || "its lines could not be drawn", id });
+    }
+    return;
+  }
   if ("lines" in e.data) {
     try {
       (self as unknown as Worker).postMessage({ result: traceLines(e.data.lines) });

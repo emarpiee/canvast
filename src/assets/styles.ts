@@ -19,6 +19,8 @@ import type { TextLook } from "../text/text-style";
 import { formatRatio } from "../app/export-size";
 import { cleanExportPreset, exportPresetSummary, type ExportPreset } from "../app/export-prefs";
 import { cleanNamePattern } from "../app/export-names";
+import { cleanLineStyle, lineStyleSummary } from "./model-look";
+import type { ModelLook } from "./model-look";
 
 export interface StyleItem {
   readonly id: string;
@@ -197,7 +199,18 @@ export const EXPORT_NAME_KIND: StyleKind = {
   summary: (d) => (d as { pattern: string }).pattern,
 };
 
-export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND, BALLOON_KIND, RATIO_KIND, EXPORT_KIND, EXPORT_NAME_KIND];
+/** The line art of a 3D view (its lines, shading, fill and ground), saved from the view's Line styles menu to use on any model. */
+export const LINE_STYLE_KIND: StyleKind = {
+  id: "lines3d",
+  label: "3D line style",
+  plural: "3D line styles",
+  empty: "None yet. Save one from the Line styles menu of a 3D view.",
+  validate: (d) => cleanLineStyle(d),
+  summary: (d) => lineStyleSummary(d as ModelLook),
+  look: (d) => ({ swatches: [(d as ModelLook)["linesColour"], (d as ModelLook)["bg"], (d as ModelLook)["toneColour"]].filter((c): c is string => typeof c === "string" && isColour(c)) }),
+};
+
+export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND, BALLOON_KIND, LINE_STYLE_KIND, RATIO_KIND, EXPORT_KIND, EXPORT_NAME_KIND];
 
 export const kindById = (id: string): StyleKind | undefined => STYLE_KINDS.find((k) => k.id === id);
 

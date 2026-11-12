@@ -699,6 +699,7 @@ Take the colours of a reference as a palette to paint with.
 | Adjustments | A whole Adjust stack |
 | Patterns | A generator with its settings and seed: pressing its card puts it back in the Pattern panel and makes it on what is selected (on each of several selected shapes) |
 | Speech balloons | Size, tails, paint and the look of the words; goes on the selected balloons when you press its card. Not linked: changing the style later does not change them |
+| 3D line styles | The line art of a 3D view: see [Line art of a 3D model](#line-art-of-a-3d-model) |
 | Custom ratios | See [Sheets](#sheets) |
 | Export presets | See [Export…](#export) |
 
@@ -831,7 +832,7 @@ Keep every reference once, in folders by subject, and see a print's details besi
 | [Search](#search) | Words, keywords, operators, saved searches, filters |
 | [Folders and tags](#folders-and-tags) | The sidebar's trees, Organize, quick filters |
 | [The viewer](#the-viewer) | Filmstrip, zoom, slideshow, players |
-| [PDFs and 3D models](#pdfs-and-3d-models) | A reader for PDFs, a lit view of 3D models |
+| [PDFs and 3D models](#pdfs-and-3d-models) | A reader for PDFs, a lit view of 3D models and their line art |
 | [Art files](#art-files) | Pictures from `.kra`, `.psd`, `.procreate` and others |
 | [Fonts](#fonts) | Samples of the library's fonts |
 | [Similar images](#similar-images) | Duplicates and near-duplicates |
@@ -964,12 +965,12 @@ Read a study handout beside your pictures, without another app.
 
 Turn a simple 3D object under a light, as the start of a still-life lighting study.
 
-![A turned vase in the 3D view, lit from one side, its camera, surface and light settings beside it](docs/screenshots/model-view.webp)
+![A turned vase in the 3D view, lit from one side, its camera and surface settings beside it under the View tab](docs/screenshots/model-view.webp)
 
 | | PDF | 3D model (GLB, glTF, STL, OBJ, PLY) |
 | --- | --- | --- |
 | In the library and details | Its first page | Its first view |
-| Moving around | Page buttons, a page number, Page Up and Down, Home, End; zoom with its buttons, Ctrl+wheel or Ctrl and + or - | Drag to turn, Shift or right drag to slide, wheel to zoom, double-click for the first view |
+| Moving around | Page buttons, a page number, Page Up and Down, Home, End; zoom with its buttons, Ctrl+wheel or Ctrl and + or - | Drag to turn, Shift or right drag to slide, wheel to zoom, double-click for the first view; on a touch screen, two fingers pinch to zoom and move together to slide |
 | Remembered | The page it was left at | The view it was left at, with its lights |
 | Opened from a card | At the page that card shows | At the view that card shows |
 | Bookmarks | Pages, and the contents the PDF carries | Views |
@@ -982,6 +983,8 @@ Bookmarks are in the view's bar and in the details, each with a ⋯ to rename or
 
 #### The 3D view's settings
 
+The settings are in three tabs: **View** (camera, surface, background, pose), **Lines** and **Light**. In a narrow view, such as a phone or a small panel on a canvas, they are a sheet under the model, and the bar keeps turning, lighting and line styles, with the rest in its ⋯ menu.
+
 | Setting | What it does |
 | --- | --- |
 | **Camera** | Around, height, zoom, lens and focal length |
@@ -991,9 +994,41 @@ Bookmarks are in the view's bar and in the details, each with a ⋯ to rename or
 | **Background** | A colour or none, so a card can be see-through |
 | **Lights** | Three lights (sun, point, spot or off, each with a colour, strength and direction), with light all around. They stand still round the model while the camera turns, as lamps in a room. **Lighting** in the bar sets a classic setup: Rembrandt, loop, butterfly, split, rim, three-point, even |
 | **Tones** | Shows the light in 2 to 5 flat steps of value, to read shadow shapes |
-| **Lines** | Draws line art, the outer outline and the inner forms, over the model or alone, with its width, colour, how much outline and inner detail show, and its reach: how far it looks for a change, apart from how wide lines are drawn, so fine lines can still find gentle forms |
-| **Place the lines** | Puts this view's line art on the canvas as paths to edit, which copy and export like any shape. They are the lines the view shows, followed along their middles, as one line width. A dense scan gives many short lines: raise *Min. placed*, the shortest line placed (it changes only what is placed), or lower *Inner detail* |
 | **Reset** | Double-click a setting's name for that one, the button on a group for the group, or the one in the bar for all, as in the Pattern panel |
+
+#### Line art of a 3D model
+
+Draw a model as a technical illustration or a print: its outline, creases and the edges behind, with hatching or dots where the light does not fall.
+
+![The vase drawn as an etching in the 3D view: an ink outline, cross-hatched shadows on its dark side, on cream paper, with the Lines tab beside it](docs/screenshots/model-lines.webp)
+
+| Setting | What it does |
+| --- | --- |
+| **Show** | Off, over the model, on a flat fill of one colour, or the lines alone |
+| **Find by** | *Model edges*: the lines of its own faces, exact, at any size. *The picture*: lines where the view changes in depth or turn, for scans and very dense models (with its outline, inner detail and reach) |
+| **Outline** | Where the surface turns away: the outer shape and its overlaps, with its width and colour |
+| **Creases** | Where two faces meet at a sharper turn than the crease angle, with their own width and colour |
+| **Hidden edges** | The edges behind, dashed, with their colour, opacity and dash, as a technical drawing shows them |
+| **Shading** | The light's shadows as hatching, cross-hatching, halftone dots or stippling, with their colour, spacing, strength, width and angle. They follow the lights of the Light tab |
+| **Hand-drawn** | A wobble, as by hand; far lines fading; near lines thicker |
+
+Give a model the look of a blueprint or a comic in one choice, and keep your own looks for other models.
+
+![The Line styles menu of the 3D view open over the vase: Blueprint, Ink, Architectural, Etching, Patent, Comic dots, Pencil and Toon, then Save these lines as a style](docs/screenshots/model-line-styles.webp)
+
+| Line styles (in the bar) | |
+| --- | --- |
+| Built in | Blueprint, Ink, Architectural, Etching, Patent, Comic dots, Pencil, Toon: each sets all the lines, their fill and the background (Toon also the surface) |
+| Your own | *Save these lines as a style* keeps them in the [Styles](#styles) panel as a 3D line style, offered in this menu for any model; pressing its card in the panel gives it to the 3D view in front |
+
+| Using the lines | |
+| --- | --- |
+| **Place the lines** | Puts this view's line art on the canvas as paths to edit, which copy and export like any shape: from the model's edges, the outline, creases, hidden edges, tones and the fill, each kind in its own paths; from the picture, its lines followed along their middles, as one line width (a dense scan gives many short lines: raise *Min. placed*, the shortest line placed, or lower *Inner detail*) |
+| **Save the lines as SVG** | Saves this view's line art as an SVG file with each kind in its own group, on the background; over the model, the picture of the model is under the lines |
+
+Check a figure's pose on a phone: the model above, its settings below.
+
+![The 3D view on a phone: the vase in ink lines above, the Lines tab as a sheet under it, and the bar's other buttons in its ⋯ menu](docs/screenshots/model-narrow.webp)
 
 ### Art files
 
@@ -2266,6 +2301,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | --- | --- |
 | PDF | Forms are shown but not filled; links to the web are not opened; a password is asked each time and a card shows no picture of such a PDF; a font a PDF does not carry comes from the system, and East Asian text that needs one may not show |
 | 3D | GLB, glTF, STL, OBJ and PLY only, one file each: what lies in another file (an OBJ's materials, a glTF's textures) and compressed glTF are not read; a model over 1 GB does not open, and over 512 MB has a plain card |
+| 3D line art | On a model of millions of triangles, lines from its edges come a moment after the view; placed lines are paths only, without the model's surface |
 | Text | No Indic shaping; other computers can wrap missing characters differently |
 | Partial backups | ⚠️ An Advanced export can only be added, never used to update a workspace. Links in notes to items left out find nothing until those items are there |
 | Concealed folders | A view filter, not privacy: no password, nothing encrypted, the files stay readable on the disk. The canvas's font list and texture picker still offer their items |
@@ -2296,6 +2332,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | --- | --- |
 | PDF | Forms are shown but not filled, and links to the web are not opened (links inside a PDF are followed). A PDF's password is asked each time it opens and kept nowhere, and its card shows no picture. A font a PDF does not carry comes from the system, and East Asian text that needs one may not show. The library's search reads PDFs up to 128 MB and 2000 pages |
 | 3D | Only GLB, glTF, STL, OBJ and PLY are read, one file each: an OBJ's materials, a glTF's textures in other files and compressed glTF are not. A model over 1 GB does not open, and one over 512 MB has a plain card. Without 3D graphics in the browser or machine a model stays a card |
+| 3D line art | Lines from a model's edges are worked out off the page, a view at a time: on a model of millions of triangles they come a moment after the view, and coarser while it turns (*The picture* keeps up with any model). Placed lines are paths only: the model's own surface is not placed, and an SVG holds it as a picture only when the lines are over the model. Hidden edges, shading and hand-drawn lines come only from the model's edges |
 | Text | Complex scripts that need Indic shaping are not supported; OpenType positioning goes no further than kerning. Characters missing from the interface font fall back to a system font: their width then comes from the browser, so such text can wrap differently on another computer and pixelates at extreme depth |
 | Vector networks | One fill for the whole network (no fill per region) |
 | Note zoom | Only a note's text grows; pictures keep their size |
@@ -2686,7 +2723,7 @@ Every picture in this README is made by code: each one is a Playwright test in `
 | `comics.shot.ts` | A lettered comic page, the balloon kinds, a balloon's tail, a cover's type |
 | `library.shot.ts` | The gallery, the list, the sidebar, search and its help, greyscale in the viewer, Organize, several selected, similar images, art files, a font, properties, rename, a thumbnail, taking a file out |
 | `notes.shot.ts` | Study notes in the editor, their links and properties, the note beside its print |
-| `views.shot.ts` | A PDF handout, a 3D vase, the *How to import* question |
+| `views.shot.ts` | A PDF handout, a 3D vase, its line art, its line styles and the 3D view on a phone, the *How to import* question |
 | `privacy.shot.ts` | The context menu, hiding, hidden mode, the padlock, the backup question, Settings > Privacy, the lock screen |
 | `workspace.shot.ts` | The showcase (home, deep, far out, a tour), boards and canvases, bookmarks, search on the canvas, the command palette, Settings, Shortcuts, the info bar, Storage, Advanced export, Delete all, a second tab, Export |
 | `tools.shot.ts` | The canvast tools' menu in a terminal |
