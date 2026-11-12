@@ -813,8 +813,8 @@ test("markdown that comes as words: pasted, it is read as markdown; marks saved 
   await expect(page(p).locator("strong")).toHaveText("bold");
   // C: typed at a line's start, then a space, a mark makes its format (the cursor put at the end of the last line)
   await page(p).locator("p").last().evaluate((el) => {
+    (el.closest("[contenteditable]") as HTMLElement).focus(); // (first: the editor puts back its own cursor when it gets the focus)
     getSelection()!.collapse(el, el.childNodes.length);
-    (el.closest("[contenteditable]") as HTMLElement).focus();
   });
   await p.keyboard.press("Enter");
   await p.keyboard.type("- item");
