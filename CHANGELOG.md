@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.57.14 — Auto layout: live reflow, masonry, justified rows, grid tracks and more (2026-11-13)
+
+- **Added:** while a thing is dragged on a sheet with auto layout, the others make room for it live, closing the gap behind it and opening one where it would land, on another such sheet too (ADR 0193).
+- **Added:** two more flows: **Masonry** (columns of one width, each picture in the shortest) and **Justified rows** (every row one height, as wide as the sheet).
+- **Added:** a grid's **columns and rows**: each hugs, has a set size or takes a share of the room; a thing can **span** several columns and rows.
+- **Added:** padding and gap **handles** on a selected sheet with auto layout, dragged on the canvas.
+- **Added:** an **Order** rule for a layout: name A–Z or Z–A, largest first, by kind, kept as things are added.
+- **Added:** **Layout styles**: save a sheet's layout in the Styles panel and give it to other sheets.
+- **Added:** a filling thing's least and most size, in % of the room.
+- **Changed:** the greyed-out packing control says why it cannot pack.
+
 ## 0.57.13 — A PDF's page extracted as a picture (2026-11-13)
 
 - **Added:** **Extract this page** in the PDF view: the page in sight becomes a picture in the library, at 150, 300 or 600 dots an inch (Settings > Saving to the library), named, filed and tagged as an extracted frame is (`book-p03.png`); from a PDF's card on a canvas it is placed beside the card (ADR 0192).

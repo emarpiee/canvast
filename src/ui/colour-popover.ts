@@ -21,6 +21,7 @@ import { ADJUSTMENTS, BLUR_TYPES, MAX_CURVE_POINTS, MAX_LAYERS, SHADOW_START, cl
 import type { BlurType } from "../doc/adjust";
 import type { Adjust, AdjustKey, Channel } from "../doc/adjust";
 import type { GradientStop } from "../doc/paint";
+import type { LayoutTrack } from "../doc/model";
 import { swatchBackground } from "../render/ink";
 import type { SettingsStore } from "../settings/settings";
 import { clearRect, MENU_GAP, placeMenu } from "./more-menu";
@@ -694,6 +695,15 @@ export interface TextBoxOptions {
   onClose?(): void;
 }
 
+/** A row of a bar's popover with a number: its name, the field (`data-field`) and its unit. */
+const opNum = (id: string, field: string, label: string, value: string, unit: string, min: number, step: string): string =>
+  `<div class="op-row"><label class="op-label" for="${id}">${label}</label><input id="${id}" class="op-width" data-field="${field}" type="number" min="${min}" step="${step}" inputmode="decimal" value="${value}"><span class="op-unit">${unit}</span></div>`;
+/** A row of a bar's popover with choices side by side (`data-<attr>` on each, the one chosen checked). */
+const opChoices = (id: string, attr: string, label: string, items: ReadonlyArray<readonly [string, string, string]>, value: string): string =>
+  `<div class="op-row"><span class="op-label" id="${id}">${label}</span><div class="seg paint-modes op-choices" role="radiogroup" aria-labelledby="${id}">${items
+    .map(([v, text, tip]) => `<button type="button" role="radio" data-${attr}="${v}" aria-checked="${v === value}" title="${tip}">${text}</button>`)
+    .join("")}</div></div>`;
+
 /** Space between paragraphs, first-line indent, case, a line limit, and a set height with where the words sit in it. */
 export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void {
   if (open && open.anchor === anchor) return closeColourPopover(true);
@@ -703,12 +713,8 @@ export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void
   pop.className = "colour-pop outline-pop";
   pop.setAttribute("role", "dialog");
   pop.setAttribute("aria-label", "Paragraph and box options");
-  const num = (key: string, label: string, value: string, unit: string, min: number, step: string): string =>
-    `<div class="op-row"><label class="op-label" for="tb-${key}">${label}</label><input id="tb-${key}" class="op-width" data-field="${key}" type="number" min="${min}" step="${step}" inputmode="decimal" value="${value}"><span class="op-unit">${unit}</span></div>`;
-  const choices = (key: string, label: string, items: ReadonlyArray<[string, string, string]>, value: string): string =>
-    `<div class="op-row"><span class="op-label" id="tb-${key}">${label}</span><div class="seg paint-modes op-choices" role="radiogroup" aria-labelledby="tb-${key}">${items
-      .map(([v, text, tip]) => `<button type="button" role="radio" data-${key}="${v}" aria-checked="${v === value}" title="${tip}">${text}</button>`)
-      .join("")}</div></div>`;
+  const num = (key: string, label: string, value: string, unit: string, min: number, step: string): string => opNum(`tb-${key}`, key, label, value, unit, min, step);
+  const choices = (key: string, label: string, items: ReadonlyArray<[string, string, string]>, value: string): string => opChoices(`tb-${key}`, key, label, items, value);
   const round = (v: number): string => String(Math.round(v * 100) / 100);
   const along = o.pathOpts
     ? num("pathStart", "Start at", round(o.pathOpts.start * 100), "%", 0, "1") +
@@ -759,6 +765,76 @@ export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void
     } else if (b.dataset["caps"]) o.onChange({ caps: b.dataset["caps"] === "none" ? null : (b.dataset["caps"] as TextBoxOptions["caps"]) }, true);
     else o.onChange({ valign: b.dataset["valign"] as TextBoxOptions["valign"] }, true);
   });
+  popHost().appendChild(pop);
+  place(pop, anchor);
+  anchor.setAttribute("aria-expanded", "true");
+  open = { pop, anchor, picker: { destroy() {} }, onClose: o.onClose };
+  pop.querySelector<HTMLElement>("input")!.focus();
+}
+
+// ---- A grid's columns and rows (ADR 0193) ------------------------------------------------------------------------------------------
+
+export interface TracksOptions {
+  cols: readonly LayoutTrack[];
+  rows: readonly LayoutTrack[];
+  /** Screen px per unit of the sheet: a fixed size is typed in px as seen now. */
+  ppu: number;
+  onChange(cols: LayoutTrack[], rows: LayoutTrack[], final: boolean): void;
+  onClose?(): void;
+}
+
+/** How many columns and rows, and each one's size: as large as what is in it (Hug), a set size (Fixed, px), or a share of the room left (Share). */
+export function openTracksPopover(anchor: HTMLElement, o: TracksOptions): void {
+  if (open && open.anchor === anchor) return closeColourPopover(true);
+  closeColourPopover();
+  installCloseRules();
+  const pop = document.createElement("div");
+  pop.className = "colour-pop outline-pop";
+  pop.setAttribute("role", "dialog");
+  pop.setAttribute("aria-label", "Columns and rows");
+  let cols = [...o.cols], rows = [...o.rows];
+  const SIZES = [["hug", "Hug", "As large as what is in it"], ["fixed", "Fixed", "A set size"], ["fr", "Share", "A share of the room left (a sheet that hugs has none: then it hugs)"]] as const;
+  const round = (v: number): string => String(Math.round(v * 10) / 10);
+  const trackRows = (which: "c" | "r", list: readonly LayoutTrack[], word: string): string =>
+    list
+      .map((t, i) => {
+        const value = t.size === "fixed" ? opNum(`tr-${which}${i}-v`, `${which}:${i}`, `${word} ${i + 1} size`, round((t.v ?? 0) * o.ppu), "px", 0, "any") : t.size === "fr" ? opNum(`tr-${which}${i}-v`, `${which}:${i}`, `${word} ${i + 1} share`, round(t.v ?? 1), "parts", 0, "0.1") : "";
+        return opChoices(`tr-${which}${i}`, "track", `${word} ${i + 1}`, SIZES.map(([v, text, tip]) => [`${which}:${i}:${v}`, text, tip] as const), `${which}:${i}:${t.size}`) + value;
+      })
+      .join("");
+  const render = (): void => {
+    pop.innerHTML = opNum("tr-cols", "cols", "Columns", String(cols.length), "", 1, "1") + trackRows("c", cols, "Column") + opNum("tr-rows", "rows", "Rows set", String(rows.length), "the rest hug", 0, "1") + trackRows("r", rows, "Row");
+    scrubNumbers(pop);
+    for (const input of pop.querySelectorAll<HTMLInputElement>("input[data-field]")) {
+      const key = input.dataset["field"]!;
+      liveNumber(input, (v, final) => {
+        if (!(v >= 0)) return;
+        if (key === "cols" || key === "rows") {
+          if (!final) return;
+          const n = Math.max(key === "cols" ? 1 : 0, Math.min(1024, Math.round(v)));
+          const grow = (list: LayoutTrack[]): LayoutTrack[] => Array.from({ length: n }, (_, i) => list[i] ?? { size: "hug" as const });
+          if (key === "cols") cols = grow(cols);
+          else rows = grow(rows);
+          o.onChange(cols, rows, true);
+          return render();
+        }
+        const [which, at] = key.split(":") as ["c" | "r", string];
+        const list = which === "c" ? cols : rows, i = Number(at), t = list[i]!;
+        list[i] = { ...t, v: t.size === "fixed" ? v / (o.ppu || 1) : v };
+        o.onChange(cols, rows, final);
+      });
+    }
+  };
+  pop.addEventListener("click", (e) => {
+    const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button[data-track]");
+    if (!b) return;
+    const [which, at, size] = b.dataset["track"]!.split(":") as ["c" | "r", string, LayoutTrack["size"]];
+    const list = which === "c" ? cols : rows, i = Number(at);
+    list[i] = size === "hug" ? { size } : { size, v: size === "fixed" ? (list[i]?.size === "fixed" ? list[i]!.v ?? 0 : 100 / (o.ppu || 1)) : 1 };
+    o.onChange(cols, rows, true);
+    render();
+  });
+  render();
   popHost().appendChild(pop);
   place(pop, anchor);
   anchor.setAttribute("aria-expanded", "true");

@@ -20,6 +20,7 @@ import { formatRatio } from "../app/export-size";
 import { cleanExportPreset, exportPresetSummary, type ExportPreset } from "../app/export-prefs";
 import { cleanNamePattern } from "../app/export-names";
 import { cleanLineStyle, lineStyleSummary } from "./model-look";
+import { isSheetLayout, type SheetLayout } from "../doc/model";
 import type { ModelLook } from "./model-look";
 
 export interface StyleItem {
@@ -199,6 +200,21 @@ export const EXPORT_NAME_KIND: StyleKind = {
   summary: (d) => (d as { pattern: string }).pattern,
 };
 
+/** An auto layout of a sheet (ADR 0193): its flow, gap, padding, alignments, columns and order, its lengths in px as seen when saved. */
+export const LAYOUT_STYLE_KIND: StyleKind = {
+  id: "layout",
+  label: "Layout",
+  plural: "Layouts",
+  empty: "None yet. Save one from Layout styles in the bar, with a sheet with auto layout selected.",
+  validate: (d) => (isSheetLayout(d) ? d : null),
+  summary: (d) => {
+    const l = d as SheetLayout;
+    const flow = { row: "Row", column: "Column", wrap: "Wrap", grid: "Grid", masonry: "Masonry", justified: "Justified rows" }[l.flow];
+    const cols = l.flow === "grid" || l.flow === "masonry" ? (l.cols?.length || l.columns) : undefined;
+    return [flow, cols ? plural(cols, "column") : "", `gap ${Math.round(l.gap[0])} px`].filter(Boolean).join(" · ");
+  },
+};
+
 /** The line art of a 3D view (its lines, shading, fill and ground), saved from the view's Line styles menu to use on any model. */
 export const LINE_STYLE_KIND: StyleKind = {
   id: "lines3d",
@@ -210,7 +226,7 @@ export const LINE_STYLE_KIND: StyleKind = {
   look: (d) => ({ swatches: [(d as ModelLook)["linesColour"], (d as ModelLook)["bg"], (d as ModelLook)["toneColour"]].filter((c): c is string => typeof c === "string" && isColour(c)) }),
 };
 
-export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND, BALLOON_KIND, LINE_STYLE_KIND, RATIO_KIND, EXPORT_KIND, EXPORT_NAME_KIND];
+export const STYLE_KINDS: readonly StyleKind[] = [ADJUSTMENT_KIND, GRADIENT_KIND, COLOUR_KIND, PALETTE_KIND, TEXT_KIND, PATTERN_KIND, BALLOON_KIND, LINE_STYLE_KIND, LAYOUT_STYLE_KIND, RATIO_KIND, EXPORT_KIND, EXPORT_NAME_KIND];
 
 export const kindById = (id: string): StyleKind | undefined => STYLE_KINDS.find((k) => k.id === id);
 

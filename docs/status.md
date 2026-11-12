@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.14: auto layout, more: live reflow, masonry, justified rows, tracks, spans, handles, order, styles (2026-11-13)
+
+- **Implemented:** ADR 0193. auto-layout.ts: `placeItems` with `placeGrid` (tracks, spans, sparse placing, shares ≥ contents), `placeMasonry`, `placeJustified`, fill limits as shares; `sortedUnits` (arrange's `sortUnits`); `previewLayout` (scene-view, move and scale previews); `layoutNow`. model.ts: flows `masonry`, `justified`, `LayoutTrack`, `cols`, `rows`, `rowHeight`, `sort`, `inLayout.span/min/max`, `LayoutPatch`, `isSheetLayout`. edit-ops `layoutTimes`. interaction/layout-handles.ts + scene-renderer + tools gesture `layouthandle`. Bar: flows, Columns and rows popover (`openTracksPopover`, shared `opNum`/`opChoices`), Row, Order, Layout styles; Span and Min/Max on a thing. Styles kind `layout`, `applyLayoutStyle`. Debug hook `shownBox`.
+- **Tested:** typecheck and build here; the layout rules run alone in Node (every new unit case) and the new e2e steps mirrored in a scratch run (reflow mid-drag, gap handle, flows, tracks, order, style, span). Unit `auto-layout.test.ts` and e2e `sheets.spec` on GitHub; shots `auto-layout` (taken again), `layout-masonry`, `layout-justified`, `layout-tracks`.
+- **Known failures:** none known yet.
+- **Unverified:** Firefox; touch drag of the handles; live reflow on a canvas of many laid-out sheets (it lays out each sheet the drag reaches, each frame).
+- **Committed:** v0.57.14 on `main`.
+- **Next bounded task:** read this push's runs; take the shots.
+
 ## v0.57.13: a PDF's page extracted as a picture (2026-11-13)
 
 - **Implemented:** ADR 0192. Extract this page in `pdf-view.ts` (drawn by `drawPage` at `frame.pageDpi`, at most 10 000 px); `framePosition` reads `Page n / count` as `p0n`; `keepFrame` (frames.ts) keeps a frame or page and places it, shared by the library viewer's Extract frame and the PDF view; `placePictureBeside` (actions.ts) shared by Extract frame on a canvas and a page from a card (`ViewPlace.pictureBeside`, main.ts `cardActions`).

@@ -2,6 +2,7 @@ import type { BalloonLook } from "../doc/balloon-geometry";
 import { copyPlainText } from "../app/system-clipboard";
 import { cleanName, freeNameIn } from "../doc/file-names";
 import type { Adjust } from "../doc/adjust";
+import type { SheetLayout } from "../doc/model";
 import { plural } from "../doc/plural";
 import type { EditorState } from "../app/editor-state";
 import type { StyleItem, StyleLibrary, PaletteData, PatternData } from "../assets/styles";
@@ -51,6 +52,8 @@ export interface StylesDeps {
   text: { count(): number; current(): TextLook | null; apply(look: TextLook, label: string): void };
   /** Pattern styles: putting one into the Pattern panel (and making it on what is picked). */
   balloon: { can(): boolean; apply(look: BalloonLook): void };
+  /** Layout styles: given to the one picked sheet. */
+  layout: { can(): boolean; apply(data: SheetLayout, name: string): void };
   /** 3D line styles: given to the 3D view in front. */
   lines3d: { can(): boolean; apply(data: unknown, name: string): void };
   /** Custom ratios: given to the one selected sheet or shape; `current` is its ratio (null: none selected); `ask` asks for a ratio or a size in px. */
@@ -97,7 +100,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
   fileInput.dataset["testid"] = "styles-import";
   panel.appendChild(fileInput);
 
-  const canApply = (kind: string): boolean => (kind === "export" ? true : kind === "ratio" ? deps.ratio.current() !== null : kind === "pattern" ? true : kind === "balloon" ? deps.balloon.can() : kind === "lines3d" ? deps.lines3d.can() : kind === "adjustment" ? deps.adjustment.can() : kind === "text" ? deps.text.count() > 0 : deps.paint.count() > 0 || (kind === "gradient" && deps.map.count() > 0));
+  const canApply = (kind: string): boolean => (kind === "export" ? true : kind === "ratio" ? deps.ratio.current() !== null : kind === "pattern" ? true : kind === "balloon" ? deps.balloon.can() : kind === "lines3d" ? deps.lines3d.can() : kind === "layout" ? deps.layout.can() : kind === "adjustment" ? deps.adjustment.can() : kind === "text" ? deps.text.count() > 0 : deps.paint.count() > 0 || (kind === "gradient" && deps.map.count() > 0));
   const kindsShown = STYLE_KINDS;
 
   /** The small pictures of pattern styles, made once for each (the data of a style does not change; an update gets a new key). */
@@ -145,9 +148,9 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       .map((c, i) => `<div class="pal-row"><button type="button" class="pal-swatch" data-edit-colour="${i}" style="background:${esc(c.c)}" title="Change this colour" aria-label="Change the colour ${esc(c.name || c.c.toUpperCase())}"></button><input class="pal-name" data-colour-name="${i}" value="${esc(c.name ?? "")}" placeholder="${esc(c.c.toUpperCase())}" maxlength="${MAX_NAME}" aria-label="Name of colour ${i + 1}"><button type="button" class="layer-btn" data-remove-colour="${i}" aria-label="Remove ${esc(c.name || c.c.toUpperCase())}" title="Remove"${pal.colours.length < 2 ? " disabled" : ""}>${ICONS.x}</button></div>`)
       .join("")}<div class="pal-actions"><button type="button" class="pal-add" data-add-colour="${esc(item.id)}"${pal.colours.length >= MAX_PALETTE ? " disabled" : ""}>Add colour</button><button type="button" class="pal-done" data-done>Done</button></div></div>`;
 
-  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette, text: ICONS.textStyle, pattern: ICONS.mountainSnow, balloon: ICONS.speechBalloon, lines3d: ICONS.draftingCompass, ratio: ICONS.proportions, export: ICONS.fileCog, exportname: ICONS.fileSignature };
+  const TAB_ICON: Record<string, string> = { adjustment: ICONS.slidersHorizontal, gradient: ICONS.blend, colour: ICONS.droplet, palette: ICONS.palette, text: ICONS.textStyle, pattern: ICONS.mountainSnow, balloon: ICONS.speechBalloon, lines3d: ICONS.draftingCompass, layout: ICONS.layoutStyles, ratio: ICONS.proportions, export: ICONS.fileCog, exportname: ICONS.fileSignature };
   /** The short line under each kind in the list of kinds. */
-  const KIND_HINT: Record<string, string> = { adjustment: "From the Adjust panel", gradient: "Blends of colours", colour: "Single colours", palette: "Sets of colours", text: "Size, spacing, colour", pattern: "A generator and its seed", balloon: "Speech balloon looks", lines3d: "Line art of 3D views", ratio: "Shapes of sheets and shapes", export: "Choices of Export…", exportname: "File names for Export…" };
+  const KIND_HINT: Record<string, string> = { adjustment: "From the Adjust panel", gradient: "Blends of colours", colour: "Single colours", palette: "Sets of colours", text: "Size, spacing, colour", pattern: "A generator and its seed", balloon: "Speech balloon looks", lines3d: "Line art of 3D views", layout: "Auto layouts of sheets", ratio: "Shapes of sheets and shapes", export: "Choices of Export…", exportname: "File names for Export…" };
   const GUIDE: Record<string, string> = {
     adjustment: "Save an adjustment from the Adjust panel of a picture, then press it here to give other pictures the same look.",
     gradient: "A gradient is a blend of colours. Save one from the fill or outline picker, make a new one here, or import a GIMP .ggr file.",
@@ -156,6 +159,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     pattern: "A pattern style is a generator with its settings and seed. Save one from the Pattern panel, then press it to make the same pattern on the selected sheet or shape.",
     export: "An export preset keeps the Export dialog's choices: format, quality, background, padding, resolution and size. Choose one in the dialog's Preset list.",
     exportname: "A name format names exported files: words and tokens such as {name}, {n} for the number, {w} and {h} for the size. Save one from the Export dialog; it is offered there next time, and goes with the workspace's backups.",
+    layout: "A layout is a sheet's auto layout: its flow, gap, padding, alignments, columns and order. Save one from Layout styles in the bar, then select a sheet and press it here to lay that sheet out the same way.",
     lines3d: "A 3D line style is the line art of a 3D view: its lines, shading, fill and background. Save one from the Line styles menu of a 3D view, then press it here, or choose it in that menu, to give another model the same drawing.",
     ratio: "Your own shapes for sheets and shapes, beside the built-in ones of the Shapes… list. Select a sheet or shape, then press one to give it that ratio.",
     text: "A text style is a size, spacing, alignment and colour. Select a text, save its style here, then press it to give other texts the same look.",
@@ -209,7 +213,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
       body: `<div class="styles-body" role="tabpanel" aria-label="${esc(k.plural)}">
         <div class="styles-tab-head"><h3>${esc(k.plural)}</h3>${k.id === "gradient" || k.id === "palette" ? moreButton(`More actions for ${k.plural}`, `data-kind-more="${k.id}"`) : ""}</div>
         ${paints ? `<div class="styles-target"><span id="styles-target-l">Apply to</span><div class="seg" role="radiogroup" aria-labelledby="styles-target-l">${seg("fill", "Fill", "Colours go on the fill of the selected shapes")}${seg("stroke", "Outline", "Colours go on the outline of the selected shapes")}${seg("both", "Both", "Fill and outline")}</div></div>` : ""}
-        ${!can ? `<p class="styles-hint">${ICONS.pointer}<span>${paints ? (k.id === "gradient" ? "Select shapes or pictures on the canvas, then press one to apply it (on a picture it becomes a gradient map)." : "Select shapes on the canvas, then press one to apply it.") : k.id === "text" ? "Select texts on the canvas, then press one to apply it." : k.id === "lines3d" ? "Open a 3D model, then press one to give its view these lines." : "Select pictures on the canvas, then press one to apply it."}</span></p>` : ""}
+        ${!can ? `<p class="styles-hint">${ICONS.pointer}<span>${paints ? (k.id === "gradient" ? "Select shapes or pictures on the canvas, then press one to apply it (on a picture it becomes a gradient map)." : "Select shapes on the canvas, then press one to apply it.") : k.id === "text" ? "Select texts on the canvas, then press one to apply it." : k.id === "lines3d" ? "Open a 3D model, then press one to give its view these lines." : k.id === "layout" ? "Select a sheet on the canvas, then press one to lay it out that way." : "Select pictures on the canvas, then press one to apply it."}</span></p>` : ""}
         ${actions ? `<div class="styles-actions">${actions}</div>` : ""}
         ${empty}
         ${all.length ? `<ul class="styles-list" aria-label="${esc(k.plural)}">${items.map((st) => card(st, can)).join("") || `<li class="layers-empty">No ${esc(k.plural.toLowerCase())} match.</li>`}</ul>` : ""}
@@ -606,6 +610,7 @@ export function mountStylesPanel(host: HTMLElement, editor: EditorState, styles:
     else if (item.kind === "pattern") deps.pattern.apply(item.data as PatternData, item.name);
     else if (item.kind === "balloon") deps.balloon.apply(item.data as BalloonLook);
     else if (item.kind === "lines3d") deps.lines3d.apply(item.data, item.name);
+    else if (item.kind === "layout") deps.layout.apply(item.data as SheetLayout, item.name);
     else if (item.kind === "ratio") deps.ratio.apply(item.data as number, item.name);
     else if (item.kind === "export") deps.ratio.say(`Choose “${item.name}” in the Preset list of Export….`);
     else applyPaint(item);

@@ -59,11 +59,11 @@ import { parseSvg } from "./svg-import";
 import { piecesOf } from "../doc/path-pieces";
 import { NOTE_PAGE_PIXEL_W, canBeBackdrop, pivotOf } from "../doc/model";
 import { MAX_NAME_LENGTH, editSubs, inkStyle, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs, strokePoints } from "../doc/model";
-import { worldBounds, scaleAbout } from "../doc/edit-ops";
+import { worldBounds, scaleAbout, layoutTimes } from "../doc/edit-ops";
 import { planSheetScale } from "../doc/constraints";
-import { DEFAULT_LAYOUT, guessLayout, isLaidOut, layOutSheet, type LaidOutSheet } from "../doc/auto-layout";
+import { DEFAULT_LAYOUT, guessLayout, isLaidOut, layOutSheet, layoutNow, type LaidOutSheet } from "../doc/auto-layout";
 import { ownerOf } from "../doc/belongs";
-import type { SheetLayout } from "../doc/model";
+import type { LayoutPatch, SheetLayout } from "../doc/model";
 import { localToWorld, normalizeUnit, placeAbove, unionBounds, restack, rotateAbout, translate } from "../doc/edit-ops";
 import { expandToUnits, groupObjects, ungroupObjects, unitKey } from "../doc/groups";
 import type { AlignKey, GapKey, SortKey, Unit } from "../doc/arrange";
@@ -2859,18 +2859,41 @@ export function autoLayoutShortcut(doc: DocumentStore, editor: EditorState): voi
 }
 
 /** Change the picked sheet's auto layout (its flow, gap, padding, alignment, hugging, columns): one undo step; not final, only shown. */
-export function patchAutoLayout(doc: DocumentStore, editor: EditorState, patch: Partial<SheetLayout>, final = true): void {
+export function patchAutoLayout(doc: DocumentStore, editor: EditorState, patch: LayoutPatch, final = true): void {
   const got = autoLayoutOf(doc, editor);
   if (!got || editor.blockEdit() || got.sheet.locked) return;
-  let layout: SheetLayout = { ...got.layout, ...patch };
-  // (a wrap needs a width to wrap at: a sheet that hugged its width keeps the width it has)
-  if (patch.flow === "wrap" && got.layout.flow !== "wrap" && layout.hug[0]) layout = { ...layout, hug: [false, layout.hug[1]] };
+  const layoutMut: Record<string, unknown> = { ...got.layout, ...patch };
+  for (const k of Object.keys(patch)) if (layoutMut[k] === undefined) delete layoutMut[k];
+  let layout = layoutMut as unknown as SheetLayout;
+  // (a wrap or justified rows need a width to fill: a sheet that hugged its width keeps the width it has)
+  if ((patch.flow === "wrap" || patch.flow === "justified") && got.layout.flow !== patch.flow && layout.hug[0]) layout = { ...layout, hug: [false, layout.hug[1]] };
+  // (justified rows aim at a height: the items' usual one now, kept, so laying out again does not change it)
+  if (patch.flow === "justified" && layout.rowHeight === undefined) {
+    const hs = layoutNow(got.sheet, doc.ordered(), doc.space).items.map((c) => c.h).filter((h) => h > 0).sort((a, b) => a - b);
+    if (hs.length) layout = { ...layout, rowHeight: hs[Math.floor((hs.length - 1) / 2)]! };
+  }
+  // (a number of columns set: the tracks follow it, new ones hugging)
+  if (patch.columns !== undefined && layout.cols) layout = { ...layout, cols: Array.from({ length: patch.columns }, (_, i) => layout.cols![i] ?? { size: "hug" as const }) };
   const sheet = { ...got.sheet, container: { ...got.sheet.container, layout } } as LaidOutSheet;
   if (!final) return showReplaced(editor, [sheet, ...layOutSheet(sheet, doc.ordered().map((o) => (o.id === sheet.id ? sheet : o)), doc.space)]);
   editor.preview = { kind: "none" };
   doc.commit(doc.transaction("Change auto layout", [sheet]));
   editor.changed();
 }
+
+/**
+ * A saved layout style (ADR 0193) on the one picked sheet, with or without a layout before: its lengths, kept in px as seen when saved, given
+ * in px as seen now (`ppu`: screen px per unit of the sheet). One undo step.
+ */
+export function applyLayoutStyle(doc: DocumentStore, editor: EditorState, layoutPx: SheetLayout, ppu: (id: string) => number, name: string): void {
+  const s = pickedSheet(doc, editor);
+  const k = s ? ppu(s.id) : 0;
+  if (!s || s.locked || editor.blockEdit() || !(k > 0 && k < Infinity)) return;
+  doc.commit(doc.transaction(`Layout style ${name}`, [{ ...s, container: { ...s.container!, layout: layoutTimes(layoutPx, 1 / k, 1 / k) } } as CanvasObject]));
+  editor.changed();
+}
+/** Whether one sheet is picked that a layout style can go on. */
+export const canTakeLayoutStyle = (doc: DocumentStore, editor: EditorState): boolean => { const s = pickedSheet(doc, editor); return !!s && !s.locked; };
 
 /** The layout a sheet gets when turned on from the Layers panel (no selection needed): read from what is on it. */
 export function setSheetLayout(doc: DocumentStore, editor: EditorState, id: string, on: boolean): void {
@@ -2882,23 +2905,31 @@ export function setSheetLayout(doc: DocumentStore, editor: EditorState, id: stri
 }
 
 /** How the first picked thing on a sheet with auto layout takes part in it (null: none is on one); `stretch`: whether it can fill (a pen stroke and a turned thing cannot). */
-export function selectedInLayout(doc: DocumentStore, editor: EditorState): { fill: "none" | "x" | "y" | "both"; free: boolean; stretch: boolean } | null {
+export function selectedInLayout(doc: DocumentStore, editor: EditorState): InLayoutState | null {
   const on = selected(doc, editor).find((o) => o.parent !== undefined && isLaidOut(doc.get(o.parent)) && ownerOf(o) === undefined);
-  return on ? { fill: on.inLayout?.fill ?? "none", free: on.inLayout?.free === true, stretch: on.kind !== "stroke" && !on.rot } : null;
+  const flow = on ? (doc.get(on.parent!) as LaidOutSheet).container.layout.flow : null;
+  return on ? { fill: on.inLayout?.fill ?? "none", free: on.inLayout?.free === true, stretch: on.kind !== "stroke" && !on.rot, grid: flow === "grid", span: on.inLayout?.span ?? [1, 1], min: on.inLayout?.min ?? [0, 0], max: on.inLayout?.max ?? [0, 0] } : null;
 }
+/** How a thing takes part in its sheet's auto layout, as the bar shows it: `grid` when the sheet is a grid (it may span); limits as shares, 0 = none. */
+export interface InLayoutState { fill: "none" | "x" | "y" | "both"; free: boolean; stretch: boolean; grid: boolean; span: readonly [number, number]; min: readonly [number, number]; max: readonly [number, number] }
+export type InLayoutPatch = { fill?: "none" | "x" | "y" | "both"; free?: boolean; span?: readonly [number, number]; min?: readonly [number, number]; max?: readonly [number, number] };
 
 /** Change how the picked things on sheets with auto layout take part in it: fill the room along an axis, or stay out of the layout where they are. One undo step. */
-export function setInLayout(doc: DocumentStore, editor: EditorState, patch: { fill?: "none" | "x" | "y" | "both"; free?: boolean }): void {
+export function setInLayout(doc: DocumentStore, editor: EditorState, patch: InLayoutPatch): void {
   const on = selected(doc, editor).filter((o) => o.parent !== undefined && isLaidOut(doc.get(o.parent)) && !o.locked && ownerOf(o) === undefined);
   if (!on.length || editor.blockEdit()) return;
   const next = on.map((o): CanvasObject => {
-    const fill = patch.fill ?? o.inLayout?.fill ?? "none";
-    const free = patch.free ?? o.inLayout?.free === true;
+    const il = o.inLayout ?? {};
+    const fill = patch.fill ?? il.fill ?? "none";
+    const free = patch.free ?? il.free === true;
+    const span = patch.span ?? il.span ?? [1, 1];
+    const min = patch.min ?? il.min ?? [0, 0], max = patch.max ?? il.max ?? [0, 0];
     const { inLayout: _i, ...rest } = o;
-    const v = { ...(fill !== "none" ? { fill } : {}), ...(free ? { free: true as const } : {}) };
+    // (only what differs from the usual is kept)
+    const v = { ...(fill !== "none" ? { fill } : {}), ...(free ? { free: true as const } : {}), ...(span[0] > 1 || span[1] > 1 ? { span } : {}), ...(min[0] || min[1] ? { min } : {}), ...(max[0] || max[1] ? { max } : {}) };
     return (Object.keys(v).length ? { ...rest, inLayout: v } : rest) as CanvasObject;
   });
-  doc.commit(doc.transaction(patch.free !== undefined ? (patch.free ? "Keep out of the layout" : "Back into the layout") : "Fill in the layout", next));
+  doc.commit(doc.transaction(patch.free !== undefined ? (patch.free ? "Keep out of the layout" : "Back into the layout") : patch.span ? "Span in the grid" : patch.min || patch.max ? "Limits in the layout" : "Fill in the layout", next));
   editor.changed();
 }
 

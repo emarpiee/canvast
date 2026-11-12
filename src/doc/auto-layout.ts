@@ -1,6 +1,6 @@
 import * as D from "../core/dyadic";
 import type { FrameSpace } from "../core/frames";
-import type { CanvasObject, ObjectId, PathObject, SheetLayout } from "./model";
+import type { CanvasObject, LayoutSort, LayoutTrack, ObjectId, PathObject, SheetLayout } from "./model";
 import { expressObjectIn, homeObject } from "./model";
 import { ancestorsOf, descendantsOf, isContainer } from "./containers";
 import { normalizeUnit, scaleAbout, translate, unionBounds, worldBounds } from "./edit-ops";
@@ -10,6 +10,8 @@ import type { DerivationSource } from "./boolean-group";
 import { planSheetScale } from "./constraints";
 import { drawnParams, drawnSubs } from "./path";
 import { roundCorners } from "./rounding";
+import { sortUnits } from "./arrange";
+import { plainText } from "../text/markdown";
 
 /**
  * Auto layout (ADR 0186): a sheet whose contents are placed by rules (a row, a column, a wrap or a grid, with a gap, padding and an
@@ -29,87 +31,85 @@ export const DEFAULT_LAYOUT: SheetLayout = { flow: "row", gap: [0, 0], pad: [0, 
 
 /** A box in the sheet's units, from its top-left corner. */
 export interface Cell { x: number; y: number; w: number; h: number }
-/** An item to place: its size, and whether it fills the room along an axis. */
-export interface ItemSize { w: number; h: number; fill?: "x" | "y" | "both" }
+/** An item to place: its size, whether it fills the room along an axis (within its least and most share of the room), and in a grid how many columns and rows it covers. */
+export interface ItemSize { w: number; h: number; fill?: "x" | "y" | "both"; span?: readonly [number, number]; min?: readonly [number, number]; max?: readonly [number, number] }
+
+const offset = (free: number, how: string): number => (how === "centre" ? free / 2 : how === "end" ? free : 0);
+/** A filling item's length on an axis (0 across, 1 down) held between its least and most share of the room. */
+const limited = (v: number, it: ItemSize, axis: 0 | 1, room: number): number => {
+  const lo = (it.min?.[axis] ?? 0) * room, hi = it.max?.[axis] ? it.max[axis] * room : Infinity;
+  return Number.isFinite(room) && room > 0 ? Math.min(Math.max(v, lo), Math.max(lo, hi)) : v;
+};
+const sum = (vs: readonly number[]): number => vs.reduce((s, v) => s + v, 0);
+const median = (vs: readonly number[]): number => [...vs].sort((a, b) => a - b)[Math.floor((vs.length - 1) / 2)] ?? 0;
 
 /**
  * Where items go on a sheet of `W` × `H` (its units): each item's box, and the size the sheet takes (its own, or its contents' on the axes it
- * hugs). The one rule for row, column, wrap and grid: items run along the flow (the main axis) with `gap[0]` between them, lines across it
- * with `gap[1]`; `justify` places a line's items in the room along the flow, `align` an item in its line and the block of lines in the room
- * across (only a sheet that does not hug has room). A grid has as many columns as `columns` says (else about as many as rows), each as wide
- * as its widest item, each row as tall as its tallest. An item that fills takes the room left on its axis (a fixed sheet), or its line's height.
+ * hugs). Row, column and wrap: items run along the flow (the main axis) with `gap[0]` between them, lines across it with `gap[1]`; `justify`
+ * places a line's items in the room along the flow, `align` an item in its line and the block of lines in the room across (only a sheet that
+ * does not hug has room); an item that fills takes the room left on its axis (shared, within its limits), or its line's height. A grid, a
+ * masonry and justified rows have rules of their own (`placeGrid`, `placeMasonry`, `placeJustified`).
  */
 export function placeItems(l: SheetLayout, W: number, H: number, items: readonly ItemSize[]): { cells: Cell[]; w: number; h: number } {
+  if (l.flow === "grid") return placeGrid(l, W, H, items);
+  if (l.flow === "masonry") return placeMasonry(l, W, H, items);
+  if (l.flow === "justified") return placeJustified(l, W, H, items);
   const col = l.flow === "column";
   const [padT, padR, padB, padL] = l.pad;
   const [gapM, gapC] = l.gap;
   const m = (i: ItemSize): number => (col ? i.h : i.w), c = (i: ItemSize): number => (col ? i.w : i.h);
   const fillM = (i: ItemSize): boolean => i.fill === "both" || i.fill === (col ? "y" : "x");
   const fillC = (i: ItemSize): boolean => i.fill === "both" || i.fill === (col ? "x" : "y");
+  const axM: 0 | 1 = col ? 1 : 0, axC: 0 | 1 = col ? 0 : 1;
   const padM0 = col ? padT : padL, padM1 = col ? padB : padR, padC0 = col ? padL : padT, padC1 = col ? padR : padB;
   const hugM = col ? l.hug[1] : l.hug[0], hugC = col ? l.hug[0] : l.hug[1];
   const innerM = (col ? H : W) - padM0 - padM1, innerC = (col ? W : H) - padC0 - padC1;
   const n = items.length;
-  const at: Array<{ m: number; c: number; lm: number; lc: number }> = items.map((i) => ({ m: 0, c: 0, lm: m(i), lc: c(i) }));
+  // (a filling item is at least its least share already, before any room is shared out)
+  const at: Array<{ m: number; c: number; lm: number; lc: number }> = items.map((i) => ({ m: 0, c: 0, lm: fillM(i) && !hugM ? limited(m(i), i, axM, innerM) : m(i), lc: c(i) }));
   let contentM = 0, contentC = 0;
-  const offset = (free: number, how: string): number => (how === "centre" ? free / 2 : how === "end" ? free : 0);
-  if (l.flow === "grid" && n) {
-    const cols = Math.max(1, Math.min(n, l.columns ?? Math.ceil(Math.sqrt(n))));
-    const rows = Math.ceil(n / cols);
-    const colM = Array.from({ length: cols }, (_, j) => Math.max(0, ...items.filter((_, k) => k % cols === j).map(m)));
-    const rowC = Array.from({ length: rows }, (_, i) => Math.max(0, ...items.slice(i * cols, (i + 1) * cols).map(c)));
-    contentM = colM.reduce((s, v) => s + v, 0) + (cols - 1) * gapM;
-    contentC = rowC.reduce((s, v) => s + v, 0) + (rows - 1) * gapC;
-    const freeM = hugM ? 0 : innerM - contentM, freeC = hugC ? 0 : innerC - contentC;
-    const spreadM = l.justify === "between" && cols > 1 && freeM > 0 ? freeM / (cols - 1) : 0;
-    let cy = padC0 + offset(freeC, l.align);
-    for (let i = 0; i < rows; i++) {
-      let cx = padM0 + (spreadM ? 0 : offset(freeM, l.justify));
-      for (let j = 0; j < cols && i * cols + j < n; j++) {
-        const k = i * cols + j, it = items[k]!, a = at[k]!;
-        if (fillM(it)) a.lm = colM[j]!;
-        if (fillC(it)) a.lc = rowC[i]!;
-        a.m = cx + offset(colM[j]! - a.lm, l.justify === "between" ? "start" : l.justify);
-        a.c = cy + offset(rowC[i]! - a.lc, l.align);
-        cx += colM[j]! + gapM + spreadM;
-      }
-      cy += rowC[i]! + gapC;
-    }
-  } else if (n) {
+  if (n) {
     // the lines: one, or as many as the room along the flow asks for (a wrap)
     const lines: number[][] = [];
     const limit = l.flow === "wrap" && !hugM ? Math.max(0, innerM) : Infinity;
     let line: number[] = [], len = 0;
     items.forEach((it, k) => {
-      const add = (line.length ? gapM : 0) + m(it);
+      const add = (line.length ? gapM : 0) + at[k]!.lm;
       if (line.length && len + add > limit + 1e-9) {
         lines.push(line);
         line = [];
-        len = m(it);
+        len = at[k]!.lm;
       } else len += add;
       line.push(k);
     });
     lines.push(line);
-    const lineM = lines.map((ln) => ln.reduce((s, k) => s + m(items[k]!), 0) + (ln.length - 1) * gapM);
+    const lineM = lines.map((ln) => sum(ln.map((k) => at[k]!.lm)) + (ln.length - 1) * gapM);
     const lineC = lines.map((ln) => Math.max(0, ...ln.map((k) => c(items[k]!))));
     // (a lone line in a sheet that does not hug across: the line is as tall as the room, so an item fills or aligns in all of it)
     if (lines.length === 1 && !hugC) lineC[0] = Math.max(lineC[0]!, innerC);
     contentM = Math.max(...lineM);
-    contentC = lineC.reduce((s, v) => s + v, 0) + (lines.length - 1) * gapC;
+    contentC = sum(lineC) + (lines.length - 1) * gapC;
     const freeC = hugC ? 0 : innerC - contentC;
     let cc = padC0 + offset(freeC, l.align);
     lines.forEach((ln, i) => {
       let free = hugM ? 0 : innerM - lineM[i]!;
-      const fills = ln.filter((k) => fillM(items[k]!));
-      if (free > 0 && fills.length) {
-        for (const k of fills) at[k]!.lm += free / fills.length;
-        free = 0;
+      // The room left goes to the filling items in equal shares, each within its most; what one cannot take goes to the others.
+      let open = ln.filter((k) => fillM(items[k]!));
+      for (let round = 0; free > 1e-9 && open.length && round < ln.length; round++) {
+        const share = free / open.length, next: number[] = [];
+        for (const k of open) {
+          const a = at[k]!, got = limited(a.lm + share, items[k]!, axM, innerM);
+          free -= got - a.lm;
+          if (got >= a.lm + share - 1e-9) next.push(k);
+          a.lm = got;
+        }
+        open = next;
       }
       const spread = l.justify === "between" && ln.length > 1 && free > 0 ? free / (ln.length - 1) : 0;
       let cm = padM0 + (spread ? 0 : offset(free, l.justify));
       for (const k of ln) {
         const a = at[k]!;
-        if (fillC(items[k]!)) a.lc = lineC[i]!;
+        if (fillC(items[k]!)) a.lc = limited(lineC[i]!, items[k]!, axC, innerC);
         a.m = cm;
         a.c = cc + offset(lineC[i]! - a.lc, l.align);
         cm += a.lm + gapM + spread;
@@ -123,8 +123,155 @@ export function placeItems(l: SheetLayout, W: number, H: number, items: readonly
   return { cells, w: col ? sizeC : sizeM, h: col ? sizeM : sizeC };
 }
 
+/** How many columns a grid or a masonry has: its tracks, the number set, else about as many as rows. */
+const columnsOf = (l: SheetLayout, n: number): number => Math.max(1, l.cols?.length || l.columns || Math.ceil(Math.sqrt(Math.max(1, n))));
+
+/** Tracks' sizes: a hug track as large as what is in it alone, a fixed one its length, the shares of the room left, each at least as large as what is in it (`room`, Infinity when the sheet hugs: then a share hugs too). */
+function trackSizes(tracks: readonly LayoutTrack[] | undefined, count: number, hug: readonly number[], room: number, gap: number): number[] {
+  const t = (i: number): LayoutTrack => tracks?.[i] ?? { size: "hug" };
+  const out = Array.from({ length: count }, (_, i) => (t(i).size === "fixed" ? (t(i).v ?? 0) : hug[i] ?? 0));
+  const fr = Array.from({ length: count }, (_, i) => i).filter((i) => t(i).size === "fr");
+  if (fr.length && Number.isFinite(room)) {
+    // (a share is never smaller than what is in it: one held at that size leaves the rest of the room to the others)
+    let open = fr, left = room - sum(out.filter((_, i) => t(i).size !== "fr")) - gap * (count - 1);
+    for (let round = 0; round < fr.length && open.length; round++) {
+      const weight = sum(open.map((i) => t(i).v ?? 1)) || 1;
+      const held = open.filter((i) => (left * (t(i).v ?? 1)) / weight < (hug[i] ?? 0));
+      if (!held.length) {
+        for (const i of open) out[i] = Math.max(0, (left * (t(i).v ?? 1)) / weight);
+        break;
+      }
+      for (const i of held) left -= out[i] = hug[i] ?? 0;
+      open = open.filter((i) => !held.includes(i));
+    }
+  }
+  return out;
+}
+
+/**
+ * A grid: columns and rows of tracks, each as large as what is in it alone, a set length, or a share of the room (ADR 0193). Items take the
+ * next free place, row by row, as many columns and rows as they span (one that does not fit on a row goes to the next); a spanning item
+ * larger than its tracks widens the ones that hug. An item sits in its place by the alignments, or fills it.
+ */
+function placeGrid(l: SheetLayout, W: number, H: number, items: readonly ItemSize[]): { cells: Cell[]; w: number; h: number } {
+  const [padT, padR, padB, padL] = l.pad;
+  const [gapX, gapY] = l.gap;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const n = items.length;
+  if (!n) return { cells: [], w: l.hug[0] ? padL + padR : W, h: l.hug[1] ? padT + padB : H };
+  const C = columnsOf(l, n);
+  const taken: boolean[][] = [];
+  const free = (r: number, c: number, cs: number, rs: number): boolean => {
+    if (c + cs > C) return false;
+    for (let i = r; i < r + rs; i++) for (let j = c; j < c + cs; j++) if (taken[i]?.[j]) return false;
+    return true;
+  };
+  let r0 = 0, c0 = 0;
+  const pos = items.map((it) => {
+    const cs = Math.min(C, Math.max(1, it.span?.[0] ?? 1)), rs = Math.max(1, it.span?.[1] ?? 1);
+    let r = r0, c = c0;
+    while (!free(r, c, cs, rs)) if (++c + cs > C) (c = 0), r++;
+    for (let i = r; i < r + rs; i++) for (let j = c; j < c + cs; j++) (taken[i] ??= [])[j] = true;
+    r0 = r;
+    c0 = c + cs;
+    return { r, c, cs, rs };
+  });
+  const R = taken.length;
+  const hugW = Array.from({ length: C }, (_, j) => Math.max(0, ...items.filter((_, k) => pos[k]!.c === j && pos[k]!.cs === 1).map((i) => i.w)));
+  const hugH = Array.from({ length: R }, (_, i) => Math.max(0, ...items.filter((_, k) => pos[k]!.r === i && pos[k]!.rs === 1).map((i2) => i2.h)));
+  // (an item over several tracks larger than them widens those that hug, in equal shares)
+  const widen = (sizes: number[], tracks: readonly LayoutTrack[] | undefined, from: number, count: number, want: number, gap: number): void => {
+    const have = sum(sizes.slice(from, from + count)) + gap * (count - 1);
+    if (want <= have) return;
+    const hugs = Array.from({ length: count }, (_, i) => from + i).filter((i) => (tracks?.[i]?.size ?? "hug") === "hug");
+    for (const i of hugs.length ? hugs : [from + count - 1]) sizes[i]! += (want - have) / (hugs.length || 1);
+  };
+  pos.forEach((p, k) => {
+    if (p.cs > 1) widen(hugW, l.cols, p.c, p.cs, items[k]!.w, gapX);
+    if (p.rs > 1) widen(hugH, l.rows, p.r, p.rs, items[k]!.h, gapY);
+  });
+  const colW = trackSizes(l.cols, C, hugW, l.hug[0] ? Infinity : innerW, gapX);
+  const rowH = trackSizes(l.rows, R, hugH, l.hug[1] ? Infinity : innerH, gapY);
+  const contentW = sum(colW) + (C - 1) * gapX, contentH = sum(rowH) + (R - 1) * gapY;
+  const freeW = l.hug[0] ? 0 : innerW - contentW, freeH = l.hug[1] ? 0 : innerH - contentH;
+  const spread = l.justify === "between" && C > 1 && freeW > 0 ? freeW / (C - 1) : 0;
+  const x0 = padL + (spread ? 0 : offset(freeW, l.justify)), y0 = padT + offset(freeH, l.align);
+  const colX = colW.map((_, j) => x0 + sum(colW.slice(0, j)) + j * (gapX + spread));
+  const rowY = rowH.map((_, i) => y0 + sum(rowH.slice(0, i)) + i * gapY);
+  const cells = items.map((it, k): Cell => {
+    const p = pos[k]!;
+    const cw = sum(colW.slice(p.c, p.c + p.cs)) + (p.cs - 1) * (gapX + spread), ch = sum(rowH.slice(p.r, p.r + p.rs)) + (p.rs - 1) * gapY;
+    const w = it.fill === "x" || it.fill === "both" ? limited(cw, it, 0, innerW) : it.w;
+    const h = it.fill === "y" || it.fill === "both" ? limited(ch, it, 1, innerH) : it.h;
+    return { x: colX[p.c]! + offset(cw - w, l.justify === "between" ? "start" : l.justify), y: rowY[p.r]! + offset(ch - h, l.align), w, h };
+  });
+  return { cells, w: l.hug[0] ? padL + contentW + padR : W, h: l.hug[1] ? padT + contentH + padB : H };
+}
+
+/**
+ * Masonry: columns of one width, each item made as wide as a column (its shape kept) and put in the shortest column, so pictures of every
+ * shape pack with no holes (ADR 0193). The columns share the sheet's width; a sheet that hugs its width makes them as wide as its widest item.
+ */
+function placeMasonry(l: SheetLayout, W: number, H: number, items: readonly ItemSize[]): { cells: Cell[]; w: number; h: number } {
+  const [padT, padR, padB, padL] = l.pad;
+  const [gapX, gapY] = l.gap;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const n = items.length;
+  const C = Math.min(Math.max(1, n), columnsOf(l, n));
+  const colW = l.hug[0] ? Math.max(0, ...items.map((i) => i.w)) : Math.max(0, (innerW - (C - 1) * gapX) / C);
+  const heights = new Array<number>(C).fill(0);
+  const placed = items.map((it) => {
+    const k = heights.indexOf(Math.min(...heights));
+    const h = it.w > 0 ? (it.h * colW) / it.w : it.h;
+    const cell = { x: padL + k * (colW + gapX), y: padT + heights[k]!, w: colW, h };
+    heights[k]! += h + gapY;
+    return cell;
+  });
+  const contentW = C * colW + (C - 1) * gapX, contentH = n ? Math.max(...heights) - gapY : 0;
+  const dy = l.hug[1] ? 0 : offset(innerH - contentH, l.align);
+  return { cells: placed.map((c) => ({ ...c, y: c.y + dy })), w: l.hug[0] ? padL + contentW + padR : W, h: l.hug[1] ? padT + contentH + padB : H };
+}
+
+/**
+ * Justified rows: items of one row all one height, the row as wide as the sheet, as a gallery of photographs (ADR 0193). Items are taken at
+ * the row height aimed at (`rowHeight`, else their usual height) until the row is as wide as the room, then the row is scaled to fit it
+ * exactly; the last row keeps the height aimed at, placed by `justify`. A sheet that hugs its width has no width to fill: one row.
+ */
+function placeJustified(l: SheetLayout, W: number, H: number, items: readonly ItemSize[]): { cells: Cell[]; w: number; h: number } {
+  const [padT, padR, padB, padL] = l.pad;
+  const [gapX, gapY] = l.gap;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const room = l.hug[0] ? Infinity : Math.max(0, innerW);
+  const target = l.rowHeight ?? median(items.map((i) => i.h).filter((h) => h > 0));
+  const at = items.map((i) => (i.h > 0 ? (i.w * target) / i.h : i.w));
+  const cells: Cell[] = new Array(items.length);
+  let y = padT, row: number[] = [], widest = 0;
+  const close = (fit: boolean): void => {
+    if (!row.length) return;
+    const gaps = (row.length - 1) * gapX, natural = sum(row.map((k) => at[k]!));
+    const k = fit && natural > 0 ? Math.max(0, room - gaps) / natural : 1;
+    const h = target * k, w = natural * k + gaps;
+    let x = padL + (fit ? 0 : offset(Number.isFinite(room) ? room - w : 0, l.justify === "between" ? "start" : l.justify));
+    for (const i of row) {
+      cells[i] = { x, y, w: at[i]! * k, h };
+      x += at[i]! * k + gapX;
+    }
+    widest = Math.max(widest, w);
+    y += h + gapY;
+    row = [];
+  };
+  items.forEach((_, i) => {
+    row.push(i);
+    if (sum(row.map((k) => at[k]!)) + (row.length - 1) * gapX >= room) close(true);
+  });
+  close(false);
+  const contentH = items.length ? y - gapY - padT : 0;
+  const dy = l.hug[1] ? 0 : offset(innerH - contentH, l.align);
+  return { cells: cells.map((c) => ({ ...c, y: c.y + dy })), w: l.hug[0] ? padL + widest + padR : W, h: l.hug[1] ? padT + contentH + padB : H };
+}
+
 /** An item of a sheet: the objects it is made of (one, or a group's), what they carry (a sheet's contents), and its box in the sheet's units. */
-interface Unit { key: string; objs: CanvasObject[]; carried: CanvasObject[]; x0: number; y0: number; x1: number; y1: number; fill?: ItemSize["fill"] }
+interface Unit { key: string; objs: CanvasObject[]; carried: CanvasObject[]; x0: number; y0: number; x1: number; y1: number; fill?: ItemSize["fill"]; span?: ItemSize["span"]; min?: ItemSize["min"]; max?: ItemSize["max"] }
 
 /** The sheet's box as dyadics in its frame, its unit, and how to read a point of that frame in its units from its corner. */
 function frameOf(sheet: LaidOutSheet, space: FrameSpace) {
@@ -155,7 +302,9 @@ function unitsOf(sheet: LaidOutSheet, all: readonly CanvasObject[], space: Frame
     const one = objs.length === 1 ? objs[0]! : null;
     // (a pen stroke keeps its shape: it scales as a whole only; a turned thing is only moved)
     const fill = one && one.kind !== "stroke" && !one.rot ? one.inLayout?.fill : undefined;
-    units.push({ key, objs, carried, x0: rel(b.min.x, sb.min.x), y0: rel(b.min.y, sb.min.y), x1: rel(b.max.x, sb.min.x), y1: rel(b.max.y, sb.min.y), ...(fill ? { fill } : {}) });
+    // (an item's span and limits are those of its first object: a group's or a thing's alone)
+    const il = objs[0]!.inLayout;
+    units.push({ key, objs, carried, x0: rel(b.min.x, sb.min.x), y0: rel(b.min.y, sb.min.y), x1: rel(b.max.x, sb.min.x), y1: rel(b.max.y, sb.min.y), ...(fill ? { fill } : {}), ...(il?.span ? { span: il.span } : {}), ...(il?.min ? { min: il.min } : {}), ...(il?.max ? { max: il.max } : {}) });
   }
   // (a thing attached to an item goes with it, not as an item of its own)
   const carried = new Set(units.flatMap((u) => u.carried.map((o) => o.id)));
@@ -185,6 +334,13 @@ function orderWithDropped(units: readonly Unit[], flow: SheetLayout["flow"], mov
   return out;
 }
 
+/** The items in the order a sort rule says, from what the canvas knows of them: a picture's name as placed, a text's first words, its size, its kind. */
+function sortedUnits(units: readonly Unit[], key: LayoutSort): Unit[] {
+  const nameOf = (o: CanvasObject): string => (o.kind === "text" ? plainText(o.md, 40).trim() : (o.name ?? ""));
+  const as = units.map((u) => ({ objects: u.objs, name: nameOf(u.objs[0]!), u }));
+  return sortUnits(as, key).map((a) => (a as (typeof as)[number]).u);
+}
+
 /**
  * The sheet laid out: the objects that change (items moved, filled items stretched, the sheet resized when it hugs, and the stacking order
  * of dropped items). `moved`: the keys of the items dropped on the sheet in this change (`unitKeyOf`), which take the place they were dropped at.
@@ -193,8 +349,9 @@ export function layOutSheet(sheet: LaidOutSheet, all: readonly CanvasObject[], s
   const l = sheet.container.layout;
   const { f, sb, u, W, H } = frameOf(sheet, space);
   if (!(W > 0 && H > 0 && Number.isFinite(W + H))) return [];
-  const units = orderWithDropped(unitsOf(sheet, all, space), l.flow, moved);
-  const { cells, w, h } = placeItems(l, W, H, units.map((un) => ({ w: un.x1 - un.x0, h: un.y1 - un.y0, ...(un.fill ? { fill: un.fill } : {}) })));
+  // (a sort rule orders the items whatever their stacking: a dropped one takes its place by the rule)
+  const units = l.sort ? sortedUnits(unitsOf(sheet, all, space), l.sort) : orderWithDropped(unitsOf(sheet, all, space), l.flow, moved);
+  const { cells, w, h } = placeItems(l, W, H, units.map((un) => ({ w: un.x1 - un.x0, h: un.y1 - un.y0, ...(un.fill ? { fill: un.fill } : {}), ...(un.span ? { span: un.span } : {}), ...(un.min ? { min: un.min } : {}), ...(un.max ? { max: un.max } : {}) })));
   const out = new Map<ObjectId, CanvasObject>();
   const near = (a: number, b: number): boolean => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
   units.forEach((un, i) => {
@@ -207,15 +364,19 @@ export function layOutSheet(sheet: LaidOutSheet, all: readonly CanvasObject[], s
     let group: CanvasObject[] = [...un.objs, ...un.carried].map((o) => expressObjectIn(o, f));
     if (kx !== 1 || ky !== 1) {
       const one = group[0]!;
-      const corner = worldBounds(one).min;
-      // (a sheet that fills takes what is on it along by their pins; anything else is stretched about its corner)
-      if (isContainer(one)) group = [...planSheetScale(group, corner, kx, ky, false, false).values()];
-      else group = [scaleAbout(one, corner, kx, one.kind === "text" ? 1 : ky), ...group.slice(1)]; // (words only get wider: they wrap again)
+      // (a sheet that fills takes what is on it along by their pins; a thing alone is stretched about its corner; a group, as a masonry or
+      // justified rows size it, is scaled as one about its own corner)
+      if (un.objs.length === 1 && isContainer(one)) group = [...planSheetScale(group, worldBounds(one).min, kx, ky, false, false).values()];
+      else if (un.objs.length === 1) group = [scaleAbout(one, worldBounds(one).min, kx, one.kind === "text" ? 1 : ky), ...group.slice(1)]; // (words only get wider: they wrap again)
+      else {
+        const corner = unionBounds(group.slice(0, un.objs.length))!.min;
+        group = group.map((o) => scaleAbout(o, corner, kx, o.kind === "text" ? 1 : ky));
+      }
     }
     for (const o of group) out.set(o.id, homeObject(translate(o, dx, dy), space));
   });
   // the stacking order of dropped items: the items' z values, dealt again in the new order (each item keeps its own inner order)
-  if (moved.size && units.length > 1) {
+  if (moved.size && units.length > 1 && !l.sort) {
     const zs = units.flatMap((un) => [...un.objs, ...un.carried].map((o) => o.z)).sort((a, b) => b - a);
     let k = 0;
     for (const un of units) {
@@ -236,6 +397,48 @@ export function layOutSheet(sheet: LaidOutSheet, all: readonly CanvasObject[], s
     }
   }
   return [...out.values()];
+}
+
+/** A laid-out sheet's items, in their order, with their boxes as placed now and the sheet's size (its units): for the handles on the canvas and a new row height. */
+export function layoutNow(sheet: LaidOutSheet, all: readonly CanvasObject[], space: FrameSpace): { items: Cell[]; W: number; H: number } {
+  const { W, H } = frameOf(sheet, space);
+  const l = sheet.container.layout;
+  const units = l.sort ? sortedUnits(unitsOf(sheet, all, space), l.sort) : orderWithDropped(unitsOf(sheet, all, space), l.flow, new Set());
+  return { items: units.map((u) => ({ x: u.x0, y: u.y0, w: u.x1 - u.x0, h: u.y1 - u.y0 })), W, H };
+}
+
+/**
+ * Live reflow (ADR 0193): while things are dragged (`shown`: them as they are seen now), the sheets with auto layout they are over laid out
+ * again around them, as dropping them there would, without the dragged things themselves (they follow the pointer). A thing dragged off its
+ * sheet leaves its place; one dragged over another sheet with auto layout makes room there. Nothing is stored.
+ */
+export function previewLayout(src: DerivationSource, shown: ReadonlyMap<ObjectId, CanvasObject | null>): CanvasObject[] {
+  const moved = [...shown.values()].filter((o): o is CanvasObject => !!o);
+  if (!moved.length) return [];
+  const sheets = [...src.all()].filter((o): o is LaidOutSheet => isLaidOut(o) && !o.hidden && !shown.has(o.id));
+  if (!sheets.length) return [];
+  const ids = new Set(moved.map((o) => o.id));
+  // (the things dragged whose sheet is not dragged with them: each goes to the topmost laid-out sheet under its middle, or to none)
+  const next = moved.map((o) => {
+    if (o.parent !== undefined && ids.has(o.parent)) return o;
+    const was = o.parent === undefined ? undefined : src.get(o.parent);
+    if (was && !isLaidOut(was)) return o;
+    let over: LaidOutSheet | undefined;
+    for (const sh of sheets) {
+      if (sh.id === o.id || (over && sh.z < over.z)) continue;
+      try {
+        const sb = worldBounds(sh), b = worldBounds(expressObjectIn(o, sh.frame ?? src.space.world));
+        const mx = D.shift(D.add(b.min.x, b.max.x), -1), my = D.shift(D.add(b.min.y, b.max.y), -1);
+        if (D.cmp(mx, sb.min.x) >= 0 && D.cmp(mx, sb.max.x) <= 0 && D.cmp(my, sb.min.y) >= 0 && D.cmp(my, sb.max.y) <= 0) over = sh;
+      } catch {
+        // (too far apart in size to compare: not over it)
+      }
+    }
+    if (over?.id === o.parent) return o;
+    const { parent: _p, ...off } = o;
+    return (over ? { ...o, parent: over.id } : off) as CanvasObject;
+  });
+  return withAutoLayout(src, next, []).filter((o) => !ids.has(o.id));
 }
 
 /** The key of the item a thing on a sheet belongs to (its outermost group, else itself). */

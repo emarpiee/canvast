@@ -7,7 +7,7 @@ import { screenToWorld } from "../core/camera";
 import type { ViewState } from "../app/view-state";
 import type { EditorState, Tool } from "../app/editor-state";
 import type { DocumentStore } from "../doc/document-store";
-import type { CanvasObject, ImageObject, ObjectId, PathObject, StrokeObject, TextObject } from "../doc/model";
+import type { CanvasObject, ImageObject, ObjectId, PathObject, SheetLayout, StrokeObject, TextObject } from "../doc/model";
 import { editSubs, homeObject, newObjectId, pathSubs, strokePoints } from "../doc/model";
 import type { Paint } from "../doc/paint";
 import type { ShapeKind, SubPath } from "../doc/path";
@@ -35,6 +35,7 @@ import { TILT_FULL_DEG, expandStroke } from "./pens";
 import { normalizeUnit, restack, worldBounds } from "../doc/edit-ops";
 import { MAX_SNAP_TARGETS, SNAP_PX, bestSnap } from "./snap";
 import { visibleObjects } from "../render/scene-view";
+import { draggedLength, handleLength, layoutHandleAt, layoutHandles, withHandleLength, type LayoutHandle } from "./layout-handles";
 import type { FrameIndex } from "../scene/frame-index";
 import { cameraIn } from "../scene/frame-index";
 import { boxSelect, edgeDistancePx, hitsObject, insideBody, lassoSelect, pickAll, sweepHits } from "../render/hit-test";
@@ -56,7 +57,7 @@ import type { SelectionFrame } from "../render/selection-frame";
 import { TURN, angleFromRadians, cosSin, normAngle, radiansFromAngle } from "../core/angle";
 import { formatRatio } from "../app/export-size";
 import { PanGesture } from "./navigation";
-import { drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, setShapeText, setBalloonLink, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
+import { autoLayoutOf, patchAutoLayout, drawSheetOver, finishShapeBuilder, fillGapAt, finishGapFill, attachSelection, sheetSelection, arrangeSelection, commitCornerAt, commitCornerSet, commitCorners, commitShape as commitShapeNumbers, balloonText, setShapeText, setBalloonLink, commitPaint, deleteSelection, flattenSelection, duplicateSelection, groupSelection, previewPaint, redo, ungroupSelection, undo } from "../app/actions";
 import { expandToUnits, groupObjects, isInside } from "../doc/groups";
 import { boolGroupsOf, isResult } from "../doc/boolean-group";
 
@@ -266,6 +267,8 @@ type Gesture =
   | { kind: "shape"; pointerId: number; start: ScreenPoint; /** What a corner being drawn snaps to (null: snapping off). */ snap: SnapContext | null }
   /** A side handle of words in a shape: the shape sets their box, so what it changes is the padding. */
   | { kind: "textpad"; pointerId: number; start: ScreenPoint; edge: Edge; pads: { padX: number; padY: number; padR: number; padB: number }; emPx: number; moved: boolean }
+  /** A handle of a sheet's auto layout (ADR 0193): its padding or a gap, from its length at the press. */
+  | { kind: "layouthandle"; pointerId: number; start: ScreenPoint; h: LayoutHandle; v0: number; ppu: number; flow: SheetLayout["flow"]; moved: boolean }
   /** A node of the path being built has been placed; dragging pulls its handles out (Path tool). */
   | { kind: "pathnode"; pointerId: number; start: ScreenPoint; dragging: boolean }
   /** A node, a handle or a segment of the selected path (Edit nodes tool); `base` is the path's geometry when the press began. */
@@ -1004,6 +1007,17 @@ export function attachTools(
     } else if (pick.what === "corner" && sel && !(sel.id === id && sel.idx.has(pick.dot.index))) editor.cornerSel = null; // (another corner: the picked ones are let go)
     return true;
   };
+  const updateLayoutHandle = (s: ScreenPoint, final: boolean): void => {
+    if (g.kind !== "layouthandle") return;
+    if (Math.hypot(s.x - g.start.x, s.y - g.start.y) >= DRAG_THRESHOLD_PX) g.moved = true;
+    if (!g.moved) return;
+    const got = autoLayoutOf(doc, editor);
+    if (!got) return;
+    const v = draggedLength(g.h, g.flow, g.v0, s.x - g.start.x, s.y - g.start.y, g.ppu);
+    patchAutoLayout(doc, editor, withHandleLength(got.layout, g.h, v), final);
+    const px = Math.round(v * g.ppu * 10) / 10;
+    editor.handleLabel = final ? null : { x: s.x, y: s.y, text: `${g.h.what === "pad" ? "Padding" : "Gap"} ${px} px` };
+  };
   const updatePadding = (s: ScreenPoint, final: boolean): void => {
     if (g.kind !== "textpad") return;
     if (Math.hypot(s.x - g.start.x, s.y - g.start.y) >= DRAG_THRESHOLD_PX) g.moved = true;
@@ -1408,6 +1422,15 @@ export function attachTools(
       if (target) attachSelection(doc, editor, target.id);
       editor.changed();
       return;
+    }
+    // A picked sheet's auto layout handles (ADR 0193): its padding and gaps, dragged as the bar's numbers are.
+    if (editor.selection.size && !editor.blockEdit()) {
+      const lh = layoutHandles(doc, visible().filter((p) => editor.selection.has(p.obj.id)));
+      const h = lh && layoutHandleAt(lh.handles, s.x, s.y);
+      if (lh && h) {
+        g = { kind: "layouthandle", pointerId: e.pointerId, start: s, h, v0: handleLength(lh.sheet.container.layout, h), ppu: lh.ppu, flow: lh.sheet.container.layout.flow, moved: false };
+        return;
+      }
     }
     if (startGradientPress(e, s) || startCornerPress(e, s)) return;
     // Ctrl or Cmd and a click on a link of a text opens it in a new tab (nothing is picked).
@@ -2347,6 +2370,9 @@ export function attachTools(
       case "textpad":
         updatePadding(s, false);
         break;
+      case "layouthandle":
+        updateLayoutHandle(s, false);
+        break;
       case "shape":
         updateShape(s, e);
         break;
@@ -2521,6 +2547,11 @@ export function attachTools(
         editor.handleLabel = null;
         if (cancelled || !g.moved) editor.preview = { kind: "none" };
         else updateCorner(s, true);
+        break;
+      case "layouthandle":
+        editor.handleLabel = null;
+        if (cancelled || !g.moved) editor.preview = { kind: "none" };
+        else updateLayoutHandle(s, true);
         break;
       case "textpad":
         editor.handleLabel = null;

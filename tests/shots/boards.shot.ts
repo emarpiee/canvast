@@ -58,6 +58,63 @@ test("auto-layout", async ({ scene: s }) => {
   await s.shot("auto-layout", await s.around({ objects: [sheet], els: ["[data-auto-layout]"], pad: 30 }));
 });
 
+/** Pictures of every shape on a new sheet with auto layout, picked; its flow and lengths set in the bar (a field and its value). */
+async function laidOut(s: Scene, art: string[], flow: string, fields: ReadonlyArray<readonly [string, string]>): Promise<string> {
+  const ids = await s.place(art);
+  await s.fit(ids, 0.6);
+  await s.select(ids);
+  await s.p.keyboard.press("Shift+A");
+  await expect.poll(async () => (await s.objects()).some((o) => o.container)).toBe(true);
+  const sheet = (await s.objects()).find((o) => o.container)!.id;
+  await s.select([sheet]);
+  await s.p.locator(`[data-layout-flow="${flow}"]`).click();
+  for (const [sel, v] of fields) {
+    await s.p.locator(sel).fill(v);
+    await s.p.locator(sel).press("Enter");
+  }
+  return sheet;
+}
+
+test("layout-masonry", async ({ scene: s }) => {
+  await s.look({ theme: "light", hue: 30 });
+  await s.canvas("References");
+  const art = await s.art(...artFiles("hokusai", "degas", "delany", "anonymous", "vangogh"));
+  const sheet = await laidOut(s, art, "masonry", [["[data-layout-columns]", "4"], ['[data-layout-gap="0"]', "18"], ['[data-layout-gap="1"]', "18"], ['[data-layout-pad="h"]', "24"], ['[data-layout-pad="v"]', "24"]]);
+  await s.fit([sheet], 0.78, [0.5, 0.55]);
+  await s.select([sheet]);
+  await s.settle();
+  await s.shot("layout-masonry", await s.around({ objects: [sheet], pad: 24 }));
+});
+
+test("layout-justified", async ({ scene: s }) => {
+  await s.look({ theme: "dark", hue: 200 });
+  await s.canvas("Landscapes");
+  const art = await s.art(...artFiles("waterloo", "verhaecht", "leprince", "vangogh", "hokusai-under", "hokusai-seaside", "degas-dancer_onstage", "bonheur"));
+  const sheet = await laidOut(s, art, "justified", [['[data-layout-gap="0"]', "14"], ['[data-layout-gap="1"]', "14"], ['[data-layout-pad="h"]', "20"], ['[data-layout-pad="v"]', "20"]]);
+  await s.fit([sheet], 0.8, [0.5, 0.55]);
+  await s.select([sheet]);
+  await s.settle();
+  await s.shot("layout-justified", await s.around({ objects: [sheet], pad: 24 }));
+});
+
+test("layout-tracks", async ({ scene: s }) => {
+  await s.look({ theme: "dark", hue: 270 });
+  await s.canvas("Page 1");
+  const art = await s.art("bonheur", "degas-dancer_with", "degas-dancer_onstage", "delacroix", "degheyn");
+  const sheet = await laidOut(s, art, "grid", [["[data-layout-columns]", "3"], ['[data-layout-gap="0"]', "20"], ['[data-layout-gap="1"]', "20"], ['[data-layout-pad="h"]', "32"], ['[data-layout-pad="v"]', "32"]]);
+  // (the first picture spans the top row: a wide establishing panel)
+  const first = (await s.objects()).filter((o) => o.kind === "image").map((o) => o.id)[0]!;
+  await s.select([first]);
+  await s.p.locator('[data-in-span="0"]').fill("3");
+  await s.p.locator('[data-in-span="0"]').press("Enter");
+  await s.select([sheet]);
+  await s.p.locator("[data-layout-tracks]").click();
+  await s.p.locator('button[data-track="c:1:fr"]').click();
+  await expect(s.p.getByRole("dialog", { name: "Columns and rows" })).toBeVisible();
+  await s.settle();
+  await s.shot("layout-tracks", await s.around({ objects: [sheet], els: ['[role="dialog"][aria-label="Columns and rows"]'], pad: 24 }));
+});
+
 test("import-menu", async ({ scene: s }) => {
   await s.art("hokusai-under", "hokusai-seaside", "waterloo", "verhaecht");
   await s.p.getByTestId("view-assets").click();

@@ -309,6 +309,10 @@ import fileTextSvg from "lucide-static/icons/file-text.svg";
 import fileSignatureSvg from "lucide-static/icons/file-signature.svg";
 import fileCodeSvg from "lucide-static/icons/file-code.svg";
 import draftingCompassSvg from "lucide-static/icons/drafting-compass.svg";
+import layoutDashboardSvg from "lucide-static/icons/layout-dashboard.svg";
+import rows4Svg from "lucide-static/icons/rows-4.svg";
+import columns3CogSvg from "lucide-static/icons/columns-3-cog.svg";
+import layoutPanelLeftSvg from "lucide-static/icons/layout-panel-left.svg";
 import layers2 from "lucide-static/icons/layers-2.svg";
 import alignHStart from "lucide-static/icons/align-horizontal-justify-start.svg";
 import alignHCenter from "lucide-static/icons/align-horizontal-justify-center.svg";
@@ -742,6 +746,10 @@ export const ICONS = {
   flowColumn: clean(galleryVerticalSvg),
   flowWrap: clean(grid3x2Svg),
   flowGrid: clean(table2Svg),
+  flowMasonry: clean(layoutDashboardSvg),
+  flowJustified: clean(rows4Svg),
+  layoutTracks: clean(columns3CogSvg),
+  layoutStyles: clean(layoutPanelLeftSvg),
   hugWidth: clean(foldHorizontalSvg),
   hugHeight: clean(foldVerticalSvg),
   layoutFree: clean(layoutFreeformSvg),

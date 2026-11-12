@@ -6,12 +6,14 @@ import type { FrameCamera } from "../core/frames";
 import { cameraIn } from "../scene/frame-index";
 import type { EditorState } from "../app/editor-state";
 import type { AssetLibrary } from "../assets/asset-library";
+import type { LayoutHandle } from "../interaction/layout-handles";
+import { handleLies } from "../interaction/layout-handles";
 import type { ProjectedObject, ScreenBox } from "./projection";
 import { projectObject, projectionFor } from "./projection";
 import type { RasterSource } from "./draw-objects";
 import { drawMasked } from "./mask";
 import { addFillPath, batchable, drawCover, drawImageObject, drawLockMark, drawPath, drawStroke, strokeBatch, strokeLineWidth } from "./draw-objects";
-import type { PathObject, StrokeObject } from "../doc/model";
+import type { PathObject, SheetLayout, StrokeObject } from "../doc/model";
 import { NODE, drawnSubs } from "../doc/path";
 import { shapeHandles, gradientHandles, nodesOnScreen } from "../interaction/path-edit";
 import { takeTexturePending } from "./texture";
@@ -242,6 +244,8 @@ export function drawOverlays(
   labels: readonly ItemLabel[] = [],
   /** The balloon whose words are the selection. */
   owner?: ProjectedObject,
+  /** The picked sheet's auto layout handles (ADR 0193). */
+  layout?: { handles: readonly LayoutHandle[]; flow: SheetLayout["flow"] } | null,
 ): void {
   if (editor.builder) drawBuilder(ctx, editor.builder, fc, vp, theme);
   if (editor.gapFill) drawGaps(ctx, editor.gapFill, fc, vp, theme);
@@ -423,6 +427,7 @@ export function drawOverlays(
   drawSelection(ctx, selected, editor, theme, vp);
   if (editor.tool === "node") drawNodes(ctx, selected, editor, theme);
   if (editor.tool === "select") drawCornerHandles(ctx, selected, editor, theme, owner);
+  if (editor.tool === "select" && layout) drawLayoutHandles(ctx, layout.handles, layout.flow, theme);
   drawHandleLabel(ctx, editor, theme); // (whatever the tool: a resize, a handle, or a box being drawn says its value)
   // (not while the nodes are edited or a shape's corners are opened out one by one: those handles are what is being worked on)
   if (editor.tool === "select" && !(selected.length === 1 && editor.cornersOpen === selected[0]!.obj.id)) drawGradientHandles(ctx, selected, theme, editor.gradientFocus);
@@ -484,6 +489,23 @@ function drawPathNodes(ctx: CanvasRenderingContext2D, po: ProjectedObject, edito
     ctx.fillStyle = on ? theme.selection : theme.handleFill;
     ctx.fillRect(n.p[0] - half + 1, n.p[1] - half + 1, HANDLE_SIZE_PX - 2, HANDLE_SIZE_PX - 2);
     ctx.strokeRect(n.p[0] - half + 1, n.p[1] - half + 1, HANDLE_SIZE_PX - 2, HANDLE_SIZE_PX - 2);
+  }
+  ctx.restore();
+}
+
+/** A sheet's auto layout handles: a short bar along each edge's padding, one across each gap (ADR 0193). */
+function drawLayoutHandles(ctx: CanvasRenderingContext2D, handles: readonly LayoutHandle[], flow: SheetLayout["flow"], theme: SceneTheme): void {
+  ctx.save();
+  ctx.lineWidth = 1.25;
+  for (const h of handles) {
+    const across = handleLies(h, flow);
+    const [w, ht] = across ? [14, 5] : [5, 14];
+    ctx.fillStyle = h.what === "gap" ? theme.selection : theme.handleFill;
+    ctx.strokeStyle = h.what === "gap" ? theme.handleFill : theme.selection;
+    ctx.beginPath();
+    ctx.roundRect(h.x - w / 2, h.y - ht / 2, w, ht, 2.5);
+    ctx.fill();
+    ctx.stroke();
   }
   ctx.restore();
 }

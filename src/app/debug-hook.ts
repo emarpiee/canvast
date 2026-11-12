@@ -144,6 +144,8 @@ export interface DebugHook {
   itemLabels(): Array<{ id: string; text: string; x: number; y: number; w: number; h: number }>;
   /** Projected screen geometry of an object (null when offscreen). */
   objectScreen(id: string): { box: ScreenBox; q: number[]; radius: number } | null;
+  /** An object's screen box as it is drawn now: with what is being dragged, and what makes room for it (live reflow, ADR 0193). */
+  shownBox(id: string): ScreenBox | null;
   /** Save the view and collect stored frames nothing refers to (normally done after many frames were written). */
   collectFrames(): Promise<void>;
   /** Number of stored frame records of the current canvas. */
@@ -465,6 +467,10 @@ export function installDebugHook(
       const cam = camFor(o);
       const po = cam && projectObject(o, cam, view.viewport, { keepTiny: true });
       return po ? { box: { ...po.box }, q: [...po.q], radius: po.radius } : null;
+    },
+    shownBox: (id) => {
+      const po = visibleObjects(doc, deps.index, editor, view.frameCamera, view.viewport).find((p) => p.obj.id === id);
+      return po ? { ...po.box } : null;
     },
     collectFrames: async () => {
       await writer.flush();

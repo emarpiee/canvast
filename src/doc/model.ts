@@ -111,7 +111,22 @@ interface ObjectBase {
 export interface InLayout {
   readonly fill?: "x" | "y" | "both";
   readonly free?: true;
+  /** In a grid: how many columns and rows it covers (ADR 0193). Absent = one of each. */
+  readonly span?: readonly [number, number];
+  /** A filling thing's least and most size, as shares (0–1) of the room inside the sheet along each axis; 0 = no limit (ADR 0193). Shares, not lengths: they need no unit and stay true as the sheet is resized. */
+  readonly min?: readonly [number, number];
+  readonly max?: readonly [number, number];
 }
+/** The size of a grid's column or row (ADR 0193): as wide as what is in it, a set length (the sheet's units), or a share of the room left. */
+export interface LayoutTrack {
+  readonly size: "hug" | "fixed" | "fr";
+  /** A fixed track's length, or a share's weight. */
+  readonly v?: number;
+}
+export const LAYOUT_TRACK_SIZES = ["hug", "fixed", "fr"] as const;
+/** The orders a layout can keep its items in by itself (ADR 0193), from what the canvas knows of them. */
+export const LAYOUT_SORTS = ["name-asc", "name-desc", "size", "type"] as const;
+export type LayoutSort = (typeof LAYOUT_SORTS)[number];
 
 /**
  * Auto layout of a sheet (ADR 0186): what is on it is placed by these rules, not by hand. Lengths are in the sheet's own units (`unit`), so
@@ -127,19 +142,43 @@ export interface SheetLayout {
   /** Items along the flow, in a sheet that does not hug: packed at the start, the centre or the end, or spread between. */
   readonly justify: "start" | "centre" | "end" | "between";
   readonly hug: readonly [boolean, boolean];
-  /** Grid: how many columns; absent = about as many as rows. */
+  /** Grid and masonry: how many columns; absent = about as many as rows. */
   readonly columns?: number;
+  /** Grid: each column's and row's size (ADR 0193); absent = each as large as what is in it. Columns past these, or rows past these, hug. */
+  readonly cols?: readonly LayoutTrack[];
+  readonly rows?: readonly LayoutTrack[];
+  /** Justified rows: the height a row aims at before it is made as wide as the room (the sheet's units); absent = the items' usual height. */
+  readonly rowHeight?: number;
+  /** The items in this order, whatever their stacking (ADR 0193); absent = the stacking order, front first. */
+  readonly sort?: LayoutSort;
 }
-export type LayoutFlow = "row" | "column" | "wrap" | "grid";
-export const LAYOUT_FLOWS: readonly LayoutFlow[] = ["row", "column", "wrap", "grid"];
+/** A change to a layout: a value set, or `undefined` to take that setting away (back to its usual). */
+export type LayoutPatch = { readonly [K in keyof SheetLayout]?: SheetLayout[K] | undefined };
+export type LayoutFlow = "row" | "column" | "wrap" | "grid" | "masonry" | "justified";
+export const LAYOUT_FLOWS: readonly LayoutFlow[] = ["row", "column", "wrap", "grid", "masonry", "justified"];
 export const LAYOUT_ALIGNS = ["start", "centre", "end"] as const;
 export const LAYOUT_JUSTIFIES = ["start", "centre", "end", "between"] as const;
+export const isSheetLayout = (l: unknown): l is SheetLayout => validLayout(l);
 const validLayout = (l: unknown): l is SheetLayout => {
   const o = l as SheetLayout | null;
   const len = (v: unknown): boolean => typeof v === "number" && Number.isFinite(v) && v >= 0;
   return typeof o === "object" && o !== null && LAYOUT_FLOWS.includes(o.flow) && Array.isArray(o.gap) && o.gap.length === 2 && o.gap.every(len) && Array.isArray(o.pad) && o.pad.length === 4 && o.pad.every(len) &&
     (LAYOUT_ALIGNS as readonly string[]).includes(o.align) && (LAYOUT_JUSTIFIES as readonly string[]).includes(o.justify) && Array.isArray(o.hug) && o.hug.length === 2 && o.hug.every((v) => typeof v === "boolean") &&
-    (o.columns === undefined || (Number.isInteger(o.columns) && o.columns >= 1 && o.columns <= 1024));
+    (o.columns === undefined || (Number.isInteger(o.columns) && o.columns >= 1 && o.columns <= 1024)) &&
+    [o.cols, o.rows].every((ts) => ts === undefined || (Array.isArray(ts) && ts.length <= 1024 && ts.every(validTrack))) &&
+    (o.rowHeight === undefined || (len(o.rowHeight) && o.rowHeight > 0)) &&
+    (o.sort === undefined || (LAYOUT_SORTS as readonly string[]).includes(o.sort));
+};
+const validTrack = (t: unknown): t is LayoutTrack => {
+  const o = t as LayoutTrack | null;
+  return typeof o === "object" && o !== null && (LAYOUT_TRACK_SIZES as readonly string[]).includes(o.size) && (o.v === undefined || (typeof o.v === "number" && Number.isFinite(o.v) && o.v >= 0));
+};
+/** Whether what an object keeps of its place in a layout is sound. */
+const validInLayout = (v: unknown): boolean => {
+  const o = v as InLayout | null;
+  const pair = (p: unknown, ok: (n: number) => boolean): boolean => p === undefined || (Array.isArray(p) && p.length === 2 && p.every((n) => typeof n === "number" && Number.isFinite(n) && ok(n)));
+  return typeof o === "object" && o !== null && (o.fill === undefined || ["x", "y", "both"].includes(o.fill)) && (o.free === undefined || o.free === true) &&
+    pair(o.span, (n) => Number.isInteger(n) && n >= 1 && n <= 1024) && pair(o.min, (n) => n >= 0 && n <= 1) && pair(o.max, (n) => n >= 0 && n <= 1);
 };
 
 /** What a pattern was made with: generator id, group id, seed and the values of its settings (numbers, texts and switches). */
@@ -609,7 +648,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
   if (o.groups !== undefined && !(Array.isArray(o.groups) && o.groups.length > 0 && o.groups.length <= 16 && new Set(o.groups).size === o.groups.length && o.groups.every((g) => ID_RE.test(g)))) throw new InvalidObjectError("bad groups");
   if (o.parent !== undefined && !(typeof o.parent === "string" && ID_RE.test(o.parent) && o.parent !== o.id)) throw new InvalidObjectError("bad parent");
   if (o.constraint !== undefined && !(typeof o.constraint === "object" && o.constraint !== null && ["left", "right", "both", "center", "scale"].includes(o.constraint.h) && ["top", "bottom", "both", "center", "scale"].includes(o.constraint.v))) throw new InvalidObjectError("bad constraint");
-  if (o.inLayout !== undefined && !(typeof o.inLayout === "object" && o.inLayout !== null && (o.inLayout.fill === undefined || ["x", "y", "both"].includes(o.inLayout.fill)) && (o.inLayout.free === undefined || o.inLayout.free === true))) throw new InvalidObjectError("bad inLayout");
+  if (o.inLayout !== undefined && !validInLayout(o.inLayout)) throw new InvalidObjectError("bad inLayout");
   if (o.name !== undefined && !(typeof o.name === "string" && o.name.length > 0 && o.name.length <= MAX_NAME_LENGTH)) throw new InvalidObjectError("bad name");
   if (o.adjust !== undefined && !validAdjust(o.adjust)) throw new InvalidObjectError("bad adjustments");
   if (o.blend !== undefined && !(BLEND_MODES as readonly string[]).includes(o.blend)) throw new InvalidObjectError("bad blend mode");

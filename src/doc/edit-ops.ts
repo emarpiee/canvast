@@ -1,7 +1,7 @@
 import * as D from "../core/dyadic";
 import type { WorldPoint } from "../core/camera";
 import { cosSin, normAngle } from "../core/angle";
-import type { CanvasObject, PathObject } from "./model";
+import type { CanvasObject, PathObject, SheetLayout } from "./model";
 import { localBounds, pivotOf } from "./model";
 import { scaleParams, scaleRadius, scaleSubs } from "./path";
 import { roundCorners } from "./rounding";
@@ -41,13 +41,15 @@ function stretched(o: PathObject, kx: number, ky: number, keepRadius: boolean): 
 }
 
 /** A path with its local units renamed (s times as many units for the same size): everything in local units follows. */
-/** A sheet's auto layout lengths (gaps, padding: in its units) scaled with it; nothing for a path without one. */
-const layoutScaled = (o: PathObject, kx: number, ky: number): Partial<PathObject> => {
-  const l = o.container?.layout;
-  if (!l) return {};
+/** A layout's lengths (gaps, padding, fixed tracks, a row height) times `kx` across and `ky` down: as its sheet is scaled, or into another unit. */
+export function layoutTimes(l: SheetLayout, kx: number, ky: number): SheetLayout {
   const along = l.flow === "column" ? ky : kx, across = l.flow === "column" ? kx : ky;
-  return { container: { ...o.container!, layout: { ...l, gap: [l.gap[0] * along, l.gap[1] * across], pad: [l.pad[0] * ky, l.pad[1] * kx, l.pad[2] * ky, l.pad[3] * kx] } } };
-};
+  const tracks = (ts: NonNullable<SheetLayout["cols"]>, k: number): SheetLayout["cols"] => ts.map((t) => (t.size === "fixed" && t.v !== undefined ? { ...t, v: t.v * k } : t));
+  return { ...l, gap: [l.gap[0] * along, l.gap[1] * across], pad: [l.pad[0] * ky, l.pad[1] * kx, l.pad[2] * ky, l.pad[3] * kx], ...(l.cols ? { cols: tracks(l.cols, kx)! } : {}), ...(l.rows ? { rows: tracks(l.rows, ky)! } : {}), ...(l.rowHeight !== undefined ? { rowHeight: l.rowHeight * ky } : {}) };
+}
+
+/** A sheet's auto layout lengths (in its units) scaled with it; nothing for a path without one. */
+const layoutScaled = (o: PathObject, kx: number, ky: number): Partial<PathObject> => (o.container?.layout ? { container: { ...o.container, layout: layoutTimes(o.container.layout, kx, ky) } } : {});
 
 function renamed(o: PathObject, s: number): Partial<PathObject> {
   return {

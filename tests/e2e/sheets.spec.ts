@@ -917,3 +917,68 @@ test("auto layout: Shift+A puts the picked things on a sheet that lays them out 
   await expect.poll(async () => (await laid()).find((o) => o.id === sheet.id)!.container!.layout).toBeUndefined();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("auto layout, more (ADR 0193): live reflow while dragging, the gap handle, masonry, justified rows, grid tracks and spans, a sort rule, a saved layout", async ({ app }) => {
+  const p = app.page;
+  type Laid = Obj & { inLayout?: { span?: number[] }; container?: { clip: boolean; layout?: { flow: string; gap: number[]; rowHeight?: number; cols?: Array<{ size: string }>; sort?: string } } };
+  const laid = async (): Promise<Laid[]> => (await objs(app)) as Laid[];
+  const boxOf = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
+  const shown = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.shownBox(i), id))!;
+  const layout = async () => (await laid()).find((o) => o.container)!.container!.layout!;
+  await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false));
+  await key(app, "u");
+  await drag(app, [400, 300], [460, 390]);
+  await drag(app, [480, 300], [580, 360]);
+  await drag(app, [600, 300], [650, 350]);
+  await drag(app, [670, 300], [750, 420]);
+  const [s1, s2, s3, s4] = (await objs(app)).slice(-4).map((o) => o.id) as [string, string, string, string];
+  await key(app, "v");
+  await key(app, "Control+a");
+  await key(app, "Shift+A");
+  await app.frame();
+  // Dragged past the next one and not yet let go, the next one already takes its place; the stored places wait for the drop.
+  await click(app, 430, 345);
+  expect(await selection(app)).toEqual([s1]);
+  await p.mouse.move(430, 345);
+  await p.mouse.down();
+  await p.mouse.move(560, 345, { steps: 8 });
+  await expect.poll(async () => Math.round((await shown(s2)).minX)).toBe(400);
+  expect(Math.round((await boxOf(s2)).minX), "nothing stored while dragging").toBe(480);
+  await p.mouse.up();
+  await app.frame();
+  expect(Math.round((await boxOf(s2)).minX)).toBe(400);
+  await key(app, "Control+z");
+  await app.frame();
+  // The gap handle between the first two: dragged, the gap follows, as its number in the bar.
+  await pickSheet(app);
+  expect((await layout()).gap[0] ?? 0).toBeCloseTo(20, 1);
+  await drag(app, [470, 345], [480, 345]);
+  await expect.poll(async () => Math.round((await layout()).gap[0] ?? 0)).toBe(30);
+  // Masonry: every item one width; justified rows: one row height kept; a grid with a fixed first column and a spanning item.
+  await p.locator('[data-layout-flow="masonry"]').click();
+  await expect.poll(async () => new Set(await Promise.all([s1, s2, s3, s4].map(async (id) => Math.round((await boxOf(id)).maxX - (await boxOf(id)).minX)))).size).toBe(1);
+  await p.locator('[data-layout-flow="justified"]').click();
+  await expect.poll(async () => (await layout()).rowHeight ?? 0).toBeGreaterThan(0);
+  await p.locator('[data-layout-flow="grid"]').click();
+  await p.locator("[data-layout-tracks]").click();
+  await p.locator('button[data-track="c:0:fixed"]').click();
+  await expect.poll(async () => (await layout()).cols?.[0]?.size).toBe("fixed");
+  await key(app, "Escape");
+  // A sort rule: the largest first, whatever was drawn first.
+  await p.locator("[data-layout-sort]").selectOption("size");
+  await expect.poll(async () => (await layout()).sort).toBe("size");
+  // A layout kept as a style, offered again in its menu.
+  await p.locator("[data-layout-styles]").click();
+  await p.getByRole("menuitem", { name: /^Save this layout as a style/ }).click();
+  await p.locator("[data-layout-styles]").click();
+  await expect(p.getByRole("menuitem", { name: /^Layout 1/ })).toBeVisible();
+  await key(app, "Escape");
+  // An item spans two columns of the grid.
+  const [x, y] = await (async () => { const b = await boxOf(s3); return [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2]; })();
+  await click(app, x, y);
+  expect(await selection(app)).toEqual([s3]);
+  await p.locator('[data-in-span="0"]').fill("2");
+  await p.locator('[data-in-span="0"]').press("Enter");
+  await expect.poll(async () => (await laid()).find((o) => o.id === s3)!.inLayout?.span).toEqual([2, 1]);
+  expect(app.consoleErrors).toEqual([]);
+});

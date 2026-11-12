@@ -5,6 +5,7 @@ import type { DocumentStore } from "../doc/document-store";
 import type { EditorState } from "../app/editor-state";
 import type { CanvasObject, ObjectId } from "../doc/model";
 import { isBoolMember, isResult, operandOf, operandsOf, previewResults } from "../doc/boolean-group";
+import { previewLayout } from "../doc/auto-layout";
 import type { FrameIndex } from "../scene/frame-index";
 import { cameraIn } from "../scene/frame-index";
 import type { ProjectedObject } from "./projection";
@@ -122,6 +123,9 @@ export function visibleObjects(
       if (o) shown.set(id, editor.previewed(o));
     }
     for (const o of previewResults(doc, shown)) derived.set(o.id, o);
+    // (things moved or resized on a sheet with auto layout: the others make room as they would on release, ADR 0193)
+    const pk = editor.preview.kind;
+    if (pk === "move" || pk === "scale") for (const o of previewLayout(doc, shown)) derived.set(o.id, o);
     // (the words inside a shape being changed go with it while the gesture goes on)
     for (const t of textsInShapes(doc)) {
       const p = shown.get(parentOf(t)!);

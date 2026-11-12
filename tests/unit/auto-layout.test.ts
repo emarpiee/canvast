@@ -4,7 +4,7 @@ import { FrameSpace } from "../../src/core/frames";
 import type { CanvasObject, PathObject, SheetLayout } from "../../src/doc/model";
 import { newObjectId } from "../../src/doc/model";
 import type { DerivationSource } from "../../src/doc/boolean-group";
-import { DEFAULT_LAYOUT, guessLayout, layOutSheet, placeItems, withAutoLayout, type ItemSize } from "../../src/doc/auto-layout";
+import { DEFAULT_LAYOUT, guessLayout, layOutSheet, placeItems, previewLayout, withAutoLayout, type ItemSize } from "../../src/doc/auto-layout";
 import { worldBounds } from "../../src/doc/edit-ops";
 
 const space = new FrameSpace();
@@ -50,6 +50,37 @@ describe("placing items (doc/auto-layout.ts placeItems)", () => {
     const fill = fixed({}, [{ w: 10, h: 10, fill: "x" }, { w: 10, h: 10 }]);
     expect(fill.map((c) => [c.x, c.w])).toEqual([[0, 90], [90, 10]]);
     expect(fixed({}, [{ w: 10, h: 10, fill: "y" }])[0]!.h).toBe(50);
+  });
+});
+
+describe("masonry, justified rows, tracks, spans and limits (ADR 0193)", () => {
+  const l = (p: Partial<SheetLayout>): SheetLayout => ({ ...DEFAULT_LAYOUT, ...p });
+  const r = (cs: readonly { x: number; y: number; w: number; h: number }[]) => cs.map((c) => [c.x, c.y, c.w, c.h].map((v) => Math.round(v * 100) / 100));
+  it("masonry: columns of one width share the sheet's, each item made that wide in its shape and put in the shortest column", () => {
+    const m = placeItems(l({ flow: "masonry", columns: 2, gap: [10, 5], hug: [false, true] }), 50, 10, [{ w: 10, h: 10 }, { w: 10, h: 20 }, { w: 10, h: 10 }]);
+    expect(r(m.cells)).toEqual([[0, 0, 20, 20], [30, 0, 20, 40], [0, 25, 20, 20]]);
+    expect([m.w, m.h]).toEqual([50, 45]);
+  });
+  it("justified rows: a row fills the width at one height; the last keeps the height aimed at", () => {
+    const j = placeItems(l({ flow: "justified", gap: [10, 10], rowHeight: 10, hug: [false, true] }), 100, 10, [{ w: 20, h: 10 }, { w: 40, h: 10 }, { w: 30, h: 10 }, { w: 20, h: 20 }]);
+    const k = 80 / 90;
+    expect(r(j.cells)).toEqual(r([{ x: 0, y: 0, w: 20 * k, h: 10 * k }, { x: 20 * k + 10, y: 0, w: 40 * k, h: 10 * k }, { x: 60 * k + 20, y: 0, w: 30 * k, h: 10 * k }, { x: 0, y: 10 * k + 10, w: 10, h: 10 }]));
+  });
+  it("grid tracks: a set size, a share of the room left, one as large as what is in it; a share is never smaller than what is in it", () => {
+    const g = placeItems(l({ flow: "grid", cols: [{ size: "fixed", v: 30 }, { size: "fr", v: 1 }, { size: "hug" }], hug: [false, true] }), 100, 10, [{ w: 10, h: 10 }, { w: 10, h: 10 }, { w: 10, h: 10 }]);
+    expect(g.cells.map((c) => c.x)).toEqual([0, 30, 90]);
+    const held = placeItems(l({ flow: "grid", cols: [{ size: "fr" }, { size: "fr" }], hug: [false, true] }), 40, 10, [{ w: 50, h: 10 }, { w: 10, h: 10 }]);
+    expect(held.cells.map((c) => c.x)).toEqual([0, 50]);
+  });
+  it("spans: an item over two columns takes them both (widening them, as it is wider than they are) and the next ones flow under it", () => {
+    const g = placeItems(l({ flow: "grid", columns: 2, gap: [2, 2] }), 100, 100, [{ w: 30, h: 10, span: [2, 1] }, { w: 10, h: 10 }, { w: 10, h: 10, fill: "x" }]);
+    expect(r(g.cells)).toEqual([[0, 0, 30, 10], [0, 12, 10, 10], [16, 12, 14, 10]]);
+  });
+  it("limits: a filling item stops at its most share of the room, the rest stays free", () => {
+    const f = placeItems(l({ flow: "row", hug: [false, false] }), 100, 20, [{ w: 10, h: 10, fill: "x", max: [0.5, 0] }, { w: 10, h: 10 }]);
+    expect(f.cells.map((c) => [c.x, c.w])).toEqual([[0, 50], [50, 10]]);
+    const lo = placeItems(l({ flow: "row", hug: [false, false] }), 100, 20, [{ w: 10, h: 10, fill: "y", min: [0, 0.8] }]);
+    expect(lo.cells[0]!.h).toBe(20);
   });
 });
 
@@ -104,6 +135,26 @@ describe("laying out a sheet (layOutSheet, withAutoLayout)", () => {
     near(box(of(out, other)), [0, 0, 20, 10]);
     near(box(of(out, inner)), [20, 0, 100, 10]);
     near(box(of(out, on)), [20, 0, 100, 10]);
+  });
+});
+
+describe("a sort rule and live reflow (ADR 0193)", () => {
+  it("a sort rule orders the items whatever their stacking: largest first", () => {
+    const s = sheet(0, 0, 100, 100, 0, { flow: "row", gap: [0, 0], sort: "size" });
+    const small = rect(0, 0, 10, 10, 2, { parent: s.id }), big = rect(10, 0, 30, 30, 1, { parent: s.id });
+    const out = layOutSheet(s as never, [s, small, big], space);
+    near(box(of(out, big)), [0, 0, 30, 30]);
+    near(box(of(out, small)), [30, 0, 40, 10]);
+  });
+  it("while one is dragged, the others make room as a drop there would, and the dragged one is left to the pointer; dragged off, its place closes", () => {
+    const s = sheet(0, 0, 60, 20, 0, { flow: "row", gap: [10, 0] });
+    const a = rect(0, 0, 20, 10, 2, { parent: s.id }), b = rect(30, 0, 20, 10, 1, { parent: s.id });
+    const shown = previewLayout(src(s, a, b), new Map([[b.id, { ...b, anchor: at(-15, 0) } as CanvasObject]]));
+    expect(shown.find((o) => o.id === b.id)).toBeUndefined();
+    near(box(of(shown, a)), [30, 0, 50, 10]);
+    const off = previewLayout(src(s, a, b), new Map([[a.id, { ...a, anchor: at(500, 500) } as CanvasObject]]));
+    near(box(of(off, b)), [0, 0, 20, 10]);
+    near(box(of(off, s)), [0, 0, 20, 10]);
   });
 });
 

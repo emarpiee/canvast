@@ -394,7 +394,7 @@ Auto layout places what is on a sheet by rules, so a board, a page of panels or 
 
 Let a sheet lay its pictures out in a grid that stays tidy as you add more.
 
-![The horse board's sheet selected, its pictures in a three-column grid, the auto layout controls in the bar above](docs/screenshots/auto-layout.webp)
+![The horse board's sheet selected, its pictures in a three-column grid, the gap and padding handles on it, the auto layout controls in the bar above](docs/screenshots/auto-layout.webp)
 
 | Turn it on | |
 | --- | --- |
@@ -403,23 +403,52 @@ Let a sheet lay its pictures out in a grid that stays tidy as you add more.
 
 | Control (Properties bar, sheet selected) | What it does |
 | --- | --- |
-| **Flow** | **Row**, **column**, **wrap** (rows that break at the sheet's width) or **grid** |
+| **Flow** | **Row**, **column**, **wrap** (rows that break at the sheet's width), **grid**, **masonry** or **justified rows** (see below) |
 | **Gap** | Between items along the flow, and between lines |
 | **Pad** | Padding left and right, top and bottom; the button beside it opens each side |
 | **Start, Centre, End** | Where items sit across the flow (and the block of lines in a sheet that does not hug) |
-| **Pack start, centre, end, Spread** | Where items sit along the flow, in a sheet wider than they are |
+| **Pack start, centre, end, Spread** | Where items sit along the flow, in a sheet wider than they are. Greyed out when there is no room to pack in (the sheet hugs that way, or it is a masonry): its tip says which |
 | **Hug W**, **Hug H** | The sheet grows and shrinks to its contents on that axis; off, it keeps its size and the items are aligned in it |
-| **Columns** | For a grid: how many (empty: about as many as rows) |
+| **Columns** | For a grid or a masonry: how many (empty: about as many as rows) |
+| **Columns and rows** | For a grid: each column and row **Hug** (as large as what is in it), **Fixed** (a size in px) or **Share** (a share of the room left, never smaller than what is in it); rows past those set hug |
+| **Row** | For justified rows: the height a row aims at before it is made as wide as the sheet |
+| **Order** | The stacking order (as Layers lists it), or a rule kept as things are added: name A–Z or Z–A (a picture's name as placed, a text's first words), largest first, by kind |
+| **Layout styles** | Your saved layouts, and *Save this layout as a style*: kept in the [Styles](#styles) panel, given to a selected sheet from there or this menu. Lengths are kept in px as seen |
+
+| On the sheet itself | |
+| --- | --- |
+| **Padding handles** | A small bar inside each edge of the selected sheet: drag it in for more padding, out for less |
+| **Gap handles** | A bar between the first two items (the gap along the flow) and one between the first two lines: drag it to change that gap. Each shows its length while it moves |
+
+| Flows that size the items | |
+| --- | --- |
+| **Masonry** | Columns of one width share the sheet's width; each item is made that wide, in its own shape, and goes in the shortest column, so pictures of every shape pack with no holes. A sheet that hugs its width makes the columns as wide as its widest item |
+| **Justified rows** | Every item in a row is one height and the row is as wide as the sheet, as a gallery of photographs; the last row keeps the height aimed at. The row height is taken from the items when you choose it; choosing it turns hugging the width off |
+
+Pack references of every shape into tidy columns with no holes.
+
+![Hokusai prints, Degas dancers and botanical studies in four masonry columns of one width on a light sheet](docs/screenshots/layout-masonry.webp)
+
+Lay a row of landscapes out as a gallery, each row one height and as wide as the board.
+
+![Landscapes, Hokusai prints and a Degas dancer in justified rows on a dark sheet, each row one height](docs/screenshots/layout-justified.webp)
+
+Plan a page: a wide first panel across the top, the columns under it sized by rule.
+
+![A grid of horse and dancer studies, the first spanning all three columns, with the Columns and rows popover open: the middle column set to a share of the room](docs/screenshots/layout-tracks.webp)
 
 | On a thing on such a sheet | What it does |
 | --- | --- |
 | **Fill** | Stretches it to the room along an axis: width, height or both |
+| **Min**, **Max** | For a thing that fills: its least and most size on that axis, in % of the room inside the sheet (0: no limit) |
+| **Span** | In a grid: how many columns and rows it covers; the others flow round it |
 | **Keep out of the layout** | It stays where it is put; the others flow round it |
 
 | Behaviour | |
 | --- | --- |
 | Changes | Anything added to, taken off, resized or moved on the sheet lays it out again, in the same undo step; a sheet that hugs inside another lays that one out too |
-| Order | The stacking order, front first, as Layers lists it. A thing dropped on the sheet takes the place it is dropped at (it moves there when released) |
+| Order | The stacking order, front first, as Layers lists it, unless an Order rule is set. A thing dropped on the sheet takes the place it is dropped at |
+| While dragging | The others make room as you drag over the sheet, closing the gap behind it and opening one where it would land; dragged off the sheet, its place closes; over another sheet with auto layout, that sheet makes room. Nothing is stored until you let go |
 | Resizing the sheet by hand | It stops hugging on that axis and keeps the size given |
 
 ### Arranging and snapping
@@ -699,6 +728,7 @@ Take the colours of a reference as a palette to paint with.
 | Adjustments | A whole Adjust stack |
 | Patterns | A generator with its settings and seed: pressing its card puts it back in the Pattern panel and makes it on what is selected (on each of several selected shapes) |
 | Speech balloons | Size, tails, paint and the look of the words; goes on the selected balloons when you press its card. Not linked: changing the style later does not change them |
+| Layouts | A sheet's auto layout: see [Auto layout](#auto-layout) |
 | 3D line styles | The line art of a 3D view: see [Line art of a 3D model](#line-art-of-a-3d-model) |
 | Custom ratios | See [Sheets](#sheets) |
 | Export presets | See [Export…](#export) |
@@ -2322,6 +2352,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Angular gradient in SVG | Exported as a picture, not vectors, with a warning |
 | Varied fills | Repeat after 16 to 31 cells |
 | Pattern | No rotated sheets; at most 600 shapes |
+| Auto layout | A masonry and justified rows resize the items; a turned sheet has none; a sort rule knows only what is on the canvas (no library date or colour) |
 | SVG import | No text, patterns or masks from inside an SVG |
 | Adjustments and shadows | Not on a playing video or GIF; only shapes keep them in SVG |
 | Boolean groups | No per-corner radii |
@@ -2346,6 +2377,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Angular gradient in SVG | SVG has no sweep gradient, so an SVG holds a picture of it (up to 384 px a side, about 300 KB), not vectors; the Export dialog, Save as SVG and Copy as SVG warn. A PDF of such a shape is made as a picture, and picture exports are exact |
 | Varied fills | The copies of a varied texture repeat after a block of 16 to 31 cells |
 | Pattern | A rotated sheet or shape is refused. A result is at most 600 shapes. Ungrouping a pattern, or moving one of its shapes out of its group, ends its link with the panel (the shapes stay as ordinary ones). Resizing the sheet makes the pattern again at the new size from its settings and seed, so a generator whose layout depends on the size (how many waves fit, say) can place its shapes differently |
+| Auto layout | A turned sheet cannot have one. A masonry and justified rows resize the items to their places: a pen stroke and a turned thing are scaled as a whole, words only get wider (they wrap again). A grid places spanning items row by row in order, so a hole a big item leaves is not filled by a later small one. A sort rule orders by what the canvas holds (a picture's name as placed, a text's first words, size, kind), not by the library's dates or colours. Lengths of a saved layout style are px as seen when it was saved |
 | SVG import | Text, patterns and masks inside an SVG are not imported; a dropped SVG file is placed as a picture (make a vector copy to edit it) |
 | Adjustments and shadows | Shadows are not shown on a video or GIF while it plays. Adjustments (and shadows) are written to an exported SVG only for shapes (not pen strokes or text), as an SVG filter that matches the canvas closely but not exactly (curves, levels and the gradient map are sampled; grain differs). A shape bigger than about 8 million pixels on screen is drawn unadjusted. Grain on a shape is fixed to the screen pixels, not to the shape |
 | Boolean groups | Per-corner radii on a boolean result are not available |

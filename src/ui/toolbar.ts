@@ -6,20 +6,21 @@ import type { MenuItem } from "./more-menu";
 import { createBar, isOff, syncGroups, syncScroll } from "./bar";
 import { liveNumber } from "./live";
 import { isContainer } from "../doc/containers";
-import type { CanvasObject, SheetLayout } from "../doc/model";
+import type { CanvasObject, LayoutPatch, SheetLayout } from "../doc/model";
 import { LAYOUT_FLOWS } from "../doc/model";
 import type { TextLook, lookOf } from "../text/text-style";
 import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 import type { EditorState, Tool } from "../app/editor-state";
 import { PEN_WIDTHS } from "../app/editor-state";
-import type { PaintPatch } from "../app/actions";
+import type { InLayoutPatch, InLayoutState, PaintPatch } from "../app/actions";
+import { layoutTimes } from "../doc/edit-ops";
 import { SHAPE_KINDS } from "../doc/path";
 import type { Paint } from "../doc/paint";
 import { isGradient, paintCss } from "../doc/paint";
 import { isTexture } from "../doc/texture";
 import type { Arrow, ShapeKind } from "../doc/path";
 import type { GradientStop } from "../doc/paint";
-import { openColourPopover, openFontOptionsPopover, openOutlinePopover, openPaintPopover, openTextBoxPopover } from "./colour-popover";
+import { openColourPopover, openFontOptionsPopover, openOutlinePopover, openPaintPopover, openTextBoxPopover, openTracksPopover } from "./colour-popover";
 import { BUNDLED_FONT_NAME, fontFor } from "../text/fonts";
 import type { Adjust } from "../doc/adjust";
 import { setAdjustPreviewing } from "../render/adjust-image";
@@ -82,11 +83,14 @@ export interface ToolbarActions {
   /** Whether the picked sheet scales what is on it when it is resized, and the switch for it (a property of the sheet). */
   sheetScale(): boolean;
   /** Auto layout (ADR 0186) of the one picked sheet (null: none, or it has none), with the screen px per unit of the sheet (its lengths are shown in px), and changing it. */
-  autoLayout(): { layout: SheetLayout; ppu: number } | null;
-  setAutoLayout(patch: Partial<SheetLayout>, final?: boolean): void;
+  autoLayout(): { layout: SheetLayout; ppu: number; /** How many items it lays out. */ items: number } | null;
+  setAutoLayout(patch: LayoutPatch, final?: boolean): void;
+  /** Saved layout styles (lengths in px as seen when saved), and saving one (ADR 0193). */
+  layoutStyles(): ReadonlyArray<{ name: string; summary: string; data: SheetLayout }>;
+  saveLayoutStyle(layoutPx: SheetLayout): void;
   /** How the first picked thing on a sheet with auto layout takes part in it (null: none is), and changing it. */
-  inLayout(): { fill: "none" | "x" | "y" | "both"; free: boolean; stretch: boolean } | null;
-  setInLayout(patch: { fill?: "none" | "x" | "y" | "both"; free?: boolean }): void;
+  inLayout(): InLayoutState | null;
+  setInLayout(patch: InLayoutPatch): void;
   setSheetScale(on: boolean): void;
   resizeOnSheet(w: number, h: number, final?: boolean): void;
   /** Pictures (ADR 0118): crop the picked still, show it whole, and the adjustments of the picked pictures. */
@@ -304,7 +308,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
           <button type="button" data-sheet-turn aria-label="Turn it on its side: swap its width and height" title="Turn it on its side: portrait ⇄ landscape (the same area)">${ICONS.arrowRightLeft}</button>
           <button type="button" data-sheet-scale aria-pressed="false" aria-label="Scale contents with the sheet" title="Scale contents (kept with this sheet): when the sheet is resized, everything on it grows with it, whatever its pins say">${ICONS.sheetScale}</button></span>
         <span class="tb-count" data-kind="sheet" data-auto-layout hidden title="Auto layout: how what is on the sheet is placed. Lengths in px as seen now">
-          <span class="seg" role="radiogroup" aria-label="Flow">${[["row", "Row: items left to right", ICONS.flowRow], ["column", "Column: items top to bottom", ICONS.flowColumn], ["wrap", "Wrap: rows that break at the sheet's width", ICONS.flowWrap], ["grid", "Grid: columns and rows", ICONS.flowGrid]].map(([v, t, i]) => `<button type="button" role="radio" data-layout-flow="${v}" aria-checked="false" aria-label="${t}" title="${t}">${i}</button>`).join("")}</span>
+          <span class="seg" role="radiogroup" aria-label="Flow">${[["row", "Row: items left to right", ICONS.flowRow], ["column", "Column: items top to bottom", ICONS.flowColumn], ["wrap", "Wrap: rows that break at the sheet's width", ICONS.flowWrap], ["grid", "Grid: columns and rows", ICONS.flowGrid], ["masonry", "Masonry: columns of one width, each item in the shortest", ICONS.flowMasonry], ["justified", "Justified rows: each row one height, as wide as the sheet", ICONS.flowJustified]].map(([v, t, i]) => `<button type="button" role="radio" data-layout-flow="${v}" aria-checked="false" aria-label="${t}" title="${t}">${i}</button>`).join("")}</span>
           <label>Gap <input type="number" data-layout-gap="0" min="0" step="any" inputmode="decimal" aria-label="Gap between items along the flow (px)" title="Gap between items along the flow"></label><label><input type="number" data-layout-gap="1" min="0" step="any" inputmode="decimal" aria-label="Gap between lines (px)" title="Gap between lines (a wrap or a grid)"></label>
           <label>Pad <input type="number" data-layout-pad="h" min="0" step="any" inputmode="decimal" aria-label="Padding left and right (px)" title="Padding left and right"></label><label><input type="number" data-layout-pad="v" min="0" step="any" inputmode="decimal" aria-label="Padding top and bottom (px)" title="Padding top and bottom"></label>
           <span data-layout-pad-sides hidden>${[["t", "top"], ["r", "right"], ["b", "bottom"], ["l", "left"]].map(([k, n]) => `<label>${n!.charAt(0).toUpperCase()} <input type="number" data-layout-pad="${k}" min="0" step="any" inputmode="decimal" aria-label="Padding ${n} (px)" title="Padding ${n}"></label>`).join("")}</span>
@@ -312,10 +316,16 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
           <select data-layout-align aria-label="Items across the flow" title="Items across the flow: at the start, the centre or the end of their line (and the block of lines in a sheet that does not hug)"><option value="start">Start</option><option value="centre">Centre</option><option value="end">End</option></select>
           <select data-layout-justify aria-label="Items along the flow" title="Items along the flow, in a sheet that does not hug: packed at the start, the centre or the end, or spread between"><option value="start">Pack start</option><option value="centre">Pack centre</option><option value="end">Pack end</option><option value="between">Spread</option></select>
           <button type="button" data-layout-hug="0" aria-pressed="false" aria-label="Hug the width" title="Hug the width: the sheet is as wide as its contents (off: it keeps its width, and the contents are aligned in it)">${ICONS.hugWidth}</button><button type="button" data-layout-hug="1" aria-pressed="false" aria-label="Hug the height" title="Hug the height: the sheet is as tall as its contents (off: it keeps its height)">${ICONS.hugHeight}</button>
-          <label data-layout-columns-wrap hidden>Columns <input type="number" data-layout-columns min="1" max="1024" step="1" inputmode="numeric" aria-label="Columns of the grid" title="Columns of the grid (empty: about as many as rows)"></label></span>
+          <label data-layout-columns-wrap hidden>Columns <input type="number" data-layout-columns min="1" max="1024" step="1" inputmode="numeric" aria-label="Columns" title="Columns of the grid or masonry (empty: about as many as rows)"></label>
+          <button type="button" data-layout-tracks hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Columns and rows" title="Columns and rows: each as large as what is in it, a set size, or a share of the room">${ICONS.layoutTracks}</button>
+          <label data-layout-rowh-wrap hidden>Row <input type="number" data-layout-rowh min="1" step="any" inputmode="decimal" aria-label="Row height aimed at (px)" title="The height a row aims at before it is made as wide as the sheet"></label>
+          <select data-layout-sort aria-label="Order of the items" title="Order of the items: the stacking order (as Layers lists it), or kept by a rule as things are added"><option value="">Stacking order</option><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="size">Largest first</option><option value="type">By kind</option></select>
+          <button type="button" data-layout-styles aria-haspopup="menu" aria-label="Layout styles" title="Layout styles: your saved layouts, and save this one">${ICONS.layoutStyles}</button></span>
         <span class="tb-count" data-kind="any" data-in-layout hidden title="How it takes part in its sheet's auto layout">In layout
           <select data-in-fill aria-label="Fill: stretch to the room" title="Its size in the layout: its own, or stretched to the room along an axis"><option value="none">Own size</option><option value="x">Fill width</option><option value="y">Fill height</option><option value="both">Fill both</option></select>
-          <button type="button" data-in-free aria-pressed="false" aria-label="Keep out of the layout" title="Keep out of the layout: it stays where it is put, the others flow round it">${ICONS.layoutFree}</button></span>
+          <button type="button" data-in-free aria-pressed="false" aria-label="Keep out of the layout" title="Keep out of the layout: it stays where it is put, the others flow round it">${ICONS.layoutFree}</button>
+          <span data-in-span-wrap hidden>Span <input type="number" data-in-span="0" min="1" max="1024" step="1" inputmode="numeric" aria-label="Columns it spans" title="Columns it spans"><input type="number" data-in-span="1" min="1" max="1024" step="1" inputmode="numeric" aria-label="Rows it spans" title="Rows it spans"></span>
+          <span data-in-limits hidden>${[["0", "W"], ["1", "H"]].map(([i, a]) => `<span data-in-limit-axis="${i}"><label>Min ${a} <input type="number" data-in-min="${i}" min="0" max="100" step="1" inputmode="numeric" aria-label="Least ${a === "W" ? "width" : "height"}, % of the room" title="Its least ${a === "W" ? "width" : "height"} as it fills, in % of the room inside the sheet (0: none)"></label><label>Max ${a} <input type="number" data-in-max="${i}" min="0" max="100" step="1" inputmode="numeric" aria-label="Most ${a === "W" ? "width" : "height"}, % of the room" title="Its most ${a === "W" ? "width" : "height"} as it fills, in % of the room inside the sheet (0: none)"></label></span>`).join("")}</span></span>
         <label class="tb-count" data-kind="shape" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the field left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
       <div class="tb-group tb-options" data-for="text note select node" data-kind="text">
@@ -695,7 +705,43 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const i = Number(b.dataset["layoutHug"]);
     actions.setAutoLayout({ hug: i === 0 ? [!al.layout.hug[0], al.layout.hug[1]] : [al.layout.hug[0], !al.layout.hug[1]] });
   });
-  liveNumber(layoutEl("[data-layout-columns]"), (v, final) => { if (final) actions.setAutoLayout(Number.isFinite(v) && v >= 1 ? { columns: Math.round(v) } : { columns: undefined as unknown as number }); });
+  liveNumber(layoutEl("[data-layout-columns]"), (v, final) => { if (final) actions.setAutoLayout(Number.isFinite(v) && v >= 1 ? { columns: Math.round(v) } : { columns: undefined, cols: undefined }); });
+  liveNumber(layoutEl("[data-layout-rowh]"), (v, final) => { const u = toUnits(v); if (Number.isFinite(u) && u > 0) actions.setAutoLayout({ rowHeight: u }, final); });
+  layoutEl<HTMLSelectElement>("[data-layout-sort]").addEventListener("change", (e) => { const v = (e.target as HTMLSelectElement).value; actions.setAutoLayout({ sort: v ? (v as SheetLayout["sort"]) : undefined }); });
+  layoutEl<HTMLElement>("[data-layout-tracks]").addEventListener("click", (e) => {
+    const al = actions.autoLayout();
+    if (!al) return;
+    const n = al.layout.cols?.length || al.layout.columns || Math.ceil(Math.sqrt(Math.max(1, al.items)));
+    openTracksPopover(e.currentTarget as HTMLElement, {
+      cols: al.layout.cols ?? Array.from({ length: Math.max(1, n) }, () => ({ size: "hug" as const })),
+      rows: al.layout.rows ?? [],
+      ppu: al.ppu,
+      onChange: (cols, rows, final) => actions.setAutoLayout({ cols, columns: cols.length, ...(rows.length ? { rows } : { rows: undefined }) }, final),
+    });
+  });
+  // Layout styles (ADR 0193): kept in px as seen when saved, given in px as seen now, as the numbers of the bar are.
+  layoutEl<HTMLElement>("[data-layout-styles]").addEventListener("click", (e) => {
+    const al = actions.autoLayout();
+    if (!al || !(al.ppu > 0 && al.ppu < Infinity)) return;
+    const saved = actions.layoutStyles();
+    openMoreMenu(e.currentTarget as HTMLElement, [
+      ...saved.map((st): MenuItem => ({ label: st.name, hint: st.summary, icon: ICONS.layoutStyles, run: () => actions.setAutoLayout(layoutTimes(st.data, 1 / al.ppu, 1 / al.ppu)) })),
+      ...(saved.length ? [] : [{ label: "No layout styles yet", hint: "Save this one with the row below", icon: ICONS.layoutStyles, disabled: true, run: () => undefined } satisfies MenuItem]),
+      { label: "Save this layout as a style", hint: "Kept in Styles, for any sheet", icon: ICONS.save, sep: true, run: () => actions.saveLayoutStyle(layoutTimes(al.layout, al.ppu, al.ppu)) },
+    ], "Layout styles");
+  });
+  for (const i of [0, 1] as const) liveNumber(root.querySelector<HTMLInputElement>(`[data-in-span="${i}"]`)!, (v, final) => {
+    const il = actions.inLayout();
+    if (!final || !il || !(v >= 1)) return;
+    actions.setInLayout({ span: i === 0 ? [Math.round(v), il.span[1]] : [il.span[0], Math.round(v)] });
+  });
+  for (const k of ["min", "max"] as const) for (const i of [0, 1] as const) liveNumber(root.querySelector<HTMLInputElement>(`[data-in-${k}="${i}"]`)!, (v, final) => {
+    const il = actions.inLayout();
+    if (!final || !il || !(v >= 0)) return;
+    const pair = [...il[k]] as [number, number];
+    pair[i] = Math.min(100, v) / 100;
+    actions.setInLayout({ [k]: pair });
+  });
   root.querySelector<HTMLSelectElement>("[data-in-fill]")!.addEventListener("change", (e) => actions.setInLayout({ fill: (e.target as HTMLSelectElement).value as "none" | "x" | "y" | "both" }));
   root.querySelector<HTMLElement>("[data-in-free]")!.addEventListener("click", () => { const il = actions.inLayout(); if (il) actions.setInLayout({ free: !il.free }); });
   root.querySelector<HTMLElement>("[data-crop]")!.addEventListener("click", () => {
@@ -1100,10 +1146,20 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       layoutEl<HTMLSelectElement>("[data-layout-align]").value = l.align;
       layoutEl<HTMLSelectElement>("[data-layout-justify]").value = l.justify;
       for (const b of root.querySelectorAll<HTMLElement>("[data-layout-hug]")) b.setAttribute("aria-pressed", String(l.hug[Number(b.dataset["layoutHug"])]));
-      layoutEl<HTMLElement>("[data-layout-columns-wrap]").hidden = l.flow !== "grid";
+      layoutEl<HTMLElement>("[data-layout-columns-wrap]").hidden = l.flow !== "grid" && l.flow !== "masonry";
+      layoutEl<HTMLElement>("[data-layout-tracks]").hidden = l.flow !== "grid";
+      layoutEl<HTMLElement>("[data-layout-rowh-wrap]").hidden = l.flow !== "justified";
+      const rowh = layoutEl<HTMLInputElement>("[data-layout-rowh]");
+      if (free(rowh)) rowh.value = l.rowHeight === undefined ? "" : px(l.rowHeight);
+      const sortSel = layoutEl<HTMLSelectElement>("[data-layout-sort]");
+      sortSel.value = l.sort ?? "";
       const cols = layoutEl<HTMLInputElement>("[data-layout-columns]");
-      if (free(cols)) cols.value = l.columns === undefined ? "" : String(l.columns);
-      layoutEl<HTMLSelectElement>("[data-layout-justify]").disabled = l.hug[l.flow === "column" ? 1 : 0];
+      if (free(cols)) cols.value = l.cols?.length ? String(l.cols.length) : l.columns === undefined ? "" : String(l.columns);
+      // (packing along the flow needs room along it: a sheet that hugs that way has none, and a masonry's columns fill the width)
+      const justifySel = layoutEl<HTMLSelectElement>("[data-layout-justify]");
+      const noRoom = l.flow === "masonry" || l.hug[l.flow === "column" ? 1 : 0];
+      justifySel.disabled = noRoom;
+      justifySel.title = noRoom ? (l.flow === "masonry" ? "Items along the flow: a masonry's columns fill the sheet's width, so there is no room to pack in" : `Items along the flow: needs room, so turn off ${l.flow === "column" ? "Hug the height" : "Hug the width"} first`) : "Items along the flow, in a sheet that does not hug: packed at the start, the centre or the end, or spread between";
       void LAYOUT_FLOWS;
     }
     const il = pick && still ? actions.inLayout() : null;
@@ -1113,6 +1169,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       fill.value = il.fill;
       fill.disabled = !il.stretch;
       root.querySelector<HTMLElement>("[data-in-free]")!.setAttribute("aria-pressed", String(il.free));
+      root.querySelector<HTMLElement>("[data-in-span-wrap]")!.hidden = !il.grid || il.free;
+      for (const i of [0, 1] as const) { const f = root.querySelector<HTMLInputElement>(`[data-in-span="${i}"]`)!; if (free(f)) f.value = String(il.span[i]); }
+      const fills = [il.fill === "x" || il.fill === "both", il.fill === "y" || il.fill === "both"];
+      root.querySelector<HTMLElement>("[data-in-limits]")!.hidden = il.free || !fills.some(Boolean);
+      for (const i of [0, 1] as const) {
+        root.querySelector<HTMLElement>(`[data-in-limit-axis="${i}"]`)!.hidden = !fills[i];
+        for (const k of ["min", "max"] as const) { const f = root.querySelector<HTMLInputElement>(`[data-in-${k}="${i}"]`)!; if (free(f)) f.value = String(Math.round(il[k][i] * 100)); }
+      }
     }
     const ratio = pick && still ? actions.sheetRatio() : null;
     root.querySelector<HTMLElement>("[data-sheet-size]")!.hidden = ratio === null;

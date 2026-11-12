@@ -18,4 +18,4 @@
 - A long row of items on a sheet that does not hug runs past its edge (it is cut when the sheet clips), as in other tools; a wrap needs a width, so choosing it turns hugging the width off.
 - A pen stroke and a turned thing never fill (they keep their shape); words fill the width only (they wrap again).
 - A video playing on a nested sheet that fills follows the sheet's pins, like any resize of a sheet.
-- While an item is dragged, the others do not step aside yet: the item takes its place when it is released.
+- While an item is dragged, the others do not step aside yet: the item takes its place when it is released. (Since ADR 0193 they do, ahead of the drop.)

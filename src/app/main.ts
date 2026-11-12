@@ -43,7 +43,7 @@ import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
 import { applyBalloonStyle, balloonStyle, balloonsToPaths, canConnectBalloons, connectBalloons, selectedBalloon, selectedLink, selectedShapeText, setBalloonLink, setShapeText } from "./actions";
-import { backdropState, setBackdrop, canSplitPaths, splitPaths, placeCardViews, placeLinesBeside, imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, moveLayers, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, placePictureBeside, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, canSetInShape, setTextInShape, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, buildTarget, exportTargets, exportEachTargets, canSheetEach, sheetEach, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, autoLayoutOf, autoLayoutState, setAutoLayout, autoLayoutShortcut, patchAutoLayout, setSheetLayout, selectedInLayout, setInLayout, sheetRatio, ratioOfSheet, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
+import { backdropState, setBackdrop, canSplitPaths, splitPaths, placeCardViews, placeLinesBeside, imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, moveLayers, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, placePictureBeside, applyLayoutStyle, canTakeLayoutStyle, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, canSetInShape, setTextInShape, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, buildTarget, exportTargets, exportEachTargets, canSheetEach, sheetEach, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, autoLayoutOf, autoLayoutState, setAutoLayout, autoLayoutShortcut, patchAutoLayout, setSheetLayout, selectedInLayout, setInLayout, sheetRatio, ratioOfSheet, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -127,6 +127,8 @@ import { extractPalette } from "../assets/extract-palette";
 import { mountTagsPanel } from "../ui/tags-panel";
 import { mountStylesPanel } from "../ui/styles-panel";
 import { modelViewInFront } from "../ui/model-front";
+import { layoutHandles } from "../interaction/layout-handles";
+import { layoutNow } from "../doc/auto-layout";
 import type { ModelLook } from "../assets/model-look";
 import { linkedUpdates } from "./style-sync";
 import { PanelDock } from "../ui/panel-dock";
@@ -161,7 +163,8 @@ import { descendantsOf, isContainer, rootsOf } from "../doc/containers";
 import { isResult } from "../doc/boolean-group";
 import { CameraHistory } from "./camera-history";
 import { mountTour } from "./tour";
-import { ADJUSTMENT_KIND, EXPORT_KIND, EXPORT_NAME_KIND, RATIO_KIND } from "../assets/styles";
+import { ADJUSTMENT_KIND, EXPORT_KIND, EXPORT_NAME_KIND, LAYOUT_STYLE_KIND, RATIO_KIND } from "../assets/styles";
+import type { SheetLayout } from "../doc/model";
 import { formatRatio, parseRatio } from "./export-size";
 import { setColourStyles } from "../ui/colour-popover";
 import { setTextureHooks } from "../ui/texture-editor";
@@ -814,7 +817,9 @@ async function start(): Promise<void> {
     if (!shot || shot.overlays) {
       const words = selected.length === 1 && selected[0]!.obj.kind === "text" ? (selected[0]!.obj as TextObject).inShape?.shape : undefined;
       const owner = words !== undefined && (doc.get(words) as PathObject | undefined)?.params?.balloon ? visibleObjects(doc, index, null, fc, vp).find((p) => p.obj.id === words) : undefined;
-      drawOverlays(ctx, selected, editor, fc, vp, theme, members, labels, owner);
+      // (a picked sheet with auto layout: its gap and padding handles, not while it or something on it is being changed)
+      const lh = editor.preview.kind === "none" || editor.preview.kind === "replace" ? layoutHandles(doc, selected) : null;
+      drawOverlays(ctx, selected, editor, fc, vp, theme, members, labels, owner, lh && { handles: lh.handles, flow: lh.sheet.container.layout.flow });
     }
     if ((editor.revealAt || editor.revealIds) && (!shot || shot.overlays)) {
       const all = (visible ??= visibleObjects(doc, index, editor, fc, vp));
@@ -1386,6 +1391,7 @@ async function start(): Promise<void> {
     },
     balloon: { can: () => selectedBalloon(doc, editor) !== null, apply: (look) => applyBalloonStyle(doc, editor, look) },
     lines3d: { can: () => modelViewInFront() !== null, apply: (d, name) => modelViewInFront()?.useLineStyle(d as ModelLook, name) },
+    layout: { can: () => canTakeLayoutStyle(doc, editor), apply: (d, name) => applyLayoutStyle(doc, editor, d, textPpu, name) },
     pattern: {
       current: () => patternPanel.current(),
       apply: (d, label) => {
@@ -1651,8 +1657,10 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     resizeOnSheet: (w, h, final) => resizeOnSheet(doc, editor, w, h, final),
     sheetScale: () => sheetScalesContents(doc, editor),
     setSheetScale: (on) => setSheetScale(doc, editor, on),
-    autoLayout: () => { const got = autoLayoutOf(doc, editor); return got ? { layout: got.layout, ppu: textPpu(got.sheet.id) } : null; },
+    autoLayout: () => { const got = autoLayoutOf(doc, editor); return got ? { layout: got.layout, ppu: textPpu(got.sheet.id), items: layoutNow(got.sheet, doc.ordered(), doc.space).items.length } : null; },
     setAutoLayout: (patch, final) => patchAutoLayout(doc, editor, patch, final),
+    layoutStyles: () => session.styles.of(LAYOUT_STYLE_KIND.id).map((st) => ({ name: st.name, summary: LAYOUT_STYLE_KIND.summary(st.data), data: st.data as SheetLayout })),
+    saveLayoutStyle: (l) => void session.styles.add(LAYOUT_STYLE_KIND.id, "", l).then((made) => { editor.message = made ? `Saved the layout “${made.name}” in Styles.` : "The layout could not be saved."; editor.changed(); }),
     inLayout: () => selectedInLayout(doc, editor),
     setInLayout: (patch) => setInLayout(doc, editor, patch),
     croppable: () => croppablePicture(doc, editor) !== null,

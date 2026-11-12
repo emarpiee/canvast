@@ -199,6 +199,10 @@ One icon per function: two buttons that do different things never share an icon,
 | `rotate-cw` | Reload the library: read it again and draw every card anew (end of the Library's status bar) |
 | `layout-template` | Auto layout on or off (Sheets menu, the sheet's badge in Layers) |
 | `gallery-horizontal` | Auto layout flow: row (Properties bar) |
+| `layout-dashboard` | Auto layout flow: masonry (Properties bar) |
+| `rows-4` | Auto layout flow: justified rows (Properties bar) |
+| `columns-3-cog` | A grid's columns and rows (Properties bar) |
+| `layout-panel-left` | Layout styles: saved auto layouts (Properties bar menu, the Styles panel) |
 | `gallery-vertical` | Auto layout flow: column |
 | `grid-3x2` | Auto layout flow: wrap |
 | `table-2` | Auto layout flow: grid |
