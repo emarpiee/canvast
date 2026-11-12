@@ -978,7 +978,7 @@ function installFileCalls(win: BrowserWindow, root: string, partition: string): 
         return index!.query(q, /missing/i.test(q.text) ? await absentNow(l) : new Set());
       }
       case "counts":
-        return index!.counts(args[0] === true);
+        return index!.counts(args[0] === true, Array.isArray(args[1]) ? args[1].filter((x): x is string => typeof x === "string").slice(0, 5000) : []);
       case "fieldKeys":
         return index!.fieldKeys(args[0] === true);
       case "fieldValues":

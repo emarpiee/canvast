@@ -3197,7 +3197,7 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
 .side-kids + .side-n { margin-left: var(--s-2); }
 /* A pinned folder shows its pin, filled, just before its count; under the pointer the row's own Pin and More take that place. */
 .side-pinned { display: inline-flex; flex: none; margin-left: auto; color: var(--hud-muted); }
-.side-pinned + .side-kids { margin-left: var(--s-2); }
+.side-pinned + .side-kids, .side-pinned + .side-pinned { margin-left: var(--s-2); }
 .side-pinned svg { width: var(--icon-sm); height: var(--icon-sm); fill: currentColor; }
 .side-item.is-active .side-pinned { color: inherit; }
 @media (hover: hover) and (min-width: 641px) { .side-row.tree-row:has(.side-more):is(:hover, :focus-within) .side-pinned { visibility: hidden; } }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.3 — Conceal a folder (2026-11-12)
+
+- **Added:** **Conceal folder** in a library folder's ⋯ menu, a view filter: its items, and its subfolders', are listed only when that folder (or one in it) is opened, not in All items, a search, a file type, a tag, another folder, Similar images, the Library's and notes' pickers or a note's suggestions; nothing of the folder or its items changes. A fog mark on its row, **Reveal folder** to list them everywhere again, kept in the workspace; Settings > Privacy counts and lists the concealed folders.
+
 ## 0.57.2 — Long films start at once, pinned folders' pin before the count (2026-11-12)
 
 - **Fixed:** in the desktop app a video or sound file of `library/` plays as it is read (a part at a time from the workspace folder), in the gallery and on the canvas: an hour-long film started only after its whole file was read into the page (most of a minute), and its details read it whole again; in the gallery a film past the import limit plays too.

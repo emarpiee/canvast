@@ -32,7 +32,7 @@ import type { SearchWay } from "../search/history";
 import { forget as forgetSaved, moved, parseSaved, renamed, sameSearch, withLook, type SavedLook, type SavedSearch } from "../search/saved";
 import { paintRecent, paintSaveToggle, saveToggleHtml, wireRecent, wireSaveToggle, type SavedStore } from "./search-recent";
 import { evalQuery, parseQuery, type Query } from "../search/query";
-import { contentOf, countSide as countSideOf, inScope as inScopeOf, libraryPaging, matcher, pickedKeys, propValue, propValues, sortListed, togglePicked, type LibraryQuery, type SideCounts, type SortKey, type UsageFilter } from "../assets/library-match";
+import { concealedUnder, contentOf, countSide as countSideOf, inScope as inScopeOf, libraryPaging, matcher, pickedKeys, propValue, propValues, sortListed, togglePicked, type LibraryQuery, type SideCounts, type SortKey, type UsageFilter } from "../assets/library-match";
 import { LOOK_SIZE, lookOf, similarGroups, type Look } from "../assets/look";
 import type { AssetLibrary } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
@@ -735,7 +735,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       if (how === "delete") return void deleteThumbnail(picked);
       thumb = picked;
     } else if (how === "library") {
-      const pics = (await session.catalog!.list().catch(() => null))?.entries.filter((e) => e.type.startsWith("image/") && !e.card && e.present && (hiddenMode || !meta(e).hidden)) ?? [];
+      const hush = concealedNow();
+      const pics = (await session.catalog!.list().catch(() => null))?.entries.filter((e) => e.type.startsWith("image/") && !e.card && e.present && (hiddenMode || !meta(e).hidden) && !(hush && meta(e).folderIds.some((id) => hush.has(id)))) ?? [];
       thumb = await openLibraryPicker(anchor, pics.sort((a, b) => b.importedAt - a.importedAt).map((e) => ({ hash: e.hash, name: e.name, thumb: async () => (await session.catalog?.thumb(e.hash).catch(() => undefined))?.blob })));
       if (!thumb) return;
     } else if (how === "upload") {
@@ -828,6 +829,9 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let beforeHidden: { scope: string; search: string; way: "all" | "name" | "tag"; top: number } | null = null;
   /** Every folder, the hidden ones too (a listing's `folders` are those the mode shows). */
   let allFolders: AssetFolder[] = [];
+  /** Concealed folders (setting `library.concealed`, the workspace's): a view filter, their items listed only when one of them is opened. */
+  let concealedIds: string[] = [];
+  const concealedNow = (): Set<string> | null => concealedUnder(listing?.folders.length ? listing.folders : allFolders, concealedIds);
   /** The folders the mode shows: in hidden mode the hidden ones and those holding hidden items (`holding`), else those not hidden. */
   const modeFolders = (holding: Iterable<string>): AssetFolder[] => (hiddenMode ? hiddenModeFolders(allFolders, holding) : visibleFolders(allFolders)).sort((a, b) => a.name.localeCompare(b.name));
   /** Inline name input in the sidebar: a new folder (under `parent`) or a rename. */
@@ -2069,7 +2073,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
    */
   const pagedListing = async (pages: LibraryPages, metaOnly: boolean): Promise<CatalogListing | null> => {
     const gen = generation;
-    const [folders, counts, usage, keys] = await Promise.all([pages.folders(), pages.counts(hiddenMode), metaOnly ? Promise.resolve(usageMap) : pages.usage(), pages.fieldKeys(hiddenMode)]);
+    const [folders, counts, usage, keys] = await Promise.all([pages.folders(), pages.counts(hiddenMode, concealedIds), metaOnly ? Promise.resolve(usageMap) : pages.usage(), pages.fieldKeys(hiddenMode)]);
     if (gen !== generation) return null;
     allFolders = folders;
     usageMap = usage;
@@ -2242,7 +2246,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
   let filterMemo: { key: string; of: CatalogListing; tags: typeof canvasTags; wantsLooks: boolean; looksGen: number; durationsGen: number; tree: unknown; rows: CatalogListing["entries"] } | null = null;
   const filteredEntries = (): CatalogListing["entries"] => {
     if (!listing) return [];
-    const memoKey = [search.value, way, usageSel.value, sortSel.value, reversed, scope, hiddenMode].join("\u0001");
+    const memoKey = [search.value, way, usageSel.value, sortSel.value, reversed, scope, hiddenMode, concealedIds.join(",")].join("\u0001");
     const m = filterMemo;
     if (m && m.key === memoKey && m.of === listing && m.tags === canvasTags && m.tree === session.tree && m.durationsGen === durationsGen && (!m.wantsLooks || m.looksGen === looksGen)) {
       wantsLooks = m.wantsLooks;
@@ -2278,7 +2282,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const group = new Map<string, number>();
     if (scope === "similar") similar().forEach((g, i) => g.forEach((h) => group.set(h, i)));
     const inFolders = scope.startsWith("folder:") ? folderSubtree(listing.folders, scope.slice(7)) : null;
-    const sets = { inFolders, canvasTagged: scope.startsWith("ctag:") ? canvasTagAssets(scope.slice(5)) : null, similar: group };
+    const sets = { inFolders, canvasTagged: scope.startsWith("ctag:") ? canvasTagAssets(scope.slice(5)) : null, similar: group, concealed: concealedNow() };
     const inScope = (e: CatalogListing["entries"][number]): boolean => inScopeOf(e, scope, sets, hiddenMode);
     // The library sorted once for this sort (kept until the library or the sort changes); a search or a filter only keeps rows of it, in
     // that order: sorting again on every keystroke cost most of the time with tens of thousands of items.
@@ -2504,7 +2508,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     saveUi();
   };
   /** What the page-at-a-time list depends on: the scope, the search and how, the usage filter, the sort. */
-  const queryKey = (): string => [search.value, way, usageSel.value, sortSel.value, reversed, scope, durationsGen, hiddenMode].join("\u0001");
+  const queryKey = (): string => [search.value, way, usageSel.value, sortSel.value, reversed, scope, durationsGen, hiddenMode, concealedIds.join(",")].join("\u0001");
   let querying = "";
   const requery = async (pages: LibraryPages): Promise<void> => {
     const key = queryKey();
@@ -2526,6 +2530,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       ...(scope.startsWith("folder:") && listing ? { inFolders: [...folderSubtree(listing.folders, scope.slice(7))] } : {}),
       ...(scope.startsWith("ctag:") ? { canvasTagged: [...canvasTagAssets(scope.slice(5))] } : {}),
       ...(hiddenMode ? { hidden: true } : {}),
+      ...(concealedIds.length ? { concealed: concealedIds } : {}),
     };
     const r = await pages.query(q).catch(() => null);
     if (querying !== key) return; // (another was asked for meanwhile)
@@ -2573,16 +2578,19 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const usageAll = usageSel.value === "all" && !search.value.trim() && scope === "all";
     // (the items of the mode: hidden ones are counted in hidden mode only, and only they are)
     if (totalOf?.of !== (paged ?? listing)) {
-      const mine = paged ? null : listing.entries.filter((e) => meta(e).hidden === hiddenMode);
+      const hush = concealedNow();
+      const mine = paged ? null : listing.entries.filter((e) => meta(e).hidden === hiddenMode && !(hush && meta(e).folderIds.some((id) => hush.has(id))));
       totalOf = { of: paged ?? listing, n: paged ? paged.total : mine!.length, bytes: paged ? paged.bytes : mine!.reduce((n, e) => n + e.size, 0) };
       total.textContent = `${fmtBytes(totalOf.bytes)} in all`;
     }
     const all = totalOf.n;
-    count.textContent = `${rows.length === all ? "" : `${rows.length} of `}${all} item${all === 1 ? "" : "s"}`;
+    // (a concealed folder opened: its items are not among all the others, so it says what it shows on its own)
+    const hushHere = scope.startsWith("folder:") && !!concealedNow()?.has(scope.slice(7));
+    count.textContent = hushHere ? `${plural(rows.length, "item")} in a concealed folder` : `${rows.length === all ? "" : `${rows.length} of `}${all} item${all === 1 ? "" : "s"}`;
     // What hides items is said over the grid, with a way back to all of them (a filter left on looked like lost files).
-    const why = [usageSel.value !== "all" ? usageSel.selectedOptions[0]?.text ?? "" : "", scope !== "all" ? scopeNameOf() : "", search.value.trim() ? `“${search.value.trim()}”` : ""].filter(Boolean);
-    filteredChip.hidden = !why.length || rows.length >= all;
-    if (!filteredChip.hidden) filteredText.textContent = `Showing ${rows.length} of ${plural(all, "item")}: ${why.join(" · ")}`;
+    const why = [usageSel.value !== "all" ? usageSel.selectedOptions[0]?.text ?? "" : "", scope !== "all" ? scopeNameOf() : "", hushHere ? "concealed: listed only here" : "", search.value.trim() ? `“${search.value.trim()}”` : ""].filter(Boolean);
+    filteredChip.hidden = !why.length || (rows.length >= all && !hushHere);
+    if (!filteredChip.hidden) filteredText.textContent = hushHere ? `Showing ${plural(rows.length, "item")}: ${why.join(" · ")}` : `Showing ${rows.length} of ${plural(all, "item")}: ${why.join(" · ")}`;
     showPicked();
     const timed = (name: string, at: number): void => void (laps.length < 40 && laps.push([name, performance.now() - at])); // (a redraw after the opening adds its own, a few)
     let at = performance.now();
@@ -2663,7 +2671,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         of: l,
         counts: p
           ? { hidden: p.hidden, shown: p.shown, favourites: p.favourites, missing: p.missing, unfiled: p.unfiled, tags: new Map(p.tags.map(([k, label, n]) => [k, { label, n }])), tagsUnder: new Map(p.tagsUnder), types: new Map(p.types), folders: new Map(p.folders) }
-          : countSideOf(l.entries, allFolders, hiddenMode),
+          : countSideOf(l.entries, allFolders, hiddenMode, concealedIds),
       };
     }
     return sideCounts.counts;
@@ -2678,7 +2686,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (n === undefined) {
       const words = searchWords(q);
       n = 0;
-      for (const e of listing.entries) if (inScopeOf(withUsage(e), "all", {}, hiddenMode) && matchesQuery(e, words, "all", m === "bookmark" ? "all" : m)) n++;
+      const concealed = concealedNow();
+      for (const e of listing.entries) if (inScopeOf(withUsage(e), "all", { concealed }, hiddenMode) && matchesQuery(e, words, "all", m === "bookmark" ? "all" : m)) n++;
       savedCounts.n.set(key, n);
     }
     return n;
@@ -2740,17 +2749,21 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           : item(`folder:${f.id}`, esc(f.name), subtreeCount(f.id), {
               depth: at.depth,
               cls: `tree-row${pinnedNow.has(f.id) ? " is-pinned" : ""}`,
-              ...(ui.pinned.includes(f.id) ? { mark: `<span class="side-pinned" aria-hidden="true">${ICONS.pin}</span>` } : {}), // (a pinned folder says so before its count)
+              // (a pinned folder says so before its count, and a concealed one, which it leaves out of every list but its own)
+              ...(ui.pinned.includes(f.id) || concealedIds.includes(f.id) ? { mark: `${concealedIds.includes(f.id) ? `<span class="side-pinned side-concealed" aria-hidden="true">${ICONS.conceal}</span>` : ""}${ui.pinned.includes(f.id) ? `<span class="side-pinned" aria-hidden="true">${ICONS.pin}</span>` : ""}` } : {}),
               before: treeGuides(at.depth, at.last, at.conts), // (no arrow: a folder with subfolders opens and closes on its own row)
               ...(at.hasKids && !findingFolders ? { expanded: at.open } : {}),
               icon: pinnedNow.has(f.id) ? ICONS.folderUp : at.open ? ICONS.folderOpen : ICONS.folder,
-              ...(pinnedNow.has(f.id) ? { title: `${esc(folderPath(listing!.folders, f.id).join(" › "))} (pinned)` } : {}),
+              ...(pinnedNow.has(f.id) || concealedIds.includes(f.id) ? { title: `${esc(folderPath(listing!.folders, f.id).join(" › "))} (${[pinnedNow.has(f.id) ? "pinned" : "", concealedIds.includes(f.id) ? "concealed: its items are listed only here" : ""].filter(Boolean).join(", ")})` } : {}),
               extra: (ro ? "" : `<button type="button" class="side-more side-pin" data-folder-action="pin" data-id="${esc(f.id)}" aria-pressed="${ui.pinned.includes(f.id)}" aria-label="${ui.pinned.includes(f.id) ? "Unpin" : "Pin"} folder ${esc(f.name)}" title="${ui.pinned.includes(f.id) ? "Unpin" : "Pin to top"}">${ICONS.pin}</button>`) + more("folder", f.id, f.name, [
                 { attr: "data-folder-action", value: "new", label: "New subfolder", hint: "A folder inside this one", icon: ICONS.folderPlus, aria: `New folder inside ${f.name}` },
                 { attr: "data-folder-action", value: "rename", label: "Rename", hint: "Give it a new name", icon: ICONS.textCursorInput, aria: `Rename folder ${f.name}` },
                 ui.pinned.includes(f.id)
                   ? { attr: "data-folder-action", value: "pin", label: "Unpin", hint: "Back in its place in the list", icon: ICONS.pinOff, aria: `Unpin folder ${f.name}` }
                   : { attr: "data-folder-action", value: "pin", label: "Pin to top", hint: "First in the list, on this device", icon: ICONS.pin, aria: `Pin folder ${f.name}` },
+                ...(hiddenMode ? [] : [concealedIds.includes(f.id)
+                  ? { attr: "data-folder-action", value: "conceal", label: "Reveal folder", hint: "Its items in every list again", icon: ICONS.reveal, aria: `Reveal folder ${f.name}: its items are listed everywhere again` }
+                  : { attr: "data-folder-action", value: "conceal", label: "Conceal folder", hint: "Its items listed only in it", icon: ICONS.conceal, aria: `Conceal folder ${f.name}: its items are listed only when it is opened` }]),
                 hiddenMode
                   ? { attr: "data-folder-action", value: "show", label: "Unhide folder", hint: "And everything in it", icon: ICONS.eye, aria: `Unhide folder ${f.name} and everything in it` }
                   : { attr: "data-folder-action", value: "hide", label: "Hide folder", hint: "And everything in it", icon: ICONS.eyeClosed, aria: `Hide folder ${f.name} and everything in it` },
@@ -4569,6 +4582,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     const id = b.dataset["id"] ?? "";
     const f = listing?.folders.find((x) => x.id === id);
     switch (b.dataset["folderAction"]) {
+      case "conceal":
+        // (only the list of concealed folders changes: the folder and its items are left as they are)
+        settings.set("library.concealed", JSON.stringify(concealedIds.includes(id) ? concealedIds.filter((x) => x !== id) : [...concealedIds, id]));
+        break;
       case "pin":
         settings.set("library.pinned", JSON.stringify(ui.pinned.includes(id) ? ui.pinned.filter((x) => x !== id) : [...ui.pinned, id]));
         break;
@@ -5525,9 +5542,17 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       ui.pinned = JSON.parse(settings.get("library.pinned")) as string[];
       renderSide();
     }
+    if (key === "library.concealed") {
+      concealedIds = JSON.parse(settings.get("library.concealed")) as string[];
+      sideCounts = null; // (counted again without, or with, what they hold)
+      savedCounts = null;
+      totalOf = null;
+      void refresh(true); // (listed again: a page at a time, the counts come from where the library is)
+    }
     if (key === "search.saved.library" || key === "search.saved.hidden") renderSide(); // (another device or tab saved one)
   });
   // Pinned folders are the workspace's (0.54.47): this device's, from before, go there once.
+  concealedIds = JSON.parse(settings.get("library.concealed")) as string[];
   if (settings.isSet("library.pinned")) ui.pinned = JSON.parse(settings.get("library.pinned")) as string[];
   else if (ui.pinned.length) settings.set("library.pinned", JSON.stringify(ui.pinned));
   // The gaps between cards follow the density setting.

@@ -384,6 +384,8 @@ export interface BackupHooks {
   password(kind: "hidden" | "workspace", action: "status" | "set" | "remove" | "lock" | "newkey"): Promise<{ has: boolean; text: string; open?: boolean; rekey?: boolean }>;
   /** The desktop app: how the workspace splits its library's files (16, 256 or 4,096), and splitting them another way (asks first). */
   librarySplit?: { get(): Promise<{ split: 1 | 2 | 3; items: number }>; set(split: 1 | 2 | 3): Promise<boolean> };
+  /** The concealed library folders, each by its path (Privacy's Concealed folders). */
+  concealedFolders?(): Promise<string[]>;
 }
 
 /** The desktop app: what it keeps on this computer, outside the workspace folder, and what to do for full privacy. */
@@ -420,7 +422,7 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
           .map((c) => `<div class="set-card">${c.title ? `<h3>${esc(c.title)}</h3>` : ""}${c.rows.map(rowHtml).join("")}</div>`)
           .join("") +
         (t.id === "privacy"
-          ? (DESKTOP
+          ? `<div class="set-card" data-concealed-card><h3>Concealed folders</h3>${plainRowHtml({ label: "Concealed folders", help: "Their items are listed only when the folder itself is opened: not in All items, a search, a type, a tag or another folder. Nothing of them is changed or hidden on the disk. Conceal or reveal one from its ⋯ menu in the Library.", control: `<span class="set-scope" data-concealed-n></span><button type="button" class="set-reset" data-concealed-show data-testid="concealed-show">Show…</button>` })}</div>` + (DESKTOP
               ? pwCard("workspace", "Password for the workspace", "Asked when the app opens: nothing of the workspace is shown until it is given. It keeps people at your screen out; it does not encrypt your data, so someone who can open the workspace folder, or an exported file, is not stopped. It cannot be recovered: to change or remove it you enter the old one.") +
                 pwCard("hidden", "Password for the Hidden items", "Hidden items are encrypted with it in the workspace folder: their files, names, tags and notes cannot be read without it. It is asked before the Hidden items open and before an export that includes them (an exported file is not encrypted). It cannot be recovered: if it is lost, so are the hidden items. It cannot be removed while items are hidden. Unlocked, they stay unlocked until Lock now or closing the app: leaving hidden mode only takes them off this screen, and devices they are shared with can still open them.") +
                 DEVICE_DATA_CARD
@@ -531,6 +533,10 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   const errorLine = (e: { at: number; what: string }): string => `<li><time>${new Date(e.at).toLocaleTimeString()}</time> ${esc(e.what)}</li>`;
   onErrorLog(showErrors);
   root.addEventListener("click", (e) => {
+    if ((e.target as HTMLElement).closest("[data-concealed-show]") && backup?.concealedFolders) {
+      void backup.concealedFolders().then((names) => listDialog({ title: "Concealed folders", testid: "concealed-dialog", lines: ["Their items are listed only when the folder is opened. Reveal one from its ⋯ menu in the Library."], body: () => `<ul class="set-errors">${names.map((n) => `<li>${esc(n)}</li>`).join("") || "<li>None</li>"}</ul>` }));
+      return;
+    }
     const b = (e.target as HTMLElement).closest<HTMLElement>("[data-about]");
     if (!b) return;
     if (b.dataset["about"] === "clear") clearErrorLog();
@@ -754,6 +760,12 @@ export function mountSettingsView(root: HTMLElement, settings: SettingsStore, ke
   const refresh = (): void => {
     renderKeys();
     search();
+    // Privacy › Concealed folders: how many, and the list (a list that grows opens in a dialog, never on the page).
+    const nConcealed = (JSON.parse(settings.get("library.concealed")) as string[]).length;
+    const nEl = root.querySelector<HTMLElement>("[data-concealed-n]");
+    if (nEl) nEl.textContent = nConcealed ? plural(nConcealed, "folder") : "None";
+    const showEl = root.querySelector<HTMLButtonElement>("[data-concealed-show]");
+    if (showEl) showEl.disabled = !nConcealed || !backup?.concealedFolders;
     for (const r of all) {
       const el = root.querySelector<HTMLInputElement | HTMLSelectElement>(`[data-set="${r.key}"]`);
       if (!el) continue;

@@ -259,7 +259,7 @@ export class DesktopCatalog implements CatalogStore {
 
   readonly pages: LibraryPages = {
     query: (q) => this.lib.calls.query(q),
-    counts: (hidden) => this.lib.calls.counts(hidden),
+    counts: (hidden, concealed) => this.lib.calls.counts(hidden, concealed),
     fieldKeys: (hidden) => this.lib.calls.fieldKeys(hidden),
     fieldValues: (key, hidden) => this.lib.calls.fieldValues(key, hidden),
     listed: (hashes) => this.lib.calls.listed(hashes),

@@ -99,6 +99,8 @@ export const SETTINGS = {
   "search.saved.hidden": { scope: "device", default: "[]", validate: validSaved, effect: "immediate" } as Def<string>,
   /** Library folders pinned to the top of the Folders list, by id. */
   "library.pinned": { scope: "workspace", default: "[]", validate: idList, effect: "immediate" } as Def<string>,
+  /** Concealed library folders, by id: their items are listed only when one of them is opened (a view filter: the folders and items are not changed). */
+  "library.concealed": { scope: "workspace", default: "[]", validate: idList, effect: "immediate" } as Def<string>,
   "search.saved.canvas": { scope: "workspace", default: "[]", validate: validSaved, effect: "immediate" } as Def<string>,
   // Shapes and paths (ADR 0099): what the Shape and Path tools make. The outline is not remembered: every session starts with none.
   "shape.kind": { scope: "device", default: "rect", validate: oneOf("rect", "ellipse", "line", "polygon", "star"), effect: "immediate" } as Def<"rect" | "ellipse" | "line" | "polygon" | "star">,

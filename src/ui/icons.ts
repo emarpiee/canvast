@@ -343,6 +343,8 @@ import eraser from "lucide-static/icons/eraser.svg";
 import x from "lucide-static/icons/x.svg";
 import eye from "lucide-static/icons/eye.svg";
 import eyeClosedIcon from "lucide-static/icons/eye-closed.svg";
+import cloudFogSvg from "lucide-static/icons/cloud-fog.svg";
+import hazeSvg from "lucide-static/icons/haze.svg";
 import eyeOff from "lucide-static/icons/eye-off.svg";
 import passwordShowSvg from "lucide-static/icons/view.svg";
 import passwordHideSvg from "lucide-static/icons/eye-dashed.svg";
@@ -618,6 +620,10 @@ export const ICONS = {
   eye: clean(eye),
   eyeOff: clean(eyeOff),
   eyeClosed: clean(eyeClosedIcon),
+  /** Conceal folder: its items are left out of every list but its own (a view filter, not Hide). */
+  conceal: clean(cloudFogSvg),
+  /** Reveal folder: a concealed folder's items are listed everywhere again. */
+  reveal: clean(hazeSvg),
   passwordShow: clean(passwordShowSvg),
   passwordHide: clean(passwordHideSvg),
   lockKeyhole: clean(lockKeyhole),

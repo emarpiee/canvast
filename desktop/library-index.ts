@@ -6,7 +6,7 @@
  */
 import type { AssetFolder, CatalogEntry } from "../src/assets/asset-catalog";
 import { FOLDERS_KEY } from "../src/assets/asset-catalog";
-import { countSide, inScope, matcher, propValues, sortListed } from "../src/assets/library-match";
+import { concealedUnder, countSide, inScope, matcher, propValues, sortListed } from "../src/assets/library-match";
 import type { ListedEntry, SortKey, UsageFilter, Way } from "../src/assets/library-match";
 import { parseQuery } from "../src/search/query";
 import type { LibraryOp } from "../src/storage/desktop-bridge";
@@ -36,6 +36,8 @@ export interface LibraryQuery {
   canvasTagged?: string[];
   /** Hidden mode: the hidden items instead of the shown ones. */
   hidden?: boolean;
+  /** Concealed folders (setting `library.concealed`): their items are listed only when one of them is opened. */
+  concealed?: string[];
 }
 
 export interface QueryResult {
@@ -55,7 +57,7 @@ export class LibraryIndex {
   /** Changes since the sorted lists were made. */
   private version = 0;
   private sorted: { key: string; version: number; rows: ListedEntry[] } | null = null;
-  private side: { version: number; hidden: boolean; counts: ReturnType<typeof countSide> } | null = null;
+  private side: { version: number; hidden: boolean; concealed: string; counts: ReturnType<typeof countSide> } | null = null;
   private usedBefore: string[] = [];
 
   constructor(private readonly lib: IndexedLibrary) {
@@ -112,20 +114,21 @@ export class LibraryIndex {
     }
     const words = q.text.trim() ? parseQuery(q.text).query : null;
     const match = matcher({ folders, canvasNames: (ids) => ids.flatMap((id) => q.canvasNames[id] ?? []), all: () => items.values() });
-    const sets = { inFolders: q.inFolders ? new Set(q.inFolders) : null, canvasTagged: q.canvasTagged ? new Set(q.canvasTagged) : null };
+    const sets = { inFolders: q.inFolders ? new Set(q.inFolders) : null, canvasTagged: q.canvasTagged ? new Set(q.canvasTagged) : null, concealed: concealedUnder(folders, q.concealed ?? []) };
     const rows = this.sorted.rows.filter((e) => inScope(e, q.scope, sets, q.hidden === true) && (!words && q.usage === "all" ? true : match(e, words, q.usage, q.way)));
     const ratios = new Float32Array(rows.length);
     rows.forEach((e, i) => (ratios[i] = Math.max(0.4, Math.min(3, e.pixelW / Math.max(1, e.pixelH)))));
     // (the items of the mode: hidden ones are counted in hidden mode only, and only they are)
     let bytes = 0, total = 0;
-    for (const e of items.values()) if (!!e.hidden === (q.hidden === true)) (bytes += e.size), total++;
+    for (const e of items.values()) if (!!e.hidden === (q.hidden === true) && !(sets.concealed && (e.folderIds ?? []).some((id) => sets.concealed!.has(id)))) (bytes += e.size), total++; // (nor a concealed folder's)
     return { hashes: rows.map((e) => e.hash).join(""), ratios, total, bytes };
   }
 
   /** The sidebar's counts (made again only after a change), as plain lists; of the hidden items in hidden mode (`hidden`). */
-  counts(hidden = false): { hidden: number; shown: number; favourites: number; missing: number; unfiled: number; tags: Array<[string, string, number]>; tagsUnder: Array<[string, number]>; types: Array<[string, number]>; folders: Array<[string, number]> } {
+  counts(hidden = false, concealed: readonly string[] = []): { hidden: number; shown: number; favourites: number; missing: number; unfiled: number; tags: Array<[string, string, number]>; tagsUnder: Array<[string, number]>; types: Array<[string, number]>; folders: Array<[string, number]> } {
     const items = this.all();
-    if (!this.side || this.side.version !== this.version || this.side.hidden !== hidden) this.side = { version: this.version, hidden, counts: countSide(items.values(), this.folders(), hidden) };
+    const hush = concealed.join("\u0001");
+    if (!this.side || this.side.version !== this.version || this.side.hidden !== hidden || this.side.concealed !== hush) this.side = { version: this.version, hidden, concealed: hush, counts: countSide(items.values(), this.folders(), hidden, concealed) };
     const c = this.side.counts;
     return { hidden: c.hidden, shown: c.shown, favourites: c.favourites, missing: c.missing, unfiled: c.unfiled, tags: [...c.tags].map(([k, v]) => [k, v.label, v.n]), tagsUnder: [...c.tagsUnder], types: [...c.types], folders: [...c.folders] };
   }

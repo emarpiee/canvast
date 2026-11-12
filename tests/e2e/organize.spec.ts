@@ -493,6 +493,22 @@ test("folders nest, an asset is in one folder at a time, and deleting a folder n
   await expect(cards(p)).toHaveCount(0);
   expect(await p.evaluate(() => window.__canvastDebug.storedAssetHashes())).toEqual([HASH, GREEN_HASH].sort());
 
+  // Conceal Refs: a view filter only. Its items, and its subfolder's, are listed only when it or a folder in it is opened; nothing of them changes.
+  await sideAct(p, "folder", "Refs", "Conceal folder Refs: its items are listed only when it is opened");
+  await side(p, /^All items/).click();
+  await expect(cards(p)).toHaveCount(0);
+  await expect(side(p, /^All items/)).toContainText("0");
+  await side(p, /^Refs/).click();
+  await expect(cards(p)).toHaveCount(2);
+  await expect(p.getByTestId("assets-filtered")).toContainText("concealed: listed only here");
+  await side(p, /^Hands/).click();
+  await expect(cards(p)).toHaveCount(1);
+  await pick(p, HASH);
+  await expect(p.getByTestId("asset-folder-now")).toHaveText("Refs › Hands"); // (still filed where it was)
+  await sideAct(p, "folder", "Refs", "Reveal folder Refs: its items are listed everywhere again");
+  await side(p, /^All items/).click();
+  await expect(cards(p)).toHaveCount(2);
+
   // Export folder: its files and its subfolders', as a ZIP that keeps its folders (from the folder itself) or puts them all together.
   const exported = async (flat: boolean): Promise<string[]> => {
     const [dl] = await Promise.all([p.waitForEvent("download"), (async () => {

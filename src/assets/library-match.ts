@@ -3,7 +3,7 @@
  * memory) and the desktop app's main process (which lists a library of a million items from its database, a page at a time).
  */
 import type { AssetFolder, CatalogEntry, Usage } from "./asset-catalog";
-import { folderPath, meta } from "./asset-catalog";
+import { folderPath, folderSubtree, meta } from "./asset-catalog";
 import { chipOf, extOf } from "./file-kind";
 import type { Extra, Filter } from "./filters";
 import { parseFilter, typedValue } from "./filters";
@@ -163,9 +163,24 @@ export function togglePicked(scope: string, key: string): string {
   return [...part("ext:"), ...part("tag:")].join("&") || "all";
 }
 
-export function inScope(e: ListedEntry, scope: string, sets: { inFolders?: Has | null; canvasTagged?: Has | null; similar?: Has | null } = {}, hiddenMode = false): boolean {
+/**
+ * Concealed folders (Conceal folder): only a view filter, kept apart from the folders (setting `library.concealed`), so nothing of a folder or
+ * its items changes. Each folder named and every folder under it.
+ */
+export function concealedUnder(folders: readonly AssetFolder[], ids: readonly string[]): Set<string> | null {
+  if (!ids.length) return null;
+  const out = new Set<string>();
+  for (const id of ids) for (const f of folderSubtree(folders, id)) out.add(f);
+  return out;
+}
+/** Whether an item lies in a concealed folder: then it is listed only when a concealed folder is the one opened. */
+const isConcealed = (folderIds: readonly string[], concealed: Has | null | undefined): boolean => !!concealed && folderIds.some((id) => concealed.has(id));
+
+export function inScope(e: ListedEntry, scope: string, sets: { inFolders?: Has | null; canvasTagged?: Has | null; similar?: Has | null; concealed?: Has | null } = {}, hiddenMode = false): boolean {
   const m = meta(e);
   if (m.hidden !== hiddenMode) return false;
+  // (in a concealed folder: nowhere but that folder, or a folder of it, opened; not All items, a search, a type, a tag or a parent folder)
+  if (isConcealed(m.folderIds, sets.concealed) && !(scope.startsWith("folder:") && sets.concealed!.has(scope.slice(7)))) return false;
   if (scope === "similar") return !!sets.similar?.has(e.hash);
   if (scope === "favorites") return m.favorite;
   if (scope === "unfiled") return m.folderIds.length === 0;
@@ -265,14 +280,24 @@ export interface SideCounts {
   types: Map<string, number>;
   folders: Map<string, number>;
 }
-export function countSide(entries: Iterable<CatalogEntry>, folders: readonly AssetFolder[], hiddenMode = false): SideCounts {
+export function countSide(entries: Iterable<CatalogEntry>, folders: readonly AssetFolder[], hiddenMode = false, concealedIds: readonly string[] = []): SideCounts {
+  const concealed = concealedUnder(folders, concealedIds);
   const c: SideCounts = { hidden: 0, shown: 0, favourites: 0, missing: 0, unfiled: 0, tags: new Map(), tagsUnder: new Map(), types: new Map(), folders: new Map() };
   const parentOf = new Map(folders.map((f) => [f.id, f.parentId]));
   for (const e of entries) {
     const m = meta(e);
+    const hush = isConcealed(m.folderIds, concealed);
     if (m.hidden) c.hidden++;
-    else c.shown++;
+    else if (!hush) c.shown++;
     if (m.hidden !== hiddenMode) continue; // (what is hidden is counted in hidden mode only, and only it is)
+    if (hush) {
+      // (a concealed item counts only in the concealed folders it lies in: everywhere else it is not listed)
+      for (let id: string | null | undefined = m.folderIds.find((x) => concealed!.has(x)), guard = 0; id && concealed!.has(id) && guard < 1000; guard++) {
+        c.folders.set(id, (c.folders.get(id) ?? 0) + 1);
+        id = parentOf.get(id);
+      }
+      continue;
+    }
     if (m.favorite) c.favourites++;
     if (!m.folderIds.length) c.unfiled++;
     if ((e as { present?: boolean }).present === false) c.missing++;

@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.3: conceal a folder (2026-11-12)
+
+- **Implemented:** the setting `library.concealed` (workspace; folder ids, the folders themselves untouched); one rule in `inScope` and `countSide` (src/assets/library-match.ts), used by the page and the desktop index (the list goes with each query and count over IPC and to a LAN guest); Conceal and Reveal in a folder's menu, its fog mark, the line over the grid inside it, the status count; left out of the Library's thumbnail picker and the notes' picker and suggestions; Settings > Privacy count and list.
+- **Tested:** in the browser and the desktop app while building (All items, its count, search, file type and tag leave it out; the folder and its subfolder list it; Reveal brings it back; the desktop keeps it in workspace.json); `organize.spec.ts` folder test extended; new unit test `library-conceal.test.ts`; the GitHub runs of this push are the check.
+- **Known failures:** none known.
+- **Unverified:** the LAN guest's view of a host's concealed folders; the canvas's font list and texture picker still offer concealed items (by design for now, in Limitations).
+- **Committed:** v0.57.3 on `main`.
+- **Next bounded task:** none set.
+
 ## v0.57.2: long films stream in the desktop app; pinned folders' pin before the count (2026-11-12)
 
 - **Implemented:** `OriginalStore.mediaUrl` (desktop: `app://canvast/media/<library path>`, served a byte range at a time by the shell from `library/` only, never `.hidden/` or a link out; browser: null, its Blobs already stream); the gallery and the canvas player play from it; the details check a video's size before reading it; `media-src` allows `app:`; a pinned folder's pin is drawn before its count.
@@ -45,7 +54,7 @@ Unverified / Committed / Next bounded task**.
 - **Known failures:** a hidden video is still decrypted whole before it plays.
 - **Unverified:** frame extraction from a streamed film uses the element's picture only (no decode of the file when that picture is blank).
 - **Committed:** v0.57.2 on `main`.
-- **Next bounded task:** conceal folders, waiting for the owner's go on the plan.
+- **Next bounded task:** conceal folders (done in v0.57.3).
 
 ## v0.57.1: outline width in the bar, folders without arrows, wider Settings (2026-11-12)
 

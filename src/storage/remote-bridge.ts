@@ -171,9 +171,9 @@ export class GuestLibrary implements LibraryCalls {
     const r = await this.lib<{ hashes: string; ratios: number[] | Record<string, number>; total: number; bytes: number }>("query", q);
     return { ...r, ratios: Float32Array.from(Array.isArray(r.ratios) ? r.ratios : Object.values(r.ratios)) };
   }
-  async counts(hidden = false): Promise<Awaited<ReturnType<LibraryCalls["counts"]>>> {
+  async counts(hidden = false, concealed: readonly string[] = []): Promise<Awaited<ReturnType<LibraryCalls["counts"]>>> {
     if (hidden) return this.hiddenIndex.counts(true);
-    const c = await this.lib<Awaited<ReturnType<LibraryCalls["counts"]>>>("counts", false);
+    const c = await this.lib<Awaited<ReturnType<LibraryCalls["counts"]>>>("counts", false, [...concealed]);
     return { ...c, hidden: [...this.mine.values()].filter((e) => e.state === "active" && e.hidden).length };
   }
   async fieldKeys(hidden = false): Promise<string[]> {

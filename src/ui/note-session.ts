@@ -2,6 +2,7 @@ import type { Session } from "../app/session";
 import type { AssetLibrary } from "../assets/asset-library";
 import type { CatalogEntry } from "../assets/asset-catalog";
 import { meta } from "../assets/asset-catalog";
+import { concealedUnder } from "../assets/library-match";
 import { chipOf } from "../assets/file-kind";
 import type { SettingsStore } from "../settings/settings";
 import { desktopBridge } from "../storage/desktop-bridge";
@@ -151,6 +152,11 @@ export class OpenNote {
       }
       return got;
     };
+    // What is offered (the picker, link and tag suggestions) leaves out a concealed folder's items; a link already written still finds them.
+    const offered = (): CatalogEntry[] => {
+      const hush = concealedUnder(folders, JSON.parse(this.deps.settings.get("library.concealed")) as string[]);
+      return hush ? all.filter((x) => !(x.folderIds ?? []).some((id) => hush.has(id))) : all;
+    };
     const self = all.find((x) => x.hash === hash);
     const dir = (await pathOf(self ?? { hash, name: this.name, folderIds: [] })).slice(0, -1);
     const host: NoteHost = {
@@ -171,7 +177,7 @@ export class OpenNote {
         return pathOf(x ?? { hash: h, name: "", folderIds: [] });
       },
       async choose(kind) {
-        const list = all.filter((x) => fits(kind, x)).sort((a, b) => b.importedAt - a.importedAt);
+        const list = offered().filter((x) => fits(kind, x)).sort((a, b) => b.importedAt - a.importedAt);
         const chosen = await openLibraryPicker(
           null,
           list.map((x) => ({ hash: x.hash, name: x.name, ...(x.type.startsWith("image/") && !x.card ? {} : { chip: chipOf(x.name, x.type) }), thumb: () => session.thumbBlob(x.hash) })),
@@ -189,11 +195,12 @@ export class OpenNote {
         // A note by its name without `.md`, any other file by its whole name; a name two items share gets its folders in front.
         const keyOf = (x: CatalogEntry): string => (noteKindOf(x.name) === "md" ? x.name.replace(/\.(md|markdown)$/i, "") : x.name);
         const count = new Map<string, number>();
-        for (const x of all) count.set(keyOf(x).toLowerCase(), (count.get(keyOf(x).toLowerCase()) ?? 0) + 1);
+        const shown = offered();
+        for (const x of shown) count.set(keyOf(x).toLowerCase(), (count.get(keyOf(x).toLowerCase()) ?? 0) + 1);
         const canvases = (session.tree?.boards ?? []).flatMap(({ board, canvases }) => canvases.map((c) => ({ key: `canvas:${c.name}`, name: c.name, hash: board.id })));
         return Promise.all([
           ...canvases,
-          ...all.filter((x) => x.hash !== hash).map(async (x) => {
+          ...shown.filter((x) => x.hash !== hash).map(async (x) => {
             const key = keyOf(x);
             if ((count.get(key.toLowerCase()) ?? 0) < 2) return { key, name: key, hash: x.hash };
             const path = (await pathOf(x)).slice(0, -1);
@@ -206,7 +213,7 @@ export class OpenNote {
         const found = link.startsWith(WIKI) ? await host.findWiki(decodeURIComponent(link.slice(WIKI.length))) : target ? await host.find(target) : null;
         return found ? ((await session.thumbBlob(found.hash)) ?? null) : null;
       },
-      tags: async () => [...new Set(all.flatMap((x) => x.tags ?? []))].sort((a, b) => a.localeCompare(b)),
+      tags: async () => [...new Set(offered().flatMap((x) => x.tags ?? []))].sort((a, b) => a.localeCompare(b)),
       async findWiki(target) {
         const t = wikiTarget(target);
         const named = all.filter((x) => x.name.toLowerCase() === t.name || wikiKeyOf(x.name) === t.name);

@@ -84,7 +84,7 @@ import { AssetLibrary, MAX_IMPORT_BYTES } from "../assets/asset-library";
 import { openBrowserStorage } from "../storage/idb-storage";
 import { openDesktopStorage } from "../storage/desktop-storage";
 import { desktopBridge } from "../storage/desktop-bridge";
-import { meta } from "../assets/asset-catalog";
+import { folderPath, meta } from "../assets/asset-catalog";
 import type { OpenHooks, Storage } from "../storage/store";
 import type { SaveState } from "../storage/canvas-persistence";
 import { Session } from "./session";
@@ -2616,6 +2616,12 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       return (host: HTMLElement) => (draw ??= mountLibraryFolderCard(host, session))();
     })(),
     persist: async () => void (await navigator.storage?.persist?.().catch(() => false)),
+    concealedFolders: async () => {
+      const ids = JSON.parse(settings.get("library.concealed")) as string[];
+      const cat = session.catalog;
+      const folders = (cat ? await (cat.pages ? cat.pages.folders() : cat.list().then((l) => l.folders)).catch(() => null) : null) ?? [];
+      return ids.flatMap((id) => (folders.some((f) => f.id === id) ? [folderPath(folders, id).join(" › ")] : [])).sort((a, b) => a.localeCompare(b));
+    },
     ...(storage?.folderSync
       ? {
           librarySplit: {
