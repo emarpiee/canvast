@@ -76,7 +76,22 @@ async function pan(label, perFrame, seconds = 4, fraction = 0, input = null) {
   await cdp.send("Profiler.start");
   await page.mouse.move(720, 450);
   const steps = Math.round(seconds * 60);
-  if (input) await input(steps);
+  if (input) {
+    await H(() => {
+      window.__wheelAt = {};
+      window.__zr = [Infinity, -Infinity];
+      window.addEventListener("wheel", (e) => {
+        const t = e.target;
+        const k = t?.id === "canvas" ? "canvas" : `${t?.tagName}.${String(t?.className).slice(0, 40)}`;
+        window.__wheelAt[k] = (window.__wheelAt[k] ?? 0) + 1;
+        const c = window.__canvastDebug.camera();
+        const z = Number(c.zi ?? 0) + Number(c.zf ?? 0);
+        window.__zr = [Math.min(window.__zr[0], z), Math.max(window.__zr[1], z)];
+      }, { capture: true });
+    });
+    await input(steps);
+    console.log(`  wheel landed: ${JSON.stringify(await H(() => window.__wheelAt))}; zoom range ${JSON.stringify(await H(() => window.__zr))}; camera ${JSON.stringify(await H(() => window.__canvastDebug.camera()))}`);
+  }
   else await page.mouse.down();
   for (let i = 0; !input && i < steps; i++) {
     const phase = Math.sin((i / steps) * Math.PI * 2);
