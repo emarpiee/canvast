@@ -811,11 +811,10 @@ test("markdown that comes as words: pasted, it is read as markdown; marks saved 
   await paste("- alpha\n- beta\n\nSome **bold** words");
   await expect(page(p).locator("ul li")).toHaveText(["alpha", "beta", "dash"]);
   await expect(page(p).locator("strong")).toHaveText("bold");
-  // C: typed at a line's start, then a space, a mark makes its format (the cursor put at the end of the last line)
-  await page(p).locator("p").last().evaluate((el) => {
-    (el.closest("[contenteditable]") as HTMLElement).focus(); // (first: the editor puts back its own cursor when it gets the focus)
-    getSelection()!.collapse(el, el.childNodes.length);
-  });
+  // C: typed at a line's start, then a space, a mark makes its format
+  const last = page(p).locator("p").last();
+  const box = (await last.boundingBox())!;
+  await last.click({ position: { x: box.width - 4, y: box.height / 2 } }); // (the line's end, as a person puts the cursor there)
   await p.keyboard.press("Enter");
   await p.keyboard.type("- item");
   await expect(page(p).locator("li").filter({ hasText: "item" })).toHaveCount(1);
