@@ -20,7 +20,7 @@ on:
         options: [quick, full]
         default: quick
       spec:
-        description: "Only this test, to chase a failure (tests/e2e/x.spec.ts or tests/e2e/x.spec.ts:123); empty: the suite"
+        description: "Only these tests, to chase a failure (tests/e2e/x.spec.ts, tests/e2e/x.spec.ts:123, several apart by spaces); empty: the suite"
         type: string
         default: ""
       project:
@@ -59,7 +59,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps ${{ inputs.project == 'firefox' && 'firefox' || 'chromium' }}
       - name: Run the test
-        run: npm run test:snap -- --project=${{ inputs.project }} --repeat-each=${{ inputs.repeat }} --trace=on --retries=0 "${{ inputs.spec }}"
+        run: npm run test:snap -- --project=${{ inputs.project }} --repeat-each=${{ inputs.repeat }} --trace=on --retries=0 ${{ inputs.spec }}
       - name: Keep the results and traces
         if: always()
         uses: actions/upload-artifact@v4
