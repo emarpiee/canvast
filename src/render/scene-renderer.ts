@@ -15,14 +15,14 @@ import type { PathObject, StrokeObject } from "../doc/model";
 import { NODE, drawnSubs } from "../doc/path";
 import { shapeHandles, gradientHandles, nodesOnScreen } from "../interaction/path-edit";
 import { takeTexturePending } from "./texture";
-import { rasterKey } from "../doc/model";
+import { isBackdrop, rasterKey } from "../doc/model";
 import { drawText } from "./draw-text";
 import type { Pt, SelectionFrame } from "./selection-frame";
 import { expandStroke } from "../interaction/pens";
 import { LABEL_FONT } from "./item-label";
 import type { ItemLabel } from "./item-label";
 import { cropOf, hasShadow, isNeutral } from "../doc/adjust";
-import { drawAdjusted } from "./adjust-shape";
+import { drawAdjusted, drawBackdrop } from "./adjust-shape";
 import { itemCorners, rotateHandleAt, selectionFrame } from "./selection-frame";
 
 export interface SceneTheme {
@@ -205,6 +205,13 @@ export function drawObjects(
     // (what a blur or a shadow spreads past the object is cut by its sheets too: the cut goes round the whole of it, adjusted and masked)
     const paintAdj = (c: CanvasRenderingContext2D): void => {
       const a = po.obj.adjust;
+      if (isBackdrop(po.obj)) {
+        // An adjustment shape (ADR 0188): what is under it is adjusted inside its outline, then its own fill and outline go over that, plain.
+        const ev = !!po.obj.evenodd;
+        if (a && !isNeutral(a)) drawBackdrop(c, po, a, (g) => (po.cover ? g.rect(0, 0, vp.width, vp.height) : addFillPath(g, po, vp)), ev && !po.cover);
+        paintOne(c, po, false);
+        return;
+      }
       // (a picture is adjusted in its own pixels: only its shadows are made here)
       if (a && po.obj.kind !== "image" && !po.cover && !isNeutral(a)) drawAdjusted(c, po, a, (g) => paintOne(g, po, false));
       else if (a && po.obj.kind === "image" && !po.cover && hasShadow(a)) drawAdjusted(c, po, a, (g) => paintOne(g, po, false), false);

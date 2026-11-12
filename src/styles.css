@@ -863,6 +863,10 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .adjust-body { overflow-y: auto; padding: var(--s-6) var(--s-6) var(--s-6); min-height: 0; }
 .adjust-pop { display: grid; gap: var(--s-6); }
 .adj-empty { margin: 0; color: var(--hud-muted); font: var(--font-meta); }
+/* An adjustment shape (ADR 0188): the switch that makes the adjustments of the selected shapes act on what is under them. */
+.adj-backdrop { display: flex; align-items: center; gap: var(--s-4); padding: var(--s-4) var(--s-6); font: var(--font-control); color: var(--hud-fg); cursor: pointer; }
+.adj-backdrop[hidden] { display: none; }
+.adj-backdrop svg { flex: none; width: var(--icon-sm); height: var(--icon-sm); color: var(--hud-muted); }
 .adj-head { display: grid; grid-template-columns: 1fr; align-items: baseline; gap: var(--s-1) var(--s-4); }
 .adj-note { grid-column: 1; font: var(--font-meta); color: var(--hud-muted); }
 .adj-layers { display: flex; flex-wrap: wrap; gap: var(--s-2); padding-bottom: var(--s-4); }

@@ -385,6 +385,7 @@ export function parseSvg(text: string): SvgImport | null {
     if (shapes.length > 20000) return;
     const name = el.localName;
     if (SKIP.has(name) || el.getAttribute("display") === "none" || /display:\s*none/.test(el.getAttribute("style") ?? "")) return;
+    if (el.hasAttribute("data-canvast-derived")) return; // (what this app wrote again to show an adjustment shape's effect: not shapes of their own, ADR 0188)
     const st = readStyle(el, parent);
     const m = mul(pm, parseTransform(el.getAttribute("transform")));
     const a = alpha * st.opacity;

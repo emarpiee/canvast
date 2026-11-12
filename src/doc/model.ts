@@ -342,6 +342,11 @@ export interface PathObject extends ObjectBase {
   readonly evenodd?: true;
   readonly shape?: ShapeKind;
   /**
+   * An adjustment shape (ADR 0188): its adjustments are made on what is drawn under it, inside its outline, not on itself (its own fill and
+   * outline are drawn over that, as they are). Only a shape made with a shape tool and not a line (`canBeBackdrop`); a path never.
+   */
+  readonly backdrop?: true;
+  /**
    * Rounded corners (ADR 0105): the radius in local units, or for a rectangle one per node. `sub` is then the rounded geometry and `base` the
    * sharp one it was made from (what Edit nodes shows and edits), except on the result of a boolean group, which is rounded as it is derived.
    */
@@ -360,6 +365,11 @@ export interface PathObject extends ObjectBase {
 export type CanvasObject = StrokeObject | ImageObject | TextObject | PathObject;
 
 /** The outline style of a path as `paintBounds` takes it (null: no outline). */
+/** Whether a path can be an adjustment shape (ADR 0188): made with a shape tool (not a line: it has no inside), not a sheet, not a network. */
+export const canBeBackdrop = (o: PathObject): boolean => o.shape !== undefined && o.shape !== "line" && o.container === undefined && o.net !== true;
+/** An adjustment shape: it adjusts what is under it (ADR 0188). */
+export const isBackdrop = (o: CanvasObject): o is PathObject & { backdrop: true } => o.kind === "path" && o.backdrop === true;
+
 export const pathStyle = (o: PathObject): { width: number; join?: Join; cap?: Cap; arrows?: boolean; miter?: number } | null => (o.stroke === null ? null : { width: o.width, ...(o.join ? { join: o.join } : {}), ...(o.cap ? { cap: o.cap } : {}), ...(o.arrowStart || o.arrowEnd ? { arrows: true } : {}), ...(o.miterAngle !== undefined ? { miter: miterLimitOf(o.miterAngle) } : {}) });
 
 /** Where the outline of a path sits: undefined (centred) unless every sub-path is closed and `align` says inside or outside. */
@@ -661,6 +671,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     for (const [what, v] of [["start", o.arrowStart], ["end", o.arrowEnd]] as const) if (v !== undefined && !ARROWS.includes(v)) throw new InvalidObjectError(`bad arrow ${what}`);
     if (o.dashOffset !== undefined && !(typeof o.dashOffset === "number" && Number.isFinite(o.dashOffset))) throw new InvalidObjectError("bad dash offset");
     if (o.align !== undefined && o.align !== "inside" && o.align !== "outside") throw new InvalidObjectError("bad align");
+    if (o.backdrop !== undefined && !(o.backdrop === true && canBeBackdrop(o))) throw new InvalidObjectError("an adjustment shape is a shape that is not a line, a sheet or a path");
     if (o.radius !== undefined) {
       const rs = typeof o.radius === "number" ? [o.radius] : o.radius;
       if (!Array.isArray(rs) && typeof o.radius !== "number") throw new InvalidObjectError("bad radius");
@@ -846,6 +857,7 @@ export function deserializeObject(s: SerializedObject, space?: FrameSpace): Canv
       ...(s["container"] !== undefined ? { container: s["container"] as NonNullable<PathObject["container"]> } : {}),
       ...(s["evenodd"] === true ? { evenodd: true as const } : {}),
       ...(s["shape"] !== undefined ? { shape: s["shape"] as ShapeKind } : {}),
+      ...(s["backdrop"] === true ? { backdrop: true as const } : {}),
       ...(s["params"] !== undefined ? { params: s["params"] as ShapeParams } : {}),
       ...(s["radius"] !== undefined ? { radius: s["radius"] as Radius } : {}),
       ...(s["initial"] !== undefined ? { initial: s["initial"] as InitialShape } : {}),

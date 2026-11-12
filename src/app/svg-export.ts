@@ -9,7 +9,7 @@ import { outlineOf } from "../doc/outline-stroke";
 import type { FrameSpace } from "../core/frames";
 import * as D from "../core/dyadic";
 import type { PathObject } from "../doc/model";
-import { alignOf, expressObjectIn, inkStyle, pathSubs } from "../doc/model";
+import { alignOf, expressObjectIn, inkStyle, isBackdrop, pathSubs } from "../doc/model";
 import type { Gradient, Paint } from "../doc/paint";
 import { isGradient, solidOf } from "../doc/paint";
 import { copyAt, isTexture, isVaried } from "../doc/texture";
@@ -467,11 +467,21 @@ export function exportSvg(
     return id;
   };
   let pad = 0; // room round the drawing for a blur, which spreads past the shapes (the file's box would cut it)
-  const body = placed.map((p) => {
+  const body: string[] = [];
+  for (const p of placed) {
     const m = p.o.mask ? maskFor(p.o.mask.by, p.o.mask.mode, p.o.mask.invert === true) : null;
     let out = render(p);
     const adj = p.o.adjust;
-    if (adj && !isNeutral(adj)) {
+    if (adj && !isNeutral(adj) && isBackdrop(p.o)) {
+      // An adjustment shape (ADR 0188): SVG cannot read what is behind, so what is drawn before it is written again, through its adjustments,
+      // cut by its outline (marked derived: this app does not read it back as shapes); then the shape itself, plain.
+      if (body.length) {
+        const bb = geometryBounds(mapSubs(p.subs, (x, y) => [(x - minX) * sc, (y - minY) * sc]));
+        const id = `a${defs.length}`;
+        defs.push(svgAdjustFilter({ ...adj, dropOpacity: 0, innerOpacity: 0 }, id, Math.max(bb.maxX - bb.minX, bb.maxY - bb.minY)));
+        out = `  <g clip-path="url(#${clipFor(p)})" data-canvast-derived="backdrop"><g filter="url(#${id})">\n${body.join("\n")}\n  </g></g>\n${out}`;
+      }
+    } else if (adj && !isNeutral(adj)) {
       // the adjustments of a shape as an SVG filter (the same one the canvas draws it through)
       const bb = geometryBounds(mapSubs(p.subs, (x, y) => [(x - minX) * sc, (y - minY) * sc]));
       const id = `a${defs.length}`;
@@ -483,7 +493,7 @@ export function exportSvg(
     }
     if (m) out = `  <g mask="url(#${m})">\n${out}\n  </g>`;
     for (const c of lay.clips(p)) out = `  <g clip-path="url(#${clipFor(c)})">\n${out}\n  </g>`;
-    return out;
-  });
+    body.push(out);
+  }
   return `<svg xmlns="http://www.w3.org/2000/svg"${usesXlink ? ' xmlns:xlink="http://www.w3.org/1999/xlink"' : ""} viewBox="0 0 ${num(w + 2 * pad)} ${num(h + 2 * pad)}" width="${size ? esc(size.w) : num(w + 2 * pad)}" height="${size ? esc(size.h) : num(h + 2 * pad)}">\n${defs.length ? `  <defs>${defs.join("")}</defs>\n` : ""}${pad ? `  <g transform="translate(${num(pad)} ${num(pad)})">\n` : ""}${body.join("\n")}${pad ? "\n  </g>" : ""}\n</svg>\n`;
 }

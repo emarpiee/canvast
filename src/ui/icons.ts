@@ -344,6 +344,7 @@ import x from "lucide-static/icons/x.svg";
 import eye from "lucide-static/icons/eye.svg";
 import eyeClosedIcon from "lucide-static/icons/eye-closed.svg";
 import cloudFogSvg from "lucide-static/icons/cloud-fog.svg";
+import apertureSvg from "lucide-static/icons/aperture.svg";
 import hazeSvg from "lucide-static/icons/haze.svg";
 import eyeOff from "lucide-static/icons/eye-off.svg";
 import passwordShowSvg from "lucide-static/icons/view.svg";
@@ -622,6 +623,8 @@ export const ICONS = {
   eyeClosed: clean(eyeClosedIcon),
   /** Conceal folder: its items are left out of every list but its own (a view filter, not Hide). */
   conceal: clean(cloudFogSvg),
+  /** An adjustment shape (ADR 0188): its row in Layers, the switch of the Adjust panel. */
+  adjustShape: clean(apertureSvg),
   /** Reveal folder: a concealed folder's items are listed everywhere again. */
   reveal: clean(hazeSvg),
   passwordShow: clean(passwordShowSvg),

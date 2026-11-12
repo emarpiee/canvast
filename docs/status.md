@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.5: adjustment shapes (2026-11-12)
+
+- **Implemented:** `PathObject.backdrop` (ADR 0188) with `canBeBackdrop`/`isBackdrop`; `drawBackdrop` (adjust-shape.ts) at the shape's turn in `drawObjects`; tiles under one drawn with room for its reach; the direct view draws objects on their own layer when one is in view; picked inside; Adjust panel switch (`backdropState`/`setBackdrop`, one undo step); dropped where a shape becomes a path; Layers label and aperture icon; SVG export writes what is under it again through its filter (`data-canvast-derived`, skipped on import).
+- **Tested:** in the browser while building (blur over a striped picture inside the ellipse only; exposure on the tile path; tiles on = off; picked inside; SVG holds the derived copy, pasting it back adds no duplicate); new e2e test in `vectors.spec.ts`, new unit test `adjustment-shape.test.ts`; the GitHub runs of this push are the check.
+- **Known failures:** none known.
+- **Unverified:** Firefox by hand; the pan and zoom budget with an adjustment shape in view (the standard's showcase has none).
+- **Committed:** v0.57.5 on `main`.
+- **Next bounded task:** the owner's follow-up: higher adjustment limits, more blur types, a pixelate adjustment.
+
 ## v0.57.3: conceal a folder (2026-11-12)
 
 - **Implemented:** the setting `library.concealed` (workspace; folder ids, the folders themselves untouched); one rule in `inScope` and `countSide` (src/assets/library-match.ts), used by the page and the desktop index (the list goes with each query and count over IPC and to a LAN guest); Conceal and Reveal in a folder's menu, its fog mark, the line over the grid inside it, the status count; left out of the Library's thumbnail picker and the notes' picker and suggestions; Settings > Privacy count and list.

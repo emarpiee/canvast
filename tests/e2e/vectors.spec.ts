@@ -3577,6 +3577,51 @@ test("adjustments on a shape: drawn on what it looks like, blur spreads past its
   expect(((await objs(app)).find((o) => o.id === id) as unknown as { adjust?: unknown }).adjust).toEqual({ exposure: 60 });
 });
 
+test("an adjustment shape (ADR 0188): a shape with no fill adjusts what is under it, inside its outline only, the same with tiles or without; picked inside, one undo step, kept over a reload", async ({ app }) => {
+  const p = app.page;
+  const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);
+  await key(app, "u");
+  await drag(app, [500, 300], [800, 450]); // a filled rectangle under it
+  await p.click('[data-shape-kind="ellipse"]');
+  await p.locator('[data-paint="fill"]').click();
+  await p.locator('.colour-pop [data-mode="none"]').click();
+  await p.locator('[data-paint="fill"]').click(); // (the next shape: no fill)
+  await drag(app, [560, 320], [700, 430]);
+  const id = (await last(app)).id;
+  await key(app, "v");
+  const plain = await px(630, 375);
+  await p.getByRole("button", { name: /^Adjust the picture/ }).click();
+  await p.getByTestId("adjust-backdrop").check();
+  await expect.poll(async () => ((await last(app)) as Obj & { backdrop?: boolean }).backdrop).toBe(true);
+  await p.locator('.adjust-pop [data-adj-num="exposure"]').fill("100");
+  await p.locator('.adjust-pop [data-adj-num="exposure"]').blur();
+  await p.evaluate(() => window.__canvastDebug.select([]));
+  await app.frame();
+  expect(await px(630, 375), "under it: brighter").not.toEqual(plain);
+  expect(await px(520, 310), "beside it: the plain fill").toEqual(plain);
+  const row = () => p.evaluate(() => Array.from({ length: 30 }, (_, i) => window.__canvastDebug.pixelAt(520 + i * 9, 375)));
+  await p.evaluate(() => window.__canvastDebug.setTileCache(false));
+  await app.frame();
+  const direct = await row();
+  await p.evaluate(() => window.__canvastDebug.setTileCache(true));
+  await app.frame();
+  expect(await row()).toEqual(direct);
+  // picked anywhere inside it, though it has no fill
+  await click(app, 630, 375);
+  expect(await p.evaluate(() => window.__canvastDebug.selection())).toEqual([id]);
+  const bd = async () => ((await objs(app)).find((o) => o.id === id) as Obj & { backdrop?: boolean }).backdrop;
+  await key(app, "Escape");
+  await key(app, "Control+z"); // the exposure
+  await key(app, "Control+z"); // the switch, in one step
+  expect(await bd()).toBeUndefined();
+  await key(app, "Control+Shift+z");
+  await key(app, "Control+Shift+z");
+  expect(await bd()).toBe(true);
+  await reload(app);
+  expect(await bd()).toBe(true);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("shadows in the Adjust panel: a drop shadow is drawn below the shape (starting soft), an inner shadow darkens inside its edge, and both are in the SVG", async ({ app }) => {
   const p = app.page;
   const px = (x: number, y: number) => p.evaluate(([a, b]) => window.__canvastDebug.pixelAt(a!, b!), [x, y]);

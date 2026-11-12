@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.57.5 — Adjustment shapes (2026-11-12)
+
+- **Added:** adjustment shapes (ADR 0188): **Adjust what is under it** in the Adjust panel makes a shape's adjustments act on what lies under it, inside its outline. A circle with no fill and a blur over a picture blurs that part of it; it follows the shape, is picked anywhere inside, has its own row in Layers and its own icon. Any shape made with a shape tool, not a line or a path. Exports draw it; an SVG writes what is under it again through its filter.
+
 ## 0.57.4 — Concealed folders' setting on one line (2026-11-12)
 
 - **Fixed:** Settings > Privacy › Concealed folders said what it is on more than one short line.

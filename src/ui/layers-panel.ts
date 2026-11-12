@@ -8,7 +8,7 @@ import { plural } from "../doc/plural";
 import type { DocumentStore } from "../doc/document-store";
 import type { AssetNames } from "../app/asset-names";
 import type { BlendMode, CanvasObject, PathObject } from "../doc/model";
-import { BLEND_MODES, MAX_NAME_LENGTH, inkOf } from "../doc/model";
+import { BLEND_MODES, MAX_NAME_LENGTH, inkOf, isBackdrop } from "../doc/model";
 import { SHAPE_NAMES } from "../doc/path";
 import { isBoolMember, isResult } from "../doc/boolean-group";
 import { ancestorsOf, isContainer } from "../doc/containers";
@@ -164,6 +164,8 @@ const boolIcon = (op: BoolOp): string => (op === "union" ? ICONS.squaresUnite : 
 
 /** Short name of an object for lists and mention labels. */
 export function labelOf(o: CanvasObject, names?: ReadonlyMap<string, string>): { icon: string; text: string; swatch?: string } {
+  // (an adjustment shape: what it does, not its colour, ADR 0188)
+  if (isBackdrop(o)) return { icon: ICONS.adjustShape, text: o.name || `Adjustment ${SHAPE_NAMES[o.shape ?? "path"].toLowerCase()}` };
   if (o.name) return { icon: o.kind === "stroke" ? ICONS.spline : o.kind === "image" ? ICONS.image : o.kind === "path" ? ICONS.vectorSquare : ICONS.type, text: o.name, ...(o.kind !== "image" ? { swatch: inkOf(o).rgb } : {}) };
   if (o.kind === "stroke") return { icon: ICONS.spline, text: "Stroke", swatch: o.color };
   if (o.kind === "path") return { icon: ICONS.vectorSquare, text: SHAPE_NAMES[o.shape ?? "path"], swatch: inkOf(o).rgb };

@@ -57,7 +57,7 @@ import { isMaskObject, maskMembers } from "../doc/masks";
 import { parseCssPaint } from "./css-paint";
 import { parseSvg } from "./svg-import";
 import { piecesOf } from "../doc/path-pieces";
-import { NOTE_PAGE_PIXEL_W, pivotOf } from "../doc/model";
+import { NOTE_PAGE_PIXEL_W, canBeBackdrop, pivotOf } from "../doc/model";
 import { MAX_NAME_LENGTH, editSubs, inkStyle, expressObjectIn, homeObject, localBounds, newObjectId, pathSubs, strokePoints } from "../doc/model";
 import { worldBounds, scaleAbout } from "../doc/edit-ops";
 import { planSheetScale } from "../doc/constraints";
@@ -1413,7 +1413,7 @@ export function applyBalloonStyle(doc: DocumentStore, editor: EditorState, style
 
 /** The selected balloons become ordinary paths, for editing their nodes: their numbers are given up. */
 export function balloonsToPaths(doc: DocumentStore, editor: EditorState): void {
-  const next = balloonTargets(doc, editor).map((o) => { const { params: _p, shape: _s, ...rest } = o; return rest as PathObject; });
+  const next = balloonTargets(doc, editor).map((o) => { const { params: _p, shape: _s, backdrop: _bd, ...rest } = o; return rest as PathObject; });
   if (!next.length || editor.blockEdit()) return;
   doc.commit(doc.transaction(next.length === 1 ? "Convert balloon to path" : `Convert ${next.length} balloons to paths`, next));
   editor.changed();
@@ -1926,7 +1926,7 @@ export function splitPaths(doc: DocumentStore, editor: EditorState): void {
   const paths = splittable(doc, editor);
   if (!paths.length) return;
   const made = paths.flatMap((o) => {
-    const { shape: _s, params: _p, radius: _r, base: _b, initial: _i, gen: _g, ...rest } = o;
+    const { shape: _s, backdrop: _bd, params: _p, radius: _r, base: _b, initial: _i, gen: _g, ...rest } = o; // (pieces are paths: no adjustment shape)
     const pieces = piecesOf(o.sub);
     return pieces.map((subs, i): PathObject => ({ ...rest, id: newObjectId(), z: o.z + (i / pieces.length) * 1e-3, sub: subs.map((k) => o.sub[k]!) }));
   });
@@ -1954,7 +1954,7 @@ export function simplifySelection(doc: DocumentStore, editor: EditorState): void
     if (count(sub) >= count(o.sub)) return [];
     before += count(o.sub);
     after += count(sub);
-    const { shape: _s, params: _p, radius: _r, base: _b, initial: _i, ...rest } = o;
+    const { shape: _s, backdrop: _bd, params: _p, radius: _r, base: _b, initial: _i, ...rest } = o; // (a path now: no adjustment shape)
     return [{ ...rest, sub }];
   });
   if (!next.length) {
@@ -3125,6 +3125,33 @@ export function commitAdjust(doc: DocumentStore, editor: EditorState, adjust: Ad
     })
     .filter((n, i) => JSON.stringify(ps[i]!.adjust ?? null) !== JSON.stringify(clean ?? null) || JSON.stringify(ps[i]!.styles) !== JSON.stringify(n.styles));
   if (next.length) doc.commit(doc.transaction(next.length === 1 ? label : `${label} (${next.length} pictures)`, next));
+  editor.changed();
+}
+
+/** The selected shapes that can be adjustment shapes (ADR 0188), when every selected object is one; null otherwise. */
+function backdropTargets(doc: DocumentStore, editor: EditorState): PathObject[] | null {
+  const sel = [...editor.selection].map((id) => doc.get(id));
+  if (!sel.length || !sel.every((o) => o?.kind === "path" && canBeBackdrop(o))) return null;
+  return sel as PathObject[];
+}
+
+/** Whether the selected shapes adjust what is under them: on for all, on for some (mixed), or null when the selection is not only such shapes. */
+export function backdropState(doc: DocumentStore, editor: EditorState): { on: boolean; mixed: boolean } | null {
+  const t = backdropTargets(doc, editor);
+  if (!t) return null;
+  const on = t.filter((o) => o.backdrop === true).length;
+  return { on: on === t.length, mixed: on > 0 && on < t.length };
+}
+
+/** The selected shapes adjust what is under them (or stop): one undo step (ADR 0188). */
+export function setBackdrop(doc: DocumentStore, editor: EditorState, on: boolean): void {
+  const t = backdropTargets(doc, editor);
+  if (!t || editor.blockEdit()) return;
+  const next = t.filter((o) => (o.backdrop === true) !== on).map((o): PathObject => {
+    const { backdrop: _b, ...rest } = o;
+    return on ? { ...rest, backdrop: true } : rest;
+  });
+  if (next.length) doc.commit(doc.transaction(on ? (next.length === 1 ? "Adjust what is under the shape" : `Adjust what is under ${next.length} shapes`) : next.length === 1 ? "Adjust the shape itself" : `Adjust ${next.length} shapes themselves`, next));
   editor.changed();
 }
 

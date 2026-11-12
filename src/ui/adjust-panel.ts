@@ -17,6 +17,9 @@ export interface AdjustPanelActions {
   previewAdjust(a: Adjust): void;
   commitAdjust(a: Adjust, label: string): void;
   adjustStyles(): { save(name: string, a: Adjust): Promise<void>; gradients(): Array<{ name: string; stops: readonly GradientStop[] }> };
+  /** Adjustment shapes (ADR 0188): whether the selected shapes adjust what is under them (null: the selection is not only shapes that can). */
+  backdropState(): { on: boolean; mixed: boolean } | null;
+  setBackdrop(on: boolean): void;
 }
 
 export function mountAdjustPanel(host: HTMLElement, editor: EditorState, actions: AdjustPanelActions): void {
@@ -28,7 +31,7 @@ export function mountAdjustPanel(host: HTMLElement, editor: EditorState, actions
   panel.innerHTML = panelHtml({
     title: "Adjust",
     tools: `<button type="button" class="layer-btn" data-reset aria-label="Reset the adjustments" title="Reset the adjustments of the selected pictures">${ICONS.listRestart}</button>`,
-    sub: `<div data-adj-sub></div>`,
+    sub: `<label class="adj-backdrop" data-adj-backdrop hidden title="The adjustments are made on what is under the shape, inside its outline, not on the shape itself"><input type="checkbox" data-testid="adjust-backdrop">${ICONS.adjustShape}<span>Adjust what is under it</span></label><div data-adj-sub></div>`,
     body: `<div class="adjust-body"></div>`,
     foot: `<div data-adj-foot></div>`,
   });
@@ -39,6 +42,9 @@ export function mountAdjustPanel(host: HTMLElement, editor: EditorState, actions
   const strips = [subHost.parentElement!, footHost.parentElement!]; // (the panel's strip under the header and its footer: there only while a picture is being adjusted)
   let shown: { ids: string; handle: { current(): Adjust; reset(): void } | null } | null = null;
   const resetBtn = panel.querySelector<HTMLElement>("[data-reset]")!;
+  const backdropRow = panel.querySelector<HTMLElement>("[data-adj-backdrop]")!;
+  const backdropBox = backdropRow.querySelector<HTMLInputElement>("input")!;
+  backdropBox.addEventListener("change", () => actions.setBackdrop(backdropBox.checked));
   let scheduled = false;
 
   /** An unfinished slider is not kept, and the picture is drawn in full again. */
@@ -62,6 +68,13 @@ export function mountAdjustPanel(host: HTMLElement, editor: EditorState, actions
     }
     if (panel.hidden) return;
     const sel = actions.selectedAdjust();
+    // (the selected shapes can adjust what is under them instead of themselves)
+    const bd = actions.backdropState();
+    backdropRow.hidden = !bd;
+    if (bd) {
+      backdropBox.checked = bd.on;
+      backdropBox.indeterminate = bd.mixed;
+    }
     resetBtn.hidden = !sel;
     for (const e of strips) e.hidden = !sel;
     const ids = [...editor.selection].sort().join(",");

@@ -62,7 +62,7 @@ const rgba = (hex: string, a: number): string => `rgba(${parseInt(hex.slice(1, 3
  * A blur wider than SMOOTH_PX px (deep in, where it is as wide as the view) or a layer bigger than MAX_PIXELS is made at half, quarter ... the
  * resolution and drawn scaled up: what is blurred has no detail to lose, and the cost stays the same at any zoom.
  */
-export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject, a: Adjust, body: (c: CanvasRenderingContext2D) => void, colour = true): void {
+export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject, a: Adjust, body: (c: CanvasRenderingContext2D) => void, colour = true, alpha = 1): void {
   const t = ctx.getTransform();
   const W = ctx.canvas.width, H = ctx.canvas.height;
   if (t.b !== 0 || t.c !== 0 || t.a <= 0 || t.d <= 0) return body(ctx); // (the canvas is only ever scaled and moved here)
@@ -161,10 +161,44 @@ export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject,
   }
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = alpha;
   if (po.obj.blend) ctx.globalCompositeOperation = po.obj.blend;
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(shown, 0, 0, w, h, x0, y0, w * s, h * s);
+  ctx.restore();
+}
+
+/**
+ * An adjustment shape (ADR 0188): what is already drawn under it on `ctx`, inside its outline (`outline` adds it to the context's path, in its
+ * CSS px), made again with the adjustments. The pixels are taken from the canvas as far as it holds them (a tile is drawn with room for this: see
+ * TileCache), with room round the outline for a blur to read what lies next to it. The shape's opacity is how much of the adjusted picture covers
+ * the plain one; its shadows are not made (it has nothing of its own to cast one).
+ */
+export function drawBackdrop(ctx: CanvasRenderingContext2D, po: ProjectedObject, a: Adjust, outline: (c: CanvasRenderingContext2D) => void, evenodd = false): void {
+  const t = ctx.getTransform();
+  if (t.b !== 0 || t.c !== 0 || t.a <= 0 || t.d <= 0) return;
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  const pad = adjustReach(po, Math.max(W / t.a, H / t.d)) || MARGIN;
+  const x0 = Math.max(0, Math.floor((po.box.minX - pad) * t.a + t.e)), y0 = Math.max(0, Math.floor((po.box.minY - pad) * t.d + t.f));
+  const x1 = Math.min(W, Math.ceil((po.box.maxX + pad) * t.a + t.e)), y1 = Math.min(H, Math.ceil((po.box.maxY + pad) * t.d + t.f));
+  const w = x1 - x0, h = y1 - y0;
+  if (!(w > 0 && h > 0)) return;
+  const snap = layer(6, w, h);
+  snap.drawImage(ctx.canvas, x0, y0, w, h, 0, 0, w, h);
+  const plain: Adjust = { ...a, dropOpacity: 0, innerOpacity: 0 };
+  const strength = Math.max(0, Math.min(1, po.obj.opacity));
+  ctx.save();
+  ctx.beginPath();
+  outline(ctx);
+  ctx.clip(evenodd ? "evenodd" : "nonzero");
+  if (strength >= 1) {
+    // (what was there goes: a see-through edge of the adjusted picture would let the plain one show through)
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(x0, y0, w, h);
+    ctx.restore();
+  }
+  drawAdjusted(ctx, po, plain, (g) => g.drawImage(snap.canvas, (x0 - t.e) / t.a, (y0 - t.f) / t.d, w / t.a, h / t.d), true, strength);
   ctx.restore();
 }

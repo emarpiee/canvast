@@ -336,6 +336,7 @@ Give prints a soft drop shadow so they read as paper laid on a table.
 | On shapes, strokes and text | Applied to the object as drawn (fill, outline, gradient and texture together). A blur is a share of the object's size, so it does not change with zoom (far inside an object it stays at most about 330 px wide) |
 | Exporting | A selection leaves room for a blur or a drop shadow. An exported SVG carries them as a filter on the shape, and making the SVG into shapes again brings them back. A vector PDF draws such a shape as a picture instead (see [Limitations](#limitations)) |
 | On a sheet that clips | The sheet cuts what a blur or a shadow spreads past its edge too |
+| **Adjust what is under it** | For shapes (rectangle, ellipse, polygon, star, speech balloon; not a line or a path): the adjustments are made on what lies under the shape, inside its outline, not on the shape. A circle with no fill and a blur of 100 over a picture blurs that part of it; move it and the effect follows. Objects only (not the grid); its own fill and outline stay plain over it; its opacity is the strength. Picked anywhere inside; *Adjustment ellipse* in Layers. Making it a path turns it off |
 
 ### Video, audio and GIFs
 
@@ -2262,6 +2263,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Text | No Indic shaping; other computers can wrap missing characters differently |
 | Partial backups | ⚠️ An Advanced export can only be added, never used to update a workspace. Links in notes to items left out find nothing until those items are there |
 | Concealed folders | A view filter, not privacy: no password, nothing encrypted, the files stay readable on the disk. The canvas's font list and texture picker still offer their items |
+| Adjustment shapes | In an SVG, what is under one is written again through its filter; made into shapes again, it comes back as a plain path |
 | Text in a shape | While typing, the lines are straight, in a box in the shape; they take the shape's flow when you finish |
 | Text in a shape | A text moved on its own goes back into its shape; on a turned balloon the words stay upright |
 | Text on a path | A text set along a path by an older version does not follow it until it is set again |
@@ -2302,6 +2304,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Eraser | Trimming works on strokes, not on vector paths |
 | Files | In a browser, imports are limited to 256 MiB per file; the desktop app has no such limit |
 | Concealed folders | Concealing is a view filter, not privacy: there is no password and nothing is encrypted, so the files stay readable on the disk and in exports, and the items still show on the canvases they are placed on. The canvas's font list and texture picker still offer a concealed folder's fonts and pictures. Hide (see [Privacy and hidden items](#privacy-and-hidden-items)) keeps items out of view for real |
+| Adjustment shapes | SVG cannot read what lies behind a shape: an exported SVG writes what is under an adjustment shape again, through its adjustments, cut by its outline (other programs show it as on the canvas). Made into shapes again in this app, the copy is left out and the adjustment shape comes back as a plain path, which cannot be one. A blur over a large, busy area is drawn again whenever what is under it changes |
 | Clipboard | Ctrl+C keeps the real objects for pasting back only while nothing else was copied: a picture copied for other apps pastes back as the objects only if the window kept the focus and the app copied nothing else in between (otherwise it comes back as a new picture, and shapes as an SVG import or a picture). A copy of a single picture, GIF or video is one PNG (a GIF or video is its current frame); files such as audio and PDF cannot be put on the system clipboard by a web page; Cut puts text only |
 | Video | Only what the built-in browser engine plays: HEVC (H.265) video, the format of many phones, does not play in the desktop app or in most browsers (the viewer says so; *Open in default app* plays it in the system's player), and shows as a card on Firefox for Android (it still plays from the player) |
 

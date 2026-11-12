@@ -1,6 +1,7 @@
 import * as D from "../core/dyadic";
 import type { Camera, Viewport } from "../core/camera";
 import type { CanvasObject, ObjectId } from "../doc/model";
+import { isBackdrop } from "../doc/model";
 import type { ProjectedObject } from "./projection";
 
 /**
@@ -148,6 +149,8 @@ export class TileCache {
   /** Prebuilt sets one zoom level in (+1) and out (-1) from `gen`. */
   private readonly ahead = new Map<number, Generation>();
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  /** A tile drawn with more room round it (an adjustment shape's blur reads beyond the tile), kept for the next one. */
+  private roomy: HTMLCanvasElement | null = null;
   private aheadArgs: { source: AheadSource; vp: Viewport; dpr: number; reach: Reach } | null = null;
   /** Build the neighbouring zoom levels in idle time (turned off on the lower quality levels). */
   idleBuild = true;
@@ -465,10 +468,16 @@ export class TileCache {
       const l = (i * td + dx) / dpr + m - GUARD_CSS;
       const t = (j * td + dy) / dpr + m - GUARD_CSS;
       const r = { l, t, r: l + TILE_CSS + 2 * GUARD_CSS, b: t + TILE_CSS + 2 * GUARD_CSS };
-      const mine = list.filter((po) => {
-        const e = reach(po);
-        return po.box.maxX + e >= r.l && po.box.minX - e <= r.r && po.box.maxY + e >= r.t && po.box.minY - e <= r.b;
-      });
+      const near = (q: { l: number; t: number; r: number; b: number }): ProjectedObject[] =>
+        list.filter((po) => {
+          const e = reach(po);
+          return po.box.maxX + e >= q.l && po.box.minX - e <= q.r && po.box.maxY + e >= q.t && po.box.minY - e <= q.b;
+        });
+      let mine = near(r);
+      // An adjustment shape (ADR 0188) reads what is drawn under it, as far as its blur reaches: the tile is drawn with that much more room
+      // round it (what lies there drawn too), and its middle kept, so a blur never ends at a tile's edge.
+      const more = Math.ceil(Math.max(0, ...mine.filter((po) => isBackdrop(po.obj)).map(reach)) - GUARD_CSS);
+      if (more > 0) mine = near({ l: r.l - more, t: r.t - more, r: r.r + more, b: r.b + more });
       const tile: Tile = { canvas: null, ids: new Set(mine.map((po) => po.obj.id)), pending: false };
       if (mine.length) {
         const canvas = this.pool.pop() ?? document.createElement("canvas");
@@ -480,8 +489,19 @@ export class TileCache {
         tctx.globalAlpha = 1;
         tctx.clearRect(0, 0, size, size);
         // Inflated CSS coords → this tile's device pixels (all offsets are whole device pixels).
-        tctx.setTransform(dpr, 0, 0, dpr, -(i * td + dx) - m * dpr + gd, -(j * td + dy) - m * dpr + gd);
-        tile.pending = drawObjects(tctx, mine, list, infl);
+        if (more > 0) {
+          const md = Math.ceil(more * dpr);
+          const big = (this.roomy ??= document.createElement("canvas"));
+          big.width = size + 2 * md; // (also clears it)
+          big.height = size + 2 * md;
+          const bctx = big.getContext("2d")!;
+          bctx.setTransform(dpr, 0, 0, dpr, -(i * td + dx) - m * dpr + gd + md, -(j * td + dy) - m * dpr + gd + md);
+          tile.pending = drawObjects(bctx, mine, list, infl);
+          tctx.drawImage(big, md, md, size, size, 0, 0, size, size);
+        } else {
+          tctx.setTransform(dpr, 0, 0, dpr, -(i * td + dx) - m * dpr + gd, -(j * td + dy) - m * dpr + gd);
+          tile.pending = drawObjects(tctx, mine, list, infl);
+        }
         tile.canvas = canvas;
       }
       g.tiles.set(`${i},${j}`, tile);

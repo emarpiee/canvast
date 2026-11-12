@@ -127,6 +127,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `arrow-up-right` | Go to link (notes editor) |
 | `eye` | Show all hidden; Unhide folder (Library, hidden mode) |
 | `eye-closed` | Hide from the library (an item, or a folder with everything in it: Hide folder); the Hidden list of the library |
+| `aperture` | An adjustment shape: it adjusts what is under it (its row in Layers; the Adjust panel's switch) |
 | `cloud-fog` | Conceal folder: its items are listed only in it (Library folder's menu); a concealed folder's mark on its row |
 | `haze` | Reveal folder: a concealed folder's items are listed everywhere again (Library folder's menu) |
 | `eye-off` | Hide the selection; Hide selection |

@@ -19,7 +19,7 @@ export interface RegionShape {
 
 /** The look a region takes: the shape on top of the shapes it is inside, without its place or its links. */
 export function pathLookOf(top: PathObject): Omit<PathObject, "sub" | "id" | "anchor" | "unit" | "z" | "frame"> {
-  const { sub: _s, id: _i, anchor: _a, unit: _u, z: _z, frame: _f, rot: _r, shape: _sh, evenodd: _e, groups: _g, groupNames: _gn, boolOps: _b, radius: _rad, smoothing: _sm, base: _bs, params: _pm, initial: _in, name: _n, parent: _p, container: _c, result: _res, attachmentTargetId: _at, constraint: _co, ...look } = top;
+  const { sub: _s, id: _i, anchor: _a, unit: _u, z: _z, frame: _f, rot: _r, shape: _sh, backdrop: _bd, evenodd: _e, groups: _g, groupNames: _gn, boolOps: _b, radius: _rad, smoothing: _sm, base: _bs, params: _pm, initial: _in, name: _n, parent: _p, container: _c, result: _res, attachmentTargetId: _at, constraint: _co, ...look } = top;
   return { ...look, attachmentTargetId: null };
 }
 
