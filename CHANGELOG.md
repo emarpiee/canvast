@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.57.1 — Outline width in the bar, folders without arrows, wider Settings (2026-11-12)
+
+- **Added:** the outline's width beside **Outline** in the bar, between the colour and Outline options, for every selected object that has an outline: type it or drag the field.
+- **Changed:** Library folders open and close with a click on their row (no arrow); a folder with subfolders shows a small branch mark before its count; a pinned folder always shows its filled pin.
+- **Changed:** Settings uses the room of a wide screen: up to 1600 px, a tab's cards in two columns.
+- **Fixed:** a setting's choice whose value has quotes (a font's name) lost it; a settings row left out still showed.
+
 ## 0.57.0 — Smooth pan and zoom, auto layout, Export by pattern (2026-11-11)
 
 Everything since 0.56.0, in one release (0.56.1 to 0.56.40).

@@ -617,7 +617,7 @@ A repeated fill can **vary each copy**:
 | Order | Each object on its own (in turn or shuffled) or the whole arrangement |
 | Seed | The same copies every time; *New seed* gives others |
 
-**Outlines** have a position (inside, centre, outside), corners, ends, dashes, arrow heads and a sharp-corner limit, and can be a gradient.
+**Outlines** have a width (the field beside **Outline** in the bar: type it or drag it; also in Outline options), a position (inside, centre, outside), corners, ends, dashes, arrow heads and a sharp-corner limit, and can be a gradient.
 
 ### Pattern and guides
 
@@ -902,7 +902,7 @@ Pin the folder you work from most, nest tags by subject and keep the searches yo
 
 | Sidebar list | What it holds |
 | --- | --- |
-| **Folders** | An item lives in one folder; folders nest. They fold (the arrow on a folder with subfolders, or Collapse all on the Folders header), remembered on this device |
+| **Folders** | An item lives in one folder; folders nest. They fold: a click on a folder that has subfolders opens or closes it (a small branch mark before its count says it has some), or Collapse all on the Folders header; remembered on this device |
 | **Tags** | Several per item. A tag with a `/` (`reference/anatomy`) is a branch of a tree, with arrows that fold it and a parent that finds and counts what is nested under it, each item once; or all in a row with their whole names, by the button on the Tags header. Renamed in one dialog, from a tag's ⋯ menu in the sidebar or the Tags panel, or a double-click on it in the details |
 | **Favourites**, **File types**, **Canvas tags** | The starred items; each kind of file; the tags of the canvases' objects |
 | **Unfiled**, **Missing** | Items in no folder; the items whose file is gone (as `is:missing`), shown while there are some |
@@ -917,7 +917,7 @@ Pin the folder you work from most, nest tags by subject and keep the searches yo
 | **Search a list** | Folders, Tags and Canvas tags each have a search box for their own list: it finds a folder by name or path, opens what leads to it, and `Esc` empties it. It only narrows that list: the items shown change when you choose a row |
 | **Show more** | A long list shows its first rows and **Show N more**, remembered on this device |
 | **Sort a list** | The sort button in its head (or `Alt+↑` / `Alt+↓` on a section's name) changes the order at each click, remembered on this device: folders A to Z, Z to A, newest first and oldest first; tags A to Z and Z to A; file types the most first, A to Z, Z to A. Newest and oldest follow the order the library holds its folders in, as folders have no date of their own: one found on the disk counts from when it was found, and one hidden and shown again can count as newer |
-| **Pin a folder** | The pin button on a folder's row (it shows when the pointer is on the row, filled on a pinned folder; not on small or touch screens), or **Pin to top** in its ⋯ menu or on a right click, puts it first in the Folders list, a subfolder too, with an arrow on its folder icon; **Unpin** puts it back. Pins are kept in the workspace (pins made before on a device move there), and a search shows every folder in its usual place |
+| **Pin a folder** | The pin button on a folder's row (it shows when the pointer is on the row, not on small or touch screens; a pinned folder always shows its filled pin), or **Pin to top** in its ⋯ menu or on a right click, puts it first in the Folders list, a subfolder too, with an arrow on its folder icon; **Unpin** puts it back. Pins are kept in the workspace (pins made before on a device move there), and a search shows every folder in its usual place |
 | **Quick filters** | A file type or a tag in the sidebar lists only those items; `Ctrl`+click (`⌘` on a Mac) adds another type or tag to the filter, or takes it out: any of the types chosen and any of the tags chosen |
 | **File by dragging** | Drop items onto a folder to move them into it, onto *Unfiled* to take them out of their folders, onto a tag to tag them, onto *Favourites* to mark them; a selected item carries the whole selection |
 
@@ -2159,7 +2159,7 @@ See what the app is doing: zoom, frame times and memory, with Information shown 
 
 ### Settings
 
-Open Settings with the gear button. Each setting says what it is on one line; **More** under it has the whole explanation, and the search box finds words in both. Each says where it is kept, at the end of its row: *This device* or *This workspace*. Settings can be reset one by one (the undo-arrow icon at the end of a row) or together. Every group has an icon in the list on the left, and the groups are indented under their heading. All of them travel in a workspace backup (see [Backups](#backups)).
+Open Settings with the gear button. Each setting says what it is on one line; **More** under it has the whole explanation, and the search box finds words in both. Each says where it is kept, at the end of its row: *This device* or *This workspace*. On a wide screen a tab's cards sit in two columns. Settings can be reset one by one (the undo-arrow icon at the end of a row) or together. Every group has an icon in the list on the left, and the groups are indented under their heading. All of them travel in a workspace backup (see [Backups](#backups)).
 
 Make the app yours: theme, theme colour, density and the canvas.
 

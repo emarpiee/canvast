@@ -936,9 +936,9 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 /* Settings view (ui/settings-view.ts). */
 #settings-view { position: fixed; inset: 0; z-index: 2; display: flex; flex-direction: column; padding: calc((var(--nav-bottom, var(--s-15)) + 2 * var(--near)) / var(--ui-scale, 1)) var(--s-8) 0; background: var(--theme-bg); font: var(--text-md)/1.4 var(--font-ui); }
 #settings-view[hidden] { display: none; }
-.set-head { display: flex; align-items: center; gap: var(--s-6); max-width: 960px; width: 100%; margin: 0 auto var(--s-6); }
+.set-head { display: flex; align-items: center; gap: var(--s-6); max-width: 1600px; width: 100%; margin: 0 auto var(--s-6); }
 .set-title { margin: 0; font-size: var(--text-3xl); font-weight: 600; flex: 1; }
-.set-body { display: flex; gap: var(--s-10); max-width: 960px; width: 100%; margin: 0 auto; min-height: 0; flex: 1; }
+.set-body { display: flex; gap: var(--s-10); max-width: 1600px; width: 100%; margin: 0 auto; min-height: 0; flex: 1; }
 .set-tabs { display: flex; flex-direction: column; gap: var(--s-1); width: 210px; flex: none; }
 .set-tabs button { text-align: left; font: inherit; color: inherit; padding: var(--s-4) var(--s-6); background: none; border: 0; border-radius: var(--r-sm); cursor: pointer; }
 .set-tabs button:hover { background: var(--hud-hover); }
@@ -946,6 +946,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .set-panels { flex: 1; min-width: 0; overflow: auto; padding-bottom: var(--s-13); }
 .set-panels h2 { margin: var(--s-2) 0 var(--s-6); font-size: var(--text-xl); }
 .set-row { display: grid; grid-template-columns: minmax(0, 1fr) 220px 100px 60px; align-items: center; gap: var(--s-6); padding: var(--s-6) 0; border-bottom: 1px solid var(--hud-border); }
+.set-row[hidden] { display: none; } /* (a row left out, as Legacy's colour dials in Retroma) */
 .set-row label { display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; }
 .set-help { color: var(--hud-muted); font-size: var(--text-sm); }
 .set-words { min-width: 0; display: grid; gap: var(--s-1); }
@@ -1300,6 +1301,7 @@ body:has(.assets-place-zone:not([hidden])) :is(#nav, .view-settings, .assets-bar
 /* The library sidebar. */
 .assets-side { flex: 0 0 208px; overflow: auto; padding-bottom: var(--s-8); }
 .side-list { list-style: none; margin: 0 0 var(--s-4); padding: 0; }
+.folder-group, .folder-group-list { display: contents; } /* (a top-level folder and its subfolders, together: a theme may draw them as one box) */
 .side-row { display: flex; align-items: center; gap: var(--s-1); padding-left: calc(var(--depth, 0) * var(--sp-7)); }
 .side-item { flex: 1; min-width: 0; display: flex; justify-content: space-between; gap: var(--s-4); padding: var(--s-4) var(--s-6); font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-radius: var(--r-md); cursor: pointer; }
 .side-item:hover { background: var(--hud-hover); }
@@ -2625,6 +2627,14 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
   .set-card { padding: var(--s-6) var(--s-6); }
 }
 .set-panels > section[hidden] { display: none; }
+/* A wide screen: the cards of a tab flow in two columns (each still wide enough for its rows on one line), so the page uses the room
+   without stretching a row into a line too long to read; a tab with more than cards (Shortcuts, Storage) stays one column. */
+.set-panels { container-type: inline-size; }
+@container (min-width: 75rem) {
+  .set-panels > section:not([hidden]):not(:has(> :not(h2, .set-card))) { display: block; columns: 2; column-gap: var(--s-8); }
+  .set-panels > section:not(:has(> :not(h2, .set-card))) > h2 { column-span: all; margin-bottom: var(--s-6); }
+  .set-panels > section:not(:has(> :not(h2, .set-card))) > .set-card { break-inside: avoid; margin-bottom: var(--s-6); }
+}
 
 /* ---- Animation (ADR 0093): what appears fades and eases in, what you point at changes colour smoothly. Every duration and curve is a token; the Animation setting (Performance) scales or removes them all. ---- */
 :root[data-motion="subtle"] { --anim-move: 0; }
@@ -3182,6 +3192,17 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
   .side-row.tree-row:has(.side-pin):hover .side-item, .side-row.tree-row:has(.side-pin):focus-within .side-item { padding-right: calc(var(--s-2) + var(--tree-row-h)); }
 }
 .side-pin[aria-pressed="true"] svg, .assets-hidden-bar [data-action="hidden-stay"][aria-pressed="true"] svg { fill: currentColor; } /* (pinned: filled, the one look of a pin that is on) */
+/* A folder with subfolders: a small branch before its count (it opens and closes on its own row, with no arrow). */
+.side-kids { flex: none; width: var(--sp-3); height: var(--sp-3); margin-left: auto; margin-right: calc(-1 * var(--s-2)); border-left: 1.5px solid currentColor; border-bottom: 1.5px solid currentColor; border-bottom-left-radius: 2px; opacity: 0.6; }
+.side-kids + .side-n { margin-left: var(--s-2); }
+/* A pinned folder always shows its pin, filled: at the row's edge with the count before it; under the pointer it makes room for More. */
+.side-row .side-more.side-pin[aria-pressed="true"] { opacity: 1; }
+@media (hover: hover) and (min-width: 641px) {
+  .side-row.tree-row .side-more.side-pin[aria-pressed="true"] { right: var(--s-2); }
+  .side-row.tree-row:has(.side-pin[aria-pressed="true"]) .side-item { padding-right: calc(var(--s-2) + var(--tree-row-h)); }
+  .side-row.tree-row:is(:hover, :focus-within) .side-more.side-pin[aria-pressed="true"] { right: calc(var(--s-2) + var(--tree-row-h)); }
+}
+@media (hover: none), (max-width: 640px) { .side-row .side-more.side-pin[aria-pressed="true"] { display: inline-flex; } }
 @media (hover: none), (max-width: 640px) { .side-row .side-more.side-pin { display: none; } } /* (no hover to show it: pinning is in the row's More) */
 .asset-where { margin: 0 0 var(--s-4); font-size: var(--text-sm); overflow-wrap: anywhere; }
 

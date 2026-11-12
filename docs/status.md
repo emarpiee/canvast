@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.1: outline width in the bar, folders without arrows, wider Settings (2026-11-12)
+
+- **Implemented:** the outline's width field beside Outline (type or drag, as Outline options); Library folders open and close on their row with a branch mark and an always-shown pin when pinned; Settings up to 1600 px with a tab's cards in two columns on a wide screen; a choice's quoted value kept; a row left out hidden.
+- **Tested:** in the browser while building (the width field set by dragging matches Outline options; Settings at 1920 px); the outline test in `vectors.spec.ts` extended; the GitHub `Tests` run of this push is the check.
+- **Known failures:** none known.
+- **Unverified:** the two Settings columns in Firefox; README screenshots of folders still show the arrow until the shots are taken again.
+- **Committed:** v0.57.1 on `main`. The Retroma theme waits on branch `retroma-v4` (backlog).
+- **Next bounded task:** none set.
+
 ## v0.57.0: smooth pan and zoom, the pan and zoom standard; release of 0.56.1 to 0.56.40 (2026-11-11)
 
 - **Implemented:** the tile cache keeps its set through sub-pixel pans and builds it exactly at rest; a rest is no move since the timer and no pointer held; a heavy view (slow to draw or over 1,500 objects) waits for a zoom to hold still and builds a new set a few tiles a frame (8 ms) over the old one scaled, the rest drawn exactly, from the middle outwards. The pan and zoom standard (`scripts/bench-pan.mjs --check`, `scripts/lib/pan-zoom-budget.mjs`, the `Pan and zoom` workflow) gates `npm run release`.
