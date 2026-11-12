@@ -119,7 +119,7 @@ test("pdf-extract", async ({ scene: s }) => {
   await expect.poll(async () => (await s.objects()).filter((o) => o.kind === "image").length).toBe(2);
   const page = (await s.objects()).filter((o) => o.kind === "image").at(-1)!.id;
   await panel.locator("[data-close]").click();
-  await s.fit([card, page], 0.8);
+  await s.fit([card, page], 0.6);
   await s.blur();
   await s.settle(800);
   await s.shot("pdf-extract", await s.around({ objects: [card, page] }));
