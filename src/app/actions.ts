@@ -921,11 +921,15 @@ export async function extractFrame(
   const src = doc.get(sourceId);
   if (!src || src.kind !== "image" || !src.media) return;
   const sourceName = (await assets.record(src.assetId).catch(() => undefined))?.name ?? "";
-  const record = await store({ png, label, sourceName, sourceHash: src.assetId });
-  const { media: _m, groups: _g, hidden: _h, locked: _l, rot, ...rest } = src;
-  const frame: ImageObject = { ...rest, ...(rot ? { rot } : {}), id: newObjectId(), assetId: record.hash, pixelW: record.pixelW, pixelH: record.pixelH, z: doc.topZ() + 1 };
-  const placed = translate(frame, D.shift(D.fromNumber(src.w * 1.05), src.unit), D.ZERO) as ImageObject;
-  doc.commit(doc.transaction("Extract frame", [placed]));
+  placePictureBeside(doc, editor, src, await store({ png, label, sourceName, sourceHash: src.assetId }), "Extract frame");
+}
+
+/** A picture from a card (a video's frame, a PDF's page) placed just right of it, as wide as it, selected; one step of undo. */
+export function placePictureBeside(doc: DocumentStore, editor: EditorState, from: ImageObject, record: Pick<AssetRecord, "hash" | "pixelW" | "pixelH">, label: string): void {
+  const { media: _m, groups: _g, hidden: _h, locked: _l, preview: _p, crop: _c, rot, ...rest } = from;
+  const picture: ImageObject = { ...rest, ...(rot ? { rot } : {}), id: newObjectId(), assetId: record.hash, pixelW: record.pixelW, pixelH: record.pixelH, h: (from.w * record.pixelH) / record.pixelW, z: doc.topZ() + 1 };
+  const placed = translate(picture, D.shift(D.fromNumber(from.w * 1.05), from.unit), D.ZERO) as ImageObject;
+  doc.commit(doc.transaction(label, [placed]));
   editor.select([placed.id]);
 }
 

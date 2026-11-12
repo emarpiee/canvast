@@ -9,8 +9,10 @@ import { fileInLibrary } from "./library-filing";
  * Settings > Saving to the library.
  */
 
-/** Where in the source the frame is: a video's time as `1h02m03s` or `0m03s`, a GIF's frame as `frame12`. */
+/** Where in the source the frame is: a video's time as `1h02m03s` or `0m03s`, a GIF's frame as `frame12`, a PDF's page as `p03` (as many digits as its last page has, so pages sort in order). */
 export function framePosition(label: string): string {
+  const page = /^Page (\d+) \/ (\d+)\b/.exec(label);
+  if (page) return `p${page[1]!.padStart(page[2]!.length, "0")}`;
   const gif = /^Frame (\d+)\b/.exec(label);
   if (gif) return `frame${gif[1]}`;
   const t = /^(?:(\d+):)?(\d+):(\d{2})\b/.exec(label);
@@ -23,7 +25,7 @@ export function framePosition(label: string): string {
 
 export interface FrameShot {
   png: Blob;
-  /** The engine's label ("0:03 / 1:20", "Frame 12 / 40"). */
+  /** The engine's label ("0:03 / 1:20", "Frame 12 / 40"), or a PDF's page ("Page 3 / 40"). */
   label: string;
   sourceName: string;
   sourceHash: string;
@@ -70,6 +72,25 @@ export const newNoteName = (session: Session, settings: SettingsStore): string =
 export function editedName(session: Session, settings: SettingsStore, sourceName: string): string {
   const stem = sourceName.replace(/\.[^.]*$/, "") || "picture";
   return shotFileName(settings.get("edit.name"), { ...placeParts(session), extra: { name: stem, position: "" } }, settings.get("edit.nameStyle"));
+}
+
+/**
+ * Keeps an extracted frame or page in the library, then places it: beside what it came from when that is a card on a canvas (`beside`),
+ * else on the open canvas only when Settings > Saving to the library says so (the library does not change a canvas by itself). Says which.
+ */
+export async function keepFrame(assets: AssetLibrary, session: Session, settings: SettingsStore, shot: FrameShot, what: string, beside?: (record: AssetRecord) => void): Promise<AssetRecord> {
+  const record = await storeFrame(assets, session, settings, shot);
+  if (beside) {
+    beside(record);
+    session.editor.message = `${what} placed beside it and added to the library.`;
+  } else if (!settings.get("frame.place")) session.editor.message = `${what} “${record.name}” added to the library.`;
+  else {
+    const id = await session.placeAsset(record.hash);
+    const here = session.tree?.boards.flatMap((b) => b.canvases.map((c) => ({ b: b.board.name, c })))?.find((x) => x.c.id === session.current?.canvasId);
+    session.editor.message = id ? `${what} placed on ${here ? `${here.b} › ${here.c.name}` : "the open canvas"} and added to the library.` : `The ${what.toLowerCase()} was added to the library; it could not be placed.`;
+  }
+  session.editor.changed();
+  return record;
 }
 
 export async function storeFrame(assets: AssetLibrary, session: Session, settings: SettingsStore, shot: FrameShot): Promise<AssetRecord> {

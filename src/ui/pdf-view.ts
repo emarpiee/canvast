@@ -1,5 +1,6 @@
 import type { PDFDocumentProxy, PDFPageProxy, RenderTask } from "pdfjs-dist";
-import { PDF_CARD_EDGE, closePdf, needsPassword, openPdf, pageFit, pageSize, pageWords, pdfTextLayer } from "../assets/pdf-engine";
+import { PDF_CARD_EDGE, closePdf, drawPage, needsPassword, openPdf, pageFit, pageSize, pageWords, pdfTextLayer } from "../assets/pdf-engine";
+import { keepFrame } from "../app/frames";
 import { pageList } from "../assets/pdf-pages";
 import { scrubNumbers } from "../colour-picker/scrub";
 import { promptDialog } from "./confirm";
@@ -20,6 +21,8 @@ const REDRAW_MS = 150;
 const WHEEL_ZOOM = 0.002;
 /** The most cards one Place pages makes. */
 const MAX_PLACED_PAGES = 200;
+/** An extracted page's longer side at most, in pixels, whatever its resolution. */
+const MAX_EXTRACT_EDGE = 10_000;
 
 /** A page's place on show. */
 interface Slot {
@@ -64,6 +67,7 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
       ${barButton("mark", ICONS.bookmarkPlus, "Bookmark this page", "Bookmark this page, or take its bookmark off", 'aria-pressed="false"')}
       ${barButton("marks", ICONS.tableOfContents, "Go to", "Bookmarks, and the contents of this PDF", 'aria-haspopup="menu"')}
       ${place.placeViews ? barButton("place", ICONS.grid2x2Plus, "Place pages on the canvas", "Place pages on the canvas: a card for each") : ""}
+      ${barButton("extract", ICONS.imageDown, "Extract this page", "Extract this page: keeps it as a picture in the library (Settings > Saving to the library)")}
       ${place.setPreview ? barButton("card", ICONS.pictureInPicture, "Show this page on the card", "Show this page on the card on the canvas, this copy only (Ctrl+S)") : ""}
     </div>
     <div class="pdf-pages" tabindex="0" data-testid="pdf-pages"></div>
@@ -357,6 +361,27 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
     await walk(await pdf.getOutline().catch(() => null) ?? undefined, 0);
     return out;
   };
+  /** The page in sight becomes a picture in the library, as an extracted frame does (its name, format, folder and tags); from a card on a canvas, it is placed beside it. */
+  const extractPage = async (): Promise<void> => {
+    if (deps.session.editor.blockEdit()) return;
+    const n = current;
+    const page = await pdf.getPage(n);
+    const s = pageSize(page);
+    const k = Math.min(Number(deps.settings.get("frame.pageDpi")) / 72, MAX_EXTRACT_EDGE / Math.max(s.w, s.h)); // (a page's size is in points, 72 an inch)
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(s.w * k));
+    canvas.height = Math.max(1, Math.round(s.h * k));
+    await drawPage(page, canvas);
+    page.cleanup();
+    const png = await new Promise<Blob | null>((done) => canvas.toBlob(done, "image/png"));
+    canvas.width = canvas.height = 0;
+    if (!png || closed) {
+      deps.session.editor.message = "The page could not be extracted.";
+      return deps.session.editor.changed();
+    }
+    await keepFrame(deps.assets, deps.session, deps.settings, { png, label: `Page ${n} / ${count}`, sourceName: file.name, sourceHash: hash }, "Page", place.pictureBeside);
+    await place.refresh();
+  };
   const placePages = async (): Promise<void> => {
     const asked = await promptDialog({ title: "Place pages on the canvas", lines: [`A card for each page, of ${count}: for example 1-4, 9`], value: `${current}`, confirmLabel: "Place" });
     if (asked === null) return;
@@ -379,6 +404,8 @@ export async function openPdfView(el: HTMLElement, file: FileFacts, deps: ViewDe
       case "mark": return void toggleMark();
       case "place":
         return void placePages();
+      case "extract":
+        return void extractPage();
       case "card":
         return showOnCard();
       case "marks":

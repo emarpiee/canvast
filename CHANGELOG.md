@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.57.13 — A PDF's page extracted as a picture (2026-11-13)
+
+- **Added:** **Extract this page** in the PDF view: the page in sight becomes a picture in the library, at 150, 300 or 600 dots an inch (Settings > Saving to the library), named, filed and tagged as an extracted frame is (`book-p03.png`); from a PDF's card on a canvas it is placed beside the card (ADR 0192).
+- **Changed:** the Extracted frames settings speak of PDF pages too: their name, format, folder and tags apply to both.
+
 ## 0.57.12 — Line art of 3D models from their own edges; the 3D view on small screens (2026-11-13)
 
 - **Added:** lines of a 3D model found from its own edges (*Find by: Model edges*, the new default; ADR 0191): the outline, creases where faces meet at a sharper turn than an angle you set, and the edges behind, dashed, each with its own width and colour.

@@ -235,6 +235,8 @@ export const SETTINGS = {
   // Extracted frames (ADR 0081).
   "frame.format": { scope: "workspace", default: "png", validate: oneOf("webp", "png", "jpeg"), effect: "immediate" } as Def<"webp" | "png" | "jpeg">,
   "frame.quality": { scope: "workspace", default: 92, validate: range(10, 100), effect: "immediate" } as Def<number>,
+  /** How finely a PDF's page is drawn when extracted, in dots an inch. */
+  "frame.pageDpi": { scope: "workspace", default: "300", validate: oneOf("150", "300", "600"), effect: "immediate" } as Def<"150" | "300" | "600">,
   "frame.folder": { scope: "workspace", default: "Extracted frames", validate: text(60), effect: "immediate" } as Def<string>,
   "frame.name": { scope: "workspace", default: "{name}-{position}", validate: text(120), effect: "immediate" } as Def<string>,
   "frame.nameStyle": { scope: "workspace", default: "keep", validate: oneOf("snake", "kebab", "camel", "pascal", "keep", "underscores"), effect: "immediate" } as Def<"snake" | "kebab" | "camel" | "pascal" | "keep" | "underscores">,

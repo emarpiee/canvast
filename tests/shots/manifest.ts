@@ -98,6 +98,7 @@ export const SHOTS: Record<string, ShotSpec> = {
 
   // PDFs, 3D models and backups
   "pdf-view": { section: "#pdfs-and-3d-models", use: "Read a study handout beside your pictures, without another app.", alt: "A PDF handout, Reading a woodblock print, open in the Library's PDF view: its first page, the page box, and its thumbnails" },
+  "pdf-extract": { section: "#pdfs-and-3d-models", use: "Copy a diagram out of a handout to draw over it, as a picture of its own.", alt: "A PDF handout's card on a canvas and, beside it, its second page extracted as a picture" },
   "model-view": { section: "#pdfs-and-3d-models", use: "Turn a simple 3D object under a light, as the start of a still-life lighting study.", alt: "A turned vase in the 3D view, lit from one side, its camera and surface settings beside it under the View tab" },
   "model-lines": { section: "#line-art-of-a-3d-model", use: "Draw a model as a technical illustration or a print: its outline, creases and the edges behind, with hatching or dots where the light does not fall.", alt: "The vase drawn as an etching in the 3D view: an ink outline, cross-hatched shadows on its dark side, on cream paper, with the Lines tab beside it" },
   "model-line-styles": { section: "#line-art-of-a-3d-model", use: "Give a model the look of a blueprint or a comic in one choice, and keep your own looks for other models.", alt: "The Line styles menu of the 3D view open over the vase: Blueprint, Ink, Architectural, Etching, Patent, Comic dots, Pencil and Toon, then Save these lines as a style", pointer: true },

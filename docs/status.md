@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.13: a PDF's page extracted as a picture (2026-11-13)
+
+- **Implemented:** ADR 0192. Extract this page in `pdf-view.ts` (drawn by `drawPage` at `frame.pageDpi`, at most 10 000 px); `framePosition` reads `Page n / count` as `p0n`; `keepFrame` (frames.ts) keeps a frame or page and places it, shared by the library viewer's Extract frame and the PDF view; `placePictureBeside` (actions.ts) shared by Extract frame on a canvas and a page from a card (`ViewPlace.pictureBeside`, main.ts `cardActions`).
+- **Tested:** typecheck and build here; unit `frames.test.ts` (page positions) and `file-views.spec` (in the library a named picture, from a card a picture beside it at 300 dpi) on GitHub; shots `pdf-view` (its bar) and `pdf-extract` taken again on GitHub.
+- **Known failures:** none known yet.
+- **Unverified:** Firefox; a 600 dpi page of a large format by hand.
+- **Committed:** v0.57.13 on `main`.
+- **Next bounded task:** read this push's runs.
+
 ## v0.57.12: line art of 3D models from their own edges; the 3D view on small screens (2026-11-13)
 
 - **Implemented:** ADR 0191. `src/assets/model-edges.ts` (EdgeModel: joined corners, outline and crease edges, a face buffer, visibility along each edge with the rim rule, tones, hand-drawn, lines joined into groups; `paintInk`, `inkSvg`, `drawingOfLines`), run in the model worker (`{mesh}`, `{ink, id}`); `ModelStage` keeps a worker per stage, one view at a time, the latest waiting, paints its lines on a canvas laid over the picture (a quad), a flat-fill surface, `inkOf` for Place and SVG, `inkSettled` for cards, `data-inked` on the stage. Line settings in four groups, `MODEL_TABS`, `LINE_PRESETS`, `LINE_STYLE_KIND` (`lines3d`) and the Styles panel's `lines3d` deps through `src/ui/model-front.ts`; the 3D view's tabs, Line styles menu, Save SVG, More menu for narrow views (`@container`), two-pointer pinch and slide. A setting row may depend on a switch.

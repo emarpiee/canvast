@@ -97,6 +97,34 @@ test("model-view", async ({ scene: s }) => {
   await s.shot("model-view");
 });
 
+test("pdf-extract", async ({ scene: s }) => {
+  await s.look({ theme: "light", hue: 30 });
+  await files(s);
+  await s.p.locator('[data-testid="asset-card"][title="reading_a_woodblock_print.pdf"]').dblclick();
+  await s.p.locator('[data-testid="pdf-view"] .pdf-page[data-page="1"][data-drawn]').waitFor();
+  await expect(async () => {
+    if (!(await s.p.getByTestId("asset-place").isVisible())) await s.p.locator(".viewer-details").click();
+    await expect(s.p.getByTestId("asset-place")).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await s.p.getByTestId("asset-place").click();
+  await expect.poll(async () => (await s.objects()).filter((o) => o.kind === "image").length).toBe(1);
+  const card = (await s.objects()).find((o) => o.kind === "image")!.id;
+  const at = (await s.p.locator("canvas").first().boundingBox())!;
+  await s.p.mouse.dblclick(at.x + at.width / 2, at.y + at.height / 2);
+  const panel = s.p.getByTestId("note-panel");
+  await panel.locator('.pdf-page[data-page="1"][data-drawn]').waitFor();
+  await panel.getByTestId("pdf-page").fill("2");
+  await panel.getByTestId("pdf-page").press("Enter");
+  await panel.getByTestId("view-extract").click();
+  await expect.poll(async () => (await s.objects()).filter((o) => o.kind === "image").length).toBe(2);
+  const page = (await s.objects()).filter((o) => o.kind === "image").at(-1)!.id;
+  await panel.locator("[data-close]").click();
+  await s.fit([card, page], 0.8);
+  await s.blur();
+  await s.settle(800);
+  await s.shot("pdf-extract", await s.around({ objects: [card, page] }));
+});
+
 /** The vase open in its 3D view, in a line style (turned a little to be seen from above, unless asked not to); the Lines tab shown. */
 async function vaseInLines(s: Scene, style: string, turn = true): Promise<void> {
   await s.p.locator('[data-testid="asset-card"][title="vase_for_light_study.stl"]').dblclick();

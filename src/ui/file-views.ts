@@ -3,6 +3,7 @@ import { noteKindOf, opensAsNote, tooBigForNote } from "../notes/note-file";
 import { OpenNote } from "./note-session";
 import type { NoteDeps, NotePlace } from "./note-session";
 import type { MarksChange, ViewMark } from "./view-state";
+import type { AssetRecord } from "../assets/asset-library";
 
 /**
  * The kinds of file that open in a view of their own, in the library's viewer and in the panel on a canvas alike. A new kind of file is one
@@ -17,11 +18,13 @@ export type ViewPlace = NotePlace & {
   placeViews?(items: ReadonlyArray<{ preview: string; size: { w: number; h: number } }>): void;
   /** A drawing (SVG text) as editable paths on the canvas, as large as a card of `size`. */
   placeLines?(svg: string, size: { w: number; h: number }): void;
+  /** A picture made from the file (a PDF's page) placed beside the card it was opened from. */
+  pictureBeside?(record: AssetRecord): void;
   /** Opened from a card: what it shows (doc/model.ts `preview`, "" its first look), where the view starts instead of where the file was left. */
   startAt?: string;
 };
 /** What a place on a canvas can do with the card it was opened from. */
-export type CardActions = Pick<ViewPlace, "setPreview" | "placeViews" | "placeLines" | "startAt">;
+export type CardActions = Pick<ViewPlace, "setPreview" | "placeViews" | "placeLines" | "pictureBeside" | "startAt">;
 export type ViewDeps = NoteDeps;
 
 /** A file open in its view. */

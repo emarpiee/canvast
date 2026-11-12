@@ -364,7 +364,7 @@ Keep a key frame of a clip as a still picture, to draw from or to place in a sto
 | | |
 | --- | --- |
 | Out of view | Playback continues when the item scrolls out of view |
-| **Extract frame** | Turns the current frame of a video or GIF into a picture in the library (PNG, WebP or JPEG). Settings name it, file it in a folder and tag it, optionally placing it on the canvas |
+| **Extract frame** | Turns the current frame of a video or GIF into a picture in the library (PNG, WebP or JPEG). Settings name it, file it in a folder and tag it, optionally placing it on the canvas. A PDF's page is extracted the same way, with **Extract this page** in its [view](#pdfs-and-3d-models) |
 | On a sheet that clips | A playing video is cut by the sheet's shape, as the canvas cuts it |
 | Long films (desktop app) | A video or sound file in the workspace's `library/` plays as it is read, on the canvas and in the gallery: an hour-long film starts at once, and in the gallery a file past the import limit plays too. A hidden one is decrypted whole first, so it takes longer to start |
 
@@ -978,6 +978,11 @@ Turn a simple 3D object under a light, as the start of a still-life lighting stu
 | Placed from the view (**Place**) | The page in sight | The view in sight |
 | Several cards at once | **Place pages**: a card for each page typed, such as `1-4, 9` | **Place a turnaround**: eight cards, from all around |
 | Finding | Ctrl+F in it; the library's search finds its words too | |
+| As a picture file | **Extract this page**: the page in sight as a picture in the library, at 150, 300 or 600 dots an inch, named, filed and tagged as an [extracted frame](#video-audio-and-gifs) is (`book-p03.png`); from a card on a canvas it is placed beside the card | The view's lines: **Save the lines as SVG** |
+
+Copy a diagram out of a handout to draw over it, as a picture of its own.
+
+![A PDF handout's card on a canvas and, beside it, its second page extracted as a picture](docs/screenshots/pdf-extract.webp)
 
 Bookmarks are in the view's bar and in the details, each with a ⋯ to rename or delete it. In the panel on a canvas, Ctrl+S shows the page or view on that card. What a card shows belongs to that card, so copies can show different pages or views; it is one step of undo, and nothing new is stored.
 
@@ -2228,7 +2233,7 @@ Make the app yours: theme, theme colour, density and the canvas.
 | Shortcuts | Rebind any shortcut to a key or a chord; the full list is also on `?` |
 | Notes | The notes editor's style in the library and on a canvas (each its own, Document at first); on a canvas, Panel or Window; a new note's name (a pattern, as screenshots have) and the width of the Note tool's card; the Notes folder new notes are filed in; light or dark previews (Preview look); whether note cards show the whole note or a part (Note cards show), and which properties they show (Note cards show properties); Write tags and properties into note files; whether typed markdown marks make formats (Markdown marks make formats); Save notes on close; what to do when a note's formatting does not fit its file |
 | Media and playback | Players: starting volume and step sizes. The library viewer: its edges (a click on the left or right goes to the previous or next item), how long the player stays while a video plays, slideshow time |
-| Saving to the library | Extracted frames and edited pictures (format, quality, folder, name, tags), and the folder and tags of what is saved to the library from the canvas, one pair for each kind: pictures from Export… (*Exports*, `export`), patterns (*Patterns*, `pattern`) and shapes saved as SVG (*Shapes*, `shape`); screenshots have theirs in the Screenshot group. In the desktop app, Keep file names and Sort files by kind |
+| Saving to the library | Extracted frames and PDF pages (format, quality, a page's resolution, folder, name, tags) and edited pictures (format, quality, folder, name, tags), and the folder and tags of what is saved to the library from the canvas, one pair for each kind: pictures from Export… (*Exports*, `export`), patterns (*Patterns*, `pattern`) and shapes saved as SVG (*Shapes*, `shape`); screenshots have theirs in the Screenshot group. In the desktop app, Keep file names and Sort files by kind |
 | Screenshot | Format, quality, pattern, transparency, interface, clipboard, folder, name and tags |
 | Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, Actions bar place, item names, density (comfortable, compact, dense), round or sharp corners, Zen mode; panels: minimize inactive ones, how many stay open |
 | Performance | Adaptive quality, fixed quality level, memory for pictures, animation and its speed |
@@ -2724,7 +2729,7 @@ Every picture in this README is made by code: each one is a Playwright test in `
 | `comics.shot.ts` | A lettered comic page, the balloon kinds, a balloon's tail, a cover's type |
 | `library.shot.ts` | The gallery, the list, the sidebar, search and its help, greyscale in the viewer, Organize, several selected, similar images, art files, a font, properties, rename, a thumbnail, taking a file out |
 | `notes.shot.ts` | Study notes in the editor, their links and properties, the note beside its print |
-| `views.shot.ts` | A PDF handout, a 3D vase, its line art, its line styles and the 3D view on a phone, the *How to import* question |
+| `views.shot.ts` | A PDF handout and a page extracted from it, a 3D vase, its line art, its line styles and the 3D view on a phone, the *How to import* question |
 | `privacy.shot.ts` | The context menu, hiding, hidden mode, the padlock, the backup question, Settings > Privacy, the lock screen |
 | `workspace.shot.ts` | The showcase (home, deep, far out, a tour), boards and canvases, bookmarks, search on the canvas, the command palette, Settings, Shortcuts, the info bar, Storage, Advanced export, Delete all, a second tab, Export |
 | `tools.shot.ts` | The canvast tools' menu in a terminal |

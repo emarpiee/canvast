@@ -157,7 +157,7 @@ One icon per function: two buttons that do different things never share an icon,
 | `hexagon` | Polygon shape |
 | `highlighter` | Marker |
 | `house` | Return to origin |
-| `image-down` | Extract frame (media player) |
+| `image-down` | Extract frame (media player); Extract this page (PDF view) |
 | `image-plus` | Fill in the missing bookmark pictures; New palette from the picked picture |
 | `images` | Assets view; All assets1 |
 | `infinity` | Canvas view |

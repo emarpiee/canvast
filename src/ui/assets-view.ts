@@ -19,7 +19,7 @@ import { renamedTag, tagFormatNote, tagIsOrUnder } from "../doc/tags";
 import { mountSuggest } from "./search-suggest";
 import type { SuggestSources } from "../search/suggest";
 import { itemsIn, justifiedLayout, listLayout, nearestInRow, rowOf, squaresLayout, type GridLayout } from "./library-layout";
-import { newNoteName, storeFrame } from "../app/frames";
+import { keepFrame, newNoteName } from "../app/frames";
 import { artFullPicture, isArtFile } from "../assets/art-preview";
 import { externalFolder } from "../storage/external-folder";
 import { isModelFile, isPdfFile, AUTO_COPY_NOTE, cardRatio, chipOf, describeFile, extOf, hasThumb, isAutoCopy, isCard, isFontFile } from "../assets/file-kind";
@@ -1448,16 +1448,8 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     if (!png || eng !== engine) return;
     const src = entryOf(at);
     // The name, format, folder and tags come from Settings > Saving to the library (ADR 0081).
-    const record = await storeFrame(assets, session, settings, { png, label: engine.label(), sourceName: src?.name ?? "frame", sourceHash: at });
-    if (!settings.get("frame.place")) {
-      session.editor.message = `Frame “${record.name}” added to the library.`;
-      session.editor.changed();
-      return void (await refresh());
-    }
-    const id = await session.placeAsset(record.hash);
-    const here = session.tree?.boards.flatMap((b) => b.canvases.map((c) => ({ b: b.board.name, c })))?.find((x) => x.c.id === session.current?.canvasId);
-    session.editor.message = id ? `Frame placed on ${here ? `${here.b} › ${here.c.name}` : "the open canvas"} and added to the library.` : "The frame was added to the library; it could not be placed.";
-    session.editor.changed();
+    await keepFrame(assets, session, settings, { png, label: engine.label(), sourceName: src?.name ?? "frame", sourceHash: at }, "Frame");
+    await refresh();
   };
   // The player floats over the picture: while the pointer rests it fades away after Settings > Library (Hide the player),
   // playing or paused, also with the pointer resting on it; only a move of the mouse, a click or a touch brings it back. Keys (step,

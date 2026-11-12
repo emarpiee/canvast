@@ -468,11 +468,18 @@ test("a long PDF: only what is near is drawn; find goes to the page; the library
   expect(app.consoleErrors).toEqual([]);
 });
 
-test("on a canvas: pages placed as cards, one step of undo; the panel closes and opens again", async ({ app }) => {
+test("on a canvas: pages placed as cards, one step of undo; a page extracted as a picture, in the library and beside its card; the panel closes and opens again", async ({ app }) => {
   const p = app.page;
   await importPdf(p);
   await card(p).dblclick();
   await expect(view(p)).toBeVisible();
+  // In the library: the page in sight becomes a picture there, named as an extracted frame is ({name}-{position}).
+  await p.getByTestId("pdf-page").fill("2");
+  await p.getByTestId("pdf-page").press("Enter");
+  await p.getByTestId("view-extract").click();
+  await expect(p.getByTestId("toast")).toContainText("Page “book-p2.png” added to the library.");
+  await p.getByTestId("pdf-page").fill("1");
+  await p.getByTestId("pdf-page").press("Enter");
   await detailsShown(p);
   await p.getByTestId("asset-place").click();
   const pics = () => p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "image") as unknown as Array<{ preview?: string; w: number; h: number }>);
@@ -488,6 +495,13 @@ test("on a canvas: pages placed as cards, one step of undo; the panel closes and
   const made = await pics();
   expect(made[1]!.w / made[1]!.h).toBeCloseTo(4 / 3, 2);
   expect(made[2]!.w / made[2]!.h).toBeCloseTo(3 / 4, 2);
+  // From a card, the page is placed beside it, the shape of the page, at 300 dots an inch (its 300 by 400 points: 1250 by 1667 pixels).
+  await panel.getByTestId("view-extract").click();
+  await expect.poll(async () => (await pics()).length).toBe(4);
+  const page = (await p.evaluate(() => window.__canvastDebug.objects().filter((o) => o.kind === "image").at(-1)) as unknown as { assetId: string; pixelW: number; pixelH: number; preview?: string });
+  expect(page.assetId).not.toBe(HASH);
+  expect(page.preview).toBeUndefined();
+  expect([page.pixelW, page.pixelH]).toEqual([1250, 1667]);
   await panel.locator("[data-close]").click();
   await expect(panel).toBeHidden();
   await p.mouse.dblclick(box.x + box.width / 2, box.y + box.height / 2);
