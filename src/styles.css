@@ -948,6 +948,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .set-panels { flex: 1; min-width: 0; overflow: auto; padding-bottom: var(--s-13); }
 .set-panels h2 { margin: var(--s-2) 0 var(--s-6); font-size: var(--text-xl); }
 .set-row { display: grid; grid-template-columns: minmax(0, 1fr) 220px 100px 60px; align-items: center; gap: var(--s-6); padding: var(--s-6) 0; border-bottom: 1px solid var(--hud-border); }
+.set-row[hidden] { display: none; } /* (a row left out, as Legacy's colour dials in Retroma) */
 .set-row label { display: flex; flex-direction: column; gap: var(--s-1); min-width: 0; }
 .set-help { color: var(--hud-muted); font-size: var(--text-sm); }
 .set-words { min-width: 0; display: grid; gap: var(--s-1); }
