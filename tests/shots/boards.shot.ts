@@ -95,7 +95,9 @@ test("layout-justified", async ({ scene: s }) => {
   const w = (await s.box([sheet]))!;
   await s.p.locator("[data-layout-rowh]").fill(String(Math.round((w.maxX - w.minX) / 4.5)));
   await s.p.locator("[data-layout-rowh]").press("Enter");
-  if ((await s.p.locator('[data-layout-hug="1"]').getAttribute("aria-pressed")) !== "true") await s.p.locator('[data-layout-hug="1"]').click();
+  const hugH = s.p.locator('[data-layout-hug="1"]');
+  if ((await hugH.getAttribute("aria-pressed")) !== "true") await hugH.click();
+  await expect(hugH).toHaveAttribute("aria-pressed", "true");
   await s.fit([sheet], 0.66, [0.5, 0.47]);
   await s.select([sheet]);
   await s.settle();
@@ -112,6 +114,7 @@ test("layout-tracks", async ({ scene: s }) => {
   await s.select([first]);
   await s.p.locator('[data-in-span="0"]').fill("3");
   await s.p.locator('[data-in-span="0"]').press("Enter");
+  await s.p.locator("[data-in-fill]").selectOption("x"); // (as wide as the three columns it spans)
   await s.fit([sheet], 0.5, [0.62, 0.55]);
   await s.select([sheet]);
   await s.p.locator("[data-layout-tracks]").click();
