@@ -91,6 +91,12 @@ interface Generation {
   range?: { i0: number; i1: number; j0: number; j1: number };
   /** For a set built ahead of time: how to render its remaining tiles. */
   ahead?: { cam: Camera; query: QueryVisible; draw: DrawObjects };
+  /**
+   * For a set started empty for the view: the time spent building its tiles so far, in one frame or in slices over a backdrop; once its
+   * view is whole, that is what the view costs (`TileCache.lastFullMs`), and it is not measured again (`measuring` false).
+   */
+  measuring?: boolean;
+  buildMs?: number;
 }
 
 export interface TileFrame {
@@ -294,7 +300,7 @@ export class TileCache {
       // Build tiles only once the zoom has held still for a frame; in a dense
       // scene build now (the zoom moved beyond the preview range).
       if (!stable && !dense) return null;
-      this.gen = { key, z, center: cam.center, frameId, vp, tiles: new Map() };
+      this.gen = { key, z, center: cam.center, frameId, vp, tiles: new Map(), measuring: true, buildMs: 0 };
     }
     let off = this.offset(this.gen, cam, vp, dpr);
     // A move that is not whole device pixels (a pointer between pixels: Wayland, scaled screens, touchpads, a glide): while the view moves,
@@ -316,7 +322,7 @@ export class TileCache {
       // Enormous, or resting after an inexact move: start over at this camera (on a dense canvas over the old set, a few tiles a frame).
       if (off && dense && !this.dirty.size && this.gen!.tiles.size) this.toBack();
       else this.clear();
-      this.gen = { key, z, center: cam.center, frameId, vp, tiles: new Map() };
+      this.gen = { key, z, center: cam.center, frameId, vp, tiles: new Map(), measuring: true, buildMs: 0 };
       off = { dx: 0, dy: 0, ax: 0, ay: 0, whole: true };
     }
     const g = this.gen!;
@@ -416,9 +422,16 @@ export class TileCache {
         g.tiles.delete(k);
       }
     }
-    if (missing.length === needed.length && needed.length && !stillMissing.length) {
-      this.lastFullMs = performance.now() - buildStart;
-      this.lastFullObjects = visible;
+    // What the view costs, judged again by every set started for it once its view is whole, built in one frame or a few tiles a frame
+    // over a backdrop. (Judged only from sets built in one frame, a view once found dense stayed dense: its sets are built in slices, so
+    // one slow build at one zoom made every later zoom, light ones too, build a whole set at each level a wheel crossed.)
+    if (g.measuring) {
+      g.buildMs! += performance.now() - buildStart;
+      if (missing.length) this.lastFullObjects = visible; // (the query found them: 0 on a frame that built nothing)
+      if (needed.length && !stillMissing.length) {
+        g.measuring = false;
+        this.lastFullMs = g.buildMs!;
+      }
     }
     if (ahead && this.idleBuild && (this.lastFullMs > this.denseMs || this.lastFullObjects > DENSE_OBJECTS) && !this.refineTimer) {
       this.aheadArgs = { source: ahead, vp, dpr, reach };

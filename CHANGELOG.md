@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.57.8 — Wheel zoom no longer rebuilds the view at every level (2026-11-12)
+
+- **Fixed:** after one slow build of the view, a wheel or touchpad zoom built a whole new set of tiles at every level it crossed, light views too, so it stuttered (the cost of a view was judged only from a set built in one frame, and a view judged costly builds its sets a few tiles a frame, so it was never judged again). Every set started for a view now judges it once it is whole.
+- **Added:** the `Tests` workflow runs only the tests it is given (*Run workflow* with a `spec`), many times in one browser set-up, with their traces kept, to chase a failure that comes now and then.
+
 ## 0.57.7 — Advanced adjustment controls; adjustment shapes without a seam (2026-11-12)
 
 - **Added:** advanced controls folded under Blur, Sharpen, Grain and Pixelate in the Adjust panel (ADR 0190): a motion blur's offset, a zoom or spin blur's centre, a blur's quality, sharpening's radius, grain's size and colour, pixelate's round dots.

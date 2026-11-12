@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.8: wheel zoom no longer rebuilds the view at every level (2026-11-12)
+
+- **Implemented:** `TileCache` judges what a view costs (`lastFullMs`, `lastFullObjects`) from every set started for it once its view is whole, built in one frame or in slices over a backdrop (`Generation.measuring`, `buildMs`); before, only a set built in one frame was measured, so one slow build left a view dense for good and a wheel zoom built a set at each level crossed (the Pan and zoom standard's intermittent `wheel-zoom-slow` 984 tiles, 40 sets thrown away: 3 of the last 8 pushes). The `Tests` workflow takes `spec`, `project` and `repeat` (branch `ci-one-spec` merged). The flaky paste step of `vectors.spec.ts` "adjustments on a shape" now reports what the page was in when it fails (objects added, read-only, focus, notices).
+- **Tested:** typecheck and build here; the Pan and zoom standard and Tests run on GitHub for this push.
+- **Known failures:** the paste step of "adjustments on a shape" fails now and then in whole-group runs (cause not yet named; its next failure says it).
+- **Unverified:** the Pan and zoom standard over several pushes (the failure came about one push in three).
+- **Committed:** v0.57.8 on `main`.
+- **Next bounded task:** read this push's Pan and zoom and Tests runs.
+
 ## v0.57.7: advanced adjustment controls; adjustment shapes without a seam (2026-11-12)
 
 - **Implemented:** ADR 0190: `blurOffset`, `blurCenterX/Y`, `blurQuality`, `sharpenRadius`, `grainSize`, `grainColour`, `pixelShape` (model, cleaning, `typedBlur`, `pixelateInto` dots, `layerPrimitives`, `adjustInto`); the panel's folds (`ADVANCED`, `advOpen`). `drawBackdrop` now composes the adjusted inside and the plain outside off the canvas by one soft edge and puts them back in one draw (the seam).

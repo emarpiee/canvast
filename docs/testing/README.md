@@ -59,6 +59,9 @@ group. Each job runs from its own snapshot, as here. GitHub's machines are share
 measures time (frame times, a time budget) is run again on the reference machine before it counts; such a failure is never fixed by
 loosening a limit. `npm run bench` stays on the reference machine.
 
+A failure that comes now and then is chased with *Run workflow* and a `spec` (one or more files or `file:line`, apart by spaces), a
+`project` and a `repeat` count: only those tests run, that many times, and their traces are kept whether they pass or fail.
+
 ## Rules
 
 1. **Run what the change needs.** `npm run test:affected` (or `npm test`) after a change and before a commit, push or release; the

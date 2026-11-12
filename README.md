@@ -2620,7 +2620,7 @@ The build is deterministic: the same source produces the same `canvast.html`, an
 | Workflow | What it runs |
 | --- | --- |
 | `CI` (`.github/workflows/ci.yml`) | Typecheck, unit tests, the build, the offline, naming, token, storage, picker and pattern checks, and the reproducible-build check; keeps the built file as an artifact |
-| `Tests` (`.github/workflows/tests.yml`) | The whole end-to-end suite, one job per test group and browser set-up (Chromium, Chromium CPU-only, Chromium at pixel ratio 2 with touch, Firefox) plus the desktop app under a virtual display, all at once. The full suite every Sunday and on request |
+| `Tests` (`.github/workflows/tests.yml`) | The whole end-to-end suite, one job per test group and browser set-up (Chromium, Chromium CPU-only, Chromium at pixel ratio 2 with touch, Firefox) plus the desktop app under a virtual display, all at once. The full suite every Sunday and on request; on request with a *spec*, only those tests, run many times in one browser set-up with their traces kept, to chase a failure that comes now and then |
 | `Pan and zoom` (`.github/workflows/pan-zoom.yml`) | The [pan and zoom standard](#the-pan-and-zoom-standard): panning and wheel zooming the showcase, held to a fixed budget |
 
 Shared machines vary in speed, so a failure there in a test that measures time is checked again on the reference machine before it counts.

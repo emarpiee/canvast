@@ -3568,7 +3568,12 @@ test("adjustments on a shape: drawn on what it looks like, blur spreads past its
       window.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
     }, svgText);
     // (the SVG is read in its own time: wait for what it makes, not one frame)
-    await expect.poll(async () => ((await objs(app)).slice(n0) as unknown as Array<{ adjust?: unknown }>).at(-1)?.adjust).toEqual({ exposure: 60, blur: 100 });
+    // (this failed now and then in whole-group runs only, never alone: when it does, say what the page was in, so the cause is named)
+    await expect.poll(async () => ((await objs(app)).slice(n0) as unknown as Array<{ adjust?: unknown }>).at(-1)?.adjust).toEqual({ exposure: 60, blur: 100 }).catch(async (e: Error) => {
+      const added = ((await objs(app)).slice(n0) as unknown as Array<{ kind: string; adjust?: unknown; shape?: string }>).map((o) => ({ kind: o.kind, shape: o.shape, adjust: o.adjust }));
+      const state = await p.evaluate(() => ({ session: window.__canvastDebug.session(), focus: `${document.activeElement?.tagName}.${(document.activeElement as HTMLElement | null)?.className ?? ""}`, notices: [...document.querySelectorAll('[data-testid="toast"]')].map((t) => t.textContent) }));
+      throw new Error(`${e.message}\nadded by the paste: ${JSON.stringify(added)}\nread-only: ${state.session.readOnly} (lease ${state.session.lease}); focus: ${state.focus}; notices: ${JSON.stringify(state.notices)}`);
+    });
     await key(app, "Control+z"); // (the paste first, then the blur)
   }
   await key(app, "Control+z");
