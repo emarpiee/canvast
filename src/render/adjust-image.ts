@@ -3,6 +3,7 @@
  * zooming and turning draw the kept copy. The colour part is `adjustPixel` over every pixel; blur uses the canvas's own filter; sharpen
  * is a 3 x 3 unsharp mask; grain is the same noise on every draw (it is fixed to the pixel, not to the time).
  */
+import { pixelCell, pixelateInto, typedBlur } from "./blur-types";
 import type { Adjust } from "../doc/adjust";
 import type { ImageObject } from "../doc/model";
 import { adjustKey, cropOf, isLayerColourNeutral, layersOf, prepare } from "../doc/adjust";
@@ -46,9 +47,16 @@ export function adjustInto(c: HTMLCanvasElement, draw: (g: CanvasRenderingContex
   const g = c.getContext("2d", { willReadFrequently: true });
   if (!g) return false;
   const w = c.width, h = c.height;
-  if (a.blur) g.filter = `blur(${((a.blur / 100) * 0.02 * (ref ?? Math.max(w, h))).toFixed(2)}px)`;
+  const sigma = ((a.blur ?? 0) / 100) * 0.02 * (ref ?? Math.max(w, h));
+  if (a.blur && !a.blurType) g.filter = `blur(${sigma.toFixed(2)}px)`;
   draw(g);
   g.filter = "none";
+  if (a.blur && a.blurType) {
+    // (a blur of another type, ADR 0189: from copies of what was drawn)
+    const blurred = typedBlur(c, a.blurType, sigma, a.blurAngle ?? 0);
+    g.clearRect(0, 0, w, h);
+    g.drawImage(blurred, 0, 0);
+  }
   const img = g.getImageData(0, 0, w, h);
   const d = img.data;
   const colour = !isLayerColourNeutral(a);
@@ -84,6 +92,7 @@ export function adjustInto(c: HTMLCanvasElement, draw: (g: CanvasRenderingContex
     }
   }
   g.putImageData(img, 0, 0);
+  if (a.pixelate) pixelateInto(c, pixelCell(a.pixelate, ref ?? Math.max(w, h)));
   return true;
 }
 

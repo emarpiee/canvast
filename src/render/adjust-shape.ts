@@ -11,6 +11,7 @@ import type { ProjectedObject } from "./projection";
 import { adjustInto } from "./adjust-image";
 import { morphFilter, playingFilter } from "./adjust-filter";
 import { withClipExtra } from "./draw-objects";
+import { pixelCell, pixelateInto, typedBlur } from "./blur-types";
 
 /** Largest scratch layer (device px at its own resolution): a bigger one is made smaller and drawn scaled up (what is blurred is smooth). */
 const MAX_PIXELS = 4_000_000;
@@ -89,7 +90,9 @@ export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject,
     g.setTransform(1, 0, 0, 1, 0, 0);
   };
   let out: HTMLCanvasElement;
-  const filter = colour ? playingFilter(a, refDev) : "";
+  // (a blur of another type is made after the colour, from copies of the layer: the filter then has no blur of its own)
+  const typed = colour && a.blurType && maxBlur(a) ? a.blurType : null;
+  const filter = colour ? playingFilter(typed ? { ...a, blur: 0 } : a, refDev) : "";
   if (!colour || "filter" in ctx) {
     const g0 = layer(0, w, h);
     draw(g0);
@@ -110,6 +113,8 @@ export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject,
     if (!adjustInto(c, draw, a, refDev)) return body(ctx);
     out = c;
   }
+  if (typed && "filter" in ctx) out = typedBlur(out, typed, (maxBlur(a) / 100) * 0.02 * refDev, a.blurAngle ?? 0);
+  if (colour && a.pixelate && "filter" in ctx) pixelateInto(out, pixelCell(a.pixelate, refDev));
   const inner = shadowOf(a, "inner");
   if (inner) {
     // the inside of the edge: what is not under the object (made smaller by the spread) moved by the offset, blurred, kept where the object is

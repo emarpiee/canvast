@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.6: blur types, pixelate, wider adjustment ranges (2026-11-12)
+
+- **Implemented:** `AdjustSpec.max` per adjustment (ADR 0189); `blurType` and `blurAngle`, `pixelate` in the model, validation, cleaning and the cache key; `render/blur-types.ts` (`typedBlur`, `pixelateInto`) used by `drawAdjusted` and `adjustInto`; the Detail group's Type, Angle and Pixelate rows.
+- **Tested:** in the browser while building (each blur type and pixelate drawn on a picture, blur 300); unit test of ranges and cleaning updated; new e2e test in `pictures.spec.ts`; the GitHub runs of this push are the check.
+- **Known failures:** none known.
+- **Unverified:** Firefox by hand; the cost of a very wide motion blur on a large picture.
+- **Committed:** v0.57.6 on `main`.
+- **Next bounded task:** none set.
+
 ## v0.57.5: adjustment shapes (2026-11-12)
 
 - **Implemented:** `PathObject.backdrop` (ADR 0188) with `canBeBackdrop`/`isBackdrop`; `drawBackdrop` (adjust-shape.ts) at the shape's turn in `drawObjects`; tiles under one drawn with room for its reach; the direct view draws objects on their own layer when one is in view; picked inside; Adjust panel switch (`backdropState`/`setBackdrop`, one undo step); dropped where a shape becomes a path; Layers label and aperture icon; SVG export writes what is under it again through its filter (`data-canvast-derived`, skipped on import).
@@ -45,7 +54,7 @@ Unverified / Committed / Next bounded task**.
 - **Known failures:** none known.
 - **Unverified:** Firefox by hand; the pan and zoom budget with an adjustment shape in view (the standard's showcase has none).
 - **Committed:** v0.57.5 on `main`.
-- **Next bounded task:** the owner's follow-up: higher adjustment limits, more blur types, a pixelate adjustment.
+- **Next bounded task:** higher limits, blur types, pixelate (done in v0.57.6).
 
 ## v0.57.3: conceal a folder (2026-11-12)
 

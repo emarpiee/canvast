@@ -1,7 +1,7 @@
 /**
  * Non-destructive adjustments of a picture (ADR 0118): numbers kept on the instance, applied when it is drawn, so the original is
- * never touched and every number can be changed again. Each is from -100 to 100 (0: no change), except blur, sharpen and grain, which
- * are 0 to 100. `adjustPixel` is the whole of the colour part, one pixel at a time, so a picture seen magnified (each source pixel a big
+ * never touched and every number can be changed again. Each has its own range (`ADJUSTMENTS`, 0: no change): the colour ones go past 100
+ * for a stronger change, blur to 400, sharpen and grain to 200; a blur has a type (`blurType`, ADR 0189) and pixelate makes square cells. `adjustPixel` is the whole of the colour part, one pixel at a time, so a picture seen magnified (each source pixel a big
  * rectangle), seen from so far in that it is one colour, and drawn at ordinary size all agree.
  */
 import type { GradientStop } from "./paint";
@@ -62,8 +62,14 @@ export interface Adjust {
   readonly green?: number;
   readonly blue?: number;
   readonly blur?: number;
+  /** How the blur spreads (ADR 0189): absent is the usual soft blur; along a line (`blurAngle`), out from the middle, or round it. */
+  readonly blurType?: BlurType;
+  /** The direction of a motion blur, in degrees (0: across). */
+  readonly blurAngle?: number;
   readonly sharpen?: number;
   readonly grain?: number;
+  /** Square cells, a share of the object's size (100: a tenth of it). */
+  readonly pixelate?: number;
   /**
    * Shadows of what is drawn (not of a picture's pixels): a drop shadow behind it and an inner shadow inside its edge. Opacity 0 = none. The offset
    * (`X`, `Y`: -100 to 100, a tenth of the object's size at the ends), the `Blur` and the `Spread` (how far the shadow is grown, or the inner one shrunk: 0 to 100, a twentieth of its size) are shares of the object's own
@@ -83,42 +89,49 @@ export interface Adjust {
   readonly innerColor?: string;
 }
 
-export type AdjustKey = Exclude<keyof Adjust, "map" | "levels" | "curves" | "next" | "dropColor" | "innerColor">;
+export type AdjustKey = Exclude<keyof Adjust, "map" | "levels" | "curves" | "next" | "dropColor" | "innerColor" | "blurType">;
+
+/** The kinds of blur besides the usual one (ADR 0189). */
+export type BlurType = "motion" | "zoom" | "spin";
+export const BLUR_TYPES: ReadonlyArray<readonly [BlurType | "", string]> = [["", "Soft"], ["motion", "Motion"], ["zoom", "Zoom"], ["spin", "Spin"]];
 
 export interface AdjustSpec {
   readonly key: AdjustKey;
   readonly label: string;
   readonly min: number;
+  readonly max: number;
   /** Part of the colour of each pixel (true), or needs the pixels around it (false). */
   readonly pointwise: boolean;
 }
 
 /** In the order they are offered. */
 export const ADJUSTMENTS: readonly AdjustSpec[] = [
-  { key: "exposure", label: "Exposure", min: -100, pointwise: true },
-  { key: "contrast", label: "Contrast", min: -100, pointwise: true },
-  { key: "highlights", label: "Highlights", min: -100, pointwise: true },
-  { key: "shadows", label: "Shadows", min: -100, pointwise: true },
-  { key: "temperature", label: "Temperature", min: -100, pointwise: true },
-  { key: "tint", label: "Tint", min: -100, pointwise: true },
-  { key: "saturation", label: "Saturation", min: -100, pointwise: true },
-  { key: "vibrance", label: "Vibrance", min: -100, pointwise: true },
-  { key: "red", label: "Red", min: -100, pointwise: true },
-  { key: "green", label: "Green", min: -100, pointwise: true },
-  { key: "blue", label: "Blue", min: -100, pointwise: true },
-  { key: "blur", label: "Blur", min: 0, pointwise: false },
-  { key: "sharpen", label: "Sharpen", min: 0, pointwise: false },
-  { key: "grain", label: "Grain", min: 0, pointwise: false },
-  { key: "dropOpacity", label: "Opacity", min: 0, pointwise: false },
-  { key: "dropX", label: "Across", min: -100, pointwise: false },
-  { key: "dropY", label: "Down", min: -100, pointwise: false },
-  { key: "dropBlur", label: "Blur", min: 0, pointwise: false },
-  { key: "dropSpread", label: "Spread", min: 0, pointwise: false },
-  { key: "innerOpacity", label: "Opacity", min: 0, pointwise: false },
-  { key: "innerX", label: "Across", min: -100, pointwise: false },
-  { key: "innerY", label: "Down", min: -100, pointwise: false },
-  { key: "innerBlur", label: "Blur", min: 0, pointwise: false },
-  { key: "innerSpread", label: "Spread", min: 0, pointwise: false },
+  { key: "exposure", label: "Exposure", min: -200, max: 200, pointwise: true },
+  { key: "contrast", label: "Contrast", min: -100, max: 200, pointwise: true },
+  { key: "highlights", label: "Highlights", min: -100, max: 100, pointwise: true },
+  { key: "shadows", label: "Shadows", min: -100, max: 100, pointwise: true },
+  { key: "temperature", label: "Temperature", min: -200, max: 200, pointwise: true },
+  { key: "tint", label: "Tint", min: -200, max: 200, pointwise: true },
+  { key: "saturation", label: "Saturation", min: -100, max: 200, pointwise: true },
+  { key: "vibrance", label: "Vibrance", min: -100, max: 200, pointwise: true },
+  { key: "red", label: "Red", min: -200, max: 200, pointwise: true },
+  { key: "green", label: "Green", min: -200, max: 200, pointwise: true },
+  { key: "blue", label: "Blue", min: -200, max: 200, pointwise: true },
+  { key: "blur", label: "Blur", min: 0, max: 400, pointwise: false },
+  { key: "blurAngle", label: "Angle", min: 0, max: 359, pointwise: false },
+  { key: "sharpen", label: "Sharpen", min: 0, max: 200, pointwise: false },
+  { key: "grain", label: "Grain", min: 0, max: 200, pointwise: false },
+  { key: "pixelate", label: "Pixelate", min: 0, max: 100, pointwise: false },
+  { key: "dropOpacity", label: "Opacity", min: 0, max: 100, pointwise: false },
+  { key: "dropX", label: "Across", min: -300, max: 300, pointwise: false },
+  { key: "dropY", label: "Down", min: -300, max: 300, pointwise: false },
+  { key: "dropBlur", label: "Blur", min: 0, max: 400, pointwise: false },
+  { key: "dropSpread", label: "Spread", min: 0, max: 400, pointwise: false },
+  { key: "innerOpacity", label: "Opacity", min: 0, max: 100, pointwise: false },
+  { key: "innerX", label: "Across", min: -300, max: 300, pointwise: false },
+  { key: "innerY", label: "Down", min: -300, max: 300, pointwise: false },
+  { key: "innerBlur", label: "Blur", min: 0, max: 400, pointwise: false },
+  { key: "innerSpread", label: "Spread", min: 0, max: 400, pointwise: false },
 ];
 
 /** Whether any layer has a drop or an inner shadow. */
@@ -200,10 +213,11 @@ export function validAdjust(a: unknown, depth = 1): a is Adjust {
     if (k === "map") return validMap(v);
     if (k === "next") return validAdjust(v, depth + 1);
     if (k === "dropColor" || k === "innerColor") return isColour(v);
+    if (k === "blurType") return BLUR_TYPES.some(([t]) => t !== "" && t === v);
     if (k === "levels") return !!v && typeof v === "object" && Object.entries(v).every(([ch, l]) => CHANNELS.includes(ch as Channel) && cleanLevels(l as Levels) !== undefined);
     if (k === "curves") return !!v && typeof v === "object" && Object.entries(v).every(([ch, c]) => CHANNELS.includes(ch as Channel) && cleanCurve(c as CurvePoints) !== undefined);
     const s = ADJUSTMENTS.find((x) => x.key === k);
-    return !!s && typeof v === "number" && Number.isFinite(v) && v >= s.min && v <= 100;
+    return !!s && typeof v === "number" && Number.isFinite(v) && v >= s.min && v <= s.max;
   });
 }
 
@@ -221,7 +235,7 @@ export function validMap(m: unknown): m is GradientMap {
 }
 
 /** Whether the pictures around a pixel matter (blur, sharpen, grain): such an adjustment is drawn at the size seen, never at depth. */
-export const needsNeighbours = (a: Adjust | undefined): boolean => layersOf(a).some((l) => !!l.blur || !!l.sharpen || !!l.grain);
+export const needsNeighbours = (a: Adjust | undefined): boolean => layersOf(a).some((l) => !!l.blur || !!l.sharpen || !!l.grain || !!l.pixelate);
 
 /** The adjustments with only the nonzero numbers, in range; undefined when nothing is left. A stack keeps its layers that change something. */
 export function cleanAdjust(a: Adjust, depth = 1): Adjust | undefined {
@@ -248,9 +262,12 @@ export function cleanAdjust(a: Adjust, depth = 1): Adjust | undefined {
   for (const s of ADJUSTMENTS) {
     const v = a[s.key];
     if (typeof v !== "number" || !Number.isFinite(v)) continue;
-    const c = Math.max(s.min, Math.min(100, Math.round(v)));
+    const c = Math.max(s.min, Math.min(s.max, Math.round(v)));
     if (c !== 0) out[s.key] = c;
   }
+  // (a blur's type only with a blur, and its angle only with a motion blur)
+  if (out["blur"] && a.blurType && BLUR_TYPES.some(([t]) => t !== "" && t === a.blurType)) out["blurType"] = a.blurType;
+  if (out["blurType"] !== "motion") delete out["blurAngle"];
   if (out["dropOpacity"] && isColour(a.dropColor) && a.dropColor.toLowerCase() !== "#000000") out["dropColor"] = a.dropColor.toLowerCase();
   if (out["innerOpacity"] && isColour(a.innerColor) && a.innerColor.toLowerCase() !== "#000000") out["innerColor"] = a.innerColor.toLowerCase();
   return Object.keys(out).length ? (out as Adjust) : undefined;
@@ -258,7 +275,7 @@ export function cleanAdjust(a: Adjust, depth = 1): Adjust | undefined {
 
 /** A short text that differs whenever the adjustments do (to cache what was drawn with them). */
 export const adjustKey = (a: Adjust | undefined): string =>
-  a ? ADJUSTMENTS.map((s) => a[s.key] ?? 0).join(",") + (a.map ? `|${a.map.amount}:${a.map.stops.map((s) => `${s.o}${s.c}`).join(",")}` : "") + (a.levels ? `|L${JSON.stringify(a.levels)}` : "") + (a.curves ? `|C${JSON.stringify(a.curves)}` : "") + (a.next ? `|N(${adjustKey(a.next)})` : "") + (a.dropColor ?? "") + (a.innerColor ?? "") : "";
+  a ? ADJUSTMENTS.map((s) => a[s.key] ?? 0).join(",") + (a.blurType ? `|B${a.blurType}` : "") + (a.map ? `|${a.map.amount}:${a.map.stops.map((s) => `${s.o}${s.c}`).join(",")}` : "") + (a.levels ? `|L${JSON.stringify(a.levels)}` : "") + (a.curves ? `|C${JSON.stringify(a.curves)}` : "") + (a.next ? `|N(${adjustKey(a.next)})` : "") + (a.dropColor ?? "") + (a.innerColor ?? "") : "";
 
 const clamp = (v: number): number => (v < 0 ? 0 : v > 255 ? 255 : v);
 /** sRGB byte to linear light, and back (a table of 4096 steps): exposure works in linear light, and a table is far quicker than a power. */

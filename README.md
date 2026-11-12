@@ -326,12 +326,14 @@ Give prints a soft drop shadow so they read as paper laid on a table.
 | Light | Exposure, contrast, highlights, shadows |
 | Colour | Temperature, tint, saturation, vibrance, red, green and blue |
 | Tone | Levels, curves, gradient map |
-| Detail | Blur, sharpen, grain |
+| Detail | Blur (soft, motion along an angle, zoom out from the middle, spin round it), sharpen, grain, pixelate |
 | Shadows | **Drop shadow** and **inner shadow**: opacity, across, down, blur, spread and a colour each |
 
 | How it works | |
 | --- | --- |
 | Stacks | Reorder, hide, and **Copy** and **Paste adjustments** to move a whole stack between items. Each group has its own *Reset* |
+| Ranges | Past 100 where a stronger change means something: exposure, temperature, tint and the three primaries from -200 to 200, contrast, saturation and vibrance up to 200, blur up to 400, sharpen and grain up to 200, a shadow's blur and spread up to 400 and its offset to ±300 |
+| Blur types and pixelate | The blur's *Type*: **Soft**, **Motion** (with its *Angle*), **Zoom** or **Spin**, as wide as a soft blur of the same number. **Pixelate** makes square cells, a tenth of the object at 100 |
 | Shadows | A new shadow starts soft and a little below. Offset and blur are shares of the object's own size (an offset of 100 is a tenth of it), so a shadow looks the same at any zoom. A picture's pixels are not touched; its shadow is drawn beside it. A playing video shows no shadow (its paused frame does) |
 | On shapes, strokes and text | Applied to the object as drawn (fill, outline, gradient and texture together). A blur is a share of the object's size, so it does not change with zoom (far inside an object it stays at most about 330 px wide) |
 | Exporting | A selection leaves room for a blur or a drop shadow. An exported SVG carries them as a filter on the shape, and making the SVG into shapes again brings them back. A vector PDF draws such a shape as a picture instead (see [Limitations](#limitations)) |
@@ -2264,6 +2266,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Partial backups | ⚠️ An Advanced export can only be added, never used to update a workspace. Links in notes to items left out find nothing until those items are there |
 | Concealed folders | A view filter, not privacy: no password, nothing encrypted, the files stay readable on the disk. The canvas's font list and texture picker still offer their items |
 | Adjustment shapes | In an SVG, what is under one is written again through its filter; made into shapes again, it comes back as a plain path |
+| Blur types, pixelate | An SVG writes a motion, zoom or spin blur as a soft one and leaves out pixelate; a playing video or GIF shows a soft blur and no pixelate |
 | Text in a shape | While typing, the lines are straight, in a box in the shape; they take the shape's flow when you finish |
 | Text in a shape | A text moved on its own goes back into its shape; on a turned balloon the words stay upright |
 | Text on a path | A text set along a path by an older version does not follow it until it is set again |
@@ -2305,6 +2308,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Files | In a browser, imports are limited to 256 MiB per file; the desktop app has no such limit |
 | Concealed folders | Concealing is a view filter, not privacy: there is no password and nothing is encrypted, so the files stay readable on the disk and in exports, and the items still show on the canvases they are placed on. The canvas's font list and texture picker still offer a concealed folder's fonts and pictures. Hide (see [Privacy and hidden items](#privacy-and-hidden-items)) keeps items out of view for real |
 | Adjustment shapes | SVG cannot read what lies behind a shape: an exported SVG writes what is under an adjustment shape again, through its adjustments, cut by its outline (other programs show it as on the canvas). Made into shapes again in this app, the copy is left out and the adjustment shape comes back as a plain path, which cannot be one. A blur over a large, busy area is drawn again whenever what is under it changes |
+| Blur types, pixelate | SVG has only a soft blur: a motion, zoom or spin blur is written as a soft one of the same width, and pixelate is left out (the exported picture formats draw both). A playing video or GIF is adjusted by the browser's own filter, which has a soft blur only and no pixelate; its paused frame shows them |
 | Clipboard | Ctrl+C keeps the real objects for pasting back only while nothing else was copied: a picture copied for other apps pastes back as the objects only if the window kept the focus and the app copied nothing else in between (otherwise it comes back as a new picture, and shapes as an SVG import or a picture). A copy of a single picture, GIF or video is one PNG (a GIF or video is its current frame); files such as audio and PDF cannot be put on the system clipboard by a web page; Cut puts text only |
 | Video | Only what the built-in browser engine plays: HEVC (H.265) video, the format of many phones, does not play in the desktop app or in most browsers (the viewer says so; *Open in default app* plays it in the system's player), and shows as a card on Firefox for Android (it still plays from the player) |
 

@@ -167,6 +167,45 @@ test("adjustments: kept on the picture, drawn live, one undo step, copied to ano
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("a blur has a type (motion, zoom, spin) and a picture can be pixelated (ADR 0189): each draws its own way; the angle only for motion; kept over a reload", async ({ app }) => {
+  const p = app.page;
+  const a = await place(app, "stripes.png", makePng(120, 90, (x) => (Math.floor(x / 6) % 2 ? [20, 20, 20, 255] : [240, 240, 240, 255])));
+  const ba = await boxOf(app, a.id);
+  const cx = Math.round((ba.minX + ba.maxX) / 2), cy = Math.round((ba.minY + ba.maxY) / 2);
+  const row = (): Promise<string> => p.evaluate(([x0, x1, y]) => JSON.stringify(Array.from({ length: 24 }, (_, i) => window.__canvastDebug.pixelAt(Math.round(x0! + ((x1! - x0!) * i) / 23), y!))), [ba.minX + 12, ba.maxX - 12, cy]);
+  await p.keyboard.press("v");
+  await p.mouse.click(cx, cy);
+  await openAdjust(p);
+  const pop = p.locator(".adjust-pop");
+  const num = async (k: string, v: number): Promise<void> => {
+    await pop.locator(`[data-adj-num="${k}"]`).fill(String(v));
+    await pop.locator(`[data-adj-num="${k}"]`).blur();
+  };
+  await num("blur", 300); // (past the old 100)
+  await app.frame();
+  const looks = [await row()];
+  await expect(pop.locator('[data-adj-row="blurAngle"]')).toBeHidden();
+  for (const t of ["motion", "zoom", "spin"]) {
+    await pop.locator("[data-adj-blur-type]").selectOption(t);
+    if (t === "motion") await expect(pop.locator('[data-adj-row="blurAngle"]')).toBeVisible();
+    await expect.poll(row, `${t} draws differently`).not.toBe(looks.at(-1));
+    looks.push(await row());
+  }
+  expect((await objs(app)).find((o) => o.id === a.id)!.adjust).toEqual({ blur: 300, blurType: "spin" });
+  await p.reload();
+  await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+  expect((await objs(app)).find((o) => o.id === a.id)!.adjust).toEqual({ blur: 300, blurType: "spin" });
+  // pixelate: cells of a tenth of the picture, each one colour: the fine stripes are gone
+  await p.keyboard.press("v");
+  await p.mouse.click(cx, cy);
+  await openAdjust(p);
+  await num("blur", 0);
+  await num("pixelate", 100);
+  await app.frame();
+  await expect.poll(async () => { const r = JSON.parse(await row()) as number[][]; const v = r.map((c) => c[0]!); return Math.max(...v) - Math.min(...v); }).toBeLessThan(160);
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("an adjusted picture too big to be decoded whole is still drawn whole when zoomed out (a reduced copy is adjusted at its own size)", async ({ app }) => {
   const p = app.page;
   const big = makePng(2400, 1600, (x, y) => [x % 256, y % 256, 120, 255]);

@@ -31,7 +31,15 @@ describe("adjustments of a picture (ADR 0118)", () => {
     expect(Math.abs(vivid[0] - vivid[1] - (250 - 20))).toBeLessThan(dull[0] - dull[1]);
   });
   it("is kept clean: zeros go, numbers are rounded and held in range, neighbours are told apart", () => {
-    expect(cleanAdjust({ exposure: 0, contrast: 33.4, blur: -20, grain: 140 })).toEqual({ contrast: 33, grain: 100 });
+    expect(cleanAdjust({ exposure: 0, contrast: 33.4, blur: -20, grain: 260 })).toEqual({ contrast: 33, grain: 200 });
+    // each its own range (ADR 0189): past 100 where a stronger change means something, never past where it stops meaning anything
+    expect(cleanAdjust({ blur: 900, exposure: -500, contrast: -300, saturation: 500 })).toEqual({ blur: 400, exposure: -200, contrast: -100, saturation: 200 });
+    // a blur's type only with a blur, its angle only with a motion blur
+    expect(cleanAdjust({ blur: 50, blurType: "motion", blurAngle: 30 })).toEqual({ blur: 50, blurType: "motion", blurAngle: 30 });
+    expect(cleanAdjust({ blur: 50, blurType: "zoom", blurAngle: 30 })).toEqual({ blur: 50, blurType: "zoom" });
+    expect(cleanAdjust({ blurType: "spin", pixelate: 40 })).toEqual({ pixelate: 40 });
+    expect(needsNeighbours({ pixelate: 5 })).toBe(true);
+    expect(adjustKey({ blur: 5 })).not.toBe(adjustKey({ blur: 5, blurType: "spin" }));
     expect(cleanAdjust({ exposure: 0.2 })).toBeUndefined();
     expect(needsNeighbours({ blur: 5 })).toBe(true);
     expect(needsNeighbours({ exposure: 5 })).toBe(false);

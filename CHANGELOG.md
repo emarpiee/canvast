@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.57.6 — Blur types, pixelate, stronger adjustments (2026-11-12)
+
+- **Added:** a blur's *Type* in the Adjust panel: **Motion** (with an angle), **Zoom** and **Spin** beside the usual soft blur (ADR 0189).
+- **Added:** **Pixelate**: square cells, a tenth of the object at 100.
+- **Changed:** adjustments go further: exposure, temperature, tint and the primaries to ±200, contrast, saturation and vibrance to 200, blur to 400, sharpen and grain to 200, shadow blur and spread to 400.
+
 ## 0.57.5 — Adjustment shapes (2026-11-12)
 
 - **Added:** adjustment shapes (ADR 0188): **Adjust what is under it** in the Adjust panel makes a shape's adjustments act on what lies under it, inside its outline. A circle with no fill and a blur over a picture blurs that part of it; it follows the shape, is picked anywhere inside, has its own row in Layers and its own icon. Any shape made with a shape tool, not a line or a path. Exports draw it; an SVG writes what is under it again through its filter.

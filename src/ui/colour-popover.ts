@@ -17,7 +17,8 @@ import { gradientCss } from "../assets/styles";
 import { ICONS } from "./icons";
 import { liveNumber } from "./live";
 import { scrubNumbers } from "../colour-picker/scrub";
-import { ADJUSTMENTS, MAX_CURVE_POINTS, MAX_LAYERS, SHADOW_START, cleanAdjust, curveFn, layersOf } from "../doc/adjust";
+import { ADJUSTMENTS, BLUR_TYPES, MAX_CURVE_POINTS, MAX_LAYERS, SHADOW_START, cleanAdjust, curveFn, layersOf } from "../doc/adjust";
+import type { BlurType } from "../doc/adjust";
 import type { Adjust, AdjustKey, Channel } from "../doc/adjust";
 import type { GradientStop } from "../doc/paint";
 import { swatchBackground } from "../render/ink";
@@ -901,7 +902,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   const GROUPS: Array<[string, readonly AdjustKey[]]> = [
     ["Light", ["exposure", "contrast", "highlights", "shadows"]],
     ["Colour", ["temperature", "tint", "saturation", "vibrance", "red", "green", "blue"]],
-    ["Detail", ["blur", "sharpen", "grain"]],
+    ["Detail", ["blur", "blurAngle", "sharpen", "grain", "pixelate"]],
     ["Drop shadow", ["dropOpacity", "dropX", "dropY", "dropBlur", "dropSpread"]],
     ["Inner shadow", ["innerOpacity", "innerX", "innerY", "innerBlur", "innerSpread"]],
   ];
@@ -913,7 +914,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   };
   /** What each group holds, so its Reset can take it all off (a shadow's colour with it). */
   const GROUP_FIELDS: Record<string, readonly (keyof Adjust)[]> = {
-    ...Object.fromEntries(GROUPS.map(([name, keys]) => [name, [...keys, ...(SHADOW_COLOUR[name] ? [SHADOW_COLOUR[name]!] : [])]])),
+    ...Object.fromEntries(GROUPS.map(([name, keys]) => [name, [...keys, ...(SHADOW_COLOUR[name] ? [SHADOW_COLOUR[name]!] : []), ...(name === "Detail" ? (["blurType"] as const) : [])]])),
     "Gradient map": ["map"],
     Levels: ["levels"],
     Curves: ["curves"],
@@ -924,8 +925,11 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   const syncResets = (): void => {
     for (const b of pop.querySelectorAll<HTMLButtonElement>("[data-group-reset]")) b.disabled = !groupChanged(b.dataset["groupReset"]!);
   };
+  /** How a blur spreads (ADR 0189): soft, along a line, out from the middle, round it; the angle row only for a line. */
+  const blurTypeRow = (): string =>
+    `<div class="adj-row"><label class="adj-label" for="adj-blur-type">Type</label><select id="adj-blur-type" data-adj-blur-type aria-label="Blur type">${BLUR_TYPES.map(([v, l]) => `<option value="${v}"${(cur.blurType ?? "") === v ? " selected" : ""}>${l}</option>`).join("")}</select></div>`;
   const row = (s: (typeof rows)[number]): string =>
-    `<div class="adj-row${cur[s.key] ? " is-changed" : ""}" data-adj-row="${s.key}"><label class="adj-label" for="adj-num-${s.key}" title="Double-click to reset ${s.label}">${s.label}</label><input type="range" id="adj-${s.key}" data-adj="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label}"><input type="number" class="adj-num" id="adj-num-${s.key}" data-adj-num="${s.key}" min="${s.min}" max="100" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label} (number)"></div>`;
+    `<div class="adj-row${cur[s.key] ? " is-changed" : ""}"${s.key === "blurAngle" && cur.blurType !== "motion" ? " hidden" : ""} data-adj-row="${s.key}"><label class="adj-label" for="adj-num-${s.key}" title="Double-click to reset ${s.label}">${s.label}</label><input type="range" id="adj-${s.key}" data-adj="${s.key}" min="${s.min}" max="${s.max}" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label}"><input type="number" class="adj-num" id="adj-num-${s.key}" data-adj-num="${s.key}" min="${s.min}" max="${s.max}" step="1" value="${cur[s.key] ?? 0}" aria-label="${s.label} (number)"></div>`;
   let saved = o.styles.gradients();
   const sameStops = (a: readonly GradientStop[], b: readonly GradientStop[]): boolean => JSON.stringify(a) === JSON.stringify(b);
   const mapIndex = (): string => (!cur.map ? "" : String(saved.findIndex((g) => sameStops(g.stops, cur.map!.stops)))).replace("-1", "keep");
@@ -940,7 +944,7 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   pop.innerHTML =
     layerTabs +
     `<header class="adj-head"><span class="adj-note">${o.count > 1 ? `Shows the first of ${o.count} pictures; applies to all.` : "The file is not changed."}</span></header>` +
-    GROUPS.map(([name, keys]) => `<section class="adj-group" aria-label="${name}">${head(name)}${keys.map((k) => row(rows.find((r) => r.key === k)!)).join("")}${colourRow(name)}</section>`).join("") +
+    GROUPS.map(([name, keys]) => `<section class="adj-group" aria-label="${name}">${head(name)}${keys.map((k) => row(rows.find((r) => r.key === k)!) + (k === "blur" ? blurTypeRow() : "")).join("")}${colourRow(name)}</section>`).join("") +
     mapSection() +
     levelsSection +
     curvesSection +
@@ -1076,6 +1080,14 @@ function buildAdjustLayer(host: HTMLElement, o: AdjustOptions, layerAt: number, 
   });
   pop.addEventListener("change", (e) => {
     const t = e.target as HTMLInputElement;
+    if (t.hasAttribute("data-adj-blur-type")) {
+      const { blurType: _t, ...rest } = cur;
+      cur = t.value ? { ...rest, blurType: t.value as BlurType } : rest;
+      pop.querySelector<HTMLElement>('[data-adj-row="blurAngle"]')!.hidden = cur.blurType !== "motion";
+      cancelPreview();
+      emitChange("Blur type");
+      return;
+    }
     if (t.dataset["adjColour"]) {
       cancelPreview();
       emitChange("Adjust picture");
