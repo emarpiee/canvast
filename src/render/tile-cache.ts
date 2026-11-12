@@ -130,7 +130,7 @@ export class TileCache {
   /** Tiles rendered since the page loaded (diagnostics and tests). */
   renderedTotal = 0;
   /** Why tile sets were thrown away and built again, counted (benchmarks and tests read them): a move that was not whole device pixels, a new zoom or frame. */
-  readonly restarts = { offset: 0, key: 0, lastOffset: null as null | { ax: number; ay: number } };
+  readonly restarts = { offset: 0, key: 0, lastOffset: null as null | { ax: number; ay: number }, why: {} as Record<string, number> };
   /** Cost of the last full tile-set build (about one exact frame of committed objects). */
   lastFullMs = 0;
   /** How many objects the last whole set held. */
@@ -291,6 +291,11 @@ export class TileCache {
         if (pv2) return pv2;
       }
       this.restarts.key++;
+      {
+        const dz = Math.abs(z - this.gen.z);
+        const w = `${dense ? `dense(${this.lastFullMs > this.denseMs ? `ms ${this.lastFullMs.toFixed(1)}>${this.denseMs}` : ""}${this.lastFullObjects > DENSE_OBJECTS ? ` obj ${this.lastFullObjects}` : ""})` : "light"} ${stable ? (refine ? "refine" : "stable") : "moving"} dz${dz > PREVIEW_MAX_LEVELS ? ">1" : "<=1"}${this.dirty.size ? " dirty" : ""}${this.gen.frameId !== frameId ? " frame" : ""}${this.gen.tiles.size ? "" : " empty"}`;
+        this.restarts.why[w] = (this.restarts.why[w] ?? 0) + 1;
+      }
       // Beyond it, with nothing prepared: the old set stays as a backdrop while the new one is built a few tiles a frame.
       // (and so when the zoom comes to rest on a dense canvas: its exact set is built over the scaled one, not in one long frame)
       if (dense && this.gen.frameId === frameId && !this.dirty.size && this.gen.tiles.size && Math.abs(z - this.gen.z) <= BACK_MAX_LEVELS) this.toBack();

@@ -114,6 +114,7 @@ async function pan(label, perFrame, seconds = 4, fraction = 0, input = null) {
     tiles_built: rendered, restarts, profile_ms: Math.round(total), top,
   };
   console.log(`\n== ${label}: ${r.fps} FPS, frame p50 ${r.frame_ms.p50} ms p95 ${r.frame_ms.p95} ms worst ${r.frame_ms.worst} ms; draw p50 ${r.draw_ms.p50} p95 ${r.draw_ms.p95} worst ${r.draw_ms.worst} ms; tiles built ${rendered}; sets thrown away: ${restarts.offset} not whole px, ${restarts.key} zoom/frame; last offset ${JSON.stringify(restarts.lastOffset)}`);
+  for (const [w, k] of Object.entries(s1.restarts.why)) if (k - (s0.restarts.why[w] ?? 0)) console.log(`  why: ${k - (s0.restarts.why[w] ?? 0)} × ${w}`);
   for (const x of top) console.log(`  ${x.share.padStart(6)}  ${String(x.ms).padStart(5)} ms  ${x.fn}`);
   return r;
 }
