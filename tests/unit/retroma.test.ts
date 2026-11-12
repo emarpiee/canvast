@@ -6,7 +6,10 @@ import { resolve } from "node:path";
 import { computeRetroma, presetSettings, PRESETS } from "../../src/theme/retroma/engine";
 
 /** Where the app departs from the demo on the owner's word (each value then follows the app, not the fixture). */
-const OWNER_CHANGES: Record<string, string> = {};
+const OWNER_CHANGES: Record<string, string> = {
+  "--info-bg": "2026-11-12: the canvas's info bar as Obsidian Retroma's status bar (the panes' hue, lightness 0.55), not the demo's deep frame",
+  "--info-fg": "2026-11-12: its text, held to 4.5:1 on that bar",
+};
 const gold = JSON.parse(readFileSync(resolve(__dirname, "fixtures/retroma-golden.json"), "utf8")) as { cases: Record<string, { vars: Record<string, string>; data: Record<string, string> }> };
 
 describe("Retroma engine", () => {

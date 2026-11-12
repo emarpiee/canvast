@@ -303,7 +303,7 @@
 }
 /* (the canvas fills the frame; the gap inside the frame stays as room, with no colour and no ring: the bars and the info bar keep to it) */
 :root[data-look="retroma"] body[data-view="canvas"] .hud-bottom { inset: auto var(--rt-pane-gap) var(--rt-pane-gap); }
-:root[data-look="retroma"] body[data-view="canvas"] .hud-bottom > .hud-readout { border-radius: var(--rt-r-in); corner-shape: var(--rt-corner-pane); }
+:root[data-look="retroma"] body[data-view="canvas"] .hud-bottom > .hud-readout:not(.assets-readout) { border-top: 2px solid var(--rt-info-edge); border-radius: var(--rt-r-in); corner-shape: var(--rt-corner-pane); } /* (Obsidian Retroma's status bar: a darker line on top) */
 :root[data-look="retroma"] body[data-view="canvas"] #canvas-host { /* (the canvas sits straight in the frame: no gap, no panel of its own) */
   inset: var(--rt-pane-out); overflow: hidden;
   border: var(--rt-ring-o) transparent; border-color: var(--rt-ring-o-t) var(--rt-ring-o-r) var(--rt-ring-o-b) var(--rt-ring-o-l);

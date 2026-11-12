@@ -206,7 +206,9 @@ function palette() {
   T.menu = own(S.cMenu, T.btnBg); T.menuOl = own(S.cMenuOl, T.outline);
   T.title = S.focused ? own(S.cTitle, T.frame) : own(S.cTitleOff, T.frame);
   T.titleFg = fix(S.focused ? own(S.cTitleText, T.fgOnFrame) : own(S.cTitleTextOff, T.fgOnFrameMuted), T.title, S.focused ? k : 3);
-  T.status = own(S.cStatus, T.paneAlt); T.statusFg = fix(own(S.cStatusText, T.fgMuted), T.status, k); T.info = own(S.cStatus, T.frameDeep); T.infoFg = fix(own(S.cStatusText, T.onFrameDeep), T.info, k);
+  T.status = own(S.cStatus, T.paneAlt); T.statusFg = fix(own(S.cStatusText, T.fgMuted), T.status, k); T.info = own(S.cStatus, D ? T.frameDeep : rc(0.55, bg, H1)); T.infoFg = fix(own(S.cStatusText, T.onFrameDeep), T.info, k);
+  /* (the owner's: the canvas's info bar as Obsidian Retroma's status bar, the panes' hue half light with a darker edge on top, not the demo's deep frame) */
+  T.infoEdge = D ? T.info : rc(0.35, bg / 2, H1);
   // canvas, cards on it, groups
   const sh = S.sel === "comp" ? H + 180 : S.sel === "custom" ? S.selhue : H;
   T.canvas = own(S.cCanvas, S.ground === "grey" ? rc(D ? 0.42 : 0.62, 0, 0) : S.ground === "dark" ? rc(0.18, 0, 0) : (D ? T.paneAlt : T.paper));
@@ -332,7 +334,7 @@ function lighting(T) {
     "btn-bg": T.btnBg, "btn-hover": T.btnHover, "btn-on": T.btnOn, "field-bg": T.field, chip: T.chip, "second-tint": T.second,
     "outline-c": T.outline, "outline-hover": T.outlineHover, rule: T.rule, fg: T.fg, "fg-muted": T.fgMuted, "fg-on-frame": T.fgOnFrame, "fg-on-frame-muted": T.fgOnFrameMuted, "fg-on-on": T.fgOnOn, "fg-on-second": T.fgOnSecond, "fg-on-canvas": T.fgOnCanvas,
     icon: T.icon, "icon-on": T.iconOn, accent: T.accent, "accent-hover": T.accentHover, "on-accent": T.onAccent, focus: T.focus, select: T.select, selection: T.selection, mat: T.mat, scrim: T.scrim, "pane-inner": T.paneInner, danger: T.danger, hover: T.hover,
-    "hdr-bg": T.hdr, "hdr-fg": T.hdrFg, "mhdr-bg": T.mhdr, "mhdr-fg": T.mhdrFg, "tab-outline": T.tabOutline, "tab-fg-on": T.tabOn, "tab-fg-off": T.tabOff, "menu-bg": T.menu, "menu-ol-c": T.menuOl, "title-bg": T.title, "title-fg": T.titleFg, "status-bg": T.status, "status-fg": T.statusFg, "info-bg": T.info, "info-fg": T.infoFg,
+    "hdr-bg": T.hdr, "hdr-fg": T.hdrFg, "mhdr-bg": T.mhdr, "mhdr-fg": T.mhdrFg, "tab-outline": T.tabOutline, "tab-fg-on": T.tabOn, "tab-fg-off": T.tabOff, "menu-bg": T.menu, "menu-ol-c": T.menuOl, "title-bg": T.title, "title-fg": T.titleFg, "status-bg": T.status, "status-fg": T.statusFg, "info-bg": T.info, "info-fg": T.infoFg, "info-edge": T.infoEdge,
     "ccard-bg": T.ccard, "ccard-ol-c": T.ccardOl, "grp-bg": T.grp, "grp-ol-c": T.grpOl, "img-ol-c": T.imgOl, "folder-pane-bg": T.folderPane, "pdf-bg": T.pdf, "pdf-thumbs-bg": T.pdfThumbs, "m-tool-bg": T.mTool,
     "sb-thumb": { ...T.outline, a: 0.55 }, "sb-track": { ...T.outline, a: 0.06 }, "indent-c": T.guide,
     "ed-bg": T.ed, "ed-hdr-bg": T.edHdr, "pat-c": T.pattern, h1: T.h1, h2: T.h2, h3: T.h3, "h-ul-c": T.hUl, "para-fg": T.para, "bold-c": T.bold, "ital-c": T.ital, "link-c": T.link, "elink-c": T.elink, "link-ul-c": T.linkUl,
