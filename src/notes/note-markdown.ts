@@ -33,12 +33,38 @@ export interface Pasted<T> {
   props: Prop[];
 }
 
-/** Markdown on the clipboard that the editor would not read as it stands (Obsidian's own source: `![[embeds]]`, properties, `[[links]]` and `[^footnotes]` over lines), ready for `markdownHtml`; else null. */
-export function pastedMarkdown(text: string): Pasted<string> | null {
+/** A line that starts a markdown block: a list item (a task too), a heading, a quote, a fence or a table row. */
+const MD_BLOCK = /^[ \t]{0,3}(?:[-*+][ \t]+\S|\d{1,9}[.)][ \t]+\S|#{1,6}[ \t]+\S|>[ \t]?\S|```|~~~|\|.*\|[ \t]*$)/m;
+/** Inline markdown: bold, code, a link with its address, a wiki link. */
+const MD_INLINE = /\*\*[^*\n]+\*\*|__[^_\n]+__|`[^`\n]+`|\[[^\]\n]+\]\([^)\s]+\)|\[\[[^\]\n]+\]\]/;
+/** Elements of a page that are its structure: HTML with none of them is words laid out, not a page drawn from markdown. */
+const HTML_STRUCTURE = /<(?:ul|ol|li|h[1-6]|blockquote|table|pre|strong|b|em|i|code|a)\b/i;
+
+/**
+ * Markdown on the clipboard that the editor would not read as it stands, ready for `markdownHtml`; else null: Obsidian's own source
+ * (`![[embeds]]`, properties, `[[links]]` and `[^footnotes]` over lines), and any markdown that comes as words (a chat app's or a
+ * terminal's copy, a `.md` file in a text editor: `html` empty or holding the same words without lists, headings or marks). Words with
+ * no markdown in them are left to the editor, as they are.
+ */
+export function pastedMarkdown(text: string, html = ""): Pasted<string> | null {
   const t = text.replace(/\r\n/g, "\n");
   const { props, body } = splitFrontmatter(t);
-  if (!props && !/!\[\[/.test(t) && !(t.includes("\n") && /\[\[|\[\^/.test(t))) return null;
+  const obsidian = !!props || /!\[\[/.test(t) || (t.includes("\n") && /\[\[|\[\^/.test(t));
+  const words = !HTML_STRUCTURE.test(html) && (MD_BLOCK.test(body) || MD_INLINE.test(body));
+  if (!obsidian && !words) return null;
   return { content: body, props: props ?? [] };
+}
+
+/**
+ * The marks of a markdown block a writer escapes in a paragraph's lines (`1\.`, `\-`, `\#`, `\>`), taken off, so the lines are read as
+ * the list, heading or quote they say (a note pasted or typed before lists were read from words; see `readMarks` in the notes editor).
+ * An indent written with no-break spaces is spaces again (a list inside a list).
+ */
+export function unescapeMarks(md: string): string {
+  return md
+    .split("\n")
+    .map((line) => line.replace(/^([ \t ]*)(?:(\d{1,9})\\([.)])|\\([-*+>#]))/, (_m, lead: string, n?: string, dot?: string, mark?: string) => `${lead.replace(/ /g, " ")}${n !== undefined ? `${n}${dot}` : mark}`))
+    .join("\n");
 }
 
 /** What Obsidian puts on the clipboard as HTML (a page it drew, when no source came with it), with its embeds and links as this app's own; else null. */

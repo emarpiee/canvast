@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.9: notes read markdown that comes as words, and copy as markdown (2026-11-12)
+
+- **Implemented:** the escaped marks the owner saw (`1\.`, `\-`) came from SunEditor's markdown writer (`escapeLineStart`): lines of a paragraph that start with a block mark are escaped so they stay words. They were words because a paste of markdown as plain text was read as markdown only for Obsidian's own syntax, and typed `-`/`#`/`>` marks were never read (SunEditor reads only `1.` and `---`). `pastedMarkdown(text, html)` reads markdown blocks or inline marks when the clipboard has no page with structure (not in a code block); `partNow` copies and cuts a part as markdown (`mdOf`, wrapped in its lists, quotes, tables, or its own line when selected whole) with `text/html` beside it (`copyTextAndPage` for the toolbar's Copy); `readMarks` (the `/` menu's *Lines with marks into lists*) reads paragraphs with escaped marks again (`unescapeMarks`); setting `notes.typedMarks` (device, off) makes typed marks formats.
+- **Tested:** typecheck and build here; notes.spec copy test extended (a part as markdown) and a new test (paste as words, the `/` command on an escaped file, typed marks with the setting on), on GitHub.
+- **Known failures:** none known.
+- **Unverified:** Firefox (its paste and copy events cannot carry test data); pasting from real chat apps and editors by hand.
+- **Committed:** v0.57.9 on `main`.
+- **Next bounded task:** read this push's Tests run.
+
 ## v0.57.8: wheel zoom no longer rebuilds the view at every level (2026-11-12)
 
 - **Implemented:** `TileCache` judges what a view costs (`lastFullMs`, `lastFullObjects`) from every set started for it once its view is whole, built in one frame or in slices over a backdrop (`Generation.measuring`, `buildMs`); before, only a set built in one frame was measured, so one slow build left a view dense for good and a wheel zoom built a set at each level crossed (the Pan and zoom standard's intermittent `wheel-zoom-slow` 984 tiles, 40 sets thrown away: 3 of the last 8 pushes). The `Tests` workflow takes `spec`, `project` and `repeat` (branch `ci-one-spec` merged). The flaky paste step of `vectors.spec.ts` "adjustments on a shape" now reports what the page was in when it fails (objects added, read-only, focus, notices).

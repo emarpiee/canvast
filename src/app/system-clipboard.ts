@@ -130,6 +130,16 @@ export async function copyPlainText(text: string): Promise<boolean> {
   }
 }
 
+/** Words for apps that take text and the same as a page for apps that take pages; the words alone where the browser cannot write both. */
+export async function copyTextAndPage(text: string, html: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ "text/plain": new Blob([text], { type: "text/plain" }), "text/html": new Blob([html], { type: "text/html" }) })]);
+    return true;
+  } catch {
+    return copyPlainText(text);
+  }
+}
+
 /** One picture on the clipboard as two types is one file: its vectors, when there are both. */
 export const onePerPicture = (files: readonly File[]): File[] => {
   const svg = files.filter((f) => f.type === SVG_TYPE);
