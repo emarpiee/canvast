@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.57.2 — Long films start at once, pinned folders' pin before the count (2026-11-12)
+
+- **Fixed:** in the desktop app a video or sound file of `library/` plays as it is read (a part at a time from the workspace folder), in the gallery and on the canvas: an hour-long film started only after its whole file was read into the page (most of a minute), and its details read it whole again; in the gallery a film past the import limit plays too.
+- **Changed:** a pinned folder shows its filled pin just before its count, not at the row's edge.
+
 ## 0.57.1 — Outline width in the bar, folders without arrows, wider Settings (2026-11-12)
 
 - **Added:** the outline's width beside **Outline** in the bar, between the colour and Outline options, for every selected object that has an outline: type it or drag the field.

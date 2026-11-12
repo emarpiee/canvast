@@ -27,6 +27,7 @@ for (const out of [process.stdout, process.stderr]) out.on("error", () => undefi
 import type { LibraryQuery } from "./library-index";
 import type { LibraryOp } from "../src/storage/desktop-bridge";
 import { pathToFileURL } from "node:url";
+import { Readable } from "node:stream";
 import { SHARED, SHARE_CALLS, WRITE_CALLS, installShare, shareChanged } from "./share-host";
 import { installGuestCalls } from "./guest-window";
 
@@ -244,6 +245,40 @@ async function inside(root: string, rel: string): Promise<string> {
     }
   }
   return full;
+}
+
+/** What a media file is, by its extension, for the element that plays it (it reads the file's own header too). */
+const MEDIA_TYPES: Record<string, string> = {
+  mp4: "video/mp4", m4v: "video/mp4", mov: "video/quicktime", webm: "video/webm", mkv: "video/x-matroska", ogv: "video/ogg", avi: "video/x-msvideo",
+  mp3: "audio/mpeg", m4a: "audio/mp4", aac: "audio/aac", wav: "audio/wav", ogg: "audio/ogg", oga: "audio/ogg", opus: "audio/ogg", flac: "audio/flac",
+};
+
+/**
+ * A readable library file of the workspace (`library/…`, never a hidden item's sealed file), served to the page's video or sound element a byte
+ * range at a time, so a long film plays at once instead of after the whole file has gone through the page. Anything else is not found.
+ */
+async function mediaResponse(root: string, rel: string, range: string | null): Promise<Response> {
+  const none = (): Response => new Response("not found", { status: 404 });
+  if (!rel.startsWith("library/") || isHiddenFile(rel)) return none();
+  let real: string;
+  try {
+    real = await realpath(await inside(root, rel)); // (the file itself must not be a link out either)
+    const realRoot = await realpath(root);
+    if (!real.startsWith(realRoot + sep)) return none();
+  } catch {
+    return none();
+  }
+  const info = await stat(real).catch(() => null);
+  if (!info?.isFile()) return none();
+  const size = info.size;
+  const type = MEDIA_TYPES[rel.slice(rel.lastIndexOf(".") + 1).toLowerCase()] ?? "application/octet-stream";
+  const body = (start: number, end: number): ReadableStream => Readable.toWeb(createReadStream(real, { start, end })) as ReadableStream;
+  const m = /^bytes=(\d*)-(\d*)$/.exec(range?.trim() ?? "");
+  if (!m || (!m[1] && !m[2])) return new Response(size ? body(0, size - 1) : "", { status: 200, headers: { "Content-Type": type, "Content-Length": String(size), "Accept-Ranges": "bytes" } });
+  const start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
+  const end = m[1] && m[2] ? Math.min(Number(m[2]), size - 1) : size - 1;
+  if (start > end || start >= size) return new Response("", { status: 416, headers: { "Content-Range": `bytes */${size}` } });
+  return new Response(body(start, end), { status: 206, headers: { "Content-Type": type, "Content-Length": String(end - start + 1), "Content-Range": `bytes ${start}-${end}/${size}`, "Accept-Ranges": "bytes" } });
 }
 
 /**
@@ -1148,9 +1183,18 @@ async function partitionOf(workspace: string): Promise<string> {
 async function openWindow(workspace: string): Promise<void> {
   const partition = await partitionOf(workspace);
   const ses = session.fromPartition(partition);
-  // Only the app itself is served; any other path of the scheme is not found.
+  // The app itself, and the workspace's readable library files for its video and sound elements (a part at a time); any other path is not found.
   ses.protocol.handle(SCHEME, (req) => {
     const url = new URL(req.url);
+    if (url.host === "canvast" && url.pathname.startsWith("/media/")) {
+      let rel = "";
+      try {
+        rel = decodeURIComponent(url.pathname.slice("/media/".length));
+      } catch {
+        return new Response("not found", { status: 404 });
+      }
+      return mediaResponse(workspace, rel, req.headers.get("range"));
+    }
     if (url.host !== "canvast" || (url.pathname !== "/" && url.pathname !== "/canvast.html")) return new Response("not found", { status: 404 });
     return net.fetch(pathToFileURL(HTML).toString());
   });

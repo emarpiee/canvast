@@ -637,6 +637,12 @@ export class DesktopOriginals implements OriginalStore {
     return (await desktopBridge()?.hash(path).catch(() => null)) ?? null;
   }
 
+  async mediaUrl(hash: string): Promise<string | null> {
+    const file = await this.fileOf(hash);
+    // (the desktop shell serves the workspace's readable library files at app://canvast/media/, a byte range at a time: desktop/main.ts)
+    return file?.startsWith("library/") && location.protocol === "app:" ? `${location.origin}/media/${file.split("/").map(encodeURIComponent).join("/")}` : null;
+  }
+
   async entryState(hash: string): Promise<CatalogEntry["state"] | undefined> {
     return (await this.lib.entry(hash))?.state;
   }

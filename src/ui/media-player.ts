@@ -32,6 +32,8 @@ export interface MediaPlayerActions {
   extract(id: string, png: Blob, label: string): void;
   /** Draw the instance again (its picture was replaced). */
   repaint(id: string): void;
+  /** Where a video or sound plays from a part at a time (`OriginalStore.mediaUrl`), or null: its file is read whole. */
+  mediaUrl(hash: string): Promise<string | null>;
 }
 
 /** Beyond this many CSS px a side, the overlay is not laid out (browsers cap element sizes); the media still plays. */
@@ -44,7 +46,8 @@ export interface Engine {
   readonly el: HTMLElement;
   /** Whether the overlay is drawn over the picture (audio has none). */
   visual: boolean;
-  load(o: ImageObject, blob: Blob, duration: number): Promise<void>;
+  /** `src`: the file, or an address it plays from a part at a time (`OriginalStore.mediaUrl`; a GIF is always the file). */
+  load(o: ImageObject, src: Blob | string, duration: number): Promise<void>;
   unload(): void;
   pos(): number;
   /** The last position: scrubber range and "play from the start" test. */
@@ -87,11 +90,12 @@ export function avEngine(v: HTMLVideoElement): Engine {
   const e: Engine = {
     el: v,
     visual: true,
-    async load(o, blob, dur) {
-      url = URL.createObjectURL(blob);
-      file = blob;
+    async load(o, src, dur) {
+      // (an address is streamed by the element; a file is made an address of its own, kept for the frames the element cannot give)
+      url = typeof src === "string" ? "" : URL.createObjectURL(src);
+      file = typeof src === "string" ? null : src;
       v.muted = false;
-      v.src = url;
+      v.src = typeof src === "string" ? src : url;
       await new Promise<void>((res, rej) => {
         v.addEventListener("loadedmetadata", () => res(), { once: true });
         v.addEventListener("error", () => rej(new Error("this browser cannot play the file")), { once: true });
@@ -144,7 +148,7 @@ export function avEngine(v: HTMLVideoElement): Engine {
     step: (dir, amount, repeat) => e.seek(stepTime(e.pos(), dir * amount, duration, repeat)),
     label: () => `${formatTime(e.pos())} / ${formatTime(duration)}`,
     async frame() {
-      if (!file || !v.videoWidth || v.readyState < 2) return null;
+      if (!v.videoWidth || v.readyState < 2) return null;
       const bmp = await pictureNow(v, file, e.pos());
       if (!bmp) return null;
       const c = document.createElement("canvas");
@@ -155,7 +159,7 @@ export function avEngine(v: HTMLVideoElement): Engine {
       return new Promise((res) => c.toBlob(res, "image/png"));
     },
     async snap() {
-      return file && v.videoWidth ? pictureNow(v, file, e.pos()) : null;
+      return v.videoWidth ? pictureNow(v, file, e.pos()) : null;
     },
     shown: Promise.resolve(null),
     onSettled: () => undefined,
@@ -224,8 +228,9 @@ export function gifEngine(c: HTMLCanvasElement): Engine {
   const e: Engine = {
     el: c,
     visual: true,
-    async load(o, blob) {
-      g = new GifFrames(new Uint8Array(await blob.arrayBuffer()));
+    async load(o, src) {
+      if (typeof src === "string") throw new Error("a GIF is read whole");
+      g = new GifFrames(new Uint8Array(await src.arrayBuffer()));
       c.width = g.width;
       c.height = g.height;
       loop = o.media!.repeat;
@@ -479,11 +484,13 @@ export function mountMediaPlayer(host: HTMLElement, view: ViewState, doc: Docume
 
   const open = async (p: Player): Promise<void> => {
     const mine = ++p.loading;
-    const rec = await assets.record(p.o.assetId);
+    // (a video or a sound from its address where it has one: a long film starts at once, not after its whole file is read into the page)
+    const url = p.eng.el instanceof HTMLMediaElement ? await actions.mediaUrl(p.o.assetId.split("#")[0]!).catch(() => null) : null;
+    const rec = url ? null : await assets.record(p.o.assetId);
     if (mine !== p.loading || players.get(p.o.id) !== p) return;
     try {
-      if (!rec) throw new Error("file missing");
-      await p.eng.load(p.o, rec.blob, rec.duration ?? 0);
+      if (!url && !rec) throw new Error("file missing");
+      await p.eng.load(p.o, url ?? rec!.blob, rec?.duration ?? 0);
     } catch {
       if (mine === p.loading) {
         p.loading = 0;

@@ -1320,7 +1320,7 @@ async function start(): Promise<void> {
   });
   const bookmarkTour = mountTour(document.body, view, bookmarkList, settings);
   mountBookmarksPanel(side, editor, bookmarkList, () => (assets.revealing ? padlocked(() => (renderNow(), captureThumb(canvas))) : captureThumb(canvas)), () => bookmarkTour.start(), { update: (ids) => void refreshThumbs(ids) }, () => void bookmarkPicked());
-  mountMediaPlayer(host, view, doc, editor, assets, settings, { setMedia: (id, patch, label) => setMedia(doc, editor, id, patch, label), extract: (id, png, label) => void extractFrame(doc, editor, assets, id, png, label, (shot) => storeFrame(assets, session, settings, shot)), repaint: (id) => { tiles.invalidate(new Set([id])); invalidate(); } });
+  mountMediaPlayer(host, view, doc, editor, assets, settings, { setMedia: (id, patch, label) => setMedia(doc, editor, id, patch, label), extract: (id, png, label) => void extractFrame(doc, editor, assets, id, png, label, (shot) => storeFrame(assets, session, settings, shot)), repaint: (id) => { tiles.invalidate(new Set([id])); invalidate(); }, mediaUrl: (h) => session.storage?.originals.mediaUrl(h) ?? Promise.resolve(null) });
   mountLayersPanel(side, editor, doc, {
     setFlagOn: (ids, flag, on) => setFlagOn(doc, editor, ids, flag, on),
     setClip: (id, clip) => setSheetClip(doc, editor, id, clip),

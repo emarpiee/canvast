@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.2: long films stream in the desktop app; pinned folders' pin before the count (2026-11-12)
+
+- **Implemented:** `OriginalStore.mediaUrl` (desktop: `app://canvast/media/<library path>`, served a byte range at a time by the shell from `library/` only, never `.hidden/` or a link out; browser: null, its Blobs already stream); the gallery and the canvas player play from it; the details check a video's size before reading it; `media-src` allows `app:`; a pinned folder's pin is drawn before its count.
+- **Tested:** in the desktop app while building: a 40-minute film ready to play 2 s after opening, a seek to 38 min plays; the route answers a range and refuses `.hidden/`, a link out and `..`; the sandbox test in `desktop.spec.ts` extended with those answers; the GitHub `Tests` run of this push is the check.
+- **Known failures:** a hidden video is still decrypted whole before it plays.
+- **Unverified:** frame extraction from a streamed film uses the element's picture only (no decode of the file when that picture is blank).
+- **Committed:** v0.57.2 on `main`.
+- **Next bounded task:** conceal folders, waiting for the owner's go on the plan.
+
 ## v0.57.1: outline width in the bar, folders without arrows, wider Settings (2026-11-12)
 
 - **Implemented:** the outline's width field beside Outline (type or drag, as Outline options); Library folders open and close on their row with a branch mark and an always-shown pin when pinned; Settings up to 1600 px with a tab's cards in two columns on a wide screen; a choice's quoted value kept; a row left out hidden.

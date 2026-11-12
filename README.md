@@ -362,6 +362,7 @@ Keep a key frame of a clip as a still picture, to draw from or to place in a sto
 | Out of view | Playback continues when the item scrolls out of view |
 | **Extract frame** | Turns the current frame of a video or GIF into a picture in the library (PNG, WebP or JPEG). Settings name it, file it in a folder and tag it, optionally placing it on the canvas |
 | On a sheet that clips | A playing video is cut by the sheet's shape, as the canvas cuts it |
+| Long films (desktop app) | A video or sound file in the workspace's `library/` plays as it is read, on the canvas and in the gallery: an hour-long film starts at once, and in the gallery a file past the import limit plays too. A hidden one is decrypted whole first, so it takes longer to start |
 
 ### Sheets
 

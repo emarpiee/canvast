@@ -187,6 +187,10 @@ export class IdbOriginals implements OriginalStore {
     return rec?.ext && rec.file && !isHiddenFile(rec.file) ? rec.file : null;
   }
 
+  async mediaUrl(_hash: string): Promise<string | null> {
+    return null; // (the browser's storage gives a Blob that is read from the disk as it plays already)
+  }
+
   async hashAt(_path: string): Promise<string | null> {
     return null; // (no files: an item is found by its name)
   }

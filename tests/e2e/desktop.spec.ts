@@ -68,10 +68,18 @@ async function exportBackup(app: ElectronApplication, page: Page, to: string, as
   return readFileSync(to);
 }
 
-test("the desktop page is sandboxed: no Node, no path outside the workspace folder, nothing from the network", async () => {
+test("the desktop page is sandboxed: no Node, no path outside the workspace folder, nothing from the network; media plays a part at a time from library/ only", async () => {
   const ws = tempDir("canvast-ws-");
   const outside = tempDir("canvast-out-");
   symlinkSync(outside, join(ws, "link-out")); // a link inside the workspace that leads out of it
+  // what the media address may serve (a library file, a byte range of it) and what it must not (a hidden item's sealed file, a link out of library/)
+  mkdirSync(join(ws, "library/video"), { recursive: true });
+  mkdirSync(join(ws, ".hidden"), { recursive: true });
+  writeFileSync(join(ws, "library/video/clip.mp4"), Buffer.from([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]));
+  writeFileSync(join(ws, ".hidden/sealed"), Buffer.from([9, 9]));
+  const elsewhere = tempDir("canvast-else-");
+  writeFileSync(join(elsewhere, "secret.mp4"), Buffer.from([7, 7]));
+  symlinkSync(join(elsewhere, "secret.mp4"), join(ws, "library/video/out.mp4"));
   const { app, page, requests } = await launch(ws);
   try {
     expect(page.url()).toBe("app://canvast/#debug");
@@ -93,6 +101,16 @@ test("the desktop page is sandboxed: no Node, no path outside the workspace fold
       return out;
     });
     expect(refused).toEqual(["../escape.txt: refused", "/abs: refused", "dots: refused", "link: refused", "read link: refused"]);
+    const media = await app.evaluate(async ({ BrowserWindow }, paths) => {
+      const ses = BrowserWindow.getAllWindows()[0]!.webContents.session;
+      const out: string[] = [];
+      for (const p of paths) {
+        const r = await ses.fetch(`app://canvast/media/${p}`, { headers: { Range: "bytes=2-4" } });
+        out.push(`${p}: ${r.status}${r.status === 206 ? ` ${r.headers.get("content-range")} ${[...new Uint8Array(await r.arrayBuffer())].join(",")}` : ""}`);
+      }
+      return out;
+    }, ["library/video/clip.mp4", ".hidden/sealed", "library/video/out.mp4", "library/..%2F.hidden%2Fsealed", "link-out/x.mp4"]);
+    expect(media).toEqual(["library/video/clip.mp4: 206 bytes 2-4/10 2,3,4", ".hidden/sealed: 404", "library/video/out.mp4: 404", "library/..%2F.hidden%2Fsealed: 404", "link-out/x.mp4: 404"]);
     // Many writes of one file at once (hidden.json while hidden files move) all land: each has its own temporary file.
     expect(await page.evaluate(() => Promise.allSettled(Array.from({ length: 40 }, (_, i) => window.canvastDesktop!.write("burst.json", new Uint8Array([i])))).then((r) => r.filter((x) => x.status === "rejected").length))).toBe(0);
     expect(readdirSync(ws).filter((n) => n.startsWith("burst.json"))).toEqual(["burst.json"]);

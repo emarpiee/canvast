@@ -1739,7 +1739,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
     slideAlpha = false;
     viewer.classList.remove("is-font", "has-alpha");
     checker.hidden = true;
-    const rec = e.present ? await assets.record(hash).catch(() => undefined) : undefined;
+    // A video or a sound plays from its address where there is one (a file of the workspace folder, read a part at a time as it plays):
+    // the whole file is not read into the page first, which took a long film most of a minute.
+    const stream = e.present && /^(video|audio)\//.test(e.type) ? ((await session.storage?.originals.mediaUrl(hash).catch(() => null)) ?? null) : null;
+    const rec = e.present ? (stream ? ({ hash, name: e.name, type: e.type, size: e.size, blob: new Blob([]) } as AssetRecord) : await assets.record(hash).catch(() => undefined)) : undefined;
     if (token !== slideToken) return;
     if (rec?.type === "image/svg+xml") {
       // A vector picture is the picture itself, drawn at the size it is shown: not capped at a few times its small natural size, and never pixelated.
@@ -1812,7 +1815,6 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         return;
       } },
       { claims: () => /^(video|audio)\//.test(rec.type), show: async () => {
-        slideUrl = URL.createObjectURL(rec.blob);
         // A video or audio original plays here, with the same player as on the canvas (an audio file shows the picture of its waveform above it).
         const isVideo = rec.type.startsWith("video/");
         slideImg.hidden = isVideo;
@@ -1824,7 +1826,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
         };
         slideMedia.hidden = false;
         try {
-          await avEng.load(playOf(false), rec.blob, rec.duration ?? 0);
+          await avEng.load(playOf(false), stream ?? rec.blob, rec.duration ?? 0);
         } catch {
           if (token !== slideToken) return;
           unloadMedia();
@@ -2702,10 +2704,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
       return `<button type="button" class="side-more" data-side-more data-kind="${kind}" data-id="${esc(id)}" aria-haspopup="menu" aria-expanded="false" aria-label="More actions for ${kindWord[kind]} ${esc(name)}" title="More">${ICONS.ellipsis}</button>`;
     };
     const picked = pickedKeys(scope);
-    const item = (key: string, label: string, n: number | null, opts: { depth?: number; icon?: string; extra?: string; cls?: string; before?: string; title?: string; /** What the row does, in place of choosing a scope. */ attrs?: string; /** A row with rows under it: open or not (a click opens or closes it). */ expanded?: boolean } = {}): string => {
+    const item = (key: string, label: string, n: number | null, opts: { depth?: number; icon?: string; /** Before the count (a pinned folder's pin). */ mark?: string; extra?: string; cls?: string; before?: string; title?: string; /** What the row does, in place of choosing a scope. */ attrs?: string; /** A row with rows under it: open or not (a click opens or closes it). */ expanded?: boolean } = {}): string => {
       const current = TRASH_WORD.test(search.value) ? key === "trash" : scope === key || picked.has(key);
       return `<li class="side-row ${opts.cls ?? ""}${current ? " is-current" : ""}" style="--depth:${opts.depth ?? 0}">${opts.before ?? ""}<button type="button" class="side-item${current ? " is-active" : ""}" ${opts.attrs ?? `data-scope="${esc(key)}" aria-current="${scope === key || picked.has(key)}"`}${opts.expanded === undefined ? "" : ` aria-expanded="${opts.expanded}"`} title="${opts.title ?? label.replace(/<[^>]*>/g, "")}${/^(ext|tag):/.test(key) ? " (Ctrl+click: add to the filter)" : ""}">
-        ${opts.icon ?? ""}<span class="side-label">${label}</span>${opts.expanded === undefined ? "" : `<span class="side-kids" aria-hidden="true"></span>`}${n === null ? "" : `<span class="side-n${opts.before !== undefined ? " layer-count" : ""}">${n}</span>`}</button>${opts.extra ?? ""}</li>`;
+        ${opts.icon ?? ""}<span class="side-label">${label}</span>${opts.mark ?? ""}${opts.expanded === undefined ? "" : `<span class="side-kids" aria-hidden="true"></span>`}${n === null ? "" : `<span class="side-n${opts.before !== undefined ? " layer-count" : ""}">${n}</span>`}</button>${opts.extra ?? ""}</li>`;
     };
     const nameInput = (value: string, label: string): string =>
       `<li class="side-row"><input class="side-name" data-testid="folder-name-input" value="${esc(value)}" aria-label="${label}" maxlength="120"></li>`;
@@ -2738,6 +2740,7 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
           : item(`folder:${f.id}`, esc(f.name), subtreeCount(f.id), {
               depth: at.depth,
               cls: `tree-row${pinnedNow.has(f.id) ? " is-pinned" : ""}`,
+              ...(ui.pinned.includes(f.id) ? { mark: `<span class="side-pinned" aria-hidden="true">${ICONS.pin}</span>` } : {}), // (a pinned folder says so before its count)
               before: treeGuides(at.depth, at.last, at.conts), // (no arrow: a folder with subfolders opens and closes on its own row)
               ...(at.hasKids && !findingFolders ? { expanded: at.open } : {}),
               icon: pinnedNow.has(f.id) ? ICONS.folderUp : at.open ? ICONS.folderOpen : ICONS.folder,
@@ -3133,9 +3136,10 @@ export function mountAssetsView(root: HTMLElement, session: Session, assets: Ass
 
   /** What the file says about itself, put in the details panel when it has read it (ADR 0138). */
   const fillMetadata = async (hash: string, type: string): Promise<void> => {
+    const video = /^(video|audio)\//.test(type);
+    if (video && (entryOf(hash)?.size ?? 0) > 100 * 2 ** 20) return; // (known from its entry: a long film is not read whole only to be left alone)
     const rec = await assets.record(hash).catch(() => undefined);
     if (!rec) return;
-    const video = /^(video|audio)\//.test(type);
     if (video && rec.blob.size > 100 * 2 ** 20) return;
     const bytes = new Uint8Array(await (video ? rec.blob : rec.blob.slice(0, 2 * 2 ** 20)).arrayBuffer());
     const { rows } = await readMetadata(bytes, type);

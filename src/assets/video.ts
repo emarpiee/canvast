@@ -221,11 +221,11 @@ export async function decodeAudio(blob: Blob): Promise<{ bitmap: ImageBitmap; du
 }
 
 /** The picture a video element shows now, whichever way works here: the element, else (MP4) the file's own frame at `t`. */
-export async function pictureNow(v: HTMLVideoElement, blob: Blob, t: number): Promise<ImageBitmap | null> {
+export async function pictureNow(v: HTMLVideoElement, blob: Blob | null, t: number): Promise<ImageBitmap | null> {
   const b = elementBlank ? null : await frameBitmap(v).catch(() => null);
   if (b && !isFlat(b)) return b;
   // Flat: a real flat frame, or a browser that draws nothing. The file's own frame tells; where it cannot be decoded that way, keep the element's.
-  const f = await decodeMp4Frame(blob, t).then((r) => r.bitmap, () => null);
+  const f = blob ? await decodeMp4Frame(blob, t).then((r) => r.bitmap, () => null) : null; // (a film played from its address: the element's picture only)
   if (f) {
     b?.close();
     return f;
