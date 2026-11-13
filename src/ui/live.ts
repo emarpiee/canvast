@@ -4,7 +4,7 @@
  * the field, the end of a drag) it is stored as one undo step (`apply(value, true)`). Every numeric field of the bars and popovers
  * goes through here, so none can forget to be live.
  */
-export function liveNumber(input: HTMLInputElement, apply: (value: number, final: boolean) => void, parse: (text: string) => number = Number): void {
+export function liveNumber(input: HTMLInputElement, apply: (value: number, final: boolean) => void, parse: (text: string) => number = Number, /** An emptied field is a value too (NaN, when settled): for a field whose empty means automatic. */ emptyMeansAuto = false): void {
   const read = (): number | null => {
     const t = input.value.trim();
     if (t === "") return null;
@@ -18,5 +18,6 @@ export function liveNumber(input: HTMLInputElement, apply: (value: number, final
   input.addEventListener("change", () => {
     const v = read();
     if (v !== null) apply(v, true);
+    else if (emptyMeansAuto && input.value.trim() === "") apply(NaN, true);
   });
 }

@@ -47,6 +47,15 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.57.22: auto layout audited (2026-11-13)
+
+- **Implemented:** `placeItems` contains a filling picture in its room (`ItemSize.keep`), the Fill choice of a picture offers Own size and Fill the room (`InLayoutState.keepShape`); `liveNumber` takes an emptied field as a value where asked (Columns).
+- **Tested:** a scratch audit of every auto layout control and behaviour through real input (creation, the six flows, gap, padding and each side, align, pack and spread, Size and Doesn't fit, hand resize, columns, Auto by count and shape, tracks, spans, row height, the five sort rules, layout styles, Fill, Min/Max, Keep out, gap and padding handles, live reflow, drop on and off, delete and undo/redo, nested sheets, pictures, copy and paste, reload, off and on): 122 of 122 checks in Chromium and in Firefox, after the two fixes. Unit test (a picture fills in shape) and the sheets spec (Columns emptied) extended; Tests on GitHub.
+- **Known failures:** none known.
+- **Unverified:** touch input.
+- **Committed:** v0.57.22 on `main`.
+- **Next bounded task:** a green run, then the 0.58.0 release.
+
 ## v0.57.21: a sheet's size in plain words (2026-11-13)
 
 - **Implemented:** ADR 0196: the Size choice (`data-layout-size`) replaces the Hug toggles; a hand resize sets only the flow's axis (`setAxisOf`, `withAutoLayout`); `layoutOverflow` and the bar's Doesn't fit: Fit; Pack start hidden when it has no room; the bar's labels obey `hidden` (`.tb-count label:not([hidden])`).

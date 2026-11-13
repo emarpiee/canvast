@@ -32,7 +32,7 @@ export const DEFAULT_LAYOUT: SheetLayout = { flow: "row", gap: [0, 0], pad: [0, 
 /** A box in the sheet's units, from its top-left corner. */
 export interface Cell { x: number; y: number; w: number; h: number }
 /** An item to place: its size, whether it fills the room along an axis (within its least and most share of the room), and in a grid how many columns and rows it covers. */
-export interface ItemSize { w: number; h: number; fill?: "x" | "y" | "both"; span?: readonly [number, number]; min?: readonly [number, number]; max?: readonly [number, number] }
+export interface ItemSize { w: number; h: number; fill?: "x" | "y" | "both"; span?: readonly [number, number]; min?: readonly [number, number]; max?: readonly [number, number]; /** A picture: a fill never changes its shape. */ keep?: true }
 
 const offset = (free: number, how: string): number => (how === "centre" ? free / 2 : how === "end" ? free : 0);
 /** A filling item's length on an axis (0 across, 1 down) held between its least and most share of the room. */
@@ -51,9 +51,22 @@ const median = (vs: readonly number[]): number => [...vs].sort((a, b) => a - b)[
  * masonry and justified rows have rules of their own (`placeGrid`, `placeMasonry`, `placeJustified`).
  */
 export function placeItems(l: SheetLayout, W: number, H: number, items: readonly ItemSize[]): { cells: Cell[]; w: number; h: number } {
-  if (l.flow === "grid") return placeGrid(l, W, H, items);
-  if (l.flow === "masonry") return placeMasonry(l, W, H, items);
-  if (l.flow === "justified") return placeJustified(l, W, H, items);
+  const got = l.flow === "grid" ? placeGrid(l, W, H, items) : l.flow === "masonry" ? placeMasonry(l, W, H, items) : l.flow === "justified" ? placeJustified(l, W, H, items) : placeLines(l, W, H, items);
+  if (!items.some((i) => i.keep && i.fill)) return got;
+  // (a picture that fills keeps its shape: as large as the room it is given allows, in the middle of it; ADR 0196)
+  return {
+    ...got,
+    cells: got.cells.map((c, k) => {
+      const it = items[k]!;
+      if (!it.keep || !it.fill || !(it.w > 0 && it.h > 0)) return c;
+      const s = Math.min(c.w / it.w, c.h / it.h), w = it.w * s, h = it.h * s;
+      return { x: c.x + (c.w - w) / 2, y: c.y + (c.h - h) / 2, w, h };
+    }),
+  };
+}
+
+/** Row, column and wrap: items along the flow in lines (see `placeItems`). */
+function placeLines(l: SheetLayout, W: number, H: number, items: readonly ItemSize[]): { cells: Cell[]; w: number; h: number } {
   const col = l.flow === "column";
   const [padT, padR, padB, padL] = l.pad;
   const [gapM, gapC] = l.gap;
@@ -419,7 +432,7 @@ export function layOutSheet(sheet: LaidOutSheet, all: readonly CanvasObject[], s
   return [...out.values()];
 }
 
-const itemOf = (un: Unit): ItemSize => ({ w: un.x1 - un.x0, h: un.y1 - un.y0, ...(un.fill ? { fill: un.fill } : {}), ...(un.span ? { span: un.span } : {}), ...(un.min ? { min: un.min } : {}), ...(un.max ? { max: un.max } : {}) });
+const itemOf = (un: Unit): ItemSize => ({ w: un.x1 - un.x0, h: un.y1 - un.y0, ...(un.objs.length === 1 && un.objs[0]!.kind === "image" ? { keep: true as const } : {}), ...(un.fill ? { fill: un.fill } : {}), ...(un.span ? { span: un.span } : {}), ...(un.min ? { min: un.min } : {}), ...(un.max ? { max: un.max } : {}) });
 
 /**
  * Whether what is laid out on a sheet of a set size runs past its edge, across and down (ADR 0196): the sheet cuts it off, so the bar says so

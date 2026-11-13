@@ -920,7 +920,7 @@ test("auto layout: Shift+A puts the picked things on a sheet that lays them out 
 
 test("auto layout, more (ADR 0193): live reflow while dragging, the gap handle, masonry, justified rows, grid tracks and spans, a sort rule, a saved layout", async ({ app }) => {
   const p = app.page;
-  type Laid = Obj & { inLayout?: { span?: number[] }; container?: { clip: boolean; layout?: { flow: string; gap: number[]; rowHeight?: number; cols?: Array<{ size: string }>; sort?: string } } };
+  type Laid = Obj & { inLayout?: { span?: number[] }; container?: { clip: boolean; layout?: { flow: string; gap: number[]; rowHeight?: number; columns?: number; cols?: Array<{ size: string }>; sort?: string } } };
   const laid = async (): Promise<Laid[]> => (await objs(app)) as Laid[];
   const boxOf = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box;
   const shown = async (id: string) => (await p.evaluate((i) => window.__canvastDebug.shownBox(i), id))!;
@@ -960,6 +960,14 @@ test("auto layout, more (ADR 0193): live reflow while dragging, the gap handle, 
   await p.locator('[data-layout-flow="justified"]').click();
   await expect.poll(async () => (await layout()).rowHeight ?? 0).toBeGreaterThan(0);
   await p.locator('[data-layout-flow="grid"]').click();
+  // (a number of columns set, then emptied: chosen automatically again)
+  await p.locator("[data-layout-columns]").fill("2");
+  await p.locator("[data-layout-columns]").press("Enter");
+  await expect.poll(async () => (await layout()).columns).toBe(2);
+  await p.locator("[data-layout-columns]").fill("");
+  await p.locator("[data-layout-columns]").press("Enter");
+  await expect.poll(async () => (await layout()).columns).toBeUndefined();
+  await expect(p.locator("[data-layout-colsby]")).toBeVisible();
   await p.locator("[data-layout-tracks]").click();
   await p.locator('button[data-track="c:0:fixed"]').click();
   await expect.poll(async () => (await layout()).cols?.[0]?.size).toBe("fixed");

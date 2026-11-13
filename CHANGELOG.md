@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.57.22 — Auto layout audited: pictures keep their shape (2026-11-13)
+
+- **Fixed:** a picture set to Fill on a laid-out sheet was stretched out of shape (a wide photograph squashed into a tall cell); it now grows as large as its room allows and keeps its shape. Its choice reads Fill the room.
+- **Fixed:** emptying Columns did not go back to automatic columns; it kept the last number.
+
 ## 0.57.21 — A sheet's size in plain words, and nothing cut off by a resize (2026-11-13)
 
 - **Changed:** auto layout's two Hug toggles are one **Size** choice: Fits contents, Set width, Set height or Set size.

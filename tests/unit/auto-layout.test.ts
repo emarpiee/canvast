@@ -94,6 +94,10 @@ describe("masonry, justified rows, tracks, spans and limits (ADR 0193)", () => {
     const lo = placeItems(l({ flow: "row", hug: [false, false] }), 100, 20, [{ w: 10, h: 10, fill: "y", min: [0, 0.8] }]);
     expect(lo.cells[0]!.h).toBe(20);
   });
+  it("a picture that fills keeps its shape: as large as its room allows, in the middle of it (ADR 0196)", () => {
+    const pic = placeItems(l({ flow: "row", hug: [false, false] }), 100, 20, [{ w: 30, h: 10, fill: "both", keep: true }]);
+    expect(pic.cells[0]).toEqual({ x: 20, y: 0, w: 60, h: 20 });
+  });
 });
 
 describe("laying out a sheet (layOutSheet, withAutoLayout)", () => {

@@ -709,7 +709,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const al = actions.autoLayout();
     if (al) actions.setAutoLayout({ hug: [al.layout.hug[0] || al.overflow[0], al.layout.hug[1] || al.overflow[1]] });
   });
-  liveNumber(layoutEl("[data-layout-columns]"), (v, final) => { if (final) actions.setAutoLayout(Number.isFinite(v) && v >= 1 ? { columns: Math.round(v) } : { columns: undefined, cols: undefined }); });
+  liveNumber(layoutEl("[data-layout-columns]"), (v, final) => { if (final) actions.setAutoLayout(Number.isFinite(v) && v >= 1 ? { columns: Math.round(v) } : { columns: undefined, cols: undefined }); }, Number, true);
   layoutEl<HTMLSelectElement>("[data-layout-colsby]").addEventListener("change", (e) => actions.setAutoLayout({ columnsBy: (e.target as HTMLSelectElement).value as "count" | "shape" }));
   liveNumber(layoutEl("[data-layout-rowh]"), (v, final) => { const u = toUnits(v); if (Number.isFinite(u) && u > 0) actions.setAutoLayout({ rowHeight: u }, final); });
   layoutEl<HTMLSelectElement>("[data-layout-sort]").addEventListener("change", (e) => { const v = (e.target as HTMLSelectElement).value; actions.setAutoLayout({ sort: v ? (v as SheetLayout["sort"]) : undefined }); });
@@ -1178,6 +1178,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       const fill = root.querySelector<HTMLSelectElement>("[data-in-fill]")!;
       fill.value = il.fill;
       fill.disabled = !il.stretch;
+      // (a picture keeps its shape: it fills the room as far as its shape allows, so only Own size and Fill the room are offered)
+      for (const o of fill.options) if (o.value === "x" || o.value === "y") o.hidden = il.keepShape && o.value !== il.fill;
+      fill.querySelector<HTMLOptionElement>('option[value="both"]')!.textContent = il.keepShape ? "Fill the room" : "Fill both";
       root.querySelector<HTMLElement>("[data-in-free]")!.setAttribute("aria-pressed", String(il.free));
       root.querySelector<HTMLElement>("[data-in-span-wrap]")!.hidden = !il.grid || il.free;
       for (const i of [0, 1] as const) { const f = root.querySelector<HTMLInputElement>(`[data-in-span="${i}"]`)!; if (free(f)) f.value = String(il.span[i]); }

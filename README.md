@@ -440,7 +440,7 @@ Plan a page: a wide panel across all the columns, the columns sized by rule.
 
 | On a thing on such a sheet | What it does |
 | --- | --- |
-| **Fill** | Stretches it to the room along an axis: width, height or both |
+| **Fill** | Stretches it to the room along an axis: width, height or both. A picture keeps its shape: **Fill the room** makes it as large as its room allows, in the middle of it |
 | **Min**, **Max** | For a thing that fills: its least and most size on that axis, in % of the room inside the sheet (0: no limit) |
 | **Span** | In a grid: how many columns and rows it covers; the others flow round it |
 | **Keep out of the layout** | It stays where it is put; the others flow round it |

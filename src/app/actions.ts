@@ -2962,10 +2962,10 @@ export function setSheetLayout(doc: DocumentStore, editor: EditorState, id: stri
 export function selectedInLayout(doc: DocumentStore, editor: EditorState): InLayoutState | null {
   const on = selected(doc, editor).find((o) => o.parent !== undefined && isLaidOut(doc.get(o.parent)) && ownerOf(o) === undefined);
   const flow = on ? (doc.get(on.parent!) as LaidOutSheet).container.layout.flow : null;
-  return on ? { fill: on.inLayout?.fill ?? "none", free: on.inLayout?.free === true, stretch: on.kind !== "stroke" && !on.rot, grid: flow === "grid", span: on.inLayout?.span ?? [1, 1], min: on.inLayout?.min ?? [0, 0], max: on.inLayout?.max ?? [0, 0] } : null;
+  return on ? { fill: on.inLayout?.fill ?? "none", free: on.inLayout?.free === true, stretch: on.kind !== "stroke" && !on.rot, keepShape: on.kind === "image", grid: flow === "grid", span: on.inLayout?.span ?? [1, 1], min: on.inLayout?.min ?? [0, 0], max: on.inLayout?.max ?? [0, 0] } : null;
 }
 /** How a thing takes part in its sheet's auto layout, as the bar shows it: `grid` when the sheet is a grid (it may span); limits as shares, 0 = none. */
-export interface InLayoutState { fill: "none" | "x" | "y" | "both"; free: boolean; stretch: boolean; grid: boolean; span: readonly [number, number]; min: readonly [number, number]; max: readonly [number, number] }
+export interface InLayoutState { fill: "none" | "x" | "y" | "both"; free: boolean; stretch: boolean; /** A picture: a fill keeps its shape. */ keepShape: boolean; grid: boolean; span: readonly [number, number]; min: readonly [number, number]; max: readonly [number, number] }
 export type InLayoutPatch = { fill?: "none" | "x" | "y" | "both"; free?: boolean; span?: readonly [number, number]; min?: readonly [number, number]; max?: readonly [number, number] };
 
 /** Change how the picked things on sheets with auto layout take part in it: fill the room along an axis, or stay out of the layout where they are. One undo step. */
