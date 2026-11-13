@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.18 — The chips by the selection keep its rotate handle free (2026-11-14)
+
+- **Fixed:** the Properties chips by the selection sat so near it that they covered its rotate handle; they now stand clear of it.
+
 ## 0.58.17 — The chips by the selection scroll on a small window (2026-11-14)
 
 - **Changed:** on a small window the Properties chips by the selection stay inside it and scroll sideways, with the fade and arrow at the end that has more, as the Actions bar does.

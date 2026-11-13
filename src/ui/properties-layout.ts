@@ -3,7 +3,7 @@ import { ICONS } from "./icons";
 import { arrangeForm, nameControls, sectionIcon, sectionLabel, sectionSummary, showSections, shownSections, sectionOfControl } from "./bar-sections";
 import { closeChipPopover, followChip, openChipPopover, placeChipPopover, syncChips } from "./value-chips";
 import type { ChipSpec } from "./value-chips";
-import { inRoom, placeBy, selectionBoxIn } from "./near-selection";
+import { inRoom, placeBy, selectionBoxIn, clearOfHandles } from "./near-selection";
 import { setControlRevealer } from "../commands/from-bars";
 import type { PropertiesBar } from "./toolbar";
 import type { EditorState } from "../app/editor-state";
@@ -149,7 +149,7 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
     syncScroll(top.row);
     if (beside) syncScroll(nearRow); // (a small window: the chips by the selection scroll sideways, as the Actions bar)
     if (beside) {
-      const at = placeBy(box!, near.offsetWidth, near.offsetHeight, "above", 6);
+      const at = placeBy(box!, near.offsetWidth, near.offsetHeight, "above", clearOfHandles(6)) /* (the rotate handle stays free) */;
       const [l, t] = [`${Math.round(at.left)}px`, `${Math.round(at.top)}px`];
       if (near.style.left !== l) near.style.left = l;
       if (near.style.top !== t) near.style.top = t;

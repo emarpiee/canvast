@@ -34,7 +34,7 @@ test("a shape drawn with the Shape tool: its chips stand above it and edit it, t
   const near = p.locator(".props-near");
   // (named groups as the Actions bar's: the section's name, and on its chip the section's icon and value)
   await expect(near.locator(".tb-cap")).toHaveText(["Look", "Shape", "Size"]);
-  expect((await near.boundingBox())!.y + (await near.boundingBox())!.height, "the chips above the shape").toBeLessThanOrEqual(380);
+  expect((await near.boundingBox())!.y + (await near.boundingBox())!.height, "the chips above the shape, clear of its rotate handle (26 px over it)").toBeLessThanOrEqual(380 - 26 - 6);
   // the Shape chip: its corner radius is the drawn shape's
   const chip = near.locator('[data-vchip="shape"]');
   await chip.click();

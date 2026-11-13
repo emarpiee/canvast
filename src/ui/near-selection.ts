@@ -1,4 +1,6 @@
 import type { EditorState } from "../app/editor-state";
+import { HANDLE_SIZE_PX } from "../render/scene-renderer";
+import { ROTATE_HANDLE_OFFSET } from "../render/selection-frame";
 
 /** How much the interface is zoomed (Settings > Interface size): the bars are drawn zoomed by it, so their places are in its px. */
 export const uiScale = (): number => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")) || 1;
@@ -15,6 +17,9 @@ export function selectionBoxIn(host: HTMLElement, editor: EditorState): ScreenBo
   const home = host.getBoundingClientRect();
   return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys), roomW: home.width / k, roomH: home.height / k };
 }
+
+/** A gap from the selection's box that keeps its rotate handle (above the box, or on any side when turned) clear, in interface px. */
+export const clearOfHandles = (gap: number): number => (ROTATE_HANDLE_OFFSET + HANDLE_SIZE_PX / 2 + 1) / uiScale() + gap;
 
 /** Whether any of the box is in its room (a selection scrolled out of the view is not). */
 export const inRoom = (b: ScreenBox): boolean => b.right > 0 && b.bottom > 0 && b.left < b.roomW && b.top < b.roomH;

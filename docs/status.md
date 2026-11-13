@@ -47,6 +47,12 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.18: the chips by the selection keep its rotate handle free (2026-11-14)
+
+- **Implemented:** the chips are placed `clearOfHandles(6)` from the selection's box (`ui/near-selection.ts`: the rotate handle's offset and size, in interface px), on either side.
+- **Tested:** build and typecheck here; scratch, Chromium and Firefox: the chips end 11 px over the handle's place, which is drawn whole. `bar-layouts.spec.ts:28` checks it.
+- **Committed:** v0.58.18 on `main`.
+
 ## v0.58.17: the chips by the selection scroll on a small window (2026-11-14)
 
 - **Implemented:** `.props-near` is capped to the window and its row scrolls sideways with the shared cue (`syncScroll`, the Actions bar's rule). A copy, cut or paste takes a focused element that is no longer shown (a closed dialog's button before it leaves the page, the hidden palette's box) as the page; the palette lets go of the keys when it closes. This was the cause of the paste failures of `vectors.spec.ts:3046` and `:3516` (the paste came while the Export dialog or the palette was closing).
