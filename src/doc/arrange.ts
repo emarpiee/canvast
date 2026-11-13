@@ -74,7 +74,16 @@ export function gridShape(sizes: ReadonlyArray<{ w: number; h: number }>, gapFra
   const cellW = Math.max(0, ...sizes.map((s) => s.w));
   const cellH = Math.max(0, ...sizes.map((s) => s.h));
   const gap = gapFraction * Math.max(cellW, cellH);
-  return { cellW, cellH, gap, cols: Math.min(n, Math.max(1, Math.round(Math.sqrt((n * (cellH + gap)) / (cellW + gap || 1))))) };
+  return { cellW, cellH, gap, cols: shapedColumns(n, cellW, cellH, gap, gap) };
+}
+
+/**
+ * How many columns of cells `cellW` × `cellH` (with their gaps) make a block of `n` about `ratio` times as wide as it is tall (1: about square):
+ * the one rule for Arrange's grid and an auto layout grid by shape (ADR 0195).
+ */
+export function shapedColumns(n: number, cellW: number, cellH: number, gapX: number, gapY: number, ratio = 1): number {
+  const c = Math.sqrt((Math.max(1, n) * (cellH + gapY) * ratio) / (cellW + gapX || 1));
+  return Math.min(Math.max(1, n), Math.max(1, Math.round(Number.isFinite(c) ? c : 1)));
 }
 
 export function gridCells(sizes: ReadonlyArray<{ w: number; h: number }>, gapFraction: number): { cells: Array<{ x: number; y: number }>; w: number; h: number } {

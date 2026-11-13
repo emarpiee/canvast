@@ -10,7 +10,7 @@ import type { DerivationSource } from "./boolean-group";
 import { planSheetScale } from "./constraints";
 import { drawnParams, drawnSubs } from "./path";
 import { roundCorners } from "./rounding";
-import { sortUnits } from "./arrange";
+import { shapedColumns, sortUnits } from "./arrange";
 import { plainText } from "../text/markdown";
 
 /**
@@ -123,8 +123,25 @@ export function placeItems(l: SheetLayout, W: number, H: number, items: readonly
   return { cells, w: col ? sizeC : sizeM, h: col ? sizeM : sizeC };
 }
 
-/** How many columns a grid or a masonry has: its tracks, the number set, else about as many as rows. */
-const columnsOf = (l: SheetLayout, n: number): number => Math.max(1, l.cols?.length || l.columns || Math.ceil(Math.sqrt(Math.max(1, n))));
+/**
+ * How many columns a grid or a masonry has: its tracks, the number set, else as `columnsBy` says (ADR 0195). By count: about as many as rows
+ * from the number of items alone. By shape: from the items' shapes, for a block about as wide as tall, or, on a sheet whose size is set
+ * both ways, as wide for its height as the room inside it (it fills the sheet). A grid's cell is its largest item; a masonry's items are
+ * scaled to one width, so their heights for a width add up (Σ h/w) and √(Σ h/w × wide/tall) columns fill it.
+ */
+export function columnsOf(l: SheetLayout, items: readonly ItemSize[], W: number, H: number): number {
+  const set = l.cols?.length || l.columns;
+  if (set) return Math.max(1, set);
+  const n = Math.max(1, items.length);
+  if (l.columnsBy !== "shape" || !items.length) return Math.ceil(Math.sqrt(n));
+  const innerW = W - l.pad[1] - l.pad[3], innerH = H - l.pad[0] - l.pad[2];
+  const ratio = !l.hug[0] && !l.hug[1] && innerW > 0 && innerH > 0 ? innerW / innerH : 1;
+  if (l.flow === "masonry") {
+    const tall = sum(items.map((i) => (i.w > 0 ? i.h / i.w : 1)));
+    return Math.min(n, Math.max(1, Math.round(Math.sqrt(tall * ratio))));
+  }
+  return shapedColumns(n, Math.max(0, ...items.map((i) => i.w)), Math.max(0, ...items.map((i) => i.h)), l.gap[0], l.gap[1], ratio);
+}
 
 /** Tracks' sizes: a hug track as large as what is in it alone, a fixed one its length, the shares of the room left, each at least as large as what is in it (`room`, Infinity when the sheet hugs: then a share hugs too). */
 function trackSizes(tracks: readonly LayoutTrack[] | undefined, count: number, hug: readonly number[], room: number, gap: number): number[] {
@@ -159,7 +176,7 @@ function placeGrid(l: SheetLayout, W: number, H: number, items: readonly ItemSiz
   const innerW = W - padL - padR, innerH = H - padT - padB;
   const n = items.length;
   if (!n) return { cells: [], w: l.hug[0] ? padL + padR : W, h: l.hug[1] ? padT + padB : H };
-  const C = columnsOf(l, n);
+  const C = columnsOf(l, items, W, H);
   const taken: boolean[][] = [];
   const free = (r: number, c: number, cs: number, rs: number): boolean => {
     if (c + cs > C) return false;
@@ -217,7 +234,7 @@ function placeMasonry(l: SheetLayout, W: number, H: number, items: readonly Item
   const [gapX, gapY] = l.gap;
   const innerW = W - padL - padR, innerH = H - padT - padB;
   const n = items.length;
-  const C = Math.min(Math.max(1, n), columnsOf(l, n));
+  const C = Math.min(Math.max(1, n), columnsOf(l, items, W, H));
   const colW = l.hug[0] ? Math.max(0, ...items.map((i) => i.w)) : Math.max(0, (innerW - (C - 1) * gapX) / C);
   const heights = new Array<number>(C).fill(0);
   const placed = items.map((it) => {
@@ -456,7 +473,8 @@ export function guessLayout(sheet: PathObject & { container: { clip: boolean } }
   const laid = { ...sheet, container: { ...sheet.container, layout: DEFAULT_LAYOUT } } as LaidOutSheet;
   const { W, H } = frameOf(laid, space);
   const units = unitsOf(laid, all, space);
-  if (units.length === 0 || !(W > 0 && H > 0)) return { ...DEFAULT_LAYOUT, hug: [hug[0], hug[1]] };
+  // (a layout made now chooses its columns by the items' shapes when none are set: ADR 0195)
+  if (units.length === 0 || !(W > 0 && H > 0)) return { ...DEFAULT_LAYOUT, columnsBy: "shape", hug: [hug[0], hug[1]] };
   const pad = (v: number): number => Math.max(0, Math.round(v * 1e6) / 1e6);
   const edges: SheetLayout["pad"] = [pad(Math.min(...units.map((u) => u.y0))), pad(W - Math.max(...units.map((u) => u.x1))), pad(H - Math.max(...units.map((u) => u.y1))), pad(Math.min(...units.map((u) => u.x0)))];
   const overlapY = (a: Unit, b: Unit): boolean => a.y0 < b.y1 && b.y0 < a.y1;
@@ -465,8 +483,8 @@ export function guessLayout(sheet: PathObject & { container: { clip: boolean } }
   const byX = [...units].sort((a, b) => a.x0 - b.x0), byY = [...units].sort((a, b) => a.y0 - b.y0);
   const gapsX = (us: Unit[]): number[] => us.slice(1).map((u, i) => u.x0 - us[i]!.x1);
   const gapsY = (us: Unit[]): number[] => us.slice(1).map((u, i) => u.y0 - us[i]!.y1);
-  if (units.length === 1 || byX.every((u, i) => i === 0 || overlapY(u, byX[i - 1]!))) return { ...DEFAULT_LAYOUT, flow: "row", gap: [median(gapsX(byX)), 0], pad: edges, hug: [hug[0], hug[1]] };
-  if (byY.every((u, i) => i === 0 || overlapX(u, byY[i - 1]!))) return { ...DEFAULT_LAYOUT, flow: "column", gap: [median(gapsY(byY)), 0], pad: edges, hug: [hug[0], hug[1]] };
+  if (units.length === 1 || byX.every((u, i) => i === 0 || overlapY(u, byX[i - 1]!))) return { ...DEFAULT_LAYOUT, columnsBy: "shape", flow: "row", gap: [median(gapsX(byX)), 0], pad: edges, hug: [hug[0], hug[1]] };
+  if (byY.every((u, i) => i === 0 || overlapX(u, byY[i - 1]!))) return { ...DEFAULT_LAYOUT, columnsBy: "shape", flow: "column", gap: [median(gapsY(byY)), 0], pad: edges, hug: [hug[0], hug[1]] };
   // lines: items whose vertical spans overlap, top to bottom
   const lines: Unit[][] = [];
   for (const u of byY) {
@@ -478,7 +496,7 @@ export function guessLayout(sheet: PathObject & { container: { clip: boolean } }
   const gapX = median(rows.flatMap(gapsX));
   const gapY = median(rows.slice(1).map((ln, i) => Math.min(...ln.map((u) => u.y0)) - Math.max(...rows[i]!.map((u) => u.y1))));
   const grid = rows.length > 1 && rows.every((ln) => ln.length === rows[0]!.length) && rows[0]!.length > 1;
-  return { ...DEFAULT_LAYOUT, flow: grid ? "grid" : "wrap", ...(grid ? { columns: rows[0]!.length } : {}), gap: [gapX, gapY], pad: edges, hug: [hug[0], hug[1]] };
+  return { ...DEFAULT_LAYOUT, columnsBy: "shape", flow: grid ? "grid" : "wrap", ...(grid ? { columns: rows[0]!.length } : {}), gap: [gapX, gapY], pad: edges, hug: [hug[0], hug[1]] };
 }
 
 /**

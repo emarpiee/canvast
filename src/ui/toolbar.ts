@@ -83,7 +83,7 @@ export interface ToolbarActions {
   /** Whether the picked sheet scales what is on it when it is resized, and the switch for it (a property of the sheet). */
   sheetScale(): boolean;
   /** Auto layout (ADR 0186) of the one picked sheet (null: none, or it has none), with the screen px per unit of the sheet (its lengths are shown in px), and changing it. */
-  autoLayout(): { layout: SheetLayout; ppu: number; /** How many items it lays out. */ items: number } | null;
+  autoLayout(): { layout: SheetLayout; ppu: number; /** How many items it lays out, and how many columns a grid or masonry has now. */ items: number; columns: number } | null;
   setAutoLayout(patch: LayoutPatch, final?: boolean): void;
   /** Saved layout styles (lengths in px as seen when saved), and saving one (ADR 0193). */
   layoutStyles(): ReadonlyArray<{ name: string; summary: string; data: SheetLayout }>;
@@ -316,7 +316,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
           <select data-layout-align aria-label="Items across the flow" title="Items across the flow: at the start, the centre or the end of their line (and the block of lines in a sheet that does not hug)"><option value="start">Start</option><option value="centre">Centre</option><option value="end">End</option></select>
           <select data-layout-justify aria-label="Items along the flow" title="Items along the flow, in a sheet that does not hug: packed at the start, the centre or the end, or spread between"><option value="start">Pack start</option><option value="centre">Pack centre</option><option value="end">Pack end</option><option value="between">Spread</option></select>
           <button type="button" data-layout-hug="0" aria-pressed="false" aria-label="Hug the width" title="Hug the width: the sheet is as wide as its contents (off: it keeps its width, and the contents are aligned in it)">${ICONS.hugWidth}</button><button type="button" data-layout-hug="1" aria-pressed="false" aria-label="Hug the height" title="Hug the height: the sheet is as tall as its contents (off: it keeps its height)">${ICONS.hugHeight}</button>
-          <label data-layout-columns-wrap hidden>Columns <input type="number" data-layout-columns min="1" max="1024" step="1" inputmode="numeric" aria-label="Columns" title="Columns of the grid or masonry (empty: about as many as rows)"></label>
+          <label data-layout-columns-wrap hidden>Columns <input type="number" data-layout-columns min="1" max="1024" step="1" inputmode="numeric" placeholder="auto" aria-label="Columns" title="Columns of the grid or masonry (empty: chosen as the list beside it says)"></label>
+          <select data-layout-colsby hidden aria-label="Columns when none are set" title="Columns when none are set: by the number of items (about as many as rows), or by their shapes (a board about as wide as tall, or one that fills a sheet whose size is set)"><option value="count">Auto: by count</option><option value="shape">Auto: by shape</option></select>
           <button type="button" data-layout-tracks hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Columns and rows" title="Columns and rows: each as large as what is in it, a set size, or a share of the room">${ICONS.layoutTracks}</button>
           <label data-layout-rowh-wrap hidden>Row <input type="number" data-layout-rowh min="1" step="any" inputmode="decimal" aria-label="Row height aimed at (px)" title="The height a row aims at before it is made as wide as the sheet"></label>
           <select data-layout-sort aria-label="Order of the items" title="Order of the items: the stacking order (as Layers lists it), or kept by a rule as things are added"><option value="">Stacking order</option><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="date">Newest first</option><option value="size">Largest first</option><option value="type">By kind</option></select>
@@ -706,12 +707,13 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     actions.setAutoLayout({ hug: i === 0 ? [!al.layout.hug[0], al.layout.hug[1]] : [al.layout.hug[0], !al.layout.hug[1]] });
   });
   liveNumber(layoutEl("[data-layout-columns]"), (v, final) => { if (final) actions.setAutoLayout(Number.isFinite(v) && v >= 1 ? { columns: Math.round(v) } : { columns: undefined, cols: undefined }); });
+  layoutEl<HTMLSelectElement>("[data-layout-colsby]").addEventListener("change", (e) => actions.setAutoLayout({ columnsBy: (e.target as HTMLSelectElement).value as "count" | "shape" }));
   liveNumber(layoutEl("[data-layout-rowh]"), (v, final) => { const u = toUnits(v); if (Number.isFinite(u) && u > 0) actions.setAutoLayout({ rowHeight: u }, final); });
   layoutEl<HTMLSelectElement>("[data-layout-sort]").addEventListener("change", (e) => { const v = (e.target as HTMLSelectElement).value; actions.setAutoLayout({ sort: v ? (v as SheetLayout["sort"]) : undefined }); });
   layoutEl<HTMLElement>("[data-layout-tracks]").addEventListener("click", (e) => {
     const al = actions.autoLayout();
     if (!al) return;
-    const n = al.layout.cols?.length || al.layout.columns || Math.ceil(Math.sqrt(Math.max(1, al.items)));
+    const n = al.layout.cols?.length || al.layout.columns || al.columns;
     openTracksPopover(e.currentTarget as HTMLElement, {
       cols: al.layout.cols ?? Array.from({ length: Math.max(1, n) }, () => ({ size: "hug" as const })),
       rows: al.layout.rows ?? [],
@@ -1148,6 +1150,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       for (const b of root.querySelectorAll<HTMLElement>("[data-layout-hug]")) b.setAttribute("aria-pressed", String(l.hug[Number(b.dataset["layoutHug"])]));
       layoutEl<HTMLElement>("[data-layout-columns-wrap]").hidden = l.flow !== "grid" && l.flow !== "masonry";
       layoutEl<HTMLElement>("[data-layout-tracks]").hidden = l.flow !== "grid";
+      const colsBy = layoutEl<HTMLSelectElement>("[data-layout-colsby]");
+      colsBy.hidden = (l.flow !== "grid" && l.flow !== "masonry") || !!(l.cols?.length || l.columns);
+      colsBy.value = l.columnsBy ?? "count";
       layoutEl<HTMLElement>("[data-layout-rowh-wrap]").hidden = l.flow !== "justified";
       const rowh = layoutEl<HTMLInputElement>("[data-layout-rowh]");
       if (free(rowh)) rowh.value = l.rowHeight === undefined ? "" : px(l.rowHeight);

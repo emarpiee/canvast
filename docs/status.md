@@ -38,6 +38,16 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.16: auto layout columns by the items' shapes (2026-11-13)
+
+- **Implemented:** ADR 0195. `SheetLayout.columnsBy` ("count" absent, "shape"); `columnsOf` (auto-layout.ts, exported for the bar): masonry √(Σh/w × wide/tall), grid `shapedColumns` (arrange.ts, the one rule with Arrange's `gridShape`); a sheet whose size is set both ways fills it, else about square; `guessLayout` and Keep it tidy start with "shape"; the bar's list beside Columns (hidden when a number or tracks are set); the Tracks popover starts from the columns there are now.
+- **Tested:** typecheck here; the counts run alone in Node (13 portrait items: by count 4, by shape 5, 16:9 sheet 6, A4 4; landscape 3; a number set wins). Unit `auto-layout.test.ts` and e2e `sheets.spec` on GitHub.
+- **Known failures:** none known yet.
+- **Also:** GitHub issue #2 fixed: the Layers panel is not drawn again while its opacity slider is held (it was replaced under the pointer, ending the drag), and it is drawn with `redraw()` so the focused slider keeps its focus; `frames.spec` drags it with the mouse.
+- **Unverified:** Firefox.
+- **Committed:** v0.57.16 on `main`.
+- **Next bounded task:** read this push's runs.
+
 ## v0.57.15: Arrange and auto layout work together (2026-11-13)
 
 - **Implemented:** ADR 0194. `arrangeAsLayout`, `laidOutAround` (shared with Shift+A), `laidOutSheetOfSelection`, `orderLaidOutSheet`, a guard in `layoutSelection`; `gridShape` shared by `gridCells`; setting `arrange.keepTidy` (menu tick and Settings row); `ImageObject.added` set by `imageAt`, `sort: "date"`, `withDates` (dates of older pictures from the library in the same step, main `libraryDates`); context-bar Align disabled and Arrange rows as the sheet's order.

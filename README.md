@@ -409,7 +409,7 @@ Let a sheet lay its pictures out in a grid that stays tidy as you add more.
 | **Start, Centre, End** | Where items sit across the flow (and the block of lines in a sheet that does not hug) |
 | **Pack start, centre, end, Spread** | Where items sit along the flow, in a sheet wider than they are. Greyed out when there is no room to pack in (the sheet hugs that way, or it is a masonry): its tip says which |
 | **Hug W**, **Hug H** | The sheet grows and shrinks to its contents on that axis; off, it keeps its size and the items are aligned in it |
-| **Columns** | For a grid or a masonry: how many (empty: about as many as rows) |
+| **Columns** | For a grid or a masonry: how many. Empty: chosen by the list beside it, **Auto: by shape** (from the items' shapes: a board about as wide as tall when the sheet hugs, or one that fills a sheet whose size you set; new layouts start with it) or **Auto: by count** (about as many as rows from the number of items alone; layouts made before keep it) |
 | **Columns and rows** | For a grid: each column and row **Hug** (as large as what is in it), **Fixed** (a size in px) or **Share** (a share of the room left, never smaller than what is in it); rows past those set hug |
 | **Row** | For justified rows: the height a row aims at before it is made as wide as the sheet |
 | **Order** | The stacking order (as Layers lists it), or a rule kept as things are added: name A–Z or Z–A (a picture's name as placed, a text's first words), newest first (when the picture's file came into the library), largest first, by kind. An Arrange order on things of the sheet sets it too |

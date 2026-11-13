@@ -76,6 +76,18 @@ describe("masonry, justified rows, tracks, spans and limits (ADR 0193)", () => {
     const g = placeItems(l({ flow: "grid", columns: 2, gap: [2, 2] }), 100, 100, [{ w: 30, h: 10, span: [2, 1] }, { w: 10, h: 10 }, { w: 10, h: 10, fill: "x" }]);
     expect(r(g.cells)).toEqual([[0, 0, 30, 10], [0, 12, 10, 10], [16, 12, 14, 10]]);
   });
+  it("columns when none are set: by count, as before; by shape, a board about as wide as tall, or one that fills a sheet whose size is set (ADR 0195)", () => {
+    const tall = Array.from({ length: 13 }, () => ({ w: 10, h: 17 })), wide = Array.from({ length: 13 }, () => ({ w: 10, h: 6 }));
+    const cols = (p: Partial<SheetLayout>, items: ItemSize[], W = 100, H = 100) => new Set(placeItems(l(p), W, H, items).cells.map((c) => Math.round(c.x * 100))).size;
+    expect(cols({ flow: "masonry" }, tall)).toBe(4);
+    expect(cols({ flow: "masonry", columnsBy: "shape" }, tall)).toBe(5);
+    expect(cols({ flow: "masonry", columnsBy: "shape" }, wide)).toBe(3);
+    expect(cols({ flow: "masonry", columnsBy: "shape", hug: [false, false] }, tall, 160, 90)).toBe(6);
+    expect(cols({ flow: "masonry", columnsBy: "shape", hug: [false, false] }, tall, 71, 100)).toBe(4);
+    expect(cols({ flow: "grid" }, tall)).toBe(4);
+    expect(cols({ flow: "grid", columnsBy: "shape" }, tall)).toBe(5);
+    expect(cols({ flow: "grid", columnsBy: "shape", columns: 2 }, tall)).toBe(2);
+  });
   it("limits: a filling item stops at its most share of the room, the rest stays free", () => {
     const f = placeItems(l({ flow: "row", hug: [false, false] }), 100, 20, [{ w: 10, h: 10, fill: "x", max: [0.5, 0] }, { w: 10, h: 10 }]);
     expect(f.cells.map((c) => [c.x, c.w])).toEqual([[0, 50], [50, 10]]);

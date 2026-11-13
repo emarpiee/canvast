@@ -1,4 +1,5 @@
 import { showMoreButton } from "./show-more";
+import { redraw } from "./redraw";
 import { treeGuides, treeSlot } from "./tree";
 import { rowHolds, rowMembers, type LayerPlace } from "../doc/layer-move";
 import { ownerOf } from "../doc/belongs";
@@ -213,12 +214,15 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     return `${actionsRow}<label class="layers-blend">Blend <select data-blend ${sel.length ? "" : "disabled"} aria-label="Blend mode of the selection">${modes}</select></label><label class="layers-opacity">Opacity <input type="range" data-opacity min="${MIN_OPACITY * 100}" max="100" step="1" value="${pct}" ${sel.length ? "" : "disabled"} aria-label="Opacity of the selection"> <output>${pct}%</output></label>`;
   };
 
+  /** The opacity slider is held by the pointer. */
+  let sliding = false;
   const render = (): void => {
     scheduled = false;
     panel.hidden = !editor.layersOpen;
     if (!editor.layersOpen) return;
-    // A name being typed is not redrawn under the cursor (a redraw would end the edit).
-    if ((renaming && panel.querySelector("[data-rename]"))) return;
+    // A name being typed is not redrawn under the cursor (a redraw would end the edit), nor the opacity slider while it is held: a new slider
+    // under the pointer would end the drag (issue #2). The panel is drawn when it is let go.
+    if ((renaming && panel.querySelector("[data-rename]")) || sliding) return;
     const all = doc.ordered().filter((o) => !isResult(o));
     for (const o of all) if (o.kind === "image") actions.names.get(o.assetId);
     const tree = layerTree(all);
@@ -263,7 +267,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
           .map((o): Node => ({ id: o.id, group: false, members: [o], children: [], z: o.z }))
       : tree;
     const list = shownTree.map((n) => row(n, 0, false, [])).join("");
-    panel.innerHTML = panelHtml({
+    redraw(panel, panelHtml({
       title: "Layers",
       count: all.length,
       tools: `<button type="button" class="layer-btn" data-sort-toggle aria-pressed="${sortOpen}" aria-expanded="${sortOpen}" aria-label="Sort the layers by name" title="Sort the layers by name">${ICONS.arrowDownAZ}</button>
@@ -271,7 +275,7 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
       sub: `${all.length > 12 || filter ? `<div class="layers-filter"><input type="search" data-layers-filter placeholder="Filter ${plural(all.length, "layer")} by name" aria-label="Filter the layers by name" autocomplete="off" value="${esc(filter)}"></div>` : ""}${sortOpen ? `<div class="layers-sort" role="group" aria-label="Sort by name"><span>Sort by name</span><button type="button" data-sort="asc">A to Z</button><button type="button" data-sort="desc">Z to A</button><small>Only the stacking order changes; nothing moves on the canvas.</small></div>` : ""}`,
       body: `<ul role="tree" aria-label="Objects, front to back">${list || `<li class="layers-empty">${q ? "No layer has that name." : "Nothing on this canvas yet."}</li>`}${rows >= limit ? `<li class="layers-more-row">${showMoreButton({ attrs: "data-more", label: `Show ${MAX_ROWS} more rows` })}</li>` : ""}</ul>`,
       foot: footer(),
-    });
+    }));
     if (refocusFilter) {
       refocusFilter = false;
       const f = panel.querySelector<HTMLInputElement>("[data-layers-filter]");
@@ -380,6 +384,14 @@ export function mountLayersPanel(host: HTMLElement, editor: EditorState, doc: Do
     }
     endRename(true);
   });
+  // The opacity slider held: the panel waits for it (see render).
+  panel.addEventListener("pointerdown", (e) => void ((e.target as Element).closest("[data-opacity]") && (sliding = true)));
+  for (const type of ["pointerup", "pointercancel"])
+    window.addEventListener(type, () => {
+      if (!sliding) return;
+      sliding = false;
+      schedule();
+    });
   panel.addEventListener("input", (e) => {
     const t = e.target as HTMLInputElement;
     if (t.matches("[data-rename]") && renaming) renaming.value = t.value;

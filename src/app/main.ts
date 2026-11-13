@@ -128,7 +128,7 @@ import { mountTagsPanel } from "../ui/tags-panel";
 import { mountStylesPanel } from "../ui/styles-panel";
 import { modelViewInFront } from "../ui/model-front";
 import { layoutHandles } from "../interaction/layout-handles";
-import { layoutNow } from "../doc/auto-layout";
+import { columnsOf, layoutNow } from "../doc/auto-layout";
 import type { ModelLook } from "../assets/model-look";
 import { linkedUpdates } from "./style-sync";
 import { PanelDock } from "../ui/panel-dock";
@@ -1674,7 +1674,12 @@ async function start(): Promise<void> {
     resizeOnSheet: (w, h, final) => resizeOnSheet(doc, editor, w, h, final),
     sheetScale: () => sheetScalesContents(doc, editor),
     setSheetScale: (on) => setSheetScale(doc, editor, on),
-    autoLayout: () => { const got = autoLayoutOf(doc, editor); return got ? { layout: got.layout, ppu: textPpu(got.sheet.id), items: layoutNow(got.sheet, doc.ordered(), doc.space).items.length } : null; },
+    autoLayout: () => {
+      const got = autoLayoutOf(doc, editor);
+      if (!got) return null;
+      const now = layoutNow(got.sheet, doc.ordered(), doc.space);
+      return { layout: got.layout, ppu: textPpu(got.sheet.id), items: now.items.length, columns: columnsOf(got.layout, now.items, now.W, now.H) };
+    },
     setAutoLayout: (patch, final) => {
       // (a date order: the pictures on the sheet placed before they kept their library date get it now, in the same step)
       const got = patch.sort === "date" ? autoLayoutOf(doc, editor) : null;

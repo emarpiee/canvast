@@ -2904,8 +2904,9 @@ export function arrangeAsLayout(doc: DocumentStore, editor: EditorState, key: So
   if (editor.blockEdit()) return;
   laidOutAround(doc, editor, "Arrange and keep tidy", (sheet, all) => {
     const base = { ...sheet, container: { ...sheet.container, layout: DEFAULT_LAYOUT } } as LaidOutSheet;
+    // (the space Arrange would put; the columns by the items' shapes, as Arrange's grid has them, now kept as things are added: ADR 0195)
     const g = gridShape(layoutNow(base, all, doc.space).items, GAP_FRACTION[gap]);
-    return { ...DEFAULT_LAYOUT, flow: "grid", columns: g.cols, gap: [g.gap, g.gap], hug: [true, true], ...(key === "stack" ? {} : { sort: key }) };
+    return { ...DEFAULT_LAYOUT, flow: "grid", columnsBy: "shape", gap: [g.gap, g.gap], hug: [true, true], ...(key === "stack" ? {} : { sort: key }) };
   }, dates);
 }
 

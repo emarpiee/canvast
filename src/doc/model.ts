@@ -142,8 +142,14 @@ export interface SheetLayout {
   /** Items along the flow, in a sheet that does not hug: packed at the start, the centre or the end, or spread between. */
   readonly justify: "start" | "centre" | "end" | "between";
   readonly hug: readonly [boolean, boolean];
-  /** Grid and masonry: how many columns; absent = about as many as rows. */
+  /** Grid and masonry: how many columns; absent = chosen by `columnsBy`. */
   readonly columns?: number;
+  /**
+   * How a grid or masonry chooses its columns when `columns` is not set (ADR 0195): "count", about as many as rows from the number of items alone
+   * (absent: layouts made before keep it, so nothing moves); "shape", from the items' shapes, for a board about as wide as tall when the sheet
+   * hugs, or filling the sheet when its size is set.
+   */
+  readonly columnsBy?: "count" | "shape";
   /** Grid: each column's and row's size (ADR 0193); absent = each as large as what is in it. Columns past these, or rows past these, hug. */
   readonly cols?: readonly LayoutTrack[];
   readonly rows?: readonly LayoutTrack[];
@@ -167,7 +173,8 @@ const validLayout = (l: unknown): l is SheetLayout => {
     (o.columns === undefined || (Number.isInteger(o.columns) && o.columns >= 1 && o.columns <= 1024)) &&
     [o.cols, o.rows].every((ts) => ts === undefined || (Array.isArray(ts) && ts.length <= 1024 && ts.every(validTrack))) &&
     (o.rowHeight === undefined || (len(o.rowHeight) && o.rowHeight > 0)) &&
-    (o.sort === undefined || (LAYOUT_SORTS as readonly string[]).includes(o.sort));
+    (o.sort === undefined || (LAYOUT_SORTS as readonly string[]).includes(o.sort)) &&
+    (o.columnsBy === undefined || o.columnsBy === "count" || o.columnsBy === "shape");
 };
 const validTrack = (t: unknown): t is LayoutTrack => {
   const o = t as LayoutTrack | null;

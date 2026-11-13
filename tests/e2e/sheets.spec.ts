@@ -1001,6 +1001,7 @@ test("Arrange and auto layout (ADR 0194): Keep it tidy makes the grid a sheet wi
   await expect.poll(async () => (await laid()).find((o) => o.container)?.container?.layout?.flow).toBe("grid");
   const sheet = (await laid()).find((o) => o.container)!;
   expect(sheet.container!.layout!.sort).toBe("size");
+  expect((sheet.container!.layout as { columnsBy?: string }).columnsBy, "a layout made now chooses its columns by shape (ADR 0195)").toBe("shape");
   // Two of the things on it picked: lining them up waits for the sheet; an order is its rule.
   const [a, b] = (await laid()).filter((o) => o.parent === sheet.id);
   const mid = async (id: string): Promise<[number, number]> => { const bx = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box; return [(bx.minX + bx.maxX) / 2, (bx.minY + bx.maxY) / 2]; };

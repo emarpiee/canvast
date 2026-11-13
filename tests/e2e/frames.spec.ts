@@ -1172,6 +1172,17 @@ test("layers panel: lists objects front to back, selects, hides and locks from i
   expect(await opacityOf()).toBeCloseTo(0.4);
   await p.keyboard.press("Control+z");
   expect(await opacityOf()).toBe(1);
+  // Dragged with the mouse, the slider follows the pointer to where it is let go: the panel is not drawn again under it (issue #2).
+  const slider = (await panel.locator("[data-opacity]").boundingBox())!;
+  await p.mouse.move(slider.x + slider.width - 3, slider.y + slider.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(slider.x + slider.width * 0.7, slider.y + slider.height / 2, { steps: 4 });
+  await p.mouse.move(slider.x + slider.width * 0.4, slider.y + slider.height / 2, { steps: 4 });
+  await p.mouse.up();
+  await expect.poll(opacityOf).toBeLessThan(0.6);
+  expect(await opacityOf()).toBeGreaterThan(0.2);
+  await p.keyboard.press("Control+z");
+  await expect.poll(opacityOf, "one undo step for the whole drag").toBe(1);
   // Blend mode (ADR 0047): set from the panel, one undo step, kept with the object.
   const field = (id: string, k: string) => p.evaluate(([i, key]) => window.__canvastDebug.objects().find((o) => o.id === i)![key!], [id, k] as const);
   const before = await ink();

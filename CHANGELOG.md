@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.57.16 — Auto layout columns by the items' shapes (2026-11-13)
+
+- **Added:** **Auto: by shape** for a grid's or masonry's columns when none are set: from the items' shapes, a board about as wide as tall, or one that fills a sheet whose size you set (ADR 0195). New layouts and Keep it tidy start with it.
+- **Changed:** **Auto: by count** keeps the former rule (about as many columns as rows); layouts made before keep it, so nothing on them moves.
+- **Fixed:** the Layers panel's opacity slider could not be dragged with a mouse, only clicked (GitHub issue #2): the panel was drawn again under it at each step of the drag.
+
 ## 0.57.15 — Arrange and auto layout work together (2026-11-13)
 
 - **Added:** **Keep it tidy** in the Arrange menu (and Settings > Drawing and selection): Arrange in a grid makes the grid as a sheet with auto layout, which stays a grid as things are added (ADR 0194).
