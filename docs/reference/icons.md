@@ -36,13 +36,13 @@ One icon per function: two buttons that do different things never share an icon,
 | `route-off` | Take a text off its path or shape (Actions bar) |
 | `square-dashed-text` | Flow the picked text inside the picked closed shape (Actions bar) |
 | `case-sensitive` | Font options of a text (kerning, features, axes) |
-| `link-2` | Link of the selected words (text editor bar) |
+| `link-2` | Link of the selected text (text editor bar) |
 | `rows-3` | Paragraph and box options of a text (paragraph space, first line, case, most lines, height) |
-| `underline` | Underline the selected words (text editor bar) |
-| `strikethrough` | Strike through the selected words (text editor bar) |
-| `baseline` | Colour of the selected words (text editor bar) |
-| `a-arrow-up` | Make the selected words bigger (text editor bar) |
-| `a-arrow-down` | Make the selected words smaller (text editor bar) |
+| `underline` | Underline the selected text (text editor bar) |
+| `strikethrough` | Strike through the selected text (text editor bar) |
+| `baseline` | Colour of the selected text (text editor bar) |
+| `a-arrow-up` | Make the selected text bigger (text editor bar) |
+| `a-arrow-down` | Make the selected text smaller (text editor bar) |
 | `a-large-small` | The Text styles tab of the Styles panel |
 | `captions` | Item names: always shown |
 | `scan-text` | Item names: shown for the picked items |

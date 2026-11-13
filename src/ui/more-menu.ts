@@ -156,6 +156,8 @@ export interface MenuOptions {
   consumeOutside?: boolean;
   /** Closer rows, one line each (a long list to choose from: the colours of a selection). */
   compact?: boolean;
+  /** The focus stays where it is (the text being typed: the keys go on into it); the menu takes none, when it opens or after a choice. Escape still closes a menu that stays open. */
+  keepFocus?: boolean;
   /** The menu opened under a finger that is still down: the click that comes when it lifts is not a choice; only a press on the menu itself arms it. */
   needPress?: boolean;
 }
@@ -228,7 +230,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
         current = opts.refresh(); // (what is ticked or offered has changed)
         if (!current.length) return closeMoreMenu(); // (nothing applies any more: the button is gone too)
         render();
-        (menu.querySelector<HTMLElement>(`[data-i="${index}"]:not(:disabled)`) ?? menu.querySelector<HTMLElement>("button:not(:disabled)"))?.focus(); // (so Escape still reaches the menu)
+        if (!opts.keepFocus) (menu.querySelector<HTMLElement>(`[data-i="${index}"]:not(:disabled)`) ?? menu.querySelector<HTMLElement>("button:not(:disabled)"))?.focus(); // (so Escape still reaches the menu)
       }
       requestAnimationFrame(() => open?.menu === menu && placeMenu(menu, anchor)); // (the selection may have moved)
       return;
@@ -236,7 +238,7 @@ export function openMoreMenu(anchor: HTMLElement, items: readonly MenuItem[], la
     closeMoreMenu();
     item.run();
   });
-  menu.querySelector<HTMLElement>("button:not(:disabled)")?.focus();
+  if (!opts.keepFocus) menu.querySelector<HTMLElement>("button:not(:disabled)")?.focus();
 }
 
 let installed = false;

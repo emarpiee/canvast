@@ -2,7 +2,7 @@ import type { PathObject } from "../doc/model";
 import { flowOf } from "../text/shape-flow";
 import { copyPlainText } from "../app/system-clipboard";
 import * as D from "../core/dyadic";
-import { captionedGroup, hoverNames, syncScroll } from "./bar";
+import { syncScroll } from "./bar";
 import { newInk } from "../render/ink";
 import type { WorldPoint } from "../core/camera";
 import { lookAt, worldToScreen } from "../core/camera";
@@ -68,9 +68,9 @@ const F = (cmd: string, icon: string, label: string, hint: string): FormatCmd =>
 const FORMAT_GROUPS: Array<{ name: string; buttons: FormatCmd[]; menus: Array<{ id: string; icon: string; label: string; items: FormatCmd[] }> }> = [
   { name: "Style", buttons: [F("bold", ICONS.bold, "Bold (Ctrl+B)", ""), F("italic", ICONS.italic, "Italic (Ctrl+I)", ""), F("underline", ICONS.underline, "Underline (Ctrl+U)", ""), F("strike", ICONS.strikethrough, "Strikethrough (Ctrl+Shift+X)", "")], menus: [] },
   {
-    name: "Words",
-    buttons: [F("link", ICONS.textLink, "Link of the selected words", ""), F("colour", ICONS.textColour, "Colour of the selected words", "")],
-    menus: [{ id: "size", icon: ICONS.textBigger, label: "Size of the selected words", items: [F("bigger", ICONS.textBigger, "Make the selected words bigger", "A quarter bigger"), F("smaller", ICONS.textSmaller, "Make the selected words smaller", "A fifth smaller")] }],
+    name: "Text",
+    buttons: [F("link", ICONS.textLink, "Link of the selected text", ""), F("colour", ICONS.textColour, "Colour of the selected text", "")],
+    menus: [{ id: "size", icon: ICONS.textBigger, label: "Size of the selected text", items: [F("bigger", ICONS.textBigger, "Make the selected text bigger", "A quarter bigger"), F("smaller", ICONS.textSmaller, "Make the selected text smaller", "A fifth smaller")] }],
   },
   {
     name: "Paragraph",
@@ -124,15 +124,14 @@ export function mountTextEditor(
   bar.hidden = true;
   const button = (f: { cmd?: string; menu?: string; icon: string; label: string }): string =>
     `<button type="button" ${f.menu ? `data-format-menu="${f.menu}" aria-haspopup="menu" aria-expanded="false"` : `data-cmd="${f.cmd}"`} aria-label="${f.label}" title="${f.label}">${f.icon}</button>`;
-  // (named groups as the Actions bar's and the Properties chips': their names as Settings > Appearance > group names say, on hover in a layer)
-  bar.innerHTML = FORMAT_GROUPS.map((g) => captionedGroup(g.name, [...g.buttons.map(button), ...g.menus.map((m) => button({ menu: m.id, icon: m.icon, label: m.label }))].join(""))).join("");
+  // (groups with a line between them, as every bar's, but no names: the owner's choice for this bar, whose tools say what they do)
+  bar.innerHTML = FORMAT_GROUPS.map((g) => `<div class="tb-group" role="group" aria-label="${g.name}">${[...g.buttons.map(button), ...g.menus.map((m) => button({ menu: m.id, icon: m.icon, label: m.label }))].join("")}</div>`).join("");
   const fontSelect = document.createElement("select");
   fontSelect.dataset["fontOfWords"] = "";
-  fontSelect.setAttribute("aria-label", "Font of the selected words");
-  fontSelect.title = "Font of the selected words";
-  bar.querySelector('[aria-label="Words"] > .tb-row')!.append(fontSelect);
+  fontSelect.setAttribute("aria-label", "Font of the selected text");
+  fontSelect.title = "Font of the selected text";
+  bar.querySelector('[aria-label="Text"]')!.append(fontSelect);
   host.append(box, bar);
-  const names = hoverNames(bar, host);
 
   let target: TextObject | null = null;
   let isNew = false;
@@ -311,7 +310,7 @@ export function mountTextEditor(
     return r && !r.collapsed && box.contains(r.commonAncestorContainer) ? r : null;
   };
   const needWords = (): void => {
-    editor.message = "Select the words first.";
+    editor.message = "Select some text first.";
     editor.changed();
   };
   /**
@@ -352,7 +351,7 @@ export function mountTextEditor(
     const saved = r.cloneRange();
     const at = r.startContainer.nodeType === Node.TEXT_NODE ? r.startContainer.parentElement : (r.startContainer as HTMLElement);
     const now = at?.closest("a")?.getAttribute("href") ?? "";
-    void promptDialog({ title: "Link", lines: ["Where do the selected words go? A web address (https://…) or an email (mailto:…). Leave it empty to take the link away. Ctrl+click on the words opens it."], value: now, confirmLabel: "Set link" }).then((url) => {
+    void promptDialog({ title: "Link", lines: ["Where does the selected text go? A web address (https://…) or an email (mailto:…). Leave it empty to take the link away. Ctrl+click on the linked text opens it."], value: now, confirmLabel: "Set link" }).then((url) => {
       if (url === null) return;
       box.focus({ preventScroll: true });
       const sel = getSelection();
@@ -375,7 +374,7 @@ export function mountTextEditor(
     const first = r.startContainer.nodeType === Node.TEXT_NODE ? r.startContainer.parentElement : (r.startContainer as HTMLElement);
     const now = first ? hexOfCss(getComputedStyle(first).color) : "#000000";
     openColourPopover(anchor.closest("button") ?? anchor, {
-      name: "Colour of the selected words",
+      name: "Colour of the selected text",
       value: now,
       alpha: true,
       onInput: (hex) => {
@@ -448,7 +447,7 @@ export function mountTextEditor(
       // (a choice of the menu runs on the words still selected in the text: the text takes the focus back first; the menu stays open, as
       // every group menu of a bar, with the choice now made ticked, until Escape or a press outside)
       const items = (): MenuItem[] => menu.items.map((f): MenuItem => ({ id: f.cmd, label: f.label, hint: f.hint, icon: f.icon, ...(isOn(f.cmd) === null ? {} : { checked: isOn(f.cmd)! }), run: () => run(f.cmd, menuBtn) }));
-      openMoreMenu(menuBtn, items(), menu.label, { keepOpen: true, refresh: items });
+      openMoreMenu(menuBtn, items(), menu.label, { keepOpen: true, refresh: items, keepFocus: true }); // (the keys go on into the text)
       return;
     }
     const cmd = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd]")?.dataset["cmd"];
@@ -551,7 +550,6 @@ export function mountTextEditor(
     bar.classList.toggle("is-near", near);
     if (near) placeAbove(bar, boxOfElementIn(host, box));
     else if (bar.style.left || bar.style.top) bar.style.left = bar.style.top = "";
-    if (!bar.hidden) names.place(); // (its group names, shown on hover, over or under it where it now is)
   };
 
   return {

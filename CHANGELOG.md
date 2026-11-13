@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.58.25 — "Text", not "words", where it is any text (2026-11-14)
+
+- **Fixed:** after a choice in a menu of the text format bar the focus went to the menu: what was typed next went nowhere, and Escape no longer finished the text; the keys now go on into the text (the first Escape closes the menu, the next finishes the text).
+- **Fixed:** while a colour was dragged in the colour picker, the chips by the selection showed the Select tool's own options (Brush, Options) in place of the selection's (Size...); a colour tried in the picker or a field is no drag on the canvas.
+- **Changed:** the text format bar shows no group names (its groups and the lines between them stay).
+- **Fixed:** what applies to any selected text, a letter too (its link, colour, size and font; a balloon's text; Remove format; the signs that wrap a selection), said "words"; it says "text" now, in the app and the README. "Words" stays where it means words (search words, words in braces of a name pattern, a word that does not fit on a line).
+
 ## 0.58.24 — The text format bar stands where the Properties bar does (2026-11-14)
 
 - **Changed:** while words are typed, their format bar stands where the Properties bar is: just above the words when it is near the selection, at the top otherwise (the rule of the chips by the selection, shared).

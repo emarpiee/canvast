@@ -35,7 +35,7 @@ export type Preview =
   /** Nodes of one path being dragged (ADR 0099): the path as it would be (a turned path is baked, so `rot` goes). */
   | { kind: "nodes"; ids: readonly ObjectId[]; sub: readonly SubPath[]; /** Several paths at once (nodes picked together): each path's own sub-paths; `sub` is then unused. */ subs?: ReadonlyMap<ObjectId, readonly SubPath[]> }
   /** The fill and/or outline of paths being changed in the colour picker (ADR 0099); committed once when the picker settles. */
-  | { kind: "paint"; ids: readonly ObjectId[]; fill?: Paint | null; stroke?: Paint | null }
+  | { kind: "paint"; ids: readonly ObjectId[]; fill?: Paint | null; stroke?: Paint | null; /** Previewed from a field or the colour picker, not dragged on the canvas. */ field?: true }
   /** Objects shown as they would be after a change being dragged (a corner radius, a star's ratio): replaced whole, stored once when it ends. */
   | { kind: "replace"; ids: readonly ObjectId[]; objs: ReadonlyMap<ObjectId, CanvasObject> };
 
@@ -286,7 +286,9 @@ export class EditorState {
 
   /** Something is being dragged on the canvas. A value typed or scrubbed in a field shows as a preview too, and is not this: the bars stay, and the field keeps the focus. */
   get gesturing(): boolean {
-    return this.preview.kind !== "none" && this.preview.kind !== "replace";
+    // (a colour tried in the picker or a field is no drag: the bars keep showing what they edit, as for a value typed: "replace")
+    const p = this.preview;
+    return p.kind !== "none" && p.kind !== "replace" && !(p.kind === "paint" && p.field);
   }
 
   setTool(t: Tool): void {

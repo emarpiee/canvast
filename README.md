@@ -731,7 +731,7 @@ Take the colours of a reference as a palette to paint with.
 | Text styles | Size, alignment, spacing, colour |
 | Adjustments | A whole Adjust stack |
 | Patterns | A generator with its settings and seed: pressing its card puts it back in the Pattern panel and makes it on what is selected (on each of several selected shapes) |
-| Speech balloons | Size, tails, paint and the look of the words; goes on the selected balloons when you press its card. Not linked: changing the style later does not change them |
+| Speech balloons | Size, tails, paint and the look of the text; goes on the selected balloons when you press its card. Not linked: changing the style later does not change them |
 | Layouts | A sheet's auto layout: see [Auto layout](#auto-layout) |
 | 3D line styles | The line art of a 3D view: see [Line art of a 3D model](#line-art-of-a-3d-model) |
 | Custom ratios | See [Sheets](#sheets) |
@@ -801,8 +801,8 @@ Point a balloon's tail at the speaker.
 | --- | --- |
 | **Handles** | Set the tail tip, base, width, middle width and bend, the rounding or bump depth, the body's size, and its place while the tail tip stays; they snap when Snap is on |
 | **Tails** | Double-click the outline to add one; let a tip go inside the body to remove it |
-| **Panel** | Its button is at the start of the Properties bar: twelve bodies, a double line, any number of tails with rounded tips, thought bubbles, presets, and the words (alignment across and down, padding for each side, what happens to words that do not fit, and **Fit text to shape**) |
-| **Styles** | *Save as style* keeps size, ratio, tails, paint and the look of the words; its words go only into a balloon that has none |
+| **Panel** | Its button is at the start of the Properties bar: twelve bodies, a double line, any number of tails with rounded tips, thought bubbles, presets, and the text (alignment across and down, padding for each side, what happens to words that do not fit, and **Fit text to shape**) |
+| **Styles** | *Save as style* keeps size, ratio, tails, paint and the look of the text; its text goes only into a balloon that has none |
 | **Connectors** | Select two or more balloons and *Connect balloons* joins them, left to right. A connector is a neck, pinch, line or dots, and follows its balloons; its handles set the width, the bend and where each end stands on its balloon |
 | **Paint** | The normal fill and outline, including dashes |
 
@@ -810,8 +810,8 @@ Point a balloon's tail at the speaker.
 | --- | --- |
 | The next balloon | Takes the look of the last one changed |
 | What belongs to it | A balloon's words, connectors and their cover pieces are in its group and sheet, in front of it, and its row in Layers stands for them. Connect balloons joins balloons on the same sheet |
-| Deleting | A balloon removes its connectors and leaves its words as plain text; deleting it with its words removes both |
-| Copying | Copy, cut and duplicate take a balloon's words with it, and a connector only when both its balloons go too |
+| Deleting | A balloon removes its connectors and leaves its text as a text of its own; deleting it with its text removes both |
+| Copying | Copy, cut and duplicate take a balloon's text with it, and a connector only when both its balloons go too |
 | *Convert to path* | Gives up the balloon's numbers for node editing |
 
 ### Text
@@ -826,16 +826,16 @@ Set a cover's type: a title and a subtitle in fonts of your own.
 | --- | --- |
 | Click or drag | A click makes a text as wide as its words; a drag makes a box of that width |
 | Editing | Double-click to edit; `Esc` or `Ctrl/⌘+Enter` finishes |
-| Resizing | The left and right handles change only the width of the box, and the words wrap again at the same size; the other handles scale the text |
+| Resizing | The left and right handles change only the width of the box, and the text wraps again at the same size; the other handles scale the text |
 
 | Feature | What it does |
 | --- | --- |
-| **Formatting** | Bold, italic, underline, strikethrough, links, colour and size of any range, headings, bulleted, numbered and nested lists (`Tab` nests a list item). The format bar stands where the Properties bar does (at the top, or just above the words being typed) and keeps its tools in named groups: **Style**, **Words** (the size menu and the font), **Paragraph** (the paragraph and list menus) and **Finish**. Its menus stay open after a choice, ticking the one made, until `Esc` or a press outside, and never cover the words. **Copy Markdown** is one click away |
+| **Formatting** | Bold, italic, underline, strikethrough, links, colour and size of any range, headings, bulleted, numbered and nested lists (`Tab` nests a list item). The format bar stands where the Properties bar does (at the top, or just above the text being typed) and keeps its tools in groups with a line between them: style, the selected text (link, colour, the size menu and the font), paragraph (the paragraph and list menus) and finish. Its menus stay open after a choice, ticking the one made, until `Esc` or a press outside, and never cover the text. **Copy Markdown** is one click away |
 | **Look** | Colour or gradient, outline, size, line height, letter spacing, alignment, auto or fixed width, paragraph spacing, indent, case, line limit, a set height, kerning, OpenType features and the axes of variable fonts |
 | **Fonts** | Import `.ttf`, `.otf`, `.woff` or `.woff2` into the library, including variable fonts. One text may use several fonts. Right-to-left and mixed-direction text are supported |
 | **Paragraph and box** | At the start of the text's bar: the paragraph and card settings (a text can sit on a coloured card; **Make note files** turns such texts into notes) |
-| **Text on a path** | *Path tools > Text along a path*: the words follow the path when it moves or changes, in the same undo step, and are plain text again when the path is deleted. *Paragraph and box* sets where they start, their alignment along it, the side and the distance from it |
-| **Text in a shape** | Select a text and a closed shape (a boolean shape or a group works too: the words go in its biggest piece), then *Path tools > Text inside the shape*. The shape sets where the words go (see below) |
+| **Text on a path** | *Path tools > Text along a path*: the text follows the path when it moves or changes, in the same undo step, and are plain text again when the path is deleted. *Paragraph and box* sets where they start, their alignment along it, the side and the distance from it |
+| **Text in a shape** | Select a text and a closed shape (a boolean shape or a group works too: the text goes in its biggest piece), then *Path tools > Text inside the shape*. The shape sets where the words go (see below) |
 | **Text to path** | `Ctrl/⌘+E` turns letters into editable outlines |
 | **Off its path or shape** | *Text off its path or shape* sets them straight again |
 
@@ -1210,7 +1210,7 @@ Take a reference out of the app: download it or export it.
 
 | In detail | |
 | --- | --- |
-| **Copy** | `Ctrl+C` in the library and its viewer, or the menu: a picture goes as a PNG, also a GIF's first frame and an SVG drawn, which the message says; only the first of several pictures fits. The PNG goes alone on the clipboard (a name beside it would be pasted instead of the picture by many programs). A markdown or rich text note goes as markdown with its properties on top, a plain text note as its words, several notes joined. A video or sound goes as its library picture. Any other file, or a picture the app cannot draw (TIFF, HEIC, PSD), goes as its name, which the message says. On a canvas, `Ctrl+C` on one note card gives the note's words and pastes back as the card |
+| **Copy** | `Ctrl+C` in the library and its viewer, or the menu: a picture goes as a PNG, also a GIF's first frame and an SVG drawn, which the message says; only the first of several pictures fits. The PNG goes alone on the clipboard (a name beside it would be pasted instead of the picture by many programs). A markdown or rich text note goes as markdown with its properties on top, a plain text note as its text, several notes joined. A video or sound goes as its library picture. Any other file, or a picture the app cannot draw (TIFF, HEIC, PSD), goes as its name, which the message says. On a canvas, `Ctrl+C` on one note card gives the note's words and pastes back as the card |
 | *Copy file name*, *Paste* | The name as text; *Paste* brings a picture from the clipboard in, named by the text beside it when there is one and it is a file name, else `image` |
 | **Copy file** | Desktop app; the same menu and a right click on a canvas: puts the real files on the clipboard, of any kind, to paste in a file manager |
 | **Dragging out** | Desktop app: drag a card onto a file manager or another program, as a copy; several selected go together, up to 1,000. If a program refuses it, hold `Alt` as you start the drag for a real file drag, which nothing inside the app receives. Hidden items stay in: use **Copy file** |
@@ -1230,7 +1230,7 @@ Bring back a file deleted by mistake: the workspace folder keeps deleted files i
 | Action | What happens |
 | --- | --- |
 | **Delete…** on an unused item | It leaves the library |
-| **Delete…** on an item in use | Deleted everywhere, after a confirmation that says where it is used (the first three canvases and how many others). Its instances are removed from every canvas first; a text using it as its font keeps its words in the default font. Undo brings them back on the open canvas, not on the others |
+| **Delete…** on an item in use | Deleted everywhere, after a confirmation that says where it is used (the first three canvases and how many others). Its instances are removed from every canvas first; a text using it as its font keeps its text in the default font. Undo brings them back on the open canvas, not on the others |
 | **Delete everywhere** | A selected item's right-click menu on a canvas, the command palette, and the library's details: the file and every instance of it, after saying where it is used; on a canvas, text and shapes selected with it stay. Outside hidden mode, a hidden item is a padlock: Delete everywhere, Copy file and copying a note card do not reach it, whatever the password state |
 | **Trash** (desktop app) | The library's sidebar: puts `is:trash` in the search box and shows the files in this workspace's `.trash` folder as cards in place of the grid, each with the picture the library gives its kind (a note's page, a PDF's, a video's frame, an art file's picture…), not your system's trash; anything else typed filters by name, and anything else in the sidebar goes back to the library. Pick files as in the library (Ctrl, Shift, Ctrl+A): **Restore** and **Delete for good** are in the details panel and the right-click menu. A file comes back where it was, never over another; its tags and folder come back only if the library still remembers it. Delete for good asks first. Hidden files there are listed only in hidden mode with the Hidden items open; outside it they neither show nor count. Boards and canvases in `.trash` are not listed |
 | **Missing files** | For example after clearing site data, or a file taken out of the library folder: flagged with their usage; importing the same file again restores every instance |
@@ -1278,17 +1278,17 @@ Keep study notes on a reference: its facts as properties, the print embedded, a 
 
 | The editor ([SunEditor](https://suneditor.com)) | |
 | --- | --- |
-| **Editor style** | Settings > Notes: *Document* (pages, every tool; the default), *Classic* (one short toolbar row, the rest behind its **+**), *Bottom* (the same, below), *Balloon* (the toolbar only over selected words), *Notion-like* (a handle beside each block) |
+| **Editor style** | Settings > Notes: *Document* (pages, every tool; the default), *Classic* (one short toolbar row, the rest behind its **+**), *Bottom* (the same, below), *Balloon* (the toolbar only over selected text), *Notion-like* (a handle beside each block) |
 | **The `/` menu** | In every editor style: type `/` at the start of a line or after a space, then words to find a command (headings, lists, quote, code, table, picture, link and more) |
 | **Pictures, video, sound and files** | Come from the library: the gallery buttons (Insert ▸ Image gallery, Video gallery, Audio gallery, File gallery, File browser) open the library chooser, and a file uploaded, dropped or pasted into a note is put in the library first. Its own **Import…** button takes files from this device into the library and into the note |
 | **Templates** | Insert ▸ Template inserts a block at the cursor: *Meeting notes*, *To-do list*, *Journal entry*, *Reference sheet*, then **your own**: any note in the library tagged `template` is listed by its name, its pictures and links pointing at the same library items. `{{date}}`, `{{time}}` and `{{title}}` in one are filled in: today, now, the note's name |
 | **Layouts** | Insert ▸ Layout: *Two columns*, *Three columns*, *Sidebar and main*. A layout takes the place of the whole note (`Ctrl+Z` brings the note back), and markdown cannot hold columns, so a note with one is saved as a rich text note |
 | **Task lists** | Click a box to tick it; it is saved as `- [x]`. A task shows its box only (no bullet) |
-| **Links from the clipboard** | Select words and paste a web address or a `[[link]]`: those words become the link. The selection's toolbar has the 🔗 link button too |
-| **Remove format** | The eraser in the toolbar over selected words, and in the Text menu: takes sizes, fonts and colours off the words chosen, so a heading made bigger or smaller by accident goes back to its own size |
+| **Links from the clipboard** | Select words and paste a web address or a `[[link]]`: that text becomes the link. The selection's toolbar has the 🔗 link button too |
+| **Remove format** | The eraser in the toolbar over selected text, and in the Text menu: takes sizes, fonts and colours off the text chosen, so a heading made bigger or smaller by accident goes back to its own size |
 | **Colours in code blocks** | A block with a language is coloured, in any of the 21 languages it offers. The colours are painted over the words, so the note itself does not change. **Colour code in notes** in Settings > Notes turns it off |
 | **The word under the cursor** | `Ctrl+B`, `Ctrl+I`, `Ctrl+U` and **Code** with the cursor inside a word format the whole word, or remove the format from text already in it, with nothing selected |
-| **Signs round selected words** | Typing `"`, `'`, `(`, `[`, `{`, `<`, `=` or `%` over selected words wraps them, and they stay selected. In a note with formats, `` ` `` makes code, `*` or `_` italic (twice: bold) and `~` strikethrough. **Signs wrap selected words** in Settings > Notes turns it off |
+| **Signs round selected text** | Typing `"`, `'`, `(`, `[`, `{`, `<`, `=` or `%` over selected text wraps it, and it stays selected. In a note with formats, `` ` `` makes code, `*` or `_` italic (twice: bold) and `~` strikethrough. **Signs wrap selected text** in Settings > Notes turns it off |
 | **Marks typed at a line's start** | `1.` then a space starts a numbered list, and `---` a line, always. With **Markdown marks make formats** on (Settings > Notes; off at first), `-`, `*`, `+`, any number with `.` or `)`, `>` and `#` to `######` then a space do too: the mark goes, the line takes the format, one undo step |
 | **Lines with marks into lists** | In the `/` menu. Lines that start with `1.`, `-`, `#` or `>` but are words (pasted as words or typed before marks were read; saved, their marks show as `1\.` or `\-` in the file) become the list, heading or quote they say, in the whole note; one undo step. Nothing changes a note by itself |
 | **Markdown and Code views** | Show the note as text; coming back without a change there, the note is as it was (picture sizes, spacing). A change made there is read back from that text, which markdown keeps without sizes or styles |
@@ -1302,7 +1302,7 @@ Keep study notes on a reference: its facts as properties, the print embedded, a 
 | --- | --- |
 | Name | *New note name* (Settings > Notes; `Note {yyyy}-{mm}-{dd} {hhmmss}` at first), which is also its title |
 | From the Note tool | The note goes in the Notes folder, its card is placed where you clicked and it opens in the Note panel |
-| From texts on a card | Texts on a card (what the Note tool made before notes were files; a card is also one of a text's box options) become notes with **Make note files** in their Actions bar: the same place, width and stacking, the words in a `.md` file named by its first line |
+| From texts on a card | Texts on a card (what the Note tool made before notes were files; a card is also one of a text's box options) become notes with **Make note files** in their Actions bar: the same place, width and stacking, the text in a `.md` file named by its first line |
 
 ### Notes on a canvas
 
@@ -1318,7 +1318,7 @@ Keep the notes beside the picture they are about, and edit them there.
 | **The panel** | A panel like Layers (it never folds): it floats, docks to a side (keeping its own width), its width and height can be dragged. ✕ closes it (asking about unsaved changes); the card shows the saved version at once |
 | **Undo** | Saving is no step of the canvas's undo: undo and redo on the canvas keep the saved version (they never bring an older one back) |
 | **Renaming** | The rename button in its header (or F2) renames the note with the library's rename dialog; the extension stays as it is, and `.note.html` counts as one extension there and in batch rename |
-| **Card size** | A side handle lays the page out at the new width or height, the words keeping their size; dragging a corner evenly (`Shift`) zooms the whole card. A new version keeps the card's width. **Reset size** in a card's Actions bar puts it back to its Note tool card size |
+| **Card size** | A side handle lays the page out at the new width or height, the text keeping its size; dragging a corner evenly (`Shift`) zooms the whole card. A new version keeps the card's width. **Reset size** in a card's Actions bar puts it back to its Note tool card size |
 | **Whole note or part** | **Note cards show** (Settings > Notes) applies to every card at once: *Whole note* (the default), the height follows the note, also when it is saved longer; *Part*, you set the height and what does not fit fades out into the page's paper |
 | **Labels** | **Note cards show properties** (Settings > Notes) takes names separated by commas (`status, type, tags`): their values show as small labels at the top of each note's card and library picture, at once. They say what the details panel says, written into the file or not, and change as soon as a property does |
 | **Hidden notes** | A hidden note opens there only while the hidden items show, and closes (its changes saved) as soon as they no longer do: hidden mode ended, the hidden items locked |
@@ -1349,7 +1349,7 @@ Keep the notes beside the picture they are about, and edit them there.
 
 | What a save may change by itself (Settings > Notes, all off by default) | |
 | --- | --- |
-| **Write tags and properties into note files** | Writes what is changed in the library into the file too; off, the file changes only when you save its words, and what its YAML says is still read into the library |
+| **Write tags and properties into note files** | Writes what is changed in the library into the file too; off, the file changes only when you save its text, and what its YAML says is still read into the library |
 | **Automatic created and modified** | Both properties are always there, not editable or removable in the details panel (also before the first save). A save writes the time into modified, and into created when the note has none (from when it came into the library). Their names (`created-on`, say) and the **Date and time format** (`YYYY-MM-DDTHH:mm`) are settings; sorting and date searches need the numbers in that order |
 | **Title** | *First heading*: a save writes the first H1 into the title property, which is then not editable or removable there. With no H1 the title stays. The title shown for a note is the file's name (as in Obsidian); a `title:` property is one of its properties |
 | **Rename notes on save** | A save names the file from **File name comes from** (*First heading* or *Title property*), in **File name style**: *Keep as written* (only what a file cannot hold changes: `My Note: Part 1` → `My Note- Part 1.md`) or *Clean* (`my_note-part_1.md`), the two rules of Keep file names. The links to it in other notes follow, and it is a step of the library's undo (the next save renames it again). Turning it on renames nothing until a note is saved. With nothing to name it by (no heading or title, or only marks such as `# ???`) the name stays; when another note has the name first, the file and the item end in `-2`, and stay so until the name wanted changes. In the desktop app with Keep file names off, a note named as written has a tidy file until its name next changes |
@@ -1377,7 +1377,7 @@ Link notes to each other and see what links to a note.
 | **A look before opening** | The pointer resting on a link shows the preview of what it points at (a note's page, a picture) |
 | **Linked from and Links** | A note's details list the notes that link to it and what it links to (notes, pictures, any file, each with its folder), each with a count; a link that finds nothing is greyed. Click a row to open it. They follow the saved file, so a new link shows after saving. Plain text files are not tracked |
 | **Renaming or moving** | An item in the library writes the links to it in every note again (`[[old name]]` when that name was its alone, a path to its old place), and a note that moved has its own paths written from its new folder; each changed note is saved as a new version |
-| **#tags in the words** | As Obsidian reads them: `#` then a word with a letter in it, not in code; `#123` and `# Heading` are none. With a YAML block, the item's tags are exactly its `tags:` and its #tags, and taking a `#tag` out of the words takes the tag away at the next save; tags added in the library go into the YAML, never into the words. A note without YAML only adds its #tags |
+| **#tags in the words** | As Obsidian reads them: `#` then a word with a letter in it, not in code; `#123` and `# Heading` are none. With a YAML block, the item's tags are exactly its `tags:` and its #tags, and taking a `#tag` out of the text takes the tag away at the next save; tags added in the library go into the YAML, never into the text. A note without YAML only adds its #tags |
 | **Search inside notes** | The library search (All) finds a note by the words in it too (read once per version while searching) |
 
 | How links are written | |
@@ -1481,7 +1481,7 @@ Export several pictures at once: leave some out, name the files by a pattern, an
 | Presets | *Save these as a preset…* keeps the choices (format, quality, background, padding, resolution, size, name pattern, size rule, extra versions) as a saved style; choose one from *Preset*, update it there, or manage them in the Styles panel |
 | Again | It opens as you last exported that sheet or selection on this device; *Export again* in the Export menu does it with no dialog. `Enter` exports as last time, `Ctrl+C` copies |
 | Result | Download it, copy it, or keep it in the library |
-| Several items | Selected sheets, or with *Separate files* any selected items (pictures at their own pixels). A balloon and its words are one item, and a connector is none. Otherwise a selection is one picture |
+| Several items | Selected sheets, or with *Separate files* any selected items (pictures at their own pixels). A balloon and its text are one item, and a connector is none. Otherwise a selection is one picture |
 | What goes | Each item has a tick: click an item anywhere to leave it out (it fades and loses its number) or bring it back; `Ctrl`+click (`⌘` on a Mac) several, `Shift`+click to set a whole run like the last one clicked, or use *All* and *None*. `Space` on an item ticks or unticks it, `Delete` leaves it out. Reorder them with the arrows or by dragging |
 | Output | For several items: *Separate files* (one ZIP), *PDF pages* (one PDF, a page for each, in the order shown) or *One picture* (all of them together) |
 | Size of each | For several items: *Same width*, *Same height*, *Longest side*, or *Scale* (1× to 4× each one's size on the canvas, so big things stay bigger) |
@@ -2383,7 +2383,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Angular gradient in SVG | SVG has no sweep gradient, so an SVG holds a picture of it (up to 384 px a side, about 300 KB), not vectors; the Export dialog, Save as SVG and Copy as SVG warn. A PDF of such a shape is made as a picture, and picture exports are exact |
 | Varied fills | The copies of a varied texture repeat after a block of 16 to 31 cells |
 | Pattern | A rotated sheet or shape is refused. A result is at most 600 shapes. Ungrouping a pattern, or moving one of its shapes out of its group, ends its link with the panel (the shapes stay as ordinary ones). Resizing the sheet makes the pattern again at the new size from its settings and seed, so a generator whose layout depends on the size (how many waves fit, say) can place its shapes differently |
-| Auto layout | A turned sheet cannot have one. A masonry and justified rows resize the items to their places: a pen stroke and a turned thing are scaled as a whole, words only get wider (they wrap again). A grid places spanning items row by row in order, so a hole a big item leaves is not filled by a later small one. A sort rule orders by what the canvas holds (a picture's name as placed and when its file came into the library, a text's first words, size, kind), not by colour; a picture placed before it kept its date gets it from the library when a date order is chosen. Lengths of a saved layout style are px as seen when it was saved |
+| Auto layout | A turned sheet cannot have one. A masonry and justified rows resize the items to their places: a pen stroke and a turned thing are scaled as a whole, text only gets wider (it wraps again). A grid places spanning items row by row in order, so a hole a big item leaves is not filled by a later small one. A sort rule orders by what the canvas holds (a picture's name as placed and when its file came into the library, a text's first words, size, kind), not by colour; a picture placed before it kept its date gets it from the library when a date order is chosen. Lengths of a saved layout style are px as seen when it was saved |
 | SVG import | Text, patterns and masks inside an SVG are not imported; a dropped SVG file is placed as a picture (make a vector copy to edit it) |
 | Adjustments and shadows | Shadows are not shown on a video or GIF while it plays. Adjustments (and shadows) are written to an exported SVG only for shapes (not pen strokes or text), as an SVG filter that matches the canvas closely but not exactly (curves, levels and the gradient map are sampled; grain differs). A shape bigger than about 8 million pixels on screen is drawn unadjusted. Grain on a shape is fixed to the screen pixels, not to the shape |
 | Boolean groups | Per-corner radii on a boolean result are not available |

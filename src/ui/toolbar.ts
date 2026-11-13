@@ -220,8 +220,8 @@ const TEXT_ALIGNS = [
   { id: "justify", label: "Justify", icon: ICONS.textAlignJustify },
 ] as const;
 const TEXT_FITS = [
-  { id: "width", label: "Auto width", title: "Auto width: the box is as wide as the words (a click makes one)", icon: ICONS.textAutoWidth },
-  { id: "fixed", label: "Fixed width", title: "Fixed width: the words wrap at the box's width (drag a box to make one)", icon: ICONS.textFixedWidth },
+  { id: "width", label: "Auto width", title: "Auto width: the box is as wide as its text (a click makes one)", icon: ICONS.textAutoWidth },
+  { id: "fixed", label: "Fixed width", title: "Fixed width: the text wraps at the box's width (drag a box to make one)", icon: ICONS.textFixedWidth },
 ] as const;
 
 const KIND_LABEL: Record<string, string> = { all: "All", sheet: "Sheet", shape: "Shape", text: "Text", picture: "Picture", stroke: "Stroke" };
@@ -342,7 +342,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-kind="shape" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the field left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
       <div class="tb-group tb-options" data-for="text note select node" data-kind="text">
-        <button type="button" data-balloon-panel hidden aria-label="Speech balloon and text in shape" title="Speech balloon and text in shape: body, tails, words, padding, alignment, connectors">${ICONS.speechBalloon}</button>
+        <button type="button" data-balloon-panel hidden aria-label="Speech balloon and text in shape" title="Speech balloon and text in shape: body, tails, text, padding, alignment, connectors">${ICONS.speechBalloon}</button>
         <button type="button" data-text-box data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Paragraph and box options" title="Paragraph and box: space between paragraphs, first line, case, most lines, set height">${ICONS.textBox}</button>
         <button type="button" class="swatch swatch-paint" data-text-colour data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Text colour" title="Text colour: open the colour picker (with transparency)"><span data-paint-chip></span></button>
         <label class="tb-count" data-text-wrap hidden title="Font: the bundled one, or a font file from the library (import one here)"><select data-text-font aria-label="Font"></select></label>
@@ -362,7 +362,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       </div>
       <div class="tb-group tb-options" data-for="select node" data-sel-colours data-no-command hidden role="group" aria-label="Colours of the selection"></div>
       <div class="tb-group tb-options" data-for="shape balloon path select node" data-kind="shape sheet picture">
-        <button type="button" data-balloon-panel hidden aria-label="Speech balloon and text in shape" title="Speech balloon and text in shape: body, tails, words, padding, alignment, connectors">${ICONS.speechBalloon}</button>
+        <button type="button" data-balloon-panel hidden aria-label="Speech balloon and text in shape" title="Speech balloon and text in shape: body, tails, text, padding, alignment, connectors">${ICONS.speechBalloon}</button>
         <button type="button" class="swatch swatch-paint" data-kind="shape sheet" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
         <button type="button" class="swatch swatch-paint" data-paint="stroke" aria-haspopup="dialog" aria-expanded="false" aria-label="Outline" title="Outline colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Outline</b></button>
       <label class="tb-count" data-scrub="outline-w" data-outline-w-wrap hidden title="Outline width, in px at this zoom (0: none). Drag the field left or right to change it">Width <input type="number" data-outline-w min="0" step="0.5" inputmode="decimal" aria-label="Outline width (px at this zoom)"></label>

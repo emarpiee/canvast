@@ -23,7 +23,7 @@ export async function deleteEverywhere(session: Session, d: DeleteEverywhere): P
   const ok = await confirmDialog({
     title: `Delete ${one ? `“${d.name || "Untitled"}”` : plural(d.hashes.length, "item")} everywhere?`,
     lines: [
-      `${one ? "It is" : "They are"} used ${plural(d.uses, "time")}${where ? ` on ${where}` : d.canvases ? ` on ${plural(d.canvases, "canvas", "canvases")} or more` : ""}. Those instances are removed too; a text that uses one as its font keeps its words in the default font.`,
+      `${one ? "It is" : "They are"} used ${plural(d.uses, "time")}${where ? ` on ${where}` : d.canvases ? ` on ${plural(d.canvases, "canvas", "canvases")} or more` : ""}. Those instances are removed too; a text that uses one as its font keeps its text in the default font.`,
       `On the open canvas Undo brings them back; on the other canvases they cannot be brought back. The files are erased from ${desktopBridge() ? "the workspace folder" : "this browser's storage"} once nothing can use them any more.`,
     ],
     confirmLabel: "Delete everywhere",

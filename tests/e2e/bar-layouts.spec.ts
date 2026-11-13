@@ -46,6 +46,13 @@ test("a shape drawn with the Shape tool: its chips stand above it and edit it, t
   // the Look chip: a fill for this shape is the next one's too
   await near.locator('[data-vchip="look"]').click();
   await p.locator(".vchip-pop [data-paint=fill]").click();
+  // a colour tried by dragging in the picker is no drag on the canvas: the chips stay the selection's (not the tool's own, Brush and Options)
+  const slider = (await p.locator(".colour-pop .cp-wheel, .colour-pop .cp-plane, .colour-pop [data-slider='1']").first().boundingBox())!; // (whichever the picker's layout shows)
+  await p.mouse.move(slider.x + slider.width * 0.3, slider.y + slider.height / 2);
+  await p.mouse.down();
+  await p.mouse.move(slider.x + slider.width * 0.7, slider.y + slider.height / 2, { steps: 4 });
+  await expect(near.locator(".tb-cap"), "while the colour is dragged").toHaveText(["Look", "Shape", "Size"]);
+  await p.mouse.up();
   const hex = p.locator(".colour-pop [data-hex]");
   await hex.fill("ff8800");
   await hex.press("Enter");

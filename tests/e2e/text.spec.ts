@@ -676,7 +676,7 @@ test("words of a text can be underlined, struck through, given a colour and a si
   await select(4, 3);
   await p.getByRole("button", { name: "Strikethrough (Ctrl+Shift+X)" }).click();
   await select(8, 5);
-  await p.getByRole("button", { name: "Colour of the selected words" }).click();
+  await p.getByRole("button", { name: "Colour of the selected text" }).click();
   await p.locator(".colour-pop [data-hex]").fill("ff0000");
   await p.locator(".colour-pop [data-hex]").press("Enter");
   await p.keyboard.press("Escape"); // closes the picker, then the edit
@@ -695,8 +695,8 @@ test("words of a text can be underlined, struck through, given a colour and a si
   await p.mouse.dblclick(310, 308);
   await expect(p.getByTestId("text-editor")).toBeFocused();
   await select(14, 4);
-  await format(p, "Size of the selected words", "Make the selected words bigger");
-  await format(p, "Size of the selected words", "Make the selected words bigger");
+  await format(p, "Size of the selected text", "Make the selected text bigger");
+  await format(p, "Size of the selected text", "Make the selected text bigger");
   await finish(p);
   [t] = await textObjects(p);
   expect(t!.md).toContain('<span style="font-size:156.25%">four</span>');
@@ -866,7 +866,7 @@ test("selected words can be made a link (web or mail address only, shown underli
     for (let i = 0; i < count; i++) await p.keyboard.press("Shift+ArrowRight");
   };
   await select(3, 5);
-  await p.getByRole("button", { name: "Link of the selected words" }).click();
+  await p.getByRole("button", { name: "Link of the selected text" }).click();
   const caret = await p.getByTestId("prompt-input").evaluate((el) => [getComputedStyle(el).caretColor, getComputedStyle(document.documentElement).getPropertyValue("--hud-accent")] as const);
   expect(caret[0], "the caret is not left to the browser's default").not.toBe("auto");
   expect(await p.evaluate(() => [getComputedStyle(document.body).userSelect, getComputedStyle(document.querySelector('[data-testid="prompt-input"]')!).userSelect]), "interface text is not selectable, a field's is").toEqual(["none", "text"]);
@@ -875,7 +875,7 @@ test("selected words can be made a link (web or mail address only, shown underli
   await expect(p.getByTestId("prompt-dialog")).toHaveCount(0);
   await expect(p.getByTestId("text-editor")).toBeVisible(); // the dialog did not end the edit
   await select(3, 5);
-  await p.getByRole("button", { name: "Link of the selected words" }).click();
+  await p.getByRole("button", { name: "Link of the selected text" }).click();
   await p.getByTestId("prompt-input").fill("https://example.com/a(b)");
   await p.getByTestId("prompt-input").press("Enter");
   await expect(p.getByTestId("prompt-dialog")).toHaveCount(0);
@@ -905,7 +905,7 @@ test("selected words can be made a link (web or mail address only, shown underli
   await p.mouse.dblclick(box.minX + 4, y);
   await expect(p.getByTestId("text-editor")).toBeFocused();
   await p.keyboard.press("Control+a");
-  await p.getByRole("button", { name: "Link of the selected words" }).click();
+  await p.getByRole("button", { name: "Link of the selected text" }).click();
   await expect(p.getByTestId("prompt-input")).toHaveValue("");
   await p.getByTestId("prompt-input").fill("");
   await p.getByTestId("prompt-input").press("Enter");

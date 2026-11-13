@@ -47,6 +47,13 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.25: "text", not "words", where it is any text (2026-11-14)
+
+- **Implemented:** the format bar's groups are plain `.tb-group`s again (no `captionedGroup`, no hover names); its middle group is "Text". Every name, hint, label and notice that said "words" for any selected text or a text's content says "text" (text editor, toolbar, colour popover, balloon panel, Layers labels "Text of …", context bar, delete everywhere, an undo label, notes, settings "Signs wrap selected text"), with the tests (`text.spec.ts`), the icon registry and the README.
+- **Also:** the shared menu has `keepFocus` (it takes no focus, when it opens or after a choice; Escape still closes one that stays open), used by the format bar: 0.58.24's `text.spec.ts` (49, 136, 795, all four projects) failed because the focus went to the menu after a choice, so `finish()`'s Escape did not reach the text. A colour previewed from a field or the picker is marked (`field` on the paint preview) and is not `gesturing`: the bar no longer switched to the tool's own groups during a drag in the picker (`bar-layouts.spec.ts` checks the chips during such a drag).
+- **Tested:** build and typecheck here; the format bar in Chromium and Firefox (no names, menus as in 0.58.24; after a choice "XY" typed goes into the text, the first Escape closes the menu, the second finishes it); a balloon with the picker's ring dragged: the chips stay Look, Size (before: Look, Brush, Options), and a shape's Look, Shape, Size, both browsers.
+- **Committed:** v0.58.25 on `main`.
+
 ## v0.58.24: the text format bar stands where the Properties bar does (2026-11-14)
 
 - **Implemented:** `ui/near-selection.ts`: `placeAbove` (one call for the chips by the selection and the format bar) and `boxOfElementIn`; the text editor takes the Properties place (`ui.properties`) and has `follow()`, called after each frame (`textFollow` in `main.ts`); its groups are `captionedGroup`s with the shared `hoverNames`; its menus open with `keepOpen` and a `refresh` that ticks the heading or list where the caret is; `setMenuAvoid` gives the words being typed while they are. Tests: `text.spec.ts`'s `format()` closes the menu with Escape after a choice (and checks the text is still typed); `bar-layouts.spec.ts` checks the format bar above the words.

@@ -409,7 +409,7 @@ export class OpenNote {
       lines: [`Part of the formatting of “${this.name}” cannot be kept in a ${plain} file: fonts, sizes, colours, alignment or the page layout.`],
       choices: [
         { value: "rich", label: "Save as a rich text note", help: `Keeps everything: “${this.name}” becomes “${richNameOf(this.name)}” (its folder, tags, links and cards on canvases follow it).` },
-        { value: "text", label: `Save as plain ${plain}`, help: this.kind === "md" ? "Keeps the text, headings, lists, links, tables and pictures; the rest of the formatting is dropped." : "Keeps the words only." },
+        { value: "text", label: `Save as plain ${plain}`, help: this.kind === "md" ? "Keeps the text, headings, lists, links, tables and pictures; the rest of the formatting is dropped." : "Keeps the text only." },
       ],
       confirmLabel: "Save",
     });

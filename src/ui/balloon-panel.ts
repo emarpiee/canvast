@@ -51,7 +51,7 @@ const TEXT: Section = { title: "Text", items: [
   R("padR", "Padding right", 0, 4, 0.4, 0.05),
   R("padY", "Padding top", 0, 4, 0, 0.05),
   R("padB", "Padding bottom", 0, 4, 0, 0.05),
-  Ch("over", "Too many words", [["show", "Show"], ["hide", "Hide"]], "show"),
+  Ch("over", "Too much text", [["show", "Show"], ["hide", "Hide"]], "show"),
 ] };
 const LINK: Section = { title: "Connector", items: [
   Ch("linkStyle", "Kind", LINK_STYLES, "neck", true),
@@ -115,8 +115,8 @@ export function mountBalloonPanel(host: HTMLElement, editor: EditorState, action
   const btn = (id: string, label: string, tip: string): string => `<button type="button" class="adj-map-edit" data-bl="${id}" title="${tip}">${label}</button>`;
   panel.innerHTML = panelHtml({
     title: "Speech balloon",
-    body: `<div data-bl-rows></div><p class="adj-note" data-bl-over hidden>Some words do not fit in this shape.</p>`,
-    foot: `<div class="adj-foot">${btn("addtail", "Add tail", "A new tail on this balloon")}${btn("deltail", "Remove tail", "Take this tail away")}${btn("fit", "Fit text to shape", "The biggest size at which all the words fit")}${btn("connect", "Connect balloons", "Join the selected balloons, each to the next")}${btn("save", "Save as style", "Keep this balloon's look in the Styles panel")}${btn("topath", "Convert to path", "An ordinary path, for editing its nodes")}</div>`,
+    body: `<div data-bl-rows></div><p class="adj-note" data-bl-over hidden>Some of the text does not fit in this shape.</p>`,
+    foot: `<div class="adj-foot">${btn("addtail", "Add tail", "A new tail on this balloon")}${btn("deltail", "Remove tail", "Take this tail away")}${btn("fit", "Fit text to shape", "The biggest size at which all the text fits")}${btn("connect", "Connect balloons", "Join the selected balloons, each to the next")}${btn("save", "Save as style", "Keep this balloon's look in the Styles panel")}${btn("topath", "Convert to path", "An ordinary path, for editing its nodes")}</div>`,
   });
   host.append(panel);
   const rowsEl = panel.querySelector<HTMLElement>("[data-bl-rows]")!, titleEl = panel.querySelector<HTMLElement>("h2")!;

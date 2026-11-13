@@ -385,7 +385,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
             ] : []),
             ...(actions.canOutline() ? [row("outline", "Text to path", "Convert the text to a path (Ctrl+E)", ICONS.replace, () => actions.outline())] : []),
             ...(actions.canSetOnPath() ? [row("onpath", "Text along a path", "Set the text along the selected path (select the text and the path)", ICONS.route, () => actions.setOnPath())] : []),
-            ...(actions.canSetInShape() ? [row("inshape", "Text inside the shape", "The words flow inside the selected closed shape", ICONS.textInShape, () => actions.setInShape())] : []),
+            ...(actions.canSetInShape() ? [row("inshape", "Text inside the shape", "The text flows inside the selected closed shape", ICONS.textInShape, () => actions.setInShape())] : []),
             ...(actions.canTakeOffPath() ? [row("offpath", "Text off its path or shape", "The text is set straight again", ICONS.routeOff, () => actions.takeOffPath())] : []),
           ];
         };

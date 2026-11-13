@@ -1071,11 +1071,11 @@ export interface PaintPatch {
 }
 
 /** Show a new fill or outline on the selected paths without storing it (the picker is still being dragged). */
-export function previewPaint(doc: DocumentStore, editor: EditorState, patch: PaintPatch): void {
+export function previewPaint(doc: DocumentStore, editor: EditorState, patch: PaintPatch, /** From a field or the colour picker, not a drag on the canvas. */ field = false): void {
   const ids = lined(doc, editor).map((o) => o.id);
   if (!ids.length || editor.blockEdit()) return;
   if (editor.region && patch.fill !== undefined) return; // (a picked region is coloured when the picker lets go)
-  editor.preview = { kind: "paint", ids, ...patch };
+  editor.preview = { kind: "paint", ids, ...patch, ...(field ? { field: true as const } : {}) };
   editor.changed();
 }
 
@@ -1342,7 +1342,7 @@ export function balloonText(doc: DocumentStore, path: PathObject): TextObject | 
   const had = wordsOf(doc, path);
   if (had) return had;
   const made = newBalloonWords(doc, path, "Text");
-  if (made) doc.commit(doc.transaction("Add words to balloon", [made]));
+  if (made) doc.commit(doc.transaction("Add text to balloon", [made]));
   return made;
 }
 

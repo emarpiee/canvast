@@ -1028,8 +1028,8 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .bar-name { position: absolute; top: 0; padding: var(--s-1) var(--s-4); font: var(--font-meta); line-height: 1; color: var(--hud-muted); white-space: nowrap; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-pill); transform: translate(-50%, calc(-100% - var(--near))); }
 :root[data-group-names="bottom-hover"] .bar-name { top: 100%; transform: translate(-50%, var(--near)); }
 @media (any-hover: hover) {
-  :root[data-group-names$="hover"] :is(.ctx-bar, .props-row, .text-format) .tb-captioned > .tb-cap { display: none; }
-  :root[data-group-names$="hover"] :is(.ctx-wrap:has(> .ctx-bar:is(:hover, :focus-within)), .props-near:is(:hover, :focus-within), .props-chips:is(:hover, :focus-within), :has(> .text-format:is(:hover, :focus-within))) > .bar-names { display: block; }
+  :root[data-group-names$="hover"] :is(.ctx-bar, .props-row) .tb-captioned > .tb-cap { display: none; }
+  :root[data-group-names$="hover"] :is(.ctx-wrap:has(> .ctx-bar:is(:hover, :focus-within)), .props-near:is(:hover, :focus-within), .props-chips:is(:hover, :focus-within)) > .bar-names { display: block; }
 }
 .ctx-bar button { display: inline-flex; flex: none; align-items: center; justify-content: center; color: inherit; background: transparent; border: 0; cursor: pointer; }
 .ctx-bar button[hidden] { display: none; }

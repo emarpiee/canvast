@@ -1237,7 +1237,7 @@ async function start(): Promise<void> {
       const l = labelOf(o, assetNames.map);
       const owner = ownerOf(o);
       const of = owner !== undefined ? doc.get(owner) : undefined;
-      return { icon: l.icon, label: of ? `${o.kind === "text" ? "Words" : "Connector"} of ${labelOf(of, assetNames.map).text}` : l.text };
+      return { icon: l.icon, label: of ? `${o.kind === "text" ? "Text" : "Connector"} of ${labelOf(of, assetNames.map).text}` : l.text };
     };
     const one = (o: CanvasObject, from: Choice["from"], why?: RevealWhy): Choice => ({ ids: [o.id], enter: [...(o.groups ?? [])], ...named(o), from, ...(why ? { why } : {}) });
     const out: Choice[] = [
@@ -1747,7 +1747,7 @@ async function start(): Promise<void> {
         return po && !po.cover ? po.proj.ppu : 0;
       }, final);
     },
-    paintSelected: (patch, final) => (final ? commitPaint(doc, editor, patch) : previewPaint(doc, editor, patch)),
+    paintSelected: (patch, final) => (final ? commitPaint(doc, editor, patch) : previewPaint(doc, editor, patch, true)),
   });
   // How the Properties bar shows (ADR 0198): the bar at the top, or value chips just above the selection.
   const PROPS_WHERE = { bar: "in the bar above", near: "under Look just above the selection" } as const;
