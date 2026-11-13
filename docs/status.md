@@ -47,6 +47,12 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.17: the chips by the selection scroll on a small window (2026-11-14)
+
+- **Implemented:** `.props-near` is capped to the window and its row scrolls sideways with the shared cue (`syncScroll`, the Actions bar's rule). A copy, cut or paste takes a focused element that is no longer shown (a closed dialog's button before it leaves the page, the hidden palette's box) as the page; the palette lets go of the keys when it closes. This was the cause of the paste failures of `vectors.spec.ts:3046` and `:3516` (the paste came while the Export dialog or the palette was closing).
+- **Tested:** build and typecheck here; scratch at 427 × 900, Chromium and Firefox: the sheet's chips end inside the window, the end cue shows, the wheel scrolls them, the last chip opens. `bar-layouts.spec.ts` checks it at that size. On GitHub (0.58.16): every group green but `vectors.spec.ts:3046` and `:3516` in Chromium (twice): this change.
+- **Committed:** v0.58.17 on `main`.
+
 ## v0.58.16: a chip's options stay open while a colour is set (2026-11-13)
 
 - **Implemented:** the chips hide for a drag only when no chip's popover is open (a value changed there previews too).

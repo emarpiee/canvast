@@ -96,6 +96,17 @@ test("every chip of a sheet, a thing on it, several things and a mix keeps the r
   expect(pop.x < k.x + k.width && pop.x + pop.width > k.x, "under or over its chip, not elsewhere").toBe(true);
   expect(Math.min(Math.abs(pop.y - (k.y + k.height)), Math.abs(k.y - (pop.y + pop.height))), "next to it").toBeLessThan(24);
   expect(await floatingProblems(p)).toEqual([]);
+  // a small window: the sheet's chips stay inside it and scroll sideways, with the cue at the end that has more (as the Actions bar)
+  await p.keyboard.press("Escape");
+  await p.setViewportSize({ width: 427, height: 900 });
+  await select(app, [sheet]);
+  const row = p.locator(".props-near > .props-row");
+  await expect(row).toHaveAttribute("data-scroll-end", "");
+  expect((await p.locator(".props-near").boundingBox())!.x + (await p.locator(".props-near").boundingBox())!.width, "inside the window").toBeLessThanOrEqual(427);
+  await row.evaluate((r) => r.scrollTo({ left: r.scrollWidth }));
+  await expect(row).toHaveAttribute("data-scroll-start", "");
+  await row.locator("[data-vchip]").last().click();
+  await expect(p.locator(".vchip-pop")).toBeVisible();
   expect(app.consoleErrors).toEqual([]);
 });
 

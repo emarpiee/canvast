@@ -147,6 +147,7 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
     top.el.hidden = beside || ids.length === 0;
     near.hidden = !beside;
     syncScroll(top.row);
+    if (beside) syncScroll(nearRow); // (a small window: the chips by the selection scroll sideways, as the Actions bar)
     if (beside) {
       const at = placeBy(box!, near.offsetWidth, near.offsetHeight, "above", 6);
       const [l, t] = [`${Math.round(at.left)}px`, `${Math.round(at.top)}px`];

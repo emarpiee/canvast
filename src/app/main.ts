@@ -3088,7 +3088,12 @@ async function start(): Promise<void> {
     return !!el && (el.isContentEditable || /^(TEXTAREA|SELECT)$/.test(el.tagName) || (el.tagName === "INPUT" && !/^(range|checkbox|radio|button|color)$/.test((el as HTMLInputElement).type)));
   };
   /** Where a copy, cut or paste belongs: the element that has the keys (the page itself when none does), else the event's target. */
-  const clipTarget = (e: Event): EventTarget | null => document.activeElement ?? e.target;
+  // (a field that is no longer shown has not the keys: a dialog just closed keeps its focused button until it leaves the page, the palette
+  // its box until the next frame. A paste then is the page's, not lost.)
+  const clipTarget = (e: Event): EventTarget | null => {
+    const a = document.activeElement;
+    return a instanceof HTMLElement && a !== document.body && !a.checkVisibility() ? document.body : (a ?? e.target);
+  };
   const receive = (all: File[]): void => {
     // Archives are imported (after confirmation); everything else is a media import.
     for (const f of all.filter(isArchiveFile)) void runImport(session, f);

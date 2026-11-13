@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.58.17 — The chips by the selection scroll on a small window (2026-11-14)
+
+- **Changed:** on a small window the Properties chips by the selection stay inside it and scroll sideways, with the fade and arrow at the end that has more, as the Actions bar does.
+- **Fixed:** a paste right after a dialog or the command palette closed could be lost (the field that had the keys was still taken for the place of the paste while it was going away).
+
 ## 0.58.16 — A chip's options stay open while a colour is set (2026-11-13)
 
 - **Fixed:** setting a colour from a chip's options closed them (the colour's live preview was taken for a drag on the canvas).

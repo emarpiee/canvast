@@ -77,6 +77,7 @@ export function mountCommandPalette(registry: CommandRegistry): { open(): void; 
   };
   const close = (): void => {
     if (root.hidden) return;
+    if (root.contains(document.activeElement)) (document.activeElement as HTMLElement).blur(); // (its box keeps no keys once hidden)
     root.hidden = true;
     asking = null;
     input.placeholder = placeholder;
