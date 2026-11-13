@@ -2176,7 +2176,6 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 | Section | What is in it |
 | --- | --- |
 | [The interface](#the-interface) | The bars, panels and menus |
-| [Value chips and the Properties panel](#value-chips-and-the-properties-panel) | Other ways to show the bars: short chips, a panel, chips by the selection |
 | [The command palette](#the-command-palette) | Any command by name, and macros |
 | [Context menus](#context-menus) | What fits where you are |
 | [The info bar](#the-info-bar) | Zoom, position, saving, and what the app is doing |
@@ -2189,45 +2188,15 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 | Part | Where | What it does |
 | --- | --- | --- |
 | **Tool rail** | Left | Undo and Redo, the tools (Import after Note), then Screenshot and Search |
-| **Properties bar** | Top, a panel, or by the selection | The options of the tool or of what is selected: in one row, as [value chips](#value-chips-and-the-properties-panel), in the Properties panel, or as value chips just above the selection (Settings > Appearance > Properties) |
-| **Actions bar** | Bottom, or with the selection | What can be done with the selection, in named groups (Items, Files, Edit shapes, Arrange, Attach, Selection), always in that order, some of them menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. The names show under or over the buttons, or only on hover, floating over or under the bar without moving it (not offered on a touch screen), or not at all (Settings > Appearance). Its groups can also be [value chips](#value-chips-and-the-properties-panel). It sits at the bottom or follows the selection (Settings). When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
-| **Panels** | Either side, or floating | Layers, Bookmarks, Tags, Styles, Adjust, Pattern, Speech balloon, Properties: they float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back |
+| **Properties bar** | Top | The options of the tool or of what is selected |
+| **Actions bar** | Bottom, or with the selection | What can be done with the selection, in named groups (Items, Files, Edit shapes, Arrange, Attach, Selection), always in that order, some of them menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. The names show under or over the buttons, or only on hover, floating over or under the bar without moving it (not offered on a touch screen), or not at all (Settings > Appearance). It sits at the bottom or follows the selection (Settings). When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
+| **Panels** | Either side, or floating | Layers, Bookmarks, Tags, Styles, Adjust, Pattern, Speech balloon: they float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back |
 | **Zen mode** | `Z`, or the leaf button | Fades the bars and panels until the pointer is over them |
 | **Screenshot** | The camera button | Saves the selection, or the whole view, to the library. Settings choose the format, quality, name, folder and tags, and whether to include the canvas pattern and the interface, a transparent background, and a copy on the clipboard |
 | **Hint line** | Bottom | What the tool does, and what each key does over a handle |
 | **Notices** | Above the Actions bar | Report results, often with a *View* button that opens what was made. They fade after a time that fits their length (an error stays to be read), and stack above the Actions bar, never over it |
 | **Long work** | A notice | Exporting, importing, opening a library, moving files, deleting everything: a notice with a progress bar and its current stage, which stays until the work ends and then says the result |
 | **Layouts** | | Adapt to large, medium and phone-sized screens, with scroll cues on bars that scroll |
-
-### Value chips and the Properties panel
-
-Keep the canvas clear: the options of what is selected can be a few short chips that say what each group is set to, a panel, or chips right above the selection. Settings > Appearance > **Properties** chooses; the controls are the same in each.
-
-Round a print's corners from its Shape chip, the bar at the top a few short chips.
-
-![Hokusai's Great Wave selected with its corners rounded, the top bar as three chips (Look, Shape 28 px, Picture) and the Shape chip open on its Radius field](docs/screenshots/value-chips.webp)
-
-Lay a study sheet out with every option of its auto layout in the Properties panel.
-
-![A sheet of four horse and dancer studies in a grid, the Properties panel beside it with Look folded to its colours and the Size and Auto layout options open](docs/screenshots/properties-panel.webp)
-
-Set a cover title with its options right above it and its actions right under it.
-
-![The title THE CROSSING over Hokusai's Great Wave, selected, with value chips above it (Look, Text) and the Actions bar's groups as chips under it](docs/screenshots/near-selection.webp)
-
-| Choice | How it shows |
-| --- | --- |
-| **In the bar at the top** | Every option in one row (the default) |
-| **Value chips** | One chip per group, with its values: *Look* with the fill and outline colours and the outline's width, *Shape* with the corner radius, *Size* with the ratio, *Text* with the font and size, *Auto layout*, *Brush* for the Pen. A click opens that group's options under it; a change shows on the chip at once. Escape or a click elsewhere closes it |
-| **In a panel** | The Properties panel in the dock, its groups one under another. It opens by itself when something is selected (or a tool has options) and closes when nothing is. Its heading folds a group, which then shows its values on one line. The anchor keeps it open; × keeps it closed until the **Properties** button at the top opens it again; the shrink button shows only the groups, each opening beside the panel. The top keeps the *Look* chip and that button. On a phone-width window it shows as value chips |
-| **Near the selection** | The value chips just above what is selected. With the Actions bar set to follow the selection it stands under it, so the two frame the selection. With nothing selected, or the selection out of view, the chips go back to the top |
-
-| Actions bar groups | How they show (Settings > Appearance > **Actions bar groups**) |
-| --- | --- |
-| **Buttons** | Every button, under its group's name (the default) |
-| **Value chips** | One chip per group: its name and the icons of what it holds. A click lists its actions with what each does; a group of one action, as Find, is the action itself |
-
-The command palette finds every option in each way: one inside a closed chip or a folded group is opened before it runs.
 
 ### The command palette
 
@@ -2298,7 +2267,7 @@ Make the app yours: theme, theme colour, density and the canvas.
 | Media and playback | Players: starting volume and step sizes. The library viewer: its edges (a click on the left or right goes to the previous or next item), how long the player stays while a video plays, slideshow time |
 | Saving to the library | Extracted frames and PDF pages (format, quality, a page's resolution, folder, name, tags) and edited pictures (format, quality, folder, name, tags), and the folder and tags of what is saved to the library from the canvas, one pair for each kind: pictures from Export… (*Exports*, `export`), patterns (*Patterns*, `pattern`) and shapes saved as SVG (*Shapes*, `shape`); screenshots have theirs in the Screenshot group. In the desktop app, Keep file names and Sort files by kind |
 | Screenshot | Format, quality, pattern, transparency, interface, clipboard, folder, name and tags |
-| Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, how the Properties bar shows, Actions bar place, its groups as buttons or chips and their names, item names, density (comfortable, compact, dense), round or sharp corners, Zen mode; panels: minimize inactive ones, how many stay open |
+| Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, Actions bar place and its group names, item names, density (comfortable, compact, dense), round or sharp corners, Zen mode; panels: minimize inactive ones, how many stay open |
 | Performance | Adaptive quality, fixed quality level, memory for pictures, animation and its speed |
 | Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, Advanced export, changes only, files as ZIP, import); in the desktop app, where deleted files go and when `.trash` is emptied; *Start from scratch* (delete all data, after a warning with a backup offered first) |
 | Privacy | The word that begins hidden mode, remembering the Hidden password until the tab closes, the passwords of the workspace and of the Hidden items, Lock now and New key; what stays on your machine |

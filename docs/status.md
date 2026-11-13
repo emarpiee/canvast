@@ -65,7 +65,7 @@ Unverified / Committed / Next bounded task**.
 - **Implemented:** ADR 0198. `ui/bar-sections.ts` (sections, summaries), `ui/value-chips.ts` (chip, popover, `syncChips`), `ui/properties-layout.ts` (bar, chips, panel, near), `ui/near-selection.ts` (`placeBy`, shared with the following Actions bar); `toolbar.ts` finds its controls wherever the bar is (`q`, `qa`, `listen`); Actions bar chips in `context-bar.ts`; palette reveal in `from-bars.ts`; settings `ui.properties`, `ui.propsFolded`, `ui.propsPin`, `ui.propsMini`, `ui.actionsView`.
 - **Tested:** typecheck and build here; scratch runs in Chromium and Firefox (every way, a shape, text, the Pen, the palette opening a closed chip, a change in a popover shown on its chip, the panel's fold, short form and narrow fallback); new `bar-layouts.spec.ts` (interface group) on GitHub.
 - **Known failures:** none known.
-- **Unverified:** a real touch screen. README pictures: value-chips, properties-panel, near-selection (Screenshots workflow, 2026-11-13).
+- **Unverified:** a real touch screen. The README is not updated for these ways (text or pictures) until the owner approves them.
 - **Committed:** v0.58.5 on `main`.
 - **Next bounded task:** the pictures; the owner's choice of defaults after trying them.
 
