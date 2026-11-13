@@ -27,6 +27,7 @@ async function launch(workspace: string, device = "userdata", /** Most of these 
   const requests: string[] = [];
   page.on("request", (r) => requests.push(r.url()));
   await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined", null, { timeout: 30_000 });
+  await page.evaluate(() => (window.__canvastDebug.setSetting("ui.properties", "bar"), window.__canvastDebug.setSetting("ui.groupNames", "bottom"))); // (as every spec: harness.ts)
   if (!keepFiles) await page.evaluate(() => (window.__canvastDebug.setSetting("library.keepFileNames", false), window.__canvastDebug.setSetting("library.sortFiles", true)));
   return { app, page, requests };
 }

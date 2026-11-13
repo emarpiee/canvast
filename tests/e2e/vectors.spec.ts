@@ -3237,11 +3237,8 @@ test("the selection options (radius lock, snap, axis box) are a bar of their own
     return Math.abs(d.y + d.height / 2 - (c.y + c.height / 2));
   };
   await expect.poll(line, { message: "on the bar's line" }).toBeLessThan(2);
-  // Settings > Actions bar: follows the selection; the options go with it
-  await p.getByTestId("view-settings").click();
-  await p.locator("#settings-view").getByRole("tab", { name: "Appearance" }).click();
-  await p.locator("#settings-view").getByLabel("Actions bar", { exact: true }).selectOption("follow");
-  await p.getByTestId("view-canvas").click();
+  // the Actions bar following the selection (no longer a row of Settings: the app's place is the bottom, ADR 0198): the options go with it
+  await p.evaluate(() => window.__canvastDebug.setSetting("ui.actions", "follow"));
   await expect(ctx).toHaveClass(/is-following/);
   await expect(pick).toBeVisible();
   await expect.poll(line, { message: "still on the bar's line" }).toBeLessThan(2);

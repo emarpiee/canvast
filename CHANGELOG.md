@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.27 — The bars' places are the app's own (2026-11-14)
+
+- **Changed:** the Properties options stand as chips near the selection, the Actions bar at the bottom with its group names over its buttons: the app's own places, no longer settings. The three rows (Properties, Actions bar, Actions bar group names) are gone from Settings > Appearance, and an install that had others is moved to these once.
+
 ## 0.58.26 — A speech balloon's options in the Properties bar (2026-11-14)
 
 - **Changed:** the Speech balloon panel is gone: its options are in the Properties bar, as four groups that are chips by the selection with the forms of every chip: **Body** (shape, preset, hand-drawn, double line, seed; Save as style, Convert to path, Connect balloons), **Tail** (kind, widths, round tip, base; Add tail, Remove tail; which tail when there are several), **Text in shape** (across, down, padding, too much text; Fit text to shape) and **Connector** (its kind, width and bend). Sliders became number fields, as every value of the bar (drag one sideways to change it).

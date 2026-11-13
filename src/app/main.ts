@@ -337,6 +337,15 @@ async function start(): Promise<void> {
   const notices = mountNotices(document.body, editor);
   // Device settings (ADR 0017): pen and select options come back after a reload.
   const settings = new SettingsStore();
+  // The places of the bars are the app's own now, not settings (ADR 0198): the Properties bar near the selection, the Actions bar at the bottom,
+  // its group names over its buttons. Their rows are hidden, so a value saved before is put to these, once (the debug hook can still change
+  // them: the tests do).
+  if (settings.get("ui.barPlaces") < 1) {
+    settings.set("ui.properties", "near");
+    settings.set("ui.actions", "bottom");
+    settings.set("ui.groupNames", "top");
+    settings.set("ui.barPlaces", 1);
+  }
   initColourPopover(settings);
   // Every shortcut is a command of the keymap (ADR 0158): the layer that turns the keys the person chose into the keys the handlers hear goes in before any handler.
   const keymap = new Keymap(settings);

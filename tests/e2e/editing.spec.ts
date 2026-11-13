@@ -356,7 +356,7 @@ test("delete, undo delete (what comes back is selected), and invalid imports are
 
 test("Actions bar set to follow the selection: it sits just under the picked thing, not at the bottom, and moves when the view pans", async ({ app }) => {
   const p = app.page;
-  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ "ui.actions": "follow" })));
+  await p.evaluate(() => localStorage.setItem("canvast.settings", JSON.stringify({ ...JSON.parse(localStorage.getItem("canvast.settings") ?? "{}"), "ui.actions": "follow" })));
   await p.reload();
   await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
   await key(app, "p");

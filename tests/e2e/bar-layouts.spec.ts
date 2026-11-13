@@ -4,7 +4,7 @@ import type { App } from "./harness";
 /**
  * The Properties bar near the selection (ADR 0198): value chips just above what is selected, each opening its options as a form, and the one
  * rule of the tools that make things (what a tool has just made stays selected, its chips edit it and the next one takes it). Every chip of
- * every kind is checked against the rules of floating bars (`floatingProblems`). (Every other spec uses the bar at the top, the default.)
+ * every kind is checked against the rules of floating bars (`floatingProblems`). (The app's own place since 0.58.27; every other spec uses the bar at the top: harness.ts.)
  */
 const set = (app: App, key: string, value: unknown) => app.page.evaluate(([k, v]) => window.__canvastDebug.setSetting(k, v), [key, value] as const);
 const objects = (app: App) => app.page.evaluate(() => window.__canvastDebug.objects() as Array<{ id: string; container?: unknown; fill?: unknown; kind: string }>);

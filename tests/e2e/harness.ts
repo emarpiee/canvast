@@ -89,6 +89,16 @@ export const test = base.extend<{ app: App }>({
       if (m.type() === "error") consoleErrors.push(m.text());
     });
     page.on("pageerror", (e) => consoleErrors.push(String(e) + "\n" + (e.stack ?? "")));
+    // (the specs were written for the Properties bar at the top and the Actions bar's names under it; bar-layouts.spec tries the chips by the
+    // selection, the app's own place since 0.58.27. Before the app, at every load and reload: only what is not set already, so a test's own
+    // value, or its own settings written before a reload, stays.)
+    await page.addInitScript(() => {
+      try {
+        const saved = JSON.parse(localStorage.getItem("canvast.settings") ?? "{}") as Record<string, unknown>;
+        const want: Record<string, unknown> = { "ui.barPlaces": 1, "ui.properties": "bar", "ui.groupNames": "bottom" };
+        if (Object.keys(want).some((k) => !(k in saved))) localStorage.setItem("canvast.settings", JSON.stringify({ ...want, ...saved }));
+      } catch { /* (no storage: the app's own places) */ }
+    });
     await page.goto(APP_URL);
     // (an app that never starts says why: the page's errors so far)
     await page.waitForFunction(() => typeof window.__canvastDebug !== "undefined").catch((e: Error) => {

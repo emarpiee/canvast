@@ -206,10 +206,12 @@ export const SETTINGS = {
   "ui.animSpeed": { scope: "device", default: "normal", validate: oneOf("slow", "normal", "fast"), effect: "immediate" } as Def<"slow" | "normal" | "fast">,
   "ui.hints": { scope: "device", default: "all", validate: oneOf("all", "bar", "off"), effect: "immediate" } as Def<"all" | "bar" | "off">,
   /** Where the names of the Actions bar's groups show (ADR 0197): under or over the buttons, always or while the pointer is on the bar, or not at all. */
-  "ui.groupNames": { scope: "device", default: "bottom", validate: oneOf("top", "bottom", "top-hover", "bottom-hover", "off"), effect: "immediate" } as Def<"top" | "bottom" | "top-hover" | "bottom-hover" | "off">,
+  "ui.groupNames": { scope: "device", default: "top", validate: oneOf("top", "bottom", "top-hover", "bottom-hover", "off"), effect: "immediate" } as Def<"top" | "bottom" | "top-hover" | "bottom-hover" | "off">,
   "ui.actions": { scope: "device", default: "bottom", validate: oneOf("bottom", "follow"), effect: "immediate" } as Def<"bottom" | "follow">,
   /** How the options of the tool or of what is selected show (ADR 0198): the bar at the top, or value chips just above the selection. */
-  "ui.properties": { scope: "device", default: "bar", validate: oneOf("bar", "near"), effect: "immediate" } as Def<"bar" | "near">,
+  /** The bars' places as the app now has them were put in once (1): a value set since (the debug hook, a test) is kept. */
+  "ui.barPlaces": { scope: "device", default: 0, validate: range(0, 1), effect: "immediate" } as Def<number>,
+  "ui.properties": { scope: "device", default: "near", validate: oneOf("bar", "near"), effect: "immediate" } as Def<"bar" | "near">,
   "ui.names": { scope: "device", default: "all", validate: oneOf("all", "picked", "off"), effect: "immediate" } as Def<"all" | "picked" | "off">,
   "ui.zen": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   /** Every shortcut the person changed, as JSON: command id → keys (settings/keymap.ts). Empty: all as they were. */
