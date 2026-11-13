@@ -292,7 +292,7 @@ Crop a study down to the part you are learning from, without changing the file.
 
 Mirror a drawing to see its proportions with fresh eyes.
 
-![De Gheyn's two studies of a saddled horse beside a mirrored copy, labelled original and flipped, the Flip buttons in the Picture chip's options above the copy](docs/screenshots/flip.webp)
+![De Gheyn's two studies of a saddled horse beside a mirrored copy, labelled original and flipped under them, Flip horizontally on in the Picture chip's options above the copy](docs/screenshots/flip.webp)
 
 Give a print rounded corners and a thin outline, as a card on a mood board.
 
@@ -820,7 +820,7 @@ Press `T`, click and type. Text is stored as Markdown, and you can zoom into a l
 
 Set a cover's type: a title and a subtitle in fonts of your own.
 
-![Hokusai's Great Wave with the title THE CROSSING being set in Bangers above it and a subtitle in Cormorant Garamond italic, the Text chip's options open](docs/screenshots/text.webp)
+![Hokusai's Great Wave with the title THE CROSSING being set in Bangers above it and a subtitle in Cormorant Garamond italic, its formatting bar over it](docs/screenshots/text.webp)
 
 | Making text | |
 | --- | --- |

@@ -146,6 +146,6 @@ test("text", async ({ scene: s }) => {
   await s.p.keyboard.type("THE CROSSING");
   await s.p.keyboard.press("Control+a");
   await s.settle();
-  await s.control("[data-text-size]"); // (its chip's options open, framed with what they edit)
-  await s.shot("text", await s.around({ objects: [pic!, sub], els: ["[data-text-size]", ...(await s.chipEls())], pad: 30 }));
+  // (no chip's options open: the formatting bar over the title is the picture)
+  await s.shot("text", await s.around({ objects: [pic!, sub], els: [".text-format", ...(await s.chipEls())], pad: 30 }));
 });

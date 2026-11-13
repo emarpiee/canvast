@@ -53,7 +53,8 @@ test("auto-layout", async ({ scene: s }) => {
     await field.fill(v);
     await field.press("Enter");
   }
-  await s.fit([sheet], 0.7, [0.5, 0.55]);
+  // (smaller and lower: the Layout chip's options open above its chips, the Actions bar below the sheet)
+  await s.fit([sheet], 0.52, [0.5, 0.6]);
   await s.select([sheet]);
   await s.settle();
   await s.control('[data-layout-flow="grid"]'); // (the Layout chip's options open)
@@ -165,8 +166,9 @@ test("flip", async ({ scene: s }) => {
   await expect(await s.control('[data-flip="x"]')).toHaveAttribute("aria-pressed", "true");
   await s.select([]);
   const [a, b] = [(await s.box([ids[0]!]))!, (await s.box([ids[1]!]))!];
-  const t1 = await s.text(a.minX, a.minY - 44, "original", { size: 26, font: "caveat", colour: "#e8c27a" });
-  const t2 = await s.text(b.minX, b.minY - 44, "flipped: proportions with fresh eyes", { size: 26, font: "caveat", colour: "#e8c27a" });
+  // (the labels under the pictures: the chips by the selection stand above it)
+  const t1 = await s.text(a.minX, a.maxY + 16, "original", { size: 26, font: "caveat", colour: "#e8c27a" });
+  const t2 = await s.text(b.minX, b.maxY + 16, "flipped: proportions with fresh eyes", { size: 26, font: "caveat", colour: "#e8c27a" });
   await s.select([ids[1]!]);
   await s.settle();
   await s.control('[data-flip="x"]'); // (its chip's options open, framed with what they edit)
