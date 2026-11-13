@@ -1174,9 +1174,13 @@ test("layers panel: lists objects front to back, selects, hides and locks from i
   expect(await opacityOf()).toBe(1);
   // Dragged with the mouse, the slider follows the pointer to where it is let go: the panel is not drawn again under it (issue #2).
   // (the panel is drawn again after the undo: wait for the slider it ends with, not one being replaced)
+  // (the redraw is in the next frame: let it pass, then keep the box the wait found, not a second read that a redraw can come between)
   const sliderBox = () => panel.locator("[data-opacity]").boundingBox();
-  await expect.poll(async () => (await sliderBox()) !== null).toBe(true);
-  const slider = (await sliderBox())!;
+  await app.frame();
+  await app.frame();
+  let found = null as Awaited<ReturnType<typeof sliderBox>>;
+  await expect.poll(async () => (found = await sliderBox()) !== null).toBe(true);
+  const slider = found!;
   await p.mouse.move(slider.x + slider.width - 3, slider.y + slider.height / 2);
   await p.mouse.down();
   await p.mouse.move(slider.x + slider.width * 0.7, slider.y + slider.height / 2, { steps: 4 });

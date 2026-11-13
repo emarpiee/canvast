@@ -83,6 +83,23 @@ describe("OKLCH is the standard OKLab polar form, with the chroma asked for clip
   });
 });
 
+describe("turning only the hue (Ottosson: OKHSL and OKLCH keep the lightness, OKHSV does not)", () => {
+  // (the reference's table: OKHSL "Orthogonal Lightness: yes", OKHSV "no": its value is measured from each hue's brightest colour)
+  const lightness = (model: (typeof MODELS)[number], h: number, s: number, x: number): number => rgbToOklch(toRgb(model, h, s, x)).L;
+  for (const model of ["okhsl", "oklch"] as const) {
+    it(`${model}: at every hue, the same saturation and lightness give one OKLab lightness (within a byte's rounding)`, () => {
+      for (const s of [0.3, 0.6, 0.9]) for (const x of [0.3, 0.5, 0.7]) {
+        const first = lightness(model, 0, s, x);
+        for (let h = 5; h < 360; h += 5) expect(Math.abs(lightness(model, h, s, x) - first), `${model} h=${h} s=${s} x=${x}`).toBeLessThan(0.006);
+      }
+    });
+  }
+  it("okhsv: the lightness changes with the hue at the same saturation and value, as in the reference (a yellow is lighter than a blue)", () => {
+    const yellow = lightness("okhsv", 110, 0.7, 0.65), blue = lightness("okhsv", 250, 0.7, 0.65);
+    expect(yellow - blue).toBeGreaterThan(0.1);
+  });
+});
+
 describe("the fast plane painter", () => {
   for (const model of MODELS) {
     it(`${model}: every pixel of the plane is within 2 bytes of the exact conversion, at many hues`, () => {

@@ -6,7 +6,7 @@
  * shadows are shares of the object's whole size on screen, so zooming does not change how they look.
  */
 import type { Adjust } from "../doc/adjust";
-import { SHADOW_OFFSET, SHADOW_SOFT, hasShadow, layersOf, reachFraction, shadowOf } from "../doc/adjust";
+import { SHADOW_OFFSET, SHADOW_SOFT, hasShadow, layersOf, needsPixels, reachFraction, shadowOf } from "../doc/adjust";
 import type { ProjectedObject } from "./projection";
 import { adjustInto } from "./adjust-image";
 import { morphFilter, playingFilter } from "./adjust-filter";
@@ -92,8 +92,11 @@ export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject,
   let out: HTMLCanvasElement;
   // (a blur of another type is made after the colour, from copies of the layer: the filter then has no blur of its own)
   const typed = colour && a.blurType && maxBlur(a) ? a.blurType : null;
-  const filter = colour ? playingFilter(typed ? { ...a, blur: 0 } : a, refDev) : "";
-  if (!colour || "filter" in ctx) {
+  // Saturation, vibrance and a gradient map keep how light each colour looks (OKLab, as on a picture), which a filter cannot: those are made
+  // on the pixels, the whole stack, as a picture's are; the rest goes through the filter on the graphics card.
+  const gpu = !colour || ("filter" in ctx && !needsPixels(a));
+  const filter = colour && gpu ? playingFilter(typed ? { ...a, blur: 0 } : a, refDev) : "";
+  if (gpu) {
     const g0 = layer(0, w, h);
     draw(g0);
     out = g0.canvas;
@@ -113,8 +116,8 @@ export function drawAdjusted(ctx: CanvasRenderingContext2D, po: ProjectedObject,
     if (!adjustInto(c, draw, a, refDev)) return body(ctx);
     out = c;
   }
-  if (typed && "filter" in ctx) out = typedBlur(out, typed, (maxBlur(a) / 100) * 0.02 * refDev, a);
-  if (colour && a.pixelate && "filter" in ctx) pixelateInto(out, pixelCell(a.pixelate, refDev), a.pixelShape === "dots");
+  if (typed && gpu) out = typedBlur(out, typed, (maxBlur(a) / 100) * 0.02 * refDev, a);
+  if (colour && a.pixelate && gpu) pixelateInto(out, pixelCell(a.pixelate, refDev), a.pixelShape === "dots");
   const inner = shadowOf(a, "inner");
   if (inner) {
     // the inside of the edge: what is not under the object (made smaller by the spread) moved by the offset, blurred, kept where the object is

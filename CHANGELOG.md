@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.58.22 — Saturation keeps how light a colour looks (2026-11-14)
+
+- **Fixed:** *Saturation* -100 turned colours of one lightness (only their hue differed, in OKHSL or OKLCH) into different greys, which made it look as if the colour picker changed the lightness with the hue; saturation and vibrance now change only how colourful a colour is, in OKLab, so they become one grey, as light as they look.
+- **Changed:** the gradient map places a colour by how light it looks (a grey keeps its place).
+- **Fixed:** on a wide window the side panels moved down while the colours of a selection showed under the Properties bar (since 0.58.19; before, they never did).
+- **Changed:** shapes with saturation, vibrance or a gradient map are adjusted on their pixels, as pictures are, so a shape and a picture of one colour give one grey. An exported SVG and a playing video keep the colour's luminance instead (the closest a filter comes).
+
 ## 0.58.21 — A choice in a list keeps its picker open (2026-11-14)
 
 - **Fixed:** choosing in a dropdown inside the colour picker (its kind, its format), the Adjust panel or a chip's options closed what the dropdown was in; a press in the list, and Enter or Escape there, are the list's alone now.

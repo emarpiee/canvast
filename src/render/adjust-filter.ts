@@ -93,16 +93,21 @@ function layerPrimitives(a: Adjust, id: string, f: string[]): void {
     f.push(`<feColorMatrix type="matrix" values="${n(r)} 0 0 0 0  0 ${n(g)} 0 0 0  0 0 ${n(b)} 0 0  0 0 0 1 0"/>`);
   }
   if (c) f.push(`<feComponentTransfer>${transfer(() => `type="linear" slope="${n(1 + c)}" intercept="${n(0.5 - 0.5 * (1 + c))}"`)}</feComponentTransfer>`);
-  if (a.saturation || a.vibrance) f.push(`<feColorMatrix type="saturate" values="${n(Math.max(0, 1 + (a.saturation ?? 0) / 100 + ((a.vibrance ?? 0) / 100) * 0.5))}"/>`);
+  // (in linear light: the grey of a colour is as light as the colour, the nearest a filter comes to the canvas, which keeps its OKLab lightness)
+  if (a.saturation || a.vibrance) f.push(`<feColorMatrix type="saturate" color-interpolation-filters="linearRGB" values="${n(Math.max(0, 1 + (a.saturation ?? 0) / 100 + ((a.vibrance ?? 0) / 100) * 0.5))}"/>`);
   if (a.map) {
     // the gradient map: brightness, looked up in a table of the gradient, mixed back with the picture by the amount
     const k = a.map.amount / 100;
     const at = (t: number): readonly number[] => stopsAt(a.map!.stops, t);
-    const table = (ch: 0 | 1 | 2): string => Array.from({ length: 33 }, (_, i) => n(at(i / 32)[ch]! / 255)).join(" ");
+    // (its place on the map: the luminance, in linear light, read as the value of the grey of that luminance; the table, worked in linear
+    // light too, gives the gradient's colour there in linear light. The canvas places by OKLab lightness: for a grey both are its value.)
+    const lin = (c: number): number => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    const srgb = (c: number): number => (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055);
+    const table = (ch: 0 | 1 | 2): string => Array.from({ length: 65 }, (_, i) => n(lin(at(srgb(i / 64))[ch]! / 255))).join(" ");
     f.push(
       `<feColorMatrix type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1 0" result="pre-${id}"/>` +
-        `<feColorMatrix in="pre-${id}" type="matrix" values="0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0 0 0 1 0"/>` +
-        `<feComponentTransfer result="map-${id}"><feFuncR type="table" tableValues="${table(0)}"/><feFuncG type="table" tableValues="${table(1)}"/><feFuncB type="table" tableValues="${table(2)}"/></feComponentTransfer>` +
+        `<feColorMatrix in="pre-${id}" type="matrix" color-interpolation-filters="linearRGB" values="0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0.2126 0.7152 0.0722 0 0  0 0 0 1 0" result="y-${id}"/>` +
+        `<feComponentTransfer in="y-${id}" color-interpolation-filters="linearRGB" result="map-${id}"><feFuncR type="table" tableValues="${table(0)}"/><feFuncG type="table" tableValues="${table(1)}"/><feFuncB type="table" tableValues="${table(2)}"/></feComponentTransfer>` +
         `<feComposite in="map-${id}" in2="pre-${id}" operator="arithmetic" k1="0" k2="${n(k)}" k3="${n(1 - k)}" k4="0"/>`,
     );
   }

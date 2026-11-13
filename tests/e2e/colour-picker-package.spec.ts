@@ -103,6 +103,41 @@ test("colour picker package: four layouts, plane, transparency, text formats, co
   expect(errors).toEqual([]);
 });
 
+test("colour picker package: turning only the hue keeps the saturation and lightness, and in OKHSL and OKLCH how light the colour looks; back at the first hue, the same colour", async ({ page }) => {
+  await page.goto(DEMO);
+  const cp = page.locator("#host .cp");
+  const num = (i: number) => cp.locator(`[data-num="${i}"]`);
+  const set = async (i: number, v: number) => {
+    await num(i).fill(String(v));
+    await num(i).press("Enter");
+  };
+  // OKLab lightness of a hex colour (what OKHSL and OKLCH keep at every hue: Ottosson's reference)
+  const lightness = (hex: string): number => {
+    const lin = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    const [r, g, b] = [1, 3, 5].map((i) => lin(parseInt(hex.replace("#", "").padStart(7, "#").slice(i, i + 2), 16) / 255)) as [number, number, number];
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b), m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b), q = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+    return 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * q;
+  };
+  await cp.locator("[data-view-select]").selectOption("sliders");
+  // (OKLCH's middle field is the chroma itself: one inside sRGB at every hue, else the field shows what sRGB can show at each hue)
+  for (const [model, sat] of [["okhsl", "50"], ["oklch", "0.05"]] as const) {
+    await cp.locator(`[data-model="${model}"]`).click();
+    await num(1).fill(sat);
+    await num(1).press("Enter");
+    await set(2, 55);
+    await set(0, 0);
+    const first = await cp.locator("[data-hex]").inputValue();
+    const others = [await num(1).inputValue(), await num(2).inputValue()];
+    for (const h of [60, 110, 180, 250, 300, 30]) {
+      await set(0, h);
+      expect([await num(1).inputValue(), await num(2).inputValue()], `${model} at ${h}: the other two as they were`).toEqual(others);
+      expect(Math.abs(lightness(await cp.locator("[data-hex]").inputValue()) - lightness(first)), `${model} at ${h}: as light`).toBeLessThan(0.006);
+    }
+    await set(0, 0);
+    expect(await cp.locator("[data-hex]").inputValue(), `${model}: back at the first hue, nothing drifted`).toBe(first);
+  }
+});
+
 test("gradient editor in the package: stops by bar, handle, field and key; kinds; angle and centre; the stop's own colour picker", async ({ page }) => {
   await page.goto(DEMO);
   type G = { type: string; angle: number; cx: number; r: number; stops: Array<{ offset: number; colour: string }> };

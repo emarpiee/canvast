@@ -2384,7 +2384,8 @@ async function start(): Promise<void> {
     // Side panels start below the toolbar, however many rows it wraps to: the Properties bar, or its chips at the top (ADR 0198).
     // The options' row (the Properties bar, or its chips at the top) comes and goes with the tool and the selection (none for the Hand):
     // the panels, the rail of a small window and what else starts under the bars keep their place, at the lowest that row has reached for
-    // this window and these settings. A row under it that shows only now and then (the colours of a selection) moves them only while shown.
+    // this window and these settings. A row under it that shows only now and then (the colours of a selection) moves them only on a small
+    // window, where the rows stack, and only while shown.
     const shownOpts = [...barBox.querySelectorAll<HTMLElement>(".toolbar")].filter((t) => !t.hidden && !t.closest(".props-park"));
     const extra = (t: HTMLElement): boolean => t.dataset["cmdGroup"] === "Colours";
     const mainRows = shownOpts.filter((t) => !extra(t));
@@ -2407,7 +2408,7 @@ async function start(): Promise<void> {
       below = extraH ? near + extraH : 0;
     } else {
       main = Math.max(navBottom, dock?.bottom ?? 0, ...mainRows.map((t) => t.getBoundingClientRect().bottom));
-      below = Math.max(0, ...extraRows.map((t) => t.getBoundingClientRect().bottom - main));
+      below = 0; // (a wide window: the colours row is in the middle, between the panels at the sides; they stay where they are)
     }
     const html = document.documentElement;
     const key = `${appView}|${innerWidth}|${barBox.querySelector(".props-park .toolbar") ? "near" : "bar"}|${html.dataset["groupNames"] ?? ""}|${html.dataset["density"] ?? ""}|${getComputedStyle(html).getPropertyValue("--ui-scale")}`;

@@ -1,5 +1,31 @@
 import { describe, expect, it } from "vitest";
+import { rgbToOklch, toRgb } from "../../src/colour-picker/colour";
 import { adjustKey, adjustPixel, cleanAdjust, cropOf, cssFilter, isNeutral, needsNeighbours, validMap } from "../../src/doc/adjust";
+
+describe("saturation, vibrance and the gradient map keep how light a colour looks (OKLab)", () => {
+  // colours of one OKLab lightness that differ only in hue (OKHSL keeps the lightness at every hue)
+  const sameLight = [0, 60, 110, 180, 250, 300].map((h) => toRgb("okhsl", h, 0.6, 0.45));
+  const greyFor = (L: number): number => { const y = L ** 3; return Math.round(255 * (y <= 0.0031308 ? 12.92 * y : 1.055 * y ** (1 / 2.4) - 0.055)); };
+  it("saturation -100: colours of one lightness become one grey, the grey as light as they look (not a brightness formula of RGB)", () => {
+    const greys = sameLight.map((c) => adjustPixel(c[0], c[1], c[2], { saturation: -100 }).map(Math.round));
+    for (const g of greys) expect(Math.max(...g) - Math.min(...g), "a grey").toBeLessThanOrEqual(1);
+    const want = greyFor(rgbToOklch(sameLight[0]!).L);
+    for (const g of greys) expect(Math.abs(g[0]! - want), JSON.stringify(greys)).toBeLessThanOrEqual(1);
+  });
+  it("more or less saturation, and vibrance, change the chroma only: the lightness stays", () => {
+    for (const a of [{ saturation: 40 }, { saturation: -50 }, { vibrance: 60 }]) for (const c of sameLight) {
+      const out = adjustPixel(c[0], c[1], c[2], a).map(Math.round) as [number, number, number];
+      expect(Math.abs(rgbToOklch(out).L - rgbToOklch(c).L), `${JSON.stringify(a)} ${c}`).toBeLessThan(0.01);
+      if (a.saturation === 40) expect(rgbToOklch(out).C).toBeGreaterThan(rgbToOklch(c).C);
+    }
+  });
+  it("the gradient map places a colour by how light it looks: a grey keeps its place, colours of one lightness share one", () => {
+    const map = { amount: 100, stops: [{ o: 0, c: "#000000" }, { o: 1, c: "#ffffff" }] };
+    for (const v of [30, 128, 220]) expect(Math.abs(adjustPixel(v, v, v, { map } as never)[0]! - v), `grey ${v}`).toBeLessThanOrEqual(1);
+    const placed = sameLight.map((c) => Math.round(adjustPixel(c[0], c[1], c[2], { map } as never)[0]!));
+    expect(Math.max(...placed) - Math.min(...placed), JSON.stringify(placed)).toBeLessThanOrEqual(1);
+  });
+});
 
 describe("adjustments of a picture (ADR 0118)", () => {
   it("none is none: no change to any pixel", () => {

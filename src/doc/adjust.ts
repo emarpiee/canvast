@@ -317,6 +317,100 @@ for (let i = 0; i <= 4096; i++) {
   const c = i / 4096;
   L2S[i] = Math.round(255 * (c <= 0.0031308 ? c * 12.92 : 1.055 * c ** (1 / 2.4) - 0.055));
 }
+/** An sRGB value (0..1, of a colour already changed by earlier steps) to linear light, by a table of 4096 steps. */
+const F2L = new Float32Array(4097);
+for (let i = 0; i <= 4096; i++) {
+  const c = i / 4096;
+  F2L[i] = c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+}
+const toLin = (v: number): number => (v <= 0 ? 0 : v >= 1 ? 1 : F2L[Math.round(v * 4096)]!);
+const toSrgb = (lin: number): number => L2S[lin <= 0 ? 0 : lin >= 1 ? 4096 : Math.round(lin * 4096)]! / 255;
+/** The cube root of 0..1 from a table read by the square root (even steps near black, where the root is steepest), between its steps: far
+ * quicker than Math.cbrt over every pixel of a large picture, within 0.0002. */
+const CBRT_N = 4096;
+const CBRT = new Float32Array(CBRT_N + 2);
+for (let i = 0; i <= CBRT_N + 1; i++) CBRT[i] = Math.cbrt((i / CBRT_N) ** 2);
+const cbrt01 = (x: number): number => {
+  if (x <= 0) return 0;
+  if (x >= 1) return Math.cbrt(x);
+  const t = Math.sqrt(x) * CBRT_N, i = t | 0;
+  return CBRT[i]! + (CBRT[i + 1]! - CBRT[i]!) * (t - i);
+};
+/** OKLab of a pixel (sRGB values 0..1), written into `out` (no allocation per pixel). */
+function okLab(R: number, G: number, B: number, out: Float64Array): void {
+  const r = toLin(R), g = toLin(G), b = toLin(B);
+  const l = cbrt01(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b);
+  const m = cbrt01(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b);
+  const q = cbrt01(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b);
+  out[0] = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * q;
+  out[1] = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * q;
+  out[2] = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * q;
+}
+/** The sRGB value (0..1) of the grey as light as OKLab lightness `L`: the brightness a colour's grey keeps, and its place on a gradient map. */
+const greyOf = (L: number): number => toSrgb(L * L * L);
+/**
+ * A colour (sRGB values 0..1) with its OKLab chroma times `k` and its lightness kept, written into `out` in linear light and not yet cut to
+ * what sRGB shows (what the grid holds: smooth, so read between its points it stays exact; the cut is made per pixel, `toSrgb`).
+ */
+function saturateOk(R: number, G: number, B: number, k: number, out: Float64Array): void {
+  okLab(R, G, B, out);
+  const L = out[0]!, A = out[1]! * k, Bk = out[2]! * k;
+  const l_ = L + 0.3963377774 * A + 0.2158037573 * Bk, m_ = L - 0.1055613458 * A - 0.0638541728 * Bk, q_ = L - 0.0894841775 * A - 1.291485548 * Bk;
+  const l = l_ * l_ * l_, m = m_ * m_ * m_, q = q_ * q_ * q_;
+  out[0] = 4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * q;
+  out[1] = -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * q;
+  out[2] = -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * q;
+}
+/**
+ * A step of the adjustments that works in OKLab (saturation, vibrance, a gradient map's lightness), worked out once for a grid of colours
+ * when the settings are set, then read for each pixel between the grid's points (trilinear): OKLab for every pixel of a large picture was
+ * three times slower than the RGB formula it replaced; this is as quick. `n` values a point.
+ */
+const GRID = 33;
+function colourGrid(n: number, f: (r: number, g: number, b: number, out: Float64Array) => void): Float32Array {
+  const grid = new Float32Array(GRID * GRID * GRID * n);
+  const out = new Float64Array(3);
+  for (let ri = 0; ri < GRID; ri++) for (let gi = 0; gi < GRID; gi++) for (let bi = 0; bi < GRID; bi++) {
+    f(ri / (GRID - 1), gi / (GRID - 1), bi / (GRID - 1), out);
+    const at = ((ri * GRID + gi) * GRID + bi) * n;
+    for (let c = 0; c < n; c++) grid[at + c] = out[c]!;
+  }
+  return grid;
+}
+const cell = (v: number): number => (v <= 0 ? 0 : v >= 1 ? GRID - 1 : v * (GRID - 1));
+const G1 = 3, G2 = GRID * 3, G3 = GRID * GRID * 3;
+/** `sample` for a grid of three values a point, written out (it runs for every pixel). */
+function sample3(grid: Float32Array, R: number, G: number, B: number, out: Float64Array): void {
+  const x = cell(R), y = cell(G), z = cell(B);
+  const x0 = x >= GRID - 1 ? GRID - 2 : x | 0, y0 = y >= GRID - 1 ? GRID - 2 : y | 0, z0 = z >= GRID - 1 ? GRID - 2 : z | 0;
+  const fx = x - x0, fy = y - y0, fz = z - z0;
+  const gx = 1 - fx, gy = 1 - fy, gz = 1 - fz;
+  const w000 = gx * gy * gz, w100 = fx * gy * gz, w010 = gx * fy * gz, w110 = fx * fy * gz;
+  const w001 = gx * gy * fz, w101 = fx * gy * fz, w011 = gx * fy * fz, w111 = fx * fy * fz;
+  const p = x0 * G3 + y0 * G2 + z0 * G1;
+  for (let c = 0; c < 3; c++) {
+    const q = p + c;
+    out[c] = w000 * grid[q]! + w100 * grid[q + G3]! + w010 * grid[q + G2]! + w110 * grid[q + G3 + G2]!
+      + w001 * grid[q + G1]! + w101 * grid[q + G3 + G1]! + w011 * grid[q + G2 + G1]! + w111 * grid[q + G3 + G2 + G1]!;
+  }
+}
+/** The grid's value at a colour (sRGB values 0..1, outside it as at its edge), between its eight nearest points, into `out`. */
+function sample(grid: Float32Array, R: number, G: number, B: number, n: number, out: Float64Array): void {
+  const x = cell(R), y = cell(G), z = cell(B);
+  const x0 = Math.min(GRID - 2, x | 0), y0 = Math.min(GRID - 2, y | 0), z0 = Math.min(GRID - 2, z | 0);
+  const fx = x - x0, fy = y - y0, fz = z - z0;
+  const s1 = n, s2 = GRID * n, s3 = GRID * GRID * n;
+  const a = (x0 * GRID * GRID + y0 * GRID + z0) * n;
+  for (let c = 0; c < n; c++) {
+    const p = a + c;
+    const c00 = grid[p]! + (grid[p + s3]! - grid[p]!) * fx;
+    const c01 = grid[p + s1]! + (grid[p + s3 + s1]! - grid[p + s1]!) * fx;
+    const c10 = grid[p + s2]! + (grid[p + s3 + s2]! - grid[p + s2]!) * fx;
+    const c11 = grid[p + s2 + s1]! + (grid[p + s3 + s2 + s1]! - grid[p + s2 + s1]!) * fx;
+    const c0 = c00 + (c10 - c00) * fy, c1 = c01 + (c11 - c01) * fy;
+    out[c] = c0 + (c1 - c0) * fz;
+  }
+}
 
 /**
  * The colour part of the adjustments made ready once, as a function that changes the first three bytes of the pixel at `i` of `d` in place
@@ -380,6 +474,8 @@ export function prepareStack(a: Adjust): (d: { [i: number]: number }, i: number)
 }
 
 /** Whether a layer changes colour (the numbers that act on one pixel at a time). */
+/** Whether the adjustments change colours in a way only the pixels can show exactly (OKLab: saturation, vibrance, a gradient map), not a filter. */
+export const needsPixels = (a: Adjust): boolean => layersOf(a).some((l) => !!(l.saturation || l.vibrance || l.map));
 export const isLayerColourNeutral = (l: Adjust): boolean => !l.map && !l.levels && !l.curves && !(l.exposure || l.contrast || l.highlights || l.shadows || l.temperature || l.tint || l.saturation || l.vibrance || l.red || l.green || l.blue);
 
 export function prepare(a: Adjust): (d: { [i: number]: number }, i: number) => void {
@@ -409,6 +505,16 @@ export function prepare(a: Adjust): (d: { [i: number]: number }, i: number) => v
   const tr = toneTable([a.levels?.master, a.levels?.r], [a.curves?.master, a.curves?.r]);
   const tg = toneTable([a.levels?.master, a.levels?.g], [a.curves?.master, a.curves?.g]);
   const tb = toneTable([a.levels?.master, a.levels?.b], [a.curves?.master, a.curves?.b]);
+  const satGrid = colourful ? colourGrid(3, (r, g, b, out) => {
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+    // vibrance lifts the dull colours more than the vivid ones
+    saturateOk(r, g, b, Math.max(0, 1 + sat + vib * (1 - (mx <= 0 ? 0 : (mx - mn) / mx))), out);
+  }) : null;
+  const lightGrid = lut ? colourGrid(1, (r, g, b, out) => {
+    okLab(r, g, b, out);
+    out[0] = greyOf(out[0]!);
+  }) : null;
+  const px3 = new Float64Array(3);
   return (d, i) => {
     let R: number, G: number, B: number;
     if (expK) {
@@ -437,17 +543,19 @@ export function prepare(a: Adjust): (d: { [i: number]: number }, i: number) => v
       G = (G - 0.5) * ck + 0.5;
       B = (B - 0.5) * ck + 0.5;
     }
-    if (colourful) {
-      const y = 0.299 * R + 0.587 * G + 0.114 * B;
-      const mx = Math.max(R, G, B), mn = Math.min(R, G, B);
-      // vibrance lifts the dull colours more than the vivid ones
-      const k = 1 + sat + vib * (1 - (mx <= 0 ? 0 : (mx - mn) / mx));
-      R = y + (R - y) * k;
-      G = y + (G - y) * k;
-      B = y + (B - y) * k;
+    if (satGrid) {
+      // In OKLab: only the chroma changes, the lightness stays, so -100 is the grey as light as the colour looks (a yellow and a blue of
+      // one lightness become one grey), not a grey by a brightness formula of the RGB values. (Read from a grid made once for these settings: `colourGrid`.)
+      sample3(satGrid, R, G, B, px3);
+      R = toSrgb(px3[0]!);
+      G = toSrgb(px3[1]!);
+      B = toSrgb(px3[2]!);
     }
     if (lut) {
-      const y = Math.max(0, Math.min(255, Math.round((0.299 * R + 0.587 * G + 0.114 * B) * 255)));
+      // its place on the map: how light it looks (the value of the grey as light as it), so a grey keeps its place and colours of one
+      // lightness share one
+      sample(lightGrid!, R, G, B, 1, px3);
+      const y = Math.max(0, Math.min(255, Math.round(px3[0]! * 255)));
       R += (lut[y * 3]! / 255 - R) * mapK;
       G += (lut[y * 3 + 1]! / 255 - G) * mapK;
       B += (lut[y * 3 + 2]! / 255 - B) * mapK;
