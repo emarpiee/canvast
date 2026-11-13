@@ -1,4 +1,5 @@
 import { ICONS } from "./icons";
+import { placeMenu } from "./more-menu";
 import { esc } from "./format";
 
 /**
@@ -52,17 +53,22 @@ export function closeChipPopover(): void {
   pop.remove();
 }
 
-/** Place the popover under its chip (over it when there is no room below), inside the window. */
+/** Place the popover by its chip as every menu is placed (`placeMenu`): inside the window, and never over the selected things. */
 export function placeChipPopover(): void {
-  if (!open) return;
-  const { pop, anchor } = open;
-  const a = anchor.getBoundingClientRect();
-  const gap = 6;
-  const w = pop.offsetWidth;
-  const h = pop.offsetHeight;
-  const below = a.bottom + gap + h <= innerHeight || a.top - gap - h < 0;
-  pop.style.left = `${Math.round(Math.max(gap, Math.min(innerWidth - w - gap, a.left)))}px`;
-  pop.style.top = `${Math.round(below ? a.bottom + gap : a.top - gap - h)}px`;
+  if (open) placeMenu(open.pop, open.anchor);
+}
+
+/**
+ * The chips were drawn again (the selection moved them, or they moved between the top and the selection): the open popover follows its chip,
+ * the new element of the same id, so it never stays behind at a corner of the window. Without that chip it closes.
+ */
+export function followChip(chip: HTMLElement | null): void {
+  if (!open || open.anchor === chip) return;
+  if (!chip) return closeChipPopover();
+  open.anchor.setAttribute("aria-expanded", "false");
+  open.anchor = chip;
+  chip.setAttribute("aria-expanded", "true");
+  placeChipPopover();
 }
 
 /** Open a chip's popover with `content` in it (a second press on the same chip closes it). */

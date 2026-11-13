@@ -371,9 +371,6 @@ import circleAlert from "lucide-static/icons/circle-alert.svg";
 import circleCheck from "lucide-static/icons/circle-check.svg";
 import loaderCircle from "lucide-static/icons/loader-circle.svg";
 import triangleAlert from "lucide-static/icons/triangle-alert.svg";
-import settings2Svg from "lucide-static/icons/settings-2.svg";
-import anchorSvg from "lucide-static/icons/anchor.svg";
-import panelRightCloseSvg from "lucide-static/icons/panel-right-close.svg";
 
 function clean(svg: string): string {
   return svg
@@ -651,12 +648,6 @@ export const ICONS = {
   goToLink: clean(arrowUpRight),
   chevronUp: clean(chevronUp),
   panelRight: clean(panelRight),
-  /** The Properties panel's switch (ADR 0198). */
-  properties: clean(settings2Svg),
-  /** Keep the Properties panel open, with nothing selected too. */
-  keepOpen: clean(anchorSvg),
-  /** The Properties panel shows only its sections, each opening beside it. */
-  panelShrink: clean(panelRightCloseSvg),
   maximize: clean(maximize),
   imageUpscale: clean(imageUpscale),
   columns3: clean(columns3),

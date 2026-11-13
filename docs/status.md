@@ -47,6 +47,14 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.9: near the selection cleaned up; one rule for the tools that make things (2026-11-13)
+
+- **Implemented:** ADR 0198 revised: `ui.properties` bar or near only (panel, top chips and Actions chips removed with their settings and icons); the popover as a form (`nameControls`, `is-form`); Auto layout split into three sections; Colours chip; `placeMenu` keeps clear of a menu's own bar; colour picker whole; `followChip`; `editor.selectMade` / `editsSelection` / `editsMade` for every tool that makes things, handles and double-click on what was just made; CLAUDE.md rules; `floatingProblems` audit in the harness.
+- **Tested:** typecheck and build here; scratch runs of the audit on every chip of a shape, a sheet, a thing on it, several, a mix, the Pen and a text, in Chromium and Firefox: no problems; the Balloon tool's tail drag and double-click to type, and a fill kept for the next shape; `bar-layouts.spec.ts` rewritten (GitHub).
+- **Known failures:** none known.
+- **Unverified:** a real touch screen; the README is not updated for this until the owner approves it.
+- **Committed:** v0.58.9 on `main`.
+
 ## v0.58.8: the Properties panel stays closed with nothing selected (2026-11-13)
 
 - **Implemented:** `panelShown` in `ui/properties-layout.ts` leaves out the Select and Edit nodes tools with nothing selected.

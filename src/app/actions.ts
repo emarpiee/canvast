@@ -2282,7 +2282,7 @@ export function drawSheetOver(doc: DocumentStore, editor: EditorState, sheet: Pa
   const body = { ...sheet, z: lowest - 1 };
   const placed = below ? (placeAbove(all, [body], below)[0] ?? body) : body;
   doc.commit(doc.transaction("Draw sheet", [placed, ...roots.map((o) => ({ ...o, parent: sheet.id }) as CanvasObject)]));
-  editor.select([placed.id]);
+  editor.selectMade([placed.id]);
   editor.message = `${sheet.name ?? "The sheet"} holds ${roots.length === 1 ? "1 item" : `${roots.length} items`} it was drawn over.`;
   editor.changed();
 }

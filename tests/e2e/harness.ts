@@ -245,6 +245,87 @@ export async function importMode(p: Page, mode: "add" | "update" = "add"): Promi
  * Every visible settings row of a panel, checked as one design: its controls end at the row's right edge, sit on one line, and each
  * button, field and select is the standard control height (`--ctl`). Answers what is wrong, by row name (empty when nothing is).
  */
+/**
+ * The rules of the floating bars and popovers (ADR 0198, CLAUDE.md "Floating bars and popovers"), checked on what is open now: the value
+ * chips by the selection, a chip's popover, the colour picker and any menu. Each problem is one line that says what and where:
+ * - inside the window, and never over the selected things (the box menus keep clear of) nor over the chip or bar it came from;
+ * - a chip's popover is a form: every control that shows has a visible name on its row, all names in one font and size, its rows apart
+ *   by a spacing token, its padding a spacing token, and it is as wide as its rows (no empty room), with nothing cut off sideways;
+ * - the colours in the chips are all the same size;
+ * - the colour picker is whole (it scrolls only when the window is shorter than it).
+ */
+export function floatingProblems(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const out: string[] = [];
+    const root = getComputedStyle(document.documentElement);
+    const px = (v: string): number => {
+      const probe = document.createElement("div");
+      probe.style.width = v;
+      document.body.appendChild(probe);
+      const w = probe.getBoundingClientRect().width;
+      probe.remove();
+      return w;
+    };
+    const tokens = new Set(["--s-1", "--s-2", "--s-4", "--s-6", "--s-8", "--s-10", "--s-12", "--s-13", "--s-14", "--s-15", "--gap", "--pad", "--near"].filter((t) => root.getPropertyValue(t).trim()).map((t) => Math.round(px(`var(${t})`) * 10) / 10));
+    tokens.add(0);
+    const isToken = (v: number): boolean => [...tokens].some((t) => Math.abs(t - v) < 0.6);
+    const shown = (el: Element): boolean => {
+      const r = el.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && getComputedStyle(el).visibility !== "hidden";
+    };
+    const name = (el: Element): string => (el.getAttribute("aria-label") ?? el.textContent ?? el.className).trim().slice(0, 40);
+    type Box = { left: number; top: number; right: number; bottom: number };
+    const overlaps = (a: Box, b: Box): boolean => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
+    const sel = window.__canvastDebug.selectionBox();
+    const floating = [...document.querySelectorAll<HTMLElement>(".vchip-pop, .colour-pop, .pop-menu, .props-near")].filter(shown);
+    for (const f of floating) {
+      const r = f.getBoundingClientRect();
+      const what = f.className.split(" ")[0];
+      if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) out.push(`${what}: runs out of the window`);
+      if (sel && overlaps(r, sel)) out.push(`${what}: covers the selected things`);
+    }
+    const pop = document.querySelector<HTMLElement>(".vchip-pop");
+    const chip = document.querySelector<HTMLElement>('.vchip[aria-expanded="true"]');
+    if (pop && shown(pop)) {
+      if (chip && overlaps(pop.getBoundingClientRect(), chip.getBoundingClientRect())) out.push("the popover covers its own chip");
+      const bar = chip?.closest<HTMLElement>(".props-near, .props-chips");
+      if (bar && overlaps(pop.getBoundingClientRect(), bar.getBoundingClientRect())) out.push("the popover covers the chips it came from");
+      const cs = getComputedStyle(pop);
+      for (const side of ["paddingTop", "paddingLeft"] as const) if (!isToken(parseFloat(cs[side]))) out.push(`the popover's ${side} (${cs[side]}) is not a spacing token`);
+      if (pop.scrollWidth > pop.clientWidth + 1) out.push("the popover cuts its rows off sideways");
+      const form = pop.querySelector<HTMLElement>(".toolbar.is-form .tb-options-row");
+      if (form) {
+        const gap = parseFloat(getComputedStyle(form).rowGap);
+        if (!isToken(gap)) out.push(`the form's rows are ${gap} px apart, not a spacing token`);
+        const controls = [...form.querySelectorAll<HTMLElement>("input:not([type=file]), select, button")].filter(shown).filter((c) => !c.closest("[role=radiogroup], .seg") && !c.matches(".width"));
+        const fonts = new Set<string>();
+        let widest = 0;
+        for (const c of controls) {
+          const row = c.closest<HTMLElement>("label, button") ?? c;
+          const words = [...row.querySelectorAll<HTMLElement>(".pf-name, .swatch-name")].filter(shown);
+          const own = [...row.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim());
+          if (!words.length && !own) out.push(`“${name(c)}” has no name on its row`);
+          for (const w of words) fonts.add(`${getComputedStyle(w).fontSize} ${getComputedStyle(w).fontWeight}`);
+          if (own) fonts.add(`${getComputedStyle(row).fontSize} ${getComputedStyle(row).fontWeight}`);
+          widest = Math.max(widest, row.scrollWidth);
+        }
+        for (const g of [...form.querySelectorAll<HTMLElement>("[role=radiogroup], .seg")].filter(shown)) {
+          if (!g.dataset["name"]) out.push(`the choices “${name(g)}” have no name`);
+          widest = Math.max(widest, g.scrollWidth);
+        }
+        if (fonts.size > 1) out.push(`the names of the form are in ${fonts.size} different fonts or sizes: ${[...fonts].join(", ")}`);
+        const room = pop.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+        if (widest && room - widest > 24) out.push(`the popover is ${Math.round(room - widest)} px wider than its widest row`);
+      }
+    }
+    const sizes = new Set([...document.querySelectorAll<HTMLElement>(".props-near .vchip-sw, .props-chips .vchip-sw")].filter(shown).map((s) => `${Math.round(s.getBoundingClientRect().width)}x${Math.round(s.getBoundingClientRect().height)}`));
+    if (sizes.size > 1) out.push(`the colours of the chips are of ${sizes.size} sizes: ${[...sizes].join(", ")}`);
+    const picker = document.querySelector<HTMLElement>(".colour-pop");
+    if (picker && shown(picker) && picker.scrollHeight > picker.clientHeight + 1 && picker.scrollHeight < innerHeight - 16) out.push("the colour picker scrolls though the window is tall enough for it");
+    return out;
+  });
+}
+
 export function settingsRowProblems(panel: ReturnType<Page["locator"]>): Promise<string[]> {
   return panel.evaluate((root) => {
     const probe = document.createElement("div");

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.58.9 — Near the selection, cleaned up; one rule for the tools that make things (2026-11-13)
+
+- **Removed:** the Properties panel, value chips at the top as a choice of their own, and the Actions bar's groups as chips; **Properties** is the bar at the top or **Near the selection**.
+- **Changed:** a chip's options are a form: one option a row, every field with its own full name (no more "T", "W" or a second Gap without a name), one font and size, as wide as its content; Auto layout is three chips (Layout, Spacing, Columns and order); the colours of several shapes are a **Colours** chip; a fill shows as a dot and an outline as a ring of the same size.
+- **Changed:** every tool that makes things (Shape, Balloon, Sheet, Path) keeps the new thing selected and stays the tool; the options edit what was just made and the next one takes them; its own handles (a balloon's tail, a corner's radius dot) and a double-click on it work as with the Select tool (the Balloon tool no longer switches to Select).
+- **Fixed:** a chip's popover could jump to a corner of the window when the chips changed (choosing a kind in a mix); with a shape just drawn, the options changed the next shape instead of it; popovers and the colour picker could cover the selection or their own chips; the colour picker was cut short instead of moving where it fits; the Pen's options popover had empty room.
+
 ## 0.58.8 — The Properties panel stays closed with nothing selected (2026-11-13)
 
 - **Fixed:** set to open by itself, the Properties panel also opened with nothing selected (for the Select tool's own options); it now opens for a selection, a text being typed in, or a tool with options.

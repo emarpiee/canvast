@@ -8,6 +8,7 @@ import { libraryTesting } from "../storage/library-mirror";
 import { libraryPaging } from "../assets/library-match";
 import type { IdbStorage } from "../storage/idb-storage";
 import { beginProgress } from "./progress";
+import { menuAvoid } from "../ui/more-menu";
 import type { Progress } from "./progress";
 import type { Dir } from "../storage/external-folder";
 
@@ -102,6 +103,8 @@ import { visibleObjects } from "../render/scene-view";
  */
 export interface DebugHook {
   camera(): SerializedCamera;
+  /** The box of the selected things on the screen (client px), as menus and popovers keep clear of it; null: nothing selected. */
+  selectionBox(): { left: number; top: number; right: number; bottom: number } | null;
   /** Zoom by any number of levels (≤ 2^50) about the centre, in frames: cheap at any depth (ADR 0014). */
   jump(levels: number): void;
   /** Gliding between views, in ms (0: off; the test session starts with it off). */
@@ -391,6 +394,7 @@ export function installDebugHook(
   const camFor = (o: CanvasObject) => cameraIn(view.frameCamera, o.frame ?? doc.space.world);
   const hook: DebugHook = {
     camera: () => serializeCamera(view.worldCamera()),
+    selectionBox: () => menuAvoid(),
     jump: (levels) => view.zoomBy(levels),
     glide: (ms) => void (view.glideMs = ms),
     setSetting: (key, value) => deps.setSetting(key, value),

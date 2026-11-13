@@ -121,6 +121,20 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 
 - **File views.** A kind of file that opens in a view of its own (notes, PDFs, 3D models) is one row of `src/ui/file-views.ts` (its view, for the library's viewer and the panel on a canvas alike) and one of `PICTURE_KINDS` in `src/assets/adapters.ts` (its picture on a card and thumbnail); what a card shows of it is `ImageObject.preview`, its place and bookmarks `CatalogEntry.viewer` (`src/ui/view-state.ts`). Settings are `mountSettings` of `src/ui/setting-rows.ts` (rows, a double-click to reset one, a group's Reset, draggable numbers). Nothing else needs to know the kind.
 
+- **Floating bars and popovers (ADR 0198).** What floats over the canvas for the selection (the value chips near it, a chip's popover, the colour picker, menus) follows these rules, and `floatingProblems(page)` in `tests/e2e/harness.ts` checks them; a spec that opens one runs it (`bar-layouts.spec.ts` opens every chip of every kind):
+
+| Rule | How |
+| --- | --- |
+| Never over the selection, nor over the chip or bar it came from | Place it with `placeMenu` (it keeps clear of `setMenuAvoid`'s box and of its own bar) or `placeBy` (`ui/near-selection.ts`); never compute a place of its own |
+| Inside the window, shown whole | The colour picker moves beside its bar rather than shrink; it scrolls only when the window is shorter than it |
+| A popover is a form | One option a row: its name at the left, its control at the right edge; a row of choices under its name; a button with its icon and name. Every control has a visible name (`nameControls` in `ui/bar-sections.ts` gives one from its `aria-label`); a word too short to say what it is ("T", "W") gives way to the full name |
+| One look | Every name in one font and size; colours of one size (a fill a dot, an outline a ring); spacing and sizes only from tokens |
+| As wide as it needs | Width from its content (`max-content`, capped, long names wrap): never a fixed width with empty room |
+| Short | A long group is split into chips of their own (Auto layout: Layout, Spacing, Columns and order); a new control of the Properties bar gets a section (`assignSections` in `ui/toolbar.ts`, its group's is enough) |
+| Follows its chip | Chips are drawn again with `syncChips`; an open popover follows its chip (`followChip`) or closes, never stays at a corner |
+
+- **Tools that make things (ADR 0198).** Every tool that makes an object (Shape, Balloon, Sheet, Path, and any new one) ends with `editor.selectMade(ids)`: the tool stays, the new object is selected, the options edit it (`editor.editsSelection`) and what they set is also the tool's for the next one (`editor.editsMade`); its own handles (a balloon's tail, a corner's radius dot, a gradient's) and a double-click on it work as with the Select tool; its box's corners do not (a new shape drawn from there is drawn). Never switch tools after making something, and never test `editor.tool === "select"` to decide whether the options edit the selection.
+
 - **Panels (ADR 0156).** A floating panel is built with `panelHtml` (`src/ui/panel.ts`): optional header, optional strip under it, a scrolling body, optional footer. Leave out the parts it does not need; do not write layout CSS for them.
 
 - **Icons (`src/ui/icons.ts`, registry in `docs/reference/icons.md`).** Every icon button must use an icon no other *different* function uses, and the icon must make sense for what the button does (not a stand-in picked because it was free). Buttons with the same function (all "close", all "delete", all "More") share one icon. Before adding an icon button, check the registry and `src/ui/icons.ts` for the icon you want, and add a row when you add one. Don't reuse an icon from another function even if it is close (a pencil is the Pen tool, so Rename uses a text cursor).

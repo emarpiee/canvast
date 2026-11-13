@@ -8,7 +8,8 @@
 /** A group of a bar with its name shown under its controls (ADR 0197): the controls go in `.tb-row`. */
 export const captionedGroup = (name: string, items: string): string => `<div class="tb-group tb-captioned" role="group" aria-label="${name}"><span class="tb-cap" aria-hidden="true">${name}</span><div class="tb-row">${items}</div></div>`;
 
-export const isOff = (e: HTMLElement): boolean => !!e.hidden || e.hasAttribute("data-off");
+export const isOff = (e: HTMLElement): boolean =>
+  !!e.hidden || e.hasAttribute("data-off") || (e.classList.contains("pf-row") && [...e.children].every((c) => c.classList.contains("pf-name") || isOff(c as HTMLElement))); // (a named field's wrapper, ADR 0198, is as off as its field)
 
 /** Show each direct group of `bar` that `wanted` allows (default: all) and that has a control showing; hide the others. */
 export function syncGroups(bar: HTMLElement, wanted: (group: HTMLElement) => boolean = () => true): void {

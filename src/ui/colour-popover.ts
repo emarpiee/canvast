@@ -24,7 +24,7 @@ import type { GradientStop } from "../doc/paint";
 import type { LayoutTrack } from "../doc/model";
 import { swatchBackground } from "../render/ink";
 import type { SettingsStore } from "../settings/settings";
-import { clearRect, MENU_GAP, placeMenu } from "./more-menu";
+import { clearRect, MENU_GAP, menuAvoid, placeMenu } from "./more-menu";
 
 /**
  * The app's one colour picker (ADR 0098): the standalone picker in `src/colour-picker/`, in a popover under the button that opened it.
@@ -68,17 +68,36 @@ export interface ColourPopoverOptions {
   onClose?(): void;
 }
 
-/** Under the button, or above it when that fits better; when neither fits, under it with a scroll (never over the button). */
+/**
+ * Under the button, or above it when that fits better (as every menu, off the selected things). The picker is shown whole: when it fits
+ * neither under nor above, it goes beside the bar of its button (on the side away from the selection), as tall as it is; only a window
+ * shorter than the picker gives it a scroll.
+ */
 function place(pop: HTMLElement, anchor: HTMLElement): void {
+  const edge = 8;
   pop.style.maxHeight = "";
+  const room = window.innerHeight - 2 * edge;
+  if (pop.offsetHeight > room) pop.style.maxHeight = `${room}px`; // (a short window: the only case it scrolls)
   placeMenu(pop, anchor);
   const a = clearRect(anchor);
   const m = pop.getBoundingClientRect();
-  if (m.top < a.bottom && m.bottom > a.top) {
-    const top = a.bottom + MENU_GAP;
+  if (!(m.top < a.bottom && m.bottom > a.top)) return;
+  const avoid = menuAvoid();
+  const right = a.right + MENU_GAP;
+  const left = a.left - MENU_GAP - m.width;
+  const fitsRight = right + m.width <= window.innerWidth - edge;
+  const fitsLeft = left >= edge;
+  const awayLeft = !!avoid && (avoid.left + avoid.right) / 2 > (a.left + a.right) / 2; // (the selection is to the right: go left)
+  const x = awayLeft ? (fitsLeft ? left : fitsRight ? right : null) : fitsRight ? right : fitsLeft ? left : null;
+  const y = Math.max(edge, Math.min(window.innerHeight - edge - m.height, a.top));
+  if (x === null) {
+    const top = a.bottom + MENU_GAP; // (no room beside either: under the bar, with a scroll)
     pop.style.top = `${parseFloat(pop.style.top) + (top - m.top)}px`;
-    pop.style.maxHeight = `${window.innerHeight - top - 8}px`;
+    pop.style.maxHeight = `${window.innerHeight - top - edge}px`;
+    return;
   }
+  pop.style.left = `${parseFloat(pop.style.left) + (x - m.left)}px`;
+  pop.style.top = `${parseFloat(pop.style.top) + (y - m.top)}px`;
 }
 
 /** A texture's source is being picked on the canvas (ADR 0154): a press there is the pick, not a press outside, so the chooser stays. */

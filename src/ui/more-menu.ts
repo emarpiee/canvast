@@ -82,6 +82,8 @@ let avoidBox: () => { left: number; top: number; right: number; bottom: number }
 export const setMenuAvoid = (f: typeof avoidBox): void => {
   avoidBox = f;
 };
+/** The box menus and popovers keep clear of now (null: none). */
+export const menuAvoid = (): ReturnType<typeof avoidBox> => avoidBox();
 
 /**
  * Keep a menu inside the window, under its button (above it when there is no room), right edges aligned; and not over the selected items:
@@ -89,7 +91,7 @@ export const setMenuAvoid = (f: typeof avoidBox): void => {
  */
 /** The room a menu keeps clear: a button inside a bar of the app (a horizontal one) stands for the whole bar, so the menu clears the bar's edge, not only the button's. */
 export function clearRect(anchor: HTMLElement): DOMRect {
-  return (anchor.closest(".toolbar, .ctx-bar, .dock, .hud-controls, .assets-bar") ?? anchor).getBoundingClientRect();
+  return (anchor.closest(".toolbar, .ctx-bar, .props-near, .dock, .hud-controls, .assets-bar") ?? anchor).getBoundingClientRect();
 }
 
 export const MENU_GAP = 8; // (the space between a bar or button and the menu it opens; the same for every menu and popover)
@@ -110,7 +112,9 @@ export function placeMenu(menu: HTMLElement, anchor: HTMLElement): void {
   let left = left0;
   const avoid = avoidBox();
   if (avoid) {
-    const overlap = (l: number, t: number): number => Math.max(0, Math.min(l + w, avoid.right + gap) - Math.max(l, avoid.left - gap)) * Math.max(0, Math.min(t + h, avoid.bottom + gap) - Math.max(t, avoid.top - gap));
+    // (what a place covers: of the selected things, and of the menu's own bar, so it never hides the chip or button it came from)
+    const over = (b: { left: number; top: number; right: number; bottom: number }, l: number, t: number): number => Math.max(0, Math.min(l + w, b.right + gap) - Math.max(l, b.left - gap)) * Math.max(0, Math.min(t + h, b.bottom + gap) - Math.max(t, b.top - gap));
+    const overlap = (l: number, t: number): number => over(avoid, l, t) + over(c, l, t);
     const fit = (l: number, t: number): { l: number; t: number } => ({ l: Math.max(gap, Math.min(window.innerWidth - w - gap, l)), t: Math.max(gap, Math.min(window.innerHeight - h - gap, t)) });
     const options = [
       { l: left0, t: top },

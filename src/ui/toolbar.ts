@@ -235,6 +235,8 @@ const FONT_FEATURES: Record<string, string> = { liga: "Ligatures", dlig: "Discre
 export interface PropertiesBar {
   bar: HTMLElement;
   row: HTMLElement;
+  /** The bar of the colours of a selection of several shapes (under the Properties bar). */
+  colours: HTMLElement;
   onUpdate(fn: () => void): void;
   refresh(): void;
 }
@@ -333,7 +335,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
           <select data-layout-sort aria-label="Order of the items" title="Order of the items: the stacking order (as Layers lists it), or kept by a rule as things are added"><option value="">Stacking order</option><option value="name-asc">Name A–Z</option><option value="name-desc">Name Z–A</option><option value="date">Newest first</option><option value="size">Largest first</option><option value="type">By kind</option></select>
           <button type="button" data-layout-styles aria-haspopup="menu" aria-label="Layout styles" title="Layout styles: your saved layouts, and save this one">${ICONS.layoutStyles}</button></span>
         <span class="tb-count" data-kind="any" data-in-layout hidden title="How it takes part in its sheet's auto layout">In layout
-          <select data-in-fill aria-label="Fill: stretch to the room" title="Its size in the layout: its own, or stretched to the room along an axis"><option value="none">Own size</option><option value="x">Fill width</option><option value="y">Fill height</option><option value="both">Fill both</option></select>
+          <select data-in-fill aria-label="Size in the layout: its own, or stretched to the room" title="Its size in the layout: its own, or stretched to the room along an axis"><option value="none">Own size</option><option value="x">Fill width</option><option value="y">Fill height</option><option value="both">Fill both</option></select>
           <button type="button" data-in-free aria-pressed="false" aria-label="Keep out of the layout" title="Keep out of the layout: it stays where it is put, the others flow round it">${ICONS.layoutFree}</button>
           <span data-in-span-wrap hidden>Span <input type="number" data-in-span="0" min="1" max="1024" step="1" inputmode="numeric" aria-label="Columns it spans" title="Columns it spans"><input type="number" data-in-span="1" min="1" max="1024" step="1" inputmode="numeric" aria-label="Rows it spans" title="Rows it spans"></span>
           <span data-in-limits hidden>${[["0", "W"], ["1", "H"]].map(([i, a]) => `<span data-in-limit-axis="${i}"><label>Min ${a} <input type="number" data-in-min="${i}" min="0" max="100" step="1" inputmode="numeric" aria-label="Least ${a === "W" ? "width" : "height"}, % of the room" title="Its least ${a === "W" ? "width" : "height"} as it fills, in % of the room inside the sheet (0: none)"></label><label>Max ${a} <input type="number" data-in-max="${i}" min="0" max="100" step="1" inputmode="numeric" aria-label="Most ${a === "W" ? "width" : "height"}, % of the room" title="Its most ${a === "W" ? "width" : "height"} as it fills, in % of the room inside the sheet (0: none)"></label></span>`).join("")}</span></span>
@@ -408,19 +410,20 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   `;
   // The Properties bar may be placed outside this root (in a chip's popover, the Properties panel or beside the selection: ui/properties-layout.ts):
   // its controls are found, and its events heard, wherever it is.
+  // (the same holds for the bar of the colours of a selection, made just below: `own` lists both)
   const barEl = root.querySelector<HTMLElement>(".toolbar")!;
   const barRow = barEl.querySelector<HTMLElement>(".tb-options-row")!;
-  const inRoot = (): boolean => root.contains(barEl);
+  const own: HTMLElement[] = [barEl];
+  const away = (): HTMLElement[] => own.filter((el) => !root.contains(el));
   function q<E extends Element = Element>(sel: string): E | null {
-    return root.querySelector<E>(sel) ?? (inRoot() ? null : barEl.querySelector<E>(sel));
+    return root.querySelector<E>(sel) ?? away().map((el) => el.querySelector<E>(sel)).find((e) => e) ?? null;
   }
   function qa<E extends Element = Element>(sel: string): E[] {
-    const found = [...root.querySelectorAll<E>(sel)];
-    return inRoot() ? found : [...found, ...barEl.querySelectorAll<E>(sel)];
+    return [...root.querySelectorAll<E>(sel), ...away().flatMap((el) => [...el.querySelectorAll<E>(sel)])];
   }
   function listen<K extends keyof HTMLElementEventMap>(type: K, fn: (e: HTMLElementEventMap[K]) => void, capture = false): void {
     root.addEventListener(type, fn, capture);
-    barEl.addEventListener(type, (e) => { if (!inRoot()) fn(e); }, capture);
+    for (const el of own) el.addEventListener(type, (e) => { if (!root.contains(el)) fn(e); }, capture);
   }
   // Each control's section (ADR 0198), for the ways the bar can be shown (value chips, the Properties panel, beside the selection): a control's
   // own, else its group's.
@@ -430,6 +433,8 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     ["[data-pin-wrap], [data-on-sheet]", "position"],
     ["[data-crop], [data-uncrop], [data-flip], [data-unflip]", "picture"],
     ["[data-sheet-size]", "size"],
+    ["[data-auto-layout] > label:has([data-layout-gap]), [data-auto-layout] > label:has([data-layout-pad]), [data-layout-pad-sides], [data-layout-pad-each]", "spacing"],
+    ["[data-layout-columns-wrap], [data-layout-colsby], [data-layout-tracks], [data-layout-rowh-wrap], [data-layout-sort]", "columns"],
     ["[data-auto-layout]", "layout"],
     ["[data-in-layout]", "inlayout"],
     [".tb-subject", "kind"],
@@ -445,6 +450,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   ]);
   // The colours of a selection are a second bar of their own, just under this one (the same bar component, ADR 0128).
   const colourBar = createBar("Colours of the selection", "Colours");
+  own.push(colourBar.el);
   colourBar.row.append(q("[data-sel-colours]")!);
   // The Outline options button sits beside the Outline colour: in this bar, after the chips, when several shapes are picked.
   const outlineBtn = q<HTMLElement>("[data-outline-options]")!;
@@ -514,11 +520,13 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   });
 
   // The fill and outline chips: the colours the next shape gets (Shape and Path tools), or those of the selected paths.
-  const editsSelection = (): boolean => editor.tool === "select" || editor.tool === "node";
+  const editsSelection = (): boolean => editor.editsSelection;
   const paintNow = (which: "fill" | "stroke"): Paint | null => (editsSelection() ? (actions.selectedPaint()?.[which] ?? null) : which === "fill" ? editor.shapeFill : editor.shapeStroke);
   const setPaint = (which: "fill" | "stroke", value: Paint | null, final: boolean): void => {
     if (editsSelection()) actions.paintSelected({ [which]: value }, final);
-    else {
+    // (what the tool has just made is edited, and its colour is also the tool's for the next one: ADR 0198)
+    if (editsSelection() && !(final && editor.editsMade)) return;
+    {
       if (which === "fill") editor.shapeFill = value;
       else editor.shapeStroke = value;
       editor.changed();
@@ -1107,7 +1115,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     q<HTMLElement>("[data-tips-wrap]")!.hidden = editor.shapeKind !== "star";
     if (document.activeElement !== sides) sides.value = String(editor.shapeSides);
     if (document.activeElement !== tips) tips.value = String(editor.shapeTips);
-    const pick = editor.tool === "select" || editor.tool === "node";
+    const pick = editor.editsSelection;
     const still = !editor.gesturing;
     for (const b of qa<HTMLElement>("[data-balloon-panel]")) b.hidden = !(pick && still && actions.hasBalloon());
     // (a field is left as it is while it is typed in, and while a value from one is being shown: the document has the old number until it is settled)
@@ -1277,14 +1285,14 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (free(sw)) sw.value = noOutline ? "0" : String(Math.max(1, sliderFromPen(editor.shapeWidthPx)));
     q<HTMLElement>("[data-shape-out]")!.textContent = noOutline ? "None" : `${editor.shapeWidthPx} px`;
     // The paint chips show the next shape's colours, or the selected paths' (and are there only when something has them).
-    const sel = editor.tool === "select" || editor.tool === "node" ? actions.selectedPaint() : null;
-    const several = (editor.tool === "select" || editor.tool === "node") && !editor.gesturing ? actions.selectionPaints().count >= 2 : false;
+    const sel = editor.editsSelection ? actions.selectedPaint() : null;
+    const several = editor.editsSelection && !editor.gesturing ? actions.selectionPaints().count >= 2 : false;
     if (!editor.gesturing) {
     }
     const outlineAt = several ? q<HTMLElement>("[data-sel-colours]")! : outlineHome;
     if (outlineBtn.parentElement !== outlineAt) outlineAt.append(outlineW, outlineBtn);
-    outlineBtn.hidden = (editor.tool === "select" || editor.tool === "node") && !sel;
-    const ol = (editor.tool === "select" || editor.tool === "node") && sel && !editor.gesturing ? actions.selectedOutline() : null;
+    outlineBtn.hidden = editor.editsSelection && !sel;
+    const ol = editor.editsSelection && sel && !editor.gesturing ? actions.selectedOutline() : null;
     outlineW.hidden = !ol;
     if (ol && free(outlineWInput)) {
       outlineWInput.value = ol.widthPx === null ? "" : String(Math.round(ol.widthPx * 100) / 100);
@@ -1293,7 +1301,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     for (const b of qa<HTMLButtonElement>("[data-paint]")) {
       const which = b.dataset["paint"] as "fill" | "stroke";
       const value = sel ? sel[which] : which === "fill" ? editor.shapeFill : editor.shapeStroke;
-      b.hidden = (editor.tool === "select" || editor.tool === "node") && (!sel || several);
+      b.hidden = editor.editsSelection && (!sel || several);
       b.classList.toggle("is-none", value === null);
       (b.querySelector("[data-paint-chip]") as HTMLElement).style.setProperty("--paint", value === null ? "linear-gradient(transparent, transparent)" : typeof value === "string" ? `linear-gradient(${sel ? value : newInk(value)}, ${sel ? value : newInk(value)})` : paintCss(value)); // (what the next shape gets is the colour it will have)
     }
@@ -1324,7 +1332,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     q<HTMLElement>("[data-lock]")!.setAttribute("aria-pressed", String(editor.lock !== null));
     const lockR = pq("[data-lock-radius]");
     lockR.setAttribute("aria-pressed", String(editor.lockRadius));
-    if (!editor.gesturing) lockR.hidden = !(editor.tool === "select" && actions.selectedCorners() !== null); // (there when a picked shape has corners)
+    if (!editor.gesturing) lockR.hidden = !(editor.editsSelection && editor.tool !== "node" && actions.selectedCorners() !== null); // (there when a picked shape has corners)
     for (const b of qa<HTMLElement>("[data-filter]")) {
       b.setAttribute("aria-checked", String(b.dataset["filter"] === editor.lassoFilter));
     }
@@ -1336,7 +1344,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     penSize.dataset["for"] = editor.tool === "select" && editor.selection.size > 0 && ![...editor.selection].some((id) => doc.get(id)?.kind === "stroke") ? "pen" : "pen select";
     // One row, one kind at a time (ADR 0128): when the picked items are of different kinds, chips at the start choose which kind's
     // properties the row shows; what is for another kind is switched off, never moved into a menu.
-    const picking = (editor.tool === "select" || editor.tool === "node") && !editor.gesturing;
+    const picking = editor.editsSelection && !editor.gesturing;
     const kinds = picking ? [...new Set([...editor.selection].flatMap((id) => { const o = doc.get(id); return o ? [kindOf(o)] : []; }))] : [];
     // (`all`, chosen by its chip, shows only what is for any kind in this row; the Actions bar below follows the same choice)
     const chosen = editor.subject === "all" && kinds.length > 1 ? "all" : kinds.includes(editor.subject ?? "") ? editor.subject! : (kinds[0] ?? null);
@@ -1357,7 +1365,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     const row = barRow;
     q<HTMLElement>("[data-mask-paint]")!.dataset["for"] = editor.maskEdit ? "pen" : ""; // (only while a brush mask is painted)
     for (const b of qa<HTMLElement>("[data-mask-ink]")) b.setAttribute("aria-pressed", String(b.dataset["maskInk"] !== "done" && editor.maskEdit?.ink === (b.dataset["maskInk"] === "show" ? "#ffffff" : "#000000")));
-    const rowTool = editor.editingText ? "text" : editor.tool; // (while a text is typed in, the bar offers the text's options, whatever tool is active)
+    // (while a text is typed in, the bar offers the text's options, whatever tool is active; while what a tool has just made is selected, its
+    // options, as with the Select tool: ADR 0198)
+    const rowTool = editor.editingText ? "text" : editor.editsMade ? "select" : editor.tool;
     syncGroups(row, (g) => g.dataset["for"]!.split(" ").includes(rowTool));
     barEl.hidden = ![...row.querySelectorAll<HTMLElement>(":scope > .tb-group")].some((g) => !g.hidden);
     syncScroll(row);
@@ -1378,5 +1388,5 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     update();
   });
   update();
-  return { bar: barEl, row: barRow, onUpdate: (fn) => void afterUpdate.push(fn), refresh: update };
+  return { bar: barEl, row: barRow, colours: colourBar.el, onUpdate: (fn) => void afterUpdate.push(fn), refresh: update };
 }

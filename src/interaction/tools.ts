@@ -834,8 +834,7 @@ export function attachTools(
       }
     }
     doc.commit(doc.transaction(editor.tool === "sheet" ? "Draw sheet" : `Draw ${SHAPE_NAMES[d.kind].toLowerCase()}`, [obj]));
-    editor.select([obj.id]);
-    if (editor.tool === "balloon") editor.setTool("select"); // (its handles are what comes next)
+    editor.selectMade([obj.id]); // (the tool stays; its handles, a balloon's tail too, work on it: madeHandlePress)
   };
 
   // The Path tool: a click adds a corner, a drag pulls a smooth node's handles out, a click on the first node closes the path;
@@ -908,7 +907,7 @@ export function attachTools(
     };
     const made = homeObject(normalizeUnit(obj), doc.space);
     doc.commit(doc.transaction(closed ? "Draw closed path" : "Draw path", [made]));
-    editor.select([made.id]);
+    editor.selectMade([made.id]);
     editor.changed();
   };
 
@@ -979,7 +978,7 @@ export function attachTools(
   };
   const startCornerPress = (e: PointerEvent, s: ScreenPoint): boolean => {
     const tgt = gradientTarget();
-    if (!tgt || editor.blockEdit() || editor.tool !== "select") return false;
+    if (!tgt || editor.blockEdit() || (editor.tool !== "select" && !editor.editsMade)) return false; // (and on what a tool has just made: ADR 0198)
     const open = editor.cornersOpen === tgt.o.id;
     const h = shapeHandles(tgt.po, open, editor);
     const pick = h && hitCornerHandle(h, s.x, s.y, open);
@@ -1413,6 +1412,12 @@ export function attachTools(
   };
 
   // ---- select -------------------------------------------------------------
+  /**
+   * A press of a tool that makes things, on one of the own handles of what it has just made (ADR 0198): a balloon's tail, a corner's radius
+   * dot, a gradient's handles work as with the Select tool, without changing tools. Its box's corners and sides are not taken: a new shape
+   * drawn from the corner of the last one (to line them up) is drawn, not the last one resized.
+   */
+  const madeHandlePress = (e: PointerEvent, s: ScreenPoint): boolean => editor.editsMade && !editor.blockEdit() && (startGradientPress(e, s) || startCornerPress(e, s));
   const startSelectPress = (e: PointerEvent, s: ScreenPoint): void => {
     const before = [...editor.selection]; // (a finger's press may pick on its way down: a long press gives that back)
     // Attach (ADR 0109): the next press names the object the picked ones follow.
@@ -2143,6 +2148,7 @@ export function attachTools(
         break;
       case "text":
       case "note":
+        if (madeHandlePress(e, s)) break;
         {
           // (a text box dragged out snaps its corners as a drawn shape does; a click on a text edits it, where it is)
           const snap = editor.snap && !(e.ctrlKey || e.metaKey) && !textAt(s) ? snapContext([], view.frame, true) : null;
@@ -2153,10 +2159,10 @@ export function attachTools(
       case "shape":
       case "balloon":
       case "sheet":
-        startShape(s, e);
+        if (!madeHandlePress(e, s)) startShape(s, e);
         break;
       case "path":
-        startPathNode(s, e);
+        if (!madeHandlePress(e, s)) startPathNode(s, e);
         break;
       case "node": {
         if (startNodePress(e, s) || startGradientPress(e, s)) break;
@@ -2697,7 +2703,9 @@ export function attachTools(
       }
       return;
     }
-    if (effectiveTool() !== "select" || editor.readOnly) return;
+    // (with a tool that makes things, a double-click on what it has just made does as with the Select tool: a balloon's words, ADR 0198)
+    const onMade = editor.editsMade && (() => { const top = pickAll(unlocked(visible()), local(e).x, local(e).y)[0]?.obj; return !!top && editor.made.has(top.id); })();
+    if ((effectiveTool() !== "select" && !onMade) || editor.readOnly) return;
     const s = local(e);
     // A double-click on the main radius dot opens the corners out (or closes them): it is not a double-click on the shape.
     const unit = gradientTarget();

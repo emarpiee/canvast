@@ -448,9 +448,6 @@ async function start(): Promise<void> {
     const names = settings.get("ui.groupNames");
     if (names !== "bottom") root.dataset["groupNames"] = names;
     else delete root.dataset["groupNames"];
-    // The Actions bar's groups as buttons (the default) or as value chips (ui/context-bar.ts reads this too)
-    if (settings.get("ui.actionsView") === "chips") root.dataset["actionsView"] = "chips";
-    else delete root.dataset["actionsView"];
     const density = settings.get("ui.density");
     if (density !== "compact") root.dataset["density"] = density;
     else delete root.dataset["density"]; // compact is the default
@@ -1740,28 +1737,15 @@ async function start(): Promise<void> {
     },
     paintSelected: (patch, final) => (final ? commitPaint(doc, editor, patch) : previewPaint(doc, editor, patch)),
   });
-  // How the Properties bar shows (ADR 0198): the bar, value chips, the Properties panel (in the dock) or chips by the selection.
-  const PROPS_WHERE = { bar: "in the bar above", chips: "under Look in the bar above", panel: "in the Properties panel", near: "under Look just above the selection" } as const;
-  const propsLayout = mountPropertiesLayout(document.getElementById("toolbar")!, host, editor, propsBar, {
-    place: () => settings.get("ui.properties"),
-    folded: () => settings.get("ui.propsFolded").split(",").filter(Boolean),
-    setFolded: (ids) => void settings.set("ui.propsFolded", ids.join(",")),
-    pin: () => settings.get("ui.propsPin"),
-    setPin: (p) => void settings.set("ui.propsPin", p),
-    mini: () => settings.get("ui.propsMini"),
-    setMini: (on) => void settings.set("ui.propsMini", on),
-    narrow: () => narrow.matches,
-  });
-  side.append(propsLayout.el);
+  // How the Properties bar shows (ADR 0198): the bar at the top, or value chips just above the selection.
+  const PROPS_WHERE = { bar: "in the bar above", near: "under Look just above the selection" } as const;
+  const propsLayout = mountPropertiesLayout(document.getElementById("toolbar")!, host, editor, propsBar, () => settings.get("ui.properties"));
   propsFollow = propsLayout.follow;
-  dock.add(propsLayout.el, { id: "properties", title: "Properties", side: "right" });
   const placeProps = (): void => {
-    const place = settings.get("ui.properties");
-    setPropsWhere(PROPS_WHERE[place === "panel" && narrow.matches ? "chips" : place]); // (a narrow window shows the panel's sections as chips)
+    setPropsWhere(PROPS_WHERE[settings.get("ui.properties")]);
     propsBar.refresh();
   };
   placeProps();
-  narrow.addEventListener("change", placeProps);
   // File something just saved in the library in the folder and with the tags the settings give for its kind (what is saved from the canvas has its own).
   const fileInLibraryAs = (hash: string, kind: "export" | "pattern" | "svg"): Promise<string> =>
     fileInLibrary(session, hash, settings.get(`${kind}.folder`).trim(), shotTags({ screenshot: false, board: false, canvas: false, items: false, custom: settings.get(`${kind}.tags`) }, "", "", []));
@@ -2841,13 +2825,7 @@ async function start(): Promise<void> {
     switch (key) {
       case "pen.color": editor.penColor = settings.get(key); break;
       case "pen.widthPx": editor.penWidthPx = settings.get(key); break;
-      case "ui.actionsView":
-        applyAppearance();
-        contextUpdate();
-        break;
       case "ui.properties":
-      case "ui.propsPin":
-      case "ui.propsMini":
         placeProps();
         break;
       case "pen.kind": editor.penKind = settings.get(key); break;

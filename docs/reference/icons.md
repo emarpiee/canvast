@@ -339,6 +339,3 @@ One icon per function: two buttons that do different things never share an icon,
 | `radio-tower` | Settings tab: Sharing (this workspace on the local network) |
 | `cast` | Switch workspace: Connect to a shared workspace (another computer's, on the local network) |
 | `text-search` | Find (Actions bar): the command palette, to find any option or action by name |
-| `settings-2` | Properties: show or hide the Properties panel (the switch at the top) |
-| `anchor` | Keep the Properties panel open, with nothing selected too |
-| `panel-right-close` | Properties panel: only the sections, each opening its options beside it |

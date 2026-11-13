@@ -3301,50 +3301,56 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .np-date[hidden], .np-date input[hidden] { display: none; }
 .np-label { color: var(--hud-muted); font: var(--font-meta); }
 
-/* ---- Value chips and the ways the Properties bar shows (ADR 0198: ui/value-chips.ts, ui/properties-layout.ts, ui/bar-sections.ts) ---- */
-/* A chip: the name of a group of controls and what it is set to; it opens them. */
+/* ---- The Properties bar near the selection (ADR 0198: ui/value-chips.ts, ui/properties-layout.ts, ui/bar-sections.ts) ---- */
+/* A chip: the name of a group of options and what it is set to; it opens them. */
 .vchip { display: inline-flex; flex: none; align-items: center; gap: var(--s-4); height: var(--ctl); padding: 0 var(--s-6); color: inherit; font: var(--font-control); white-space: nowrap; background: transparent; border: 1px solid transparent; border-radius: var(--ctl-r, var(--r-md)); cursor: pointer; }
 .vchip:hover { background: var(--hud-hover); }
-.vchip[aria-expanded="true"], .vchip[aria-pressed="true"] { border-color: var(--hud-accent); background: var(--hud-hover); }
+.vchip[aria-expanded="true"] { border-color: var(--hud-accent); background: var(--hud-hover); }
 .vchip-k { font-weight: var(--weight-medium); }
 .vchip-v { display: inline-flex; align-items: center; gap: var(--s-2); color: var(--hud-muted); font: var(--font-meta); }
-.vchip-sw { width: var(--icon-sm); height: var(--icon-sm); border: 1px solid var(--hud-border); border-radius: var(--r-dot); }
+/* A colour in a chip: a fill a dot, an outline a ring of its colour, both the size of a swatch in the bar. */
+.vchip-sw { flex: none; width: var(--icon-sm); height: var(--icon-sm); background: var(--sw); border: 1px solid var(--hud-border); border-radius: var(--r-dot); }
+.vchip-sw.is-ring:not(.is-none) { border: 0; mask: radial-gradient(closest-side, transparent 52%, currentColor 56%); }
 .vchip-sw.is-none { background: linear-gradient(135deg, transparent 45%, var(--hud-danger) 45% 55%, transparent 55%); }
-.vchip-arrow, .vchip-ic { display: inline-flex; color: var(--hud-muted); }
-.vchip-arrow svg, .vchip-ic svg { width: var(--icon-sm); height: var(--icon-sm); }
+.vchip-arrow { display: inline-flex; color: var(--hud-muted); }
+.vchip-arrow svg { width: var(--icon-sm); height: var(--icon-sm); }
 .vchip svg { flex: none; }
-.vchip-pop { min-width: calc(8 * var(--ctl)); max-width: min(calc(100vw - var(--sp-8)), calc(12 * var(--ctl))); }
-/* The bar laid out in a popover or the panel: its controls wrap, a label and its field on one line each. */
-.toolbar.is-stacked { display: block; min-height: 0; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; }
-.toolbar.is-stacked[hidden] { display: none; }
-.toolbar.is-stacked .tb-options-row { flex-wrap: wrap; justify-content: flex-start; align-items: center; overflow: visible; gap: var(--s-4); }
-.toolbar.is-stacked .tb-options-row::before, .toolbar.is-stacked .tb-options-row::after { display: none; }
-.toolbar.is-stacked .tb-options-row > .tb-group:not([hidden], [data-sec-off]) { display: contents; }
-.toolbar.is-stacked .tb-options-row :is(label, .tb-count):not([hidden], [data-sec-off]) { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-4); }
-.toolbar.is-stacked .tb-options-row .tb-count :is(.tb-count, label) { flex-basis: auto; }
-.toolbar.is-stacked .tb-options-row label[data-bare]:not([hidden]) { flex: 0 0 auto; } /* (the second field of a pair, as Gap's or Pad's: on its name's line) */
-.toolbar.is-stacked .tb-options-row label:not([hidden]):has(+ label[data-bare]) { flex: 1 1 50%; flex-wrap: nowrap; }
-.toolbar.is-stacked .seg { flex-wrap: wrap; }
-.toolbar.is-stacked .tb-options-row input[type="number"] { width: calc(2 * var(--ctl)); }
-.toolbar.is-stacked .tb-options-row input[type="text"] { width: calc(3 * var(--ctl)); }
-.toolbar:not(.is-panel) .ps-head { display: none; }
-.toolbar.is-panel .ps-head { display: flex; flex: 1 1 100%; align-items: center; gap: var(--s-4); height: var(--list-h); margin-top: var(--s-4); padding: 0 var(--s-2); color: inherit; font: var(--weight-semibold) var(--text-sm)/1.3 var(--font-ui); background: none; border: 0; border-top: 1px solid var(--hud-border); border-radius: 0; cursor: pointer; }
-.toolbar.is-panel .ps-head[hidden] { display: none; }
-.toolbar.is-panel .ps-head .ps-name { flex: none; }
-.toolbar.is-panel .ps-head .ps-sum { display: inline-flex; flex: 1; justify-content: flex-end; align-items: center; gap: var(--s-2); min-width: 0; overflow: hidden; color: var(--hud-muted); font: var(--font-meta); }
-.toolbar.is-panel .ps-head svg { width: var(--icon-sm); height: var(--icon-sm); transition: transform var(--dur-fast); }
-.toolbar.is-panel .ps-head[aria-expanded="false"] svg { transform: rotate(-90deg); }
-.props-panel .panel-body { padding: var(--s-6); }
-.props-mini { display: flex; flex-direction: column; align-items: stretch; gap: var(--s-2); }
-.props-mini[hidden] { display: none; }
-.props-mini .vchip { justify-content: space-between; }
-.props-quick { display: contents; }
+/* Its popover is as wide as what it holds (never a fixed width with empty room), up to a limit where long names wrap. */
+.vchip-pop { width: max-content; max-width: min(calc(100vw - var(--sp-8)), calc(10 * var(--ctl))); }
+/* The bar as a form in a chip's popover: one option a row, its name at the left and its control at the right edge; a row of choices
+   (a radio group) under its name; a button with its icon and name, as a menu row. Every holder of controls steps aside (display: contents). */
+.toolbar.is-form { display: block; min-height: 0; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; }
+.toolbar.is-form[hidden] { display: none; }
+.toolbar.is-form .tb-options-row { display: flex; flex-direction: column; align-items: stretch; gap: var(--s-4); overflow: visible; }
+.toolbar.is-form .tb-options-row::before, .toolbar.is-form .tb-options-row::after { display: none; }
+.toolbar.is-form .tb-options-row :is(.tb-group, span):not([role="radiogroup"], .seg, button *, .pf-name, .pf-cap, .pf-short, .size-out, [hidden], [data-sec-off], [data-off]) { display: contents; }
+.toolbar.is-form .tb-options-row :is(label, .pf-row):not(.pf-multi, [hidden], [data-sec-off], [data-off]) { display: flex; align-items: center; justify-content: space-between; gap: var(--s-8); min-height: var(--field-h); }
+.toolbar.is-form .tb-options-row :is(label, .pf-row) > :is(input, select) { flex: none; }
+.toolbar.is-form .tb-options-row label.pf-multi:not([hidden], [data-sec-off], [data-off]) { display: contents; }
+.toolbar.is-form .tb-options-row button:not([role="radio"], .seg *, [hidden], [data-sec-off], [data-off]) { display: flex; justify-content: flex-start; gap: var(--s-6); width: auto; height: var(--ctl); padding: 0 var(--s-4); border: 0; border-radius: var(--ctl-r, var(--r-md)); }
+.toolbar.is-form .tb-options-row button:not([role="radio"], .seg *, [aria-pressed="true"], :hover) { background: transparent; } /* (a swatch or a tool's button looks like every other row) */
+.toolbar.is-form .tb-options-row :is([role="radiogroup"], .seg):not([hidden], [data-sec-off], [data-off]) { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); }
+.toolbar.is-form .tb-options-row :is([role="radiogroup"], .seg)[data-name]::before { content: attr(data-name); flex: 1 1 100%; color: var(--hud-muted); font: var(--font-meta); }
+.toolbar.is-form .tb-options-row input[type="number"] { width: calc(2 * var(--ctl)); }
+.toolbar.is-form .tb-options-row input[type="text"] { width: calc(3 * var(--ctl)); }
+.toolbar.is-form .tb-options-row .size-out { display: none; }
+.toolbar.is-form .tb-options-row .tb-group.tb-group { margin: 0; padding: 0; border: 0; } /* (no lines between groups in a form) */
+/* (the pen's widths: one row of little pictures, the size slider under them) */
+.toolbar.is-form .tb-options-row .tb-group:has(> button.width):not([hidden], [data-sec-off], [data-off]) { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); }
+.toolbar.is-form .tb-options-row .tb-group > button.width:not([hidden]) { display: inline-flex; justify-content: center; width: var(--ctl); padding: 0; }
+.toolbar.is-form .tb-options-row .tb-group:has(> button.width) > .pf-row { flex: 1 1 100%; }
+/* (the colours of a selection in their chip's popover: the bar as it is, without its own frame) */
+.vchip-pop > .toolbar { min-height: 0; padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; }
+/* Names: only in the form; a short word of the bar ("T", "Gap") gives way to the full name there. Loose words of a part are its headings. */
+.pf-name { display: none; }
+.toolbar .tb-options-row .pf-row { display: contents; } /* (in the bar a named field's wrapper changes nothing) */
+/* (one look for every name in the form: a label's own words, a button's or a swatch's name, an added name) */
+.toolbar.is-form .tb-options-row :is(label, .pf-name, .swatch-name) { color: var(--hud-fg); font: var(--font-control); font-weight: var(--weight-regular); }
+.toolbar.is-form .tb-options-row .pf-name { display: inline; flex: 1 1 auto; width: auto; height: auto; min-width: 0; padding: 0; text-align: start; background: none; border: 0; border-radius: 0; box-shadow: none; } /* (not a swatch's dot, though it sits in one) */
+.toolbar.is-form .tb-options-row .pf-row:not([hidden], [data-sec-off], [data-off]) { display: flex; }
+.toolbar.is-form .tb-options-row .pf-row:has(> :is(input, select):is([hidden], [data-off])) { display: none; }
+.toolbar.is-form .pf-short, .toolbar.is-form .pf-cap[data-quiet] { display: none; }
+.toolbar.is-form .pf-cap { margin-top: var(--s-4); color: var(--hud-muted); font: var(--font-meta); }
 /* Value chips just above the selection: placed by ui/near-selection.ts, as the Actions bar that follows it. */
 .props-near { position: absolute; z-index: var(--z-edge); display: flex; align-items: center; }
 .props-near[hidden] { display: none; }
-/* The Actions bar as value chips: one chip a group, its buttons listed in a menu. */
-.ctx-chip-host { display: none; }
-.ctx-bar button.vchip { width: auto; padding: 0 var(--s-6); }
-:root[data-actions-view="chips"] .ctx-bar .tb-captioned > .ctx-chip-host { display: contents; }
-:root[data-actions-view="chips"] .ctx-bar .tb-captioned > :is(.tb-row, .tb-cap), :root[data-actions-view="chips"] .ctx-names { display: none; }
-

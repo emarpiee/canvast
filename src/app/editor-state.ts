@@ -298,7 +298,33 @@ export class EditorState {
     this.changed();
   }
 
+  /**
+   * What the tool in use has just made (ADR 0198), one rule for every tool that makes things (shapes, balloons, sheets, paths, texts, notes,
+   * and any to come): it is selected and the tool stays. While it is all that is selected, the options edit it, as they would with the Select
+   * tool, and what they set is also the tool's own for the next one (`editsMade`); a press on its handles resizes or turns it. Picking
+   * anything else ends it. With nothing selected the options are the tool's own.
+   */
+  readonly made = new Set<ObjectId>();
+
+  /** Select what a tool has just made (the one call every tool that makes things uses). */
+  selectMade(ids: Iterable<ObjectId>): void {
+    const list = [...ids];
+    this.select(list);
+    for (const id of list) this.made.add(id);
+  }
+
+  /** The options edit the selection: with the Select or Edit nodes tool, or while what is selected is what the tool has just made. */
+  get editsSelection(): boolean {
+    return this.tool === "select" || this.tool === "node" || (this.selection.size > 0 && [...this.selection].every((id) => this.made.has(id)));
+  }
+
+  /** The options edit what the tool has just made (not the Select tool): what they set is also kept for the tool's next one. */
+  get editsMade(): boolean {
+    return this.tool !== "select" && this.tool !== "node" && this.editsSelection;
+  }
+
   select(ids: Iterable<ObjectId>, additive = false): void {
+    this.made.clear();
     if (!additive) {
       this.selection.clear();
       this.gradientFocus = null; // (a new pick starts with the fill's gradient again: the focus was for the shape that was picked)

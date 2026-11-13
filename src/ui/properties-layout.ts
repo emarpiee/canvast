@@ -1,258 +1,128 @@
 import { createBar, syncScroll } from "./bar";
-import { SECTIONS, orderBySection, sectionLabel, sectionSummary, showSections, shownSections } from "./bar-sections";
-import { closeChipPopover, openChipPopover, placeChipPopover, syncChips } from "./value-chips";
+import { nameControls, sectionLabel, sectionSummary, showSections, shownSections, sectionOfControl } from "./bar-sections";
+import { closeChipPopover, followChip, openChipPopover, placeChipPopover, syncChips } from "./value-chips";
 import type { ChipSpec } from "./value-chips";
 import { inRoom, placeBy, selectionBoxIn } from "./near-selection";
-import { panelHtml } from "./panel";
-import { ICONS } from "./icons";
 import { setControlRevealer } from "../commands/from-bars";
 import type { PropertiesBar } from "./toolbar";
 import type { EditorState } from "../app/editor-state";
 
 /**
- * How the Properties bar is shown (ADR 0198, Settings > Appearance > Properties): as it is (one row at the top), as value chips (one per section,
- * each opening its controls), in the Properties panel (the sections one under another, opening by itself when there is something to show), or as
- * value chips just above the selection. The controls are always the same ones, moved: the bar itself goes into the chip's popover, the panel, or
- * waits, unseen, in its parking place; so whatever they do (live numbers, colour pickers, the command palette, shortcuts) works in every way.
+ * How the Properties bar is shown (ADR 0198, Settings > Appearance > Properties): as it is (one row at the top), or as value chips just above
+ * the selection (one chip per section, saying what it is set to, each opening its controls under it). With nothing selected (a tool's own
+ * options) or the selection out of view, the chips stand at the top. The controls are always the same ones, moved: the bar itself goes into
+ * the chip's popover, or waits, unseen, in its parking place; so whatever they do (live numbers, colour pickers, the command palette,
+ * shortcuts) works the same.
  */
-export type PropertiesPlace = "bar" | "chips" | "panel" | "near";
-export type PanelPin = "auto" | "open" | "closed";
+export type PropertiesPlace = "bar" | "near";
+/** The chip of the colours of a selection of several shapes. */
+const COLOURS = "colours";
 
-export interface PropertiesLayoutOptions {
-  place(): PropertiesPlace;
-  folded(): readonly string[];
-  setFolded(ids: readonly string[]): void;
-  pin(): PanelPin;
-  setPin(p: PanelPin): void;
-  mini(): boolean;
-  setMini(on: boolean): void;
-  /** Whether the window is too narrow for a panel beside the canvas (the panel is then shown as chips). */
-  narrow(): boolean;
-}
-
-export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement, editor: EditorState, pb: PropertiesBar, opts: PropertiesLayoutOptions): { el: HTMLElement; refresh(): void; follow(): void } {
-  const { bar, row } = pb;
-  const home = { parent: bar.parentElement!, next: bar.nextSibling };
+export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement, editor: EditorState, pb: PropertiesBar, place: () => PropertiesPlace): { refresh(): void; follow(): void } {
+  const { bar, row, colours } = pb;
+  const home = bar.parentElement!;
   // Where the bar waits, unseen, while it is shown as chips: in the same root (so it is still found there), hidden.
   const park = document.createElement("div");
   park.className = "props-park";
   park.hidden = true;
   root.append(park);
-  // The value chips: a bar of the standard shape at the top, after the Properties bar's own place (or above the selection).
-  const chips = createBar("Properties", "Properties");
-  delete chips.el.dataset["cmdGroup"]; // (the chips are not commands: the controls they open are)
-  chips.el.classList.add("props-chips");
-  bar.after(chips.el);
+  // The chips at the top (a bar of the standard shape, after the Properties bar's own place), and the ones just above the selection.
+  const top = createBar("Properties", "Properties");
+  delete top.el.dataset["cmdGroup"]; // (the chips are not commands: the controls they open are)
+  top.el.classList.add("props-chips");
+  bar.after(top.el);
   const near = document.createElement("div");
   near.className = "props-near";
   near.hidden = true;
   canvasHost.append(near);
+  // (every control gets a name of its own, seen when the bar is laid out as a form in a popover)
+  nameControls(row);
 
-  // The Properties panel, in the dock with the others.
-  const panel = document.createElement("aside");
-  panel.className = "layers-panel props-panel";
-  panel.setAttribute("aria-label", "Properties");
-  panel.dataset["testid"] = "properties-panel";
-  panel.hidden = true;
-  panel.innerHTML = panelHtml({
-    title: "Properties",
-    tools: `<button type="button" class="layer-btn" data-props-pin aria-pressed="false" aria-label="Keep the panel open" title="Keep the panel open, even with nothing selected">${ICONS.keepOpen}</button><button type="button" class="layer-btn" data-props-mini aria-pressed="false" aria-label="Only the sections" title="Only the sections: each opens its options beside it">${ICONS.panelShrink}</button>`,
-    body: `<div class="props-host" data-props-host></div><div class="props-mini" data-props-minilist hidden></div><p class="adj-note" data-props-empty hidden>Select something, or pick a tool, to see its options here.</p>`,
-  });
-  const panelHost = panel.querySelector<HTMLElement>("[data-props-host]")!;
-  const miniList = panel.querySelector<HTMLElement>("[data-props-minilist]")!;
-  const empty = panel.querySelector<HTMLElement>("[data-props-empty]")!;
-  // The headings of the sections in the panel: in the bar's row, each before its section's controls (`order`), seen only in the panel.
-  for (const [i, s] of SECTIONS.entries()) {
-    const h = document.createElement("button");
-    h.type = "button";
-    h.className = "ps-head";
-    h.dataset["psHead"] = s.id;
-    h.dataset["noCommand"] = "";
-    h.style.order = String(2 * i);
-    h.setAttribute("aria-expanded", "true");
-    h.innerHTML = `<span class="ps-name">${s.label}</span><span class="ps-sum"></span>${ICONS.chevronDown}`;
-    row.append(h);
-  }
-
-  // (a field with no name of its own is the second of a pair, as Gap's or Pad's: laid out on its name's line)
-  for (const l of row.querySelectorAll<HTMLElement>("label")) {
-    if (![...l.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim())) l.setAttribute("data-bare", "");
-  }
-
-  let place: PropertiesPlace = "bar";
+  let now: PropertiesPlace = "bar";
   /** The section a chip's popover shows now (null: none is open). */
   let popped: string | null = null;
-  const effective = (): PropertiesPlace => (opts.place() === "panel" && opts.narrow() ? "chips" : opts.place());
-
-  const putBar = (where: HTMLElement | "home"): void => {
-    const parent = where === "home" ? home.parent : where;
-    if (bar.parentElement === parent) return;
-    if (where === "home") home.parent.insertBefore(bar, chips.el);
-    else where.append(bar);
-  };
-  const stacked = (on: boolean, panelHeads: boolean): void => {
-    bar.classList.toggle("is-stacked", on);
-    bar.classList.toggle("is-panel", panelHeads);
-    orderBySection(row, on);
-  };
 
   const closePop = (): void => {
     if (popped !== null) closeChipPopover();
   };
-  /** Open a section's controls under its chip: the bar moves into the popover, showing that section only. */
+  /**
+   * Open a section's controls under its chip: the bar moves into the popover, laid out as a form, showing that section only. The colours of a
+   * selection of several shapes (a bar of their own at the top) are one more chip, "Colours", whose popover holds that bar.
+   */
   const popSection = (anchor: HTMLElement, id: string): void => {
-    openChipPopover(anchor, sectionLabel(id), (pop) => {
+    openChipPopover(anchor, id === COLOURS ? "Colours" : sectionLabel(id), (pop) => {
       popped = id;
-      stacked(true, false);
+      if (id === COLOURS) return void pop.append(colours);
+      bar.classList.add("is-form");
       showSections(row, new Set([id]));
       pop.append(bar);
     }, () => {
       popped = null;
+      bar.classList.remove("is-form");
       showSections(row, null);
       settle();
     });
   };
 
-  const chipsOf = (ids: readonly string[]): ChipSpec[] => ids.map((id) => ({ id, label: sectionLabel(id), value: sectionSummary(row, id), title: `${sectionLabel(id)}: open its options` }));
-  /** The panel shows itself for a selection, a text being typed in, or a tool with options; not for the Select tool's own options with nothing selected. */
-  const panelShown = (): boolean => {
-    const pin = opts.pin();
-    const idle = (editor.tool === "select" || editor.tool === "node") && editor.selection.size === 0 && !editor.editingText;
-    return pin === "open" || (pin === "auto" && !bar.hidden && !idle);
-  };
+  const coloursValue = (): string => [...colours.querySelectorAll<HTMLElement>("[data-sel-colour]")].slice(0, 3).map((b) => `<span class="vchip-sw${b.hasAttribute("data-ring") ? " is-ring" : ""}" style="--sw:${b.querySelector<HTMLElement>("[data-paint-chip]")?.style.getPropertyValue("--paint") ?? ""}"></span>`).join("");
+  const chipsOf = (ids: readonly string[]): ChipSpec[] => ids.map((id) => (id === COLOURS ? { id, label: "Colours", value: coloursValue(), title: "Colours: every colour of the selection, each to change everywhere" } : { id, label: sectionLabel(id), value: sectionSummary(row, id), title: `${sectionLabel(id)}: open its options` }));
 
-  /** Lay everything out for the current place, after every update of the bar. */
+  /** Lay everything out for the current place, after every update of the bar and every frame. */
   const settle = (): void => {
-    const was = place;
-    place = effective();
-    if (was !== place) closePop();
-    bar.toggleAttribute("data-parked", place !== "bar");
-    const ids = bar.hidden ? [] : shownSections(row);
-    if (place === "bar") {
-      stacked(false, false);
-      showSections(row, null);
-      putBar("home");
-      chips.el.hidden = true;
+    const was = now;
+    now = place();
+    if (was !== now) closePop();
+    bar.toggleAttribute("data-parked", now !== "bar");
+    colours.toggleAttribute("data-parked", now !== "bar");
+    if (now === "bar") {
+      if (bar.parentElement !== home) home.insertBefore(bar, top.el);
+      if (colours.parentElement !== home) top.el.after(colours);
+      top.el.hidden = true;
       near.hidden = true;
-      panel.hidden = true;
       return;
     }
-    if (place === "panel") {
-      near.hidden = true;
-      panel.hidden = !panelShown();
-      chips.el.hidden = false;
-      // (the top keeps what is used most: the Look chip, and the panel's switch)
-      if (!chips.row.querySelector("[data-props-toggle]")) {
-        chips.row.innerHTML = `<span class="props-quick"></span><button type="button" class="vchip" data-props-toggle aria-pressed="false" title="Properties: show or hide the panel">${ICONS.properties}<span class="vchip-k">Properties</span></button>`;
-      }
-      syncChips(chips.row.querySelector<HTMLElement>(".props-quick")!, chipsOf(ids.filter((id) => id === "look")));
-      chips.row.querySelector("[data-props-toggle]")!.setAttribute("aria-pressed", String(!panel.hidden));
-      const mini = opts.mini();
-      panel.querySelector("[data-props-mini]")!.setAttribute("aria-pressed", String(mini));
-      panel.querySelector("[data-props-pin]")!.setAttribute("aria-pressed", String(opts.pin() === "open"));
-      miniList.hidden = !mini;
-      empty.hidden = !bar.hidden;
-      if (mini) {
-        syncChips(miniList, chipsOf(ids));
-        if (popped === null) putBar(park);
-      } else if (popped === null) {
-        putBar(panelHost);
-        stacked(true, true);
-        const folded = new Set(opts.folded());
-        showSections(row, new Set(SECTIONS.map((s) => s.id).filter((id) => !folded.has(id))));
-        for (const h of row.querySelectorAll<HTMLElement>("[data-ps-head]")) {
-          const id = h.dataset["psHead"]!;
-          h.hidden = !ids.includes(id);
-          h.setAttribute("aria-expanded", String(!folded.has(id)));
-          const sum = h.querySelector<HTMLElement>(".ps-sum")!;
-          const html = folded.has(id) ? sectionSummary(row, id) : "";
-          if (sum.innerHTML !== html) sum.innerHTML = html;
-        }
-      }
-      if (popped !== null) placeChipPopover();
-      return;
-    }
-    // Value chips: at the top, or just above the selection (back at the top when nothing is selected or it is out of the view).
-    panel.hidden = true;
-    if (popped === null) putBar(park);
+    const ids = [...(bar.hidden ? [] : shownSections(row)), ...(colours.hidden ? [] : [COLOURS])];
+    if (popped === null && bar.parentElement !== park) park.append(bar);
+    if (popped !== COLOURS && colours.parentElement !== park) park.append(colours);
     if (popped !== null && !ids.includes(popped)) closePop();
-    const box = place === "near" ? selectionBoxIn(canvasHost, editor) : null;
-    const beside = !!box && inRoom(box) && !bar.hidden;
-    const host = beside ? near : chips.row;
-    if (host === chips.row && chips.row.querySelector("[data-props-toggle]")) chips.row.innerHTML = "";
+    const box = selectionBoxIn(canvasHost, editor);
+    const beside = editor.selection.size > 0 && !!box && inRoom(box) && ids.length > 0;
+    const host = beside ? near : top.row;
+    // (the same chips in the same place keep their elements: an open popover stays under its chip)
     syncChips(host, chipsOf(ids));
-    chips.el.hidden = beside || bar.hidden;
+    syncChips(beside ? top.row : near, []);
+    top.el.hidden = beside || ids.length === 0;
     near.hidden = !beside;
-    syncScroll(chips.row);
+    syncScroll(top.row);
     if (beside) {
       const at = placeBy(box!, near.offsetWidth, near.offsetHeight, "above", 6);
-      near.style.left = `${Math.round(at.left)}px`;
-      near.style.top = `${Math.round(at.top)}px`;
+      const [l, t] = [`${Math.round(at.left)}px`, `${Math.round(at.top)}px`];
+      if (near.style.left !== l) near.style.left = l;
+      if (near.style.top !== t) near.style.top = t;
     }
-    if (popped !== null) placeChipPopover();
+    if (popped !== null) {
+      followChip(host.querySelector<HTMLElement>(`[data-vchip="${CSS.escape(popped)}"]`));
+      placeChipPopover();
+    }
   };
   pb.onUpdate(settle);
 
-  // A chip opens its section; in the panel a heading folds its section; the panel's buttons.
   const onChip = (e: MouseEvent): void => {
-    const t = e.target as HTMLElement;
-    const chip = t.closest<HTMLElement>("[data-vchip]");
-    if (chip) {
-      const id = chip.dataset["vchip"]!;
-      if (place === "panel" && !opts.mini() && chip.closest(".props-chips")) return openInPanel(id);
-      return popSection(chip, id);
-    }
-    if (t.closest("[data-props-toggle]")) {
-      opts.setPin(panel.hidden ? (bar.hidden ? "open" : "auto") : "closed");
-      settle();
-    }
+    const chip = (e.target as HTMLElement).closest<HTMLElement>("[data-vchip]");
+    if (chip) popSection(chip, chip.dataset["vchip"]!);
   };
-  for (const el of [chips.row, near, miniList]) el.addEventListener("click", onChip);
+  for (const el of [top.row, near]) el.addEventListener("click", onChip);
   // (a press on the chips is not a press on the canvas under them)
   near.addEventListener("pointerdown", (e) => e.stopPropagation());
-  row.addEventListener("click", (e) => {
-    const h = (e.target as HTMLElement).closest<HTMLElement>("[data-ps-head]");
-    if (!h) return;
-    const id = h.dataset["psHead"]!;
-    const folded = new Set(opts.folded());
-    if (folded.has(id)) folded.delete(id);
-    else folded.add(id);
-    opts.setFolded([...folded]);
-    settle();
-  });
-  panel.querySelector("[data-close]")!.addEventListener("click", () => {
-    opts.setPin("closed");
-    settle();
-  });
-  panel.querySelector("[data-props-pin]")!.addEventListener("click", () => {
-    opts.setPin(opts.pin() === "open" ? "auto" : "open");
-    settle();
-  });
-  panel.querySelector("[data-props-mini]")!.addEventListener("click", () => {
-    closePop();
-    opts.setMini(!opts.mini());
-    settle();
-  });
-  const openInPanel = (id: string): void => {
-    if (opts.pin() === "closed") opts.setPin("auto");
-    const folded = new Set(opts.folded());
-    if (folded.delete(id)) opts.setFolded([...folded]);
-    if (opts.mini()) opts.setMini(false);
-    settle();
-    row.querySelector<HTMLElement>(`[data-ps-head="${id}"]`)?.scrollIntoView({ block: "nearest" });
-  };
 
-  // The command palette finds every control, also one in a closed chip or a folded section: it is shown first.
+  // The command palette finds every control, also one in a closed chip: its chip is opened first.
   setControlRevealer((el) => {
-    if (!bar.contains(el) || place === "bar") return;
-    const item = [...row.querySelectorAll<HTMLElement>(":scope > .tb-group > *")].find((it) => it.contains(el));
-    const id = item?.dataset["section"] ?? item?.parentElement?.dataset["section"] ?? "options";
-    if (place === "panel" && !opts.mini()) return openInPanel(id);
+    if (!(bar.contains(el) || colours.contains(el)) || now === "bar") return;
+    const id = colours.contains(el) ? COLOURS : sectionOfControl(row, el);
     if (popped === id) return;
-    const chip = document.querySelector<HTMLElement>(`.props-chips:not([hidden]) [data-vchip="${CSS.escape(id)}"], .props-near:not([hidden]) [data-vchip="${CSS.escape(id)}"], [data-props-minilist]:not([hidden]) [data-vchip="${CSS.escape(id)}"]`);
+    const chip = document.querySelector<HTMLElement>(`.props-chips:not([hidden]) [data-vchip="${CSS.escape(id)}"], .props-near:not([hidden]) [data-vchip="${CSS.escape(id)}"]`);
     if (chip) popSection(chip, id);
   });
   // (near the selection, the chips follow it after every frame, as the Actions bar does: the selection's place on the screen is known once drawn)
-  return { el: panel, refresh: settle, follow: () => { if (place === "near") settle(); } };
+  return { refresh: settle, follow: () => { if (now === "near") settle(); } };
 }
