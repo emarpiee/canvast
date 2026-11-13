@@ -21,6 +21,8 @@ export const SECTIONS: readonly Section[] = [
   { id: "mask", label: "Mask", icon: ICONS.secMask },
   { id: "look", label: "Look", icon: ICONS.secLook },
   { id: "text", label: "Text", icon: ICONS.secText },
+  { id: "textoutline", label: "Text outline", icon: ICONS.secTextoutline },
+  { id: "paragraph", label: "Paragraph", icon: ICONS.secParagraph },
   { id: "shape", label: "Shape", icon: ICONS.secShape },
   { id: "picture", label: "Picture", icon: ICONS.secPicture },
   { id: "size", label: "Size", icon: ICONS.secSize },
@@ -110,8 +112,8 @@ export function nameControls(row: HTMLElement): void {
     if (b.closest("[role=radiogroup], .seg") || b.matches(".width") || named(b) || !nameOf(b)) continue; // (the pen's widths are pictures of themselves)
     b.append(nameEl(nameOf(b)));
   }
-  // A label's own words name its field, unless they are too short to say what it is ("T", "W") or the label is the first of a pair whose
-  // second field has no words (Gap, Pad): then the field's full name is shown instead, and the short words only in the bar.
+  // In the form a field is named by its full name ("Text size", "Line height", "Padding top"), never by the short word of the bar ("Size",
+  // "Line", "T"): the short word stays, for the bar only.
   const words = (l: Element): string => [...l.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent!.trim()).join(" ").trim();
   const labels = [...row.querySelectorAll<HTMLLabelElement>("label")];
   const bare = new Set(labels.filter((l) => !words(l) && !named(l)));
@@ -136,8 +138,7 @@ export function nameControls(row: HTMLElement): void {
   for (const l of labels) {
     const field = l.querySelector<HTMLElement>("input:not([type=file]), select");
     if (!field || bare.has(l) || l.classList.contains("pf-multi")) continue;
-    const pairHead = !!l.nextElementSibling && bare.has(l.nextElementSibling as HTMLLabelElement);
-    if (words(l).length > 2 && !pairHead) continue;
+    if (!field.getAttribute("aria-label")) continue; // (no fuller name than the label's own words)
     for (const n of [...l.childNodes]) if (n.nodeType === Node.TEXT_NODE && n.textContent!.trim()) {
       const short = document.createElement("span");
       short.className = "pf-short";

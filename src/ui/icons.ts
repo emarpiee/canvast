@@ -371,6 +371,8 @@ import circleAlert from "lucide-static/icons/circle-alert.svg";
 import circleCheck from "lucide-static/icons/circle-check.svg";
 import loaderCircle from "lucide-static/icons/loader-circle.svg";
 import triangleAlert from "lucide-static/icons/triangle-alert.svg";
+import secTextoutlineSvg from "lucide-static/icons/text-select.svg";
+import secParagraphSvg from "lucide-static/icons/pilcrow-right.svg";
 import textSizeMenuSvg from "lucide-static/icons/unfold-vertical.svg";
 import paragraphMenuSvg from "lucide-static/icons/heading.svg";
 import listMenuSvg from "lucide-static/icons/list-collapse.svg";
@@ -690,6 +692,8 @@ export const ICONS = {
   secLasso: clean(secLassoSvg),
   secOptions: clean(secOptionsSvg),
   secColours: clean(secColoursSvg),
+  secTextoutline: clean(secTextoutlineSvg),
+  secParagraph: clean(secParagraphSvg),
   maximize: clean(maximize),
   imageUpscale: clean(imageUpscale),
   columns3: clean(columns3),

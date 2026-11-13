@@ -441,6 +441,9 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     ["[data-mask-paint]", "mask"],
     ['.tb-group[data-for="pen"][aria-label="Colour"]', "look"],
     ['.tb-group[data-for="shape"]', "shape"],
+    // (Text is three chips: the font, the outline round the letters, the paragraph)
+    ["[data-text-outline], label:has([data-text-outline-w])", "textoutline"],
+    ['label:has([data-text-line]), label:has([data-text-track]), [data-text-box], .tb-group[data-kind="text"][role="radiogroup"]', "paragraph"],
     ['.tb-group[data-kind="text"]', "text"],
     ['.tb-group[data-for="shape balloon path select node"]', "look"],
     ['.tb-group[data-for="shape balloon path"]', "look"],

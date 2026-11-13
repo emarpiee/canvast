@@ -69,35 +69,49 @@ export interface ColourPopoverOptions {
 }
 
 /**
- * Under the button, or above it when that fits better (as every menu, off the selected things). The picker is shown whole: when it fits
- * neither under nor above, it goes beside the bar of its button, on a side where it covers nothing of the interface (the dock, the tools,
- * the Actions bar) nor the selection; when every such place covers something, it stays under the bar with a scroll, as a short window gives.
+ * The picker is shown whole, and covers nothing it should not: the selected things, the bar of its button, and the rest of the interface
+ * (the dock, the tools, the Actions bar, the chips). It may cover the popover its button is in (a chip's): that is its parent, and the
+ * room keeps the selection in view. The places tried, in order: under its button or above it (as every menu), over its parent popover,
+ * beside the bar of its button, then beside the selection. It is never put over the selection; of the places that keep the selection clear,
+ * the one that covers the least of the interface wins (whole matters more than a bar kept in view). When every place is over the selection it
+ * stays under the bar, with a scroll. A window shorter than the picker always gives it a scroll.
  */
 function place(pop: HTMLElement, anchor: HTMLElement): void {
   const edge = 8;
   pop.style.maxHeight = "";
   const room = window.innerHeight - 2 * edge;
-  if (pop.offsetHeight > room) pop.style.maxHeight = `${room}px`; // (a short window: it scrolls whatever the place)
+  if (pop.offsetHeight > room) pop.style.maxHeight = `${room}px`;
   placeMenu(pop, anchor);
   const a = clearRect(anchor);
   const m = pop.getBoundingClientRect();
-  if (!(m.top < a.bottom && m.bottom > a.top)) return;
   type Box = { left: number; top: number; right: number; bottom: number };
-  const keepClear: Box[] = [...document.querySelectorAll<HTMLElement>(".rail, .dock, .ctx-wrap, #nav, .hud-controls, .props-near")].filter((el) => el.offsetParent && !el.contains(anchor)).map((el) => el.getBoundingClientRect());
-  const avoid = menuAvoid();
-  if (avoid) keepClear.push(avoid);
-  const covers = (l: number, t: number): number => keepClear.reduce((sum, b) => sum + Math.max(0, Math.min(l + m.width, b.right) - Math.max(l, b.left)) * Math.max(0, Math.min(t + m.height, b.bottom) - Math.max(t, b.top)), 0);
-  const y = Math.max(edge, Math.min(window.innerHeight - edge - m.height, a.top));
-  const beside = [a.right + MENU_GAP, a.left - MENU_GAP - m.width].filter((x) => x >= edge && x + m.width <= window.innerWidth - edge);
-  const x = beside.find((l) => covers(l, y) === 0);
-  if (x === undefined) {
-    const top = a.bottom + MENU_GAP; // (no clear place beside: under the bar, with a scroll)
+  // (the popover its button is in may be covered: it is the picker's parent, and the room it frees keeps the selection in view)
+  const parent = anchor.closest<HTMLElement>(".vchip-pop");
+  const hud: Box[] = [...(parent ? [] : [a]), ...[...document.querySelectorAll<HTMLElement>(`.rail, .dock, .ctx-wrap, #nav, .hud-controls${parent ? "" : ", .props-near"}`)].filter((el) => el.getClientRects().length > 0).map((el) => el.getBoundingClientRect())];
+  const sel = menuAvoid();
+  const over = (b: Box, l: number, t: number): number => Math.max(0, Math.min(l + m.width, b.right) - Math.max(l, b.left)) * Math.max(0, Math.min(t + m.height, b.bottom) - Math.max(t, b.top));
+  const covers = (l: number, t: number): number => hud.reduce((sum, b) => sum + over(b, l, t), 0);
+  const onSelection = (l: number, t: number): boolean => !!sel && over(sel, l, t) > 0;
+  const fitY = (t: number): number => Math.max(edge, Math.min(window.innerHeight - edge - m.height, t));
+  const inX = (l: number): boolean => l >= edge && l + m.width <= window.innerWidth - edge;
+  const tries: Array<[number, number]> = [[m.left, m.top]];
+  if (parent) {
+    const pr = parent.getBoundingClientRect(); // (over its parent popover, from its corner: the selection stays clear)
+    for (const l of [pr.left, pr.right - m.width]) if (inX(l)) tries.push([l, fitY(pr.top)]);
+  }
+  for (const l of [a.right + MENU_GAP, a.left - MENU_GAP - m.width]) if (inX(l)) tries.push([l, fitY(a.top)]);
+  if (sel) for (const l of [sel.right + MENU_GAP, sel.left - MENU_GAP - m.width]) if (inX(l)) tries.push([l, fitY(sel.top)]);
+  // (never over the selection; of the rest, the place that covers the least of the interface: whole is worth more than a bar kept in view)
+  const fair = tries.filter(([l, t]) => !onSelection(l, t));
+  const clear = fair.length ? fair.reduce((best, p) => (covers(p[0], p[1]) < covers(best[0], best[1]) ? p : best)) : undefined;
+  if (!clear) {
+    const top = a.bottom + MENU_GAP; // (no clear place: under the bar, with a scroll)
     pop.style.top = `${parseFloat(pop.style.top) + (top - m.top)}px`;
     pop.style.maxHeight = `${window.innerHeight - top - edge}px`;
     return;
   }
-  pop.style.left = `${parseFloat(pop.style.left) + (x - m.left)}px`;
-  pop.style.top = `${parseFloat(pop.style.top) + (y - m.top)}px`;
+  pop.style.left = `${parseFloat(pop.style.left) + (clear[0] - m.left)}px`;
+  pop.style.top = `${parseFloat(pop.style.top) + (clear[1] - m.top)}px`;
 }
 
 /** A texture's source is being picked on the canvas (ADR 0154): a press there is the pick, not a press outside, so the chooser stays. */

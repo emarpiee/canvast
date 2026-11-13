@@ -117,3 +117,25 @@ test("with nothing selected a tool's chips are at the top; the palette opens a c
   await expect(top).toBeHidden();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("a text's chips are Text, Text outline and Paragraph, every field named in full with its value whole; its colour picker stays off it", async ({ app }) => {
+  const p = app.page;
+  await set(app, "ui.properties", "near");
+  await p.keyboard.press("t");
+  await p.mouse.click(500, 420);
+  await p.keyboard.type("abc");
+  await p.keyboard.press("Escape");
+  await p.keyboard.press("v");
+  await select(app, [(await objects(app)).at(-1)!.id]);
+  const near = p.locator(".props-near");
+  await expect(near.locator(".tb-cap")).toHaveText(["Look", "Text", "Text outline", "Paragraph"]);
+  expect(await auditChips(app, ".props-near")).toEqual([]);
+  await near.locator('[data-vchip="paragraph"]').click();
+  await expect(p.locator(".vchip-pop").getByText("Line height", { exact: true }), "the full name, not the bar's \"Line\"").toBeVisible();
+  await p.keyboard.press("Escape");
+  await near.locator('[data-vchip="text"]').click();
+  await p.locator(".vchip-pop [data-text-colour]").click();
+  await expect(p.locator(".colour-pop")).toBeVisible();
+  expect(await floatingProblems(p)).toEqual([]);
+  expect(app.consoleErrors).toEqual([]);
+});

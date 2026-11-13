@@ -3335,7 +3335,7 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .toolbar.is-form .tb-options-row button:not([role="radio"], .seg *, [aria-pressed="true"], :hover) { background: transparent; } /* (a swatch or a tool's button looks like every other row) */
 .toolbar.is-form .tb-options-row :is([role="radiogroup"], .seg):not([hidden], [data-sec-off], [data-off]) { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); }
 .toolbar.is-form .tb-options-row :is([role="radiogroup"], .seg)[data-name]::before { content: attr(data-name); flex: 1 1 100%; color: var(--hud-muted); font: var(--font-meta); }
-.toolbar.is-form .tb-options-row input[type="number"] { width: calc(2 * var(--ctl)); }
+.toolbar.is-form .tb-options-row input[type="number"] { width: calc(2.5 * var(--ctl)); } /* (room for a value with decimals and its arrows: never cut) */
 .toolbar.is-form .tb-options-row input[type="text"] { width: calc(3 * var(--ctl)); }
 .toolbar.is-form .tb-options-row .size-out { display: none; }
 .toolbar.is-form .tb-options-row .tb-group.tb-group { margin: 0; padding: 0; border: 0; } /* (no lines between groups in a form) */

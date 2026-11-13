@@ -383,6 +383,15 @@ function floatingRules(page: Page): Promise<string[]> {
           widest = Math.max(widest, g.scrollWidth);
         }
         if (fonts.size > 1) out.push(`the names of the form are in ${fonts.size} different fonts or sizes: ${[...fonts].join(", ")}`);
+        // (a value is never cut: its words fit in its field, a number's arrows aside)
+        const pen = document.createElement("canvas").getContext("2d")!;
+        for (const f of [...form.querySelectorAll<HTMLInputElement>("input[type=number], input[type=text]")].filter(shown)) {
+          const cs = getComputedStyle(f);
+          pen.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+          // (from the outer width: browsers count a number's arrows in its inner width differently)
+          const room = f.offsetWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth) - (f.type === "number" ? 18 : 0);
+          if (pen.measureText(f.value).width > room + 0.5) out.push(`the value “${f.value}” of “${name(f)}” is cut`);
+        }
         const room = pop.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
         if (widest && room - widest > 24) out.push(`the popover is ${Math.round(room - widest)} px wider than its widest row`);
       }

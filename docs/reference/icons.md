@@ -359,3 +359,5 @@ One icon per function: two buttons that do different things never share an icon,
 | `lasso-select` | Properties near the selection: the Lasso chip |
 | `settings-2` | Properties near the selection: the Options chip |
 | `spray-can` | Properties near the selection: the Colours chip |
+| `text-select` | Properties near the selection: the Text outline chip |
+| `pilcrow-right` | Properties near the selection: the Paragraph chip |
