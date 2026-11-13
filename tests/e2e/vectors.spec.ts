@@ -1438,6 +1438,7 @@ test("the interface around the vector tools: the hint floats at the bottom (and 
   // seven shapes of seven colours
   const hexes = ["e11d48", "f59e0b", "84cc16", "14b8a6", "3b82f6", "8b5cf6", "ec4899"];
   for (const [n, hex] of hexes.entries()) {
+    await p.evaluate(() => window.__canvastDebug.select([])); // (with the last shape still selected its fill would change too: ADR 0198)
     await p.click('[data-paint="fill"]');
     await pop.locator("[data-hex]").fill(hex);
     await pop.locator("[data-hex]").press("Enter");

@@ -1673,6 +1673,8 @@ test("the list to choose from shows a group inside the selection by its name and
   // Ctrl held over nothing inside a selection longer than the list shows: the small list beside the pointer holds every row and the wheel
   // scrolls it (the view does not zoom); letting go of Ctrl ends it.
   await key(app, "u");
+  // (a shape just drawn stays selected, and the Actions bar with it, so notices stand higher: the one of the list goes first)
+  for (const b of await p.getByRole("button", { name: "Dismiss" }).all()) await b.click();
   for (let i = 0; i < 16; i++) await app.drag({ x: 420 + (i % 8) * 40, y: 560 + Math.floor(i / 8) * 40 }, { x: 445 + (i % 8) * 40, y: 585 + Math.floor(i / 8) * 40 }, 2);
   await key(app, "v");
   await key(app, "Control+a");

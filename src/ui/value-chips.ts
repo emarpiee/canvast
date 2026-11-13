@@ -1,26 +1,28 @@
 import { ICONS } from "./icons";
 import { placeMenu } from "./more-menu";
 import { esc } from "./format";
+import { captionedGroup } from "./bar";
 
 /**
- * Value chips (ADR 0198): one button per group of controls that says what the group is set to (a section of the Properties bar: "Look ● ⁄ 2 px";
- * a group of the Actions bar: its name and the icons of what it holds), opening the group's controls under it. One look and one popover for
- * the top bar, the chips beside the selection and the Actions bar.
+ * Value chips (ADR 0198): the Properties bar by the selection made as the Actions bar is, one named group per section (`captionedGroup`: its
+ * name under or over it, on hover, or hidden, as Settings say for both bars), whose one button is the section's icon and what it is set to
+ * ("Sheet", "16 : 9", a fill's dot), opening the section's options under it.
  */
-export function chipHtml(o: { id: string; label: string; value: string; title: string; attr?: string }): string {
-  return `<button type="button" class="vchip" ${o.attr ?? "data-vchip"}="${esc(o.id)}" aria-haspopup="dialog" aria-expanded="false" title="${esc(o.title)}"><span class="vchip-k">${esc(o.label)}</span>${o.value ? `<span class="vchip-v">${o.value}</span>` : ""}<span class="vchip-arrow">${ICONS.chevronDown}</span></button>`;
+export function chipHtml(o: ChipSpec): string {
+  const button = `<button type="button" class="vchip" data-vchip="${esc(o.id)}" aria-haspopup="dialog" aria-expanded="false" aria-label="${esc(o.label)}" title="${esc(o.title)}"><span class="vchip-ic">${o.icon}</span>${o.value ? `<span class="vchip-v">${o.value}</span>` : ""}<span class="vchip-arrow">${ICONS.chevronDown}</span></button>`;
+  return captionedGroup(esc(o.label), button);
 }
 
-export interface ChipSpec { id: string; label: string; value: string; title: string }
+export interface ChipSpec { id: string; label: string; icon: string; value: string; title: string }
 
 /**
  * Show these chips in `host`, changing only what changed: when the same chips are there, only their values are written again, so a chip
  * whose popover is open stays the same element (the popover keeps its place under it).
  */
-export function syncChips(host: HTMLElement, chips: readonly ChipSpec[], attr = "data-vchip"): void {
-  const now = [...host.querySelectorAll<HTMLElement>(`[${attr}]`)];
-  if (now.length !== chips.length || now.some((c, i) => c.getAttribute(attr) !== chips[i]!.id)) {
-    host.innerHTML = chips.map((c) => chipHtml({ ...c, attr })).join("");
+export function syncChips(host: HTMLElement, chips: readonly ChipSpec[]): void {
+  const now = [...host.querySelectorAll<HTMLElement>("[data-vchip]")];
+  if (now.length !== chips.length || now.some((c, i) => c.dataset["vchip"] !== chips[i]!.id)) {
+    host.innerHTML = chips.map(chipHtml).join("");
     return;
   }
   now.forEach((el, i) => {
@@ -30,7 +32,7 @@ export function syncChips(host: HTMLElement, chips: readonly ChipSpec[], attr = 
     if (!v) {
       v = document.createElement("span");
       v.className = "vchip-v";
-      el.querySelector(".vchip-k")!.after(v);
+      el.querySelector(".vchip-ic")!.after(v);
     }
     if (v.innerHTML !== c.value) v.innerHTML = c.value;
   });

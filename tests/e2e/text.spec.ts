@@ -34,11 +34,17 @@ function isText(c: [number, number, number]): boolean {
   return Math.abs(c[0] - TEXT_RGB[0]!) + Math.abs(c[1] - TEXT_RGB[1]!) + Math.abs(c[2] - TEXT_RGB[2]!) < 60;
 }
 
+/** A command of the text format bar that sits in one of its menus (ADR 0198): open the menu, choose the row. */
+async function format(p: Page, menu: string, item: string): Promise<void> {
+  await p.getByRole("toolbar", { name: "Text format" }).getByRole("button", { name: menu }).click();
+  await p.locator(".pop-menu").getByRole("menuitem", { name: item }).click();
+}
+
 test("type, format, save, reload and copy a text object as Markdown", async ({ app }) => {
   const p = app.page;
   await newText(p, 300, 300);
   await p.keyboard.type("Title");
-  await p.getByRole("button", { name: "Heading 1" }).click();
+  await format(p, "Paragraph: heading or body text", "Heading 1");
   await p.keyboard.press("End");
   await p.keyboard.press("Enter");
   await p.keyboard.type("Body ");
@@ -145,7 +151,7 @@ test("double-click edits a text; lists and pasted text become Markdown; emptying
   await p.mouse.dblclick(box.minX + 10, box.minY + 12);
   await expect(p.getByTestId("text-editor")).toBeFocused();
   await expect(p.getByTestId("text-editor")).toHaveText("one");
-  await p.getByRole("button", { name: "Bulleted list" }).click();
+  await format(p, "List: bulleted or numbered", "Bulleted list");
   await p.keyboard.press("End");
   await p.keyboard.press("Enter");
   await p.keyboard.type("two ");
@@ -683,8 +689,8 @@ test("words of a text can be underlined, struck through, given a colour and a si
   await p.mouse.dblclick(310, 308);
   await expect(p.getByTestId("text-editor")).toBeFocused();
   await select(14, 4);
-  await p.getByRole("button", { name: "Make the selected words bigger" }).click();
-  await p.getByRole("button", { name: "Make the selected words bigger" }).click();
+  await format(p, "Size of the selected words", "Make the selected words bigger");
+  await format(p, "Size of the selected words", "Make the selected words bigger");
   await finish(p);
   [t] = await textObjects(p);
   expect(t!.md).toContain('<span style="font-size:156.25%">four</span>');
@@ -784,7 +790,7 @@ test("Tab nests a list item; the paragraph and box options (space, first line, c
   const p = app.page;
   await newText(p, 300, 300);
   await p.keyboard.type("one");
-  await p.getByRole("button", { name: "Bulleted list" }).click();
+  await format(p, "List: bulleted or numbered", "Bulleted list");
   await p.keyboard.press("End");
   await p.keyboard.press("Enter");
   await p.keyboard.type("two");

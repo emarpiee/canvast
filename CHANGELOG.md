@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.58.10 — The chips and the text format bar made as the Actions bar (2026-11-13)
+
+- **Changed:** the Properties chips near the selection are made as the Actions bar: one named group per section (its name under or over it, on hover, or hidden, as Settings say for both bars), each chip the section's icon and its value; each section has an icon of its own.
+- **Changed:** the text format bar is made as the Actions bar: groups (style, words, paragraph, finish) with a line between them, and the size of the words, the headings and the lists in group menus.
+- **Fixed:** the name of a pressed option in a chip's popover (Keep out of the layout) had too little contrast; the colour picker beside its bar could cover the dock; choosing another shape kind after drawing changed the shape just drawn instead of the next one.
+
 ## 0.58.9 — Near the selection, cleaned up; one rule for the tools that make things (2026-11-13)
 
 - **Removed:** the Properties panel, value chips at the top as a choice of their own, and the Actions bar's groups as chips; **Properties** is the bar at the top or **Near the selection**.

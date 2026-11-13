@@ -1002,6 +1002,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       editor.changed();
     } else if (d["shapeKind"]) {
       editor.shapeKind = d["shapeKind"] as typeof editor.shapeKind;
+      editor.made.clear(); // (another kind: the next shape is being prepared, its options are the tool's: ADR 0198)
       if (editor.tool === "path") editor.setTool("shape");
       editor.changed();
     } else if (d["selColour"] !== undefined) {

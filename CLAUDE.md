@@ -132,6 +132,8 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 | As wide as it needs | Width from its content (`max-content`, capped, long names wrap): never a fixed width with empty room |
 | Short | A long group is split into chips of their own (Auto layout: Layout, Spacing, Columns and order); a new control of the Properties bar gets a section (`assignSections` in `ui/toolbar.ts`, its group's is enough) |
 | Follows its chip | Chips are drawn again with `syncChips`; an open popover follows its chip (`followChip`) or closes, never stays at a corner |
+| One bar design | A bar of grouped controls is made as the Actions bar: `.tb-group`s with a line between them, names by `captionedGroup` (shown as Settings > Appearance > group names say; on hover by `hoverNames`), rarer commands in a group menu (`openMoreMenu`, the corner mark). The Properties chips (a section's icon and value, its name as the group's) and the text format bar follow it |
+| Contrast | Text 4.5:1 and icons 3:1 there too (`lowContrast`, run by `floatingProblems`); a name on a pressed button takes the button's colour |
 
 - **Tools that make things (ADR 0198).** Every tool that makes an object (Shape, Balloon, Sheet, Path, and any new one) ends with `editor.selectMade(ids)`: the tool stays, the new object is selected, the options edit it (`editor.editsSelection`) and what they set is also the tool's for the next one (`editor.editsMade`); its own handles (a balloon's tail, a corner's radius dot, a gradient's) and a double-click on it work as with the Select tool; its box's corners do not (a new shape drawn from there is drawn). Never switch tools after making something, and never test `editor.tool === "select"` to decide whether the options edit the selection.
 

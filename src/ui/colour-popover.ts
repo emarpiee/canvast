@@ -70,28 +70,28 @@ export interface ColourPopoverOptions {
 
 /**
  * Under the button, or above it when that fits better (as every menu, off the selected things). The picker is shown whole: when it fits
- * neither under nor above, it goes beside the bar of its button (on the side away from the selection), as tall as it is; only a window
- * shorter than the picker gives it a scroll.
+ * neither under nor above, it goes beside the bar of its button, on a side where it covers nothing of the interface (the dock, the tools,
+ * the Actions bar) nor the selection; when every such place covers something, it stays under the bar with a scroll, as a short window gives.
  */
 function place(pop: HTMLElement, anchor: HTMLElement): void {
   const edge = 8;
   pop.style.maxHeight = "";
   const room = window.innerHeight - 2 * edge;
-  if (pop.offsetHeight > room) pop.style.maxHeight = `${room}px`; // (a short window: the only case it scrolls)
+  if (pop.offsetHeight > room) pop.style.maxHeight = `${room}px`; // (a short window: it scrolls whatever the place)
   placeMenu(pop, anchor);
   const a = clearRect(anchor);
   const m = pop.getBoundingClientRect();
   if (!(m.top < a.bottom && m.bottom > a.top)) return;
+  type Box = { left: number; top: number; right: number; bottom: number };
+  const keepClear: Box[] = [...document.querySelectorAll<HTMLElement>(".rail, .dock, .ctx-wrap, #nav, .hud-controls, .props-near")].filter((el) => el.offsetParent && !el.contains(anchor)).map((el) => el.getBoundingClientRect());
   const avoid = menuAvoid();
-  const right = a.right + MENU_GAP;
-  const left = a.left - MENU_GAP - m.width;
-  const fitsRight = right + m.width <= window.innerWidth - edge;
-  const fitsLeft = left >= edge;
-  const awayLeft = !!avoid && (avoid.left + avoid.right) / 2 > (a.left + a.right) / 2; // (the selection is to the right: go left)
-  const x = awayLeft ? (fitsLeft ? left : fitsRight ? right : null) : fitsRight ? right : fitsLeft ? left : null;
+  if (avoid) keepClear.push(avoid);
+  const covers = (l: number, t: number): number => keepClear.reduce((sum, b) => sum + Math.max(0, Math.min(l + m.width, b.right) - Math.max(l, b.left)) * Math.max(0, Math.min(t + m.height, b.bottom) - Math.max(t, b.top)), 0);
   const y = Math.max(edge, Math.min(window.innerHeight - edge - m.height, a.top));
-  if (x === null) {
-    const top = a.bottom + MENU_GAP; // (no room beside either: under the bar, with a scroll)
+  const beside = [a.right + MENU_GAP, a.left - MENU_GAP - m.width].filter((x) => x >= edge && x + m.width <= window.innerWidth - edge);
+  const x = beside.find((l) => covers(l, y) === 0);
+  if (x === undefined) {
+    const top = a.bottom + MENU_GAP; // (no clear place beside: under the bar, with a scroll)
     pop.style.top = `${parseFloat(pop.style.top) + (top - m.top)}px`;
     pop.style.maxHeight = `${window.innerHeight - top - edge}px`;
     return;

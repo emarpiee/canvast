@@ -1,3 +1,5 @@
+import { uiScale } from "./near-selection";
+
 /**
  * The one way every bar of the app is built (ADR 0128): a row of `.tb-group`s, each a set of controls that go together. A group shows when
  * something in it shows; the line between groups comes from one CSS rule (`.tb-group:not([hidden]) ~ .tb-group:not([hidden])`), never from
@@ -7,6 +9,37 @@
 /** A control or group is out: hidden by its own logic, or switched off because it is not for the kind being edited (`data-off`). */
 /** A group of a bar with its name shown under its controls (ADR 0197): the controls go in `.tb-row`. */
 export const captionedGroup = (name: string, items: string): string => `<div class="tb-group tb-captioned" role="group" aria-label="${name}"><span class="tb-cap" aria-hidden="true">${name}</span><div class="tb-row">${items}</div></div>`;
+
+/**
+ * The names of a bar's groups shown only on hover (Settings > Appearance > group names, ADR 0197): they float over or under the bar in a layer
+ * of their own, in `layerHost` (a parent of the bar that is placed), so the bar does not grow or move. One layer for every bar with named
+ * groups (the Actions bar, the Properties chips by the selection). `place` after the bar's groups change.
+ */
+export function hoverNames(bar: HTMLElement, layerHost: HTMLElement): { place(): void } {
+  const names = document.createElement("div");
+  names.className = "bar-names";
+  names.setAttribute("aria-hidden", "true");
+  layerHost.prepend(names); // (first: what else is in the host keeps its order)
+  const place = (): void => {
+    if (!(document.documentElement.dataset["groupNames"] ?? "").endsWith("hover") || bar.hidden) return;
+    const k = uiScale();
+    const [home, mine] = [layerHost.getBoundingClientRect(), bar.getBoundingClientRect()];
+    names.style.top = `${Math.round((mine.top - home.top) / k)}px`;
+    names.style.height = `${Math.round(mine.height / k)}px`;
+    names.replaceChildren(...[...bar.querySelectorAll<HTMLElement>(":scope > .tb-captioned:not([hidden])")].flatMap((g) => {
+      const r = g.getBoundingClientRect();
+      const mid = r.left + r.width / 2;
+      if (mid < mine.left || mid > mine.right) return []; // (scrolled out of the bar)
+      const name = document.createElement("span");
+      name.className = "bar-name";
+      name.textContent = g.getAttribute("aria-label");
+      name.style.left = `${Math.round((mid - home.left) / k)}px`;
+      return [name];
+    }));
+  };
+  for (const ev of ["pointerenter", "focusin", "scroll"]) bar.addEventListener(ev, place);
+  return { place };
+}
 
 export const isOff = (e: HTMLElement): boolean =>
   !!e.hidden || e.hasAttribute("data-off") || (e.classList.contains("pf-row") && [...e.children].every((c) => c.classList.contains("pf-name") || isOff(c as HTMLElement))); // (a named field's wrapper, ADR 0198, is as off as its field)

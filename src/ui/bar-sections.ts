@@ -1,5 +1,6 @@
 import { isOff } from "./bar";
 import { esc } from "./format";
+import { ICONS } from "./icons";
 import { shortTitle } from "../commands/from-bars";
 
 /**
@@ -10,29 +11,32 @@ import { shortTitle } from "../commands/from-bars";
 export interface Section {
   id: string;
   label: string;
+  /** Its chip's icon (a unique one: docs/reference/icons.md). */
+  icon: string;
 }
 
 /** The sections, in the order they show. Long ones are split, so a popover stays short (Auto layout: Layout, Spacing, Columns and order). */
 export const SECTIONS: readonly Section[] = [
-  { id: "kind", label: "Kind" },
-  { id: "mask", label: "Mask" },
-  { id: "look", label: "Look" },
-  { id: "text", label: "Text" },
-  { id: "shape", label: "Shape" },
-  { id: "picture", label: "Picture" },
-  { id: "size", label: "Size" },
-  { id: "layout", label: "Layout" },
-  { id: "spacing", label: "Spacing" },
-  { id: "columns", label: "Columns and order" },
-  { id: "inlayout", label: "In layout" },
-  { id: "position", label: "On sheet" },
-  { id: "brush", label: "Brush" },
-  { id: "eraser", label: "Eraser" },
-  { id: "lasso", label: "Lasso" },
-  { id: "options", label: "Options" },
+  { id: "kind", label: "Kind", icon: ICONS.secKind },
+  { id: "mask", label: "Mask", icon: ICONS.secMask },
+  { id: "look", label: "Look", icon: ICONS.secLook },
+  { id: "text", label: "Text", icon: ICONS.secText },
+  { id: "shape", label: "Shape", icon: ICONS.secShape },
+  { id: "picture", label: "Picture", icon: ICONS.secPicture },
+  { id: "size", label: "Size", icon: ICONS.secSize },
+  { id: "layout", label: "Layout", icon: ICONS.secLayout },
+  { id: "spacing", label: "Spacing", icon: ICONS.secSpacing },
+  { id: "columns", label: "Columns and order", icon: ICONS.secColumns },
+  { id: "inlayout", label: "In layout", icon: ICONS.secInlayout },
+  { id: "position", label: "On sheet", icon: ICONS.secPosition },
+  { id: "brush", label: "Brush", icon: ICONS.secBrush },
+  { id: "eraser", label: "Eraser", icon: ICONS.secEraser },
+  { id: "lasso", label: "Lasso", icon: ICONS.secLasso },
+  { id: "options", label: "Options", icon: ICONS.secOptions },
 ];
 const ORDER = new Map(SECTIONS.map((s, i) => [s.id, i]));
 export const sectionLabel = (id: string): string => SECTIONS.find((s) => s.id === id)?.label ?? id;
+export const sectionIcon = (id: string): string => SECTIONS.find((s) => s.id === id)?.icon ?? ICONS.secOptions;
 
 /** Give the bar's controls their sections: a selector and its section; what is inside takes it too, unless it has its own. */
 export function assignSections(row: HTMLElement, map: ReadonlyArray<readonly [selector: string, section: string]>): void {
@@ -202,6 +206,7 @@ export function sectionSummary(row: HTMLElement, id: string): string {
       }
     }
   }
-  const text = words.filter(Boolean).slice(0, 2).map((w) => esc(w.length > 16 ? `${w.slice(0, 15)}…` : w)).join(" · ");
+  // (one value, short: the chips are as compact as the Actions bar's buttons; the popover shows the rest)
+  const text = words.filter(Boolean).slice(0, 1).map((w) => esc(w.length > 14 ? `${w.slice(0, 13)}…` : w)).join("");
   return swatches.slice(0, 3).join("") + (text ? `<span class="vchip-t">${text}</span>` : "");
 }

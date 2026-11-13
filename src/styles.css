@@ -1020,22 +1020,22 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 /* Where the names show (Settings > Appearance > Actions bar group names): over the buttons, only while the pointer is on the bar, or not at all. */
 :root[data-group-names^="top"] .tb-captioned > .tb-cap { order: -1; }
 :root[data-group-names="off"] .tb-captioned > .tb-cap { display: none; }
-/* On hover they float over or under the bar in a layer of their own (ui/context-bar.ts), so no bar grows or moves. (A touch screen cannot hover:
-   there the names stay in the bar.) */
-.ctx-names { position: absolute; left: 0; right: 0; display: none; pointer-events: none; }
-.ctx-name { position: absolute; top: 0; padding: var(--s-1) var(--s-4); font: var(--font-meta); line-height: 1; color: var(--hud-muted); white-space: nowrap; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-pill); transform: translate(-50%, calc(-100% - var(--near))); }
-:root[data-group-names="bottom-hover"] .ctx-name { top: 100%; transform: translate(-50%, var(--near)); }
+/* On hover they float over or under the bar in a layer of their own (`hoverNames`, ui/bar.ts), so no bar grows or moves. (A touch screen cannot
+   hover: there the names stay in the bar.) The Actions bar and the Properties chips by the selection alike. */
+.bar-names { position: absolute; left: 0; right: 0; display: none; pointer-events: none; }
+.bar-name { position: absolute; top: 0; padding: var(--s-1) var(--s-4); font: var(--font-meta); line-height: 1; color: var(--hud-muted); white-space: nowrap; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-pill); transform: translate(-50%, calc(-100% - var(--near))); }
+:root[data-group-names="bottom-hover"] .bar-name { top: 100%; transform: translate(-50%, var(--near)); }
 @media (any-hover: hover) {
-  :root[data-group-names$="hover"] .ctx-bar .tb-captioned > .tb-cap { display: none; }
-  :root[data-group-names$="hover"] .ctx-wrap:has(> .ctx-bar:is(:hover, :focus-within)) > .ctx-names { display: block; }
+  :root[data-group-names$="hover"] :is(.ctx-bar, .props-row) .tb-captioned > .tb-cap { display: none; }
+  :root[data-group-names$="hover"] :is(.ctx-wrap:has(> .ctx-bar:is(:hover, :focus-within)), .props-near:is(:hover, :focus-within), .props-chips:is(:hover, :focus-within)) > .bar-names { display: block; }
 }
 .ctx-bar button { display: inline-flex; flex: none; align-items: center; justify-content: center; color: inherit; background: transparent; border: 0; cursor: pointer; }
 .ctx-bar button[hidden] { display: none; }
 /* A button that opens a menu of tools wears a small corner mark (bottom right), so it reads as a group without changing the bar's size. */
 /* One mark for every button that opens a group of choices (a menu on the Actions bar, the kinds of a tool on the rail): `aria-haspopup` says it, the mark shows it. */
-:is(.ctx-bar, .rail) button:is([aria-haspopup="menu"], [aria-haspopup="true"]) { position: relative; }
-:is(.ctx-bar, .rail) button:is([aria-haspopup="menu"], [aria-haspopup="true"])::after { content: ""; position: absolute; right: var(--s-2); bottom: var(--s-2); width: var(--sp-3); height: var(--sp-3); background: currentColor; clip-path: polygon(100% 0, 100% 100%, 0 100%); opacity: var(--mark-opacity); pointer-events: none; }
-:is(.ctx-bar, .rail) button:is([aria-haspopup="menu"], [aria-haspopup="true"])[aria-expanded="true"]::after { opacity: 1; }
+:is(.ctx-bar, .rail, .text-format) button:is([aria-haspopup="menu"], [aria-haspopup="true"]) { position: relative; }
+:is(.ctx-bar, .rail, .text-format) button:is([aria-haspopup="menu"], [aria-haspopup="true"])::after { content: ""; position: absolute; right: var(--s-2); bottom: var(--s-2); width: var(--sp-3); height: var(--sp-3); background: currentColor; clip-path: polygon(100% 0, 100% 100%, 0 100%); opacity: var(--mark-opacity); pointer-events: none; }
+:is(.ctx-bar, .rail, .text-format) button:is([aria-haspopup="menu"], [aria-haspopup="true"])[aria-expanded="true"]::after { opacity: 1; }
 .ctx-bar button[data-ctx="delete"]:hover { color: var(--canvas-danger); }
 .ctx-bar button:hover:not(:disabled) { background: var(--hud-hover); }
 .ctx-bar button:disabled { opacity: 0.35; cursor: default; }
@@ -3302,18 +3302,22 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .np-label { color: var(--hud-muted); font: var(--font-meta); }
 
 /* ---- The Properties bar near the selection (ADR 0198: ui/value-chips.ts, ui/properties-layout.ts, ui/bar-sections.ts) ---- */
-/* A chip: the name of a group of options and what it is set to; it opens them. */
-.vchip { display: inline-flex; flex: none; align-items: center; gap: var(--s-4); height: var(--ctl); padding: 0 var(--s-6); color: inherit; font: var(--font-control); white-space: nowrap; background: transparent; border: 1px solid transparent; border-radius: var(--ctl-r, var(--r-md)); cursor: pointer; }
+/* The chips' row: named groups as the Actions bar's (`captionedGroup`), a line between groups, one chip in each. */
+.props-row { display: flex; align-items: center; gap: var(--gap); }
+.props-row .tb-group { flex: none; }
+/* A chip: the section's icon and what it is set to; it opens its options. As compact as an Actions bar button. */
+.vchip { display: inline-flex; flex: none; align-items: center; gap: var(--s-2); height: var(--ctl); padding: 0 var(--s-4); color: inherit; font: var(--font-control); white-space: nowrap; background: transparent; border: 1px solid transparent; border-radius: var(--ctl-r, var(--r-md)); cursor: pointer; }
+.vchip-ic { display: inline-flex; }
+.vchip .vchip-ic svg { width: var(--icon-md); height: var(--icon-md); }
 .vchip:hover { background: var(--hud-hover); }
 .vchip[aria-expanded="true"] { border-color: var(--hud-accent); background: var(--hud-hover); }
-.vchip-k { font-weight: var(--weight-medium); }
 .vchip-v { display: inline-flex; align-items: center; gap: var(--s-2); color: var(--hud-muted); font: var(--font-meta); }
 /* A colour in a chip: a fill a dot, an outline a ring of its colour, both the size of a swatch in the bar. */
 .vchip-sw { flex: none; width: var(--icon-sm); height: var(--icon-sm); background: var(--sw); border: 1px solid var(--hud-border); border-radius: var(--r-dot); }
 .vchip-sw.is-ring:not(.is-none) { border: 0; mask: radial-gradient(closest-side, transparent 52%, currentColor 56%); }
 .vchip-sw.is-none { background: linear-gradient(135deg, transparent 45%, var(--hud-danger) 45% 55%, transparent 55%); }
 .vchip-arrow { display: inline-flex; color: var(--hud-muted); }
-.vchip-arrow svg { width: var(--icon-sm); height: var(--icon-sm); }
+.vchip .vchip-arrow svg { width: var(--icon-sm); height: var(--icon-sm); }
 .vchip svg { flex: none; }
 /* Its popover is as wide as what it holds (never a fixed width with empty room), up to a limit where long names wrap. */
 .vchip-pop { width: max-content; max-width: min(calc(100vw - var(--sp-8)), calc(10 * var(--ctl))); }
@@ -3345,7 +3349,9 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .pf-name { display: none; }
 .toolbar .tb-options-row .pf-row { display: contents; } /* (in the bar a named field's wrapper changes nothing) */
 /* (one look for every name in the form: a label's own words, a button's or a swatch's name, an added name) */
-.toolbar.is-form .tb-options-row :is(label, .pf-name, .swatch-name) { color: var(--hud-fg); font: var(--font-control); font-weight: var(--weight-regular); }
+.toolbar.is-form .tb-options-row :is(label, .pf-name, .swatch-name) { font: var(--font-control); font-weight: var(--weight-regular); }
+.toolbar.is-form .tb-options-row label { color: var(--hud-fg); }
+.toolbar.is-form .tb-options-row :is(.pf-name, .swatch-name) { color: inherit; } /* (a button's name takes the button's colour: on a pressed one, the accent's own) */
 .toolbar.is-form .tb-options-row .pf-name { display: inline; flex: 1 1 auto; width: auto; height: auto; min-width: 0; padding: 0; text-align: start; background: none; border: 0; border-radius: 0; box-shadow: none; } /* (not a swatch's dot, though it sits in one) */
 .toolbar.is-form .tb-options-row .pf-row:not([hidden], [data-sec-off], [data-off]) { display: flex; }
 .toolbar.is-form .tb-options-row .pf-row:has(> :is(input, select):is([hidden], [data-off])) { display: none; }

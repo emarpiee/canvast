@@ -290,6 +290,7 @@ export class EditorState {
   }
 
   setTool(t: Tool): void {
+    if (t !== this.tool) this.made.clear(); // (another tool: what the last one made is no longer being worked on)
     this.tool = t;
     this.eraser = null;
     this.heldTool = null;

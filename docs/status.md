@@ -47,6 +47,12 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.10: chips and the text format bar made as the Actions bar (2026-11-13)
+
+- **Implemented:** chips as captioned groups with section icons (17 new unique icons), `hoverNames` in `ui/bar.ts` shared by the Actions bar and the chips; text format bar in groups with menus (`FORMAT_GROUPS`, `openMoreMenu`); contrast fix of names on pressed buttons and `lowContrast` moved into the harness and run by `floatingProblems`; colour picker placement scored against the interface; `made` ends with another shape kind or tool. Test fixes: `editing.spec` 1650 (dismiss the notice), `vectors.spec` 1429 (deselect between colours), `text.spec` (menus).
+- **Tested:** typecheck and build here; scratch runs: the audit with contrast on every chip of every kind, Chromium and Firefox, no problems; headings and bigger words through the format bar's menus in both browsers.
+- **Committed:** v0.58.10 on `main`.
+
 ## v0.58.9: near the selection cleaned up; one rule for the tools that make things (2026-11-13)
 
 - **Implemented:** ADR 0198 revised: `ui.properties` bar or near only (panel, top chips and Actions chips removed with their settings and icons); the popover as a form (`nameControls`, `is-form`); Auto layout split into three sections; Colours chip; `placeMenu` keeps clear of a menu's own bar; colour picker whole; `followChip`; `editor.selectMade` / `editsSelection` / `editsMade` for every tool that makes things, handles and double-click on what was just made; CLAUDE.md rules; `floatingProblems` audit in the harness.

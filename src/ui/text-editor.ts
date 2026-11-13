@@ -22,6 +22,8 @@ import { NEW_TEXT_PX, fitWidth, lookOf, withLook } from "../text/text-style";
 import type { TextLook } from "../text/text-style";
 import { BUNDLED_FONT_NAME, FALLBACK_FAMILY, faceStyleOf, familyFor, hashOfFamily } from "../text/fonts";
 import { ICONS } from "./icons";
+import { openMoreMenu } from "./more-menu";
+import type { MenuItem } from "./more-menu";
 import { esc } from "./format";
 import { openColourPopover } from "./colour-popover";
 import { promptDialog } from "./confirm";
@@ -55,24 +57,31 @@ export async function copyText(s: string): Promise<void> {
   await copyPlainText(s);
 }
 
-const FORMATS: Array<{ cmd: string; icon: string; label: string }> = [
-  { cmd: "bold", icon: ICONS.bold, label: "Bold (Ctrl+B)" },
-  { cmd: "italic", icon: ICONS.italic, label: "Italic (Ctrl+I)" },
-  { cmd: "underline", icon: ICONS.underline, label: "Underline (Ctrl+U)" },
-  { cmd: "strike", icon: ICONS.strikethrough, label: "Strikethrough (Ctrl+Shift+X)" },
-  { cmd: "link", icon: ICONS.textLink, label: "Link of the selected words" },
-  { cmd: "colour", icon: ICONS.textColour, label: "Colour of the selected words" },
-  { cmd: "bigger", icon: ICONS.textBigger, label: "Make the selected words bigger" },
-  { cmd: "smaller", icon: ICONS.textSmaller, label: "Make the selected words smaller" },
-  { cmd: "h1", icon: ICONS.heading1, label: "Heading 1" },
-  { cmd: "h2", icon: ICONS.heading2, label: "Heading 2" },
-  { cmd: "h3", icon: ICONS.heading3, label: "Heading 3" },
-  { cmd: "p", icon: ICONS.pilcrow, label: "Body text" },
-  { cmd: "ul", icon: ICONS.list, label: "Bulleted list" },
-  { cmd: "ol", icon: ICONS.listOrdered, label: "Numbered list" },
-  { cmd: "copy", icon: ICONS.markdown, label: "Copy Markdown" },
-  { cmd: "done", icon: ICONS.check, label: "Done (Esc)" },
+/** A command of the text format bar: a button of its own, or a row of one of its menus (the label is also its name to tests and screen readers). */
+interface FormatCmd { cmd: string; icon: string; label: string; hint: string }
+const F = (cmd: string, icon: string, label: string, hint: string): FormatCmd => ({ cmd, icon, label, hint });
+/**
+ * The text format bar (ADR 0198), made as the Actions bar is: groups of buttons with a line between them, no names; what is used less sits in
+ * a menu of its group (the shared one, `openMoreMenu`), as the Actions bar's Align or Shapes. A group is its buttons, then its menus.
+ */
+const FORMAT_GROUPS: Array<{ name: string; buttons: FormatCmd[]; menus: Array<{ id: string; icon: string; label: string; items: FormatCmd[] }> }> = [
+  { name: "Style", buttons: [F("bold", ICONS.bold, "Bold (Ctrl+B)", ""), F("italic", ICONS.italic, "Italic (Ctrl+I)", ""), F("underline", ICONS.underline, "Underline (Ctrl+U)", ""), F("strike", ICONS.strikethrough, "Strikethrough (Ctrl+Shift+X)", "")], menus: [] },
+  {
+    name: "Words",
+    buttons: [F("link", ICONS.textLink, "Link of the selected words", ""), F("colour", ICONS.textColour, "Colour of the selected words", "")],
+    menus: [{ id: "size", icon: ICONS.textSizeMenu, label: "Size of the selected words", items: [F("bigger", ICONS.textBigger, "Make the selected words bigger", "A quarter bigger"), F("smaller", ICONS.textSmaller, "Make the selected words smaller", "A fifth smaller")] }],
+  },
+  {
+    name: "Paragraph",
+    buttons: [],
+    menus: [
+      { id: "block", icon: ICONS.paragraphMenu, label: "Paragraph: heading or body text", items: [F("h1", ICONS.heading1, "Heading 1", "The biggest title"), F("h2", ICONS.heading2, "Heading 2", "A section's title"), F("h3", ICONS.heading3, "Heading 3", "A small title"), F("p", ICONS.pilcrow, "Body text", "Plain paragraph")] },
+      { id: "list", icon: ICONS.listMenu, label: "List: bulleted or numbered", items: [F("ul", ICONS.list, "Bulleted list", "A dot before each line"), F("ol", ICONS.listOrdered, "Numbered list", "1, 2, 3 before the lines")] },
+    ],
+  },
+  { name: "Finish", buttons: [F("copy", ICONS.markdown, "Copy Markdown", ""), F("done", ICONS.check, "Done (Esc)", "")], menus: [] },
 ];
+const FORMAT_MENUS = new Map(FORMAT_GROUPS.flatMap((g) => g.menus.map((m) => [m.id, m] as const)));
 
 export interface TextEditor {
   /** Edit `target`, or a new text: at the point `at` (the middle of its first line), as wide as its words, or (`widthPx`, dragged out) as wide as that, from its top-left corner. */
@@ -108,12 +117,14 @@ export function mountTextEditor(
   bar.setAttribute("role", "toolbar");
   bar.setAttribute("aria-label", "Text format");
   bar.hidden = true;
-  bar.innerHTML = FORMATS.map((f) => `<button type="button" data-cmd="${f.cmd}" aria-label="${f.label}" title="${f.label}">${f.icon}</button>`).join("");
+  const button = (f: { cmd?: string; menu?: string; icon: string; label: string }): string =>
+    `<button type="button" ${f.menu ? `data-format-menu="${f.menu}" aria-haspopup="menu" aria-expanded="false"` : `data-cmd="${f.cmd}"`} aria-label="${f.label}" title="${f.label}">${f.icon}</button>`;
+  bar.innerHTML = FORMAT_GROUPS.map((g) => `<div class="tb-group" role="group" aria-label="${g.name}">${[...g.buttons.map(button), ...g.menus.map((m) => button({ menu: m.id, icon: m.icon, label: m.label }))].join("")}</div>`).join("");
   const fontSelect = document.createElement("select");
   fontSelect.dataset["fontOfWords"] = "";
   fontSelect.setAttribute("aria-label", "Font of the selected words");
   fontSelect.title = "Font of the selected words";
-  bar.append(fontSelect);
+  bar.querySelector('[aria-label="Words"]')!.append(fontSelect);
   host.append(box, bar);
 
   let target: TextObject | null = null;
@@ -424,8 +435,18 @@ export function mountTextEditor(
     if (!(e.target as HTMLElement).closest("select")) e.preventDefault(); // keep the text selection
   });
   bar.addEventListener("click", (e) => {
+    const menuBtn = (e.target as HTMLElement).closest<HTMLElement>("[data-format-menu]");
+    const menu = menuBtn && FORMAT_MENUS.get(menuBtn.dataset["formatMenu"]!);
+    if (menuBtn && menu) {
+      // (a choice of the menu runs on the words still selected in the text: the text takes the focus back first)
+      openMoreMenu(menuBtn, menu.items.map((f): MenuItem => ({ id: f.cmd, label: f.label, hint: f.hint, icon: f.icon, run: () => run(f.cmd, menuBtn) })), menu.label);
+      return;
+    }
     const cmd = (e.target as HTMLElement).closest<HTMLElement>("[data-cmd]")?.dataset["cmd"];
-    if (!cmd) return;
+    if (cmd) run(cmd, e.target as HTMLElement);
+  });
+  const run = (cmd: string, from: HTMLElement): void => {
+    box.focus({ preventScroll: true });
     if (cmd === "done") commit();
     else if (cmd === "copy") {
       void copyText(serialize(domToBlocks(box))).then(() => {
@@ -437,10 +458,10 @@ export function mountTextEditor(
     else if (cmd === "bold" || cmd === "italic" || cmd === "underline") document.execCommand(cmd);
     else if (cmd === "strike") document.execCommand("strikeThrough");
     else if (cmd === "bigger" || cmd === "smaller") resizeSelection(cmd === "bigger" ? 1.25 : 0.8);
-    else if (cmd === "colour") pickSelectionColour(e.target as HTMLElement);
+    else if (cmd === "colour") pickSelectionColour(from);
     else if (cmd === "link") linkSelection();
     else document.execCommand("formatBlock", false, `<${cmd === "p" ? "div" : cmd}>`);
-  });
+  };
   box.addEventListener("keydown", (e) => {
     // A key that belongs to an input method (choosing or cancelling a candidate) is the method's, not a command of the editor.
     if (e.isComposing || e.keyCode === 229) return;
@@ -478,7 +499,7 @@ export function mountTextEditor(
     document.execCommand("insertText", false, e.clipboardData?.getData("text/plain") ?? "");
   });
   // The options bar and its pop-ups (size, font, colour...) change the text while it is open: using them does not end the edit.
-  const OPTIONS = ".toolbar, .colour-pop, dialog.confirm";
+  const OPTIONS = ".toolbar, .colour-pop, .pop-menu, dialog.confirm";
   const inside = (n: EventTarget | null): boolean => n instanceof Element && (box.contains(n) || bar.contains(n) || n.closest(OPTIONS) !== null);
   box.addEventListener("focusout", (e) => {
     if (inside(e.relatedTarget)) return;

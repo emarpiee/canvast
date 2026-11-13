@@ -1,5 +1,6 @@
-import { createBar, syncScroll } from "./bar";
-import { nameControls, sectionLabel, sectionSummary, showSections, shownSections, sectionOfControl } from "./bar-sections";
+import { createBar, hoverNames, syncScroll } from "./bar";
+import { ICONS } from "./icons";
+import { nameControls, sectionIcon, sectionLabel, sectionSummary, showSections, shownSections, sectionOfControl } from "./bar-sections";
 import { closeChipPopover, followChip, openChipPopover, placeChipPopover, syncChips } from "./value-chips";
 import type { ChipSpec } from "./value-chips";
 import { inRoom, placeBy, selectionBoxIn } from "./near-selection";
@@ -35,6 +36,12 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
   near.className = "props-near";
   near.hidden = true;
   canvasHost.append(near);
+  // (the chips by the selection in a row of their own: the names shown on hover float in a layer beside it, as the Actions bar's: ADR 0197)
+  const nearRow = document.createElement("div");
+  nearRow.className = "props-row";
+  near.append(nearRow);
+  top.row.classList.add("props-row");
+  const names = [hoverNames(nearRow, near), hoverNames(top.row, top.el)];
   // (every control gets a name of its own, seen when the bar is laid out as a form in a popover)
   nameControls(row);
 
@@ -65,7 +72,7 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
   };
 
   const coloursValue = (): string => [...colours.querySelectorAll<HTMLElement>("[data-sel-colour]")].slice(0, 3).map((b) => `<span class="vchip-sw${b.hasAttribute("data-ring") ? " is-ring" : ""}" style="--sw:${b.querySelector<HTMLElement>("[data-paint-chip]")?.style.getPropertyValue("--paint") ?? ""}"></span>`).join("");
-  const chipsOf = (ids: readonly string[]): ChipSpec[] => ids.map((id) => (id === COLOURS ? { id, label: "Colours", value: coloursValue(), title: "Colours: every colour of the selection, each to change everywhere" } : { id, label: sectionLabel(id), value: sectionSummary(row, id), title: `${sectionLabel(id)}: open its options` }));
+  const chipsOf = (ids: readonly string[]): ChipSpec[] => ids.map((id) => (id === COLOURS ? { id, label: "Colours", icon: ICONS.secColours, value: coloursValue(), title: "Colours: every colour of the selection, each to change everywhere" } : { id, label: sectionLabel(id), icon: sectionIcon(id), value: sectionSummary(row, id), title: `${sectionLabel(id)}: open its options` }));
 
   /** Lay everything out for the current place, after every update of the bar and every frame. */
   const settle = (): void => {
@@ -87,10 +94,11 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
     if (popped !== null && !ids.includes(popped)) closePop();
     const box = selectionBoxIn(canvasHost, editor);
     const beside = editor.selection.size > 0 && !!box && inRoom(box) && ids.length > 0;
-    const host = beside ? near : top.row;
+    const host = beside ? nearRow : top.row;
     // (the same chips in the same place keep their elements: an open popover stays under its chip)
     syncChips(host, chipsOf(ids));
-    syncChips(beside ? top.row : near, []);
+    syncChips(beside ? top.row : nearRow, []);
+    for (const n of names) n.place();
     top.el.hidden = beside || ids.length === 0;
     near.hidden = !beside;
     syncScroll(top.row);
@@ -111,7 +119,7 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
     const chip = (e.target as HTMLElement).closest<HTMLElement>("[data-vchip]");
     if (chip) popSection(chip, chip.dataset["vchip"]!);
   };
-  for (const el of [top.row, near]) el.addEventListener("click", onChip);
+  for (const el of [top.row, nearRow]) el.addEventListener("click", onChip);
   // (a press on the chips is not a press on the canvas under them)
   near.addEventListener("pointerdown", (e) => e.stopPropagation());
 

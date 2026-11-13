@@ -32,7 +32,8 @@ test("a shape drawn with the Shape tool: its chips stand above it and edit it, t
   await app.drag({ x: 500, y: 380 }, { x: 700, y: 520 }, 6);
   await expect(p.getByRole("radio", { name: "Shape and path" })).toHaveAttribute("aria-checked", "true");
   const near = p.locator(".props-near");
-  await expect(near.locator("[data-vchip]")).toHaveText([/^Look/, /^Shape/, /^Size/]);
+  // (named groups as the Actions bar's: the section's name, and on its chip the section's icon and value)
+  await expect(near.locator(".tb-cap")).toHaveText(["Look", "Shape", "Size"]);
   expect((await near.boundingBox())!.y + (await near.boundingBox())!.height, "the chips above the shape").toBeLessThanOrEqual(380);
   // the Shape chip: its corner radius is the drawn shape's
   const chip = near.locator('[data-vchip="shape"]');
@@ -103,7 +104,7 @@ test("with nothing selected a tool's chips are at the top; the palette opens a c
   await set(app, "ui.properties", "near");
   await p.keyboard.press("p");
   const top = p.locator(".props-chips");
-  await expect(top.locator("[data-vchip]")).toHaveText([/^Look/, /^Brush/]);
+  await expect(top.locator(".tb-cap")).toHaveText(["Look", "Brush"]);
   expect(await auditChips(app, ".props-chips")).toEqual([]);
   await p.keyboard.press("Control+k");
   await p.keyboard.type("Stabilizer");

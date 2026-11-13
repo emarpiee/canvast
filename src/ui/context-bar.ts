@@ -7,7 +7,7 @@ import { ICONS } from "./icons";
 import { GAP_LABEL, GAP_ORDER } from "../doc/arrange";
 import type { GapKey } from "../doc/arrange";
 import { LAYOUT_MENU } from "./toolbar";
-import { captionedGroup, syncGroups, syncScroll } from "./bar";
+import { captionedGroup, hoverNames, syncGroups, syncScroll } from "./bar";
 import { placeBy, selectionBoxIn, uiScale } from "./near-selection";
 import { isContainer } from "../doc/containers";
 import { closeMoreMenu, MENU_GAP, openMoreMenu } from "./more-menu";
@@ -219,28 +219,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   host.appendChild(wrap);
   // With a hover choice (Settings > Appearance > Actions bar group names) the names float over or under the bar while the pointer is on it: a
   // layer of their own in the wrapper, so neither the bar nor the options bar beside it changes size or moves (ADR 0197).
-  const names = document.createElement("div");
-  names.className = "ctx-names";
-  names.setAttribute("aria-hidden", "true");
-  wrap.prepend(names); // (first: the Actions bar and the selection options bar beside it stay next to each other)
-  const placeNames = (): void => {
-    if (!(document.documentElement.dataset["groupNames"] ?? "").endsWith("hover") || bar.hidden) return;
-    const k = uiScale();
-    const [home, mine] = [wrap.getBoundingClientRect(), bar.getBoundingClientRect()];
-    names.style.top = `${Math.round((mine.top - home.top) / k)}px`;
-    names.style.height = `${Math.round(mine.height / k)}px`;
-    names.replaceChildren(...[...bar.querySelectorAll<HTMLElement>(":scope > .tb-captioned:not([hidden])")].flatMap((g) => {
-      const r = g.getBoundingClientRect();
-      const mid = r.left + r.width / 2;
-      if (mid < mine.left || mid > mine.right) return []; // (scrolled out of the bar)
-      const name = document.createElement("span");
-      name.className = "ctx-name";
-      name.textContent = g.getAttribute("aria-label");
-      name.style.left = `${Math.round((mid - home.left) / k)}px`;
-      return [name];
-    }));
-  };
-  for (const ev of ["pointerenter", "focusin", "scroll"]) bar.addEventListener(ev, placeNames);
+  const placeNames = hoverNames(bar, wrap).place;
   // Tools that are for some kinds of thing only (the others are for any): with a mixed pick, a chip at the start shows the tools of one kind (ADR 0152).
   const FOR_KINDS: Record<string, string> = { library: "image", open: "image", copyadj: "image,path,stroke,text", pasteadj: "image,path,stroke,text", copypng: "image", bake: "image", vectorise: "image", exportmenu: "image,path,stroke,text", pathmenu: "path,stroke,text", boolmenu: "path", statemenu: "path" };
   for (const [act, kinds] of Object.entries(FOR_KINDS)) bar.querySelector<HTMLElement>(`[data-ctx="${act}"]`)?.setAttribute("data-for", kinds);
