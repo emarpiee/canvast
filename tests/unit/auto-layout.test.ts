@@ -149,7 +149,8 @@ describe("a sort rule and live reflow (ADR 0193)", () => {
   it("while one is dragged, the others make room as a drop there would, and the dragged one is left to the pointer; dragged off, its place closes", () => {
     const s = sheet(0, 0, 60, 20, 0, { flow: "row", gap: [10, 0] });
     const a = rect(0, 0, 20, 10, 2, { parent: s.id }), b = rect(30, 0, 20, 10, 1, { parent: s.id });
-    const shown = previewLayout(src(s, a, b), new Map([[b.id, { ...b, anchor: at(-15, 0) } as CanvasObject]]));
+    // (b's middle dragged to x 5, on the sheet, before a's middle at 10)
+    const shown = previewLayout(src(s, a, b), new Map([[b.id, { ...b, anchor: at(-5, 0) } as CanvasObject]]));
     expect(shown.find((o) => o.id === b.id)).toBeUndefined();
     near(box(of(shown, a)), [30, 0, 50, 10]);
     const off = previewLayout(src(s, a, b), new Map([[a.id, { ...a, anchor: at(500, 500) } as CanvasObject]]));

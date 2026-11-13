@@ -114,7 +114,11 @@ test("layout-tracks", async ({ scene: s }) => {
   await s.select([first]);
   await s.p.locator('[data-in-span="0"]').fill("3");
   await s.p.locator('[data-in-span="0"]').press("Enter");
-  await s.p.locator("[data-in-fill]").selectOption("x"); // (as wide as the three columns it spans)
+  // (made larger in its own shape: the columns it spans widen round it)
+  const w0 = Number(await s.p.locator("[data-on-w]").inputValue()), h0 = Number(await s.p.locator("[data-on-h]").inputValue());
+  await s.p.locator("[data-on-w]").fill(String(Math.round(w0 * 260) / 100));
+  await s.p.locator("[data-on-h]").fill(String(Math.round(h0 * 260) / 100));
+  await s.p.locator("[data-on-h]").press("Enter");
   await s.fit([sheet], 0.5, [0.62, 0.55]);
   await s.select([sheet]);
   await s.p.locator("[data-layout-tracks]").click();
