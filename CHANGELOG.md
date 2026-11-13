@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.8 — The Properties panel stays closed with nothing selected (2026-11-13)
+
+- **Fixed:** set to open by itself, the Properties panel also opened with nothing selected (for the Select tool's own options); it now opens for a selection, a text being typed in, or a tool with options.
+
 ## 0.58.7 — Chips by the selection follow it; tidier fields in the Properties panel (2026-11-13)
 
 - **Fixed:** with **Near the selection**, the chips stayed at the top when something was selected without a click (from Layers, a search, the palette): they now follow the selection after every frame, as the Actions bar does.

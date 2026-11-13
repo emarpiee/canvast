@@ -115,9 +115,11 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
   };
 
   const chipsOf = (ids: readonly string[]): ChipSpec[] => ids.map((id) => ({ id, label: sectionLabel(id), value: sectionSummary(row, id), title: `${sectionLabel(id)}: open its options` }));
+  /** The panel shows itself for a selection, a text being typed in, or a tool with options; not for the Select tool's own options with nothing selected. */
   const panelShown = (): boolean => {
     const pin = opts.pin();
-    return pin === "open" || (pin === "auto" && !bar.hidden);
+    const idle = (editor.tool === "select" || editor.tool === "node") && editor.selection.size === 0 && !editor.editingText;
+    return pin === "open" || (pin === "auto" && !bar.hidden && !idle);
   };
 
   /** Lay everything out for the current place, after every update of the bar. */

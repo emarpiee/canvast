@@ -47,6 +47,12 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.8: the Properties panel stays closed with nothing selected (2026-11-13)
+
+- **Implemented:** `panelShown` in `ui/properties-layout.ts` leaves out the Select and Edit nodes tools with nothing selected.
+- **Tested:** build and typecheck here; scratch run (closed empty, open with a shape, closed again, open for the Pen); `bar-layouts.spec.ts:46` had failed on GitHub in the three Chromium projects for this.
+- **Committed:** v0.58.8 on `main`.
+
 ## v0.58.7: near chips follow the selection every frame; panel fields in pairs (2026-11-13)
 
 - **Implemented:** `follow()` of `ui/properties-layout.ts` runs after every frame (as `contextUpdate`) in the near way; labels with no text are `data-bare` and stay on their name's line; the flow buttons wrap.
