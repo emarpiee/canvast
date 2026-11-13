@@ -371,7 +371,7 @@ export function layOutSheet(sheet: LaidOutSheet, all: readonly CanvasObject[], s
   if (!(W > 0 && H > 0 && Number.isFinite(W + H))) return [];
   // (a sort rule orders the items whatever their stacking: a dropped one takes its place by the rule)
   const units = l.sort ? sortedUnits(unitsOf(sheet, all, space), l.sort) : orderWithDropped(unitsOf(sheet, all, space), l.flow, moved);
-  const { cells, w, h } = placeItems(l, W, H, units.map((un) => ({ w: un.x1 - un.x0, h: un.y1 - un.y0, ...(un.fill ? { fill: un.fill } : {}), ...(un.span ? { span: un.span } : {}), ...(un.min ? { min: un.min } : {}), ...(un.max ? { max: un.max } : {}) })));
+  const { cells, w, h } = placeItems(l, W, H, units.map(itemOf));
   const out = new Map<ObjectId, CanvasObject>();
   const near = (a: number, b: number): boolean => Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
   units.forEach((un, i) => {
@@ -418,6 +418,25 @@ export function layOutSheet(sheet: LaidOutSheet, all: readonly CanvasObject[], s
   }
   return [...out.values()];
 }
+
+const itemOf = (un: Unit): ItemSize => ({ w: un.x1 - un.x0, h: un.y1 - un.y0, ...(un.fill ? { fill: un.fill } : {}), ...(un.span ? { span: un.span } : {}), ...(un.min ? { min: un.min } : {}), ...(un.max ? { max: un.max } : {}) });
+
+/**
+ * Whether what is laid out on a sheet of a set size runs past its edge, across and down (ADR 0196): the sheet cuts it off, so the bar says so
+ * and offers to fit. An axis the sheet fits to its contents never overflows.
+ */
+export function layoutOverflow(sheet: LaidOutSheet, all: readonly CanvasObject[], space: FrameSpace): [boolean, boolean] {
+  const l = sheet.container.layout;
+  const { W, H } = frameOf(sheet, space);
+  if (!(W > 0 && H > 0 && Number.isFinite(W + H)) || (l.hug[0] && l.hug[1])) return [false, false];
+  const units = l.sort ? sortedUnits(unitsOf(sheet, all, space), l.sort) : orderWithDropped(unitsOf(sheet, all, space), l.flow, new Set());
+  const { cells } = placeItems(l, W, H, units.map(itemOf));
+  const eps = 1e-6 * Math.max(W, H);
+  return [!l.hug[0] && cells.some((c) => c.x < -eps || c.x + c.w > W + eps), !l.hug[1] && cells.some((c) => c.y < -eps || c.y + c.h > H + eps)];
+}
+
+/** The axis a sheet's size is set on when it is resized by hand (ADR 0196): the width, or the height of a column; the other keeps fitting. */
+export const setAxisOf = (flow: SheetLayout["flow"]): 0 | 1 => (flow === "column" ? 1 : 0);
 
 /** A laid-out sheet's items, in their order, with their boxes as placed now and the sheet's size (its units): for the handles on the canvas and a new row height. */
 export function layoutNow(sheet: LaidOutSheet, all: readonly CanvasObject[], space: FrameSpace): { items: Cell[]; W: number; H: number } {
@@ -558,16 +577,17 @@ export function withAutoLayout(src: DerivationSource, next: readonly CanvasObjec
     mark(o.parent, dropped ? unitKeyOf(o) : undefined);
   }
   for (const id of removed) mark(src.get(id)?.parent);
-  // a sheet resized by hand (its size in this change differs from before) keeps the size given: it no longer hugs on that axis
+  // a sheet resized by hand (its size in this change differs from before) keeps the width given (a column: the height); the other axis
+  // keeps fitting its contents, so a resize never leaves what is on it cut off (ADR 0196)
   for (const o of next) {
     const was = src.get(o.id);
-    if (!isLaidOut(o) || !isLaidOut(was) || !(o.container.layout.hug[0] || o.container.layout.hug[1])) continue;
+    if (!isLaidOut(o) || !isLaidOut(was)) continue;
+    const l = o.container.layout, axis = setAxisOf(l.flow);
+    if (!l.hug[axis]) continue;
     const a = worldBounds(o), b = worldBounds(expressObjectIn(was, o.frame ?? src.space.world));
     const same = (p: D.Dyadic, q: D.Dyadic, p2: D.Dyadic, q2: D.Dyadic): boolean => D.equals(D.sub(p, q), D.sub(p2, q2));
-    const wSame = same(a.max.x, a.min.x, b.max.x, b.min.x), hSame = same(a.max.y, a.min.y, b.max.y, b.min.y);
-    if (wSame && hSame) continue;
-    const l = o.container.layout;
-    out.set(o.id, { ...o, container: { ...o.container, layout: { ...l, hug: [l.hug[0] && wSame, l.hug[1] && hSame] } } } as CanvasObject);
+    if (axis === 0 ? same(a.max.x, a.min.x, b.max.x, b.min.x) : same(a.max.y, a.min.y, b.max.y, b.min.y)) continue;
+    out.set(o.id, { ...o, container: { ...o.container, layout: { ...l, hug: axis === 0 ? [false, l.hug[1]] : [l.hug[0], false] } } } as CanvasObject);
   }
   const depthOf = (id: ObjectId): number => { const o = now(id); return o ? ancestorsOf(now, o).length : 0; };
   const done = new Set<ObjectId>();

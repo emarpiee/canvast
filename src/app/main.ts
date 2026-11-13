@@ -128,7 +128,7 @@ import { mountTagsPanel } from "../ui/tags-panel";
 import { mountStylesPanel } from "../ui/styles-panel";
 import { modelViewInFront } from "../ui/model-front";
 import { layoutHandles } from "../interaction/layout-handles";
-import { columnsOf, layoutNow } from "../doc/auto-layout";
+import { columnsOf, layoutNow, layoutOverflow } from "../doc/auto-layout";
 import type { ModelLook } from "../assets/model-look";
 import { linkedUpdates } from "./style-sync";
 import { PanelDock } from "../ui/panel-dock";
@@ -1678,7 +1678,7 @@ async function start(): Promise<void> {
       const got = autoLayoutOf(doc, editor);
       if (!got) return null;
       const now = layoutNow(got.sheet, doc.ordered(), doc.space);
-      return { layout: got.layout, ppu: textPpu(got.sheet.id), items: now.items.length, columns: columnsOf(got.layout, now.items, now.W, now.H) };
+      return { layout: got.layout, ppu: textPpu(got.sheet.id), items: now.items.length, columns: columnsOf(got.layout, now.items, now.W, now.H), overflow: layoutOverflow(got.sheet, doc.ordered(), doc.space) };
     },
     setAutoLayout: (patch, final) => {
       // (a date order: the pictures on the sheet placed before they kept their library date get it now, in the same step)

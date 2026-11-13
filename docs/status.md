@@ -47,6 +47,15 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.57.21: a sheet's size in plain words (2026-11-13)
+
+- **Implemented:** ADR 0196: the Size choice (`data-layout-size`) replaces the Hug toggles; a hand resize sets only the flow's axis (`setAxisOf`, `withAutoLayout`); `layoutOverflow` and the bar's Doesn't fit: Fit; Pack start hidden when it has no room; the bar's labels obey `hidden` (`.tb-count label:not([hidden])`).
+- **Tested:** typecheck and build here; the owner's case (masonry on a short sheet), the Size choice, the overflow button and which fields show per flow checked in a scratch run. Unit tests extended (resize rule, overflow); Tests on GitHub.
+- **Known failures:** none known yet.
+- **Unverified:** Firefox.
+- **Committed:** v0.57.21 on `main`.
+- **Next bounded task:** a full audit of auto layout (owner asked), then the 0.58.0 release.
+
 ## v0.57.20: the border of a zoom-out drawn exactly (2026-11-13)
 
 - **Implemented:** `TileCache`: a set drawn scaled is clipped to the view it was made for (`viewOf`), and `extent` stops there too, so the border drawn exactly while zooming out starts at that edge. Before, a whole tile row past the view (800 px is not whole tiles) was shown scaled in the bottom strip, blurred: `tiles.spec` "dense scenes … refine" counted 0.96% of the border unlike the exact picture before the recolour and 1.009% after (limit 1%, not loosened); now 0.001%. `vectors.spec` adjustment shape waits for the stored exposure and the drawn change (Firefox read the pixel a frame early).

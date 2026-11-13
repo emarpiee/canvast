@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.57.21 — A sheet's size in plain words, and nothing cut off by a resize (2026-11-13)
+
+- **Changed:** auto layout's two Hug toggles are one **Size** choice: Fits contents, Set width, Set height or Set size.
+- **Changed:** resizing a laid-out sheet by hand sets its width (a column: its height) and the other side keeps fitting what is on it, so pictures are no longer cut off at its edge.
+- **Added:** **Doesn't fit: Fit** in the bar when something runs past the edge of a sheet whose size is set.
+- **Changed:** Pack start is hidden when it cannot do anything (a masonry, or a sheet that fits its contents along the flow), instead of greyed out.
+- **Fixed:** the bar showed Columns and Row together whatever the layout; each shows only for the layout it belongs to.
+
 ## 0.57.20 — The border of a zoom-out drawn exactly (2026-11-13)
 
 - **Fixed:** zooming out on a busy canvas, a strip along the bottom of the view showed a blurred, scaled-down picture for a moment where the exact one should be drawn (the last row of tiles reached past the view it was made for).

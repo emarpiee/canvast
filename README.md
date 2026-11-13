@@ -399,17 +399,18 @@ Let a sheet lay its pictures out in a grid that stays tidy as you add more.
 | Turn it on | |
 | --- | --- |
 | On a sheet | `Shift+A`, **Auto layout** in the Sheets menu of the Actions bar, or the layout badge on the sheet's row in Layers. It reads the layout from where things are, so they stay put |
-| On loose things | `Shift+A`, or **Auto layout on a new sheet** in the Sheets menu: a new sheet round them (with no fill) that lays them out and hugs them |
+| On loose things | `Shift+A`, or **Auto layout on a new sheet** in the Sheets menu: a new sheet round them (with no fill) that lays them out and fits them |
 
 | Control (Properties bar, sheet selected) | What it does |
 | --- | --- |
 | **Flow** | **Row**, **column**, **wrap** (rows that break at the sheet's width), **grid**, **masonry** or **justified rows** (see below) |
 | **Gap** | Between items along the flow, and between lines |
 | **Pad** | Padding left and right, top and bottom; the button beside it opens each side |
-| **Start, Centre, End** | Where items sit across the flow (and the block of lines in a sheet that does not hug) |
-| **Pack start, centre, end, Spread** | Where items sit along the flow, in a sheet wider than they are. Greyed out when there is no room to pack in (the sheet hugs that way, or it is a masonry): its tip says which |
-| **Hug W**, **Hug H** | The sheet grows and shrinks to its contents on that axis; off, it keeps its size and the items are aligned in it |
-| **Columns** | For a grid or a masonry: how many. Empty: chosen by the list beside it, **Auto: by shape** (from the items' shapes: a board about as wide as tall when the sheet hugs, or one that fills a sheet whose size you set; new layouts start with it) or **Auto: by count** (about as many as rows from the number of items alone; layouts made before keep it) |
+| **Start, Centre, End** | Where items sit across the flow (and the block of lines in a sheet with room for them) |
+| **Pack start, centre, end, Spread** | Where items sit along the flow, in a sheet wider than they are. Shown only when there is room to pack in (not in a masonry, nor when the sheet fits its contents that way) |
+| **Size** | **Fits contents**: the sheet grows and shrinks to what is on it. **Set width**: you set the width, the height fits (a column: **Set height**). **Set size**: you set both, and what does not fit is cut off at the edge |
+| **Doesn't fit: Fit** | Shown when something runs past the edge of a sheet whose size is set: makes the sheet fit it on that side |
+| **Columns** | For a grid or a masonry: how many. Empty: chosen by the list beside it, **Auto: by shape** (from the items' shapes: a board about as wide as tall when the sheet fits its contents, or one that fills a sheet whose size you set; new layouts start with it) or **Auto: by count** (about as many as rows from the number of items alone; layouts made before keep it) |
 | **Columns and rows** | For a grid: each column and row **Hug** (as large as what is in it), **Fixed** (a size in px) or **Share** (a share of the room left, never smaller than what is in it); rows past those set hug |
 | **Row** | For justified rows: the height a row aims at before it is made as wide as the sheet |
 | **Order** | The stacking order (as Layers lists it), or a rule kept as things are added: name A–Z or Z–A (a picture's name as placed, a text's first words), newest first (when the picture's file came into the library), largest first, by kind. An Arrange order on things of the sheet sets it too |
@@ -422,8 +423,8 @@ Let a sheet lay its pictures out in a grid that stays tidy as you add more.
 
 | Flows that size the items | |
 | --- | --- |
-| **Masonry** | Columns of one width share the sheet's width; each item is made that wide, in its own shape, and goes in the shortest column, so pictures of every shape pack with no holes. A sheet that hugs its width makes the columns as wide as its widest item |
-| **Justified rows** | Every item in a row is one height and the row is as wide as the sheet, as a gallery of photographs; the last row keeps the height aimed at. The row height is taken from the items when you choose it; choosing it turns hugging the width off |
+| **Masonry** | Columns of one width share the sheet's width; each item is made that wide, in its own shape, and goes in the shortest column, so pictures of every shape pack with no holes. A sheet that fits its contents makes the columns as wide as its widest item |
+| **Justified rows** | Every item in a row is one height and the row is as wide as the sheet, as a gallery of photographs; the last row keeps the height aimed at. The row height is taken from the items when you choose it; choosing it sets the width (Set width) |
 
 Pack references of every shape into tidy columns with no holes.
 
@@ -446,10 +447,10 @@ Plan a page: a wide panel across all the columns, the columns sized by rule.
 
 | Behaviour | |
 | --- | --- |
-| Changes | Anything added to, taken off, resized or moved on the sheet lays it out again, in the same undo step; a sheet that hugs inside another lays that one out too |
+| Changes | Anything added to, taken off, resized or moved on the sheet lays it out again, in the same undo step; a sheet that fits its contents inside another lays that one out too |
 | Order | The stacking order, front first, as Layers lists it, unless an Order rule is set. A thing dropped on the sheet takes the place it is dropped at |
 | While dragging | The others make room as you drag over the sheet, closing the gap behind it and opening one where it would land; dragged off the sheet, its place closes; over another sheet with auto layout, that sheet makes room. Nothing is stored until you let go |
-| Resizing the sheet by hand | It stops hugging on that axis and keeps the size given |
+| Resizing the sheet by hand | It keeps the width you give it (a column: the height) and the other side goes on fitting, so nothing is cut off. Set size keeps both |
 
 ### Arranging and snapping
 

@@ -95,9 +95,9 @@ test("layout-justified", async ({ scene: s }) => {
   const w = (await s.box([sheet]))!;
   await s.p.locator("[data-layout-rowh]").fill(String(Math.round((w.maxX - w.minX) / 4.5)));
   await s.p.locator("[data-layout-rowh]").press("Enter");
-  const hugH = s.p.locator('[data-layout-hug="1"]');
-  if ((await hugH.getAttribute("aria-pressed")) !== "true") await hugH.click();
-  await expect(hugH).toHaveAttribute("aria-pressed", "true");
+  const size = s.p.locator("[data-layout-size]");
+  if ((await size.inputValue()) !== "w") await size.selectOption("w");
+  await expect(size).toHaveValue("w");
   await s.fit([sheet], 0.66, [0.5, 0.47]);
   await s.select([sheet]);
   await s.settle();

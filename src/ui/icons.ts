@@ -69,8 +69,6 @@ import galleryHorizontalSvg from "lucide-static/icons/gallery-horizontal.svg";
 import galleryVerticalSvg from "lucide-static/icons/gallery-vertical.svg";
 import grid3x2Svg from "lucide-static/icons/grid-3x2.svg";
 import table2Svg from "lucide-static/icons/table-2.svg";
-import foldHorizontalSvg from "lucide-static/icons/fold-horizontal.svg";
-import foldVerticalSvg from "lucide-static/icons/fold-vertical.svg";
 import layoutFreeformSvg from "lucide-static/icons/layout-freeform.svg";
 import cropSvg from "lucide-static/icons/crop.svg";
 import flipHorizontalSvg from "lucide-static/icons/flip-horizontal-2.svg";
@@ -750,8 +748,6 @@ export const ICONS = {
   flowJustified: clean(rows4Svg),
   layoutTracks: clean(columns3CogSvg),
   layoutStyles: clean(layoutPanelLeftSvg),
-  hugWidth: clean(foldHorizontalSvg),
-  hugHeight: clean(foldVerticalSvg),
   layoutFree: clean(layoutFreeformSvg),
   crop: clean(cropSvg),
   flipHorizontal: clean(flipHorizontalSvg),

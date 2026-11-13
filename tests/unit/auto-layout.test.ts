@@ -4,7 +4,7 @@ import { FrameSpace } from "../../src/core/frames";
 import type { CanvasObject, PathObject, SheetLayout } from "../../src/doc/model";
 import { deserializeObject, newObjectId, serializeObject } from "../../src/doc/model";
 import type { DerivationSource } from "../../src/doc/boolean-group";
-import { DEFAULT_LAYOUT, guessLayout, layOutSheet, placeItems, previewLayout, withAutoLayout, type ItemSize } from "../../src/doc/auto-layout";
+import { DEFAULT_LAYOUT, guessLayout, layOutSheet, layoutOverflow, placeItems, previewLayout, withAutoLayout, type ItemSize } from "../../src/doc/auto-layout";
 import { worldBounds } from "../../src/doc/edit-ops";
 
 const space = new FrameSpace();
@@ -115,7 +115,7 @@ describe("laying out a sheet (layOutSheet, withAutoLayout)", () => {
     expect(of(out, b).z).toBe(2);
     expect(of(out, a).z).toBe(1);
   });
-  it("the whole sheet moved keeps its order; a sheet resized by hand stops hugging on that axis; a hidden or free thing is left alone", () => {
+  it("the whole sheet moved keeps its order; a sheet resized by hand keeps the width given and its height still fits (a column: the other way round); a hidden or free thing is left alone", () => {
     const s = sheet(0, 0, 50, 10, 0, { flow: "row", gap: [10, 0] });
     const a = rect(0, 0, 20, 10, 2, { parent: s.id }), b = rect(30, 0, 20, 10, 1, { parent: s.id });
     const shift = (o: CanvasObject): CanvasObject => ({ ...o, anchor: at(D.toNumber(o.anchor.x) + 100, D.toNumber(o.anchor.y) + 5) });
@@ -124,6 +124,12 @@ describe("laying out a sheet (layOutSheet, withAutoLayout)", () => {
     near(box(of(movedAll, b)), [130, 5, 150, 15]);
     const wider = withAutoLayout(src(s, a, b), [{ ...rect(0, 0, 80, 10, 0), id: s.id, container: s.container! }], []);
     expect((of(wider, s) as PathObject).container!.layout!.hug).toEqual([false, true]);
+    // (dragged taller, the height goes on fitting, so nothing is cut off; a column keeps the height given and its width fits)
+    const taller = withAutoLayout(src(s, a, b), [{ ...rect(0, 0, 50, 40, 0), id: s.id, container: s.container! }], []);
+    expect((of(taller, s) as PathObject).container!.layout!.hug).toEqual([true, true]);
+    const col = sheet(0, 0, 20, 30, 0, { flow: "column" });
+    const colWider = withAutoLayout(src(col, rect(0, 0, 20, 30, 1, { parent: col.id })), [{ ...rect(0, 0, 60, 50, 0), id: col.id, container: col.container! }], []);
+    expect((of(colWider, col) as PathObject).container!.layout!.hug).toEqual([true, false]);
     const hidden = rect(40, 40, 5, 5, 3, { parent: s.id, hidden: true }), free = rect(40, 40, 5, 5, 4, { parent: s.id, inLayout: { free: true } });
     const out = withAutoLayout(src(s, a, b, hidden, free), [{ ...a, fill: "#ff0000" } as CanvasObject], []);
     expect(out.find((o) => o.id === hidden.id)).toBeUndefined();
@@ -147,6 +153,17 @@ describe("laying out a sheet (layOutSheet, withAutoLayout)", () => {
     near(box(of(out, other)), [0, 0, 20, 10]);
     near(box(of(out, inner)), [20, 0, 100, 10]);
     near(box(of(out, on)), [20, 0, 100, 10]);
+  });
+});
+
+describe("what does not fit a sheet of a set size (ADR 0196)", () => {
+  it("is found down and across; a sheet that fits its contents never overflows", () => {
+    const tall = rect(0, 0, 10, 50, 1), wide = rect(0, 0, 80, 10, 2);
+    const fixed = sheet(0, 0, 50, 20, 0, { flow: "column", hug: [false, false] });
+    expect(layoutOverflow(fixed as never, [fixed, { ...tall, parent: fixed.id }], space)).toEqual([false, true]);
+    expect(layoutOverflow(fixed as never, [fixed, { ...wide, parent: fixed.id }], space)).toEqual([true, false]);
+    const fits = sheet(0, 0, 50, 20, 0, { flow: "column", hug: [true, true] });
+    expect(layoutOverflow(fits as never, [fits, { ...tall, parent: fits.id }], space)).toEqual([false, false]);
   });
 });
 
