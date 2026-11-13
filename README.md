@@ -839,6 +839,10 @@ Set a cover's type: a title and a subtitle in fonts of your own.
 | **Text to path** | `Ctrl/⌘+E` turns letters into editable outlines |
 | **Off its path or shape** | *Text off its path or shape* sets them straight again |
 
+Set a title along an arch over a print, and slide it into place with its handles.
+
+![THE GREAT WAVE in Bangers set along an arch over Hokusai's Under the Wave off Kanagawa, its diamond handle on the arch named Start at, two arrows above the letters](docs/screenshots/text-on-path.webp)
+
 **Text in a shape**, in detail:
 
 | | |
@@ -2190,7 +2194,7 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 | Part | Where | What it does |
 | --- | --- | --- |
 | **Tool rail** | Left | Undo and Redo, the tools (Import after Note), then Screenshot and Search |
-| **Properties bar** | By the selection, or at the top | The options of the tool or of what is selected, as named chips just above what is selected, each showing its first value; a chip opens its options as a short form, one named option a row. With nothing selected, or another tool picked, the chips stand at the top. On a small window the chips scroll sideways |
+| **Properties bar** | By the selection, or at the top | The options of the tool or of what is selected, as named chips just above what is selected, each showing its first value; a chip opens its options as a short form, one named option a row; the menus it opens (Outline, Paragraph and box, Font, Columns and rows) are forms too, with switches for what is on or off. With nothing selected, or another tool picked, the chips stand at the top. On a small window the chips scroll sideways |
 | **Actions bar** | Bottom | What can be done with the selection, in named groups (Items, Files, Adjust, Edit shapes, Arrange, Attach, Selection, Find), always in that order, some of them menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. The names of its groups show over the buttons. When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
 | **Panels** | Either side, or floating | Layers, Bookmarks, Tags, Styles, Adjust, Pattern: they float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back |
 | **Zen mode** | `Z`, or the leaf button | Fades the bars and panels until the pointer is over them |
@@ -2199,6 +2203,7 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 | **Notices** | Above the Actions bar | Report results, often with a *View* button that opens what was made. They fade after a time that fits their length (an error stays to be read), and stack above the Actions bar, never over it |
 | **Long work** | A notice | Exporting, importing, opening a library, moving files, deleting everything: a notice with a progress bar and its current stage, which stays until the work ends and then says the result |
 | **Layouts** | | Adapt to large, medium and phone-sized screens, with scroll cues on bars that scroll. The panels keep their place when the options at the top come and go |
+| **Fields** | Everywhere | Every number, text and list field has one look. Numbers sit at the right and have no arrows: type one, drag it, or step it with the arrow keys |
 | **Lists** | Every dropdown | One list in the app's look, placed off the selection. The arrow keys move through it, and a choice rested on for a moment is taken with the list still open (a font can be tried at once); `Enter` or a click takes it and closes the list, `Esc` closes it, typing jumps to a choice |
 
 ### The command palette

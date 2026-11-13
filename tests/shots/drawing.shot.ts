@@ -222,6 +222,38 @@ test("path-tools", async ({ scene: s }) => {
   await s.shot("path-tools", await s.around({ objects: await s.ids(), els: [".pop-menu"], pad: 30 }));
 });
 
+test("text-on-path", async ({ scene: s }) => {
+  await s.look({ theme: "dark", hue: 200 });
+  await s.fonts();
+  const [h] = await s.art("hokusai-under");
+  await s.canvas("Cover");
+  const [pic] = await s.place([h!]);
+  await s.fit([pic!], 0.5, [0.5, 0.6]);
+  const b = (await s.box([pic!]))!;
+  // (an arch over the print, the title set along it: then slid to the middle and lifted off the line with its handles)
+  const w = b.maxX - b.minX;
+  const [arch] = await s.svg(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 160"><path d="M10 150 C 150 10, 450 10, 590 150" fill="none" stroke="#7d93b8" stroke-width="2"/></svg>`, [(b.minX + b.maxX) / 2, b.minY - 70], true);
+  await s.fit([pic!, arch!], 0.62, [0.5, 0.55]);
+  const t = await s.text(b.minX, b.maxY + 60, "THE GREAT WAVE", { size: 40, font: "bangers", colour: "#f2efe8" });
+  await s.select([arch!, t]);
+  await pathWith(s.p, "onpath");
+  await s.select([t]);
+  await s.settle();
+  const dots = () => s.p.evaluate(() => window.__canvastDebug.pathTextDots());
+  const along = (await dots()).find((d) => d.part === "along")!;
+  const ab = (await s.box([arch!]))!;
+  await s.app.drag({ x: along.x, y: along.y }, { x: ab.minX + (ab.maxX - ab.minX) * 0.22, y: ab.minY + (ab.maxY - ab.minY) * 0.3 }, 6);
+  const lift = (await dots()).find((d) => d.part === "lift")!, at = (await dots()).find((d) => d.part === "along")!;
+  const k = 14 / Math.hypot(lift.x - at.x, lift.y - at.y);
+  await s.app.drag({ x: lift.x, y: lift.y }, { x: lift.x + (lift.x - at.x) * k, y: lift.y + (lift.y - at.y) * k }, 4);
+  await expect.poll(async () => ((await s.objects()).find((o) => o.id === t) as unknown as { onPath?: { lift?: number } }).onPath?.lift ?? 0).toBeGreaterThan(0);
+  // (the pointer resting on the diamond: its name and value show)
+  const now = (await dots()).find((d) => d.part === "along")!;
+  await s.p.mouse.move(now.x, now.y);
+  await expect.poll(() => s.p.evaluate(() => window.__canvastDebug.handleLabel())).toMatch(/^Start at/);
+  await s.shot("text-on-path", await s.around({ objects: [pic!, arch!, t], pad: 30 }));
+});
+
 test("pen-stabilizer", async ({ scene: s }) => {
   await s.look({ theme: "light", hue: 20, pattern: "dots" });
   const [h] = await s.art("delacroix");

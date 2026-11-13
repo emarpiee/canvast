@@ -42,6 +42,7 @@ export const SHOTS: Record<string, ShotSpec> = {
   "guides": { section: "#pattern-and-guides", use: "Read a composition: lay a golden spiral over the print to see where the eye travels.", alt: "Hokusai's Great Wave with a golden spiral guide over it, the Pattern panel on its Guides tab" },
   "palette": { section: "#styles", use: "Take the colours of a reference as a palette to paint with.", alt: "Hokusai's Great Wave and, in the Styles panel, a palette of its main colours made from the picture" },
   "colour-picker": { section: "#the-colour-picker", use: "Match a colour by eye: mix a swatch until it sits beside the Prussian blue of the print.", alt: "Hokusai's Great Wave, a blue swatch beside it, and the colour picker open on the swatch's fill" },
+  "text-on-path": { section: "#text", use: "Set a title along an arch over a print, and slide it into place with its handles.", alt: "THE GREAT WAVE in Bangers set along an arch over Hokusai's Under the Wave off Kanagawa, its diamond handle on the arch named Start at, two arrows above the letters", pointer: true },
   "path-tools": { section: "#more-vector-tools", use: "Set a title along a curve for a cover.", alt: "The words Under the wave off Kanagawa set along a curved line, the Path tools menu open" },
 
   // Comics and storyboards
