@@ -47,6 +47,12 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.11: colour picker off the selection; full names; Text split; Adjust in the Actions bar (2026-11-13)
+
+- **Implemented:** colour picker placement (never the selection, may cover its parent popover and the chips, least interface covered, whole); full field names in the form; wider number fields; sections Text outline and Paragraph (icons `text-select`, `pilcrow-right`); the audit checks values fit their fields; Adjust group in the Actions bar (`adjustState`, `toggleAdjust`, `resetAdjust`); chips hidden while dragging.
+- **Tested:** build and typecheck here; scratch runs: the audit on a text's chips and its colour picker and on every other kind, Chromium and Firefox, no problems; chips hidden during a drag and back after; Adjust opens the Adjust panel. New test in `bar-layouts.spec.ts`; `pictures.spec.ts` finds Reset in the Actions bar.
+- **Committed:** v0.58.11 on `main` (the code went in 0e604532, these notes with the Adjust move).
+
 ## v0.58.10: chips and the text format bar made as the Actions bar (2026-11-13)
 
 - **Implemented:** chips as captioned groups with section icons (17 new unique icons), `hoverNames` in `ui/bar.ts` shared by the Actions bar and the chips; text format bar in groups with menus (`FORMAT_GROUPS`, `openMoreMenu`); contrast fix of names on pressed buttons and `lowContrast` moved into the harness and run by `floatingProblems`; colour picker placement scored against the interface; `made` ends with another shape kind or tool. Test fixes: `editing.spec` 1650 (dismiss the notice), `vectors.spec` 1429 (deselect between colours), `text.spec` (menus).

@@ -92,6 +92,12 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
     if (popped === null && bar.parentElement !== park) park.append(bar);
     if (popped !== COLOURS && colours.parentElement !== park) park.append(colours);
     if (popped !== null && !ids.includes(popped)) closePop();
+    // (while something is dragged the chips step aside, as the Actions bar does: they do not follow it about, nor jump to the top)
+    if (editor.gesturing) {
+      closePop();
+      near.hidden = top.el.hidden = true;
+      return;
+    }
     const box = selectionBoxIn(canvasHost, editor);
     const beside = editor.selection.size > 0 && !!box && inRoom(box) && ids.length > 0;
     const host = beside ? nearRow : top.row;

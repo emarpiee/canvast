@@ -69,6 +69,10 @@ export interface ContextActions {
   /** Copy the Markdown of the picked texts. */
   copyMarkdown(): void;
   pictureTools(): { still: boolean; canPaste: boolean } | null;
+  /** Whether the selection can be adjusted, and is (null: it cannot); showing or hiding the Adjust panel; taking the adjustments away. */
+  adjustState(): { adjusted: boolean } | null;
+  toggleAdjust(): void;
+  resetAdjust(): void;
   copyAdjust(): void;
   pasteAdjust(): void;
   copyRendered(): void;
@@ -199,11 +203,15 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       btn("viewfile", ICONS.bookOpen, "Open it here (or double-click it)"),
       btn("makenote", ICONS.fileInput, "Make note files: the texts on a card become notes in the library, edited in the note panel"),
       btn("open", ICONS.externalLink, desktopBridge() ? "Open in default app" : "Open in a new tab"),
-      btn("copyadj", ICONS.clipboardList, "Copy the adjustments of the picture"),
-      btn("pasteadj", ICONS.clipboardPaste, "Paste the copied adjustments on the selected pictures"),
       btn("copypng", ICONS.clipboardPlain, "Copy the picture to the clipboard as it looks now (crop and adjustments included)"),
       btn("bake", ICONS.copyPlus, "Make a new picture of it as it looks now, beside it"),
       btn("vectorise", ICONS.vectorPolygon, "Turn this SVG picture into editable vector shapes, in its place (the file stays in the library)")) +
+    // (the adjustments, for any picture, shape or text: one group, with their copy and paste: ADR 0198)
+    group("Adjust",
+      btn("adjust", ICONS.slidersVertical, "Adjust the picture", 'aria-pressed="false"'),
+      btn("adjustreset", ICONS.listRestart, "Reset the adjustments"),
+      btn("copyadj", ICONS.clipboardList, "Copy the adjustments of the picture"),
+      btn("pasteadj", ICONS.clipboardPaste, "Paste the copied adjustments on the selected pictures")) +
     group("Regions", btn("builderdone", ICONS.check, "Done: keep the regions as they are now (Enter)"), btn("buildercancel", ICONS.x, "Cancel the Shape builder (Esc)")) +
     group("Edit shapes", btn("pathmenu", ICONS.pathMenu, "Path tools: simplify, outline stroke, taper, vector network, divide, shape builder, text to path", 'aria-haspopup="menu" aria-expanded="false"'), btn("maskmenu", ICONS.maskMenu, "Masks: make one from the top shape, or change the one selected", 'aria-haspopup="menu" aria-expanded="false"'), btn("boolmenu", ICONS.boolMenu, "Shapes: join, intersect, subtract or exclude the selected shapes, and manage the group they make", 'aria-haspopup="menu" aria-expanded="false"'), btn("sheetmenu", ICONS.sheetMenu, "Sheets: put the selected things on a sheet, release the sheet, fit it to what is on it", 'aria-haspopup="menu" aria-expanded="false"')) +
     group("Arrange", btn("alignmenu", ICONS.alignMenu, "Align and distribute: a list of the ways to line the selected things up", 'aria-haspopup="menu" aria-expanded="false"'), btn("arrangemenu", ICONS.arrangeMenu, "Arrange in a grid: the ways to order the items, and the space between them", 'aria-haspopup="menu" aria-expanded="false"'), btn("sizemenu", ICONS.sizeMenu, "Size: reset it, or give the selected the same width or height", 'aria-haspopup="menu" aria-expanded="false"'), btn("statemenu", ICONS.stateMenu, "Initial state: save the shape as it is now, replace the saved one, or go back to it", 'aria-haspopup="menu" aria-expanded="false"'), btn("front", ICONS.bringToFront, "Bring to front"), btn("back", ICONS.sendToBack, "Send to back"), btn("unrotate", ICONS.rotateCcw, "Reset rotation"), btn("baserot", ICONS.rotateCwSquare, "Apply rotation: make the current turn the shape's own, the new zero (it looks the same; its box fits it)"), btn("unstretch", ICONS.ratio, "Reset proportions (the picture's own shape)")) +
@@ -221,7 +229,7 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
   // layer of their own in the wrapper, so neither the bar nor the options bar beside it changes size or moves (ADR 0197).
   const placeNames = hoverNames(bar, wrap).place;
   // Tools that are for some kinds of thing only (the others are for any): with a mixed pick, a chip at the start shows the tools of one kind (ADR 0152).
-  const FOR_KINDS: Record<string, string> = { library: "image", open: "image", copyadj: "image,path,stroke,text", pasteadj: "image,path,stroke,text", copypng: "image", bake: "image", vectorise: "image", exportmenu: "image,path,stroke,text", pathmenu: "path,stroke,text", boolmenu: "path", statemenu: "path" };
+  const FOR_KINDS: Record<string, string> = { library: "image", open: "image", adjust: "image,path,stroke,text", adjustreset: "image,path,stroke,text", copyadj: "image,path,stroke,text", pasteadj: "image,path,stroke,text", copypng: "image", bake: "image", vectorise: "image", exportmenu: "image,path,stroke,text", pathmenu: "path,stroke,text", boolmenu: "path", statemenu: "path" };
   for (const [act, kinds] of Object.entries(FOR_KINDS)) bar.querySelector<HTMLElement>(`[data-ctx="${act}"]`)?.setAttribute("data-for", kinds);
   // With a mixed pick the kind chosen in the Properties bar (`editor.subject`, its chips: All, Picture, Shape ...) also chooses which tools show here: one set of chips, not two.
   const BAR_KINDS: Record<string, readonly string[]> = { picture: ["image", "media"], shape: ["path"], stroke: ["stroke"], text: ["text"], sheet: [] };
@@ -394,6 +402,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       case "attach": actions.attach(); break;
       case "detach": actions.detach(); break;
       case "vectorise": actions.vectorise(); break;
+      case "adjust": actions.toggleAdjust(); break;
+      case "adjustreset": actions.resetAdjust(); break;
       case "copyadj": actions.copyAdjust(); break;
       case "pasteadj": actions.pasteAdjust(); break;
       case "copypng": actions.copyRendered(); break;
@@ -488,6 +498,13 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
     q("detach").hidden = !actions.canDetach();
     q("vectorise").hidden = !actions.svgPicture();
     const pic = actions.pictureTools();
+    // (Adjust: the Adjust panel, for what can be adjusted; "adjusted" in its name when it is)
+    const adj = actions.adjustState();
+    q("adjust").hidden = !adj;
+    q("adjust").setAttribute("aria-pressed", String(editor.adjustOpen));
+    q("adjust").classList.toggle("is-applied", !!adj?.adjusted);
+    q("adjust").setAttribute("aria-label", adj?.adjusted ? "Adjust the picture (adjusted)" : "Adjust the picture");
+    q("adjustreset").hidden = !adj?.adjusted;
     q("copyadj").hidden = !pic;
     q("pasteadj").hidden = !pic;
     q("pasteadj").disabled = !pic?.canPaste;

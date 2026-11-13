@@ -296,8 +296,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-tips-wrap hidden>Points <input type="number" data-tips min="3" max="24" step="1" inputmode="numeric" aria-label="Star points"></label>
       </div>
       <div class="tb-group tb-options" data-for="select node" data-shape-props>
-        <button type="button" data-kind="picture shape stroke text" data-adjust hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Adjust the picture" title="Adjust the picture, shape or text: exposure, contrast, colour, blur and more. The original is not changed.">${ICONS.slidersVertical}</button>
-        <button type="button" data-kind="picture shape stroke text" data-adjust-reset hidden aria-label="Reset the adjustments" title="Reset the adjustments of the selected pictures">${ICONS.listRestart}</button>
         <label class="tb-count" data-kind="shape picture" data-scrub="radius" data-sel-radius-wrap hidden title="Drag the field left or right to change it">Radius <input type="text" data-sel-radius size="8" inputmode="decimal" aria-label="Corner radius (px)" title="Corner radius, in px at this zoom. Several values (one for every corner) set them each; double-click the dot on the shape to open its corners out."></label>
         <label class="tb-count" data-kind="shape" data-scrub="smooth" data-sel-smooth-wrap hidden title="Drag the field left or right to change it">Smooth <input type="number" data-sel-smooth min="0" max="100" step="5" inputmode="numeric" aria-label="Corner smoothing (%)" title="Corner smoothing: the rounded corners start farther out and blend into the line"></label>
         <label class="tb-count" data-kind="shape" data-scrub="sides" data-sel-sides-wrap hidden title="Drag the field left or right to change it">Sides <input type="number" data-sel-sides min="3" max="24" step="1" inputmode="numeric" aria-label="Polygon sides"></label>
@@ -428,7 +426,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   // Each control's section (ADR 0198), for the ways the bar can be shown (value chips, the Properties panel, beside the selection): a control's
   // own, else its group's.
   assignSections(barRow, [
-    ["[data-adjust], [data-adjust-reset]", "look"],
     ["[data-sel-radius-wrap], [data-sel-smooth-wrap], [data-sel-sides-wrap], [data-sel-tips-wrap], [data-sel-inner-wrap]", "shape"],
     ["[data-pin-wrap], [data-on-sheet]", "position"],
     ["[data-crop], [data-uncrop], [data-flip], [data-unflip]", "picture"],
@@ -814,12 +811,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   q<HTMLElement>("[data-uncrop]")!.addEventListener("click", () => actions.uncrop());
   for (const b of qa<HTMLElement>("[data-flip]")) b.addEventListener("click", () => actions.flip(b.dataset["flip"] as "x" | "y"));
   q<HTMLElement>("[data-unflip]")!.addEventListener("click", () => actions.unflip());
-  q<HTMLElement>("[data-adjust-reset]")!.addEventListener("click", () => actions.commitAdjust({}, "Reset adjustments"));
-  q<HTMLElement>("[data-adjust]")!.addEventListener("click", () => {
-    if (!actions.selectedAdjust() && !editor.adjustOpen) return;
-    editor.adjustOpen = !editor.adjustOpen; // the Adjust panel (ui/adjust-panel.ts, ADR 0123)
-    editor.changed();
-  });
   shapeInput("[data-sel-sides]", (v) => (v >= 3 && v <= 24 ? { sides: Math.round(v) } : null));
   shapeInput("[data-sel-tips]", (v) => (v >= 3 && v <= 24 ? { tips: Math.round(v) } : null));
   liveNumber(q<HTMLInputElement>("[data-sel-smooth]")!, (v, final) => v >= 0 && v <= 100 && actions.setSmoothing(v, final));
@@ -1173,14 +1164,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       b.setAttribute("aria-pressed", String(!!flip?.[b.dataset["flip"] as "x" | "y"]));
     }
     q<HTMLElement>("[data-unflip]")!.hidden = !(flip && (flip.x || flip.y));
-    const adj = pick && still ? actions.selectedAdjust() : null;
-    const adjustBtn = q<HTMLElement>("[data-adjust]")!;
-    adjustBtn.hidden = !adj;
-    adjustBtn.setAttribute("aria-pressed", String(editor.adjustOpen));
-    const adjusted = !!adj && Object.keys(adj.adjust).length > 0;
-    adjustBtn.classList.toggle("is-applied", adjusted);
-    adjustBtn.setAttribute("aria-label", adjusted ? "Adjust the picture (adjusted)" : "Adjust the picture");
-    q<HTMLElement>("[data-adjust-reset]")!.hidden = !adj || Object.keys(adj.adjust).length === 0;
     const on = pick && still ? actions.boxOnSheet() : null;
     q<HTMLElement>("[data-on-sheet]")!.hidden = !on;
     if (on) {

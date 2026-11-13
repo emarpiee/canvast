@@ -2250,6 +2250,16 @@ async function start(): Promise<void> {
         const sa = selectedAdjust(doc, editor);
         return sa ? { still: sa.stills && [...editor.selection].some((id) => doc.get(id)?.kind === "image"), canPaste: canPasteAdjustments() } : null;
       },
+      adjustState: () => {
+        const a = editor.selection.size && !editor.gesturing ? selectedAdjust(doc, editor) : null;
+        return a ? { adjusted: Object.keys(a.adjust).length > 0 } : null;
+      },
+      toggleAdjust: () => {
+        if (!selectedAdjust(doc, editor) && !editor.adjustOpen) return;
+        editor.adjustOpen = !editor.adjustOpen; // the Adjust panel (ui/adjust-panel.ts, ADR 0123)
+        editor.changed();
+      },
+      resetAdjust: () => commitAdjust(doc, editor, {}, "Reset adjustments"),
       copyAdjust: () => void copyAdjustments(doc, editor),
       pasteAdjust: () => pasteAdjustments(doc, editor),
       copyRendered: () => void copyAsShown(),

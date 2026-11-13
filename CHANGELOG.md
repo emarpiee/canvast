@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.58.11 — The colour picker off the selection; full names; Adjust in the Actions bar (2026-11-13)
+
+- **Changed:** a chip's options name every field in full ("Text size", "Line height", "Letter spacing", "Corner radius"), never the bar's short word; Text is three chips (Text, Text outline, Paragraph).
+- **Changed:** **Adjust the picture** and **Reset the adjustments** moved from the Properties bar to a new **Adjust** group of the Actions bar, with Copy and Paste adjustments (from Files).
+- **Changed:** the chips by the selection hide while something is dragged, as the Actions bar does.
+- **Fixed:** the colour picker could cover the selected thing: it may now cover the options it came from instead, never the selection, and stays whole; values with decimals were cut in their fields.
+
 ## 0.58.10 — The chips and the text format bar made as the Actions bar (2026-11-13)
 
 - **Changed:** the Properties chips near the selection are made as the Actions bar: one named group per section (its name under or over it, on hover, or hidden, as Settings say for both bars), each chip the section's icon and its value; each section has an icon of its own.

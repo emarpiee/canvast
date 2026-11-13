@@ -125,9 +125,10 @@ Which tests when (see `docs/testing/README.md` for commands, groups and duration
 
 | Rule | How |
 | --- | --- |
+| Out of the way while dragging | The chips by the selection hide while something is dragged (as the Actions bar does), and come back when it is let go |
 | Never over the selection, nor over the chip or bar it came from | Place it with `placeMenu` (it keeps clear of `setMenuAvoid`'s box and of its own bar) or `placeBy` (`ui/near-selection.ts`); never compute a place of its own |
-| Inside the window, shown whole | The colour picker moves beside its bar rather than shrink; it scrolls only when the window is shorter than it |
-| A popover is a form | One option a row: its name at the left, its control at the right edge; a row of choices under its name; a button with its icon and name. Every control has a visible name (`nameControls` in `ui/bar-sections.ts` gives one from its `aria-label`); a word too short to say what it is ("T", "W") gives way to the full name |
+| Inside the window, shown whole | The colour picker is never over the selection; it may cover the popover it came from (its parent) and the chips; of the places left it takes the one that covers the least of the interface, whole; it scrolls only when no place keeps the selection clear or the window is shorter than it |
+| A popover is a form | One option a row: its name at the left, its control at the right edge; a row of choices under its name; a button with its icon and name. Every control has a visible name, its full one (`nameControls` in `ui/bar-sections.ts`, from its `aria-label`: "Text size", "Line height"), never the bar's short word ("Size", "Line"); a value always fits its field (the audit measures it) |
 | One look | Every name in one font and size; colours of one size (a fill a dot, an outline a ring); spacing and sizes only from tokens |
 | As wide as it needs | Width from its content (`max-content`, capped, long names wrap): never a fixed width with empty room |
 | Short | A long group is split into chips of their own (Auto layout: Layout, Spacing, Columns and order); a new control of the Properties bar gets a section (`assignSections` in `ui/toolbar.ts`, its group's is enough) |

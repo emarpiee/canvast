@@ -292,7 +292,7 @@ test("Reset beside Adjust takes the adjustments off at once, and is there only w
   await p.keyboard.press("v");
   const b = await boxOf(app, pic.id);
   await p.mouse.click(Math.round((b.minX + b.maxX) / 2), Math.round((b.minY + b.maxY) / 2));
-  const reset = p.getByRole("toolbar", { name: "Tool options" }).getByRole("button", { name: "Reset the adjustments" });
+  const reset = p.getByTestId("context-bar").getByRole("button", { name: "Reset the adjustments" }); // (in the Actions bar's Adjust group: ADR 0198)
   await expect(reset).toBeHidden();
   await openAdjust(p);
   await p.locator('.adjust-pop [data-adj-num="exposure"]').fill("25");
