@@ -880,6 +880,7 @@ async function start(): Promise<void> {
 
   let appView: AppView = "canvas";
   let contextUpdate: () => void = () => undefined;
+  let propsFollow: () => void = () => undefined;
   let drawCount = 0;
   const draw = (): void => {
     drawCount++;
@@ -891,6 +892,7 @@ async function start(): Promise<void> {
       stats.record(ms);
       quality.record(ms);
       contextUpdate();
+      propsFollow();
     }
     const waiters = frameWaiters;
     frameWaiters = [];
@@ -1751,6 +1753,7 @@ async function start(): Promise<void> {
     narrow: () => narrow.matches,
   });
   side.append(propsLayout.el);
+  propsFollow = propsLayout.follow;
   dock.add(propsLayout.el, { id: "properties", title: "Properties", side: "right" });
   const placeProps = (): void => {
     const place = settings.get("ui.properties");
