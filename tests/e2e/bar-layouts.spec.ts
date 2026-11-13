@@ -53,7 +53,7 @@ test("a shape drawn with the Shape tool: its chips stand above it and edit it, t
   await p.keyboard.press("Escape");
   const first = (await objects(app))[0]!;
   expect(JSON.stringify(first.fill)).toContain("ff8800");
-  await app.drag({ x: 260, y: 180 }, { x: 380, y: 260 }, 6); // (clear of the chips and of the Actions bar the drawn shape now has)
+  await app.drag({ x: 800, y: 180 }, { x: 920, y: 260 }, 6); // (clear of the chips, the Actions bar the drawn shape now has, and the dev panel)
   const second = (await objects(app)).at(-1)!;
   expect(second.id).not.toBe(first.id);
   expect(JSON.stringify(second.fill), "the tool kept the colour").toContain("ff8800");

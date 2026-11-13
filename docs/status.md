@@ -47,6 +47,12 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.15: the colour picker keeps its panel clear (2026-11-13)
+
+- **Implemented:** the panel or dialog of the picker's button is kept clear as its bar is. Tests: `styles.spec.ts:155` waits for the picker before its Escape (a race: an Escape before it opened closed nothing) and checks it closed; `bar-layouts.spec.ts:28` draws right of the dev panel (x 378).
+- **Tested:** build and typecheck here; the palette steps in a scratch run; the scratch audit of every tool and kind, Chromium and Firefox, no problems. On GitHub (0.58.14): those two failed, everything else passed.
+- **Committed:** v0.58.15 on `main`.
+
 ## v0.58.14: the colour picker by its button again (2026-11-13)
 
 - **Implemented:** `place` in `ui/colour-popover.ts` keeps the menu place when it is clear of the selection and of its button's bar; the search for another place only then. Tests: `bar-layouts.spec.ts` (a drag clear of the Actions bar; a text has no Look chip).

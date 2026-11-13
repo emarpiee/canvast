@@ -190,7 +190,9 @@ test("Styles: a palette from the selection's colours is opened, a colour of it a
   await card.locator('[data-colour-name="0"]').blur();
   await card.getByRole("button", { name: "Add colour" }).click();
   await expect(card.locator(".pal-row")).toHaveCount(3);
-  await p.keyboard.press("Escape"); // the picker that opens on the new colour
+  await expect(p.locator(".colour-pop"), "the picker opens on the new colour").toBeVisible(); // (waited for: an Escape before it opens closes nothing)
+  await p.keyboard.press("Escape");
+  await expect(p.locator(".colour-pop")).toHaveCount(0);
   await card.getByRole("button", { name: /^Remove/ }).last().click();
   await expect(card.locator(".pal-row")).toHaveCount(2);
   await card.getByRole("button", { name: "Done" }).click();

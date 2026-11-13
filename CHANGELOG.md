@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.15 — The colour picker keeps its panel clear (2026-11-13)
+
+- **Fixed:** a colour picker opened from a panel (a palette's colour in the Styles panel) could cover the panel's own rows when it had to move off the selection.
+
 ## 0.58.14 — The colour picker by its button again (2026-11-13)
 
 - **Fixed:** the colour picker moved beside the selection whenever its usual place touched the Actions bar, and could cover what a texture is picked from or the next button of a palette; it stays where it always opens (under or over its button) unless that would cover the selection or its own bar.

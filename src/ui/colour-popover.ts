@@ -87,7 +87,9 @@ function place(pop: HTMLElement, anchor: HTMLElement): void {
   type Box = { left: number; top: number; right: number; bottom: number };
   // (the popover its button is in may be covered: it is the picker's parent, and the room it frees keeps the selection in view)
   const parent = anchor.closest<HTMLElement>(".vchip-pop");
-  const hud: Box[] = [...(parent ? [] : [a]), ...[...document.querySelectorAll<HTMLElement>(`.rail, .dock, .ctx-wrap, #nav, .hud-controls${parent ? "" : ", .props-near"}`)].filter((el) => el.getClientRects().length > 0).map((el) => el.getBoundingClientRect())];
+  // (the panel its button is in is kept clear too, as its bar: the picker never hides the row it was opened from)
+  const home = parent ? null : anchor.closest<HTMLElement>(".dock-item, aside, dialog");
+  const hud: Box[] = [...(parent ? [] : [a]), ...(home ? [home.getBoundingClientRect()] : []), ...[...document.querySelectorAll<HTMLElement>(`.rail, .dock, .ctx-wrap, #nav, .hud-controls${parent ? "" : ", .props-near"}`)].filter((el) => el.getClientRects().length > 0).map((el) => el.getBoundingClientRect())];
   const sel = menuAvoid();
   const over = (b: Box, l: number, t: number): number => Math.max(0, Math.min(l + m.width, b.right) - Math.max(l, b.left)) * Math.max(0, Math.min(t + m.height, b.bottom) - Math.max(t, b.top));
   const covers = (l: number, t: number): number => hud.reduce((sum, b) => sum + over(b, l, t), 0);
