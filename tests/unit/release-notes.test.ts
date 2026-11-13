@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 // @ts-expect-error (a build script, plain JavaScript)
-import { changelogSection, changelogSince, olderThan, releaseNotes, splitBullets } from "../../scripts/lib/release-notes.mjs";
+import { changelogSection, changelogSince, issuesIn, olderThan, releaseNotes, splitBullets } from "../../scripts/lib/release-notes.mjs";
 
 const CHANGELOG = `# Changelog
 
@@ -62,5 +62,12 @@ describe("release notes", () => {
     expect(olderThan("0.45.9", "0.46.0")).toBe(true);
     expect(olderThan("0.46.0", "0.46.0")).toBe(false);
     expect(olderThan("1.0.0", "0.99.9")).toBe(false);
+  });
+});
+
+describe("the issues a release fixes (close on release)", () => {
+  it("every issue named, once, in order; a colour is no issue", () => {
+    expect(issuesIn(["**Fixed:** the slider could not be dragged (GitHub issue #2).", "**Fixed:** two more (issues #7 and issue #12), and #111111 stays a colour.", "**Fixed:** again issue #2."])).toEqual([2, 7, 12]);
+    expect(issuesIn(["**Added:** nothing to close."])).toEqual([]);
   });
 });

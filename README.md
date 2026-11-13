@@ -14,9 +14,9 @@
 <p align="center">
   <a href="https://github.com/emarpiee/canvast/actions/workflows/tests.yml"><img src="https://github.com/emarpiee/canvast/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="https://github.com/emarpiee/canvast/actions/workflows/ci.yml"><img src="https://github.com/emarpiee/canvast/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/emarpiee/canvast/releases/latest"><img src="https://img.shields.io/github/v/release/emarpiee/canvast?label=release&color=007B69" alt="Latest release"></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/emarpiee/canvast?color=007B69" alt="Licence: GPL-3.0"></a>
-  <a href="#installation"><img src="https://img.shields.io/badge/runs_on-Linux_%C2%B7_any_browser-007B69" alt="Runs on Linux and in any modern browser"></a>
+  <a href="https://github.com/emarpiee/canvast/releases/latest"><img src="https://img.shields.io/github/v/release/emarpiee/canvast?label=release&color=71685E" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/emarpiee/canvast?color=71685E" alt="Licence: GPL-3.0"></a>
+  <a href="#installation"><img src="https://img.shields.io/badge/runs_on-Linux_%C2%B7_any_browser-71685E" alt="Runs on Linux and in any modern browser"></a>
 </p>
 
 ![A minute of canvast in use: references landing on a board, a grey value study, crop and auto layout, gesture lines over dancers, shapes, boolean cuts, patterns, guides, a mask, a gradient and the colour picker, a lettered comic page, the Library, its viewer, a PDF and a 3D model, a linked note, export, a dive 24 levels into the canvas, hidden items, the lock screen, theme colours, and the logo](docs/screenshots/canvast-60s.gif)
@@ -2734,11 +2734,20 @@ The budget is never loosened to let a change pass. A time over it once is run ag
 
 1. It builds and checks `dist/canvast.html`, and checks that the [pan and zoom standard](#the-pan-and-zoom-standard) passed on the commit.
 2. It creates (or updates) the GitHub release `vX.Y.Z` with the file and its SHA-256, and the [canvast tools](#canvast-tools-without-the-app) built from the same commit (`canvast-tools.mjs`), and marks it **Latest**.
-3. It reads the release back to confirm it is the latest and serves the same file.
+3. It reads the release back to confirm it is the latest and serves the same file, then closes the GitHub issues the release fixes (see below).
 4. Publishing starts the `Release packages` workflow (`.github/workflows/release-packages.yml`). On an x86_64 and an ARM machine it builds the app from the tag, checks that its single file is the one released (the build is reproducible), makes the packages with `npm run package:desktop` (which checks each), and adds them with their SHA-256 and the AppImage's `.zsync`. No package is uploaded from the developer's machine; the workflow can also be run by hand for a tag.
 5. When `Release packages` ends, the `Try it online` workflow (`.github/workflows/pages.yml`) checks the released `canvast.html` against its SHA-256 and puts it on GitHub Pages as the [online copy](#trying-it-online). It can be run by hand to publish the latest release again.
 
-`npm run release -- --dry-run` does everything but publish and prints the notes. The notes are split into **Features** and **Fixes** from the CHANGELOG: a bullet starting with `**Fixed:**` is a fix; `**Added:**`, `**Changed:**` and `**Removed:**` are features.
+`npm run release -- --dry-run` does everything but publish and prints the notes, and which issues it would close. The notes are split into **Features** and **Fixes** from the CHANGELOG: a bullet starting with `**Fixed:**` is a fix; `**Added:**`, `**Changed:**` and `**Removed:**` are features.
+
+**Issues close on release**, not on commit: a patch is not something people can download, a release is.
+
+| When | What happens |
+| --- | --- |
+| A fix is committed | Its CHANGELOG bullet names the issue as `issue #N`; the issue gets the label `fixed: next release` and a comment that the fix is on `main` and ships in the next release. It stays open |
+| The release is published | `npm run release` finds every `issue #N` in the release's notes, comments on each with the release's link, takes the label off and closes it. One already closed is left alone; one it cannot reach is named, and the release stands |
+
+Only `issue #N` (or `issues #N`) counts, never a bare `#N`, which could be a colour.
 
 ### The showcase and the screenshots
 
@@ -2794,7 +2803,7 @@ The made files are kept in `docs/brand/`: the board (`canvast-brand-guidelines.c
 
 | | |
 | --- | --- |
-| Defined in | `scripts/brand/pages.mjs`: the logo (a frame, a window cut from it a little low and to the right, and a dot in the window's middle), its colours (the default theme's Viridian in light mode, with an orange dot) and the nine guideline pages. |
+| Defined in | `scripts/brand/pages.mjs`: the logo (a frame, a window cut from it a little low and to the right, and a dot in the window's middle), its colours (the default theme's Stone, a warm grey, in light mode, with an orange dot) and the nine guideline pages. |
 | Drawn in the app | The build draws the pages on one canvas as nine sheets with bookmarks. The construction glyph is made with the Shape tool and *Subtract*, the crosses with the Path tool, the labels with the Text tool in Space Grotesk. The cover's dot holds the mark again at 1/64, twenty times over (121 zoom levels). The scripts work on a copy of `dist/canvast.html` in the system's temp folder. |
 | Every size | One drawing, the favicon too |
 | In the app | The full-colour logo is only the favicon (inline in `src/index.html`). Everywhere else (over the lock screen, beside the name in Settings > About and diagnostics) the app shows the one-colour mark in the theme's text colour, so it follows light, dark and the theme colour (`src/ui/brand.ts`, the same geometry as `pages.mjs`). |

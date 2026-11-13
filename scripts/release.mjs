@@ -10,7 +10,7 @@ import { mkdtempSync, readFileSync, writeFileSync, statSync, rmSync } from "node
 import { tmpdir } from "node:os";
 import { basename, join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
-import { changelogSection, changelogSince, olderThan, releaseNotes } from "./lib/release-notes.mjs";
+import { FIXED_LABEL, changelogSection, changelogSince, issuesIn, olderThan, releaseNotes } from "./lib/release-notes.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const dry = process.argv.includes("--dry-run"), force = process.argv.includes("--force");
@@ -57,7 +57,9 @@ const dir = mkdtempSync(join(tmpdir(), "canvast-release-"));
 const notesFile = join(dir, "notes.md");
 writeFileSync(notesFile, notes);
 const title = `canvast ${version}`; // (the page title is the version; the notes start with what it is called)
-if (dry) { say(`\n--dry-run: would publish ${tag} “${title}” as the latest release of ${repo}.\n\n${notes}`); rmSync(dir, { recursive: true }); process.exit(0); }
+// The GitHub issues this release fixes ("issue #N" in its bullets): closed once it is published, with where the fix is (close on release).
+const fixedIssues = issuesIn(section.bullets);
+if (dry) { say(`\n--dry-run: would publish ${tag} “${title}” as the latest release of ${repo}${fixedIssues.length ? `, then close issue${fixedIssues.length === 1 ? "" : "s"} ${fixedIssues.map((n) => `#${n}`).join(", ")}` : ""}.\n\n${notes}`); rmSync(dir, { recursive: true }); process.exit(0); }
 
 // 4. Create it (or, if the tag already has a release, replace its file and notes), always as the latest
 // The standalone tools (one file for Node.js, built from this commit): beside the app, for anyone without it.
@@ -83,3 +85,18 @@ const served = sha256(join(dir, "canvast.html"));
 rmSync(dir, { recursive: true });
 if (served !== sum) stop(`the file on the release (${served}) is not the one built here (${sum}).`);
 say(`\n✅ ${tag} is the latest release and serves canvast.html (${sum.slice(0, 12)}…)\n   ${shown.url}\n   https://github.com/${repo}/releases/latest/download/canvast.html`);
+
+// 6. Close the issues it fixes: a comment saying where the fix is, the waiting label taken off. One that is already closed is left as it is;
+// one that cannot be reached is named, and the release stands.
+for (const n of fixedIssues) {
+  try {
+    const issue = JSON.parse(run("gh", ["issue", "view", String(n), "--repo", repo, "--json", "state"]));
+    if (issue.state !== "OPEN") continue;
+    run("gh", ["issue", "comment", String(n), "--repo", repo, "--body", `Fixed in [${tag}](${shown.url}), out now: the app is at https://github.com/${repo}/releases/latest/download/canvast.html, and the desktop packages follow on the release page.`]);
+    run("gh", ["issue", "edit", String(n), "--repo", repo, "--remove-label", FIXED_LABEL], { stdio: ["ignore", "pipe", "ignore"] });
+    run("gh", ["issue", "close", String(n), "--repo", repo, "--reason", "completed"]);
+    say(`   closed issue #${n}`);
+  } catch {
+    say(`⚠️ issue #${n} could not be closed: close it by hand.`);
+  }
+}

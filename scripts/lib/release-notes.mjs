@@ -31,6 +31,19 @@ export function changelogSince(changelog, version, previousVersion) {
   return { ...section, bullets: [...section.bullets, ...earlier.flatMap((e) => e.bullets)], earlier: earlier.map((e) => `${e.version} (${e.title})`) };
 }
 
+/**
+ * The GitHub issues a release fixes: every "issue #N" (or "issues #N") in its bullets, in order, once each. A bare "#N" is not taken: the
+ * changelog also holds colours such as #111111.
+ */
+export function issuesIn(bullets) {
+  const out = [];
+  for (const b of bullets) for (const m of b.matchAll(/\bissues?\s+#(\d+)/gi)) if (!out.includes(Number(m[1]))) out.push(Number(m[1]));
+  return out;
+}
+
+/** The label a fixed issue waits under until the release that carries the fix. */
+export const FIXED_LABEL = "fixed: next release";
+
 /** Features and fixes of a section's bullets. */
 export function splitBullets(bullets) {
   const isFix = (b) => /^\*\*Fix(ed)?\b[^*]*:?\*\*/i.test(b);
