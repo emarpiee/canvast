@@ -27,6 +27,11 @@ import shapeToolSvg from "lucide-static/icons/pentagon.svg";
 import sheetEachSvg from "lucide-static/icons/book-copy.svg";
 import speechBalloonSvg from "lucide-static/icons/message-circle.svg";
 import pathToolSvg from "lucide-static/icons/spline-pointer.svg";
+import balloonTailSvg from "lucide-static/icons/navigation-2.svg";
+import balloonConnectorSvg from "lucide-static/icons/git-commit-horizontal.svg";
+import tailAddSvg from "lucide-static/icons/message-circle-plus.svg";
+import tailRemoveSvg from "lucide-static/icons/message-circle-x.svg";
+import fitTextToShapeSvg from "lucide-static/icons/maximize-2.svg";
 import nodeToolSvg from "lucide-static/icons/waypoints.svg";
 import vectorSquareSvg from "lucide-static/icons/vector-square.svg";
 import releaseBooleanSvg from "lucide-static/icons/split.svg";
@@ -702,6 +707,11 @@ export const ICONS = {
   shapeTool: clean(shapeToolSvg),
   sheetEach: clean(sheetEachSvg),
   speechBalloon: clean(speechBalloonSvg),
+  balloonTail: clean(balloonTailSvg),
+  balloonConnector: clean(balloonConnectorSvg),
+  tailAdd: clean(tailAddSvg),
+  tailRemove: clean(tailRemoveSvg),
+  fitTextToShape: clean(fitTextToShapeSvg),
   pathTool: clean(pathToolSvg),
   nodeTool: clean(nodeToolSvg),
   vectorSquare: clean(vectorSquareSvg),

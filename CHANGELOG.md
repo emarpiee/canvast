@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.58.26 — A speech balloon's options in the Properties bar (2026-11-14)
+
+- **Changed:** the Speech balloon panel is gone: its options are in the Properties bar, as four groups that are chips by the selection with the forms of every chip: **Body** (shape, preset, hand-drawn, double line, seed; Save as style, Convert to path, Connect balloons), **Tail** (kind, widths, round tip, base; Add tail, Remove tail; which tail when there are several), **Text in shape** (across, down, padding, too much text; Fit text to shape) and **Connector** (its kind, width and bend). Sliders became number fields, as every value of the bar (drag one sideways to change it).
+- **Added:** icons for a tail, a connector, Add tail, Remove tail and Fit text to shape (none had one).
+
 ## 0.58.25 — "Text", not "words", where it is any text (2026-11-14)
 
 - **Fixed:** after a choice in a menu of the text format bar the focus went to the menu: what was typed next went nowhere, and Escape no longer finished the text; the keys now go on into the text (the first Escape closes the menu, the next finishes the text).

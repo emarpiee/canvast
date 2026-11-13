@@ -138,7 +138,7 @@ import { PanelDock } from "../ui/panel-dock";
 import { mountAdjustPanel } from "../ui/adjust-panel";
 import { mountPatternPanel } from "../ui/pattern-panel";
 import { balloonLook, rememberBalloonLook, validLook } from "../doc/balloon-geometry";
-import { mountBalloonPanel } from "../ui/balloon-panel";
+import type { BalloonActions } from "../ui/balloon-bar";
 import { makePattern, makePatternEach, newPatternSession, patternBox, patternTargetLabel, patternTargets, foundPattern, sessionPattern } from "./pattern";
 import { cleanValues, generatorById } from "../gen";
 import { mountCanvasSearch } from "../ui/canvas-search";
@@ -1542,7 +1542,8 @@ async function start(): Promise<void> {
     },
   });
   dock.add(panelEl("pattern-panel"), { id: "pattern", title: "Pattern", side: "right" });
-  const balloonPanel = mountBalloonPanel(side, editor, {
+  // A speech balloon's options and a text in a shape's: groups of the Properties bar, chips by the selection (ADR 0198; once a panel).
+  const balloonActions: BalloonActions = {
     selected: () => selectedBalloon(doc, editor),
     change: (f, final) => {
       commitShape(doc, editor, { balloon: f }, final);
@@ -1569,11 +1570,10 @@ async function start(): Promise<void> {
     toPath: () => {
       void confirmDialog({ title: "Convert to path?", lines: ["The balloon becomes an ordinary path: its nodes can be edited, and its body, tails and connectors can no longer be set."], confirmLabel: "Convert" }).then((yes) => { if (yes) balloonsToPaths(doc, editor); });
     },
-  });
+  };
   try {
     rememberBalloonLook(validLook(JSON.parse(settings.get("balloon.look") || "null")));
   } catch { /* (an old or broken value: the usual balloon) */ }
-  dock.add(panelEl("balloon-panel"), { id: "balloon", title: "Speech balloon", side: "right" });
 /** When the files of these pictures came into the library, for those that do not know it yet (by file). */
   const libraryDates = async (objs: readonly CanvasObject[]): Promise<Map<string, number>> => {
     const out = new Map<string, number>();
@@ -1656,8 +1656,7 @@ async function start(): Promise<void> {
     setArrows: (patch) => commitArrows(doc, editor, patch),
     selectionPaints: () => selectionPaints(doc, editor),
     recolourSelected: (from, to, final) => recolour(doc, editor, from, to, final),
-    hasBalloon: () => selectedBalloon(doc, editor) !== null || selectedShapeText(doc, editor) !== null || selectedLink(doc, editor) !== null,
-    toggleBalloonPanel: () => balloonPanel.toggle(),
+    balloon: balloonActions,
     selectedPin: () => selectedPin(doc, editor),
     fonts: libraryFonts,
     importFont: async (file) => {

@@ -801,7 +801,7 @@ Point a balloon's tail at the speaker.
 | --- | --- |
 | **Handles** | Set the tail tip, base, width, middle width and bend, the rounding or bump depth, the body's size, and its place while the tail tip stays; they snap when Snap is on |
 | **Tails** | Double-click the outline to add one; let a tip go inside the body to remove it |
-| **Panel** | Its button is at the start of the Properties bar: twelve bodies, a double line, any number of tails with rounded tips, thought bubbles, presets, and the text (alignment across and down, padding for each side, what happens to words that do not fit, and **Fit text to shape**) |
+| **Options** | In the Properties bar, or as chips by the selection: **Body** (twelve bodies, presets, hand-drawn, a double line, *Save as style*, *Convert to path*), **Tail** (its kind, widths, rounded tip, base, *Add tail* and *Remove tail*; *Which tail* when there are several), **Text in shape** (alignment across and down, padding for each side, what happens to text that does not fit, **Fit text to shape**) and **Connector** (its kind, width and bend, when one is selected) |
 | **Styles** | *Save as style* keeps size, ratio, tails, paint and the look of the text; its text goes only into a balloon that has none |
 | **Connectors** | Select two or more balloons and *Connect balloons* joins them, left to right. A connector is a neck, pinch, line or dots, and follows its balloons; its handles set the width, the bend and where each end stands on its balloon |
 | **Paint** | The normal fill and outline, including dashes |
@@ -809,7 +809,7 @@ Point a balloon's tail at the speaker.
 | Behaviour | |
 | --- | --- |
 | The next balloon | Takes the look of the last one changed |
-| What belongs to it | A balloon's words, connectors and their cover pieces are in its group and sheet, in front of it, and its row in Layers stands for them. Connect balloons joins balloons on the same sheet |
+| What belongs to it | A balloon's text, connectors and their cover pieces are in its group and sheet, in front of it, and its row in Layers stands for them. Connect balloons joins balloons on the same sheet |
 | Deleting | A balloon removes its connectors and leaves its text as a text of its own; deleting it with its text removes both |
 | Copying | Copy, cut and duplicate take a balloon's text with it, and a connector only when both its balloons go too |
 | *Convert to path* | Gives up the balloon's numbers for node editing |
@@ -847,7 +847,7 @@ Set a cover's type: a title and a subtitle in fonts of your own.
 | Handles | Its corner handles change its letter size, and each side handle changes the padding on its side |
 | Fitting | A long first word moves down to where it fits whole. Words that do not fit go on below it (a note says when some do not). Holes in a shape are avoided |
 | While typing | The words sit in a box in the middle of the shape, on its colour, and take the shape's flow when you finish |
-| Options | The speech balloon button at the start of the Properties bar: alignment across and down (with Justify), padding for each side, overflow and **Fit text to shape** |
+| Options | **Text in shape** in the Properties bar (or its chip by the selection): alignment across and down (with Justify), padding for each side, overflow and **Fit text to shape** |
 | Deleting the shape | Or the speech balloon: leaves plain text |
 
 ---
@@ -2192,7 +2192,7 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 | **Tool rail** | Left | Undo and Redo, the tools (Import after Note), then Screenshot and Search |
 | **Properties bar** | Top, or by the selection | The options of the tool or of what is selected. With *Properties* set to *Near the selection* (Settings > Appearance) they are named chips just above what is selected, each showing its first value; a chip opens its options as a short form, one named option a row. With nothing selected, or another tool picked, the chips stand at the top. On a small window the chips scroll sideways |
 | **Actions bar** | Bottom, or with the selection | What can be done with the selection, in named groups (Items, Files, Adjust, Edit shapes, Arrange, Attach, Selection, Find), always in that order, some of them menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. The names show under or over the buttons, or only on hover, floating over or under the bar without moving it (not offered on a touch screen), or not at all (Settings > Appearance). It sits at the bottom or follows the selection (Settings). When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
-| **Panels** | Either side, or floating | Layers, Bookmarks, Tags, Styles, Adjust, Pattern, Speech balloon: they float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back |
+| **Panels** | Either side, or floating | Layers, Bookmarks, Tags, Styles, Adjust, Pattern: they float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back |
 | **Zen mode** | `Z`, or the leaf button | Fades the bars and panels until the pointer is over them |
 | **Screenshot** | The camera button | Saves the selection, or the whole view, to the library. Settings choose the format, quality, name, folder and tags, and whether to include the canvas pattern and the interface, a transparent background, and a copy on the clipboard |
 | **Hint line** | Bottom | What the tool does, and what each key does over a handle |

@@ -24,6 +24,11 @@ export const SECTIONS: readonly Section[] = [
   { id: "textoutline", label: "Text outline", icon: ICONS.outlineOptions },
   { id: "paragraph", label: "Paragraph", icon: ICONS.textBox },
   { id: "shape", label: "Shape", icon: ICONS.shapeTool },
+  // (a speech balloon, a text in a shape, a connector: what was the Speech balloon panel)
+  { id: "balloon", label: "Body", icon: ICONS.speechBalloon },
+  { id: "tail", label: "Tail", icon: ICONS.balloonTail },
+  { id: "shapetext", label: "Text in shape", icon: ICONS.textInShape },
+  { id: "connector", label: "Connector", icon: ICONS.balloonConnector },
   { id: "picture", label: "Picture", icon: ICONS.image },
   { id: "size", label: "Size", icon: ICONS.ratio },
   { id: "layout", label: "Layout", icon: ICONS.autoLayout },

@@ -1290,8 +1290,7 @@ test("copy, cut, paste and duplicate keep every kind of object whole, on the sam
   }
   await key(app, "v");
   await drag([385, 495], [700, 720]);
-  await p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
-  await p.locator('[data-bl="connect"]').click();
+  await p.locator('[data-bl="connect"]').click(); // (in the balloon's Body options of the Properties bar: once the Speech balloon panel)
   await clear();
   await key(app, "c");
   await drag([760, 460], [1000, 660]);

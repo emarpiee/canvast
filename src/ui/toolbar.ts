@@ -1,3 +1,4 @@
+import { mountBalloonBar, type BalloonActions } from "./balloon-bar";
 import { scrubNumbers } from "../colour-picker/scrub";
 import { RATIO_PRESETS, formatRatio, parseRatio } from "../app/export-size";
 import { esc } from "./format";
@@ -112,8 +113,8 @@ export interface ToolbarActions {
   canPasteAdjust(): boolean;
   copyRendered(): void;
   bake(): void;
-  hasBalloon(): boolean;
-  toggleBalloonPanel(): void;
+  /** A speech balloon's options and a text in a shape's, as groups of this bar (ADR 0198; once a panel). */
+  balloon: BalloonActions;
   selectedShape(): { shape: "polygon" | "star"; sides: number; tips: number; inner: number } | null;
   /** Change the sides, points or ratio of the picked polygons and stars: one undo step. */
   shapeSelected(change: { sides?: number; tips?: number; inner?: number }, final?: boolean): void;
@@ -342,7 +343,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
         <label class="tb-count" data-kind="shape" data-scrub="inner" data-sel-inner-wrap hidden title="Drag the field left or right to change it">Ratio <input type="number" data-sel-inner min="5" max="95" step="1" inputmode="numeric" aria-label="Star ratio (percent)" title="Inner radius as a percent of the outer one"></label>
       </div>
       <div class="tb-group tb-options" data-for="text note select node" data-kind="text">
-        <button type="button" data-balloon-panel hidden aria-label="Speech balloon and text in shape" title="Speech balloon and text in shape: body, tails, text, padding, alignment, connectors">${ICONS.speechBalloon}</button>
         <button type="button" data-text-box data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Paragraph and box options" title="Paragraph and box: space between paragraphs, first line, case, most lines, set height">${ICONS.textBox}</button>
         <button type="button" class="swatch swatch-paint" data-text-colour data-text-wrap hidden aria-haspopup="dialog" aria-expanded="false" aria-label="Text colour" title="Text colour: open the colour picker (with transparency)"><span data-paint-chip></span></button>
         <label class="tb-count" data-text-wrap hidden title="Font: the bundled one, or a font file from the library (import one here)"><select data-text-font aria-label="Font"></select></label>
@@ -362,7 +362,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       </div>
       <div class="tb-group tb-options" data-for="select node" data-sel-colours data-no-command hidden role="group" aria-label="Colours of the selection"></div>
       <div class="tb-group tb-options" data-for="shape balloon path select node" data-kind="shape sheet picture">
-        <button type="button" data-balloon-panel hidden aria-label="Speech balloon and text in shape" title="Speech balloon and text in shape: body, tails, text, padding, alignment, connectors">${ICONS.speechBalloon}</button>
         <button type="button" class="swatch swatch-paint" data-kind="shape sheet" data-paint="fill" aria-haspopup="dialog" aria-expanded="false" aria-label="Fill" title="Fill colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Fill</b></button>
         <button type="button" class="swatch swatch-paint" data-paint="stroke" aria-haspopup="dialog" aria-expanded="false" aria-label="Outline" title="Outline colour: open the colour picker"><span data-paint-chip></span><b class="swatch-name">Outline</b></button>
       <label class="tb-count" data-scrub="outline-w" data-outline-w-wrap hidden title="Outline width, in px at this zoom (0: none). Drag the field left or right to change it">Width <input type="number" data-outline-w min="0" step="0.5" inputmode="decimal" aria-label="Outline width (px at this zoom)"></label>
@@ -427,7 +426,13 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   }
   // Each control's section (ADR 0198), for the ways the bar can be shown (value chips, the Properties panel, beside the selection): a control's
   // own, else its group's.
+  // A speech balloon's options and a text in a shape's, after Look: four groups, four chips (they were the Speech balloon panel).
+  const balloonBar = mountBalloonBar(q<HTMLElement>('.tb-group[data-for="shape balloon path select node"][data-kind]')!, actions.balloon);
   assignSections(barRow, [
+    ['[data-bl-group="body"]', "balloon"],
+    ['[data-bl-group="tail"]', "tail"],
+    ['[data-bl-group="text"]', "shapetext"],
+    ['[data-bl-group="link"]', "connector"],
     ["[data-sel-radius-wrap], [data-sel-smooth-wrap], [data-sel-sides-wrap], [data-sel-tips-wrap], [data-sel-inner-wrap]", "shape"],
     ["[data-pin-wrap], [data-on-sheet]", "position"],
     ["[data-crop], [data-uncrop], [data-flip], [data-unflip]", "picture"],
@@ -663,7 +668,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
       onChange: (patch, final) => actions.setTextStyle({ ...patch, ...(patch.axes && Object.keys(patch.axes).length === 0 ? { axes: null } : {}) }, final),
     });
   });
-  for (const b of qa<HTMLElement>("[data-balloon-panel]")) b.addEventListener("click", () => actions.toggleBalloonPanel());
   q<HTMLElement>("[data-text-box]")!.addEventListener("click", (e) => {
     const t = actions.selectedTextStyle();
     if (!t) return;
@@ -1083,6 +1087,7 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
   pickGroup.addEventListener("click", onClick);
 
   const update = (): void => {
+    balloonBar.sync(); // (before the groups are sorted: what applies is shown)
     for (const b of qa<HTMLElement>("[data-tool]")) {
       // (Shape and Path are one place on the rail: the Shape button stays lit on the Path tool, which is chosen in the options beside the shapes)
       const on = b.dataset["tool"] === editor.tool || (b.dataset["tool"] === "shape" && editor.tool === "path" && !b.closest(".tb-options"));
@@ -1114,7 +1119,6 @@ export function mountToolbar(root: HTMLElement, editor: EditorState, doc: Docume
     if (document.activeElement !== tips) tips.value = String(editor.shapeTips);
     const pick = editor.editsSelection;
     const still = !editor.gesturing;
-    for (const b of qa<HTMLElement>("[data-balloon-panel]")) b.hidden = !(pick && still && actions.hasBalloon());
     // (a field is left as it is while it is typed in, and while a value from one is being shown: the document has the old number until it is settled)
     const free = (el: Element): boolean => document.activeElement !== el && editor.preview.kind !== "replace"; // (not while something is being dragged: the numbers wait for it to end)
     const shp = pick && still ? actions.selectedShape() : null;

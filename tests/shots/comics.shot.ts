@@ -19,8 +19,7 @@ async function balloon(s: Scene, b: Balloon): Promise<string> {
   await s.tool("select");
   await s.select([id]);
   if (b.kind) {
-    if (!(await p.locator("[data-k='preset'] select").isVisible())) await p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
-    await p.locator("[data-k='preset'] select").selectOption(b.kind);
+    await p.locator("[data-bln='preset']").selectOption(b.kind); // (the balloon's Body options, in the Properties bar)
   }
   // its words first (a double-click in the body, where it was drawn), then its tail to the speaker
   await p.mouse.dblclick((x0 + x1) / 2, (y0 + y1) / 2);
@@ -98,9 +97,8 @@ test("balloon-kinds", async ({ scene: s }) => {
   made.push(await balloon(s, { box: [910, 240, 1220, 440], words: "LOOK OUT!", kind: "shout", tip: [1000, 540], font: "bangers", size: 34 }));
   made.push(await balloon(s, { box: [300, 600, 700, 670], words: "LATER THAT NIGHT.", kind: "caption", fill: "#f3e3a6" }));
   await s.select([made[2]!]);
-  if (!(await s.p.locator("[data-k='preset'] select").isVisible())) await s.p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
   await s.settle();
-  await s.shot("balloon-kinds", await s.around({ objects: made, els: ["[data-k='preset']"], pad: 30 }));
+  await s.shot("balloon-kinds", await s.around({ objects: made, els: ["[data-bl-group='body']"], pad: 30 }));
 });
 
 test("balloons", async ({ scene: s }) => {
@@ -114,9 +112,8 @@ test("balloons", async ({ scene: s }) => {
   const id = await balloon(s, { box: [...inside(b, 0.5, 0.05), ...inside(b, 0.95, 0.33)] as [number, number, number, number], words: "THE FORD IS HIGH THIS YEAR.", kind: "speech", tip: inside(b, 0.55, 0.62), size: 16 });
   await s.fit([pic!], 0.62, [0.4, 0.5]);
   await s.select([id]);
-  if (!(await s.p.locator("[data-k='preset'] select").isVisible())) await s.p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
   await s.settle();
-  await s.shot("balloons", await s.around({ objects: [pic!], els: ["[data-k='preset']"], pad: 24 }));
+  await s.shot("balloons", await s.around({ objects: [pic!], els: ["[data-bl-group='body']"], pad: 24 }));
 });
 
 test("text", async ({ scene: s }) => {

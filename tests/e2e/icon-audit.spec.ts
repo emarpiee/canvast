@@ -91,6 +91,8 @@ test("icons audit: the same thing shows the same icon: each chip of the Properti
   const keys = [...sections.matchAll(/icon: ICONS\.(\w+)/g)].map((m) => m[1]!);
   expect(keys.length, "the sections were read").toBeGreaterThan(10);
   const elsewhere = walk(path.join(ROOT, "src")).filter((f) => !/bar-sections\.ts$|icons\.ts$/.test(f)).map((f) => fs.readFileSync(f, "utf8")).join("\n");
-  const fresh = keys.filter((k) => !new RegExp(`ICONS\\.${k}\\b`).test(elsewhere));
+  // (a thing that had no icon anywhere gets one of its own, CLAUDE.md "Icons": these, each with why; every other chip reuses)
+  const NEW_FOR_THING: Record<string, string> = { balloonTail: "a speech balloon's tail: nothing showed it before its chip (ADR 0198)" };
+  const fresh = keys.filter((k) => !NEW_FOR_THING[k] && !new RegExp(`ICONS\\.${k}\\b`).test(elsewhere));
   expect(fresh, "chip icons used nowhere else: made for the chip instead of reused").toEqual([]);
 });

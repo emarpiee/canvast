@@ -164,7 +164,7 @@ export const BALLOON_KIND: StyleKind = {
   id: "balloon",
   label: "Speech balloon",
   plural: "Speech balloons",
-  empty: "None yet. Save one from the Speech balloon panel.",
+  empty: "None yet. Save one from a balloon's Body options (Save as style).",
   validate: (d) => validLook(d),
   summary: (d) => BODIES.find(([id]) => id === (d as BalloonLook).body)?.[1] ?? "Balloon",
   look: () => ({}),

@@ -47,6 +47,13 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.26: a speech balloon's options in the Properties bar (2026-11-14)
+
+- **Implemented:** `ui/balloon-bar.ts` (from `ui/balloon-panel.ts`, removed): the same settings, values and changes (only what was changed goes onto each balloon; a drag along a number is one undo step), as four `.tb-group`s of the Properties bar after Look, built once by `mountToolbar` (its actions take `balloon: BalloonActions`) and filled by its `update` before the groups are sorted; what does not apply is hidden. Sections `balloon`, `tail`, `shapetext`, `connector` (`ui/bar-sections.ts`). Full names that clash with no other row or chip ("Body shape", "Tail kind", "Connector width"). New icons: `navigation-2`, `git-commit-horizontal`, `message-circle-plus`, `message-circle-x`, `maximize-2` (registry rows). The panel's dock entry and its bar buttons are gone. Tests: `bar-layouts.spec.ts` (a balloon's chips, every one audited, a value and Add tail); the Connect balloons steps of `editing.spec.ts` and `vectors.spec.ts` press the bar's button; `comics.shot.ts` picks the preset there; `icon-audit.spec.ts` lists the chips whose thing had no icon before (the tail), each with why.
+- **Tested:** build and typecheck here. Scratch in Chromium and Firefox: a balloon's chips Look, Body, Tail, Size; every chip's form passes `floatingProblems`; Tail base 60 and Add tail reach the balloon; the bar at the top shows Body and Tail. Chromium: a balloon with text adds Text in shape; two balloons, Body's Connect balloons makes a connector, whose chips are Look, Connector, Size.
+- **Unverified:** the README pictures of balloons still show the panel (to be taken again with the other pictures of the Properties bar).
+- **Committed:** v0.58.26 on `main`.
+
 ## v0.58.25: "text", not "words", where it is any text (2026-11-14)
 
 - **Implemented:** the format bar's groups are plain `.tb-group`s again (no `captionedGroup`, no hover names); its middle group is "Text". Every name, hint, label and notice that said "words" for any selected text or a text's content says "text" (text editor, toolbar, colour popover, balloon panel, Layers labels "Text of …", context bar, delete everywhere, an undo label, notes, settings "Signs wrap selected text"), with the tests (`text.spec.ts`), the icon registry and the README.

@@ -3814,8 +3814,7 @@ test("speech balloon: a double-click makes its words, kept in the body; nothing 
   await click(app, 1000, 650);
   await key(app, "v");
   await key(app, "Control+a");
-  await p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
-  await p.locator('[data-bl="connect"]').click();
+  await p.locator('[data-bl="connect"]').click(); // (in the balloon's Body options of the Properties bar: once the Speech balloon panel)
   const count = () => p.evaluate(() => {
     const all = window.__canvastDebug.objects() as Array<{ kind: string; params?: { link?: { cover?: string } } }>;
     const link = (o: (typeof all)[number]) => o.params?.link;
@@ -3864,8 +3863,7 @@ test("a balloon's words and connector belong to it: in its group and sheet, in f
   }
   await key(app, "v");
   await key(app, "Control+a");
-  await p.locator("[data-balloon-panel]").filter({ visible: true }).first().click();
-  await p.locator('[data-bl="connect"]').click();
+  await p.locator('[data-bl="connect"]').click(); // (in the balloon's Body options of the Properties bar: once the Speech balloon panel)
   await click(app, 1000, 650);
   type O = { id: string; kind: string; z: number; groups?: string[]; parent?: string; inShape?: { shape: string }; params?: { balloon?: unknown; link?: { a: string; cover?: string } } };
   const all = () => p.evaluate(() => window.__canvastDebug.objects()) as unknown as Promise<O[]>;

@@ -243,7 +243,12 @@ One icon per function: two buttons that do different things never share an icon,
 | `presentation` | Start the slideshow |
 | `rectangle-horizontal` | Rectangle shape |
 | `redo-2` | Redo |
-| `replace` | Convert text to path (the selection bar) |
+| `replace` | Convert text to path (the selection bar); Convert a balloon to path (its Body options) |
+| `navigation-2` | A speech balloon's Tail: its chip and section in the Properties bar |
+| `git-commit-horizontal` | A balloon connector: its chip and section in the Properties bar; Connect balloons |
+| `message-circle-plus` | Add tail (a balloon's Tail options) |
+| `message-circle-x` | Remove tail (a balloon's Tail options) |
+| `maximize-2` | Fit text to shape (Text in shape options) |
 | `ruler` | By size, largest first |
 | `scaling` | Pen size follows zoom |
 | `search` | Search the canvas |

@@ -117,6 +117,30 @@ test("every chip of a sheet, a thing on it, several things and a mix keeps the r
   expect(app.consoleErrors).toEqual([]);
 });
 
+test("a speech balloon's options are chips (Body, Tail) with the forms of every chip; a value set there reaches the balloon, and Add tail adds one", async ({ app }) => {
+  const p = app.page;
+  await set(app, "ui.properties", "near");
+  await p.keyboard.press("k");
+  await app.drag({ x: 560, y: 420 }, { x: 800, y: 580 }, 5);
+  await p.keyboard.press("v");
+  await p.mouse.click(680, 480);
+  const near = p.locator(".props-near");
+  await expect(near.locator(".tb-cap")).toHaveText(["Look", "Body", "Tail", "Size"]);
+  await expect(p.getByTestId("balloon-panel"), "no panel of its own any more").toHaveCount(0);
+  expect(await auditChips(app, ".props-near")).toEqual([]);
+  const tails = () => p.evaluate(() => (window.__canvastDebug.objects().find((o) => o["params"]) as unknown as { params: { balloon: { tails: Array<{ width: number }> } } }).params.balloon.tails);
+  const w0 = (await tails())[0]!.width;
+  await near.locator('[data-vchip="tail"]').click();
+  const base = p.locator('.vchip-pop [data-bln="tailW"]');
+  await base.fill("60");
+  await base.press("Enter");
+  await expect.poll(async () => (await tails())[0]!.width, "the tail's base is wider").toBeGreaterThan(w0);
+  await p.locator('.vchip-pop [data-bl="addtail"]').click();
+  await expect.poll(async () => (await tails()).length).toBe(2);
+  await expect(p.locator('.vchip-pop [data-bln="which"]'), "two tails: which one is set").toBeVisible();
+  expect(app.consoleErrors).toEqual([]);
+});
+
 test("with nothing selected a tool's chips are at the top; the palette opens a closed chip; back to the bar, the options are in it", async ({ app }) => {
   const p = app.page;
   await set(app, "ui.properties", "near");
