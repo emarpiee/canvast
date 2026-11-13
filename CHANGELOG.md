@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.57.18 — Auto layout settings kept on reload and paste (2026-11-13)
+
+- **Fixed:** how a thing takes part in an auto layout (Fill, Keep out of the layout, its span and limits) was lost when the canvas was opened again or the thing was pasted.
+- **Fixed:** a picture's library date (for a layout's date order) was lost the same way.
+
 ## 0.57.17 — A warm grey brand (2026-11-13)
 
 - **Changed:** the brand and the app's default theme are a warm grey, Stone (theme colour 70°, colourfulness 20%), instead of Viridian; the logo keeps its orange dot. Viridian stays a Theme colour preset, and Stone is a new one.

@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.18: auto layout settings kept on reload and paste (2026-11-13)
+
+- **Implemented:** `deserializeObject` reads `inLayout` (never read since ADR 0186) and `ImageObject.added` (code in 2beab99d; this entry and the version follow the recolour's 0.57.17).
+- **Tested:** typecheck here; the round trip in Node; unit round trip in `auto-layout.test.ts`; `editing.spec` copy and reload tests on GitHub.
+- **Known failures:** none known yet.
+- **Unverified:** none.
+- **Committed:** v0.57.18 on `main`.
+- **Next bounded task:** read this push's runs.
+
 ## v0.57.17: a warm grey brand (2026-11-13)
 
 - **Implemented:** default theme Stone (`--hue` 70, `--vivid` 0.2; settings `ui.hue` 70, `ui.vivid` 20; Stone first preset, Viridian kept); origin axes and snap guides fixed colours (orange, magenta), not tinted by the theme; favicon, desktop window background, brand palette (`scripts/brand/pages.mjs`, `cover.mjs`) and the files made from it (icons, header logo, cover, social preview, board and its previews).
