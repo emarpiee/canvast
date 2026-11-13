@@ -136,6 +136,7 @@ import { mountAdjustPanel } from "../ui/adjust-panel";
 import { mountPatternPanel } from "../ui/pattern-panel";
 import { balloonLook, rememberBalloonLook, validLook } from "../doc/balloon-geometry";
 import { mountBalloonPanel } from "../ui/balloon-panel";
+import { mountPropertiesPanel } from "../ui/properties-panel";
 import { makePattern, makePatternEach, newPatternSession, patternBox, patternTargetLabel, patternTargets, foundPattern, sessionPattern } from "./pattern";
 import { cleanValues, generatorById } from "../gen";
 import { mountCanvasSearch } from "../ui/canvas-search";
@@ -1588,8 +1589,7 @@ async function start(): Promise<void> {
   };
   let lastGrid: { cmd: Extract<LayoutCommand, { grid: unknown }>; ids: string } | null = null;
   const hintLine = { current: null as null | { refresh(): void } };
-  mountToolbar(document.getElementById("toolbar")!, editor, doc, {
-    findCommand: () => palette.open(),
+  const propsBar = mountToolbar(document.getElementById("toolbar")!, editor, doc, {
     importFiles,
     openSearch: (prefix) => canvasSearch.open(prefix),
     screenshot: () => void takeScreenshot(),
@@ -1730,6 +1730,14 @@ async function start(): Promise<void> {
     },
     paintSelected: (patch, final) => (final ? commitPaint(doc, editor, patch) : previewPaint(doc, editor, patch)),
   });
+  // The Properties panel (ADR 0197): the bar's controls in a panel of the dock, or the bar at the top, as Settings say.
+  const propsPanel = mountPropertiesPanel(side, propsBar, {
+    folded: () => settings.get("ui.propsFolded").split(",").filter(Boolean),
+    setFolded: (ids) => void settings.set("ui.propsFolded", ids.join(",")),
+  });
+  dock.add(propsPanel.el, { id: "properties", title: "Properties", side: "right" });
+  propsPanel.setPlace(settings.get("ui.properties"));
+  settings.subscribe((key) => key === "ui.properties" && propsPanel.setPlace(settings.get("ui.properties")));
   // File something just saved in the library in the folder and with the tags the settings give for its kind (what is saved from the canvas has its own).
   const fileInLibraryAs = (hash: string, kind: "export" | "pattern" | "svg"): Promise<string> =>
     fileInLibrary(session, hash, settings.get(`${kind}.folder`).trim(), shotTags({ screenshot: false, board: false, canvas: false, items: false, custom: settings.get(`${kind}.tags`) }, "", "", []));

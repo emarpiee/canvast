@@ -401,7 +401,7 @@ Let a sheet lay its pictures out in a grid that stays tidy as you add more.
 | On a sheet | `Shift+A`, **Auto layout** in the Sheets menu of the Actions bar, or the layout badge on the sheet's row in Layers. It reads the layout from where things are, so they stay put |
 | On loose things | `Shift+A`, or **Auto layout on a new sheet** in the Sheets menu: a new sheet round them (with no fill) that lays them out and fits them |
 
-| Control (Properties bar, sheet selected: the Size, Layout, Spacing and Columns & order tabs) | What it does |
+| Control (Properties, sheet selected) | What it does |
 | --- | --- |
 | **Flow** | **Row**, **column**, **wrap** (rows that break at the sheet's width), **grid**, **masonry** or **justified rows** (see below) |
 | **Gap** | Between items along the flow, and between lines |
@@ -470,7 +470,7 @@ Line studies up along their bottom edges.
 | **Size** menu | Gives the selected pictures, note cards, shapes, strokes and text the width or height of the smallest, the middle or the largest of them, in proportion. **Reset size** puts pictures, videos, GIFs, sounds and note cards back to the size they are placed at, at the current zoom (one pixel of the file for one of the screen; a note card at Settings > Notes > Note tool card size), about their middle. Several selected keep their layout: they move apart only as far as it takes to keep their gaps |
 | **Copy, cut, paste, duplicate** | `Ctrl/⌘+C`, `X`, `V`, `D`; `Alt`+drag copies |
 | **Groups** | `Ctrl/⌘+G`; a group (also a boolean group) counts as one thing; its shapes line up with each other only when you select them one by one (in Layers, or inside the group). A group or several selected move from anywhere in their box, gaps too; press outside it to draw a selection box |
-| **Editing** | With a mixed selection, a dropdown at the start of the Properties bar (All, Pictures, Media, Shapes, Strokes, Texts) narrows both bars to one kind |
+| **Kind chips** | With a mixed selection, chips at the start of Properties (All, Pictures, Media, Shapes, Strokes, Texts) narrow both it and the Actions bar to one kind |
 | **Hide and lock** | *Show all hidden* and *Unlock all* bring everything back |
 
 **Snapping** (the magnet button turns it off; *Snap to the grid* and *Snap distance* are in Settings > Drawing):
@@ -2188,7 +2188,7 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 | Part | Where | What it does |
 | --- | --- | --- |
 | **Tool rail** | Left | Undo and Redo, the tools (Import after Note), then Screenshot and Search |
-| **Properties bar** | Top | How the tool or what is selected looks and behaves: settings only. With a selection, tabs at its start show one section at a time, in a fixed order: **Look** first (fill, outline, adjustments), then what is the kind's own (**Text**, **Shape**, **Picture**), then the sheet's (**Size**, **Layout**, **Spacing**, **Columns & order**, **In layout**, **On sheet**). Each kind of selection opens on the tab used last. **Find** at its end opens the command palette |
+| **Properties** | A panel on the right, or the bar at the top (Settings > Appearance > Properties) | How the tool or what is selected looks and behaves. **In a panel** (the default): its sections one under another, Look first (Look, Text, Shape, Picture, Size, Layout, Spacing, Columns and order, In layout, On sheet, Options), each heading folds (kept), and *Find a property* at the top leaves only the properties whose name has what you type. Its button is in the panel buttons at the top right. **In the bar at the top**: the same controls in one row over the canvas |
 | **Actions bar** | Bottom, or with the selection | What can be done with the selection: actions only, in groups named under their buttons (Items, Files, Edit shapes, Arrange, Attach, Selection, Find), always in that order, some of them menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. It sits at the bottom or follows the selection (Settings). When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
 | **Panels** | Either side, or floating | Layers, Bookmarks, Tags, Styles, Adjust, Pattern, Speech balloon: they float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back |
 | **Zen mode** | `Z`, or the leaf button | Fades the bars and panels until the pointer is over them |
@@ -2267,7 +2267,7 @@ Make the app yours: theme, theme colour, density and the canvas.
 | Media and playback | Players: starting volume and step sizes. The library viewer: its edges (a click on the left or right goes to the previous or next item), how long the player stays while a video plays, slideshow time |
 | Saving to the library | Extracted frames and PDF pages (format, quality, a page's resolution, folder, name, tags) and edited pictures (format, quality, folder, name, tags), and the folder and tags of what is saved to the library from the canvas, one pair for each kind: pictures from Export… (*Exports*, `export`), patterns (*Patterns*, `pattern`) and shapes saved as SVG (*Shapes*, `shape`); screenshots have theirs in the Screenshot group. In the desktop app, Keep file names and Sort files by kind |
 | Screenshot | Format, quality, pattern, transparency, interface, clipboard, folder, name and tags |
-| Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, Actions bar place, item names, density (comfortable, compact, dense), round or sharp corners, Zen mode; panels: minimize inactive ones, how many stay open |
+| Appearance | Theme (system, light, dark), theme colour (or adaptive, from the canvas background), colourfulness, information shown, hints and tooltips, canvas pattern, Properties (a panel or the bar at the top), Actions bar place, item names, density (comfortable, compact, dense), round or sharp corners, Zen mode; panels: minimize inactive ones, how many stay open |
 | Performance | Adaptive quality, fixed quality level, memory for pictures, animation and its speed |
 | Storage | Space used and whether the browser keeps the data; the library folder (choose it, move files in and out, the library index and its automatic saving); how saving is going; backups (export, Advanced export, changes only, files as ZIP, import); in the desktop app, where deleted files go and when `.trash` is emptied; *Start from scratch* (delete all data, after a warning with a backup offered first) |
 | Privacy | The word that begins hidden mode, remembering the Hidden password until the tab closes, the passwords of the workspace and of the Hidden items, Lock now and New key; what stays on your machine |
@@ -2308,7 +2308,7 @@ Change any shortcut, with a warning when two clash.
 | Bring to front · send to back | `Ctrl/⌘+]` · `Ctrl/⌘+[` |
 | Bookmarks | `[` previous · `]` next · `Alt+1` … `Alt+9` go to bookmark 1 to 9 |
 | Previous view · next view | `Alt+Shift+←` · `Alt+Shift+→` |
-| Command palette | `Ctrl/⌘+K`, or **Find** at the end of either bar (`@kind` narrows it; commands can take a value; macros record and replay). An option on a tab of the Properties bar that is not open is found too: running it opens its tab |
+| Command palette | `Ctrl/⌘+K`, or **Find** at the end of the Actions bar (`@kind` narrows it; commands can take a value; macros record and replay) |
 | Context menu | Right-click the canvas |
 | Search | `Ctrl+F` (library: `Ctrl+Shift+F`); on the canvas `#` searches tags, `@` bookmarks, `/` is the command palette and `?` the shortcut list |
 | Focus on selection · fit everything | `F` · `F` again |

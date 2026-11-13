@@ -5,9 +5,6 @@
  */
 
 /** A control or group is out: hidden by its own logic, or switched off because it is not for the kind being edited (`data-off`). */
-/** Sent from a control of the Properties bar (bubbling) to open the section it is in (ADR 0197): the detail is the section's id. */
-export const OPEN_SECTION_EVENT = "canvast:open-section";
-
 /** A group of a bar with its name shown over its controls (ADR 0197): the controls go in `.tb-row`. */
 export const captionedGroup = (name: string, items: string): string => `<div class="tb-group tb-captioned" role="group" aria-label="${name}"><span class="tb-cap" aria-hidden="true">${name}</span><div class="tb-row">${items}</div></div>`;
 

@@ -333,6 +333,7 @@ import captionsSvg from "lucide-static/icons/captions.svg";
 import captionsOffSvg from "lucide-static/icons/captions-off.svg";
 import scanTextSvg from "lucide-static/icons/scan-text.svg";
 import textSearchSvg from "lucide-static/icons/text-search.svg";
+import settings2Svg from "lucide-static/icons/settings-2.svg";
 import squareIcon from "lucide-static/icons/square.svg";
 import arrowUpDown from "lucide-static/icons/arrow-up-down.svg";
 import ellipsisIcon from "lucide-static/icons/ellipsis.svg";
@@ -686,6 +687,7 @@ export const ICONS = {
   captionsOff: clean(captionsOffSvg),
   scanText: clean(scanTextSvg),
   findCommand: clean(textSearchSvg),
+  properties: clean(settings2Svg),
   squareIcon: clean(squareIcon),
   star: clean(starIcon),
   trash2: clean(trash2),

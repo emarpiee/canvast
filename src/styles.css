@@ -455,9 +455,8 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 :is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs) { scroll-padding-inline: var(--sp-10); }
 /* Switched off: for another kind of item than the one being edited (ui/toolbar.ts). */
 [data-off] { display: none !important; }
-/* In a section of the Properties bar that is not open (ADR 0197): its tab shows it. */
-[data-section-off] { display: none !important; }
-.toolbar button[role="tab"][aria-selected="true"] { background: var(--hud-accent); color: var(--hud-accent-fg); }
+/* Folded or filtered out in the Properties panel (ADR 0197). */
+[data-section-off], [data-filter-off] { display: none !important; }
 .toolbar .tb-chip { width: auto; padding: 0 var(--s-6); font: var(--font-meta); }
 .tb-group { display: flex; gap: var(--s-1); align-items: center; }
 .tb-group[hidden] { display: none; }
@@ -3292,3 +3291,24 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .np-date { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-4); }
 .np-date[hidden], .np-date input[hidden] { display: none; }
 .np-label { color: var(--hud-muted); font: var(--font-meta); }
+
+/* The Properties panel (ADR 0197): the Properties bar laid out down a panel of the dock, its sections under headings that fold, Look first.
+   The bar's groups give way (display: contents) so that each control takes its place in its own section (ui/properties-panel.ts sets the order). */
+.props-find { width: 100%; height: var(--field-h); padding: 0 var(--s-4); font: var(--font-value); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.toolbar.is-panel { display: block; min-height: 0; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; }
+.toolbar.is-panel[hidden] { display: none; }
+.toolbar.is-panel .tb-options-row { flex-wrap: wrap; justify-content: flex-start; align-items: center; overflow: visible; gap: var(--s-4); }
+.toolbar.is-panel .tb-options-row::before, .toolbar.is-panel .tb-options-row::after { display: none; }
+.toolbar.is-panel .tb-options-row :is(.tb-group, [data-ps-flat]):not([hidden], [data-section]) { display: contents; }
+.toolbar.is-panel .tb-options-row .tb-group.tb-group.tb-group { margin: 0; padding: 0; border: 0; }
+.toolbar.is-panel .tb-options-row :is(label, .tb-count):not([hidden], [data-ps-flat]) { display: flex; flex: 1 1 100%; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s-4); }
+.toolbar.is-panel .tb-options-row .tb-count .tb-count, .toolbar.is-panel .tb-options-row .tb-count label { flex-basis: auto; }
+.toolbar:not(.is-panel) .ps-head { display: none; }
+.toolbar.is-panel .ps-head { display: flex; flex: 1 1 100%; justify-content: space-between; align-items: center; height: var(--list-h); margin-top: var(--s-4); padding: 0 var(--s-2); font: var(--weight-semibold) var(--text-sm)/1.3 var(--font-ui); border-top: 1px solid var(--hud-border); border-radius: 0; }
+.toolbar.is-panel .ps-head:first-of-type { margin-top: 0; }
+.toolbar.is-panel .ps-head[hidden] { display: none; }
+.toolbar.is-panel .ps-head svg { transition: transform var(--dur-fast, 0s); }
+.toolbar.is-panel .ps-head[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.toolbar.is-panel .tb-options-row label:not([hidden], [data-ps-flat]):has(+ label[data-ps-bare]) { flex: 1 1 60%; flex-wrap: nowrap; }
+.toolbar.is-panel .tb-options-row label[data-ps-bare]:not([hidden], [data-ps-flat]) { flex: 0 0 auto; }
+.toolbar.is-panel .tb-options-row input:is([type="number"], [type="text"]) { width: calc(2 * var(--ctl)); }

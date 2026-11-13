@@ -47,14 +47,14 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
-## v0.57.23: the bars organised (branch bars-organized, 2026-11-13)
+## v0.57.24: a Properties panel (branch bars-organized, 2026-11-13)
 
-- **Implemented:** ADR 0197: `data-section` on every control of a selection, `SECTIONS` and `organize` in `ui/toolbar.ts` (tabs, the tab kept per kind, `data-section-off`), `captionedGroup` in `ui/bar.ts` for the Actions bar's named groups, Find in both bars, `OPEN_SECTION_EVENT` for the command palette (`commands/from-bars.ts`).
-- **Tested:** typecheck and build here; the tabs of a sheet, a picture and a shape, that no tab scrolls at 1400 px, the tab kept per kind, and the palette opening a closed tab, checked in a scratch run. No E2E run on this branch (owner: UI change, no tests).
-- **Known failures:** none known; E2E specs that click bar controls on a tab that is not open may need the tab first.
-- **Unverified:** Firefox, phone width, every kind of selection, the shots of the bars.
-- **Committed:** v0.57.23 on branch `bars-organized` (not merged).
-- **Next bounded task:** owner tries it; then the README pictures of both bars.
+- **Implemented:** ADR 0197: `ui/properties-panel.ts` (the panel, sections, folds, find), `data-section` on every control of `ui/toolbar.ts`, `q`/`qa`/`listen` and `PropertiesBar` so the bar works in either place, settings `ui.properties` and `ui.propsFolded`, the dock button; the Actions bar's named groups (`captionedGroup`) and Find. The tabs tried in 0.57.23 are gone: the bar is main's.
+- **Tested:** typecheck and build here; the panel for a sheet, a picture, the Pen, nothing selected, Find a property, a folded section, and the switch back to the bar, checked in a scratch run in Chromium. No E2E run on this branch (owner: UI change, no tests).
+- **Known failures:** none known.
+- **Unverified:** Firefox, phone width, text and balloon selections in the panel, every popover opened from the panel.
+- **Committed:** v0.57.24 on branch `bars-organized` (not merged).
+- **Next bounded task:** the owner tries it; then README pictures, and E2E for the panel before merging.
 
 ## v0.57.22: auto layout audited (2026-11-13)
 

@@ -1,13 +1,11 @@
 # Changelog
 
-## 0.57.23 — The bars organised (2026-11-13)
+## 0.57.24 — A Properties panel, named groups in the Actions bar (2026-11-13)
 
-- **Changed:** the Properties bar shows a selection's options in tabs at its start (Look, Text, Shape, Picture, Size, Layout, Spacing, Columns & order, In layout, On sheet), one at a time, so it no longer scrolls sideways; Look is always first and each kind of selection opens on the tab used last.
+- **Added:** a **Properties** panel in the dock: the options of the tool or of what is selected, in sections one under another (Look first), each heading folding, with *Find a property* at the top. Settings > Appearance > Properties chooses it (the default) or the bar at the top, as before.
 - **Changed:** the Actions bar's groups show their names under their buttons (Items, Files, Edit shapes, Arrange, Attach, Selection).
-- **Changed:** the colours of a selection and its outline width are in the Look tab, no longer a second bar under the Properties bar.
-- **Changed:** with things of several kinds selected, which kind's options show is chosen in a dropdown (**Editing: Sheet ▾**) instead of chips that looked like the tabs.
-- **Added:** **Find** at the end of both bars opens the command palette; an option on a tab that is not open is found too, and running it opens its tab.
-- **Changed:** auto layout's Size choice is in the Size tab, beside the sheet's ratio; Gap and Pad are in Spacing; columns, row height, order and saved layouts in Columns & order.
+- **Added:** **Find** at the end of the Actions bar opens the command palette.
+- **Changed:** hints say Fill and Outline are in Properties, wherever it is.
 
 ## 0.57.22 — Auto layout audited: pictures keep their shape (2026-11-13)
 

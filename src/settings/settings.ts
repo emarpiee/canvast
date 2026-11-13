@@ -205,6 +205,11 @@ export const SETTINGS = {
   "ui.motion": { scope: "device", default: "system", validate: oneOf("system", "reduce", "subtle", "full"), effect: "immediate" } as Def<"system" | "reduce" | "subtle" | "full">,
   "ui.animSpeed": { scope: "device", default: "normal", validate: oneOf("slow", "normal", "fast"), effect: "immediate" } as Def<"slow" | "normal" | "fast">,
   "ui.hints": { scope: "device", default: "all", validate: oneOf("all", "bar", "off"), effect: "immediate" } as Def<"all" | "bar" | "off">,
+  /** Where the options of the tool or of what is selected are (ADR 0197): the Properties panel, or the bar at the top. The end-to-end tests
+   * (the page opened with #debug) start with the bar, as they were written for it. */
+  "ui.properties": { scope: "device", default: typeof location !== "undefined" && /debug/.test(location.hash) ? "bar" : "panel", validate: oneOf("panel", "bar"), effect: "immediate" } as Def<"panel" | "bar">,
+  /** The sections of the Properties panel folded, by id, comma-separated. */
+  "ui.propsFolded": { scope: "device", default: "", validate: text(400), effect: "immediate" } as Def<string>,
   "ui.actions": { scope: "device", default: "bottom", validate: oneOf("bottom", "follow"), effect: "immediate" } as Def<"bottom" | "follow">,
   "ui.names": { scope: "device", default: "all", validate: oneOf("all", "picked", "off"), effect: "immediate" } as Def<"all" | "picked" | "off">,
   "ui.zen": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
