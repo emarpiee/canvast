@@ -1017,14 +1017,18 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .tb-captioned { flex-direction: column; align-items: stretch; gap: 0; }
 .tb-captioned > .tb-row { display: flex; gap: var(--s-1); align-items: center; justify-content: center; }
 .tb-captioned > .tb-cap { order: 1; padding-inline: var(--s-2); font: var(--font-meta); color: var(--hud-muted); line-height: 1; text-align: center; white-space: nowrap; }
-/* Where the names show (Settings > Appearance > Actions bar group names): over the buttons, only while the pointer is on the bar (they take
-   no room until then: the bar grows on hover), or not at all. */
+/* Where the names show (Settings > Appearance > Actions bar group names): over the buttons, only while the pointer is on the bar, or not at all. */
 :root[data-group-names^="top"] .tb-captioned > .tb-cap { order: -1; }
-/* (no height and unseen, but its width is kept, so the groups do not widen and the buttons do not slide sideways on hover) */
-:root[data-group-names$="hover"] .ctx-bar:not(:hover, :focus-within) .tb-captioned > .tb-cap { height: 0; overflow: hidden; visibility: hidden; }
 :root[data-group-names="off"] .tb-captioned > .tb-cap { display: none; }
-/* (a touch screen cannot hover: there the names always show) */
-@media not (any-hover: hover) { :root[data-group-names$="hover"] .ctx-bar .tb-captioned > .tb-cap { height: auto; visibility: visible; } }
+/* On hover they float over or under the bar in a layer of their own (ui/context-bar.ts), so no bar grows or moves. (A touch screen cannot hover:
+   there the names stay in the bar.) */
+.ctx-names { position: absolute; left: 0; right: 0; display: none; pointer-events: none; }
+.ctx-name { position: absolute; top: 0; padding: var(--s-1) var(--s-4); font: var(--font-meta); line-height: 1; color: var(--hud-muted); white-space: nowrap; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-pill); transform: translate(-50%, calc(-100% - var(--near))); }
+:root[data-group-names="bottom-hover"] .ctx-name { top: 100%; transform: translate(-50%, var(--near)); }
+@media (any-hover: hover) {
+  :root[data-group-names$="hover"] .ctx-bar .tb-captioned > .tb-cap { display: none; }
+  :root[data-group-names$="hover"] .ctx-wrap:has(> .ctx-bar:is(:hover, :focus-within)) > .ctx-names { display: block; }
+}
 .ctx-bar button { display: inline-flex; flex: none; align-items: center; justify-content: center; color: inherit; background: transparent; border: 0; cursor: pointer; }
 .ctx-bar button[hidden] { display: none; }
 /* A button that opens a menu of tools wears a small corner mark (bottom right), so it reads as a group without changing the bar's size. */

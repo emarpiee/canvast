@@ -47,6 +47,15 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.4: hover group names float beside the bar (2026-11-13)
+
+- **Implemented:** a names layer `.ctx-names` in `.ctx-wrap` (ui/context-bar.ts), labels centred on the visible groups, placed on pointerenter, focusin, scroll and update while hovered; shown by CSS only where the pointer can hover; inline names stay on touch.
+- **Tested:** typecheck and build here; scratch run in Chromium and Firefox: both bars keep the same box on hover, all seven names shown, no errors.
+- **Known failures:** none known. Names under the bar may sit over the bottom-right controls while shown.
+- **Unverified:** a real touch screen; the bar scrolled sideways.
+- **Committed:** v0.58.4 on `main`.
+- **Next bounded task:** the owner's plan for the Properties bar.
+
 ## v0.58.3: hover group names take no room (2026-11-13)
 
 - **Implemented:** with a hover choice the names have no height and are unseen (their width kept, so nothing slides sideways) until the pointer is on the bar (or a control in it has the focus); the bar grows on hover. Touch screens still always show them.

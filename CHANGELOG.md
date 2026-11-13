@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.4 — Hover group names float beside the bar (2026-11-13)
+
+- **Changed:** Actions bar group names set to show on hover float over or under the bar on small labels; neither the bar nor the options bar beside it grows or moves any more.
+
 ## 0.58.3 — Hover group names take no room (2026-11-13)
 
 - **Changed:** the Actions bar's group names set to show on hover take no room until the pointer is on the bar (an empty strip showed before); the README's Actions bar row reads in order again.
