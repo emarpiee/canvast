@@ -345,7 +345,10 @@ function floatingRules(page: Page): Promise<string[]> {
     const name = (el: Element): string => (el.getAttribute("aria-label") ?? el.textContent ?? el.className).trim().slice(0, 40);
     type Box = { left: number; top: number; right: number; bottom: number };
     const overlaps = (a: Box, b: Box): boolean => a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1;
-    const sel = window.__canvastDebug.selectionBox();
+    // (a selection that fills more than a third of the window, zoomed in close, leaves no place clear of it: then it may be covered)
+    const box = window.__canvastDebug.selectionBox();
+    const seen = box ? Math.max(0, Math.min(box.right, innerWidth) - Math.max(box.left, 0)) * Math.max(0, Math.min(box.bottom, innerHeight) - Math.max(box.top, 0)) : 0;
+    const sel = box && seen <= (innerWidth * innerHeight) / 3 ? box : null;
     const floating = [...document.querySelectorAll<HTMLElement>(".vchip-pop, .colour-pop, .pop-menu, .props-near")].filter(shown);
     for (const f of floating) {
       const r = f.getBoundingClientRect();
@@ -383,6 +386,25 @@ function floatingRules(page: Page): Promise<string[]> {
           widest = Math.max(widest, g.scrollWidth);
         }
         if (fonts.size > 1) out.push(`the names of the form are in ${fonts.size} different fonts or sizes: ${[...fonts].join(", ")}`);
+        // The rows (CLAUDE.md "Floating bars and popovers", ADR 0198): values, then choices, then switches, then more, a line between kinds;
+        // every control on a row; the values' controls on one right edge; no two rows with one name; no row named like another chip.
+        const ORDER: Record<string, number> = { value: 1, choice: 2, switch: 3, more: 4 };
+        const rows = [...form.querySelectorAll<HTMLElement>("[data-row]")].filter(shown).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+        rows.forEach((r, i) => {
+          const prev = rows[i - 1];
+          if (!prev) return;
+          const [k0, k1] = [ORDER[prev.dataset["row"]!]!, ORDER[r.dataset["row"]!]!];
+          if (k1 < k0) out.push(`the ${r.dataset["row"]} row “${name(r)}” comes after a ${prev.dataset["row"]} row`);
+          if (k1 !== k0 && parseFloat(getComputedStyle(r).borderTopWidth) === 0) out.push(`no line before the ${r.dataset["row"]} rows (at “${name(r)}”)`);
+        });
+        for (const c of controls) if (!c.closest("[data-row]")) out.push(`“${name(c)}” is on no row of the form`);
+        const rights = rows.filter((r) => r.dataset["row"] === "value" && r.querySelector("input, select")).map((r) => Math.round([...r.querySelectorAll("input, select")].filter(shown).at(-1)!.getBoundingClientRect().right));
+        if (rights.length && Math.max(...rights) - Math.min(...rights) > 2) out.push(`the values' controls do not end on one edge (${[...new Set(rights)].join(", ")})`);
+        const rowName = (r: HTMLElement): string => (r.dataset["name"] ?? [...r.querySelectorAll<HTMLElement>(".pf-name, .swatch-name")].filter(shown).map((n) => n.textContent!.trim()).join(" ") ?? "").trim() || [...r.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent!.trim()).join(" ").trim();
+        const names = rows.map(rowName).filter(Boolean);
+        for (const n of new Set(names)) if (names.filter((x) => x === n).length > 1) out.push(`two rows are called “${n}”`);
+        const others = [...document.querySelectorAll<HTMLElement>(".props-row .tb-cap")].map((c) => c.textContent!.trim()).filter((c) => c !== chip?.getAttribute("aria-label"));
+        for (const n of names) if (others.includes(n)) out.push(`a row is called “${n}”, the name of another chip`);
         // (a value is never cut: its words fit in its field, a number's arrows aside)
         const pen = document.createElement("canvas").getContext("2d")!;
         for (const f of [...form.querySelectorAll<HTMLInputElement>("input[type=number], input[type=text]")].filter(shown)) {

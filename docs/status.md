@@ -47,6 +47,13 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.12: four kinds of rows; names and icons; tool options at the top (2026-11-13)
+
+- **Implemented:** `data-row` kinds and `arrangeForm`; `.pf-choices` wrappers; `data-name` overrides; chip icons reused (new section and menu icons removed), Kind chip with the chosen kind's icon; outline kept in Look when parked, Colours chip only with colours; chips by the selection only while `editsSelection`. Audit: row order, lines, controls on rows, one right edge, unique names, no row named like another chip; icon audit: chip icons reused. CLAUDE.md: icons "reuse first", form rows, names, where the chips stand.
+- **Tested:** build and typecheck here; a scratch audit of every tool (Pen, Shape, Balloon, Sheet, Path, Text, Note, Eraser, Lasso, Edit nodes, Select) with and without a selection and of every kind (shape, balloon, stroke, text, picture, several, a mix, a sheet, a picture on a sheet), each chip, its popover and its colour pickers, Chromium and Firefox: no problems, no errors (it found and fixed: a bar moved while its focused field blurred, the scroll arrow in a form, choices too wide). New tests in `bar-layouts.spec.ts` and `icon-audit.spec.ts`.
+- **Committed:** v0.58.12 on `main`.
+- **Next bounded task:** the shared combobox for every dropdown (owner: everywhere).
+
 ## v0.58.11: colour picker off the selection; full names; Text split; Adjust in the Actions bar (2026-11-13)
 
 - **Implemented:** colour picker placement (never the selection, may cover its parent popover and the chips, least interface covered, whole); full field names in the form; wider number fields; sections Text outline and Paragraph (icons `text-select`, `pilcrow-right`); the audit checks values fit their fields; Adjust group in the Actions bar (`adjustState`, `toggleAdjust`, `resetAdjust`); chips hidden while dragging.

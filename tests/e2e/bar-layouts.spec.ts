@@ -139,3 +139,19 @@ test("a text's chips are Text, Text outline and Paragraph, every field named in 
   expect(await floatingProblems(p)).toEqual([]);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("with something selected, another tool's options stand at the top, never by the selection; back on Select they are the selection's again", async ({ app }) => {
+  const p = app.page;
+  await set(app, "ui.properties", "near");
+  await p.keyboard.press("u");
+  await app.drag({ x: 500, y: 380 }, { x: 700, y: 520 }, 6);
+  await p.keyboard.press("v");
+  for (const [key, first] of [["e", "Eraser"], ["t", "Text"], ["p", "Look"], ["l", "Lasso"], ["u", "Look"]] as const) {
+    await p.keyboard.press(key);
+    await expect(p.locator(".props-near"), `${key}: not by the selection`).toBeHidden();
+    await expect(p.locator(".props-chips .tb-cap").first(), `${key}: the tool's own, at the top`).toHaveText(first);
+  }
+  await p.keyboard.press("v");
+  await expect(p.locator(".props-near")).toBeVisible();
+  expect(app.consoleErrors).toEqual([]);
+});

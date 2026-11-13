@@ -69,14 +69,14 @@ const FORMAT_GROUPS: Array<{ name: string; buttons: FormatCmd[]; menus: Array<{ 
   {
     name: "Words",
     buttons: [F("link", ICONS.textLink, "Link of the selected words", ""), F("colour", ICONS.textColour, "Colour of the selected words", "")],
-    menus: [{ id: "size", icon: ICONS.textSizeMenu, label: "Size of the selected words", items: [F("bigger", ICONS.textBigger, "Make the selected words bigger", "A quarter bigger"), F("smaller", ICONS.textSmaller, "Make the selected words smaller", "A fifth smaller")] }],
+    menus: [{ id: "size", icon: ICONS.textBigger, label: "Size of the selected words", items: [F("bigger", ICONS.textBigger, "Make the selected words bigger", "A quarter bigger"), F("smaller", ICONS.textSmaller, "Make the selected words smaller", "A fifth smaller")] }],
   },
   {
     name: "Paragraph",
     buttons: [],
     menus: [
-      { id: "block", icon: ICONS.paragraphMenu, label: "Paragraph: heading or body text", items: [F("h1", ICONS.heading1, "Heading 1", "The biggest title"), F("h2", ICONS.heading2, "Heading 2", "A section's title"), F("h3", ICONS.heading3, "Heading 3", "A small title"), F("p", ICONS.pilcrow, "Body text", "Plain paragraph")] },
-      { id: "list", icon: ICONS.listMenu, label: "List: bulleted or numbered", items: [F("ul", ICONS.list, "Bulleted list", "A dot before each line"), F("ol", ICONS.listOrdered, "Numbered list", "1, 2, 3 before the lines")] },
+      { id: "block", icon: ICONS.pilcrow, label: "Paragraph: heading or body text", items: [F("h1", ICONS.heading1, "Heading 1", "The biggest title"), F("h2", ICONS.heading2, "Heading 2", "A section's title"), F("h3", ICONS.heading3, "Heading 3", "A small title"), F("p", ICONS.pilcrow, "Body text", "Plain paragraph")] },
+      { id: "list", icon: ICONS.list, label: "List: bulleted or numbered", items: [F("ul", ICONS.list, "Bulleted list", "A dot before each line"), F("ol", ICONS.listOrdered, "Numbered list", "1, 2, 3 before the lines")] },
     ],
   },
   { name: "Finish", buttons: [F("copy", ICONS.markdown, "Copy Markdown", ""), F("done", ICONS.check, "Done (Esc)", "")], menus: [] },

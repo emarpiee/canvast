@@ -84,3 +84,13 @@ test("icons audit: Save, Import, Download, Upload, Delete, Remove, Update and Pl
   }
   expect([...wrong, ...bare].sort(), "Buttons whose name and icon disagree (docs/reference/icons.md)").toEqual([]);
 });
+
+test("icons audit: the same thing shows the same icon: each chip of the Properties bar uses the icon its thing has elsewhere, none made for the chip", () => {
+  // (CLAUDE.md "Icons": reuse first. A chip stands for a thing the app already shows (the Text tool, auto layout, a fill): its icon is that one.)
+  const sections = fs.readFileSync(path.join(ROOT, "src/ui/bar-sections.ts"), "utf8");
+  const keys = [...sections.matchAll(/icon: ICONS\.(\w+)/g)].map((m) => m[1]!);
+  expect(keys.length, "the sections were read").toBeGreaterThan(10);
+  const elsewhere = walk(path.join(ROOT, "src")).filter((f) => !/bar-sections\.ts$|icons\.ts$/.test(f)).map((f) => fs.readFileSync(f, "utf8")).join("\n");
+  const fresh = keys.filter((k) => !new RegExp(`ICONS\\.${k}\\b`).test(elsewhere));
+  expect(fresh, "chip icons used nowhere else: made for the chip instead of reused").toEqual([]);
+});

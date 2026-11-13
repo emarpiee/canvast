@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.58.12 — Chips' options in four kinds of rows; names and icons that say what they are (2026-11-13)
+
+- **Changed:** a chip's options are in four kinds of rows, always in this order with a line between them: values (name left, control right; a colour's swatch at the right), choices, switches (a switch at the right), and what opens more (menu rows with a ›).
+- **Changed:** clearer names in the chips' options (Ratio, Common ratios, Gap between items, Align items, Pack items, Order, Kind to edit...); each chip shows the icon its thing has everywhere (the Text tool's, Auto layout's, the fill's), and the Kind chip the chosen kind's own (the Sheet tool's for a sheet).
+- **Fixed:** the Colours chip showed with no colours (only the outline's width); a ratio was called "Shape"; with something selected, another tool's options (Eraser, Text, Pen) stood by the selection instead of at the top; the Kind popover's names wrapped; closing a chip's options while one of its fields had the focus could fail (and leave later popovers over their chips); the sideways-scroll arrow showed inside a chip's options.
+
 ## 0.58.11 — The colour picker off the selection; full names; Adjust in the Actions bar (2026-11-13)
 
 - **Changed:** a chip's options name every field in full ("Text size", "Line height", "Letter spacing", "Corner radius"), never the bar's short word; Text is three chips (Text, Text outline, Paragraph).

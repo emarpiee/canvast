@@ -371,28 +371,6 @@ import circleAlert from "lucide-static/icons/circle-alert.svg";
 import circleCheck from "lucide-static/icons/circle-check.svg";
 import loaderCircle from "lucide-static/icons/loader-circle.svg";
 import triangleAlert from "lucide-static/icons/triangle-alert.svg";
-import secTextoutlineSvg from "lucide-static/icons/text-select.svg";
-import secParagraphSvg from "lucide-static/icons/pilcrow-right.svg";
-import textSizeMenuSvg from "lucide-static/icons/unfold-vertical.svg";
-import paragraphMenuSvg from "lucide-static/icons/heading.svg";
-import listMenuSvg from "lucide-static/icons/list-collapse.svg";
-import secKindSvg from "lucide-static/icons/boxes.svg";
-import secMaskSvg from "lucide-static/icons/paintbrush-vertical.svg";
-import secLookSvg from "lucide-static/icons/paintbrush.svg";
-import secTextSvg from "lucide-static/icons/type-outline.svg";
-import secShapeSvg from "lucide-static/icons/triangle-right.svg";
-import secPictureSvg from "lucide-static/icons/wallpaper.svg";
-import secSizeSvg from "lucide-static/icons/maximize-2.svg";
-import secLayoutSvg from "lucide-static/icons/panels-left-bottom.svg";
-import secSpacingSvg from "lucide-static/icons/align-horizontal-space-between.svg";
-import secColumnsSvg from "lucide-static/icons/columns-4.svg";
-import secInlayoutSvg from "lucide-static/icons/square-dashed-kanban.svg";
-import secPositionSvg from "lucide-static/icons/move.svg";
-import secBrushSvg from "lucide-static/icons/line-squiggle.svg";
-import secEraserSvg from "lucide-static/icons/brush-cleaning.svg";
-import secLassoSvg from "lucide-static/icons/lasso-select.svg";
-import secOptionsSvg from "lucide-static/icons/settings-2.svg";
-import secColoursSvg from "lucide-static/icons/spray-can.svg";
 
 function clean(svg: string): string {
   return svg
@@ -670,30 +648,6 @@ export const ICONS = {
   goToLink: clean(arrowUpRight),
   chevronUp: clean(chevronUp),
   panelRight: clean(panelRight),
-  /** The text format bar's menus (ADR 0198): the size of the selected words, the paragraph's kind, the list's kind. */
-  textSizeMenu: clean(textSizeMenuSvg),
-  paragraphMenu: clean(paragraphMenuSvg),
-  listMenu: clean(listMenuSvg),
-  /** The sections of the Properties bar near the selection (ADR 0198): each chip's icon. */
-  secKind: clean(secKindSvg),
-  secMask: clean(secMaskSvg),
-  secLook: clean(secLookSvg),
-  secText: clean(secTextSvg),
-  secShape: clean(secShapeSvg),
-  secPicture: clean(secPictureSvg),
-  secSize: clean(secSizeSvg),
-  secLayout: clean(secLayoutSvg),
-  secSpacing: clean(secSpacingSvg),
-  secColumns: clean(secColumnsSvg),
-  secInlayout: clean(secInlayoutSvg),
-  secPosition: clean(secPositionSvg),
-  secBrush: clean(secBrushSvg),
-  secEraser: clean(secEraserSvg),
-  secLasso: clean(secLassoSvg),
-  secOptions: clean(secOptionsSvg),
-  secColours: clean(secColoursSvg),
-  secTextoutline: clean(secTextoutlineSvg),
-  secParagraph: clean(secParagraphSvg),
   maximize: clean(maximize),
   imageUpscale: clean(imageUpscale),
   columns3: clean(columns3),

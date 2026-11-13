@@ -339,25 +339,3 @@ One icon per function: two buttons that do different things never share an icon,
 | `radio-tower` | Settings tab: Sharing (this workspace on the local network) |
 | `cast` | Switch workspace: Connect to a shared workspace (another computer's, on the local network) |
 | `text-search` | Find (Actions bar): the command palette, to find any option or action by name |
-| `unfold-vertical` | Text format bar: the menu of the size of the selected words (bigger, smaller) |
-| `heading` | Text format bar: the menu of the paragraph's kind (headings, body text) |
-| `list-collapse` | Text format bar: the menu of the list's kind (bulleted, numbered) |
-| `boxes` | Properties near the selection: the Kind chip |
-| `paintbrush-vertical` | Properties near the selection: the Mask chip |
-| `paintbrush` | Properties near the selection: the Look chip |
-| `type-outline` | Properties near the selection: the Text chip |
-| `triangle-right` | Properties near the selection: the Shape chip |
-| `wallpaper` | Properties near the selection: the Picture chip |
-| `maximize-2` | Properties near the selection: the Size chip |
-| `panels-left-bottom` | Properties near the selection: the Layout chip |
-| `align-horizontal-space-between` | Properties near the selection: the Spacing chip |
-| `columns-4` | Properties near the selection: the Columns and order chip |
-| `square-dashed-kanban` | Properties near the selection: the In layout chip |
-| `move` | Properties near the selection: the On sheet chip |
-| `line-squiggle` | Properties near the selection: the Brush chip |
-| `brush-cleaning` | Properties near the selection: the Eraser chip |
-| `lasso-select` | Properties near the selection: the Lasso chip |
-| `settings-2` | Properties near the selection: the Options chip |
-| `spray-can` | Properties near the selection: the Colours chip |
-| `text-select` | Properties near the selection: the Text outline chip |
-| `pilcrow-right` | Properties near the selection: the Paragraph chip |

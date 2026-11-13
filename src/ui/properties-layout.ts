@@ -1,6 +1,6 @@
 import { createBar, hoverNames, syncScroll } from "./bar";
 import { ICONS } from "./icons";
-import { nameControls, sectionIcon, sectionLabel, sectionSummary, showSections, shownSections, sectionOfControl } from "./bar-sections";
+import { arrangeForm, nameControls, sectionIcon, sectionLabel, sectionSummary, showSections, shownSections, sectionOfControl } from "./bar-sections";
 import { closeChipPopover, followChip, openChipPopover, placeChipPopover, syncChips } from "./value-chips";
 import type { ChipSpec } from "./value-chips";
 import { inRoom, placeBy, selectionBoxIn } from "./near-selection";
@@ -59,10 +59,11 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
   const popSection = (anchor: HTMLElement, id: string): void => {
     openChipPopover(anchor, id === COLOURS ? "Colours" : sectionLabel(id), (pop) => {
       popped = id;
-      if (id === COLOURS) return void pop.append(colours);
+      if (id === COLOURS) return void move(colours, () => pop.append(colours));
       bar.classList.add("is-form");
       showSections(row, new Set([id]));
-      pop.append(bar);
+      arrangeForm(row);
+      move(bar, () => pop.append(bar));
     }, () => {
       popped = null;
       bar.classList.remove("is-form");
@@ -71,26 +72,61 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
     });
   };
 
+  // (a section that is one choice, the kind to edit, shows the icon of what is chosen: the Sheet tool's for a sheet)
+  const chipIcon = (id: string): string => (id === "kind" ? row.querySelector('[data-subject][aria-checked="true"] svg')?.outerHTML : undefined) ?? sectionIcon(id);
   const coloursValue = (): string => [...colours.querySelectorAll<HTMLElement>("[data-sel-colour]")].slice(0, 3).map((b) => `<span class="vchip-sw${b.hasAttribute("data-ring") ? " is-ring" : ""}" style="--sw:${b.querySelector<HTMLElement>("[data-paint-chip]")?.style.getPropertyValue("--paint") ?? ""}"></span>`).join("");
-  const chipsOf = (ids: readonly string[]): ChipSpec[] => ids.map((id) => (id === COLOURS ? { id, label: "Colours", icon: ICONS.secColours, value: coloursValue(), title: "Colours: every colour of the selection, each to change everywhere" } : { id, label: sectionLabel(id), icon: sectionIcon(id), value: sectionSummary(row, id), title: `${sectionLabel(id)}: open its options` }));
+  const chipsOf = (ids: readonly string[]): ChipSpec[] => ids.map((id) => (id === COLOURS ? { id, label: "Colours", icon: ICONS.palette, value: coloursValue(), title: "Colours: every colour of the selection, each to change everywhere" } : { id, label: sectionLabel(id), icon: chipIcon(id), value: sectionSummary(row, id), title: `${sectionLabel(id)}: open its options` }));
 
   /** Lay everything out for the current place, after every update of the bar and every frame. */
+  /**
+   * Move one of the bars somewhere else. A field inside it that has the focus is left first (its change and blur run now, while it is still
+   * in place), and a move asked for by what that sets off is done after this one, never inside it.
+   */
+  let moving = false;
+  const move = (el: HTMLElement, put: () => void): void => {
+    if (moving) return;
+    moving = true;
+    try {
+      const focused = document.activeElement;
+      if (focused instanceof HTMLElement && el.contains(focused)) focused.blur();
+      put();
+    } finally {
+      moving = false;
+    }
+  };
+  let settling = false;
+  let again = false;
   const settle = (): void => {
+    if (settling) {
+      again = true; // (asked for while laying out: once more, after)
+      return;
+    }
+    settling = true;
+    try {
+      do {
+        again = false;
+        settleOnce();
+      } while (again);
+    } finally {
+      settling = false;
+    }
+  };
+  const settleOnce = (): void => {
     const was = now;
     now = place();
     if (was !== now) closePop();
     bar.toggleAttribute("data-parked", now !== "bar");
     colours.toggleAttribute("data-parked", now !== "bar");
     if (now === "bar") {
-      if (bar.parentElement !== home) home.insertBefore(bar, top.el);
-      if (colours.parentElement !== home) top.el.after(colours);
+      if (bar.parentElement !== home) move(bar, () => home.insertBefore(bar, top.el));
+      if (colours.parentElement !== home) move(colours, () => top.el.after(colours));
       top.el.hidden = true;
       near.hidden = true;
       return;
     }
-    const ids = [...(bar.hidden ? [] : shownSections(row)), ...(colours.hidden ? [] : [COLOURS])];
-    if (popped === null && bar.parentElement !== park) park.append(bar);
-    if (popped !== COLOURS && colours.parentElement !== park) park.append(colours);
+    const ids = [...(bar.hidden ? [] : shownSections(row)), ...(colours.hidden || !colours.querySelector("[data-sel-colour]") ? [] : [COLOURS])];
+    if (popped === null && bar.parentElement !== park) move(bar, () => park.append(bar));
+    if (popped !== COLOURS && colours.parentElement !== park) move(colours, () => park.append(colours));
     if (popped !== null && !ids.includes(popped)) closePop();
     // (while something is dragged the chips step aside, as the Actions bar does: they do not follow it about, nor jump to the top)
     if (editor.gesturing) {
@@ -99,7 +135,9 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
       return;
     }
     const box = selectionBoxIn(canvasHost, editor);
-    const beside = editor.selection.size > 0 && !!box && inRoom(box) && ids.length > 0;
+    // (by the selection only when the options are the selection's, as the Actions bar shows only then: with another tool picked they are
+    // that tool's, and stand at the top)
+    const beside = editor.editsSelection && editor.selection.size > 0 && !editor.editingText && !!box && inRoom(box) && ids.length > 0;
     const host = beside ? nearRow : top.row;
     // (the same chips in the same place keep their elements: an open popover stays under its chip)
     syncChips(host, chipsOf(ids));
@@ -115,6 +153,7 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
       if (near.style.top !== t) near.style.top = t;
     }
     if (popped !== null) {
+      if (popped !== COLOURS) arrangeForm(row); // (what shows may have changed: the lines between kinds follow)
       followChip(host.querySelector<HTMLElement>(`[data-vchip="${CSS.escape(popped)}"]`));
       placeChipPopover();
     }

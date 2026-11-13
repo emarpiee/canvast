@@ -11,34 +11,34 @@ import { shortTitle } from "../commands/from-bars";
 export interface Section {
   id: string;
   label: string;
-  /** Its chip's icon (a unique one: docs/reference/icons.md). */
+  /** Its chip's icon: the icon the same thing has elsewhere (the Text tool's for Text, the Auto layout's for Layout...), never a new one for it. */
   icon: string;
 }
 
 /** The sections, in the order they show. Long ones are split, so a popover stays short (Auto layout: Layout, Spacing, Columns and order). */
 export const SECTIONS: readonly Section[] = [
-  { id: "kind", label: "Kind", icon: ICONS.secKind },
-  { id: "mask", label: "Mask", icon: ICONS.secMask },
-  { id: "look", label: "Look", icon: ICONS.secLook },
-  { id: "text", label: "Text", icon: ICONS.secText },
-  { id: "textoutline", label: "Text outline", icon: ICONS.secTextoutline },
-  { id: "paragraph", label: "Paragraph", icon: ICONS.secParagraph },
-  { id: "shape", label: "Shape", icon: ICONS.secShape },
-  { id: "picture", label: "Picture", icon: ICONS.secPicture },
-  { id: "size", label: "Size", icon: ICONS.secSize },
-  { id: "layout", label: "Layout", icon: ICONS.secLayout },
-  { id: "spacing", label: "Spacing", icon: ICONS.secSpacing },
-  { id: "columns", label: "Columns and order", icon: ICONS.secColumns },
-  { id: "inlayout", label: "In layout", icon: ICONS.secInlayout },
-  { id: "position", label: "On sheet", icon: ICONS.secPosition },
-  { id: "brush", label: "Brush", icon: ICONS.secBrush },
-  { id: "eraser", label: "Eraser", icon: ICONS.secEraser },
-  { id: "lasso", label: "Lasso", icon: ICONS.secLasso },
-  { id: "options", label: "Options", icon: ICONS.secOptions },
+  { id: "kind", label: "Kind", icon: ICONS.shapes },
+  { id: "mask", label: "Mask", icon: ICONS.maskMenu },
+  { id: "look", label: "Look", icon: ICONS.paintBucket },
+  { id: "text", label: "Text", icon: ICONS.type },
+  { id: "textoutline", label: "Text outline", icon: ICONS.outlineOptions },
+  { id: "paragraph", label: "Paragraph", icon: ICONS.textBox },
+  { id: "shape", label: "Shape", icon: ICONS.shapeTool },
+  { id: "picture", label: "Picture", icon: ICONS.image },
+  { id: "size", label: "Size", icon: ICONS.ratio },
+  { id: "layout", label: "Layout", icon: ICONS.autoLayout },
+  { id: "spacing", label: "Spacing", icon: ICONS.distH },
+  { id: "columns", label: "Columns and order", icon: ICONS.flowGrid },
+  { id: "inlayout", label: "In layout", icon: ICONS.layoutFree },
+  { id: "position", label: "On sheet", icon: ICONS.sheetTool },
+  { id: "brush", label: "Brush", icon: ICONS.pencil },
+  { id: "eraser", label: "Eraser", icon: ICONS.eraser },
+  { id: "lasso", label: "Lasso", icon: ICONS.lasso },
+  { id: "options", label: "Options", icon: ICONS.pointer },
 ];
 const ORDER = new Map(SECTIONS.map((s, i) => [s.id, i]));
 export const sectionLabel = (id: string): string => SECTIONS.find((s) => s.id === id)?.label ?? id;
-export const sectionIcon = (id: string): string => SECTIONS.find((s) => s.id === id)?.icon ?? ICONS.secOptions;
+export const sectionIcon = (id: string): string => SECTIONS.find((s) => s.id === id)?.icon ?? ICONS.pointer;
 
 /** Give the bar's controls their sections: a selector and its section; what is inside takes it too, unless it has its own. */
 export function assignSections(row: HTMLElement, map: ReadonlyArray<readonly [selector: string, section: string]>): void {
@@ -91,7 +91,8 @@ export function showSections(row: HTMLElement, ids: ReadonlySet<string> | null):
 }
 
 const unitOf = (label: string): string => (/\(px/.test(label) ? " px" : /%|per ?cent/i.test(label) ? "%" : "");
-const nameOf = (el: Element): string => shortTitle(el.getAttribute("aria-label") ?? "");
+/** A control's name in the form: its own `data-name` when its accessible name is a sentence (or says something else), else that name, short. */
+const nameOf = (el: Element): string => (el as HTMLElement).dataset?.["name"] ?? shortTitle(el.getAttribute("aria-label") ?? "");
 
 /**
  * Every control of the bar gets a name of its own, seen only when the bar is laid out as a form (in a chip's popover): a button with only an
@@ -162,7 +163,33 @@ export function nameControls(row: HTMLElement): void {
     f.before(wrap);
     wrap.append(nameEl(nameOf(f)), f);
   }
-  for (const g of row.querySelectorAll<HTMLElement>("[role=radiogroup], .seg")) if (g.getAttribute("aria-label")) g.dataset["name"] = g.getAttribute("aria-label")!;
+  for (const g of row.querySelectorAll<HTMLElement>("[role=radiogroup], .seg")) if (!g.dataset["name"] && g.getAttribute("aria-label")) g.dataset["name"] = g.getAttribute("aria-label")!;
+  // Choices that sit inside a bigger part (the pen's widths beside its size, the flows of auto layout) get a row of their own, named.
+  const wrapChoices = (items: HTMLElement[], name: string): void => {
+    if (!items.length || items[0]!.parentElement?.classList.contains("pf-choices")) return;
+    const w = document.createElement("span");
+    w.className = "pf-choices";
+    w.dataset["name"] = name;
+    const sec = items[0]!.dataset["section"];
+    if (sec) w.dataset["section"] = sec;
+    items[0]!.before(w);
+    w.append(...items);
+  };
+  for (const g of row.querySelectorAll<HTMLElement>(".tb-group:has(> button.width)")) wrapChoices([...g.querySelectorAll<HTMLElement>(":scope > button.width")], "Pen width");
+  for (const seg of row.querySelectorAll<HTMLElement>(".seg")) wrapChoices([seg], seg.getAttribute("aria-label") ?? "");
+  // The kind of row each control makes in the form (CSS orders them: values, choices, switches, more; `arrangeForm` puts a line between kinds).
+  const ROW_KINDS: ReadonlyArray<readonly [string, FormRow]> = [
+    ["label:not(.pf-multi):has(input:not([type=file]), select), span.pf-row, button.swatch:has([data-paint-chip], [data-colour-chip])", "value"],
+    ["[role=radiogroup], .pf-choices", "choice"],
+    ["button[aria-pressed]:not([role=radio], .swatch, .width)", "switch"],
+    ["button:not([role=radio], .width, [aria-pressed])", "more"], // (a swatch with a colour is a value, taken first; one without, as Outline options, opens more)
+  ];
+  for (const [sel, kind] of ROW_KINDS) {
+    for (const el of row.querySelectorAll<HTMLElement>(sel)) {
+      if (el.dataset["row"] || (kind !== "choice" && el.closest("[role=radiogroup], .pf-choices")) || (kind === "choice" && el.parentElement?.closest("[data-row=choice]"))) continue;
+      el.dataset["row"] = kind;
+    }
+  }
   // (loose words in a part: its headings; a lone "%" or the like says nothing on its own)
   for (const part of row.querySelectorAll<HTMLElement>(".tb-count, [data-in-span-wrap]")) {
     for (const n of [...part.childNodes]) {
@@ -176,6 +203,20 @@ export function nameControls(row: HTMLElement): void {
       n.replaceWith(cap);
     }
   }
+}
+
+/** The kinds of rows of the form, in their order (ADR 0198). */
+export type FormRow = "value" | "choice" | "switch" | "more";
+const ROW_ORDER: Record<FormRow, number> = { value: 1, choice: 2, switch: 3, more: 4 };
+
+/** Put a line before the first row of each kind that follows another kind, among the rows that show now (after the sections shown change). */
+export function arrangeForm(row: HTMLElement): void {
+  const rows = [...row.querySelectorAll<HTMLElement>("[data-row]")].filter((r) => shows(r, row) && !r.closest("[data-sec-off]"));
+  rows.sort((a, b) => ROW_ORDER[a.dataset["row"] as FormRow] - ROW_ORDER[b.dataset["row"] as FormRow]); // (stable: the bar's order within a kind)
+  rows.forEach((r, i) => {
+    const divide = i > 0 && rows[i - 1]!.dataset["row"] !== r.dataset["row"];
+    if (r.hasAttribute("data-divide") !== divide) r.toggleAttribute("data-divide", divide);
+  });
 }
 
 /**

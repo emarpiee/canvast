@@ -42,7 +42,7 @@ export function hoverNames(bar: HTMLElement, layerHost: HTMLElement): { place():
 }
 
 export const isOff = (e: HTMLElement): boolean =>
-  !!e.hidden || e.hasAttribute("data-off") || (e.classList.contains("pf-row") && [...e.children].every((c) => c.classList.contains("pf-name") || isOff(c as HTMLElement))); // (a named field's wrapper, ADR 0198, is as off as its field)
+  !!e.hidden || e.hasAttribute("data-off") || (e.matches(".pf-row, .pf-choices") && [...e.children].every((c) => c.classList.contains("pf-name") || isOff(c as HTMLElement))); // (a named field's wrapper, ADR 0198, is as off as its field)
 
 /** Show each direct group of `bar` that `wanted` allows (default: all) and that has a control showing; hide the others. */
 export function syncGroups(bar: HTMLElement, wanted: (group: HTMLElement) => boolean = () => true): void {
@@ -73,7 +73,7 @@ export function createBar(label: string, commandGroup: string): { el: HTMLElemen
  * at that end only). One cue for every row that scrolls; it follows the row's own scrolling.
  */
 export function syncScroll(row: HTMLElement): void {
-  const over = row.scrollWidth > row.clientWidth + 1;
+  const over = !row.closest(".is-form") && row.scrollWidth > row.clientWidth + 1; // (a bar laid out as a form, in a popover, does not scroll sideways)
   row.toggleAttribute("data-scroll", over);
   row.toggleAttribute("data-scroll-start", over && row.scrollLeft > 1);
   row.toggleAttribute("data-scroll-end", over && row.scrollLeft + row.clientWidth < row.scrollWidth - 1);

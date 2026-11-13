@@ -455,7 +455,8 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 :is(.tb-options-row, .ctx-bar, .hud-controls, #toolbar > .dock, .set-tabs) { scroll-padding-inline: var(--sp-10); }
 /* Switched off: for another kind of item than the one being edited (ui/toolbar.ts). */
 [data-off], [data-sec-off] { display: none !important; }
-.toolbar .tb-chip { width: auto; padding: 0 var(--s-6); font: var(--font-meta); }
+.toolbar .tb-chip { display: inline-flex; align-items: center; gap: var(--s-2); width: auto; padding: 0 var(--s-6); font: var(--font-meta); }
+.toolbar .tb-chip svg { width: var(--icon-sm); height: var(--icon-sm); }
 .tb-group { display: flex; gap: var(--s-1); align-items: center; }
 .tb-group[hidden] { display: none; }
 /* The one separator of every bar of groups (the options bar, the dock, any new one): a line before a group that follows a group that is shown,
@@ -3320,43 +3321,65 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .vchip .vchip-arrow svg { width: var(--icon-sm); height: var(--icon-sm); }
 .vchip svg { flex: none; }
 /* Its popover is as wide as what it holds (never a fixed width with empty room), up to a limit where long names wrap. */
-.vchip-pop { width: max-content; max-width: min(calc(100vw - var(--sp-8)), calc(10 * var(--ctl))); }
-/* The bar as a form in a chip's popover: one option a row, its name at the left and its control at the right edge; a row of choices
-   (a radio group) under its name; a button with its icon and name, as a menu row. Every holder of controls steps aside (display: contents). */
+.vchip-pop { width: max-content; max-width: min(calc(100vw - var(--sp-8)), calc(14 * var(--ctl))); }
+/* The bar as a form in a chip's popover (ADR 0198, CLAUDE.md "Floating bars and popovers"). Four kinds of rows, always in this order, with a
+   line between kinds (`data-row`, `data-divide`: `nameControls`, `arrangeForm` in ui/bar-sections.ts):
+   1 values: the name at the left, the control at the right edge (a number, a list, a colour's swatch);
+   2 choices: the name at the left, the row of choices at the right;
+   3 switches: the name at the left, a switch at the right;
+   4 more: what opens another panel or acts at once, as menu rows (icon, name; a › when it opens something).
+   Every holder of controls steps aside (display: contents), so the rows are the form's own. */
 .toolbar.is-form { display: block; min-height: 0; padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; backdrop-filter: none; }
 .toolbar.is-form[hidden] { display: none; }
-.toolbar.is-form .tb-options-row { display: flex; flex-direction: column; align-items: stretch; gap: var(--s-4); overflow: visible; }
+.toolbar.is-form .tb-options-row { display: flex; flex-direction: column; align-items: stretch; gap: var(--s-2); overflow: visible; }
 .toolbar.is-form .tb-options-row::before, .toolbar.is-form .tb-options-row::after { display: none; }
-.toolbar.is-form .tb-options-row :is(.tb-group, span):not([role="radiogroup"], .seg, button *, .pf-name, .pf-cap, .pf-short, .size-out, [hidden], [data-sec-off], [data-off]) { display: contents; }
-.toolbar.is-form .tb-options-row :is(label, .pf-row):not(.pf-multi, [hidden], [data-sec-off], [data-off]) { display: flex; align-items: center; justify-content: space-between; gap: var(--s-8); min-height: var(--field-h); }
-.toolbar.is-form .tb-options-row :is(label, .pf-row) > :is(input, select) { flex: none; }
-.toolbar.is-form .tb-options-row label.pf-multi:not([hidden], [data-sec-off], [data-off]) { display: contents; }
-.toolbar.is-form .tb-options-row button:not([role="radio"], .seg *, [hidden], [data-sec-off], [data-off]) { display: flex; justify-content: flex-start; gap: var(--s-6); width: auto; height: var(--ctl); padding: 0 var(--s-4); border: 0; border-radius: var(--ctl-r, var(--r-md)); }
-.toolbar.is-form .tb-options-row button:not([role="radio"], .seg *, [aria-pressed="true"], :hover) { background: transparent; } /* (a swatch or a tool's button looks like every other row) */
-.toolbar.is-form .tb-options-row :is([role="radiogroup"], .seg):not([hidden], [data-sec-off], [data-off]) { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); }
-.toolbar.is-form .tb-options-row :is([role="radiogroup"], .seg)[data-name]::before { content: attr(data-name); flex: 1 1 100%; color: var(--hud-muted); font: var(--font-meta); }
+.toolbar.is-form .tb-options-row :is(.tb-group, span, label.pf-multi):not([data-row], button *, .pf-name, .pf-cap, .pf-short, .size-out, [hidden], [data-sec-off], [data-off]) { display: contents; }
+.toolbar.is-form .tb-options-row .tb-group.tb-group { margin: 0; padding: 0; border: 0; } /* (no lines between the bar's groups: the form has its own) */
+.toolbar.is-form .tb-options-row [data-row]:not([hidden], [data-sec-off], [data-off]) { display: flex; align-items: center; justify-content: space-between; gap: var(--s-8); min-height: var(--field-h); }
+.toolbar.is-form .tb-options-row [data-row="value"] { order: 1; }
+.toolbar.is-form .tb-options-row [data-row="choice"] { order: 2; }
+.toolbar.is-form .tb-options-row [data-row="switch"] { order: 3; }
+.toolbar.is-form .tb-options-row [data-row="more"] { order: 4; }
+.toolbar.is-form .tb-options-row [data-row][data-divide] { margin-top: var(--s-4); padding-top: var(--s-4); border-top: 1px solid var(--hud-border); }
+.toolbar.is-form .tb-options-row [data-row] > :is(input, select) { flex: none; }
+/* (every name in one column, one font, one colour; a pressed button's takes the button's colour) */
+.toolbar.is-form .tb-options-row :is(label, .pf-name, .swatch-name) { font: var(--font-control); font-weight: var(--weight-regular); }
+.toolbar.is-form .tb-options-row label { color: var(--hud-fg); }
+.toolbar.is-form .tb-options-row :is(.pf-name, .swatch-name) { flex: 1 1 auto; width: auto; height: auto; min-width: 0; padding: 0; color: inherit; text-align: start; background: none; border: 0; border-radius: 0; box-shadow: none; } /* (not a swatch's dot, though it sits in one) */
+/* buttons as rows: no frame of their own, a hover */
+.toolbar.is-form .tb-options-row button[data-row] { width: auto; height: auto; min-height: var(--field-h); padding: 0 var(--s-4); margin-inline: calc(-1 * var(--s-4)); color: var(--hud-fg); background: transparent; border: 0; border-radius: var(--ctl-r, var(--r-md)); }
+.toolbar.is-form .tb-options-row button[data-row]:hover { background: var(--hud-hover); }
+/* 1 a colour: its name at the left, its swatch at the right (the swatch is the button's first part) */
+.toolbar.is-form .tb-options-row button.swatch[data-row="value"] { flex-direction: row-reverse; }
+/* 2 choices: their name at the left, the choices at the right */
+.toolbar.is-form .tb-options-row [data-row="choice"] { flex-wrap: wrap; justify-content: flex-end; gap: var(--gap); } /* (choices too many for one line go on under it, at the right) */
+.toolbar.is-form .tb-options-row [data-row="choice"][data-name]::before { content: attr(data-name); flex: 1 1 auto; margin-right: var(--s-8); color: var(--hud-fg); font: var(--font-control); white-space: nowrap; }
+.toolbar.is-form .tb-options-row .pf-choices > .seg { flex: none; }
+.toolbar.is-form .tb-options-row [data-row="choice"] :is(button, svg) { flex: none; }
+.toolbar.is-form .tb-options-row .pf-choices .seg button { width: var(--ctl); }
+.toolbar.is-form .tb-options-row .pf-choices:not(:has(> :not([hidden], [data-off]))) { display: none; } /* (choices that all are off: no name alone) */
+.toolbar.is-form .tb-options-row [data-row="choice"] > button:not([hidden]) { flex: none; width: var(--ctl); padding: 0; }
+.toolbar.is-form .tb-options-row [data-row="choice"] > button.tb-chip:not([hidden]) { width: auto; padding: 0 var(--s-4); }
+.toolbar.is-form .tb-options-row .pf-choices > button.width:not([hidden]) { display: inline-flex; justify-content: center; width: var(--ctl); padding: 0; }
+/* 3 a switch: its name, then the switch at the right (drawn from tokens; on: the accent) */
+.toolbar.is-form .tb-options-row button[data-row="switch"] > svg { flex: none; }
+.toolbar.is-form .tb-options-row button[data-row="switch"]::after { content: ""; flex: none; width: calc(1.5 * var(--icon-lg)); height: var(--icon-sm); border-radius: var(--r-pill); background: radial-gradient(circle at calc(var(--icon-sm) / 2) 50%, var(--hud-bg) 0 calc(var(--icon-sm) / 2 - var(--sp-1) * 2), transparent calc(var(--icon-sm) / 2 - var(--sp-1))), var(--hud-border); }
+.toolbar.is-form .tb-options-row button[data-row="switch"][aria-pressed="true"]::after { background: radial-gradient(circle at calc(100% - var(--icon-sm) / 2) 50%, var(--hud-accent-fg) 0 calc(var(--icon-sm) / 2 - var(--sp-1) * 2), transparent calc(var(--icon-sm) / 2 - var(--sp-1))), var(--hud-accent); }
+/* 4 more: a menu row; a › when it opens a panel or a menu */
+.toolbar.is-form .tb-options-row button[data-row="more"] > svg { flex: none; }
+.toolbar.is-form .tb-options-row button[data-row="more"]:is([aria-haspopup="dialog"], [aria-haspopup="menu"])::after { content: ""; flex: none; width: var(--icon-sm); height: var(--icon-sm); background: currentColor; mask: var(--chevron-mask) center / contain no-repeat; transform: rotate(-90deg); }
 .toolbar.is-form .tb-options-row input[type="number"] { width: calc(2.5 * var(--ctl)); } /* (room for a value with decimals and its arrows: never cut) */
 .toolbar.is-form .tb-options-row input[type="text"] { width: calc(3 * var(--ctl)); }
 .toolbar.is-form .tb-options-row .size-out { display: none; }
-.toolbar.is-form .tb-options-row .tb-group.tb-group { margin: 0; padding: 0; border: 0; } /* (no lines between groups in a form) */
-/* (the pen's widths: one row of little pictures, the size slider under them) */
-.toolbar.is-form .tb-options-row .tb-group:has(> button.width):not([hidden], [data-sec-off], [data-off]) { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap); }
-.toolbar.is-form .tb-options-row .tb-group > button.width:not([hidden]) { display: inline-flex; justify-content: center; width: var(--ctl); padding: 0; }
-.toolbar.is-form .tb-options-row .tb-group:has(> button.width) > .pf-row { flex: 1 1 100%; }
 /* (the colours of a selection in their chip's popover: the bar as it is, without its own frame) */
 .vchip-pop > .toolbar { min-height: 0; padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; }
-/* Names: only in the form; a short word of the bar ("T", "Gap") gives way to the full name there. Loose words of a part are its headings. */
+/* Names: only in the form; the bar keeps its short words. Loose words of a part are its headings, with the values they head. */
 .pf-name { display: none; }
-.toolbar .tb-options-row .pf-row { display: contents; } /* (in the bar a named field's wrapper changes nothing) */
-/* (one look for every name in the form: a label's own words, a button's or a swatch's name, an added name) */
-.toolbar.is-form .tb-options-row :is(label, .pf-name, .swatch-name) { font: var(--font-control); font-weight: var(--weight-regular); }
-.toolbar.is-form .tb-options-row label { color: var(--hud-fg); }
-.toolbar.is-form .tb-options-row :is(.pf-name, .swatch-name) { color: inherit; } /* (a button's name takes the button's colour: on a pressed one, the accent's own) */
-.toolbar.is-form .tb-options-row .pf-name { display: inline; flex: 1 1 auto; width: auto; height: auto; min-width: 0; padding: 0; text-align: start; background: none; border: 0; border-radius: 0; box-shadow: none; } /* (not a swatch's dot, though it sits in one) */
-.toolbar.is-form .tb-options-row .pf-row:not([hidden], [data-sec-off], [data-off]) { display: flex; }
+.toolbar .tb-options-row :is(.pf-row, .pf-choices) { display: contents; } /* (in the bar a named field's or choices' wrapper changes nothing) */
+.toolbar.is-form .tb-options-row .pf-name { display: inline; }
 .toolbar.is-form .tb-options-row .pf-row:has(> :is(input, select):is([hidden], [data-off])) { display: none; }
 .toolbar.is-form .pf-short, .toolbar.is-form .pf-cap[data-quiet] { display: none; }
-.toolbar.is-form .pf-cap { margin-top: var(--s-4); color: var(--hud-muted); font: var(--font-meta); }
+.toolbar.is-form .tb-options-row .pf-cap { order: 1; margin-top: var(--s-4); color: var(--hud-muted); font: var(--font-meta); }
 /* Value chips just above the selection: placed by ui/near-selection.ts, as the Actions bar that follows it. */
 .props-near { position: absolute; z-index: var(--z-edge); display: flex; align-items: center; }
 .props-near[hidden] { display: none; }
