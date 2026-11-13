@@ -982,3 +982,39 @@ test("auto layout, more (ADR 0193): live reflow while dragging, the gap handle, 
   await expect.poll(async () => (await laid()).find((o) => o.id === s3)!.inLayout?.span).toEqual([2, 1]);
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("Arrange and auto layout (ADR 0194): Keep it tidy makes the grid a sheet with auto layout; on such a sheet Align waits for the sheet and an Arrange order becomes its rule", async ({ app }) => {
+  const p = app.page;
+  type Laid = Obj & { container?: { clip: boolean; layout?: { flow: string; sort?: string } } };
+  const laid = async (): Promise<Laid[]> => (await objs(app)) as Laid[];
+  await p.evaluate(() => window.__canvastDebug.setSetting("snap.grid", false));
+  await key(app, "u");
+  await drag(app, [400, 300], [440, 340]);
+  await drag(app, [500, 320], [600, 420]);
+  await drag(app, [650, 300], [700, 360]);
+  await key(app, "v");
+  await key(app, "Control+a");
+  await p.locator('[data-ctx="arrangemenu"]').click();
+  await p.locator('.pop-menu [data-id="keeptidy"]').click();
+  await p.locator('.pop-menu [data-id="grid:size"]').click();
+  await key(app, "Escape");
+  await expect.poll(async () => (await laid()).find((o) => o.container)?.container?.layout?.flow).toBe("grid");
+  const sheet = (await laid()).find((o) => o.container)!;
+  expect(sheet.container!.layout!.sort).toBe("size");
+  // Two of the things on it picked: lining them up waits for the sheet; an order is its rule.
+  const [a, b] = (await laid()).filter((o) => o.parent === sheet.id);
+  const mid = async (id: string): Promise<[number, number]> => { const bx = (await p.evaluate((i) => window.__canvastDebug.objectScreen(i), id))!.box; return [(bx.minX + bx.maxX) / 2, (bx.minY + bx.maxY) / 2]; };
+  await click(app, ...(await mid(a!.id)));
+  await p.keyboard.down("Shift");
+  await click(app, ...(await mid(b!.id)));
+  await p.keyboard.up("Shift");
+  expect((await selection(app)).sort()).toEqual([a!.id, b!.id].sort());
+  await p.locator('[data-ctx="alignmenu"]').click();
+  await expect(p.locator('.pop-menu [data-id="align:left"]')).toBeDisabled();
+  await key(app, "Escape");
+  await p.locator('[data-ctx="arrangemenu"]').click();
+  await p.locator('.pop-menu [data-id="grid:name-asc"]').click();
+  await expect.poll(async () => (await laid()).find((o) => o.id === sheet.id)!.container!.layout!.sort).toBe("name-asc");
+  await key(app, "Escape");
+  expect(app.consoleErrors).toEqual([]);
+});

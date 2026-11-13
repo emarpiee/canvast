@@ -334,10 +334,13 @@ function orderWithDropped(units: readonly Unit[], flow: SheetLayout["flow"], mov
   return out;
 }
 
-/** The items in the order a sort rule says, from what the canvas knows of them: a picture's name as placed, a text's first words, its size, its kind. */
+/** The items in the order a sort rule says, from what the canvas knows of them: a picture's name as placed and when its file came into the library, a text's first words, its size, its kind. */
 function sortedUnits(units: readonly Unit[], key: LayoutSort): Unit[] {
   const nameOf = (o: CanvasObject): string => (o.kind === "text" ? plainText(o.md, 40).trim() : (o.name ?? ""));
-  const as = units.map((u) => ({ objects: u.objs, name: nameOf(u.objs[0]!), u }));
+  const as = units.map((u) => {
+    const first = u.objs[0]!;
+    return { objects: u.objs, name: nameOf(first), u, ...(first.kind === "image" && first.added !== undefined ? { date: first.added } : {}) };
+  });
   return sortUnits(as, key).map((a) => (a as (typeof as)[number]).u);
 }
 

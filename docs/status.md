@@ -38,6 +38,15 @@ Unverified / Committed / Next bounded task**.
 | 5 | Creative editing, including **arrange selected items in a grid (A–Z, Z–A, by date, size, type), align and distribute** | **done** ([ADR 0036](adr/0036-arrange-align-distribute.md)) |
 | WF | Workspace folder and the desktop app ([ADR 0177](adr/0177-workspace-folder-desktop-app.md)): Electron shell, the workspace as a folder of files, encrypted hidden items, outside changes; Linux packages (AppImage with updates, `.deb`, `.rpm`, `.tar.gz`, x86_64 and aarch64) | **done** (v0.49.0; packages v0.50.33 to 0.50.35) |
 
+## v0.57.15: Arrange and auto layout work together (2026-11-13)
+
+- **Implemented:** ADR 0194. `arrangeAsLayout`, `laidOutAround` (shared with Shift+A), `laidOutSheetOfSelection`, `orderLaidOutSheet`, a guard in `layoutSelection`; `gridShape` shared by `gridCells`; setting `arrange.keepTidy` (menu tick and Settings row); `ImageObject.added` set by `imageAt`, `sort: "date"`, `withDates` (dates of older pictures from the library in the same step, main `libraryDates`); context-bar Align disabled and Arrange rows as the sheet's order.
+- **Tested:** typecheck and build here; a scratch run (Keep it tidy makes a grid sheet in size order; Align greyed out; an Arrange order sets the sheet's rule). Unit (date order) and e2e (`sheets.spec`) on GitHub; the `arrange` shot taken again (its menu has a new row).
+- **Known failures:** none known yet.
+- **Unverified:** Firefox; the dates of pictures placed before, by hand.
+- **Committed:** v0.57.15 on `main`.
+- **Next bounded task:** read this push's runs.
+
 ## v0.57.14: auto layout, more: live reflow, masonry, justified rows, tracks, spans, handles, order, styles (2026-11-13)
 
 - **Implemented:** ADR 0193. auto-layout.ts: `placeItems` with `placeGrid` (tracks, spans, sparse placing, shares ≥ contents), `placeMasonry`, `placeJustified`, fill limits as shares; `sortedUnits` (arrange's `sortUnits`); `previewLayout` (scene-view, move and scale previews); `layoutNow`. model.ts: flows `masonry`, `justified`, `LayoutTrack`, `cols`, `rows`, `rowHeight`, `sort`, `inLayout.span/min/max`, `LayoutPatch`, `isSheetLayout`. edit-ops `layoutTimes`. interaction/layout-handles.ts + scene-renderer + tools gesture `layouthandle`. Bar: flows, Columns and rows popover (`openTracksPopover`, shared `opNum`/`opChoices`), Row, Order, Layout styles; Span and Min/Max on a thing. Styles kind `layout`, `applyLayoutStyle`. Debug hook `shownBox`.

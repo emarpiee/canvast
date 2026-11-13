@@ -43,7 +43,7 @@ import { installDebugHook } from "./debug-hook";
 import { EditorState } from "./editor-state";
 import type { LayoutCommand } from "./actions";
 import { applyBalloonStyle, balloonStyle, balloonsToPaths, canConnectBalloons, connectBalloons, selectedBalloon, selectedLink, selectedShapeText, setBalloonLink, setShapeText } from "./actions";
-import { backdropState, setBackdrop, canSplitPaths, splitPaths, placeCardViews, placeLinesBeside, imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, moveLayers, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, placePictureBeside, applyLayoutStyle, canTakeLayoutStyle, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, canSetInShape, setTextInShape, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, buildTarget, exportTargets, exportEachTargets, canSheetEach, sheetEach, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, autoLayoutOf, autoLayoutState, setAutoLayout, autoLayoutShortcut, patchAutoLayout, setSheetLayout, selectedInLayout, setInLayout, sheetRatio, ratioOfSheet, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
+import { backdropState, setBackdrop, canSplitPaths, splitPaths, placeCardViews, placeLinesBeside, imageAt, pasteCssPaint, copiedText, setCopiedText, renderedStill, isPlaceholderText, markCopiedPicture, isCopiedPicture, forgetCopiedPicture, applyRotation, showReplaced, arrangeSelection, copySelection, cutSelection, duplicateSelection, pasteObjects, layoutSelection, clearFlag, deleteSelection, groupSelection, importImages, moveAbove, moveLayers, setStackOrder, tagObjects, resetRotation, resetProportions, resettable, resetSize, sizeResets, recolourOldInk, svgWarningOfTargets, svgWarningOfSelection, extractFrame, placePictureBeside, applyLayoutStyle, canTakeLayoutStyle, laidOutSheetOfSelection, arrangeAsLayout, pruneSelection, redo, setFlag, setMedia, setFlagOn, setOpacityOn, setBlendOn, renameLayer, ungroupSelection, undo, selectedPaint, previewPaint, commitPaint, combineSelection, canCombine, selectedOutline, commitOutline, selectedDashNumbers, commitDashNumbers, selectedArrows, commitArrows, selectedMiterAngle, commitMiterAngle, selectedShape, commitShape, selectedCorners, commitCorners, selectedSmoothing, commitSmoothing, selectionPaints, recolour, initialShapeState, setInitialShape, resetToInitialShape, groupJoinMode, addToBooleanGroup, takeOutOfBooleanGroup, convertTextToPath, simplifySelection, canSimplify, outlineStroke, setWidthProfile, canOutlineStroke, makeMask, makeClippingMask, canMakeMask, changeMask, selectTheMask, canReleaseMask, selectedMask, startBrushMask, paintMask, divide, startShapeBuilder, finishShapeBuilder, canDivide, canFillGaps, fillAllGaps, startGapFill, finishGapFill, makeNetwork, releaseNetwork, canMakeNetwork, canReleaseNetwork, strokeToPath, canStrokeToPath, setTextOnPath, canSetOnPath, canSetInShape, setTextInShape, takeTextOffPath, canTakeOffPath, canOutline, booleanSelection, releaseBoolean, flattenBoolean, canExportSvg, exportTarget, buildTarget, exportTargets, exportEachTargets, canSheetEach, sheetEach, svgOfTarget, pdfVectorOfTarget, svgOfSelection, importSvg, setSheetClip, sheetSelection, releaseSheets, selectedPin, setPin, canFitSheet, fitSheet, autoLayoutOf, autoLayoutState, setAutoLayout, autoLayoutShortcut, patchAutoLayout, setSheetLayout, selectedInLayout, setInLayout, sheetRatio, ratioOfSheet, setSheetRatio, sheetScalesContents, setSheetScale, boxOnSheet, moveOnSheet, resizeOnSheet, canDetach, detachSelection, selectedTextStyle, setTextStyle, croppablePicture, isCropped, uncropPicture, selectedFlip, flipPictures, unflipPictures, selectedAdjust, pictureCount, applyGradientMap, paintTargetCount, selectionColours, previewAdjust, commitAdjust, copyAdjustments, pasteAdjustments, canPasteAdjustments, copyRenderedPicture, bakePicture, sizeResetBlock, matchSize, sizable } from "./actions";
 import { attachNavigation } from "../interaction/navigation";
 import { attachTools } from "../interaction/tools";
 import { createFocusCycle, focusObjects, stepToNeighbour } from "../interaction/item-navigation";
@@ -1554,15 +1554,32 @@ async function start(): Promise<void> {
     rememberBalloonLook(validLook(JSON.parse(settings.get("balloon.look") || "null")));
   } catch { /* (an old or broken value: the usual balloon) */ }
   dock.add(panelEl("balloon-panel"), { id: "balloon", title: "Speech balloon", side: "right" });
-const runLayout = async (cmd: LayoutCommand): Promise<void> => {
+/** When the files of these pictures came into the library, for those that do not know it yet (by file). */
+  const libraryDates = async (objs: readonly CanvasObject[]): Promise<Map<string, number>> => {
+    const out = new Map<string, number>();
+    for (const o of objs) {
+      if (o.kind !== "image" || o.added !== undefined || out.has(o.assetId) || !session.catalog) continue;
+      const e = await session.catalog.entry(o.assetId).catch(() => undefined);
+      if (e?.importedAt !== undefined) out.set(o.assetId, e.importedAt);
+    }
+    return out;
+  };
+  const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     // Sorting by name needs the file names of the selected images (the document only has their hashes).
     const names = new Map<string, { name: string; date: number }>();
     if ("grid" in cmd && (cmd.grid.startsWith("name") || cmd.grid === "date") && session.catalog) {
+      // (the things a sheet lays out: all of them, as its order covers them all)
+      const sheet = laidOutSheetOfSelection(doc, editor);
       for (const o of doc.ordered()) {
-        if (o.kind !== "image" || !editor.selection.has(o.id) || names.has(o.assetId)) continue;
+        if (o.kind !== "image" || !(editor.selection.has(o.id) || (sheet && o.parent === sheet.id)) || names.has(o.assetId)) continue;
         const e = await session.catalog.entry(o.assetId).catch(() => undefined);
         names.set(o.assetId, { name: e?.name ?? "", date: e?.importedAt ?? 0 });
       }
+    }
+    // Kept tidy (ADR 0194): the grid as a sheet with auto layout, unless the things are on one already (then their sheet's order is set).
+    if ("grid" in cmd && settings.get("arrange.keepTidy") && !laidOutSheetOfSelection(doc, editor)) {
+      lastGrid = null;
+      return arrangeAsLayout(doc, editor, cmd.grid, settings.get("arrange.gap"), new Map([...names].map(([h, v]) => [h, v.date])));
     }
     // The grid is laid out with the chosen space between items; the last grid is kept so a new spacing can lay it out again.
     const full: LayoutCommand = "grid" in cmd ? { grid: cmd.grid, gap: settings.get("arrange.gap") } : cmd;
@@ -1658,7 +1675,12 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
     sheetScale: () => sheetScalesContents(doc, editor),
     setSheetScale: (on) => setSheetScale(doc, editor, on),
     autoLayout: () => { const got = autoLayoutOf(doc, editor); return got ? { layout: got.layout, ppu: textPpu(got.sheet.id), items: layoutNow(got.sheet, doc.ordered(), doc.space).items.length } : null; },
-    setAutoLayout: (patch, final) => patchAutoLayout(doc, editor, patch, final),
+    setAutoLayout: (patch, final) => {
+      // (a date order: the pictures on the sheet placed before they kept their library date get it now, in the same step)
+      const got = patch.sort === "date" ? autoLayoutOf(doc, editor) : null;
+      if (!got) return patchAutoLayout(doc, editor, patch, final);
+      void libraryDates(doc.ordered().filter((o) => o.parent === got.sheet.id)).then((dates) => patchAutoLayout(doc, editor, patch, final, dates));
+    },
     layoutStyles: () => session.styles.of(LAYOUT_STYLE_KIND.id).map((st) => ({ name: st.name, summary: LAYOUT_STYLE_KIND.summary(st.data), data: st.data as SheetLayout })),
     saveLayoutStyle: (l) => void session.styles.add(LAYOUT_STYLE_KIND.id, "", l).then((made) => { editor.message = made ? `Saved the layout “${made.name}” in Styles.` : "The layout could not be saved."; editor.changed(); }),
     inLayout: () => selectedInLayout(doc, editor),
@@ -2290,6 +2312,9 @@ const runLayout = async (cmd: LayoutCommand): Promise<void> => {
       arrange: (to) => arrangeSelection(doc, editor, to),
       layout: (cmd) => void runLayout(cmd),
       gap: () => settings.get("arrange.gap"),
+      laidOutOrder: () => { const s = laidOutSheetOfSelection(doc, editor); return s ? (s.container.layout.sort ?? "stack") : null; },
+      keepTidy: () => settings.get("arrange.keepTidy"),
+      setKeepTidy: (on) => settings.set("arrange.keepTidy", on),
       setGap: (gap) => {
         settings.set("arrange.gap", gap);
         // Choosing another space right after arranging the same items lays them out again with it (one more undo step).

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.57.15 — Arrange and auto layout work together (2026-11-13)
+
+- **Added:** **Keep it tidy** in the Arrange menu (and Settings > Drawing and selection): Arrange in a grid makes the grid as a sheet with auto layout, which stays a grid as things are added (ADR 0194).
+- **Added:** auto layout can order by date: newest first, by when a picture's file came into the library.
+- **Changed:** on things a sheet with auto layout places, Align and distribute are greyed out (the sheet's alignment does it), and an Arrange order becomes the sheet's Order rule.
+- **Fixed:** aligning or distributing things on a sheet with auto layout was undone at once, or changed their order.
+
 ## 0.57.14 — Auto layout: live reflow, masonry, justified rows, grid tracks and more (2026-11-13)
 
 - **Added:** while a thing is dragged on a sheet with auto layout, the others make room for it live, closing the gap behind it and opening one where it would land, on another such sheet too (ADR 0193).

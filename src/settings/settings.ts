@@ -211,6 +211,8 @@ export const SETTINGS = {
   /** Every shortcut the person changed, as JSON: command id → keys (settings/keymap.ts). Empty: all as they were. */
   "keys.custom": { scope: "device", default: "{}", validate: (v: unknown) => { try { return typeof v === "string" && typeof JSON.parse(v) === "object" ? v : undefined; } catch { return undefined; } }, effect: "immediate" } as Def<string>,
   "key.zen": { scope: "device", default: "z", validate: letter, effect: "immediate" } as Def<string>,
+  /** Arrange in a grid makes the grid a sheet with auto layout that keeps it (ADR 0194). Off: a grid once, as before. */
+  "arrange.keepTidy": { scope: "device", default: false, validate: (v: unknown) => (typeof v === "boolean" ? v : undefined), effect: "immediate" } as Def<boolean>,
   "arrange.gap": { scope: "device", default: "normal", validate: oneOf("none", "tight", "normal", "wide", "wider"), effect: "immediate" } as Def<"none" | "tight" | "normal" | "wide" | "wider">,
   // Screenshots (ADR 0080).
   "shot.format": { scope: "workspace", default: "webp", validate: oneOf("webp", "png", "jpeg"), effect: "immediate" } as Def<"webp" | "png" | "jpeg">,

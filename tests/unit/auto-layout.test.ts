@@ -146,6 +146,13 @@ describe("a sort rule and live reflow (ADR 0193)", () => {
     near(box(of(out, big)), [0, 0, 30, 30]);
     near(box(of(out, small)), [30, 0, 40, 10]);
   });
+  it("a date order: the pictures whose files came into the library last first, those with no date after them", () => {
+    const s = sheet(0, 0, 100, 100, 0, { flow: "row", gap: [0, 0], sort: "date" });
+    const pic = (x: number, z: number, added?: number): CanvasObject => ({ id: newObjectId(), kind: "image", assetId: "a".repeat(64), anchor: at(x, 0), unit: 0, z, opacity: 1, attachmentTargetId: null, w: 10, h: 10, pixelW: 10, pixelH: 10, parent: s.id, ...(added !== undefined ? { added } : {}) } as CanvasObject);
+    const old = pic(0, 3, 1000), none = pic(10, 2), recent = pic(20, 1, 5000);
+    const out = layOutSheet(s as never, [s, old, none, recent], space);
+    expect([recent, old, none].map((o) => box(of(out, o))[0])).toEqual([0, 10, 20]);
+  });
   it("while one is dragged, the others make room as a drop there would, and the dragged one is left to the pointer; dragged off, its place closes", () => {
     const s = sheet(0, 0, 60, 20, 0, { flow: "row", gap: [10, 0] });
     const a = rect(0, 0, 20, 10, 2, { parent: s.id }), b = rect(30, 0, 20, 10, 1, { parent: s.id });

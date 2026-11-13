@@ -125,7 +125,7 @@ export interface LayoutTrack {
 }
 export const LAYOUT_TRACK_SIZES = ["hug", "fixed", "fr"] as const;
 /** The orders a layout can keep its items in by itself (ADR 0193), from what the canvas knows of them. */
-export const LAYOUT_SORTS = ["name-asc", "name-desc", "size", "type"] as const;
+export const LAYOUT_SORTS = ["name-asc", "name-desc", "date", "size", "type"] as const;
 export type LayoutSort = (typeof LAYOUT_SORTS)[number];
 
 /**
@@ -248,6 +248,8 @@ export interface ImageObject extends ObjectBase {
   readonly page?: true;
   /** What this object's card shows of its file, as that kind of file reads it (a PDF's page number); absent = its first look. Its picture is drawn from the file, nothing is stored. `pixelW` × `pixelH` are that picture's. */
   readonly preview?: string;
+  /** When its file came into the library (ms), kept as it is placed, so a layout can order by it (ADR 0194); absent = not known. */
+  readonly added?: number;
   /** Mirrored left to right (`flipX`) or top to bottom (`flipY`) inside its box, about the box's centre; absent = not. */
   readonly flipX?: true;
   readonly flipY?: true;
@@ -674,6 +676,7 @@ export function validateObject(o: CanvasObject): CanvasObject {
     if ((o.flipX !== undefined && o.flipX !== true) || (o.flipY !== undefined && o.flipY !== true)) throw new InvalidObjectError("bad flip");
     if (o.page !== undefined && o.page !== true) throw new InvalidObjectError("bad page");
     if (o.preview !== undefined && (typeof o.preview !== "string" || o.preview.length === 0 || o.preview.length > 2000)) throw new InvalidObjectError("bad preview");
+    if (o.added !== undefined && !(typeof o.added === "number" && Number.isFinite(o.added) && o.added >= 0)) throw new InvalidObjectError("bad added date");
     if (o.radius !== undefined) {
       const rs = typeof o.radius === "number" ? [o.radius] : o.radius;
       if (!Array.isArray(rs) || (typeof o.radius !== "number" && rs.length !== 4) || !rs.every((v: unknown) => typeof v === "number" && Number.isFinite(v) && v >= 0)) throw new InvalidObjectError("bad radius");

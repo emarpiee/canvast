@@ -71,7 +71,7 @@ import { buildPayload, ClipboardError, instantiate, parsePayload } from "../doc/
 import { isOwnWriting, writeSystemClipboard } from "./system-clipboard";
 import type { ClipboardPayload } from "../doc/clipboard";
 import { depthOf } from "../core/frames";
-import { alignUnits, arrangeGrid, distributeUnits, gridCells } from "../doc/arrange";
+import { GAP_FRACTION, alignUnits, arrangeGrid, distributeUnits, gridCells, gridShape } from "../doc/arrange";
 import type { AssetLibrary, AssetRecord } from "../assets/asset-library";
 import { duplicateNotice } from "../assets/asset-library";
 import type { EditorState } from "./editor-state";
@@ -198,6 +198,14 @@ function layoutUnits(doc: DocumentStore, editor: EditorState, names: ReadonlyMap
  */
 export function layoutSelection(doc: DocumentStore, editor: EditorState, cmd: LayoutCommand, names: ReadonlyMap<string, { name: string; date: number }> = new Map()): void {
   if (editor.blockEdit()) return;
+  // Things a sheet lays out are placed by it (ADR 0194): an order becomes its rule; lining them up by hand would be undone at once.
+  const onSheet = laidOutSheetOfSelection(doc, editor);
+  if (onSheet) {
+    if ("grid" in cmd) return orderLaidOutSheet(doc, editor, onSheet, cmd.grid, new Map([...names].map(([h, v]) => [h, v.date])));
+    editor.message = "Their sheet places them: change its alignment in the bar, or keep one out of the layout.";
+    editor.changed();
+    return;
+  }
   const laid = layoutUnits(doc, editor, names);
   if (typeof laid === "string") {
     editor.message = laid;
@@ -787,7 +795,7 @@ function mediaKindOf(rec: Pick<AssetRecord, "type" | "frames">): MediaState["kin
 }
 
 /** The image object for `rec` with its top-left corner at screen (x, y) and a size of wPx by hPx CSS px. */
-export function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type" | "frames"> & { /** Its name in the library now: the layer keeps it from here on. */ placedName?: string }, doc: DocumentStore, view: ViewState, x: number, y: number, wPx: number, hPx: number, z: number): ImageObject {
+export function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "type" | "frames"> & { /** Its name in the library now: the layer keeps it from here on. */ placedName?: string; /** When it came into the library: kept, for a layout's date order. */ importedAt?: number }, doc: DocumentStore, view: ViewState, x: number, y: number, wPx: number, hPx: number, z: number): ImageObject {
   const cam = view.camera;
   const f = 2 ** cam.zf; // local unit = 2^-zi world = f CSS px
   const c = screenToWorld(cam, view.viewport, { x, y });
@@ -803,6 +811,7 @@ export function imageAt(rec: Pick<AssetRecord, "hash" | "pixelW" | "pixelH" | "t
     opacity: 1,
     attachmentTargetId: null,
     ...(rec.placedName && rec.placedName.length <= MAX_NAME_LENGTH ? { name: rec.placedName, autoName: true as const } : {}),
+    ...(rec.importedAt !== undefined && Number.isFinite(rec.importedAt) && rec.importedAt >= 0 ? { added: rec.importedAt } : {}),
     assetId: rec.hash,
     w: wPx / f,
     h: hPx / f,
@@ -2843,23 +2852,65 @@ export function autoLayoutShortcut(doc: DocumentStore, editor: EditorState): voi
   const state = autoLayoutState(doc, editor);
   if (state !== null) return setAutoLayout(doc, editor, !state);
   if (editor.blockEdit()) return;
+  laidOutAround(doc, editor, "Auto layout", (sheet, all) => guessLayout(sheet, all, doc.space, [true, true]));
+}
+
+/** A new sheet round the picked things (no fill: it is there to place them, as other tools make it), laid out by `layoutOf`, and picked: one undo step. False when nothing can go on one. */
+function laidOutAround(doc: DocumentStore, editor: EditorState, label: string, layoutOf: (sheet: PathObject & { container: { clip: boolean } }, all: readonly CanvasObject[]) => SheetLayout, dates: ReadonlyMap<string, number> = new Map()): boolean {
   const roots = rootsOf(selected(doc, editor).filter((o) => !o.locked));
-  const made = roots.length ? sheetAround(doc, roots, doc.ordered(), null) : null; // (no fill: the sheet is there to place them, as other tools make it)
+  const made = roots.length ? sheetAround(doc, roots, doc.ordered(), null) : null;
   if (!made) {
     editor.message = "Select things to lay out, or a sheet.";
     editor.changed();
-    return;
+    return false;
   }
-  const inside = new Map(made.inside.map((o) => [o.id, o] as const));
+  const insideList = withDates(made.inside, dates);
+  const inside = new Map(insideList.map((o) => [o.id, o] as const));
   const all = [...doc.ordered().map((o) => inside.get(o.id) ?? o), made.sheet];
-  const sheet = { ...made.sheet, container: { ...made.sheet.container!, layout: guessLayout(made.sheet as PathObject & { container: { clip: boolean } }, all, doc.space, [true, true]) } } as LaidOutSheet;
-  doc.commit(doc.transaction("Auto layout", [sheet, ...made.inside]));
+  const sheet = { ...made.sheet, container: { ...made.sheet.container!, layout: layoutOf(made.sheet as PathObject & { container: { clip: boolean } }, all) } } as LaidOutSheet;
+  doc.commit(doc.transaction(label, [sheet, ...insideList]));
   editor.select([sheet.id]);
+  editor.changed();
+  return true;
+}
+
+/** Pictures given when their files came into the library (`dates`, by file), where they do not know it yet: placed before they kept it. */
+function withDates<T extends CanvasObject>(objs: readonly T[], dates: ReadonlyMap<string, number>): T[] {
+  return objs.map((o) => (o.kind === "image" && o.added === undefined && dates.has(o.assetId) ? ({ ...o, added: dates.get(o.assetId)! } as T) : o));
+}
+
+/** The one sheet with auto layout that every picked thing is on (null when some are not, or on different ones): such things are placed by it, not by hand (ADR 0194). */
+export function laidOutSheetOfSelection(doc: DocumentStore, editor: EditorState): LaidOutSheet | null {
+  const picked = selected(doc, editor).filter((o) => ownerOf(o) === undefined);
+  const parent = picked[0]?.parent;
+  const sheet = parent === undefined ? undefined : doc.get(parent);
+  return isLaidOut(sheet) && !sheet.locked && picked.every((o) => o.parent === parent) ? sheet : null;
+}
+
+/** An Arrange order on things a sheet lays out: the sheet's own Order rule (a lasting one), pictures given their dates for a date order. One undo step. */
+export function orderLaidOutSheet(doc: DocumentStore, editor: EditorState, sheet: LaidOutSheet, key: SortKey, dates: ReadonlyMap<string, number> = new Map()): void {
+  if (editor.blockEdit()) return;
+  const { sort: _s, ...rest } = sheet.container.layout;
+  const layout: SheetLayout = key === "stack" ? rest : { ...rest, sort: key };
+  const items = doc.ordered().filter((o) => o.parent === sheet.id);
+  const dated = key === "date" ? withDates(items, dates).filter((o, i) => o !== items[i]) : [];
+  doc.commit(doc.transaction("Order of the layout", [{ ...sheet, container: { ...sheet.container, layout } } as CanvasObject, ...dated]));
+  editor.message = key === "stack" ? "The sheet orders its things by their stacking again." : "The sheet keeps this order as things are added.";
   editor.changed();
 }
 
+/** Arrange in a grid and keep it tidy (ADR 0194): a new sheet round the picked things, laid out as the grid Arrange makes (its space, about as wide as tall), its order kept as a rule. */
+export function arrangeAsLayout(doc: DocumentStore, editor: EditorState, key: SortKey, gap: GapKey, dates: ReadonlyMap<string, number> = new Map()): void {
+  if (editor.blockEdit()) return;
+  laidOutAround(doc, editor, "Arrange and keep tidy", (sheet, all) => {
+    const base = { ...sheet, container: { ...sheet.container, layout: DEFAULT_LAYOUT } } as LaidOutSheet;
+    const g = gridShape(layoutNow(base, all, doc.space).items, GAP_FRACTION[gap]);
+    return { ...DEFAULT_LAYOUT, flow: "grid", columns: g.cols, gap: [g.gap, g.gap], hug: [true, true], ...(key === "stack" ? {} : { sort: key }) };
+  }, dates);
+}
+
 /** Change the picked sheet's auto layout (its flow, gap, padding, alignment, hugging, columns): one undo step; not final, only shown. */
-export function patchAutoLayout(doc: DocumentStore, editor: EditorState, patch: LayoutPatch, final = true): void {
+export function patchAutoLayout(doc: DocumentStore, editor: EditorState, patch: LayoutPatch, final = true, /** For a date order: when the pictures' files came into the library, for those placed before they kept it. */ dates: ReadonlyMap<string, number> = new Map()): void {
   const got = autoLayoutOf(doc, editor);
   if (!got || editor.blockEdit() || got.sheet.locked) return;
   const layoutMut: Record<string, unknown> = { ...got.layout, ...patch };
@@ -2877,7 +2928,9 @@ export function patchAutoLayout(doc: DocumentStore, editor: EditorState, patch: 
   const sheet = { ...got.sheet, container: { ...got.sheet.container, layout } } as LaidOutSheet;
   if (!final) return showReplaced(editor, [sheet, ...layOutSheet(sheet, doc.ordered().map((o) => (o.id === sheet.id ? sheet : o)), doc.space)]);
   editor.preview = { kind: "none" };
-  doc.commit(doc.transaction("Change auto layout", [sheet]));
+  const items = dates.size ? doc.ordered().filter((o) => o.parent === sheet.id) : [];
+  const dated = withDates(items, dates).filter((o, i) => o !== items[i]);
+  doc.commit(doc.transaction("Change auto layout", [sheet, ...dated]));
   editor.changed();
 }
 

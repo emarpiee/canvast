@@ -68,13 +68,19 @@ export function sortUnits(units: readonly Unit[], key: SortKey): Unit[] {
  * centred in its cell, filling left to right then down, columns chosen so the grid is about as wide as it is tall.
  * Returns each box's top-left and the grid's size. Shared with the batch-import grid (ADR 0030).
  */
+/** A roughly square grid's cells (as large as the largest box), the space between them and how many columns it has: about as wide as it is tall. */
+export function gridShape(sizes: ReadonlyArray<{ w: number; h: number }>, gapFraction: number): { cellW: number; cellH: number; gap: number; cols: number } {
+  const n = Math.max(1, sizes.length);
+  const cellW = Math.max(0, ...sizes.map((s) => s.w));
+  const cellH = Math.max(0, ...sizes.map((s) => s.h));
+  const gap = gapFraction * Math.max(cellW, cellH);
+  return { cellW, cellH, gap, cols: Math.min(n, Math.max(1, Math.round(Math.sqrt((n * (cellH + gap)) / (cellW + gap || 1))))) };
+}
+
 export function gridCells(sizes: ReadonlyArray<{ w: number; h: number }>, gapFraction: number): { cells: Array<{ x: number; y: number }>; w: number; h: number } {
   const n = sizes.length;
   if (!n) return { cells: [], w: 0, h: 0 };
-  const cellW = Math.max(...sizes.map((s) => s.w));
-  const cellH = Math.max(...sizes.map((s) => s.h));
-  const gap = gapFraction * Math.max(cellW, cellH);
-  const cols = Math.min(n, Math.max(1, Math.round(Math.sqrt((n * (cellH + gap)) / (cellW + gap)))));
+  const { cellW, cellH, gap, cols } = gridShape(sizes, gapFraction);
   const rows = Math.ceil(n / cols);
   return {
     cells: sizes.map((s, i) => ({ x: (i % cols) * (cellW + gap) + (cellW - s.w) / 2, y: Math.floor(i / cols) * (cellH + gap) + (cellH - s.h) / 2 })),

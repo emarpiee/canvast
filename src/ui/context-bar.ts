@@ -157,6 +157,11 @@ export interface ContextActions {
   /** The space between items in a grid (ADR 0074), and choosing another one (a grid just made is laid out again with it). */
   gap(): GapKey;
   setGap(gap: GapKey): void;
+  /** The order rule of the sheet with auto layout every selected thing is on (ADR 0194): null when they are not on one; "stack" for none. */
+  laidOutOrder(): string | null;
+  /** Arrange in a grid keeps it tidy: the grid made as a sheet with auto layout, its order a rule. */
+  keepTidy(): boolean;
+  setKeepTidy(on: boolean): void;
   setFlag(flag: "hidden" | "locked"): void;
   deleteSelection(): void;
 }
@@ -223,7 +228,8 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
         // One menu for Align and Distribute; it stays open while several are tried (the shared grouped-tools menu, more-menu.ts)
         const rows = (head: string, prefix: string): MenuItem[] => LAYOUT_MENU.find((g) => g.head.startsWith(head))!.items.map((i) => ({
           id: i.id, label: `${prefix}${i.label}`, hint: i.hint, icon: i.icon,
-          disabled: i.id.startsWith("distribute") && editor.selection.size < 3,
+          // (things their sheet lays out are placed by it: lining them up by hand would be undone at once)
+          ...(actions.laidOutOrder() !== null ? { disabled: true, hint: "Their sheet places them: see its alignment" } : { disabled: i.id.startsWith("distribute") && editor.selection.size < 3 }),
           run: () => { const [kind, arg] = i.id.split(":") as [string, string]; actions.layout(kind === "align" ? { align: arg as AlignKey } : { distribute: arg as "x" | "y" }); },
         }));
         openMoreMenu(b, [...rows("Align", "Align "), ...rows("Distribute", "Distribute ")], "Align and distribute", { keepOpen: true });
@@ -247,10 +253,18 @@ export function mountContextBar(host: HTMLElement, editor: EditorState, doc: Doc
       }
       case "arrangemenu": {
         // The grid orders and the space between the items in one menu that stays open (the same grouped-tools menu as Align); the space is ticked
-        const items = (): MenuItem[] => [
-          ...LAYOUT_MENU.find((g) => g.head.startsWith("Arrange"))!.items.map((i): MenuItem => ({ id: i.id, label: i.label, hint: i.hint, icon: i.icon, run: () => actions.layout({ grid: i.id.split(":")[1] as SortKey }) })),
-          ...GAP_ORDER.map((g): MenuItem => ({ id: `gap:${g}`, label: `Space: ${GAP_LABEL[g].toLowerCase()}`, hint: GAP_HINT[g], icon: `<span class="menu-gap">${GAP_SHORT[g]}</span>`, checked: g === actions.gap(), run: () => { actions.setGap(g); update(); } })),
-        ];
+        // (things a sheet lays out: an order is the sheet's rule, ticked when it is the one; the space is the sheet's gap)
+        const items = (): MenuItem[] => {
+          const order = actions.laidOutOrder();
+          const orders = LAYOUT_MENU.find((g) => g.head.startsWith("Arrange"))!.items;
+          if (order !== null)
+            return orders.map((i): MenuItem => ({ id: i.id, label: i.label, hint: "The sheet keeps this order", icon: i.icon, checked: i.id === `grid:${order}`, run: () => actions.layout({ grid: i.id.split(":")[1] as SortKey }) }));
+          return [
+            ...orders.map((i): MenuItem => ({ id: i.id, label: i.label, hint: actions.keepTidy() ? "On a sheet that keeps it" : i.hint, icon: i.icon, run: () => actions.layout({ grid: i.id.split(":")[1] as SortKey }) })),
+            ...GAP_ORDER.map((g): MenuItem => ({ id: `gap:${g}`, label: `Space: ${GAP_LABEL[g].toLowerCase()}`, hint: GAP_HINT[g], icon: `<span class="menu-gap">${GAP_SHORT[g]}</span>`, checked: g === actions.gap(), run: () => { actions.setGap(g); update(); } })),
+            { id: "keeptidy", label: "Keep it tidy", hint: "As auto layout: it stays a grid", icon: ICONS.autoLayout, sep: true, checked: actions.keepTidy(), run: () => { actions.setKeepTidy(!actions.keepTidy()); update(); } },
+          ];
+        };
         openMoreMenu(b, items(), "Arrange in a grid", { keepOpen: true, refresh: items });
         break;
       }

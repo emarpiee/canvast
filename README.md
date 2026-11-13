@@ -412,7 +412,7 @@ Let a sheet lay its pictures out in a grid that stays tidy as you add more.
 | **Columns** | For a grid or a masonry: how many (empty: about as many as rows) |
 | **Columns and rows** | For a grid: each column and row **Hug** (as large as what is in it), **Fixed** (a size in px) or **Share** (a share of the room left, never smaller than what is in it); rows past those set hug |
 | **Row** | For justified rows: the height a row aims at before it is made as wide as the sheet |
-| **Order** | The stacking order (as Layers lists it), or a rule kept as things are added: name A–Z or Z–A (a picture's name as placed, a text's first words), largest first, by kind |
+| **Order** | The stacking order (as Layers lists it), or a rule kept as things are added: name A–Z or Z–A (a picture's name as placed, a text's first words), newest first (when the picture's file came into the library), largest first, by kind. An Arrange order on things of the sheet sets it too |
 | **Layout styles** | Your saved layouts, and *Save this layout as a style*: kept in the [Styles](#styles) panel, given to a selected sheet from there or this menu. Lengths are kept in px as seen |
 
 | On the sheet itself | |
@@ -464,7 +464,8 @@ Line studies up along their bottom edges.
 | Feature | What it does |
 | --- | --- |
 | **Align and distribute** | The Align menu of the Actions bar lines the selection up by its edges or middles, or spaces it evenly. One thing on a sheet aligns with its sheet |
-| **Arrange in a grid** | By name, date, size or type, with a gap |
+| **Arrange in a grid** | By name, date, size or type, with a gap: once, where they are. With **Keep it tidy** (in the Arrange menu, or Settings > Drawing) the grid is made as a sheet with [auto layout](#auto-layout), its order kept as a rule, so it stays a grid as things are added |
+| **On a sheet with auto layout** | The sheet places what is on it: Align and distribute are greyed out (the sheet's own alignment is in the bar), and an Arrange order becomes the sheet's Order rule |
 | **Size** menu | Gives the selected pictures, note cards, shapes, strokes and text the width or height of the smallest, the middle or the largest of them, in proportion. **Reset size** puts pictures, videos, GIFs, sounds and note cards back to the size they are placed at, at the current zoom (one pixel of the file for one of the screen; a note card at Settings > Notes > Note tool card size), about their middle. Several selected keep their layout: they move apart only as far as it takes to keep their gaps |
 | **Copy, cut, paste, duplicate** | `Ctrl/⌘+C`, `X`, `V`, `D`; `Alt`+drag copies |
 | **Groups** | `Ctrl/⌘+G`; a group (also a boolean group) counts as one thing; its shapes line up with each other only when you select them one by one (in Layers, or inside the group). A group or several selected move from anywhere in their box, gaps too; press outside it to draw a selection box |
@@ -2352,7 +2353,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Angular gradient in SVG | Exported as a picture, not vectors, with a warning |
 | Varied fills | Repeat after 16 to 31 cells |
 | Pattern | No rotated sheets; at most 600 shapes |
-| Auto layout | A masonry and justified rows resize the items; a turned sheet has none; a sort rule knows only what is on the canvas (no library date or colour) |
+| Auto layout | A masonry and justified rows resize the items; a turned sheet has none; a sort rule cannot order by colour |
 | SVG import | No text, patterns or masks from inside an SVG |
 | Adjustments and shadows | Not on a playing video or GIF; only shapes keep them in SVG |
 | Boolean groups | No per-corner radii |
@@ -2377,7 +2378,7 @@ What canvast does not do today, for both versions, then each. **The limits that 
 | Angular gradient in SVG | SVG has no sweep gradient, so an SVG holds a picture of it (up to 384 px a side, about 300 KB), not vectors; the Export dialog, Save as SVG and Copy as SVG warn. A PDF of such a shape is made as a picture, and picture exports are exact |
 | Varied fills | The copies of a varied texture repeat after a block of 16 to 31 cells |
 | Pattern | A rotated sheet or shape is refused. A result is at most 600 shapes. Ungrouping a pattern, or moving one of its shapes out of its group, ends its link with the panel (the shapes stay as ordinary ones). Resizing the sheet makes the pattern again at the new size from its settings and seed, so a generator whose layout depends on the size (how many waves fit, say) can place its shapes differently |
-| Auto layout | A turned sheet cannot have one. A masonry and justified rows resize the items to their places: a pen stroke and a turned thing are scaled as a whole, words only get wider (they wrap again). A grid places spanning items row by row in order, so a hole a big item leaves is not filled by a later small one. A sort rule orders by what the canvas holds (a picture's name as placed, a text's first words, size, kind), not by the library's dates or colours. Lengths of a saved layout style are px as seen when it was saved |
+| Auto layout | A turned sheet cannot have one. A masonry and justified rows resize the items to their places: a pen stroke and a turned thing are scaled as a whole, words only get wider (they wrap again). A grid places spanning items row by row in order, so a hole a big item leaves is not filled by a later small one. A sort rule orders by what the canvas holds (a picture's name as placed and when its file came into the library, a text's first words, size, kind), not by colour; a picture placed before it kept its date gets it from the library when a date order is chosen. Lengths of a saved layout style are px as seen when it was saved |
 | SVG import | Text, patterns and masks inside an SVG are not imported; a dropped SVG file is placed as a picture (make a vector copy to edit it) |
 | Adjustments and shadows | Shadows are not shown on a video or GIF while it plays. Adjustments (and shadows) are written to an exported SVG only for shapes (not pen strokes or text), as an SVG filter that matches the canvas closely but not exactly (curves, levels and the gradient map are sampled; grain differs). A shape bigger than about 8 million pixels on screen is drawn unadjusted. Grain on a shape is fixed to the screen pixels, not to the shape |
 | Boolean groups | Per-corner radii on a boolean result are not available |
