@@ -249,7 +249,7 @@ test("value-chips", async ({ scene: s }) => {
   const art = await s.art("hokusai-under");
   await s.canvas("Prints");
   const [id] = await s.place(art);
-  await s.fit([id!], 0.5, [0.5, 0.62]);
+  await s.fit([id!], 0.38, [0.5, 0.5]);
   await s.select([id!]);
   await setting(s, "ui.properties", "chips");
   await s.p.locator('.props-chips [data-vchip="shape"]').click();
@@ -291,9 +291,9 @@ test("near-selection", async ({ scene: s }) => {
   const [h] = await s.art("hokusai-under");
   await s.canvas("Cover");
   const [pic] = await s.place([h!]);
-  await s.fit([pic!], 0.45, [0.5, 0.62]);
+  await s.fit([pic!], 0.36, [0.5, 0.74]);
   const b = (await s.box([pic!]))!;
-  const title = await s.text(b.minX, b.minY - 60, "THE CROSSING", { size: 56, font: "bangers", colour: "#f4efe6" });
+  const title = await s.text(b.minX, b.minY - 190, "THE CROSSING", { size: 56, font: "bangers", colour: "#f4efe6" });
   await setting(s, "ui.properties", "near");
   await setting(s, "ui.actions", "follow");
   await setting(s, "ui.actionsView", "chips");
