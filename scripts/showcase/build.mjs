@@ -19,6 +19,8 @@ const p = ctx.pages()[0] ?? (await ctx.newPage());
 p.on("pageerror", (e) => console.log("PAGEERROR", String(e)));
 await p.goto("file://" + process.cwd() + "/dist/canvast.html#debug");
 await p.waitForFunction(() => typeof window.__canvastDebug !== "undefined");
+// (the showcase is drawn through the Properties bar at the top, as the specs use it: the app's own place is by the selection, ADR 0198)
+await p.evaluate(() => (window.__canvastDebug.setSetting("ui.properties", "bar"), window.__canvastDebug.setSetting("ui.groupNames", "bottom")));
 await p.addStyleTag({ content: ".hud-dev,.hud-debug{display:none!important}" });
 const H = (fn, arg) => p.evaluate(fn, arg);
 const frame = () => H(() => window.__canvastDebug.nextFrame());

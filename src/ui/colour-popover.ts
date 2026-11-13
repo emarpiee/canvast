@@ -756,8 +756,8 @@ export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void
   const round = (v: number): string => String(Math.round(v * 100) / 100);
   const along = o.pathOpts
     ? num("pathStart", "Start at", round(o.pathOpts.start * 100), "%", 0, "1") +
-      choices("pathAlign", "Along the path", [["start", "Start", "From the start point"], ["center", "Middle", "In the middle of the path"], ["end", "End", "Up to the end of the path"]], o.pathOpts.align) +
-      choices("pathSide", "Side", [["a", "This", "On this side of the path"], ["b", "Other", "On the other side, read the other way"]], o.pathOpts.flip ? "b" : "a") +
+      choices("path-align", "Along the path", [["start", "Start", "From the start point"], ["center", "Middle", "In the middle of the path"], ["end", "End", "Up to the end of the path"]], o.pathOpts.align) +
+      choices("path-side", "Side", [["a", "This", "On this side of the path"], ["b", "Other", "On the other side, read the other way"]], o.pathOpts.flip ? "b" : "a") +
       num("pathLift", "Off the path", round(o.pathOpts.lift), "em", 0, "0.05")
     : "";
   pop.innerHTML =
@@ -793,6 +793,7 @@ export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>("button[role=radio]");
     if (!b) return;
     for (const x of b.closest("[role=radiogroup]")!.querySelectorAll("button")) x.setAttribute("aria-checked", String(x === b));
+    // (data-path-align and data-path-side: an attribute's name has no capitals in HTML, so `dataset` finds them only written with a hyphen)
     if (b.dataset["pathAlign"]) o.onChange({ pathOpts: { align: b.dataset["pathAlign"] as "start" | "center" | "end" } }, true);
     else if (b.dataset["pathSide"]) o.onChange({ pathOpts: { flip: b.dataset["pathSide"] === "b" } }, true);
     else if (b.dataset["card"]) {

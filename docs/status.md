@@ -47,6 +47,12 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.28: text along a path, where along it and which side (2026-11-14)
+
+- **Implemented:** the two choice rows of a text along a path in `openTextBoxPopover` (`ui/colour-popover.ts`) are named `path-align` and `path-side` (an attribute's name loses its capitals in HTML; `dataset.pathAlign` reads `data-path-align`); every other choice row of the file was checked: one-word names. `text.spec.ts`'s text along a path checks End (kept, the words move) and Other (kept). `scripts/showcase/build.mjs` draws through the Properties bar at the top (it failed with the chips by the selection as the app's place: Screenshots and Pan and zoom on 3930d497).
+- **Tested:** build and typecheck here. Scratch (Chromium, chips by the selection): a short text along a path: Start x 294, Middle 537, End 774, Other flips it; a text longer than the path moves too; the options stay open; no errors.
+- **Committed:** v0.58.28 on `main`.
+
 ## v0.58.27: the bars' places are the app's own (2026-11-14)
 
 - **Implemented:** defaults `ui.properties` near, `ui.groupNames` top (`ui.actions` stays bottom); the three rows are no longer in Settings; `ui.barPlaces` marks that an install was moved to them (once, at start: a value set since, by the debug hook or a test, stays). Tests: the harness writes the Properties bar at the top and the names under the buttons before the app loads, at every load, only where not set (a test's own settings, written before a reload, stay); the desktop launch sets them after loading; `vectors.spec.ts`'s Actions bar that follows the selection is set by the debug hook (its row is gone); `editing.spec.ts` and `pictures.spec.ts` add their setting to the saved ones. README: the Interface table and Settings > Appearance.

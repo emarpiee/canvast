@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.28 — Text along a path: where along it, and which side (2026-11-14)
+
+- **Fixed:** for a text along a path, *Along the path* (Start, Middle, End) and *Side* (This, Other) in Paragraph and box options did nothing: their buttons' attributes (`data-pathAlign`) were lowered to `data-pathalign` by HTML and never read. They are `data-path-align` and `data-path-side` now.
+
 ## 0.58.27 — The bars' places are the app's own (2026-11-14)
 
 - **Changed:** the Properties options stand as chips near the selection, the Actions bar at the bottom with its group names over its buttons: the app's own places, no longer settings. The three rows (Properties, Actions bar, Actions bar group names) are gone from Settings > Appearance, and an install that had others is moved to these once.

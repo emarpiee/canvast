@@ -952,6 +952,18 @@ test("a text is set along a picked path (a copy of its curve), runs along it and
   });
   expect(onLine).toBeGreaterThan(30);
 
+  // Where along the path, and on which side (Paragraph and box options): each choice is kept, and the words move
+  await p.mouse.click(flat.minX + 12, (flat.minY + flat.maxY) / 2);
+  await p.evaluate((id) => window.__canvastDebug.select([id]), text.id);
+  await p.locator("[data-text-box]").filter({ visible: true }).first().click();
+  const before = await box();
+  await p.locator('.outline-pop [data-path-align="end"]').click();
+  await expect.poll(async () => ((await textObjects(p))[0]!["onPath"] as { align?: string }).align).toBe("end");
+  expect((await box()).maxX, "the words moved towards the end").toBeGreaterThan(before.maxX);
+  await p.locator('.outline-pop [data-path-side="b"]').click();
+  await expect.poll(async () => ((await textObjects(p))[0]!["onPath"] as { flip?: boolean }).flip).toBe(true);
+  await p.keyboard.press("Escape");
+
   // Taking it off sets it straight again, and undo puts it back on.
   await pathWith(p, "offpath");
   await expect.poll(async () => (await textObjects(p))[0]!["onPath"]).toBeUndefined();
