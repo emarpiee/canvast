@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.23 — Vibrance test measures colourfulness (2026-11-14)
+
+- **Fixed:** the unit test of vibrance measured the change of the RGB spread, which a colour kept inside sRGB in OKLab moves differently; it measures how much more colourful each colour becomes (OKLab chroma): a dull one about 1.9 times, a vivid one about 1.04.
+
 ## 0.58.22 — Saturation keeps how light a colour looks (2026-11-14)
 
 - **Fixed:** *Saturation* -100 turned colours of one lightness (only their hue differed, in OKHSL or OKLCH) into different greys, which made it look as if the colour picker changed the lightness with the hue; saturation and vibrance now change only how colourful a colour is, in OKLab, so they become one grey, as light as they look.

@@ -47,6 +47,12 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.23: the vibrance test measures colourfulness (2026-11-14)
+
+- **Implemented:** `adjust.test.ts` "vibrance lifts a dull colour more than a vivid one" compares OKLab chroma before and after (it failed on 0.58.22's CI: the vivid red, cut at the edge of sRGB, moved its RGB spread by 25).
+- **Tested:** the check run against the source as a script: 1.926 and 1.035. `pictures.spec.ts:214` failed once in Firefox on 0.58.22 (pixelate after a blur and a reload; it passed on 0.58.21; nothing it uses changed): re-run.
+- **Committed:** v0.58.23 on `main`.
+
 ## v0.58.22: saturation keeps how light a colour looks (2026-11-14)
 
 - **Implemented:** ADR 0200. `doc/adjust.ts`: the OKLab step (saturation, vibrance, the gradient map's lightness) from a 33³ grid of linear light read trilinearly, `greyOf`, `needsPixels`; `render/adjust-shape.ts` uses the pixel path for those; `render/adjust-filter.ts` works them in linear light. The picker's maths unchanged (it follows the reference).

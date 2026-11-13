@@ -50,11 +50,11 @@ describe("adjustments of a picture (ADR 0118)", () => {
     expect(adjustPixel(240, 240, 240, { highlights: 80 })[0]).toBeLessThan(240);
     expect(Math.abs(adjustPixel(128, 128, 128, { shadows: 80 })[0] - 128)).toBeLessThan(adjustPixel(30, 30, 30, { shadows: 80 })[0] - 30 + 5);
   });
-  it("vibrance lifts a dull colour more than a vivid one", () => {
-    const dull = adjustPixel(130, 120, 120, { vibrance: 100 });
-    const vivid = adjustPixel(250, 20, 20, { vibrance: 100 });
-    expect(dull[0] - dull[1]).toBeGreaterThan(130 - 120 + 8);
-    expect(Math.abs(vivid[0] - vivid[1] - (250 - 20))).toBeLessThan(dull[0] - dull[1]);
+  it("vibrance lifts a dull colour more than a vivid one (how much more colourful each becomes, in OKLab chroma)", () => {
+    const lift = (c: [number, number, number]): number => rgbToOklch(adjustPixel(...c, { vibrance: 100 }).map(Math.round) as [number, number, number]).C / rgbToOklch(c).C;
+    const dull = lift([130, 120, 120]), vivid = lift([250, 20, 20]);
+    expect(dull, "a dull colour: much more colourful").toBeGreaterThan(1.5);
+    expect(vivid, "a vivid one: hardly").toBeLessThan(1.15);
   });
   it("is kept clean: zeros go, numbers are rounded and held in range, neighbours are told apart", () => {
     expect(cleanAdjust({ exposure: 0, contrast: 33.4, blur: -20, grain: 260 })).toEqual({ contrast: 33, grain: 200 });
