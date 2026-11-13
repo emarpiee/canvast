@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.58.29 — One look for every field; sub-menus as forms (2026-11-14)
+
+- **Changed:** every field of the app (numbers, text, lists) has one look: one height, edge, corner and font. Numbers are right-aligned, without spin arrows.
+- **Changed:** Outline options, Paragraph and box options, Font options and Columns and rows are forms as the chips' options are: values, choices, switches, then more, a name at the left and the control at the right. Their on/off options are switches.
+- **Changed:** the names in these forms are small and muted, so the values read first.
+
 ## 0.58.28 — Text along a path: where along it, and which side (2026-11-14)
 
 - **Fixed:** for a text along a path, *Along the path* (Start, Middle, End) and *Side* (This, Other) in Paragraph and box options did nothing: their buttons' attributes (`data-pathAlign`) were lowered to `data-pathalign` by HTML and never read. They are `data-path-align` and `data-path-side` now.

@@ -1,4 +1,4 @@
-import { exportWith, expect, test } from "./harness";
+import { exportWith, expect, fieldLooks, test } from "./harness";
 import type { App } from "./harness";
 import { makePng } from "./png";
 
@@ -32,7 +32,12 @@ const unscrubbed = (app: App, where: string): Promise<Field[]> =>
 test("audit: every number field of the app scrubs (lists the ones that do not)", async ({ app }) => {
   const p = app.page;
   const found: Field[] = [];
-  const scan = async (where: string): Promise<void> => void found.push(...(await unscrubbed(app, where)));
+  // (and every field's look: one field style for the whole app, ADR 0201)
+  const looks: Array<{ where: string; label: string; look: string; reads: string | null }> = [];
+  const scan = async (where: string): Promise<void> => {
+    found.push(...(await unscrubbed(app, where)));
+    looks.push(...(await fieldLooks(p)).map((f) => ({ where, ...f })));
+  };
   // a shape, a picture and a text on the canvas, so every bar and panel has something to show
   await p.keyboard.press("u");
   await app.drag({ x: 480, y: 300 }, { x: 640, y: 400 }, 6);
@@ -97,4 +102,14 @@ test("audit: every number field of the app scrubs (lists the ones that do not)",
   console.log(`SCRUB AUDIT, fields looked at: ${Object.entries(checked).map(([k, n]) => `${k}: ${n}`).join("; ")}`);
   console.log(`SCRUB AUDIT: ${unique.length} number field(s) cannot be dragged:\n${unique.map((f) => `  ${f.where} — ${f.label} (${f.kind})`).join("\n")}`);
   expect(unique).toEqual([]);
+  // one field style: every field looks as most do (its height aside), a number reads at the right; the odd ones, with where they are
+  const counts = new Map<string, number>();
+  for (const f of looks) counts.set(f.look, (counts.get(f.look) ?? 0) + 1);
+  const usual = [...counts].sort((a, b) => b[1] - a[1])[0]?.[0];
+  const odd = [...new Set([
+    ...looks.filter((f) => f.look !== usual).map((f) => `${f.where} — ${f.label}: ${f.look}`),
+    ...looks.filter((f) => f.reads !== null && f.reads !== "right").map((f) => `${f.where} — ${f.label}: a number read at the ${f.reads}`),
+  ])];
+  console.log(`FIELD STYLE: ${looks.length} fields; the usual look: ${usual}`);
+  expect(odd, "fields with a look of their own").toEqual([]);
 });

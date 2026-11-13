@@ -305,6 +305,12 @@ html, body {
 /* The theme's controls, never the browser's: a select, a text field or a number field that no rule below styles (a new one, one made in code) still looks like the rest.
    :where() gives it no weight, so every rule of a panel or bar overrides it whatever its place in the file. */
 :where(select, textarea, input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], input[type="date"], input[type="datetime-local"]) { font: var(--font-value); min-height: var(--field-h); box-sizing: border-box; color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-sm); padding: var(--s-2) var(--s-4); }
+/* ONE FIELD STYLE (ADR 0201): every field of the app looks like this one; a place sets only where it sits and how wide it is (a settings row
+   or a bar of --ctl may set its height), never its fill, edge, rounding, padding or font. A number reads at the right, in figures of one
+   width, with no arrows: it is changed by typing, the arrow keys, or dragging along it (scrub). (`fieldStyleProblems` in tests/e2e/harness.ts) */
+:where(select, input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], input[type="date"], input[type="datetime-local"]) { height: var(--field-h); padding-block: 0; }
+:where(input[type="number"]) { text-align: right; font-variant-numeric: tabular-nums; appearance: textfield; -moz-appearance: textfield; }
+input[type="number"]::-webkit-inner-spin-button, input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 /* Every place text is typed shows its caret and its selection in the accent, so neither depends on the browser's default against our backgrounds. */
 input, textarea, [contenteditable="true"] { caret-color: var(--hud-accent); }
 ::selection { background: color-mix(in oklch, var(--hud-accent) 45%, transparent); }
@@ -514,15 +520,7 @@ input[type="range"], .media-scrub, .tb-count[data-scrub] input, input[data-scrub
 .hud-zoom:hover { background: var(--hud-hover); }
 .hud-zoom:focus-visible { outline: 2px solid var(--hud-accent); }
 .hud-zoom[hidden], .hud-zoom-input[hidden] { display: none; }
-.hud-zoom-input {
-  font: inherit;
-  color: inherit;
-  background: transparent;
-  border: 1px solid var(--hud-accent);
-  border-radius: var(--r-xs);
-  padding: 0 var(--s-2);
-  width: 16ch;
-}
+.hud-zoom-input { color: inherit; width: 16ch; }
 
 .hud-dev {
   position: absolute;
@@ -732,7 +730,7 @@ dialog.confirm .confirm-list span { font-size: var(--text-sm); color: var(--hud-
 dialog.confirm .confirm-warn { margin: 0 0 var(--s-6); padding: var(--s-4) var(--s-6); border: 1px solid var(--hud-danger); border-radius: var(--r-md); background: color-mix(in oklch, var(--hud-danger) 10%, transparent); }
 dialog.confirm .confirm-warn p:last-child { margin-bottom: 0; }
 /* the field of a prompt (and of the lock screen): the same as a field in Settings */
-dialog.confirm .prompt-input { box-sizing: border-box; display: block; width: 100%; height: var(--ctl); padding: 0 var(--s-6); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-md); }
+dialog.confirm .prompt-input { box-sizing: border-box; display: block; width: 100%; height: var(--ctl); color: inherit; }
 /* A password field: the eye button inside its right end shows what was typed. */
 .secret-field { position: relative; display: block; }
 dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) + var(--s-6)); }
@@ -893,9 +891,9 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .adj-adv { display: grid; gap: var(--s-2); margin: 0 0 var(--s-2) var(--s-6); padding-left: var(--s-4); border-left: 1px solid var(--hud-border); }
 .adj-adv[hidden] { display: none; }
 .adj-row input[type="range"] { width: 100%; min-width: 0; }
-.adj-num { width: 100%; box-sizing: border-box; height: var(--field-h); padding: 0 var(--s-4); text-align: right; font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.adj-num { width: 100%; } /* (the look: the one field style) */
 .adj-map { display: grid; gap: var(--s-4); }
-.adj-map select { width: 100%; height: var(--field-h); padding: 0 var(--s-4); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.adj-map select { width: 100%; height: var(--field-h); color: var(--hud-fg); }
 .adj-map-bar { display: block; height: var(--sp-8); border-radius: var(--r-sm); border: 1px solid var(--hud-border); }
 /* A gradient painted in a box that has a border: from the border's outer edge and not tiled (else the far end of the gradient shows in the border). */
 .style-bar, .gradient-chip, .adj-map-bar { background-origin: border-box; background-repeat: no-repeat; }
@@ -906,7 +904,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .adj-foot { display: grid; gap: var(--s-4); padding: var(--s-4) var(--s-6) var(--s-4); }
 .panel-sub .adj-layers { padding: var(--s-4) var(--s-6) var(--s-4); border-bottom: 1px solid var(--hud-border); }
 .adj-save { display: grid; grid-template-columns: 1fr auto; gap: var(--s-4); }
-.adj-name { height: var(--field-h); padding: 0 var(--s-4); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); min-width: 0; }
+.adj-name { height: var(--field-h); color: var(--hud-fg); min-width: 0; }
 .adj-save button { height: var(--field-h); padding: 0 var(--s-6); background: var(--hud-accent); color: var(--hud-accent-fg); border: 0; border-radius: var(--r-sm); cursor: pointer; font: var(--font-value); }
 .adj-open { display: flex; align-items: center; gap: var(--s-4); height: var(--field-h); padding: 0 var(--s-4); background: none; color: var(--hud-muted); border: 0; border-radius: var(--r-sm); cursor: pointer; font: var(--font-meta); }
 .adj-open:hover { background: var(--hud-hover); color: var(--hud-fg); }
@@ -926,7 +924,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .colour-save:hover { background: var(--hud-hover); }
 .palette { position: fixed; top: 14vh; left: 50%; transform: translateX(-50%); z-index: var(--z-pop); width: min(34rem, calc(100vw - var(--sp-8))); display: flex; flex-direction: column; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); overflow: hidden; }
 .palette[hidden] { display: none; }
-.palette-input { padding: var(--s-6) var(--s-8); font: var(--font-value); color: var(--hud-fg); background: transparent; border: 0; border-bottom: 1px solid var(--hud-edge); outline: none; }
+.palette-input { color: var(--hud-fg); }
 .palette-list { list-style: none; margin: 0; padding: var(--s-2); max-height: 50vh; overflow: auto; }
 .palette-list li { display: flex; align-items: baseline; gap: var(--s-6); padding: var(--s-4) var(--s-6); border-radius: var(--r-md); cursor: pointer; color: var(--hud-fg); font: var(--font-value); }
 .palette-list li.is-active { background: var(--hud-hover); }
@@ -972,7 +970,7 @@ dialog.confirm .secret-field .prompt-input { padding-right: calc(var(--icon-xl) 
 .set-control { display: flex; align-items: center; justify-content: flex-end; gap: var(--s-4); min-width: 0; } /* (every row's controls end at its right edge) */
 .set-control input[type="range"] { flex: 1; min-width: 0; }
 .set-control output { min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; opacity: 0.8; }
-.set-control select { width: 100%; font: inherit; color: inherit; height: var(--ctl); background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-sm); }
+.set-control select { width: 100%; height: var(--ctl); } /* (the look: the one field style) */
 .set-scope { font-size: var(--text-xs); color: var(--hud-muted); }
 .set-reset { font: inherit; font-size: var(--text-sm); color: inherit; height: var(--row-btn); background: none; border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
 .set-reset:disabled { opacity: 0.35; cursor: default; }
@@ -1259,7 +1257,7 @@ body:has(.assets-place-zone:not([hidden])) :is(#nav, .view-settings, .assets-bar
 .drag-count { position: absolute; top: calc(-1 * var(--near)); right: calc(-1 * var(--near)); min-width: var(--sp-10); padding: var(--s-1) var(--s-4); font: var(--weight-semibold) var(--text-sm) var(--font-ui); text-align: center; color: var(--hud-accent-fg); background: var(--hud-accent); border-radius: var(--r-pill); }
 .assets-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--near); min-height: calc(var(--ctl) + 2 * var(--pad) + 2px); padding-left: calc(var(--nav-w, 0px) + var(--near)); padding-right: calc(var(--bar-h) + var(--near) + var(--edge)); }
 .assets-search { flex: 1 1 220px; min-width: 0; max-width: 380px; }
-.assets-bar input[type="search"], .assets-bar select { height: var(--ctl); padding: 0 var(--s-6); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-md); }
+.assets-bar input[type="search"], .assets-bar select { height: var(--ctl); } /* (as tall as the bar's buttons; the look: the one field style) */
 .assets-bar select { padding-right: var(--s-4); }
 /* The status bar: the canvas's own readout and controls (the same classes, so one look), in a row under the library instead of floating. */
 /* The library's status bar is the canvas's (.hud-bottom): the full-width strip at the bottom. Here it sits in the page's column, from edge
@@ -1396,7 +1394,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .tag-chip { display: inline-flex; align-items: center; gap: var(--s-1); padding: var(--s-1) var(--s-2) var(--s-1) var(--s-6); font-size: var(--text-sm); background: var(--hud-hover); border-radius: var(--r-pill); }
 .tag-chip button { font: inherit; color: inherit; background: transparent; border: 0; border-radius: var(--r-dot); width: var(--chip-btn); height: var(--chip-btn); cursor: pointer; }
 .tag-chip button:hover:not(:disabled) { background: var(--hud-hover); }
-.tag-input { flex: 1 1 100px; min-width: 0; font: inherit; color: inherit; background: transparent; border: 0; border-bottom: 1px solid var(--hud-edge); padding: var(--s-2) var(--s-1); }
+.tag-input { flex: 1 1 100px; min-width: 0; color: inherit; }
 /* several picked: a tag only some have (dashed, with how many), a folder only some are in (how many) */
 .tag-chip.is-partial { background: transparent; border: 1px dashed var(--hud-border); }
 .tag-count { font-size: var(--text-xs); color: var(--hud-muted); }
@@ -1423,7 +1421,7 @@ button.asset-preview { display: flex; align-items: center; justify-content: cent
 .field-list { padding: var(--s-2); border: 1px solid var(--hud-border); border-radius: var(--r-sm); min-width: 0; }
 .field-item { max-width: 100%; min-width: 0; cursor: grab; }
 .field-item > span { min-width: 0; overflow-wrap: anywhere; }
-.field-item-input { flex: 1; min-width: var(--sp-15); border: 0; background: transparent; }
+.field-item-input { flex: 1; min-width: var(--sp-15); }
 .field-warn { display: flex; gap: var(--s-2); align-items: flex-start; margin: 0; font-size: var(--text-sm); color: var(--hud-danger); }
 .field-warn[hidden] { display: none; }
 .field-warn svg { flex: none; width: var(--icon-md); height: var(--icon-md); }
@@ -2031,7 +2029,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .layers-tags .tag-chips { display: flex; flex-wrap: wrap; gap: var(--s-2); align-items: center; }
 .layers-tags .tag-chip { display: inline-flex; align-items: center; gap: var(--s-1); padding: 1px var(--s-2) 1px var(--s-4); border-radius: var(--r-pill); background: var(--hud-hover); }
 .layers-tags .tag-chip button { width: calc(var(--chip-btn) - var(--sp-1)); height: calc(var(--chip-btn) - var(--sp-1)); padding: 0; font: inherit; color: inherit; background: transparent; border: 0; border-radius: var(--r-dot); cursor: pointer; }
-.layers-tags .tag-input { flex: 1; min-width: 80px; font: inherit; color: inherit; background: transparent; border: 0; border-bottom: 1px solid var(--hud-edge); padding: var(--s-1) 0; outline: 0; }
+.layers-tags .tag-input { flex: 1; min-width: 80px; color: inherit; }
 .layers-tags .tag-input:focus { border-bottom-color: var(--hud-accent); }
 .tag-chip.is-suggest { padding: var(--s-1) var(--s-6); font: inherit; font-size: var(--text-sm); color: inherit; background: transparent; border: 1px dashed var(--hud-muted); cursor: pointer; }
 .tag-chip.is-suggest:hover:not(:disabled) { background: var(--hud-hover); border-style: solid; }
@@ -2159,7 +2157,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .bookmark-text { display: grid; gap: var(--s-1); min-width: 0; }
 .bookmarks-panel .bookmark-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .bookmark-meta { font-size: var(--text-xs); color: var(--hud-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.bookmarks-panel .bookmark input { flex: 1; min-width: 0; font: inherit; font-weight: 600; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-accent); border-radius: var(--r-sm); padding: var(--s-1) var(--s-4); }
+.bookmarks-panel .bookmark input { flex: 1; min-width: 0; color: inherit; }
 .bookmark-actions { display: inline-flex; flex: none; }
 .bookmark-actions .layer-btn { width: calc(var(--row-btn) + var(--sp-3)); height: calc(var(--row-btn) + var(--sp-3)); }
 .bookmark-actions .layer-btn svg { width: 16px; height: 16px; }
@@ -2186,8 +2184,8 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .panel-foot { border-top: 1px solid var(--hud-border); padding-bottom: var(--s-4); }
 .panel-sub[hidden], .panel-foot[hidden] { display: none; }
 .layers-filter { padding: var(--s-4) var(--s-4) var(--s-1); }
-.layers-filter input { width: 100%; box-sizing: border-box; height: var(--ctl); padding: 0 var(--s-6); font: inherit; color: inherit; background: color-mix(in oklch, var(--hud-fg) 6%, transparent); border: 1px solid var(--hud-border); border-radius: var(--ctl-r); outline: 0; }
-.layers-filter input:focus { border-color: var(--hud-accent); }
+.layers-filter input { width: 100%; box-sizing: border-box; height: var(--ctl); color: inherit; }
+/* .layers-filter input:focus: the one field style (ADR 0201) */
 .layers-more-row { list-style: none; padding: var(--s-2) 0; }
 /* The eye and the lock stay quiet until a row is pointed at or selected, unless the item is hidden or locked (touch screens always show them). */
 @media (hover: hover) {
@@ -2402,8 +2400,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 .nav-ws .nav-ws-rename:hover { color: var(--hud-fg); background: var(--hud-hover); }
 .nav-ws .nav-ws-rename svg { width: var(--icon-md); height: var(--icon-md); }
 
-.set-text { min-width: 0; width: min(100%, 360px); height: var(--list-h); padding: 0 var(--s-6); font: var(--font-control); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
-.set-text:focus { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
+.set-text { min-width: 0; width: min(100%, 360px); height: var(--list-h); } /* (the look: the one field style) */
 
 /* The board menu never pushes past its own edge: a long canvas name (with "42 objects" beside it) is cut with an ellipsis, not clipped (ADR 0079). */
 .nav-menu > *, .nav-menu .nav-board, .nav-menu .nav-canvases, .nav-menu .nav-canvas-row, .nav-menu .nav-canvas, .nav-menu .nav-board-head { min-width: 0; }
@@ -2429,7 +2426,7 @@ body[data-viewing] #nav, body[data-viewing] .view-settings { display: none; }
 /* The rename dialog (ui/batch-rename.ts, ADR 0085). */
 dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); }
 .rn-row { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: var(--s-6); margin-bottom: var(--s-6); }
-.rn-row select { justify-self: end; min-width: 220px; height: var(--list-h); padding: 0 var(--s-6); font: var(--font-control); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-md); }
+.rn-row select { justify-self: end; min-width: 220px; height: var(--list-h); color: inherit; }
 .rn-fields { display: grid; gap: var(--s-4); margin-bottom: var(--s-4); }
 .rn-fields[hidden], .rn-keep[hidden] { display: none; }
 .rn-field { display: grid; gap: var(--s-2); }
@@ -2441,7 +2438,7 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
 .rn-link:hover { color: var(--hud-fg); }
 .rn-link[hidden] { display: none; }
 .rn-field > span, .rn-inline > span { color: var(--hud-muted); font-size: var(--text-sm); }
-.rn-input { min-width: 0; height: var(--list-h); padding: 0 var(--s-6); font: var(--font-control); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-md); }
+.rn-input { min-width: 0; height: var(--list-h); color: inherit; }
 .rn-input:focus, .rn-num:focus, .rn-row select:focus { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 .rn-inline { display: flex; align-items: center; justify-content: space-between; gap: var(--s-6); }
 .rn-num { width: 88px; height: var(--list-h); padding: 0 var(--s-4); font: var(--font-control); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); }
@@ -2478,7 +2475,7 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
 .asset-sec h3 { margin: 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--hud-muted); }
 .asset-sec .asset-note { font-size: var(--text-xs); line-height: 1.45; }
 .asset-sec .tag-chips { gap: var(--s-2); }
-.asset-inspector .tag-input { flex: 1 1 100%; width: 100%; height: var(--list-h); padding: 0 var(--s-6); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-md); }
+.asset-inspector .tag-input { flex: 1 1 100%; width: 100%; height: var(--list-h); color: inherit; }
 .asset-inspector .tag-input:focus { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
 .asset-ctags li { align-items: baseline; }
 .asset-ctags .tag-where { flex: 1 1 8em; }
@@ -2641,8 +2638,7 @@ dialog.rename-dialog { width: min(var(--dlg-l), calc(100vw - 2 * var(--edge))); 
 .set-label { font-weight: var(--weight-medium); }
 .set-help { opacity: 1; color: var(--hud-muted); font-size: var(--text-sm); }
 .set-scope { opacity: 1; color: var(--hud-muted); min-width: var(--sp-15); }
-.set-control select, .set-control input[type="text"], .set-control input:not([type]) { width: 100%; height: var(--ctl); padding: 0 var(--s-6); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-md); }
-.set-control select { padding-right: var(--s-4); }
+.set-control select, .set-control input[type="text"], .set-control input:not([type]) { width: 100%; height: var(--ctl); } /* (a settings row's controls are --ctl tall; the look: the one field style) */
 .set-control output { opacity: 1; color: var(--hud-muted); }
 /* The shortcut keys: the same rows as every other tab, the whole width. */
 .set-keys, .set-info.set-keys { max-width: none; }
@@ -2689,7 +2685,7 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 .set-tabs button[aria-selected="true"] .set-hits { color: var(--hud-accent-text); background: var(--hud-accent-fg); }
 .set-searchbox { position: relative; display: flex; align-items: center; flex: 0 1 320px; min-width: 0; }
 .set-searchbox > svg { position: absolute; left: var(--s-4); width: var(--icon-md); height: var(--icon-md); color: var(--hud-muted); pointer-events: none; }
-.set-search { width: 100%; height: var(--ctl); padding: 0 var(--s-12) 0 var(--s-12); font: inherit; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-md); }
+.set-search { width: 100%; height: var(--ctl); padding-inline: var(--s-12); color: inherit; }
 .set-search::-webkit-search-cancel-button { display: none; }
 .set-searchbox .cs-clear { position: absolute; right: var(--s-2); }
 .set-title { flex: 1 1 auto; }
@@ -2757,6 +2753,10 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
   --cp-thumb: var(--sp-8); --cp-bar: var(--sp-6); --cp-swatch: var(--sp-9); --cp-field-h: var(--field-h); --cp-dot: var(--r-dot);
 }
 .colour-pop, .vchip-pop { position: fixed; z-index: var(--z-pop); max-width: calc(100vw - var(--sp-8)); max-height: calc(100dvh - var(--sp-8)); overflow: auto; padding: var(--s-6); background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-lg); box-shadow: var(--hud-lift); backdrop-filter: blur(12px); }
+/* In the app the colour picker's fields take the one field style (the standalone package keeps its own look) */
+.colour-pop .cp :is(.cp-num, .cp-hex, .cp-select) { height: var(--field-h); min-height: var(--field-h); color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-sm); font: var(--font-value); font-variant-numeric: tabular-nums; }
+.colour-pop .cp :is(.cp-num, .cp-select) { padding: 0 var(--s-4); }
+.colour-pop .cp .cp-hex :is(input, span) { font: var(--font-value); }
 .colour-pop, .pop-menu { animation: pop-in var(--dur-base) var(--ease-out) both; }
 /* Settings: the colour row is a button showing the colour and its hex; it opens the picker. */
 .set-colour { display: inline-flex; align-items: center; gap: var(--s-4); height: var(--ctl); padding: 0 var(--s-6); font: var(--font-control); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-md); cursor: pointer; }
@@ -2780,19 +2780,19 @@ button, select, input, textarea, summary, [role="tab"] { transition: background-
 .toolbar .tb-count[hidden] { display: none; }
 .toolbar .tb-count input[data-sheet-ratio] { width: calc(var(--sp-15) * 1.5); text-align: left; }
 .toolbar .tb-count label:not([hidden]) { display: inline-flex; align-items: center; gap: var(--s-4); }
-.toolbar .tb-count select, .text-format select { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; height: var(--field-h); padding: 0 var(--s-4); font: var(--font-value); color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.toolbar .tb-count select, .text-format select { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; height: var(--field-h); color: inherit; }
 input[data-scrub-input] { cursor: ew-resize; user-select: text; }
 input[data-scrub-input]:focus { cursor: text; }
 .toolbar .tb-count[data-scrub] input { cursor: ew-resize; }
 .toolbar .tb-count[data-scrub] input:focus { cursor: text; }
-.toolbar .tb-count input { width: calc(var(--sp-14) + var(--sp-6)); height: var(--field-h); padding: 0 var(--s-4); font: var(--font-value); text-align: right; color: inherit; background: var(--hud-bg); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.toolbar .tb-count input { width: calc(var(--sp-14) + var(--sp-6)); } /* (the look: the one field style) */
 /* The paint chooser: none, a colour, a linear or a radial gradient. */
 .outline-pop { display: grid; gap: var(--s-4); min-width: 0; }
 .op-row { display: grid; grid-template-columns: 4.5rem 1fr; align-items: center; gap: var(--s-4); }
 .op-row[hidden] { display: none; }
 .op-label { font: var(--font-meta); color: var(--hud-muted); }
 .seg.op-choices { margin-bottom: 0; }
-.op-width, .op-num { width: 5rem; padding: var(--s-2) var(--s-4); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.op-width, .op-num { width: calc(2.5 * var(--ctl)); } /* (as wide as a chip form's number; the look: the one field style) */
 .op-unit { display: none; }
 .op-note { margin: 0; font: var(--font-meta); color: var(--hud-muted); }
 .tex-editor { display: grid; gap: var(--s-4); min-width: 15rem; }
@@ -2808,7 +2808,7 @@ input[data-scrub-input]:focus { cursor: text; }
 .adj-row .tex-newseed { justify-self: end; display: inline-flex; align-items: center; padding: 0 var(--s-4); }
 .tex-newseed svg { width: var(--icon-sm); height: var(--icon-sm); }
 /* a choice (Mode, Grid, Align) ends at the right edge, in the column of the numbers above it, as wide as its words need */
-.tex-fields .adj-row > select, .adj-group > .adj-row > select[data-choice] { grid-column: 2 / -1; justify-self: end; width: auto; min-width: 3.75rem; max-width: 100%; height: var(--field-h); padding: 0 var(--s-4); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.tex-fields .adj-row > select, .adj-group > .adj-row > select[data-choice] { grid-column: 2 / -1; justify-self: end; width: auto; min-width: 3.75rem; max-width: 100%; height: var(--field-h); color: var(--hud-fg); }
 .seg.paint-modes { display: flex; overflow-x: auto; margin-bottom: var(--s-6); }
 .seg.paint-modes button { flex: 1 0 auto; display: grid; place-items: center; height: auto; padding: var(--s-2) var(--s-4); font: var(--font-meta); white-space: nowrap; }
 .paint-modes button svg { width: var(--icon-md); height: var(--icon-md); }
@@ -2858,7 +2858,7 @@ input[data-scrub-input]:focus { cursor: text; }
 .pal-row { display: grid; grid-template-columns: var(--sp-10) minmax(0, 1fr) auto; align-items: center; gap: var(--s-4); }
 .pal-swatch { width: var(--sp-10); height: var(--sp-10); padding: 0; border: 1px solid var(--hud-border); border-radius: var(--r-sm); cursor: pointer; }
 .pal-swatch:hover { outline: 2px solid var(--hud-accent); outline-offset: 1px; }
-.pal-name { min-width: 0; padding: var(--s-2) var(--s-4); font: var(--font-value); color: var(--hud-fg); background: var(--hud-hover); border: 1px solid var(--hud-border); border-radius: var(--r-sm); }
+.pal-name { min-width: 0; color: var(--hud-fg); }
 .pal-actions { display: flex; justify-content: space-between; gap: var(--s-4); }
 .pal-add, .pal-done { height: var(--field-h); padding: 0 var(--s-6); border-radius: var(--r-sm); border: 1px solid var(--hud-border); cursor: pointer; font: var(--font-value); background: var(--hud-hover); color: var(--hud-fg); }
 .pal-done { background: var(--hud-accent); color: var(--hud-accent-fg); border-color: transparent; }
@@ -2985,10 +2985,8 @@ dialog.export-dlg { width: min(var(--dlg-3xl), calc(100vw - 2 * var(--edge))); m
 .ex-field.ex-preset select { flex: 1; min-width: 0; }
 .ex-swatch { display: inline-block; flex: none; width: var(--icon-sm); height: var(--icon-sm); background: var(--swatch, transparent); border: 1px solid var(--hud-border); border-radius: var(--r-dot); }
 .ex-field { display: flex; flex-direction: column; gap: var(--s-2); color: var(--hud-muted); font: var(--font-meta); }
-.ex-field input[type="number"], .ex-field input[type="text"], .ex-field select { height: var(--list-h); padding: 0 var(--s-4); color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-edge); border-radius: var(--r-sm); font: var(--font-value); font-variant-numeric: tabular-nums; }
+.ex-field input[type="number"], .ex-field input[type="text"], .ex-field select { height: var(--list-h); } /* (the look: the one field style) */
 .ex-field input[type="number"] { width: calc(var(--sp-15) + var(--sp-9)); text-align: right; }
-.ex-field input[type="number"] { appearance: textfield; }
-.ex-field input[type="number"]::-webkit-inner-spin-button, .ex-field input[type="number"]::-webkit-outer-spin-button { appearance: none; margin: 0; }
 .ex-field[hidden], .ex-times[hidden] { display: none; }
 .ex-times { align-self: end; padding-bottom: var(--s-4); color: var(--hud-muted); }
 .ex-label { color: var(--hud-muted); font: var(--font-meta); align-self: center; }
@@ -3123,7 +3121,7 @@ dialog.reset-dialog h3 { margin: var(--s-6) 0 var(--s-4); font-size: var(--text-
 .reset-step span { opacity: 0.75; font-size: var(--text-sm); }
 .reset-kept { margin: var(--s-6) 0 0; }
 .reset-type { display: grid; gap: var(--s-4); margin-top: var(--s-6); }
-.reset-type input { font: inherit; padding: var(--s-4) var(--s-4); color: inherit; background: transparent; border: 1px solid var(--hud-edge); border-radius: var(--r-sm); }
+.reset-type input { color: inherit; }
 .storage-check { display: flex; gap: var(--s-4); align-items: center; margin-top: var(--s-6); }
 .action-rows { display: grid; gap: var(--s-4); margin-top: var(--s-6); }
 .action-row { display: grid; grid-template-columns: var(--action-w) 1fr; gap: var(--s-6); align-items: center; }
@@ -3336,48 +3334,54 @@ dialog.choice-dialog { width: min(var(--choice-w), calc(100vw - var(--sp-10))); 
 .toolbar.is-form .tb-options-row::before, .toolbar.is-form .tb-options-row::after { display: none; }
 .toolbar.is-form .tb-options-row :is(.tb-group, span, label.pf-multi):not([data-row], button *, .pf-name, .pf-cap, .pf-short, .size-out, [hidden], [data-sec-off], [data-off]) { display: contents; }
 .toolbar.is-form .tb-options-row .tb-group.tb-group { margin: 0; padding: 0; border: 0; } /* (no lines between the bar's groups: the form has its own) */
-.toolbar.is-form .tb-options-row [data-row]:not([hidden], [data-sec-off], [data-off]) { display: flex; align-items: center; justify-content: space-between; gap: var(--s-8); min-height: var(--field-h); }
-.toolbar.is-form .tb-options-row [data-row="value"] { order: 1; }
-.toolbar.is-form .tb-options-row [data-row="choice"] { order: 2; }
-.toolbar.is-form .tb-options-row [data-row="switch"] { order: 3; }
-.toolbar.is-form .tb-options-row [data-row="more"] { order: 4; }
-.toolbar.is-form .tb-options-row [data-row][data-divide] { margin-top: var(--s-4); padding-top: var(--s-4); border-top: 1px solid var(--hud-border); }
-.toolbar.is-form .tb-options-row [data-row] > :is(input, select) { flex: none; }
+:is(.toolbar.is-form .tb-options-row, .pop-form) [data-row]:not([hidden], [data-sec-off], [data-off]) { display: flex; align-items: center; justify-content: space-between; gap: var(--s-8); min-height: var(--field-h); }
+:is(.toolbar.is-form .tb-options-row, .pop-form) [data-row="value"] { order: 1; }
+:is(.toolbar.is-form .tb-options-row, .pop-form) [data-row="choice"] { order: 2; }
+:is(.toolbar.is-form .tb-options-row, .pop-form) [data-row="switch"] { order: 3; }
+:is(.toolbar.is-form .tb-options-row, .pop-form) [data-row="more"] { order: 4; }
+:is(.toolbar.is-form .tb-options-row, .pop-form) [data-row][data-divide] { margin-top: var(--s-4); padding-top: var(--s-4); border-top: 1px solid var(--hud-border); }
+:is(.toolbar.is-form .tb-options-row, .pop-form) [data-row] > :is(input, select) { flex: none; }
 /* (every name in one column, one font, one colour; a pressed button's takes the button's colour) */
-.toolbar.is-form .tb-options-row :is(label, .pf-name, .swatch-name) { font: var(--font-control); font-weight: var(--weight-regular); }
-.toolbar.is-form .tb-options-row label { color: var(--hud-fg); }
-.toolbar.is-form .tb-options-row :is(.pf-name, .swatch-name) { flex: 1 1 auto; width: auto; height: auto; min-width: 0; padding: 0; color: inherit; text-align: start; background: none; border: 0; border-radius: 0; box-shadow: none; } /* (not a swatch's dot, though it sits in one) */
+:is(.toolbar.is-form .tb-options-row, .pop-form) :is(label, .pf-name, .swatch-name, .op-label) { font: var(--font-meta); } /* (every name small, ADR 0201) */
+:is(.toolbar.is-form .tb-options-row, .pop-form) :is(label, .op-label) { color: var(--hud-muted); } /* (and muted: the values and controls lead) */
+:is(.toolbar.is-form .tb-options-row, .pop-form) :is(.pf-name, .swatch-name) { flex: 1 1 auto; width: auto; height: auto; min-width: 0; padding: 0; color: inherit; text-align: start; background: none; border: 0; border-radius: 0; box-shadow: none; } /* (not a swatch's dot, though it sits in one) */
 /* buttons as rows: no frame of their own, a hover */
-.toolbar.is-form .tb-options-row button[data-row] { width: auto; height: auto; min-height: var(--field-h); padding: 0 var(--s-4); margin-inline: calc(-1 * var(--s-4)); color: var(--hud-fg); background: transparent; border: 0; border-radius: var(--ctl-r, var(--r-md)); }
-.toolbar.is-form .tb-options-row button[data-row]:hover { background: var(--hud-hover); }
+:is(.toolbar.is-form .tb-options-row, .pop-form) button[data-row] { width: auto; height: auto; min-height: var(--field-h); padding: 0 var(--s-4); margin-inline: calc(-1 * var(--s-4)); color: var(--hud-fg); background: transparent; border: 0; border-radius: var(--ctl-r, var(--r-md)); }
+:is(.toolbar.is-form .tb-options-row, .pop-form) button[data-row]:hover { background: var(--hud-hover); }
 /* 1 a colour: its name at the left, its swatch at the right (the swatch is the button's first part) */
-.toolbar.is-form .tb-options-row button.swatch[data-row="value"] { flex-direction: row-reverse; }
+:is(.toolbar.is-form .tb-options-row, .pop-form) button.swatch[data-row="value"] { flex-direction: row-reverse; }
 /* 2 choices: their name at the left, the choices at the right */
-.toolbar.is-form .tb-options-row [data-row="choice"] { flex-wrap: wrap; justify-content: flex-end; gap: var(--gap); } /* (choices too many for one line go on under it, at the right) */
-.toolbar.is-form .tb-options-row [data-row="choice"][data-name]::before { content: attr(data-name); flex: 1 1 auto; margin-right: var(--s-8); color: var(--hud-fg); font: var(--font-control); white-space: nowrap; }
-.toolbar.is-form .tb-options-row .pf-choices > .seg { flex: none; }
-.toolbar.is-form .tb-options-row [data-row="choice"] :is(button, svg) { flex: none; }
-.toolbar.is-form .tb-options-row .pf-choices .seg button { width: var(--ctl); }
-.toolbar.is-form .tb-options-row .pf-choices:not(:has(> :not([hidden], [data-off]))) { display: none; } /* (choices that all are off: no name alone) */
-.toolbar.is-form .tb-options-row [data-row="choice"] > button:not([hidden]) { flex: none; width: var(--ctl); padding: 0; }
-.toolbar.is-form .tb-options-row [data-row="choice"] > button.tb-chip:not([hidden]) { width: auto; padding: 0 var(--s-4); }
-.toolbar.is-form .tb-options-row .pf-choices > button.width:not([hidden]) { display: inline-flex; justify-content: center; width: var(--ctl); padding: 0; }
+:is(.toolbar.is-form .tb-options-row, .pop-form) [data-row="choice"] { flex-wrap: wrap; justify-content: flex-end; gap: var(--gap); } /* (choices too many for one line go on under it, at the right) */
+:is(.toolbar.is-form .tb-options-row, .pop-form) [data-row="choice"][data-name]::before { content: attr(data-name); flex: 1 1 auto; margin-right: var(--s-8); color: var(--hud-muted); font: var(--font-meta); white-space: nowrap; }
+:is(.toolbar.is-form .tb-options-row, .pop-form) .pf-choices > .seg { flex: none; }
+:is(.toolbar.is-form .tb-options-row, .pop-form) [data-row="choice"] :is(button, svg) { flex: none; }
+:is(.toolbar.is-form .tb-options-row, .pop-form) .pf-choices .seg button { width: var(--ctl); }
+:is(.toolbar.is-form .tb-options-row, .pop-form) .pf-choices:not(:has(> :not([hidden], [data-off]))) { display: none; } /* (choices that all are off: no name alone) */
+:is(.toolbar.is-form .tb-options-row, .pop-form) [data-row="choice"] > button:not([hidden]) { flex: none; width: var(--ctl); padding: 0; }
+:is(.toolbar.is-form .tb-options-row, .pop-form) [data-row="choice"] > button.tb-chip:not([hidden]) { width: auto; padding: 0 var(--s-4); }
+:is(.toolbar.is-form .tb-options-row, .pop-form) .pf-choices > button.width:not([hidden]) { display: inline-flex; justify-content: center; width: var(--ctl); padding: 0; }
 /* 3 a switch: its name, then the switch at the right (drawn from tokens; on: the accent) */
-.toolbar.is-form .tb-options-row button[data-row="switch"] > svg { flex: none; }
-.toolbar.is-form .tb-options-row button[data-row="switch"]::after { content: ""; flex: none; width: calc(1.5 * var(--icon-lg)); height: var(--icon-sm); border-radius: var(--r-pill); background: radial-gradient(circle at calc(var(--icon-sm) / 2) 50%, var(--hud-bg) 0 calc(var(--icon-sm) / 2 - var(--sp-1) * 2), transparent calc(var(--icon-sm) / 2 - var(--sp-1))), var(--hud-border); }
-.toolbar.is-form .tb-options-row button[data-row="switch"][aria-pressed="true"]::after { background: radial-gradient(circle at calc(100% - var(--icon-sm) / 2) 50%, var(--hud-accent-fg) 0 calc(var(--icon-sm) / 2 - var(--sp-1) * 2), transparent calc(var(--icon-sm) / 2 - var(--sp-1))), var(--hud-accent); }
+:is(.toolbar.is-form .tb-options-row, .pop-form) button[data-row="switch"] > svg { flex: none; }
+:is(.toolbar.is-form .tb-options-row, .pop-form) button[data-row="switch"]::after { content: ""; flex: none; width: calc(1.5 * var(--icon-lg)); height: var(--icon-sm); border-radius: var(--r-pill); background: radial-gradient(circle at calc(var(--icon-sm) / 2) 50%, var(--hud-bg) 0 calc(var(--icon-sm) / 2 - var(--sp-1) * 2), transparent calc(var(--icon-sm) / 2 - var(--sp-1))), var(--hud-border); }
+:is(.toolbar.is-form .tb-options-row, .pop-form) button[data-row="switch"][aria-pressed="true"]::after { background: radial-gradient(circle at calc(100% - var(--icon-sm) / 2) 50%, var(--hud-accent-fg) 0 calc(var(--icon-sm) / 2 - var(--sp-1) * 2), transparent calc(var(--icon-sm) / 2 - var(--sp-1))), var(--hud-accent); }
 /* 4 more: a menu row; a › when it opens a panel or a menu */
-.toolbar.is-form .tb-options-row button[data-row="more"] > svg { flex: none; }
-.toolbar.is-form .tb-options-row button[data-row="more"]:is([aria-haspopup="dialog"], [aria-haspopup="menu"])::after { content: ""; flex: none; width: var(--icon-sm); height: var(--icon-sm); background: currentColor; mask: var(--chevron-mask) center / contain no-repeat; transform: rotate(-90deg); }
-.toolbar.is-form .tb-options-row input[type="number"] { width: calc(2.5 * var(--ctl)); } /* (room for a value with decimals and its arrows: never cut) */
-.toolbar.is-form .tb-options-row input[type="text"] { width: calc(3 * var(--ctl)); }
+:is(.toolbar.is-form .tb-options-row, .pop-form) button[data-row="more"] > svg { flex: none; }
+:is(.toolbar.is-form .tb-options-row, .pop-form) button[data-row="more"]:is([aria-haspopup="dialog"], [aria-haspopup="menu"])::after { content: ""; flex: none; width: var(--icon-sm); height: var(--icon-sm); background: currentColor; mask: var(--chevron-mask) center / contain no-repeat; transform: rotate(-90deg); }
+:is(.toolbar.is-form .tb-options-row, .pop-form) input[type="number"] { width: calc(2.5 * var(--ctl)); } /* (room for a value with decimals and its arrows: never cut) */
+:is(.toolbar.is-form .tb-options-row, .pop-form) input[type="text"] { width: calc(3 * var(--ctl)); }
 .toolbar.is-form .tb-options-row .size-out { display: none; }
 /* (the colours of a selection in their chip's popover: the bar as it is, without its own frame) */
 .vchip-pop > .toolbar { min-height: 0; padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; }
 /* Names: only in the form; the bar keeps its short words. Loose words of a part are its headings, with the values they head. */
+/* A sub-menu of the bar as a form (`formRows`, ui/bar-sections.ts; ADR 0201): the rows above, its own frame (it scrolls when long) */
+.pop-form { display: flex; flex-direction: column; align-items: stretch; gap: var(--s-2); width: max-content; max-width: min(calc(100vw - var(--sp-8)), calc(14 * var(--ctl))); }
+.pop-form [data-row] > .op-label { flex: 1 1 auto; margin-right: var(--s-8); }
+.pop-form > .op-note { order: 0; }
+.pop-form.keeps-order [data-row][data-row] { order: 0; }
+:is(.toolbar.is-form .tb-options-row, .pop-form) button[data-row="switch"] { color: var(--hud-muted); } /* (a switch's name as every name: after the rule of button rows; its switch keeps its own colours) */ /* (a column's kind, then its size: in the order made) */
 .pf-name { display: none; }
 .toolbar .tb-options-row :is(.pf-row, .pf-choices) { display: contents; } /* (in the bar a named field's or choices' wrapper changes nothing) */
-.toolbar.is-form .tb-options-row .pf-name { display: inline; }
+:is(.toolbar.is-form .tb-options-row, .pop-form) .pf-name { display: inline; }
 .toolbar.is-form .tb-options-row .pf-row:has(> :is(input, select):is([hidden], [data-off])) { display: none; }
 .toolbar.is-form .pf-short, .toolbar.is-form .pf-cap[data-quiet] { display: none; }
 .toolbar.is-form .tb-options-row .pf-cap { order: 1; margin-top: var(--s-4); color: var(--hud-muted); font: var(--font-meta); }

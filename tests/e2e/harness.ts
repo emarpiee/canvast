@@ -193,11 +193,15 @@ export async function outlineShapes(page: Page): Promise<void> {
 }
 
 export async function setPenColour(page: Page, hex: string): Promise<void> {
-  await page.locator("[data-colour-open]").click();
+  // (in the bar at the top, or with the chips of the Properties bar in the Look chip's options: ADR 0198)
+  const shown = page.locator("[data-colour-open]").filter({ visible: true });
+  if (!(await shown.count())) await page.locator('.props-chips:not([hidden]) [data-vchip="look"], .props-near:not([hidden]) [data-vchip="look"]').first().click();
+  await page.locator("[data-colour-open]").filter({ visible: true }).first().click();
   const field = page.locator(".colour-pop [data-hex]");
   await field.fill(hex.replace("#", ""));
   await field.press("Enter");
   await page.keyboard.press("Escape");
+  if (await page.locator(".vchip-pop").count()) await page.keyboard.press("Escape"); // (and the chip's options, closed)
 }
 
 /**
@@ -366,6 +370,61 @@ function floatingRules(page: Page): Promise<string[]> {
       if (r.left < -1 || r.top < -1 || r.right > innerWidth + 1 || r.bottom > innerHeight + 1) out.push(`${what}: runs out of the window`);
       if (sel && overlaps(r, sel)) out.push(`${what}: covers the selected things`);
     }
+    /** The rules of a form: a chip's options, or a sub-menu of the bar (`.pop-form`: Outline options, Paragraph and box options...). */
+    const formChecks = (form: HTMLElement, pop: HTMLElement, tag: string): void => {
+      const say = (m: string): number => out.push(tag + m);
+      const cs = getComputedStyle(pop);
+      const chip = document.querySelector<HTMLElement>('.vchip[aria-expanded="true"]');
+      const gap = parseFloat(getComputedStyle(form).rowGap);
+      if (!isToken(gap)) say(`the form's rows are ${gap} px apart, not a spacing token`);
+      const controls = [...form.querySelectorAll<HTMLElement>("input:not([type=file]), select, button")].filter(shown).filter((c) => !c.closest("[role=radiogroup], .seg") && !c.matches(".width"));
+      const fonts = new Set<string>();
+      let widest = 0;
+      for (const c of controls) {
+        const row = c.closest<HTMLElement>("label, button, [data-row]") ?? c;
+        const words = [...row.querySelectorAll<HTMLElement>(".pf-name, .swatch-name, .op-label")].filter(shown);
+        const own = [...row.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim());
+        if (!words.length && !own) say(`“${name(c)}” has no name on its row`);
+        for (const w of words) fonts.add(`${getComputedStyle(w).fontSize} ${getComputedStyle(w).fontWeight}`);
+        if (own) fonts.add(`${getComputedStyle(row).fontSize} ${getComputedStyle(row).fontWeight}`);
+        widest = Math.max(widest, row.scrollWidth);
+      }
+      for (const g of [...form.querySelectorAll<HTMLElement>("[role=radiogroup], .seg")].filter(shown)) {
+        if (!g.dataset["name"] && !(g.getAttribute("aria-labelledby") && document.getElementById(g.getAttribute("aria-labelledby")!)?.textContent?.trim())) say(`the choices “${name(g)}” have no name`);
+        widest = Math.max(widest, g.scrollWidth);
+      }
+      if (fonts.size > 1) say(`the names of the form are in ${fonts.size} different fonts or sizes: ${[...fonts].join(", ")}`);
+      // The rows (CLAUDE.md "Floating bars and popovers", ADR 0198): values, then choices, then switches, then more, a line between kinds;
+      // every control on a row; the values' controls on one right edge; no two rows with one name; no row named like another chip.
+      const ORDER: Record<string, number> = { value: 1, choice: 2, switch: 3, more: 4 };
+      const rows = [...form.querySelectorAll<HTMLElement>("[data-row]")].filter(shown).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
+      if (!form.classList.contains("keeps-order")) rows.forEach((r, i) => {
+        const prev = rows[i - 1];
+        if (!prev) return;
+        const [k0, k1] = [ORDER[prev.dataset["row"]!]!, ORDER[r.dataset["row"]!]!];
+        if (k1 < k0) say(`the ${r.dataset["row"]} row “${name(r)}” comes after a ${prev.dataset["row"]} row`);
+        if (k1 !== k0 && parseFloat(getComputedStyle(r).borderTopWidth) === 0) say(`no line before the ${r.dataset["row"]} rows (at “${name(r)}”)`);
+      });
+      for (const c of controls) if (!c.closest("[data-row]")) say(`“${name(c)}” is on no row of the form`);
+      const rights = rows.filter((r) => r.dataset["row"] === "value" && r.querySelector("input, select")).map((r) => Math.round([...r.querySelectorAll("input, select")].filter(shown).at(-1)!.getBoundingClientRect().right));
+      if (rights.length && Math.max(...rights) - Math.min(...rights) > 2) say(`the values' controls do not end on one edge (${[...new Set(rights)].join(", ")})`);
+      const rowName = (r: HTMLElement): string => (r.dataset["name"] ?? [...r.querySelectorAll<HTMLElement>(".pf-name, .swatch-name, .op-label")].filter(shown).map((n) => n.textContent!.trim()).join(" ") ?? "").trim() || [...r.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent!.trim()).join(" ").trim();
+      const names = rows.map(rowName).filter(Boolean);
+      for (const n of new Set(names)) if (names.filter((x) => x === n).length > 1) say(`two rows are called “${n}”`);
+      const others = [...document.querySelectorAll<HTMLElement>(".props-row .tb-cap")].map((c) => c.textContent!.trim()).filter((c) => c !== chip?.getAttribute("aria-label"));
+      for (const n of names) if (others.includes(n)) say(`a row is called “${n}”, the name of another chip`);
+      // (a value is never cut: its words fit in its field, a number's arrows aside)
+      const pen = document.createElement("canvas").getContext("2d")!;
+      for (const f of [...form.querySelectorAll<HTMLInputElement>("input[type=number], input[type=text]")].filter(shown)) {
+        const cs = getComputedStyle(f);
+        pen.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+        // (from the outer width: browsers count a number's arrows in its inner width differently)
+        const room = f.offsetWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth) - (f.type === "number" ? 18 : 0);
+        if (pen.measureText(f.value).width > room + 0.5) say(`the value “${f.value}” of “${name(f)}” is cut`);
+      }
+      const room = pop.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      if (widest && room - widest > 24) say(`the popover is ${Math.round(room - widest)} px wider than its widest row`);
+    };
     const pop = document.querySelector<HTMLElement>(".vchip-pop");
     const chip = document.querySelector<HTMLElement>('.vchip[aria-expanded="true"]');
     if (pop && shown(pop)) {
@@ -376,62 +435,34 @@ function floatingRules(page: Page): Promise<string[]> {
       for (const side of ["paddingTop", "paddingLeft"] as const) if (!isToken(parseFloat(cs[side]))) out.push(`the popover's ${side} (${cs[side]}) is not a spacing token`);
       if (pop.scrollWidth > pop.clientWidth + 1) out.push("the popover cuts its rows off sideways");
       const form = pop.querySelector<HTMLElement>(".toolbar.is-form .tb-options-row");
-      if (form) {
-        const gap = parseFloat(getComputedStyle(form).rowGap);
-        if (!isToken(gap)) out.push(`the form's rows are ${gap} px apart, not a spacing token`);
-        const controls = [...form.querySelectorAll<HTMLElement>("input:not([type=file]), select, button")].filter(shown).filter((c) => !c.closest("[role=radiogroup], .seg") && !c.matches(".width"));
-        const fonts = new Set<string>();
-        let widest = 0;
-        for (const c of controls) {
-          const row = c.closest<HTMLElement>("label, button") ?? c;
-          const words = [...row.querySelectorAll<HTMLElement>(".pf-name, .swatch-name")].filter(shown);
-          const own = [...row.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim());
-          if (!words.length && !own) out.push(`“${name(c)}” has no name on its row`);
-          for (const w of words) fonts.add(`${getComputedStyle(w).fontSize} ${getComputedStyle(w).fontWeight}`);
-          if (own) fonts.add(`${getComputedStyle(row).fontSize} ${getComputedStyle(row).fontWeight}`);
-          widest = Math.max(widest, row.scrollWidth);
-        }
-        for (const g of [...form.querySelectorAll<HTMLElement>("[role=radiogroup], .seg")].filter(shown)) {
-          if (!g.dataset["name"]) out.push(`the choices “${name(g)}” have no name`);
-          widest = Math.max(widest, g.scrollWidth);
-        }
-        if (fonts.size > 1) out.push(`the names of the form are in ${fonts.size} different fonts or sizes: ${[...fonts].join(", ")}`);
-        // The rows (CLAUDE.md "Floating bars and popovers", ADR 0198): values, then choices, then switches, then more, a line between kinds;
-        // every control on a row; the values' controls on one right edge; no two rows with one name; no row named like another chip.
-        const ORDER: Record<string, number> = { value: 1, choice: 2, switch: 3, more: 4 };
-        const rows = [...form.querySelectorAll<HTMLElement>("[data-row]")].filter(shown).sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
-        rows.forEach((r, i) => {
-          const prev = rows[i - 1];
-          if (!prev) return;
-          const [k0, k1] = [ORDER[prev.dataset["row"]!]!, ORDER[r.dataset["row"]!]!];
-          if (k1 < k0) out.push(`the ${r.dataset["row"]} row “${name(r)}” comes after a ${prev.dataset["row"]} row`);
-          if (k1 !== k0 && parseFloat(getComputedStyle(r).borderTopWidth) === 0) out.push(`no line before the ${r.dataset["row"]} rows (at “${name(r)}”)`);
-        });
-        for (const c of controls) if (!c.closest("[data-row]")) out.push(`“${name(c)}” is on no row of the form`);
-        const rights = rows.filter((r) => r.dataset["row"] === "value" && r.querySelector("input, select")).map((r) => Math.round([...r.querySelectorAll("input, select")].filter(shown).at(-1)!.getBoundingClientRect().right));
-        if (rights.length && Math.max(...rights) - Math.min(...rights) > 2) out.push(`the values' controls do not end on one edge (${[...new Set(rights)].join(", ")})`);
-        const rowName = (r: HTMLElement): string => (r.dataset["name"] ?? [...r.querySelectorAll<HTMLElement>(".pf-name, .swatch-name")].filter(shown).map((n) => n.textContent!.trim()).join(" ") ?? "").trim() || [...r.childNodes].filter((n) => n.nodeType === Node.TEXT_NODE).map((n) => n.textContent!.trim()).join(" ").trim();
-        const names = rows.map(rowName).filter(Boolean);
-        for (const n of new Set(names)) if (names.filter((x) => x === n).length > 1) out.push(`two rows are called “${n}”`);
-        const others = [...document.querySelectorAll<HTMLElement>(".props-row .tb-cap")].map((c) => c.textContent!.trim()).filter((c) => c !== chip?.getAttribute("aria-label"));
-        for (const n of names) if (others.includes(n)) out.push(`a row is called “${n}”, the name of another chip`);
-        // (a value is never cut: its words fit in its field, a number's arrows aside)
-        const pen = document.createElement("canvas").getContext("2d")!;
-        for (const f of [...form.querySelectorAll<HTMLInputElement>("input[type=number], input[type=text]")].filter(shown)) {
-          const cs = getComputedStyle(f);
-          pen.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-          // (from the outer width: browsers count a number's arrows in its inner width differently)
-          const room = f.offsetWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - parseFloat(cs.borderLeftWidth) - parseFloat(cs.borderRightWidth) - (f.type === "number" ? 18 : 0);
-          if (pen.measureText(f.value).width > room + 0.5) out.push(`the value “${f.value}” of “${name(f)}” is cut`);
-        }
-        const room = pop.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
-        if (widest && room - widest > 24) out.push(`the popover is ${Math.round(room - widest)} px wider than its widest row`);
-      }
+      if (form) formChecks(form, pop, "");
     }
+    for (const sub of [...document.querySelectorAll<HTMLElement>(".pop-form")].filter(shown)) formChecks(sub, sub, `${sub.getAttribute("aria-label") ?? "a sub-menu"}: `);
     const sizes = new Set([...document.querySelectorAll<HTMLElement>(".props-near .vchip-sw, .props-chips .vchip-sw")].filter(shown).map((s) => `${Math.round(s.getBoundingClientRect().width)}x${Math.round(s.getBoundingClientRect().height)}`));
     if (sizes.size > 1) out.push(`the colours of the chips are of ${sizes.size} sizes: ${[...sizes].join(", ")}`);
     const picker = document.querySelector<HTMLElement>(".colour-pop");
     if (picker && shown(picker) && picker.scrollHeight > picker.clientHeight + 1 && picker.scrollHeight < innerHeight - 16) out.push("the colour picker scrolls though the window is tall enough for it");
+    return out;
+  });
+}
+
+/**
+ * The look of every field that shows (ADR 0201: one field style for the whole app): its fill, edge, rounding, font, padding and, for a number,
+ * where its value reads. Its height is its place's (a settings row, a bar of --ctl). Left out: what is not typed in (checkboxes, ranges,
+ * files), the developer panel, and a search box's own field inside its framed box (the box is the field).
+ */
+export function fieldLooks(page: Page): Promise<Array<{ label: string; look: string; reads: string | null }>> {
+  return page.evaluate(() => {
+    const out: Array<{ label: string; look: string; reads: string | null }> = [];
+    const sel = 'select, input:not([type]), input[type="text"], input[type="number"], input[type="search"], input[type="url"], input[type="email"], .cp-hex';
+    for (const el of document.querySelectorAll<HTMLElement>(sel)) {
+      const r = el.getBoundingClientRect();
+      if (!r.width || !r.height || el.closest("[hidden], .hud-dev, .cs-box, .assets-searchbox") || el.matches(".cp-hex input")) continue;
+      const c = getComputedStyle(el);
+      const look = [c.backgroundColor, `${c.borderTopWidth} ${c.borderTopColor}`, c.borderTopLeftRadius, `${c.fontSize} ${c.fontWeight}`, `pad ${c.paddingLeft}`].join(" | ");
+      const label = el.getAttribute("aria-label") || (el as HTMLInputElement).labels?.[0]?.textContent?.trim() || el.className || el.tagName;
+      out.push({ label: label.slice(0, 50), look, reads: el.matches('input[type="number"]') ? c.textAlign : null });
+    }
     return out;
   });
 }

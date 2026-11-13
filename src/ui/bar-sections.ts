@@ -225,6 +225,28 @@ export function arrangeForm(row: HTMLElement): void {
 }
 
 /**
+ * A sub-menu of the Properties bar (Outline options, Paragraph and box options, Font options, Columns and rows) laid out as every chip's form
+ * (ADR 0201): its rows marked by kind (a row of choices, a field, a switch), a unit written after a field put in the row's name (so every
+ * field ends on one edge), then ordered and divided by kind as `arrangeForm` does. `keepOrder`: rows that belong together in the order they
+ * were made (a column's kind, then its size) keep it. Rows shown or hidden later are divided again.
+ */
+export function formRows(pop: HTMLElement, opts: { keepOrder?: boolean } = {}): void {
+  pop.classList.add("pop-form");
+  pop.classList.toggle("keeps-order", !!opts.keepOrder);
+  for (const r of pop.querySelectorAll<HTMLElement>(".op-row")) {
+    if (!r.dataset["row"]) r.dataset["row"] = r.querySelector('[role="radiogroup"], .seg') ? "choice" : r.querySelector('input:not([type="checkbox"]), select') ? "value" : "switch";
+    const unit = r.querySelector<HTMLElement>(":scope > .op-unit");
+    const name = r.querySelector<HTMLElement>(".op-label");
+    const u = unit?.textContent?.trim();
+    if (unit && name && u) name.textContent = `${name.textContent} (${u})`;
+    unit?.remove();
+  }
+  const arrange = (): void => (opts.keepOrder ? undefined : arrangeForm(pop));
+  arrange();
+  if (!opts.keepOrder) new MutationObserver(arrange).observe(pop, { subtree: true, attributes: true, attributeFilter: ["hidden"] });
+}
+
+/**
  * What a section is set to now, read from its controls (so every kind and tool is covered without a word of its own): the colours as
  * swatches (a fill a dot, an outline a ring of its colour, the same size), then the first values (a number with its unit, a choice, the
  * option on). HTML, short.

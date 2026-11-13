@@ -1,3 +1,4 @@
+import { formRows } from "./bar-sections";
 import { popHost } from "./modal";
 import type { AlignChoice, CapChoice, DashChoice, JoinChoice } from "../doc/stroke-look";
 import { NOTE_CARD, NOTE_COLOURS } from "../text/text-style";
@@ -705,6 +706,7 @@ export function openOutlinePopover(anchor: HTMLElement, o: OutlineOptions): void
       }
     }
   });
+  formRows(pop); // (the rows of every chip's form, ADR 0201)
   popHost().appendChild(pop);
   place(pop, anchor);
   anchor.setAttribute("aria-expanded", "true");
@@ -804,6 +806,7 @@ export function openTextBoxPopover(anchor: HTMLElement, o: TextBoxOptions): void
     } else if (b.dataset["caps"]) o.onChange({ caps: b.dataset["caps"] === "none" ? null : (b.dataset["caps"] as TextBoxOptions["caps"]) }, true);
     else o.onChange({ valign: b.dataset["valign"] as TextBoxOptions["valign"] }, true);
   });
+  formRows(pop); // (the rows of every chip's form, ADR 0201)
   popHost().appendChild(pop);
   place(pop, anchor);
   anchor.setAttribute("aria-expanded", "true");
@@ -843,6 +846,7 @@ export function openTracksPopover(anchor: HTMLElement, o: TracksOptions): void {
       .join("");
   const render = (): void => {
     pop.innerHTML = opNum("tr-cols", "cols", "Columns", String(cols.length), "", 1, "1") + trackRows("c", cols, "Column") + opNum("tr-rows", "rows", "Rows set", String(rows.length), "the rest hug", 0, "1") + trackRows("r", rows, "Row");
+    formRows(pop, { keepOrder: true }); // (a column's kind, then its size: in the order made)
     scrubNumbers(pop);
     for (const input of pop.querySelectorAll<HTMLInputElement>("input[data-field]")) {
       const key = input.dataset["field"]!;
@@ -909,8 +913,8 @@ export function openFontOptionsPopover(anchor: HTMLElement, o: FontOptions): voi
   const values = Object.fromEntries(o.axes.map((a) => [a.tag, a.value]));
   pop.innerHTML =
     `<p class="op-note">${esc(o.family)} ${esc(o.style)}</p>` +
-    `<label class="op-row font-switch"><span class="op-label">Kerning</span><input type="checkbox" data-kerning${o.kerning ? " checked" : ""} aria-label="Kerning: the font's own spacing of letter pairs"></label>` +
-    o.features.map((f) => `<label class="op-row font-switch"><span class="op-label">${esc(f.label)}</span><input type="checkbox" data-feature="${esc(f.tag)}"${f.on ? " checked" : ""} aria-label="${esc(f.label)}"></label>`).join("") +
+    `<button type="button" class="op-row font-switch" data-row="switch" role="switch" data-kerning aria-checked="${o.kerning}" aria-pressed="${o.kerning}" aria-label="Kerning: the font's own spacing of letter pairs"><span class="pf-name">Kerning</span></button>` +
+    o.features.map((f) => `<button type="button" class="op-row font-switch" data-row="switch" role="switch" data-feature="${esc(f.tag)}" aria-checked="${f.on}" aria-pressed="${f.on}" aria-label="${esc(f.label)}"><span class="pf-name">${esc(f.label)}</span></button>`).join("") +
     o.axes.map((a) => `<div class="op-row"><label class="op-label" for="fo-${esc(a.tag)}">${esc(a.name)}</label><input id="fo-${esc(a.tag)}" class="op-width" data-axis="${esc(a.tag)}" type="number" min="${a.min}" max="${a.max}" step="any" inputmode="decimal" value="${Math.round(a.value * 100) / 100}"><input type="range" data-axis-range="${esc(a.tag)}" min="${a.min}" max="${a.max}" step="any" value="${a.value}" aria-label="${esc(a.name)} slider"></div>`).join("") +
     (o.axes.length === 0 && o.features.length === 0 ? `<p class="op-note">This font has no features or axes to set beyond kerning.</p>` : "");
   const axesNow = (): Record<string, number> => {
@@ -918,11 +922,15 @@ export function openFontOptionsPopover(anchor: HTMLElement, o: FontOptions): voi
     for (const a of o.axes) if (values[a.tag] !== a.def) out[a.tag] = values[a.tag]!;
     return out;
   };
-  pop.addEventListener("change", (e) => {
-    const t = e.target as HTMLInputElement;
-    if (t.dataset["kerning"] !== undefined) o.onChange({ kerning: t.checked }, true);
+  pop.addEventListener("click", (e) => {
+    const t = (e.target as HTMLElement).closest<HTMLButtonElement>('button[role="switch"]');
+    if (!t) return;
+    const now = t.getAttribute("aria-pressed") !== "true";
+    t.setAttribute("aria-pressed", String(now));
+    t.setAttribute("aria-checked", String(now));
+    if (t.dataset["kerning"] !== undefined) o.onChange({ kerning: now }, true);
     else if (t.dataset["feature"]) {
-      if (t.checked) on.add(t.dataset["feature"]);
+      if (now) on.add(t.dataset["feature"]);
       else on.delete(t.dataset["feature"]);
       o.onChange({ features: [...on] }, true);
     }
@@ -948,11 +956,12 @@ export function openFontOptionsPopover(anchor: HTMLElement, o: FontOptions): voi
       set(a.def, true);
     });
   }
+  formRows(pop); // (the rows of every chip's form, ADR 0201)
   popHost().appendChild(pop);
   place(pop, anchor);
   anchor.setAttribute("aria-expanded", "true");
   open = { pop, anchor, picker: { destroy() {} }, onClose: o.onClose };
-  pop.querySelector<HTMLElement>("input")!.focus();
+  pop.querySelector<HTMLElement>("input, button")?.focus(); // (its first field or switch: a font with no axes has switches only)
 }
 
 // ---- Adjust: the non-destructive adjustments of a picture (ADR 0118) -------------------------------------------------------------

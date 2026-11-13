@@ -47,6 +47,12 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.29: one look for every field; sub-menus as forms (2026-11-14)
+
+- **Implemented:** one field rule in `src/styles.css` (ADR 0201): `--field-h`, `--hud-edge`, `--r-sm`, the value font; numbers right-aligned, tabular, no spin buttons; about 30 place rules cut to their width (the Settings search keeps room for its icon). `formRows` in `ui/bar-sections.ts`, used by Outline options, Paragraph and box options, Font options (switches) and Columns and rows (`keepOrder`) in `ui/colour-popover.ts`; form rules shared by `.pop-form`; names `--font-meta`, muted. Tests: `formChecks` in `floatingRules` for every shown sub-menu form; `fieldLooks`, checked in `scrub-audit.spec.ts`; `text.spec.ts` presses the Kerning switch; `setPenColour` opens the look chip first.
+- **Tested:** build and typecheck here. Scratch: 839 fields, one look, numbers right; the four sub-menus pass the floating rules in Chromium and Firefox, no errors.
+- **Committed:** v0.58.29 on `main`.
+
 ## v0.58.28: text along a path, where along it and which side (2026-11-14)
 
 - **Implemented:** the two choice rows of a text along a path in `openTextBoxPopover` (`ui/colour-popover.ts`) are named `path-align` and `path-side` (an attribute's name loses its capitals in HTML; `dataset.pathAlign` reads `data-path-align`); every other choice row of the file was checked: one-word names. `text.spec.ts`'s text along a path checks End (kept, the words move) and Other (kept). `scripts/showcase/build.mjs` draws through the Properties bar at the top (it failed with the chips by the selection as the app's place: Screenshots and Pan and zoom on 3930d497).

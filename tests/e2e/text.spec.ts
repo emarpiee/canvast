@@ -1050,7 +1050,8 @@ test("WOFF2, PostScript (OpenType) and variable fonts can be imported and used; 
 
   // Kerning moves a close pair in; the layout (and so the box) is narrower.
   const unkerned = await width(t!.id);
-  await pop.locator("input[data-kerning]").check();
+  await pop.getByRole("switch", { name: /^Kerning/ }).click(); // (a switch row, as in every chip's form)
+  await expect(pop.getByRole("switch", { name: /^Kerning/ })).toHaveAttribute("aria-checked", "true");
   await expect.poll(async () => (await textObjects(p))[0]!["kerning"]).toBe(true);
   await expect.poll(async () => width(t!.id)).toBeLessThan(unkerned);
   // The default weight again takes the axis away.
