@@ -55,8 +55,8 @@ body{margin:0;background:${C.paper};font-family:Inter}
 .bar span{display:inline-flex;align-items:center;gap:7px}
 .bar svg{color:${C.muted}}
 </style></head><body><div style="position:relative;width:${W}px;height:${H}px;overflow:hidden">${svg}
-<div class="t" style="left:100px;top:${O.y + 34}px;font-size:38px">Every point is a canvas.</div>
-<div class="t" style="left:100px;top:${O.y + 96}px;font-size:21px;color:${C.muted}">An endless canvas in one file. Pan and zoom without limit,<br>draw, write, place pictures. Every position is stored exactly.</div>
+<div class="t" style="left:100px;top:${O.y + 34}px;font-size:38px">Your references, drawings and notes, in one place.</div>
+<div class="t" style="left:100px;top:${O.y + 96}px;font-size:21px;color:${C.muted}">A creative workspace on an endless canvas: reference boards,<br>vector drawing, comics, a library of your files and linked notes.</div>
 <div class="t" style="left:${tx + S + 34}px;top:${ty + 6}px;font-size:18px;color:${C.muted}"><b style="font-weight:600;color:${C.ink}">The dot is the origin.</b><br>Zoom into it 10^301,030<br>times and it is still a<br>canvas you can draw on.</div>
 <div class="bar"><span><b>Zoom 1×</b></span><span>Saved</span><span class="facts"><span>${icon("file-code")}One HTML file</span><span>${icon("user-round-x")}No account</span><span>${icon("wifi-off")}Works offline</span></span></div>
 </div></body></html>`;
