@@ -155,3 +155,22 @@ test("with something selected, another tool's options stand at the top, never by
   await expect(p.locator(".props-near")).toBeVisible();
   expect(app.consoleErrors).toEqual([]);
 });
+
+test("every dropdown opens the app's one list: the arrows move, a choice rested on is taken with the list still open, Enter takes and closes", async ({ app }) => {
+  const p = app.page;
+  await p.getByTestId("view-settings").click();
+  const field = p.locator("select:visible").first();
+  const before = await field.inputValue();
+  await field.focus();
+  await p.keyboard.press("ArrowDown"); // (opens the list, not the browser's)
+  const list = p.locator(".combo-pop");
+  await expect(list).toBeVisible();
+  await expect(list.locator('[aria-selected="true"]')).toHaveCount(1);
+  await p.keyboard.press("ArrowDown");
+  await expect.poll(() => field.inputValue(), { message: "taken after a moment, the list still open" }).not.toBe(before);
+  await expect(list).toBeVisible();
+  expect(await floatingProblems(p)).toEqual([]);
+  await p.keyboard.press("Enter");
+  await expect(list).toHaveCount(0);
+  expect(app.consoleErrors).toEqual([]);
+});

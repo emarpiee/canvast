@@ -120,6 +120,7 @@ import { ICONS } from "../ui/icons";
 import { mountContextBar } from "../ui/context-bar";
 import { mountPropertiesLayout } from "../ui/properties-layout";
 import { setPropsWhere } from "../ui/tool-hint";
+import { installCombobox } from "../ui/combobox";
 import { installMenuKeys } from "../ui/more-menu";
 import { chooseDialog, confirmDialog, promptDialog } from "../ui/confirm";
 import { busyProgress, currentBusy, openBusyScreen, openStartScreen } from "../ui/busy-screen";
@@ -241,6 +242,7 @@ const SAVE_TEXT: Record<SaveState, string> = {
 };
 
 async function start(): Promise<void> {
+  installCombobox(); // (every dropdown of the app opens the one list: ui/combobox.ts, ADR 0198)
   const host = document.getElementById("canvas-host")!;
   const canvas = document.getElementById("canvas") as HTMLCanvasElement;
   const ctx = canvas.getContext("2d", { alpha: false });

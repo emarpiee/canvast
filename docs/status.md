@@ -47,6 +47,13 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.13: one dropdown list (2026-11-13)
+
+- **Implemented:** `ui/combobox.ts`, installed in `main.ts`: document pointerdown, mousedown and keydown on a `<select>` open a `pop-menu combo-pop` list (options, groups, tick, keys, 0.9 s dwell, type-ahead), placed by `placeMenu`; CSS rows. No dropdown changed.
+- **Tested:** build and typecheck here; scratch: the order of a sheet's items (arrows, dwell, Enter) in a chip's form and a Settings dropdown, Chromium and Firefox, no errors. New test in `bar-layouts.spec.ts`.
+- **Unverified:** a real touch screen; the font list of the text format bar with fonts in the library.
+- **Committed:** v0.58.13 on `main`.
+
 ## v0.58.12: four kinds of rows; names and icons; tool options at the top (2026-11-13)
 
 - **Implemented:** `data-row` kinds and `arrangeForm`; `.pf-choices` wrappers; `data-name` overrides; chip icons reused (new section and menu icons removed), Kind chip with the chosen kind's icon; outline kept in Look when parked, Colours chip only with colours; chips by the selection only while `editsSelection`. Audit: row order, lines, controls on rows, one right edge, unique names, no row named like another chip; icon audit: chip icons reused. CLAUDE.md: icons "reuse first", form rows, names, where the chips stand.

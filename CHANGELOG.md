@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.58.13 — One dropdown list for the whole app (2026-11-13)
+
+- **Changed:** every dropdown of the app (the bars, the chips' options, Settings, Export, the Library...) opens one list made as the app's menus: the arrow keys move through it and a choice they rest on is taken after a moment with the list still open (a font tried at once), Enter or a click takes it and closes, letters jump to a choice; it is never over the selected things and is at most twelve rows tall.
+
 ## 0.58.12 — Chips' options in four kinds of rows; names and icons that say what they are (2026-11-13)
 
 - **Changed:** a chip's options are in four kinds of rows, always in this order with a line between them: values (name left, control right; a colour's swatch at the right), choices, switches (a switch at the right), and what opens more (menu rows with a ›).

@@ -25,6 +25,7 @@ The Properties bar at the top was felt as cluttered: one long row, different for
 - **Icons reused**: each chip's icon is the one its thing has elsewhere (the Text tool's, Auto layout's, the fill's...; the Kind chip the chosen kind's own); no icon is made for a chip (icon audit).
 - **The Colours chip** only when the selection has colours to list; near the selection the outline's width and options stay in Look.
 - **Where**: by the selection only while the options edit it (`editsSelection`, as the Actions bar); another tool's options stand at the top.
+- **One dropdown list**: every `<select>` opens the list of `ui/combobox.ts`, installed once (document events: a press or an arrow on a select), so the 29 dropdowns of the app needed no change and keep their values, events and tests (`selectOption`). The arrows move; a choice rested on for about a second is taken with the list open (a font tried without closing anything); Enter or a click takes it and closes. It is a menu of the app (`pop-menu`), placed by `placeMenu`, at most twelve rows tall, inside a modal dialog when its field is.
 - **While dragging** the chips by the selection hide, as the Actions bar does, and an open popover closes.
 - Choosing another shape kind or another tool ends "just made": the options are then the tool's, for the next one.
 - **The command palette** offers a control in a closed chip (`data-parked`) and opens the chip first.
