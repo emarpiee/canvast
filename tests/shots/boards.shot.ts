@@ -109,7 +109,7 @@ test("layout-tracks", async ({ scene: s }) => {
   await s.canvas("Page 1");
   const art = await s.art("bonheur", "degas-dancer_with", "degas-dancer_onstage", "delacroix", "degheyn");
   const sheet = await laidOut(s, art, "grid", [["[data-layout-columns]", "3"], ['[data-layout-gap="0"]', "20"], ['[data-layout-gap="1"]', "20"], ['[data-layout-pad="h"]', "32"], ['[data-layout-pad="v"]', "32"]]);
-  // (the first picture, the front one, spans the top row: a wide establishing panel)
+  // (the front picture, Bonheur's wide horse fair, spans all three columns: a wide establishing panel)
   const first = (await s.objects()).filter((o) => o.kind === "image").map((o) => o.id).at(-1)!;
   await s.select([first]);
   await s.p.locator('[data-in-span="0"]').fill("3");

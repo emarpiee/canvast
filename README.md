@@ -433,9 +433,9 @@ Lay a row of landscapes out as a gallery, each row one height and as wide as the
 
 ![Landscapes, Hokusai prints and a Degas dancer in justified rows on a dark sheet, each row one height](docs/screenshots/layout-justified.webp)
 
-Plan a page: a wide first panel across the top, the columns under it sized by rule.
+Plan a page: a wide panel across all the columns, the columns sized by rule.
 
-![A grid of horse and dancer studies, the first spanning all three columns, with the Columns and rows popover open: the middle column set to a share of the room](docs/screenshots/layout-tracks.webp)
+![A grid of dancer and horse studies, a wide horse study by Rosa Bonheur spanning all three columns, with the Columns and rows popover open: the middle column set to a share of the room](docs/screenshots/layout-tracks.webp)
 
 | On a thing on such a sheet | What it does |
 | --- | --- |
