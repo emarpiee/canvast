@@ -47,6 +47,12 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.7: near chips follow the selection every frame; panel fields in pairs (2026-11-13)
+
+- **Implemented:** `follow()` of `ui/properties-layout.ts` runs after every frame (as `contextUpdate`) in the near way; labels with no text are `data-bare` and stay on their name's line; the flow buttons wrap.
+- **Tested:** build here; scratch run (a selection made by the debug hook shows the near chips; the panel at 760 px wide); found by the Screenshots run of the README pictures.
+- **Committed:** v0.58.7 on `main`.
+
 ## v0.58.6: the hover names' layer first in the Actions bar's row (2026-11-13)
 
 - **Implemented:** `.ctx-names` is prepended to `.ctx-wrap`, so the selection options bar is next to the Actions bar again (`vectors.spec.ts:3220` failed on 0.58.4 in chromium and firefox).

@@ -30,7 +30,7 @@ export interface PropertiesLayoutOptions {
   narrow(): boolean;
 }
 
-export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement, editor: EditorState, pb: PropertiesBar, opts: PropertiesLayoutOptions): { el: HTMLElement; refresh(): void } {
+export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement, editor: EditorState, pb: PropertiesBar, opts: PropertiesLayoutOptions): { el: HTMLElement; refresh(): void; follow(): void } {
   const { bar, row } = pb;
   const home = { parent: bar.parentElement!, next: bar.nextSibling };
   // Where the bar waits, unseen, while it is shown as chips: in the same root (so it is still found there), hidden.
@@ -73,6 +73,11 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
     h.setAttribute("aria-expanded", "true");
     h.innerHTML = `<span class="ps-name">${s.label}</span><span class="ps-sum"></span>${ICONS.chevronDown}`;
     row.append(h);
+  }
+
+  // (a field with no name of its own is the second of a pair, as Gap's or Pad's: laid out on its name's line)
+  for (const l of row.querySelectorAll<HTMLElement>("label")) {
+    if (![...l.childNodes].some((n) => n.nodeType === Node.TEXT_NODE && n.textContent!.trim())) l.setAttribute("data-bare", "");
   }
 
   let place: PropertiesPlace = "bar";
@@ -246,5 +251,6 @@ export function mountPropertiesLayout(root: HTMLElement, canvasHost: HTMLElement
     const chip = document.querySelector<HTMLElement>(`.props-chips:not([hidden]) [data-vchip="${CSS.escape(id)}"], .props-near:not([hidden]) [data-vchip="${CSS.escape(id)}"], [data-props-minilist]:not([hidden]) [data-vchip="${CSS.escape(id)}"]`);
     if (chip) popSection(chip, id);
   });
-  return { el: panel, refresh: settle };
+  // (near the selection, the chips follow it after every frame, as the Actions bar does: the selection's place on the screen is known once drawn)
+  return { el: panel, refresh: settle, follow: () => { if (place === "near") settle(); } };
 }

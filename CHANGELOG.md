@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.58.7 — Chips by the selection follow it; tidier fields in the Properties panel (2026-11-13)
+
+- **Fixed:** with **Near the selection**, the chips stayed at the top when something was selected without a click (from Layers, a search, the palette): they now follow the selection after every frame, as the Actions bar does.
+- **Fixed:** in the Properties panel and the chips' popovers a field with no name of its own (the second Gap or Pad) stood on a line of its own, and the six flows ran past the panel's edge.
+
 ## 0.58.6 — The selection options stay beside the Actions bar (2026-11-13)
 
 - **Fixed:** the layer of the Actions bar's hover names stood between the Actions bar and the selection options bar beside it; it is now first in their row.
