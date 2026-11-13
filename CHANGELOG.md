@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.57.19 — The border of a zoom-out drawn exactly (2026-11-13)
+## 0.57.20 — The border of a zoom-out drawn exactly (2026-11-13)
 
 - **Fixed:** zooming out on a busy canvas, a strip along the bottom of the view showed a blurred, scaled-down picture for a moment where the exact one should be drawn (the last row of tiles reached past the view it was made for).
 

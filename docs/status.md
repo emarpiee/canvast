@@ -47,13 +47,13 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
-## v0.57.19: the border of a zoom-out drawn exactly (2026-11-13)
+## v0.57.20: the border of a zoom-out drawn exactly (2026-11-13)
 
 - **Implemented:** `TileCache`: a set drawn scaled is clipped to the view it was made for (`viewOf`), and `extent` stops there too, so the border drawn exactly while zooming out starts at that edge. Before, a whole tile row past the view (800 px is not whole tiles) was shown scaled in the bottom strip, blurred: `tiles.spec` "dense scenes … refine" counted 0.96% of the border unlike the exact picture before the recolour and 1.009% after (limit 1%, not loosened); now 0.001%. `vectors.spec` adjustment shape waits for the stored exposure and the drawn change (Firefox read the pixel a frame early).
 - **Tested:** typecheck and build here; the tiles check reproduced and measured in a scratch run against builds before and after the recolour. Tests and Pan and zoom on GitHub.
 - **Known failures:** none known yet.
 - **Unverified:** none.
-- **Committed:** v0.57.19 on `main`.
+- **Committed:** v0.57.20 on `main`.
 - **Next bounded task:** a green run, then the 0.58.0 release (owner's go).
 
 ## v0.57.18: auto layout settings kept on reload and paste (2026-11-13)
