@@ -2327,6 +2327,7 @@ async function start(): Promise<void> {
       },
       setFlag: (flag) => setFlag(doc, editor, flag),
       deleteSelection: () => deleteSelection(doc, editor),
+      findCommand: () => palette.open(),
     },
     () => appView !== "canvas" || textEditor.isOpen,
     () => settings.get("ui.actions"),

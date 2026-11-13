@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.58.1 — The Actions bar names its groups (2026-11-13)
+
+- **Changed:** the Actions bar's groups show their names under their buttons (Items, Files, Edit shapes, Arrange, Attach, Selection), always in the same order.
+- **Added:** **Find** at the end of the Actions bar opens the command palette, to find any option or action by its name.
+
 ## 0.58.0 — Adjustment shapes, 3D line art, auto layout for real boards, a warm grey brand (2026-11-13)
 
 Everything since 0.57.0, in one release (0.57.1 to 0.57.22).

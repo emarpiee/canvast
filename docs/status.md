@@ -47,6 +47,15 @@ Unverified / Committed / Next bounded task**.
 - **Committed:** v0.57.19 on `main`.
 - **Next bounded task:** retake the README screenshots in Stone when the owner says.
 
+## v0.58.1: the Actions bar names its groups (2026-11-13)
+
+- **Implemented:** ADR 0197: `captionedGroup` in `ui/bar.ts` (a group's name under its controls, read by `syncGroups`), used by every group of the Actions bar; Find at its end (`findCommand`, icon `text-search`).
+- **Tested:** typecheck and build here; checked by eye in a scratch run on the branch. Tests on GitHub.
+- **Known failures:** none known.
+- **Unverified:** phone width.
+- **Committed:** v0.58.1 on `main`. The Properties panel and the bar's tabs stay on branch `bars-organized`, not kept.
+- **Next bounded task:** the owner's new plan for the Properties bar.
+
 ## v0.58.0: release (2026-11-13)
 
 - **Implemented:** the release of 0.57.1 to 0.57.22 (adjustment shapes, 3D line art, PDF page extract, auto layout for real boards, Conceal folder, markdown in notes, the Stone brand, issue #2).

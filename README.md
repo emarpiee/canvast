@@ -2189,7 +2189,7 @@ node scripts/hidden-items.mjs encrypt ~/Art/my-workspace ~/decrypted/sketch.png
 | --- | --- | --- |
 | **Tool rail** | Left | Undo and Redo, the tools (Import after Note), then Screenshot and Search |
 | **Properties bar** | Top | The options of the tool or of what is selected |
-| **Actions bar** | Bottom, or with the selection | What can be done with the selection, grouped in menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. It sits at the bottom or follows the selection (Settings). When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
+| **Actions bar** | Bottom, or with the selection | What can be done with the selection, in groups named under their buttons (Items, Files, Edit shapes, Arrange, Attach, Selection), always in that order, some of them menus (Align, Arrange, Shapes, Masks, Path tools, Sheets, Export, Initial state) that list only what applies. It sits at the bottom or follows the selection (Settings). When wider than the window it shows a fade and an arrow; the mouse wheel scrolls it sideways |
 | **Panels** | Either side, or floating | Layers, Bookmarks, Tags, Styles, Adjust, Pattern, Speech balloon: they float or dock to either side, are resizable, and can minimize when inactive. *Reset the panel layout* puts them back |
 | **Zen mode** | `Z`, or the leaf button | Fades the bars and panels until the pointer is over them |
 | **Screenshot** | The camera button | Saves the selection, or the whole view, to the library. Settings choose the format, quality, name, folder and tags, and whether to include the canvas pattern and the interface, a transparent background, and a copy on the clipboard |
@@ -2308,7 +2308,7 @@ Change any shortcut, with a warning when two clash.
 | Bring to front · send to back | `Ctrl/⌘+]` · `Ctrl/⌘+[` |
 | Bookmarks | `[` previous · `]` next · `Alt+1` … `Alt+9` go to bookmark 1 to 9 |
 | Previous view · next view | `Alt+Shift+←` · `Alt+Shift+→` |
-| Command palette | `Ctrl/⌘+K` (`@kind` narrows it; commands can take a value; macros record and replay) |
+| Command palette | `Ctrl/⌘+K`, or **Find** at the end of the Actions bar (`@kind` narrows it; commands can take a value; macros record and replay) |
 | Context menu | Right-click the canvas |
 | Search | `Ctrl+F` (library: `Ctrl+Shift+F`); on the canvas `#` searches tags, `@` bookmarks, `/` is the command palette and `?` the shortcut list |
 | Focus on selection · fit everything | `F` · `F` again |
