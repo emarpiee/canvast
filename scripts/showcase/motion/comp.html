@@ -1,0 +1,679 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>canvast motion</title>
+<script src="../../../node_modules/gsap/dist/gsap.min.js"></script>
+<style>
+@font-face { font-family: SG; src: url(../fonts/SpaceGrotesk_400Regular.ttf); font-weight: 400; }
+@font-face { font-family: SG; src: url(../fonts/SpaceGrotesk_700Bold.ttf); font-weight: 700; }
+@font-face { font-family: Caveat; src: url(../fonts/Caveat-Bold.ttf); }
+@font-face { font-family: Bangers; src: url(../fonts/Bangers-Regular.ttf); }
+@font-face { font-family: Corm; src: url(../fonts/CormorantGaramond-SemiBold.ttf); font-style: normal; }
+@font-face { font-family: Corm; src: url(../fonts/CormorantGaramond-SemiBoldItalic.ttf); font-style: italic; }
+@font-face { font-family: Comic; src: url(../fonts/ComicNeue-Bold.ttf); }
+:root { --deep:#141312; --ink:#232120; --stone:#71685E; --spark:#FFA460; --paper:#F1F0EE; --haze:#E1DDD8; --gold:#e8c27a; }
+* { box-sizing: border-box; margin: 0; }
+html, body { background: #000; overflow: hidden; }
+#stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; font-family: SG, sans-serif; color: var(--paper); background: var(--deep); }
+.layer { position: absolute; inset: 0; pointer-events: none; }
+.scene { visibility: hidden; perspective: 2600px; }
+.mask { display: inline-block; overflow: hidden; vertical-align: top; padding: .04em .08em .16em; margin: -.04em -.08em -.16em; }
+.ch { display: inline-block; white-space: pre; }
+.word { display: inline-block; white-space: nowrap; }
+/* word spaces: tight tracking eats them, and Caveat's and Bangers' own spaces are narrow, so each gets a little back */
+.tight { word-spacing: .1em; }
+.cav { font-family: Caveat; word-spacing: .16em; }
+.bang { font-family: Bangers; word-spacing: .14em; }
+.corm { font-family: Corm; font-style: italic; word-spacing: .06em; }
+#grid { position: absolute; left: -960px; top: -540px; width: 3840px; height: 2160px; background-image: radial-gradient(circle, rgba(241,240,238,.16) 1.6px, transparent 1.9px); background-size: 48px 48px; background-position: center; }
+#vig { background: radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.5) 100%); }
+
+.win { position: absolute; left: 240px; top: 90px; width: 1440px; height: 900px; border-radius: 18px; overflow: hidden; background: #111; box-shadow: 0 50px 120px rgba(0,0,0,.6), 0 0 0 1px rgba(241,240,238,.12); }
+.cam { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; transform-origin: 0 0; }
+.cam canvas { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; }
+.cur { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+.cur svg { position: absolute; left: -3px; top: -2px; width: 30px; height: 36px; filter: drop-shadow(0 3px 6px rgba(0,0,0,.5)); }
+.cur i { position: absolute; left: -26px; top: -26px; width: 52px; height: 52px; border-radius: 50%; border: 3px solid var(--spark); opacity: 0; }
+.chip { position: absolute; right: 56px; bottom: 44px; font-size: 19px; color: var(--haze); display: flex; gap: 12px; align-items: center; padding: 10px 18px; border-radius: 12px; background: rgba(20,19,18,.78); visibility: hidden; z-index: 20; }
+.chip i { width: 11px; height: 11px; border-radius: 50%; background: #ff5a4d; box-shadow: 0 0 12px #ff5a4d; }
+
+.label { position: absolute; left: 96px; top: 300px; width: 600px; z-index: 5; }
+.label .num { font-weight: 700; font-size: 22px; letter-spacing: .32em; word-spacing: .2em; color: var(--spark); margin-bottom: 18px; }
+.label .h { font-weight: 700; font-size: 60px; letter-spacing: -.03em; line-height: 1.02; }
+.label .big { font-size: 128px; line-height: .95; margin-top: 6px; color: var(--gold); }
+.label .big.corm { letter-spacing: -.01em; }
+.label .big.cav { color: var(--spark); font-size: 140px; line-height: .85; }
+.label .big.sg { font-weight: 700; font-size: 96px; letter-spacing: -.04em; color: var(--paper); }
+.label .sub { font-size: 25px; line-height: 1.4; color: var(--haze); margin-top: 30px; width: 470px; }
+.label.corner { top: auto; bottom: 86px; }
+.label.corner .sub { margin-top: 16px; width: 640px; color: var(--paper); }
+.shade { background: linear-gradient(20deg, rgba(11,11,10,.9) 0%, rgba(11,11,10,.45) 32%, rgba(11,11,10,0) 54%); }
+
+.top { position: absolute; left: 0; right: 0; top: 112px; text-align: center; }
+.top .num { font-weight: 700; font-size: 22px; letter-spacing: .32em; word-spacing: .2em; color: var(--spark); }
+.top .h { font-weight: 700; font-size: 74px; letter-spacing: -.035em; margin-top: 14px; }
+.cap { position: absolute; width: 640px; text-align: center; font-size: 30px; font-weight: 700; }
+.cap small { display: block; font-weight: 400; font-size: 21px; color: var(--haze); margin-top: 6px; }
+.flash { position: absolute; border-radius: 10px; background: #fff; opacity: 0; }
+
+#intro .t1 { position: absolute; left: 0; right: 0; top: 330px; text-align: center; font-weight: 700; font-size: 150px; letter-spacing: -.045em; line-height: 1; }
+#intro .t2 { position: absolute; left: 0; right: 0; top: 520px; text-align: center; line-height: 1; white-space: nowrap; font-size: 140px; }
+#intro .draw { font-size: 170px; color: var(--spark); display: inline-block; clip-path: inset(-30% 100% -30% -5%); vertical-align: -.06em; margin-right: .22em; }
+#intro .refs { font-size: 140px; color: var(--paper); }
+#intro svg { position: absolute; inset: 0; overflow: visible; }
+#intro .float { position: absolute; width: 220px; border-radius: 10px; box-shadow: 0 30px 60px rgba(0,0,0,.6); opacity: .9; }
+
+#draw .word { position: absolute; left: 90px; bottom: 150px; font-size: 260px; line-height: .8; color: var(--spark); clip-path: inset(-30% 100% -30% -5%); }
+#draw .sub { position: absolute; left: 100px; bottom: 92px; font-size: 27px; color: var(--paper); word-spacing: .05em; }
+#draw .sub b { color: var(--spark); letter-spacing: .3em; margin-right: 14px; font-size: 22px; }
+#wipe { position: absolute; inset: 0; overflow: visible; visibility: hidden; }
+
+#comic { background: #f4ecd6; }
+#comic .tone { background-image: radial-gradient(circle, rgba(35,33,32,.16) 2.4px, transparent 2.8px); background-size: 18px 18px; }
+#comic .title { position: absolute; left: 70px; top: 60px; z-index: 3; }
+#comic .title .k { display: inline-block; font-family: Comic; font-size: 26px; word-spacing: .12em; padding: 8px 16px; background: #f3e3a6; border: 3px solid #111; color: #111; transform: rotate(-2deg); }
+#comic .title .t { font-size: 120px; line-height: .9; color: #111; letter-spacing: .02em; margin-top: 16px; text-shadow: 5px 5px 0 var(--spark); }
+.panel { position: absolute; border: 10px solid #111; visibility: hidden; }
+#shout { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+#shout .word { position: absolute; left: 960px; top: 540px; transform: translate(-50%,-50%); font-size: 280px; color: var(--spark); -webkit-text-stroke: 12px #111; paint-order: stroke fill; white-space: nowrap; letter-spacing: .03em; text-shadow: 14px 14px 0 #111; }
+#shout svg { position: absolute; inset: 0; }
+#lettering .kick { position: absolute; left: 80px; bottom: 70px; font-family: Comic; font-size: 26px; word-spacing: .12em; padding: 8px 16px; background: #f3e3a6; border: 3px solid #111; color: #111; transform: rotate(-2deg); z-index: 4; }
+
+#lib .tile { position: absolute; width: 300px; height: 340px; border-radius: 14px; overflow: hidden; background: #222; box-shadow: 0 20px 50px rgba(0,0,0,.5); }
+#lib .tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.br { color: var(--spark); display: inline-block; }
+
+#endless .hud { position: absolute; inset: 0; text-shadow: 0 4px 30px rgba(0,0,0,.7); }
+#endless .top .h { font-size: 78px; }
+#endless .zoom { position: absolute; left: 96px; bottom: 80px; }
+#endless .zoom small { display: block; font-weight: 700; font-size: 20px; letter-spacing: .34em; color: var(--spark); margin-bottom: 6px; }
+#endless .zoom b { display: block; font-size: 120px; line-height: .95; letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
+#endless .lvl { position: absolute; left: 100px; bottom: 262px; font-size: 26px; color: var(--haze); font-variant-numeric: tabular-nums; }
+#endless .no { position: absolute; right: 96px; bottom: 84px; text-align: right; font-weight: 700; font-size: 104px; line-height: .98; letter-spacing: -.045em; word-spacing: .1em; }
+#endless .no div:last-child { color: var(--spark); }
+#endless .tag { position: absolute; padding: 8px 16px; border-radius: 10px; background: rgba(20,19,18,.82); font-size: 22px; font-weight: 700; border-left: 4px solid var(--spark); }
+#endless .ring { position: absolute; left: 960px; top: 540px; width: 2400px; height: 1500px; margin: -750px -1200px; border: 4px solid var(--spark); border-radius: 120px; opacity: 0; }
+
+#themes .sw { position: absolute; right: 96px; top: 96px; display: flex; gap: 14px; z-index: 6; }
+#themes .sw i { width: 34px; height: 34px; border-radius: 10px; box-shadow: 0 6px 16px rgba(0,0,0,.4); }
+
+.slam { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; clip-path: polygon(0 0, 0 0, -30% 100%, -30% 100%); }
+.slam .k { font-weight: 700; font-size: 24px; letter-spacing: .34em; word-spacing: .3em; text-transform: uppercase; margin-bottom: 30px; }
+.slam .t { font-weight: 700; font-size: 210px; letter-spacing: -.055em; word-spacing: .1em; line-height: 1; white-space: nowrap; }
+
+#iris { position: absolute; left: 860px; top: 440px; width: 200px; height: 200px; border-radius: 60px; background: var(--stone); transform: scale(0); }
+#end { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+#end .lockup { display: flex; align-items: center; gap: 46px; }
+#end .lockup svg { width: 230px; height: 230px; overflow: visible; }
+#end .wm { font-weight: 700; font-size: 200px; letter-spacing: -.045em; line-height: 1; padding-bottom: 26px; }
+#end .tagline { font-size: 48px; margin-top: 26px; white-space: nowrap; }
+#end .tagline .cav { font-size: 66px; color: var(--spark); margin: 0 .16em; }
+#end .tagline .corm { font-size: 58px; margin-left: .12em; }
+#end .foot { position: absolute; bottom: 80px; display: flex; gap: 54px; font-size: 24px; color: var(--haze); }
+#end .foot span::before { content: ''; display: inline-block; width: 12px; height: 12px; border-radius: 4px; background: var(--spark); margin-right: 14px; vertical-align: 2px; }
+#end .url { position: absolute; top: 80px; font-size: 24px; letter-spacing: .12em; color: var(--haze); }
+#flash { background: #fff; opacity: 0; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="grid"></div>
+
+  <div id="intro" class="layer scene">
+    <svg viewBox="0 0 1920 1080"><path id="loop" d="M-80 900 C 260 720, 420 1010, 700 860 S 1000 520, 1260 640 S 1700 980, 2000 250" fill="none" stroke="#FFA460" stroke-width="9" stroke-linecap="round"/><circle id="nib" r="11" fill="#FFA460"/></svg>
+    <div class="t1 tight"><span class="mask">An endless canvas</span></div>
+    <div class="t2"><span class="draw cav">for drawing</span><span class="mask refs corm">and references</span></div>
+  </div>
+
+  <div id="refs" class="layer scene"></div>
+  <div id="cl" class="layer scene"></div>
+  <div id="draw" class="layer scene"><div class="layer shade"></div><div class="word cav">Draw</div><div class="sub"><b>02</b>Pressure pens, over your references</div></div>
+  <div id="shp" class="layer scene"></div>
+  <div id="vec" class="layer scene"></div>
+  <div id="col" class="layer scene"></div>
+  <svg id="wipe" class="layer" viewBox="0 0 1920 1080"><path id="brush" d="M-300 820 C 300 1100, 700 -60, 1100 300 S 1700 1000, 2300 200" fill="none" stroke="#FFA460" stroke-width="760" stroke-linecap="round"/></svg>
+
+  <div id="comic" class="layer scene">
+    <div class="layer tone"></div>
+    <div class="title"><div class="k">03 — COMICS &amp; STORYBOARDS</div><div class="t bang">PAGES, PANELS<br>&amp; BALLOONS</div></div>
+    <div id="shout"><svg viewBox="0 0 1920 1080"><g id="rays" stroke="#111" stroke-width="7" stroke-linecap="round"></g></svg><div class="word bang">HOLD ON!</div></div>
+  </div>
+  <div id="lettering" class="layer scene"><div class="kick">LETTERING IN YOUR OWN FONTS</div></div>
+  <div id="panels" class="layer"></div>
+
+  <div id="lib" class="layer scene"><div class="tiles layer"></div></div>
+  <div id="vw" class="layer scene"></div>
+  <div id="fv" class="layer scene"></div>
+  <div id="notes" class="layer scene"></div>
+  <div id="exp" class="layer scene"></div>
+
+  <div id="endless" class="layer scene">
+    <div class="ring"></div><div class="ring"></div><div class="ring"></div>
+    <div class="hud">
+      <div class="top"><div class="h tight"><span class="mask">All of it, on one canvas.</span></div></div>
+      <div class="tag" style="left:300px;top:250px">Reference board</div>
+      <div class="tag" style="left:1320px;top:250px">Gesture drawing</div>
+      <div class="tag" style="left:300px;top:760px">Comic page</div>
+      <div class="tag" style="left:1320px;top:760px">Botanical studies</div>
+      <div class="lvl">0 levels down</div>
+      <div class="zoom"><small>ZOOM</small><b>×1</b></div>
+      <div class="no"><div><span class="mask">No edges.</span></div><div><span class="mask">No limit.</span></div></div>
+    </div>
+  </div>
+
+  <div id="hid" class="layer scene"></div>
+  <div id="lk" class="layer scene"></div>
+  <div id="themes" class="layer scene"><div class="sw"></div></div>
+
+  <div class="chip" id="chip"><i></i>Recorded in canvast</div>
+
+  <div id="slams" class="layer">
+    <div class="slam" style="background:var(--ink)"><div class="k" style="color:var(--spark)">No network needed</div><div class="t">Offline.</div></div>
+    <div class="slam" style="background:var(--stone)"><div class="k">No sign-up, no upload</div><div class="t">No account.</div></div>
+    <div class="slam" style="background:var(--spark);color:var(--ink)"><div class="k">or a desktop app for Linux</div><div class="t">One HTML file.</div></div>
+    <div class="slam" style="background:var(--paper);color:var(--ink)"><div class="k" style="color:var(--stone)">Plain files, on your own disk</div><div class="t">Yours.</div></div>
+  </div>
+
+  <div id="iris"></div>
+  <div id="end" class="layer scene">
+    <div class="url">github.com/emarpiee/canvast</div>
+    <div class="lockup">
+      <svg viewBox="14 14 36 36"><path class="ring" fill="#F1F0EE" fill-rule="evenodd"/><rect class="pt" x="30.7" y="30.7" width="6.933" height="6.933" rx="1.907" fill="#FFA460"/></svg>
+      <div class="wm"><span class="mask">canvast</span></div>
+    </div>
+    <div class="tagline">An endless canvas for<span class="cav">drawing</span>and<span class="corm">references</span></div>
+    <div class="foot"><span>Free and open source</span><span>Offline, no account</span><span>Any browser · Linux desktop</span></div>
+  </div>
+  <div id="vig" class="layer"></div>
+  <div id="flash" class="layer"></div>
+</div>
+
+<script>
+// A 60 s motion piece, "An endless canvas for drawing and references", on the app's own footage (footage.spec.ts; ?foot=<dir>, default
+// docs/media/footage). Everything is a function of time: await seek(t). It also lists its sound cues (window.CUES) for audio.mjs.
+const FOOT = new URLSearchParams(location.search).get('foot') || '../../../docs/media/footage';
+const RING_D = 'M24.2 14.667H39.801A9.533 9.533 0 0 1 49.334 24.2V39.801A9.533 9.533 0 0 1 39.801 49.334H24.2A9.533 9.533 0 0 1 14.667 39.801V24.2A9.533 9.533 0 0 1 24.2 14.667ZM30.093 24.2H38.24A5.893 5.893 0 0 1 44.133 30.093V38.24A5.893 5.893 0 0 1 38.24 44.133H30.093A5.893 5.893 0 0 1 24.2 38.24V30.093A5.893 5.893 0 0 1 30.093 24.2Z';
+document.querySelectorAll('path.ring').forEach((p) => p.setAttribute('d', RING_D));
+const ART = ['delacroix-study_of_a_horse', 'bonheur-study_for_the_horse_fair', 'degheyn-two_studies_of_a_saddled_horse', 'hokusai-under_the_wave_off_kanagawa',
+  'degas-dancer_with_a_fan', 'vangogh-wheat_field_with_cypresses', 'hokusai-mystical_bird', 'delany-botanical_study', 'leprince-landscape_with_peasants_fording',
+  'degas-dancer_onstage', 'hokusai-seaside_village_in_winter_from', 'verhaecht-mountainous_landscape', 'anonymous-botanical_studies', 'hokusai-rooster_hen_and_chicken_with',
+  'waterloo-wooded_landscape', 'degas-dancer_adjusting_her_slipper', 'hokusai-still_life_double_cherry_blossom', 'degas-dancer'].map((n) => `../art/${n}.jpg`);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, f) => a + (b - a) * f;
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const el = (tag, cls, html, parent) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; if (parent) parent.appendChild(e); return e; };
+const CURSOR = '<svg viewBox="0 0 30 36"><path d="M3 2 L3 29 L10 22.5 L14.5 33 L19 31 L14.6 21 L24 21 Z" fill="#fff" stroke="#111" stroke-width="2.2" stroke-linejoin="round"/></svg>';
+
+/** Letters to animate one by one, kept in words that never break inside (a line breaks only at a space). */
+function chars(e) {
+  const t = e.textContent; e.textContent = '';
+  const out = [];
+  t.split(' ').forEach((w, k) => {
+    if (k) out.push(el('span', 'ch', ' ', e));
+    const word = el('span', 'word', null, e);
+    for (const c of w) out.push(el('span', 'ch', c, word));
+  });
+  return out;
+}
+
+// ---------- footage players ----------
+class Player {
+  constructor(name, parent) {
+    this.name = name; this.el = el('div', 'win', `<div class="cam"><canvas width="2160" height="1350"></canvas><div class="cur">${CURSOR}<i></i></div></div>`, parent);
+    this.cam = $('.cam', this.el); this.cv = $('canvas', this.el); this.ctx = this.cv.getContext('2d'); this.cur = $('.cur', this.el); this.ring = $('.cur i', this.el);
+    Object.assign(this, { f: 0, S: 1, fx: 720, fy: 450, follow: 0, cursor: 1, on: 0, last: -1, cache: new Map() });
+  }
+  async init() { this.meta = await (await fetch(`${FOOT}/${this.name}/meta.json`)).json(); this.n = this.meta.count; }
+  img(i) {
+    i = clamp(i, 0, this.n - 1);
+    if (!this.cache.has(i)) {
+      const im = new Image(); im.src = `${FOOT}/${this.name}/f${String(i).padStart(4, '0')}.jpg`;
+      this.cache.set(i, im.decode().then(() => im));
+      if (this.cache.size > 12) this.cache.delete(this.cache.keys().next().value);
+    }
+    return this.cache.get(i);
+  }
+  index() { return clamp(Math.floor(this.f + 1e-6), 0, this.n - 1); }
+  async paint(i) { if (i !== this.last) { this.ctx.drawImage(await this.img(i), 0, 0, 2160, 1350); this.last = i; } this.img(i + 1); }
+  ptr(i) {
+    let x = 0, y = 0, w = 0;
+    for (let k = 0; k < 6; k++) { const p = this.meta.frames[clamp(i - k, 0, this.n - 1)].ptr; if (p) { const q = 1 / (k + 1); x += p[0] * q; y += p[1] * q; w += q; } }
+    return w ? [x / w, y / w] : null;
+  }
+  async render() {
+    if (!this.on) return;
+    const i = this.index();
+    await this.paint(i);
+    let fx = this.fx, fy = this.fy;
+    const pp = this.ptr(i);
+    if (this.follow > 0 && pp) { fx = lerp(fx, pp[0], this.follow); fy = lerp(fy, pp[1], this.follow); }
+    const hw = 720 / this.S, hh = 450 / this.S;
+    if (this.S >= 1) { fx = clamp(fx, hw, 1440 - hw); fy = clamp(fy, hh, 900 - hh); }
+    this.cam.style.transform = `translate(720px,450px) scale(${this.S}) translate(${-fx}px,${-fy}px)`;
+    const m = this.meta.frames[i], p = m.ptr;
+    this.cur.style.display = p && this.cursor > 0 ? 'block' : 'none';
+    if (p) this.cur.style.transform = `translate(${p[0]}px,${p[1]}px) scale(${1.15 / this.S})`;
+    this.ring.style.opacity = m.down ? .9 : 0;
+  }
+}
+class Zoomer extends Player {
+  async render() {
+    if (!this.on) return;
+    const f = clamp(this.f, 0, this.n - 1), i = Math.min(Math.ceil(f - 1e-6), this.n - 1), s = 2 ** ((i - f) * this.meta.step);
+    const v = Math.abs(f - (this.pf ?? f)); this.pf = f;
+    const im = await this.img(i), c = this.ctx;
+    c.save(); c.fillStyle = '#000'; c.fillRect(0, 0, 2160, 1350);
+    const draw = (k, a) => { c.globalAlpha = a; c.setTransform(k, 0, 0, k, 1080 * (1 - k), 675 * (1 - k)); c.drawImage(im, 0, 0, 2160, 1350); };
+    draw(s, 1);
+    const blur = clamp(v * .05, 0, .12);
+    if (blur > .004) for (let j = 1; j <= 6; j++) draw(s * (1 + blur * j / 6), .5 / (j + 1));
+    c.restore();
+    this.img(i - 1); this.img(i - 2);
+    this.cur.style.display = 'none';
+  }
+}
+
+// ---------- the timeline (bars of 2 s: the music runs at 120 bpm) ----------
+const T = { refs: 4, values: 8, cl: 10, draw: 12, shp: 16, vec: 18, col: 20, comic: 22, lett: 26, lib: 28, vw: 30.5, fv: 32, notes: 34, exp: 36,
+  endless: 38, hid: 46, lk: 48, themes: 50, slams: 52, end: 56, out: 60 };
+const tl = gsap.timeline({ paused: true });
+const CUES = []; const cue = (t, k, v = 1) => CUES.push({ t, k, v });
+window.CUES = CUES;
+const show = (sel, a, b) => { tl.set(sel, { visibility: 'visible' }, a); if (b != null) tl.set(sel, { visibility: 'hidden' }, b); };
+const run = (p, a, b) => { tl.set(p, { on: 1 }, a); if (b != null) tl.set(p, { on: 0 }, b); p.span = [a, b]; };
+const play = (p, a, b, ease = 'none', from = 0, to = p.n - 1) => tl.fromTo(p, { f: from }, { f: to, duration: b - a, ease, immediateRender: false }, a);
+const rise = (els, t, o = {}) => tl.from(els, { yPercent: 115, duration: .6, ease: 'expo.out', stagger: .022, ...o }, t);
+const SIDE = { x: 260, y: 30, scale: .86, rotationY: -9 };
+
+/** A label at the left (or a corner): num, h (rises by letter), big (a font of its own), sub. */
+function label(parent, { num, h, big, bigCls = 'corm', sub, corner = false }) {
+  return el('div', 'label' + (corner ? ' corner' : ''), `<div class="num">${num}</div>${h ? `<div class="h tight"><span class="mask">${h}</span></div>` : ''}${big ? `<div class="big ${bigCls}"><span class="mask">${big}</span></div>` : ''}${sub ? `<div class="sub">${sub}</div>` : ''}`, parent);
+}
+function labelIn(lab, t, out) {
+  tl.from($('.num', lab), { x: -40, autoAlpha: 0, duration: .5, ease: 'expo.out' }, t);
+  $$('.mask', lab).map(chars).forEach((m, k) => rise(m, t + .08 + k * .14));
+  if ($('.sub', lab)) tl.from($('.sub', lab), { y: 24, autoAlpha: 0, duration: .6, ease: 'expo.out' }, t + .35);
+  if (out != null) tl.to(lab, { x: -120, autoAlpha: 0, duration: .3, ease: 'power3.in' }, out);
+}
+/** Cards in a row: footage that flips from its first frame to its last (or plays), each with a caption and a flash. */
+function cards(scene, names, caps, t0, t1, title, { scale = .39, play: plays = [] } = {}) {
+  const n = names.length, w = 1440 * scale, gap = n === 2 ? 90 : 46, x0 = 960 - (n * w + (n - 1) * gap) / 2 + w / 2;
+  const top = el('div', 'top', `<div class="num">${title[0]}</div><div class="h tight"><span class="mask">${title[1]}</span></div>`, scene);
+  rise(chars($('.mask', top)), t0 + .05, { stagger: .016 });
+  tl.from($('.num', top), { autoAlpha: 0, y: -20, duration: .4 }, t0);
+  names.forEach((name, k) => {
+    const p = P[name], cx = x0 + k * (w + gap), cy = n === 2 ? 560 : 545;
+    run(p, t0 - .1, t1 + .2);
+    gsap.set(p.el, { left: 0, top: 0, x: cx - 720, y: cy - 450, scale, borderRadius: 18 / scale * .9 });
+    tl.from(p.el, { y: 1300, rotation: [-8, 5, 9][k], duration: .7, ease: 'expo.out' }, t0 - .05 + k * .09);
+    cue(t0 + k * .09, 'whoosh', .5);
+    const at = t0 + .55 + k * .3, isPlay = plays.includes(name);
+    if (isPlay) play(p, at - .35, t1 - .1);
+    else tl.fromTo(p, { f: 0 }, { f: p.n - 1, duration: .04, ease: 'none', immediateRender: false }, at);
+    if (!isPlay) {
+      const fl = el('div', 'flash', null, scene);
+      gsap.set(fl, { left: cx - w / 2, top: cy - 900 * scale / 2, width: w, height: 900 * scale });
+      tl.fromTo(fl, { opacity: .85 }, { opacity: 0, duration: .35, ease: 'power2.out', immediateRender: false }, at + .03);
+      tl.fromTo(p.el, { scale: scale * 1.05 }, { scale, duration: .4, ease: 'back.out(3)', immediateRender: false }, at);
+      cue(at, 'pop', .8);
+    }
+    const cap = el('div', 'cap', `${caps[k][0]}<small>${caps[k][1]}</small>`, scene);
+    gsap.set(cap, { left: cx - 320, top: cy + 900 * scale / 2 + 34 });
+    tl.from(cap, { y: 30, autoAlpha: 0, duration: .5, ease: 'expo.out' }, t0 + .25 + k * .1);
+  });
+  tl.to(scene, { autoAlpha: 0, scale: .92, duration: .25, ease: 'power2.in' }, t1 - .2);
+}
+
+let P = {};
+const NAMES = { refs: 'refs', values: 'refs', crop: 'cl', autolayout: 'cl', adjust: 'cl', draw: 'draw', shapes: 'shp', boolean: 'vec', pattern: 'vec', guides: 'vec',
+  mask: 'col', gradient: 'col', picker: 'col', comic: 'comic', title: 'lettering', library: 'lib', viewer: 'vw', pdf: 'fv', model: 'fv', notes: 'notes',
+  export: 'exp', hide: 'hid', lock: 'lk', themes: 'themes' };
+function players() {
+  for (const [n, scene] of Object.entries(NAMES)) {
+    const s = document.getElementById(scene); P[n] = new Player(n, s);
+    const before = s.querySelector('.shade, .tiles, .sw, .title, .kick');
+    if (before) s.insertBefore(P[n].el, before);
+  }
+  P.endless = new Zoomer('endless', $('#endless')); $('#endless').insertBefore(P.endless.el, $('#endless .ring'));
+}
+
+function build() {
+  tl.fromTo('#grid', { x: 0, y: 0 }, { x: -160, y: -80, duration: T.out, ease: 'none' }, 0);
+
+  // ---- 0 · intro: a pen line, the title, prints drifting past ----
+  show('#intro', 0, T.refs + .5);
+  const intro = $('#intro');
+  [[180, 140, -8], [1560, 120, 6], [120, 700, 5], [1600, 690, -6], [820, 40, 3], [880, 880, -4]].forEach(([x, y, r], k) => {
+    const im = el('img', 'float'); im.src = ART[[3, 0, 7, 9, 6, 5][k]];
+    intro.insertBefore(im, intro.firstChild);
+    gsap.set(im, { left: x, top: y, rotation: r });
+    tl.fromTo(im, { z: -1600, autoAlpha: 0 }, { z: 400, autoAlpha: .55, duration: 4, ease: 'none' }, -.2 + k * .12);
+  });
+  const loop = $('#loop'), L = loop.getTotalLength(), nib = $('#nib');
+  gsap.set(loop, { strokeDasharray: L, strokeDashoffset: L });
+  const pen = { u: 0 };
+  tl.to(pen, { u: 1, duration: 1.9, ease: 'power2.inOut', onUpdate: () => { loop.style.strokeDashoffset = L * (1 - pen.u); const q = loop.getPointAtLength(L * pen.u); nib.setAttribute('cx', q.x); nib.setAttribute('cy', q.y); } }, .15);
+  cue(.15, 'scribble', 1.9);
+  rise(chars($('#intro .t1 .mask')), .5, { stagger: .03, duration: .8 });
+  cue(.5, 'pop', .5);
+  tl.to('#intro .draw', { clipPath: 'inset(-30% -5% -30% -5%)', duration: .7, ease: 'power2.inOut' }, 1.3);
+  cue(1.3, 'scribble', .7);
+  rise(chars($('#intro .refs')), 1.75, { stagger: .025 });
+  cue(1.75, 'pop', .5);
+  cue(1.0, 'riser', 3.0);
+  tl.to('#intro', { scale: 2.4, autoAlpha: 0, filter: 'blur(14px)', duration: .6, ease: 'power3.in' }, T.refs - .4);
+  tl.to('#grid', { scale: 3.5, autoAlpha: .35, duration: .6, ease: 'power3.in' }, T.refs - .4).to('#grid', { scale: 1.1, autoAlpha: 1, duration: .9, ease: 'expo.out' }, T.refs + .3);
+  cue(T.refs - .4, 'whoosh', 1);
+
+  // ---- 1 · references: prints tossed onto the board, then the board flips to a value study ----
+  show('#refs', T.refs - .2, T.cl + .2);
+  run(P.refs, T.refs - .2, T.values + .3);
+  gsap.set([P.refs.el, P.values.el], SIDE);
+  tl.from(P.refs.el, { z: -2600, rotationY: -40, rotationX: 18, autoAlpha: 0, duration: 1.1, ease: 'expo.out' }, T.refs - .2);
+  const lr = label($('#refs'), { num: '01 — BOARDS', h: 'Collect', big: 'references.', sub: 'Pictures, video and files on a canvas, with notes beside them.' });
+  labelIn(lr, T.refs + .25, T.values - .1);
+  const r = P.refs, rm = r.meta, land = T.refs + .4;
+  const firstText = rm.frames.findIndex((f) => f.key);
+  play(r, land, land + 1.2, 'none', 0, firstText - 1);
+  play(r, land + 1.25, T.values - .35, 'none', firstText - 1);
+  r.map = (i) => i < firstText ? land + i / (firstText - 1) * 1.2 : land + 1.25 + (i - firstText + 1) / (r.n - firstText) * (T.values - .35 - land - 1.25);
+  rm.boxes.forEach((b, k) => {
+    const im = el('img'); im.src = `../art/${rm.files[k]}`;
+    Object.assign(im.style, { position: 'absolute', left: b.minX + 'px', top: b.minY + 'px', width: (b.maxX - b.minX) + 'px', height: (b.maxY - b.minY) + 'px', boxShadow: '0 30px 60px rgba(0,0,0,.6)' });
+    r.cam.insertBefore(im, r.cur);
+    const at = r.map(2 + 4 * k + 3);
+    tl.fromTo(im, { y: -760 - k * 60, x: (k - 1) * 160, rotation: [-24, 14, -10][k], scale: 1.35, autoAlpha: 1 }, { y: 0, x: 0, rotation: 0, scale: 1, duration: .6, ease: 'back.out(1.3)' }, at - .6)
+      .to(im, { autoAlpha: 0, duration: .12 }, at + .05);
+    cue(at - .55, 'whoosh', .45);
+  });
+  tl.fromTo(r, { S: 1, fx: 720, fy: 450 }, { S: 1.32, fy: 360, fx: 700, duration: 2.2, ease: 'power2.inOut', immediateRender: false }, T.refs + 1.6);
+  tl.to(P.refs.el, { rotationY: 81, duration: .3, ease: 'power2.in' }, T.values - .3).set(P.refs.el, { visibility: 'hidden' }, T.values);
+  cue(T.values - .3, 'flip', 1);
+  run(P.values, T.values - .05, T.cl + .2);
+  gsap.set(P.values.el, { visibility: 'hidden' }); tl.set(P.values.el, { visibility: 'visible' }, T.values).set(P.values.el, { visibility: 'hidden' }, T.cl + .2);
+  tl.fromTo(P.values.el, { rotationY: -99 }, { rotationY: -9, duration: .7, ease: 'back.out(1.6)', immediateRender: false }, T.values);
+  const lv = label($('#refs'), { num: '01 — BOARDS', h: 'Flip it. Grey it.', big: 'Study it.', sub: 'Crop, flip and adjust a copy. The file itself is never touched.' });
+  labelIn(lv, T.values + .1, T.cl - .25);
+  const v = P.values, vb = v.meta.boxes[1];
+  play(v, T.values + .15, T.cl - .15);
+  tl.fromTo(v, { S: 1, fx: 720, fy: 450 }, { S: 1.38, fx: (vb.minX + vb.maxX) / 2 + 60, fy: (vb.minY + vb.maxY) / 2, duration: 1.5, ease: 'power3.inOut', immediateRender: false }, T.values + .2);
+  tl.to(P.values.el, { x: -1600, rotationY: 20, duration: .3, ease: 'power3.in' }, T.cl - .3);
+  cue(T.cl - .3, 'whoosh', .8);
+
+  // ---- crop and auto layout, side by side ----
+  show('#cl', T.cl - .1, T.draw + .1);
+  cards($('#cl'), ['crop', 'autolayout', 'adjust'], [['Crop', 'without touching the file'], ['Auto layout', 'grid, masonry, justified rows'], ['Adjustment shapes', 'pixelate or blur what is under'], ], T.cl, T.draw, ['01 — BOARDS', 'Crop, lay out, adjust.'], { play: ['crop', 'autolayout', 'adjust'] });
+
+  // ---- brush wipe into drawing ----
+  const brush = $('#brush'), BL = brush.getTotalLength();
+  gsap.set(brush, { strokeDasharray: `${BL} ${BL}`, strokeDashoffset: BL });
+  tl.set('#wipe', { visibility: 'visible' }, T.draw - .42).set('#wipe', { visibility: 'hidden' }, T.draw + .5);
+  tl.to(brush, { strokeDashoffset: 0, duration: .42, ease: 'power3.in' }, T.draw - .42).to(brush, { strokeDashoffset: -BL, duration: .48, ease: 'power3.out' }, T.draw + .02);
+  cue(T.draw - .42, 'brush', 1);
+
+  // ---- 2 · draw: the camera follows the pen ----
+  show('#draw', T.draw, T.shp + .1);
+  run(P.draw, T.draw, T.shp + .1);
+  gsap.set(P.draw.el, { scale: 1.34, borderRadius: 0 });
+  const d = P.draw;
+  play(d, T.draw + .05, T.draw + 3.1);
+  tl.fromTo(d, { S: 1.9, follow: 1 }, { S: 1.9, duration: 2.4, ease: 'none', immediateRender: false }, T.draw);
+  tl.to(d, { S: 1, follow: 0, duration: .9, ease: 'power3.inOut' }, T.draw + 2.6);
+  tl.to('#draw .word', { clipPath: 'inset(-30% -5% -30% -5%)', duration: .7, ease: 'power2.inOut' }, T.draw + .4);
+  cue(T.draw + .4, 'scribble', .7);
+  tl.from('#draw .sub', { y: 30, autoAlpha: 0, duration: .5, ease: 'expo.out' }, T.draw + .75);
+  tl.to('#draw', { scale: .8, autoAlpha: 0, duration: .3, ease: 'power3.in' }, T.shp - .25);
+  cue(T.shp - .25, 'whoosh', .7);
+
+  // ---- shapes ----
+  show('#shp', T.shp - .1, T.vec + .1);
+  run(P.shapes, T.shp - .1, T.vec + .1);
+  gsap.set(P.shapes.el, SIDE);
+  tl.from(P.shapes.el, { y: 1200, rotationX: -40, duration: .7, ease: 'expo.out' }, T.shp - .1);
+  labelIn(label($('#shp'), { num: '02 — DRAWING', h: 'Block it in', big: 'with shapes.', sub: 'Rectangles, ovals, polygons and stars, each with its own fill.' }), T.shp + .1, T.vec - .2);
+  play(P.shapes, T.shp + .1, T.vec - .1);
+  tl.fromTo(P.shapes, { S: 1.25, fx: 720, fy: 410 }, { S: 1.1, duration: 1.9, ease: 'none', immediateRender: false }, T.shp);
+  tl.to(P.shapes.el, { scale: .3, autoAlpha: 0, duration: .25, ease: 'power3.in' }, T.vec - .25);
+
+  // ---- vectors, then colour ----
+  show('#vec', T.vec - .15, T.col + .1);
+  cards($('#vec'), ['boolean', 'pattern', 'guides'], [['Boolean shapes', 'join, cut, flatten'], ['38 patterns', 'made on any shape'], ['55 guides', 'golden spiral, thirds, perspective']], T.vec, T.col, ['02 — VECTORS', 'Then edit every node.'], { play: ['pattern'] });
+  const fo = (p, x, y, s) => Object.assign(p, { fx: x, fy: y, S: s });
+  fo(P.boolean, 720, 450, 1.35); fo(P.pattern, 720, 445, 1.45); fo(P.guides, P.guides.meta.box ? (P.guides.meta.box.minX + P.guides.meta.box.maxX) / 2 : 605, 450, 1.3);
+  show('#col', T.col - .15, T.comic + .1);
+  cards($('#col'), ['mask', 'gradient', 'picker'], [['Masks', 'any shape clips a picture'], ['Gradients', 'linear, radial, conic'], ['A colour picker', 'for everything, OKLCH inside']], T.col, T.comic, ['02 — COLOUR', 'Masks, gradients, any colour.'], { play: ['mask', 'picker'] });
+  fo(P.mask, 720, 450, 1.3); fo(P.gradient, 760, 430, 1.2); fo(P.picker, 820, 450, 1.25);
+
+  // ---- 3 · comics: panels wipe in, a balloon is lettered, it shouts ----
+  const panes = [[-40, -40, 1060, 600, -3], [980, -60, 1000, 640, 2], [-60, 520, 760, 620, 2], [660, 560, 1320, 600, -2]];
+  panes.forEach(([x, y, w, h, rot], k) => {
+    const pe = el('div', 'panel', null, $('#panels'));
+    Object.assign(pe.style, { left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px', background: ['#FFA460', '#f3e3a6', '#fff', '#007B69'][k] });
+    const from = [{ x: -1400 }, { y: -900 }, { y: 900 }, { x: 1600 }][k];
+    tl.set(pe, { visibility: 'visible' }, T.comic - .42 + k * .05)
+      .fromTo(pe, { ...from, rotation: rot }, { x: 0, y: 0, duration: .32, ease: 'power3.out', immediateRender: false }, T.comic - .42 + k * .05)
+      .to(pe, { ...Object.fromEntries(Object.entries(from).map(([a, b]) => [a, -b])), duration: .34, ease: 'power3.in' }, T.comic + .08 + k * .04)
+      .set(pe, { visibility: 'hidden' }, T.comic + .6);
+    cue(T.comic - .42 + k * .05, 'slap', .7);
+  });
+  show('#comic', T.comic, T.lett + .2);
+  run(P.comic, T.comic, T.lett + .2);
+  const c = P.comic, pan = c.meta.panel;
+  gsap.set(c.el, { x: 230, y: 40, scale: .82, rotation: -1.5 });
+  tl.from('#comic .title .k', { scale: 0, rotation: -20, duration: .5, ease: 'back.out(2.5)' }, T.comic + .25);
+  tl.from('#comic .title .t', { x: -60, autoAlpha: 0, duration: .5, ease: 'expo.out' }, T.comic + .35);
+  const cs = T.comic + .2, ce = T.lett - .6;
+  play(c, cs, ce);
+  c.map = (i) => cs + i / (c.n - 1) * (ce - cs);
+  tl.fromTo(c, { S: 1, fx: 720, fy: 450 }, { S: 1.7, fx: (pan.minX + pan.maxX) / 2, fy: (pan.minY + pan.maxY) / 2, duration: .9, ease: 'power3.inOut', immediateRender: false }, T.comic + .35);
+  tl.to(c, { S: 1, fx: 720, fy: 450, duration: .7, ease: 'power3.inOut' }, ce - .2);
+  const rays = $('#rays');
+  for (let k = 0; k < 44; k++) { const a = k / 44 * Math.PI * 2 + (k % 3) * .03, r0 = 330 + (k % 4) * 40, r1 = 1300; const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+    l.setAttribute('x1', 960 + Math.cos(a) * r0); l.setAttribute('y1', 540 + Math.sin(a) * r0 * .7); l.setAttribute('x2', 960 + Math.cos(a) * r1); l.setAttribute('y2', 540 + Math.sin(a) * r1 * .7); rays.appendChild(l); }
+  const lastKey = c.meta.frames.map((f, i) => f.key ? i : -1).filter((i) => i >= 0).pop();
+  const hold = c.map(lastKey) + .12;
+  gsap.set('#shout', { autoAlpha: 0 });
+  tl.set('#shout', { autoAlpha: 1 }, hold).from('#shout .word', { scale: 0, rotation: -14, duration: .45, ease: 'back.out(2.6)' }, hold)
+    .from('#rays', { scale: .5, autoAlpha: 0, transformOrigin: '960px 540px', duration: .3, ease: 'expo.out' }, hold)
+    .fromTo(c.el, { x: 230 }, { x: 238, duration: .05, repeat: 5, yoyo: true, ease: 'none', immediateRender: false }, hold)
+    .to('#shout', { autoAlpha: 0, scale: 1.25, duration: .25, ease: 'power2.in' }, hold + .85);
+  cue(hold, 'boom', 1);
+  tl.to(c.el, { y: -1300, duration: .35, ease: 'power3.in' }, T.lett - .3);
+  cue(T.lett - .3, 'whoosh', .8);
+
+  // ---- lettering: a title typed in Bangers ----
+  show('#lettering', T.lett - .1, T.lib + .1);
+  run(P.title, T.lett - .1, T.lib + .1);
+  gsap.set(P.title.el, { scale: 1.2, borderRadius: 0 });
+  tl.from(P.title.el, { y: 1300, duration: .4, ease: 'expo.out' }, T.lett - .1);
+  tl.from('#lettering .kick', { scale: 0, rotation: -20, duration: .45, ease: 'back.out(2.5)' }, T.lett + .2);
+  play(P.title, T.lett + .1, T.lib - .3);
+  const tb = P.title.meta.frames.find((f) => f.ptr)?.ptr ?? [500, 300];
+  tl.fromTo(P.title, { S: 1.45, fx: tb[0] + 300, fy: tb[1] + 170 }, { S: 1, fx: 720, fy: 450, duration: 1.9, ease: 'power2.inOut', immediateRender: false }, T.lett);
+
+  // ---- 4 · library: the art floods in as cards, then settles into the app ----
+  show('#lib', T.lib - .35, T.vw + .2);
+  run(P.library, T.lib, T.vw + .2);
+  const tiles = $('#lib .tiles');
+  ART.forEach((src, k) => {
+    const t = el('div', 'tile', `<img src="${src}">`, tiles);
+    const col = k % 6, row = Math.floor(k / 6);
+    gsap.set(t, { left: 30 + col * 315, top: 10 + row * 355 });
+    tl.from(t, { rotationY: 90, scale: .6, autoAlpha: 0, duration: .32, ease: 'power3.out' }, T.lib - .35 + (col + row) * .03)
+      .to(t, { x: 960 - (30 + col * 315 + 150), y: 560 - (10 + row * 355 + 170), scale: .12, autoAlpha: 0, duration: .4, ease: 'power3.in' }, T.lib + .05 + (k % 5) * .01);
+    if (k % 3 === 0) cue(T.lib - .35 + (col + row) * .03, 'tick', .6);
+  });
+  gsap.set(P.library.el, SIDE);
+  tl.from(P.library.el, { scale: .2, autoAlpha: 0, duration: .55, ease: 'expo.out' }, T.lib + .3);
+  cue(T.lib + .05, 'whoosh', .7);
+  labelIn(label($('#lib'), { num: '04 — LIBRARY', h: 'Every file,', big: 'once.', sub: 'Folders, tags, and a search that knows sizes, ratios and colours.' }), T.lib + .45, T.vw - .2);
+  const lb = P.library;
+  play(lb, T.lib + .4, T.vw - .2);
+  tl.fromTo(lb, { S: 1, follow: 0 }, { S: 1.55, follow: .9, duration: .55, ease: 'power3.inOut', immediateRender: false }, T.lib + .55).to(lb, { S: 1.1, follow: .4, duration: .5, ease: 'power3.inOut' }, T.lib + 1.6);
+  tl.to(lb.el, { x: -1500, filter: 'blur(10px)', duration: .3, ease: 'power3.in' }, T.vw - .3);
+  cue(T.vw - .3, 'whoosh', .8);
+
+  // ---- the viewer, then PDFs and 3D models ----
+  show('#vw', T.vw - .05, T.fv + .1);
+  run(P.viewer, T.vw - .05, T.fv + .1);
+  gsap.set(P.viewer.el, SIDE);
+  tl.from(P.viewer.el, { x: 2200, filter: 'blur(10px)', duration: .45, ease: 'expo.out' }, T.vw - .05);
+  labelIn(label($('#vw'), { num: '04 — LIBRARY', h: 'A viewer that', big: 'sees values.', sub: 'Zoom, flip and greyscale, without touching the file.' }), T.vw + .05, T.fv - .2);
+  play(P.viewer, T.vw + .05, T.fv - .15);
+  tl.to(P.viewer.el, { scale: .3, autoAlpha: 0, duration: .25, ease: 'power3.in' }, T.fv - .25);
+  show('#fv', T.fv - .15, T.notes + .1);
+  cards($('#fv'), ['pdf', 'model'], [['PDFs', 'read a handout, page by page'], ['3D models', 'turn it, then draw its line art']], T.fv, T.notes, ['04 — FILE VIEWS', 'Not only pictures.'], { scale: .55, play: ['pdf', 'model'] });
+
+  // ---- 5 · notes ----
+  show('#notes', T.notes - .05, T.exp + .1);
+  run(P.notes, T.notes - .05, T.exp + .1);
+  gsap.set(P.notes.el, SIDE);
+  tl.from(P.notes.el, { x: 2200, filter: 'blur(10px)', duration: .45, ease: 'expo.out' }, T.notes - .05);
+  cue(T.notes - .05, 'whoosh', .6);
+  const nl = label($('#notes'), { num: '05 — NOTES', h: 'Notes that', sub: 'Markdown, backlinks and properties, as cards beside your references.' });
+  const big = el('div', 'big sg', '<span class="br b1">[[</span>link<span class="br b2">]]</span>');
+  nl.insertBefore(big, $('.sub', nl));
+  labelIn(nl, T.notes + .1, T.exp - .2);
+  tl.from(big, { yPercent: 60, autoAlpha: 0, duration: .5, ease: 'expo.out' }, T.notes + .3)
+    .from($('.b1', big), { x: 120, duration: .45, ease: 'back.out(2)' }, T.notes + .4).from($('.b2', big), { x: -120, duration: .45, ease: 'back.out(2)' }, T.notes + .4);
+  cue(T.notes + .55, 'click', .8);
+  play(P.notes, T.notes + .1, T.exp - .2);
+  tl.to(P.notes.el, { rotationY: 81, duration: .25, ease: 'power2.in' }, T.exp - .25);
+  cue(T.exp - .25, 'flip', .8);
+
+  // ---- 6 · export ----
+  show('#exp', T.exp - .05, T.endless + .2);
+  run(P.export, T.exp - .05, T.endless + .2);
+  gsap.set(P.export.el, SIDE);
+  tl.fromTo(P.export.el, { rotationY: -99 }, { rotationY: -9, duration: .6, ease: 'back.out(1.6)', immediateRender: false }, T.exp - .05);
+  labelIn(label($('#exp'), { num: '06 — EXPORT', h: 'PNG, SVG, PDF.', big: 'Any size.', sub: 'Pages to PDF, pictures at any resolution, or copy straight to other apps.' }), T.exp + .1, T.endless - .2);
+  play(P.export, T.exp + .05, T.endless - .3);
+  tl.fromTo(P.export, { S: 1 }, { S: 1.15, duration: 1.8, ease: 'power1.inOut', immediateRender: false }, T.exp + .1);
+  tl.to(P.export.el, { scale: .05, rotationY: 0, x: 0, y: 0, autoAlpha: 0, duration: .4, ease: 'power3.in' }, T.endless - .35);
+  cue(T.endless - .35, 'suck', 1);
+
+  // ---- 7 · the endless canvas: the project, then a dive 24 levels through pictures inside pictures ----
+  show('#endless', T.endless - .1, T.hid + .3);
+  run(P.endless, T.endless - .1, T.hid + .3);
+  const e = P.endless, em = e.meta, ov = Math.round(-em.overviewAt / em.step), last = e.n - 1;
+  gsap.set(e.el, { scale: 1.34, borderRadius: 0 });
+  tl.fromTo(e.el, { autoAlpha: 0 }, { autoAlpha: 1, duration: .3, immediateRender: false }, T.endless - .1);
+  tl.fromTo(e, { f: last }, { f: ov, duration: 1.1, ease: 'power3.out', immediateRender: false }, T.endless - .1);
+  rise(chars($('#endless .top .mask')), T.endless + .1, { stagger: .02 });
+  $$('#endless .tag').forEach((g, k) => { tl.from(g, { scale: 0, autoAlpha: 0, duration: .35, ease: 'back.out(2.2)' }, T.endless + .35 + k * .08).to(g, { autoAlpha: 0, duration: .2 }, T.endless + 1.45); cue(T.endless + .35 + k * .08, 'tick', .7); });
+  tl.to('#endless .top', { autoAlpha: 0, y: -40, duration: .3, ease: 'power2.in' }, T.endless + 1.4);
+  const dive = T.endless + 1.6, DIVE = 5.1;
+  tl.to(e, { f: 0, duration: DIVE, ease: 'sine.inOut' }, dive);
+  cue(dive, 'dive', DIVE);
+  const zb = $('#endless .zoom b'), lv2 = $('#endless .lvl'), zz = { l: 0 };
+  tl.from(['#endless .zoom', '#endless .lvl'], { autoAlpha: 0, x: -40, duration: .4, ease: 'expo.out' }, dive - .1);
+  tl.to(zz, { l: em.deep, duration: DIVE, ease: 'sine.inOut', onUpdate: () => { zb.textContent = '×' + Math.round(2 ** zz.l).toLocaleString('en-US'); lv2.textContent = `${Math.floor(zz.l)} levels down`; } }, dive);
+  $$('#endless .ring').forEach((rg, k) => tl.fromTo(rg, { scale: .004, opacity: .9 }, { scale: 1, opacity: 0, duration: 1.2, ease: 'power2.in', repeat: 3, immediateRender: false }, dive + k * .4));
+  $$('#endless .no .mask').forEach((m, k) => rise(chars(m), dive + DIVE - 1.4 + k * .4, { stagger: .025 }));
+  tl.to('#endless .hud', { autoAlpha: 0, duration: .25 }, T.hid - .3);
+  tl.to(e.el, { rotation: 8, scale: 2.4, autoAlpha: 0, filter: 'blur(12px)', duration: .35, ease: 'power3.in' }, T.hid - .3);
+  cue(T.hid - .3, 'whoosh', 1);
+
+  // ---- 8 · privacy: hidden from the library, a locked workspace ----
+  show('#hid', T.hid - .05, T.lk + .1);
+  run(P.hide, T.hid - .05, T.lk + .1);
+  gsap.set(P.hide.el, SIDE);
+  tl.from(P.hide.el, { scale: .5, autoAlpha: 0, rotationY: 30, duration: .5, ease: 'expo.out' }, T.hid - .05);
+  labelIn(label($('#hid'), { num: '07 — PRIVACY', h: 'Hide what is', big: 'private.', sub: 'Hidden items leave the Library until you ask for them.' }), T.hid + .1, T.lk - .2);
+  play(P.hide, T.hid + .05, T.lk - .2);
+  tl.fromTo(P.hide, { S: 1 }, { S: 1.18, fx: 640, fy: 420, duration: 1.8, ease: 'power1.inOut', immediateRender: false }, T.hid + .1);
+  tl.to(P.hide.el, { autoAlpha: 0, scale: .7, duration: .25 }, T.lk - .25);
+  show('#lk', T.lk - .1, T.themes + .1);
+  run(P.lock, T.lk - .1, T.themes + .1);
+  gsap.set(P.lock.el, { scale: 1.34, borderRadius: 0 });
+  tl.fromTo(P.lock.el, { autoAlpha: 0, scale: 1.6 }, { autoAlpha: 1, scale: 1.34, duration: .4, ease: 'expo.out', immediateRender: false }, T.lk - .1);
+  play(P.lock, T.lk, T.themes - .2);
+  tl.fromTo(P.lock, { S: 1.5, fx: 720, fy: 470 }, { S: 1.5, duration: 1.2, ease: 'none', immediateRender: false }, T.lk).to(P.lock, { S: 1, duration: .5, ease: 'power3.inOut' }, T.lk + 1.25);
+  el('div', 'layer shade', null, $('#lk'));
+  labelIn(label($('#lk'), { num: '07 — PRIVACY', h: 'Locked with your password.', sub: 'In the desktop app, hidden files are encrypted on disk.', corner: true }), T.lk + .15, T.themes - .2);
+
+  // ---- 9 · make it yours ----
+  show('#themes', T.themes - .1, T.slams + .3);
+  run(P.themes, T.themes - .1, T.slams + .3);
+  gsap.set(P.themes.el, { scale: 1.34, borderRadius: 0 });
+  play(P.themes, T.themes - .1, T.slams - .2);
+  el('div', 'layer shade', null, $('#themes'));
+  labelIn(label($('#themes'), { num: '08 — YOUR WORKSPACE', h: 'Your colours,', big: 'dark or light.', bigCls: 'cav', corner: true }), T.themes + .05);
+  const sw = $('#themes .sw');
+  // (the swatches are the Theme colour presets: Stone, Viridian, Ultramarine, Violet, Madder, Ochre)
+  for (const [k, [h, c]] of [[70, .03], [178, .14], [265, .14], [310, .14], [15, .14], [80, .14]].entries()) { const i = el('i', null, null, sw); i.style.background = `oklch(.68 ${c} ${h})`; tl.from(i, { scale: 0, duration: .35, ease: 'back.out(3)' }, T.themes + .2 + k * .06); }
+  tl.fromTo(P.themes, { S: 1.15, fx: 720, fy: 440 }, { S: 1, duration: 2, ease: 'power1.inOut', immediateRender: false }, T.themes - .1);
+
+  // the "recorded in canvast" chip while the app is on screen
+  for (const [a, b] of [[T.refs + .8, T.cl - .3], [T.cl + .3, T.vec - .3], [T.vec + .3, T.comic - .4], [T.comic + .7, T.lib - .4], [T.lib + .6, T.fv - .2], [T.fv + .3, T.endless + .1], [T.endless + .4, T.slams - .3]])
+    tl.set('#chip', { visibility: 'visible' }, a).fromTo('#chip', { autoAlpha: 0, y: 12 }, { autoAlpha: 1, y: 0, duration: .3, immediateRender: false }, a).to('#chip', { autoAlpha: 0, duration: .15 }, b - .15);
+
+  // ---- 10 · promises ----
+  const slams = $$('.slam'), SL = (T.end - T.slams) / slams.length;
+  slams.forEach((s, k) => {
+    const t = T.slams + k * SL;
+    tl.to(s, { clipPath: 'polygon(0% 0%, 130% 0%, 100% 100%, -30% 100%)', duration: .3, ease: 'power3.inOut' }, t);
+    rise(chars($('.t', s)), t + .08, { stagger: .02, duration: .45 });
+    tl.from($('.k', s), { autoAlpha: 0, y: -16, duration: .3 }, t + .12);
+    tl.set(s, { visibility: 'hidden' }, T.end + .6);
+    cue(t, 'slam', 1);
+  });
+
+  // ---- 11 · the end ----
+  tl.to('#iris', { scale: 12, duration: .55, ease: 'power3.in' }, T.end - .1);
+  cue(T.end - .1, 'suck', .8);
+  show('#end', T.end + .3);
+  const mark = $('#end svg');
+  tl.from(mark.querySelector('.ring'), { scale: .2, rotate: -180, opacity: 0, svgOrigin: '34.17 34.17', duration: .9, ease: 'expo.out' }, T.end + .3)
+    .from(mark.querySelector('.pt'), { scale: 0, svgOrigin: '34.17 34.17', duration: .5, ease: 'back.out(4)' }, T.end + .55);
+  cue(T.end + .3, 'shimmer', 1);
+  rise(chars($('#end .wm .mask')), T.end + .5, { stagger: .045, duration: .8 });
+  tl.from('#end .tagline', { y: 30, autoAlpha: 0, duration: .7, ease: 'expo.out' }, T.end + 1.0);
+  tl.from('#end .foot span', { y: 20, autoAlpha: 0, duration: .5, ease: 'expo.out', stagger: .1 }, T.end + 1.4);
+  tl.from('#end .url', { y: -20, autoAlpha: 0, duration: .5, ease: 'expo.out' }, T.end + 1.6);
+  tl.fromTo('#flash', { opacity: .7 }, { opacity: 0, duration: .4, immediateRender: false }, T.end + .3);
+  tl.to('#end .lockup', { scale: 1.04, duration: 3.4, ease: 'none' }, T.end + .6);
+  tl.to('#stage', { opacity: 0, duration: .45, ease: 'power1.in' }, T.out - .45);
+  tl.set({}, {}, T.out);
+}
+
+window.seek = async (t) => {
+  tl.time(t, false);
+  await Promise.all(Object.values(P).map((p) => p.render()));
+};
+/** Sound cues from the footage: keys typed, clicks, things landing, at the time each frame is first shown. */
+window.footCues = () => {
+  const out = [];
+  for (const p of Object.values(P)) {
+    if (!p.span || p instanceof Zoomer) continue;
+    let prev = -1;
+    for (let t = p.span[0]; t < p.span[1]; t += 1 / 120) {
+      tl.time(t, true);
+      if (!p.on) continue;
+      const i = p.index();
+      for (let k = prev + 1; k <= i && prev >= 0; k++) {
+        const m = p.meta.frames[k], was = p.meta.frames[k - 1] ?? {};
+        if (m.key) for (let j = 0; j < m.key; j++) out.push({ t: t + j * .045, k: 'key', v: .6 });
+        if (m.down && !was.down) out.push({ t, k: 'click', v: .8 });
+        if (m.land) out.push({ t, k: 'land', v: 1 });
+        if (m.pop) out.push({ t, k: 'pop', v: .7 });
+      }
+      prev = i;
+    }
+  }
+  tl.time(0, true);
+  return out;
+};
+(async () => {
+  await document.fonts.ready;
+  await Promise.all([...document.fonts].map((f) => f.load().catch(() => {})));
+  players();
+  await Promise.all(Object.values(P).map((p) => p.init()));
+  build();
+  await window.seek(0);
+  window.ready = true;
+})();
+</script>
+</body>
+</html>

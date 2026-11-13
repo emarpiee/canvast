@@ -13,8 +13,6 @@ dist-tools/
 dist-preview/
 test-builds/
 
-# Rendered video, too big to commit for now
+# Rendered video and its recorded footage (made again by the Showcase GIF workflow)
 docs/media/
 
-# The showcase motion piece: kept on the owner's machine, not in the repository
-scripts/showcase/motion/

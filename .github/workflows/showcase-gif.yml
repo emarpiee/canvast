@@ -1,0 +1,51 @@
+name: Showcase GIF
+
+# The one-minute animation at the top of the README, made on GitHub's runners (recording and rendering lag a workstation in use).
+# Run by hand from a branch; the GIF and the video come as an artifact to look at and commit (docs/screenshots/canvast-60s.gif).
+on:
+  workflow_dispatch:
+
+jobs:
+  gif:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: sudo apt-get update && sudo apt-get install -y xvfb ffmpeg gifsicle
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Record the clips
+        # (each clip of footage.spec.ts drives the app as the README shots do, frame by frame)
+        env:
+          CANVAST_BUILD_DIR: dist
+        run: xvfb-run -a npx playwright test -c scripts/showcase/motion/footage.config.ts
+      - name: Render the video
+        run: xvfb-run -a node scripts/showcase/motion/render.mjs docs/media/canvast-60s.mp4
+      - name: The GIF
+        # (720 px wide, 12 frames a second, its own 128-colour palette from what changes between frames, then gifsicle: as the README says)
+        run: |
+          mkdir -p out
+          ffmpeg -y -loglevel error -i docs/media/canvast-60s.mp4 -vf "fps=12,scale=720:-1:flags=lanczos,palettegen=max_colors=128:stats_mode=diff" out/palette.png
+          ffmpeg -y -loglevel error -i docs/media/canvast-60s.mp4 -i out/palette.png -lavfi "fps=12,scale=720:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:diff_mode=rectangle" out/raw.gif
+          gifsicle -O3 --lossy=120 out/raw.gif -o out/canvast-60s.gif
+          cp docs/media/canvast-60s.mp4 out/
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: showcase-gif
+          path: |
+            out/canvast-60s.gif
+            out/canvast-60s.mp4
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: failed-clips
+          path: test-results/motion/
+          if-no-files-found: ignore
