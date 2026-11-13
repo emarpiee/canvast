@@ -42,11 +42,16 @@ async function balloon(s: Scene, b: Balloon): Promise<string> {
   if (words) {
     await s.select([words.id]);
     await s.font(b.font ?? "comic neue");
-    const sz = p.getByRole("spinbutton", { name: "Text size (px at this zoom)" });
+    const sz = await s.control("[data-text-size]");
     await sz.fill(String(b.size ?? 20));
     await sz.press("Enter");
-    await p.getByRole("button", { name: "Text colour" }).click();
+    await (await s.control("[data-text-colour]")).click();
     await s.hex("#111111");
+    // (never words past the shape: when they do not fit at that size, the balloon's own Fit text to shape makes them as big as fits)
+    await s.select([id]);
+    const fit = await s.control('[data-bl="fit"]');
+    if (/does not fit/.test((await fit.getAttribute("title")) ?? "")) await fit.click();
+    await p.keyboard.press("Escape");
   }
   await s.select([]);
   await s.settle();
@@ -81,9 +86,9 @@ test("comic", async ({ scene: s }) => {
   b = await on(1);
   await balloon(s, { box: [...inside(b, 0.5, 0.05), ...inside(b, 0.96, 0.33)] as [number, number, number, number], words: "THE FORD IS HIGH THIS YEAR.", kind: "speech", tip: inside(b, 0.55, 0.62), size: 15 });
   b = await on(2);
-  await balloon(s, { box: [...inside(b, 0.03, 0.04), ...inside(b, 0.45, 0.18)] as [number, number, number, number], words: "THREE DAYS OVER THE PASS.", kind: "caption", fill: "#f3e3a6", size: 15 });
+  await balloon(s, { box: [...inside(b, 0.03, 0.04), ...inside(b, 0.5, 0.22)] as [number, number, number, number], words: "THREE DAYS OVER THE PASS.", kind: "caption", fill: "#f3e3a6", size: 15 });
   b = await on(3);
-  await balloon(s, { box: [...inside(b, 0.55, 0.04), ...inside(b, 0.95, 0.36)] as [number, number, number, number], words: "HOLD ON!", kind: "shout", tip: inside(b, 0.42, 0.7), font: "bangers", size: 30 });
+  await balloon(s, { box: [...inside(b, 0.5, 0.03), ...inside(b, 0.97, 0.45)] as [number, number, number, number], words: "HOLD ON!", kind: "shout", tip: inside(b, 0.42, 0.7), font: "bangers", size: 30 });
   await s.fit([pg], 0.66);
   await s.shot("comic", await s.around({ objects: [pg], pad: 20 }));
 });
